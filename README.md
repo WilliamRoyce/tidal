@@ -1,6 +1,6 @@
 # Project Template
 
-View the `my_project` package documentation [here](https://matt-ord.github.io/my_project/).
+View the `torsion_gertsenshtein` package documentation [here](https://williamroyce.github.io/torsion_gertsenshtein/).
 
 ## Setup
 

@@ -32,7 +32,7 @@
 				"python.testing.pytestEnabled": true,
 				"python.analysis.diagnosticMode": "openFilesOnly",
 				"python.analysis.include": [
-					"my_project"
+					"torsion_gertsenshtein"
 				],
 				"python.analysis.autoImportCompletions": true,
 				"ty.diagnosticMode": "workspace",

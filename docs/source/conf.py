@@ -1,5 +1,5 @@
-project = "My Project"
-author = "Matthew Ord"
+project = "Torsion-Gertsenshtein"
+author = "William Royce"
 version = "0.0.1"
 
 extensions = ["sphinx.ext.autodoc"]

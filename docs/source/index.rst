@@ -1,5 +1,5 @@
 
-My Project Documentation
+Torsion Gertsenshtein Documentation
 ===============================
 
 This is a Python package.

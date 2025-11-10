@@ -1,7 +1,7 @@
 def test_import() -> None:
     try:
-        import my_project  # noqa: PLC0415
+        import torsion_gertsenshtein  # noqa: PLC0415
     except ImportError:
-        my_project = None
+        torsion_gertsenshtein = None
 
-    assert my_project is not None, "my_project module should not be None"
+    assert torsion_gertsenshtein is not None, "torsion_gertsenshtein module should not be None"

@@ -1,5 +1,5 @@
 [project]
-name = "my_project"
+name = "torsion_gertsenshtein"
 version = "0.0.1"
 description = "An example Python Package"
 readme = "README.md"
@@ -68,7 +68,7 @@ testpaths = ["tests"]
 
 [tool.pyright]
 typeCheckingMode = "strict"
-include = ["tests", "my_project", "examples"]
+include = ["tests", "torsion_gertsenshtein", "examples"]
 reportImplicitOverride = true
 reportUnknownMemberType = false
 
