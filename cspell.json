@@ -6,8 +6,6 @@
         "gertsenshtein"
     ],
     "ignoreWords": [
-        "Phonopy",
-        "Wannier",
         "pytest",
         "pyright",
         "pydata",
