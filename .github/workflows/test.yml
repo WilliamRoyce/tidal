@@ -1,0 +1,42 @@
+name: Run Tests
+
+on:
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Set up Python
+        run: uv python install
+
+      - name: Install the project
+        run: uv sync --all-extras
+
+      - name: Run lint
+        run: uv run ruff check --output-format=github
+
+      - name: Run type check
+        run: uv run pyright
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Run cspell
+        uses: streetsidesoftware/cspell-action@v7
+        with:
+          use_cspell_files: true
+          strict: true
+          incremental_files_only: true

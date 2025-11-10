@@ -1,0 +1,77 @@
+[project]
+name = "my_project"
+version = "0.0.1"
+description = "An example Python Package"
+readme = "README.md"
+requires-python = ">=3.14,<3.15"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "ruff",
+    "pytest >=8.3.3,<9.0.0",
+    "pyright ==1.1.403",
+    "sphinx >=8.1.3,<9.0.0",
+    "pydata-sphinx-theme >=0.16.0,<0.17.0",
+]
+
+
+[tool.ruff]
+unsafe-fixes = true
+exclude = [".git", ".git-rewrite", ".vscode"]
+
+[tool.ruff.lint]
+select = ["ALL"]
+preview = true
+ignore = [
+    "COM812",
+    "E501",
+    "S101",
+    "PT009",
+    "D100",
+    "D105",
+    "CPY001",
+    "TD003",
+    "TD002",
+    "DOC201",
+    "DOC402",
+    "PD",
+]
+fixable = ["ALL"]
+unfixable = ["T201"]
+
+
+[tool.ruff.lint.extend-per-file-ignores]
+"tests/**/*" = ["PLR6301", "PLR0914", "D101", "D102", "D103", "D104"]
+"examples/**/*" = ["INP001", "T201"]
+"scripts/**/*" = ["INP001", "T201", "D101", "D102", "D103", "D104"]
+"docs/**/*" = ["INP001", "I002"]
+
+[tool.ruff.lint.pylint]
+allow-dunder-method-names = [
+    "__as_fundamental__",
+    "__from_fundamental__",
+    "__into_fundamental__",
+    "__as_transformed__",
+    "__into_transformed__",
+    "__from_transformed__",
+    "__convert_vector_into__",
+    "__into_inner__",
+    "__from_inner__",
+]
+
+[tool.ruff.lint.pydocstyle]
+convention = "numpy"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.pyright]
+typeCheckingMode = "strict"
+include = ["tests", "my_project", "examples"]
+reportImplicitOverride = true
+reportUnknownMemberType = false
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
