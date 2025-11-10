@@ -1,6 +1,6 @@
 # Project Template
 
-View the `torsion_gertsenshtein` package documentation [here](https://williamroyce.github.io/Torsion-Gertsenshtein/).
+View the `torsion_gertsenshtein` package documentation [here](https://williamroyce.github.io/torsion-gertsenshtein/).
 
 ## Setup
 
@@ -48,4 +48,3 @@ This project uses the **Code Spell Checker** extension for VS Code.
 To add words to the spell checker's dictionary,
 add them to the `.vscode/cspell.json` file under
 the `words` or `ignoreWords` section.
-
