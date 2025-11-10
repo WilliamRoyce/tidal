@@ -26,7 +26,7 @@ jobs:
 
       - name: Build Sphinx documentation
         run: |
-          uv run sphinx-apidoc --force --module-first -o docs/source/ my_project/
+          uv run sphinx-apidoc --force --module-first -o docs/source/ torsion_gertsenshtein/
           cd docs
           make html
 
