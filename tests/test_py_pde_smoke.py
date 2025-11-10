@@ -18,7 +18,7 @@ def test_py_pde_diffusion_smoke() -> None:
     eq = PDE({"u": "laplace(u)"})
 
     # Short integration; tracker=None to avoid plotting
-    out = eq.solve(state, t_range=0.02, dt=1e-3, tracker=None)
+    out = eq.solve(state, t_range=0.02, dt=1e-4, tracker=None)
     # eq.solve can return either a tuple (field, info) or just the field.
     if isinstance(out, tuple):
         result, _ = out
