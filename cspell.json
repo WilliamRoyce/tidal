@@ -6,7 +6,9 @@
         "gertsenshtein",
         "imshow",
         "numba",
-        "sympy"
+        "pycache",
+        "sympy",
+        "venv"
     ],
     "ignoreWords": [
         "pytest",
