@@ -48,3 +48,4 @@ This project uses the **Code Spell Checker** extension for VS Code.
 To add words to the spell checker's dictionary,
 add them to the `.vscode/cspell.json` file under
 the `words` or `ignoreWords` section.
+
