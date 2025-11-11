@@ -49,7 +49,9 @@ class SimulationConfig:
 
     t_end: float = 100.0
     dt: float | None = None  # If None, let solver choose (adaptive)
-    backend: str = "auto"  # py-pde backend: "numpy" or "numba"
+    backend: Literal["auto", "numpy", "numba"] = (
+        "auto"  # py-pde backend: "numpy" or "numba"
+    )
     solver: Literal["scipy", "explicit"] = "scipy"  # "scipy" (adaptive) or "explicit"
     method: str = "RK45"  # for scipy solver
     data_dir: str | None = None
