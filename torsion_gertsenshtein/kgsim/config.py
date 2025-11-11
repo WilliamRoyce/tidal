@@ -68,6 +68,7 @@ class SimulationConfig:
             If dt is not None and <= 0.0.
             If t_end <= 0.0.
             If solver is not 'scipy' or 'explicit'.
+            If backend is not 'auto', 'numpy', or 'numba'.
         """
         if self.dt is not None and self.dt <= 0.0:
             msg = "dt must be positive or None for adaptive stepping"
@@ -75,6 +76,11 @@ class SimulationConfig:
         if self.t_end <= 0.0:
             msg = "t_end must be positive"
             raise ValueError(msg)
-        if self.solver not in {"scipy", "explicit"}:
-            msg = f"Unknown solver: {self.solver!r}, must be 'scipy' or 'explicit'"
+        valid_solvers = {"scipy", "explicit"}
+        if self.solver not in valid_solvers:
+            msg = f"invalid solver: {self.solver!r}"
+            raise ValueError(msg)
+        valid_backends = {"auto", "numpy", "numba"}
+        if self.backend not in valid_backends:
+            msg = f"invalid backend: {self.backend!r}"
             raise ValueError(msg)
