@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING, Any
 import matplotlib as mpl
 
 mpl.use("Agg")
+import operator
+
 import matplotlib.pyplot as plt
 import numpy as np
 
@@ -24,6 +26,31 @@ if TYPE_CHECKING:
 
 
 def main() -> None:
+    """
+    Run a 1D Klein-Gordon simulation of a Gaussian pulse.
+
+    This function performs the following steps:
+    - Construct a 1D periodic computational grid (default: 1024 points over [0, 200]).
+    - Instantiate Klein-Gordon PDE parameters (mass=0.5) and the PDE object.
+    - Initialize the field as a Gaussian pulse with specified amplitude and width.
+    - Collect snapshots of φ at the initial time and at each tracker interrupt via
+        an observer callback. Snapshots are stored as a list of (time, numpy.ndarray)
+        tuples where each array has shape (nx,).
+    - Configure and run the time integrator (adaptive dt with the "RK45" SciPy
+        solver by default, using the "numba" backend). The run call fills the
+        snapshots list as a side effect.
+    - Assemble the recorded snapshots into a 2D array of shape (nt, nx) where
+        rows correspond to times and columns to spatial grid points.
+    - Create and save an image of the evolution using matplotlib.imshow with the
+        horizontal axis as x and the vertical axis as t. The output image is written
+        to "outputs/phi_evolution.png" (the outputs directory is created if needed).
+    - Print the saved file path to stdout.
+
+    Raises
+    ------
+    RuntimeError
+        If no snapshots were recorded during the simulation.
+    """
     grid_config = GridConfig(
         dim=1, shape=(1024,), bounds=((0.0, 200.0),), periodic=True
     )
@@ -38,8 +65,7 @@ def main() -> None:
     snapshots: list[tuple[float, np.ndarray]] = []
 
     # Record initial condition
-    phi0 = state[0]
-    snapshots.append((0.0, np.asarray(phi0.data).copy()))
+    snapshots.append((0.0, np.asarray(state[0].data).copy()))
 
     # Observer that records φ at each tracker interrupt
     def record_phi(state_coll: FieldCollection, t: float) -> dict[str, Any]:
@@ -52,35 +78,50 @@ def main() -> None:
         dt=None,  # adaptive
         solver="scipy",  # or "explicit"
         method="RK45",
-        backend="numba",
+        backend="numba",  # prefer 'numpy' here for portability unless numba RHS is provided
         progress=True,
     )
 
     # run accepts an extra_observer callback (side-effect: fills snapshots)
     run(pde=pde, state=state, config=simulation_config, extra_observer=record_phi)
 
+    # Ensure there is at least one snapshot
+    if not snapshots:
+        msg = "No snapshots were recorded during the simulation."
+        raise RuntimeError(msg)
+
+    # Sort by time (observer callbacks might not be strictly increasing)
+    snapshots.sort(key=operator.itemgetter(0))
+
     # Build evolution array: shape (nt, nx) with time as vertical axis
     times = [t for t, _ in snapshots]
-    phi_rows = [arr.reshape(-1) for _, arr in snapshots]
-    data = np.vstack(phi_rows)  # (nt, nx)
+    # Build evolution array: shape (nt, nx) with time as vertical axis
+    phi_rows = [
+        arr.reshape(grid.shape) if hasattr(grid, "shape") else arr.ravel()
+        for _, arr in snapshots
+    ]
+    data = np.vstack([row.ravel() for row in phi_rows])  # (nt, nx)
 
-    x0, x1 = grid.axes_bounds[0]
-    t0, t1 = min(times), max(times)
+    pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
+    out = "outputs/phi_evolution.png"
 
     fig, ax = plt.subplots(figsize=(8, 6))
     im = ax.imshow(
         data,
         aspect="auto",
         origin="lower",
-        extent=(x0, x1, t0, t1),
+        extent=(
+            grid.axes_bounds[0][0],
+            grid.axes_bounds[0][1],
+            min(times),
+            max(times),
+        ),
+        cmap="bwr",
     )
     ax.set_xlabel("x")
     ax.set_ylabel("t")
     ax.set_title(r"Klein-Gordon evolution: $\phi(x,t)$")
     fig.colorbar(im, ax=ax, label=r"$\phi$")
-
-    pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-    out = "outputs/phi_evolution.png"
     fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {out}")
