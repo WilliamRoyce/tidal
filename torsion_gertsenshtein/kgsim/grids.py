@@ -24,7 +24,6 @@ def make_grid(cfg: GridConfig) -> CartesianGrid:
     CartesianGrid
         A py-pde CartesianGrid instance constructed according to the configuration.
     """
-    cfg.validate()
     return CartesianGrid(
         bounds=list(cfg.bounds), shape=list(cfg.shape), periodic=cfg.periodic
     )

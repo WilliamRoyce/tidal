@@ -23,7 +23,7 @@ class GridConfig:
     bounds: Sequence[tuple[float, float]] = ((0.0, 100.0),)
     periodic: bool | Sequence[bool] = True
 
-    def validate(self) -> None:
+    def __post_init__(self) -> None:
         """
         Validate that the object's shape and bounds match the configured dimensionality.
 
@@ -57,3 +57,24 @@ class SimulationConfig:
     data_dir: str | None = None
     save_every: float | None = None  # save snapshots every X time units
     progress: bool = True
+
+    def __post_init__(self) -> None:
+        """
+        Validate configuration after initialization.
+
+        Raises
+        ------
+        ValueError
+            If dt is not None and <= 0.0.
+            If t_end <= 0.0.
+            If solver is not 'scipy' or 'explicit'.
+        """
+        if self.dt is not None and self.dt <= 0.0:
+            msg = "dt must be positive or None for adaptive stepping"
+            raise ValueError(msg)
+        if self.t_end <= 0.0:
+            msg = "t_end must be positive"
+            raise ValueError(msg)
+        if self.solver not in {"scipy", "explicit"}:
+            msg = f"Unknown solver: {self.solver!r}, must be 'scipy' or 'explicit'"
+            raise ValueError(msg)
