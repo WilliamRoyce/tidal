@@ -3,9 +3,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from pde import (
-    ExplicitSolver,
     ProgressTracker,
-    ScipySolver,
 )
 from pde.trackers import CallbackTracker
 
@@ -25,9 +23,10 @@ if TYPE_CHECKING:
 
 
 def run(
+    *,
     pde: KleinGordonPDE,
     state: FieldCollection,
-    cfg: SimulationConfig,
+    config: SimulationConfig,
     extra_observer: Callable[[FieldCollection, float], dict[str, Any]] | None = None,
 ) -> FieldCollection:
     """
@@ -58,7 +57,7 @@ def run(
             the built-in total-energy observer.
     state : FieldCollection
             The initial field/state collection to pass to the solver.
-    cfg : SimulationConfig
+    config : SimulationConfig
             Simulation configuration. Expected attributes:
                 - solver: str, one of "scipy" or "explicit" (controls solver selection).
                 - method: optional str, passed to ScipySolver when solver == "scipy".
@@ -95,50 +94,48 @@ def run(
     - Any solver-specific options should be supplied through the SimulationConfig
         instance (e.g. method/backend).
     """
-    # Build trackers
-    tracker_items: list[TrackerBase | str] = []
-    if cfg.progress:
-        tracker_items.append(ProgressTracker())  # Progress bar via named tracker
+    # --- trackers ---
+    trackers: list[TrackerBase | str] = []
+    if config.progress:
+        trackers.append(ProgressTracker())  # or simply "progress"
 
-    # Energy tracker (your observer returns a dict -> fine for CallbackTracker)
-    energy_cb = total_energy_observer(mass=(getattr(pde, "m2", 0.0) ** 0.5))
-    tracker_items.append(CallbackTracker(energy_cb, interrupts=1))
+    mass = float(getattr(pde, "m2", 0.0)) ** 0.5 if hasattr(pde, "m2") else 0.0
+    trackers.append(CallbackTracker(total_energy_observer(mass=mass), interrupts=1))
 
     if extra_observer is not None:
-        tracker_items.append(CallbackTracker(extra_observer, interrupts=1))
+        trackers.append(CallbackTracker(extra_observer, interrupts=1))
 
-    # Wrap into a single TrackerBase
-    tracker: tuple[TrackerBase | str, ...] = tuple(tracker_items)
+    tracker_param: tuple[TrackerBase | str, ...] = tuple(trackers)
 
-    # Choose solver
-    if cfg.solver == "scipy":
-        solver = ScipySolver(pde, method=cfg.method, backend=cfg.backend)
-    elif cfg.solver == "explicit":
-        solver = ExplicitSolver(pde, backend=cfg.backend)
+    # --- solver selection: pass CLASS + kwargs (not an instance) ---
+    if config.solver == "scipy":
+        solver_name = "scipy"
+        solver_kwargs: dict[str, Any] = {
+            "method": config.method,
+            "backend": config.backend,
+        }
+    elif config.solver == "explicit":
+        solver_name = "explicit"
+        solver_kwargs = {"backend": config.backend}
     else:
         # defensive runtime guard so the type checker knows `solver` is always bound
-        msg = f"Unknown solver: {cfg.solver!r}"
+        msg = f"Unknown solver: {config.solver!r}"
         raise ValueError(msg)
 
-    m2_val = getattr(pde, "m2", 0.0)
-    mass = float(m2_val) ** 0.5 if isinstance(m2_val, (int, float)) else 0.0
-    obs = [total_energy_observer(mass=mass)]
-    if extra_observer:
-        obs.append(extra_observer)
-
-    out = pde.solve(
+    # --- run via PDEBase.solve ---
+    raw = pde.solve(
         state=state,
-        t_range=cfg.t_end,
-        dt=cfg.dt,
-        tracker=tracker,
-        solver=solver,
+        t_range=config.t_end,
+        dt=config.dt,
+        tracker=tracker_param,
+        solver=solver_name,
+        **solver_kwargs,
     )
 
-    # Normalize possible return shapes: FieldCollection | (FieldCollection|None, info) | None
-    if isinstance(out, tuple):
-        result, _ = out
+    if isinstance(raw, tuple):
+        result, _info = raw
     else:
-        result, _ = out, {}
+        result = raw
 
     if result is None:
         msg = "solver returned None"
