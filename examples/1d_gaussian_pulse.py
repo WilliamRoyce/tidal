@@ -1,3 +1,5 @@
+import matplotlib.pyplot as plt
+
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
     KGParameters,
@@ -34,6 +36,9 @@ def main() -> None:
     # Plot φ at the end
     phi = result[0]
     phi.plot(title=r"Klein-Gordon: $\phi(x, t_{\mathrm{end}})$")
+
+    plt.gcf().savefig("phi_end.png", dpi=300, bbox_inches="tight")
+    plt.close()
 
 
 if __name__ == "__main__":
