@@ -5,6 +5,8 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 from pde import ScalarField
 
+from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
+
 if TYPE_CHECKING:
     from collections.abc import Callable
 
@@ -53,7 +55,14 @@ def total_energy_observer(
             msg = "evolution_rate requires ScalarField instances for (phi, pi)"
             raise TypeError(msg)
 
-        grad_phi = phi.gradient(bc="natural")  # vector field
+        bc = infer_bc_from_grid(phi.grid)
+        if bc is None:
+            grad_phi = phi.gradient(bc="periodic")
+        else:
+            # Cast to Any to satisfy the type checker; runtime accepts the mapping form.
+            grad_phi = phi.gradient(bc=cast("Any", bc))
+        grad_phi = cast("FieldCollection", grad_phi)
+
         grad_sq = sum(g.data**2 for g in grad_phi)  # |∇φ|^2
         density = 0.5 * (pi.data**2 + grad_sq + m2 * phi.data**2)
 

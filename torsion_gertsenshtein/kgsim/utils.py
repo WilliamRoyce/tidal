@@ -3,7 +3,6 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from pde import ScalarField
-from typing_extensions import Protocol
 
 if TYPE_CHECKING:
     # type-checker only import (stubs may be missing at runtime)
@@ -68,18 +67,7 @@ def mul_scalar_field(
     return cast("ScalarField", scalar * field)
 
 
-class _GridLike(Protocol):
-    """
-    Minimal protocol describing the attributes we read from a grid object.
-
-    This avoids typing.Any while being permissive enough for runtime grid objects.
-    """
-
-    boundaries: Mapping[str, Mapping[str, object]] | None
-    periodic: bool | Sequence[bool] | None
-
-
-def infer_bc_from_grid(grid: _GridLike) -> Mapping[str, Mapping[str, object]] | None:
+def infer_bc_from_grid(grid: object) -> Mapping[str, Mapping[str, object]] | None:
     """
     Infer a boundary condition argument suitable for py-pde functions.
 
@@ -89,12 +77,12 @@ def infer_bc_from_grid(grid: _GridLike) -> Mapping[str, Mapping[str, object]] | 
       - dict: explicit boundary condition (e.g. homogeneous Neumann).
     """
     # If the grid exposes a boundaries mapping (already explicit), reuse it.
-    bd = grid.boundaries
+    bd = getattr(grid, "boundaries", None)
     if bd is not None:
-        return bd
+        return bd  # assume it's already the right mapping at runtime
 
     # If the grid is periodic on any axis, prefer letting py-pde handle BCs implicitly.
-    periodic = grid.periodic
+    periodic = getattr(grid, "periodic", None)
     if periodic is None:
         return None
 
