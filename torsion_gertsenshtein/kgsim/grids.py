@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from pde import CartesianGrid
 
 if TYPE_CHECKING:
-    from torsion_gertsenshtein.kgsim.config import GridConfig
+    from .config import GridConfig
 
 
 def make_grid(cfg: GridConfig) -> CartesianGrid:

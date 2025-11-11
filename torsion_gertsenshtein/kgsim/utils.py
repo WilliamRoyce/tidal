@@ -6,7 +6,29 @@ from pde import ScalarField
 
 if TYPE_CHECKING:
     # type-checker only import (stubs may be missing at runtime)
+    from collections.abc import Sequence
+
     from pde.fields.datafield_base import DataFieldBase  # type: ignore[import]
+
+
+def natural_center(bounds: Sequence[tuple[float, float]]) -> list[float]:
+    """
+    Return the midpoint (natural center) for each interval in `bounds`.
+
+    Parameters.
+    ----------
+    bounds : Sequence[tuple[float, float]]
+        An iterable of 2-tuples (or 2-length sequences) representing numeric intervals
+        (a, b). Each tuple's elements should be numbers (ints or floats). The function
+        computes the midpoint for each interval as (a + b) / 2 and does not require
+        that a <= b.
+
+    Returns
+    -------
+    list[float]
+        A list of midpoints corresponding to each input interval, in the same order.
+    """
+    return [(a + b) / 2 for (a, b) in bounds]
 
 
 def sub_scalar_fields(
