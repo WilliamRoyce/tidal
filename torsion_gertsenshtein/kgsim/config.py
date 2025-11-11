@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Literal
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -49,8 +49,8 @@ class SimulationConfig:
 
     t_end: float = 100.0
     dt: float | None = None  # If None, let solver choose (adaptive)
-    backend: str = "numba"  # py-pde backend: "numpy" or "numba"
-    solver: str = "scipy"  # "scipy" (adaptive) or "explicit"
+    backend: str = "auto"  # py-pde backend: "numpy" or "numba"
+    solver: Literal["scipy", "explicit"] = "scipy"  # "scipy" (adaptive) or "explicit"
     method: str = "RK45"  # for scipy solver
     data_dir: str | None = None
     save_every: float | None = None  # save snapshots every X time units
