@@ -3,10 +3,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 from pde import ScalarField
+from typing_extensions import Protocol
 
 if TYPE_CHECKING:
     # type-checker only import (stubs may be missing at runtime)
-    from collections.abc import Sequence
+    from collections.abc import Mapping, Sequence
 
     from pde.fields.datafield_base import DataFieldBase  # type: ignore[import]
 
@@ -65,3 +66,48 @@ def mul_scalar_field(
         raise TypeError(msg)
     # rely on field.__rmul__ / __mul__ at runtime; cast so the type checker knows the result type
     return cast("ScalarField", scalar * field)
+
+
+class _GridLike(Protocol):
+    """
+    Minimal protocol describing the attributes we read from a grid object.
+
+    This avoids typing.Any while being permissive enough for runtime grid objects.
+    """
+
+    boundaries: Mapping[str, Mapping[str, object]] | None
+    periodic: bool | Sequence[bool] | None
+
+
+def infer_bc_from_grid(grid: _GridLike) -> Mapping[str, Mapping[str, object]] | None:
+    """
+    Infer a boundary condition argument suitable for py-pde functions.
+
+    Returns
+    -------
+      - None: let py-pde use the grid's own (e.g. periodic) boundary handling.
+      - dict: explicit boundary condition (e.g. homogeneous Neumann).
+    """
+    # If the grid exposes a boundaries mapping (already explicit), reuse it.
+    bd = grid.boundaries
+    if bd is not None:
+        return bd
+
+    # If the grid is periodic on any axis, prefer letting py-pde handle BCs implicitly.
+    periodic = grid.periodic
+    if periodic is None:
+        return None
+
+    if isinstance(periodic, bool):
+        # fully periodic -> let py-pde handle it
+        if periodic:
+            return None
+        # fully non-periodic -> explicit homogeneous Neumann
+        return {"all": {"value": "natural"}}
+
+    # periodic is a Sequence[bool]: if any axis is periodic, let py-pde determine BCs
+    if any(bool(p) for p in periodic):
+        return None
+
+    # no periodic axes -> explicit homogeneous Neumann
+    return {"all": {"value": "natural"}}
