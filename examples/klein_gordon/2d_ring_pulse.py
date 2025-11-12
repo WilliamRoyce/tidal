@@ -12,7 +12,7 @@ import shutil
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib import animation
-from matplotlib.animation import PillowWriter
+from matplotlib.animation import FFMpegWriter, PillowWriter
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
@@ -81,7 +81,9 @@ def make_recorder() -> tuple[
     return record_phi, snapshots
 
 
-def choose_writer_and_out(snap_count: int, t_end: float) -> tuple[Any, str, str, int]:
+def choose_writer_and_out(
+    snap_count: int, t_end: float
+) -> tuple[FFMpegWriter | PillowWriter, str, str]:
     """
     Select an appropriate matplotlib animation writer and output filename.
 
@@ -95,13 +97,12 @@ def choose_writer_and_out(snap_count: int, t_end: float) -> tuple[Any, str, str,
 
     Returns
     -------
-    tuple[Any, str, str, int]
+    tuple[Any, str, str]
         A tuple containing:
         - writer: an instance of a matplotlib.animation writer (FFMpegWriter or PillowWriter).
         - out: str, path to the output file. Uses "outputs/phi_evolution_2d.mp4" when
           ffmpeg is selected, otherwise "outputs/phi_evolution_2d.gif".
         - use_writer: str, identifier of the writer used ("ffmpeg" or "pillow").
-        - fps: int, computed frames per second: max(1, int(snap_count / max(1.0, t_end / 5.0))).
 
     Behavior
     --------
@@ -124,7 +125,7 @@ def choose_writer_and_out(snap_count: int, t_end: float) -> tuple[Any, str, str,
         writer = PillowWriter(fps=fps)
         out = "outputs/phi_evolution_2d.gif"
         use_writer = "pillow"
-    return writer, out, use_writer, fps
+    return writer, out, use_writer
 
 
 def prepare_figure(
@@ -257,11 +258,10 @@ def main() -> None:
     pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
 
     # Prepare figure and writer
-    first_frame = snapshots[0][1].reshape(grid.shape)
-    fig, ax, im = prepare_figure(first_frame, grid)
+    fig, ax, im = prepare_figure(snapshots[0][1].reshape(grid.shape), grid)
 
     # choose writer (FFMpegWriter preferred)
-    writer, out, use_writer, fps = choose_writer_and_out(
+    writer, out, use_writer = choose_writer_and_out(
         len(snapshots), simulation_config.t_end
     )
 
@@ -280,7 +280,7 @@ def main() -> None:
             writer.grab_frame()
 
     plt.close(fig)
-    print(f"Saved {out} using {use_writer} writer (fps={fps})")
+    print(f"Saved {out} using {use_writer} writer")
 
 
 if __name__ == "__main__":
