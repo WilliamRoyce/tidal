@@ -3,12 +3,19 @@
     "version": "0.2",
     "language": "en",
     "words": [
+        "clim",
+        "cmap",
+        "dphi",
         "gertsenshtein",
         "imshow",
+        "kgsim",
+        "Neumann",
         "numba",
         "pycache",
         "sympy",
-        "venv"
+        "venv",
+        "vmax",
+        "vmin"
     ],
     "ignoreWords": [
         "pytest",
