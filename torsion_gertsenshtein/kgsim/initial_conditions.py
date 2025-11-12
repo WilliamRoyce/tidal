@@ -81,61 +81,109 @@ def ring_pulse_2d(
     sigma: float = 1.0,
 ) -> FieldCollection:
     """
-    Create a 2D ring-shaped Gaussian initial condition on a CartesianGrid.
+    Create a 2D ring-shaped Gaussian pulse on the provided CartesianGrid.
+
+    The function constructs a scalar field phi defined by a circular Gaussian
+    envelope centered at the midpoint of the grid bounds and an accompanying
+    momentum field pi initialized to zero. The radial profile is
+
+        phi(r) = amplitude * exp(- (r - initial_radius)**2 / (2 * sigma**2) )
+
+    where r is the distance from the grid center. The fields are returned as a
+    FieldCollection containing two ScalarField instances labeled "phi" and "pi".
 
     Parameters
     ----------
     grid : CartesianGrid
-        A 2D CartesianGrid on which to evaluate the ring pulse. The function
-        requires grid.dim == 2. The grid is expected to provide:
-        - grid.cell_coords: an (N_cells, 2) array of cell center coordinates,
-        - grid.axes_bounds: sequence of two (min, max) bounds for each axis,
-        - grid.shape: the shape used to reshape 1D data arrays into the grid layout.
+        A 2-dimensional grid object. The function expects either:
+          - grid.coordinate_arrays: a tuple/list of two arrays for X and Y,
+            where each array is either a 1D axis array (length nx, ny) or full
+            2D arrays with shape == grid.shape; or
+          - grid.cell_coords: a (N, 2) array of flattened cell coordinates which
+            will be reshaped to grid.shape.
+        The grid must also provide:
+          - grid.shape: shape tuple matching the coordinate arrays, and
+          - grid.axes_bounds: iterable of two (min, max) pairs used to compute
+            the center as the midpoint of each axis.
+        If both coordinate_arrays and cell_coords are missing a RuntimeError is raised.
+        If grid.dim != 2 a ValueError is raised.
+
     amplitude : float, optional
         Peak amplitude of the Gaussian ring (default: 1.0).
+
     initial_radius : float, optional
-        Radial distance from the grid center where the ring is centered
-        (default: 5.0).
+        Radius of the ring (distance from the grid center where the Gaussian is
+        centered) (default: 5.0).
+
     sigma : float, optional
-        Standard deviation of the radial Gaussian profile (controls ring width)
-        (default: 1.0).
+        Standard deviation (width) of the Gaussian envelope (default: 1.0).
 
     Returns
     -------
     FieldCollection
-        A collection containing two ScalarField objects with labels ["phi", "pi"]:
-        - phi: the ring-shaped Gaussian field with data shaped to grid.shape,
-          computed as amplitude * exp(-((radius - initial_radius)**2) / (2*sigma**2)),
-          where radius is the distance from the grid center for each cell.
-        - pi: a ScalarField of zeros with the same shape as phi.
+        A FieldCollection([phi, pi], labels=["phi", "pi"]) where:
+          - phi is a ScalarField on `grid` containing the ring Gaussian values
+            with shape == grid.shape, and
+          - pi is a ScalarField of zeros with the same shape.
 
     Raises
     ------
     ValueError
-        If the provided grid is not two-dimensional (grid.dim != 2).
+        If grid.dim != 2.
+
+    RuntimeError
+        If the grid has neither `coordinate_arrays` nor `cell_coords`.
 
     Notes
     -----
-    - The grid center is computed as the midpoint of each axis bounds:
-      center_i = (axes_bounds[i][0] + axes_bounds[i][1]) / 2.
-    - radius is computed per cell via Euclidean distance from the center using
-      grid.cell_coords.
-    - The returned phi data is created from a flattened radial profile and then
-      reshaped to grid.shape to match the grid layout.
+    - If grid.coordinate_arrays provides 1D axis arrays for X and Y, a full 2D mesh
+      is created using numpy.meshgrid with indexing="ij".
+    - The center used for computing radii is the midpoint of each axis bounds:
+      center = 0.5 * (min + max) for each axis.
+    - The returned phi array has the same layout/shape as grid.shape.
     """
     if grid.dim != 2:  # noqa: PLR2004
         msg = "ring_pulse_2d requires a 2D grid."
         raise ValueError(msg)
-    coordinates = cast("np.ndarray", grid.cell_coords)
+
+    # Prefer coordinate_arrays (may be either 1D axis arrays or full 2D arrays).
+    coordinate_grid = getattr(grid, "coordinate_arrays", None)
+    if coordinate_grid is not None:
+        x_coordinate_array = coordinate_grid[0]
+        y_coordinate_array = coordinate_grid[1]
+        # If axes are 1D (length nx, ny) create full grids with meshgrid.
+        if x_coordinate_array.ndim == 1 and y_coordinate_array.ndim == 1:
+            x_grid_coordinate, y_grid_coordinate = np.meshgrid(
+                x_coordinate_array, y_coordinate_array, indexing="ij"
+            )
+        else:
+            # coordinate_arrays already has full shape == grid.shape
+            x_grid_coordinate, y_grid_coordinate = (
+                x_coordinate_array,
+                y_coordinate_array,
+            )
+    else:
+        # Fall back to cell_coords which is (N, dim) and must be reshaped
+        cell_coordinates = getattr(grid, "cell_coords", None)
+        if cell_coordinates is None:
+            msg = "Grid has neither 'coordinate_arrays' nor 'cell_coords'."
+            raise RuntimeError(msg)
+        # cell_coords is flat (N,2) -> reshape to grid.shape
+        x_grid_coordinate = cell_coordinates[:, 0].reshape(grid.shape)
+        y_grid_coordinate = cell_coordinates[:, 1].reshape(grid.shape)
+
     # center is mid of bounds
-    center_x = sum(grid.axes_bounds[0]) / 2
-    center_y = sum(grid.axes_bounds[1]) / 2
+    center_x = 0.5 * (grid.axes_bounds[0][0] + grid.axes_bounds[0][1])
+    center_y = 0.5 * (grid.axes_bounds[1][0] + grid.axes_bounds[1][1])
+
     radius = np.sqrt(
-        (coordinates[:, 0] - center_x) ** 2 + (coordinates[:, 1] - center_y) ** 2
+        (x_grid_coordinate - center_x) ** 2 + (y_grid_coordinate - center_y) ** 2
     )
     phi_array = amplitude * np.exp(-((radius - initial_radius) ** 2) / (2 * sigma**2))
-    phi = ScalarField(grid, data=phi_array.reshape(grid.shape))
-    pi = ScalarField(grid, data=np.zeros_like(phi.data))
+
+    # phi_array should now have shape == grid.shape
+    phi = ScalarField(grid, data=phi_array)
+    pi = ScalarField(grid, data=np.zeros_like(phi_array))
     return FieldCollection([phi, pi], labels=["phi", "pi"])
 
 
