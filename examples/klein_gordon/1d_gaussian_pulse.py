@@ -95,7 +95,6 @@ def main() -> None:
 
     # Build evolution array: shape (nt, nx) with time as vertical axis
     times = [t for t, _ in snapshots]
-    # Build evolution array: shape (nt, nx) with time as vertical axis
     phi_rows = [
         arr.reshape(grid.shape) if hasattr(grid, "shape") else arr.ravel()
         for _, arr in snapshots

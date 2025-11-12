@@ -39,15 +39,15 @@ def run(
 
     Behavior summary
     - Builds tracker items in order:
-        - Optional progress tracker when cfg.progress is truthy.
+        - Optional progress tracker when config.progress is truthy.
         - A callback tracker that records the system's total energy (derived from
             pde.m2 when present).
         - An optional user-supplied callback observer (extra_observer).
         The trackers are wrapped into a tuple and passed to the PDE solver as the
         `tracker` argument.
-    - Selects the solver implementation based on cfg.solver:
-        - "scipy" -> ScipySolver(pde, method=cfg.method, backend=cfg.backend)
-        - "explicit" -> ExplicitSolver(pde, backend=cfg.backend)
+    - Selects the solver implementation based on config.solver:
+        - "scipy" -> ScipySolver(pde, method=config.method, backend=config.backend)
+        - "explicit" -> ExplicitSolver(pde, backend=config.backend)
     - Calls pde.solve(...) with the assembled solver, tracker, time range and dt.
 
     Parameters
@@ -74,14 +74,14 @@ def run(
 
     Returns
     -------
-    Any
-            The return value from `pde.solve(...)`. The concrete type depends on the
-            PDE/solver implementation (often a solution object or time-history).
+    FieldCollection
+            The return value from `pde.solve(...)`. This is always a FieldCollection
+            object representing the final state of the simulation.
 
     Raises
     ------
     ValueError
-            If cfg.solver is not one of the supported solver identifiers.
+            If config.solver is not one of the supported solver identifiers.
     RuntimeError
             If the solver returns None instead of a FieldCollection result.
 

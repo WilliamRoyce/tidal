@@ -15,7 +15,7 @@ def natural_center(bounds: Sequence[tuple[float, float]]) -> list[float]:
     """
     Return the midpoint (natural center) for each interval in `bounds`.
 
-    Parameters.
+    Parameters
     ----------
     bounds : Sequence[tuple[float, float]]
         An iterable of 2-tuples (or 2-length sequences) representing numeric intervals

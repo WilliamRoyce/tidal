@@ -12,7 +12,8 @@ class KleinGordonPDE(PDE):
     """
     Klein-Gordon equation represented in first-order (in time) form.
 
-    This class implements the system:
+    This class implements the following system of equations:
+        d/dt phi = pi
         d/dt pi  = laplace(phi) - m^2 * phi
 
     It is intended to be used with the PDE solver framework and operates on
