@@ -28,6 +28,7 @@ def run(
     state: FieldCollection,
     config: SimulationConfig,
     extra_observer: Callable[[FieldCollection, float], dict[str, Any]] | None = None,
+    snapshot_interval: float | None = None,
 ) -> FieldCollection:
     """
     Run the Klein-Gordon simulation with the configured solver and observers.
@@ -95,47 +96,62 @@ def run(
         instance (e.g. method/backend).
     """
     # --- trackers ---
-    trackers: list[TrackerBase | str] = []
+    observer_trackers: list[TrackerBase | str] = []
     if config.progress:
-        trackers.append(ProgressTracker())  # or simply "progress"
+        observer_trackers.append(ProgressTracker())  # or simply "progress"
 
     mass = float(getattr(pde, "m2", 0.0)) ** 0.5 if hasattr(pde, "m2") else 0.0
-    trackers.append(CallbackTracker(total_energy_observer(mass=mass), interrupts=1))
-
+    observer_trackers.append(
+        CallbackTracker(
+            total_energy_observer(mass=mass),
+            interrupts=1 if snapshot_interval is None else snapshot_interval,
+        )
+    )
     if extra_observer is not None:
-        trackers.append(CallbackTracker(extra_observer, interrupts=1))
+        observer_trackers.append(
+            CallbackTracker(
+                extra_observer,
+                interrupts=1 if snapshot_interval is None else snapshot_interval,
+            )
+        )
 
-    tracker_param: tuple[TrackerBase | str, ...] = tuple(trackers)
+    tracker: tuple[TrackerBase | str, ...] = tuple(observer_trackers)
 
     # --- solver selection: pass CLASS + kwargs (not an instance) ---
+
+    # decide backend; if PDE doesn't implement numba RHS, fall back to numpy
+    backend = config.backend
+    if backend == "numba" and not hasattr(pde, "_make_pde_rhs_numba"):
+        backend = "numpy"
+
     if config.solver == "scipy":
         solver_name = "scipy"
         solver_kwargs: dict[str, Any] = {
             "method": config.method,
-            "backend": config.backend,
+            "backend": backend,
         }
     elif config.solver == "explicit":
         solver_name = "explicit"
-        solver_kwargs = {"backend": config.backend}
+        solver_kwargs = {"backend": backend}
     else:
         # defensive runtime guard so the type checker knows `solver` is always bound
         msg = f"Unknown solver: {config.solver!r}"
         raise ValueError(msg)
 
     # --- run via PDEBase.solve ---
-    raw = pde.solve(
+    solution_output = pde.solve(
         state=state,
         t_range=config.t_end,
         dt=config.dt,
-        tracker=tracker_param,
+        tracker=tracker,
         solver=solver_name,
         **solver_kwargs,
     )
 
-    if isinstance(raw, tuple):
-        result, _info = raw
+    if isinstance(solution_output, tuple):
+        result, _info = solution_output
     else:
-        result = raw
+        result = solution_output
 
     if result is None:
         msg = "solver returned None"
