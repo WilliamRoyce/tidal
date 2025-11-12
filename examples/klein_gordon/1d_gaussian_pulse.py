@@ -70,7 +70,7 @@ def main() -> None:
     # Observer that records φ at each tracker interrupt
     def record_phi(state_coll: FieldCollection, t: float) -> dict[str, Any]:
         phi_field = state_coll[0]
-        snapshots.append((float(t), np.asarray(phi_field.data).copy()))
+        snapshots.append((t, np.asarray(phi_field.data).copy()))
         return {}
 
     simulation_config = SimulationConfig(
