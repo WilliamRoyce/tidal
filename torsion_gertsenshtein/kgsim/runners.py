@@ -117,8 +117,6 @@ def run(
 
     tracker: tuple[TrackerBase | str, ...] = tuple(observer_trackers)
 
-    # --- solver selection: pass CLASS + kwargs (not an instance) ---
-
     # decide backend; if PDE doesn't implement numba RHS, fall back to numpy
     backend = config.backend
     if backend == "numba" and not hasattr(pde, "_make_pde_rhs_numba"):
@@ -138,7 +136,6 @@ def run(
         msg = f"Unknown solver: {config.solver!r}"
         raise ValueError(msg)
 
-    # --- run via PDEBase.solve ---
     solution_output = pde.solve(
         state=state,
         t_range=config.t_end,
