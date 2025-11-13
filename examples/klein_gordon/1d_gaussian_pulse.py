@@ -37,7 +37,7 @@ def main() -> None:
         an observer callback. Snapshots are stored as a list of (time, numpy.ndarray)
         tuples where each array has shape (nx,).
     - Configure and run the time integrator (adaptive dt with the "RK45" SciPy
-        solver by default, using the "numba" backend). The run call fills the
+        solver by default, using the "numpy" backend). The run call fills the
         snapshots list as a side effect.
     - Assemble the recorded snapshots into a 2D array of shape (nt, nx) where
         rows correspond to times and columns to spatial grid points.
@@ -78,7 +78,7 @@ def main() -> None:
         dt=None,  # adaptive
         solver="scipy",  # or "explicit"
         method="RK45",
-        backend="numba",  # prefer 'numpy' here for portability unless numba RHS is provided
+        backend="numpy",  # prefer 'numpy' here for portability unless numba RHS is provided
         progress=True,
     )
 
