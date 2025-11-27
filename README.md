@@ -1,38 +1,47 @@
-# Project Template
+# Torsion Gertsenshtein
 
 View the `torsion_gertsenshtein` package documentation [here](https://williamroyce.github.io/torsion-gertsenshtein/).
 
-Lightweight PDE examples and utilities for experimenting with a Klein–Gordon system built on top of the py-pde library. This repository collects a small simulation toolkit (kgsim) plus runnable examples (1D and 2D) used during development.
+A research codebase for exploring **electromagnetic ↔ gravitational wave conversion** (Gertsenshtein effect) and potential **amplification mechanisms** in gravity theories with **torsion** (Poincaré gauge theory; parity-even quadratic invariants). The repository will host:
+
+- A lightweight PDE sandbox (built on [`py-pde`]) for rapid prototyping and numerics.
+- A symbolic pipeline (Mathematica + xAct) for **deriving linearized field equations** and exporting them to Python-friendly forms.
+- Documentation and experiments for **mixing mechanisms** and **hyperbolicity/causality checks** relevant to the effect.
+
+> TL;DR: start with Klein–Gordon toy systems in 1+1D → grow to coupled EM/metric/torsion perturbations → test conversion and stability in controlled scenarios.
+
+---
+
+## Current status (usable today)
+
+- **PDE sandbox (`torsion_gertsenshtein.kgsim`)**: lightweight PDE examples and utilities for experimenting with a first-order Klein–Gordon system built on top of the py-pde library. This repository collects a small simulation toolkit (kgsim) with helpers for grids, initial data, observers, and runs; 1D & 2D examples and snapshot/video export used during development.
+- **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), optional ffmpeg; Sphinx docs skeleton; basic tests.
 
 This README describes the current capabilities, how to run the examples, and planned improvements.
 
-## Current functionality
+---
 
-Package: `torsion_gertsenshtein.kgsim`
+# Project Scope and Milestones
 
-- `config.py`
-  - `KGParameters` — physics parameters (mass).
-  - `GridConfig`, `SimulationConfig` — concise dataclasses for grid and runtime settings.
-- `grids.py`
-  - `make_grid(cfg)` — construct a `py-pde` CartesianGrid from `GridConfig`.
-- `initial_conditions.py`
-  - `gaussian_pulse(...)` — 1D Gaussian initial condition (φ, π).
-  - `ring_pulse_2d(...)` — 2D ring Gaussian initial condition (φ, π).
-- `equations.py`
-  - `KleinGordonPDE` — Klein–Gordon PDE in first-order form (φ, π).
-- `utils.py`
-  - small helpers for BC inference, coordinate helpers, and typed arithmetic helpers (e.g. `mul_scalar_field`, `sub_scalar_fields`).
-- `observers.py`
-  - `total_energy_observer(mass)` — computes total field energy; intended for trackers.
-- `runners.py`
-  - `run(...)` — convenience entry to run a simulation, attach trackers/observers, and normalize solver returns.
-  - Supports `extra_observer` and `snapshot_interval` (record snapshots at a fixed cadence).
+This section clarifies where we’re going beyond KG demos.
 
-Examples (under `examples/`):
+## Objectives
 
-- `klein_gordon/1d_gaussian_pulse.py` — 1D evolution and static plots.
-- `klein_gordon/2d_ring_pulse.py` — 2D ring pulse example with snapshot collection and video export.
-- `py_pde_laplacian_demo.py` — simple demo adapted from py-pde.
+- Baseline re-derivation of the standard Gertsenshtein effect (Einstein–Maxwell) and its tiny conversion amplitude.
+- Extend the gravitational sector to parity-even quadratic PGT with torsion; identify propagating modes and viable parameter windows.
+- Linearized PDE system in a flat metric background with constant external magnetic field and (if allowed) homogeneous torsion background. Extract mixing terms.
+- Well-posedness: characteristic analysis, hyperbolicity, and causality (characteristic speeds).
+- Numerical experiments: 1+1D toy models mapping EM/GR/torsion modes to coupled scalars; verify conversion scaling and stability; then scale up in fidelity.
+
+## Future aims / TODOs
+
+- Implement a Numba RHS for `KleinGordonPDE` to enable the `numba` backend.
+- Add a small test suite (initial_conditions, utils, observers).
+- Improve and publish type stubs for py-pde usages or vendor a narrow Protocol for solver/field interfaces to reduce casts.
+- Add CI (GitHub Actions) to run linting, tests, and build docs.
+- Expand initial condition library and example gallery.
+
+# Development Environment
 
 ## Quickstart
 
@@ -121,7 +130,7 @@ python -m http.server -d docs/build/html 8000
 On push to `main`, CI builds the docs and deploys to:
 
 ```bash
-$BROWSER https://williamroyce.github.io/torsion-gertsenshtein/
+https://williamroyce.github.io/torsion-gertsenshtein/
 ```
 
 Use `$BROWSER <url>` (from within the devcontainer) to open the project documentation link in the host browser.
@@ -134,14 +143,6 @@ Use `$BROWSER <url>` (from within the devcontainer) to open the project document
 - Type-checker warnings about third-party stubs — run examples anyway; code uses TYPE_CHECKING guards and runtime-safe casts where necessary.
 - Pages 404 or deploy errors: ensure Settings → Pages → Source = GitHub Actions and Actions → Workflow permissions = Read/Write.
 
-## Future aims / TODOs
-
-- Implement a Numba RHS for `KleinGordonPDE` to enable the `numba` backend.
-- Add a small test suite (initial_conditions, utils, observers).
-- Improve and publish type stubs for py-pde usages or vendor a narrow Protocol for solver/field interfaces to reduce casts.
-- Add CI (GitHub Actions) to run linting, tests, and build docs.
-- Expand initial condition library and example gallery.
-
 ## Contributing
 
 - Open an issue or submit a PR.
@@ -149,4 +150,4 @@ Use `$BROWSER <url>` (from within the devcontainer) to open the project document
 
 ## License
 
-No license file included in this repository. Add a LICENSE file if you intend to open-source this work.
+No LICENSE file included in this repository. Add a LICENSE file if you intend to open-source this work, before distributing artifacts or accepting external contributions.
