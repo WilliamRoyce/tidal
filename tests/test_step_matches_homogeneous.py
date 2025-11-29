@@ -61,7 +61,8 @@ def test_setup(steps: int, dt: float) -> SimulationConfig:
 
 
 @pytest.mark.parametrize(
-    ("nx", "L", "mass", "dt", "steps", "stride"), [(512, 200.0, 0.5, 0.05, 2000, 20)]
+    ("grid_size", "length", "mass", "dt", "steps", "stride"),
+    [(512, 200.0, 0.5, 0.05, 2000, 20)],
 )
 def test_step_covering_grid_matches_homogeneous(  # noqa: PLR0913, PLR0917
     grid_size: int, length: float, mass: float, dt: float, steps: int, stride: int
