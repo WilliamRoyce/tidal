@@ -4,23 +4,22 @@ import pathlib
 from typing import TYPE_CHECKING, Any
 
 import matplotlib as mpl
+import numpy as np
+from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
 
 mpl.use("Agg")
 import operator
 
-import matplotlib.pyplot as plt
-import numpy as np
-
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
-    KGParameters,
-    KleinGordonPDE,
     SimulationConfig,
     gaussian_pulse,
     make_grid,
     run,
 )
+from torsion_gertsenshtein.kgsim.equations import InhomogeneousKGPDE
+from torsion_gertsenshtein.kgsim.profiles import step_region_1d
 
 if TYPE_CHECKING:
     from pde import FieldCollection
@@ -38,17 +37,31 @@ def _build_simulation_components() -> dict[str, Any]:
     )
     grid = make_grid(grid_config)
 
-    params = KGParameters(mass=0.5)
-    pde = KleinGordonPDE(params)
+    # --- coefficients ---
+    m_out = 0.25
+    m_in = 5.0
+    x0, x1 = 150.0, 150.5
+    # Build m^2(x)
+    m2_field = step_region_1d(
+        grid,
+        x0=x0,
+        x1=x1,
+        inside_value=m_in**2,
+        outside_value=m_out**2,
+    )
 
+    # --- initial state ---
     state = gaussian_pulse(grid, amplitude=1.0, width=5.0, initial_velocity=0.0)
 
+    # --- PDE / solver config ---
+    pde = InhomogeneousKGPDE(m2_field=m2_field)
+    # --- simulation config ---
     simulation_config = SimulationConfig(
         t_end=200.0,
         dt=None,  # adaptive
-        solver="scipy",  # or "explicit"
+        solver="scipy",
         method="RK45",
-        backend="numpy",  # prefer 'numpy' here for portability unless numba RHS is provided
+        backend="numpy",  # will auto-fallback to numpy for InhomogeneousKGPDE
         progress=True,
     )
 
@@ -66,30 +79,16 @@ def _build_simulation_components() -> dict[str, Any]:
 
 
 def main() -> None:
-    """
-    Run a 1D Klein-Gordon simulation of a Gaussian pulse.
+    """Run a 1D Klein-Gordon simulation with a mass step, collect snapshots, and save an x-t image.
 
-    This function performs the following steps:
-    - Construct a 1D periodic computational grid (default: 1024 points over [0, 200]).
-    - Instantiate Klein-Gordon PDE parameters (mass=0.5) and the PDE object.
-    - Initialize the field as a Gaussian pulse with specified amplitude and width.
-    - Collect snapshots of φ at the initial time and at each tracker interrupt via
-        an observer callback. Snapshots are stored as a list of (time, numpy.ndarray)
-        tuples where each array has shape (nx,).
-    - Configure and run the time integrator (adaptive dt with the "RK45" SciPy
-        solver by default, using the "numpy" backend). The run call fills the
-        snapshots list as a side effect.
-    - Assemble the recorded snapshots into a 2D array of shape (nt, nx) where
-        rows correspond to times and columns to spatial grid points.
-    - Create and save an image of the evolution using matplotlib.imshow with the
-        horizontal axis as x and the vertical axis as t. The output image is written
-        to "outputs/phi_evolution.png" (the outputs directory is created if needed).
-    - Print the saved file path to stdout.
+    This function delegates grid and field construction, PDE/state setup, time evolution
+    and snapshot collection, and plotting to smaller helpers so the public function is
+    documented and keeps a small number of local variables.
 
     Raises
     ------
     RuntimeError
-        If no snapshots were recorded during the simulation.
+        If no snapshots are recorded during the simulation or if a non-finite field is encountered during evolution.
     """
     simulation_components = _build_simulation_components()
 
@@ -140,7 +139,7 @@ def main() -> None:
     norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
 
     pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-    out = "outputs/KG_evolution.png"
+    out = "outputs/KG_mass_step.png"
 
     fig, ax = plt.subplots(figsize=(8, 6))
     im = ax.imshow(
@@ -158,7 +157,7 @@ def main() -> None:
     )
     ax.set_xlabel("x")
     ax.set_ylabel("t")
-    ax.set_title(r"Klein-Gordon evolution: $\phi(x,t)$")
+    ax.set_title(r"Klein-Gordon $\phi(x,t)$ with mass step")
     fig.colorbar(im, ax=ax, label=r"$\phi$")
     fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)

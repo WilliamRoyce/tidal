@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
 from pde import ScalarField
 
 if TYPE_CHECKING:
     # type-checker only import (stubs may be missing at runtime)
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Mapping
 
     from pde.fields.datafield_base import DataFieldBase  # type: ignore[import]
 
@@ -69,33 +70,31 @@ def mul_scalar_field(
 
 def infer_bc_from_grid(grid: object) -> Mapping[str, Mapping[str, object]] | None:
     """
-    Infer a boundary condition argument suitable for py-pde functions.
+    Infer boundary-condition descriptor from a grid-like object.
 
-    Returns
-    -------
-      - None: let py-pde use the grid's own (e.g. periodic) boundary handling.
-      - dict: explicit boundary condition (e.g. homogeneous Neumann).
+    Returns None to indicate "let py-pde use the grid's (periodic) defaults".
+    Only returns an explicit BC mapping for confirmed non-periodic grids.
     """
-    # If the grid exposes a boundaries mapping (already explicit), reuse it.
+    # Try explicit boundaries first
     bd = getattr(grid, "boundaries", None)
-    if bd is not None:
-        return bd  # assume it's already the right mapping at runtime
-
-    # If the grid is periodic on any axis, prefer letting py-pde handle BCs implicitly.
     periodic = getattr(grid, "periodic", None)
-    if periodic is None:
-        return None
 
-    if isinstance(periodic, bool):
-        # fully periodic -> let py-pde handle it
-        if periodic:
-            return None
-        # fully non-periodic -> explicit homogeneous Neumann
-        return {"all": {"value": "natural"}}
+    result: Mapping[str, Mapping[str, object]] | None
+    # explicit boundaries override periodic inference
+    if bd is not None:
+        result = bd
+    # handle periodic being None/True/False/sequence/other in branches
+    elif periodic is None or periodic is True:
+        result = None
+    elif periodic is False:
+        result = {"all": {"type": "derivative", "value": 0.0}}
+    elif isinstance(periodic, Sequence):
+        periodic_seq = cast("Sequence[bool]", periodic)
+        if any(periodic_seq):
+            result = None
+        else:
+            result = {"all": {"type": "derivative", "value": 0.0}}
+    else:
+        result = None
 
-    # periodic is a Sequence[bool]: if any axis is periodic, let py-pde determine BCs
-    if any(bool(p) for p in periodic):
-        return None
-
-    # no periodic axes -> explicit homogeneous Neumann
-    return {"all": {"value": "natural"}}
+    return result
