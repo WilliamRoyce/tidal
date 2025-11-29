@@ -26,6 +26,45 @@ if TYPE_CHECKING:
     from pde import FieldCollection
 
 
+def _build_simulation_components() -> dict[str, Any]:
+    """
+    Build and return all components needed to run the simulation as a single dict.
+
+    Returning a single container lets `main` keep few local variables.
+    """
+    # --- grid ---
+    grid_config = GridConfig(
+        dim=1, shape=(1024,), bounds=((0.0, 200.0),), periodic=True
+    )
+    grid = make_grid(grid_config)
+
+    params = KGParameters(mass=0.5)
+    pde = KleinGordonPDE(params)
+
+    state = gaussian_pulse(grid, amplitude=1.0, width=5.0, initial_velocity=0.0)
+
+    simulation_config = SimulationConfig(
+        t_end=200.0,
+        dt=None,  # adaptive
+        solver="scipy",  # or "explicit"
+        method="RK45",
+        backend="numpy",  # prefer 'numpy' here for portability unless numba RHS is provided
+        progress=True,
+    )
+
+    # --- any observers / snapshots ---
+    observers: list[Any] = []  # keep as list to be appended inside builder if needed
+
+    return {
+        "grid_config": grid_config,
+        "grid": grid,
+        "state": state,
+        "pde": pde,
+        "simulation_config": simulation_config,
+        "observers": observers,
+    }
+
+
 def main() -> None:
     """
     Run a 1D Klein-Gordon simulation of a Gaussian pulse.
@@ -52,21 +91,13 @@ def main() -> None:
     RuntimeError
         If no snapshots were recorded during the simulation.
     """
-    grid_config = GridConfig(
-        dim=1, shape=(1024,), bounds=((0.0, 200.0),), periodic=True
-    )
-    grid = make_grid(grid_config)
-
-    params = KGParameters(mass=0.5)
-    pde = KleinGordonPDE(params)
-
-    state = gaussian_pulse(grid, amplitude=1.0, width=5.0, initial_velocity=0.0)
+    simulation_components = _build_simulation_components()
 
     # Collector for snapshots (time, phi_array)
     snapshots: list[tuple[float, np.ndarray]] = []
 
     # Record initial condition
-    snapshots.append((0.0, np.asarray(state[0].data).copy()))
+    snapshots.append((0.0, np.asarray(simulation_components["state"][0].data).copy()))
 
     # Observer that records φ at each tracker interrupt
     def record_phi(state_coll: FieldCollection, t: float) -> dict[str, Any]:
@@ -77,17 +108,13 @@ def main() -> None:
         snapshots.append((t, arr.copy()))
         return {}
 
-    simulation_config = SimulationConfig(
-        t_end=200.0,
-        dt=None,  # adaptive
-        solver="scipy",  # or "explicit"
-        method="RK45",
-        backend="numpy",  # prefer 'numpy' here for portability unless numba RHS is provided
-        progress=True,
-    )
-
     # run accepts an extra_observer callback (side-effect: fills snapshots)
-    run(pde=pde, state=state, config=simulation_config, extra_observer=record_phi)
+    run(
+        pde=simulation_components["pde"],
+        state=simulation_components["state"],
+        config=simulation_components["simulation_config"],
+        extra_observer=record_phi,
+    )
 
     # Ensure there is at least one snapshot
     if not snapshots:
@@ -100,7 +127,9 @@ def main() -> None:
     # Build evolution array: shape (nt, nx) with time as vertical axis
     times = [t for t, _ in snapshots]
     phi_rows = [
-        arr.reshape(grid.shape) if hasattr(grid, "shape") else arr.ravel()
+        arr.reshape(simulation_components["grid"].shape)
+        if hasattr(simulation_components["grid"], "shape")
+        else arr.ravel()
         for _, arr in snapshots
     ]
     data = np.vstack([row.ravel() for row in phi_rows])  # (nt, nx)
@@ -119,8 +148,8 @@ def main() -> None:
         aspect="auto",
         origin="lower",
         extent=(
-            grid.axes_bounds[0][0],
-            grid.axes_bounds[0][1],
+            simulation_components["grid"].axes_bounds[0][0],
+            simulation_components["grid"].axes_bounds[0][1],
             min(times),
             max(times),
         ),
