@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
 from pde import ScalarField
 
 if TYPE_CHECKING:
     # type-checker only import (stubs may be missing at runtime)
-    from collections.abc import Mapping, Sequence
+    from collections.abc import Mapping
 
     from pde.fields.datafield_base import DataFieldBase  # type: ignore[import]
 
@@ -69,33 +70,38 @@ def mul_scalar_field(
 
 def infer_bc_from_grid(grid: object) -> Mapping[str, Mapping[str, object]] | None:
     """
-    Infer a boundary condition argument suitable for py-pde functions.
+    Infer boundary-condition descriptor from a grid-like object.
 
-    Returns
-    -------
-      - None: let py-pde use the grid's own (e.g. periodic) boundary handling.
-      - dict: explicit boundary condition (e.g. homogeneous Neumann).
+    Returns None to indicate "let py-pde use the grid's (periodic) defaults".
+    Only returns an explicit BC mapping for confirmed non-periodic grids.
     """
-    # If the grid exposes a boundaries mapping (already explicit), reuse it.
+    # Try explicit boundaries first
     bd = getattr(grid, "boundaries", None)
     if bd is not None:
-        return bd  # assume it's already the right mapping at runtime
+        return bd
 
-    # If the grid is periodic on any axis, prefer letting py-pde handle BCs implicitly.
     periodic = getattr(grid, "periodic", None)
+
+    # If periodic info is missing, defer to py-pde (return None, not a dict!)
     if periodic is None:
         return None
 
-    if isinstance(periodic, bool):
-        # fully periodic -> let py-pde handle it
-        if periodic:
-            return None
-        # fully non-periodic -> explicit homogeneous Neumann
-        return {"all": {"value": "natural"}}
-
-    # periodic is a Sequence[bool]: if any axis is periodic, let py-pde determine BCs
-    if any(bool(p) for p in periodic):
+    # Fully periodic boolean -> let py-pde handle it implicitly
+    if periodic is True:
         return None
 
-    # no periodic axes -> explicit homogeneous Neumann
-    return {"all": {"value": "natural"}}
+    # Fully non-periodic boolean -> explicit homogeneous Neumann
+    if periodic is False:
+        return {"all": {"type": "derivative", "value": 0.0}}
+
+    # periodic is a Sequence: check if ANY axis is periodic
+    if isinstance(periodic, Sequence):
+        periodic_seq = cast("Sequence[bool]", periodic)
+        if any(bool(p) for p in periodic_seq):
+            # At least one axis is periodic -> let py-pde handle it
+            return None
+        # All axes are non-periodic -> explicit BC
+        return {"all": {"type": "derivative", "value": 0.0}}
+
+    # Unknown periodic type -> defer to py-pde (safer default)
+    return None

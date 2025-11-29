@@ -3,11 +3,10 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from pde import (
+    PDEBase,
     ProgressTracker,
 )
 from pde.trackers import CallbackTracker
-
-from torsion_gertsenshtein.kgsim.observers import total_energy_observer
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -17,14 +16,12 @@ if TYPE_CHECKING:
     )
     from pde.trackers.base import TrackerBase
 
-    from torsion_gertsenshtein.kgsim.equations import KleinGordonPDE
-
     from .config import SimulationConfig
 
 
 def run(
     *,
-    pde: KleinGordonPDE,
+    pde: PDEBase,
     state: FieldCollection,
     config: SimulationConfig,
     extra_observer: Callable[[FieldCollection, float], dict[str, Any]] | None = None,
@@ -99,14 +96,6 @@ def run(
     observer_trackers: list[TrackerBase | str] = []
     if config.progress:
         observer_trackers.append(ProgressTracker())  # or simply "progress"
-
-    mass = float(getattr(pde, "m2", 0.0)) ** 0.5 if hasattr(pde, "m2") else 0.0
-    observer_trackers.append(
-        CallbackTracker(
-            total_energy_observer(mass=mass),
-            interrupts=1 if snapshot_interval is None else snapshot_interval,
-        )
-    )
     if extra_observer is not None:
         observer_trackers.append(
             CallbackTracker(
@@ -136,14 +125,30 @@ def run(
         msg = f"Unknown solver: {config.solver!r}"
         raise ValueError(msg)
 
-    solution_output = pde.solve(
-        state=state,
-        t_range=config.t_end,
-        dt=config.dt,
-        tracker=tracker,
-        solver=solver_name,
-        **solver_kwargs,
-    )
+    # --- call solve with auto-fallback for numba-incompatible PDEs ---
+    try:
+        solution_output = pde.solve(
+            state=state,
+            t_range=config.t_end,
+            dt=config.dt,
+            tracker=tracker,
+            solver=solver_name,
+            **solver_kwargs,
+        )
+    except NotImplementedError:
+        # custom PDEs (like InhomogeneousKGPDE) don't implement numba RHS
+        if solver_kwargs.get("backend") == "numba":
+            solver_kwargs = {**solver_kwargs, "backend": "numpy"}
+            solution_output = pde.solve(
+                state=state,
+                t_range=config.t_end,
+                dt=config.dt,
+                tracker=tracker,
+                solver=solver_name,
+                **solver_kwargs,
+            )
+        else:
+            raise
 
     if isinstance(solution_output, tuple):
         result, _info = solution_output

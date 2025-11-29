@@ -12,7 +12,7 @@ A research codebase for exploring **electromagnetic ↔ gravitational wave conve
 
 ---
 
-## Current status (usable today)
+## Current Status (usable today)
 
 - **PDE sandbox (`torsion_gertsenshtein.kgsim`)**: lightweight PDE examples and utilities for experimenting with a first-order Klein–Gordon system built on top of the py-pde library. This repository collects a small simulation toolkit (kgsim) with helpers for grids, initial data, observers, and runs; 1D & 2D examples and snapshot/video export used during development.
 - **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), optional ffmpeg; Sphinx docs skeleton; basic tests.
@@ -33,13 +33,15 @@ This section clarifies where we’re going beyond KG demos.
 - Well-posedness: characteristic analysis, hyperbolicity, and causality (characteristic speeds).
 - Numerical experiments: 1+1D toy models mapping EM/GR/torsion modes to coupled scalars; verify conversion scaling and stability; then scale up in fidelity.
 
-## Future aims / TODOs
+## Future Aims / TODOs
 
 - Implement a Numba RHS for `KleinGordonPDE` to enable the `numba` backend.
 - Add a small test suite (initial_conditions, utils, observers).
 - Improve and publish type stubs for py-pde usages or vendor a narrow Protocol for solver/field interfaces to reduce casts.
 - Add CI (GitHub Actions) to run linting, tests, and build docs.
 - Expand initial condition library and example gallery.
+
+---
 
 # Development Environment
 
@@ -73,7 +75,7 @@ uv python pin 3.11
 uv sync --all-extras
 ```
 
-## Running the examples
+## Running the Examples
 
 This repository includes a development container configured for Debian. When you open the workspace in a devcontainer (VS Code Remote - Containers / Codespaces) common tools (git, node/npm, eslint, apt, etc.) are already available on PATH which simplifies setup.
 
@@ -89,7 +91,7 @@ uv run python examples/klein_gordon/2d_ring_pulse.py
 
 Outputs are written to `outputs/`.
 
-## (Optional) video support
+## (Optional) Video Support
 
 For MP4 via Matplotlib’s FFMpegWriter:
 
@@ -110,11 +112,13 @@ uv run pytest -q
 
 Add more tests under `tests/` (ICs, utils, observers).
 
+---
+
 ## Documentation
 
 The repo builds Sphinx docs and deploys to GitHub Pages via Actions.
 
-### Local build:
+### Local Build:
 
 ```bash
 # auto-generate API docs
@@ -134,6 +138,8 @@ https://williamroyce.github.io/torsion-gertsenshtein/
 ```
 
 Use `$BROWSER <url>` (from within the devcontainer) to open the project documentation link in the host browser.
+
+---
 
 ## Troubleshooting
 

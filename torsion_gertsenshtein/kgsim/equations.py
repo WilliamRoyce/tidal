@@ -1,12 +1,20 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
+import numpy as np
 from pde import DataFieldBase, FieldCollection, PDEBase, ScalarField
 from typing_extensions import override
 
+from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
+
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from .config import KGParameters
+import logging
+
+_logger = logging.getLogger(__name__)
 
 
 class KleinGordonPDE(PDEBase):
@@ -54,8 +62,30 @@ class KleinGordonPDE(PDEBase):
             msg = "state must contain ScalarField(phi) and ScalarField(pi)"
             raise TypeError(msg)
 
-        # Compute laplacian(φ)
-        lap_phi = phi.laplace(bc="natural")
+        # For periodic grids: pass bc="periodic" to let py-pde handle it
+        # For non-periodic: use inferred BC or periodic as fallback
+        periodic = getattr(phi.grid, "periodic", None)
+        # Narrow the type for the type checker before calling any()
+        if periodic is True:
+            is_periodic = True
+        elif isinstance(periodic, (list, tuple)):
+            periodic_seq = cast("Sequence[bool]", periodic)
+            is_periodic = any(periodic_seq)
+        else:
+            is_periodic = False
+
+        if is_periodic:
+            # Periodic grid: use default boundary handling (NO bc argument)
+            _logger.debug("Using periodic boundary handling (no explicit bc)")
+            lap_phi = phi.laplace(bc="periodic")
+        else:
+            # Non-periodic: infer appropriate BC
+            bc = infer_bc_from_grid(phi.grid)
+            lap_phi = (
+                phi.laplace(bc="periodic")
+                if bc is None
+                else phi.laplace(bc=cast("Any", bc))
+            )
 
         dphi_dt = pi.copy()
         dpi_dt = lap_phi - self.m2 * phi
@@ -95,6 +125,13 @@ class InhomogeneousKGPDE(PDEBase):
         if m2_field.grid != potential_field.grid:
             msg = "m2_field and V_field must live on the same grid"
             raise ValueError(msg)
+        # Normalize numeric dtype to float64 to avoid unexpected dtype/broadcast behavior
+        m2_field = ScalarField(
+            m2_field.grid, data=np.asarray(m2_field.data, dtype=float)
+        )
+        potential_field = ScalarField(
+            potential_field.grid, data=np.asarray(potential_field.data, dtype=float)
+        )
         self.m2_field = m2_field
         self.potential_field = potential_field
 
@@ -102,6 +139,7 @@ class InhomogeneousKGPDE(PDEBase):
     def evolution_rate(
         self, state: FieldCollection | DataFieldBase, t: float = 0.0
     ) -> FieldCollection:
+        # runtime sanity checks to prevent silent broadcasting which leads to blow-ups
         if not isinstance(state, FieldCollection):
             msg = "state must be FieldCollection(phi, pi)"
             raise TypeError(msg)
@@ -111,7 +149,36 @@ class InhomogeneousKGPDE(PDEBase):
             msg = "state must contain ScalarField(phi) and ScalarField(pi)"
             raise TypeError(msg)
 
-        lap_phi = phi.laplace(bc="natural")
+        # Ensure coefficient fields live on the same grid as phi
+        if phi.grid != self.m2_field.grid or phi.grid != self.potential_field.grid:
+            msg = "state fields and coefficient fields must live on the same grid"
+            raise ValueError(msg)
+
+        # For periodic grids: pass bc="periodic" to let py-pde handle it
+        # For non-periodic: use inferred BC or periodic as fallback
+        periodic = getattr(phi.grid, "periodic", None)
+        # Narrow the type for the type checker before calling any()
+        if periodic is True:
+            is_periodic = True
+        elif isinstance(periodic, (list, tuple)):
+            periodic_seq = cast("Sequence[bool]", periodic)
+            is_periodic = any(periodic_seq)
+        else:
+            is_periodic = False
+
+        if is_periodic:
+            # Periodic grid: use default boundary handling (NO bc argument)
+            _logger.debug("Using periodic boundary handling (no explicit bc)")
+            lap_phi = phi.laplace(bc="periodic")
+        else:
+            # Non-periodic: infer appropriate BC
+            bc = infer_bc_from_grid(phi.grid)
+            lap_phi = (
+                phi.laplace(bc="periodic")
+                if bc is None
+                else phi.laplace(bc=cast("Any", bc))
+            )
+
         dphi_dt = pi.copy()
 
         dpi_dt = lap_phi - self.m2_field * phi + self.potential_field * phi

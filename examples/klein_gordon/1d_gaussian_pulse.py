@@ -4,6 +4,7 @@ import pathlib
 from typing import TYPE_CHECKING, Any
 
 import matplotlib as mpl
+from matplotlib.colors import TwoSlopeNorm
 
 mpl.use("Agg")
 import operator
@@ -69,8 +70,11 @@ def main() -> None:
 
     # Observer that records φ at each tracker interrupt
     def record_phi(state_coll: FieldCollection, t: float) -> dict[str, Any]:
-        phi_field = state_coll[0]
-        snapshots.append((t, np.asarray(phi_field.data).copy()))
+        arr = np.asarray(state_coll[0].data)
+        if not np.isfinite(arr).all():
+            msg = f"Non-finite field at t={t}"
+            raise RuntimeError(msg)
+        snapshots.append((t, arr.copy()))
         return {}
 
     simulation_config = SimulationConfig(
@@ -101,8 +105,13 @@ def main() -> None:
     ]
     data = np.vstack([row.ravel() for row in phi_rows])  # (nt, nx)
 
+    # Center colormap on zero even if data is asymmetric
+    vmin = float(data.min())
+    vmax = float(data.max())
+    norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
+
     pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-    out = "outputs/phi_evolution.png"
+    out = "outputs/KG_evolution.png"
 
     fig, ax = plt.subplots(figsize=(8, 6))
     im = ax.imshow(
@@ -116,6 +125,7 @@ def main() -> None:
             max(times),
         ),
         cmap="bwr",
+        norm=norm,
     )
     ax.set_xlabel("x")
     ax.set_ylabel("t")
