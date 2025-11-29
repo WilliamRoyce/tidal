@@ -77,31 +77,24 @@ def infer_bc_from_grid(grid: object) -> Mapping[str, Mapping[str, object]] | Non
     """
     # Try explicit boundaries first
     bd = getattr(grid, "boundaries", None)
-    if bd is not None:
-        return bd
-
     periodic = getattr(grid, "periodic", None)
 
-    # If periodic info is missing, defer to py-pde (return None, not a dict!)
-    if periodic is None:
-        return None
-
-    # Fully periodic boolean -> let py-pde handle it implicitly
-    if periodic is True:
-        return None
-
-    # Fully non-periodic boolean -> explicit homogeneous Neumann
-    if periodic is False:
-        return {"all": {"type": "derivative", "value": 0.0}}
-
-    # periodic is a Sequence: check if ANY axis is periodic
-    if isinstance(periodic, Sequence):
+    result: Mapping[str, Mapping[str, object]] | None
+    # explicit boundaries override periodic inference
+    if bd is not None:
+        result = bd
+    # handle periodic being None/True/False/sequence/other in branches
+    elif periodic is None or periodic is True:
+        result = None
+    elif periodic is False:
+        result = {"all": {"type": "derivative", "value": 0.0}}
+    elif isinstance(periodic, Sequence):
         periodic_seq = cast("Sequence[bool]", periodic)
-        if any(bool(p) for p in periodic_seq):
-            # At least one axis is periodic -> let py-pde handle it
-            return None
-        # All axes are non-periodic -> explicit BC
-        return {"all": {"type": "derivative", "value": 0.0}}
+        if any(periodic_seq):
+            result = None
+        else:
+            result = {"all": {"type": "derivative", "value": 0.0}}
+    else:
+        result = None
 
-    # Unknown periodic type -> defer to py-pde (safer default)
-    return None
+    return result
