@@ -48,7 +48,8 @@
 				"peakchen90.open-html-in-browser",
 				"github.vscode-github-actions",
 				"GitHub.copilot",
-				"astral-sh.ty"
+				"astral-sh.ty",
+				"GitHub.copilot-chat"
 			]
 		}
 	},
