@@ -48,7 +48,7 @@ def make_recorder(
 # ---- the actual test ----
 
 
-def test_setup(steps: int, dt: float) -> SimulationConfig:
+def initialize_simulation_config(steps: int, dt: float) -> SimulationConfig:
     # --- configs (deterministic) ---
     t_end = steps * dt
     return SimulationConfig(
@@ -98,7 +98,7 @@ def test_step_covering_grid_matches_homogeneous(  # noqa: PLR0913, PLR0917
     run(
         pde=pde_a,
         state=state_a,
-        config=test_setup(steps=steps, dt=dt),
+        config=initialize_simulation_config(steps=steps, dt=dt),
         extra_observer=recorder_a,
     )
 
@@ -127,7 +127,7 @@ def test_step_covering_grid_matches_homogeneous(  # noqa: PLR0913, PLR0917
     run(
         pde=pde_b,
         state=state_b,
-        config=test_setup(steps=steps, dt=dt),
+        config=initialize_simulation_config(steps=steps, dt=dt),
         extra_observer=recorder_b,
     )
 
