@@ -1,11 +1,15 @@
 from __future__ import annotations
 
-from typing import cast
+from collections.abc import Sequence
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 from pde import CartesianGrid, FieldCollection, ScalarField
 
 from torsion_gertsenshtein.kgsim.utils import natural_center
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def gaussian_pulse(
@@ -60,16 +64,15 @@ def gaussian_pulse(
     coordinates = cast("np.ndarray", grid.cell_coords)  # (N, dim)
     if center is None:
         center = natural_center(grid.axes_bounds)
-    # validate center dimensionality and raise explicitly to match the docstring
+    # validate center dimensionality
     if len(center) != grid.dim:
         msg = f"center must have length {grid.dim}, got {len(center)}"
         raise ValueError(msg)
     r2 = np.sum((coordinates - np.array(center)) ** 2, axis=1)
     phi_arr = amplitude * np.exp(-r2 / (2.0 * width**2))
-    pi_arr = initial_velocity * phi_arr
 
     phi = ScalarField(grid, data=phi_arr.reshape(grid.shape))
-    pi = ScalarField(grid, data=pi_arr.reshape(grid.shape))
+    pi = ScalarField(grid, data=initial_velocity * phi_arr.reshape(grid.shape))
     return FieldCollection([phi, pi], labels=["phi", "pi"])
 
 
@@ -256,3 +259,122 @@ def plane_wave(
     phi = ScalarField(grid, data=phi_array.reshape(grid.shape))
     pi = ScalarField(grid, data=pi_array.reshape(grid.shape))
     return FieldCollection([phi, pi], labels=["phi", "pi"])
+
+
+def _expand_param(
+    name: str, values: Sequence[float] | float | None, n: int
+) -> np.ndarray:
+    """Normalize scalar-or-sequence parameter to a 1D numpy array of length n.
+
+    Parameters
+    ----------
+    name : str
+        Name of the parameter (used for error messages).
+    values : Sequence[float] | float | None
+        A scalar or sequence to normalize to a 1D numpy array.
+    n : int
+        Target length of the returned array.
+
+    Returns
+    -------
+    np.ndarray
+        A 1D numpy array of length `n` containing the parameter values.
+
+    Raises
+    ------
+    ValueError
+        If `values` is None, or if the resulting array does not have length `n`.
+    """
+    if values is None:
+        msg = f"{name} must be provided"
+        raise ValueError(msg)
+    arr = np.atleast_1d(np.asarray(values, dtype=float))
+    if arr.size == 1 and n > 1:
+        arr = np.full((n,), float(arr.item()), dtype=float)
+    if arr.size != n:
+        msg = f"{name} must have length == number of fields"
+        raise ValueError(msg)
+    return arr
+
+
+def multi_gaussian(
+    grid: CartesianGrid,
+    amplitudes: Sequence[float],
+    widths: Sequence[float],
+    centers: Sequence[float] | None = None,
+    velocities: Sequence[float] | None = None,
+) -> FieldCollection:
+    """1D-only multi-gaussian initializer (safe handling of shapes and broadcasting).
+
+    Parameters
+    ----------
+    grid : CartesianGrid
+        A 1D CartesianGrid.
+    amplitudes : Sequence[float]
+        Sequence of amplitudes, one per Gaussian.
+    widths : Sequence[float]
+        Sequence of widths (standard deviations), one per Gaussian.
+    centers : Sequence[float] or None, optional
+        Sequence of center positions (or None to use domain midpoint for each).
+    velocities : Sequence[float] or None, optional
+        Sequence of initial velocities (or None to use zeros).
+
+    Returns
+    -------
+    FieldCollection
+        FieldCollection containing (phi, pi) pairs for each Gaussian.
+
+    Raises
+    ------
+    ValueError
+        If grid.dim != 1, if any width is non-positive, or if any of the
+        parameter sequences does not match the expected number of fields.
+    """
+    if grid.dim != 1:
+        msg = "multi_gaussian currently supports 1D grids only"
+        raise ValueError(msg)
+
+    field_count = len(amplitudes)
+
+    amp_arr = _expand_param("amplitudes", amplitudes, field_count)
+    width_arr = _expand_param("widths", widths, field_count)
+
+    # coordinates: ensure concrete numpy array for typing and numeric ops
+    coords = cast("np.ndarray", grid.cell_coords)
+    x = coords[:, 0] if coords.ndim > 1 else coords
+
+    # default center: midpoint of domain
+    mid = float((x.min() + x.max()) / 2.0)
+    centers_arr = (
+        _expand_param("centers", centers, field_count)
+        if centers is not None
+        else np.full((field_count,), mid, dtype=float)
+    )
+
+    vel_arr = (
+        _expand_param("velocities", velocities, field_count)
+        if velocities is not None
+        else np.zeros((field_count,), dtype=float)
+    )
+
+    fields: list[ScalarField] = []
+    labels: list[str | None] = []
+    # Build fields using vectorized expression per field
+    for i in range(field_count):
+        sigma = width_arr[i]
+        if sigma <= 0:
+            msg = "widths must be positive"
+            raise ValueError(msg)
+        dx = x - centers_arr[i]
+        phi_arr = amp_arr[i] * np.exp(-(dx * dx) / (2.0 * sigma * sigma))
+        pi_arr = vel_arr[i] * phi_arr
+
+        fields.extend(
+            (
+                ScalarField(grid, data=phi_arr.reshape(grid.shape)),
+                ScalarField(grid, data=pi_arr.reshape(grid.shape)),
+            )
+        )
+        labels.extend([f"phi{i}", f"pi{i}"])
+
+    return FieldCollection(fields, labels=labels)

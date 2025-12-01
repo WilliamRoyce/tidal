@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
+from numpy.testing import assert_allclose
 from pde import PDE, CartesianGrid, ScalarField
 
 from torsion_gertsenshtein.kgsim import (
@@ -15,6 +16,7 @@ from torsion_gertsenshtein.kgsim import (
 )
 from torsion_gertsenshtein.kgsim.config import KGParameters
 from torsion_gertsenshtein.kgsim.equations import KleinGordonPDE
+from torsion_gertsenshtein.kgsim.initial_conditions import multi_gaussian
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -79,3 +81,45 @@ def test_kg_pde_expression_equivalence() -> None:
         assert any(periodic_seq)
     else:
         assert bool(periodic)
+
+
+def test_gaussian_equals_multi_gaussian_single_field() -> None:
+    """gaussian_pulse(...) should match multi_gaussian(... ) when N == 1."""
+    # grid / parameters
+    grid_cfg = GridConfig(dim=1, shape=(64,), bounds=((0.0, 10.0),), periodic=True)
+    grid = make_grid(grid_cfg)
+
+    amplitude = 1.234
+    width = 0.8
+    center = [5.0]
+    initial_velocity = 0.42
+
+    # single-field calls
+    fc_single = gaussian_pulse(
+        grid,
+        amplitude=amplitude,
+        center=center,
+        width=width,
+        initial_velocity=initial_velocity,
+    )
+    fc_multi = multi_gaussian(
+        grid,
+        amplitudes=[amplitude],
+        widths=[width],
+        centers=center,
+        velocities=[initial_velocity],
+    )
+
+    # extract arrays and compare
+    phi_single = np.asarray(fc_single[0].data).reshape(grid.shape)
+    pi_single = np.asarray(fc_single[1].data).reshape(grid.shape)
+
+    phi_multi = np.asarray(fc_multi[0].data).reshape(grid.shape)
+    pi_multi = np.asarray(fc_multi[1].data).reshape(grid.shape)
+
+    assert_allclose(
+        phi_single, phi_multi, atol=0.0, rtol=0.0, err_msg="phi arrays do not match"
+    )
+    assert_allclose(
+        pi_single, pi_multi, atol=0.0, rtol=0.0, err_msg="pi arrays do not match"
+    )
