@@ -3,6 +3,8 @@
     "version": "0.2",
     "language": "en",
     "words": [
+        "atleast",
+        "cbar",
         "clim",
         "cmap",
         "dphi",
@@ -17,10 +19,12 @@
         "numba",
         "pycache",
         "rtol",
+        "sharey",
         "sympy",
         "venv",
         "vmax",
-        "vmin"
+        "vmin",
+        "wspace"
     ],
     "ignoreWords": [
         "pytest",

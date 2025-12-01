@@ -38,8 +38,7 @@ def _build_simulation_components() -> dict[str, Any]:
     )
     grid = make_grid(grid_config)
 
-    params = KGParameters(mass=0.5)
-    pde = KleinGordonPDE(params)
+    pde = KleinGordonPDE(KGParameters(mass=0.5))
 
     state = gaussian_pulse(grid, amplitude=1.0, width=5.0, initial_velocity=0.0)
 
@@ -48,7 +47,7 @@ def _build_simulation_components() -> dict[str, Any]:
         dt=None,  # adaptive
         solver="scipy",  # or "explicit"
         method="RK45",
-        backend="numpy",  # prefer 'numpy' here for portability unless numba RHS is provided
+        backend="numba",  # prefer 'numpy' here for portability unless numba RHS is provided
         progress=True,
     )
 

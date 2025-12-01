@@ -13,13 +13,13 @@ import operator
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
+    InhomogeneousKGPDE,
     SimulationConfig,
     gaussian_pulse,
     make_grid,
     run,
+    step_region_1d,
 )
-from torsion_gertsenshtein.kgsim.equations import InhomogeneousKGPDE
-from torsion_gertsenshtein.kgsim.profiles import step_region_1d
 
 if TYPE_CHECKING:
     from pde import FieldCollection

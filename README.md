@@ -82,10 +82,13 @@ This repository includes a development container configured for Debian. When you
 All commands from the repo root:
 
 ```bash
-# 1D example
+# 1D KG example
 uv run python examples/klein_gordon/1d_gaussian_pulse.py
 
-# 2D example (writes snapshots and a video/gif)
+# 1D KG with potential step
+uv run python examples/klein_gordon/1d_step_mass.py
+
+# 2D KG example (writes snapshots and a video/gif)
 uv run python examples/klein_gordon/2d_ring_pulse.py
 ```
 

@@ -3,12 +3,18 @@
 from torsion_gertsenshtein.kgsim.config import (
     GridConfig,
     KGParameters,
+    MultiFieldParams,
     SimulationConfig,
 )
-from torsion_gertsenshtein.kgsim.equations import InhomogeneousKGPDE, KleinGordonPDE
+from torsion_gertsenshtein.kgsim.equations import (
+    InhomogeneousKGPDE,
+    KleinGordonPDE,
+    make_coupled_kg_pde,
+)
 from torsion_gertsenshtein.kgsim.grids import make_grid
 from torsion_gertsenshtein.kgsim.initial_conditions import (
     gaussian_pulse,
+    multi_gaussian,
     plane_wave,
     ring_pulse_2d,
 )
@@ -24,10 +30,13 @@ __all__ = [
     "InhomogeneousKGPDE",
     "KGParameters",
     "KleinGordonPDE",
+    "MultiFieldParams",
     "SimulationConfig",
     "constant_field",
     "gaussian_pulse",
+    "make_coupled_kg_pde",
     "make_grid",
+    "multi_gaussian",
     "plane_wave",
     "ring_pulse_2d",
     "run",
