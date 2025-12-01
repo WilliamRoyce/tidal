@@ -8,10 +8,15 @@ import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
 
-from torsion_gertsenshtein.kgsim import GridConfig, SimulationConfig, make_grid, run
-from torsion_gertsenshtein.kgsim.config import MultiFieldParams
-from torsion_gertsenshtein.kgsim.equations import make_coupled_kg_pde
-from torsion_gertsenshtein.kgsim.initial_conditions import multi_gaussian
+from torsion_gertsenshtein.kgsim import (
+    GridConfig,
+    MultiFieldParams,
+    SimulationConfig,
+    make_coupled_kg_pde,
+    make_grid,
+    multi_gaussian,
+    run,
+)
 
 if TYPE_CHECKING:
     from pde import FieldCollection
@@ -30,14 +35,14 @@ def _build_simulation_components() -> dict[str, Any]:
     grid = make_grid(grid_config)
 
     # Two fields with masses and symmetric coupling
-    masses = [0.5, 0.5]
+    masses = [0.25, 1.0]
     g = 0.2  # off-diagonal bilinear coupling
     coupling = [[0.0, g], [g, 0.0]]
     pde = make_coupled_kg_pde(MultiFieldParams(masses=masses, coupling=coupling))
 
     # IC: excite only field 0
     state = multi_gaussian(
-        grid, amplitudes=[1.0, 1.0], widths=[5.0, 5.0], velocities=[0.0, 0.0]
+        grid, amplitudes=[1.0, 0.0], widths=[5.0, 5.0], velocities=[0.0, 0.0]
     )
 
     # Sim config
@@ -63,7 +68,7 @@ def _build_simulation_components() -> dict[str, Any]:
     }
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0914
     """Run the coupled Klein-Gordon simulation.
 
     This function collects snapshots of both fields and saves a figure showing the
@@ -141,19 +146,19 @@ def main() -> None:
     ]  # (nt, nx) for field 1
 
     # Center colormap on zero even if data is asymmetric
-    vmin = [float(data[0].min()), float(data[1].min())]
-    vmax = [float(data[0].max()), float(data[1].max())]
-    norm = [
-        TwoSlopeNorm(vmin=vmin[0], vcenter=0.0, vmax=vmax[0]),
-        TwoSlopeNorm(vmin=vmin[1], vcenter=0.0, vmax=vmax[1]),
-    ]
+    vmin = np.min([data[0].min(), data[1].min()])
+    vmax = np.max([data[0].max(), data[1].max()])
+    norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
 
-    pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-    out = "outputs/KG_coupled_evolution.png"
+    # Two panels + dedicated colorbar column via GridSpec to avoid overlap with tight_layout
+    fig = plt.figure(figsize=(12, 6))
+    gs = fig.add_gridspec(1, 3, width_ratios=[1, 1, 0.03], wspace=0.05)
+    ax0 = fig.add_subplot(gs[0, 0])
+    ax1 = fig.add_subplot(gs[0, 1], sharey=ax0)
 
-    fig, ax = plt.subplots(ncols=2, figsize=(16, 6))
-    for i in range(len(ax)):
-        im = ax[i].imshow(
+    im = None
+    for i, a in enumerate([ax0, ax1]):
+        im = a.imshow(
             data[i],
             aspect="auto",
             origin="lower",
@@ -164,13 +169,25 @@ def main() -> None:
                 max(times),
             ),
             cmap="bwr",
-            norm=norm[i],
+            norm=norm,
         )
-        ax[i].set_title(rf"Klein-Gordon evolution: $\phi_{i}(x,t)$")
-        ax[i].set_xlabel("x")
-        ax[i].set_ylabel("t")
-        # add a colorbar for each subplot
-        fig.colorbar(im, ax=ax[i], label=f"$\\phi_{{{i}}}$")
+        a.set_title(r"Coupled Klein-Gordon evolution: " + rf"$\phi_{{{i}}}(x,t)$")
+        a.set_xlabel("x")
+        if i == 0:
+            a.set_ylabel("t")
+        else:
+            a.tick_params(labelleft=False, left=False)
+
+    if im is None:
+        msg = "No image was created to attach a colorbar to."
+        raise RuntimeError(msg)
+
+    # place colorbar into the small third column created above
+    cbar = fig.colorbar(im, cax=fig.add_subplot(gs[0, 2]), orientation="vertical")
+    cbar.set_label(r"$\phi$")
+
+    pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
+    out = "outputs/KG_coupled_evolution.png"
     fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {out}")
