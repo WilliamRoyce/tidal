@@ -15,6 +15,21 @@ class KGParameters:
 
 
 @dataclass(frozen=True)
+class MultiFieldParams:
+    """
+    Parameters for N coupled KG fields.
+
+    masses: length-N list of bare masses m_i >= 0
+    coupling: NxN symmetric matrix for bilinear mixing in the potential
+              V = 1/2 * sum_{ij} phi_i (M2_ij) phi_j, where
+              M2 = diag(m_i^2) + coupling
+    """
+
+    masses: Sequence[float]  # m in natural units
+    coupling: Sequence[Sequence[float]]  # NxN
+
+
+@dataclass(frozen=True)
 class GridConfig:
     """Grid configuration for py-pde CartesianGrid."""
 

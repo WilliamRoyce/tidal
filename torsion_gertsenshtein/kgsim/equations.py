@@ -11,6 +11,8 @@ from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
+    from torsion_gertsenshtein.kgsim.config import MultiFieldParams
+
     from .config import KGParameters
 import logging
 
@@ -158,3 +160,47 @@ class InhomogeneousKGPDE(PDEBase):
             "m2_checksum": float(self.m2_field.data.sum()),
             "V_checksum": float(self.potential_field.data.sum()),
         }
+
+
+def make_coupled_kg_pde(params: MultiFieldParams) -> PDE:
+    """
+    Build an expression-based PDE for N coupled Klein-Gordon fields.
+
+    This class implements the following system of equations:
+        d_t phi_i = pi_i
+        d_t pi_i  = laplace(phi_i) - sum_j M2_ij * phi_j
+        M2 = diag(m_i^2) + coupling (assumed symmetric).
+
+    Raises
+    ------
+    ValueError
+        If `coupling` is not an NxN array matching the number of masses.
+    """
+    masses = np.asarray(params.masses, dtype=float)
+    field_count = masses.size
+    coup = np.asarray(params.coupling, dtype=float)
+    if coup.shape != (field_count, field_count):
+        msg = "coupling must be NxN matching len(masses)"
+        raise ValueError(msg)
+    mass_matrix = np.diag(masses**2) + coup
+
+    # Field names
+    phi = [f"phi{i}" for i in range(field_count)]
+    pi = [f"pi{i}" for i in range(field_count)]
+
+    # Build RHS dict
+    rhs: dict[str, str] = {}
+    for i in range(field_count):
+        rhs[phi[i]] = pi[i]
+        # laplace(phi_i) - sum_j M2_ij * phi_j
+        mix = " + ".join([f"(-M2_{i}_{j})*{phi[j]}" for j in range(field_count)]) or "0"
+        rhs[pi[i]] = f"laplace({phi[i]}) + {mix}"
+
+    # Constants for all M2_ij
+    consts: dict[str, float] = {
+        f"M2_{i}_{j}": float(mass_matrix[i, j])
+        for i in range(field_count)
+        for j in range(field_count)
+    }
+
+    return PDE(rhs, consts=cast("Any", consts))
