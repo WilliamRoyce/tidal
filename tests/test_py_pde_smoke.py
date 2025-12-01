@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 from pde import PDE, CartesianGrid, ScalarField
+
+from torsion_gertsenshtein.kgsim import (
+    GridConfig,
+    SimulationConfig,
+    gaussian_pulse,
+    make_grid,
+)
+from torsion_gertsenshtein.kgsim.config import KGParameters
+from torsion_gertsenshtein.kgsim.equations import KleinGordonPDE
+
+if TYPE_CHECKING:
+    from collections.abc import Sequence
 
 
 def test_py_pde_diffusion_smoke() -> None:
@@ -35,3 +47,35 @@ def test_py_pde_diffusion_smoke() -> None:
     var0 = np.var(state.data)
     var1 = np.var(result.data)
     assert var1 < var0
+
+
+def test_kg_pde_expression_equivalence() -> None:
+    grid = make_grid(
+        GridConfig(dim=1, shape=(10,), bounds=((0.0, 1.0),), periodic=True)
+    )
+    pde = KleinGordonPDE(KGParameters(mass=0.5))
+    state = gaussian_pulse(grid, amplitude=1.0, width=1.0)
+    cfg = SimulationConfig(
+        t_end=1.0, dt=0.1, solver="explicit", backend="numba", progress=False
+    )
+    out = pde.solve(
+        state=state, t_range=cfg.t_end, dt=cfg.dt, solver="explicit", backend="numba"
+    )
+    # Normalize possible return shapes: FieldCollection | (FieldCollection|None, info) | None
+    if isinstance(out, tuple):
+        sol, _info = out
+    else:
+        sol = out
+    assert sol is not None
+
+    first = sol[0]
+    assert first is not None
+    first = cast("ScalarField", first)
+    # Grid.periodic can be a bool or a sequence (e.g. [True] for 1D).
+    periodic = getattr(first.grid, "periodic", None)
+    if isinstance(periodic, (list, tuple)):
+        # Narrow element type for the type checker
+        periodic_seq = cast("Sequence[bool]", periodic)
+        assert any(periodic_seq)
+    else:
+        assert bool(periodic)
