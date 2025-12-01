@@ -8,7 +8,7 @@
 		"ghcr.io/va-h/devcontainers-features/uv:1": {
 			"shellautocompletion": true,
 			"version": "latest"
-		}
+		},
 	},
 	"customizations": {
 		"vscode": {
@@ -49,7 +49,8 @@
 				"github.vscode-github-actions",
 				"GitHub.copilot",
 				"astral-sh.ty",
-				"GitHub.copilot-chat"
+				"GitHub.copilot-chat",
+				"github.vscode-pull-request-github"
 			]
 		}
 	},
