@@ -1,12 +1,18 @@
 from __future__ import annotations
 
+import logging
+from collections.abc import Callable  # add Callable import if not present
 from typing import TYPE_CHECKING, Any
 
-from pde import (
-    PDEBase,
-    ProgressTracker,
-)
+from pde import PDEBase, ProgressTracker
 from pde.trackers import CallbackTracker
+
+from torsion_gertsenshtein.kgsim.profiling import (
+    Timer,
+    first_tick_tracker,
+    perf_counter,
+    print_summary,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -26,6 +32,7 @@ def run(
     config: SimulationConfig,
     extra_observer: Callable[[FieldCollection, float], dict[str, Any]] | None = None,
     snapshot_interval: float | None = None,
+    profile: bool = False,
 ) -> FieldCollection:
     """
     Run the Klein-Gordon simulation with the configured solver and observers.
@@ -84,16 +91,24 @@ def run(
 
     Notes
     -----
-    - The function always installs a total-energy observer (based on pde.m2 when
-        available) in addition to any provided extra_observer.
     - The function constructs a tuple of tracker items and passes it as the
         `tracker` argument to `pde.solve`. The exact semantics and call frequency of
         CallbackTracker/ProgressTracker are governed by the tracking infrastructure.
     - Any solver-specific options should be supplied through the SimulationConfig
         instance (e.g. method/backend).
     """
-    # --- trackers ---
+    timer = Timer()
+    # 1) build trackers
+    # allow both TrackerBase instances/strings and simple callback-style trackers
     observer_trackers: list[TrackerBase | str] = []
+
+    # 2) if profiling, insert a one-shot tracker to detect first integration tick
+    prof = {"t_call_solve": 0.0, "t_first_tick": 0.0}
+    if profile:
+        # wrap callable in a Tracker instance so types match PDE's expectations
+        ft = first_tick_tracker(prof, "t_first_tick")
+        observer_trackers.append(CallbackTracker(ft))
+
     if config.progress:
         observer_trackers.append(ProgressTracker())  # or simply "progress"
     if extra_observer is not None:
@@ -106,6 +121,9 @@ def run(
 
     tracker: tuple[TrackerBase | str, ...] = tuple(observer_trackers)
 
+    timer.mark("trackers_built")
+
+    # 3) solver selection
     # decide backend; if PDE doesn't implement numba RHS, fall back to numpy
     backend = config.backend
     if backend == "numba" and not hasattr(pde, "_make_pde_rhs_numba"):
@@ -125,7 +143,11 @@ def run(
         msg = f"Unknown solver: {config.solver!r}"
         raise ValueError(msg)
 
+    timer.mark("solver_selected")
+
+    # 4) call solve
     # --- call solve with auto-fallback for numba-incompatible PDEs ---
+    prof["t_call_solve"] = perf_counter()
     try:
         solution_output = pde.solve(
             state=state,
@@ -149,6 +171,7 @@ def run(
             )
         else:
             raise
+    timer.mark("solve_returned")
 
     if isinstance(solution_output, tuple):
         result, _info = solution_output
@@ -158,5 +181,14 @@ def run(
     if result is None:
         msg = "solver returned None"
         raise RuntimeError(msg)
+
+    # 5) print profiling summary
+    if profile:
+        logger = logging.getLogger(__name__)
+        # initialization delay is time from call_solve to first callback
+        init_delay = prof["t_first_tick"] - prof["t_call_solve"]
+        # use logging instead of print
+        logger.info("init delay until first step: %.3fs", init_delay)
+        print_summary(timer.summary())
 
     return result

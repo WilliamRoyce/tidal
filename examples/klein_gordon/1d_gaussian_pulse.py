@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import pathlib
 from typing import TYPE_CHECKING, Any
 
@@ -90,6 +91,7 @@ def main() -> None:
     RuntimeError
         If no snapshots were recorded during the simulation.
     """
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     simulation_components = _build_simulation_components()
 
     # Collector for snapshots (time, phi_array)
@@ -113,6 +115,7 @@ def main() -> None:
         state=simulation_components["state"],
         config=simulation_components["simulation_config"],
         extra_observer=record_phi,
+        profile=True,
     )
 
     # Ensure there is at least one snapshot
