@@ -25,7 +25,122 @@ if TYPE_CHECKING:
     from .config import SimulationConfig
 
 
-def run(
+def _build_observer_trackers(
+    *,
+    config: SimulationConfig,
+    extra_observer: Callable[[Any, float], dict[str, Any]] | None,
+    snapshot_interval: float | None,
+    prof: dict[str, float],
+    profile: bool = False,
+) -> tuple[TrackerBase | str, ...]:
+    """Assemble tracker objects (wrapped as TrackerBase instances)."""
+    trackers: list[TrackerBase | str] = []
+
+    if profile:
+        ft = first_tick_tracker(prof, "t_first_tick")
+        trackers.append(CallbackTracker(ft))
+
+    if config.progress:
+        trackers.append(ProgressTracker())
+
+    if extra_observer is not None:
+        trackers.append(
+            CallbackTracker(
+                extra_observer,
+                interrupts=1 if snapshot_interval is None else snapshot_interval,
+            )
+        )
+
+    return tuple(trackers)
+
+
+def _select_solver_kwargs(
+    *, pde: PDEBase, config: SimulationConfig
+) -> tuple[str, dict[str, Any]]:
+    """Select solver name and kwargs based on config and PDE capabilities.
+
+    Parameters
+    ----------
+    pde : PDEBase
+        The PDE instance to query for backend capabilities.
+    config : SimulationConfig
+        Simulation configuration object with attributes `solver`, `method`, and `backend`.
+
+    Returns
+    -------
+    tuple[str, dict[str, Any]]
+        A pair of solver name and keyword arguments to pass to the solver.
+
+    Raises
+    ------
+    ValueError
+        If `config.solver` is not one of the supported solver identifiers.
+    """
+    backend = config.backend
+    if backend == "numba" and not hasattr(pde, "_make_pde_rhs_numba"):
+        backend = "numpy"
+
+    if config.solver == "scipy":
+        solver_name = "scipy"
+        solver_kwargs: dict[str, Any] = {
+            "method": config.method,
+            "backend": backend,
+        }
+    elif config.solver == "explicit":
+        solver_name = "explicit"
+        solver_kwargs = {"backend": backend}
+    else:
+        # defensive runtime guard so the type checker knows `solver` is always bound
+        msg = f"Unknown solver: {config.solver!r}"
+        raise ValueError(msg)
+
+    return solver_name, solver_kwargs
+
+
+def _call_solve_with_fallback(  # noqa: PLR0913
+    *,
+    pde: PDEBase,
+    state: FieldCollection,
+    t_end: float,
+    dt: float | None,
+    tracker: tuple[TrackerBase | str, ...],
+    solver_name: str,
+    solver_kwargs: dict[str, Any],
+    prof: dict[str, float],
+) -> FieldCollection | tuple[FieldCollection | None, dict[str, Any]] | None:
+    """Call pde.solve and retry with numpy backend if numba backend is unsupported."""
+    prof["t_call_solve"] = perf_counter()
+    try:
+        return pde.solve(
+            state=state,
+            t_range=t_end,
+            dt=dt,
+            tracker=tracker,
+            solver=solver_name,
+            **solver_kwargs,
+        )
+    except NotImplementedError:
+        if solver_kwargs.get("backend") == "numba":
+            solver_kwargs = {**solver_kwargs, "backend": "numpy"}
+            return pde.solve(
+                state=state,
+                t_range=t_end,
+                dt=dt,
+                tracker=tracker,
+                solver=solver_name,
+                **solver_kwargs,
+            )
+        raise
+
+
+def _log_profile(*, timer: Timer, prof: dict[str, float]) -> None:
+    logger = logging.getLogger(__name__)
+    init_delay = prof["t_first_tick"] - prof["t_call_solve"]
+    logger.info("init delay until first step: %.3fs", init_delay)
+    print_summary(timer.summary())
+
+
+def run(  # noqa: PLR0913
     *,
     pde: PDEBase,
     state: FieldCollection,
@@ -44,8 +159,6 @@ def run(
     Behavior summary
     - Builds tracker items in order:
         - Optional progress tracker when config.progress is truthy.
-        - A callback tracker that records the system's total energy (derived from
-            pde.m2 when present).
         - An optional user-supplied callback observer (extra_observer).
         The trackers are wrapped into a tuple and passed to the PDE solver as the
         `tracker` argument.
@@ -84,8 +197,6 @@ def run(
 
     Raises
     ------
-    ValueError
-            If config.solver is not one of the supported solver identifiers.
     RuntimeError
             If the solver returns None instead of a FieldCollection result.
 
@@ -98,79 +209,36 @@ def run(
         instance (e.g. method/backend).
     """
     timer = Timer()
-    # 1) build trackers
-    # allow both TrackerBase instances/strings and simple callback-style trackers
-    observer_trackers: list[TrackerBase | str] = []
 
-    # 2) if profiling, insert a one-shot tracker to detect first integration tick
+    # profiling bookkeeping
     prof = {"t_call_solve": 0.0, "t_first_tick": 0.0}
-    if profile:
-        # wrap callable in a Tracker instance so types match PDE's expectations
-        ft = first_tick_tracker(prof, "t_first_tick")
-        observer_trackers.append(CallbackTracker(ft))
 
-    if config.progress:
-        observer_trackers.append(ProgressTracker())  # or simply "progress"
-    if extra_observer is not None:
-        observer_trackers.append(
-            CallbackTracker(
-                extra_observer,
-                interrupts=1 if snapshot_interval is None else snapshot_interval,
-            )
-        )
-
-    tracker: tuple[TrackerBase | str, ...] = tuple(observer_trackers)
+    # 1) build trackers
+    tracker = _build_observer_trackers(
+        config=config,
+        extra_observer=extra_observer,
+        snapshot_interval=snapshot_interval,
+        profile=profile,
+        prof=prof,
+    )
 
     timer.mark("trackers_built")
 
-    # 3) solver selection
-    # decide backend; if PDE doesn't implement numba RHS, fall back to numpy
-    backend = config.backend
-    if backend == "numba" and not hasattr(pde, "_make_pde_rhs_numba"):
-        backend = "numpy"
-
-    if config.solver == "scipy":
-        solver_name = "scipy"
-        solver_kwargs: dict[str, Any] = {
-            "method": config.method,
-            "backend": backend,
-        }
-    elif config.solver == "explicit":
-        solver_name = "explicit"
-        solver_kwargs = {"backend": backend}
-    else:
-        # defensive runtime guard so the type checker knows `solver` is always bound
-        msg = f"Unknown solver: {config.solver!r}"
-        raise ValueError(msg)
-
+    # 2) solver selection
+    solver_name, solver_kwargs = _select_solver_kwargs(pde=pde, config=config)
     timer.mark("solver_selected")
 
-    # 4) call solve
-    # --- call solve with auto-fallback for numba-incompatible PDEs ---
-    prof["t_call_solve"] = perf_counter()
-    try:
-        solution_output = pde.solve(
-            state=state,
-            t_range=config.t_end,
-            dt=config.dt,
-            tracker=tracker,
-            solver=solver_name,
-            **solver_kwargs,
-        )
-    except NotImplementedError:
-        # custom PDEs (like InhomogeneousKGPDE) don't implement numba RHS
-        if solver_kwargs.get("backend") == "numba":
-            solver_kwargs = {**solver_kwargs, "backend": "numpy"}
-            solution_output = pde.solve(
-                state=state,
-                t_range=config.t_end,
-                dt=config.dt,
-                tracker=tracker,
-                solver=solver_name,
-                **solver_kwargs,
-            )
-        else:
-            raise
+    # 3) call solve (with backend fallback handled inside helper)
+    solution_output = _call_solve_with_fallback(
+        pde=pde,
+        state=state,
+        t_end=config.t_end,
+        dt=config.dt,
+        tracker=tracker,
+        solver_name=solver_name,
+        solver_kwargs=solver_kwargs,
+        prof=prof,
+    )
     timer.mark("solve_returned")
 
     if isinstance(solution_output, tuple):
@@ -182,13 +250,8 @@ def run(
         msg = "solver returned None"
         raise RuntimeError(msg)
 
-    # 5) print profiling summary
+    # 4) optional profiling log
     if profile:
-        logger = logging.getLogger(__name__)
-        # initialization delay is time from call_solve to first callback
-        init_delay = prof["t_first_tick"] - prof["t_call_solve"]
-        # use logging instead of print
-        logger.info("init delay until first step: %.3fs", init_delay)
-        print_summary(timer.summary())
+        _log_profile(timer=timer, prof=prof)
 
     return result

@@ -38,9 +38,9 @@ def _build_simulation_components() -> dict[str, Any]:
     grid = make_grid(grid_config)
 
     # --- coefficients ---
-    m_out = 0.5
-    m_in = 0.55
-    x0, x1 = 125.0, 200.0
+    m_out = 0.25
+    m_in = 5.0
+    x0, x1 = 150.0, 150.5
     # Build m^2(x)
     m2_field = step_region_1d(
         grid,
@@ -51,7 +51,7 @@ def _build_simulation_components() -> dict[str, Any]:
     )
 
     # --- initial state ---
-    state = gaussian_pulse(grid, amplitude=1.0, width=5.0, initial_velocity=50.0)
+    state = gaussian_pulse(grid, amplitude=1.0, width=5.0, initial_velocity=0.0)
 
     # --- PDE / solver config ---
     pde = InhomogeneousKGPDE(m2_field=m2_field)
@@ -139,7 +139,7 @@ def main() -> None:
     norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
 
     pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-    out = "outputs/KG_mass_step.png"
+    out = "outputs/KG_barrier.png"
 
     fig, ax = plt.subplots(figsize=(8, 6))
     im = ax.imshow(
@@ -157,7 +157,7 @@ def main() -> None:
     )
     ax.set_xlabel("x")
     ax.set_ylabel("t")
-    ax.set_title(r"Klein-Gordon $\phi(x,t)$ with mass step")
+    ax.set_title(r"Klein-Gordon $\phi(x,t)$ with Potential Barrier")
     fig.colorbar(im, ax=ax, label=r"$\phi$")
     fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
