@@ -62,7 +62,11 @@ def test_kg_pde_expression_equivalence() -> None:
         t_end=1.0, dt=0.1, solver="explicit", backend="numba", progress=False
     )
     out = pde.solve(
-        state=state, t_range=cfg.t_end, dt=cfg.dt, solver="explicit", backend="numba"
+        state=state,
+        t_range=cfg.t_end,
+        dt=cfg.dt,
+        solver=cfg.solver,
+        backend=cfg.backend,
     )
     # Normalize possible return shapes: FieldCollection | (FieldCollection|None, info) | None
     if isinstance(out, tuple):

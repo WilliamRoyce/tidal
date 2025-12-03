@@ -166,7 +166,7 @@ def make_coupled_kg_pde(params: MultiFieldParams) -> PDE:
     """
     Build an expression-based PDE for N coupled Klein-Gordon fields.
 
-    This class implements the following system of equations:
+    This function builds an expression-based PDE for the following system of equations:
         d_t phi_i = pi_i
         d_t pi_i  = laplace(phi_i) - sum_j M2_ij * phi_j
         M2 = diag(m_i^2) + coupling (assumed symmetric).
@@ -174,13 +174,29 @@ def make_coupled_kg_pde(params: MultiFieldParams) -> PDE:
     Raises
     ------
     ValueError
-        If `coupling` is not an NxN array matching the number of masses.
+        If `coupling` is not an NxN array matching the number of masses,
+        if `masses` is empty, or if any mass is negative / non-finite.
     """
     masses = np.asarray(params.masses, dtype=float)
-    field_count = masses.size
+    # validation: non-empty masses
+    if masses.size == 0:
+        msg = "masses must be a non-empty sequence"
+        raise ValueError(msg)
+    # validation: finite, non-negative masses
+    if not np.all(np.isfinite(masses)):
+        msg = "masses must contain finite numbers"
+        raise ValueError(msg)
+    if np.any(masses < 0.0):
+        msg = "masses must be non-negative"
+        raise ValueError(msg)
+
+    field_count = int(masses.size)
     coup = np.asarray(params.coupling, dtype=float)
-    if coup.shape != (field_count, field_count):
-        msg = "coupling must be NxN matching len(masses)"
+    # coupling must be a 2-D square array matching the number of masses
+    if coup.ndim != 2 or coup.shape != (field_count, field_count):  # noqa: PLR2004
+        msg = (
+            "coupling must be a 2D square array with shape (N, N) matching len(masses)"
+        )
         raise ValueError(msg)
     mass_matrix = np.diag(masses**2) + coup
 

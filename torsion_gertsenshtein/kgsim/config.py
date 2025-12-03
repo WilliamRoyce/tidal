@@ -28,6 +28,38 @@ class MultiFieldParams:
     masses: Sequence[float]  # m in natural units
     coupling: Sequence[Sequence[float]]  # NxN
 
+    def __post_init__(self) -> None:
+        """
+        Validate that masses are non-negative and coupling is NxN symmetric.
+
+        Raises
+        ------
+        ValueError
+            If any mass is negative.
+            If coupling is not square or does not match length of masses.
+            If coupling is not symmetric.
+        """
+        n = len(self.masses)
+        # Check all masses are non-negative
+        for i, m in enumerate(self.masses):
+            if m < 0:
+                msg = f"mass at index {i} is negative: {m}"
+                raise ValueError(msg)
+        # Check coupling is n x n
+        if len(self.coupling) != n:
+            msg = f"coupling matrix has {len(self.coupling)} rows, expected {n}"
+            raise ValueError(msg)
+        for i, row in enumerate(self.coupling):
+            if len(row) != n:
+                msg = f"coupling matrix row {i} has length {len(row)}, expected {n}"
+                raise ValueError(msg)
+        # Check symmetry
+        for i in range(n):
+            for j in range(i + 1, n):
+                if self.coupling[i][j] != self.coupling[j][i]:
+                    msg = f"coupling matrix is not symmetric at ({i},{j}) and ({j},{i}): {self.coupling[i][j]} != {self.coupling[j][i]}"
+                    raise ValueError(msg)
+
 
 @dataclass(frozen=True)
 class GridConfig:
