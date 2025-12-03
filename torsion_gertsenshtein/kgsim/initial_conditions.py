@@ -336,6 +336,11 @@ def multi_gaussian(
 
     field_count = len(amplitudes)
 
+    # validate non-empty amplitudes (prevent silent no-op with zero fields)
+    if field_count == 0:
+        msg = "amplitudes must be a non-empty sequence"
+        raise ValueError(msg)
+
     amp_arr = _expand_param("amplitudes", amplitudes, field_count)
     width_arr = _expand_param("widths", widths, field_count)
 
