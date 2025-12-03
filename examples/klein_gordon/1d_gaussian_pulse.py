@@ -25,6 +25,14 @@ from torsion_gertsenshtein.kgsim import (
 if TYPE_CHECKING:
     from pde import FieldCollection
 
+mpl.rcParams.update(
+    {
+        "text.usetex": True,
+        "font.family": "serif",
+        "axes.unicode_minus": False,
+    }
+)
+
 
 def _build_simulation_components() -> dict[str, Any]:
     """
@@ -160,8 +168,8 @@ def main() -> None:
         cmap="bwr",
         norm=norm,
     )
-    ax.set_xlabel("x")
-    ax.set_ylabel("t")
+    ax.set_xlabel("$x$")
+    ax.set_ylabel("$t$")
     ax.set_title(r"Klein-Gordon evolution: $\phi(x,t)$")
     fig.colorbar(im, ax=ax, label=r"$\phi$")
     fig.savefig(out, dpi=200, bbox_inches="tight")
