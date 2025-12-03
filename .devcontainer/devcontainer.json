@@ -55,5 +55,5 @@
 		}
 	},
 	"onCreateCommand": "npm install -g cspell && uv python install && uv sync --all-extras",
-	"postCreateCommand": "sudo apt-get update && sudo apt-get install -y texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra cm-super dvipng ghostscript latexmk dvisvgm && sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*"
+	"postCreateCommand": "sudo apt-get update && sudo apt-get install -y texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra cm-super ghostscript latexmk dvisvgm dvipng texlive-xetex texlive-luatex && sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*"
 }
