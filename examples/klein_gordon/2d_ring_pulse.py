@@ -7,12 +7,9 @@ import matplotlib as mpl
 
 mpl.use("Agg")
 import operator
-import shutil
 
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import animation
-from matplotlib.animation import FFMpegWriter, PillowWriter
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
@@ -23,6 +20,7 @@ from torsion_gertsenshtein.kgsim import (
     ring_pulse_2d,
     run,
 )
+from torsion_gertsenshtein.kgsim.plotting import choose_writer_and_out
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -79,53 +77,6 @@ def make_recorder() -> tuple[
         return {}
 
     return record_phi, snapshots
-
-
-def choose_writer_and_out(
-    snap_count: int, t_end: float
-) -> tuple[FFMpegWriter | PillowWriter, str, str]:
-    """
-    Select an appropriate matplotlib animation writer and output filename.
-
-    Parameters
-    ----------
-    snap_count : int
-        Number of frames/snapshots available for the animation.
-    t_end : float
-        Total simulation time (same units as snapshot spacing). Used to compute a
-        target frames-per-second (fps) for playback.
-
-    Returns
-    -------
-    tuple[Any, str, str]
-        A tuple containing:
-        - writer: an instance of a matplotlib.animation writer (FFMpegWriter or PillowWriter).
-        - out: str, path to the output file. Uses "outputs/phi_evolution_2d.mp4" when
-          ffmpeg is selected, otherwise "outputs/phi_evolution_2d.gif".
-        - use_writer: str, identifier of the writer used ("ffmpeg" or "pillow").
-
-    Behavior
-    --------
-    - Computes fps as the number of snapshots divided by (t_end / 5.0), coerced to an int
-      and clamped to at least 1 to avoid zero or fractional fps.
-    - Prefers ffmpeg if matplotlib.animation reports "ffmpeg" as available and the
-      ffmpeg executable is present on the system; in that case returns an FFMpegWriter
-      configured with metadata and a bitrate.
-    - Falls back to PillowWriter when ffmpeg is not available.
-    - Chooses output filename and a string label for which writer was chosen.
-    """
-    fps = max(1, int(snap_count / max(1.0, t_end / 5.0)))
-    if animation.writers.is_available("ffmpeg") and shutil.which("ffmpeg") is not None:
-        writer = animation.FFMpegWriter(
-            fps=fps, metadata={"artist": "kgsim"}, bitrate=2000
-        )
-        out = "outputs/phi_evolution_2d.mp4"
-        use_writer = "ffmpeg"
-    else:
-        writer = PillowWriter(fps=fps)
-        out = "outputs/phi_evolution_2d.gif"
-        use_writer = "pillow"
-    return writer, out, use_writer
 
 
 def prepare_figure(
@@ -262,7 +213,7 @@ def main() -> None:
 
     # choose writer (FFMpegWriter preferred)
     writer, out, use_writer = choose_writer_and_out(
-        len(snapshots), simulation_config.t_end
+        len(snapshots), simulation_config.t_end, "outputs/phi_evolution_2d.mp4"
     )
 
     # normalize color scale across all frames for visual consistency

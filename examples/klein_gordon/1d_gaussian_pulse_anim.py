@@ -2,15 +2,14 @@ from __future__ import annotations
 
 import logging
 import operator
-import pathlib
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import matplotlib as mpl
+from tqdm import tqdm
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import TwoSlopeNorm
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
@@ -21,6 +20,7 @@ from torsion_gertsenshtein.kgsim import (
     make_grid,
     run,
 )
+from torsion_gertsenshtein.kgsim.plotting import choose_writer_and_out
 
 if TYPE_CHECKING:
     from pde import FieldCollection
@@ -44,7 +44,7 @@ def _build_simulation_components() -> dict[str, Any]:
 
     simulation_config = SimulationConfig(
         t_end=200.0,
-        dt=None,  # adaptive
+        dt=None,  # fixed time step
         solver="scipy",  # or "explicit"
         method="RK45",
         backend="numba",  # prefer 'numpy' here for portability unless numba RHS is provided
@@ -117,6 +117,7 @@ def main() -> None:
         state=simulation_components["state"],
         config=simulation_components["simulation_config"],
         extra_observer=record_phi,
+        snapshot_interval=0.5,
         profile=True,
     )
 
@@ -128,45 +129,45 @@ def main() -> None:
     # Sort by time (observer callbacks might not be strictly increasing)
     snapshots.sort(key=operator.itemgetter(0))
 
-    # Build evolution array: shape (nt, nx) with time as vertical axis
-    times = [t for t, _ in snapshots]
-    phi_rows = [
-        arr.reshape(simulation_components["grid"].shape)
-        if hasattr(simulation_components["grid"], "shape")
-        else arr.ravel()
-        for _, arr in snapshots
-    ]
-    data = np.vstack([row.ravel() for row in phi_rows])  # (nt, nx)
+    # get x coordinates from grid
+    x = cast("np.ndarray", simulation_components["grid"].axes_coords[0])
 
-    # Center colormap on zero even if data is asymmetric
-    vmin = float(data.min())
-    vmax = float(data.max())
-    norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
+    # normalize y-axis limits across all frames for visual consistency
+    all_min = min(frame.min() for _, frame in snapshots)
+    all_max = max(frame.max() for _, frame in snapshots)
+    # add small padding to y-limits
+    y_padding = 0.1 * (all_max - all_min) if all_max > all_min else 0.1
+    ylim = (all_min - y_padding, all_max + y_padding)
 
-    pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-    out = "outputs/KG_evolution.png"
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-    im = ax.imshow(
-        data,
-        aspect="auto",
-        origin="lower",
-        extent=(
-            simulation_components["grid"].axes_bounds[0][0],
-            simulation_components["grid"].axes_bounds[0][1],
-            min(times),
-            max(times),
-        ),
-        cmap="bwr",
-        norm=norm,
-    )
+    # Prepare figure
+    fig, ax = plt.subplots(figsize=(8, 5))
+    (line,) = ax.plot(x, snapshots[0][1].ravel(), color="C0")
     ax.set_xlabel("x")
-    ax.set_ylabel("t")
-    ax.set_title(r"Klein-Gordon evolution: $\phi(x,t)$")
-    fig.colorbar(im, ax=ax, label=r"$\phi$")
-    fig.savefig(out, dpi=200, bbox_inches="tight")
+    ax.set_ylabel(r"$\phi$")
+    ax.set_xlim(x.min(), x.max())
+    ax.set_ylim(ylim)
+    ax.grid(visible=True, alpha=0.3)
+    title = ax.set_title(
+        rf"Klein-Gordon evolution: $\phi(x)$ at t = {snapshots[0][0]:.2f}"
+    )
+
+    # choose writer (FFMpegWriter preferred)
+    writer, out, use_writer = choose_writer_and_out(
+        len(snapshots),
+        simulation_components["simulation_config"].t_end,
+        "outputs/KG_evolution",
+        fps=30,
+    )
+
+    with writer.saving(fig, str(out), dpi=150):
+        for t, frame in tqdm(snapshots, desc="Writing frames", total=len(snapshots)):
+            line.set_ydata(frame.ravel())
+            title.set_text(rf"Klein-Gordon evolution: $\phi(x)$ at t = {t:.2f}")
+            fig.canvas.draw()
+            writer.grab_frame()
+
     plt.close(fig)
-    print(f"Saved {out}")
+    print(f"Saved {out} using {use_writer} writer")
 
 
 if __name__ == "__main__":

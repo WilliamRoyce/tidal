@@ -24,7 +24,10 @@
         "venv",
         "vmax",
         "vmin",
-        "wspace"
+        "wspace",
+        "xlim",
+        "ydata",
+        "ylim"
     ],
     "ignoreWords": [
         "pytest",
