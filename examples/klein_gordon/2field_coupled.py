@@ -4,6 +4,10 @@ import operator
 import pathlib
 from typing import TYPE_CHECKING, Any
 
+from torsion_gertsenshtein.plot_pgf import enable_pgf
+
+enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
+
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
@@ -187,7 +191,7 @@ def main() -> None:  # noqa: PLR0914
     cbar.set_label(r"$\phi$")
 
     pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-    out = "outputs/KG_coupled_evolution.png"
+    out = "outputs/KG_coupled_evolution.pdf"
     fig.savefig(out, dpi=200, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {out}")

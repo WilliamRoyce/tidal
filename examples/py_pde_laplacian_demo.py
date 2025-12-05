@@ -4,15 +4,16 @@ from __future__ import annotations
 
 import pathlib
 
-import matplotlib as mpl
+from torsion_gertsenshtein.plot_pgf import enable_pgf
+
+enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
+
 import matplotlib.pyplot as plt
 import numpy as np
 from pde import (
     CartesianGrid,
     solve_laplace_equation,  # pyright: ignore[reportUnknownVariableType]
 )
-
-mpl.use("Agg")  # choose non-interactive backend before importing pyplot
 
 
 def main() -> None:

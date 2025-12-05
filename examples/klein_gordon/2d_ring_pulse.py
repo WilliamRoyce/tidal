@@ -3,9 +3,10 @@ from __future__ import annotations
 import pathlib
 from typing import TYPE_CHECKING, Any
 
-import matplotlib as mpl
+from torsion_gertsenshtein.plot_pgf import enable_pgf
 
-mpl.use("Agg")
+enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
+
 import operator
 
 import matplotlib.pyplot as plt

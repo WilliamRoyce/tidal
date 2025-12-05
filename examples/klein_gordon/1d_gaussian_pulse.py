@@ -5,9 +5,10 @@ import operator
 import pathlib
 from typing import TYPE_CHECKING, Any
 
-import matplotlib as mpl
+from torsion_gertsenshtein.plot_pgf import enable_pgf
 
-mpl.use("Agg")
+enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
+
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import TwoSlopeNorm
@@ -24,14 +25,6 @@ from torsion_gertsenshtein.kgsim import (
 
 if TYPE_CHECKING:
     from pde import FieldCollection
-
-mpl.rcParams.update(
-    {
-        "text.usetex": True,
-        "font.family": "serif",
-        "axes.unicode_minus": False,
-    }
-)
 
 
 def _build_simulation_components() -> dict[str, Any]:
@@ -152,9 +145,9 @@ def main() -> None:
     norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
 
     pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-    out = "outputs/KG_evolution.png"
+    out = "outputs/KG_evolution.pdf"
 
-    fig, ax = plt.subplots(figsize=(8, 6))
+    fig, ax = plt.subplots(figsize=(4, 3))
     im = ax.imshow(
         data,
         aspect="auto",

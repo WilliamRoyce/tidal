@@ -4,12 +4,13 @@ import logging
 import operator
 from typing import TYPE_CHECKING, Any, cast
 
-import matplotlib as mpl
-from tqdm import tqdm
+from torsion_gertsenshtein.plot_pgf import enable_pgf
 
-mpl.use("Agg")
+enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
+
 import matplotlib.pyplot as plt
 import numpy as np
+from tqdm import tqdm
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,

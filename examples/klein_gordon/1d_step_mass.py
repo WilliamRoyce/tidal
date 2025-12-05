@@ -3,13 +3,15 @@ from __future__ import annotations
 import pathlib
 from typing import TYPE_CHECKING, Any
 
-import matplotlib as mpl
+from torsion_gertsenshtein.plot_pgf import enable_pgf
+
+enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
+
+import operator
+
 import numpy as np
 from matplotlib import pyplot as plt
 from matplotlib.colors import TwoSlopeNorm
-
-mpl.use("Agg")
-import operator
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
@@ -139,7 +141,7 @@ def main() -> None:
     norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
 
     pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-    out = "outputs/KG_mass_step.png"
+    out = "outputs/KG_mass_step.pdf"
 
     fig, ax = plt.subplots(figsize=(8, 6))
     im = ax.imshow(
