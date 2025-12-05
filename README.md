@@ -14,8 +14,10 @@ A research codebase for exploring **electromagnetic ↔ gravitational wave conve
 
 ## Current Status (usable today)
 
-- **PDE sandbox (`torsion_gertsenshtein.kgsim`)**: lightweight PDE examples and utilities for experimenting with a first-order Klein–Gordon system built on top of the py-pde library. This repository collects a small simulation toolkit (kgsim) with helpers for grids, initial data, observers, and runs; 1D & 2D examples and snapshot/video export used during development.
-- **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), optional ffmpeg; Sphinx docs skeleton; basic tests.
+- **PDE sandbox (`torsion_gertsenshtein.kgsim`)**: lightweight PDE examples and utilities for experimenting with first-order Klein–Gordon systems built on top of the py-pde library. This repository collects a small simulation toolkit (kgsim) with helpers for grids, initial data, observers, profiling, and runs; 1D & 2D examples with snapshot/video export and animation support.
+- **Multi-field coupled systems**: support for N-field coupled Klein–Gordon PDEs with arbitrary mass matrices and coupling terms; initial conditions and plotting utilities for symmetric multi-field experiments.
+- **Animation and visualization**: side-by-side spacetime plots (φ(x,t) heatmaps), 1D evolution animations (φ(x) vs time), and high-fps video export (MP4 via ffmpeg or GIF fallback).
+- **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), optional ffmpeg; Sphinx docs skeleton; type-checked codebase with pytest test suite.
 
 This README describes the current capabilities, how to run the examples, and planned improvements.
 
@@ -33,13 +35,22 @@ This section clarifies where we’re going beyond KG demos.
 - Well-posedness: characteristic analysis, hyperbolicity, and causality (characteristic speeds).
 - Numerical experiments: 1+1D toy models mapping EM/GR/torsion modes to coupled scalars; verify conversion scaling and stability; then scale up in fidelity.
 
+## Recent Improvements
+
+- **Coupled multi-field PDEs**: `make_coupled_kg_pde` builder for N-field systems with mass/coupling matrices; validation for matrix dimensions, finite masses, and non-negativity.
+- **Enhanced plotting**: `choose_writer_and_out` accepts custom output paths and FPS; side-by-side evolution plots with shared colorbars; clean plots with optional axis/tick removal.
+- **Profiling and logging**: timer utilities with detailed profiling summaries; logging-based output (no print statements in library code); configurable verbosity.
+- **Type safety**: explicit type annotations for observers, trackers, and callbacks; keyword-only boolean arguments to avoid positional ambiguity.
+- **Test coverage**: edge-case tests for initial conditions (non-1D grids, non-positive widths, empty amplitudes, mismatched parameter lengths); symmetry tests for coupled-field evolution.
+
 ## Future Aims / TODOs
 
-- Implement a Numba RHS for `KleinGordonPDE` to enable the `numba` backend.
-- Add a small test suite (initial_conditions, utils, observers).
+- Implement a Numba RHS for `KleinGordonPDE` and `make_coupled_kg_pde` to enable the `numba` backend for coupled systems.
+- Expand test suite: observers, profiling utilities, boundary condition handling.
 - Improve and publish type stubs for py-pde usages or vendor a narrow Protocol for solver/field interfaces to reduce casts.
-- Add CI (GitHub Actions) to run linting, tests, and build docs.
-- Expand initial condition library and example gallery.
+- Add CI (GitHub Actions) to run linting, type-checking (pyright/mypy), tests, and build docs on every push.
+- Expand initial condition library: plane waves, solitons, custom profiles.
+- Gallery of example runs with parameter sweeps and convergence studies.
 
 ---
 
@@ -65,15 +76,15 @@ uv run python -c "import torsion_gertsenshtein, pde; print('OK')"
 This repo includes a Debian-based **VS Code Dev Container**. It ensures a consistent toolchain and avoids host-machine drift.
 
 - Open the folder in VS Code
-
 - Command Palette → Dev Containers: Reopen in Container
-
 - Once inside the container:
 
 ```bash
 uv python pin 3.11
 uv sync --all-extras
 ```
+
+Common CLI tools pre-installed in the container: `git`, `node`, `npm`, `eslint`, `apt`, `dpkg`, `curl`, `wget`, `ssh`, `rsync`, `gpg`, `tree`, `find`, `grep`, `zip`, `tar`, `gzip`, etc.
 
 ## Running the Examples
 
@@ -82,17 +93,38 @@ This repository includes a development container configured for Debian. When you
 All commands from the repo root:
 
 ```bash
-# 1D KG example
+# 1D KG example: Gaussian pulse spacetime evolution (heatmap)
 uv run python examples/klein_gordon/1d_gaussian_pulse.py
 
-# 1D KG with potential step
+# 1D KG animation: time-evolving line plot of φ(x) (MP4 or GIF)
+uv run python examples/klein_gordon/1d_gaussian_pulse_anim.py
+
+# 1D KG with potential step (mass variation)
 uv run python examples/klein_gordon/1d_step_mass.py
 
-# 2D KG example (writes snapshots and a video/gif)
+# 1D potential barrier example
+uv run python examples/klein_gordon/1d_barrier.py
+
+# 2D KG example: radial ring pulse (writes snapshots and a video/gif)
 uv run python examples/klein_gordon/2d_ring_pulse.py
+
+# Coupled two-field symmetric KG system (side-by-side spacetime plots)
+uv run python examples/klein_gordon/2field_coupled.py
 ```
 
-Outputs are written to `outputs/`.
+Outputs are written to `outputs/` (created automatically if missing).
+
+### Animation Features
+
+- **1D animations** (`1d_gaussian_pulse_anim.py`): show φ(x) vs x at each time step; configurable FPS and snapshot interval; supports both MP4 (ffmpeg) and GIF (Pillow).
+- **2D animations** (`2d_ring_pulse.py`): radial collapse/expansion of a ring pulse; imshow-based heatmaps written frame-by-frame with tqdm progress bars.
+- **Coupled-field plots** (`2field_coupled.py`): two side-by-side spacetime heatmaps (one per field) with a shared colorbar; clean axis formatting; test for symmetry preservation.
+
+### Customization
+
+- **FPS control**: pass `fps=<int>` to `choose_writer_and_out` (default: auto-calculated from snapshot count and t_end).
+- **Snapshot resolution**: set `snapshot_interval` in the `run` call to match your desired temporal resolution (e.g., `dt` for every integrator step).
+- **Output format**: MP4 if ffmpeg is available; GIF fallback otherwise. Specify output path (without extension) to `choose_writer_and_out`.
 
 ## (Optional) Video Support
 
@@ -107,10 +139,17 @@ If `ffmpeg` is unavailable, the example falls back to a GIF via Pillow.
 
 ## Tests
 
-A minimal smoke test is included to ensure `py-pde` and the solver path work:
+A minimal smoke test suite is included to ensure `py-pde` and the solver path work, and to validate edge cases in initial conditions and multi-field systems:
 
 ```bash
-uv run pytest -q
+# run all tests with pytest
+uv run pytest -v
+
+# run a specific test module
+uv run pytest tests/test_py_pde_smoke.py -v
+
+# run with coverage report
+uv run pytest --cov=torsion_gertsenshtein --cov-report=html
 ```
 
 Add more tests under `tests/` (ICs, utils, observers).
@@ -130,8 +169,10 @@ uv run sphinx-apidoc --force --module-first -o docs/source/ torsion_gertsenshtei
 # build HTML
 ( cd docs && make html )
 
-# open locally
+# open locally (container users: use $BROWSER to open in host browser)
 python -m http.server -d docs/build/html 8000
+# then navigate to http://localhost:8000 or run:
+# $BROWSER http://localhost:8000
 ```
 
 On push to `main`, CI builds the docs and deploys to:
@@ -144,19 +185,52 @@ Use `$BROWSER <url>` (from within the devcontainer) to open the project document
 
 ---
 
+## Logging and Profiling
+
+The library uses Python's `logging` module (no print statements). To see info-level logs (solver progress, profiling summaries):
+
+```python
+import logging
+logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+```
+
+Run examples with `profile=True` in the `run` call to see timing breakdowns (initialization delay, solver overhead, etc.).
+
+---
+
 ## Troubleshooting
 
-- Import errors in VS Code (e.g., numpy not found): ensure the interpreter is the repo’s venv (`.venv/bin/python3`), then reload the window.
-- `llvmlite/numba` build failures: stick to **Python 3.11** (`uv python pin 3.11`).
-- FileNotFoundError: ffmpeg — install ffmpeg (see apt command above) or let the example produce a GIF.
-- Type-checker warnings about third-party stubs — run examples anyway; code uses TYPE_CHECKING guards and runtime-safe casts where necessary.
-- Pages 404 or deploy errors: ensure Settings → Pages → Source = GitHub Actions and Actions → Workflow permissions = Read/Write.
+- **Import errors in VS Code** (e.g., numpy not found): ensure the interpreter is the repo's venv (`.venv/bin/python3`), then reload the window.
+- **`llvmlite/numba` build failures**: stick to **Python 3.11** (`uv python pin 3.11`).
+- **FileNotFoundError: ffmpeg** — install ffmpeg (see apt command above) or let the example produce a GIF.
+- **Type-checker warnings about third-party stubs** — run examples anyway; code uses TYPE_CHECKING guards and runtime-safe casts where necessary.
+- **Pages 404 or deploy errors**: ensure Settings → Pages → Source = GitHub Actions and Actions → Workflow permissions = Read/Write.
+- **Animation has low frame count**: ensure `snapshot_interval` in the `run` call matches your desired temporal resolution (e.g., set to `dt` for every integrator step). Increase `fps` in `choose_writer_and_out` for smoother playback.
+- **Logging messages not visible**: call `logging.basicConfig(level=logging.INFO, ...)` at the start of your script or in `main()`.
+
+---
 
 ## Contributing
 
 - Open an issue or submit a PR.
 - If adding features that touch numerical kernels, include unit/regression tests.
+- Follow the project's type-checking and linting conventions (keyword-only booleans, explicit type annotations, no print in library code).
+
+---
 
 ## License
 
 No LICENSE file included in this repository. Add a LICENSE file if you intend to open-source this work, before distributing artifacts or accepting external contributions.
+
+---
+
+## Acknowledgements
+
+This project builds on:
+
+- [`py-pde`](https://py-pde.readthedocs.io/) for the PDE solver framework.
+- [`uv`](https://github.com/astral-sh/uv) for fast Python environment management.
+- The xAct/xTensor ecosystem (for symbolic tensor algebra, not yet integrated).
+
+[`py-pde`]: https://py-pde.readthedocs.io/
+[`uv`]: https://github.com/astral-sh/uv
