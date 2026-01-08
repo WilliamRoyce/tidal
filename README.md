@@ -15,8 +15,9 @@ A research codebase for exploring **electromagnetic ↔ gravitational wave conve
 ## Current Status (usable today)
 
 - **PDE sandbox (`torsion_gertsenshtein.kgsim`)**: lightweight PDE examples and utilities for experimenting with first-order Klein–Gordon systems built on top of the py-pde library. This repository collects a small simulation toolkit (kgsim) with helpers for grids, initial data, observers, profiling, and runs; 1D & 2D examples with snapshot/video export and animation support.
-- **Multi-field coupled systems**: support for N-field coupled Klein–Gordon PDEs with arbitrary mass matrices and coupling terms; initial conditions and plotting utilities for symmetric multi-field experiments.
-- **Animation and visualization**: side-by-side spacetime plots (φ(x,t) heatmaps), 1D evolution animations (φ(x) vs time), and high-fps video export (MP4 via ffmpeg or GIF fallback).
+- **Multi-field coupled systems**: support for N-field coupled Klein–Gordon PDEs with arbitrary mass matrices and coupling terms in both 1D and 2D; includes `multi_gaussian_2d` initializer for spatially separated or overlapping Gaussian pulses; test suite validates symmetry preservation, energy transfer, and decoupled limits.
+- **2D coupled simulations**: full support for coupled field evolution in 2D with visualization showing energy transfer between fields; dimension-agnostic PDE implementations work seamlessly with any grid dimensionality.
+- **Animation and visualization**: side-by-side spacetime plots (φ(x,t) heatmaps), 1D evolution animations (φ(x) vs time), 2D field evolution with dual-panel animations showing both coupled fields, and high-fps video export (MP4 via ffmpeg or GIF fallback).
 - **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), optional ffmpeg; Sphinx docs skeleton; type-checked codebase with pytest test suite.
 
 This README describes the current capabilities, how to run the examples, and planned improvements.
@@ -37,11 +38,13 @@ This section clarifies where we’re going beyond KG demos.
 
 ## Recent Improvements
 
+- **2D coupled-field support**: `multi_gaussian_2d` initializer for N-field systems on 2D grids; dimension-agnostic coordinate handling for both 1D and 2D; comprehensive test suite for 2D coupled dynamics (symmetry preservation, energy transfer, decoupled limits).
+- **Enhanced coordinate handling**: automatic detection of coordinate array format (flattened vs grid-shaped) in `gaussian_pulse` and `multi_gaussian_2d`; works seamlessly with different py-pde grid configurations.
 - **Coupled multi-field PDEs**: `make_coupled_kg_pde` builder for N-field systems with mass/coupling matrices; validation for matrix dimensions, finite masses, and non-negativity.
 - **Enhanced plotting**: `choose_writer_and_out` accepts custom output paths and FPS; side-by-side evolution plots with shared colorbars; clean plots with optional axis/tick removal.
 - **Profiling and logging**: timer utilities with detailed profiling summaries; logging-based output (no print statements in library code); configurable verbosity.
 - **Type safety**: explicit type annotations for observers, trackers, and callbacks; keyword-only boolean arguments to avoid positional ambiguity.
-- **Test coverage**: edge-case tests for initial conditions (non-1D grids, non-positive widths, empty amplitudes, mismatched parameter lengths); symmetry tests for coupled-field evolution.
+- **Test coverage**: edge-case tests for initial conditions (non-1D/2D grids, non-positive widths, empty amplitudes, mismatched parameter lengths); symmetry tests for coupled-field evolution in both 1D and 2D.
 
 ## Future Aims / TODOs
 
@@ -108,8 +111,11 @@ uv run python examples/klein_gordon/1d_barrier.py
 # 2D KG example: radial ring pulse (writes snapshots and a video/gif)
 uv run python examples/klein_gordon/2d_ring_pulse.py
 
-# Coupled two-field symmetric KG system (side-by-side spacetime plots)
+# Coupled two-field symmetric KG system in 1D (side-by-side spacetime plots)
 uv run python examples/klein_gordon/2field_coupled.py
+
+# **NEW** Coupled two-field KG system in 2D (animated dual-panel evolution)
+uv run python examples/klein_gordon/2d_2field_coupled.py
 ```
 
 Outputs are written to `outputs/` (created automatically if missing).
@@ -117,8 +123,9 @@ Outputs are written to `outputs/` (created automatically if missing).
 ### Animation Features
 
 - **1D animations** (`1d_gaussian_pulse_anim.py`): show φ(x) vs x at each time step; configurable FPS and snapshot interval; supports both MP4 (ffmpeg) and GIF (Pillow).
-- **2D animations** (`2d_ring_pulse.py`): radial collapse/expansion of a ring pulse; imshow-based heatmaps written frame-by-frame with tqdm progress bars.
-- **Coupled-field plots** (`2field_coupled.py`): two side-by-side spacetime heatmaps (one per field) with a shared colorbar; clean axis formatting; test for symmetry preservation.
+- **2D single-field animations** (`2d_ring_pulse.py`): radial collapse/expansion of a ring pulse; imshow-based heatmaps written frame-by-frame with tqdm progress bars.
+- **2D coupled-field animations** (`2d_2field_coupled.py`): dual-panel visualization showing both fields evolving simultaneously with shared color scale; demonstrates energy transfer between coupled fields with different masses; spatially separated initial Gaussians show propagation and interaction.
+- **1D coupled-field plots** (`2field_coupled.py`): two side-by-side spacetime heatmaps (one per field) with a shared colorbar; clean axis formatting; test for symmetry preservation.
 
 ### Customization
 

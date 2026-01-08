@@ -15,6 +15,7 @@ from torsion_gertsenshtein.kgsim.grids import make_grid
 from torsion_gertsenshtein.kgsim.initial_conditions import (
     gaussian_pulse,
     multi_gaussian,
+    multi_gaussian_2d,
     plane_wave,
     ring_pulse_2d,
 )
@@ -37,6 +38,7 @@ __all__ = [
     "make_coupled_kg_pde",
     "make_grid",
     "multi_gaussian",
+    "multi_gaussian_2d",
     "plane_wave",
     "ring_pulse_2d",
     "run",

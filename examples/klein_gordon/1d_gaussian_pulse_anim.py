@@ -2,15 +2,15 @@ from __future__ import annotations
 
 import logging
 import operator
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, Any
 
+# Create 1D line animation using unified plotting module
+from torsion_gertsenshtein.kgsim.animations import create_1d_line_animation
 from torsion_gertsenshtein.plot_pgf import enable_pgf
 
 enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
 
-import matplotlib.pyplot as plt
 import numpy as np
-from tqdm import tqdm
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
@@ -21,7 +21,6 @@ from torsion_gertsenshtein.kgsim import (
     make_grid,
     run,
 )
-from torsion_gertsenshtein.kgsim.plotting import choose_writer_and_out
 
 if TYPE_CHECKING:
     from pde import FieldCollection
@@ -130,45 +129,15 @@ def main() -> None:
     # Sort by time (observer callbacks might not be strictly increasing)
     snapshots.sort(key=operator.itemgetter(0))
 
-    # get x coordinates from grid
-    x = cast("np.ndarray", simulation_components["grid"].axes_coords[0])
-
-    # normalize y-axis limits across all frames for visual consistency
-    all_min = min(frame.min() for _, frame in snapshots)
-    all_max = max(frame.max() for _, frame in snapshots)
-    # add small padding to y-limits
-    y_padding = 0.1 * (all_max - all_min) if all_max > all_min else 0.1
-    ylim = (all_min - y_padding, all_max + y_padding)
-
-    # Prepare figure
-    fig, ax = plt.subplots(figsize=(8, 5))
-    (line,) = ax.plot(x, snapshots[0][1].ravel(), color="C0")
-    ax.set_xlabel("x")
-    ax.set_ylabel(r"$\phi$")
-    ax.set_xlim(x.min(), x.max())
-    ax.set_ylim(ylim)
-    ax.grid(visible=True, alpha=0.3)
-    title = ax.set_title(
-        rf"Klein-Gordon evolution: $\phi(x)$ at t = {snapshots[0][0]:.2f}"
-    )
-
-    # choose writer (FFMpegWriter preferred)
-    writer, out, use_writer = choose_writer_and_out(
-        len(snapshots),
-        simulation_components["simulation_config"].t_end,
+    create_1d_line_animation(
+        snapshots,
+        simulation_components["grid"],
         "outputs/KG_evolution",
+        title_template=r"Klein-Gordon evolution: $\phi(x)$ at t = {t:.2f}",
+        xlabel=r"$x$",
+        ylabel=r"$\phi$",
         fps=30,
     )
-
-    with writer.saving(fig, str(out), dpi=150):
-        for t, frame in tqdm(snapshots, desc="Writing frames", total=len(snapshots)):
-            line.set_ydata(frame.ravel())
-            title.set_text(rf"Klein-Gordon evolution: $\phi(x)$ at t = {t:.2f}")
-            fig.canvas.draw()
-            writer.grab_frame()
-
-    plt.close(fig)
-    print(f"Saved {out} using {use_writer} writer")
 
 
 if __name__ == "__main__":

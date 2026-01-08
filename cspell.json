@@ -4,6 +4,7 @@
     "language": "en",
     "words": [
         "atleast",
+        "blit",
         "cbar",
         "clim",
         "cmap",
@@ -13,6 +14,7 @@
         "imshow",
         "KGPDE",
         "kgsim",
+        "libx",
         "llvmlite",
         "lualatex",
         "Mathematica",

@@ -2,16 +2,15 @@ from __future__ import annotations
 
 import logging
 import operator
-import pathlib
 from typing import TYPE_CHECKING, Any
 
+# Create spacetime heatmap using unified plotting module
+from torsion_gertsenshtein.kgsim.animations import create_spacetime_plot
 from torsion_gertsenshtein.plot_pgf import enable_pgf
 
 enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
 
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib.colors import TwoSlopeNorm
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
@@ -129,45 +128,16 @@ def main() -> None:
     # Sort by time (observer callbacks might not be strictly increasing)
     snapshots.sort(key=operator.itemgetter(0))
 
-    # Build evolution array: shape (nt, nx) with time as vertical axis
-    times = [t for t, _ in snapshots]
-    phi_rows = [
-        arr.reshape(simulation_components["grid"].shape)
-        if hasattr(simulation_components["grid"], "shape")
-        else arr.ravel()
-        for _, arr in snapshots
-    ]
-    data = np.vstack([row.ravel() for row in phi_rows])  # (nt, nx)
-
-    # Center colormap on zero even if data is asymmetric
-    vmin = float(data.min())
-    vmax = float(data.max())
-    norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
-
-    pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-    out = "outputs/KG_evolution.pdf"
-
-    fig, ax = plt.subplots(figsize=(4, 3))
-    im = ax.imshow(
-        data,
-        aspect="auto",
-        origin="lower",
-        extent=(
-            simulation_components["grid"].axes_bounds[0][0],
-            simulation_components["grid"].axes_bounds[0][1],
-            min(times),
-            max(times),
-        ),
-        cmap="bwr",
-        norm=norm,
+    create_spacetime_plot(
+        snapshots,
+        simulation_components["grid"],
+        "outputs/KG_evolution.pdf",
+        title=r"Klein-Gordon evolution: $\phi(x,t)$",
+        xlabel=r"$x$",
+        ylabel=r"$t$",
+        cbar_label=r"$\phi$",
     )
-    ax.set_xlabel("$x$")
-    ax.set_ylabel("$t$")
-    ax.set_title(r"Klein-Gordon evolution: $\phi(x,t)$")
-    fig.colorbar(im, ax=ax, label=r"$\phi$")
-    fig.savefig(out, dpi=200, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved {out}")
+    print("Saved outputs/KG_evolution.pdf")
 
 
 if __name__ == "__main__":

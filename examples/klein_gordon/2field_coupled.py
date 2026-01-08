@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import operator
-import pathlib
 from typing import TYPE_CHECKING, Any
 
 from torsion_gertsenshtein.plot_pgf import enable_pgf
@@ -9,8 +8,6 @@ from torsion_gertsenshtein.plot_pgf import enable_pgf
 enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
 
 import numpy as np
-from matplotlib import pyplot as plt
-from matplotlib.colors import TwoSlopeNorm
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
@@ -21,6 +18,9 @@ from torsion_gertsenshtein.kgsim import (
     multi_gaussian,
     run,
 )
+
+# Create side-by-side spacetime heatmaps using unified plotting module
+from torsion_gertsenshtein.kgsim.animations import create_spacetime_plot_adjacent
 
 if TYPE_CHECKING:
     from pde import FieldCollection
@@ -72,7 +72,7 @@ def _build_simulation_components() -> dict[str, Any]:
     }
 
 
-def main() -> None:  # noqa: PLR0914
+def main() -> None:
     """Run the coupled Klein-Gordon simulation.
 
     This function collects snapshots of both fields and saves a figure showing the
@@ -130,71 +130,19 @@ def main() -> None:  # noqa: PLR0914
     # Sort by time (observer callbacks might not be strictly increasing)
     snapshots.sort(key=operator.itemgetter(0))
 
-    # Build evolution arrays for both fields: shape (nt, nx) with time as vertical axis
-    # snapshots are tuples (t, phi0_array, phi1_array)
-    times = [t for t, *_ in snapshots]
-
-    def _reshape(arr: np.ndarray) -> np.ndarray:
-        return (
-            arr.reshape(simulation_components["grid"].shape)
-            if hasattr(simulation_components["grid"], "shape")
-            else arr.ravel()
-        )
-
-    phi0_rows = [_reshape(arr0) for _, arr0, _ in snapshots]
-    phi1_rows = [_reshape(arr1) for _, _, arr1 in snapshots]
-
-    data = [
-        np.vstack([row.ravel() for row in phi0_rows]),
-        np.vstack([row.ravel() for row in phi1_rows]),
-    ]  # (nt, nx) for field 1
-
-    # Center colormap on zero even if data is asymmetric
-    vmin = np.min([data[0].min(), data[1].min()])
-    vmax = np.max([data[0].max(), data[1].max()])
-    norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
-
-    # Two panels + dedicated colorbar column via GridSpec to avoid overlap with tight_layout
-    fig = plt.figure(figsize=(12, 6))
-    gs = fig.add_gridspec(1, 3, width_ratios=[1, 1, 0.03], wspace=0.05)
-    ax0 = fig.add_subplot(gs[0, 0])
-    ax1 = fig.add_subplot(gs[0, 1], sharey=ax0)
-
-    im = None
-    for i, a in enumerate([ax0, ax1]):
-        im = a.imshow(
-            data[i],
-            aspect="auto",
-            origin="lower",
-            extent=(
-                simulation_components["grid"].axes_bounds[0][0],
-                simulation_components["grid"].axes_bounds[0][1],
-                min(times),
-                max(times),
-            ),
-            cmap="bwr",
-            norm=norm,
-        )
-        a.set_title(r"Coupled Klein-Gordon evolution: " + rf"$\phi_{{{i}}}(x,t)$")
-        a.set_xlabel("x")
-        if i == 0:
-            a.set_ylabel("t")
-        else:
-            a.tick_params(labelleft=False, left=False)
-
-    if im is None:
-        msg = "No image was created to attach a colorbar to."
-        raise RuntimeError(msg)
-
-    # place colorbar into the small third column created above
-    cbar = fig.colorbar(im, cax=fig.add_subplot(gs[0, 2]), orientation="vertical")
-    cbar.set_label(r"$\phi$")
-
-    pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-    out = "outputs/KG_coupled_evolution.pdf"
-    fig.savefig(out, dpi=200, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved {out}")
+    create_spacetime_plot_adjacent(
+        snapshots,
+        simulation_components["grid"],
+        "outputs/KG_coupled_evolution.pdf",
+        titles=(
+            r"Coupled Klein-Gordon evolution: $\phi_{0}(x,t)$",
+            r"Coupled Klein-Gordon evolution: $\phi_{1}(x,t)$",
+        ),
+        xlabel=r"$x$",
+        ylabel=r"$t$",
+        cbar_label=r"$\phi$",
+    )
+    print("Saved outputs/KG_coupled_evolution.pdf")
 
 
 if __name__ == "__main__":

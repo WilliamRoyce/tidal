@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import pathlib
 from typing import TYPE_CHECKING, Any
 
 from torsion_gertsenshtein.plot_pgf import enable_pgf
@@ -9,7 +8,6 @@ enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
 
 import operator
 
-import matplotlib.pyplot as plt
 import numpy as np
 
 from torsion_gertsenshtein.kgsim import (
@@ -21,7 +19,9 @@ from torsion_gertsenshtein.kgsim import (
     ring_pulse_2d,
     run,
 )
-from torsion_gertsenshtein.kgsim.plotting import choose_writer_and_out
+
+# Create 2D heatmap animation using unified plotting module
+from torsion_gertsenshtein.kgsim.animations import create_2d_heatmap_animation
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -78,68 +78,6 @@ def make_recorder() -> tuple[
         return {}
 
     return record_phi, snapshots
-
-
-def prepare_figure(
-    first_frame: np.ndarray, grid: CartesianGrid
-) -> tuple[Any, Any, Any]:
-    """
-    Prepare a matplotlib figure, axes, and image for visualizing a 2D scalar field.
-
-    This function creates a Figure and Axes, displays the provided 2D array
-    using imshow, and attaches a colorbar. It configures the image origin,
-    spatial extent (from the provided CartesianGrid), colormap, color limits,
-    interpolation, and aspect ratio, and labels the axes.
-
-    Parameters
-    ----------
-    first_frame : np.ndarray
-        2D array containing the initial scalar field to display. The array's
-        minimum and maximum values are used to set the image vmin and vmax.
-    grid : CartesianGrid
-        Grid object that provides axes bounds via `grid.axes_bounds`. This is
-        expected to be a sequence like ((xmin, xmax), (ymin, ymax)) and is used
-        to set the imshow extent so axis tick values correspond to physical
-        coordinates.
-
-    Returns
-    -------
-    fig : matplotlib.figure.Figure
-        The created matplotlib Figure instance.
-    ax : matplotlib.axes.Axes
-        The Axes instance on which the image was drawn. X and Y labels are set
-        to "x" and "y".
-    im : matplotlib.image.AxesImage
-        The image object returned by Axes.imshow. It uses the "bwr" colormap,
-        origin="lower", interpolation="nearest", aspect="equal", and the color
-        limits set from `first_frame`. A colorbar is attached to the figure with
-        label "φ" and shrink factor 0.8.
-
-    Notes
-    -----
-    - The function does not call plt.show(); it returns the created objects
-      so the caller can further modify them or display/save the figure.
-    """
-    fig, ax = plt.subplots(figsize=(6, 5))
-    im = ax.imshow(
-        first_frame,
-        origin="lower",
-        extent=(
-            grid.axes_bounds[0][0],
-            grid.axes_bounds[0][1],
-            grid.axes_bounds[1][0],
-            grid.axes_bounds[1][1],
-        ),
-        cmap="bwr",
-        vmin=np.min(first_frame),
-        vmax=np.max(first_frame),
-        interpolation="nearest",
-        aspect="equal",
-    )
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    fig.colorbar(im, ax=ax, shrink=0.8, label=r"$\phi$")
-    return fig, ax, im
 
 
 def main() -> None:
@@ -206,33 +144,17 @@ def main() -> None:
     # Sort by time
     snapshots.sort(key=operator.itemgetter(0))
 
-    # prepare output dir
-    pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-
-    # Prepare figure and writer
-    fig, ax, im = prepare_figure(snapshots[0][1].reshape(grid.shape), grid)
-
-    # choose writer (FFMpegWriter preferred)
-    writer, out, use_writer = choose_writer_and_out(
-        len(snapshots), simulation_config.t_end, "outputs/phi_evolution_2d.mp4"
+    create_2d_heatmap_animation(
+        snapshots,
+        grid,
+        "outputs/phi_evolution_2d.mp4",
+        title_template=r"$\phi(x,y)$ at t = {t:.3f}",
+        xlabel=r"$x$",
+        ylabel=r"$y$",
+        cbar_label=r"$\phi$",
+        cmap="bwr",
+        interpolation="nearest",
     )
-
-    # normalize color scale across all frames for visual consistency
-    all_min = min(frame.min() for _, frame in snapshots)
-    all_max = max(frame.max() for _, frame in snapshots)
-    im.set_clim(all_min, all_max)
-
-    with writer.saving(fig, str(out), dpi=150):
-        for t, frame in snapshots:
-            frame2d = frame.reshape(grid.shape)
-            im.set_data(frame2d)
-            ax.set_title(rf"$\phi(x,y)$ at t = {t:.3f}")
-            # draw + grab
-            fig.canvas.draw()
-            writer.grab_frame()
-
-    plt.close(fig)
-    print(f"Saved {out} using {use_writer} writer")
 
 
 if __name__ == "__main__":
