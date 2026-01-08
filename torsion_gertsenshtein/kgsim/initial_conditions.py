@@ -283,6 +283,8 @@ def _expand_param(
         Name of the parameter (used for error messages).
     values : Sequence[float] | float | None
         A scalar or sequence to normalize to a 1D numpy array.
+        If a scalar is provided, it will be broadcast to all fields.
+        If a sequence is provided, it must have exactly `n` elements.
     n : int
         Target length of the returned array.
 
@@ -294,17 +296,26 @@ def _expand_param(
     Raises
     ------
     ValueError
-        If `values` is None, or if the resulting array does not have length `n`.
+        If `values` is None, or if a sequence is provided with length != `n`.
     """
     if values is None:
         msg = f"{name} must be provided"
         raise ValueError(msg)
+
+    # Check if input is a scalar (not a sequence)
+    # np.ndim returns 0 for scalars, >0 for arrays/sequences
+    is_scalar = np.ndim(values) == 0
+
     arr = np.atleast_1d(np.asarray(values, dtype=float))
-    if arr.size == 1 and n > 1:
+
+    # Only broadcast if the original input was a scalar
+    if is_scalar and n > 1:
         arr = np.full((n,), float(arr.item()), dtype=float)
+
     if arr.size != n:
-        msg = f"{name} must have length == number of fields"
+        msg = f"{name} must have length {n} (got {arr.size}), or be a scalar for broadcasting"
         raise ValueError(msg)
+
     return arr
 
 
