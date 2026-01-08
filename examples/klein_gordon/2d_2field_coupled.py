@@ -12,8 +12,11 @@ their interaction over time.
 
 from __future__ import annotations
 
+import logging
 import pathlib
 from typing import TYPE_CHECKING, Any
+
+logger = logging.getLogger(__name__)
 
 # Disable PGF/LaTeX rendering for this example (causes issues with Unicode in titles)
 import numpy as np
@@ -50,7 +53,7 @@ def build_grid_and_state() -> tuple[CartesianGrid, FieldCollection]:
     grid_config = GridConfig(
         dim=2,
         shape=(128, 128),
-        bounds=((-50.0, 50.0), (-50.0, 50.0)),
+        bounds=((0.0, 200.0), (0.0, 200.0)),
         periodic=True,
     )
     grid = make_grid(grid_config)
@@ -58,9 +61,9 @@ def build_grid_and_state() -> tuple[CartesianGrid, FieldCollection]:
     # Initialize two fields: field 0 excited on the left, field 1 dormant on the right
     state = multi_gaussian_2d(
         grid,
-        amplitudes=[1.0, 0.0],
-        widths=[5.0, 5.0],
-        centers=[(-15.0, 0.0), (15.0, 0.0)],
+        amplitudes=[1.0, 1.0],
+        widths=[4.0, 4.0],
+        centers=[(100.0, 100.0), (125.0, 125.0)],
         velocities=[0.0, 0.0],
     )
     return grid, state
@@ -106,11 +109,12 @@ def main() -> None:
     3. Runs the simulation with off-diagonal coupling
     4. Creates an MP4 animation showing energy transfer between fields
     """
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     # Build simulation components
     grid, state = build_grid_and_state()
 
     # Two fields with different masses and symmetric coupling
-    masses = [0.5, 1.0]  # lighter field (0) and heavier field (1)
+    masses = [0.3, 0.7]  # lighter field (0) and heavier field (1)
     g = 0.2  # off-diagonal bilinear coupling strength
     coupling = [[0.0, g], [g, 0.0]]
     pde = make_coupled_kg_pde(MultiFieldParams(masses=masses, coupling=coupling))
@@ -118,7 +122,7 @@ def main() -> None:
     # Simulation configuration
     # Use explicit solver with adaptive time-stepping for 2D
     simulation_config = SimulationConfig(
-        t_end=100.0,
+        t_end=150.0,
         dt=None,  # adaptive
         solver="explicit",
         backend="numpy",  # numpy backend for multi-field 2D
@@ -137,11 +141,11 @@ def main() -> None:
         )
     )
 
-    print("Starting 2D coupled KG simulation...")
-    print(f"  Grid: {grid.shape} cells, domain: {grid.axes_bounds}")
-    print(f"  Masses: {masses}")
-    print(f"  Coupling strength: {g}")
-    print(f"  Simulation time: 0 to {simulation_config.t_end}")
+    logger.info("Starting 2D coupled KG simulation...")
+    logger.info("  Grid: %s cells, domain: %s", grid.shape, grid.axes_bounds)
+    logger.info("  Masses: %s", masses)
+    logger.info("  Coupling strength: %s", g)
+    logger.info("  Simulation time: 0 to %s", simulation_config.t_end)
 
     # Run simulation
     run(
@@ -151,30 +155,32 @@ def main() -> None:
         extra_observer=recorder,
     )
 
-    print(f"Simulation complete. Recorded {len(snapshots)} snapshots.")
+    logger.info("Simulation complete. Recorded %s snapshots.", len(snapshots))
 
     pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
     out_base = pathlib.Path("outputs") / "phi_evolution_2d_2field_coupled.mp4"
 
-    print(f"Creating animation: {out_base}")
+    logger.info("Creating animation: %s", out_base)
     create_2d_coupled_animation(
         snapshots,
         grid,
         out_base,
-        titles=("Field 0: φ₀(x, y, t)", "Field 1: φ₁(x, y, t)"),
-        xlabel="x",
-        ylabel="y",
-        cbar_labels=("φ₀", "φ₁"),
-        cmap="RdBu_r",
-        fps=30,
+        titles=(r"Field 0: $\phi_0(x, y, t)$", r"Field 1: $\phi_1(x, y, t)$"),
+        xlabel=r"$x$",
+        ylabel=r"$y$",
+        cbar_labels=(r"$\phi_0$", r"$\phi_1$"),
+        cmap="bwr",
+        fps=15,
         dpi=150,
     )
 
-    print(f"Animation saved to: {out_base}")
-    print("\nResults:")
-    print(f"  Field 0 initially excited at (-15, 0) with mass = {masses[0]}")
-    print(f"  Field 1 initially dormant at (15, 0) with mass = {masses[1]}")
-    print(f"  Off-diagonal coupling g = {g} causes energy transfer between fields")
+    logger.info("Animation saved to: %s", out_base)
+    logger.info("Results:")
+    logger.info("  Field 0 initially excited at (100, 100) with mass = %s", masses[0])
+    logger.info("  Field 1 initially dormant at (150, 150) with mass = %s", masses[1])
+    logger.info(
+        "  Off-diagonal coupling g = %s causes energy transfer between fields", g
+    )
 
 
 if __name__ == "__main__":
