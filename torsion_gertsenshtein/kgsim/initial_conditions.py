@@ -396,7 +396,7 @@ def multi_gaussian(
     return FieldCollection(fields, labels=labels)
 
 
-def multi_gaussian_2d(
+def multi_gaussian_2d(  # noqa: PLR0914
     grid: CartesianGrid,
     amplitudes: Sequence[float],
     widths: Sequence[float],
@@ -409,10 +409,10 @@ def multi_gaussian_2d(
     each initialized as a Gaussian centered at a specified 2D position. The
     Gaussian for field i has the form:
 
-        phi_i(x, y) = A_i * exp(-r_i^2 / (2 * σ_i^2))
+        phi_i(x, y) = A_i * exp(-r_i^2 / (2 * sigma_i^2))
 
     where r_i = sqrt((x - x_i)^2 + (y - y_i)^2) is the Euclidean distance from
-    the center (x_i, y_i), A_i is the amplitude, and σ_i is the width.
+    the center (x_i, y_i), A_i is the amplitude, and sigma_i is the width.
 
     The conjugate momentum is:
         pi_i(x, y) = v_i * phi_i(x, y)
@@ -427,7 +427,7 @@ def multi_gaussian_2d(
         Sequence of amplitudes [A_0, A_1, ..., A_{N-1}], one per field.
         Must be non-empty.
     widths : Sequence[float]
-        Sequence of widths (standard deviations) [σ_0, σ_1, ..., σ_{N-1}],
+        Sequence of widths (standard deviations) [sigma_0, sigma_1, ..., sigma_{N-1}],
         one per field. All widths must be positive.
     centers : Sequence[tuple[float, float]] or None, optional
         Sequence of center positions [(x_0, y_0), (x_1, y_1), ...], one per
