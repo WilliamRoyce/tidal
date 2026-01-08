@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
+import pytest
 from numpy.testing import assert_allclose
 from pde import PDE, CartesianGrid, ScalarField
 
@@ -61,7 +62,11 @@ def test_kg_pde_expression_equivalence() -> None:
         t_end=1.0, dt=0.1, solver="explicit", backend="numba", progress=False
     )
     out = pde.solve(
-        state=state, t_range=cfg.t_end, dt=cfg.dt, solver="explicit", backend="numba"
+        state=state,
+        t_range=cfg.t_end,
+        dt=cfg.dt,
+        solver=cfg.solver,
+        backend=cfg.backend,
     )
     # Normalize possible return shapes: FieldCollection | (FieldCollection|None, info) | None
     if isinstance(out, tuple):
@@ -81,6 +86,45 @@ def test_kg_pde_expression_equivalence() -> None:
         assert any(periodic_seq)
     else:
         assert bool(periodic)
+
+
+def _grid_1d() -> CartesianGrid:
+    return make_grid(
+        GridConfig(dim=1, shape=(32,), bounds=((0.0, 10.0),), periodic=True)
+    )
+
+
+def _grid_2d() -> CartesianGrid:
+    return make_grid(
+        GridConfig(
+            dim=2, shape=(16, 16), bounds=((0.0, 10.0), (0.0, 5.0)), periodic=True
+        )
+    )
+
+
+def test_non_1d_grid_raises_value_error() -> None:
+    grid2 = _grid_2d()
+    with pytest.raises(ValueError, match=r"(1D|1-dimension|one-dimensional)"):
+        multi_gaussian(grid2, amplitudes=[1.0], widths=[1.0])
+
+
+@pytest.mark.parametrize("bad_width", [0.0, -1.0])
+def test_non_positive_widths_raise(bad_width: Sequence[float]) -> None:
+    grid = _grid_1d()
+    with pytest.raises(ValueError, match=r"(width|positive|> ?0)"):
+        multi_gaussian(grid, amplitudes=[1.0], widths=bad_width)
+
+
+def test_mismatched_parameter_lengths_raise() -> None:
+    grid = _grid_1d()
+    with pytest.raises(ValueError, match=r"(mismatch|length|same length)"):
+        multi_gaussian(grid, amplitudes=[1.0, 2.0], widths=[1.0])
+
+
+def test_empty_amplitudes_raise() -> None:
+    grid = _grid_1d()
+    with pytest.raises(ValueError, match=r"(empty|non-?empty|at least|>= ?1)"):
+        multi_gaussian(grid, amplitudes=[], widths=[])
 
 
 def test_gaussian_equals_multi_gaussian_single_field() -> None:

@@ -1,26 +1,26 @@
 from __future__ import annotations
 
-import operator
 from typing import TYPE_CHECKING, Any
 
+# Create spacetime heatmap using unified plotting module
+from torsion_gertsenshtein.kgsim.animations import create_spacetime_plot
 from torsion_gertsenshtein.plot_pgf import enable_pgf
 
 enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
+
+import operator
 
 import numpy as np
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
-    MultiFieldParams,
+    InhomogeneousKGPDE,
     SimulationConfig,
-    make_coupled_kg_pde,
+    gaussian_pulse,
     make_grid,
-    multi_gaussian,
     run,
+    step_region_1d,
 )
-
-# Create side-by-side spacetime heatmaps using unified plotting module
-from torsion_gertsenshtein.kgsim.animations import create_spacetime_plot_adjacent
 
 if TYPE_CHECKING:
     from pde import FieldCollection
@@ -38,24 +38,31 @@ def _build_simulation_components() -> dict[str, Any]:
     )
     grid = make_grid(grid_config)
 
-    # Two fields with masses and symmetric coupling
-    masses = [0.25, 1.0]
-    g = 0.2  # off-diagonal bilinear coupling
-    coupling = [[0.0, g], [g, 0.0]]
-    pde = make_coupled_kg_pde(MultiFieldParams(masses=masses, coupling=coupling))
-
-    # IC: excite only field 0
-    state = multi_gaussian(
-        grid, amplitudes=[1.0, 0.0], widths=[5.0, 5.0], velocities=[0.0, 0.0]
+    # --- coefficients ---
+    m_out = 0.25
+    m_in = 5.0
+    x0, x1 = 150.0, 150.5
+    # Build m^2(x)
+    m2_field = step_region_1d(
+        grid,
+        x0=x0,
+        x1=x1,
+        inside_value=m_in**2,
+        outside_value=m_out**2,
     )
 
-    # Sim config
+    # --- initial state ---
+    state = gaussian_pulse(grid, amplitude=1.0, width=5.0, initial_velocity=0.0)
+
+    # --- PDE / solver config ---
+    pde = InhomogeneousKGPDE(m2_field=m2_field)
+    # --- simulation config ---
     simulation_config = SimulationConfig(
         t_end=200.0,
-        dt=None,
+        dt=None,  # adaptive
         solver="scipy",
         method="RK45",
-        backend="numba",
+        backend="numpy",  # will auto-fallback to numpy for InhomogeneousKGPDE
         progress=True,
     )
 
@@ -73,48 +80,35 @@ def _build_simulation_components() -> dict[str, Any]:
 
 
 def main() -> None:
-    """Run the coupled Klein-Gordon simulation.
+    """Run a 1D Klein-Gordon simulation with a mass step, collect snapshots, and save an x-t image.
 
-    This function collects snapshots of both fields and saves a figure showing the
-    space-time evolution.
-
-    This function builds the simulation components, records initial and tracked
-    snapshots during the run, assembles the evolution arrays for both fields,
-    and writes an image file with two subplots (one per field). It does not
-    return a value.
+    This function delegates grid and field construction, PDE/state setup, time evolution
+    and snapshot collection, and plotting to smaller helpers so the public function is
+    documented and keeps a small number of local variables.
 
     Raises
     ------
     RuntimeError
-        If no snapshots are recorded during the simulation or if a non-finite
-        field value is encountered during observation.
+        If no snapshots are recorded during the simulation or if a non-finite field is encountered during evolution.
     """
     simulation_components = _build_simulation_components()
 
     # Collector for snapshots (time, phi_array)
-    snapshots: list[tuple[float, np.ndarray, np.ndarray]] = []
+    snapshots: list[tuple[float, np.ndarray]] = []
 
     # Record initial condition
-    snapshots.append(
-        (
-            0.0,
-            np.asarray(simulation_components["state"][0].data).copy(),
-            np.asarray(simulation_components["state"][2].data).copy(),
-        )
-    )
+    snapshots.append((0.0, np.asarray(simulation_components["state"][0].data).copy()))
 
     # Observer that records φ at each tracker interrupt
     def record_phi(state_coll: FieldCollection, t: float) -> dict[str, Any]:
-        # fields order: phi0, pi0, phi1, pi1, ...
-        arr0 = np.asarray(state_coll[0].data)
-        arr1 = np.asarray(state_coll[2].data)
-        if not (np.isfinite(arr0).all() and np.isfinite(arr1).all()):
+        arr = np.asarray(state_coll[0].data)
+        if not np.isfinite(arr).all():
             msg = f"Non-finite field at t={t}"
             raise RuntimeError(msg)
-        # record both field profiles with the same timestamp
-        snapshots.append((t, arr0.copy(), arr1.copy()))
+        snapshots.append((t, arr.copy()))
         return {}
 
+    # run accepts an extra_observer callback (side-effect: fills snapshots)
     run(
         pde=simulation_components["pde"],
         state=simulation_components["state"],
@@ -130,19 +124,17 @@ def main() -> None:
     # Sort by time (observer callbacks might not be strictly increasing)
     snapshots.sort(key=operator.itemgetter(0))
 
-    create_spacetime_plot_adjacent(
+    create_spacetime_plot(
         snapshots,
         simulation_components["grid"],
-        "outputs/KG_coupled_evolution.pdf",
-        titles=(
-            r"Coupled Klein-Gordon evolution: $\phi_{0}(x,t)$",
-            r"Coupled Klein-Gordon evolution: $\phi_{1}(x,t)$",
-        ),
+        "outputs/KG_barrier.pdf",
+        title=r"Klein-Gordon $\phi(x,t)$ with Potential Barrier",
         xlabel=r"$x$",
         ylabel=r"$t$",
         cbar_label=r"$\phi$",
+        figsize=(8, 6),
     )
-    print("Saved outputs/KG_coupled_evolution.pdf")
+    print("Saved outputs/KG_barrier.pdf")
 
 
 if __name__ == "__main__":

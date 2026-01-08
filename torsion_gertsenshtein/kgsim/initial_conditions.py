@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
@@ -61,14 +60,26 @@ def gaussian_pulse(
     -----
     - Distances are computed using Euclidean norm on the grid cell coordinates.
     """
-    coordinates = cast("np.ndarray", grid.cell_coords)  # (N, dim)
+    coordinates = cast("np.ndarray", grid.cell_coords)
     if center is None:
         center = natural_center(grid.axes_bounds)
     # validate center dimensionality
     if len(center) != grid.dim:
         msg = f"center must have length {grid.dim}, got {len(center)}"
         raise ValueError(msg)
-    r2 = np.sum((coordinates - np.array(center)) ** 2, axis=1)
+
+    # Handle different coordinate formats
+    if coordinates.ndim == grid.dim + 1 and coordinates.shape[-1] == grid.dim:
+        # Coords are in shape (*grid.shape, dim) - compute distance per cell
+        center_arr = np.array(center)
+        r2 = np.sum((coordinates - center_arr) ** 2, axis=-1).ravel()
+    elif coordinates.ndim == 2 and coordinates.shape[1] == grid.dim:  # noqa: PLR2004
+        # Coords are already flattened (N_cells, dim)
+        r2 = np.sum((coordinates - np.array(center)) ** 2, axis=1)
+    else:
+        msg = f"Unexpected cell_coords shape: {coordinates.shape}"
+        raise ValueError(msg)
+
     phi_arr = amplitude * np.exp(-r2 / (2.0 * width**2))
 
     phi = ScalarField(grid, data=phi_arr.reshape(grid.shape))
@@ -272,6 +283,8 @@ def _expand_param(
         Name of the parameter (used for error messages).
     values : Sequence[float] | float | None
         A scalar or sequence to normalize to a 1D numpy array.
+        If a scalar is provided, it will be broadcast to all fields.
+        If a sequence is provided, it must have exactly `n` elements.
     n : int
         Target length of the returned array.
 
@@ -283,17 +296,26 @@ def _expand_param(
     Raises
     ------
     ValueError
-        If `values` is None, or if the resulting array does not have length `n`.
+        If `values` is None, or if a sequence is provided with length != `n`.
     """
     if values is None:
         msg = f"{name} must be provided"
         raise ValueError(msg)
+
+    # Check if input is a scalar (not a sequence)
+    # np.ndim returns 0 for scalars, >0 for arrays/sequences
+    is_scalar = np.ndim(values) == 0
+
     arr = np.atleast_1d(np.asarray(values, dtype=float))
-    if arr.size == 1 and n > 1:
+
+    # Only broadcast if the original input was a scalar
+    if is_scalar and n > 1:
         arr = np.full((n,), float(arr.item()), dtype=float)
+
     if arr.size != n:
-        msg = f"{name} must have length == number of fields"
+        msg = f"{name} must have length {n} (got {arr.size}), or be a scalar for broadcasting"
         raise ValueError(msg)
+
     return arr
 
 
@@ -336,6 +358,11 @@ def multi_gaussian(
 
     field_count = len(amplitudes)
 
+    # validate non-empty amplitudes (prevent silent no-op with zero fields)
+    if field_count == 0:
+        msg = "amplitudes must be a non-empty sequence"
+        raise ValueError(msg)
+
     amp_arr = _expand_param("amplitudes", amplitudes, field_count)
     width_arr = _expand_param("widths", widths, field_count)
 
@@ -369,6 +396,168 @@ def multi_gaussian(
         phi_arr = amp_arr[i] * np.exp(-(dx * dx) / (2.0 * sigma * sigma))
         pi_arr = vel_arr[i] * phi_arr
 
+        fields.extend(
+            (
+                ScalarField(grid, data=phi_arr.reshape(grid.shape)),
+                ScalarField(grid, data=pi_arr.reshape(grid.shape)),
+            )
+        )
+        labels.extend([f"phi{i}", f"pi{i}"])
+
+    return FieldCollection(fields, labels=labels)
+
+
+def multi_gaussian_2d(  # noqa: PLR0914
+    grid: CartesianGrid,
+    amplitudes: Sequence[float],
+    widths: Sequence[float],
+    centers: Sequence[tuple[float, float]] | None = None,
+    velocities: Sequence[float] | None = None,
+) -> FieldCollection:
+    """2D multi-gaussian initializer for N coupled Klein-Gordon fields.
+
+    This function creates a FieldCollection with N field pairs (phi_i, pi_i),
+    each initialized as a Gaussian centered at a specified 2D position. The
+    Gaussian for field i has the form:
+
+        phi_i(x, y) = A_i * exp(-r_i^2 / (2 * sigma_i^2))
+
+    where r_i = sqrt((x - x_i)^2 + (y - y_i)^2) is the Euclidean distance from
+    the center (x_i, y_i), A_i is the amplitude, and sigma_i is the width.
+
+    The conjugate momentum is:
+        pi_i(x, y) = v_i * phi_i(x, y)
+
+    where v_i is the initial velocity for field i.
+
+    Parameters
+    ----------
+    grid : CartesianGrid
+        A 2D CartesianGrid. The function will raise ValueError if grid.dim != 2.
+    amplitudes : Sequence[float]
+        Sequence of amplitudes [A_0, A_1, ..., A_{N-1}], one per field.
+        Must be non-empty.
+    widths : Sequence[float]
+        Sequence of widths (standard deviations) [sigma_0, sigma_1, ..., sigma_{N-1}],
+        one per field. All widths must be positive.
+    centers : Sequence[tuple[float, float]] or None, optional
+        Sequence of center positions [(x_0, y_0), (x_1, y_1), ...], one per
+        field. If None, all fields are centered at the midpoint of the domain.
+    velocities : Sequence[float] or None, optional
+        Sequence of initial velocities [v_0, v_1, ...], one per field.
+        If None, all velocities are set to zero.
+
+    Returns
+    -------
+    FieldCollection
+        A FieldCollection containing 2N ScalarField objects with labels
+        ["phi0", "pi0", "phi1", "pi1", ..., "phi{N-1}", "pi{N-1}"].
+        Each phi_i and pi_i has shape == grid.shape.
+
+    Raises
+    ------
+    ValueError
+        - If grid.dim != 2.
+        - If amplitudes is empty.
+        - If any width is non-positive.
+        - If centers is provided but has length != len(amplitudes).
+        - If velocities is provided but has length != len(amplitudes).
+
+    Notes
+    -----
+    - This function is designed for initializing coupled Klein-Gordon systems
+      with spatially separated or overlapping Gaussian pulses.
+    - For single-field 2D Gaussians, use `gaussian_pulse` instead.
+    - For radial ring-shaped pulses in 2D, use `ring_pulse_2d`.
+
+    Examples
+    --------
+    Create two Gaussians separated along the x-axis::
+
+        grid = make_grid(GridConfig(dim=2, shape=(128, 128),
+                                    bounds=((-50, 50), (-50, 50)),
+                                    periodic=True))
+        state = multi_gaussian_2d(
+            grid,
+            amplitudes=[1.0, 0.0],
+            widths=[5.0, 5.0],
+            centers=[(-10.0, 0.0), (10.0, 0.0)],
+        )
+    """
+    if grid.dim != 2:  # noqa: PLR2004
+        msg = "multi_gaussian_2d requires a 2D grid (grid.dim == 2)"
+        raise ValueError(msg)
+
+    field_count = len(amplitudes)
+
+    # Validate non-empty amplitudes
+    if field_count == 0:
+        msg = "amplitudes must be a non-empty sequence"
+        raise ValueError(msg)
+
+    amp_arr = _expand_param("amplitudes", amplitudes, field_count)
+    width_arr = _expand_param("widths", widths, field_count)
+
+    # Get 2D coordinates - cell_coords may be either (nx, ny, 2) or (N_cells, 2) depending on py-pde version
+    coords = cast("np.ndarray", grid.cell_coords)
+    if coords.ndim == 3 and coords.shape[-1] == grid.dim:  # noqa: PLR2004
+        # Coords are in shape (nx, ny, 2) - extract x and y arrays
+        x = coords[:, :, 0].ravel()
+        y = coords[:, :, 1].ravel()
+    elif coords.ndim == 2 and coords.shape[1] == grid.dim:  # noqa: PLR2004
+        # Coords are already flattened (N_cells, 2)
+        x = coords[:, 0]
+        y = coords[:, 1]
+    else:
+        msg = f"Unexpected cell_coords shape: {coords.shape}"
+        raise ValueError(msg)
+
+    # Default center: midpoint of domain in both dimensions
+    mid_x = float((grid.axes_bounds[0][0] + grid.axes_bounds[0][1]) / 2.0)
+    mid_y = float((grid.axes_bounds[1][0] + grid.axes_bounds[1][1]) / 2.0)
+
+    # Handle centers parameter
+    if centers is None:
+        centers_arr = np.array(
+            [(mid_x, mid_y) for _ in range(field_count)], dtype=float
+        )
+    else:
+        if len(centers) != field_count:
+            msg = f"centers must have length {field_count} (one per field)"
+            raise ValueError(msg)
+        centers_arr = np.array(centers, dtype=float)
+        if centers_arr.shape != (field_count, 2):
+            msg = f"centers must be a sequence of (x, y) tuples, got shape {centers_arr.shape}"
+            raise ValueError(msg)
+
+    # Handle velocities parameter
+    vel_arr = (
+        _expand_param("velocities", velocities, field_count)
+        if velocities is not None
+        else np.zeros((field_count,), dtype=float)
+    )
+
+    fields: list[ScalarField] = []
+    labels: list[str | None] = []
+
+    # Build fields using vectorized expressions per field
+    for i in range(field_count):
+        sigma = width_arr[i]
+        if sigma <= 0:
+            msg = "all widths must be positive"
+            raise ValueError(msg)
+
+        # Compute Euclidean distance from center
+        cx, cy = centers_arr[i]
+        dx = x - cx
+        dy = y - cy
+        r_squared = dx * dx + dy * dy
+
+        # Gaussian profile
+        phi_arr = amp_arr[i] * np.exp(-r_squared / (2.0 * sigma * sigma))
+        pi_arr = vel_arr[i] * phi_arr
+
+        # Reshape to grid shape and create ScalarFields
         fields.extend(
             (
                 ScalarField(grid, data=phi_arr.reshape(grid.shape)),

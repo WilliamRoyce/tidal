@@ -1,15 +1,16 @@
 from __future__ import annotations
 
-import pathlib
 from typing import TYPE_CHECKING, Any
 
-import matplotlib as mpl
-import numpy as np
-from matplotlib import pyplot as plt
-from matplotlib.colors import TwoSlopeNorm
+# Create spacetime heatmap using unified plotting module
+from torsion_gertsenshtein.kgsim.animations import create_spacetime_plot
+from torsion_gertsenshtein.plot_pgf import enable_pgf
 
-mpl.use("Agg")
+enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
+
 import operator
+
+import numpy as np
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
@@ -38,9 +39,9 @@ def _build_simulation_components() -> dict[str, Any]:
     grid = make_grid(grid_config)
 
     # --- coefficients ---
-    m_out = 0.25
-    m_in = 5.0
-    x0, x1 = 150.0, 150.5
+    m_out = 0.5
+    m_in = 0.55
+    x0, x1 = 125.0, 200.0
     # Build m^2(x)
     m2_field = step_region_1d(
         grid,
@@ -51,7 +52,7 @@ def _build_simulation_components() -> dict[str, Any]:
     )
 
     # --- initial state ---
-    state = gaussian_pulse(grid, amplitude=1.0, width=5.0, initial_velocity=0.0)
+    state = gaussian_pulse(grid, amplitude=1.0, width=5.0, initial_velocity=50.0)
 
     # --- PDE / solver config ---
     pde = InhomogeneousKGPDE(m2_field=m2_field)
@@ -123,45 +124,17 @@ def main() -> None:
     # Sort by time (observer callbacks might not be strictly increasing)
     snapshots.sort(key=operator.itemgetter(0))
 
-    # Build evolution array: shape (nt, nx) with time as vertical axis
-    times = [t for t, _ in snapshots]
-    phi_rows = [
-        arr.reshape(simulation_components["grid"].shape)
-        if hasattr(simulation_components["grid"], "shape")
-        else arr.ravel()
-        for _, arr in snapshots
-    ]
-    data = np.vstack([row.ravel() for row in phi_rows])  # (nt, nx)
-
-    # Center colormap on zero even if data is asymmetric
-    vmin = float(data.min())
-    vmax = float(data.max())
-    norm = TwoSlopeNorm(vmin=vmin, vcenter=0.0, vmax=vmax)
-
-    pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-    out = "outputs/KG_mass_step.png"
-
-    fig, ax = plt.subplots(figsize=(8, 6))
-    im = ax.imshow(
-        data,
-        aspect="auto",
-        origin="lower",
-        extent=(
-            simulation_components["grid"].axes_bounds[0][0],
-            simulation_components["grid"].axes_bounds[0][1],
-            min(times),
-            max(times),
-        ),
-        cmap="bwr",
-        norm=norm,
+    create_spacetime_plot(
+        snapshots,
+        simulation_components["grid"],
+        "outputs/KG_mass_step.pdf",
+        title=r"Klein-Gordon $\phi(x,t)$ with mass step",
+        xlabel=r"$x$",
+        ylabel=r"$t$",
+        cbar_label=r"$\phi$",
+        figsize=(8, 6),
     )
-    ax.set_xlabel("x")
-    ax.set_ylabel("t")
-    ax.set_title(r"Klein-Gordon $\phi(x,t)$ with mass step")
-    fig.colorbar(im, ax=ax, label=r"$\phi$")
-    fig.savefig(out, dpi=200, bbox_inches="tight")
-    plt.close(fig)
-    print(f"Saved {out}")
+    print("Saved outputs/KG_mass_step.pdf")
 
 
 if __name__ == "__main__":

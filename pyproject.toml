@@ -51,7 +51,7 @@ unfixable = ["T201"]
 
 [tool.ruff.lint.extend-per-file-ignores]
 "tests/**/*" = ["PLR6301", "PLR0914", "D101", "D102", "D103", "D104"]
-"examples/**/*" = ["INP001", "T201"]
+"examples/**/*" = ["INP001", "T201", "E402"]
 "scripts/**/*" = ["INP001", "T201", "D101", "D102", "D103", "D104"]
 "docs/**/*" = ["INP001", "I002"]
 

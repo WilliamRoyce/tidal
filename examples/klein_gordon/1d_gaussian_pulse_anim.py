@@ -4,8 +4,8 @@ import logging
 import operator
 from typing import TYPE_CHECKING, Any
 
-# Create spacetime heatmap using unified plotting module
-from torsion_gertsenshtein.kgsim.animations import create_spacetime_plot
+# Create 1D line animation using unified plotting module
+from torsion_gertsenshtein.kgsim.animations import create_1d_line_animation
 from torsion_gertsenshtein.plot_pgf import enable_pgf
 
 enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
@@ -44,7 +44,7 @@ def _build_simulation_components() -> dict[str, Any]:
 
     simulation_config = SimulationConfig(
         t_end=200.0,
-        dt=None,  # adaptive
+        dt=None,  # fixed time step
         solver="scipy",  # or "explicit"
         method="RK45",
         backend="numba",  # prefer 'numpy' here for portability unless numba RHS is provided
@@ -117,6 +117,7 @@ def main() -> None:
         state=simulation_components["state"],
         config=simulation_components["simulation_config"],
         extra_observer=record_phi,
+        snapshot_interval=0.5,
         profile=True,
     )
 
@@ -128,16 +129,15 @@ def main() -> None:
     # Sort by time (observer callbacks might not be strictly increasing)
     snapshots.sort(key=operator.itemgetter(0))
 
-    create_spacetime_plot(
+    create_1d_line_animation(
         snapshots,
         simulation_components["grid"],
-        "outputs/KG_evolution.pdf",
-        title=r"Klein-Gordon evolution: $\phi(x,t)$",
+        "outputs/KG_evolution",
+        title_template=r"Klein-Gordon evolution: $\phi(x)$ at t = {t:.2f}",
         xlabel=r"$x$",
-        ylabel=r"$t$",
-        cbar_label=r"$\phi$",
+        ylabel=r"$\phi$",
+        fps=30,
     )
-    print("Saved outputs/KG_evolution.pdf")
 
 
 if __name__ == "__main__":

@@ -1,18 +1,14 @@
 from __future__ import annotations
 
-import pathlib
 from typing import TYPE_CHECKING, Any
 
-import matplotlib as mpl
+from torsion_gertsenshtein.plot_pgf import enable_pgf
 
-mpl.use("Agg")
+enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
+
 import operator
-import shutil
 
-import matplotlib.pyplot as plt
 import numpy as np
-from matplotlib import animation
-from matplotlib.animation import FFMpegWriter, PillowWriter
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
@@ -23,6 +19,9 @@ from torsion_gertsenshtein.kgsim import (
     ring_pulse_2d,
     run,
 )
+
+# Create 2D heatmap animation using unified plotting module
+from torsion_gertsenshtein.kgsim.animations import create_2d_heatmap_animation
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -79,115 +78,6 @@ def make_recorder() -> tuple[
         return {}
 
     return record_phi, snapshots
-
-
-def choose_writer_and_out(
-    snap_count: int, t_end: float
-) -> tuple[FFMpegWriter | PillowWriter, str, str]:
-    """
-    Select an appropriate matplotlib animation writer and output filename.
-
-    Parameters
-    ----------
-    snap_count : int
-        Number of frames/snapshots available for the animation.
-    t_end : float
-        Total simulation time (same units as snapshot spacing). Used to compute a
-        target frames-per-second (fps) for playback.
-
-    Returns
-    -------
-    tuple[Any, str, str]
-        A tuple containing:
-        - writer: an instance of a matplotlib.animation writer (FFMpegWriter or PillowWriter).
-        - out: str, path to the output file. Uses "outputs/phi_evolution_2d.mp4" when
-          ffmpeg is selected, otherwise "outputs/phi_evolution_2d.gif".
-        - use_writer: str, identifier of the writer used ("ffmpeg" or "pillow").
-
-    Behavior
-    --------
-    - Computes fps as the number of snapshots divided by (t_end / 5.0), coerced to an int
-      and clamped to at least 1 to avoid zero or fractional fps.
-    - Prefers ffmpeg if matplotlib.animation reports "ffmpeg" as available and the
-      ffmpeg executable is present on the system; in that case returns an FFMpegWriter
-      configured with metadata and a bitrate.
-    - Falls back to PillowWriter when ffmpeg is not available.
-    - Chooses output filename and a string label for which writer was chosen.
-    """
-    fps = max(1, int(snap_count / max(1.0, t_end / 5.0)))
-    if animation.writers.is_available("ffmpeg") and shutil.which("ffmpeg") is not None:
-        writer = animation.FFMpegWriter(
-            fps=fps, metadata={"artist": "kgsim"}, bitrate=2000
-        )
-        out = "outputs/phi_evolution_2d.mp4"
-        use_writer = "ffmpeg"
-    else:
-        writer = PillowWriter(fps=fps)
-        out = "outputs/phi_evolution_2d.gif"
-        use_writer = "pillow"
-    return writer, out, use_writer
-
-
-def prepare_figure(
-    first_frame: np.ndarray, grid: CartesianGrid
-) -> tuple[Any, Any, Any]:
-    """
-    Prepare a matplotlib figure, axes, and image for visualizing a 2D scalar field.
-
-    This function creates a Figure and Axes, displays the provided 2D array
-    using imshow, and attaches a colorbar. It configures the image origin,
-    spatial extent (from the provided CartesianGrid), colormap, color limits,
-    interpolation, and aspect ratio, and labels the axes.
-
-    Parameters
-    ----------
-    first_frame : np.ndarray
-        2D array containing the initial scalar field to display. The array's
-        minimum and maximum values are used to set the image vmin and vmax.
-    grid : CartesianGrid
-        Grid object that provides axes bounds via `grid.axes_bounds`. This is
-        expected to be a sequence like ((xmin, xmax), (ymin, ymax)) and is used
-        to set the imshow extent so axis tick values correspond to physical
-        coordinates.
-
-    Returns
-    -------
-    fig : matplotlib.figure.Figure
-        The created matplotlib Figure instance.
-    ax : matplotlib.axes.Axes
-        The Axes instance on which the image was drawn. X and Y labels are set
-        to "x" and "y".
-    im : matplotlib.image.AxesImage
-        The image object returned by Axes.imshow. It uses the "bwr" colormap,
-        origin="lower", interpolation="nearest", aspect="equal", and the color
-        limits set from `first_frame`. A colorbar is attached to the figure with
-        label "φ" and shrink factor 0.8.
-
-    Notes
-    -----
-    - The function does not call plt.show(); it returns the created objects
-      so the caller can further modify them or display/save the figure.
-    """
-    fig, ax = plt.subplots(figsize=(6, 5))
-    im = ax.imshow(
-        first_frame,
-        origin="lower",
-        extent=(
-            grid.axes_bounds[0][0],
-            grid.axes_bounds[0][1],
-            grid.axes_bounds[1][0],
-            grid.axes_bounds[1][1],
-        ),
-        cmap="bwr",
-        vmin=np.min(first_frame),
-        vmax=np.max(first_frame),
-        interpolation="nearest",
-        aspect="equal",
-    )
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
-    fig.colorbar(im, ax=ax, shrink=0.8, label=r"$\phi$")
-    return fig, ax, im
 
 
 def main() -> None:
@@ -254,33 +144,17 @@ def main() -> None:
     # Sort by time
     snapshots.sort(key=operator.itemgetter(0))
 
-    # prepare output dir
-    pathlib.Path("outputs").mkdir(exist_ok=True, parents=True)
-
-    # Prepare figure and writer
-    fig, ax, im = prepare_figure(snapshots[0][1].reshape(grid.shape), grid)
-
-    # choose writer (FFMpegWriter preferred)
-    writer, out, use_writer = choose_writer_and_out(
-        len(snapshots), simulation_config.t_end
+    create_2d_heatmap_animation(
+        snapshots,
+        grid,
+        "outputs/phi_evolution_2d.mp4",
+        title_template=r"$\phi(x,y)$ at t = {t:.3f}",
+        xlabel=r"$x$",
+        ylabel=r"$y$",
+        cbar_label=r"$\phi$",
+        cmap="bwr",
+        interpolation="nearest",
     )
-
-    # normalize color scale across all frames for visual consistency
-    all_min = min(frame.min() for _, frame in snapshots)
-    all_max = max(frame.max() for _, frame in snapshots)
-    im.set_clim(all_min, all_max)
-
-    with writer.saving(fig, str(out), dpi=150):
-        for t, frame in snapshots:
-            frame2d = frame.reshape(grid.shape)
-            im.set_data(frame2d)
-            ax.set_title(rf"$\phi(x,y)$ at t = {t:.3f}")
-            # draw + grab
-            fig.canvas.draw()
-            writer.grab_frame()
-
-    plt.close(fig)
-    print(f"Saved {out} using {use_writer} writer")
 
 
 if __name__ == "__main__":
