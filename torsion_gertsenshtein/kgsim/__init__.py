@@ -1,7 +1,15 @@
 """Klein-Gordon equation simulation package."""
 
+from torsion_gertsenshtein.kgsim.advanced_equations import (
+    AnisotropicHigherOrderKGPDE,
+    AnisotropicKGPDE,
+    DirectionalKGPDE,
+    HigherOrderKGPDE,
+)
 from torsion_gertsenshtein.kgsim.config import (
+    AnisotropicKGParameters,
     GridConfig,
+    HigherOrderKGParameters,
     KGParameters,
     MultiFieldParams,
     SimulationConfig,
@@ -27,7 +35,13 @@ from torsion_gertsenshtein.kgsim.profiles import (
 from torsion_gertsenshtein.kgsim.runners import run
 
 __all__ = [
+    "AnisotropicHigherOrderKGPDE",
+    "AnisotropicKGPDE",
+    "AnisotropicKGParameters",
+    "DirectionalKGPDE",
     "GridConfig",
+    "HigherOrderKGPDE",
+    "HigherOrderKGParameters",
     "InhomogeneousKGPDE",
     "KGParameters",
     "KleinGordonPDE",

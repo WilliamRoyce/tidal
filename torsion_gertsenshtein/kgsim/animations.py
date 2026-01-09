@@ -464,9 +464,13 @@ def create_2d_heatmap_animation(  # noqa: PLR0913
     # Sort by time
     snapshots = sorted(snapshots, key=operator.itemgetter(0))
 
-    # Compute global color scale
+    # Compute global color scale, centered at zero
     all_min = min(frame.min() for _, frame in snapshots)
     all_max = max(frame.max() for _, frame in snapshots)
+    # Force symmetric range around zero for better visualization
+    abs_max = max(abs(all_min), abs(all_max))
+    all_min = -abs_max
+    all_max = abs_max
 
     # Setup figure
     fig, ax = plt.subplots(figsize=figsize)
