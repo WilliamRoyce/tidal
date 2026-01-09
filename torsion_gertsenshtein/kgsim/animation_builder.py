@@ -12,14 +12,19 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 import matplotlib as mpl
+from pde import FieldCollection
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib import lines, text
 from matplotlib.animation import FFMpegWriter, FuncAnimation, PillowWriter
 from matplotlib.colors import Normalize, TwoSlopeNorm
 
 if TYPE_CHECKING:
+    from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
+    from matplotlib.image import AxesImage
     from pde import CartesianGrid, MemoryStorage
 
 
@@ -120,7 +125,7 @@ class AnimationBuilder:
             raise ValueError(msg)
 
         # Extract phi data from all snapshots
-        phi_data = np.array([self.storage[i][0].data for i in range(len(self.storage))])  # type: ignore[index]
+        phi_data = np.array([self.storage[i][0].data for i in range(len(self.storage))])  # type: ignore[index,misc]
 
         # Get spatial coordinates
         x = self.grid.axes_coords[0]
@@ -190,15 +195,15 @@ class AnimationBuilder:
         fig, ax = plt.subplots(figsize=config.figsize)
 
         # Get first frame and setup colormap
-        first_frame = self.storage[0][0].data  # type: ignore[index]
-        all_data = np.array([self.storage[i][0].data for i in range(len(self.storage))])  # type: ignore[index]
+        first_frame = self.storage[0][0].data  # type: ignore[index,misc]
+        all_data = np.array([self.storage[i][0].data for i in range(len(self.storage))])  # type: ignore[index,misc]
         norm = self._setup_colormap_norm(
             all_data, use_twoslope=config.use_twoslope_norm
         )
 
         # Create initial image
         im = ax.imshow(
-            first_frame.T,  # Transpose for correct orientation
+            first_frame.T,  # type: ignore[arg-type]  # Transpose for correct orientation
             origin="lower",
             extent=extent,
             cmap=config.cmap,
@@ -222,10 +227,10 @@ class AnimationBuilder:
 
         fig.colorbar(im, ax=ax, label=config.cbar_label)
 
-        def update(frame_idx: int) -> tuple[mpl.image.AxesImage, mpl.text.Text]:
+        def update(frame_idx: int) -> tuple[AxesImage, text.Text]:
             """Update function for animation."""
-            frame2d = self.storage[frame_idx][0].data  # type: ignore[index]
-            im.set_data(frame2d.T)  # Transpose for correct orientation
+            frame2d = self.storage[frame_idx][0].data  # type: ignore[index,misc]
+            im.set_data(frame2d.T)  # type: ignore[arg-type]  # Transpose for correct orientation
             title_text.set_text(f"{config.title} (t={self.times[frame_idx]:.2f})")
             return im, title_text
 
@@ -266,7 +271,7 @@ class AnimationBuilder:
         x = self.grid.axes_coords[0]
 
         # Get data range for y-limits
-        all_data = np.array([self.storage[i][0].data for i in range(len(self.storage))])  # type: ignore[index]
+        all_data = np.array([self.storage[i][0].data for i in range(len(self.storage))])  # type: ignore[index,misc]
         ymin, ymax = all_data.min(), all_data.max()
         y_margin = 0.1 * (ymax - ymin)
 
@@ -281,10 +286,10 @@ class AnimationBuilder:
 
         title_text = ax.set_title("", fontsize=13, fontweight="bold")
 
-        def update(frame_idx: int) -> tuple[mpl.lines.Line2D, mpl.text.Text]:
+        def update(frame_idx: int) -> tuple[lines.Line2D, text.Text]:
             """Update function for animation."""
-            y_data = self.storage[frame_idx][0].data  # type: ignore[index]
-            line.set_data(x, y_data)
+            y_data = self.storage[frame_idx][0].data  # type: ignore[index,misc]
+            line.set_data(x, y_data)  # type: ignore[arg-type]
             title_text.set_text(f"{config.title} (t={self.times[frame_idx]:.2f})")
             return line, title_text
 
@@ -325,7 +330,6 @@ class AnimationBuilder:
             raise ValueError(msg)
 
         # Check we have at least 2 fields
-        from pde import FieldCollection
 
         first_snapshot = self.storage[0]
         if isinstance(first_snapshot, FieldCollection) and len(first_snapshot) < 2:  # noqa: PLR2004
@@ -336,19 +340,20 @@ class AnimationBuilder:
         fig, axes = self._setup_dual_field_figure(config, field_labels)
         im0, im1 = self._create_dual_field_images(axes, config)
 
-        def update(frame_idx: int) -> tuple[mpl.image.AxesImage, mpl.image.AxesImage]:
+        def update(frame_idx: int) -> tuple[AxesImage, AxesImage]:
             """Update function for animation."""
-            im0.set_data(self.storage[frame_idx][0].data.T)  # type: ignore[index]
-            im1.set_data(self.storage[frame_idx][1].data.T)  # type: ignore[index]
+            im0.set_data(self.storage[frame_idx][0].data.T)  # type: ignore[index,misc]
+            im1.set_data(self.storage[frame_idx][1].data.T)  # type: ignore[index,misc]
             fig.suptitle(f"{config.title} (t={self.times[frame_idx]:.2f})")
             return im0, im1
 
         # Create and save animation
         self._save_dual_animation(fig, update, config)
 
+    @staticmethod
     def _setup_dual_field_figure(
-        self, config: AnimationConfig, field_labels: tuple[str, str]
-    ) -> tuple[mpl.figure.Figure, tuple[mpl.axes.Axes, mpl.axes.Axes]]:
+        config: AnimationConfig, field_labels: tuple[str, str]
+    ) -> tuple[Figure, tuple[Axes, Axes]]:
         """Set up figure with two subplots for dual field animation."""
         fig, (ax0, ax1) = plt.subplots(
             1, 2, figsize=(config.figsize[0] * 1.8, config.figsize[1])
@@ -364,8 +369,8 @@ class AnimationBuilder:
         return fig, (ax0, ax1)
 
     def _create_dual_field_images(
-        self, axes: tuple[mpl.axes.Axes, mpl.axes.Axes], config: AnimationConfig
-    ) -> tuple[mpl.image.AxesImage, mpl.image.AxesImage]:
+        self, axes: tuple[Axes, Axes], config: AnimationConfig
+    ) -> tuple[AxesImage, AxesImage]:
         """Create initial images for dual field animation."""
         ax0, ax1 = axes
         bounds = self.grid.axes_bounds
@@ -378,11 +383,11 @@ class AnimationBuilder:
 
         # Get data for normalization
         all_data0 = np.array(
-            [self.storage[i][0].data for i in range(len(self.storage))]
-        )  # type: ignore[index]
+            [self.storage[i][0].data for i in range(len(self.storage))]  # type: ignore[index,misc]
+        )
         all_data1 = np.array(
-            [self.storage[i][1].data for i in range(len(self.storage))]
-        )  # type: ignore[index]
+            [self.storage[i][1].data for i in range(len(self.storage))]  # type: ignore[index,misc]
+        )
 
         norm0 = self._setup_colormap_norm(
             all_data0, use_twoslope=config.use_twoslope_norm
@@ -393,7 +398,7 @@ class AnimationBuilder:
 
         # Create initial images
         im0 = ax0.imshow(
-            self.storage[0][0].data.T,  # type: ignore[index]
+            self.storage[0][0].data.T,  # type: ignore[index,misc]
             origin="lower",
             extent=extent,
             cmap=config.cmap,
@@ -401,7 +406,7 @@ class AnimationBuilder:
             animated=True,
         )
         im1 = ax1.imshow(
-            self.storage[0][1].data.T,  # type: ignore[index]
+            self.storage[0][1].data.T,  # type: ignore[index,misc]
             origin="lower",
             extent=extent,
             cmap=config.cmap,
@@ -417,14 +422,14 @@ class AnimationBuilder:
 
     def _save_dual_animation(
         self,
-        fig: mpl.figure.Figure,
+        fig: Figure,
         update_func: object,
         config: AnimationConfig,
     ) -> None:
         """Save dual field animation to file."""
         anim = FuncAnimation(
             fig,
-            update_func,
+            update_func,  # type: ignore[arg-type]
             frames=len(self.storage),
             interval=50,
             blit=True,  # type: ignore[arg-type]
@@ -437,4 +442,4 @@ class AnimationBuilder:
 
         out_path.parent.mkdir(exist_ok=True, parents=True)
         anim.save(str(out_path), writer=writer, dpi=config.dpi)
-        plt.close(fig)
+        plt.close(fig)  # type: ignore[arg-type]
