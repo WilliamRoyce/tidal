@@ -3,15 +3,20 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
+from numba import jit  # type: ignore[import-untyped]
 from pde import PDE, DataFieldBase, FieldCollection, PDEBase, ScalarField
 from typing_extensions import override
 
 from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
+
+    from numpy.typing import NDArray
 
     from torsion_gertsenshtein.kgsim.config import MultiFieldParams
+
+    NumericArray = NDArray[np.float64]
 
     from .config import KGParameters
 import logging
@@ -75,8 +80,7 @@ class InhomogeneousKGPDE(PDEBase):
     Notes
     -----
     - `m2_field` and `V_field` are ScalarField on the same grid as `state`.
-    - backend="numba" is NOT supported for this custom RHS; use backend="numpy".
-      (Your runner can auto-fallback to numpy.)
+    - Numba backend is supported via `make_pde_rhs_numba` method.
     """
 
     explicit_time_dependence = False
@@ -153,6 +157,59 @@ class InhomogeneousKGPDE(PDEBase):
             raise TypeError(msg)
 
         return FieldCollection([dphi_dt, dpi_dt], labels=["phi", "pi"])
+
+    def make_pde_rhs_numba(
+        self, state: FieldCollection
+    ) -> Callable[[NumericArray, float], NumericArray]:
+        """Create a compiled function evaluating the right hand side of the PDE.
+
+        This implements spatially varying Klein-Gordon with mass and potential fields.
+
+        Args:
+            state (:class:`~pde.fields.FieldCollection`):
+                An example for the state defining the grid and data types
+
+        Returns
+        -------
+            A function with signature `(state_data, t)`, which can be called with an
+            instance of :class:`~numpy.ndarray` of the state data and the time to
+            obtained an instance of :class:`~numpy.ndarray` giving the evolution rate.
+
+        Notes
+        -----
+            The spatial coefficient fields (m2_field, potential_field) are frozen
+            at compilation time as numpy arrays.
+        """
+        # Copy spatial fields to frozen arrays
+        m2_data = self.m2_field.data.copy()
+        v_data = self.potential_field.data.copy()
+
+        # Get boundary conditions
+        bc = infer_bc_from_grid(state.grid)
+
+        # Create compiled operator
+        laplace = state.grid.make_operator("laplace", bc=bc, backend="numba")  # type: ignore[arg-type]
+
+        @jit
+        def pde_rhs(state_data: NumericArray, t: float = 0) -> NumericArray:  # noqa: ARG001
+            """Compiled helper function evaluating right hand side."""
+            # Extract fields from state array
+            phi_data = state_data[0]
+            pi_data = state_data[1]
+
+            # Prepare output array
+            rate = np.empty_like(state_data)
+
+            # dphi/dt = pi
+            rate[0] = pi_data
+
+            # dpi/dt = laplace(phi) - m2(x)*phi + V(x)*phi
+            lap_phi = laplace(phi_data)
+            rate[1] = lap_phi - m2_data * phi_data + v_data * phi_data
+
+            return rate
+
+        return pde_rhs
 
     def _cache_key(self) -> dict[str, Any]:
         # Hash by checksums to avoid serializing full arrays

@@ -119,7 +119,7 @@ def run_simulation(
     sim_config = SimulationConfig(
         t_end=200.0,
         dt=None,
-        backend="numpy",  # Required for custom evolution_rate
+        backend="numba",  # Numba-accelerated for improved performance
         solver="scipy",
         method="RK45",
         progress=True,

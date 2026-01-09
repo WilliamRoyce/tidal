@@ -105,7 +105,8 @@ def infer_bc_from_grid(
         # Use explicit BC string for periodic grids (required for gradient chaining)
         result = "auto_periodic_neumann"
     elif periodic is False:
-        result = {"all": {"type": "derivative", "value": 0.0}}
+        # Non-periodic: use Neumann (derivative=0) boundary conditions
+        result = "derivative"
     elif isinstance(periodic, Sequence):
         periodic_seq = cast("Sequence[bool]", periodic)
         if any(periodic_seq):
@@ -113,7 +114,7 @@ def infer_bc_from_grid(
             result = "auto_periodic_neumann"
         else:
             # No periodic directions
-            result = {"all": {"type": "derivative", "value": 0.0}}
+            result = "derivative"
     else:
         result = "auto_periodic_neumann"
 
