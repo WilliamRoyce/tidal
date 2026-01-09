@@ -475,8 +475,10 @@ def create_2d_heatmap_animation(  # noqa: PLR0913
     # Setup figure
     fig, ax = plt.subplots(figsize=figsize)
     first_frame = snapshots[0][1].reshape(grid.shape)
+    # imshow expects (rows, columns) = (y, x) with origin='lower', but our data is (x, y)
+    # So we need to transpose for correct visualization
     im = ax.imshow(
-        first_frame,
+        first_frame.T,  # Transpose to convert from (x, y) to (y, x) for imshow
         origin="lower",
         extent=(
             grid.axes_bounds[0][0],
@@ -506,7 +508,7 @@ def create_2d_heatmap_animation(  # noqa: PLR0913
     with writer.saving(fig, str(out), dpi=dpi):
         for t, frame in snapshots:
             frame2d = frame.reshape(grid.shape)
-            im.set_data(frame2d)
+            im.set_data(frame2d.T)  # Transpose to match imshow's (y, x) expectation
             ax.set_title(title_template.format(t=t))
             fig.canvas.draw()
             writer.grab_frame()

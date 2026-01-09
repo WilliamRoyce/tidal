@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from abc import ABC, abstractmethod
 from typing import TYPE_CHECKING, cast
 
 import numpy as np
@@ -9,6 +10,264 @@ from torsion_gertsenshtein.kgsim.utils import natural_center
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+
+class InitialCondition(ABC):
+    """Abstract base class for Klein-Gordon initial conditions.
+
+    This class provides common functionality for creating initial conditions
+    on CartesianGrid, eliminating coordinate handling duplication across
+    different IC types.
+
+    Subclasses should implement the `_compute_phi()` and optionally
+    `_compute_pi()` methods to define the specific initial field profiles.
+    """
+
+    def _get_coordinates(self, grid: CartesianGrid) -> np.ndarray:
+        """Extract and normalize grid coordinates.
+
+        Parameters
+        ----------
+        grid : CartesianGrid
+            The computational grid
+
+        Returns
+        -------
+        np.ndarray
+            Coordinates array in shape (N_cells, dim) for uniform handling
+        """
+        coordinates = cast("np.ndarray", grid.cell_coords)
+
+        # Handle different coordinate formats from different py-pde versions
+        if coordinates.ndim == grid.dim + 1 and coordinates.shape[-1] == grid.dim:
+            # Shape: (*grid.shape, dim) -> flatten to (N_cells, dim)
+            return coordinates.reshape(-1, grid.dim)
+        if coordinates.ndim == 2 and coordinates.shape[1] == grid.dim:  # noqa: PLR2004
+            # Already in (N_cells, dim) format
+            return coordinates
+        msg = f"Unexpected cell_coords shape: {coordinates.shape}"
+        raise ValueError(msg)
+
+    def _compute_distances_from_center(
+        self, grid: CartesianGrid, center: Sequence[float] | None = None
+    ) -> np.ndarray:
+        """Compute Euclidean distances from a center point.
+
+        Parameters
+        ----------
+        grid : CartesianGrid
+            The computational grid
+        center : Sequence[float] | None
+            Center coordinates. If None, uses natural_center(grid.axes_bounds)
+
+        Returns
+        -------
+        np.ndarray
+            Flattened array of distances, shape (N_cells,)
+        """
+        if center is None:
+            center = natural_center(grid.axes_bounds)
+
+        if len(center) != grid.dim:
+            msg = f"center must have length {grid.dim}, got {len(center)}"
+            raise ValueError(msg)
+
+        coords = self._get_coordinates(grid)
+        center_arr = np.asarray(center)
+
+        # Compute Euclidean distance
+        return np.sqrt(np.sum((coords - center_arr) ** 2, axis=1))
+
+    def _compute_radial_coordinates(self, grid: CartesianGrid) -> np.ndarray:
+        """Compute radial distances from origin (for 2D problems).
+
+        Parameters
+        ----------
+        grid : CartesianGrid
+            The computational grid
+
+        Returns
+        -------
+        np.ndarray
+            Flattened array of radial distances, shape (N_cells,)
+        """
+        if grid.dim != 2:  # noqa: PLR2004
+            msg = "radial_coordinates only supported for 2D grids"
+            raise ValueError(msg)
+
+        coords = self._get_coordinates(grid)
+        return np.sqrt(coords[:, 0] ** 2 + coords[:, 1] ** 2)
+
+    @abstractmethod
+    def _compute_phi(self, grid: CartesianGrid) -> np.ndarray:
+        """Compute the phi field data.
+
+        Parameters
+        ----------
+        grid : CartesianGrid
+            The computational grid
+
+        Returns
+        -------
+        np.ndarray
+            Flattened phi field values
+        """
+
+    def _compute_pi(self, grid: CartesianGrid, phi_data: np.ndarray) -> np.ndarray:
+        """Compute the pi (time derivative) field data.
+
+        Default implementation returns zeros. Override for non-zero initial velocity.
+
+        Parameters
+        ----------
+        grid : CartesianGrid
+            The computational grid
+        phi_data : np.ndarray
+            Flattened phi field values
+
+        Returns
+        -------
+        np.ndarray
+            Flattened pi field values
+        """
+        return np.zeros_like(phi_data)
+
+    def build(self, grid: CartesianGrid) -> FieldCollection:
+        """Build the initial condition FieldCollection.
+
+        Parameters
+        ----------
+        grid : CartesianGrid
+            The computational grid
+
+        Returns
+        -------
+        FieldCollection
+            Initial state containing [phi, pi] ScalarFields
+        """
+        phi_data = self._compute_phi(grid)
+        pi_data = self._compute_pi(grid, phi_data)
+
+        # Reshape to grid shape
+        phi = ScalarField(grid, data=phi_data.reshape(grid.shape), label="phi")
+        pi = ScalarField(grid, data=pi_data.reshape(grid.shape), label="pi")
+
+        return FieldCollection([phi, pi], labels=["phi", "pi"])
+
+
+class GaussianPulse(InitialCondition):
+    """Gaussian pulse initial condition using the base class pattern.
+
+    Creates a Gaussian pulse:
+        phi(x) = amplitude * exp(-|x - center|^2 / (2 * width^2))
+        pi(x) = initial_velocity * phi(x)
+
+    Examples
+    --------
+    >>> from torsion_gertsenshtein.kgsim import make_grid, GridConfig
+    >>> grid = make_grid(GridConfig(dim=1, shape=(64,), bounds=((0, 50),)))
+    >>> ic = GaussianPulse(amplitude=1.0, width=2.0, center=[25.0])
+    >>> state = ic.build(grid)
+    """
+
+    def __init__(
+        self,
+        *,
+        amplitude: float = 1.0,
+        width: float = 2.0,
+        center: Sequence[float] | None = None,
+        initial_velocity: float = 0.0,
+    ) -> None:
+        """Initialize Gaussian pulse parameters.
+
+        Parameters
+        ----------
+        amplitude : float
+            Peak amplitude (default: 1.0)
+        width : float
+            Gaussian width (standard deviation), must be positive (default: 2.0)
+        center : Sequence[float] | None
+            Center coordinates. If None, uses grid center (default: None)
+        initial_velocity : float
+            Initial time derivative scaling factor (default: 0.0)
+        """
+        if width <= 0:
+            msg = f"width must be positive, got {width}"
+            raise ValueError(msg)
+
+        self.amplitude = amplitude
+        self.width = width
+        self.center = center
+        self.initial_velocity = initial_velocity
+
+    def _compute_phi(self, grid: CartesianGrid) -> np.ndarray:
+        """Compute Gaussian phi field."""
+        r = self._compute_distances_from_center(grid, self.center)
+        return self.amplitude * np.exp(-(r**2) / (2.0 * self.width**2))
+
+    def _compute_pi(self, grid: CartesianGrid, phi_data: np.ndarray) -> np.ndarray:
+        """Compute pi field with initial velocity."""
+        return self.initial_velocity * phi_data
+
+
+class RingPulse2D(InitialCondition):
+    """2D ring-shaped Gaussian pulse initial condition.
+
+    Creates a radially symmetric ring:
+        phi(r) = amplitude * exp(-(r - initial_radius)^2 / (2 * sigma^2))
+
+    where r is the radial distance from the origin.
+
+    Examples
+    --------
+    >>> grid = make_grid(GridConfig(dim=2, shape=(64, 64),
+    ...                             bounds=((-20, 20), (-20, 20))))
+    >>> ic = RingPulse2D(amplitude=1.0, initial_radius=5.0, sigma=1.0)
+    >>> state = ic.build(grid)
+    """
+
+    def __init__(
+        self,
+        *,
+        amplitude: float = 1.0,
+        initial_radius: float = 5.0,
+        sigma: float = 1.0,
+    ) -> None:
+        """Initialize ring pulse parameters.
+
+        Parameters
+        ----------
+        amplitude : float
+            Peak amplitude (default: 1.0)
+        initial_radius : float
+            Radial position of the ring (default: 5.0)
+        sigma : float
+            Gaussian width of the ring (default: 1.0)
+        """
+        if sigma <= 0:
+            msg = f"sigma must be positive, got {sigma}"
+            raise ValueError(msg)
+        if initial_radius < 0:
+            msg = f"initial_radius must be non-negative, got {initial_radius}"
+            raise ValueError(msg)
+
+        self.amplitude = amplitude
+        self.initial_radius = initial_radius
+        self.sigma = sigma
+
+    def _compute_phi(self, grid: CartesianGrid) -> np.ndarray:
+        """Compute ring-shaped phi field."""
+        if grid.dim != 2:  # noqa: PLR2004
+            msg = f"RingPulse2D requires 2D grid, got {grid.dim}D"
+            raise ValueError(msg)
+
+        r = self._compute_radial_coordinates(grid)
+        return self.amplitude * np.exp(
+            -((r - self.initial_radius) ** 2) / (2.0 * self.sigma**2)
+        )
+
+
+# Keep original function-based API for backward compatibility
 
 
 def gaussian_pulse(

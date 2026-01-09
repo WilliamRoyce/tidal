@@ -6,6 +6,10 @@ from torsion_gertsenshtein.kgsim.advanced_equations import (
     DirectionalKGPDE,
     HigherOrderKGPDE,
 )
+from torsion_gertsenshtein.kgsim.animation_builder import (
+    AnimationBuilder,
+    AnimationConfig,
+)
 from torsion_gertsenshtein.kgsim.config import (
     AnisotropicKGParameters,
     GridConfig,
@@ -21,6 +25,9 @@ from torsion_gertsenshtein.kgsim.equations import (
 )
 from torsion_gertsenshtein.kgsim.grids import make_grid
 from torsion_gertsenshtein.kgsim.initial_conditions import (
+    GaussianPulse,
+    InitialCondition,
+    RingPulse2D,
     gaussian_pulse,
     multi_gaussian,
     multi_gaussian_2d,
@@ -32,20 +39,25 @@ from torsion_gertsenshtein.kgsim.profiles import (
     constant_field,
     step_region_1d,
 )
-from torsion_gertsenshtein.kgsim.runners import run
+from torsion_gertsenshtein.kgsim.runners import run, run_with_snapshots
 
 __all__ = [
+    "AnimationBuilder",
+    "AnimationConfig",
     "AnisotropicHigherOrderKGPDE",
     "AnisotropicKGPDE",
     "AnisotropicKGParameters",
     "DirectionalKGPDE",
+    "GaussianPulse",
     "GridConfig",
     "HigherOrderKGPDE",
     "HigherOrderKGParameters",
     "InhomogeneousKGPDE",
+    "InitialCondition",
     "KGParameters",
     "KleinGordonPDE",
     "MultiFieldParams",
+    "RingPulse2D",
     "SimulationConfig",
     "constant_field",
     "gaussian_pulse",
@@ -56,6 +68,7 @@ __all__ = [
     "plane_wave",
     "ring_pulse_2d",
     "run",
+    "run_with_snapshots",
     "step_region_1d",
     "total_energy_observer",
 ]
