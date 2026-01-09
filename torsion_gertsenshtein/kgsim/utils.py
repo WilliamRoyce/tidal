@@ -7,9 +7,11 @@ from pde import ScalarField
 
 if TYPE_CHECKING:
     # type-checker only import (stubs may be missing at runtime)
-    from collections.abc import Mapping
-
     from pde.fields.datafield_base import DataFieldBase  # type: ignore[import]
+
+# Type alias for boundary condition data compatible with py-pde
+# Can be: string for auto BC, dict for explicit BC mapping, or None
+BCDescriptor = str | dict[str, dict[str, str | float]] | None
 
 
 def natural_center(bounds: Sequence[tuple[float, float]]) -> list[float]:
@@ -68,13 +70,21 @@ def mul_scalar_field(
     return cast("ScalarField", scalar * field)
 
 
-def infer_bc_from_grid(grid: object) -> str | None:
+def infer_bc_from_grid(
+    grid: object,
+) -> BCDescriptor:
     """
     Infer boundary-condition descriptor from a grid-like object.
 
     For periodic grids, returns 'auto_periodic_neumann' which is required for
     gradient chaining to work correctly in py-pde.
     For non-periodic grids, returns an explicit BC mapping with Neumann (derivative=0).
+
+    Returns
+    -------
+    BCDescriptor
+        Boundary condition descriptor compatible with py-pde's BoundariesData type.
+        Can be: str (e.g., 'auto_periodic_neumann'), dict[str, dict[str, str | float]], or None.
 
     Notes
     -----
@@ -86,10 +96,10 @@ def infer_bc_from_grid(grid: object) -> str | None:
     bd = getattr(grid, "boundaries", None)
     periodic = getattr(grid, "periodic", None)
 
-    result: Mapping[str, Mapping[str, object]] | str | None
+    result: BCDescriptor
     # explicit boundaries override periodic inference
     if bd is not None:
-        result = bd
+        result = bd  # type: ignore[assignment]
     # handle periodic being None/True/False/sequence/other in branches
     elif periodic is None or periodic is True:
         # Use explicit BC string for periodic grids (required for gradient chaining)
