@@ -15,6 +15,61 @@ class KGParameters:
 
 
 @dataclass(frozen=True)
+class AnisotropicKGParameters:
+    """Parameters for anisotropic Klein-Gordon with directional wave speeds.
+
+    Attributes
+    ----------
+    mass : float
+        Klein-Gordon mass parameter.
+    speeds : Sequence[float]
+        Wave speeds in each spatial direction [c_x, c_y, c_z].
+        Length must match grid dimension.
+    """
+
+    mass: float = 1.0
+    speeds: Sequence[float] = (1.0, 1.0)
+
+    def __post_init__(self) -> None:
+        """Validate parameters.
+
+        Raises
+        ------
+        ValueError
+            If any speed is non-positive or speeds is empty.
+        """
+        if len(self.speeds) == 0:
+            msg = "speeds must be non-empty"
+            raise ValueError(msg)
+        for i, speed in enumerate(self.speeds):
+            if speed <= 0:
+                msg = f"speed at index {i} must be positive, got {speed}"
+                raise ValueError(msg)
+
+
+@dataclass(frozen=True)
+class HigherOrderKGParameters:
+    """Parameters for Klein-Gordon with higher-order derivative terms.
+
+    Attributes
+    ----------
+    mass : float
+        Klein-Gordon mass parameter.
+    alpha_2 : float
+        Coefficient for laplace(phi) term (standard second-order).
+    alpha_4 : float
+        Coefficient for laplace^2(phi) term (fourth-order dispersion).
+    alpha_6 : float
+        Coefficient for laplace^3(phi) term (sixth-order).
+    """
+
+    mass: float = 1.0
+    alpha_2: float = 1.0
+    alpha_4: float = 0.0
+    alpha_6: float = 0.0
+
+
+@dataclass(frozen=True)
 class MultiFieldParams:
     """
     Parameters for N coupled KG fields.

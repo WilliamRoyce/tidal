@@ -68,33 +68,43 @@ def mul_scalar_field(
     return cast("ScalarField", scalar * field)
 
 
-def infer_bc_from_grid(grid: object) -> Mapping[str, Mapping[str, object]] | None:
+def infer_bc_from_grid(grid: object) -> str | None:
     """
     Infer boundary-condition descriptor from a grid-like object.
 
-    Returns None to indicate "let py-pde use the grid's (periodic) defaults".
-    Only returns an explicit BC mapping for confirmed non-periodic grids.
+    For periodic grids, returns 'auto_periodic_neumann' which is required for
+    gradient chaining to work correctly in py-pde.
+    For non-periodic grids, returns an explicit BC mapping with Neumann (derivative=0).
+
+    Notes
+    -----
+    When using gradient().gradient() for second derivatives, py-pde requires
+    an explicit boundary condition string like 'auto_periodic_neumann' rather
+    than None, even for periodic grids.
     """
     # Try explicit boundaries first
     bd = getattr(grid, "boundaries", None)
     periodic = getattr(grid, "periodic", None)
 
-    result: Mapping[str, Mapping[str, object]] | None
+    result: Mapping[str, Mapping[str, object]] | str | None
     # explicit boundaries override periodic inference
     if bd is not None:
         result = bd
     # handle periodic being None/True/False/sequence/other in branches
     elif periodic is None or periodic is True:
-        result = None
+        # Use explicit BC string for periodic grids (required for gradient chaining)
+        result = "auto_periodic_neumann"
     elif periodic is False:
         result = {"all": {"type": "derivative", "value": 0.0}}
     elif isinstance(periodic, Sequence):
         periodic_seq = cast("Sequence[bool]", periodic)
         if any(periodic_seq):
-            result = None
+            # At least one periodic direction - use auto BC
+            result = "auto_periodic_neumann"
         else:
+            # No periodic directions
             result = {"all": {"type": "derivative", "value": 0.0}}
     else:
-        result = None
+        result = "auto_periodic_neumann"
 
     return result
