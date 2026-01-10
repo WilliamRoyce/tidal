@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, cast
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
-from pde import PDE, CartesianGrid, ScalarField
+from pde import PDE, CartesianGrid, FieldCollection, ScalarField
 
 from torsion_gertsenshtein.kgsim import (
     GridConfig,
@@ -74,6 +74,7 @@ def test_kg_pde_expression_equivalence() -> None:
     else:
         sol = out
     assert sol is not None
+    assert isinstance(sol, FieldCollection), "Expected FieldCollection from solve"
 
     first = sol[0]
     assert first is not None

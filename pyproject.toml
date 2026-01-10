@@ -83,3 +83,11 @@ reportUnknownMemberType = false
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["torsion_gertsenshtein*"]
+exclude = ["outputs*", "tests*", "docs*"]

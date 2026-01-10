@@ -4,7 +4,12 @@ import logging
 from collections.abc import Callable  # add Callable import if not present
 from typing import TYPE_CHECKING, Any
 
-from pde import MemoryStorage, PDEBase, ProgressTracker
+from pde import (
+    FieldCollection,
+    MemoryStorage,
+    PDEBase,
+    ProgressTracker,
+)
 from pde.trackers import CallbackTracker
 
 from torsion_gertsenshtein.kgsim.profiling import (
@@ -17,9 +22,6 @@ from torsion_gertsenshtein.kgsim.profiling import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from pde import (
-        FieldCollection,
-    )
     from pde.trackers.base import TrackerBase
 
     from .config import SimulationConfig
@@ -250,6 +252,9 @@ def run(  # noqa: PLR0913
         msg = "solver returned None"
         raise RuntimeError(msg)
 
+    # Type narrowing: assert result is FieldCollection after None check
+    assert isinstance(result, FieldCollection), "Expected FieldCollection from solver"
+
     # 4) optional profiling log
     if profile:
         _log_profile(timer=timer, prof=prof)
@@ -294,6 +299,11 @@ def run_with_snapshots(
         - storage.times: array of snapshot times
         - storage[i]: state at snapshot i
         - storage.data: full trajectory data
+
+    Raises
+    ------
+    RuntimeError
+        If the solver returns None instead of a FieldCollection result.
 
     Examples
     --------
@@ -377,6 +387,9 @@ def run_with_snapshots(
     if result is None:
         msg = "solver returned None"
         raise RuntimeError(msg)
+
+    # Type narrowing: assert result is FieldCollection after None check
+    assert isinstance(result, FieldCollection), "Expected FieldCollection from solver"
 
     if profile and timer is not None:
         timer.mark("solve_returned")
