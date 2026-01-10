@@ -9,6 +9,7 @@ Compare with 1d_gaussian_pulse.py to see the difference.
 
 from __future__ import annotations
 
+import logging
 import pathlib
 
 import matplotlib.pyplot as plt
@@ -24,9 +25,13 @@ from torsion_gertsenshtein.kgsim import (
     run_with_snapshots,
 )
 
+logger = logging.getLogger(__name__)
+
 
 def main() -> None:
     """Run Klein-Gordon simulation using MemoryStorage for snapshot collection."""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
+
     # Grid setup
     grid_config = GridConfig(dim=1, shape=(512,), bounds=((0.0, 200.0),), periodic=True)
     grid = make_grid(grid_config)
@@ -56,10 +61,10 @@ def main() -> None:
         snapshot_interval=1.0,  # Snapshot every 1.0 time units
     )
 
-    print("\n✓ Simulation complete")
-    print(f"  Collected {len(storage)} snapshots")
-    print(f"  Time range: [{storage.times[0]:.2f}, {storage.times[-1]:.2f}]")
-    print(f"  Final state: φ_max = {result[0].data.max():.4f}")
+    logger.info("Simulation complete")
+    logger.info("  Collected %d snapshots", len(storage))
+    logger.info("  Time range: [%.2f, %.2f]", storage.times[0], storage.times[-1])
+    logger.info("  Final state: φ_max = %.4f", result[0].data.max())
 
     # Extract data from MemoryStorage
     # Access times and field data
@@ -69,7 +74,7 @@ def main() -> None:
     # Build spacetime array: phi_data[time_idx, space_idx]
     phi_data = np.array([storage[i][0].data for i in range(len(storage))])  # type: ignore[index]
 
-    print(f"  Spacetime array shape: {phi_data.shape}")
+    logger.info("  Spacetime array shape: %s", phi_data.shape)
 
     # Create spacetime heatmap
     fig, ax = plt.subplots(figsize=(10, 6))
@@ -99,17 +104,17 @@ def main() -> None:
     out_path = "outputs/kg_memory_storage_demo.png"
     fig.savefig(out_path, dpi=200, bbox_inches="tight")
     plt.close(fig)
-    print(f"\n✓ Saved {out_path}")
+    logger.info("Saved %s", out_path)
 
     # Demonstrate accessing individual snapshots
-    print("\n--- MemoryStorage Access Examples ---")
-    print(f"First snapshot time: {storage.times[0]:.2f}")
-    print(f"First snapshot φ max: {storage[0][0].data.max():.4f}")  # type: ignore[index]
-    print(f"Last snapshot time: {storage.times[-1]:.2f}")
-    print(f"Last snapshot φ max: {storage[-1][0].data.max():.4f}")  # type: ignore[index]
+    logger.info("--- MemoryStorage Access Examples ---")
+    logger.info("First snapshot time: %.2f", storage.times[0])
+    logger.info("First snapshot φ max: %.4f", storage[0][0].data.max())  # type: ignore[index]
+    logger.info("Last snapshot time: %.2f", storage.times[-1])
+    logger.info("Last snapshot φ max: %.4f", storage[-1][0].data.max())  # type: ignore[index]
 
     # Can also iterate over storage
-    print(f"\nSnapshot times (first 5): {list(storage.times[:5])}")
+    logger.info("Snapshot times (first 5): %s", list(storage.times[:5]))
 
 
 if __name__ == "__main__":

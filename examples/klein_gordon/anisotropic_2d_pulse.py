@@ -10,6 +10,7 @@ cases shows how anisotropy affects wavefront shape and arrival times.
 
 from __future__ import annotations
 
+import logging
 from typing import TYPE_CHECKING
 
 from torsion_gertsenshtein.plot_pgf import enable_pgf
@@ -57,6 +58,7 @@ def build_grid_and_state() -> tuple[CartesianGrid, FieldCollection]:
 
 def main() -> None:
     """Run anisotropic Klein-Gordon simulation and create animation."""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     grid, state = build_grid_and_state()
 
     # Anisotropic PDE: wave propagates faster in x (c_x=2.0) than y (c_y=0.5)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from torsion_gertsenshtein.plot_pgf import enable_pgf
@@ -79,6 +80,7 @@ def main() -> None:
     and snapshot collection, and plotting to smaller helpers so the public function is
     documented and keeps a small number of local variables.
     """
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     simulation_components = _build_simulation_components()
 
     # Run simulation with automatic snapshot storage

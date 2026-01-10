@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from torsion_gertsenshtein.plot_pgf import enable_pgf
@@ -51,6 +52,7 @@ def _build_simulation_components() -> dict[str, Any]:
 
 def main() -> None:
     """Run 2D Klein-Gordon simulation for ring pulse and create animation."""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     simulation_components = _build_simulation_components()
 
     # Run simulation with automatic snapshot storage

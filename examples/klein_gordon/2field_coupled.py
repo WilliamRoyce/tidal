@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 
 from torsion_gertsenshtein.plot_pgf import enable_pgf
@@ -82,6 +83,7 @@ def main() -> None:
         If no snapshots are recorded during the simulation or if a non-finite
         field value is encountered during observation.
     """
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     simulation_components = _build_simulation_components()
 
     # Run simulation with automatic snapshot storage
