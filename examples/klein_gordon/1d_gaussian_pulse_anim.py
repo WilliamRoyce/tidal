@@ -1,29 +1,23 @@
 from __future__ import annotations
 
 import logging
-import operator
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-# Create 1D line animation using unified plotting module
-from torsion_gertsenshtein.kgsim.animations import create_1d_line_animation
 from torsion_gertsenshtein.plot_pgf import enable_pgf
 
 enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
 
-import numpy as np
-
 from torsion_gertsenshtein.kgsim import (
+    AnimationBuilder,
+    AnimationConfig,
     GridConfig,
     KGParameters,
     KleinGordonPDE,
     SimulationConfig,
     gaussian_pulse,
     make_grid,
-    run,
+    run_with_snapshots,
 )
-
-if TYPE_CHECKING:
-    from pde import FieldCollection
 
 
 def _build_simulation_components() -> dict[str, Any]:
@@ -38,13 +32,13 @@ def _build_simulation_components() -> dict[str, Any]:
     )
     grid = make_grid(grid_config)
 
-    pde = KleinGordonPDE(KGParameters(mass=0.5))
+    pde = KleinGordonPDE(params=KGParameters(mass=0.5))
 
     state = gaussian_pulse(grid, amplitude=1.0, width=5.0, initial_velocity=0.0)
 
     simulation_config = SimulationConfig(
         t_end=200.0,
-        dt=None,  # fixed time step
+        dt=None,  # Adaptive time step
         solver="scipy",  # or "explicit"
         method="RK45",
         backend="numba",  # prefer 'numpy' here for portability unless numba RHS is provided
@@ -88,56 +82,29 @@ def main() -> None:
         for each time step.
     - Save the animation as either MP4 (if ffmpeg available) or GIF.
 
-    Raises
-    ------
-    RuntimeError
-        If no snapshots were recorded during the simulation.
     """
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     simulation_components = _build_simulation_components()
 
-    # Collector for snapshots (time, phi_array)
-    snapshots: list[tuple[float, np.ndarray]] = []
-
-    # Record initial condition
-    snapshots.append((0.0, np.asarray(simulation_components["state"][0].data).copy()))
-
-    # Observer that records φ at each tracker interrupt
-    def record_phi(state_coll: FieldCollection, t: float) -> dict[str, Any]:
-        arr = np.asarray(state_coll[0].data)
-        if not np.isfinite(arr).all():
-            msg = f"Non-finite field at t={t}"
-            raise RuntimeError(msg)
-        snapshots.append((t, arr.copy()))
-        return {}
-
-    # run accepts an extra_observer callback (side-effect: fills snapshots)
-    run(
+    # Run simulation with automatic snapshot storage
+    _result, storage = run_with_snapshots(
         pde=simulation_components["pde"],
         state=simulation_components["state"],
         config=simulation_components["simulation_config"],
-        extra_observer=record_phi,
         snapshot_interval=0.5,
-        profile=True,
     )
 
-    # Ensure there is at least one snapshot
-    if not snapshots:
-        msg = "No snapshots were recorded during the simulation."
-        raise RuntimeError(msg)
-
-    # Sort by time (observer callbacks might not be strictly increasing)
-    snapshots.sort(key=operator.itemgetter(0))
-
-    create_1d_line_animation(
-        snapshots,
-        simulation_components["grid"],
-        "outputs/KG_evolution",
-        title_template=r"Klein-Gordon evolution: $\phi(x)$ at t = {t:.2f}",
+    # Create 1D line animation using AnimationBuilder
+    builder = AnimationBuilder(storage, simulation_components["grid"])
+    config = AnimationConfig(
+        output_path="outputs/KG_evolution.mp4",
+        title=r"Klein-Gordon evolution: $\phi(x)$",
         xlabel=r"$x$",
-        ylabel=r"$\phi$",
+        cbar_label=r"$\phi$",
         fps=30,
     )
+    builder.create_1d_line_animation(config)
+    print("Saved outputs/KG_evolution.[mp4|gif]")
 
 
 if __name__ == "__main__":

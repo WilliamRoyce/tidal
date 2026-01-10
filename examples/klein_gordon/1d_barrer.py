@@ -1,29 +1,22 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-# Create spacetime heatmap using unified plotting module
-from torsion_gertsenshtein.kgsim.animations import create_spacetime_plot
 from torsion_gertsenshtein.plot_pgf import enable_pgf
 
 enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
 
-import operator
-
-import numpy as np
-
 from torsion_gertsenshtein.kgsim import (
+    AnimationBuilder,
+    AnimationConfig,
     GridConfig,
     InhomogeneousKGPDE,
     SimulationConfig,
     gaussian_pulse,
     make_grid,
-    run,
+    run_with_snapshots,
     step_region_1d,
 )
-
-if TYPE_CHECKING:
-    from pde import FieldCollection
 
 
 def _build_simulation_components() -> dict[str, Any]:
@@ -59,7 +52,7 @@ def _build_simulation_components() -> dict[str, Any]:
     # --- simulation config ---
     simulation_config = SimulationConfig(
         t_end=200.0,
-        dt=None,  # adaptive
+        dt=None,  # Adaptive time step
         solver="scipy",
         method="RK45",
         backend="numpy",  # will auto-fallback to numpy for InhomogeneousKGPDE
@@ -85,55 +78,28 @@ def main() -> None:
     This function delegates grid and field construction, PDE/state setup, time evolution
     and snapshot collection, and plotting to smaller helpers so the public function is
     documented and keeps a small number of local variables.
-
-    Raises
-    ------
-    RuntimeError
-        If no snapshots are recorded during the simulation or if a non-finite field is encountered during evolution.
     """
     simulation_components = _build_simulation_components()
 
-    # Collector for snapshots (time, phi_array)
-    snapshots: list[tuple[float, np.ndarray]] = []
-
-    # Record initial condition
-    snapshots.append((0.0, np.asarray(simulation_components["state"][0].data).copy()))
-
-    # Observer that records φ at each tracker interrupt
-    def record_phi(state_coll: FieldCollection, t: float) -> dict[str, Any]:
-        arr = np.asarray(state_coll[0].data)
-        if not np.isfinite(arr).all():
-            msg = f"Non-finite field at t={t}"
-            raise RuntimeError(msg)
-        snapshots.append((t, arr.copy()))
-        return {}
-
-    # run accepts an extra_observer callback (side-effect: fills snapshots)
-    run(
+    # Run simulation with automatic snapshot storage
+    _result, storage = run_with_snapshots(
         pde=simulation_components["pde"],
         state=simulation_components["state"],
         config=simulation_components["simulation_config"],
-        extra_observer=record_phi,
+        snapshot_interval=1.0,
     )
 
-    # Ensure there is at least one snapshot
-    if not snapshots:
-        msg = "No snapshots were recorded during the simulation."
-        raise RuntimeError(msg)
-
-    # Sort by time (observer callbacks might not be strictly increasing)
-    snapshots.sort(key=operator.itemgetter(0))
-
-    create_spacetime_plot(
-        snapshots,
-        simulation_components["grid"],
-        "outputs/KG_barrier.pdf",
+    # Create spacetime plot using AnimationBuilder
+    builder = AnimationBuilder(storage, simulation_components["grid"])
+    config = AnimationConfig(
+        output_path="outputs/KG_barrier.pdf",
         title=r"Klein-Gordon $\phi(x,t)$ with Potential Barrier",
         xlabel=r"$x$",
         ylabel=r"$t$",
         cbar_label=r"$\phi$",
         figsize=(8, 6),
     )
+    builder.create_spacetime_1d(config)
     print("Saved outputs/KG_barrier.pdf")
 
 

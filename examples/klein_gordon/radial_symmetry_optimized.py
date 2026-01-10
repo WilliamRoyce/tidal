@@ -141,7 +141,7 @@ def run_radial_simulation(
     # Simulation config
     config = SimulationConfig(
         t_end=t_end,
-        dt=None,  # adaptive
+        dt=None,  # Adaptive time step
         solver="scipy",
         method="RK45",
         backend="numpy",

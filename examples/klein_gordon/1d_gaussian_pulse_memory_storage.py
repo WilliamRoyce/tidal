@@ -40,7 +40,7 @@ def main() -> None:
     pde = KleinGordonPDE(params=KGParameters(mass=0.5))
     simulation_config = SimulationConfig(
         t_end=200.0,
-        dt=None,  # adaptive
+        dt=None,  # Adaptive time step
         solver="scipy",
         method="RK45",
         backend="numpy",

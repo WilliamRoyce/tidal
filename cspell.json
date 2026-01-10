@@ -4,11 +4,13 @@
     "language": "en",
     "words": [
         "atleast",
+        "axhline",
         "biharmonic",
         "blit",
         "cbar",
         "clim",
         "cmap",
+        "contourf",
         "dphi",
         "dpkg",
         "Gaussians",

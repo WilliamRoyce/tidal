@@ -165,6 +165,103 @@ class AnimationBuilder:
         fig.savefig(output_path, dpi=config.dpi, bbox_inches="tight")
         plt.close(fig)
 
+    def create_spacetime_1d_dual(
+        self, config: AnimationConfig, field_labels: tuple[str, str] = ("φ₀", "φ₁")
+    ) -> None:
+        """Create side-by-side spacetime heatmaps for 1D two-field systems.
+
+        Parameters
+        ----------
+        config : AnimationConfig
+            Animation configuration
+        field_labels : tuple[str, str]
+            Labels for the two fields
+
+        Raises
+        ------
+        ValueError
+            If grid is not 1D or storage does not contain at least 2 fields
+        """
+        if self.grid.dim != 1:
+            msg = f"spacetime_1d_dual requires 1D grid, got {self.grid.dim}D"
+            raise ValueError(msg)
+
+        # Check we have at least 2 fields
+        first_snapshot = self.storage[0]
+        if isinstance(first_snapshot, FieldCollection) and len(first_snapshot) < 2:  # noqa: PLR2004
+            msg = "spacetime_1d_dual requires at least 2 fields in storage"
+            raise ValueError(msg)
+
+        # Extract data for both fields
+        phi0_data = np.array(
+            [self.storage[i][0].data for i in range(len(self.storage))]  # type: ignore[index,misc]
+        )
+        phi1_data = np.array(
+            [self.storage[i][1].data for i in range(len(self.storage))]  # type: ignore[index,misc]
+        )
+
+        # Get spatial coordinates
+        x = self.grid.axes_coords[0]
+
+        # Create figure with two subplots
+        fig, (ax0, ax1) = plt.subplots(
+            1, 2, figsize=(config.figsize[0] * 1.8, config.figsize[1])
+        )
+
+        # Setup extent
+        extent = (
+            float(x[0]),
+            float(x[-1]),
+            float(self.times[0]),
+            float(self.times[-1]),
+        )
+
+        # Setup colormap normalization (shared across both fields)
+        all_data = np.concatenate([phi0_data.ravel(), phi1_data.ravel()])
+        norm = self._setup_colormap_norm(
+            all_data, use_twoslope=config.use_twoslope_norm
+        )
+
+        # Plot first field
+        im0 = ax0.imshow(
+            phi0_data,
+            aspect="auto",
+            origin="lower",
+            extent=extent,
+            cmap=config.cmap,
+            norm=norm,
+            interpolation="bilinear",
+        )
+        ax0.set_xlabel(config.xlabel, fontsize=12)
+        ax0.set_ylabel(config.ylabel, fontsize=12)
+        ax0.set_title(field_labels[0], fontsize=13, fontweight="bold")
+        fig.colorbar(im0, ax=ax0, label=config.cbar_label, shrink=0.8)
+
+        # Plot second field
+        im1 = ax1.imshow(
+            phi1_data,
+            aspect="auto",
+            origin="lower",
+            extent=extent,
+            cmap=config.cmap,
+            norm=norm,
+            interpolation="bilinear",
+        )
+        ax1.set_xlabel(config.xlabel, fontsize=12)
+        ax1.set_ylabel(config.ylabel, fontsize=12)
+        ax1.set_title(field_labels[1], fontsize=13, fontweight="bold")
+        fig.colorbar(im1, ax=ax1, label=config.cbar_label, shrink=0.8)
+
+        # Overall title
+        fig.suptitle(config.title, fontsize=14, fontweight="bold")
+        fig.tight_layout()
+
+        # Save
+        output_path = pathlib.Path(config.output_path)
+        output_path.parent.mkdir(exist_ok=True, parents=True)
+        fig.savefig(output_path, dpi=config.dpi, bbox_inches="tight")
+        plt.close(fig)
+
     def create_2d_heatmap_animation(self, config: AnimationConfig) -> None:
         """Create animated 2D heatmap.
 
@@ -241,11 +338,7 @@ class AnimationBuilder:
 
         # Choose writer and save
         writer, ext = self._choose_writer(len(self.storage), self.times[-1], config.fps)
-
-        # Ensure output path has correct extension
-        out_path = pathlib.Path(config.output_path)
-        if out_path.suffix not in {".mp4", ".gif"}:
-            out_path = out_path.with_suffix(ext)
+        out_path = pathlib.Path(config.output_path).with_suffix(ext)
 
         out_path.parent.mkdir(exist_ok=True, parents=True)
         anim.save(str(out_path), writer=writer, dpi=config.dpi)
@@ -290,7 +383,7 @@ class AnimationBuilder:
             """Update function for animation."""
             y_data = self.storage[frame_idx][0].data  # type: ignore[index,misc]
             line.set_data(x, y_data)  # type: ignore[arg-type]
-            title_text.set_text(f"{config.title} (t={self.times[frame_idx]:.2f})")
+            title_text.set_text(f"{config.title} at $t = {self.times[frame_idx]:.2f}$")
             return line, title_text
 
         # Create animation
@@ -300,9 +393,7 @@ class AnimationBuilder:
 
         # Save
         writer, ext = self._choose_writer(len(self.storage), self.times[-1], config.fps)
-        out_path = pathlib.Path(config.output_path)
-        if out_path.suffix not in {".mp4", ".gif"}:
-            out_path = out_path.with_suffix(ext)
+        out_path = pathlib.Path(config.output_path).with_suffix(ext)
 
         out_path.parent.mkdir(exist_ok=True, parents=True)
         anim.save(str(out_path), writer=writer, dpi=config.dpi)
@@ -436,9 +527,7 @@ class AnimationBuilder:
         )
 
         writer, ext = self._choose_writer(len(self.storage), self.times[-1], config.fps)
-        out_path = pathlib.Path(config.output_path)
-        if out_path.suffix not in {".mp4", ".gif"}:
-            out_path = out_path.with_suffix(ext)
+        out_path = pathlib.Path(config.output_path).with_suffix(ext)
 
         out_path.parent.mkdir(exist_ok=True, parents=True)
         anim.save(str(out_path), writer=writer, dpi=config.dpi)
