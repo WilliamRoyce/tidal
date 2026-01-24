@@ -90,6 +90,11 @@ class InitialCondition(ABC):
         -------
         np.ndarray
             Flattened phi field values
+
+        Raises
+        ------
+        ValueError
+            If grid dimensions are invalid
         """
 
     def _compute_pi(self, grid: CartesianGrid, phi_data: np.ndarray) -> np.ndarray:  # noqa: ARG002, PLR6301
@@ -177,7 +182,7 @@ class GaussianPulse(InitialCondition):
         Raises
         ------
         ValueError
-            If both width and sigma are specified, or if width <= 0
+            If both width and sigma are specified, or if width <= 0, or if values are not finite
         TypeError
             If center is not a list or tuple
 
