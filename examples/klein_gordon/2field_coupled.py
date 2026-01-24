@@ -76,12 +76,6 @@ def main() -> None:
     snapshots during the run, assembles the evolution arrays for both fields,
     and writes an image file with two subplots (one per field). It does not
     return a value.
-
-    Raises
-    ------
-    RuntimeError
-        If no snapshots are recorded during the simulation or if a non-finite
-        field value is encountered during observation.
     """
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     simulation_components = _build_simulation_components()

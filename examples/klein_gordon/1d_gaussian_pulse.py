@@ -1,3 +1,26 @@
+"""1D Klein-Gordon Gaussian Pulse Simulation.
+
+This example demonstrates two equivalent ways to create initial conditions:
+
+1. **Function-based API** (convenient, quick):
+   ```python
+   state = gaussian_pulse(grid, amplitude=1.0, width=5.0)
+   ```
+
+2. **Class-based API** (flexible, reusable):
+   ```python
+   ic = GaussianPulse(amplitude=1.0, width=5.0)
+   state = ic.build(grid)
+   ```
+
+The class-based API provides:
+- Easier customization via inheritance
+- Separation of IC parameters from grid construction
+- Reusable IC objects for parameter sweeps
+
+Both APIs produce identical results and are fully compatible.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -25,6 +48,11 @@ def _build_simulation_components() -> dict[str, Any]:
     Build and return all components needed to run the simulation as a single dict.
 
     Returning a single container lets `main` keep few local variables.
+
+    Note: This example uses the function-based API (gaussian_pulse).
+    For the class-based alternative, use:
+        ic = GaussianPulse(amplitude=1.0, width=5.0, initial_velocity=0.0)
+        state = ic.build(grid)
     """
     # --- grid ---
     grid_config = GridConfig(
@@ -34,6 +62,7 @@ def _build_simulation_components() -> dict[str, Any]:
 
     pde = KleinGordonPDE(params=KGParameters(mass=0.5))
 
+    # Function-based API (convenient wrapper)
     state = gaussian_pulse(grid, amplitude=1.0, width=5.0, initial_velocity=0.0)
 
     simulation_config = SimulationConfig(

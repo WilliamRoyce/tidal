@@ -27,6 +27,10 @@ if TYPE_CHECKING:
     from matplotlib.image import AxesImage
     from pde import CartesianGrid, MemoryStorage
 
+# Animation configuration constants
+DEFAULT_FPS_DIVISOR = 5.0  # Used to calculate fps from t_end
+VIDEO_BITRATE = 2000  # Bitrate for FFMpeg encoding
+
 
 @dataclass
 class AnimationConfig:
@@ -42,6 +46,19 @@ class AnimationConfig:
     ylabel: str = "t"
     cbar_label: str = "φ"
     use_twoslope_norm: bool = True
+
+    def __post_init__(self) -> None:
+        """Validate configuration.
+
+        Raises
+        ------
+        ValueError
+            If output_path contains path traversal patterns (..).
+        """
+        path_str = str(self.output_path)
+        if ".." in path_str:
+            msg = f"output_path contains path traversal pattern '..': {path_str}"
+            raise ValueError(msg)
 
 
 class AnimationBuilder:
@@ -85,10 +102,15 @@ class AnimationBuilder:
     ) -> tuple[FFMpegWriter | PillowWriter, str]:
         """Choose animation writer (ffmpeg or pillow)."""
         if fps is None:
-            fps = max(1, int(snap_count / max(1.0, t_end / 5.0)))
+            if t_end == 0:
+                fps = 1
+            else:
+                fps = max(1, int(snap_count / max(1.0, t_end / DEFAULT_FPS_DIVISOR)))
 
         if shutil.which("ffmpeg") is not None:
-            writer = FFMpegWriter(fps=fps, metadata={"artist": "kgsim"}, bitrate=2000)
+            writer = FFMpegWriter(
+                fps=fps, metadata={"artist": "kgsim"}, bitrate=VIDEO_BITRATE
+            )
             ext = ".mp4"
         else:
             writer = PillowWriter(fps=fps)
@@ -279,6 +301,11 @@ class AnimationBuilder:
             msg = f"2d_heatmap_animation requires 2D grid, got {self.grid.dim}D"
             raise ValueError(msg)
 
+        # Validate storage
+        if len(self.storage) == 0:
+            msg = "storage is empty (no frames)"
+            raise ValueError(msg)
+
         # Get spatial extent
         bounds = self.grid.axes_bounds
         extent = (
@@ -291,9 +318,9 @@ class AnimationBuilder:
         # Setup figure
         fig, ax = plt.subplots(figsize=config.figsize)
 
-        # Get first frame and setup colormap
-        first_frame = self.storage[0][0].data  # type: ignore[index,misc]
+        # Cache array extraction for performance (avoid repeated storage access)
         all_data = np.array([self.storage[i][0].data for i in range(len(self.storage))])  # type: ignore[index,misc]
+        first_frame = all_data[0]
         norm = self._setup_colormap_norm(
             all_data, use_twoslope=config.use_twoslope_norm
         )

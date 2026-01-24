@@ -3,10 +3,11 @@ from __future__ import annotations
 from collections.abc import Sequence
 from typing import TYPE_CHECKING, cast
 
-from pde import ScalarField
+from pde import CartesianGrid, ScalarField
 
 if TYPE_CHECKING:
     # type-checker only import (stubs may be missing at runtime)
+    import numpy as np
     from pde.fields.datafield_base import DataFieldBase  # type: ignore[import]
 
 # Type alias for boundary condition data compatible with py-pde
@@ -32,6 +33,60 @@ def natural_center(bounds: Sequence[tuple[float, float]]) -> list[float]:
         A list of midpoints corresponding to each input interval, in the same order.
     """
     return [(a + b) / 2 for (a, b) in bounds]
+
+
+def extract_grid_coordinates(
+    grid: CartesianGrid, *, flatten: bool = True
+) -> np.ndarray:
+    """Extract and normalize grid cell coordinates from CartesianGrid.
+
+    Handles different py-pde versions that may return cell coordinates in
+    different formats (grid-shaped vs flattened).
+
+    Parameters
+    ----------
+    grid : CartesianGrid
+        The computational grid.
+    flatten : bool, optional
+        If True, return coordinates in shape (N_cells, dim).
+        If False, return coordinates in shape (*grid.shape, dim).
+        Default is True.
+
+    Returns
+    -------
+    np.ndarray
+        Normalized coordinate array:
+        - If flatten=True: shape (N_cells, dim)
+        - If flatten=False: shape (*grid.shape, dim)
+
+    Raises
+    ------
+    ValueError
+        If cell_coords has an unexpected shape that cannot be normalized.
+
+    Notes
+    -----
+    Different py-pde versions may provide cell_coords in different formats:
+    - Grid-shaped: (*grid.shape, dim) - newer versions
+    - Flattened: (N_cells, dim) - older versions
+    This function provides a unified interface regardless of format.
+    """
+    coordinates = cast("np.ndarray", grid.cell_coords)
+
+    # Handle grid-shaped format: (*grid.shape, dim)
+    if coordinates.ndim == grid.dim + 1 and coordinates.shape[-1] == grid.dim:
+        if flatten:
+            return coordinates.reshape(-1, grid.dim)
+        return coordinates
+
+    # Handle flattened format: (N_cells, dim)
+    if coordinates.ndim == 2 and coordinates.shape[1] == grid.dim:  # noqa: PLR2004
+        if not flatten:
+            return coordinates.reshape(*grid.shape, grid.dim)
+        return coordinates
+
+    msg = f"Unexpected cell_coords shape: {coordinates.shape} for grid with dim={grid.dim}"
+    raise ValueError(msg)
 
 
 def sub_scalar_fields(
@@ -109,12 +164,8 @@ def infer_bc_from_grid(
         result = "derivative"
     elif isinstance(periodic, Sequence):
         periodic_seq = cast("Sequence[bool]", periodic)
-        if any(periodic_seq):
-            # At least one periodic direction - use auto BC
-            result = "auto_periodic_neumann"
-        else:
-            # No periodic directions
-            result = "derivative"
+        # At least one periodic direction - use auto BC, otherwise derivative
+        result = "auto_periodic_neumann" if any(periodic_seq) else "derivative"
     else:
         result = "auto_periodic_neumann"
 

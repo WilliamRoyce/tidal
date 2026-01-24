@@ -122,7 +122,7 @@ def demo_ring_pulse_2d() -> None:
     print("✓ Created RingPulse2D IC")
     print(f"  Amplitude: {ic.amplitude}")
     print(f"  Ring radius: {ic.initial_radius}")
-    print(f"  Width: {ic.sigma}")
+    print(f"  Width: {ic.width}")
     print(f"  Max φ: {state[0].data.max():.4f}")
 
     # Visualize

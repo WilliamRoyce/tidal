@@ -1,3 +1,22 @@
+"""2D Klein-Gordon Ring Pulse Simulation.
+
+This example demonstrates creating a 2D ring-shaped initial condition using either:
+
+1. **Function-based API**:
+   ```python
+   state = ring_pulse_2d(grid, amplitude=1.0, initial_radius=15.0, sigma=2.0)
+   ```
+
+2. **Class-based API**:
+   ```python
+   ic = RingPulse2D(amplitude=1.0, initial_radius=15.0, sigma=2.0)
+   state = ic.build(grid)
+   ```
+
+The class-based approach offers reusability and easier customization
+for scenarios involving multiple ring pulses or parameter sweeps.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -21,7 +40,13 @@ from torsion_gertsenshtein.kgsim import (
 
 
 def _build_simulation_components() -> dict[str, Any]:
-    """Build simulation components for 2D ring pulse."""
+    """Build simulation components for 2D ring pulse.
+
+    Note: This example uses the function-based API (ring_pulse_2d).
+    For the class-based alternative, use:
+        ic = RingPulse2D(amplitude=1.0, initial_radius=15.0, sigma=2.0)
+        state = ic.build(grid)
+    """
     grid_config = GridConfig(
         dim=2,
         shape=(256, 256),
@@ -29,6 +54,8 @@ def _build_simulation_components() -> dict[str, Any]:
         periodic=True,
     )
     grid = make_grid(grid_config)
+
+    # Function-based API (convenient wrapper)
     state = ring_pulse_2d(grid, amplitude=1.0, initial_radius=15.0, sigma=2.0)
 
     simulation_config = SimulationConfig(
