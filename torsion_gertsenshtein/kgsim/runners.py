@@ -4,7 +4,12 @@ import logging
 from collections.abc import Callable  # add Callable import if not present
 from typing import TYPE_CHECKING, Any
 
-from pde import PDEBase, ProgressTracker
+from pde import (
+    FieldCollection,
+    MemoryStorage,
+    PDEBase,
+    ProgressTracker,
+)
 from pde.trackers import CallbackTracker
 
 from torsion_gertsenshtein.kgsim.profiling import (
@@ -17,9 +22,6 @@ from torsion_gertsenshtein.kgsim.profiling import (
 if TYPE_CHECKING:
     from collections.abc import Callable
 
-    from pde import (
-        FieldCollection,
-    )
     from pde.trackers.base import TrackerBase
 
     from .config import SimulationConfig
@@ -250,8 +252,147 @@ def run(  # noqa: PLR0913
         msg = "solver returned None"
         raise RuntimeError(msg)
 
+    # Type narrowing: assert result is FieldCollection after None check
+    assert isinstance(result, FieldCollection), "Expected FieldCollection from solver"
+
     # 4) optional profiling log
     if profile:
         _log_profile(timer=timer, prof=prof)
 
     return result
+
+
+def run_with_snapshots(
+    *,
+    pde: PDEBase,
+    state: FieldCollection,
+    config: SimulationConfig,
+    snapshot_interval: float | None = None,
+    profile: bool = False,
+) -> tuple[FieldCollection, MemoryStorage]:
+    """Run simulation with automatic snapshot storage using MemoryStorage.
+
+    This is a convenience wrapper around `run()` that automatically sets up
+    py-pde's MemoryStorage tracker to collect snapshots at regular intervals,
+    eliminating the need for manual snapshot list management.
+
+    Parameters
+    ----------
+    pde : PDEBase
+        The PDE instance defining the evolution equations.
+    state : FieldCollection
+        Initial state (typically a FieldCollection of [phi, pi]).
+    config : SimulationConfig
+        Configuration object specifying solver, timestep, backend, etc.
+    snapshot_interval : float | None, optional
+        Time interval between snapshots. If None, uses config.dt or solver
+        interrupts. Default is None.
+    profile : bool, optional
+        Whether to enable performance profiling. Default is False.
+
+    Returns
+    -------
+    result : FieldCollection
+        Final state after time evolution.
+    storage : MemoryStorage
+        Storage object containing all snapshots. Access snapshots via:
+        - storage.times: array of snapshot times
+        - storage[i]: state at snapshot i
+        - storage.data: full trajectory data
+
+    Raises
+    ------
+    RuntimeError
+        If the solver returns None instead of a FieldCollection result.
+
+    Examples
+    --------
+    >>> from torsion_gertsenshtein.kgsim import (
+    ...     GridConfig, make_grid, gaussian_pulse,
+    ...     InhomogeneousKGPDE, SimulationConfig, run_with_snapshots
+    ... )
+    >>> grid = make_grid(GridConfig(dim=1, shape=(128,), bounds=((0, 100),)))
+    >>> state = gaussian_pulse(grid, amplitude=1.0, width=2.0)
+    >>> pde = InhomogeneousKGPDE(m2_field=ScalarField(grid, data=0.5**2))
+    >>> config = SimulationConfig(t_end=50.0, solver="scipy")
+    >>> result, storage = run_with_snapshots(
+    ...     pde=pde, state=state, config=config, snapshot_interval=1.0
+    ... )
+    >>> print(f"Collected {len(storage)} snapshots")
+    >>> # Extract phi field from each snapshot
+    >>> phi_snapshots = [storage[i][0].data for i in range(len(storage))]
+
+    Notes
+    -----
+    This function replaces the common pattern of:
+
+        snapshots = []
+        def record_phi(state_coll, t):
+            snapshots.append((t, state_coll[0].data.copy()))
+            return {}
+        run(..., extra_observer=record_phi)
+
+    With the cleaner:
+
+        result, storage = run_with_snapshots(...)
+        snapshots = [(storage.times[i], storage[i][0].data)
+                     for i in range(len(storage))]
+
+    The MemoryStorage approach is more efficient and integrates better with
+    py-pde's visualization and analysis tools.
+    """
+    # Create MemoryStorage tracker
+    storage = MemoryStorage()
+    storage_tracker = storage.tracker(
+        interrupts=snapshot_interval if snapshot_interval is not None else 1
+    )
+
+    # Build other trackers
+    trackers: list[TrackerBase | str] = []
+
+    if profile:
+        prof: dict[str, float] = {"t_first_tick": 0.0}
+        ft = first_tick_tracker(prof, "t_first_tick")
+        trackers.append(CallbackTracker(ft))
+
+    if config.progress:
+        trackers.append(ProgressTracker())
+
+    # Add storage tracker
+    trackers.append(storage_tracker)
+
+    # Select solver
+    solver_name, solver_kwargs = _select_solver_kwargs(pde=pde, config=config)
+
+    # Call solve with storage tracker
+    timer = Timer() if profile else None
+    prof_dict = {"t_call_solve": 0.0} if profile else {}
+
+    solution_output = _call_solve_with_fallback(
+        pde=pde,
+        state=state,
+        t_end=config.t_end,
+        dt=config.dt,
+        tracker=tuple(trackers),
+        solver_name=solver_name,
+        solver_kwargs=solver_kwargs,
+        prof=prof_dict,
+    )
+
+    if isinstance(solution_output, tuple):
+        result, _info = solution_output
+    else:
+        result = solution_output
+
+    if result is None:
+        msg = "solver returned None"
+        raise RuntimeError(msg)
+
+    # Type narrowing: assert result is FieldCollection after None check
+    assert isinstance(result, FieldCollection), "Expected FieldCollection from solver"
+
+    if profile and timer is not None:
+        timer.mark("solve_returned")
+        _log_profile(timer=timer, prof=prof_dict)
+
+    return result, storage

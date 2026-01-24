@@ -1,29 +1,46 @@
+"""1D Klein-Gordon Gaussian Pulse Simulation.
+
+This example demonstrates two equivalent ways to create initial conditions:
+
+1. **Function-based API** (convenient, quick):
+   ```python
+   state = gaussian_pulse(grid, amplitude=1.0, width=5.0)
+   ```
+
+2. **Class-based API** (flexible, reusable):
+   ```python
+   ic = GaussianPulse(amplitude=1.0, width=5.0)
+   state = ic.build(grid)
+   ```
+
+The class-based API provides:
+- Easier customization via inheritance
+- Separation of IC parameters from grid construction
+- Reusable IC objects for parameter sweeps
+
+Both APIs produce identical results and are fully compatible.
+"""
+
 from __future__ import annotations
 
 import logging
-import operator
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
-# Create spacetime heatmap using unified plotting module
-from torsion_gertsenshtein.kgsim.animations import create_spacetime_plot
 from torsion_gertsenshtein.plot_pgf import enable_pgf
 
 enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
 
-import numpy as np
-
 from torsion_gertsenshtein.kgsim import (
+    AnimationBuilder,
+    AnimationConfig,
     GridConfig,
     KGParameters,
     KleinGordonPDE,
     SimulationConfig,
     gaussian_pulse,
     make_grid,
-    run,
+    run_with_snapshots,
 )
-
-if TYPE_CHECKING:
-    from pde import FieldCollection
 
 
 def _build_simulation_components() -> dict[str, Any]:
@@ -31,6 +48,11 @@ def _build_simulation_components() -> dict[str, Any]:
     Build and return all components needed to run the simulation as a single dict.
 
     Returning a single container lets `main` keep few local variables.
+
+    Note: This example uses the function-based API (gaussian_pulse).
+    For the class-based alternative, use:
+        ic = GaussianPulse(amplitude=1.0, width=5.0, initial_velocity=0.0)
+        state = ic.build(grid)
     """
     # --- grid ---
     grid_config = GridConfig(
@@ -38,13 +60,14 @@ def _build_simulation_components() -> dict[str, Any]:
     )
     grid = make_grid(grid_config)
 
-    pde = KleinGordonPDE(KGParameters(mass=0.5))
+    pde = KleinGordonPDE(params=KGParameters(mass=0.5))
 
+    # Function-based API (convenient wrapper)
     state = gaussian_pulse(grid, amplitude=1.0, width=5.0, initial_velocity=0.0)
 
     simulation_config = SimulationConfig(
         t_end=200.0,
-        dt=None,  # adaptive
+        dt=None,  # Adaptive time step
         solver="scipy",  # or "explicit"
         method="RK45",
         backend="numba",  # prefer 'numpy' here for portability unless numba RHS is provided
@@ -72,71 +95,31 @@ def main() -> None:
     - Construct a 1D periodic computational grid (default: 1024 points over [0, 200]).
     - Instantiate Klein-Gordon PDE parameters (mass=0.5) and the PDE object.
     - Initialize the field as a Gaussian pulse with specified amplitude and width.
-    - Collect snapshots of φ at the initial time and at each tracker interrupt via
-        an observer callback. Snapshots are stored as a list of (time, numpy.ndarray)
-        tuples where each array has shape (nx,).
-    - Configure and run the time integrator (adaptive dt with the "RK45" SciPy
-        solver by default, using the "numpy" backend). The run call fills the
-        snapshots list as a side effect.
-    - Assemble the recorded snapshots into a 2D array of shape (nt, nx) where
-        rows correspond to times and columns to spatial grid points.
-    - Create and save an image of the evolution using matplotlib.imshow with the
-        horizontal axis as x and the vertical axis as t. The output image is written
-        to "outputs/phi_evolution.png" (the outputs directory is created if needed).
-    - Print the saved file path to stdout.
-    - Assemble the recorded snapshots and create an animation showing φ(x) vs x
-        for each time step.
-    - Save the animation as either MP4 (if ffmpeg available) or GIF.
-
-    Raises
-    ------
-    RuntimeError
-        If no snapshots were recorded during the simulation.
+    - Run simulation with automatic snapshot collection using MemoryStorage.
+    - Create spacetime heatmap using AnimationBuilder.
+    - Save the output to "outputs/KG_evolution.pdf".
     """
     logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     simulation_components = _build_simulation_components()
 
-    # Collector for snapshots (time, phi_array)
-    snapshots: list[tuple[float, np.ndarray]] = []
-
-    # Record initial condition
-    snapshots.append((0.0, np.asarray(simulation_components["state"][0].data).copy()))
-
-    # Observer that records φ at each tracker interrupt
-    def record_phi(state_coll: FieldCollection, t: float) -> dict[str, Any]:
-        arr = np.asarray(state_coll[0].data)
-        if not np.isfinite(arr).all():
-            msg = f"Non-finite field at t={t}"
-            raise RuntimeError(msg)
-        snapshots.append((t, arr.copy()))
-        return {}
-
-    # run accepts an extra_observer callback (side-effect: fills snapshots)
-    run(
+    # Run simulation with automatic snapshot storage
+    _result, storage = run_with_snapshots(
         pde=simulation_components["pde"],
         state=simulation_components["state"],
         config=simulation_components["simulation_config"],
-        extra_observer=record_phi,
-        profile=True,
+        snapshot_interval=1.0,
     )
 
-    # Ensure there is at least one snapshot
-    if not snapshots:
-        msg = "No snapshots were recorded during the simulation."
-        raise RuntimeError(msg)
-
-    # Sort by time (observer callbacks might not be strictly increasing)
-    snapshots.sort(key=operator.itemgetter(0))
-
-    create_spacetime_plot(
-        snapshots,
-        simulation_components["grid"],
-        "outputs/KG_evolution.pdf",
+    # Create spacetime plot using AnimationBuilder
+    builder = AnimationBuilder(storage, simulation_components["grid"])
+    config = AnimationConfig(
+        output_path="outputs/KG_evolution.pdf",
         title=r"Klein-Gordon evolution: $\phi(x,t)$",
         xlabel=r"$x$",
         ylabel=r"$t$",
         cbar_label=r"$\phi$",
     )
+    builder.create_spacetime_1d(config)
     print("Saved outputs/KG_evolution.pdf")
 
 

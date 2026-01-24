@@ -54,6 +54,9 @@ unfixable = ["T201"]
 "examples/**/*" = ["INP001", "T201", "E402"]
 "scripts/**/*" = ["INP001", "T201", "D101", "D102", "D103", "D104"]
 "docs/**/*" = ["INP001", "I002"]
+"torsion_gertsenshtein/kgsim/animation_builder.py" = [
+    "EXE002",
+] # Container permission issue
 
 [tool.ruff.lint.pylint]
 allow-dunder-method-names = [
@@ -83,3 +86,11 @@ reportUnknownMemberType = false
 [build-system]
 requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "." }
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["torsion_gertsenshtein*"]
+exclude = ["outputs*", "tests*", "docs*"]

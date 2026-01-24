@@ -32,15 +32,19 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
+from numba import jit  # type: ignore[import-untyped]
 from pde import FieldCollection, PDEBase, ScalarField
 from typing_extensions import override
 
 from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
+    from collections.abc import Callable, Sequence
 
+    from numpy.typing import NDArray
     from pde import FieldBase
+
+    NumericArray = NDArray[np.float64]
 
 import logging
 
@@ -224,6 +228,84 @@ class AnisotropicKGPDE(PDEBase):
         dphi_dt = ScalarField(phi.grid, data=pi.data.copy())
         return FieldCollection([dphi_dt, dpi_dt])  # type: ignore[arg-type]
 
+    def make_pde_rhs_numba(
+        self, state: FieldCollection
+    ) -> Callable[[NumericArray, float], NumericArray]:
+        """Create a compiled function evaluating the right hand side of the PDE.
+
+        This implements anisotropic wave propagation using gradient chaining:
+        For each direction i: compute c_i² * ∂²φ/∂x_i² using two gradient applications.
+
+        Args:
+            state (:class:`~pde.fields.FieldCollection`):
+                An example for the state defining the grid and data types
+
+        Returns
+        -------
+            A function with signature `(state_data, t)`, which can be called with an
+            instance of :class:`~numpy.ndarray` of the state data and the time to
+            obtained an instance of :class:`~numpy.ndarray` giving the evolution rate.
+
+        Raises
+        ------
+        ValueError
+            If speeds length does not match grid dimension.
+        """
+        # Copy attributes locally (frozen during compilation)
+        m2 = self.m2
+        speeds_squared = self.speeds_squared.copy()
+        dim = len(self.speeds)
+
+        # Validate dimension matches grid
+        if dim != state.grid.dim:
+            msg = f"speeds length ({dim}) must match grid dimension ({state.grid.dim})"
+            raise ValueError(msg)
+
+        # Get boundary conditions
+        bc = infer_bc_from_grid(state.grid)
+
+        # Create compiled gradient operator
+        gradient = state.grid.make_operator("gradient", bc=bc, backend="numba")  # type: ignore[arg-type]
+
+        @jit
+        def pde_rhs(state_data: NumericArray, t: float = 0) -> NumericArray:
+            """Compiled helper function evaluating right hand side."""
+            # Extract phi and pi from state array
+            phi_data = state_data[0]
+            pi_data = state_data[1]
+
+            # Prepare output array
+            rate = np.empty_like(state_data)
+
+            # dphi/dt = pi
+            rate[0] = pi_data
+
+            # dpi/dt = Σ_i c_i² * ∂²φ/∂x_i² - m²φ
+            # Start with mass term
+            rate[1] = -m2 * phi_data
+
+            # Anisotropic Laplacian via gradient chaining
+            # grad_phi has shape (dim, *grid_shape)
+            grad_phi = gradient(phi_data, args={"t": t})
+
+            for i in range(dim):
+                # Extract i-th component: ∂φ/∂x_i
+                grad_i = grad_phi[i]
+
+                # Compute gradient of this component
+                # grad_grad_i has shape (dim, *grid_shape)
+                grad_grad_i = gradient(grad_i, args={"t": t})
+
+                # Extract i-th component: ∂²φ/∂x_i²
+                d2_phi_dxi2 = grad_grad_i[i]
+
+                # Add anisotropic contribution
+                rate[1] += speeds_squared[i] * d2_phi_dxi2
+
+            return rate
+
+        return pde_rhs
+
 
 class HigherOrderKGPDE(PDEBase):
     """Klein-Gordon equation with higher-order derivative terms.
@@ -385,6 +467,68 @@ class HigherOrderKGPDE(PDEBase):
         # First-order system: d_phi/dt = pi
         dphi_dt = ScalarField(phi.grid, data=pi.data.copy())
         return FieldCollection([dphi_dt, dpi_dt])  # type: ignore[arg-type]
+
+    def make_pde_rhs_numba(
+        self, state: FieldCollection
+    ) -> Callable[[NumericArray, float], NumericArray]:
+        """Create a compiled function evaluating the right hand side of the PDE.
+
+        Args:
+            state (:class:`~pde.fields.FieldCollection`):
+                An example for the state defining the grid and data types
+
+        Returns
+        -------
+            A function with signature `(state_data, t)`, which can be called with an
+            instance of :class:`~numpy.ndarray` of the state data and the time to
+            obtained an instance of :class:`~numpy.ndarray` giving the evolution rate.
+        """
+        # Copy attributes locally (frozen during compilation)
+        m2 = self.m2
+        alpha_2 = self.alpha_2
+        alpha_4 = self.alpha_4
+        alpha_6 = self.alpha_6
+
+        # Get boundary conditions
+        bc = infer_bc_from_grid(state.grid)
+
+        # Create compiled operators
+        laplace = state.grid.make_operator("laplace", bc=bc, backend="numba")  # type: ignore[arg-type]
+
+        @jit
+        def pde_rhs(state_data: NumericArray, t: float = 0) -> NumericArray:
+            """Compiled helper function evaluating right hand side."""
+            # Extract phi and pi from state array
+            phi_data = state_data[0]
+            pi_data = state_data[1]
+
+            # Prepare output array
+            rate = np.empty_like(state_data)
+
+            # dphi/dt = pi
+            rate[0] = pi_data
+
+            # dpi/dt = alpha_2 * ∇²φ - alpha_4 * ∇⁴φ + alpha_6 * ∇⁶φ - m²φ
+            rate[1] = -m2 * phi_data
+
+            # Nested Laplacians for higher-order terms
+            if alpha_2 != 0 or alpha_4 != 0 or alpha_6 != 0:
+                lap1 = laplace(phi_data, args={"t": t})
+                if alpha_2 != 0:
+                    rate[1] += alpha_2 * lap1
+
+                if alpha_4 != 0 or alpha_6 != 0:
+                    lap2 = laplace(lap1, args={"t": t})
+                    if alpha_4 != 0:
+                        rate[1] -= alpha_4 * lap2
+
+                    if alpha_6 != 0:
+                        lap3 = laplace(lap2, args={"t": t})
+                        rate[1] += alpha_6 * lap3
+
+            return rate
+
+        return pde_rhs
 
 
 class DirectionalKGPDE(PDEBase):
@@ -557,6 +701,82 @@ class DirectionalKGPDE(PDEBase):
         dphi_dt = ScalarField(phi.grid, data=pi.data.copy())
         return FieldCollection([dphi_dt, dpi_dt])  # type: ignore[arg-type]
 
+    def make_pde_rhs_numba(
+        self, state: FieldCollection
+    ) -> Callable[[NumericArray, float], NumericArray]:
+        """Create a compiled function evaluating the right hand side of the PDE.
+
+        This implements directional evolution with selective gradient chaining:
+        Only compute ∂²φ/∂x_i² for active directions.
+
+        Args:
+            state (:class:`~pde.fields.FieldCollection`):
+                An example for the state defining the grid and data types
+
+        Returns
+        -------
+            A function with signature `(state_data, t)`, which can be called with an
+            instance of :class:`~numpy.ndarray` of the state data and the time to
+            obtained an instance of :class:`~numpy.ndarray` giving the evolution rate.
+
+        Raises
+        ------
+        ValueError
+            If active_directions length does not match grid dimension.
+        """
+        # Copy attributes locally (frozen during compilation)
+        m2 = self.m2
+        active_directions = tuple(self.active_directions)
+        dim = len(active_directions)
+
+        # Validate dimension matches grid
+        if dim != state.grid.dim:
+            msg = f"active_directions length ({dim}) must match grid dimension ({state.grid.dim})"
+            raise ValueError(msg)
+
+        # Get boundary conditions
+        bc = infer_bc_from_grid(state.grid)
+
+        # Create compiled gradient operator
+        gradient = state.grid.make_operator("gradient", bc=bc, backend="numba")  # type: ignore[arg-type]
+
+        @jit
+        def pde_rhs(state_data: NumericArray, t: float = 0) -> NumericArray:
+            """Compiled helper function evaluating right hand side."""
+            # Extract phi and pi from state array
+            phi_data = state_data[0]
+            pi_data = state_data[1]
+
+            # Prepare output array
+            rate = np.empty_like(state_data)
+
+            # dphi/dt = pi
+            rate[0] = pi_data
+
+            # dpi/dt = sum over active directions of d2phi/dxi2 - m2*phi
+            rate[1] = -m2 * phi_data
+
+            # Directional Laplacian via gradient chaining
+            grad_phi = gradient(phi_data, args={"t": t})
+
+            for i in range(dim):
+                if active_directions[i]:
+                    # Extract i-th component: ∂φ/∂x_i
+                    grad_i = grad_phi[i]
+
+                    # Compute gradient of this component
+                    grad_grad_i = gradient(grad_i, args={"t": t})
+
+                    # Extract i-th component: ∂²φ/∂x_i²
+                    d2_phi_dxi2 = grad_grad_i[i]
+
+                    # Add contribution from active direction
+                    rate[1] += d2_phi_dxi2
+
+            return rate
+
+        return pde_rhs
+
 
 class AnisotropicHigherOrderKGPDE(PDEBase):
     """Combined anisotropic and higher-order Klein-Gordon equation.
@@ -705,3 +925,92 @@ class AnisotropicHigherOrderKGPDE(PDEBase):
         dpi_dt = spatial_term - self.m2 * phi
         dphi_dt = ScalarField(phi.grid, data=pi.data.copy())
         return FieldCollection([dphi_dt, dpi_dt])  # type: ignore[arg-type]
+
+    def make_pde_rhs_numba(
+        self, state: FieldCollection
+    ) -> Callable[[NumericArray, float], NumericArray]:
+        """Create a compiled function evaluating the right hand side of the PDE.
+
+        This implements combined anisotropic and higher-order dispersion using
+        nested gradient chaining: up to 4x gradient applications per direction.
+
+        Args:
+            state (:class:`~pde.fields.FieldCollection`):
+                An example for the state defining the grid and data types
+
+        Returns
+        -------
+            A function with signature `(state_data, t)`, which can be called with an
+            instance of :class:`~numpy.ndarray` of the state data and the time to
+            obtained an instance of :class:`~numpy.ndarray` giving the evolution rate.
+
+        Raises
+        ------
+        ValueError
+            If speeds length does not match grid dimension.
+        """
+        # Copy attributes locally (frozen during compilation)
+        m2 = self.m2
+        speeds = self.speeds.copy()
+        alpha_2 = self.alpha_2
+        alpha_4 = self.alpha_4
+        dim = len(self.speeds)
+
+        # Validate dimension matches grid
+        if dim != state.grid.dim:
+            msg = f"speeds length ({dim}) must match grid dimension ({state.grid.dim})"
+            raise ValueError(msg)
+
+        # Get boundary conditions
+        bc = infer_bc_from_grid(state.grid)
+
+        # Create compiled gradient operator
+        gradient = state.grid.make_operator("gradient", bc=bc, backend="numba")  # type: ignore[arg-type]
+
+        @jit
+        def pde_rhs(state_data: NumericArray, t: float = 0) -> NumericArray:
+            """Compiled helper function evaluating right hand side."""
+            # Extract phi and pi from state array
+            phi_data = state_data[0]
+            pi_data = state_data[1]
+
+            # Prepare output array
+            rate = np.empty_like(state_data)
+
+            # dphi/dt = pi
+            rate[0] = pi_data
+
+            # dpi/dt = anisotropic second and fourth order terms minus mass term
+            rate[1] = -m2 * phi_data
+
+            # Anisotropic higher-order terms via gradient chaining
+            grad_phi = gradient(phi_data, args={"t": t})
+
+            for i in range(dim):
+                c_i = speeds[i]
+
+                # Second-order: α₂ * c_i² * ∂²φ/∂x_i²
+                if alpha_2 != 0:
+                    # First gradient: ∂φ/∂x_i
+                    grad_i = grad_phi[i]
+
+                    # Second gradient
+                    grad_grad_i = gradient(grad_i, args={"t": t})
+                    d2_phi_dxi2 = grad_grad_i[i]  # ∂²φ/∂x_i²
+
+                    rate[1] += alpha_2 * c_i**2 * d2_phi_dxi2
+
+                    # Fourth-order: -α₄ * c_i⁴ * ∂⁴φ/∂x_i⁴
+                    if alpha_4 != 0:
+                        # Third gradient: ∂/∂x_j (∂²φ/∂x_i²) for all j
+                        grad_d2phi = gradient(d2_phi_dxi2, args={"t": t})
+
+                        # Fourth gradient: ∂/∂x_i (∂³φ/∂x_i²∂x_i)
+                        grad_grad_d2phi = gradient(grad_d2phi[i], args={"t": t})
+                        d4_phi_dxi4 = grad_grad_d2phi[i]  # ∂⁴φ/∂x_i⁴
+
+                        rate[1] -= alpha_4 * c_i**4 * d4_phi_dxi4
+
+            return rate
+
+        return pde_rhs

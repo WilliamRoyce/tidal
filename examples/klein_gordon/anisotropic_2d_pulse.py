@@ -10,27 +10,25 @@ cases shows how anisotropy affects wavefront shape and arrival times.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+import logging
+from typing import TYPE_CHECKING
 
 from torsion_gertsenshtein.plot_pgf import enable_pgf
 
 enable_pgf("xelatex")
 
-import numpy as np
-
 from torsion_gertsenshtein.kgsim import (
+    AnimationBuilder,
+    AnimationConfig,
     GridConfig,
     SimulationConfig,
     gaussian_pulse,
     make_grid,
-    run,
+    run_with_snapshots,
 )
 from torsion_gertsenshtein.kgsim.advanced_equations import AnisotropicKGPDE
-from torsion_gertsenshtein.kgsim.animations import create_2d_heatmap_animation
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
-
     from pde import CartesianGrid, FieldCollection
 
 
@@ -58,82 +56,44 @@ def build_grid_and_state() -> tuple[CartesianGrid, FieldCollection]:
     return grid, state
 
 
-def make_recorder() -> tuple[
-    Callable[[FieldCollection, float], dict[str, Any]],
-    list[tuple[float, np.ndarray]],
-]:
-    """Create recorder callback for snapshots.
-
-    Returns
-    -------
-    tuple[callable, list]
-        Recorder function and snapshots list containing (time, phi_data) tuples.
-    """
-    snapshots: list[tuple[float, np.ndarray]] = []
-
-    def record_phi(state_coll: FieldCollection, t: float) -> dict[str, Any]:
-        snapshots.append((float(t), np.asarray(state_coll[0].data).copy()))
-        return {}
-
-    return record_phi, snapshots
-
-
 def main() -> None:
     """Run anisotropic Klein-Gordon simulation and create animation."""
+    logging.basicConfig(level=logging.INFO, format="%(levelname)s: %(message)s")
     grid, state = build_grid_and_state()
 
     # Anisotropic PDE: wave propagates faster in x (c_x=2.0) than y (c_y=0.5)
-    # This creates elliptical wavefronts stretched along the x-direction
-    pde = AnisotropicKGPDE(
-        mass=0.5,
-        speeds=[2.0, 0.5],  # [c_x, c_y] - anisotropy ratio of 4:1
-    )
+    pde = AnisotropicKGPDE(mass=0.5, speeds=[2.0, 0.5])
 
-    sim_config = SimulationConfig(
+    simulation_config = SimulationConfig(
         t_end=100.0,
         dt=None,
-        backend="numpy",  # Required for custom evolution_rate
+        backend="numba",
         solver="scipy",
         method="RK45",
         progress=True,
     )
 
-    recorder, snapshots = make_recorder()
-
-    print("Running anisotropic Klein-Gordon simulation...")
-    print(f"  Grid: {grid.shape} points, bounds {grid.axes_bounds}")
-    print(f"  Anisotropic speeds: c_x = {pde.speeds[0]:.1f}, c_y = {pde.speeds[1]:.1f}")
-    print(f"  Mass: m = {np.sqrt(pde.m2):.2f}")
-    print(f"  Time range: 0 to {sim_config.t_end}")
-
-    run(
+    # Run simulation with automatic snapshot storage
+    _result, storage = run_with_snapshots(
         pde=pde,
         state=state,
-        config=sim_config,
-        extra_observer=recorder,
+        config=simulation_config,
+        snapshot_interval=1.0,
     )
 
-    print(f"Simulation complete. Recorded {len(snapshots)} snapshots.")
-
-    # Create animation showing elliptical wavefront expansion
-    output_path = "outputs/anisotropic_2d_pulse.mp4"
-    print(f"\nCreating animation: {output_path}")
-
-    create_2d_heatmap_animation(
-        snapshots=snapshots,
-        grid=grid,
-        output_path=output_path,
-        title_template="Anisotropic KG (c_x=2.0, c_y=0.5): t={t:.1f}",
-        cmap="bwr",
-        fps=15,
+    # Create animation using AnimationBuilder
+    builder = AnimationBuilder(storage, grid)
+    config = AnimationConfig(
+        output_path="outputs/anisotropic_2d_pulse.mp4",
+        title=r"Anisotropic KG: $\phi(x,y)$ at $t =$",
+        xlabel=r"$x$",
+        ylabel=r"$y$",
+        cbar_label=r"$\phi$",
+        fps=30,
+        dpi=150,
     )
-
-    print("Animation saved successfully.")
-    print("\nExpected behavior:")
-    print("  - Wavefront expands as an ellipse (not a circle)")
-    print("  - Faster propagation along x-axis (horizontal)")
-    print("  - Slower propagation along y-axis (vertical)")
-    print("  - Anisotropy ratio c_x/c_y = 4.0 determines ellipse aspect ratio")
+    builder.create_2d_heatmap_animation(config)
+    print("Saved outputs/anisotropic_2d_pulse.[mp4|gif]")
 
 
 if __name__ == "__main__":

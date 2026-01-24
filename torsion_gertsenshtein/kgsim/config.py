@@ -136,6 +136,7 @@ class GridConfig:
             will indicate which invariant failed, for example:
             - "shape length {len(self.shape)} must equal dim {self.dim}"
             - "bounds length {len(self.bounds)} must equal dim {self.dim}"
+            - "bounds[i][0] must be < bounds[i][1]"
         """
         if len(self.shape) != self.dim:
             msg = f"shape length {len(self.shape)} must equal dim {self.dim}"
@@ -143,6 +144,11 @@ class GridConfig:
         if len(self.bounds) != self.dim:
             msg = f"bounds length {len(self.bounds)} must equal dim {self.dim}"
             raise ValueError(msg)
+        # Validate bounds ordering
+        for i, (lower, upper) in enumerate(self.bounds):
+            if lower >= upper:
+                msg = f"bounds[{i}] invalid: lower bound {lower} >= upper bound {upper}"
+                raise ValueError(msg)
 
 
 @dataclass(frozen=True)
