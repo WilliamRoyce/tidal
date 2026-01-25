@@ -29,6 +29,7 @@
     "numba",
     "pycache",
     "rcfonts",
+    "repr",
     "rtol",
     "sharey",
     "sympy",
@@ -64,7 +65,10 @@
     "trange",
     "tqdm"
   ],
-  "flagWords": ["hte", "teh"],
+  "flagWords": [
+    "hte",
+    "teh"
+  ],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [
