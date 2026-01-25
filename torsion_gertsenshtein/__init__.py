@@ -1,6 +1,6 @@
-"""An Example project."""
+"""Torsion-Gertsenshtein: Klein-Gordon PDE simulations for gravitational wave research."""
 
-PYTHON_IS_COOL = True
-"""A statement about Python."""
+__version__ = "0.1.0"
 
-__all__ = ["PYTHON_IS_COOL"]
+
+__all__ = ["__version__"]
