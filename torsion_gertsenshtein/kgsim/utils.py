@@ -8,7 +8,7 @@ from pde import CartesianGrid, ScalarField
 if TYPE_CHECKING:
     # type-checker only import (stubs may be missing at runtime)
     import numpy as np
-    from pde.fields.datafield_base import DataFieldBase  # type: ignore[import]
+    from pde.fields.datafield_base import DataFieldBase
 
 # Type alias for boundary condition data compatible with py-pde
 # Can be: string for auto BC, dict for explicit BC mapping, or None
@@ -154,7 +154,7 @@ def infer_bc_from_grid(
     result: BCDescriptor
     # explicit boundaries override periodic inference
     if bd is not None:
-        result = bd  # type: ignore[assignment]
+        result = bd
     # handle periodic being None/True/False/sequence/other in branches
     elif periodic is None or periodic is True:
         # Use explicit BC string for periodic grids (required for gradient chaining)
