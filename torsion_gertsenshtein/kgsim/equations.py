@@ -1,3 +1,9 @@
+"""PDE implementations for Klein-Gordon equations.
+
+This module provides the core PDE classes for homogeneous, inhomogeneous,
+and coupled Klein-Gordon systems using the py-pde framework.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast

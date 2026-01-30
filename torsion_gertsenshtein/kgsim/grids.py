@@ -1,3 +1,5 @@
+"""Grid construction utilities for Klein-Gordon simulations."""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -9,8 +11,7 @@ if TYPE_CHECKING:
 
 
 def make_grid(cfg: GridConfig) -> CartesianGrid:
-    """
-    Create a CartesianGrid from a GridConfig.
+    """Create a CartesianGrid from a GridConfig.
 
     Parameters
     ----------

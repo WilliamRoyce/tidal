@@ -1,3 +1,9 @@
+"""Utility functions for grid operations and field manipulation.
+
+This module provides helper functions for coordinate extraction, boundary
+condition inference, and scalar field arithmetic.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Sequence
@@ -16,21 +22,20 @@ BCDescriptor = str | dict[str, dict[str, str | float]] | None
 
 
 def natural_center(bounds: Sequence[tuple[float, float]]) -> list[float]:
-    """
-    Return the midpoint (natural center) for each interval in `bounds`.
+    """Return the midpoint (natural center) for each interval in bounds.
 
     Parameters
     ----------
     bounds : Sequence[tuple[float, float]]
-        An iterable of 2-tuples (or 2-length sequences) representing numeric intervals
-        (a, b). Each tuple's elements should be numbers (ints or floats). The function
-        computes the midpoint for each interval as (a + b) / 2 and does not require
-        that a <= b.
+        An iterable of 2-tuples representing numeric intervals (a, b).
+        Each tuple's elements should be numbers (ints or floats). The function
+        computes the midpoint for each interval as (a + b) / 2 and does not
+        require that a <= b.
 
     Returns
     -------
     list[float]
-        A list of midpoints corresponding to each input interval, in the same order.
+        A list of midpoints corresponding to each input interval.
     """
     return [(a + b) / 2 for (a, b) in bounds]
 
@@ -92,8 +97,19 @@ def extract_grid_coordinates(
 def sub_scalar_fields(
     a: ScalarField | DataFieldBase, b: ScalarField | DataFieldBase
 ) -> ScalarField:
-    """
-    Subtract two scalar fields and return a ScalarField.
+    """Subtract two scalar fields and return a ScalarField.
+
+    Parameters
+    ----------
+    a : ScalarField | DataFieldBase
+        The minuend field.
+    b : ScalarField | DataFieldBase
+        The subtrahend field.
+
+    Returns
+    -------
+    ScalarField
+        Result of a - b as a ScalarField.
 
     Raises
     ------
@@ -111,7 +127,19 @@ def sub_scalar_fields(
 def mul_scalar_field(
     scalar: complex, field: ScalarField | DataFieldBase
 ) -> ScalarField:
-    """Multiply a numeric scalar and a ScalarField, returning a ScalarField (runtime-checked).
+    """Multiply a numeric scalar by a ScalarField.
+
+    Parameters
+    ----------
+    scalar : complex
+        The numeric multiplier (can be int, float, or complex).
+    field : ScalarField | DataFieldBase
+        The field to multiply.
+
+    Returns
+    -------
+    ScalarField
+        Result of scalar * field as a ScalarField.
 
     Raises
     ------
@@ -128,12 +156,17 @@ def mul_scalar_field(
 def infer_bc_from_grid(
     grid: object,
 ) -> BCDescriptor:
-    """
-    Infer boundary-condition descriptor from a grid-like object.
+    """Infer boundary-condition descriptor from a grid-like object.
 
     For periodic grids, returns 'auto_periodic_neumann' which is required for
     gradient chaining to work correctly in py-pde.
     For non-periodic grids, returns an explicit BC mapping with Neumann (derivative=0).
+
+    Parameters
+    ----------
+    grid : object
+        A grid-like object, typically a py-pde CartesianGrid. May have
+        'boundaries' and/or 'periodic' attributes.
 
     Returns
     -------

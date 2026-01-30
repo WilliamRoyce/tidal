@@ -1,3 +1,10 @@
+"""Initial condition classes and factory functions for Klein-Gordon fields.
+
+This module provides both class-based (InitialCondition, GaussianPulse, RingPulse2D)
+and function-based (gaussian_pulse, ring_pulse_2d, plane_wave) APIs for creating
+initial field configurations.
+"""
+
 from __future__ import annotations
 
 from abc import ABC, abstractmethod

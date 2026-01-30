@@ -1,3 +1,9 @@
+"""Scalar field profile generators for spatial coefficient fields.
+
+This module provides utilities for creating spatially-varying mass and potential
+fields used with InhomogeneousKGPDE.
+"""
+
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -11,7 +17,28 @@ ArrayLikeFunc = Callable[[np.ndarray], np.ndarray]
 
 
 def constant_field(grid: CartesianGrid, value: float) -> ScalarField:
-    """Create a constant scalar field on the given grid."""
+    """Create a constant scalar field on the given grid.
+
+    Parameters
+    ----------
+    grid : CartesianGrid
+        The computational grid on which to define the field.
+    value : float
+        The constant value to assign to all grid points.
+
+    Returns
+    -------
+    ScalarField
+        A scalar field with uniform value across the entire grid.
+
+    Examples
+    --------
+    >>> from pde import CartesianGrid
+    >>> grid = CartesianGrid([[0, 10]], 100)
+    >>> field = constant_field(grid, 1.5)
+    >>> field.data.min() == field.data.max() == 1.5
+    True
+    """
     return ScalarField(grid, data=float(value))
 
 
@@ -58,7 +85,39 @@ def step_region_1d(
 
 
 def from_callable(grid: CartesianGrid, fn: ArrayLikeFunc) -> ScalarField:
-    """fn(coords) -> values; coords has shape (N, dim)."""
+    """Create a scalar field by evaluating a callable at grid cell centers.
+
+    This is a flexible factory for creating arbitrary field profiles from
+    user-defined functions that operate on coordinate arrays.
+
+    Parameters
+    ----------
+    grid : CartesianGrid
+        The computational grid on which to define the field.
+    fn : Callable[[np.ndarray], np.ndarray]
+        A function that takes cell center coordinates as input and returns
+        field values. The input array has shape (N, dim) where N is the total
+        number of grid cells and dim is the spatial dimension. The function
+        should return a 1D array of shape (N,) with the field value at each
+        cell center.
+
+    Returns
+    -------
+    ScalarField
+        A scalar field with values computed from the callable, reshaped to
+        match the grid structure.
+
+    Examples
+    --------
+    >>> from pde import CartesianGrid
+    >>> import numpy as np
+    >>> grid = CartesianGrid([[0, 10]], 100)
+    >>> # Create a linear gradient field
+    >>> field = from_callable(grid, lambda coords: coords[:, 0])
+    >>> # Create a radial field in 2D
+    >>> grid_2d = CartesianGrid([[0, 1], [0, 1]], [10, 10])
+    >>> radial = from_callable(grid_2d, lambda c: np.sqrt(c[:, 0]**2 + c[:, 1]**2))
+    """
     coordinates = cast("np.ndarray", grid.cell_coords)  # (N, dim)
     vals = fn(coordinates)  # shape (N,)
     return ScalarField(grid, data=np.asarray(vals).reshape(grid.shape))
