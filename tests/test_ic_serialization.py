@@ -140,7 +140,7 @@ def test_backward_compatibility_custom_subclass() -> None:
             """Initialize with a constant value."""
             self.value = value
 
-        def _compute_phi(self, grid: CartesianGrid) -> np.ndarray:  # type: ignore[override]
+        def _compute_phi(self, grid: CartesianGrid) -> np.ndarray:
             """Return constant field."""
             return np.full(grid.shape, self.value).ravel()
 

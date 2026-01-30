@@ -134,7 +134,7 @@ def test_initial_condition_custom_subclass() -> None:
         def __init__(self, value: float) -> None:
             self.value = value
 
-        def _compute_phi(self, grid: CartesianGrid) -> np.ndarray:  # type: ignore[override]
+        def _compute_phi(self, grid: CartesianGrid) -> np.ndarray:
             coords = self._get_coordinates(grid)
             return np.full(len(coords), self.value)
 
@@ -155,7 +155,7 @@ def test_initial_condition_distance_computation() -> None:
     ic = GaussianPulse(amplitude=1.0, width=2.0)
 
     # Test distance from center (accessing protected method for testing purposes)
-    distances = ic._compute_distances_from_center(grid, center=[5.0, 5.0])  # noqa: SLF001 # type: ignore[misc]
+    distances = ic._compute_distances_from_center(grid, center=[5.0, 5.0])  # noqa: SLF001
 
     # Check distances are positive
     assert np.all(distances >= 0)
