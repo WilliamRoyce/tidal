@@ -1,8 +1,78 @@
-# Changelog - Klein-Gordon Simulator Updates
+# Changelog - Klein-Gordon Simulator & Symbolic Computing Integration
 
-## Recent Improvements (January 2026)
+## Latest: Wolfram Engine & xAct/xCoba Integration (January 31, 2026)
 
-This document summarizes the comprehensive improvements made to the Klein-Gordon simulator codebase, focusing on robustness, performance, security, and code quality.
+This update adds complete symbolic tensor algebra capabilities to the project through automated Wolfram Engine and xAct/xCoba package installation, enabling derivation of linearized field equations for the Gertsenshtein effect.
+
+---
+
+## 🚀 Symbolic Computing Infrastructure
+
+**New Components:**
+
+- 5 installation/verification scripts
+- Wolfram Engine 14.3 headless integration
+- xAct 1.2.1 tensor algebra suite
+- xCoba coordinate-based tensor computations
+- GLIBC compatibility fixes for xPerm binary
+- Comprehensive verification and smoke testing
+
+**Impact:**
+
+- Enables symbolic derivation of coupled EM/gravity/torsion field equations
+- Automated container setup for symbolic computations
+- Reproducible installation across development environments
+- Ready for xAct-based coordinate calculations and Christoffel symbol derivations
+
+### Wolfram Engine Integration
+
+**Files:** `scripts/install-wolfram-engine.sh`, `scripts/activate-wolfram.sh`
+
+Automated installation and activation of Wolfram Engine for symbolic computations:
+
+- Downloads and installs Wolfram Engine 14.3
+- Handles system dependencies (libglib2.0, X11 libraries, etc.)
+- Interactive license activation with free Wolfram ID
+- Verification of installation and activation status
+
+**Container Integration:** Dev container automatically installs if installer placed in `third_party/`
+
+### xAct/xCoba Tensor Algebra Suite
+
+**Files:** `scripts/install-xact-xcoba.sh`, `scripts/xact_smoke.wl`
+
+Complete tensor algebra capabilities for General Relativity calculations:
+
+- Official xAct 1.2.1 package suite (xCore, xPerm, xTensor, xCoba)
+- GLIBC compatibility fix: recompiles xPerm binary using Wolfram's MathLink compiler
+- Installs to user Applications directory (`~/.WolframEngine/Applications/`)
+- Smoke test verifies manifold/chart definitions, metric tensors, Riemann tensor operations
+
+```wolfram
+DefManifold[M, 4, IndexRange[a, z]];
+DefChart[spherical, M, {0, 1, 2, 3}, {t[], r[], θ[], φ[]}];
+DefMetric[-1, g[-a, -b], CD];
+```
+
+### Comprehensive Verification
+
+**File:** `scripts/verify-wolfram-setup.sh`
+
+Multi-stage verification process:
+
+1. **Wolfram Engine**: binary availability, activation, version/license check
+2. **xAct Installation**: package directory structure, core components present
+3. **xPerm Compatibility**: binary dependencies, GLIBC version compatibility
+4. **Package Loading**: successful loading of xCore, xPerm, xTensor, xCoba
+5. **Smoke Test**: complete tensor operation workflow verification
+
+**Container Automation:** `postAttachCommand` auto-installs xAct if missing and prompts for verification
+
+---
+
+## Previous Improvements (January 2026)
+
+This section covers the earlier Klein-Gordon simulator improvements focusing on robustness, performance, security, and code quality.
 
 ---
 
@@ -15,6 +85,8 @@ This document summarizes the comprehensive improvements made to the Klein-Gordon
 - 90 tests passing (11 new tests)
 - 14 linting issues resolved
 - 5+ type safety improvements
+- **NEW:** 5 symbolic computing scripts added
+- **NEW:** Wolfram Engine & xAct integration
 
 **Impact:**
 

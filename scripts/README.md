@@ -42,9 +42,33 @@ wolframscript -activate
 
 You will be prompted for your Wolfram ID credentials. If you don't have one, create a free account at [account.wolfram.com](https://account.wolfram.com/).
 
+## xAct & xCoba Setup
+
+After Wolfram Engine is installed and activated, install xAct for tensor algebra:
+
+```bash
+# Install xAct and xCoba packages
+./scripts/install-xact-xcoba.sh
+```
+
+This script:
+
+- Downloads the official xAct package suite
+- Recompiles xPerm binary for GLIBC compatibility
+- Installs to the Wolfram user Applications directory
+- Verifies installation with a test
+
+### xAct Usage Examples
+
+```wolfram
+Needs["xAct`xCoba`"];
+DefManifold[M, 4, IndexRange[a, z]];
+DefChart[spherical, M, {0, 1, 2, 3}, {t[], r[], θ[], φ[]}];
+```
+
 ### Verification
 
-Check that Wolfram Engine is working:
+Check that everything is working:
 
 ```bash
 # Check activation status
@@ -75,14 +99,66 @@ wolframscript -code "Integrate[x^2, {x, 0, 1}]"
 - Free Wolfram Engine license has 2GB memory limit
 - For larger computations, consider a commercial license
 
-### Files
+**GLIBC compatibility errors (xPerm)**
 
-- `install-wolfram-engine.sh` - Downloads and installs Wolfram Engine
-- `activate-wolfram.sh` - Helps with license activation
+- If you see `GLIBC_2.38 not found`, the xPerm binary needs recompilation
+- Run `./scripts/install-xact-xcoba.sh` which handles this automatically
 
-### Environment Variables
+## Verification
+
+Run the comprehensive verification script to check all components:
+
+```bash
+./scripts/verify-wolfram-setup.sh
+```
+
+This checks:
+
+- Wolfram Engine installation and activation
+- xAct package installation (xCore, xPerm, xTensor, xCoba)
+- xPerm binary compatibility
+- Full smoke test with tensor operations
+
+### Smoke Test
+
+Run the xAct/xCoba smoke test directly:
+
+```bash
+wolframscript -file scripts/xact_smoke.wl
+```
+
+Expected output includes:
+
+- Package loading messages
+- Manifold and chart definitions
+- Metric tensor definition
+- Riemann tensor antisymmetry verification
+- "SMOKE TEST PASSED" message
+
+## Files
+
+| Script                      | Purpose                                      |
+| --------------------------- | -------------------------------------------- |
+| `install-wolfram-engine.sh` | Downloads and installs Wolfram Engine        |
+| `activate-wolfram.sh`       | Helps with license activation                |
+| `install-xact-xcoba.sh`     | Installs xAct/xCoba with GLIBC compatibility |
+| `verify-wolfram-setup.sh`   | Comprehensive verification of all components |
+| `xact_smoke.wl`             | Wolfram Language smoke test for xAct/xCoba   |
+
+## Environment Variables
 
 | Variable              | Default                            | Description                       |
 | --------------------- | ---------------------------------- | --------------------------------- |
 | `WOLFRAM_VERSION`     | `14.3.0`                           | Wolfram Engine version to install |
 | `WOLFRAM_INSTALL_DIR` | `/usr/local/Wolfram/WolframEngine` | Installation directory            |
+| `XACT_VERSION`        | `1.2.1`                            | xAct version to install           |
+
+## Container Rebuild Behavior
+
+On container rebuild:
+
+1. **postCreateCommand**: Installs system dependencies including build tools for xPerm recompilation
+2. **postAttachCommand**: Checks Wolfram activation, auto-installs xAct/xCoba if missing
+3. **Manual**: Run `./scripts/verify-wolfram-setup.sh` for full verification
+
+**Note**: Wolfram Engine activation is per-container and needs to be redone after each rebuild.
