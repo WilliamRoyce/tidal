@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
-from numba import (
+from numba import (  # pyright: ignore[reportMissingTypeStubs,reportUnknownVariableType]
     jit,  # pyright: ignore[reportMissingTypeStubs,reportUnknownVariableType]
 )
 from pde import PDE, DataFieldBase, FieldCollection, PDEBase, ScalarField
