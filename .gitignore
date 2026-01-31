@@ -5,3 +5,7 @@ __pycache__/
 *.png
 /outputs/
 importtime.log
+
+# Wolfram Engine installers (large binary files)
+third_party/WolframEngine_*_LIN.sh
+third_party/*.sh
