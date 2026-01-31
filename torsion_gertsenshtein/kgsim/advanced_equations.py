@@ -32,7 +32,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-from numba import jit
+from numba import (
+    jit,  # pyright: ignore[reportMissingTypeStubs,reportUnknownVariableType]
+)
 from pde import FieldCollection, PDEBase, ScalarField
 from typing_extensions import override
 
@@ -687,7 +689,7 @@ class DirectionalKGPDE(PDEBase):
         for i, is_active in enumerate(self.active_directions):
             if is_active:
                 # d^2phi/dx_i^2 = d/dx_i (d phi/dx_i)
-                grad_component = grad_phi[i]
+                grad_component: ScalarField = grad_phi[i]  # pyright: ignore[reportUnknownVariableType]
                 assert isinstance(grad_component, ScalarField)
                 second_deriv: ScalarField = grad_component.gradient(bc=bc)[i]
                 spatial_term += second_deriv

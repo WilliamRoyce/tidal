@@ -354,7 +354,7 @@ class AnimationBuilder:
         def update(frame_idx: int) -> tuple[AxesImage, text.Text]:
             """Update function for animation."""
             frame2d = self.storage[frame_idx][0].data  # type: ignore[index,misc]
-            im.set_data(frame2d.T)  # Transpose for correct orientation
+            im.set_data(np.asarray(frame2d).T)  # pyright: ignore[reportUnknownArgumentType]  # Transpose
             title_text.set_text(f"{config.title} (t={self.times[frame_idx]:.2f})")
             return im, title_text
 
@@ -409,7 +409,7 @@ class AnimationBuilder:
         def update(frame_idx: int) -> tuple[lines.Line2D, text.Text]:
             """Update function for animation."""
             y_data = self.storage[frame_idx][0].data  # type: ignore[index,misc]
-            line.set_data(x, y_data)
+            line.set_data(x, np.asarray(y_data))  # pyright: ignore[reportUnknownArgumentType]
             title_text.set_text(f"{config.title} at $t = {self.times[frame_idx]:.2f}$")
             return line, title_text
 

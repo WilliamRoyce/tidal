@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
-from numba import jit
+from numba import jit  # type: ignore[import-untyped]
 from pde import PDE, DataFieldBase, FieldCollection, PDEBase, ScalarField
 from typing_extensions import override
 

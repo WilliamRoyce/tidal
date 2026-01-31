@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 from pde import CartesianGrid, FieldCollection, ScalarField
+from typing_extensions import override
 
 from torsion_gertsenshtein.kgsim.utils import extract_grid_coordinates, natural_center
 
@@ -190,8 +191,6 @@ class GaussianPulse(InitialCondition):
         ------
         ValueError
             If both width and sigma are specified, or if width <= 0, or if values are not finite
-        TypeError
-            If center is not a list or tuple
 
         Notes
         -----
@@ -231,25 +230,21 @@ class GaussianPulse(InitialCondition):
             raise ValueError(msg)
 
         # Validate and copy center to prevent mutation
-        if center is not None:
-            if not isinstance(center, (list, tuple)):
-                msg = f"center must be a list or tuple, got {type(center).__name__}"
-                raise TypeError(msg)
-            center_copy = list(center)
-        else:
-            center_copy = None
+        center_copy = list(center) if center is not None else None
 
         self.amplitude = amplitude
         self.width = final_width
         self.center = center_copy
         self.initial_velocity = initial_velocity
 
+    @override
     def _compute_phi(self, grid: CartesianGrid) -> np.ndarray:
         """Compute Gaussian phi field."""
         r = self._compute_distances_from_center(grid, self.center)
         return self.amplitude * np.exp(-(r**2) / (2.0 * self.width**2))
 
-    def _compute_pi(self, grid: CartesianGrid, phi_data: np.ndarray) -> np.ndarray:  # noqa: ARG002
+    @override
+    def _compute_pi(self, grid: CartesianGrid, phi_data: np.ndarray) -> np.ndarray:
         """Compute pi field with initial velocity."""
         return self.initial_velocity * phi_data
 
@@ -342,6 +337,7 @@ class RingPulse2D(InitialCondition):
         self.initial_radius = initial_radius
         self.width = final_sigma  # Store as .width for consistency with GaussianPulse
 
+    @override
     def _compute_phi(self, grid: CartesianGrid) -> np.ndarray:
         """Compute ring-shaped phi field centered at grid midpoint.
 
