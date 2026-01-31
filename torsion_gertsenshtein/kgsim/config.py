@@ -1,3 +1,9 @@
+"""Configuration dataclasses for Klein-Gordon simulations.
+
+This module provides frozen dataclass configurations for physical parameters,
+grid setup, and simulation runtime options.
+"""
+
 from __future__ import annotations
 
 from dataclasses import dataclass

@@ -327,7 +327,7 @@ class AnimationBuilder:
 
         # Create initial image
         im = ax.imshow(
-            first_frame.T,  # type: ignore[arg-type]  # Transpose for correct orientation
+            first_frame.T,  # Transpose for correct orientation
             origin="lower",
             extent=extent,
             cmap=config.cmap,
@@ -354,7 +354,7 @@ class AnimationBuilder:
         def update(frame_idx: int) -> tuple[AxesImage, text.Text]:
             """Update function for animation."""
             frame2d = self.storage[frame_idx][0].data  # type: ignore[index,misc]
-            im.set_data(frame2d.T)  # type: ignore[arg-type]  # Transpose for correct orientation
+            im.set_data(np.asarray(frame2d).T)  # pyright: ignore[reportUnknownArgumentType]  # Transpose
             title_text.set_text(f"{config.title} (t={self.times[frame_idx]:.2f})")
             return im, title_text
 
@@ -409,7 +409,7 @@ class AnimationBuilder:
         def update(frame_idx: int) -> tuple[lines.Line2D, text.Text]:
             """Update function for animation."""
             y_data = self.storage[frame_idx][0].data  # type: ignore[index,misc]
-            line.set_data(x, y_data)  # type: ignore[arg-type]
+            line.set_data(x, np.asarray(y_data))  # pyright: ignore[reportUnknownArgumentType]
             title_text.set_text(f"{config.title} at $t = {self.times[frame_idx]:.2f}$")
             return line, title_text
 
@@ -533,8 +533,8 @@ class AnimationBuilder:
         )
 
         # Add colorbars
-        ax0.figure.colorbar(im0, ax=ax0, label="", shrink=0.8)  # type: ignore[union-attr]
-        ax1.figure.colorbar(im1, ax=ax1, label="", shrink=0.8)  # type: ignore[union-attr]
+        ax0.figure.colorbar(im0, ax=ax0, label="", shrink=0.8)
+        ax1.figure.colorbar(im1, ax=ax1, label="", shrink=0.8)
 
         return im0, im1
 
@@ -550,7 +550,7 @@ class AnimationBuilder:
             update_func,  # type: ignore[arg-type]
             frames=len(self.storage),
             interval=50,
-            blit=True,  # type: ignore[arg-type]
+            blit=True,
         )
 
         writer, ext = self._choose_writer(len(self.storage), self.times[-1], config.fps)
@@ -558,4 +558,4 @@ class AnimationBuilder:
 
         out_path.parent.mkdir(exist_ok=True, parents=True)
         anim.save(str(out_path), writer=writer, dpi=config.dpi)
-        plt.close(fig)  # type: ignore[arg-type]
+        plt.close(fig)

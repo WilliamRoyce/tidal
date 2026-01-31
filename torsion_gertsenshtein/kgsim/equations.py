@@ -1,9 +1,17 @@
+"""PDE implementations for Klein-Gordon equations.
+
+This module provides the core PDE classes for homogeneous, inhomogeneous,
+and coupled Klein-Gordon systems using the py-pde framework.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
-from numba import jit  # type: ignore[import-untyped]
+from numba import (  # pyright: ignore[reportMissingTypeStubs,reportUnknownVariableType]
+    jit,  # pyright: ignore[reportMissingTypeStubs,reportUnknownVariableType]
+)
 from pde import PDE, DataFieldBase, FieldCollection, PDEBase, ScalarField
 from typing_extensions import override
 
@@ -48,6 +56,13 @@ class KleinGordonPDE(PDE):
     explicit_time_dependence : bool
         Set to False to indicate the PDE has no explicit dependence on time.
 
+    Notes
+    -----
+    This class uses py-pde's expression-based PDE system, which automatically
+    provides Numba JIT compilation when `backend="numba"` is specified in the
+    solver. The expressions are compiled at runtime for optimal performance.
+    No explicit `make_pde_rhs_numba` method is needed.
+
     """
 
     explicit_time_dependence = False
@@ -59,6 +74,9 @@ class KleinGordonPDE(PDE):
         # Expression engine: two fields named "phi" and "pi"
         # d_t phi = pi
         # d_t pi  = laplace(phi) - m2 * phi
+        #
+        # Note: These expressions are automatically compiled to Numba when
+        # backend="numba" is used in the solver (e.g., pde.solve(..., backend="numba"))
         rhs = {
             "phi": "pi",
             "pi": "laplace(phi) - m2 * phi",
@@ -80,7 +98,10 @@ class InhomogeneousKGPDE(PDEBase):
     Notes
     -----
     - `m2_field` and `V_field` are ScalarField on the same grid as `state`.
-    - Numba backend is supported via `make_pde_rhs_numba` method.
+    - Unlike expression-based PDEs, this class provides an explicit Numba
+      implementation via the `make_pde_rhs_numba` method for optimal performance
+      with spatially-varying coefficients. The spatial fields are frozen at
+      compilation time as numpy arrays.
     """
 
     explicit_time_dependence = False
@@ -227,6 +248,13 @@ def make_coupled_kg_pde(params: MultiFieldParams) -> PDE:
         d_t phi_i = pi_i
         d_t pi_i  = laplace(phi_i) - sum_j M2_ij * phi_j
         M2 = diag(m_i^2) + coupling (assumed symmetric).
+
+    Notes
+    -----
+    The returned PDE uses py-pde's expression system, which automatically provides
+    Numba JIT compilation when `backend="numba"` is specified in the solver.
+    The dynamically-generated expressions are compiled at runtime for optimal
+    performance with coupled field systems.
 
     Raises
     ------

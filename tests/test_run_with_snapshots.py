@@ -78,7 +78,7 @@ def test_run_with_snapshots_vs_manual_pattern() -> None:
         state_coll: pde_module.FieldCollection, t: float
     ) -> dict[str, object]:
         """Record phi field at each timestep."""
-        snapshots.append((t, state_coll[0].data.copy()))  # type: ignore[index]
+        snapshots.append((t, state_coll[0].data.copy()))
         return {}
 
     result2 = run(
@@ -181,7 +181,7 @@ def test_run_with_snapshots_2d() -> None:
     # Check 2D shapes preserved
     snapshot_0 = storage[0]
     assert isinstance(snapshot_0, pde_module.FieldCollection)
-    assert snapshot_0[0].data.shape == (32, 32)  # type: ignore[index]
+    assert snapshot_0[0].data.shape == (32, 32)
     assert result[0].data.shape == (32, 32)
 
 

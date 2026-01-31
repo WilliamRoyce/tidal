@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
+from typing_extensions import override
 
 from torsion_gertsenshtein.kgsim import (
     GaussianPulse,
@@ -60,7 +61,8 @@ class DoubleGaussianPulse(InitialCondition):
         self.center2 = center2
         self.width2 = width2
 
-    def _compute_phi(self, grid: CartesianGrid) -> np.ndarray:  # type: ignore[override]
+    @override
+    def _compute_phi(self, grid: CartesianGrid) -> np.ndarray:
         """Compute sum of two Gaussians."""
         # First pulse
         r1 = self._compute_distances_from_center(grid, self.center1)

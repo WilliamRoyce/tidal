@@ -1,3 +1,9 @@
+"""Simulation runner functions for executing Klein-Gordon time evolution.
+
+This module provides high-level run() and run_with_snapshots() functions that
+handle solver setup, tracker configuration, and execution.
+"""
+
 from __future__ import annotations
 
 import logging
@@ -136,6 +142,15 @@ def _call_solve_with_fallback(  # noqa: PLR0913
 
 
 def _log_profile(*, timer: Timer, prof: dict[str, float]) -> None:
+    """Log profiling summary including initialization delay.
+
+    Parameters
+    ----------
+    timer : Timer
+        Timer instance with marked checkpoints.
+    prof : dict[str, float]
+        Profiling dictionary containing 't_call_solve' and 't_first_tick' keys.
+    """
     logger = logging.getLogger(__name__)
     init_delay = prof["t_first_tick"] - prof["t_call_solve"]
     logger.info("init delay until first step: %.3fs", init_delay)

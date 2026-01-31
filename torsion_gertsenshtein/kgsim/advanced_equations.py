@@ -32,7 +32,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
-from numba import jit  # type: ignore[import-untyped]
+from numba import (  # pyright: ignore[reportMissingTypeStubs,reportUnknownVariableType]
+    jit,  # pyright: ignore[reportMissingTypeStubs,reportUnknownVariableType]
+)
 from pde import FieldCollection, PDEBase, ScalarField
 from typing_extensions import override
 
@@ -209,24 +211,22 @@ class AnisotropicKGPDE(PDEBase):
 
         # Compute anisotropic second derivatives: sum_i c_i^2 * d^2phi/dx_i^2
         # Using gradient chains (same pattern as AnisotropicHigherOrderKGPDE)
-        grad_phi = phi.gradient(
-            bc=bc
-        )  # Returns FieldCollection: [∂φ/∂x, ∂φ/∂y, ...]  # type: ignore[attr-defined]
+        grad_phi = phi.gradient(bc=bc)  # Returns FieldCollection: [∂φ/∂x, ∂φ/∂y, ...]
 
         spatial_term: ScalarField = ScalarField(phi.grid, data=np.zeros_like(phi.data))
         for i, c_squared in enumerate(self.speeds_squared):
             # ∂²φ/∂x_i² = ∂/∂x_i (∂φ/∂x_i) = (gradient of i-th component)[i]
-            grad_component = grad_phi[i]  # type: ignore[index]
+            grad_component = grad_phi[i]
             assert isinstance(grad_component, ScalarField)
-            d2_phi_dxi2: ScalarField = grad_component.gradient(bc=bc)[i]  # type: ignore[index]
-            spatial_term += c_squared * d2_phi_dxi2  # type: ignore[assignment]
+            d2_phi_dxi2: ScalarField = grad_component.gradient(bc=bc)[i]
+            spatial_term += c_squared * d2_phi_dxi2
 
         # Klein-Gordon evolution: d_pi/dt = anisotropic_laplacian - m^2 * phi
         dpi_dt: ScalarField = spatial_term - self.m2 * phi  # type: ignore[assignment]
         # First-order system: d_phi/dt = pi
         # Note: Must create new ScalarField, not return reference to input pi
         dphi_dt = ScalarField(phi.grid, data=pi.data.copy())
-        return FieldCollection([dphi_dt, dpi_dt])  # type: ignore[arg-type]
+        return FieldCollection([dphi_dt, dpi_dt])
 
     def make_pde_rhs_numba(
         self, state: FieldCollection
@@ -438,7 +438,7 @@ class HigherOrderKGPDE(PDEBase):
         lap_phi: ScalarField | None
         if self.alpha_2 != 0:
             lap_phi = phi.laplace(bc=bc)
-            spatial_term += self.alpha_2 * lap_phi  # type: ignore[assignment]
+            spatial_term += self.alpha_2 * lap_phi
         else:
             lap_phi = None
 
@@ -448,7 +448,7 @@ class HigherOrderKGPDE(PDEBase):
             if lap_phi is None:
                 lap_phi = phi.laplace(bc=bc)
             lap2_phi = lap_phi.laplace(bc=bc)
-            spatial_term -= self.alpha_4 * lap2_phi  # type: ignore[assignment]
+            spatial_term -= self.alpha_4 * lap2_phi
         else:
             lap2_phi = None
 
@@ -459,7 +459,7 @@ class HigherOrderKGPDE(PDEBase):
                     lap_phi = phi.laplace(bc=bc)
                 lap2_phi = lap_phi.laplace(bc=bc)
             lap3_phi: ScalarField = lap2_phi.laplace(bc=bc)
-            spatial_term += self.alpha_6 * lap3_phi  # type: ignore[assignment]
+            spatial_term += self.alpha_6 * lap3_phi
 
         # Klein-Gordon evolution: d_pi/dt = spatial_terms - m^2 * phi
         dpi_dt = spatial_term - self.m2 * phi
@@ -689,10 +689,10 @@ class DirectionalKGPDE(PDEBase):
         for i, is_active in enumerate(self.active_directions):
             if is_active:
                 # d^2phi/dx_i^2 = d/dx_i (d phi/dx_i)
-                grad_component = grad_phi[i]  # type: ignore[index]
+                grad_component: ScalarField = grad_phi[i]  # pyright: ignore[reportUnknownVariableType]
                 assert isinstance(grad_component, ScalarField)
-                second_deriv: ScalarField = grad_component.gradient(bc=bc)[i]  # type: ignore[index]
-                spatial_term += second_deriv  # type: ignore[assignment]
+                second_deriv: ScalarField = grad_component.gradient(bc=bc)[i]
+                spatial_term += second_deriv
 
         # Klein-Gordon evolution: d_pi/dt = directional_laplacian - m^2 * phi
         dpi_dt = spatial_term - self.m2 * phi
@@ -902,16 +902,16 @@ class AnisotropicHigherOrderKGPDE(PDEBase):
         bc = infer_bc_from_grid(phi.grid)
 
         # Compute directional derivatives
-        grad_phi = phi.gradient(bc=bc)  # type: ignore[attr-defined]
+        grad_phi = phi.gradient(bc=bc)
         spatial_term: ScalarField = ScalarField(phi.grid, data=np.zeros_like(phi.data))
 
         for i, c_i in enumerate(self.speeds):
             # Second-order: alpha_2 * c_i^2 * d^2phi/dx_i^2
             if self.alpha_2 != 0:
-                grad_component = grad_phi[i]  # type: ignore[index]
+                grad_component = grad_phi[i]
                 assert isinstance(grad_component, ScalarField)
-                d2_phi: ScalarField = grad_component.gradient(bc=bc)[i]  # type: ignore[index]
-                spatial_term += self.alpha_2 * c_i**2 * d2_phi  # type: ignore[assignment]
+                d2_phi: ScalarField = grad_component.gradient(bc=bc)[i]
+                spatial_term += self.alpha_2 * c_i**2 * d2_phi
 
                 # Fourth-order: -alpha_4 * c_i^4 * d^4phi/dx_i^4
                 if self.alpha_4 != 0:
@@ -919,8 +919,8 @@ class AnisotropicHigherOrderKGPDE(PDEBase):
                     d2_phi_grad = d2_phi.gradient(bc=bc)
                     d2_phi_grad_component = d2_phi_grad[i]
                     assert isinstance(d2_phi_grad_component, ScalarField)
-                    d4_phi: ScalarField = d2_phi_grad_component.gradient(bc=bc)[i]  # type: ignore[index]
-                    spatial_term -= self.alpha_4 * c_i**4 * d4_phi  # type: ignore[assignment]
+                    d4_phi: ScalarField = d2_phi_grad_component.gradient(bc=bc)[i]
+                    spatial_term -= self.alpha_4 * c_i**4 * d4_phi
 
         dpi_dt = spatial_term - self.m2 * phi
         dphi_dt = ScalarField(phi.grid, data=pi.data.copy())

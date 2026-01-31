@@ -1,3 +1,9 @@
+"""Observer callbacks for tracking simulation quantities.
+
+This module provides callback factories for use with py-pde's tracker system,
+including energy conservation monitoring.
+"""
+
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
@@ -16,35 +22,38 @@ if TYPE_CHECKING:
 def total_energy_observer(
     mass: float,
 ) -> Callable[[FieldCollection, float], dict[str, Any]]:
-    """
-    Create an observer callback that computes the total field energy for a real scalar field.
+    """Create an observer callback that computes total field energy.
 
-    The returned callback computes the spatial integral of the canonical energy density
-    for a Klein-Gordon-like field,
-      E = ∫ dV [ 0.5 π^2 + 0.5 |∇φ|^2 + 0.5 m^2 φ^2 ],
-    where φ is the scalar field, π its conjugate momentum, and m is the (physical) mass.
+    The returned callback computes the spatial integral of the canonical energy
+    density for a Klein-Gordon-like field:
+
+        E = ∫ dV [ 0.5 π² + 0.5 |∇φ|² + 0.5 m² φ² ]
+
+    where φ is the scalar field, π its conjugate momentum, and m is the mass.
 
     Parameters
     ----------
     mass : float
-      The scalar field mass m. The callback uses m**2 in the energy density.
+        The scalar field mass m. The callback uses m² in the energy density.
 
     Returns
     -------
     Callable[[FieldCollection, float], dict[str, Any]]
-      A function f(state, t) -> {"time": t, "total_energy": E} that
-      - Expects `state` to be an indexable FieldCollection where state[0] is φ and state[1] is π.
-      - Validates that both φ and π are instances of ScalarField and raises TypeError otherwise.
-      - Computes the gradient of φ using natural boundary conditions, forms |∇φ|^2,
-        evaluates the pointwise energy density 0.5*(π^2 + |∇φ|^2 + m^2 φ^2),
-        multiplies by the grid cell volumes and returns the summed (float) total energy.
+        A function f(state, t) -> {"time": t, "total_energy": E} that:
+
+        - Expects `state` to be a FieldCollection where state[0] is φ and
+          state[1] is π.
+        - Validates that both φ and π are ScalarField instances.
+        - Computes the gradient of φ, forms |∇φ|², evaluates the pointwise
+          energy density, multiplies by grid cell volumes, and returns the
+          summed total energy.
+        - Raises TypeError if state does not contain ScalarField instances.
 
     Notes
     -----
-    - The callback relies on `phi.grid.cell_volumes` to supply the integration measure;
-      the shape of the cell volumes must be compatible with phi.data.
-    - Numerical precision and conservation depend on the discretization and boundary conditions
-      used when evolving the fields.
+    The callback relies on `phi.grid.cell_volumes` for the integration measure.
+    Numerical precision and conservation depend on the discretization and
+    boundary conditions used when evolving the fields.
     """
     m2 = mass**2
 

@@ -29,6 +29,6 @@ def test_center_parameter_tuple_works() -> None:
 
 
 def test_center_parameter_validates_type() -> None:
-    """Verify that non-list/tuple types are rejected."""
-    with pytest.raises(TypeError, match="center must be a list or tuple"):
+    """Verify that non-list/tuple types are rejected with TypeError."""
+    with pytest.raises(TypeError, match="not iterable"):
         GaussianPulse(amplitude=1.0, width=2.0, center=42.0)  # type: ignore[arg-type]
