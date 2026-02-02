@@ -10,6 +10,9 @@
       "version": "latest"
     }
   },
+  "containerEnv": {
+    "INSTALL_TEX": "false"
+  },
   "customizations": {
     "vscode": {
       "settings": {
@@ -25,11 +28,15 @@
             "source.convertImportFormat": "always"
           }
         },
-        "python.testing.pytestArgs": ["tests"],
+        "python.testing.pytestArgs": [
+          "tests"
+        ],
         "python.testing.unittestEnabled": false,
         "python.testing.pytestEnabled": true,
         "python.analysis.diagnosticMode": "openFilesOnly",
-        "python.analysis.include": ["torsion_gertsenshtein"],
+        "python.analysis.include": [
+          "torsion_gertsenshtein"
+        ],
         "python.analysis.autoImportCompletions": true
       },
       "extensions": [
@@ -43,10 +50,11 @@
         "github.vscode-github-actions",
         "GitHub.copilot",
         "GitHub.copilot-chat",
-        "github.vscode-pull-request-github"
+        "github.vscode-pull-request-github",
+        "Anthropic.claude-code"
       ]
     }
   },
   "onCreateCommand": "npm install -g cspell && uv python install && uv sync --all-extras",
-  "postCreateCommand": "sudo rm -f /etc/apt/sources.list.d/yarn.list && sudo apt-get update && sudo apt-get install -y texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra cm-super ghostscript latexmk dvisvgm dvipng texlive-xetex texlive-luatex && sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*"
+  "postCreateCommand": "sudo rm -f /etc/apt/sources.list.d/yarn.list && sudo apt-get update && if [ \"$INSTALL_TEX\" = \"true\" ]; then sudo apt-get install -y texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra cm-super ghostscript latexmk dvisvgm dvipng texlive-xetex texlive-luatex; fi && sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/*"
 }
