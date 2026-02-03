@@ -224,24 +224,16 @@ class EquationSystem:
         )
 
 
-def validate_json_schema(data: Mapping[str, Any]) -> None:
-    """Validate that the JSON data matches the expected schema.
+def _validate_spacetime(spacetime: dict[str, Any]) -> None:
+    """Validate spacetime configuration.
 
     Raises
     ------
-    ValueError
-        If required fields are missing or have invalid types.
     TypeError
-        If fields have invalid types (e.g., spacetime.dimension is not an integer).
+        If spacetime is not a dictionary or spacetime.dimension is not an integer.
+    ValueError
+        If spacetime.dimension is missing.
     """
-    required_top_level = ["spacetime", "fields", "equations"]
-    for field in required_top_level:
-        if field not in data:
-            msg = f"Missing required top-level field: {field}"
-            raise ValueError(msg)
-
-    # Validate spacetime
-    spacetime = data["spacetime"]
     if "dimension" not in spacetime:
         msg = "spacetime.dimension is required"
         raise ValueError(msg)
@@ -249,19 +241,33 @@ def validate_json_schema(data: Mapping[str, Any]) -> None:
         msg = "spacetime.dimension must be an integer"
         raise TypeError(msg)
 
-    # Validate fields
-    fields = data["fields"]
-    if not isinstance(fields, list) or len(fields) == 0:
-        msg = "fields must be a non-empty list"
+
+def _validate_fields(fields: list[Any]) -> None:
+    """Validate fields list.
+
+    Raises
+    ------
+    ValueError
+        If the fields list is empty or a field is missing the 'name' key.
+    """
+    if len(fields) == 0:
+        msg = "fields must be non-empty"
         raise ValueError(msg)
     for i, field in enumerate(fields):
-        if "name" not in field:
-            msg = f"fields[{i}].name is required"
+        if not isinstance(field, dict) or "name" not in field:
+            msg = f"fields[{i}] must be a dict with 'name' key"
             raise ValueError(msg)
 
-    # Validate equations
-    equations = data["equations"]
-    if not isinstance(equations, list) or len(equations) == 0:
+
+def _validate_equations(equations: list[Any]) -> None:
+    """Validate equations list.
+
+    Raises
+    ------
+    ValueError
+        If the equations list is empty or required fields are missing.
+    """
+    if len(equations) == 0:
         msg = "equations must be a non-empty list"
         raise ValueError(msg)
     for i, eq in enumerate(equations):
@@ -271,6 +277,25 @@ def validate_json_schema(data: Mapping[str, Any]) -> None:
         if "rhs" not in eq:
             msg = f"equations[{i}].rhs is required"
             raise ValueError(msg)
+
+
+def validate_json_schema(data: Mapping[str, Any]) -> None:
+    """Validate that the JSON data matches the expected schema.
+
+    Raises
+    ------
+    ValueError
+        If required fields are missing or have invalid types.
+    """
+    required_top_level = ["spacetime", "fields", "equations"]
+    for field in required_top_level:
+        if field not in data:
+            msg = f"Missing required top-level field: {field}"
+            raise ValueError(msg)
+
+    _validate_spacetime(data["spacetime"])
+    _validate_fields(data["fields"])
+    _validate_equations(data["equations"])
 
 
 def load_equation_system(json_path: Path | str) -> EquationSystem:
