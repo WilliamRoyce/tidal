@@ -26,6 +26,9 @@ if TYPE_CHECKING:
     import numpy as np
     from numpy.typing import NDArray
     from pde.grids.base import GridBase
+    from pde.pdes.base import TState
+
+    from torsion_gertsenshtein.utils import BCDescriptor
 
     NumericArray = NDArray[np.float64]
 
@@ -84,8 +87,9 @@ class PDEFromSpec(PDEBase):
             name: i for i, name in enumerate(spec.component_names)
         }
 
+    @staticmethod
     def _get_operator(
-        self, operator_name: str, field: ScalarField, bc: Any
+        operator_name: str, field: ScalarField, bc: BCDescriptor
     ) -> ScalarField:
         """Apply a named operator to a field.
 
@@ -95,7 +99,7 @@ class PDEFromSpec(PDEBase):
             Name of the operator ("laplacian", "identity", "gradient_x", etc.)
         field : ScalarField
             The field to operate on.
-        bc : Any
+        bc : BCDescriptor
             Boundary condition specification.
 
         Returns
@@ -110,11 +114,7 @@ class PDEFromSpec(PDEBase):
         """
         if operator_name == "laplacian":
             # laplace() returns ScalarField or DataFieldBase depending on context
-            result = field.laplace(bc=bc)
-            # Ensure we return a ScalarField
-            if not isinstance(result, ScalarField):
-                result = ScalarField(field.grid, data=result.data)
-            return result
+            return field.laplace(bc=bc)
         if operator_name == "identity":
             return field.copy()
         if operator_name == "gradient_x":
@@ -141,7 +141,7 @@ class PDEFromSpec(PDEBase):
         self,
         component_idx: int,
         state: FieldCollection,
-        bc: Any,
+        bc: BCDescriptor,
     ) -> ScalarField:
         """Compute the RHS for a single component's momentum equation.
 
@@ -154,7 +154,7 @@ class PDEFromSpec(PDEBase):
             Index of the component.
         state : FieldCollection
             Current state (all fields and momenta).
-        bc : Any
+        bc : BCDescriptor
             Boundary condition specification.
 
         Returns
@@ -199,7 +199,7 @@ class PDEFromSpec(PDEBase):
     @override
     def evolution_rate(
         self,
-        state: FieldCollection,
+        state: TState,
         t: float = 0.0,
     ) -> FieldCollection:
         """Compute the time derivatives for all fields.

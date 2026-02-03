@@ -35,6 +35,7 @@
     "nabla",
     "Neumann",
     "numba",
+    "pdes",
     "pycache",
     "rcfonts",
     "repr",
