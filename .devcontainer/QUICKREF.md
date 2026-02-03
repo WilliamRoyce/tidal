@@ -2,13 +2,37 @@
 
 ## 📁 Directory Map
 
-| Folder      | Purpose         | Key Files                                                     |
-| ----------- | --------------- | ------------------------------------------------------------- |
-| `/docs/`    | Documentation   | WOLFRAM_GUIDE.md, XACT_TESTS.md                               |
-| `/scripts/` | Utility scripts | check-wolfram.sh, install-extensions-final.sh, build-xperm.sh |
-| `/tests/`   | Test suite      | test-all-xact.sh, test-xtensor.wls, test-xcoba.wls, etc.      |
+| Folder      | Purpose         | Key Files                                                                         |
+| ----------- | --------------- | --------------------------------------------------------------------------------- |
+| `/docs/`    | Documentation   | WOLFRAM_GUIDE.md, XACT_TESTS.md                                                   |
+| `/scripts/` | Utility scripts | setup_wolfram_engine.sh, setup_xact.sh, validate-setup.sh, check-wolfram.sh, etc. |
+| `/tests/`   | Test suite      | test-all-xact.sh, test-xtensor.wls, test-xcoba.wls, etc.                          |
+
+## 🎯 First-Time Setup
+
+**For new users without Wolfram Engine installed:**
+
+```bash
+# 1. Install Wolfram Engine 14.3 (~15-20 min)
+bash .devcontainer/scripts/setup_wolfram_engine.sh
+
+# 2. Install xAct packages (~5 min)
+bash .devcontainer/scripts/setup_xact.sh
+
+# 3. Validate setup (~3-5 min)
+bash .devcontainer/scripts/validate-setup.sh
+```
+
+---
 
 ## 🚀 Common Commands
+
+### Validate Complete Setup
+
+```bash
+bash .devcontainer/scripts/validate-setup.sh     # Quick health check
+bash .devcontainer/scripts/validate-setup.sh -v  # Verbose mode
+```
 
 ### Run All Tests
 
@@ -53,6 +77,16 @@ wolframscript .devcontainer/tests/test-integration.wls
 - **Container Config**: `.devcontainer/README.md`
 
 ## 🔧 Scripts Reference
+
+### Setup Scripts (First-Time)
+
+| Script                    | Purpose                        | Usage                                                |
+| ------------------------- | ------------------------------ | ---------------------------------------------------- |
+| `setup_wolfram_engine.sh` | Install Wolfram Engine 14.3    | `bash .devcontainer/scripts/setup_wolfram_engine.sh` |
+| `setup_xact.sh`           | Install xAct 1.3.0 packages    | `bash .devcontainer/scripts/setup_xact.sh`           |
+| `validate-setup.sh`       | Comprehensive setup validation | `bash .devcontainer/scripts/validate-setup.sh [-v]`  |
+
+### Maintenance Scripts
 
 | Script                          | Purpose                    | Usage                                                                                |
 | ------------------------------- | -------------------------- | ------------------------------------------------------------------------------------ |

@@ -1,5 +1,89 @@
 # Wolfram Engine - Complete Guide
 
+## 🎯 First-Time Setup (For New Users)
+
+If you're setting up this devcontainer for the first time and don't have Wolfram Engine installed yet, follow these steps:
+
+### Step 1: Install Wolfram Engine 14.3
+
+Run the interactive setup wizard:
+
+```bash
+bash .devcontainer/scripts/setup_wolfram_engine.sh
+```
+
+**What this script does:**
+- Guides you through downloading the Wolfram Engine 14.3 installer
+- Runs the installer interactively (you'll need to accept the license)
+- Activates the engine with your Wolfram ID (free developer license)
+- Verifies installation and creates activation backups
+- Ensures strict version matching (14.3 only)
+
+**Prerequisites:**
+- Wolfram ID account (free at https://account.wolfram.com/)
+- ~4 GB disk space for the engine
+- Internet connection for download and activation
+
+**Time required:** ~15-20 minutes (depending on download speed)
+
+### Step 2: Install xAct Tensor Packages
+
+Run the xAct setup wizard:
+
+```bash
+bash .devcontainer/scripts/setup_xact.sh
+```
+
+**What this script does:**
+- Downloads xAct 1.3.0 from xact.es (~6 MB)
+- Extracts all packages to your Wolfram UserBase
+- Verifies installation by loading xTensor
+- Optionally compiles xPerm for high-performance MathLink
+
+**Time required:** ~5 minutes
+
+### Step 3: Validate Your Setup
+
+Run the comprehensive validation script:
+
+```bash
+bash .devcontainer/scripts/validate-setup.sh
+```
+
+**What this checks:**
+- ✅ Wolfram Engine 14.3 installation
+- ✅ WolframKernel and wolframscript functionality
+- ✅ Activation status
+- ✅ xAct packages installation
+- ✅ xPerm MathLink compilation
+- ✅ Full test suite (all 5 xAct tests)
+- ✅ VS Code extensions
+- ✅ Python wolframclient package
+
+**Output:** Clear pass/fail report with remediation steps for any issues.
+
+**Time required:** ~3-5 minutes (includes running full test suite)
+
+### Quick Start Summary
+
+```bash
+# 1. Install Wolfram Engine (one-time, ~15-20 min)
+bash .devcontainer/scripts/setup_wolfram_engine.sh
+
+# 2. Install xAct packages (one-time, ~5 min)
+bash .devcontainer/scripts/setup_xact.sh
+
+# 3. Validate everything works (~3-5 min)
+bash .devcontainer/scripts/validate-setup.sh
+
+# 4. Done! Start using Wolfram Engine
+wolframscript -code 'Integrate[x^2, x]'
+```
+
+**Note:** These setup scripts are **idempotent** - you can run them multiple times safely. They'll skip steps that are already complete.
+
+---
+
 ## ✅ Current Status (Post-Setup)
 
 **Wolfram Engine is now fully configured and persistent!** Both WolframKernel and WolframScript work automatically after container rebuilds.
@@ -120,6 +204,22 @@ cat /etc/machine-id
 
 ## 🛠️ Troubleshooting
 
+### Quick Diagnostics
+
+Run the comprehensive validation script first:
+
+```bash
+bash .devcontainer/scripts/validate-setup.sh
+```
+
+This checks all 9 critical components and provides specific remediation steps for any issues.
+
+For verbose output with detailed information:
+
+```bash
+bash .devcontainer/scripts/validate-setup.sh -v
+```
+
 ### If WolframScript stops working:
 
 ```bash
@@ -191,17 +291,33 @@ bash .devcontainer/scripts/check-wolfram.sh
 
 Keep persistent Wolfram directories in `~/.local/wolfram/...` and `~/.cache/Wolfram/...` (outside the repo) so they never appear in git status. This repository already ignores license artifacts and installer bundles (see .gitignore for patterns like `*.mathpass`, `.Wolfram*`, `.WolframEngine*`, and `Wolfram*.{sh,run,tgz}`), so nothing sensitive should be committed.
 
-## 🔄 Initial Setup (Historical Reference)
+## 🔄 Automated Setup Scripts
 
-_This section documents the original setup process. Current users don't need to follow these steps._
+The devcontainer now includes automated setup scripts for first-time installation. See the **First-Time Setup** section at the top of this guide for instructions.
 
-### Prerequisites:
+### Available Setup Scripts:
 
-- Wolfram Engine 14.3 installed on host at `~/.local/wolfram/`
-- Valid mathpass license file with machine-specific activation
-- Wolfram ID account for cloud activation (if needed)
+**`setup_wolfram_engine.sh`** - Interactive Wolfram Engine 14.3 installation
+- Guides through downloading and installing the engine
+- Handles activation with Wolfram ID
+- Creates persistence backups
+- Strict version checking (14.3 only)
 
-### Setup Process:
+**`setup_xact.sh`** - Automated xAct package installation
+- Downloads xAct 1.3.0 from xact.es
+- Installs all tensor packages
+- Verifies installation
+- Offers optional xPerm compilation
+
+**`validate-setup.sh`** - Comprehensive environment validation
+- 9-point health check
+- Tests Wolfram Engine, xAct, activation, tests
+- Clear pass/fail report with remediation steps
+- Verbose mode available with `-v` flag
+
+### Manual Setup (Advanced)
+
+If you prefer manual setup or need to customize the installation:
 
 1. Configure devcontainer.json with required mounts
 2. Add activation restoration to postCreateCommand

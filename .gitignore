@@ -6,6 +6,7 @@ __pycache__/
 /outputs/
 importtime.log
 third_party/
+.claude
 
 # Wolfram installers / license artifacts (never commit)
 Wolfram*.sh
