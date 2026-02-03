@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """
 Example showing how to conditionally use TeX-based plotting.
 
@@ -13,7 +12,7 @@ from torsion_gertsenshtein import has_tex_support
 from torsion_gertsenshtein.plot_pgf import enable_pgf
 
 
-def main():
+def main() -> None:
     """Demonstrate conditional TeX usage."""
     # Check if TeX support is available
     if has_tex_support():
@@ -23,30 +22,30 @@ def main():
         print("TeX not available - using standard matplotlib fonts")
         # The enable_pgf function will automatically fall back
         enable_pgf("xelatex")  # This will warn and use fallback
-    
+
     # Create a simple plot
     x = np.linspace(0, 2 * np.pi, 100)
     y = np.sin(x)
-    
+
     plt.figure(figsize=(8, 6))
-    plt.plot(x, y, label=r'$\sin(x)$')
-    plt.xlabel(r'$x$')
-    plt.ylabel(r'$y$')
-    plt.title('Example Plot with Conditional TeX Support')
+    plt.plot(x, y, label=r"$\sin(x)$")
+    plt.xlabel(r"$x$")
+    plt.ylabel(r"$y$")
+    plt.title("Example Plot with Conditional TeX Support")
     plt.legend()
-    plt.grid(True, alpha=0.3)
+    plt.grid(visible=True, alpha=0.3)
     plt.tight_layout()
-    
+
     # Save in multiple formats
-    plt.savefig('example_plot.png', dpi=300, bbox_inches='tight')
-    
+    plt.savefig("example_plot.png", dpi=300, bbox_inches="tight")
+
     if has_tex_support():
         # Only save PDF if TeX is available for vector graphics
-        plt.savefig('example_plot.pdf', bbox_inches='tight')
+        plt.savefig("example_plot.pdf", bbox_inches="tight")
         print("Saved both PNG and PDF versions")
     else:
         print("Saved PNG version (PDF requires TeX)")
-    
+
     plt.show()
 
 
