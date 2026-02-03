@@ -1,14 +1,13 @@
 [project]
 name = "torsion_gertsenshtein"
 version = "0.1.0"
-description = "Klein-Gordon PDE simulations for electromagnetic-gravitational wave conversion research"
+description = "PDE simulations for electromagnetic-gravitational wave conversion research"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
 license = { text = "MIT" }
 authors = [{ name = "William Royce" }]
 keywords = [
     "physics",
-    "klein-gordon",
     "pde",
     "simulation",
     "gravitational-waves",
