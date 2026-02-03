@@ -8,15 +8,17 @@ This package provides:
 
 __version__ = "0.1.0"
 
+try:
+    from .plot_pgf import check_tex_available, pgf_available
+
+    _tex_support_available = pgf_available and check_tex_available()
+except ImportError:
+    _tex_support_available = False
+
 
 def has_tex_support() -> bool:
     """Check if TeX support is available for high-quality plotting."""
-    try:
-        from .plot_pgf import _check_tex_available, _pgf_available
-
-        return _pgf_available and _check_tex_available()
-    except ImportError:
-        return False
+    return _tex_support_available
 
 
 __all__ = ["__version__", "has_tex_support"]
