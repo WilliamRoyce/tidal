@@ -8,13 +8,13 @@ import matplotlib as mpl
 from matplotlib import rcParams
 
 # Try to use PGF backend, but fall back to default if unavailable
-_pgf_available = True
+pgf_available = True
 _pgf_backend_error = None
 
 try:
     mpl.use("pgf")
 except RuntimeError as e:
-    _pgf_available = False
+    pgf_available = False
     _pgf_backend_error = str(e)
     warnings.warn(
         f"PGF backend not available: {e}. Using default backend instead.",
@@ -23,7 +23,7 @@ except RuntimeError as e:
     )
 
 
-def _check_tex_available() -> bool:
+def check_tex_available() -> bool:
     """Check if LaTeX executables are available on the system."""
     return any(
         shutil.which(cmd) is not None for cmd in ["pdflatex", "xelatex", "lualatex"]
@@ -59,14 +59,14 @@ def enable_pgf(
         If PGF backend, LaTeX system, or PDF converter is not available and
         fallback_on_error is False.
     """
-    if not _pgf_available:
+    if not pgf_available:
         if fallback_on_error:
             _setup_fallback_fonts(serif=serif, base_size=base_size)
             return
         msg = f"PGF backend not available ({_pgf_backend_error}) and fallback disabled"
         raise RuntimeError(msg)
 
-    if not _check_tex_available():
+    if not check_tex_available():
         if fallback_on_error:
             warnings.warn(
                 f"LaTeX system '{texsystem}' not found. Falling back to standard matplotlib.",
