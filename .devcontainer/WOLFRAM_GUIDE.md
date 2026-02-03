@@ -1,0 +1,180 @@
+# Wolfram Engine - Complete Guide
+
+## ✅ Current Status (Post-Setup)
+
+**Wolfram Engine is now fully configured and persistent!** Both WolframKernel and WolframScript work automatically after container rebuilds.
+
+## 🚀 Quick Usage
+
+### Command Line
+
+```bash
+# WolframScript (simple)
+wolframscript -code "2+2"
+wolframscript -code "Integrate[x^2, x]"
+
+# WolframKernel (direct)
+/home/vscode/.local/wolfram/engine/14.3/Executables/WolframKernel -noprompt -run "Print[2+2]; Exit[]"
+
+# Run script files
+wolframscript -file mycode.wls
+```
+
+### Python Integration
+
+```python
+from wolframclient.evaluation import WolframLanguageSession
+from wolframclient.language import wl
+
+kernel = "/home/vscode/.local/wolfram/engine/14.3/Executables/WolframKernel"
+
+with WolframLanguageSession(kernel) as session:
+    result = session.evaluate(wl.Integrate(wl.Power("x", 2), "x"))
+    print(result)  # x^3/3
+```
+
+## 🔍 Diagnostics
+
+```bash
+# Quick health check
+bash .devcontainer/check-wolfram.sh
+
+# Activation management
+bash .devcontainer/wolfram-activation-manager.sh
+
+# Check license
+cat ~/.local/wolfram/userbase/Licensing/mathpass
+
+# Check machine ID
+cat /etc/machine-id
+```
+
+## 🔧 Persistence Architecture
+
+### What's Mounted from Host:
+
+- **Engine**: `~/.local/wolfram/engine/14.3` (6.7GB binaries)
+- **License**: `~/.local/wolfram/userbase/Licensing/mathpass` (machine-specific licenses)
+- **Activation Cache**: `~/.cache/Wolfram` (WolframScript tokens)
+- **Machine ID**: `/etc/machine-id` (for license validation)
+
+### Auto-Configuration:
+
+- License symlinks created in all expected locations
+- WolframScript.conf configured with correct kernel path
+- Binary symlinks placed in PATH
+- Activation data automatically restored from backup
+
+### Backup Strategy:
+
+- **Primary**: Activation tokens in mounted `~/.cache/Wolfram`
+- **Backup**: Copy stored in `~/.local/wolfram/userbase/.activation_backup`
+- **Recovery**: Automatic restoration via postCreateCommand on rebuild
+
+## 🛠️ Troubleshooting
+
+### If WolframScript stops working:
+
+```bash
+# Check if activation is present
+bash .devcontainer/wolfram-activation-manager.sh status
+
+# Restore from backup if needed
+bash .devcontainer/wolfram-activation-manager.sh restore
+
+# Re-activate if necessary (requires Wolfram ID)
+wolframscript -activate
+```
+
+### If WolframKernel stops working:
+
+```bash
+# Check license files
+bash .devcontainer/check-wolfram.sh
+
+# Verify machine ID matches license
+grep -o "^[a-f0-9]*" ~/.local/wolfram/userbase/Licensing/mathpass
+cat /etc/machine-id
+
+# If mismatch, check if on correct host machine
+```
+
+### Complete reset (if needed):
+
+```bash
+# Rebuild container (applies all mounts and auto-config)
+# Ctrl+Shift+P → "Dev Containers: Rebuild Container"
+
+# After rebuild, verify everything works
+bash .devcontainer/check-wolfram.sh
+```
+
+## 📚 Understanding the Setup
+
+### Two License Systems:
+
+1. **mathpass** (offline): Machine-specific license file for WolframKernel
+   - Located: `~/.local/wolfram/userbase/Licensing/mathpass`
+   - Requires machine ID match
+   - Works completely offline
+
+2. **Cloud activation** (online): Wolfram ID tokens for WolframScript
+   - Located: `~/.cache/Wolfram/WolframScript/`
+   - Requires one-time online activation
+   - Tokens persist via mount
+
+### Why It Persists:
+
+- **Host mounts**: Engine, license, and cache directories mounted from host
+- **Machine ID**: Container uses host's machine ID for license validation
+- **Automatic restore**: postCreateCommand restores activation on rebuild
+- **Dual backup**: Both mounted cache and backup in userbase directory
+
+## 🎯 Maintenance
+
+**Normal operation**: No maintenance required! Everything works automatically.
+
+**If activation is lost**: Run `bash .devcontainer/wolfram-activation-manager.sh restore`
+
+**For new licenses**: Replace `~/.local/wolfram/userbase/Licensing/mathpass` on host
+
+**Performance**: ~30 second startup vs ~10 minutes for full engine installation
+
+## 🔄 Initial Setup (Historical Reference)
+
+_This section documents the original setup process. Current users don't need to follow these steps._
+
+### Prerequisites:
+
+- Wolfram Engine 14.3 installed on host at `~/.local/wolfram/`
+- Valid mathpass license file with machine-specific activation
+- Wolfram ID account for cloud activation (if needed)
+
+### Setup Process:
+
+1. Configure devcontainer.json with required mounts
+2. Add activation restoration to postCreateCommand
+3. Create backup of activation tokens in mounted userbase
+4. Test both WolframKernel and WolframScript functionality
+5. Verify persistence across container rebuilds
+
+### Mount Configuration:
+
+```jsonc
+"mounts": [
+  "source=${localEnv:HOME}/.local/wolfram/engine/14.3,target=/home/vscode/.local/wolfram/engine/14.3,type=bind",
+  "source=${localEnv:HOME}/.local/wolfram/userbase,target=/home/vscode/.local/wolfram/userbase,type=bind",
+  "source=/etc/machine-id,target=/etc/machine-id,type=bind,readonly",
+  "source=${localEnv:HOME}/.cache/Wolfram,target=/home/vscode/.cache/Wolfram,type=bind"
+]
+```
+
+### Automatic Configuration (postCreateCommand):
+
+- Create `.WolframEngine` symlink to userbase
+- Generate `WolframScript.conf` with correct kernel path
+- Link license file to all expected locations
+- Create wolframscript binary symlink
+- Restore activation tokens from backup if available
+
+This setup provides a robust, maintenance-free Wolfram Engine environment that survives all container rebuilds while avoiding the overhead of repeatedly downloading and installing the 6.7GB engine.
