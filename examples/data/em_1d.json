@@ -1,0 +1,48 @@
+{
+  "metadata": {
+    "source": "xAct",
+    "lagrangian_expr": "-1/4 F[-a,-b] F[a,b]",
+    "derived_from": "Euler-Lagrange",
+    "gauge": "lorenz",
+    "linearized": true
+  },
+  "spacetime": {
+    "dimension": 2,
+    "signature": [-1, 1],
+    "coordinates": ["t", "x"]
+  },
+  "fields": [
+    {"name": "A_0", "index": 0, "is_dynamical": true},
+    {"name": "A_1", "index": 1, "is_dynamical": true}
+  ],
+  "equations": [
+    {
+      "field": "A_0",
+      "lhs": "d2_t(A_0)",
+      "rhs": {
+        "type": "linear_combination",
+        "terms": [
+          {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"}
+        ]
+      }
+    },
+    {
+      "field": "A_1",
+      "lhs": "d2_t(A_1)",
+      "rhs": {
+        "type": "linear_combination",
+        "terms": [
+          {"coefficient": 1.0, "operator": "laplacian", "field": "A_1"}
+        ]
+      }
+    }
+  ],
+  "coupling": {
+    "mass_matrix": [[0.0, 0.0], [0.0, 0.0]],
+    "coupling_matrix": [[0.0, 0.0], [0.0, 0.0]]
+  },
+  "constraints": {
+    "lorenz_gauge": "d_a A^a = 0",
+    "note": "Components A_0, A_1 satisfy independent wave equations in Lorenz gauge"
+  }
+}
