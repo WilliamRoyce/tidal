@@ -7,7 +7,7 @@ for field systems derived from Lagrangians.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 from pde import FieldCollection, ScalarField
@@ -76,11 +76,11 @@ class ComponentGaussianPulse:
 
         Returns
         -------
-        NDArray
+        NDArray[np.float64]
             Gaussian profile values at each grid point.
         """
         # Get grid coordinates
-        coords = grid.cell_coords
+        coords = cast("np.ndarray", grid.cell_coords)
 
         # Compute squared distance from center
         dist_sq = np.zeros(grid.shape, dtype=np.float64)
@@ -185,7 +185,7 @@ class ComponentPlaneWave:
         tuple[NDArray, NDArray]
             (field_data, momentum_data) arrays.
         """
-        coords = grid.cell_coords
+        coords = cast("np.ndarray", grid.cell_coords)
 
         # Compute k · x
         k_dot_x = np.zeros(grid.shape, dtype=np.float64)
@@ -247,12 +247,13 @@ class ComponentPlaneWave:
         return FieldCollection(fields)
 
 
-def create_gaussian_pulse_state(
+def create_gaussian_pulse_state(  # noqa: PLR0913
     grid: GridBase,
     spec: EquationSystem,
     center: tuple[float, ...],
     width: float,
     amplitude: float = 1.0,
+    *,
     component: str | None = None,
 ) -> FieldCollection:
     """Return a Gaussian pulse initial state.
