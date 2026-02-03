@@ -20,17 +20,32 @@ wolframscript -code "Integrate[x^2, x]"
 wolframscript -file mycode.wls
 ```
 
-### Python Integration
+### Python Integration (Quickest Path)
+
+Install the Wolfram Python client in the uv environment:
+
+```bash
+uv pip install wolframclient
+```
+
+Then use a `WolframLanguageSession` and evaluate xAct directly:
 
 ```python
 from wolframclient.evaluation import WolframLanguageSession
-from wolframclient.language import wl
+from wolframclient.language import wlexpr
 
+session = WolframLanguageSession()
+session.evaluate(wlexpr('Needs["xAct`xTensor`"]'))
+print(session.evaluate(wlexpr("$Version")))
+print(session.evaluate(wlexpr("Integrate[x^2,x]")))
+session.terminate()
+```
+
+If session startup fails, ensure the kernel is discoverable on `PATH` or pass the explicit kernel path:
+
+```python
 kernel = "/home/vscode/.local/wolfram/engine/14.3/Executables/WolframKernel"
-
-with WolframLanguageSession(kernel) as session:
-    result = session.evaluate(wl.Integrate(wl.Power("x", 2), "x"))
-    print(result)  # x^3/3
+session = WolframLanguageSession(kernel)
 ```
 
 ### xAct Tensor Package
@@ -171,6 +186,10 @@ bash .devcontainer/scripts/check-wolfram.sh
 **For new licenses**: Replace `~/.local/wolfram/userbase/Licensing/mathpass` on host
 
 **Performance**: ~30 second startup vs ~10 minutes for full engine installation
+
+## 🧹 Repo Hygiene (Never Commit)
+
+Keep persistent Wolfram directories in `~/.local/wolfram/...` and `~/.cache/Wolfram/...` (outside the repo) so they never appear in git status. This repository already ignores license artifacts and installer bundles (see .gitignore for patterns like `*.mathpass`, `.Wolfram*`, `.WolframEngine*`, and `Wolfram*.{sh,run,tgz}`), so nothing sensitive should be committed.
 
 ## 🔄 Initial Setup (Historical Reference)
 

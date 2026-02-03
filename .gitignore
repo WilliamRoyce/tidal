@@ -6,3 +6,11 @@ __pycache__/
 /outputs/
 importtime.log
 third_party/
+
+# Wolfram installers / license artifacts (never commit)
+Wolfram*.sh
+Wolfram*.run
+Wolfram*.tgz
+*.mathpass
+.Wolfram*
+.WolframEngine*
