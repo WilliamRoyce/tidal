@@ -79,6 +79,7 @@ EXTENSIONS=(
     "github.vscode-pull-request-github"
     "Anthropic.claude-code"
     "WolframResearch.wolfram"
+    "lsp-wl.lsp-wl-client"
 )
 
 echo "${BOLD}Extensions to install: ${#EXTENSIONS[@]}${RESET}"
