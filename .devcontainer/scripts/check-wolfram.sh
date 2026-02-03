@@ -48,5 +48,5 @@ fi
 
 echo ""
 echo "📚 Help:"
-echo "  Full guide: cat .devcontainer/WOLFRAM_GUIDE.md"
+echo "  Full guide: cat .devcontainer/docs/WOLFRAM_GUIDE.md"
 echo "  Manage activation: bash .devcontainer/wolfram-activation-manager.sh"

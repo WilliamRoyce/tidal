@@ -13,7 +13,7 @@ VS Code extensions need to be installed manually due to timing constraints.
 
 TO INSTALL ALL REQUIRED EXTENSIONS:
 1. Open a terminal in VS Code
-2. Run: bash /workspaces/torsion-gertsenshtein/.devcontainer/install-extensions-final.sh
+2. Run: bash /workspaces/torsion-gertsenshtein/.devcontainer/scripts/install-extensions-final.sh
 3. After completion, reload window: Ctrl+Shift+P → "Developer: Reload Window"
 
 This only needs to be done once per rebuild.

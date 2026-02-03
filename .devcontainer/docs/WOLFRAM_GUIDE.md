@@ -33,14 +33,46 @@ with WolframLanguageSession(kernel) as session:
     print(result)  # x^3/3
 ```
 
+### xAct Tensor Package
+
+**✅ xAct 1.3.0 is installed and ready for differential geometry computations!**
+
+```bash
+# xAct tensor calculations
+wolframscript -code '<<xAct`xTensor`; DefManifold[M,4]; Print["4D spacetime dimension: ", Dim[M]];'
+wolframscript -code '<<xAct`xCoba`; DefManifold[M,4]; DefChart[coord, M, {0,1,2,3}];'
+
+# Test installation and compatibility fix
+.devcontainer/tests/test-xact.wls
+```
+
+**Available xAct packages:**
+
+- `xTensor`: Core tensor algebra ✅ Fully functional
+- `xCoba`: Component calculations and coordinate charts ✅ Fully functional
+- `xPerm`: Permutation groups ✅ **MathLink ENABLED - Full performance!**
+- `xPert`: Perturbation theory ✅ Fully functional
+- `Spinors`, `xIdeal`, `TexAct`, etc. ✅ Available
+
+**Installation location:** `$WOLFRAM_USERBASE/Applications/xAct/` (persists across rebuilds)
+
+**🎉 GLIBC Issue SOLVED!** xPerm now compiled from source with full MathLink support:
+
+- Advanced permutation algorithms: ✅ Available
+- Strong generating sets: ✅ Fast computation
+- Stabilizer chain algorithms: ✅ High performance
+- All xPerm functions: ✅ Native speed
+
+**Maintenance:** Use `.devcontainer/scripts/build-xperm.sh` to rebuild xPerm after Wolfram updates.
+
 ## 🔍 Diagnostics
 
 ```bash
 # Quick health check
-bash .devcontainer/check-wolfram.sh
+bash .devcontainer/scripts/check-wolfram.sh
 
 # Activation management
-bash .devcontainer/wolfram-activation-manager.sh
+bash .devcontainer/scripts/wolfram-activation-manager.sh
 
 # Check license
 cat ~/.local/wolfram/userbase/Licensing/mathpass
@@ -77,10 +109,10 @@ cat /etc/machine-id
 
 ```bash
 # Check if activation is present
-bash .devcontainer/wolfram-activation-manager.sh status
+bash .devcontainer/scripts/wolfram-activation-manager.sh status
 
 # Restore from backup if needed
-bash .devcontainer/wolfram-activation-manager.sh restore
+bash .devcontainer/scripts/wolfram-activation-manager.sh restore
 
 # Re-activate if necessary (requires Wolfram ID)
 wolframscript -activate
@@ -90,7 +122,7 @@ wolframscript -activate
 
 ```bash
 # Check license files
-bash .devcontainer/check-wolfram.sh
+bash .devcontainer/scripts/check-wolfram.sh
 
 # Verify machine ID matches license
 grep -o "^[a-f0-9]*" ~/.local/wolfram/userbase/Licensing/mathpass
@@ -106,7 +138,7 @@ cat /etc/machine-id
 # Ctrl+Shift+P → "Dev Containers: Rebuild Container"
 
 # After rebuild, verify everything works
-bash .devcontainer/check-wolfram.sh
+bash .devcontainer/scripts/check-wolfram.sh
 ```
 
 ## 📚 Understanding the Setup
@@ -134,7 +166,7 @@ bash .devcontainer/check-wolfram.sh
 
 **Normal operation**: No maintenance required! Everything works automatically.
 
-**If activation is lost**: Run `bash .devcontainer/wolfram-activation-manager.sh restore`
+**If activation is lost**: Run `bash .devcontainer/scripts/wolfram-activation-manager.sh restore`
 
 **For new licenses**: Replace `~/.local/wolfram/userbase/Licensing/mathpass` on host
 

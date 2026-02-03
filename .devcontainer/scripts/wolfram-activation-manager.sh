@@ -133,5 +133,5 @@ if [[ "${1:-status}" == "status" ]]; then
     echo "  • If no activation, run: wolframscript -activate"
     echo "  • Backup activation after successful activation: $0 backup"
     echo "  • Check diagnostics: bash .devcontainer/check-wolfram.sh"
-    echo "  • Full guide: cat .devcontainer/WOLFRAM_GUIDE.md"
+    echo "  • Full guide: cat .devcontainer/docs/WOLFRAM_GUIDE.md"
 fi

@@ -76,7 +76,7 @@ if [[ -z "$CODE_BIN" ]] || ! command -v "$CODE_BIN" &>/dev/null; then
     echo "This suggests VS Code remote server hasn't fully initialized."
     echo "Extensions may be available after VS Code fully loads."
     echo "Try running this script manually later:"
-    echo "  bash /workspaces/torsion-gertsenshtein/.devcontainer/install-extensions-final.sh"
+    echo "  bash /workspaces/torsion-gertsenshtein/.devcontainer/scripts/install-extensions-final.sh"
     exit 0  # Don't fail - just skip for now
 fi
 
