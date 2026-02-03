@@ -60,7 +60,8 @@
         "GitHub.copilot",
         "GitHub.copilot-chat",
         "github.vscode-pull-request-github",
-        "Anthropic.claude-code"
+        "Anthropic.claude-code",
+        "WolframResearch.wolfram"
       ]
     }
   },

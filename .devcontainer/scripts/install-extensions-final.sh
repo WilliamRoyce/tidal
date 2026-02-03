@@ -78,6 +78,7 @@ EXTENSIONS=(
     "GitHub.copilot-chat"
     "github.vscode-pull-request-github"
     "Anthropic.claude-code"
+    "WolframResearch.wolfram"
 )
 
 echo "${BOLD}Extensions to install: ${#EXTENSIONS[@]}${RESET}"
