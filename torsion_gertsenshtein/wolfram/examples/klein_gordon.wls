@@ -10,25 +10,34 @@ Print["Loading xAct packages..."];
 << xAct`xTensor`;
 << xAct`xCoba`;
 
+(* Load pipeline modules *)
+Print["Loading pipeline modules..."];
+pipelinePath = FileNameJoin[{DirectoryName[$InputFileName], ".."}];
+Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];
+Get[FileNameJoin[{pipelinePath, "Linearize.wl"}]];
+Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];
+Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];
+
 (* === Step 1: Setup 1+1D Minkowski Spacetime === *)
 Print[""];
 Print["Step 1: Setting up 1+1D Minkowski spacetime..."];
 
-DefManifold[M2, 2, {a, b, c, d, e, f}];
-DefMetric[-1, eta[-a, -b], M2, SymbolOfCovD -> {";", "\[Del]"}];
+(* Use unique names to avoid conflicts *)
+$DefInfoQ = False;  (* Suppress definition info messages *)
 
-(* Get the covariant derivative *)
-CD = CovDOfMetric[eta[-a, -b]];
+(* Define manifold and metric *)
+DefManifold[M2, 2, {a, b, c, d, e, f}];
+DefMetric[-1, etaMetric[-a, -b], CD, SymbolOfCovD -> {";", "\[Del]"}, PrintAs -> "\[Eta]"];
 Print["   Manifold: M2 (2D)"];
-Print["   Metric: Minkowski eta_ab with signature (-,+)"];
-Print["   Covariant derivative: ", CD];
+Print["   Metric: Minkowski \[Eta]_ab with signature (-,+)"];
+Print["   Covariant derivative: CD"];
 
 (* Setup coordinate chart for component extraction later *)
 DefChart[cart, M2, {0, 1}, {t[], x[]}];
 Print["   Coordinates: {t, x}"];
 
 (* Set Minkowski metric components *)
-MetricInBasis[eta, -cart, DiagonalMatrix[{-1, 1}]];
+MetricInBasis[etaMetric, -cart, DiagonalMatrix[{-1, 1}]];
 Print["   Metric components: diag(-1, +1)"];
 
 (* === Step 2: Define the Scalar Field === *)
@@ -36,9 +45,10 @@ Print[""];
 Print["Step 2: Defining scalar field phi..."];
 
 DefTensor[phi[], M2];
-DefConstantSymbol[m2, PrintAs -> "m\[Squared]"];
+(* Use numeric value for mass parameter (unit mass in natural units) *)
+m2 = 1.0;
 Print["   Scalar field: phi"];
-Print["   Mass parameter: m^2"];
+Print["   Mass parameter: m^2 = ", m2];
 
 (* === Step 3: Construct the Klein-Gordon Lagrangian === *)
 Print[""];
@@ -46,7 +56,7 @@ Print["Step 3: Constructing Klein-Gordon Lagrangian..."];
 
 (* L = -1/2 (nabla_a phi)(nabla^a phi) - 1/2 m^2 phi^2 *)
 (* In xTensor notation: CD[-a][phi[]] is nabla_a phi *)
-KGLagrangian = -1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - 1/2 m2 phi[]^2;
+KGLagrangian = -1/2 CD[-a][phi[]] etaMetric[a, b] CD[-b][phi[]] - 1/2 m2 phi[]^2;
 
 Print["   L = -1/2 (\[Del]_a \[Phi])(\[Del]^a \[Phi]) - 1/2 m\[Squared] \[Phi]\[Squared]"];
 Print["   Symbolic form: ", KGLagrangian];
@@ -54,17 +64,11 @@ Print["   Symbolic form: ", KGLagrangian];
 (* === Step 4: Derive Euler-Lagrange Equation === *)
 Print[""];
 Print["Step 4: Computing Euler-Lagrange equation..."];
-Print["   Using variational derivative: \[Delta]L/\[Delta]\[Phi] - \[Del]_a[\[Delta]L/\[Delta](\[Del]_a\[Phi])] = 0"];
+Print["   Using Euler-Lagrange: \[Delta]L/\[Delta]\[Phi] = 0"];
 
-(* xTensor's VarD computes functional derivatives *)
-(* VarD[Lagrangian, field[], covd] *)
-eomRaw = VarD[KGLagrangian, phi[], CD];
-Print["   Raw EOM: ", eomRaw];
-
-(* Simplify *)
-eom = ToCanonical[eomRaw];
-eom = ContractMetric[eom, eta];
-Print["   Simplified EOM: ", eom];
+(* Use pipeline's Euler-Lagrange computation *)
+eom = EulerLagrangeEquation[KGLagrangian, phi[], CD];
+Print["   EOM: ", eom];
 
 (* === Step 5: Verify the Result === *)
 Print[""];
@@ -79,59 +83,34 @@ Print["   where \[EmptySquare] = \[Eta]^ab \[Del]_a \[Del]_b is the d'Alembertia
 (* In coordinates: Box = -d^2/dt^2 + d^2/dx^2 for signature (-,+) *)
 Print["   In coordinates: -\[PartialD]t\[Squared]\[Phi] + \[PartialD]x\[Squared]\[Phi] - m\[Squared]\[Phi] = 0"];
 
-(* === Step 6: Extract Components for JSON Export === *)
+(* === Step 6: Extract Components Using Pipeline === *)
 Print[""];
-Print["Step 6: Preparing for JSON export..."];
+Print["Step 6: Decomposing to components using pipeline..."];
 
-(* For a scalar field, there's only one component equation *)
-(* The wave equation: d^2/dt^2 phi = laplacian(phi) - m^2 phi *)
-(* Where laplacian = d^2/dx^2 in 1D *)
+(* Use pipeline's component decomposition *)
+componentEqs = DecomposeToComponents[eom, phi[], cart];
+Print["   Component equations extracted: ", Length[componentEqs], " components"];
+Print["   Components: ", componentEqs];
 
-Print["   Field: phi (scalar)"];
-Print["   Equation type: wave (second-order in time)"];
-Print["   Spatial operator: laplacian"];
-Print["   Mass term coefficient: ", m2];
-
-(* === Step 7: JSON Output Structure === *)
+(* === Step 7: Build JSON Structure Using Pipeline === *)
 Print[""];
-Print["Step 7: JSON structure for Python pipeline..."];
+Print["Step 7: Building JSON using pipeline..."];
 
-jsonOutput = <|
-  "metadata" -> <|
-    "source" -> "xAct",
-    "lagrangian_expr" -> "-1/2 CD[-a][phi[]] CD[a][phi[]] - 1/2 m2 phi[]^2",
-    "derived_from" -> "Euler-Lagrange",
-    "linearized" -> True  (* Already linear *)
-  |>,
-  "spacetime" -> <|
-    "dimension" -> 2,  (* 1 time + 1 space *)
-    "signature" -> {-1, 1},
-    "coordinates" -> {"t", "x"}
-  |>,
-  "fields" -> {
-    <|"name" -> "phi", "index" -> 0, "is_dynamical" -> True|>
-  },
-  "equations" -> {
-    <|
-      "field" -> "phi",
-      "lhs" -> "d2_t(phi)",
-      "rhs" -> <|
-        "type" -> "linear_combination",
-        "terms" -> {
-          <|"coefficient" -> 1.0, "operator" -> "laplacian", "field" -> "phi"|>,
-          <|"coefficient" -> -m2, "operator" -> "identity", "field" -> "phi"|>
-        }
-      |>
-    |>
-  },
-  "coupling" -> <|
-    "mass_matrix" -> {{m2}},
-    "coupling_matrix" -> {{0}}
-  |>
+(* Metadata for JSON export *)
+metadata = <|
+  "field_prefix" -> "phi",
+  "lagrangian_expr" -> "-1/2 CD[-a][phi[]] CD[a][phi[]] - 1/2 m2 phi[]^2",
+  "mass_squared" -> N[m2],
+  "gauge" -> "none",
+  "linearized" -> True,
+  "dimension" -> 2,  (* Spacetime dimension: 1+1D = 2 total dims *)
+  "signature" -> {-1, 1},
+  "coordinates" -> {"t", "x"}
 |>;
 
-Print["   JSON structure created"];
-Print[""];
+(* Build JSON using pipeline *)
+jsonOutput = BuildJSONStructure[componentEqs, metadata];
+Print["   JSON structure created using pipeline"];
 
 (* Export JSON *)
 outputPath = FileNameJoin[{DirectoryName[$InputFileName], "..", "..", "..", "examples", "data"}];

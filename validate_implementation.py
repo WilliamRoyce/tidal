@@ -102,7 +102,7 @@ def test_json_loading() -> bool:
         kg_spec = load_equation_system(kg_path)
         LOGGER.info("✓ Loaded KG spec: %s component(s)", kg_spec.n_components)
         assert kg_spec.n_components == KG_COMPONENTS
-        assert kg_spec.component_names == ("phi",)
+        assert kg_spec.component_names == ("phi_0",)
     except (OSError, ValueError, TypeError):
         LOGGER.exception("✗ Error loading JSON")
         return False

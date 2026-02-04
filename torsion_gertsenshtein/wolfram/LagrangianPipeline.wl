@@ -90,9 +90,7 @@ ProcessLagrangian[lagrangian_, field_, covd_, chart_, opts:OptionsPattern[]] := 
 
   (* Step 1: Derive Euler-Lagrange equations *)
   If[verbose, Print["Step 1: Deriving Euler-Lagrange equations..."]];
-  eom = VarD[lagrangian, field, covd];
-  eom = ToCanonical[eom];
-  eom = ContractMetric[eom];
+  eom = EulerLagrangeEquation[lagrangian, field, covd];
   If[verbose, Print["  EOM: ", eom]];
 
   (* Step 2: Linearize (if needed) *)

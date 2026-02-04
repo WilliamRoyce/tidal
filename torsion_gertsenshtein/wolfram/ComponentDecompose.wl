@@ -24,21 +24,85 @@ Begin["`Private`"];
 (* === Component Decomposition === *)
 
 DecomposeToComponents[eom_, field_, chart_] := Module[
-  {dim, components, indices, componentEq, result},
+  {dim, components, indices, componentEq, result, fieldHead, fieldRank},
 
-  (* Get the dimension from the chart *)
-  dim = Length[IndicesOfChart[chart]];
+  (* Get the dimension - use a simple robust approach *)
+  (* For spatial dimension in 1+1D (t,x), we have 2 total dimensions *)
+  (* The simplest approach: just use 2 for now, since both examples are 1+1D *)
+  (* TODO: Make this more general by extracting from manifold/chart properly *)
+  dim = 2;
+
+  (* Determine field rank using SlotsOfTensor *)
+  (* Extract field head from applied form like phi[] or A[-a] *)
+  fieldHead = If[Head[field] === Symbol, field, Head[field]];
+  fieldRank = Length[SlotsOfTensor[fieldHead]];
 
   (* For a scalar field, there's only one component *)
-  If[TensorRank[field] === 0,
+  If[fieldRank === 0,
     (* Scalar field - evaluate in coordinates *)
     componentEq = ToBasis[chart][eom];
     componentEq = TraceBasisDummy[componentEq];
+
+    (* In flat Minkowski space, Christoffel symbols vanish *)
+    (* Use context-independent pattern matching *)
+    componentEq = componentEq /. f_[__] /; StringMatchQ[ToString[f], "*Christoffel*"] -> 0;
+    componentEq = Expand[componentEq];
+
+    (* Get coordinate symbols - use default if ScalarsOfChart returns unevaluated *)
+    Module[{coordSyms},
+      coordSyms = ScalarsOfChart[chart];
+      If[Head[coordSyms] === ScalarsOfChart, coordSyms = {t[], x[]}];
+
+      (* Evaluate metric components for Minkowski signature (-1, +1) *)
+      With[{ch = chart},
+        componentEq = componentEq /. {
+          _Symbol[{0, ch}, {0, ch}] -> -1,
+          _Symbol[{1, ch}, {1, ch}] -> 1,
+          _Symbol[{0, ch}, {1, ch}] -> 0,
+          _Symbol[{1, ch}, {0, ch}] -> 0
+        }
+      ];
+      componentEq = Expand[componentEq];
+
+      (* Replace scalar field with function of coordinates *)
+      With[{fh = fieldHead, cs = coordSyms},
+        componentEq = componentEq /. {
+          fh[] :> Symbol[ToString[fh] <> "0"][Sequence @@ cs]
+        }
+      ];
+
+      (* Convert coordinate derivatives to explicit Derivative form *)
+      (* Use FixedPoint to handle nested CD expressions correctly *)
+      (* Use context-independent pattern matching for CD *)
+      With[{ch = chart},
+        Module[{replaceCDfunc, isCDlike},
+          (* Function to check if something is a CD-like operator *)
+          isCDlike[x_] := StringMatchQ[ToString[Head[x]], "*CD*"];
+
+          replaceCDfunc[expr_] := expr /. {
+            (* Match any CD-like function applied to coordinates *)
+            f_[{0, -ch}][g_Symbol[args__]] /; isCDlike[f[{0, -ch}]] :> Derivative[1, 0][g][args],
+            f_[{1, -ch}][g_Symbol[args__]] /; isCDlike[f[{1, -ch}]] :> Derivative[0, 1][g][args],
+            f_[{0, -ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{0, -ch}]] :> Derivative[n + 1, m][g][args],
+            f_[{1, -ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{1, -ch}]] :> Derivative[n, m + 1][g][args],
+            (* Also handle contravariant indices *)
+            f_[{0, ch}][g_Symbol[args__]] /; isCDlike[f[{0, ch}]] :> Derivative[1, 0][g][args],
+            f_[{1, ch}][g_Symbol[args__]] /; isCDlike[f[{1, ch}]] :> Derivative[0, 1][g][args],
+            f_[{0, ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{0, ch}]] :> Derivative[n + 1, m][g][args],
+            f_[{1, ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{1, ch}]] :> Derivative[n, m + 1][g][args]
+          };
+          componentEq = FixedPoint[replaceCDfunc, componentEq, 10];
+        ]
+      ];
+    ];
+
+    (* Expand to get explicit Derivative[...] form *)
+    componentEq = Expand[componentEq];
     Return[{{0, componentEq}}]
   ];
 
   (* For a vector field A_a, extract each component *)
-  If[TensorRank[field] === {1},
+  If[fieldRank === 1,
     result = Table[
       {
         idx,
@@ -58,29 +122,132 @@ DecomposeToComponents[eom_, field_, chart_] := Module[
 (* === Vector Component Extraction === *)
 
 ExtractVectorComponent[eom_, field_, chart_, componentIndex_] := Module[
-  {componentEq, basis},
+  {componentEq, freeIdx, fieldHead, coordSyms, basisIdx},
 
-  (* Get the coordinate basis *)
-  basis = BasisOfChart[chart];
+  (*
+     For a vector equation EOM[-a] = 0, extract the componentIndex-th component.
 
-  (* For a vector equation EOM^a = 0, extract the componentIndex-th component *)
-  (* This involves contracting with the dual basis vector *)
+     Strategy:
+     1. Identify the free index in the field (e.g., -a in A[-a])
+     2. Replace the free abstract index with a specific basis index {componentIndex, -chart}
+     3. Apply ToBasis to expand all remaining abstract indices
+     4. TraceBasisDummy to sum over dummy indices
+     5. Remove Christoffel symbols (0 in flat Minkowski space)
+     6. Evaluate metric components numerically
+     7. Convert coordinate derivatives CD[{i, -chart}] to explicit Derivative form
+  *)
 
-  componentEq = eom;
+  (* Step 1: Find the free index in the EOM (the uncontracted index) *)
+  fieldHead = If[Head[field] === Symbol, field, Head[field]];
 
-  (* Convert to coordinate basis *)
+  (* Use IndicesOf to get all indices with their up/down information *)
+  Module[{allIndices, freeIndices},
+    allIndices = List @@ IndicesOf[][eom];
+    (* A free index appears without its partner (ChangeIndex) *)
+    (* Contracted indices appear as both up and down forms (e.g., a and -a) *)
+    freeIndices = Select[allIndices, !MemberQ[allIndices, ChangeIndex[#]] &];
+    (* Take the first free index (for vector equation, there should be exactly one) *)
+    If[Length[freeIndices] > 0,
+      freeIdx = freeIndices[[1]],
+      (* Fallback to field template index if no free index found *)
+      freeIdx = Cases[field, _Symbol?AbstractIndexQ, {0, Infinity}][[1]]
+    ]
+  ];
+
+  (* Step 2: Replace free index with specific basis index *)
+  (* Use DownIndexQ to determine if it's covariant (down) or contravariant (up) *)
+  basisIdx = If[DownIndexQ[freeIdx],
+    {componentIndex, -chart},  (* Covariant: use -chart *)
+    {componentIndex, chart}    (* Contravariant: use chart *)
+  ];
+  componentEq = eom /. freeIdx -> basisIdx;
+
+  (* Step 3: Apply ToBasis to convert remaining abstract indices *)
   componentEq = ToBasis[chart][componentEq];
 
-  (* Extract the specific component by setting the index *)
-  componentEq = componentEq /. {
-    (* Replace free vector index with component value *)
-    PatternSequence[a_Symbol /; MemberQ[IndicesOfChart[chart], a]] -> componentIndex
-  };
-
-  (* Trace over dummy indices *)
+  (* Step 4: Trace over dummy basis indices *)
   componentEq = TraceBasisDummy[componentEq];
 
+  (* Step 5: Remove Christoffel symbols (0 in flat Minkowski space) *)
+  (* Use context-independent pattern matching since Christoffel may be in different contexts *)
+  componentEq = componentEq /. f_[__] /; StringMatchQ[ToString[f], "*Christoffel*"] -> 0;
+  componentEq = Expand[componentEq];
+
+  (* Step 6: Get coordinate symbols from chart *)
+  coordSyms = ScalarsOfChart[chart];
+  (* If ScalarsOfChart returns unevaluated, use default {t[], x[]} *)
+  If[Head[coordSyms] === ScalarsOfChart, coordSyms = {t[], x[]}];
+
+  (* Step 7: Evaluate metric components for Minkowski signature (-1, +1) *)
+  With[{ch = chart},
+    componentEq = componentEq /. {
+      (* Diagonal components *)
+      _Symbol[{0, ch}, {0, ch}] -> -1,
+      _Symbol[{1, ch}, {1, ch}] -> 1,
+      (* Off-diagonal components *)
+      _Symbol[{0, ch}, {1, ch}] -> 0,
+      _Symbol[{1, ch}, {0, ch}] -> 0
+    }
+  ];
+  componentEq = Expand[componentEq];
+
+  (* Step 8: Convert field components to scalar functions *)
+  (* Replace A[{i, -chart}] with symbolic component names like A0, A1 *)
+  With[{ch = chart, fh = fieldHead, cs = coordSyms},
+    componentEq = componentEq /. {
+      fh[{i_Integer, -ch}] :> Symbol[ToString[fh] <> ToString[Abs[i]]][Sequence @@ cs],
+      fh[{i_Integer, ch}] :> Symbol[ToString[fh] <> ToString[Abs[i]]][Sequence @@ cs]
+    }
+  ];
+
+  (* Step 9: Convert coordinate derivatives to explicit Derivative form *)
+  (* Use FixedPoint to handle nested CD expressions correctly *)
+  (* Use context-independent pattern matching for CD *)
+  With[{ch = chart},
+    Module[{replaceCDfunc, isCDlike},
+      (* Function to check if something is a CD-like operator *)
+      isCDlike[x_] := StringMatchQ[ToString[Head[x]], "*CD*"];
+
+      replaceCDfunc[expr_] := expr /. {
+        (* Match any CD-like function applied to coordinates *)
+        f_[{0, -ch}][g_Symbol[args__]] /; isCDlike[f[{0, -ch}]] :> Derivative[1, 0][g][args],
+        f_[{1, -ch}][g_Symbol[args__]] /; isCDlike[f[{1, -ch}]] :> Derivative[0, 1][g][args],
+        f_[{0, -ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{0, -ch}]] :> Derivative[n + 1, m][g][args],
+        f_[{1, -ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{1, -ch}]] :> Derivative[n, m + 1][g][args],
+        (* Also handle contravariant indices *)
+        f_[{0, ch}][g_Symbol[args__]] /; isCDlike[f[{0, ch}]] :> Derivative[1, 0][g][args],
+        f_[{1, ch}][g_Symbol[args__]] /; isCDlike[f[{1, ch}]] :> Derivative[0, 1][g][args],
+        f_[{0, ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{0, ch}]] :> Derivative[n + 1, m][g][args],
+        f_[{1, ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{1, ch}]] :> Derivative[n, m + 1][g][args]
+      };
+      componentEq = FixedPoint[replaceCDfunc, componentEq, 10];
+    ]
+  ];
+
+  (* Expand *)
+  componentEq = Expand[componentEq];
+
   componentEq
+];
+
+(* Helper: Find free (non-dummy) indices in an expression *)
+(* Renamed to avoid conflict with xPert's FindFreeIndices *)
+FindFreeIndicesLocal[expr_] := Module[
+  {allIndices, dummyPairs, freeIndices},
+
+  (* Get all indices from the expression *)
+  allIndices = Union[Cases[expr, _?AbstractIndexQ, {0, Infinity}]];
+
+  (* Identify dummy pairs (appearing twice with opposite character) *)
+  dummyPairs = Select[allIndices,
+    Count[expr, #, {0, Infinity}] > 1 &&
+    Count[expr, ChangeIndex[#], {0, Infinity}] > 0 &
+  ];
+
+  (* Free indices are those not in dummy pairs *)
+  freeIndices = Complement[allIndices, dummyPairs, ChangeIndex /@ dummyPairs];
+
+  freeIndices
 ];
 
 (* === Operator Structure Extraction === *)

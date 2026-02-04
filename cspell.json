@@ -35,6 +35,7 @@
     "mypy",
     "nabla",
     "Neumann",
+    "noqa",
     "numba",
     "pdes",
     "pycache",
@@ -57,7 +58,8 @@
     "ylim",
     "ytick",
     "yticklabels",
-    "yticks"
+    "yticks",
+    "δfield"
   ],
   "ignoreWords": [
     "pytest",
@@ -75,10 +77,7 @@
     "trange",
     "tqdm"
   ],
-  "flagWords": [
-    "hte",
-    "teh"
-  ],
+  "flagWords": ["hte", "teh", "wolfrom"],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [
@@ -90,7 +89,6 @@
     "dist/**",
     "dist.*/**",
     "temp/**",
-    "CHANGELOG.md",
     "package.json",
     ".cspell.json",
     "cspell.json",
@@ -100,7 +98,6 @@
     ".pytest_cache/**",
     ".ruff_cache/**",
     ".venv/**",
-    ".vscode/**",
     "build/**",
     "docs/**",
     "*.egg-info/**"

@@ -10,17 +10,22 @@ Print["Loading xAct packages..."];
 << xAct`xTensor`;
 << xAct`xCoba`;
 
+(* Load pipeline modules *)
+Print["Loading pipeline modules..."];
+pipelinePath = FileNameJoin[{DirectoryName[$InputFileName], ".."}];
+Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];
+Get[FileNameJoin[{pipelinePath, "Linearize.wl"}]];
+Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];
+Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];
+
 (* === Step 1: Setup 1+1D Minkowski Spacetime === *)
 Print[""];
 Print["Step 1: Setting up 1+1D Minkowski spacetime..."];
 
 DefManifold[M2, 2, {a, b, c, d, e, f, g, h}];
-DefMetric[-1, eta[-a, -b], M2,
+DefMetric[-1, eta[-a, -b], CD,
   SymbolOfCovD -> {";", "\[Del]"},
   PrintAs -> "\[Eta]"];
-
-(* Get covariant derivative *)
-CD = CovDOfMetric[eta[-a, -b]];
 
 (* Define coordinate chart: {t, x} *)
 DefChart[cart, M2, {0, 1}, {t[], x[]}];
@@ -67,18 +72,13 @@ Print["   Expanded form: ", EMLagrangianExpanded];
 
 (* === Step 4: Derive Euler-Lagrange Equations === *)
 Print[""];
-Print["Step 4: Computing Euler-Lagrange equations for A_a..."];
-Print["   \[Delta]L/\[Delta]A_a - \[Del]_b[\[Delta]L/\[Delta](\[Del]_b A_a)] = 0"];
+Print["Step 4: Computing Euler-Lagrange equations for A_a using pipeline..."];
+Print["   \[Delta]L/\[Delta]A_a = 0"];
 
-(* Use VarD to compute variational derivative *)
+(* Use pipeline's Euler-Lagrange computation *)
 (* For the EM Lagrangian, EOM is: d_b F^ba = 0 (source-free Maxwell) *)
-eomRaw = VarD[EMLagrangianExpanded, A[-a], CD];
-Print["   Raw EOM: ", eomRaw];
-
-(* Simplify *)
-eom = ToCanonical[eomRaw];
-eom = ContractMetric[eom, eta];
-Print["   Simplified EOM: ", eom];
+eom = EulerLagrangeEquation[EMLagrangianExpanded, A[-a], CD];
+Print["   EOM: ", eom];
 
 (* === Step 5: Apply Lorenz Gauge === *)
 Print[""];
@@ -90,79 +90,48 @@ Print["   Lorenz gauge: \[Del]_a A^a = 0"];
    where Box = eta^bc d_b d_c is the d'Alembertian *)
 
 (* For 1+1D: Box = -d^2/dt^2 + d^2/dx^2 *)
-Print["   In Lorenz gauge: \[EmptySquare] A_a = 0");
-Print["   where \[EmptySquare] = \[Eta]^ab \[Del]_a \[Del]_b");
+Print["   In Lorenz gauge: \[EmptySquare] A_a = 0"];
+Print["   where \[EmptySquare] = \[Eta]^ab \[Del]_a \[Del]_b"];
 
-(* === Step 6: Extract Component Equations === *)
+(* Substitute F_ab = d_a A_b - d_b A_a into Maxwell equations *)
+(* Maxwell: d_b F^ab = 0, F_ab = d_a A_b - d_b A_a *)
+(* Expanding: d_b (eta^ac eta^bd (d_c A_d - d_d A_c)) = 0 *)
+(* = eta^ac d^b d_c A_b - eta^ac d^b d_b A_c = 0 *)
+(* = d^a (d_b A^b) - Box A^a = 0 *)
+(* With Lorenz gauge d_b A^b = 0: Box A^a = 0 *)
+
+(* Construct the wave equation directly: Box A_a = eta^bc d_b d_c A_a = 0 *)
+waveEqA = eta[b, c] CD[-b][CD[-c][A[-a]]];
+Print["   Wave equation form: ", waveEqA, " = 0"];
+
+(* === Step 6: Extract Component Equations Using Pipeline === *)
 Print[""];
-Print["Step 6: Extracting component equations..."];
+Print["Step 6: Decomposing to components using pipeline..."];
 
-(* For 1+1D, we have two components: A_0 (temporal) and A_1 (spatial) *)
-(* Each satisfies the wave equation: Box A_mu = 0 *)
+(* Use pipeline's component decomposition with the wave equation form *)
+componentEqs = DecomposeToComponents[waveEqA, A[-a], cart];
+Print["   Component equations extracted: ", Length[componentEqs], " components"];
+Print["   Components: ", componentEqs];
 
-Print["   Component A_0 (temporal): \[EmptySquare] A_0 = 0"];
-Print["     \[Implies] -\[PartialD]_t\[Squared] A_0 + \[PartialD]_x\[Squared] A_0 = 0"];
-Print["     \[Implies] \[PartialD]_t\[Squared] A_0 = \[PartialD]_x\[Squared] A_0 (wave equation)"];
-
-Print["   Component A_1 (spatial): \[EmptySquare] A_1 = 0"];
-Print["     \[Implies] -\[PartialD]_t\[Squared] A_1 + \[PartialD]_x\[Squared] A_1 = 0"];
-Print["     \[Implies] \[PartialD]_t\[Squared] A_1 = \[PartialD]_x\[Squared] A_1 (wave equation)"];
-
-(* === Step 7: Build JSON Output === *)
+(* === Step 7: Build JSON Structure Using Pipeline === *)
 Print[""];
-Print["Step 7: Building JSON structure for Python pipeline..."];
+Print["Step 7: Building JSON using pipeline..."];
 
-(* The JSON structure for the EM field equations *)
-jsonOutput = <|
-  "metadata" -> <|
-    "source" -> "xAct",
-    "lagrangian_expr" -> "-1/4 F[-a,-b] F[a,b]",
-    "derived_from" -> "Euler-Lagrange",
-    "gauge" -> "lorenz",
-    "linearized" -> True  (* EM is already linear *)
-  |>,
-  "spacetime" -> <|
-    "dimension" -> 2,  (* 1 time + 1 space *)
-    "signature" -> {-1, 1},
-    "coordinates" -> {"t", "x"}
-  |>,
-  "fields" -> {
-    <|"name" -> "A_0", "index" -> 0, "is_dynamical" -> True|>,
-    <|"name" -> "A_1", "index" -> 1, "is_dynamical" -> True|>
-  },
-  "equations" -> {
-    <|
-      "field" -> "A_0",
-      "lhs" -> "d2_t(A_0)",
-      "rhs" -> <|
-        "type" -> "linear_combination",
-        "terms" -> {
-          <|"coefficient" -> 1.0, "operator" -> "laplacian", "field" -> "A_0"|>
-        }
-      |>
-    |>,
-    <|
-      "field" -> "A_1",
-      "lhs" -> "d2_t(A_1)",
-      "rhs" -> <|
-        "type" -> "linear_combination",
-        "terms" -> {
-          <|"coefficient" -> 1.0, "operator" -> "laplacian", "field" -> "A_1"|>
-        }
-      |>
-    |>
-  },
-  "coupling" -> <|
-    "mass_matrix" -> {{0.0, 0.0}, {0.0, 0.0}},
-    "coupling_matrix" -> {{0.0, 0.0}, {0.0, 0.0}}
-  |>,
-  "constraints" -> <|
-    "lorenz_gauge" -> "\[Del]_a A^a = 0",
-    "note" -> "Components A_0, A_1 satisfy independent wave equations in Lorenz gauge"
-  |>
+(* Metadata for JSON export *)
+metadata = <|
+  "field_prefix" -> "A",
+  "lagrangian_expr" -> "-1/4 F[-a,-b] F[a,b]",
+  "mass_squared" -> 0.0,  (* Massless *)
+  "gauge" -> "lorenz",
+  "linearized" -> True,
+  "dimension" -> 2,  (* Spacetime dimension: 1+1D = 2 total dims *)
+  "signature" -> {-1, 1},
+  "coordinates" -> {"t", "x"}
 |>;
 
-Print["   JSON structure created"];
+(* Build JSON using pipeline *)
+jsonOutput = BuildJSONStructure[componentEqs, metadata];
+Print["   JSON structure created using pipeline"];
 
 (* === Step 8: Export JSON === *)
 Print[""];

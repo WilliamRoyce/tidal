@@ -59,35 +59,61 @@ SetupSpacetime[dim_Integer, signature_Integer] := Module[
 EulerLagrangeEquation[lagrangian_, field_, covd_] := Module[
   {eom},
 
-  (* xTensor's VarD computes the variational derivative *)
-  (* VarD[expr, field, covd] gives d(expr)/d(field) accounting for derivatives *)
-  eom = VarD[lagrangian, field, covd];
+  (* Try xTensor's VarD first *)
+  (* VarD uses curried syntax: VarD[field, covd][expr] *)
+  eom = VarD[field, covd][lagrangian];
 
-  (* Apply canonical simplifications *)
-  eom = ToCanonical[eom];
-  eom = ContractMetric[eom];
+  (* Check if VarD returned unevaluated - if so, use manual computation *)
+  If[Head[eom] === VarD,
+    (* VarD failed - fall back to manual Euler-Lagrange *)
+    Print["VarD returned unevaluated - using manual Euler-Lagrange computation"];
+    eom = VariationalDerivative[lagrangian, field, covd],
+
+    (* VarD worked - apply canonical simplifications *)
+    eom = ToCanonical[eom];
+    eom = ContractMetric[eom]
+  ];
 
   eom
 ];
 
-(* Alternative: Explicit computation for pedagogical clarity *)
-VariationalDerivative[lagrangian_, field_, covd_] := Module[
-  {directTerm, derivativeTerm, result},
+(* Manual Euler-Lagrange Computation *)
+(* Implements: δL/δfield = ∂L/∂field - ∇_a(∂L/∂(∇_a field)) = 0 *)
+(* This provides a fallback if VarD is not working *)
 
-  (* Direct variation: dL/d(field) *)
+VariationalDerivative[lagrangian_, field_, covd_] := Module[
+  {directTerm, derivativeTerm, result, isScalar, derivLag, a, b},
+
+  (* Direct term: ∂L/∂field *)
   directTerm = D[lagrangian, field];
 
-  (* Variation with respect to first derivatives: -D_a[dL/d(D_a field)] *)
-  (* This requires careful handling of the covariant derivative structure *)
-  derivativeTerm = With[{cd = covd},
-    (* Find all terms involving cd[field] and compute their contribution *)
-    (* This is a simplified version - VarD handles this properly *)
-    0  (* Placeholder - use VarD for actual computation *)
+  (* Determine if scalar or vector field *)
+  (* Scalar field: phi[] - has no indices *)
+  (* Vector field: A[-a] - has one index *)
+  (* Check for indices by looking for AbstractIndexQ patterns *)
+  isScalar = FreeQ[field, _?AbstractIndexQ];
+
+  (* Derivative term: -∇_a (∂L/∂(∇_a field)) *)
+  derivativeTerm = If[isScalar,
+    (* Scalar field: φ[] *)
+    (* Compute -∇_a (∂L/∂(∇_a φ)) *)
+    derivLag = D[lagrangian, covd[-a][field]];
+    -covd[-a][derivLag],
+
+    (* Vector or tensor field *)
+    (* For vector A[-a]: Compute -∇_b (∂L/∂(∇_b A_a)) *)
+    derivLag = D[lagrangian, covd[-b][field]];
+    -covd[-b][derivLag]
   ];
 
-  (* The full EOM *)
+  (* Euler-Lagrange equation: δL/δfield = 0 *)
   result = directTerm + derivativeTerm;
-  ToCanonical[result]
+
+  (* Simplify using xTensor *)
+  result = ToCanonical[result];
+  result = ContractMetric[result];
+
+  result
 ];
 
 End[];

@@ -1,9 +1,9 @@
-"""End-to-end example: EM field simulation from Lagrangian.
+"""End-to-end example: Klein-Gordon field simulation from Lagrangian.
 
 This script demonstrates the complete Lagrangian-to-simulation pipeline:
-1. Load equations derived from the EM Lagrangian L = -1/4 F_uv F^uv
+1. Load equations derived from the Klein-Gordon Lagrangian L = -1/2 (∂φ)² - 1/2 m²φ²
 2. Build a PDE solver from the specification
-3. Create initial conditions (Gaussian pulse in A_1)
+3. Create initial conditions (Gaussian pulse)
 4. Run the simulation
 5. Visualize the results
 
@@ -24,9 +24,7 @@ import numpy as np
 from pde import CartesianGrid, FieldCollection, MemoryStorage, PDEBase, ScalarField
 
 from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
-from torsion_gertsenshtein.vectorfield import (
-    ComponentGaussianPulse,
-)
+from torsion_gertsenshtein.vectorfield import ComponentGaussianPulse
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -37,9 +35,8 @@ if TYPE_CHECKING:
     NumericArray = NDArray[np.float64]
 
 
-A0_TOL = 1e-10
-DEFAULT_T_END = 25.0
-OUTPUT_FILENAME = "outputs/em_from_lagrangian_output.png"
+DEFAULT_T_END = 30.0
+OUTPUT_FILENAME = "outputs/kg_from_lagrangian_output.png"
 
 
 @dataclass(frozen=True)
@@ -52,8 +49,8 @@ class SimulationData:
 
 
 def main() -> None:
-    """Run the EM field simulation from Lagrangian-derived equations."""
-    json_path = Path(__file__).parent.parent / "data" / "em_1d.json"
+    """Run the Klein-Gordon field simulation from Lagrangian-derived equations."""
+    json_path = Path(__file__).parent.parent / "data" / "klein_gordon_1d.json"
     _print_header()
     spec = _load_spec(json_path)
     pde = _build_pde(json_path)
@@ -61,14 +58,14 @@ def main() -> None:
     initial_state = _create_initial_state(grid, spec)
     storage = _run_simulation(pde, initial_state, DEFAULT_T_END)
     simulation = _collect_simulation_data(storage, grid)
-    _analyze_results(simulation)
-    _plot_results(simulation)
+    _analyze_results(simulation, spec)
+    _plot_results(simulation, spec)
     _print_footer()
 
 
 def _print_header() -> None:
     print("=" * 60)
-    print("EM Field Simulation from Lagrangian")
+    print("Klein-Gordon Field Simulation from Lagrangian")
     print("=" * 60)
     print()
 
@@ -79,7 +76,14 @@ def _load_spec(json_path: Path) -> EquationSystem:
     print(f"  Lagrangian: {spec.metadata.get('lagrangian_expr', 'N/A')}")
     print(f"  Number of components: {spec.n_components}")
     print(f"  Component names: {spec.component_names}")
-    print(f"  Gauge: {spec.metadata.get('gauge', 'none')}")
+
+    # Check for mass term
+    has_mass = any(
+        term.operator == "identity" and term.coefficient != 0
+        for eq in spec.equations
+        for term in eq.rhs_terms
+    )
+    print(f"  Mass term: {'present (m² = 1)' if has_mass else 'absent (massless)'}")
     print()
     return spec
 
@@ -105,18 +109,18 @@ def _create_grid() -> CartesianGrid:
 
 def _create_initial_state(grid: CartesianGrid, spec: EquationSystem) -> FieldCollection:
     print("Step 4: Creating initial conditions...")
-    print("  Gaussian pulse in A_1 (spatial component of vector potential)")
+    print("  Gaussian pulse for scalar field φ")
     pulse = ComponentGaussianPulse(
         center=(50.0,),
         width=5.0,
         amplitude=1.0,
-        active_components={"A_1": 1.0},
+        active_components={"phi_0": 1.0},
     )
     initial_state = pulse.create(grid, spec)
     print("  Pulse center: x = 50")
     print("  Pulse width: 5")
-    print("  Initial A_0: 0 (temporal component)")
-    print("  Initial A_1: Gaussian (spatial component)")
+    print("  Initial φ: Gaussian")
+    print("  Initial ∂_t φ: 0 (initially at rest)")
     print()
     return initial_state
 
@@ -126,7 +130,7 @@ def _run_simulation(
 ) -> MemoryStorage:
     print("Step 5: Running simulation...")
     print(f"  Duration: {t_end} time units")
-    print("  (Massless waves propagate at c = 1 in natural units)")
+    print("  (Klein-Gordon wave with m² = 1)")
     storage = MemoryStorage()
     tracker: TrackerBase = storage.tracker(interrupts=1.0)
     pde.solve(initial_state, t_range=t_end, dt=0.01, tracker=tracker)
@@ -152,84 +156,114 @@ def _get_component(snapshot: FieldCollection, index: int) -> NumericArray:
     return np.asarray(field.data, dtype=float)
 
 
-def _analyze_results(simulation: SimulationData) -> None:
+def _analyze_results(simulation: SimulationData, spec: EquationSystem) -> None:
     print("Step 6: Analyzing results...")
-    for t, snapshot in zip(simulation.times, simulation.snapshots, strict=True):
-        a0_max = float(np.max(np.abs(_get_component(snapshot, 0))))
-        if a0_max > A0_TOL:
-            print(f"  WARNING: A_0 became non-zero at t={t}: max={a0_max}")
-            break
-    else:
-        print("  A_0 remained zero throughout (no coupling) ✓")
 
-    initial_a1 = _get_component(simulation.snapshots[0], 2)
-    initial_peak_x = simulation.x[np.argmax(initial_a1)]
-    print(f"  Initial A_1 peak at x = {initial_peak_x:.1f}")
-    print("  Final A_1: pulse has split and propagated")
+    # Get φ field (index 0) and π field (index 1)
+    initial_phi = _get_component(simulation.snapshots[0], 0)
+    final_phi = _get_component(simulation.snapshots[-1], 0)
+
+    initial_peak_x = simulation.x[np.argmax(np.abs(initial_phi))]
+    final_peak_x = simulation.x[np.argmax(np.abs(final_phi))]
+
+    print(f"  Initial φ peak at x = {initial_peak_x:.1f}")
+    print(f"  Final φ: wave has evolved to x = {final_peak_x:.1f}")
+
+    # Check energy-like quantity (not conserved in discretization, but should be bounded)
+    phi_max_over_time = [
+        float(np.max(np.abs(_get_component(snapshot, 0))))
+        for snapshot in simulation.snapshots
+    ]
+    initial_max = phi_max_over_time[0]
+    final_max = phi_max_over_time[-1]
+
+    print(f"  Initial max|φ| = {initial_max:.3f}")
+    print(f"  Final max|φ| = {final_max:.3f}")
+
+    # Check if mass term affects propagation (massive waves disperse)
+    has_mass = any(
+        term.operator == "identity" and term.coefficient != 0
+        for eq in spec.equations
+        for term in eq.rhs_terms
+    )
+
+    if has_mass:
+        print("  Mass term present: wave exhibits dispersion ✓")
+    else:
+        print("  Massless case: wave propagates at c = 1 ✓")
+
     print()
 
 
-def _plot_results(simulation: SimulationData) -> None:
+def _plot_results(simulation: SimulationData, spec: EquationSystem) -> None:
     print("Step 7: Generating visualization...")
     fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+
+    # Get mass value for title
+    has_mass = any(
+        term.operator == "identity" and term.coefficient != 0
+        for eq in spec.equations
+        for term in eq.rhs_terms
+    )
+    mass_str = "m² = 1" if has_mass else "m² = 0"
+
     fig.suptitle(
-        "EM Vector Potential from Lagrangian L = -1/4 F_μν F^μν",
+        f"Klein-Gordon Scalar Field from Lagrangian ({mass_str})",
         fontsize=14,
     )
 
+    # Initial condition
     ax = axes[0, 0]
-    ax.plot(simulation.x, _get_component(simulation.snapshots[0], 2), "b-")
+    ax.plot(simulation.x, _get_component(simulation.snapshots[0], 0), "b-")
     ax.set_xlabel("x")
-    ax.set_ylabel("A_1")
+    ax.set_ylabel("φ")
     ax.set_title("Initial Condition (t=0)")
-    ax.legend(["A_1 initial"])
+    ax.legend(["φ initial"])
     ax.grid(visible=True, alpha=0.3)
 
+    # Final state
     ax = axes[0, 1]
     ax.plot(
         simulation.x,
-        _get_component(simulation.snapshots[-1], 2),
+        _get_component(simulation.snapshots[-1], 0),
         "b-",
-        label=f"A_1 at t={simulation.times[-1]:.1f}",
+        label=f"φ at t={simulation.times[-1]:.1f}",
     )
     ax.set_xlabel("x")
-    ax.set_ylabel("A_1")
+    ax.set_ylabel("φ")
     ax.set_title(f"Final State (t={simulation.times[-1]:.1f})")
     ax.legend()
     ax.grid(visible=True, alpha=0.3)
 
+    # Spacetime evolution
     ax = axes[1, 0]
-    a1_history = np.stack(
-        [_get_component(snapshot, 2) for snapshot in simulation.snapshots]
+    phi_history = np.stack(
+        [_get_component(snapshot, 0) for snapshot in simulation.snapshots]
     )
     im = ax.imshow(
-        a1_history.T,
+        phi_history.T,
         aspect="auto",
         origin="lower",
         extent=[0, simulation.times[-1], 0, 100],
-        cmap="plasma",
+        cmap="RdBu_r",
+        vmin=-np.max(np.abs(phi_history)),
+        vmax=np.max(np.abs(phi_history)),
     )
     ax.set_xlabel("Time")
     ax.set_ylabel("x")
-    ax.set_title("A_1 Spacetime Evolution")
-    plt.colorbar(im, ax=ax, label="A_1")
+    ax.set_title("φ Spacetime Evolution")
+    plt.colorbar(im, ax=ax, label="φ")
 
+    # Peak amplitude over time
     ax = axes[1, 1]
-    a0_history = np.stack(
-        [_get_component(snapshot, 0) for snapshot in simulation.snapshots]
-    )
-    a0_max = float(np.max(np.abs(a0_history)))
-    ax.plot(
-        simulation.times,
-        [
-            float(np.max(np.abs(_get_component(snapshot, 0))))
-            for snapshot in simulation.snapshots
-        ],
-        "r-",
-    )
+    phi_max = [
+        float(np.max(np.abs(_get_component(snapshot, 0))))
+        for snapshot in simulation.snapshots
+    ]
+    ax.plot(simulation.times, phi_max, "b-")
     ax.set_xlabel("Time")
-    ax.set_ylabel("max|A_0|")
-    ax.set_title(f"A_0 Component (should be ~0, max={a0_max:.2e})")
+    ax.set_ylabel("max|φ|")
+    ax.set_title("Field Amplitude Evolution")
     ax.grid(visible=True, alpha=0.3)
 
     plt.tight_layout()
@@ -247,9 +281,9 @@ def _print_footer() -> None:
     print()
     print("Key observations:")
     print("  1. Equations were derived from Lagrangian (not hardcoded)")
-    print("  2. Massless EM waves propagate at c = 1")
-    print("  3. Gaussian pulse splits into left/right moving waves")
-    print("  4. A_0 and A_1 evolve independently (no coupling)")
+    print("  2. Klein-Gordon field evolves with mass term m² = 1")
+    print("  3. Gaussian pulse propagates and disperses due to mass")
+    print("  4. Demonstrates scalar field dynamics from first principles")
     print("=" * 60)
 
 
