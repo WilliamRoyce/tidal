@@ -103,7 +103,8 @@
     ".venv/**",
     "build/**",
     "docs/**",
-    "*.egg-info/**"
+    "*.egg-info/**",
+    "uv.lock"
   ],
   "noConfigSearch": true
 }
