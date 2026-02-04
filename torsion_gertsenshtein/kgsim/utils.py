@@ -16,9 +16,7 @@ if TYPE_CHECKING:
     import numpy as np
     from pde.fields.datafield_base import DataFieldBase
 
-# Type alias for boundary condition data compatible with py-pde
-# Can be: string for auto BC, dict for explicit BC mapping, or None
-BCDescriptor = str | dict[str, dict[str, str | float]] | None
+    from torsion_gertsenshtein.utils import BCDescriptor
 
 
 def natural_center(bounds: Sequence[tuple[float, float]]) -> list[float]:

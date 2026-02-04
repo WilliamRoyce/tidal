@@ -8,7 +8,23 @@
     "ghcr.io/va-h/devcontainers-features/uv:1": {
       "shellautocompletion": true,
       "version": "latest"
+    },
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": false
     }
+  },
+  "containerEnv": {
+    "INSTALL_TEX": "false"
+  },
+  "mounts": [
+    "source=${localEnv:HOME}/.local/wolfram/engine/14.3,target=/home/vscode/.local/wolfram/engine/14.3,type=bind",
+    "source=${localEnv:HOME}/.local/wolfram/userbase,target=/home/vscode/.local/wolfram/userbase,type=bind",
+    "source=/etc/machine-id,target=/etc/machine-id,type=bind,readonly",
+    "source=${localEnv:HOME}/.cache/Wolfram,target=/home/vscode/.cache/Wolfram,type=bind"
+  ],
+  "remoteEnv": {
+    "WOLFRAM_USERBASE": "/home/vscode/.local/wolfram/userbase",
+    "PATH": "/home/vscode/.local/wolfram/engine/14.3/Executables:${env:PATH}"
   },
   "customizations": {
     "vscode": {
@@ -43,11 +59,14 @@
         "github.vscode-github-actions",
         "GitHub.copilot",
         "GitHub.copilot-chat",
-        "github.vscode-pull-request-github"
+        "github.vscode-pull-request-github",
+        "Anthropic.claude-code",
+        "WolframResearch.wolfram",
+        "lsp-wl.lsp-wl-client"
       ]
     }
   },
   "onCreateCommand": "npm install -g cspell && uv python install && uv sync --all-extras",
-  "postCreateCommand": "sudo rm -f /etc/apt/sources.list.d/yarn.list && sudo apt-get update && sudo apt-get install -y texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra cm-super ghostscript latexmk dvisvgm dvipng texlive-xetex texlive-luatex libasound2 libfreetype6 libgl1 libglu1-mesa ca-certificates curl xz-utils unzip libglib2.0-0 libx11-6 libxext6 libxrender1 libsm6 libfontconfig1 uuid-dev gcc build-essential && sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/* && chmod +x scripts/*.sh && if [ -f third_party/WolframEngine_*_LIN.sh ]; then sudo bash scripts/install-wolfram-engine.sh --skip-download; fi",
-  "postAttachCommand": "echo '\\n=== Wolfram Engine & xAct Setup ===' && if command -v wolframscript &> /dev/null; then if wolframscript -code '1+1' &> /dev/null 2>&1; then echo 'Wolfram Engine is activated.'; if [ ! -d ~/.WolframEngine/Applications/xAct ]; then echo 'Installing xAct/xCoba...'; ./scripts/install-xact-xcoba.sh; fi; echo 'Run ./scripts/verify-wolfram-setup.sh for full verification.'; else echo 'Wolfram Engine needs activation. Run: ./scripts/activate-wolfram.sh'; fi; else echo 'Wolfram Engine not installed. Place installer in third_party/ and rebuild.'; fi"
+  "postCreateCommand": "sudo rm -f /etc/apt/sources.list.d/yarn.list && sudo apt-get update && sudo apt-get install -y libfontconfig1 libfreetype6 libx11-6 libxext6 libxcb1 libxkbcommon0 libxkbcommon-x11-0 ca-certificates curl && if [ \"$INSTALL_TEX\" = \"true\" ]; then sudo apt-get install -y texlive-latex-base texlive-latex-recommended texlive-latex-extra texlive-fonts-recommended texlive-fonts-extra cm-super ghostscript latexmk dvisvgm dvipng texlive-xetex texlive-luatex; fi && sudo apt-get clean && sudo rm -rf /var/lib/apt/lists/* && ln -sf /home/vscode/.local/wolfram/userbase /home/vscode/.WolframEngine && mkdir -p /home/vscode/.config/Wolfram/WolframScript && echo 'WOLFRAMSCRIPT_KERNELPATH=/home/vscode/.local/wolfram/engine/14.3/Executables/WolframKernel' > /home/vscode/.config/Wolfram/WolframScript/WolframScript.conf && echo 'WOLFRAMSCRIPT_CLOUDBASE=https://www.wolframcloud.com' >> /home/vscode/.config/Wolfram/WolframScript/WolframScript.conf && echo 'WOLFRAMSCRIPT_AUTHENTICATIONPATH=/home/vscode/.cache/Wolfram/WolframScript/' >> /home/vscode/.config/Wolfram/WolframScript/WolframScript.conf && sudo ln -sf ../SystemFiles/Kernel/Binaries/Linux-x86-64/wolframscript /home/vscode/.local/wolfram/engine/14.3/Executables/wolframscript && sudo ln -sf /home/vscode/.local/wolfram/userbase/Licensing/mathpass /home/vscode/.local/wolfram/engine/14.3/Configuration/Licensing/mathpass && sudo mkdir -p /usr/share/WolframEngine/Licensing && sudo ln -sf /home/vscode/.local/wolfram/userbase/Licensing/mathpass /usr/share/WolframEngine/Licensing/mathpass && mkdir -p /home/vscode/.Mathematica/Licensing && ln -sf /home/vscode/.local/wolfram/userbase/Licensing/mathpass /home/vscode/.Mathematica/Licensing/mathpass && if [ -d \"/home/vscode/.local/wolfram/userbase/.activation_backup\" ]; then mkdir -p /home/vscode/.cache/Wolfram && cp -r /home/vscode/.local/wolfram/userbase/.activation_backup/* /home/vscode/.cache/Wolfram/ && echo 'Wolfram activation restored from backup'; fi && bash /workspaces/torsion-gertsenshtein/.devcontainer/scripts/install-lsp-wl.sh && bash /workspaces/torsion-gertsenshtein/.devcontainer/scripts/notify-install-extensions.sh",
+  "waitFor": "postCreateCommand"
 }

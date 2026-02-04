@@ -5,7 +5,13 @@ __pycache__/
 *.png
 /outputs/
 importtime.log
+third_party/
+.claude
 
-# Wolfram Engine installers (large binary files)
-third_party/WolframEngine_*_LIN.sh
-third_party/*.sh
+# Wolfram installers / license artifacts (never commit)
+Wolfram*.sh
+Wolfram*.run
+Wolfram*.tgz
+*.mathpass
+.Wolfram*
+.WolframEngine*

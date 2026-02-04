@@ -1,0 +1,8 @@
+{
+  "name": "GLIBC Test - Ubuntu Noble",
+  "image": "mcr.microsoft.com/devcontainers/base:noble",
+  "features": {
+    "ghcr.io/devcontainers/features/common-utils:2": {}
+  },
+  "postCreateCommand": "echo 'GLIBC Version:' && ldd --version | head -1"
+}
