@@ -24,8 +24,11 @@ Begin["`Private`"];
 
 (* === Component Decomposition === *)
 
-DecomposeToComponents[eom_, field_, chart_] := Module[
-  {dim, components, indices, componentEq, result, fieldHead, fieldRank},
+DecomposeToComponents[eom_, field_, chart_] :=
+  DecomposeToComponents[eom, field, chart, {}];
+
+DecomposeToComponents[eom_, field_, chart_, additionalFields_List] := Module[
+  {dim, components, indices, componentEq, result, fieldHead, fieldRank, allFieldHeads},
 
   (* Get the dimension - use a simple robust approach *)
   (* For spatial dimension in 1+1D (t,x), we have 2 total dimensions *)
@@ -37,6 +40,9 @@ DecomposeToComponents[eom_, field_, chart_] := Module[
   (* Extract field head from applied form like phi[] or A[-a] *)
   fieldHead = ExtractFieldHead[field];
   fieldRank = Length[SlotsOfTensor[fieldHead]];
+
+  (* Collect all field heads (primary + additional) for coordinate transformation *)
+  allFieldHeads = Join[{fieldHead}, ExtractFieldHead /@ additionalFields];
 
   (* For a scalar field, there's only one component *)
   If[fieldRank === 0,
@@ -56,11 +62,15 @@ DecomposeToComponents[eom_, field_, chart_] := Module[
       componentEq = EvaluateMinkowskiMetric[componentEq, chart];
       componentEq = Expand[componentEq];
 
-      (* Replace scalar field with function of coordinates *)
-      With[{fh = fieldHead, cs = coordSyms},
-        componentEq = componentEq /. {
-          fh[] :> Symbol[ToString[fh] <> "0"][Sequence @@ cs]
-        }
+      (* Replace ALL scalar fields with functions of coordinates *)
+      (* This ensures cross-field terms are properly transformed *)
+      Do[
+        With[{fh = afh, cs = coordSyms},
+          componentEq = componentEq /. {
+            fh[] :> Symbol[ToString[fh] <> "0"][Sequence @@ cs]
+          }
+        ],
+        {afh, allFieldHeads}
       ];
 
       (* Convert coordinate derivatives to explicit Derivative form *)

@@ -18,6 +18,10 @@ EquationToJSON::usage =
   "EquationToJSON[componentEq, fieldName, fieldIndex] converts a single \
 component equation to JSON format.";
 
+BuildMultiFieldJSONStructure::usage =
+  "BuildMultiFieldJSONStructure[fieldEquations, metadata] builds JSON for systems \
+with multiple independent fields. fieldEquations is a list of {fieldName, equation} pairs.";
+
 Begin["`Private`"];
 
 (* === JSON Structure Building === *)
@@ -71,6 +75,186 @@ BuildJSONStructure[componentEqs_, metadata_Association] := Module[
   |>;
 
   json
+];
+
+(* === Multi-Field JSON Structure Building === *)
+
+BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Module[
+  {json, fields, equations, allFieldNames, nFields},
+
+  (* fieldEquations format: {{"phi_0", eqPhi}, {"chi_0", eqChi}, ...} *)
+  allFieldNames = fieldEquations[[All, 1]];
+  nFields = Length[fieldEquations];
+
+  (* Build fields list *)
+  fields = Table[
+    <|
+      "name" -> fieldEquations[[i, 1]],
+      "index" -> i - 1,
+      "is_dynamical" -> True
+    |>,
+    {i, nFields}
+  ];
+
+  (* Convert equations to JSON format *)
+  (* Pass allFieldNames so cross-field references can be detected *)
+  equations = Table[
+    EquationToJSONMultiField[
+      fieldEquations[[i, 2]],
+      fieldEquations[[i, 1]],
+      i - 1,
+      allFieldNames,
+      metadata
+    ],
+    {i, nFields}
+  ];
+
+  (* Build full JSON structure *)
+  json = <|
+    "metadata" -> <|
+      "source" -> "xAct",
+      "lagrangian_expr" -> Lookup[metadata, "lagrangian_expr", ""],
+      "derived_from" -> "Euler-Lagrange",
+      "gauge" -> Lookup[metadata, "gauge", "none"],
+      "linearized" -> Lookup[metadata, "linearized", True]
+    |>,
+    "spacetime" -> <|
+      "dimension" -> Lookup[metadata, "dimension", 2],
+      "signature" -> Lookup[metadata, "signature", {-1, 1}],
+      "coordinates" -> Lookup[metadata, "coordinates", {"t", "x"}]
+    |>,
+    "fields" -> fields,
+    "equations" -> equations,
+    "coupling" -> <|
+      "mass_matrix" -> Lookup[metadata, "mass_matrix",
+        ConstantArray[0.0, {nFields, nFields}]],
+      "coupling_matrix" -> Lookup[metadata, "coupling_matrix",
+        ConstantArray[0.0, {nFields, nFields}]]
+    |>
+  |>;
+
+  json
+];
+
+(* Equation conversion for multi-field systems *)
+EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, metadata_] := Module[
+  {terms, rhsTerms, rhs, timeDerivTerm},
+
+  (* Same logic as EquationToJSON but with cross-field awareness *)
+  terms = If[Head[componentEq] === Plus, List @@ componentEq, {componentEq}];
+
+  timeDerivTerm = Select[terms, !FreeQ[#, Derivative[n_, 0][_] /; n >= 2] &];
+  rhs = Total[Select[terms, FreeQ[#, Derivative[n_, 0][_] /; n >= 2] &]];
+
+  If[Length[timeDerivTerm] > 0 &&
+     Head[timeDerivTerm[[1]]] === Times &&
+     timeDerivTerm[[1]][[1]] == 1,
+    rhs = -rhs
+  ];
+
+  (* Parse RHS with cross-field detection *)
+  rhsTerms = ParseMultiFieldRHS[rhs, fieldName, allFieldNames, metadata];
+
+  <|
+    "field" -> fieldName,
+    "lhs" -> "d2_t(" <> fieldName <> ")",
+    "rhs" -> <|
+      "type" -> "linear_combination",
+      "terms" -> rhsTerms
+    |>
+  |>
+];
+
+(* Parse RHS with cross-field reference detection *)
+ParseMultiFieldRHS[eq_, currentFieldName_, allFieldNames_, metadata_] := Module[
+  {terms, parsedTerms},
+
+  terms = If[Head[eq] === Plus, List @@ eq, {eq}];
+  parsedTerms = Map[IdentifyMultiFieldTerm[#, currentFieldName, allFieldNames, metadata] &, terms];
+  parsedTerms = DeleteCases[parsedTerms, Nothing];
+
+  If[Length[parsedTerms] === 0,
+    parsedTerms = {<|"coefficient" -> 1.0, "operator" -> "laplacian", "field" -> currentFieldName|>}
+  ];
+
+  parsedTerms
+];
+
+(* Identify operator and target field for multi-field systems *)
+IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_, metadata_] := Module[
+  {coefficient, operator, targetField, orderDerivatives, foundFieldHead,
+   functionHeads, fieldBaseName, matchedField},
+
+  operator = "unknown";
+  coefficient = 1.0;
+  targetField = currentFieldName;
+  foundFieldHead = Null;
+
+  (* Extract function heads from the term *)
+  (* For f[args], extract f; for Derivative[n,m][f][args], extract f *)
+  functionHeads = Union[Join[
+    (* Direct function heads: f[args] -> f *)
+    Cases[term, f_Symbol[__] :> ToString[f], {0, Infinity}],
+    (* Derivative heads: Derivative[n,m][f][args] -> f *)
+    Cases[term, Derivative[__][f_][__] :> ToString[f], {0, Infinity}]
+  ]];
+
+  (* For each field name like "phi_0", "chi_0", find matching function head *)
+  matchedField = currentFieldName;  (* Default to current field *)
+
+  Do[
+    (* Extract base name: "phi_0" -> "phi", "chi_0" -> "chi" *)
+    fieldBaseName = ToLowerCase[StringSplit[fn, "_"][[1]]];
+
+    (* Check if any function head contains this field name (case insensitive) *)
+    Do[
+      If[StringContainsQ[ToLowerCase[head], fieldBaseName],
+        matchedField = fn;
+        foundFieldHead = head;
+        Break[]
+      ],
+      {head, functionHeads}
+    ];
+    If[foundFieldHead =!= Null, Break[]],
+    {fn, allFieldNames}
+  ];
+
+  targetField = matchedField;
+
+  (* Extract numeric coefficient by replacing the field function with 1 *)
+  If[foundFieldHead =!= Null,
+    coefficient = term /. {
+      (* Replace Derivative[...][field][args] with 1 *)
+      Derivative[__][f_][__] /; ToString[f] === foundFieldHead :> 1,
+      (* Replace field[args] with 1 *)
+      f_Symbol[__] /; ToString[f] === foundFieldHead :> 1
+    };
+    coefficient = Simplify[coefficient];
+    If[!NumericQ[coefficient], coefficient = 1.0],
+    (* Fallback if no field head found *)
+    coefficient = 1.0
+  ];
+
+  (* Check for field without derivatives (mass/coupling term) *)
+  If[FreeQ[term, Derivative],
+    operator = "identity";
+    Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
+  ];
+
+  (* Check for second derivatives (Laplacian) *)
+  orderDerivatives = CountDerivativeOrder[term];
+
+  If[orderDerivatives == 2,
+    operator = "laplacian";
+    Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
+  ];
+
+  If[orderDerivatives == 1,
+    operator = "gradient_x";
+    Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
+  ];
+
+  <|"coefficient" -> N[coefficient], "operator" -> "unknown", "field" -> targetField|>
 ];
 
 (* === Equation Conversion === *)
