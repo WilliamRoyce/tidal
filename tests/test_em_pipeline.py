@@ -160,7 +160,7 @@ class TestKGPipelineValidation:
         spec = load_equation_system(kg_json_path)
 
         assert spec.n_components == 1
-        assert spec.component_names == ("phi",)
+        assert spec.component_names == ("phi_0",)
 
     def test_kg_mass_term(self, kg_json_path: Path, grid_1d: CartesianGrid) -> None:
         """Test that KG mass term causes oscillation."""
@@ -174,7 +174,7 @@ class TestKGPipelineValidation:
         initial = create_initial_state(
             grid_1d,
             spec,
-            field_data={"phi": np.ones(128)},
+            field_data={"phi_0": np.ones(128)},
         )
 
         # Run for half period (pi for m=1)
@@ -206,7 +206,7 @@ class TestKGPipelineValidation:
 
         # Pipeline state: [phi, pi]
         pipeline_state = create_initial_state(
-            grid_1d_fine, spec, field_data={"phi": phi_data}
+            grid_1d_fine, spec, field_data={"phi_0": phi_data}
         )
 
         # Existing state: [phi, pi] with field labels

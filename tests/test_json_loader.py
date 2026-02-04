@@ -305,7 +305,7 @@ class TestValidateJsonSchema:
             "fields": [],
             "equations": [],
         }
-        with pytest.raises(ValueError, match="fields must be a non-empty list"):
+        with pytest.raises(ValueError, match="fields must be non-empty"):
             validate_json_schema(data)
 
 
@@ -336,7 +336,7 @@ class TestLoadEquationSystem:
 
         num_kg_components = 1
         assert system.n_components == num_kg_components
-        assert system.component_names == ("phi",)
+        assert system.component_names == ("phi_0",)
 
     def test_file_not_found(self, tmp_path: Path) -> None:
         """Test that FileNotFoundError is raised for missing file."""
