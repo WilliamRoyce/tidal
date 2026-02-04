@@ -7,6 +7,7 @@ to numerical simulation, using both Klein-Gordon and EM field examples.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pytest
@@ -20,6 +21,7 @@ from torsion_gertsenshtein.symbolic import (
     load_equation_system,
 )
 from torsion_gertsenshtein.symbolic.pde_builder import PDEFromSpec, create_initial_state
+from torsion_gertsenshtein.utils import normalize_solve_result
 from torsion_gertsenshtein.vectorfield import (
     ComponentFieldParams,
     ComponentGaussianPulse,
@@ -66,7 +68,8 @@ class TestEMPipeline:
 
         spec = load_equation_system(em_json_path)
 
-        assert spec.n_components == 2
+        num_em_components = 2
+        assert spec.n_components == num_em_components
         assert spec.component_names == ("A_0", "A_1")
         assert spec.metadata.get("gauge") == "lorenz"
 
@@ -78,7 +81,8 @@ class TestEMPipeline:
         pde = build_pde_from_json(em_json_path)
 
         assert isinstance(pde, PDEFromSpec)
-        assert pde.n_components == 2
+        num_em_components = 2
+        assert pde.n_components == num_em_components
 
     def test_em_wave_propagation(
         self, em_json_path: Path, grid_1d: CartesianGrid
@@ -102,11 +106,12 @@ class TestEMPipeline:
         # Run short simulation
         t_end = 10.0
         result = pde.solve(initial, t_range=t_end, dt=0.01)
+        sol = normalize_solve_result(result)
 
         # Initial pulse should have spread
         # In 1D, a Gaussian splits into two pulses at +/- c*t = +/- 10
         initial_max = np.max(initial.data[2])
-        final_max = np.max(result.data[2])
+        final_max = np.max(sol.data[2])
 
         # Peak amplitude should decrease as pulse splits
         assert final_max < initial_max
@@ -135,12 +140,13 @@ class TestEMPipeline:
 
         # Run simulation
         result = pde.solve(initial, t_range=5.0, dt=0.01)
+        sol = normalize_solve_result(result)
 
         # A_0 should remain zero (no coupling in the equations)
-        assert_allclose(result.data[0], 0.0, atol=1e-10)
+        assert_allclose(sol.data[0], 0.0, atol=1e-10)
 
         # A_1 should have evolved
-        assert not np.allclose(result.data[2], initial.data[2])
+        assert not np.allclose(sol.data[2], initial.data[2])
 
 
 class TestKGPipelineValidation:
@@ -173,10 +179,11 @@ class TestKGPipelineValidation:
 
         # Run for half period (pi for m=1)
         result = pde.solve(initial, t_range=np.pi, dt=0.01)
+        sol = normalize_solve_result(result)
 
         # Uniform field should oscillate: phi(t) = cos(m*t)
         # At t=pi, phi should be approximately -1
-        assert_allclose(result.data[0], -1.0, atol=0.1)
+        assert_allclose(sol.data[0], -1.0, atol=0.1)
 
     def test_kg_pipeline_vs_existing(
         self, kg_json_path: Path, grid_1d_fine: CartesianGrid
@@ -194,7 +201,7 @@ class TestKGPipelineValidation:
         existing_pde = KleinGordonPDE(KGParameters(mass=1.0))
 
         # Create same initial conditions for both
-        x = grid_1d_fine.cell_coords[..., 0]
+        x = cast("np.ndarray", grid_1d_fine.cell_coords[..., 0])
         phi_data = np.exp(-((x - 50) ** 2) / 50)
 
         # Pipeline state: [phi, pi]
@@ -216,6 +223,8 @@ class TestKGPipelineValidation:
 
         pipeline_result = pipeline_pde.solve(pipeline_state, t_range=t_end, dt=dt)
         existing_result = existing_pde.solve(existing_state, t_range=t_end, dt=dt)
+        pipeline_result = normalize_solve_result(pipeline_result)
+        existing_result = normalize_solve_result(existing_result)
 
         # Results should match closely
         # Allow some tolerance for numerical differences
@@ -255,17 +264,20 @@ class TestFullPipelineWorkflow:
         )
 
         # 5. Verify state structure
-        assert len(state) == 4  # A_0, Pi_0, A_1, Pi_1
+        num_em_states = 4  # A_0, Pi_0, A_1, Pi_1
+        assert len(state) == num_em_states
         assert_allclose(state[0].data, 0.0)  # A_0 = 0
         assert np.max(state[2].data) > 0  # A_1 has pulse
 
         # 6. Run simulation
         result = pde.solve(state, t_range=5.0, dt=0.01)
+        sol = normalize_solve_result(result)
 
         # 7. Verify result
-        assert len(result) == 4
+        num_em_states = 4
+        assert len(sol) == num_em_states
         # Wave should have propagated
-        assert not np.allclose(result[2].data, state[2].data)
+        assert not np.allclose(sol[2].data, state[2].data)
 
     def test_spec_component_params_consistency(self, em_json_path: Path) -> None:
         """Test that spec and ComponentFieldParams are consistent."""

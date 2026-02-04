@@ -108,7 +108,7 @@ class TestOperatorTerm:
         data = {"coefficient": 1.5, "operator": "laplacian", "field": "phi"}
         term = OperatorTerm.from_dict(data)
 
-        assert term.coefficient == 1.5
+        assert term.coefficient == 1.5  # noqa: PLR2004
         assert term.operator == "laplacian"
         assert term.field == "phi"
 
@@ -150,7 +150,8 @@ class TestComponentEquation:
 
         assert eq.field_name == "A_0"
         assert eq.field_index == 0
-        assert eq.time_derivative_order == 2
+        time_derivative_order = 2
+        assert eq.time_derivative_order == time_derivative_order
         assert len(eq.rhs_terms) == 1
         assert eq.rhs_terms[0].operator == "laplacian"
 
@@ -172,8 +173,10 @@ class TestComponentEquation:
         eq = ComponentEquation.from_dict(data, fields_lookup)
 
         assert eq.field_name == "phi"
-        assert eq.time_derivative_order == 2
-        assert len(eq.rhs_terms) == 2
+        time_derivative_order = 2
+        assert eq.time_derivative_order == time_derivative_order
+        term_count = 2
+        assert len(eq.rhs_terms) == term_count
 
         # Check terms
         operators = {term.operator for term in eq.rhs_terms}
@@ -182,7 +185,7 @@ class TestComponentEquation:
 
     def test_unsupported_rhs_type_raises(self) -> None:
         """Test that unsupported RHS type raises ValueError."""
-        data = {
+        data: dict[str, Any] = {
             "field": "phi",
             "lhs": "d2_t(phi)",
             "rhs": {"type": "nonlinear", "terms": []},
@@ -201,19 +204,24 @@ class TestEquationSystem:
         """Test creating EquationSystem from EM JSON data."""
         system = EquationSystem.from_dict(em_json_data)
 
-        assert system.n_components == 2
-        assert system.dimension == 2
+        num_em_components = 2
+        assert system.n_components == num_em_components
+        dimension = 2
+        assert system.dimension == dimension
         assert system.spatial_dimension == 1
         assert system.component_names == ("A_0", "A_1")
-        assert len(system.equations) == 2
+        num_equations = 2
+        assert len(system.equations) == num_equations
         assert system.metadata["gauge"] == "lorenz"
 
     def test_from_dict_kg(self, kg_json_data: dict[str, Any]) -> None:
         """Test creating EquationSystem from Klein-Gordon JSON data."""
         system = EquationSystem.from_dict(kg_json_data)
 
-        assert system.n_components == 1
-        assert system.dimension == 2
+        num_kg_components = 1
+        assert system.n_components == num_kg_components
+        dimension = 2
+        assert system.dimension == dimension
         assert system.spatial_dimension == 1
         assert system.component_names == ("phi",)
         assert len(system.equations) == 1
@@ -265,7 +273,7 @@ class TestValidateJsonSchema:
 
     def test_missing_spacetime(self) -> None:
         """Test that missing spacetime raises ValueError."""
-        data = {"fields": [], "equations": []}
+        data: dict[str, Any] = {"fields": [], "equations": []}
         with pytest.raises(
             ValueError, match="Missing required top-level field: spacetime"
         ):
@@ -273,7 +281,7 @@ class TestValidateJsonSchema:
 
     def test_missing_fields(self) -> None:
         """Test that missing fields raises ValueError."""
-        data = {"spacetime": {"dimension": 2}, "equations": []}
+        data: dict[str, Any] = {"spacetime": {"dimension": 2}, "equations": []}
         with pytest.raises(
             ValueError, match="Missing required top-level field: fields"
         ):
@@ -281,7 +289,10 @@ class TestValidateJsonSchema:
 
     def test_missing_equations(self) -> None:
         """Test that missing equations raises ValueError."""
-        data = {"spacetime": {"dimension": 2}, "fields": [{"name": "phi"}]}
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2},
+            "fields": [{"name": "phi"}],
+        }
         with pytest.raises(
             ValueError, match="Missing required top-level field: equations"
         ):
@@ -289,7 +300,11 @@ class TestValidateJsonSchema:
 
     def test_empty_fields(self) -> None:
         """Test that empty fields list raises ValueError."""
-        data = {"spacetime": {"dimension": 2}, "fields": [], "equations": []}
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2},
+            "fields": [],
+            "equations": [],
+        }
         with pytest.raises(ValueError, match="fields must be a non-empty list"):
             validate_json_schema(data)
 
@@ -307,7 +322,8 @@ class TestLoadEquationSystem:
 
         system = load_equation_system(em_json_path)
 
-        assert system.n_components == 2
+        num_em_components = 2
+        assert system.n_components == num_em_components
         assert "A_0" in system.component_names
         assert "A_1" in system.component_names
 
@@ -318,7 +334,8 @@ class TestLoadEquationSystem:
 
         system = load_equation_system(kg_json_path)
 
-        assert system.n_components == 1
+        num_kg_components = 1
+        assert system.n_components == num_kg_components
         assert system.component_names == ("phi",)
 
     def test_file_not_found(self, tmp_path: Path) -> None:
@@ -333,4 +350,5 @@ class TestLoadEquationSystem:
             pytest.skip(f"Test file not found: {em_json_path}")
 
         system = load_equation_system(str(em_json_path))
-        assert system.n_components == 2
+        num_em_components = 2
+        assert system.n_components == num_em_components

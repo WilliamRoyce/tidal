@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -101,7 +103,8 @@ class TestComponentFieldParams:
         """Test creating params from EM specification."""
         params = ComponentFieldParams.from_equation_system(em_spec)
 
-        assert params.n_components == 2
+        num_em_components = 2
+        assert params.n_components == num_em_components
         assert params.component_names == ("A_0", "A_1")
         assert params.spatial_dimension == 1
         assert params.is_massless is True
@@ -176,7 +179,8 @@ class TestComponentGaussianPulse:
         state = pulse.create(grid_1d, em_spec)
 
         assert isinstance(state, FieldCollection)
-        assert len(state) == 4  # A_0, Pi_0, A_1, Pi_1
+        num_em_states = 4  # A_0, Pi_0, A_1, Pi_1
+        assert len(state) == num_em_states
 
         # A_0 should be zero
         assert_allclose(state[0].data, 0.0, atol=1e-10)
@@ -222,7 +226,7 @@ class TestComponentGaussianPulse:
         state = pulse.create(grid_1d, em_spec)
 
         # Find peak location
-        x = grid_1d.cell_coords[..., 0]
+        x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
         peak_idx = np.argmax(state[0].data)
         peak_x = x[peak_idx]
 
@@ -297,7 +301,7 @@ class TestComponentPlaneWave:
         state = wave.create(grid_1d, em_spec)
 
         # A_1 field should be cos(kx)
-        x = grid_1d.cell_coords[..., 0]
+        x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
         expected_field = np.cos(k * x)
         assert_allclose(state[2].data, expected_field, atol=1e-10)
 
@@ -320,7 +324,7 @@ class TestComponentPlaneWave:
 
         state = wave.create(grid_1d, em_spec)
 
-        x = grid_1d.cell_coords[..., 0]
+        x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
         expected_field = np.cos(k * x + phase)
         assert_allclose(state[0].data, expected_field, atol=1e-10)
 
