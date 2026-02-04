@@ -23,6 +23,8 @@
     "gertsenshtein",
     "hyperbolicity",
     "imshow",
+    "isfinite",
+    "isinstance",
     "KGEOM",
     "KGPDE",
     "kgsim",
@@ -49,6 +51,7 @@
     "numba",
     "pdes",
     "pycache",
+    "Pylance",
     "rcfonts",
     "Recompiles",
     "repr",
@@ -93,11 +96,7 @@
     "trange",
     "tqdm"
   ],
-  "flagWords": [
-    "hte",
-    "teh",
-    "wolfrom"
-  ],
+  "flagWords": ["hte", "teh", "wolfrom"],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [
