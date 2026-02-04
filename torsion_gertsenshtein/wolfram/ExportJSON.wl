@@ -2,7 +2,8 @@
 (* ExportJSON.wl - Export field equations to JSON format for Python pipeline *)
 (* Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline *)
 
-BeginPackage["TorsionGertsenshtein`ExportJSON`"];
+BeginPackage["TorsionGertsenshtein`ExportJSON`",
+  {"TorsionGertsenshtein`CommonUtilities`"}];
 
 (* Public symbols *)
 ExportEquationSystem::usage =
@@ -169,7 +170,7 @@ IdentifyOperatorTerm[term_, fieldPattern_, fullFieldName_, metadata_] := Module[
     (* This is a mass or identity term *)
     operator = "identity";
     (* Extract coefficient using pattern for matching *)
-    coefficient = ExtractCoefficientFromTerm[term, fieldPattern];
+    coefficient = ExtractNumericCoefficient[term, fieldPattern];
     Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
   ];
 
@@ -183,66 +184,20 @@ IdentifyOperatorTerm[term_, fieldPattern_, fullFieldName_, metadata_] := Module[
     (* Second derivatives indicate Laplacian or Box operator *)
     (* In flat space after gauge fixing, typically just Laplacian in spatial coordinates *)
     operator = "laplacian";
-    coefficient = ExtractCoefficientFromTerm[term, fieldPattern];
+    coefficient = ExtractNumericCoefficient[term, fieldPattern];
     Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
   ];
 
   If[orderDerivatives == 1,
     (* First derivatives indicate gradient *)
     operator = "gradient_x";
-    coefficient = ExtractCoefficientFromTerm[term, fieldPattern];
+    coefficient = ExtractNumericCoefficient[term, fieldPattern];
     Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
   ];
 
   (* If we can't identify it, return unknown *)
   Print["Warning: Could not identify operator for term: ", term];
   <|"coefficient" -> 1.0, "operator" -> "unknown", "field" -> targetField|>
-];
-
-(* Extract numeric coefficient from a term *)
-ExtractCoefficientFromTerm[term_, fieldName_] := Module[
-  {coeff, fieldSymbol, derivPattern},
-
-  (* Create pattern for field function with any arguments *)
-  fieldSymbol = Symbol[fieldName];
-
-  (* Replace field and its derivatives with 1 to extract coefficient *)
-  coeff = term /. {
-    (* Match Derivative[...][f][args] form (applied derivatives) *)
-    Derivative[__][f_][__] /; StringContainsQ[ToString[f], fieldName] :> 1,
-    (* Match f[args] form (bare field) *)
-    f_[__] /; StringMatchQ[ToString[f], fieldName ~~ DigitCharacter ...] :> 1
-  };
-
-  (* Simplify and try to get numeric value *)
-  coeff = Simplify[coeff];
-
-  (* Try to evaluate - N will work for both numeric and some symbolic expressions *)
-  If[NumericQ[coeff],
-    Return[coeff]
-  ];
-
-  (* If coefficient contains known constant symbols, try to extract numeric part *)
-  (* For expressions like -m2, m2, etc., try to factor out the sign *)
-  If[MatchQ[coeff, Times[-1, _Symbol]],
-    (* Negative symbolic coefficient: -m2 -> use the symbol value if available *)
-    coeff = -1.0;  (* Return just the sign, assuming unit coefficient for unknown *)
-    Return[coeff]
-  ];
-
-  If[MatchQ[coeff, _Symbol],
-    (* Positive symbolic coefficient: m2 -> assume unit coefficient *)
-    coeff = 1.0;
-    Return[coeff]
-  ];
-
-  (* Try N as last resort *)
-  coeff = Quiet[N[coeff]];
-  If[NumericQ[coeff],
-    coeff,
-    (* Default to 1.0 if all else fails *)
-    1.0
-  ]
 ];
 
 (* Count the order of derivatives in a term *)

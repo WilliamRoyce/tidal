@@ -15,63 +15,68 @@ ProcessLagrangian::usage =
 equations from a Lagrangian and exports them to JSON format. Returns the \
 JSON Association.";
 
+SetupMinkowskiND::usage =
+  "SetupMinkowskiND[dim] sets up dim-dimensional Minkowski spacetime. \
+dim=2 gives 1+1D with {t,x}, dim=4 gives 3+1D with {t,x,y,z}. \
+Returns {manifold, metric, covd, chart}.";
+
 SetupMinkowski1D::usage =
   "SetupMinkowski1D[] sets up 1+1D Minkowski spacetime with coordinates {t, x}. \
-Returns {manifold, metric, covd, chart}.";
+Equivalent to SetupMinkowskiND[2]. Returns {manifold, metric, covd, chart}.";
 
 SetupMinkowski3D::usage =
   "SetupMinkowski3D[] sets up 3+1D Minkowski spacetime with coordinates {t, x, y, z}. \
-Returns {manifold, metric, covd, chart}.";
+Equivalent to SetupMinkowskiND[4]. Returns {manifold, metric, covd, chart}.";
 
 Begin["`Private`"];
 
 (* === Spacetime Setup Helpers === *)
 
-SetupMinkowski1D[] := Module[
-  {manifold, metric, covd, chart},
+(* Parametric Minkowski spacetime setup *)
+SetupMinkowskiND[dim_Integer] := Module[
+  {manifoldSym, metricSym, chartSym, covd, indices, coords, signature},
 
-  (* Define 2D manifold (1 time + 1 space) *)
-  DefManifold[$Minkowski1D, 2, {a, b, c, d, e, f, g, h}];
+  (* Generate unique symbols for this setup based on spatial dimension *)
+  manifoldSym = Symbol["$Minkowski" <> ToString[dim - 1] <> "D"];
+  metricSym = Symbol["$eta" <> ToString[dim - 1] <> "D"];
+  chartSym = Symbol["$cart" <> ToString[dim - 1] <> "D"];
 
-  (* Define Minkowski metric with signature (-,+) *)
-  DefMetric[-1, $eta1D[-a, -b], $Minkowski1D,
+  (* Generate index symbols based on dimension *)
+  indices = Take[{a, b, c, d, e, f, g, h, i, j, k, l}, Min[dim + 4, 12]];
+
+  (* Generate coordinate symbols *)
+  coords = Switch[dim,
+    2, {t[], x[]},
+    4, {t[], x[], y[], z[]},
+    _, Table[Symbol["x" <> ToString[i]][], {i, 0, dim - 1}]
+  ];
+
+  (* Metric signature: (-1, +1, +1, ...) *)
+  signature = DiagonalMatrix[Prepend[ConstantArray[1, dim - 1], -1]];
+
+  (* Define manifold *)
+  DefManifold[manifoldSym, dim, indices];
+
+  (* Define metric with Minkowski signature *)
+  DefMetric[-1, metricSym[-a, -b], manifoldSym,
     SymbolOfCovD -> {";", "\[Del]"},
     PrintAs -> "\[Eta]"];
 
   (* Get covariant derivative *)
-  covd = CovDOfMetric[$eta1D[-a, -b]];
+  covd = CovDOfMetric[metricSym[-a, -b]];
 
   (* Define coordinate chart *)
-  DefChart[$cart1D, $Minkowski1D, {0, 1}, {t[], x[]}];
+  DefChart[chartSym, manifoldSym, Range[0, dim - 1], coords];
 
-  (* Set metric components: diag(-1, +1) *)
-  MetricInBasis[$eta1D, -$cart1D, DiagonalMatrix[{-1, 1}]];
+  (* Set metric components *)
+  MetricInBasis[metricSym, -chartSym, signature];
 
-  {$Minkowski1D, $eta1D, covd, $cart1D}
+  {manifoldSym, metricSym, covd, chartSym}
 ];
 
-SetupMinkowski3D[] := Module[
-  {manifold, metric, covd, chart},
-
-  (* Define 4D manifold (1 time + 3 space) *)
-  DefManifold[$Minkowski3D, 4, {a, b, c, d, e, f, g, h, i, j, k, l}];
-
-  (* Define Minkowski metric with signature (-,+,+,+) *)
-  DefMetric[-1, $eta3D[-a, -b], $Minkowski3D,
-    SymbolOfCovD -> {";", "\[Del]"},
-    PrintAs -> "\[Eta]"];
-
-  (* Get covariant derivative *)
-  covd = CovDOfMetric[$eta3D[-a, -b]];
-
-  (* Define coordinate chart *)
-  DefChart[$cart3D, $Minkowski3D, {0, 1, 2, 3}, {t[], x[], y[], z[]}];
-
-  (* Set metric components: diag(-1, +1, +1, +1) *)
-  MetricInBasis[$eta3D, -$cart3D, DiagonalMatrix[{-1, 1, 1, 1}]];
-
-  {$Minkowski3D, $eta3D, covd, $cart3D}
-];
+(* Backward compatibility wrappers *)
+SetupMinkowski1D[] := SetupMinkowskiND[2];
+SetupMinkowski3D[] := SetupMinkowskiND[4];
 
 (* === Main Pipeline === *)
 

@@ -3,7 +3,8 @@
 (* Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline *)
 
 BeginPackage["TorsionGertsenshtein`ComponentDecompose`",
-  {"xAct`xTensor`", "xAct`xCoba`"}];
+  {"xAct`xTensor`", "xAct`xCoba`",
+   "TorsionGertsenshtein`CommonUtilities`"}];
 
 (* Public symbols *)
 DecomposeToComponents::usage =
@@ -34,7 +35,7 @@ DecomposeToComponents[eom_, field_, chart_] := Module[
 
   (* Determine field rank using SlotsOfTensor *)
   (* Extract field head from applied form like phi[] or A[-a] *)
-  fieldHead = If[Head[field] === Symbol, field, Head[field]];
+  fieldHead = ExtractFieldHead[field];
   fieldRank = Length[SlotsOfTensor[fieldHead]];
 
   (* For a scalar field, there's only one component *)
@@ -44,24 +45,15 @@ DecomposeToComponents[eom_, field_, chart_] := Module[
     componentEq = TraceBasisDummy[componentEq];
 
     (* In flat Minkowski space, Christoffel symbols vanish *)
-    (* Use context-independent pattern matching *)
-    componentEq = componentEq /. f_[__] /; StringMatchQ[ToString[f], "*Christoffel*"] -> 0;
+    componentEq = RemoveChristoffelSymbols[componentEq];
     componentEq = Expand[componentEq];
 
-    (* Get coordinate symbols - use default if ScalarsOfChart returns unevaluated *)
+    (* Get coordinate symbols *)
     Module[{coordSyms},
-      coordSyms = ScalarsOfChart[chart];
-      If[Head[coordSyms] === ScalarsOfChart, coordSyms = {t[], x[]}];
+      coordSyms = GetCoordinateSymbols[chart];
 
       (* Evaluate metric components for Minkowski signature (-1, +1) *)
-      With[{ch = chart},
-        componentEq = componentEq /. {
-          _Symbol[{0, ch}, {0, ch}] -> -1,
-          _Symbol[{1, ch}, {1, ch}] -> 1,
-          _Symbol[{0, ch}, {1, ch}] -> 0,
-          _Symbol[{1, ch}, {0, ch}] -> 0
-        }
-      ];
+      componentEq = EvaluateMinkowskiMetric[componentEq, chart];
       componentEq = Expand[componentEq];
 
       (* Replace scalar field with function of coordinates *)
@@ -72,28 +64,7 @@ DecomposeToComponents[eom_, field_, chart_] := Module[
       ];
 
       (* Convert coordinate derivatives to explicit Derivative form *)
-      (* Use FixedPoint to handle nested CD expressions correctly *)
-      (* Use context-independent pattern matching for CD *)
-      With[{ch = chart},
-        Module[{replaceCDfunc, isCDlike},
-          (* Function to check if something is a CD-like operator *)
-          isCDlike[x_] := StringMatchQ[ToString[Head[x]], "*CD*"];
-
-          replaceCDfunc[expr_] := expr /. {
-            (* Match any CD-like function applied to coordinates *)
-            f_[{0, -ch}][g_Symbol[args__]] /; isCDlike[f[{0, -ch}]] :> Derivative[1, 0][g][args],
-            f_[{1, -ch}][g_Symbol[args__]] /; isCDlike[f[{1, -ch}]] :> Derivative[0, 1][g][args],
-            f_[{0, -ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{0, -ch}]] :> Derivative[n + 1, m][g][args],
-            f_[{1, -ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{1, -ch}]] :> Derivative[n, m + 1][g][args],
-            (* Also handle contravariant indices *)
-            f_[{0, ch}][g_Symbol[args__]] /; isCDlike[f[{0, ch}]] :> Derivative[1, 0][g][args],
-            f_[{1, ch}][g_Symbol[args__]] /; isCDlike[f[{1, ch}]] :> Derivative[0, 1][g][args],
-            f_[{0, ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{0, ch}]] :> Derivative[n + 1, m][g][args],
-            f_[{1, ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{1, ch}]] :> Derivative[n, m + 1][g][args]
-          };
-          componentEq = FixedPoint[replaceCDfunc, componentEq, 10];
-        ]
-      ];
+      componentEq = ConvertCDToDerivatives[componentEq, chart];
     ];
 
     (* Expand to get explicit Derivative[...] form *)
@@ -138,7 +109,7 @@ ExtractVectorComponent[eom_, field_, chart_, componentIndex_] := Module[
   *)
 
   (* Step 1: Find the free index in the EOM (the uncontracted index) *)
-  fieldHead = If[Head[field] === Symbol, field, Head[field]];
+  fieldHead = ExtractFieldHead[field];
 
   (* Use IndicesOf to get all indices with their up/down information *)
   Module[{allIndices, freeIndices},
@@ -169,26 +140,14 @@ ExtractVectorComponent[eom_, field_, chart_, componentIndex_] := Module[
   componentEq = TraceBasisDummy[componentEq];
 
   (* Step 5: Remove Christoffel symbols (0 in flat Minkowski space) *)
-  (* Use context-independent pattern matching since Christoffel may be in different contexts *)
-  componentEq = componentEq /. f_[__] /; StringMatchQ[ToString[f], "*Christoffel*"] -> 0;
+  componentEq = RemoveChristoffelSymbols[componentEq];
   componentEq = Expand[componentEq];
 
   (* Step 6: Get coordinate symbols from chart *)
-  coordSyms = ScalarsOfChart[chart];
-  (* If ScalarsOfChart returns unevaluated, use default {t[], x[]} *)
-  If[Head[coordSyms] === ScalarsOfChart, coordSyms = {t[], x[]}];
+  coordSyms = GetCoordinateSymbols[chart];
 
   (* Step 7: Evaluate metric components for Minkowski signature (-1, +1) *)
-  With[{ch = chart},
-    componentEq = componentEq /. {
-      (* Diagonal components *)
-      _Symbol[{0, ch}, {0, ch}] -> -1,
-      _Symbol[{1, ch}, {1, ch}] -> 1,
-      (* Off-diagonal components *)
-      _Symbol[{0, ch}, {1, ch}] -> 0,
-      _Symbol[{1, ch}, {0, ch}] -> 0
-    }
-  ];
+  componentEq = EvaluateMinkowskiMetric[componentEq, chart];
   componentEq = Expand[componentEq];
 
   (* Step 8: Convert field components to scalar functions *)
@@ -201,28 +160,7 @@ ExtractVectorComponent[eom_, field_, chart_, componentIndex_] := Module[
   ];
 
   (* Step 9: Convert coordinate derivatives to explicit Derivative form *)
-  (* Use FixedPoint to handle nested CD expressions correctly *)
-  (* Use context-independent pattern matching for CD *)
-  With[{ch = chart},
-    Module[{replaceCDfunc, isCDlike},
-      (* Function to check if something is a CD-like operator *)
-      isCDlike[x_] := StringMatchQ[ToString[Head[x]], "*CD*"];
-
-      replaceCDfunc[expr_] := expr /. {
-        (* Match any CD-like function applied to coordinates *)
-        f_[{0, -ch}][g_Symbol[args__]] /; isCDlike[f[{0, -ch}]] :> Derivative[1, 0][g][args],
-        f_[{1, -ch}][g_Symbol[args__]] /; isCDlike[f[{1, -ch}]] :> Derivative[0, 1][g][args],
-        f_[{0, -ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{0, -ch}]] :> Derivative[n + 1, m][g][args],
-        f_[{1, -ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{1, -ch}]] :> Derivative[n, m + 1][g][args],
-        (* Also handle contravariant indices *)
-        f_[{0, ch}][g_Symbol[args__]] /; isCDlike[f[{0, ch}]] :> Derivative[1, 0][g][args],
-        f_[{1, ch}][g_Symbol[args__]] /; isCDlike[f[{1, ch}]] :> Derivative[0, 1][g][args],
-        f_[{0, ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{0, ch}]] :> Derivative[n + 1, m][g][args],
-        f_[{1, ch}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{1, ch}]] :> Derivative[n, m + 1][g][args]
-      };
-      componentEq = FixedPoint[replaceCDfunc, componentEq, 10];
-    ]
-  ];
+  componentEq = ConvertCDToDerivatives[componentEq, chart];
 
   (* Expand *)
   componentEq = Expand[componentEq];
@@ -289,20 +227,13 @@ AnalyzeTerm[term_, field_, chart_] := Module[
   (* In coordinates, Laplacian appears as second derivatives *)
   If[!FreeQ[term, Derivative[2, 0]] || !FreeQ[term, Derivative[0, 2]],
     (* This is a second derivative - likely part of Laplacian or d'Alembertian *)
-    coefficient = ExtractCoefficient[term, field];
+    coefficient = ExtractNumericCoefficient[term, field];
     operator = "laplacian";  (* or "spatial_derivative" for more precision *)
     Return[<|"coefficient" -> coefficient, "operator" -> operator, "field" -> targetField|>]
   ];
 
   (* Fallback *)
   <|"coefficient" -> 1, "operator" -> "unknown", "field" -> targetField|>
-];
-
-ExtractCoefficient[term_, field_] := Module[
-  {coeff},
-  (* Extract numeric coefficient from term *)
-  coeff = term /. {field -> 1, _Derivative[__][field] -> 1};
-  If[NumericQ[coeff], coeff, 1]
 ];
 
 (* === Operator Identification === *)
