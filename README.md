@@ -29,6 +29,30 @@ This README describes the current capabilities, how to run the examples, and pla
 
 This section clarifies where we’re going beyond KG demos.
 
+## Symbolic Computing Infrastructure
+
+The project now includes a complete symbolic tensor algebra pipeline for deriving linearized field equations:
+
+- **Wolfram Engine 14.3**: Headless installation with free license activation
+- **xAct Tensor Algebra Suite**: State-of-the-art packages for General Relativity computations
+  - **xCore**: Generic programming tools and core functionality
+  - **xPerm**: Large group permutation manipulation (GLIBC-compatible binary)
+  - **xTensor**: Abstract tensor computations (flagship package)
+  - **xCoba**: Coordinate-based tensor computations for component calculations
+- **Automated Setup**: Container-friendly installation scripts with verification
+- **Compatibility Fixes**: Handles GLIBC version mismatches by recompiling xPerm binary
+
+### Usage Example
+
+```wolfram
+Needs["xAct`xCoba`"];
+DefManifold[M, 4, IndexRange[a, z]];
+DefChart[cart, M, {0, 1, 2, 3}, {t[], x[], y[], z[]}];
+DefMetric[-1, g[-a, -b], CD, {";", "∇"}, PrintAs -> "g"];
+```
+
+See [`scripts/README.md`](scripts/README.md) for complete setup instructions and [`scripts/verify-wolfram-setup.sh`](scripts/verify-wolfram-setup.sh) for verification.
+
 ## Objectives
 
 - Baseline re-derivation of the standard Gertsenshtein effect (Einstein–Maxwell) and its tiny conversion amplitude.
@@ -239,6 +263,37 @@ Run examples with `profile=True` in the `run` call to see timing breakdowns (ini
 
 ---
 
+## Symbolic Computing Setup
+
+For symbolic tensor algebra computations (deriving linearized field equations):
+
+```bash
+# 1. Download Wolfram Engine installer
+#    Visit https://www.wolfram.com/engine/
+#    Place installer in third_party/ directory
+
+# 2. Install and activate Wolfram Engine
+sudo ./scripts/install-wolfram-engine.sh
+./scripts/activate-wolfram.sh
+
+# 3. Install xAct/xCoba tensor algebra packages
+./scripts/install-xact-xcoba.sh
+
+# 4. Verify complete setup
+./scripts/verify-wolfram-setup.sh
+```
+
+The verification script checks:
+
+- Wolfram Engine installation and activation
+- xAct package installation (xCore, xPerm, xTensor, xCoba)
+- xPerm binary GLIBC compatibility
+- Full smoke test with tensor operations
+
+See [`scripts/README.md`](scripts/README.md) for detailed setup instructions.
+
+---
+
 ## Troubleshooting
 
 - **Import errors in VS Code** (e.g., numpy not found): ensure the interpreter is the repo's venv (`.venv/bin/python3`), then reload the window.
@@ -248,6 +303,9 @@ Run examples with `profile=True` in the `run` call to see timing breakdowns (ini
 - **Pages 404 or deploy errors**: ensure Settings → Pages → Source = GitHub Actions and Actions → Workflow permissions = Read/Write.
 - **Animation has low frame count**: ensure `snapshot_interval` in the `run` call matches your desired temporal resolution (e.g., set to `dt` for every integrator step). Increase `fps` in `choose_writer_and_out` for smoother playback.
 - **Logging messages not visible**: call `logging.basicConfig(level=logging.INFO, ...)` at the start of your script or in `main()`.
+- **Wolfram Engine not activated**: run `./scripts/activate-wolfram.sh` and enter your Wolfram ID credentials (free account at wolfram.com).
+- **xPerm GLIBC errors** (`GLIBC_2.38 not found`): run `./scripts/install-xact-xcoba.sh` to recompile the binary for your system.
+- **xAct packages not loading**: ensure xAct is installed in `~/.WolframEngine/Applications/xAct/` — run verification script for diagnosis.
 
 ---
 
