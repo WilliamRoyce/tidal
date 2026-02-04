@@ -14,11 +14,12 @@ A research codebase for exploring **electromagnetic ↔ gravitational wave conve
 
 ## Current Status (usable today)
 
+- **Lagrangian-to-PDE pipeline (`torsion_gertsenshtein.symbolic`, `torsion_gertsenshtein.wolfram`)**: complete symbolic-to-numerical pipeline for deriving field equations from Lagrangian densities. Uses Mathematica/xAct for symbolic derivation (Euler-Lagrange equations, linearization, component decomposition) → JSON export → Python/py-pde for dynamic PDE construction and simulation. **Zero hardcoded physics** in numerical layer - all equations derived symbolically. Includes working examples: EM field (massless waves) and Klein-Gordon (massive scalar field with dispersion). See [examples/README.md](examples/README.md) for complete documentation.
 - **PDE sandbox (`torsion_gertsenshtein.kgsim`)**: lightweight PDE examples and utilities for experimenting with first-order Klein–Gordon systems built on top of the py-pde library. This repository collects a small simulation toolkit (kgsim) with helpers for grids, initial data, observers, profiling, and runs; 1D & 2D examples with snapshot/video export and animation support.
 - **Multi-field coupled systems**: support for N-field coupled Klein–Gordon PDEs with arbitrary mass matrices and coupling terms in both 1D and 2D; includes `multi_gaussian_2d` initializer for spatially separated or overlapping Gaussian pulses; test suite validates symmetry preservation, energy transfer, and decoupled limits.
 - **2D coupled simulations**: full support for coupled field evolution in 2D with visualization showing energy transfer between fields; dimension-agnostic PDE implementations work seamlessly with any grid dimensionality.
 - **Animation and visualization**: side-by-side spacetime plots (φ(x,t) heatmaps), 1D evolution animations (φ(x) vs time), 2D field evolution with dual-panel animations showing both coupled fields, and high-fps video export (MP4 via ffmpeg or GIF fallback).
-- **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), optional ffmpeg; Sphinx docs skeleton; type-checked codebase with pytest test suite.
+- **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), Wolfram Engine 14.3 with xAct tensor framework, optional ffmpeg; Sphinx docs skeleton; type-checked codebase with pytest test suite.
 
 This README describes the current capabilities, how to run the examples, and planned improvements.
 
@@ -38,6 +39,7 @@ This section clarifies where we’re going beyond KG demos.
 
 ## Recent Improvements
 
+- **Lagrangian-to-PDE pipeline (February 2026)**: Complete symbolic derivation pipeline implemented with Mathematica/xAct → JSON → Python/py-pde. Fixed component extraction (free index detection with `IndicesOf[]`), operator identification (laplacian vs identity/mass terms), and RHS extraction. Created EM and Klein-Gordon examples demonstrating massless vs massive field dynamics. Added comprehensive documentation proving zero hardcoded physics in numerical layer. See [CHANGELOG.md](CHANGELOG.md) for detailed Phase 11 implementation notes.
 - **2D coupled-field support**: `multi_gaussian_2d` initializer for N-field systems on 2D grids; dimension-agnostic coordinate handling for both 1D and 2D; comprehensive test suite for 2D coupled dynamics (symmetry preservation, energy transfer, decoupled limits).
 - **Enhanced coordinate handling**: automatic detection of coordinate array format (flattened vs grid-shaped) in `gaussian_pulse` and `multi_gaussian_2d`; works seamlessly with different py-pde grid configurations.
 - **Coupled multi-field PDEs**: `make_coupled_kg_pde` builder for N-field systems with mass/coupling matrices; validation for matrix dimensions, finite masses, and non-negativity.
@@ -119,6 +121,38 @@ uv run python examples/klein_gordon/2d_2field_coupled.py
 ```
 
 Outputs are written to `outputs/` (created automatically if missing).
+
+### Lagrangian-to-PDE Pipeline Examples
+
+The repository includes a complete symbolic-to-numerical pipeline for deriving field equations from Lagrangians and simulating them numerically:
+
+```bash
+# Full pipeline demonstration (both EM and Klein-Gordon)
+bash examples/demo_full_pipeline.sh
+
+# EM field: Stage 1 (derive from Lagrangian L = -1/4 F_μν F^μν)
+cd examples/electromagnetic
+wolframscript -file em_lagrangian_1d.wls
+
+# EM field: Stage 2 (simulate massless wave propagation)
+uv run python examples/electromagnetic/em_from_lagrangian.py
+
+# Klein-Gordon: Stage 1 (derive from Lagrangian L = -1/2 (∂φ)² - 1/2 m²φ²)
+cd examples/scalar_field
+wolframscript -file klein_gordon.wls
+
+# Klein-Gordon: Stage 2 (simulate massive field with dispersion)
+uv run python examples/scalar_field/kg_from_lagrangian.py
+```
+
+**Key Features:**
+- **No hardcoded physics**: All equations dynamically loaded from JSON
+- **Symbolic derivation**: Mathematica/xAct computes Euler-Lagrange equations
+- **JSON interface**: Well-defined schema for equation specification
+- **Dynamic PDE construction**: Python builds solver from specification
+- **Verified examples**: EM (massless) vs Klein-Gordon (massive) demonstrate different physics from different Lagrangians
+
+See [examples/README.md](examples/README.md) for complete documentation and verification that the Python layer contains zero hardcoded physics.
 
 ### Animation Features
 
