@@ -15,6 +15,8 @@
     "coeff",
     "contourf",
     "covd",
+    "cphi",
+    "ctheta",
     "dphi",
     "dpkg",
     "Gaussians",
@@ -31,6 +33,8 @@
     "libglu",
     "libsm",
     "libx",
+    "libxext",
+    "libxrender",
     "linearization",
     "linearizes",
     "llvmlite",
@@ -89,7 +93,11 @@
     "trange",
     "tqdm"
   ],
-  "flagWords": ["hte", "teh", "wolfrom"],
+  "flagWords": [
+    "hte",
+    "teh",
+    "wolfrom"
+  ],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [
