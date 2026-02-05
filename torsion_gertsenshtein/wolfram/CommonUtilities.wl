@@ -1,6 +1,36 @@
 (* ::Package:: *)
-(* CommonUtilities.wl - Shared utilities for the Lagrangian-to-PDE pipeline *)
-(* Part of the torsion-gertsenshtein project *)
+(*
+   MODULE: CommonUtilities.wl
+   PURPOSE: Shared utilities for the Lagrangian-to-PDE pipeline
+
+   DEPENDENCIES:
+     - xAct`xTensor` (tensor calculus, covariant derivatives)
+     - xAct`xCoba` (coordinate bases, component extraction)
+
+   KEY RESPONSIBILITIES:
+     - CD → Derivative conversion: ConvertCDToDerivatives transforms xAct covariant
+       derivatives into explicit Mathematica Derivative[n,m,...][f][t,x,...] form
+     - Christoffel elimination: RemoveChristoffelSymbols sets connection terms to 0
+       (valid for flat Minkowski space)
+     - Epsilon tensor evaluation: EvaluateEpsilonComponents converts Levi-Civita
+       tensors to numeric ±1 values (supports 2D, 3D, 4D)
+     - Metric evaluation: EvaluateMinkowskiMetric handles (-,+,+,...) signature
+     - Coefficient extraction: ExtractCoefficientWithSymbolic preserves symbolic info
+     - xAct introspection: IsChristoffelSymbol, IsCovDOperator, IsEpsilonTensor
+
+   DIMENSION SUPPORT:
+     - 1+1D: 2 coordinates (t, x)
+     - 2+1D: 3 coordinates (t, x, y)
+     - 3+1D: 4 coordinates (t, x, y, z)
+     - $MaxSupportedDimension = 4 (extensible with GenerateCDRules)
+
+   SIGN CONVENTIONS (Minkowski):
+     - Metric signature: (-1, +1, +1, ...)
+     - Covariant epsilon: ε_{012...} = -1 (time index first)
+     - Contravariant epsilon: ε^{012...} = +1
+
+   Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline
+*)
 
 BeginPackage["TorsionGertsenshtein`CommonUtilities`",
   {"xAct`xTensor`", "xAct`xCoba`"}];
@@ -74,6 +104,23 @@ LeviCivitaValue::usage =
   "LeviCivitaValue[indices] returns the Levi-Civita symbol value: +1 for even \
 permutations, -1 for odd permutations, 0 for repeated indices.";
 
+(* xAct introspection helpers *)
+IsChristoffelSymbol::usage =
+  "IsChristoffelSymbol[expr] returns True if expr is a Christoffel symbol, using \
+xAct's ChristoffelQ. Wrapped in Quiet for robustness with non-xAct inputs.";
+
+IsCovDOperator::usage =
+  "IsCovDOperator[expr] returns True if expr is a covariant derivative operator, \
+using xAct's CovDQ. Falls back to string matching for non-xAct expressions.";
+
+IsEpsilonTensor::usage =
+  "IsEpsilonTensor[expr] returns True if expr is a Levi-Civita (epsilon) tensor, \
+using xAct's EpsilonQ. Handles both tensor heads and applied tensors.";
+
+MinkowskiMetricFactor::usage =
+  "MinkowskiMetricFactor[idx] returns the metric factor for index raising/lowering in \
+Minkowski space: -1 for time (idx=0), +1 for spatial indices (idx>0).";
+
 Begin["`Private`"];
 
 (* === xAct Introspection Helpers === *)
@@ -87,8 +134,18 @@ IsChristoffelSymbol[expr_] := Quiet[
 ];
 
 (* Check if expr is a covariant derivative operator using xAct introspection *)
+(* For expr like CD[-a][phi[]], Head[expr] = CD[-a], and Head[Head[expr]] = CD *)
+(* We need to extract the base symbol, not the applied form with indices *)
 IsCovDOperator[expr_] := Quiet[
-  TrueQ[xAct`xTensor`CovDQ[Head[expr]]],
+  Module[{h = Head[expr], baseSymbol},
+    (* If head is already a symbol, check directly *)
+    If[Head[h] === Symbol,
+      TrueQ[xAct`xTensor`CovDQ[h]],
+      (* Otherwise extract the base symbol (e.g., CD from CD[-a]) *)
+      baseSymbol = Head[h];
+      TrueQ[xAct`xTensor`CovDQ[baseSymbol]]
+    ]
+  ],
   {xAct`xTensor`CovDQ::argx, General::stop}
 ];
 
@@ -272,6 +329,10 @@ ExtractNumericCoefficient[term_, fieldName_] := Module[
     Derivative[__][f_][__] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
     (* Match f[args] form (bare field with numeric suffix like A0, A1) *)
     f_[__] /; StringMatchQ[ToString[f], ToString[fieldName] ~~ DigitCharacter ...] :> 1,
+    (* Match f[] form (scalar tensor with no arguments, like phi[]) *)
+    f_[] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
+    (* Match f[index] form (vector tensor with one index, like A[-a]) *)
+    f_[_] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
     (* Direct field match *)
     fieldName -> 1,
     _Derivative[__][fieldName] -> 1
@@ -316,6 +377,10 @@ ExtractCoefficientWithSymbolic[term_, fieldName_] := Module[
     Derivative[__][f_][__] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
     (* Match f[args] form (bare field with numeric suffix like A0, A1) *)
     f_[__] /; StringMatchQ[ToString[f], ToString[fieldName] ~~ DigitCharacter ...] :> 1,
+    (* Match f[] form (scalar tensor with no arguments, like phi[]) *)
+    f_[] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
+    (* Match f[index] form (vector tensor with one index, like A[-a]) *)
+    f_[_] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
     (* Direct field match *)
     fieldName -> 1,
     _Derivative[__][fieldName] -> 1

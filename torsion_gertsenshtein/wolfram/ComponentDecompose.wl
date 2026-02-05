@@ -1,6 +1,35 @@
 (* ::Package:: *)
-(* ComponentDecompose.wl - Decompose tensor equations into scalar components *)
-(* Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline *)
+(*
+   MODULE: ComponentDecompose.wl
+   PURPOSE: Decompose tensor equations into scalar component equations
+
+   DEPENDENCIES:
+     - xAct`xTensor` (tensor calculus)
+     - xAct`xCoba` (coordinate bases, ToBasis, TraceBasisDummy)
+     - TorsionGertsenshtein`CommonUtilities` (CD conversion, epsilon evaluation)
+
+   DATA FLOW:
+     Tensor EOM (abstract indices: A_a, F_{ab})
+       → ToBasis (convert to chart basis)
+       → TraceBasisDummy (sum over dummy indices)
+       → RemoveChristoffelSymbols (flat space: Γ = 0)
+       → EvaluateEpsilonComponents (ε tensors → ±1)
+       → ConvertCDToDerivatives (CD → Derivative)
+       → Extract components (A_0[t,x], A_1[t,x], ...)
+
+   KEY FEATURES:
+     - Supports scalar and vector fields
+     - additionalFields parameter for cross-field coupling (e.g., pass {chi[]}
+       when decomposing phi to ensure chi transforms to coordinate form)
+     - Dimension-agnostic: uses GetChartDimension instead of hardcoded values
+     - Automatic epsilon tensor evaluation for Chern-Simons and other topological terms
+
+   OUTPUT FORMAT:
+     List of {component_index, component_equation} pairs, where equations are
+     in Derivative[dt, dx, ...][field][t, x, ...] form ready for ExportJSON.
+
+   Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline
+*)
 
 BeginPackage["TorsionGertsenshtein`ComponentDecompose`",
   {"xAct`xTensor`", "xAct`xCoba`",

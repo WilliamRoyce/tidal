@@ -1,6 +1,93 @@
 (* ::Package:: *)
-(* LagrangianPipeline.wl - Main entry point for Lagrangian to PDE pipeline *)
-(* Part of the torsion-gertsenshtein project *)
+(*
+   MODULE: LagrangianPipeline.wl
+   PURPOSE: Main entry point for the Lagrangian-to-PDE pipeline
+
+   DEPENDENCIES:
+     - xAct`xTensor`, xAct`xCoba`, xAct`xPert` (symbolic tensor calculus)
+     - TorsionGertsenshtein`EulerLagrange` (Euler-Lagrange equations)
+     - TorsionGertsenshtein`Linearize` (linearization around background)
+     - TorsionGertsenshtein`ComponentDecompose` (tensor → scalar components)
+     - TorsionGertsenshtein`ExportJSON` (JSON export for Python)
+
+   PIPELINE ARCHITECTURE
+   =====================
+
+   Lagrangian (L)
+        │
+        ▼
+   ┌─────────────────────────────────────┐
+   │  EulerLagrange.wl                   │
+   │  EulerLagrangeEquation[L, field]    │
+   │  → Computes δL/δfield = 0           │
+   └─────────────────────────────────────┘
+        │
+        ▼
+   Equations of Motion (tensor form)
+        │
+        ▼
+   ┌─────────────────────────────────────┐
+   │  Linearize.wl                       │
+   │  LinearizeEquation[eom, field, 0]   │
+   │  → Keeps only linear terms          │
+   └─────────────────────────────────────┘
+        │
+        ▼
+   Linearized EOM (still tensor)
+        │
+        ▼
+   ┌─────────────────────────────────────┐
+   │  ComponentDecompose.wl              │
+   │  DecomposeToComponents[eom, ...]    │
+   │  → ToBasis, TraceBasisDummy         │
+   │  → Converts A_a → {A_0, A_1, ...}   │
+   └─────────────────────────────────────┘
+        │
+        ▼
+   Component equations (Derivative form)
+        │
+        ▼
+   ┌─────────────────────────────────────┐
+   │  ExportJSON.wl                      │
+   │  BuildMultiFieldJSONStructure[...]  │
+   │  → Identifies operators             │
+   │  → Extracts coefficients            │
+   │  → Builds JSON structure            │
+   └─────────────────────────────────────┘
+        │
+        ▼
+   JSON file (equations.json)
+        │
+        ▼
+   ┌─────────────────────────────────────┐
+   │  Python: json_loader.py             │
+   │  load_equation_system(path)         │
+   │  → Parses JSON → EquationSystem     │
+   └─────────────────────────────────────┘
+        │
+        ▼
+   ┌─────────────────────────────────────┐
+   │  Python: pde_builder.py             │
+   │  build_pde_from_json(path)          │
+   │  → Constructs py-pde PDE object     │
+   └─────────────────────────────────────┘
+        │
+        ▼
+   PDE simulation (py-pde)
+
+   DIMENSION SUPPORT:
+     - SetupMinkowskiND[2]: 1+1D spacetime (t, x)
+     - SetupMinkowskiND[3]: 2+1D spacetime (t, x, y)
+     - SetupMinkowskiND[4]: 3+1D spacetime (t, x, y, z)
+
+   TYPICAL USAGE:
+     {m, eta, cd, cart} = SetupMinkowskiND[2];
+     DefTensor[phi[], m];
+     L = -1/2 cd[-a][phi[]] cd[a][phi[]] - 1/2 m2 phi[]^2;
+     json = ProcessLagrangian[L, phi, cd, cart, "OutputPath" -> "output.json"];
+
+   Part of the torsion-gertsenshtein project
+*)
 
 BeginPackage["TorsionGertsenshtein`LagrangianPipeline`",
   {"xAct`xTensor`", "xAct`xCoba`", "xAct`xPert`",

@@ -1,6 +1,36 @@
 (* ::Package:: *)
-(* EulerLagrange.wl - Euler-Lagrange equation derivation for field theories *)
-(* Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline *)
+(*
+   MODULE: EulerLagrange.wl
+   PURPOSE: Derive equations of motion from Lagrangian densities via Euler-Lagrange equations
+
+   DEPENDENCIES:
+     - xAct`xTensor` (tensor calculus, variational derivatives)
+
+   DATA FLOW:
+     Lagrangian density L[φ, ∂φ, ∂²φ, ...]
+       → VariationalDerivative (functional derivative δL/δφ)
+       → EulerLagrangeEquation (compute ∂L/∂φ - D_a[∂L/∂(D_a φ)] + ... = 0)
+       → Equation of motion (tensor form)
+
+   KEY FEATURES:
+     - Handles scalar and vector fields
+     - Supports first and second-order derivative terms in Lagrangian
+     - Works with abstract indices (converts to components via ComponentDecompose)
+     - Automatic simplification via xAct's NoScalar and SortCovDs
+
+   USAGE PATTERN:
+     {manifold, metric, cd} = SetupSpacetime[dim, signature];
+     DefTensor[phi[], manifold];  (* Define scalar field *)
+     L = -1/2 cd[-a][phi[]] cd[a][phi[]];  (* Lagrangian *)
+     eom = EulerLagrangeEquation[L, phi, cd];  (* → ∂_a∂^a φ = 0 *)
+
+   IMPLICIT ASSUMPTIONS:
+     - Lagrangian is a scalar density (√-g factor assumed or handled separately)
+     - Fields are dynamical (not background)
+     - Boundary terms vanish (integration by parts)
+
+   Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline
+*)
 
 BeginPackage["TorsionGertsenshtein`EulerLagrange`", {"xAct`xTensor`"}];
 

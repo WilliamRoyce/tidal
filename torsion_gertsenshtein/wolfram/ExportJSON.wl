@@ -1,6 +1,36 @@
 (* ::Package:: *)
-(* ExportJSON.wl - Export field equations to JSON format for Python pipeline *)
-(* Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline *)
+(*
+   MODULE: ExportJSON.wl
+   PURPOSE: Convert component equations to multi-field JSON format for Python pipeline
+
+   DEPENDENCIES:
+     - TorsionGertsenshtein`CommonUtilities` (coefficient extraction, field parsing)
+
+   DATA FLOW:
+     ComponentEquations (from ComponentDecompose)
+       → ParseMultiFieldRHS (identify operators, extract coefficients)
+       → EquationToJSONMultiField (build structured equation)
+       → BuildMultiFieldJSONStructure (assemble full JSON)
+       → ExportEquationSystem (write to file)
+
+   SUPPORTED OPERATORS:
+     - identity: field without derivatives (mass/coupling terms)
+     - laplacian: full spatial Laplacian ∇²
+     - laplacian_x, laplacian_y, laplacian_z: directional second derivatives
+     - gradient_x, gradient_y, gradient_z: first-order spatial gradients
+     - cross_derivative_xy, cross_derivative_xz, cross_derivative_yz: mixed spatial
+
+   PDE TYPES (via LHS structure):
+     - Elliptic (time_order=0): Poisson, Laplace
+     - Parabolic (time_order=1): Heat, diffusion
+     - Hyperbolic (time_order=2+): Wave equations
+
+   MOMENTUM GRADIENTS:
+     Mixed time-space derivatives (∂_t∂_x φ) are converted to spatial gradients
+     of momentum fields: gradient_x(pi_i), where pi_i = ∂_t φ_i.
+
+   Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline
+*)
 
 BeginPackage["TorsionGertsenshtein`ExportJSON`",
   {"TorsionGertsenshtein`CommonUtilities`"}];
@@ -32,9 +62,87 @@ $FieldNameFormats::usage =
 \"standard\" (base_index), \"tensor\" (base_component_index), \
 \"compact\" (base+digits), \"simple\" (letters only).";
 
-GetTimeDerivativeOrder::usage;
-DetectLHSTimeOrder::usage;
-BuildLHSStructure::usage;
+GetTimeDerivativeOrder::usage =
+  "GetTimeDerivativeOrder[term] returns the order of time derivative in a term. \
+Returns 0 if no time derivative, 1 for d_t, 2 for d2_t, etc. Time index is always \
+the first slot in Derivative[dt, dx, ...].";
+
+DetectLHSTimeOrder::usage =
+  "DetectLHSTimeOrder[equation] detects the maximum time derivative order in the equation. \
+Used to determine if PDE is elliptic (0), parabolic (1), or hyperbolic (2+).";
+
+BuildLHSStructure::usage =
+  "BuildLHSStructure[fieldName, timeOrder] builds a structured LHS representation. \
+Returns an Association with \"expression\" and \"order\" keys for flexible PDE types.";
+
+(* Time derivative detection helpers *)
+ContainsTimeDerivative::usage =
+  "ContainsTimeDerivative[term, minOrder:2] returns True if term contains a time \
+derivative of at least minOrder. Time is always the first slot in Derivative[dt, dx, ...]. \
+Supports 1+1D (2-arg), 2+1D (3-arg), and 3+1D (4-arg) Derivative forms.";
+
+IsMixedTimeSpaceDerivative::usage =
+  "IsMixedTimeSpaceDerivative[term] returns True if term has BOTH time AND space \
+derivatives (e.g., Derivative[1,1,0] for d_t d_x). Used to detect terms that should \
+be converted to momentum gradients. Supports 1+1D, 2+1D, and 3+1D.";
+
+IdentifyGradientDirection::usage =
+  "IdentifyGradientDirection[term] returns the gradient direction (\"gradient_x\", \
+\"gradient_y\", or \"gradient_z\") based on derivative structure. Time slot must be 0 \
+for pure spatial gradients. Defaults to \"gradient_x\" if detection fails.";
+
+(* Spatial derivative classification *)
+ExtractSpatialGradientFromMixed::usage =
+  "ExtractSpatialGradientFromMixed[term] extracts the spatial gradient direction \
+from a mixed time-space derivative term. Returns \"gradient_x\", \"gradient_y\", or \
+\"gradient_z\". Warns if term has multiple spatial derivatives (e.g., d_t d_x d_y).";
+
+IsSpatialCrossDerivative::usage =
+  "IsSpatialCrossDerivative[term] returns True if term contains a spatial cross-derivative \
+(d_x d_y, d_x d_z, or d_y d_z with time slot = 0). Legacy boolean wrapper around \
+IdentifySpatialCrossDerivative.";
+
+IdentifySpatialCrossDerivative::usage =
+  "IdentifySpatialCrossDerivative[term] identifies spatial cross-derivatives and returns \
+the operator name: \"cross_derivative_xy\", \"cross_derivative_xz\", \"cross_derivative_yz\", \
+or False if not a cross-derivative. Requires time slot = 0.";
+
+IdentifyDirectionalLaplacian::usage =
+  "IdentifyDirectionalLaplacian[term] identifies pure second derivatives in a single \
+spatial direction. Returns \"laplacian_x\", \"laplacian_y\", \"laplacian_z\", or False. \
+Used for anisotropic equations like Navier-Cauchy where d^2_x and d^2_y have different coefficients.";
+
+(* Term identification and building *)
+BuildTermResult::usage =
+  "BuildTermResult[coeff, operator, field, symbolicCoeff:None] builds a term result \
+Association with keys \"coefficient\", \"operator\", \"field\". Optionally includes \
+\"coefficient_symbolic\" when symbolicCoeff is not None.";
+
+IdentifyMultiFieldTerm::usage =
+  "IdentifyMultiFieldTerm[term, currentFieldName, allFieldNames, metadata] analyzes a \
+single term and returns an Association with \"coefficient\", \"operator\", and \"field\" keys. \
+Detects: laplacian, directional laplacians, gradients, cross-derivatives, identity, and \
+momentum gradient terms from mixed time-space derivatives.";
+
+(* Refactored helper functions (Phase 3, Issue 10) *)
+ExtractFunctionHeads::usage =
+  "ExtractFunctionHeads[term] extracts all function head names from an expression. \
+Returns a list of strings representing function names (e.g., {\"phi0\", \"csA1\"}).";
+
+MatchFieldToHeads::usage =
+  "MatchFieldToHeads[functionHeads, allFieldNames, defaultField] matches function heads \
+to known field names using case-insensitive and prefix matching. Returns an Association \
+with \"field\" and \"head\" keys, or uses defaultField if no match found.";
+
+ExtractTermCoefficient::usage =
+  "ExtractTermCoefficient[term, fieldHead, targetField] extracts the numeric coefficient \
+and optional symbolic coefficient from a term. Returns an Association with \"numeric\" \
+and \"symbolic\" keys.";
+
+ClassifyOperatorType::usage =
+  "ClassifyOperatorType[term] classifies the differential operator in a term. Returns \
+a list {operatorName, isMixedTimeSpace} where operatorName is one of: \"identity\", \
+\"laplacian\", \"laplacian_x/y/z\", \"gradient_x/y/z\", \"cross_derivative_xy/xz/yz\".";
 
 Begin["`Private`"];
 
@@ -218,18 +326,6 @@ ParseMultiFieldRHS[eq_, currentFieldName_, allFieldNames_, metadata_] := Module[
 
 (* === LHS Structure Detection (Phase 2, Issue 6) === *)
 (* Supports parabolic (heat: d_t φ), elliptic (Poisson: ∇²φ = f), and hyperbolic (wave: d2_t φ) PDEs *)
-
-GetTimeDerivativeOrder::usage =
-  "GetTimeDerivativeOrder[term] returns the order of time derivative in a term. \
-Returns 0 if no time derivative, 1 for d_t, 2 for d2_t, etc.";
-
-DetectLHSTimeOrder::usage =
-  "DetectLHSTimeOrder[equation] detects the maximum time derivative order in the equation. \
-Used to determine if PDE is elliptic (0), parabolic (1), or hyperbolic (2+).";
-
-BuildLHSStructure::usage =
-  "BuildLHSStructure[fieldName, timeOrder] builds a structured LHS representation. \
-Returns an Association with \"expression\" and \"order\" keys for flexible PDE types.";
 
 (* Get time derivative order from a single term *)
 (* Time index is always the first slot in Derivative[dt, dx, ...] *)
@@ -501,10 +597,6 @@ BuildTermResult[coeff_, op_, field_, symbCoeff_:None] := Module[{result},
 
 (* Extract all function heads from a term *)
 (* For f[args], extract f; for Derivative[n,m][f][args], extract f *)
-ExtractFunctionHeads::usage =
-  "ExtractFunctionHeads[term] extracts all function head names from an expression. \
-Returns a list of strings representing function names (e.g., {\"phi0\", \"csA1\"}).";
-
 ExtractFunctionHeads[term_] := Union[Join[
   (* Direct function heads: f[args] -> f *)
   Cases[term, f_Symbol[__] :> ToString[f], {0, Infinity}],
@@ -514,11 +606,6 @@ ExtractFunctionHeads[term_] := Union[Join[
 
 (* Match a field name to function heads in the term *)
 (* Returns {matchedFieldName, foundHeadString} or {defaultField, Null} if no match *)
-MatchFieldToHeads::usage =
-  "MatchFieldToHeads[functionHeads, allFieldNames, defaultField] finds which field \
-a term operates on by matching function heads to field names. Returns \
-{matchedFieldName, foundHeadString}.";
-
 MatchFieldToHeads[functionHeads_List, allFieldNames_List, defaultField_String] := Module[
   {matchedField = defaultField, foundFieldHead = Null},
 
@@ -561,11 +648,6 @@ MatchFieldToHeads[functionHeads_List, allFieldNames_List, defaultField_String] :
 
 (* Extract coefficient from term given the field head *)
 (* Returns {numericCoeff, symbolicCoeff} where symbolicCoeff is None or a string *)
-ExtractTermCoefficient::usage =
-  "ExtractTermCoefficient[term, fieldHead, targetField] extracts the coefficient \
-from a term by replacing the field with 1. Returns {numericCoeff, symbolicCoeff} \
-where symbolicCoeff is None or a string representation.";
-
 ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
   {rawCoeff, coefficient = 1.0, symbolicCoeff = None},
 
@@ -608,11 +690,6 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
 
 (* Classify operator type based on derivative structure *)
 (* Returns {operatorName, shouldConvertToMomentum} *)
-ClassifyOperatorType::usage =
-  "ClassifyOperatorType[term] determines the differential operator type from the \
-derivative structure. Returns {operatorName, isMixedTimeSpace} where operatorName \
-is a string like \"laplacian\", \"gradient_x\", \"identity\", etc.";
-
 ClassifyOperatorType[term_] := Module[
   {orderDerivatives, dirLap, crossDeriv},
 

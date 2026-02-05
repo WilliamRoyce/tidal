@@ -1,6 +1,39 @@
 (* ::Package:: *)
-(* Linearize.wl - Linearization of field equations around a background *)
-(* Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline *)
+(*
+   MODULE: Linearize.wl
+   PURPOSE: Linearize field equations around a background configuration
+
+   DEPENDENCIES:
+     - xAct`xTensor` (tensor calculus)
+     - xAct`xPert` (perturbation theory, optional for advanced linearization)
+
+   DATA FLOW:
+     Nonlinear EOM (e.g., φ² terms, cross-terms)
+       → LinearizeEquation (extract linear terms around background)
+       → Linearized EOM (suitable for wave equation form)
+
+   KEY FEATURES:
+     - Zero background: extracts terms linear in the field
+     - Custom background: expands φ = φ₀ + ε·δφ, keeps O(ε) terms
+     - Handles polynomial expressions and products of fields
+     - Works with both scalar and tensor fields
+
+   LINEARIZATION STRATEGIES:
+     1. Series expansion: Expand around φ = background, keep first-order
+     2. Polynomial degree: Select terms with exactly one field factor
+     3. xPert integration: (optional) Use xAct's perturbation framework
+
+   USAGE PATTERN:
+     linearEOM = LinearizeEquation[eom, phi, 0];  (* Zero background *)
+     linearEOM = LinearizeEquation[eom, phi, phi0];  (* Around φ₀ *)
+
+   NOTES:
+     - For gauge theories, linearization should be done AFTER gauge fixing
+     - Non-minimal coupling (φ²R) requires careful treatment
+     - Assumes smooth, differentiable Lagrangian
+
+   Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline
+*)
 
 BeginPackage["TorsionGertsenshtein`Linearize`", {"xAct`xTensor`", "xAct`xPert`"}];
 
