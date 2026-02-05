@@ -22,7 +22,6 @@ correctly handles inter-field coupling.
 
 from __future__ import annotations
 
-import pathlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -44,7 +43,7 @@ if TYPE_CHECKING:
 
 
 DEFAULT_T_END = 20.0
-OUTPUT_FILENAME = "outputs/coupled_scalars_output.png"
+OUTPUT_FILENAME = "coupled_scalars_output.png"
 
 
 @dataclass(frozen=True)
@@ -330,10 +329,11 @@ def _plot_results(simulation: SimulationData, _spec: EquationSystem) -> None:  #
 
     plt.tight_layout()
 
-    output_path = pathlib.Path(OUTPUT_FILENAME)
-    output_path.parent.mkdir(exist_ok=True, parents=True)
-    plt.savefig(output_path, dpi=150)
-    print(f"  Saved plot to: {output_path}")
+    output_dir = Path(__file__).parent.parent.parent / "outputs"
+    output_dir.mkdir(exist_ok=True, parents=True)
+    output_path = output_dir / OUTPUT_FILENAME
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    print(f"Saved plot to: {output_path}")
     print()
 
 

@@ -189,10 +189,10 @@ def main() -> None:
         plt.tight_layout()
 
         output_dir = Path(__file__).parent.parent.parent / "outputs"
-        output_dir.mkdir(exist_ok=True)
+        output_dir.mkdir(exist_ok=True, parents=True)
         output_path = output_dir / OUTPUT_FILENAME
-        plt.savefig(output_path, dpi=150)
-        print(f"\nVisualization saved to: {output_path}")
+        plt.savefig(output_path, dpi=150, bbox_inches="tight")
+        print(f"Saved plot to: {output_path}")
 
     except ImportError:
         print("\nMatplotlib not available for visualization")

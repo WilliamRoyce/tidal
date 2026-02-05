@@ -14,7 +14,6 @@ the Lagrangian using Mathematica/xAct.
 
 from __future__ import annotations
 
-import pathlib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
@@ -36,7 +35,7 @@ if TYPE_CHECKING:
 
 
 DEFAULT_T_END = 30.0
-OUTPUT_FILENAME = "outputs/kg_from_lagrangian_output.png"
+OUTPUT_FILENAME = "kg_from_lagrangian_output.png"
 
 
 @dataclass(frozen=True)
@@ -268,10 +267,11 @@ def _plot_results(simulation: SimulationData, spec: EquationSystem) -> None:
 
     plt.tight_layout()
 
-    output_path = pathlib.Path(OUTPUT_FILENAME)
-    output_path.parent.mkdir(exist_ok=True, parents=True)
-    plt.savefig(output_path, dpi=150)
-    print(f"  Saved plot to: {output_path}")
+    output_dir = Path(__file__).parent.parent.parent / "outputs"
+    output_dir.mkdir(exist_ok=True, parents=True)
+    output_path = output_dir / OUTPUT_FILENAME
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    print(f"Saved plot to: {output_path}")
     print()
 
 
