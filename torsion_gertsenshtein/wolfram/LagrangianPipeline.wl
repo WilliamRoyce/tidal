@@ -165,6 +165,15 @@ SetupMinkowskiND[dim_Integer] := Module[
 SetupMinkowski1D[] := SetupMinkowskiND[2];
 SetupMinkowski3D[] := SetupMinkowskiND[4];
 
+(* === Helper Functions === *)
+
+(* Extract field prefix from tensor for JSON export.
+   Handles both scalar fields like phi[] and vector fields like A[-a], procaA[-a] *)
+ExtractFieldPrefix[field_] := Module[{head},
+  head = If[Head[field] === Symbol, field, Head[field]];
+  ToString[head]
+];
+
 (* === Main Pipeline === *)
 
 Options[ProcessLagrangian] = {
@@ -204,7 +213,7 @@ ProcessLagrangian[lagrangian_, field_, covd_, chart_, opts:OptionsPattern[]] := 
   (* Merge user metadata with defaults *)
   metadata = Join[
     <|
-      "field_prefix" -> If[TensorRank[field] === 0, "phi", "A"],
+      "field_prefix" -> ExtractFieldPrefix[field],
       "dimension" -> Length[IndicesOfChart[chart]],
       "signature" -> DiagonalMatrix[{-1}~Join~ConstantArray[1, Length[IndicesOfChart[chart]] - 1]] // Diagonal,
       "coordinates" -> Map[ToString, IndicesOfChart[chart]],

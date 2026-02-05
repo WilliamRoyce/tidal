@@ -125,6 +125,40 @@ class TestOperatorTerm:
         assert isinstance(term.coefficient, float)
         assert term.coefficient == 1.0
 
+    def test_from_dict_with_coefficient_symbolic(self) -> None:
+        """Test parsing coefficient_symbolic from JSON."""
+        data = {
+            "coefficient": -1.0,
+            "operator": "identity",
+            "field": "phi",
+            "coefficient_symbolic": "-m2",
+        }
+        term = OperatorTerm.from_dict(data)
+
+        assert term.coefficient == -1.0
+        assert term.operator == "identity"
+        assert term.field == "phi"
+        assert term.coefficient_symbolic == "-m2"
+
+    def test_from_dict_without_coefficient_symbolic(self) -> None:
+        """Test that coefficient_symbolic defaults to None."""
+        data = {"coefficient": 1.5, "operator": "laplacian", "field": "phi"}
+        term = OperatorTerm.from_dict(data)
+
+        assert term.coefficient_symbolic is None
+
+    def test_coefficient_symbolic_positive(self) -> None:
+        """Test positive symbolic coefficient."""
+        data = {
+            "coefficient": 1.0,
+            "operator": "identity",
+            "field": "A_0",
+            "coefficient_symbolic": "kappa",
+        }
+        term = OperatorTerm.from_dict(data)
+
+        assert term.coefficient_symbolic == "kappa"
+
 
 # === ComponentEquation Tests ===
 

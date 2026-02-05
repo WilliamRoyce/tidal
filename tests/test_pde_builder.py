@@ -144,7 +144,8 @@ class TestPDEFromSpec:
 
         assert pde.n_components == 1
         assert pde.spec is simple_wave_spec
-        assert not pde.explicit_time_dependence
+        # Time dependence enabled for curved spacetime support (e.g., de Sitter)
+        assert pde.explicit_time_dependence
 
     def test_init_multi_component(self, em_spec: EquationSystem) -> None:
         """Test initialization with multiple components."""
@@ -1063,3 +1064,169 @@ class TestDirectionalLaplacians3D:
 
         # Larger tolerance for 3D operators on coarse 16^3 grid
         assert_allclose(lap_sum, lap_full.data, rtol=0.05)
+
+
+# === Parameterized Coefficients Tests ===
+
+
+class TestParameterizedCoefficients:
+    """Tests for runtime parameter injection via coefficient_symbolic."""
+
+    @pytest.fixture
+    def spec_with_symbolic(self) -> EquationSystem:
+        """Create a spec with symbolic coefficient for mass term."""
+        return EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(1.0, "laplacian", "phi"),
+                        OperatorTerm(-1.0, "identity", "phi", "-m2"),  # symbolic
+                    ),
+                ),
+            ),
+            mass_matrix=((1.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+
+    def test_resolve_coefficient_with_parameter(
+        self, spec_with_symbolic: EquationSystem
+    ) -> None:
+        """Test _resolve_coefficient uses parameter value when provided."""
+        pde = PDEFromSpec(spec_with_symbolic, parameters={"m2": 0.25})
+        term = spec_with_symbolic.equations[0].rhs_terms[1]
+
+        resolved = pde._resolve_coefficient(term)
+        # "-m2" with m2=0.25 should give -0.25
+        assert resolved == -0.25  # noqa: PLR2004
+
+    def test_resolve_coefficient_without_parameter(
+        self, spec_with_symbolic: EquationSystem
+    ) -> None:
+        """Test _resolve_coefficient uses numeric default when no parameter."""
+        pde = PDEFromSpec(spec_with_symbolic)  # No parameters
+        term = spec_with_symbolic.equations[0].rhs_terms[1]
+
+        resolved = pde._resolve_coefficient(term)
+        # Should use the numeric coefficient from the term
+        assert resolved == -1.0
+
+    def test_resolve_coefficient_positive_symbolic(self) -> None:
+        """Test _resolve_coefficient with positive symbolic coefficient."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(1.0, "identity", "phi", "kappa"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec, parameters={"kappa": 2.5})
+        term = spec.equations[0].rhs_terms[0]
+
+        resolved = pde._resolve_coefficient(term)
+        assert resolved == 2.5  # noqa: PLR2004
+
+    def test_resolve_coefficient_unmatched_symbolic(self) -> None:
+        """Test _resolve_coefficient falls back to numeric for unknown symbolic."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(1.5, "identity", "phi", "unknown_param"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})  # Different param
+        term = spec.equations[0].rhs_terms[0]
+
+        resolved = pde._resolve_coefficient(term)
+        # Should fall back to numeric 1.5
+        assert resolved == 1.5  # noqa: PLR2004
+
+    def test_build_pde_from_json_with_parameters(self, kg_json_path: Path) -> None:
+        """Test build_pde_from_json accepts parameters dict."""
+        if not kg_json_path.exists():
+            pytest.skip("Test file not found")
+
+        pde = build_pde_from_json(kg_json_path, parameters={"m2": 2.0})
+        assert pde._parameters == {"m2": 2.0}
+
+    def test_pde_constructor_stores_parameters(
+        self, spec_with_symbolic: EquationSystem
+    ) -> None:
+        """Test PDEFromSpec constructor stores parameters."""
+        pde = PDEFromSpec(spec_with_symbolic, parameters={"m2": 0.5, "kappa": 1.0})
+        assert pde._parameters == {"m2": 0.5, "kappa": 1.0}
+
+    def test_pde_constructor_empty_parameters(
+        self, spec_with_symbolic: EquationSystem
+    ) -> None:
+        """Test PDEFromSpec constructor with no parameters."""
+        pde = PDEFromSpec(spec_with_symbolic)
+        assert pde._parameters == {}
+
+    def test_evolution_uses_resolved_coefficients(
+        self, spec_with_symbolic: EquationSystem, grid_1d: CartesianGrid
+    ) -> None:
+        """Test that evolution actually uses resolved coefficient values."""
+        # Create two PDEs with different mass parameters
+        pde_low_mass = PDEFromSpec(spec_with_symbolic, parameters={"m2": 0.1})
+        pde_high_mass = PDEFromSpec(spec_with_symbolic, parameters={"m2": 10.0})
+
+        # Create identical initial states with a Gaussian
+        x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
+        initial_data = np.exp(-((x - 50) ** 2) / 50)
+
+        state_low = FieldCollection([
+            ScalarField(grid_1d, data=initial_data.copy()),
+            ScalarField(grid_1d, data=0.0),  # momentum
+        ])
+        state_high = FieldCollection([
+            ScalarField(grid_1d, data=initial_data.copy()),
+            ScalarField(grid_1d, data=0.0),
+        ])
+
+        # Evolve briefly
+        result_low = pde_low_mass.solve(state_low, t_range=1.0, dt=0.01)
+        result_high = pde_high_mass.solve(state_high, t_range=1.0, dt=0.01)
+
+        result_low = normalize_solve_result(result_low)
+        result_high = normalize_solve_result(result_high)
+
+        # Extract final field data
+        final_low = result_low[0].data
+        final_high = result_high[0].data
+
+        # Different mass should lead to different evolution
+        # (higher mass = faster oscillation for Klein-Gordon)
+        assert not np.allclose(final_low, final_high, rtol=0.01)
