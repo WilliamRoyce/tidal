@@ -20,6 +20,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
+import matplotlib.pyplot as plt
 import numpy as np
 from pde import CartesianGrid, FieldCollection, ScalarField
 
@@ -149,53 +150,44 @@ def main() -> None:
     print(f"  uy max: {np.max(np.abs(final_state[2].data)):.4f}")
     print(f"  pi_uy max: {np.max(np.abs(final_state[3].data)):.4f}")
 
-    # Optional: Save visualization
-    try:
-        import matplotlib.pyplot as plt  # noqa: PLC0415
+    _fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
-        _fig, axes = plt.subplots(2, 2, figsize=(12, 10))
+    # ux displacement
+    im0 = axes[0, 0].imshow(
+        final_state[0].data.T, origin="lower", cmap="RdBu", aspect="equal"
+    )
+    axes[0, 0].set_title("ux (horizontal displacement)")
+    plt.colorbar(im0, ax=axes[0, 0])
 
-        # ux displacement
-        im0 = axes[0, 0].imshow(
-            final_state[0].data.T, origin="lower", cmap="RdBu", aspect="equal"
-        )
-        axes[0, 0].set_title("ux (horizontal displacement)")
-        plt.colorbar(im0, ax=axes[0, 0])
+    # ux velocity
+    im1 = axes[0, 1].imshow(
+        final_state[1].data.T, origin="lower", cmap="RdBu", aspect="equal"
+    )
+    axes[0, 1].set_title("∂ux/∂t (horizontal velocity)")
+    plt.colorbar(im1, ax=axes[0, 1])
 
-        # ux velocity
-        im1 = axes[0, 1].imshow(
-            final_state[1].data.T, origin="lower", cmap="RdBu", aspect="equal"
-        )
-        axes[0, 1].set_title("∂ux/∂t (horizontal velocity)")
-        plt.colorbar(im1, ax=axes[0, 1])
+    # uy displacement
+    im2 = axes[1, 0].imshow(
+        final_state[2].data.T, origin="lower", cmap="RdBu", aspect="equal"
+    )
+    axes[1, 0].set_title("uy (vertical displacement)")
+    plt.colorbar(im2, ax=axes[1, 0])
 
-        # uy displacement
-        im2 = axes[1, 0].imshow(
-            final_state[2].data.T, origin="lower", cmap="RdBu", aspect="equal"
-        )
-        axes[1, 0].set_title("uy (vertical displacement)")
-        plt.colorbar(im2, ax=axes[1, 0])
+    # uy velocity
+    im3 = axes[1, 1].imshow(
+        final_state[3].data.T, origin="lower", cmap="RdBu", aspect="equal"
+    )
+    axes[1, 1].set_title("∂uy/∂t (vertical velocity)")
+    plt.colorbar(im3, ax=axes[1, 1])
 
-        # uy velocity
-        im3 = axes[1, 1].imshow(
-            final_state[3].data.T, origin="lower", cmap="RdBu", aspect="equal"
-        )
-        axes[1, 1].set_title("∂uy/∂t (vertical velocity)")
-        plt.colorbar(im3, ax=axes[1, 1])
+    plt.suptitle("Navier-Cauchy Elastic Wave Propagation\n(derived from Lagrangian)")
+    plt.tight_layout()
 
-        plt.suptitle(
-            "Navier-Cauchy Elastic Wave Propagation\n(derived from Lagrangian)"
-        )
-        plt.tight_layout()
-
-        output_dir = Path(__file__).parent.parent.parent / "outputs"
-        output_dir.mkdir(exist_ok=True, parents=True)
-        output_path = output_dir / OUTPUT_FILENAME
-        plt.savefig(output_path, dpi=150, bbox_inches="tight")
-        print(f"Saved plot to: {output_path}")
-
-    except ImportError:
-        print("\nMatplotlib not available for visualization")
+    output_dir = Path(__file__).parent.parent.parent / "outputs"
+    output_dir.mkdir(exist_ok=True, parents=True)
+    output_path = output_dir / OUTPUT_FILENAME
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
+    print(f"Saved plot to: {output_path}")
 
 
 if __name__ == "__main__":
