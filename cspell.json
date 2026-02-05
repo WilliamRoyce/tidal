@@ -8,6 +8,7 @@
     "biharmonic",
     "blit",
     "cbar",
+    "Chern",
     "Christoffel",
     "clim",
     "cmap",
@@ -57,6 +58,7 @@
     "repr",
     "rtol",
     "sharey",
+    "Simons",
     "sympy",
     "Syms",
     "uncontracted",
@@ -96,7 +98,11 @@
     "trange",
     "tqdm"
   ],
-  "flagWords": ["hte", "teh", "wolfrom"],
+  "flagWords": [
+    "hte",
+    "teh",
+    "wolfrom"
+  ],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [
