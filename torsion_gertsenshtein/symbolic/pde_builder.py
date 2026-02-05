@@ -19,6 +19,7 @@ from typing_extensions import override
 from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
 from torsion_gertsenshtein.symbolic.json_loader import (
     EquationSystem,
+    OperatorTerm,
     load_equation_system,
 )
 
@@ -145,7 +146,7 @@ class PDEFromSpec(PDEBase):
     n_components : int
         Number of field components.
     explicit_time_dependence : bool
-        Always False (autonomous system).
+        True to support time-dependent coefficients (e.g., de Sitter spacetime).
 
     Examples
     --------
@@ -156,15 +157,32 @@ class PDEFromSpec(PDEBase):
     >>> # pde can now be used with py-pde solvers
     """
 
-    explicit_time_dependence = False
+    # Enable time-dependent coefficients for curved spacetime (e.g., de Sitter)
+    # This allows evolution_rate to receive the current time t
+    explicit_time_dependence = True
 
-    def __init__(self, spec: EquationSystem) -> None:
+    def __init__(
+        self,
+        spec: EquationSystem,
+        parameters: dict[str, float] | None = None,
+    ) -> None:
         """Initialize PDE from equation specification.
 
         Parameters
         ----------
         spec : EquationSystem
             The equation specification loaded from JSON.
+        parameters : dict[str, float] | None
+            Optional parameter values to override symbolic coefficients.
+            Keys are symbolic names (e.g., "m2", "kappa"), values are numeric.
+            When a term has a coefficient_symbolic that matches a key in this
+            dict, the parameter value is used instead of the numeric coefficient.
+
+            For time-dependent coefficients in curved spacetime:
+            - "H": Hubble parameter for de Sitter expansion (e.g., 0.1)
+            - "m2": Mass squared for Klein-Gordon field
+
+            Time-dependent terms like -2H∂_t φ are evaluated using these parameters.
         """
         super().__init__()
         self.spec = spec
@@ -172,6 +190,129 @@ class PDEFromSpec(PDEBase):
         self._component_name_to_index = {
             name: i for i, name in enumerate(spec.component_names)
         }
+        self._parameters = parameters or {}
+
+    def _resolve_coefficient(self, term: OperatorTerm) -> float:
+        """Resolve the effective coefficient for a term.
+
+        If the term has a symbolic coefficient name and that name (or its
+        negation) is in the parameters dict, use the parameter value.
+        Otherwise use the numeric coefficient from the JSON.
+
+        Parameters
+        ----------
+        term : OperatorTerm
+            The term whose coefficient to resolve.
+
+        Returns
+        -------
+        float
+            The effective coefficient value.
+        """
+        if term.coefficient_symbolic is not None:
+            sym = term.coefficient_symbolic
+
+            # Check for negated symbol like "-m2"
+            if sym.startswith("-") and sym[1:] in self._parameters:
+                return -self._parameters[sym[1:]]
+            if sym in self._parameters:
+                return self._parameters[sym]
+
+        # Default: use numeric coefficient from JSON
+        return term.coefficient
+
+    def _resolve_coefficient_at_time(self, term: OperatorTerm, t: float) -> float:
+        """Resolve coefficient that may depend on time.
+
+        For curved spacetime with time-dependent metrics (e.g., de Sitter expansion),
+        coefficients may depend on time. This method handles common patterns:
+
+        - "-2*H" (Hubble friction): Returns -2*H where H is from parameters
+        - "m2*exp(2*H*t)" (time-dependent mass): Returns -m2*exp(2*H*t)
+        - Other symbolic expressions: Attempts to evaluate or falls back to base coefficient
+
+        Parameters
+        ----------
+        term : OperatorTerm
+            The term whose coefficient to resolve.
+        t : float
+            Current simulation time.
+
+        Returns
+        -------
+        float
+            The effective coefficient value at time t.
+        """
+        import math
+
+        # For non-time-dependent terms, use standard resolution
+        if not term.time_dependent:
+            return self._resolve_coefficient(term)
+
+        # Get symbolic expression
+        sym = term.coefficient_symbolic or ""
+
+        # Pattern: n*H (Hubble friction, where n = spatial dimensions)
+        # In 1+1D (n=1): -H∂_t φ, in 2+1D (n=2): -2H∂_t φ, in 3+1D (n=3): -3H∂_t φ
+        if "H" in sym or "h" in sym.lower():
+            import re
+
+            # Require explicit Hubble parameter - no defaults
+            if "H" not in self._parameters:
+                raise ValueError(
+                    f"Hubble parameter 'H' is required for time-dependent coefficient '{sym}'. "
+                    f"Pass parameters={{'H': value}} to PDEFromSpec or build_pde_from_json."
+                )
+            H = self._parameters["H"]
+
+            # Match patterns like "-2*H", "2H", "-H", "H", "-2 H", etc.
+            match = re.match(r"^(-?\d*\.?\d*)\s*\*?\s*[Hh]$", sym.strip())
+            if not match:
+                raise ValueError(
+                    f"Cannot parse Hubble friction coefficient '{sym}'. "
+                    f"Expected format like '-H', '-2*H', '3H', etc."
+                )
+
+            multiplier_str = match.group(1)
+            # Validate the multiplier string before conversion
+            if multiplier_str in ("", None):
+                multiplier = 1.0
+            elif multiplier_str == "-":
+                multiplier = -1.0
+            else:
+                try:
+                    multiplier = float(multiplier_str)
+                except ValueError as e:
+                    raise ValueError(
+                        f"Invalid numeric multiplier '{multiplier_str}' in coefficient '{sym}'"
+                    ) from e
+            return multiplier * H
+
+        # Pattern: exp(2*H*t) or similar exponential
+        # This appears in time-dependent mass terms
+        if "exp" in sym.lower():
+            # Require explicit parameters - no defaults
+            if "m2" not in self._parameters:
+                raise ValueError(
+                    f"Mass parameter 'm2' is required for time-dependent coefficient '{sym}'. "
+                    f"Pass parameters={{'m2': value}} to PDEFromSpec or build_pde_from_json."
+                )
+            if "H" not in self._parameters:
+                raise ValueError(
+                    f"Hubble parameter 'H' is required for time-dependent coefficient '{sym}'. "
+                    f"Pass parameters={{'H': value}} to PDEFromSpec or build_pde_from_json."
+                )
+            m2 = self._parameters["m2"]
+            H = self._parameters["H"]
+            # De Sitter mass term: m² Ω² = m² e^{2Ht}
+            return -m2 * math.exp(2 * H * t)
+
+        # No fallbacks - if we can't parse it, fail explicitly
+        raise ValueError(
+            f"Cannot resolve time-dependent coefficient '{sym}' for term with "
+            f"operator '{term.operator}'. Supported patterns: '-n*H' for Hubble friction, "
+            f"'exp(...)' for exponential mass terms."
+        )
 
     @staticmethod
     def _get_operator(  # noqa: C901, PLR0911
@@ -373,6 +514,7 @@ class PDEFromSpec(PDEBase):
         component_idx: int,
         state: FieldCollection,
         bc: BCDescriptor,
+        t: float = 0.0,
     ) -> ScalarField:
         """Compute the RHS for a single component's momentum equation.
 
@@ -387,6 +529,8 @@ class PDEFromSpec(PDEBase):
             Current state (all fields and momenta).
         bc : BCDescriptor
             Boundary condition specification.
+        t : float
+            Current simulation time (for time-dependent coefficients in curved spacetime).
 
         Returns
         -------
@@ -405,13 +549,30 @@ class PDEFromSpec(PDEBase):
             # Supports both regular fields (A_0, phi_0) and momentum fields (pi_0, pi_1)
             # Momentum field support enables mixed time-space derivative handling
             target_field_name = term.field
-            target_field = self._get_field_from_state(state, target_field_name)
 
-            # Apply the operator
-            operated = self._get_operator(term.operator, target_field, bc)
+            # Handle first_derivative_t operator specially
+            # For d_t(field_i) = momentum_i, so first_derivative_t(field) returns momentum
+            if term.operator == "first_derivative_t":
+                # Get the field index for this term's target field
+                target_idx = self._component_name_to_index.get(target_field_name)
+                if target_idx is not None:
+                    # Momentum is at odd indices: state[2*i + 1]
+                    momentum = state[2 * target_idx + 1]
+                    assert isinstance(momentum, ScalarField)
+                    operated = momentum.copy()
+                else:
+                    msg = f"Unknown field for first_derivative_t: {target_field_name}"
+                    raise ValueError(msg)
+            else:
+                # Standard operator handling
+                target_field = self._get_field_from_state(state, target_field_name)
+                operated = self._get_operator(term.operator, target_field, bc)
+
+            # Resolve coefficient (use time-dependent resolution if needed)
+            coefficient = self._resolve_coefficient_at_time(term, t)
 
             # Add coefficient * operated to result
-            contribution = term.coefficient * operated
+            contribution = coefficient * operated
             result += contribution
 
         return result
@@ -433,7 +594,8 @@ class PDEFromSpec(PDEBase):
         state : FieldCollection
             Current state with 2 * n_components fields.
         t : float
-            Current time (unused for autonomous systems).
+            Current time. Used for time-dependent coefficients in curved spacetime
+            (e.g., Hubble friction in de Sitter expansion).
 
         Returns
         -------
@@ -465,7 +627,8 @@ class PDEFromSpec(PDEBase):
             d_field_dt = momentum_i.copy()
 
             # d/dt momentum_i = RHS from specification
-            d_momentum_dt = self._compute_rhs_for_component(i, state, bc)
+            # Pass current time for time-dependent coefficients (curved spacetime)
+            d_momentum_dt = self._compute_rhs_for_component(i, state, bc, t)
 
             rates.extend((d_field_dt, d_momentum_dt))
 
@@ -484,7 +647,10 @@ class PDEFromSpec(PDEBase):
         }
 
 
-def build_pde_from_json(json_path: Path | str) -> PDEFromSpec:
+def build_pde_from_json(
+    json_path: Path | str,
+    parameters: dict[str, float] | None = None,
+) -> PDEFromSpec:
     """Build a PDE from a JSON equation specification file.
 
     This is the main entry point for the Lagrangian-to-PDE pipeline on the
@@ -495,6 +661,10 @@ def build_pde_from_json(json_path: Path | str) -> PDEFromSpec:
     ----------
     json_path : Path | str
         Path to the JSON file containing the equation specification.
+    parameters : dict[str, float] | None
+        Optional parameter values to override symbolic coefficients.
+        Keys are symbolic names (e.g., "m2", "kappa"), values are numeric.
+        Example: {"m2": 0.5, "kappa": 1.0}
 
     Returns
     -------
@@ -508,9 +678,12 @@ def build_pde_from_json(json_path: Path | str) -> PDEFromSpec:
     >>> from pde import CartesianGrid, ScalarField, FieldCollection
     >>> grid = CartesianGrid([(0, 100)], 256, periodic=True)
     >>> # ... create initial conditions and solve
+
+    >>> # With custom parameter values:
+    >>> pde = build_pde_from_json("examples/data/proca_1d.json", parameters={"m2": 2.0})
     """
     spec = load_equation_system(json_path)
-    return PDEFromSpec(spec)
+    return PDEFromSpec(spec, parameters=parameters)
 
 
 def create_initial_state(

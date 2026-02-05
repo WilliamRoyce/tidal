@@ -10,8 +10,8 @@
    KEY RESPONSIBILITIES:
      - CD → Derivative conversion: ConvertCDToDerivatives transforms xAct covariant
        derivatives into explicit Mathematica Derivative[n,m,...][f][t,x,...] form
-     - Christoffel elimination: RemoveChristoffelSymbols sets connection terms to 0
-       (valid for flat Minkowski space)
+     - Christoffel evaluation: EvaluateChristoffelComponents evaluates connection terms
+       to their proper values (0 for flat Minkowski, non-zero for curved spacetimes)
      - Epsilon tensor evaluation: EvaluateEpsilonComponents converts Levi-Civita
        tensors to numeric ±1 values (supports 2D, 3D, 4D)
      - Metric evaluation: EvaluateMinkowskiMetric handles (-,+,+,...) signature
@@ -36,9 +36,23 @@ BeginPackage["TorsionGertsenshtein`CommonUtilities`",
   {"xAct`xTensor`", "xAct`xCoba`"}];
 
 (* Public symbols *)
+EvaluateChristoffelComponents::usage =
+  "EvaluateChristoffelComponents[expr, chart] evaluates Christoffel symbol components \
+to their numeric values for the given chart. For flat Minkowski space with constant \
+metric components, all Christoffel symbols evaluate to zero. For curved spacetimes, \
+this would give the proper non-zero connection coefficients. \
+Use EvaluateChristoffelComponents[expr, chart, True] to compute from xAct's metric \
+definition (for non-flat metrics).";
+
+ComputeChristoffelFromMetric::usage =
+  "ComputeChristoffelFromMetric[chart] computes Christoffel symbol components \
+using xAct's ComponentValue to extract the values computed from the metric definition. \
+Returns a 3D array where christoffel[[a+1, b+1, c+1]] = Gamma^a_bc. \
+No hardcoded values - all results derived from the metric via xAct.";
+
 RemoveChristoffelSymbols::usage =
   "RemoveChristoffelSymbols[expr] sets all Christoffel symbol terms to zero \
-(valid for flat Minkowski space).";
+(valid for flat Minkowski space). Legacy function; prefer EvaluateChristoffelComponents.";
 
 EvaluateMinkowskiMetric::usage =
   "EvaluateMinkowskiMetric[expr, chart] evaluates metric components for \
@@ -128,8 +142,21 @@ Begin["`Private`"];
 (* Wrapped in Quiet to handle inputs that xAct doesn't expect *)
 
 (* Check if expr is a Christoffel symbol using xAct introspection *)
+(* Also uses string matching fallback for xCoba-generated symbols like ChristoffelCDPDcart *)
+(* NOTE: xAct's ChristoffelQ often returns False for ChristoffelCDPDchart symbols,
+   which are created by xCoba to represent the connection between covariant derivatives.
+   The string matching fallback ensures these are properly detected. *)
 IsChristoffelSymbol[expr_] := Quiet[
-  TrueQ[xAct`xTensor`ChristoffelQ[expr]],
+  Module[{xActResult, stringCheck},
+    (* First try xAct's ChristoffelQ *)
+    xActResult = TrueQ[xAct`xTensor`ChristoffelQ[expr]];
+    If[xActResult, Return[True]];
+
+    (* Fallback: check if symbol name contains "Christoffel" *)
+    (* This catches ChristoffelCDPDcart and similar xCoba-generated symbols *)
+    stringCheck = StringContainsQ[ToString[expr], "Christoffel"];
+    stringCheck
+  ],
   {xAct`xTensor`ChristoffelQ::argx, General::stop}
 ];
 
@@ -157,10 +184,87 @@ IsEpsilonTensor[expr_] := Quiet[
   {xAct`xTensor`EpsilonQ::argx, General::stop}
 ];
 
-(* === Christoffel Symbol Removal === *)
-(* In flat Minkowski space, Christoffel symbols vanish *)
-(* Uses xAct introspection for reliable detection *)
+(* === Christoffel Symbol Evaluation === *)
+(* For flat Minkowski space with constant metric, Christoffel symbols vanish naturally.
+   We evaluate them properly rather than removing them blindly, so the code will work
+   correctly for curved spacetimes where Christoffel symbols are non-zero.
 
+   For Minkowski metric (constant components), the Christoffel formula gives:
+     Γ^a_bc = (1/2) g^{ad} (∂_b g_{cd} + ∂_c g_{bd} - ∂_d g_{bc}) = 0
+   because all metric derivatives vanish for constant metric.
+
+   Implementation: We evaluate Christoffel components in basis indices to their
+   proper numeric values. For flat space this is 0; for curved space it would be
+   computed from the metric.
+
+   NOTE: The legacy RemoveChristoffelSymbols function is kept for backward compatibility
+   but now uses the improved IsChristoffelSymbol detection which catches xCoba-generated
+   symbols like ChristoffelCDPDcart.
+*)
+
+(* Compute Christoffel symbols from xAct's metric definition.
+   Uses xAct's ToBasis and TraceBasisDummy to extract the symbolically computed values.
+   NO hardcoding - all values derived from the metric via xAct.
+
+   PREREQUISITE: Must have called MetricInBasis[metric, -chart, metricMatrix] first
+   to set the metric components. Otherwise returns unevaluated expressions.
+
+   API: xCoba computes Christoffels when metric is defined. To extract components:
+   1. ToBasis[chart][expr] - decompose abstract tensor to basis form
+   2. TraceBasisDummy - evaluate dummy basis indices to numeric values
+*)
+ComputeChristoffelFromMetric[chart_, covd_] := Module[
+  {dim, christoffelExpr, basisExpr, components},
+
+  dim = GetChartDimension[chart];
+
+  (* Get the Christoffel symbol name for this covariant derivative.
+     xCoba generates it as Christoffel<CovD><PD><chart> *)
+  christoffelExpr = Symbol["Christoffel" <> ToString[covd] <> "PD" <> ToString[chart]];
+
+  (* Extract component values using proper xAct decomposition *)
+  components = Table[
+    Module[{expr},
+      (* Build the Christoffel with specific indices *)
+      expr = christoffelExpr[{a, chart}, {-b, -chart}, {-c, -chart}];
+      (* TraceBasisDummy evaluates basis components to their numeric/symbolic values *)
+      Quiet[Simplify[TraceBasisDummy[expr]], {TraceBasisDummy::unknown}]
+    ],
+    {a, 0, dim-1}, {b, 0, dim-1}, {c, 0, dim-1}
+  ];
+
+  components
+];
+
+(* Evaluate Christoffel components to their numeric/symbolic values *)
+(* Optional third argument: covariant derivative symbol (required for curved space computation) *)
+(* If not provided, assumes flat space and returns 0 for all Christoffels *)
+EvaluateChristoffelComponents[expr_, chart_, covd_:None] := Module[
+  {result, christoffelValues},
+
+  If[covd === None,
+    (* Flat space: all Christoffels = 0 *)
+    result = expr /. {
+      f_[{i_Integer, s1:(chart | -chart)}, {j_Integer, s2:(chart | -chart)}, {k_Integer, s3:(chart | -chart)}] /;
+        IsChristoffelSymbol[f] :> 0
+    };
+    Return[result]
+  ];
+
+  (* Compute Christoffel values from xAct's metric definition *)
+  (* PREREQUISITE: MetricInBasis must have been called to set metric components *)
+  christoffelValues = ComputeChristoffelFromMetric[chart, covd];
+
+  (* Substitute computed values into expression *)
+  result = expr /. {
+    f_[{a_Integer, s1:(chart | -chart)}, {b_Integer, s2:(chart | -chart)}, {c_Integer, s3:(chart | -chart)}] /;
+      IsChristoffelSymbol[f] :> christoffelValues[[a+1, b+1, c+1]]
+  };
+
+  Simplify[result]
+];
+
+(* Legacy function for backward compatibility - now properly detects xCoba symbols *)
 RemoveChristoffelSymbols[expr_] :=
   expr /. f_[__] /; IsChristoffelSymbol[f] -> 0;
 
@@ -190,10 +294,12 @@ EvaluateMinkowskiMetric[expr_, chart_] :=
 
 GetCoordinateSymbols[chart_] := Module[{coordSyms},
   coordSyms = ScalarsOfChart[chart];
-  (* If ScalarsOfChart returns unevaluated, warn user and use default 1+1D coordinates *)
+  (* If ScalarsOfChart returns unevaluated, fail with clear error - no silent fallback *)
   If[Head[coordSyms] === ScalarsOfChart,
-    Message[GetCoordinateSymbols::fallback, chart];
-    coordSyms = {t[], x[]}
+    Throw[StringJoin[
+      "GetCoordinateSymbols: Cannot extract coordinates from chart '", ToString[chart], "'. ",
+      "Ensure chart is properly defined with DefChart before calling this function."
+    ]]
   ];
   coordSyms
 ];
@@ -216,13 +322,21 @@ ValidateDimension[dim_Integer] := Module[{},
 
 GetChartDimension[chart_] := Module[{coords, dim},
   coords = ScalarsOfChart[chart];
+  (* If ScalarsOfChart returns unevaluated, fail with clear error - no silent fallback to 2 *)
   If[Head[coords] === ScalarsOfChart,
-    Message[GetChartDimension::fallback, chart];
-    2,  (* Default to 1+1D if chart not properly defined *)
-    dim = Length[coords];
-    ValidateDimension[dim];
-    dim
-  ]
+    Throw[StringJoin[
+      "GetChartDimension: Cannot determine dimension from chart '", ToString[chart], "'. ",
+      "Ensure chart is properly defined with DefChart before calling this function."
+    ]]
+  ];
+  dim = Length[coords];
+  If[!ValidateDimension[dim],
+    Throw[StringJoin[
+      "GetChartDimension: Dimension ", ToString[dim], " exceeds maximum supported (",
+      ToString[$MaxSupportedDimension], ")."
+    ]]
+  ];
+  dim
 ];
 
 (* === Dynamic CD Rule Generation === *)
@@ -341,26 +455,18 @@ ExtractNumericCoefficient[term_, fieldName_] := Module[
   (* Simplify *)
   coeff = Simplify[coeff];
 
-  (* Handle various coefficient forms *)
+  (* Handle various coefficient forms - fail explicitly for unresolved symbolic coefficients *)
   Which[
     NumericQ[coeff], coeff,
-    (* Negative symbolic coefficient: -m2 -> return -1.0 with warning *)
-    MatchQ[coeff, Times[-1, _Symbol]],
-      Print["Warning: Symbolic coefficient '", coeff, "' converted to -1.0. ",
-            "For proper numeric values, substitute symbols before JSON export."];
-      -1.0,
-    (* Positive symbolic coefficient: m2 -> return 1.0 with warning *)
-    MatchQ[coeff, _Symbol],
-      Print["Warning: Symbolic coefficient '", coeff, "' converted to 1.0. ",
-            "For proper numeric values, substitute symbols before JSON export."];
-      1.0,
-    (* Try numeric evaluation as last resort *)
+    (* Try numeric evaluation *)
     NumericQ[Quiet[N[coeff]]], Quiet[N[coeff]],
-    (* Default to 1.0 if all else fails, with warning *)
+    (* Symbolic coefficient that cannot be resolved numerically - FAIL *)
     True,
-      Print["Warning: Could not extract numeric coefficient from '", coeff,
-            "'. Defaulting to 1.0."];
-      1.0
+      Throw[StringJoin[
+        "ExtractNumericCoefficient: Cannot extract numeric coefficient from '",
+        ToString[coeff], "' for field '", ToString[fieldName], "'. ",
+        "Substitute symbolic coefficients before export, e.g.: expr /. {m2 -> 1.0}"
+      ]]
   ]
 ];
 

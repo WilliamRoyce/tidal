@@ -19,6 +19,7 @@
      - laplacian_x, laplacian_y, laplacian_z: directional second derivatives
      - gradient_x, gradient_y, gradient_z: first-order spatial gradients
      - cross_derivative_xy, cross_derivative_xz, cross_derivative_yz: mixed spatial
+     - first_derivative_t: first-order time derivative (Hubble friction in curved spacetime)
 
    PDE TYPES (via LHS structure):
      - Elliptic (time_order=0): Poisson, Laplace
@@ -112,11 +113,17 @@ IdentifyDirectionalLaplacian::usage =
 spatial direction. Returns \"laplacian_x\", \"laplacian_y\", \"laplacian_z\", or False. \
 Used for anisotropic equations like Navier-Cauchy where d^2_x and d^2_y have different coefficients.";
 
+(* First-order time derivative detection for curved spacetime *)
+IsFirstOrderTimeDerivative::usage =
+  "IsFirstOrderTimeDerivative[term] returns True if term contains exactly a first-order \
+time derivative (no spatial derivatives). Used to detect Hubble friction terms like \
+-2H∂_t φ in curved spacetime. Time index is always the first slot in Derivative[dt, dx, ...].";
+
 (* Term identification and building *)
 BuildTermResult::usage =
-  "BuildTermResult[coeff, operator, field, symbolicCoeff:None] builds a term result \
+  "BuildTermResult[coeff, operator, field, symbolicCoeff:None, timeDependent:False] builds a term result \
 Association with keys \"coefficient\", \"operator\", \"field\". Optionally includes \
-\"coefficient_symbolic\" when symbolicCoeff is not None.";
+\"coefficient_symbolic\" when symbolicCoeff is not None, and \"time_dependent\" when timeDependent is True.";
 
 IdentifyMultiFieldTerm::usage =
   "IdentifyMultiFieldTerm[term, currentFieldName, allFieldNames, metadata] analyzes a \
@@ -317,8 +324,13 @@ ParseMultiFieldRHS[eq_, currentFieldName_, allFieldNames_, metadata_] := Module[
   parsedTerms = Map[IdentifyMultiFieldTerm[#, currentFieldName, allFieldNames, metadata] &, terms];
   parsedTerms = DeleteCases[parsedTerms, Nothing];
 
+  (* Fail explicitly if no terms were parsed - do not inject ghost equations *)
   If[Length[parsedTerms] === 0,
-    parsedTerms = {<|"coefficient" -> 1.0, "operator" -> "laplacian", "field" -> currentFieldName|>}
+    Throw[StringJoin[
+      "ParseMultiFieldRHS: No terms parsed from RHS for field '", currentFieldName, "'. ",
+      "RHS expression: ", ToString[eq], ". ",
+      "Check that the equation is properly expanded and contains recognizable operators."
+    ]]
   ];
 
   parsedTerms
@@ -424,8 +436,31 @@ IdentifyGradientDirection[term_] := Module[{},
     (* Pattern: Derivative[0, n_] where n > 0 - MUST have first slot = 0 *)
     !FreeQ[term, Derivative[0, n_][_][___] /; n > 0], "gradient_x",
 
-    (* Default to gradient_x if detection fails *)
-    True, "gradient_x"
+    (* Fail explicitly if gradient direction cannot be determined *)
+    True,
+      Throw[StringJoin[
+        "IdentifyGradientDirection: Cannot determine gradient direction for term '",
+        ToString[term], "'. ",
+        "Expected Derivative[0, n_, ...] pattern for pure spatial gradient."
+      ]]
+  ]
+];
+
+(* === First-Order Time Derivative Detection (Phase 2 Curved Spacetime) === *)
+
+(* Detect pure first-order time derivative: Derivative[1, 0, ...] with no spatial derivatives *)
+(* Used for Hubble friction terms in curved spacetime: -2H∂_t φ *)
+(* Returns True only if time order = 1 AND all spatial orders = 0 *)
+IsFirstOrderTimeDerivative[term_] := Module[{},
+  Which[
+    (* 3+1D: Derivative[1, 0, 0, 0] - first-order time, no space *)
+    !FreeQ[term, Derivative[1, 0, 0, 0][_][___]], True,
+    (* 2+1D: Derivative[1, 0, 0] - first-order time, no space *)
+    !FreeQ[term, Derivative[1, 0, 0][_][___]], True,
+    (* 1+1D: Derivative[1, 0] - first-order time, no space *)
+    !FreeQ[term, Derivative[1, 0][_][___]], True,
+    (* Default: not a pure first-order time derivative *)
+    True, False
   ]
 ];
 
@@ -515,12 +550,17 @@ ExtractSpatialGradientFromMixed[term_] := Module[{},
     !FreeQ[term, Derivative[n_, m_, 0][_][___] /; n > 0 && m > 0], "gradient_x",
     (* 2+1D: Both x and y present - default to gradient_x (warning above) *)
     !FreeQ[term, Derivative[n_, m_, p_][_][___] /; n > 0 && m > 0 && p > 0], "gradient_x",
-    (* Fallback for other patterns *)
+    (* Fallback for other 2+1D/3+1D patterns - second slot nonzero *)
     !FreeQ[term, Derivative[n_, m_, _][_][___] /; n > 0 && m > 0], "gradient_x",
     (* 1+1D: Only x exists (second slot > 0 with first slot > 0) *)
     !FreeQ[term, Derivative[n_, m_][_][___] /; n > 0 && m > 0], "gradient_x",
-    (* Default *)
-    True, "gradient_x"
+    (* Fail explicitly if spatial gradient direction cannot be determined *)
+    True,
+      Throw[StringJoin[
+        "ExtractSpatialGradientFromMixed: Cannot extract spatial gradient from mixed derivative '",
+        ToString[term], "'. ",
+        "Expected pattern Derivative[time>0, spatial...] with at least one nonzero spatial slot."
+      ]]
   ]
 ];
 
@@ -578,9 +618,10 @@ IdentifyDirectionalLaplacian[term_] := Module[{},
   ]
 ];
 
-(* Helper to build term result with optional symbolic coefficient *)
+(* Helper to build term result with optional symbolic coefficient and time dependence *)
 (* Only includes "coefficient_symbolic" key when symbolicCoeff is not None *)
-BuildTermResult[coeff_, op_, field_, symbCoeff_:None] := Module[{result},
+(* Only includes "time_dependent" key when timeDependent is True *)
+BuildTermResult[coeff_, op_, field_, symbCoeff_:None, timeDependent_:False] := Module[{result},
   result = <|
     "coefficient" -> N[coeff],
     "operator" -> op,
@@ -589,7 +630,18 @@ BuildTermResult[coeff_, op_, field_, symbCoeff_:None] := Module[{result},
   If[symbCoeff =!= None,
     result["coefficient_symbolic"] = symbCoeff
   ];
+  If[timeDependent === True,
+    result["time_dependent"] = True
+  ];
   result
+];
+
+(* Check if a coefficient expression depends on time coordinate *)
+(* Used to flag terms that need time-dependent evaluation in Python *)
+IsTimeDependentCoefficient[coeffExpr_] := Module[{},
+  (* Check for t[] (applied coordinate symbol) or t (bare symbol) *)
+  (* Coordinate symbols from xCoba appear as t[] when evaluated *)
+  !FreeQ[coeffExpr, t[]] || !FreeQ[coeffExpr, t] && !NumericQ[coeffExpr]
 ];
 
 (* === Refactored Helper Functions for IdentifyMultiFieldTerm === *)
@@ -647,9 +699,10 @@ MatchFieldToHeads[functionHeads_List, allFieldNames_List, defaultField_String] :
 ];
 
 (* Extract coefficient from term given the field head *)
-(* Returns {numericCoeff, symbolicCoeff} where symbolicCoeff is None or a string *)
+(* Returns {numericCoeff, symbolicCoeff, isTimeDependent} *)
+(* where symbolicCoeff is None or a string, isTimeDependent is True/False *)
 ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
-  {rawCoeff, coefficient = 1.0, symbolicCoeff = None},
+  {rawCoeff, coefficient = 1.0, symbolicCoeff = None, isTimeDependent = False},
 
   rawCoeff = term /. {
     (* Replace Derivative[...][field][args] with 1 *)
@@ -658,6 +711,9 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
     f_Symbol[__] /; ToString[f] === fieldHead :> 1
   };
   rawCoeff = Simplify[rawCoeff];
+
+  (* Check for time dependence in coefficient *)
+  isTimeDependent = IsTimeDependentCoefficient[rawCoeff];
 
   (* Determine numeric coefficient and symbolic representation *)
   Which[
@@ -678,14 +734,16 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
     NumericQ[Quiet[N[rawCoeff]]],
       coefficient = Quiet[N[rawCoeff]];
       symbolicCoeff = None,
-    (* Complex symbolic expression *)
+    (* Complex symbolic expression (possibly time-dependent) *)
     True,
       coefficient = 1.0;
       symbolicCoeff = ToString[rawCoeff];
-      Message[ExtractNumericCoefficient::symbolic, rawCoeff, targetField]
+      If[!isTimeDependent,
+        Message[ExtractNumericCoefficient::symbolic, rawCoeff, targetField]
+      ]
   ];
 
-  {coefficient, symbolicCoeff}
+  {coefficient, symbolicCoeff, isTimeDependent}
 ];
 
 (* Classify operator type based on derivative structure *)
@@ -696,6 +754,13 @@ ClassifyOperatorType[term_] := Module[
   (* Check for field without derivatives (mass/coupling term) *)
   If[FreeQ[term, Derivative],
     Return[{"identity", False}]
+  ];
+
+  (* Check for pure first-order time derivative (Hubble friction in curved spacetime) *)
+  (* e.g., -2H∂_t φ in de Sitter: Derivative[1, 0][φ][t, x] with no spatial derivatives *)
+  (* This must come BEFORE the mixed derivative check *)
+  If[IsFirstOrderTimeDerivative[term],
+    Return[{"first_derivative_t", False}]
   ];
 
   (* Check for mixed time-space derivatives *)
@@ -735,7 +800,7 @@ ClassifyOperatorType[term_] := Module[
 
 IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_, metadata_] := Module[
   {functionHeads, matchResult, targetField, foundFieldHead,
-   coeffResult, coefficient, symbolicCoeff,
+   coeffResult, coefficient, symbolicCoeff, isTimeDependent,
    operatorResult, operator, isMixedTimeSpace},
 
   (* Step 1: Extract function heads from term *)
@@ -746,14 +811,16 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_, metadata_] := M
   targetField = matchResult[[1]];
   foundFieldHead = matchResult[[2]];
 
-  (* Step 3: Extract coefficient *)
+  (* Step 3: Extract coefficient (now includes time-dependence check) *)
   If[foundFieldHead =!= Null,
     coeffResult = ExtractTermCoefficient[term, foundFieldHead, targetField];
     coefficient = coeffResult[[1]];
-    symbolicCoeff = coeffResult[[2]],
+    symbolicCoeff = coeffResult[[2]];
+    isTimeDependent = coeffResult[[3]],
     (* Fallback if no field head found *)
     coefficient = 1.0;
-    symbolicCoeff = None
+    symbolicCoeff = None;
+    isTimeDependent = False
   ];
 
   (* Step 4: Classify operator type *)
@@ -766,8 +833,8 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_, metadata_] := M
     targetField = FieldToMomentumName[targetField]
   ];
 
-  (* Build and return result *)
-  BuildTermResult[coefficient, operator, targetField, symbolicCoeff]
+  (* Build and return result with time-dependence flag *)
+  BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent]
 ];
 
 (* === Equation Conversion === *)
@@ -847,10 +914,13 @@ ParseEquationRHS[eq_, fieldName_, metadata_] := Module[
   (* Filter out any Nothing entries *)
   parsedTerms = DeleteCases[parsedTerms, Nothing];
 
-  (* If no terms were identified, use fallback *)
+  (* Fail explicitly if no terms were parsed - do not inject ghost equations *)
   If[Length[parsedTerms] === 0,
-    (* Fallback: assume laplacian term *)
-    parsedTerms = {<|"coefficient" -> 1.0, "operator" -> "laplacian", "field" -> fieldName|>}
+    Throw[StringJoin[
+      "ParseEquationRHS: No terms parsed from RHS for field '", fieldName, "'. ",
+      "RHS expression: ", ToString[eq], ". ",
+      "Check that the equation is properly expanded and contains recognizable operators."
+    ]]
   ];
 
   parsedTerms

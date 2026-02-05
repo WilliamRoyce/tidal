@@ -12,7 +12,7 @@
      Tensor EOM (abstract indices: A_a, F_{ab})
        → ToBasis (convert to chart basis)
        → TraceBasisDummy (sum over dummy indices)
-       → RemoveChristoffelSymbols (flat space: Γ = 0)
+       → EvaluateChristoffelComponents (flat space: Γ = 0, curved: compute from metric)
        → EvaluateEpsilonComponents (ε tensors → ±1)
        → ConvertCDToDerivatives (CD → Derivative)
        → Extract components (A_0[t,x], A_1[t,x], ...)
@@ -39,7 +39,9 @@ BeginPackage["TorsionGertsenshtein`ComponentDecompose`",
 DecomposeToComponents::usage =
   "DecomposeToComponents[eom, field, chart] decomposes the tensor equation of \
 motion into individual scalar component equations. Returns a list of \
-{component_index, component_equation} pairs.";
+{component_index, component_equation} pairs. \
+Options: \"ComputeChristoffels\" -> True computes Christoffel symbols from the \
+metric definition using xAct (for curved spacetimes). Default is False (flat space).";
 
 ExtractOperatorStructure::usage =
   "ExtractOperatorStructure[componentEq, field, chart] analyzes a component \
@@ -53,11 +55,26 @@ Begin["`Private`"];
 
 (* === Component Decomposition === *)
 
-DecomposeToComponents[eom_, field_, chart_] :=
-  DecomposeToComponents[eom, field, chart, {}];
+(* Options for DecomposeToComponents *)
+Options[DecomposeToComponents] = {
+  "ComputeChristoffels" -> False  (* Set True for curved spacetimes *)
+};
 
-DecomposeToComponents[eom_, field_, chart_, additionalFields_List] := Module[
-  {dim, components, indices, componentEq, result, fieldHead, fieldRank, allFieldHeads},
+(* 3-arg signature: eom, field, chart (no additional fields, default options) *)
+DecomposeToComponents[eom_, field_, chart_] :=
+  DecomposeToComponents[eom, field, chart, {}, "ComputeChristoffels" -> False];
+
+(* 4-arg signature: eom, field, chart, additionalFields (default options) *)
+DecomposeToComponents[eom_, field_, chart_, additionalFields_List] :=
+  DecomposeToComponents[eom, field, chart, additionalFields, "ComputeChristoffels" -> False];
+
+(* Full signature with options *)
+DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsPattern[]] := Module[
+  {dim, components, indices, componentEq, result, fieldHead, fieldRank, allFieldHeads,
+   computeChristoffels},
+
+  (* Get option value for Christoffel computation *)
+  computeChristoffels = OptionValue["ComputeChristoffels"];
 
   (* Get the dimension dynamically from the chart *)
   (* ScalarsOfChart returns the coordinate symbols, e.g., {t[], x[]} or {t[], x[], y[]} *)
@@ -77,8 +94,8 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List] := Module[
     componentEq = ToBasis[chart][eom];
     componentEq = TraceBasisDummy[componentEq];
 
-    (* In flat Minkowski space, Christoffel symbols vanish *)
-    componentEq = RemoveChristoffelSymbols[componentEq];
+    (* Evaluate Christoffel symbols (0 for flat Minkowski, or computed from metric for curved) *)
+    componentEq = EvaluateChristoffelComponents[componentEq, chart, computeChristoffels];
     componentEq = Expand[componentEq];
 
     (* Evaluate epsilon tensor components to numeric ±1 values *)
@@ -90,7 +107,7 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List] := Module[
     Module[{coordSyms},
       coordSyms = GetCoordinateSymbols[chart];
 
-      (* Evaluate metric components for Minkowski signature (-1, +1) *)
+      (* Evaluate metric components (Minkowski signature for flat, or from definition for curved) *)
       componentEq = EvaluateMinkowskiMetric[componentEq, chart];
       componentEq = Expand[componentEq];
 
@@ -119,7 +136,7 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List] := Module[
     result = Table[
       {
         idx,
-        ExtractVectorComponent[eom, field, chart, idx]
+        ExtractVectorComponent[eom, field, chart, idx, computeChristoffels]
       },
       {idx, 0, dim - 1}
     ];
@@ -134,7 +151,7 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List] := Module[
 
 (* === Vector Component Extraction === *)
 
-ExtractVectorComponent[eom_, field_, chart_, componentIndex_] := Module[
+ExtractVectorComponent[eom_, field_, chart_, componentIndex_, computeChristoffels_:False] := Module[
   {componentEq, freeIdx, fieldHead, coordSyms, basisIdx},
 
   (*
@@ -181,8 +198,8 @@ ExtractVectorComponent[eom_, field_, chart_, componentIndex_] := Module[
   (* Step 4: Trace over dummy basis indices *)
   componentEq = TraceBasisDummy[componentEq];
 
-  (* Step 5: Remove Christoffel symbols (0 in flat Minkowski space) *)
-  componentEq = RemoveChristoffelSymbols[componentEq];
+  (* Step 5: Evaluate Christoffel symbols (0 for flat, or computed from metric for curved) *)
+  componentEq = EvaluateChristoffelComponents[componentEq, chart, computeChristoffels];
   componentEq = Expand[componentEq];
 
   (* Step 6: Evaluate epsilon tensor components to numeric ±1 values *)

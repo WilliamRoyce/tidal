@@ -78,11 +78,21 @@ class OperatorTerm:
         Name of the differential operator ("laplacian", "identity", "gradient_x", etc.)
     field : str
         Name of the field this operator acts on.
+    coefficient_symbolic : str | None
+        Optional symbolic name for the coefficient (e.g., "m2", "-kappa").
+        When present, the coefficient can be overridden at runtime by passing
+        a parameters dict to the PDE constructor.
+    time_dependent : bool
+        Whether the coefficient depends on time. For curved spacetime, terms
+        like -2H∂_t φ (Hubble friction) have time-dependent coefficients when
+        the conformal factor Ω(t) varies with time. Default False for flat spacetime.
     """
 
     coefficient: float
     operator: str
     field: str
+    coefficient_symbolic: str | None = None
+    time_dependent: bool = False
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> OperatorTerm:
@@ -91,6 +101,8 @@ class OperatorTerm:
             coefficient=float(data["coefficient"]),
             operator=str(data["operator"]),
             field=str(data["field"]),
+            coefficient_symbolic=data.get("coefficient_symbolic"),
+            time_dependent=bool(data.get("time_dependent", False)),
         )
 
 
@@ -147,9 +159,18 @@ class ComponentEquation:
             OperatorTerm.from_dict(term_data) for term_data in rhs_data["terms"]
         )
 
+        # Validate field_name exists in fields_lookup - no silent fallback to 0
+        if field_name not in fields_lookup:
+            valid_fields = list(fields_lookup.keys())
+            msg = (
+                f"Unknown field '{field_name}' in equation. "
+                f"Valid fields are: {valid_fields}"
+            )
+            raise ValueError(msg)
+
         return cls(
             field_name=field_name,
-            field_index=fields_lookup.get(field_name, 0),
+            field_index=fields_lookup[field_name],
             time_derivative_order=time_derivative_order,
             rhs_terms=rhs_terms,
         )
@@ -299,17 +320,22 @@ class EquationSystem:
         )
 
         # Parse coupling matrices
+        # Note: Using list comprehension to avoid Python mutable aliasing bug
+        # where [[0.0] * n] * n creates shared row references
         coupling_data = data.get("coupling", {})
+
+        def _default_zero_matrix(n: int) -> list[list[float]]:
+            """Create a proper zero matrix without shared row references."""
+            return [[0.0 for _ in range(n)] for _ in range(n)]
+
         mass_matrix = tuple(
             tuple(float(x) for x in row)
-            for row in coupling_data.get(
-                "mass_matrix", [[0.0] * n_components] * n_components
-            )
+            for row in coupling_data.get("mass_matrix", _default_zero_matrix(n_components))
         )
         coupling_matrix = tuple(
             tuple(float(x) for x in row)
             for row in coupling_data.get(
-                "coupling_matrix", [[0.0] * n_components] * n_components
+                "coupling_matrix", _default_zero_matrix(n_components)
             )
         )
 
