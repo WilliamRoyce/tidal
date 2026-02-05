@@ -74,10 +74,8 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 
 ## Future Aims / TODOs
 
-- Implement a Numba RHS for `KleinGordonPDE` and `make_coupled_kg_pde` to enable the `numba` backend for coupled systems.
 - Expand test suite: observers, profiling utilities, boundary condition handling.
 - Improve and publish type stubs for py-pde usages or vendor a narrow Protocol for solver/field interfaces to reduce casts.
-- Add CI (GitHub Actions) to run linting, type-checking (pyright/mypy), tests, and build docs on every push.
 - Expand initial condition library: plane waves, solitons, custom profiles.
 - Gallery of example runs with parameter sweeps and convergence studies.
 
@@ -170,6 +168,7 @@ uv run python examples/scalar_field/kg_from_lagrangian.py
 ```
 
 **Key Features:**
+
 - **No hardcoded physics**: All equations dynamically loaded from JSON
 - **Symbolic derivation**: Mathematica/xAct computes Euler-Lagrange equations
 - **JSON interface**: Well-defined schema for equation specification
