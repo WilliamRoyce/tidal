@@ -27,6 +27,7 @@ from pathlib import Path
 from typing import cast
 
 OUTPUT_FILENAME = "de_sitter_kg_output.png"
+AMPLITUDE_DECAY_THRESHOLD = 0.9  # Threshold to detect Hubble friction effect
 
 import matplotlib as mpl
 
@@ -40,7 +41,7 @@ from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
 from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0914, PLR0915
     """Run the de Sitter Klein-Gordon simulation."""
     print("=" * 60)
     print("De Sitter Klein-Gordon Simulation (Hubble Friction)")
@@ -159,7 +160,7 @@ def main() -> None:
     print(f"  Amplitude ratio (final/initial): {decay_ratio:.4f}")
     print(f"  Expected from Hubble damping exp(-H*t/2) [1+1D]: {expected_decay:.4f}")
 
-    if decay_ratio < 0.9:
+    if decay_ratio < AMPLITUDE_DECAY_THRESHOLD:
         print("  Hubble friction observed: amplitude has decayed")
     else:
         print("  Note: For small H or short time, damping may be subtle")
@@ -176,7 +177,7 @@ def main() -> None:
 
     print(f"  Initial 'energy': {initial_energy:.2f}")
     print(f"  Final 'energy': {final_energy:.2f}")
-    print(f"  Energy loss: {100*(1 - final_energy/initial_energy):.1f}%")
+    print(f"  Energy loss: {100 * (1 - final_energy / initial_energy):.1f}%")
 
     # Generate visualization
     print()
@@ -258,7 +259,7 @@ def main() -> None:
 
     fig.suptitle(
         rf"De Sitter KG: $g_{{\mu\nu}} = e^{{2Ht}} \eta_{{\mu\nu}}$, H={hubble_param}, m$^2$={mass_squared}"
-        + "\nHubble friction causes energy loss to expansion",
+        "\nHubble friction causes energy loss to expansion",
         fontsize=12,
     )
     plt.tight_layout()

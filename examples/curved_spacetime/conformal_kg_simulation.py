@@ -35,7 +35,7 @@ from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
 from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0914, PLR0915
     """Run the static conformal Klein-Gordon simulation."""
     print("=" * 60)
     print("Static Conformal Klein-Gordon 1+1D Simulation")
@@ -247,7 +247,7 @@ def main() -> None:
 
     fig.suptitle(
         r"Conformal KG: $g_{\mu\nu} = \Omega^2 \eta_{\mu\nu}$, $\Omega=2$, $m_{eff}^2=4$"
-        + "\nEquivalent to flat KG with m^2=4",
+        "\nEquivalent to flat KG with m^2=4",
         fontsize=12,
     )
     plt.tight_layout()
