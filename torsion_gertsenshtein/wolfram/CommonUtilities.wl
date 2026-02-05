@@ -18,6 +18,10 @@ GetCoordinateSymbols::usage =
   "GetCoordinateSymbols[chart] returns the coordinate scalar symbols from the \
 chart, with fallback to {t[], x[]} for 1+1D.";
 
+GetChartDimension::usage =
+  "GetChartDimension[chart] returns the spacetime dimension (number of coordinates) \
+from the chart. Use this to infer dimension dynamically instead of hardcoding.";
+
 ConvertCDToDerivatives::usage =
   "ConvertCDToDerivatives[expr, chart] converts covariant derivative operators \
 (CD) to explicit Mathematica Derivative form.";
@@ -80,10 +84,22 @@ GetCoordinateSymbols[chart_] := Module[{coordSyms},
   coordSyms
 ];
 
+(* === Dimension Inference from Chart === *)
+(* Returns the number of coordinates (spacetime dimension) from the chart *)
+(* This is the single source of truth for dimension throughout the pipeline *)
+
+GetChartDimension[chart_] := Module[{coords},
+  coords = ScalarsOfChart[chart];
+  If[Head[coords] === ScalarsOfChart,
+    2,  (* Default to 1+1D if chart not properly defined *)
+    Length[coords]
+  ]
+];
+
 (* === Covariant Derivative to Explicit Derivative Conversion === *)
 (* Converts CD[{i, -chart}][f[args]] to Derivative[...][f][args] form *)
 (* Handles both covariant (-chart) and contravariant (chart) indices *)
-(* Supports 1+1D (indices 0,1) and 2+1D (indices 0,1,2) *)
+(* Supports 1+1D (indices 0,1), 2+1D (indices 0,1,2), and 3+1D (indices 0,1,2,3) *)
 (* Uses FixedPoint to handle nested derivative expressions *)
 
 ConvertCDToDerivatives[expr_, chart_] := Module[
@@ -138,7 +154,41 @@ ConvertCDToDerivatives[expr_, chart_] := Module[
     f_[{0, chart}][Derivative[n_, m_, p_][g_][args__]] /; isCDlike[f[{0, chart}]] :>
       Derivative[n + 1, m, p][g][args],
     f_[{1, chart}][Derivative[n_, m_, p_][g_][args__]] /; isCDlike[f[{1, chart}]] :>
-      Derivative[n, m + 1, p][g][args]
+      Derivative[n, m + 1, p][g][args],
+
+    (* === 3+1D rules (4-argument Derivative for index 3 = z) === *)
+    (* These rules convert 3-arg Derivative to 4-arg when index 3 is encountered *)
+    (* Covariant index 3: {3, -chart} *)
+    f_[{3, -chart}][g_Symbol[args__]] /; isCDlike[f[{3, -chart}]] :>
+      Derivative[0, 0, 0, 1][g][args],
+    f_[{3, -chart}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{3, -chart}]] :>
+      Derivative[n, m, 0, 1][g][args],
+    f_[{3, -chart}][Derivative[n_, m_, p_][g_][args__]] /; isCDlike[f[{3, -chart}]] :>
+      Derivative[n, m, p, 1][g][args],
+    f_[{3, -chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{3, -chart}]] :>
+      Derivative[n, m, p, q + 1][g][args],
+    (* Contravariant index 3: {3, chart} *)
+    f_[{3, chart}][g_Symbol[args__]] /; isCDlike[f[{3, chart}]] :>
+      Derivative[0, 0, 0, 1][g][args],
+    f_[{3, chart}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{3, chart}]] :>
+      Derivative[n, m, 0, 1][g][args],
+    f_[{3, chart}][Derivative[n_, m_, p_][g_][args__]] /; isCDlike[f[{3, chart}]] :>
+      Derivative[n, m, p, 1][g][args],
+    f_[{3, chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{3, chart}]] :>
+      Derivative[n, m, p, q + 1][g][args],
+    (* Handle 4-arg derivatives with indices 0, 1, 2 *)
+    f_[{0, -chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{0, -chart}]] :>
+      Derivative[n + 1, m, p, q][g][args],
+    f_[{1, -chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{1, -chart}]] :>
+      Derivative[n, m + 1, p, q][g][args],
+    f_[{2, -chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{2, -chart}]] :>
+      Derivative[n, m, p + 1, q][g][args],
+    f_[{0, chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{0, chart}]] :>
+      Derivative[n + 1, m, p, q][g][args],
+    f_[{1, chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{1, chart}]] :>
+      Derivative[n, m + 1, p, q][g][args],
+    f_[{2, chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{2, chart}]] :>
+      Derivative[n, m, p + 1, q][g][args]
   };
 
   (* Apply repeatedly until fixed point (max 10 iterations) *)

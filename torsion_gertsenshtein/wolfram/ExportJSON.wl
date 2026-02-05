@@ -189,12 +189,17 @@ ParseMultiFieldRHS[eq_, currentFieldName_, allFieldNames_, metadata_] := Module[
 
 (* Detect if a term contains time derivatives of at least order minOrder *)
 (* Time index is always the first slot in Derivative[dt, dx, ...] *)
+(* Supports: 1+1D (2-arg), 2+1D (3-arg), 3+1D (4-arg), and higher dimensions *)
 ContainsTimeDerivative[term_, minOrder_:2] := Module[{},
   Which[
+    (* 3+1D: Derivative[n, m, p, q] - first slot n is time *)
+    !FreeQ[term, Derivative[n_, _, _, _][_][___] /; n >= minOrder], True,
     (* 2+1D: Derivative[n, m, p] - first slot n is time *)
     !FreeQ[term, Derivative[n_, _, _][_][___] /; n >= minOrder], True,
     (* 1+1D: Derivative[n, m] - first slot n is time *)
     !FreeQ[term, Derivative[n_, _][_][___] /; n >= minOrder], True,
+    (* Generic: any arity with first slot >= minOrder *)
+    !FreeQ[term, Derivative[n_, ___][_][___] /; n >= minOrder], True,
     (* Default: no time derivative of required order *)
     True, False
   ]
@@ -202,8 +207,11 @@ ContainsTimeDerivative[term_, minOrder_:2] := Module[{},
 
 (* Check for mixed time-space derivatives that shouldn't be on RHS *)
 (* Returns True if term has BOTH time AND space derivatives *)
+(* Supports: 1+1D (2-arg), 2+1D (3-arg), 3+1D (4-arg) *)
 IsMixedTimeSpaceDerivative[term_] := Module[{},
   Which[
+    (* 3+1D: first slot > 0 AND (any spatial slot > 0) *)
+    !FreeQ[term, Derivative[n_, m_, p_, q_][_][___] /; n > 0 && (m > 0 || p > 0 || q > 0)], True,
     (* 2+1D: first slot > 0 AND (second OR third slot > 0) *)
     !FreeQ[term, Derivative[n_, m_, p_][_][___] /; n > 0 && (m > 0 || p > 0)], True,
     (* 1+1D: first slot > 0 AND second slot > 0 *)
@@ -216,9 +224,22 @@ IsMixedTimeSpaceDerivative[term_] := Module[{},
 (* Identify gradient direction from derivative structure *)
 (* In 1+1D: Derivative[dt, dx] - second slot is x *)
 (* In 2+1D: Derivative[dt, dx, dy] - second slot is x, third is y *)
+(* In 3+1D: Derivative[dt, dx, dy, dz] - second=x, third=y, fourth=z *)
 (* IMPORTANT: First slot (time) must be 0 for pure spatial gradients *)
 IdentifyGradientDirection[term_] := Module[{},
   Which[
+    (* 3+1D: Check for gradient_z first (fourth slot nonzero, others zero) *)
+    (* Pattern: Derivative[0, 0, 0, n_] where n > 0 *)
+    !FreeQ[term, Derivative[0, 0, 0, n_][_][___] /; n > 0], "gradient_z",
+
+    (* 3+1D: gradient_y (third slot nonzero, fourth zero) *)
+    (* Pattern: Derivative[0, 0, n_, 0] where n > 0 *)
+    !FreeQ[term, Derivative[0, 0, n_, 0][_][___] /; n > 0], "gradient_y",
+
+    (* 3+1D: gradient_x (second slot nonzero, third and fourth zero) *)
+    (* Pattern: Derivative[0, n_, 0, 0] where n > 0 *)
+    !FreeQ[term, Derivative[0, n_, 0, 0][_][___] /; n > 0], "gradient_x",
+
     (* 2+1D: Check for gradient_y first (third slot nonzero) *)
     (* Pattern: Derivative[0, 0, n_] where n > 0 - MUST have first slot = 0 *)
     (* This ensures we only match pure spatial gradients, not mixed time-space *)
@@ -267,15 +288,19 @@ FieldToMomentumName[fieldName_String] := Module[{parts, idx},
 (* Extract spatial gradient direction from mixed time-space derivative *)
 (* Derivative[1, 1, 0] (d_t d_x) -> "gradient_x" *)
 (* Derivative[1, 0, 1] (d_t d_y) -> "gradient_y" *)
-(* These represent d_x(pi) or d_y(pi) since d_t phi = pi *)
+(* Derivative[1, 0, 0, 1] (d_t d_z) -> "gradient_z" *)
+(* These represent d_x(pi) or d_y(pi) or d_z(pi) since d_t phi = pi *)
 (*
-   WARNING: Derivative[1, 1, 1] (d_t d_x d_y) is a mixed time + cross-spatial derivative.
-   This cannot be simply represented as gradient_x(pi) or gradient_y(pi).
-   The proper representation would require cross_derivative_xy(pi), which would need
-   a more complex operator structure. For now, we default to gradient_x with a warning.
+   WARNING: Mixed time + cross-spatial derivatives like d_t d_x d_y or d_t d_x d_z
+   cannot be simply represented as gradient(pi). They require cross_derivative(pi).
+   For now, we default to gradient_x with a warning.
 *)
 ExtractSpatialGradientFromMixed[term_] := Module[{},
-  (* First check for the problematic Derivative[n, m, p] where all are > 0 *)
+  (* Check for problematic mixed time + multiple spatial derivatives *)
+  If[!FreeQ[term, Derivative[n_, m_, p_, q_][_][___] /; n > 0 && Count[{m, p, q}, _?(# > 0 &)] > 1],
+    Print["Warning: Mixed time + cross-spatial derivative in 3+1D detected. ",
+          "Cannot exactly represent as momentum gradient. Using gradient_x(pi)."];
+  ];
   If[!FreeQ[term, Derivative[n_, m_, p_][_][___] /; n > 0 && m > 0 && p > 0],
     Print["Warning: Mixed time + cross-spatial derivative detected (e.g., d_t d_x d_y). ",
           "This term cannot be exactly represented as a simple momentum gradient. ",
@@ -283,6 +308,12 @@ ExtractSpatialGradientFromMixed[term_] := Module[{},
   ];
 
   Which[
+    (* 3+1D: z-only gradient (fourth slot > 0, second and third = 0, with time) *)
+    !FreeQ[term, Derivative[n_, 0, 0, m_][_][___] /; n > 0 && m > 0], "gradient_z",
+    (* 3+1D: y-only gradient (third slot > 0, second and fourth = 0, with time) *)
+    !FreeQ[term, Derivative[n_, 0, m_, 0][_][___] /; n > 0 && m > 0], "gradient_y",
+    (* 3+1D: x-only gradient (second slot > 0, third and fourth = 0, with time) *)
+    !FreeQ[term, Derivative[n_, m_, 0, 0][_][___] /; n > 0 && m > 0], "gradient_x",
     (* 2+1D: Check y-only gradient first (third slot > 0, second slot = 0, with time) *)
     !FreeQ[term, Derivative[n_, 0, m_][_][___] /; n > 0 && m > 0], "gradient_y",
     (* 2+1D: x-only gradient (second slot > 0, third slot = 0, with time) *)
@@ -298,19 +329,46 @@ ExtractSpatialGradientFromMixed[term_] := Module[{},
   ]
 ];
 
-(* Check if term contains a spatial cross-derivative (d_x d_y, NOT d^2_x or d^2_y) *)
-(* Pattern: Derivative[0, m, p] where BOTH m > 0 AND p > 0 *)
-IsSpatialCrossDerivative[term_] := Module[{},
-  !FreeQ[term, Derivative[0, m_, p_][_][___] /; m > 0 && p > 0]
+(* Check if term contains a spatial cross-derivative (d_x d_y, d_x d_z, d_y d_z) *)
+(* Returns False if not a cross-derivative, or the operator name if it is *)
+(* Pattern: Derivative[0, ...] where exactly 2 spatial slots are > 0 *)
+
+(* Legacy boolean version for backward compatibility *)
+IsSpatialCrossDerivative[term_] := IdentifySpatialCrossDerivative[term] =!= False;
+
+(* New version that returns the specific operator name *)
+IdentifySpatialCrossDerivative[term_] := Module[{},
+  Which[
+    (* 3+1D: cross_derivative_yz (third and fourth slots > 0, second = 0) *)
+    !FreeQ[term, Derivative[0, 0, m_, p_][_][___] /; m > 0 && p > 0], "cross_derivative_yz",
+    (* 3+1D: cross_derivative_xz (second and fourth slots > 0, third = 0) *)
+    !FreeQ[term, Derivative[0, m_, 0, p_][_][___] /; m > 0 && p > 0], "cross_derivative_xz",
+    (* 3+1D: cross_derivative_xy (second and third slots > 0, fourth = 0) *)
+    !FreeQ[term, Derivative[0, m_, p_, 0][_][___] /; m > 0 && p > 0], "cross_derivative_xy",
+    (* 2+1D: cross_derivative_xy (second and third slots > 0) *)
+    !FreeQ[term, Derivative[0, m_, p_][_][___] /; m > 0 && p > 0], "cross_derivative_xy",
+    (* Not a cross-derivative *)
+    True, False
+  ]
 ];
 
 (* === Phase 5 (Elasticity): Directional Laplacian Detection === *)
 (* Identifies pure second derivatives in a single spatial direction *)
-(* Returns: "laplacian_x", "laplacian_y", or False *)
+(* Returns: "laplacian_x", "laplacian_y", "laplacian_z", or False *)
 (* Used for anisotropic equations like Navier-Cauchy where ∂²_x and ∂²_y have different coefficients *)
+(* Supports 1+1D (2-arg), 2+1D (3-arg), and 3+1D (4-arg) Derivative forms *)
 
 IdentifyDirectionalLaplacian[term_] := Module[{},
   Which[
+    (* 3+1D: Derivative[0, 0, 0, 2] = pure ∂²/∂z² *)
+    !FreeQ[term, Derivative[0, 0, 0, 2][_][___]], "laplacian_z",
+
+    (* 3+1D: Derivative[0, 0, 2, 0] = pure ∂²/∂y² (no x or z derivative) *)
+    !FreeQ[term, Derivative[0, 0, 2, 0][_][___]], "laplacian_y",
+
+    (* 3+1D: Derivative[0, 2, 0, 0] = pure ∂²/∂x² (no y or z derivative) *)
+    !FreeQ[term, Derivative[0, 2, 0, 0][_][___]], "laplacian_x",
+
     (* 2+1D: Derivative[0, 2, 0] = pure ∂²/∂x² (no y derivative) *)
     !FreeQ[term, Derivative[0, 2, 0][_][___]], "laplacian_x",
 
@@ -417,15 +475,16 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_, metadata_] := M
   (* === Phase 4/5: Handle second-order spatial derivatives === *)
   (* Priority order: directional Laplacians > cross-derivative > generic Laplacian *)
   If[orderDerivatives == 2,
-    Module[{dirLap = IdentifyDirectionalLaplacian[term]},
-      (* Check for pure directional second derivative (laplacian_x, laplacian_y) *)
+    Module[{dirLap = IdentifyDirectionalLaplacian[term], crossDeriv},
+      (* Check for pure directional second derivative (laplacian_x, laplacian_y, laplacian_z) *)
       If[dirLap =!= False,
         operator = dirLap;
         Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
       ];
-      (* Check for cross-derivative (d_x d_y - NOT a laplacian) *)
-      If[IsSpatialCrossDerivative[term],
-        operator = "cross_derivative_xy";
+      (* Check for cross-derivative (d_x d_y, d_x d_z, d_y d_z - NOT a laplacian) *)
+      crossDeriv = IdentifySpatialCrossDerivative[term];
+      If[crossDeriv =!= False,
+        operator = crossDeriv;  (* Returns "cross_derivative_xy", "cross_derivative_xz", or "cross_derivative_yz" *)
         Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
       ];
       (* Fallback: mixed spatial second derivatives (shouldn't occur often) *)
@@ -552,15 +611,16 @@ IdentifyOperatorTerm[term_, fieldPattern_, fullFieldName_, metadata_] := Module[
 
   If[orderDerivatives == 2,
     (* Second derivatives - check for directional Laplacians first *)
-    Module[{dirLap = IdentifyDirectionalLaplacian[term]},
+    Module[{dirLap = IdentifyDirectionalLaplacian[term], crossDeriv},
       If[dirLap =!= False,
         operator = dirLap;
         coefficient = ExtractNumericCoefficient[term, fieldPattern];
         Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
       ];
-      (* Check for cross-derivative *)
-      If[IsSpatialCrossDerivative[term],
-        operator = "cross_derivative_xy";
+      (* Check for cross-derivative (xy, xz, yz) *)
+      crossDeriv = IdentifySpatialCrossDerivative[term];
+      If[crossDeriv =!= False,
+        operator = crossDeriv;  (* Returns "cross_derivative_xy", "cross_derivative_xz", or "cross_derivative_yz" *)
         coefficient = ExtractNumericCoefficient[term, fieldPattern];
         Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
       ];

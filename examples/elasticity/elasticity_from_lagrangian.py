@@ -23,6 +23,8 @@ from typing import cast
 import numpy as np
 from pde import CartesianGrid, FieldCollection, ScalarField
 
+OUTPUT_FILENAME = "elasticity_result.png"
+
 from torsion_gertsenshtein.symbolic import build_pde_from_json
 
 
@@ -188,7 +190,7 @@ def main() -> None:
 
         output_dir = Path(__file__).parent.parent.parent / "outputs"
         output_dir.mkdir(exist_ok=True)
-        output_path = output_dir / "elasticity_result.png"
+        output_path = output_dir / OUTPUT_FILENAME
         plt.savefig(output_path, dpi=150)
         print(f"\nVisualization saved to: {output_path}")
 

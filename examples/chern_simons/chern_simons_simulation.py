@@ -15,6 +15,8 @@ Equations of motion (in Lorenz gauge):
 from pathlib import Path
 from typing import cast
 
+OUTPUT_FILENAME = "chern_simons_output.png"
+
 import matplotlib as mpl
 
 from torsion_gertsenshtein.utils import normalize_solve_result
@@ -205,7 +207,7 @@ def main() -> None:  # noqa: PLR0915, PLR0914
 
     output_dir = Path(__file__).parent.parent.parent / "outputs"
     output_dir.mkdir(exist_ok=True)
-    output_path = output_dir / "chern_simons_output.png"
+    output_path = output_dir / OUTPUT_FILENAME
     plt.savefig(output_path, dpi=150)
     print(f"  Saved plot to: {output_path}")
 

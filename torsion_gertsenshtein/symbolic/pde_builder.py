@@ -146,6 +146,28 @@ class PDEFromSpec(PDEBase):
             grad_xy = grad_y.gradient(bc=bc)[0]
             assert isinstance(grad_xy, ScalarField)
             return grad_xy
+        if operator_name == "cross_derivative_xz":
+            # d/dx d/dz f = d/dx (d/dz f)
+            # Cross spatial derivative for 3+1D
+            if field.grid.dim < 3:  # noqa: PLR2004
+                msg = "cross_derivative_xz requires at least 3D grid"
+                raise ValueError(msg)
+            grad_z = field.gradient(bc=bc)[2]
+            assert isinstance(grad_z, ScalarField)
+            grad_xz = grad_z.gradient(bc=bc)[0]
+            assert isinstance(grad_xz, ScalarField)
+            return grad_xz
+        if operator_name == "cross_derivative_yz":
+            # d/dy d/dz f = d/dy (d/dz f)
+            # Cross spatial derivative for 3+1D
+            if field.grid.dim < 3:  # noqa: PLR2004
+                msg = "cross_derivative_yz requires at least 3D grid"
+                raise ValueError(msg)
+            grad_z = field.gradient(bc=bc)[2]
+            assert isinstance(grad_z, ScalarField)
+            grad_yz = grad_z.gradient(bc=bc)[1]
+            assert isinstance(grad_yz, ScalarField)
+            return grad_yz
         if operator_name == "laplacian_x":
             # Pure ∂²/∂x² - second derivative in x only
             # For anisotropic equations like Navier-Cauchy elasticity

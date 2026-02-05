@@ -949,3 +949,117 @@ class TestChernSimonsIntegration:
         assert sol.data is not None
         num_cs_states = 6
         assert len(sol.data) == num_cs_states
+
+
+# === Phase 6: 3+1D Operator Tests ===
+
+
+@pytest.fixture
+def grid_3d() -> CartesianGrid:
+    """3D periodic grid for testing 3+1D operators."""
+    return CartesianGrid([(0, 10), (0, 10), (0, 10)], [16, 16, 16], periodic=True)
+
+
+class TestCrossDerivatives3D:
+    """Tests for cross-derivatives in 3D (xz, yz)."""
+
+    def test_cross_derivative_xz_operator(self, grid_3d: CartesianGrid) -> None:
+        """Test cross_derivative_xz computes d_x d_z correctly."""
+        # Create field f(x,y,z) = sin(kx*x) * sin(kz*z)
+        # d_x d_z f = kx * kz * cos(kx*x) * cos(kz*z)
+        x = cast("np.ndarray", grid_3d.cell_coords[..., 0])
+        z = cast("np.ndarray", grid_3d.cell_coords[..., 2])
+        lx, lz = 10.0, 10.0
+        kx, kz = 2 * np.pi / lx, 2 * np.pi / lz
+
+        field_data = np.sin(kx * x) * np.sin(kz * z)
+        field = ScalarField(grid_3d, data=field_data)
+
+        result = PDEFromSpec._get_operator("cross_derivative_xz", field, "periodic")
+
+        expected = kx * kz * np.cos(kx * x) * np.cos(kz * z)
+        # Larger tolerance for 3D cross-derivatives on coarse 16^3 grid
+        assert_allclose(result.data, expected, rtol=0.06)
+
+    def test_cross_derivative_yz_operator(self, grid_3d: CartesianGrid) -> None:
+        """Test cross_derivative_yz computes d_y d_z correctly."""
+        # Create field f(x,y,z) = sin(ky*y) * sin(kz*z)
+        # d_y d_z f = ky * kz * cos(ky*y) * cos(kz*z)
+        y = cast("np.ndarray", grid_3d.cell_coords[..., 1])
+        z = cast("np.ndarray", grid_3d.cell_coords[..., 2])
+        ly, lz = 10.0, 10.0
+        ky, kz = 2 * np.pi / ly, 2 * np.pi / lz
+
+        field_data = np.sin(ky * y) * np.sin(kz * z)
+        field = ScalarField(grid_3d, data=field_data)
+
+        result = PDEFromSpec._get_operator("cross_derivative_yz", field, "periodic")
+
+        expected = ky * kz * np.cos(ky * y) * np.cos(kz * z)
+        # Larger tolerance for 3D cross-derivatives on coarse 16^3 grid
+        assert_allclose(result.data, expected, rtol=0.06)
+
+    def test_cross_derivative_xz_requires_3d(self, grid_2d: CartesianGrid) -> None:
+        """Test cross_derivative_xz raises on 2D grid."""
+        field = ScalarField(grid_2d, data=1.0)
+
+        with pytest.raises(ValueError, match="requires at least 3D"):
+            PDEFromSpec._get_operator("cross_derivative_xz", field, "periodic")
+
+    def test_cross_derivative_yz_requires_3d(self, grid_2d: CartesianGrid) -> None:
+        """Test cross_derivative_yz raises on 2D grid."""
+        field = ScalarField(grid_2d, data=1.0)
+
+        with pytest.raises(ValueError, match="requires at least 3D"):
+            PDEFromSpec._get_operator("cross_derivative_yz", field, "periodic")
+
+
+class TestDirectionalLaplacians3D:
+    """Tests for laplacian_z in 3D."""
+
+    def test_laplacian_z_operator(self, grid_3d: CartesianGrid) -> None:
+        """Test laplacian_z computes d^2/dz^2 correctly."""
+        # Create field f(x,y,z) = sin(kz*z)
+        # d^2f/dz^2 = -kz^2 * sin(kz*z)
+        z = cast("np.ndarray", grid_3d.cell_coords[..., 2])
+        lz = 10.0
+        kz = 2 * np.pi / lz
+
+        field_data = np.sin(kz * z)
+        field = ScalarField(grid_3d, data=field_data)
+
+        result = PDEFromSpec._get_operator("laplacian_z", field, "periodic")
+
+        expected = -(kz**2) * np.sin(kz * z)
+        # Larger tolerance for 3D operators on coarse 16^3 grid
+        assert_allclose(result.data, expected, rtol=0.06)
+
+    def test_laplacian_z_requires_3d(self, grid_2d: CartesianGrid) -> None:
+        """Test laplacian_z raises on 2D grid."""
+        field = ScalarField(grid_2d, data=1.0)
+
+        with pytest.raises(ValueError, match="requires at least 3D"):
+            PDEFromSpec._get_operator("laplacian_z", field, "periodic")
+
+    def test_laplacian_sum_3d(self, grid_3d: CartesianGrid) -> None:
+        """Test laplacian_x + laplacian_y + laplacian_z = laplacian in 3D."""
+        # Create field with variation in all three directions
+        x = cast("np.ndarray", grid_3d.cell_coords[..., 0])
+        y = cast("np.ndarray", grid_3d.cell_coords[..., 1])
+        z = cast("np.ndarray", grid_3d.cell_coords[..., 2])
+        k = 2 * np.pi / 10.0
+
+        field_data = np.sin(k * x) * np.sin(k * y) * np.sin(k * z)
+        field = ScalarField(grid_3d, data=field_data)
+
+        # Get all operators
+        lap_x = PDEFromSpec._get_operator("laplacian_x", field, "periodic")
+        lap_y = PDEFromSpec._get_operator("laplacian_y", field, "periodic")
+        lap_z = PDEFromSpec._get_operator("laplacian_z", field, "periodic")
+        lap_full = PDEFromSpec._get_operator("laplacian", field, "periodic")
+
+        # laplacian_x + laplacian_y + laplacian_z should equal laplacian
+        lap_sum = lap_x.data + lap_y.data + lap_z.data
+
+        # Larger tolerance for 3D operators on coarse 16^3 grid
+        assert_allclose(lap_sum, lap_full.data, rtol=0.05)
