@@ -20,6 +20,7 @@ EXAMPLES=(
     "examples/coupled_scalars/coupled_scalars.wls"
     "examples/chern_simons/chern_simons.wls"
     "examples/elasticity/navier_cauchy.wls"
+    "examples/proca/proca.wls"
 )
 
 PASSED=0
@@ -36,10 +37,10 @@ for example in "${EXAMPLES[@]}"; do
 
     echo "Running: $example"
     if wolframscript -file "$EXAMPLE_PATH"; then
-        ((PASSED++))
+        PASSED=$((PASSED + 1))
         echo "  OK"
     else
-        ((FAILED++))
+        FAILED=$((FAILED + 1))
         FAILED_EXAMPLES+=("$example")
         echo "  FAILED"
     fi
