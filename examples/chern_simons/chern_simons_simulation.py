@@ -27,7 +27,7 @@ from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
 from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0915, PLR0914
     """Run the Chern-Simons simulation."""
     print("=" * 60)
     print("Chern-Simons 2+1D Simulation from Lagrangian")
@@ -77,7 +77,7 @@ def main() -> None:
     print("Step 4: Creating initial conditions...")
 
     # Initial state: 6 fields = 3 components * (field + momentum)
-    # [A_0, pi_0, A_1, pi_1, A_2, pi_2]
+    # State layout: A_0, pi_0, A_1, pi_1, A_2, pi_2
 
     # Start with zero fields
     a0 = ScalarField(grid, data=0.0, label="A_0")
@@ -129,8 +129,8 @@ def main() -> None:
     print("Step 6: Analyzing results...")
 
     # Get initial and final states
-    initial = storage[0]
-    final = storage[-1]
+    initial = cast("FieldCollection", storage[0])
+    final = cast("FieldCollection", storage[-1])
 
     # Extract field amplitudes
     initial_a0 = np.max(np.abs(initial[0].data))
@@ -149,7 +149,7 @@ def main() -> None:
     )
 
     # Check for energy transfer (CS coupling effect)
-    if final_a0 > 0.01 or final_a2 > 0.01:
+    if final_a0 > 0.01 or final_a2 > 0.01:  # noqa: PLR2004
         print("  CS coupling effect observed: energy transferred to A_0 and A_2")
     else:
         print("  Note: CS coupling may be weak at this kappa value")

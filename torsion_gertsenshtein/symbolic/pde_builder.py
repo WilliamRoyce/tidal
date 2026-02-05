@@ -88,7 +88,7 @@ class PDEFromSpec(PDEBase):
         }
 
     @staticmethod
-    def _get_operator(
+    def _get_operator(  # noqa: C901, PLR0911
         operator_name: str, field: ScalarField, bc: BCDescriptor
     ) -> ScalarField:
         """Apply a named operator to a field.
@@ -146,6 +146,34 @@ class PDEFromSpec(PDEBase):
             grad_xy = grad_y.gradient(bc=bc)[0]
             assert isinstance(grad_xy, ScalarField)
             return grad_xy
+        if operator_name == "laplacian_x":
+            # Pure ∂²/∂x² - second derivative in x only
+            # For anisotropic equations like Navier-Cauchy elasticity
+            grad_x = field.gradient(bc=bc)[0]
+            assert isinstance(grad_x, ScalarField)
+            d2_x = grad_x.gradient(bc=bc)[0]
+            assert isinstance(d2_x, ScalarField)
+            return d2_x
+        if operator_name == "laplacian_y":
+            # Pure ∂²/∂y² - second derivative in y only
+            if field.grid.dim < 2:  # noqa: PLR2004
+                msg = "laplacian_y requires at least 2D grid"
+                raise ValueError(msg)
+            grad_y = field.gradient(bc=bc)[1]
+            assert isinstance(grad_y, ScalarField)
+            d2_y = grad_y.gradient(bc=bc)[1]
+            assert isinstance(d2_y, ScalarField)
+            return d2_y
+        if operator_name == "laplacian_z":
+            # Pure ∂²/∂z² - second derivative in z only
+            if field.grid.dim < 3:  # noqa: PLR2004
+                msg = "laplacian_z requires at least 3D grid"
+                raise ValueError(msg)
+            grad_z = field.gradient(bc=bc)[2]
+            assert isinstance(grad_z, ScalarField)
+            d2_z = grad_z.gradient(bc=bc)[2]
+            assert isinstance(d2_z, ScalarField)
+            return d2_z
 
         msg = f"Unknown operator: {operator_name}"
         raise ValueError(msg)
@@ -251,11 +279,6 @@ class PDEFromSpec(PDEBase):
         -------
         ScalarField
             The computed RHS for d/dt momentum_i.
-
-        Raises
-        ------
-        ValueError
-            If a term references an unknown field not in the component names.
         """
         eq = self.spec.equations[component_idx]
         grid = state.grid

@@ -304,6 +304,27 @@ IsSpatialCrossDerivative[term_] := Module[{},
   !FreeQ[term, Derivative[0, m_, p_][_][___] /; m > 0 && p > 0]
 ];
 
+(* === Phase 5 (Elasticity): Directional Laplacian Detection === *)
+(* Identifies pure second derivatives in a single spatial direction *)
+(* Returns: "laplacian_x", "laplacian_y", or False *)
+(* Used for anisotropic equations like Navier-Cauchy where ∂²_x and ∂²_y have different coefficients *)
+
+IdentifyDirectionalLaplacian[term_] := Module[{},
+  Which[
+    (* 2+1D: Derivative[0, 2, 0] = pure ∂²/∂x² (no y derivative) *)
+    !FreeQ[term, Derivative[0, 2, 0][_][___]], "laplacian_x",
+
+    (* 2+1D: Derivative[0, 0, 2] = pure ∂²/∂y² (no x derivative) *)
+    !FreeQ[term, Derivative[0, 0, 2][_][___]], "laplacian_y",
+
+    (* 1+1D: Derivative[0, 2] = pure ∂²/∂x² (only spatial dimension) *)
+    !FreeQ[term, Derivative[0, 2][_][___]], "laplacian_x",
+
+    (* Default: not a pure directional Laplacian *)
+    True, False
+  ]
+];
+
 (* Identify operator and target field for multi-field systems *)
 IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_, metadata_] := Module[
   {coefficient, operator, targetField, orderDerivatives, foundFieldHead,
@@ -393,13 +414,21 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_, metadata_] := M
   (* Check for derivative order *)
   orderDerivatives = CountDerivativeOrder[term];
 
-  (* === Phase 4: Handle spatial cross-derivatives === *)
-  (* Cross-derivatives like d_x d_y A are NOT laplacian - use special operator *)
+  (* === Phase 4/5: Handle second-order spatial derivatives === *)
+  (* Priority order: directional Laplacians > cross-derivative > generic Laplacian *)
   If[orderDerivatives == 2,
-    If[IsSpatialCrossDerivative[term],
-      operator = "cross_derivative_xy";
-      Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>],
-      (* Regular 2nd order spatial (laplacian) *)
+    Module[{dirLap = IdentifyDirectionalLaplacian[term]},
+      (* Check for pure directional second derivative (laplacian_x, laplacian_y) *)
+      If[dirLap =!= False,
+        operator = dirLap;
+        Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
+      ];
+      (* Check for cross-derivative (d_x d_y - NOT a laplacian) *)
+      If[IsSpatialCrossDerivative[term],
+        operator = "cross_derivative_xy";
+        Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
+      ];
+      (* Fallback: mixed spatial second derivatives (shouldn't occur often) *)
       operator = "laplacian";
       Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
     ]
@@ -522,11 +551,24 @@ IdentifyOperatorTerm[term_, fieldPattern_, fullFieldName_, metadata_] := Module[
   orderDerivatives = CountDerivativeOrder[term];
 
   If[orderDerivatives == 2,
-    (* Second derivatives indicate Laplacian or Box operator *)
-    (* In flat space after gauge fixing, typically just Laplacian in spatial coordinates *)
-    operator = "laplacian";
-    coefficient = ExtractNumericCoefficient[term, fieldPattern];
-    Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
+    (* Second derivatives - check for directional Laplacians first *)
+    Module[{dirLap = IdentifyDirectionalLaplacian[term]},
+      If[dirLap =!= False,
+        operator = dirLap;
+        coefficient = ExtractNumericCoefficient[term, fieldPattern];
+        Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
+      ];
+      (* Check for cross-derivative *)
+      If[IsSpatialCrossDerivative[term],
+        operator = "cross_derivative_xy";
+        coefficient = ExtractNumericCoefficient[term, fieldPattern];
+        Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
+      ];
+      (* Fallback: generic Laplacian *)
+      operator = "laplacian";
+      coefficient = ExtractNumericCoefficient[term, fieldPattern];
+      Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
+    ]
   ];
 
   If[orderDerivatives == 1,

@@ -22,6 +22,8 @@ from torsion_gertsenshtein.symbolic.pde_builder import (
 )
 from torsion_gertsenshtein.utils import normalize_solve_result
 
+# ruff: noqa: SLF001  # Tests need to access private methods
+
 # === Fixtures ===
 
 
@@ -553,7 +555,7 @@ class TestMomentumFieldReferences:
         """Test _get_field_from_state returns regular fields correctly."""
         pde = PDEFromSpec(em_spec)
 
-        # State: [A_0, pi_0, A_1, pi_1]
+        # State layout: A_0, pi_0, A_1, pi_1
         state = FieldCollection(
             [
                 ScalarField(grid_1d_small, data=1.0),  # A_0
@@ -576,7 +578,7 @@ class TestMomentumFieldReferences:
         """Test _get_field_from_state returns momentum fields for pi_* names."""
         pde = PDEFromSpec(em_spec)
 
-        # State: [A_0, pi_0, A_1, pi_1]
+        # State layout: A_0, pi_0, A_1, pi_1
         state = FieldCollection(
             [
                 ScalarField(grid_1d_small, data=1.0),  # A_0
@@ -660,7 +662,7 @@ class TestMomentumFieldReferences:
         pde = PDEFromSpec(spec_with_momentum_gradient)
 
         # Create state with non-zero momentum in A_1
-        # State: [A_0, pi_0, A_1, pi_1]
+        # State layout: A_0, pi_0, A_1, pi_1
         x = cast("np.ndarray", grid_2d.cell_coords[..., 0])
         pi_1_data = np.sin(2 * np.pi * x / 10)  # Varies in x
 
@@ -737,13 +739,132 @@ class TestCrossDerivativeXY:
         assert np.max(np.abs(rates[1].data)) > 0
 
 
+class TestDirectionalLaplacians:
+    """Tests for directional Laplacian operators (laplacian_x, laplacian_y, laplacian_z).
+
+    These operators compute pure second derivatives in a single direction,
+    needed for anisotropic equations like Navier-Cauchy elasticity.
+    """
+
+    def test_laplacian_x_operator(self, grid_2d: CartesianGrid) -> None:
+        """Test laplacian_x computes ∂²/∂x² correctly."""
+        # Create field f(x,y) = sin(kx*x) * const_y
+        # d²f/dx² = -kx² * sin(kx*x) * const_y
+        x = cast("np.ndarray", grid_2d.cell_coords[..., 0])
+        lx = 10.0
+        kx = 2 * np.pi / lx
+
+        # Use constant in y direction so laplacian_x is purely from x variation
+        field_data = np.sin(kx * x)
+        field = ScalarField(grid_2d, data=field_data)
+
+        # Apply laplacian_x via operator
+        result = PDEFromSpec._get_operator("laplacian_x", field, "periodic")
+
+        # d²f/dx² = -kx² * sin(kx*x)
+        expected = -(kx**2) * np.sin(kx * x)
+
+        assert_allclose(result.data, expected, rtol=0.05)
+
+    def test_laplacian_y_operator(self, grid_2d: CartesianGrid) -> None:
+        """Test laplacian_y computes ∂²/∂y² correctly."""
+        # Create field f(x,y) = const_x * sin(ky*y)
+        # d²f/dy² = -ky² * const_x * sin(ky*y)
+        y = cast("np.ndarray", grid_2d.cell_coords[..., 1])
+        ly = 10.0
+        ky = 2 * np.pi / ly
+
+        # Use constant in x direction so laplacian_y is purely from y variation
+        field_data = np.sin(ky * y)
+        field = ScalarField(grid_2d, data=field_data)
+
+        # Apply laplacian_y via operator
+        result = PDEFromSpec._get_operator("laplacian_y", field, "periodic")
+
+        # d²f/dy² = -ky² * sin(ky*y)
+        expected = -(ky**2) * np.sin(ky * y)
+
+        assert_allclose(result.data, expected, rtol=0.05)
+
+    def test_laplacian_x_vs_laplacian_y_different(self, grid_2d: CartesianGrid) -> None:
+        """Test that laplacian_x and laplacian_y give different results for mixed field."""
+        # Create field f(x,y) = sin(kx*x) * sin(ky*y) with kx ≠ ky
+        x = cast("np.ndarray", grid_2d.cell_coords[..., 0])
+        y = cast("np.ndarray", grid_2d.cell_coords[..., 1])
+        kx = 2 * np.pi / 10.0  # different wave numbers
+        ky = 4 * np.pi / 10.0
+
+        field_data = np.sin(kx * x) * np.sin(ky * y)
+        field = ScalarField(grid_2d, data=field_data)
+
+        # Apply both operators
+        lap_x_result = PDEFromSpec._get_operator("laplacian_x", field, "periodic")
+        lap_y_result = PDEFromSpec._get_operator("laplacian_y", field, "periodic")
+
+        # Expected: d²f/dx² = -kx² * sin(kx*x) * sin(ky*y)
+        #           d²f/dy² = -ky² * sin(kx*x) * sin(ky*y)
+        # Since kx ≠ ky, these should be different
+        assert not np.allclose(lap_x_result.data, lap_y_result.data)
+
+        # Verify ratio matches kx²/ky²
+        ratio = lap_x_result.data / lap_y_result.data
+        expected_ratio = (kx**2) / (ky**2)
+        assert_allclose(ratio, expected_ratio, rtol=0.05)
+
+    def test_laplacian_y_requires_2d(self, grid_1d_small: CartesianGrid) -> None:
+        """Test laplacian_y raises on 1D grid."""
+        field = ScalarField(grid_1d_small, data=1.0)
+
+        with pytest.raises(ValueError, match="requires at least 2D"):
+            PDEFromSpec._get_operator("laplacian_y", field, "periodic")
+
+    def test_laplacian_x_works_on_1d(self, grid_1d_small: CartesianGrid) -> None:
+        """Test laplacian_x works on 1D grid."""
+        x = cast("np.ndarray", grid_1d_small.cell_coords[..., 0])
+        kx = 2 * np.pi / 10.0
+
+        field_data = np.sin(kx * x)
+        field = ScalarField(grid_1d_small, data=field_data)
+
+        # Should not raise - laplacian_x works in 1D
+        result = PDEFromSpec._get_operator("laplacian_x", field, "periodic")
+
+        expected = -(kx**2) * np.sin(kx * x)
+        assert_allclose(result.data, expected, rtol=0.05)
+
+    def test_laplacian_x_plus_laplacian_y_equals_laplacian(
+        self, grid_2d: CartesianGrid
+    ) -> None:
+        """Test that laplacian_x + laplacian_y equals the full laplacian."""
+        # Create field with both x and y variation
+        x = cast("np.ndarray", grid_2d.cell_coords[..., 0])
+        y = cast("np.ndarray", grid_2d.cell_coords[..., 1])
+        kx = 2 * np.pi / 10.0
+        ky = 2 * np.pi / 10.0
+
+        field_data = np.sin(kx * x) * np.sin(ky * y)
+        field = ScalarField(grid_2d, data=field_data)
+
+        # Get all three operators
+        lap_x = PDEFromSpec._get_operator("laplacian_x", field, "periodic")
+        lap_y = PDEFromSpec._get_operator("laplacian_y", field, "periodic")
+        lap_full = PDEFromSpec._get_operator("laplacian", field, "periodic")
+
+        # laplacian_x + laplacian_y should equal laplacian
+        lap_sum = lap_x.data + lap_y.data
+
+        assert_allclose(lap_sum, lap_full.data, rtol=0.01)
+
+
 class TestChernSimonsIntegration:
     """Integration tests for Chern-Simons 2+1D with Phase 4 features."""
 
     @pytest.fixture
     def cs_json_path(self) -> Path:
         """Path to Chern-Simons 3D JSON file."""
-        return Path(__file__).parent.parent / "examples" / "data" / "chern_simons_3d.json"
+        return (
+            Path(__file__).parent.parent / "examples" / "data" / "chern_simons_3d.json"
+        )
 
     def test_load_chern_simons_json(self, cs_json_path: Path) -> None:
         """Test loading Chern-Simons JSON with momentum references."""
@@ -767,7 +888,7 @@ class TestChernSimonsIntegration:
         pde = build_pde_from_json(cs_json_path)
 
         # Create state with Gaussian pulse in A_1
-        # State: [A_0, pi_0, A_1, pi_1, A_2, pi_2]
+        # State layout: A_0, pi_0, A_1, pi_1, A_2, pi_2
         x = cast("np.ndarray", grid_2d.cell_coords[..., 0])
         y = cast("np.ndarray", grid_2d.cell_coords[..., 1])
         a1_data = np.exp(-((x - 5) ** 2 + (y - 5) ** 2) / 2)

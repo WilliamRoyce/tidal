@@ -173,7 +173,7 @@ def _get_component(snapshot: FieldCollection, index: int) -> NumericArray:
     return np.asarray(field.data, dtype=float)
 
 
-def _analyze_results(simulation: SimulationData, spec: EquationSystem) -> None:
+def _analyze_results(simulation: SimulationData, _spec: EquationSystem) -> None:
     print("Step 6: Analyzing results...")
 
     # Get phi field (index 0) and chi field (index 2)
@@ -196,7 +196,7 @@ def _analyze_results(simulation: SimulationData, spec: EquationSystem) -> None:
         float(np.max(np.abs(_get_component(snapshot, 2))))
         for snapshot in simulation.snapshots
     ]
-    if max(chi_max_over_time) > 0.01:  # Threshold for energy transfer
+    if max(chi_max_over_time) > 0.01:  # noqa: PLR2004 - threshold
         print("  Energy transfer: φ → χ observed ✓ (coupling working)")
     else:
         print("  No energy transfer to χ (check coupling)")
@@ -212,7 +212,7 @@ def _analyze_results(simulation: SimulationData, spec: EquationSystem) -> None:
     print()
 
 
-def _plot_results(simulation: SimulationData, spec: EquationSystem) -> None:
+def _plot_results(simulation: SimulationData, _spec: EquationSystem) -> None:  # noqa: PLR0915
     print("Step 7: Generating visualization...")
     fig, axes = plt.subplots(2, 3, figsize=(15, 8))
 
@@ -248,7 +248,7 @@ def _plot_results(simulation: SimulationData, spec: EquationSystem) -> None:
         [_get_component(snapshot, 2) for snapshot in simulation.snapshots]
     )
     vmax_chi = np.max(np.abs(chi_history))
-    if vmax_chi < 1e-10:
+    if vmax_chi < 1e-10:  # noqa: PLR2004
         vmax_chi = 1.0  # Avoid division by zero
     im = ax.imshow(
         chi_history.T,

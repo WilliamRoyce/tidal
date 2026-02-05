@@ -221,15 +221,14 @@ class EquationSystem:
                             f"Valid indices: 0 to {self.n_components - 1}."
                         )
                         raise ValueError(msg)
-                else:
-                    # Regular field reference
-                    if field_ref not in valid_fields:
-                        msg = (
-                            f"Unknown field reference '{field_ref}' "
-                            f"in equation for {eq.field_name}. "
-                            f"Valid fields: {sorted(valid_fields)}."
-                        )
-                        raise ValueError(msg)
+                # Regular field reference
+                elif field_ref not in valid_fields:
+                    msg = (
+                        f"Unknown field reference '{field_ref}' "
+                        f"in equation for {eq.field_name}. "
+                        f"Valid fields: {sorted(valid_fields)}."
+                    )
+                    raise ValueError(msg)
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:
