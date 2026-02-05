@@ -47,6 +47,11 @@ ResetTestCounts::usage =
 $PassCount::usage = "Count of passed tests.";
 $FailCount::usage = "Count of failed tests.";
 
+CleanupxActManifold::usage =
+  "CleanupxActManifold[manifold] forcibly cleans up an xAct manifold and all \
+its dependent objects (metrics, charts, tensors). Use before DefManifold to \
+handle partial kernel state from previous failed runs.";
+
 Begin["`Private`"];
 
 (* Global counters *)
@@ -134,6 +139,19 @@ ExitWithTestStatus[] := (
   PrintTestSummary[];
   If[$FailCount > 0, Exit[1], Exit[0]]
 );
+
+(* xAct cleanup helper for test isolation *)
+(* This handles partial kernel state where manifold exists but metrics/charts don't *)
+CleanupxActManifold[manifold_Symbol] := Module[{},
+  (* Suppress all messages during cleanup - we don't care if things don't exist *)
+  Quiet[
+    (* UndefManifold recursively undefines all dependent objects *)
+    (* This includes metrics, charts, tensors, etc. defined on the manifold *)
+    If[xAct`xTensor`xTensorQ[manifold],
+      xAct`xTensor`UndefManifold[manifold]
+    ];
+  , All];  (* Suppress ALL messages *)
+];
 
 End[];
 EndPackage[];

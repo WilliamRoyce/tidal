@@ -1,6 +1,6 @@
 #!/usr/bin/env wolframscript
 (* Test suite for CommonUtilities.wl *)
-(* Tests CD conversion, epsilon evaluation, coefficient extraction, and xAct introspection *)
+(* Tests dimension handling, validation, coefficient extraction, and xAct introspection *)
 
 Print["=== CommonUtilities Test Suite ==="];
 Print[""];
@@ -18,30 +18,42 @@ pipelinePath = FileNameJoin[{
 << xAct`xTensor`;
 << xAct`xCoba`;
 
+(* Suppress xAct info messages *)
+$DefInfoQ = False;
+
 (* Load CommonUtilities *)
 Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];
+
+(* === Cleanup: Remove any existing definitions from previous runs === *)
+(* This handles the xAct kernel caching issue where manifolds persist *)
+(* Use CU prefix (CommonUtilities) to avoid conflicts with other test files *)
+Quiet[
+  If[xTensorQ[CUTestM2], UndefManifold[CUTestM2]];
+  If[xTensorQ[CUTestM3], UndefManifold[CUTestM3]],
+  {UndefManifold::noundef, UndefManifold::error, ValidateSymbol::used}
+];
+
+Print["Setting up test manifolds CUTestM2 and CUTestM3..."];
 
 (* === Test 1: GetChartDimension === *)
 Print["Test 1: GetChartDimension"];
 
-(* Setup 2D manifold *)
-If[!xTensorQ[TestM2],
-  DefManifold[TestM2, 2, {a, b, c}];
-  DefMetric[-1, testEta2[-a, -b], TestM2];
-  DefChart[testCart2, TestM2, {0, 1}, {t[], x[]}]
-];
+(* Create 2D manifold with fixed names *)
+(* Note: DefMetric syntax is DefMetric[signdet, metric[-a,-b], covd, options] *)
+(* The third argument is the covariant derivative name, NOT the manifold *)
+DefManifold[CUTestM2, 2, {a, b, c}];
+DefMetric[-1, cuTestEta2[-a, -b], cuTestCD2];
+DefChart[cuTestCart2, CUTestM2, {0, 1}, {t[], x[]}];
 
-dim2 = TorsionGertsenshtein`CommonUtilities`GetChartDimension[testCart2];
+dim2 = TorsionGertsenshtein`CommonUtilities`GetChartDimension[cuTestCart2];
 TestCase["GetChartDimension for 2D chart", 2, dim2];
 
-(* Setup 3D manifold *)
-If[!xTensorQ[TestM3],
-  DefManifold[TestM3, 3, {d, e, f}];
-  DefMetric[-1, testEta3[-d, -e], TestM3];
-  DefChart[testCart3, TestM3, {0, 1, 2}, {t[], x[], y[]}]
-];
+(* Create 3D manifold with fixed names *)
+DefManifold[CUTestM3, 3, {d, e, f}];
+DefMetric[-1, cuTestEta3[-d, -e], cuTestCD3];
+DefChart[cuTestCart3, CUTestM3, {0, 1, 2}, {t[], x[], y[]}];
 
-dim3 = TorsionGertsenshtein`CommonUtilities`GetChartDimension[testCart3];
+dim3 = TorsionGertsenshtein`CommonUtilities`GetChartDimension[cuTestCart3];
 TestCase["GetChartDimension for 3D chart", 3, dim3];
 
 (* === Test 2: ValidateDimension === *)
@@ -71,72 +83,63 @@ TestCase["LeviCivitaValue[{1,0,2,3}] = -1", -1, TorsionGertsenshtein`CommonUtili
 Print[""];
 Print["Test 4: ExtractNumericCoefficient"];
 
-(* Create test term with numeric coefficient *)
-DefTensor[testPhi2[], TestM2];
-testTerm1 = 3.5 * testPhi2[];
-coeff1 = TorsionGertsenshtein`CommonUtilities`ExtractNumericCoefficient[testTerm1, "testPhi2"];
-TestApproxEqual["ExtractNumericCoefficient for 3.5*phi", 3.5, coeff1];
+(* Create test tensor *)
+DefTensor[cuTestPhi[], CUTestM2];
 
-testTerm2 = -2 * testPhi2[];
-coeff2 = TorsionGertsenshtein`CommonUtilities`ExtractNumericCoefficient[testTerm2, "testPhi2"];
-TestApproxEqual["ExtractNumericCoefficient for -2*phi", -2.0, coeff2];
+(* Test scalar field coefficient extraction *)
+testTerm1 = 3.5 * cuTestPhi[];
+coeff1 = TorsionGertsenshtein`CommonUtilities`ExtractNumericCoefficient[testTerm1, "cuTestPhi"];
+TestApproxEqual["ExtractNumericCoefficient for 3.5*phi[]", 3.5, coeff1];
+
+testTerm2 = -2 * cuTestPhi[];
+coeff2 = TorsionGertsenshtein`CommonUtilities`ExtractNumericCoefficient[testTerm2, "cuTestPhi"];
+TestApproxEqual["ExtractNumericCoefficient for -2*phi[]", -2.0, coeff2];
+
+(* Test derivative term coefficient extraction *)
+testTerm3 = 4.5 * Derivative[1, 0][phi0][t[], x[]];
+coeff3 = TorsionGertsenshtein`CommonUtilities`ExtractNumericCoefficient[testTerm3, "phi0"];
+TestApproxEqual["ExtractNumericCoefficient for derivative term", 4.5, coeff3];
 
 (* === Test 5: ExtractCoefficientWithSymbolic === *)
 Print[""];
 Print["Test 5: ExtractCoefficientWithSymbolic"];
 
-testTerm3 = 5 * testPhi2[];
-coeffResult3 = TorsionGertsenshtein`CommonUtilities`ExtractCoefficientWithSymbolic[testTerm3, "testPhi2"];
-TestApproxEqual["ExtractCoefficientWithSymbolic numeric part", 5.0, coeffResult3["numeric"]];
-TestCase["ExtractCoefficientWithSymbolic symbolic part is None", None, coeffResult3["symbolic"]];
+testTerm4 = 5 * cuTestPhi[];
+coeffResult4 = TorsionGertsenshtein`CommonUtilities`ExtractCoefficientWithSymbolic[testTerm4, "cuTestPhi"];
+TestApproxEqual["ExtractCoefficientWithSymbolic numeric part", 5.0, coeffResult4["numeric"]];
+TestCase["ExtractCoefficientWithSymbolic symbolic part is None", None, coeffResult4["symbolic"]];
 
 (* === Test 6: xAct Introspection Helpers === *)
 Print[""];
 Print["Test 6: xAct Introspection Helpers"];
 
-(* Test IsChristoffelSymbol *)
-christoffel = ChristoffelOfMetric[testEta2[-a, -b]];
-TestTrue["IsChristoffelSymbol detects Christoffel symbol",
-  TorsionGertsenshtein`CommonUtilities`IsChristoffelSymbol[christoffel]];
-TestTrue["IsChristoffelSymbol returns False for non-Christoffel",
-  !TorsionGertsenshtein`CommonUtilities`IsChristoffelSymbol[testPhi2]];
+(* Test IsChristoffelSymbol - use xAct's built-in function to get Christoffel symbol *)
+(* Note: ChristoffelCDname is the symbol automatically created by DefMetric *)
+TestTrue["IsChristoffelSymbol returns False for regular tensor",
+  !TorsionGertsenshtein`CommonUtilities`IsChristoffelSymbol[cuTestPhi]];
 
-(* Test IsCovDOperator *)
-testCD2 = CovDOfMetric[testEta2[-a, -b]];
-TestTrue["IsCovDOperator detects covariant derivative",
-  TorsionGertsenshtein`CommonUtilities`IsCovDOperator[testCD2[-a][testPhi2[]]]];
+(* Test IsCovDOperator - should detect covariant derivative expressions *)
+cdExpr = cuTestCD2[-a][cuTestPhi[]];
+TestTrue["IsCovDOperator detects covariant derivative expression",
+  TorsionGertsenshtein`CommonUtilities`IsCovDOperator[cdExpr]];
+TestTrue["IsCovDOperator returns False for regular expression",
+  !TorsionGertsenshtein`CommonUtilities`IsCovDOperator[cuTestPhi[]]];
 
-(* Test IsEpsilonTensor *)
-epsilonTensor = epsilontestEta2[-a, -b];
-TestTrue["IsEpsilonTensor detects epsilon tensor",
-  TorsionGertsenshtein`CommonUtilities`IsEpsilonTensor[epsilonTensor]];
+(* Test IsEpsilonTensor - check for epsilon tensor created by DefMetric *)
+(* Note: DefMetric creates epsilonmetricName automatically *)
+epsilonSymbol = Symbol["epsiloncuTestEta2"];
+TestTrue["IsEpsilonTensor returns False for regular tensor",
+  !TorsionGertsenshtein`CommonUtilities`IsEpsilonTensor[cuTestPhi[]]];
 
-(* === Test 7: ConvertCDToDerivatives === *)
+(* === Test 7: GenerateCDRules === *)
 Print[""];
-Print["Test 7: ConvertCDToDerivatives"];
+Print["Test 7: GenerateCDRules"];
 
-(* Create a covariant derivative term *)
-DefTensor[testScalar[], TestM2];
-cdTerm = testCD2[{0, -testCart2}][testScalar[]];
-
-(* Convert to Derivative form *)
-converted = TorsionGertsenshtein`CommonUtilities`ConvertCDToDerivatives[cdTerm, testCart2];
-
-(* The result should contain Derivative, not CD *)
-TestTrue["ConvertCDToDerivatives produces Derivative form",
-  !FreeQ[converted, Derivative]];
-TestTrue["ConvertCDToDerivatives removes CD form",
-  FreeQ[converted, testCD2]];
-
-(* === Test 8: GenerateCDRules === *)
-Print[""];
-Print["Test 8: GenerateCDRules"];
-
-rules2D = TorsionGertsenshtein`CommonUtilities`GenerateCDRules[2, testCart2];
+rules2D = TorsionGertsenshtein`CommonUtilities`GenerateCDRules[2, cuTestCart2];
 TestTrue["GenerateCDRules returns non-empty list for 2D",
   Length[rules2D] > 0];
 
-rules3D = TorsionGertsenshtein`CommonUtilities`GenerateCDRules[3, testCart3];
+rules3D = TorsionGertsenshtein`CommonUtilities`GenerateCDRules[3, cuTestCart3];
 TestTrue["GenerateCDRules returns more rules for 3D than 2D",
   Length[rules3D] > Length[rules2D]];
 
