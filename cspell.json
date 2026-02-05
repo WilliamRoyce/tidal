@@ -52,6 +52,7 @@
     "noqa",
     "numba",
     "pdes",
+    "Proca",
     "pycache",
     "Pylance",
     "rcfonts",
