@@ -46,6 +46,22 @@ linear part of the equation.";
 IsLinear::usage =
   "IsLinear[expr, field] returns True if the expression is linear in the field.";
 
+(* Private helper functions *)
+SelectLinearTerms::usage =
+  "SelectLinearTerms[expr, field] extracts terms that are linear (degree-1) in the field. \
+For polynomial expressions, returns Coefficient[expr, field, 1] * field. For complex \
+expressions, selects terms with exactly one field factor.";
+
+HasExactlyOneFieldFactor::usage =
+  "HasExactlyOneFieldFactor[term, field] returns True if term contains exactly one \
+occurrence of the field or its derivatives. Used to identify linear terms in non-polynomial \
+expressions.";
+
+ExpandAroundBackground::usage =
+  "ExpandAroundBackground[eom, field, background] performs manual epsilon expansion \
+around a non-zero background: field -> background + epsilon*field, then extracts O(epsilon) \
+terms. Fallback method when xPert systematic perturbation is not applicable.";
+
 Begin["`Private`"];
 
 (* === Linearization === *)

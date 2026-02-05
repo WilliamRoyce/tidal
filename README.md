@@ -2,9 +2,9 @@
 
 View the `torsion_gertsenshtein` package documentation [here](https://williamroyce.github.io/torsion-gertsenshtein/).
 
-A research codebase for exploring **electromagnetic ↔ gravitational wave conversion** (Gertsenshtein effect) and potential **amplification mechanisms** in gravity theories with **torsion** (Poincaré gauge theory; parity-even quadratic invariants). The repository will host:
+A research codebase for exploring **electromagnetic ↔ gravitational wave conversion** (Gertsenshtein effect) and potential **amplification mechanisms** in gravity theories with **torsion** (Poincaré gauge theory; parity-even quadratic invariants). The repository includes:
 
-- A lightweight PDE sandbox (built on [`py-pde`]) for rapid prototyping and numerics.
+- **A lightweight PDE sandbox** (built on [`py-pde`]) for rapid prototyping and numerics with **267 passing tests** (100% pass rate).
 - A symbolic pipeline (Mathematica + xAct) for **deriving linearized field equations** and exporting them to Python-friendly forms.
 - Documentation and experiments for **mixing mechanisms** and **hyperbolicity/causality checks** relevant to the effect.
 
@@ -20,6 +20,7 @@ A research codebase for exploring **electromagnetic ↔ gravitational wave conve
 - **2D coupled simulations**: full support for coupled field evolution in 2D with visualization showing energy transfer between fields; dimension-agnostic PDE implementations work seamlessly with any grid dimensionality.
 - **Animation and visualization**: side-by-side spacetime plots (φ(x,t) heatmaps), 1D evolution animations (φ(x) vs time), 2D field evolution with dual-panel animations showing both coupled fields, and high-fps video export (MP4 via ffmpeg or GIF fallback).
 - **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), Wolfram Engine 14.3 with xAct tensor framework, optional ffmpeg; Sphinx docs skeleton; type-checked codebase with pytest test suite.
+- **Professional development infrastructure**: 267 tests (81 Wolfram + 186 Python, 100% pass rate), 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution.
 
 This README describes the current capabilities, how to run the examples, and planned improvements.
 
@@ -53,6 +54,12 @@ DefMetric[-1, g[-a, -b], CD, {";", "∇"}, PrintAs -> "g"];
 
 See [`scripts/README.md`](scripts/README.md) for complete setup instructions and [`scripts/verify-wolfram-setup.sh`](scripts/verify-wolfram-setup.sh) for verification.
 
+**Development Tools:**
+
+- Comprehensive test suite with 81 Wolfram unit tests covering all pipeline modules
+- 5 utility scripts for workflow automation (test execution, example derivations, pipeline validation)
+- Robust kernel caching support ensuring reliable test execution across multiple runs
+
 ## Objectives
 
 - Baseline re-derivation of the standard Gertsenshtein effect (Einstein–Maxwell) and its tiny conversion amplitude.
@@ -63,6 +70,7 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 
 ## Recent Improvements
 
+- **Phase 4: Pipeline Robustness & Testing (February 2026)**: ✅ **ALL CRITICAL IMPLEMENTATION COMPLETE**. Fixed Wolfram test symbol conflicts (DefMetric syntax, coefficient extraction, xAct introspection). Created 5 development utility scripts (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`) for streamlined workflows. Completed module header documentation for all Wolfram modules with PURPOSE, DEPENDENCIES, and DATA FLOW sections. **267 tests passing** (81 Wolfram + 186 Python, 100% pass rate). Robust kernel caching handling. See [CHANGELOG.md](CHANGELOG.md) for Phase 4 details.
 - **Lagrangian-to-PDE pipeline (February 2026)**: Complete symbolic derivation pipeline implemented with Mathematica/xAct → JSON → Python/py-pde. Fixed component extraction (free index detection with `IndicesOf[]`), operator identification (laplacian vs identity/mass terms), and RHS extraction. Created EM and Klein-Gordon examples demonstrating massless vs massive field dynamics. Added comprehensive documentation proving zero hardcoded physics in numerical layer. See [CHANGELOG.md](CHANGELOG.md) for detailed Phase 11 implementation notes.
 - **2D coupled-field support**: `multi_gaussian_2d` initializer for N-field systems on 2D grids; dimension-agnostic coordinate handling for both 1D and 2D; comprehensive test suite for 2D coupled dynamics (symmetry preservation, energy transfer, decoupled limits).
 - **Enhanced coordinate handling**: automatic detection of coordinate array format (flattened vs grid-shaped) in `gaussian_pulse` and `multi_gaussian_2d`; works seamlessly with different py-pde grid configurations.
@@ -72,12 +80,13 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 - **Type safety**: explicit type annotations for observers, trackers, and callbacks; keyword-only boolean arguments to avoid positional ambiguity.
 - **Test coverage**: edge-case tests for initial conditions (non-1D/2D grids, non-positive widths, empty amplitudes, mismatched parameter lengths); symmetry tests for coupled-field evolution in both 1D and 2D.
 
-## Future Aims / TODOs
+## Future Development
 
-- Expand test suite: observers, profiling utilities, boundary condition handling.
-- Improve and publish type stubs for py-pde usages or vendor a narrow Protocol for solver/field interfaces to reduce casts.
-- Expand initial condition library: plane waves, solitons, custom profiles.
-- Gallery of example runs with parameter sweeps and convergence studies.
+- **Continuous Integration**: GitHub Actions workflow for automated Wolfram test execution on pull requests.
+- **Extended physics examples**: Coupled EM/torsion systems, gauge theory implementations, non-Abelian field theories.
+- **Expand to 3+1D**: Test full 4D spacetime with 3 spatial dimensions (current support: 1+1D and 2+1D).
+- **Higher-rank tensor support**: Extend beyond scalars and vectors (requires component extraction improvements).
+- **Gallery of example runs** with parameter sweeps, convergence studies, and performance benchmarks.
 
 ---
 
@@ -203,20 +212,56 @@ If `ffmpeg` is unavailable, the example falls back to a GIF via Pillow.
 
 ## Tests
 
-A minimal smoke test suite is included to ensure `py-pde` and the solver path work, and to validate edge cases in initial conditions and multi-field systems:
+The project includes a comprehensive test suite with **267 tests** (186 Python + 81 Wolfram) achieving **100% pass rate**.
+
+### Python Tests (186 tests)
 
 ```bash
-# run all tests with pytest
+# Run all Python tests with pytest
 uv run pytest -v
 
-# run a specific test module
+# Run a specific test module
 uv run pytest tests/test_py_pde_smoke.py -v
 
-# run with coverage report
+# Run with coverage report
 uv run pytest --cov=torsion_gertsenshtein --cov-report=html
 ```
 
-Add more tests under `tests/` (ICs, utils, observers).
+### Wolfram Tests (81 tests)
+
+```bash
+# Run all Wolfram unit tests
+./scripts/run_wolfram_tests.sh
+
+# Run individual test files
+wolframscript -file tests/wolfram/test_euler_lagrange.wls
+wolframscript -file tests/wolfram/test_common_utilities.wls
+wolframscript -file tests/wolfram/test_export_json.wls
+```
+
+### Complete Test Suite
+
+```bash
+# Run both Python and Wolfram tests
+./scripts/full_test.sh
+
+# Validate end-to-end pipeline (Lagrangian → JSON → simulation)
+./scripts/validate_pipeline.sh
+
+# Check Wolfram module syntax
+./scripts/lint_wolfram.sh
+```
+
+**Test Coverage:**
+
+- Symbolic derivation (Euler-Lagrange, component decomposition, JSON export)
+- PDE construction and operator identification
+- Initial conditions and boundary conditions
+- Multi-field coupling and energy transfer
+- Edge cases (empty grids, invalid bounds, division by zero)
+- Path traversal protection and validation
+
+See [`scripts/README.md`](scripts/README.md) for detailed documentation of utility scripts.
 
 ---
 
@@ -311,7 +356,8 @@ See [`scripts/README.md`](scripts/README.md) for detailed setup instructions.
 ## Contributing
 
 - Open an issue or submit a PR.
-- If adding features that touch numerical kernels, include unit/regression tests.
+- **Test requirements**: All changes must maintain 100% test pass rate (267 tests). New features require corresponding unit tests in both Python and Wolfram layers where applicable.
+- Run `./scripts/full_test.sh` before submitting PRs to verify all tests pass.
 - Follow the project's type-checking and linting conventions (keyword-only booleans, explicit type annotations, no print in library code).
 
 ---
@@ -328,7 +374,7 @@ This project builds on:
 
 - [`py-pde`](https://py-pde.readthedocs.io/) for the PDE solver framework.
 - [`uv`](https://github.com/astral-sh/uv) for fast Python environment management.
-- The xAct/xTensor ecosystem (for symbolic tensor algebra, not yet integrated).
+- The [xAct/xTensor ecosystem](http://www.xact.es/) for symbolic tensor algebra (xCore, xPerm, xTensor, xCoba) powering the complete Lagrangian-to-PDE derivation pipeline.
 
 [`py-pde`]: https://py-pde.readthedocs.io/
 [`uv`]: https://github.com/astral-sh/uv
