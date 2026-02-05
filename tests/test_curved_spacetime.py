@@ -18,8 +18,7 @@ from torsion_gertsenshtein.symbolic.json_loader import (
     OperatorTerm,
     load_equation_system,
 )
-from torsion_gertsenshtein.symbolic.pde_builder import PDEFromSpec, build_pde_from_json
-
+from torsion_gertsenshtein.symbolic.pde_builder import PDEFromSpec
 
 # Path to test data
 DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
@@ -130,7 +129,7 @@ class TestTimeDependentCoefficients:
 
         # Resolve at t=0 (time doesn't matter for -H which is constant)
         # For 1+1D (n=1), the symbolic coefficient is "-H", should resolve to -0.5
-        coeff = pde._resolve_coefficient_at_time(hubble_term, t=0.0)
+        coeff = pde._resolve_coefficient_at_time(hubble_term, t=0.0)  # noqa: SLF001
 
         # Should be -H = -0.5 (not -2H which is for 2+1D)
         assert coeff == pytest.approx(-0.5, rel=0.01)  # Tightened tolerance from 10% to 1%
@@ -159,7 +158,8 @@ class TestDeSitterSimulation:
         pde = PDEFromSpec(de_sitter_spec, parameters={"H": 0.2, "m2": 1.0})
 
         # Create Gaussian initial condition
-        x = grid_1d.cell_coords[..., 0]
+        # py-pde cell_coords lacks type stubs
+        x = np.asarray(grid_1d.cell_coords[..., 0])  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
         gaussian = np.exp(-((x - 25) ** 2) / (2 * 3**2))
 
         field = ScalarField(grid_1d, data=gaussian, label="phi")
@@ -176,6 +176,7 @@ class TestDeSitterSimulation:
 
         # Run for a short time
         result = pde.solve(state, t_range=5.0, dt=0.01)
+        assert isinstance(result, FieldCollection)
 
         final_energy = energy(result)
 
@@ -189,7 +190,8 @@ class TestDeSitterSimulation:
         pde = PDEFromSpec(de_sitter_spec, parameters={"H": 0.3, "m2": 0.5})
 
         # Create Gaussian initial condition
-        x = grid_1d.cell_coords[..., 0]
+        # py-pde cell_coords lacks type stubs
+        x = np.asarray(grid_1d.cell_coords[..., 0])  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
         gaussian = np.exp(-((x - 25) ** 2) / (2 * 3**2))
 
         field = ScalarField(grid_1d, data=gaussian, label="phi")
@@ -200,6 +202,7 @@ class TestDeSitterSimulation:
 
         # Run simulation
         result = pde.solve(state, t_range=10.0, dt=0.01)
+        assert isinstance(result, FieldCollection)
 
         final_max = np.max(np.abs(result[0].data))
 

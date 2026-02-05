@@ -9,6 +9,7 @@ comes from the specification that was derived from the Lagrangian.
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
@@ -52,7 +53,7 @@ class ParsedFieldName:
     format: str
 
     @classmethod
-    def parse(cls, name: str) -> "ParsedFieldName":
+    def parse(cls, name: str) -> ParsedFieldName:
         """Parse field name auto-detecting format.
 
         Parameters
@@ -221,7 +222,9 @@ class PDEFromSpec(PDEBase):
         # Default: use numeric coefficient from JSON
         return term.coefficient
 
-    def _resolve_coefficient_at_time(self, term: OperatorTerm, t: float) -> float:
+    def _resolve_coefficient_at_time(  # noqa: C901
+        self, term: OperatorTerm, t: float
+    ) -> float:
         """Resolve coefficient that may depend on time.
 
         For curved spacetime with time-dependent metrics (e.g., de Sitter expansion),
@@ -242,9 +245,12 @@ class PDEFromSpec(PDEBase):
         -------
         float
             The effective coefficient value at time t.
-        """
-        import math
 
+        Raises
+        ------
+        ValueError
+            If required parameters (H, m2) are missing or coefficient cannot be parsed.
+        """
         # For non-time-dependent terms, use standard resolution
         if not term.time_dependent:
             return self._resolve_coefficient(term)
@@ -255,27 +261,31 @@ class PDEFromSpec(PDEBase):
         # Pattern: n*H (Hubble friction, where n = spatial dimensions)
         # In 1+1D (n=1): -H∂_t φ, in 2+1D (n=2): -2H∂_t φ, in 3+1D (n=3): -3H∂_t φ
         if "H" in sym or "h" in sym.lower():
-            import re
-
             # Require explicit Hubble parameter - no defaults
             if "H" not in self._parameters:
-                raise ValueError(
+                msg = (
                     f"Hubble parameter 'H' is required for time-dependent coefficient '{sym}'. "
                     f"Pass parameters={{'H': value}} to PDEFromSpec or build_pde_from_json."
                 )
-            H = self._parameters["H"]
+                raise ValueError(
+                    msg
+                )
+            hubble_param = self._parameters["H"]
 
             # Match patterns like "-2*H", "2H", "-H", "H", "-2 H", etc.
             match = re.match(r"^(-?\d*\.?\d*)\s*\*?\s*[Hh]$", sym.strip())
             if not match:
-                raise ValueError(
+                msg = (
                     f"Cannot parse Hubble friction coefficient '{sym}'. "
                     f"Expected format like '-H', '-2*H', '3H', etc."
+                )
+                raise ValueError(
+                    msg
                 )
 
             multiplier_str = match.group(1)
             # Validate the multiplier string before conversion
-            if multiplier_str in ("", None):
+            if multiplier_str in {"", None}:
                 multiplier = 1.0
             elif multiplier_str == "-":
                 multiplier = -1.0
@@ -283,39 +293,49 @@ class PDEFromSpec(PDEBase):
                 try:
                     multiplier = float(multiplier_str)
                 except ValueError as e:
+                    msg = f"Invalid numeric multiplier '{multiplier_str}' in coefficient '{sym}'"
                     raise ValueError(
-                        f"Invalid numeric multiplier '{multiplier_str}' in coefficient '{sym}'"
+                        msg
                     ) from e
-            return multiplier * H
+            return multiplier * hubble_param
 
         # Pattern: exp(2*H*t) or similar exponential
         # This appears in time-dependent mass terms
         if "exp" in sym.lower():
             # Require explicit parameters - no defaults
             if "m2" not in self._parameters:
-                raise ValueError(
+                msg = (
                     f"Mass parameter 'm2' is required for time-dependent coefficient '{sym}'. "
                     f"Pass parameters={{'m2': value}} to PDEFromSpec or build_pde_from_json."
                 )
-            if "H" not in self._parameters:
                 raise ValueError(
+                    msg
+                )
+            if "H" not in self._parameters:
+                msg = (
                     f"Hubble parameter 'H' is required for time-dependent coefficient '{sym}'. "
                     f"Pass parameters={{'H': value}} to PDEFromSpec or build_pde_from_json."
                 )
+                raise ValueError(
+                    msg
+                )
             m2 = self._parameters["m2"]
-            H = self._parameters["H"]
+            hubble_param = self._parameters["H"]
             # De Sitter mass term: m² Ω² = m² e^{2Ht}
-            return -m2 * math.exp(2 * H * t)
+            return -m2 * math.exp(2 * hubble_param * t)
 
         # No fallbacks - if we can't parse it, fail explicitly
-        raise ValueError(
+        msg = (
             f"Cannot resolve time-dependent coefficient '{sym}' for term with "
             f"operator '{term.operator}'. Supported patterns: '-n*H' for Hubble friction, "
             f"'exp(...)' for exponential mass terms."
         )
+        raise ValueError(
+            msg
+        )
 
     @staticmethod
-    def _get_operator(  # noqa: C901, PLR0911
+    def _get_operator(  # noqa: C901, PLR0911, PLR0912, PLR0915
         operator_name: str, field: ScalarField, bc: BCDescriptor
     ) -> ScalarField:
         """Apply a named operator to a field.
@@ -536,6 +556,11 @@ class PDEFromSpec(PDEBase):
         -------
         ScalarField
             The computed RHS for d/dt momentum_i.
+
+        Raises
+        ------
+        ValueError
+            If a field or operator cannot be resolved.
         """
         eq = self.spec.equations[component_idx]
         grid = state.grid
