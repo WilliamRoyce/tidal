@@ -140,6 +140,40 @@ L = (
 
 **Example from coupled scalars:** Required `+` before `(-1/2 CD[-a][chi[]]...)`
 
+### Epsilon Tensor Not Evaluating to Numbers
+
+**Symptoms:** Epsilon tensor like `epsiloneta3[{0,-cart3},{1,-cart3},{2,cart3}]` remains in output
+
+**Cause:** Pattern mismatch in `EvaluateEpsilonComponents`
+
+**Common issues:**
+1. Wrong chart name (must match exactly)
+2. Index sign pattern not handled (mixed up/down indices)
+3. Function not being called in pipeline
+
+**Solution:**
+```mathematica
+(* Verify epsilon is being evaluated *)
+testExpr = epsiloneta3[{0, -cart3}, {1, -cart3}, {2, cart3}];
+result = EvaluateEpsilonComponents[testExpr, cart3];
+Print["Result: ", result];  (* Should be a number, not symbolic *)
+```
+
+**Debug:** If epsilon remains symbolic, check:
+- The chart variable matches exactly (e.g., `cart3` not `cart`)
+- The epsilon tensor name matches pattern (must contain "epsilon")
+- Both covariant (`-chart`) and contravariant (`chart`) cases are handled
+
+### Mixed Time-Space Derivatives in 2+1D
+
+**Symptoms:** Extra "laplacian" terms on cross-fields in JSON
+
+**Cause:** `Derivative[1, 1, 0][f][t,x,y]` (d_t d_x f) classified as second-order
+
+**Current status:** Known limitation - the time derivative detection pattern is 1+1D only
+
+**Workaround:** For now, the extra terms don't break simulation but may cause numerical artifacts
+
 ## Common Python/py-pde Issues
 
 ### "Unknown operator: X"

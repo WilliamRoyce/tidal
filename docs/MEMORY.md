@@ -121,12 +121,13 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 - **JSON:** Auto-generated via `BuildMultiFieldJSONStructure`
 - **Key:** Pass `{chi[]}` when decomposing phi, `{phi[]}` when decomposing chi
 
-### Chern-Simons 2+1D (PARTIAL)
+### Chern-Simons 2+1D (WORKING - AUTOMATED)
 - **File:** `examples/chern_simons/chern_simons.wls`
-- **Features:** 3D manifold, Maxwell derivation, manual CS terms
-- **JSON:** Manual creation with gradient_x, gradient_y operators
-- **Key:** Derive Maxwell symbolically, add CS coupling terms explicitly
-- **Limitation:** Epsilon tensor expansion not automated yet
+- **Features:** 3D manifold, full Maxwell-CS symbolic derivation, auto epsilon evaluation
+- **JSON:** Auto-generated with gradient_x, gradient_y operators
+- **Key:** Use `epsiloneta3[a, b, c]` in Lagrangian, pipeline handles rest
+- **New functions:** `EvaluateEpsilonComponents`, `IdentifyGradientDirection`
+- **Limitation:** Mixed time-space derivatives in 2+1D need better handling
 
 ## Testing Guidelines
 
@@ -157,11 +158,12 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 
 ## Future Improvements Needed
 
-1. **Automate epsilon tensor handling:** Component evaluation rules for Levi-Civita
-2. **Improve operator detection:** Handle 3-arg Derivatives consistently in ExportJSON.wl
+1. ~~**Automate epsilon tensor handling:**~~ ✅ DONE - `EvaluateEpsilonComponents` in CommonUtilities.wl
+2. **Improve time derivative detection in 2+1D:** Current pattern `Derivative[n_, 0][_]` is 1+1D only
 3. **Generalize to 3+1D:** Test full 4D spacetime with 3 spatial dimensions
 4. **Gauge fixing:** Automate Lorenz/Coulomb gauge application in Wolfram
 5. **Higher-rank tensors:** Extend beyond vectors (currently scalars and vectors work)
+6. **Clean JSON output for 2+1D:** Remove spurious cross-Laplacian terms from mixed derivatives
 
 ## Quick Reference
 
