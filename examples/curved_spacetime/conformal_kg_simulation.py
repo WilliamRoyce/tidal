@@ -106,16 +106,19 @@ def main() -> None:
     print("  Initial momentum: zero")
 
     # Run simulation
+    # Note: Using smaller dt for better energy conservation.
+    # The explicit Euler integrator does not exactly conserve the Hamiltonian.
     print()
     print("Step 5: Running simulation...")
     t_end = 20.0
-    dt = 0.01
+    dt = 0.002  # Small timestep needed for m_eff²=4 (higher frequency requires smaller dt)
 
     storage = MemoryStorage()
     result = pde.solve(
         state,
         t_range=t_end,
         dt=dt,
+        scheme="runge-kutta",  # RK4 for better energy conservation
         tracker=storage.tracker(1.0),  # Store every 1.0 time units
     )
     result = normalize_solve_result(result)
@@ -188,23 +191,35 @@ def main() -> None:
     ax.legend()
     ax.grid(visible=True, alpha=0.3)
 
-    # Energy-like quantity
+    # Energy (proper Hamiltonian for static conformal)
+    # Note: Static conformal spacetime is conservative, so Hamiltonian should be conserved.
+    # Using RK4 scheme (scheme='runge-kutta') provides much better energy conservation
+    # than the default explicit Euler, which is non-symplectic and causes linear drift.
     ax = axes[1, 0]
     energies = []
     time_values = []
+
+    # Grid spacing for gradient calculation
+    dx = float(x[1] - x[0])
+
     for t_idx in range(len(storage)):
         snapshot = cast("FieldCollection", storage[t_idx])
-        # Approximate energy: 1/2 (pi^2 + (grad phi)^2 + m_eff^2 phi^2)
         phi_data = snapshot[0].data
         pi_data = snapshot[1].data
-        m_eff_sq = 4.0  # From conformal factor
-        energy = np.sum(pi_data**2 + phi_data**2 * m_eff_sq)
+
+        # Compute spatial gradient
+        grad_phi = np.gradient(phi_data, dx)
+
+        # Proper Hamiltonian: H = ½∫[π² + (∂_x φ)² + m_eff²φ²] dx
+        m_eff_sq = 4.0  # From conformal factor Ω=2: m_eff² = m² * Ω² = 1 * 4
+        energy = np.sum(0.5 * pi_data**2 + 0.5 * grad_phi**2 + 0.5 * m_eff_sq * phi_data**2)
         energies.append(energy)
         time_values.append(t_idx)
+
     ax.plot(time_values, energies, "b-", linewidth=2)
     ax.set_xlabel("Snapshot index")
-    ax.set_ylabel("Total 'energy'")
-    ax.set_title(r"Energy-like quantity ($\pi^2 + m_{eff}^2 \phi^2$)")
+    ax.set_ylabel("Total Energy")
+    ax.set_title(r"Hamiltonian $H = \frac{1}{2}\int[\pi^2 + (\nabla\phi)^2 + m_{eff}^2\phi^2]dx$")
     ax.grid(visible=True, alpha=0.3)
 
     # Space-time diagram
