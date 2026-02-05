@@ -34,7 +34,10 @@
 	"equations":[
 		{
 			"field":"ux_0",
-			"lhs":"d2_t(ux_0)",
+			"lhs":{
+				"expression":"d2_t(ux_0)",
+				"order":{"time":2,"space":0}
+			},
 			"rhs":{
 				"type":"linear_combination",
 				"terms":[
@@ -58,7 +61,10 @@
 		},
 		{
 			"field":"uy_0",
-			"lhs":"d2_t(uy_0)",
+			"lhs":{
+				"expression":"d2_t(uy_0)",
+				"order":{"time":2,"space":0}
+			},
 			"rhs":{
 				"type":"linear_combination",
 				"terms":[

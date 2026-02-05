@@ -16,6 +16,55 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+class LHSStructure:
+    """Structure describing the left-hand side of a PDE.
+
+    Supports different PDE types:
+    - Elliptic (time_order=0): ∇²φ = f (Poisson, Laplace)
+    - Parabolic (time_order=1): ∂_t φ = ... (heat, diffusion)
+    - Hyperbolic (time_order=2): ∂²_t φ = ... (wave)
+    - Higher order: ∂^n_t φ = ...
+
+    Attributes
+    ----------
+    expression : str
+        String representation (e.g., "d2_t(phi_0)", "d_t(phi)", "phi").
+    time_order : int
+        Order of time derivative on LHS (0, 1, 2, or higher).
+    space_order : int
+        Order of space derivative on LHS (usually 0).
+    """
+
+    expression: str
+    time_order: int
+    space_order: int = 0
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> LHSStructure:
+        """Create LHSStructure from structured JSON data.
+
+        Expected format: {"expression": "...", "order": {"time": N, "space": 0}}
+
+        Parameters
+        ----------
+        data : Mapping[str, Any]
+            The structured LHS data from JSON.
+
+        Returns
+        -------
+        LHSStructure
+            Parsed LHS structure.
+        """
+        expression = str(data.get("expression", ""))
+        order = data.get("order", {})
+        time_order = int(order.get("time", 2))  # Default to 2 for hyperbolic
+        space_order = int(order.get("space", 0))
+        return cls(
+            expression=expression, time_order=time_order, space_order=space_order
+        )
+
+
+@dataclass(frozen=True)
 class OperatorTerm:
     """A single term in the RHS of a field equation.
 
@@ -83,13 +132,10 @@ class ComponentEquation:
         field_name = str(data["field"])
 
         # Parse LHS to determine time derivative order
-        lhs = str(data["lhs"])
-        if "d2_t" in lhs:
-            time_derivative_order = 2
-        elif "d_t" in lhs:
-            time_derivative_order = 1
-        else:
-            time_derivative_order = 0
+        # Requires structured format: {"expression": "...", "order": {"time": N, "space": 0}}
+        lhs_data = data["lhs"]  # Required field
+        lhs_structure = LHSStructure.from_dict(lhs_data)
+        time_derivative_order = lhs_structure.time_order
 
         # Parse RHS terms
         rhs_data = data["rhs"]

@@ -18,13 +18,38 @@ GetCoordinateSymbols::usage =
   "GetCoordinateSymbols[chart] returns the coordinate scalar symbols from the \
 chart, with fallback to {t[], x[]} for 1+1D.";
 
+GetCoordinateSymbols::fallback =
+  "Chart `1` returned invalid coordinates. Using default 1+1D {t[], x[]}.";
+
 GetChartDimension::usage =
   "GetChartDimension[chart] returns the spacetime dimension (number of coordinates) \
 from the chart. Use this to infer dimension dynamically instead of hardcoding.";
 
+GetChartDimension::fallback =
+  "Chart `1` dimension could not be determined. Defaulting to 2 (1+1D).";
+
+ValidateDimension::usage =
+  "ValidateDimension[dim] checks if dimension is within supported range (≤4). \
+Returns True if valid, False otherwise.";
+
+ValidateDimension::unsupported =
+  "Dimension `1` exceeds supported maximum of `2`. CD conversion rules may be incomplete.";
+
+$MaxSupportedDimension::usage =
+  "$MaxSupportedDimension is the maximum spacetime dimension (currently 4 for 3+1D) \
+supported by the CD conversion rules.";
+
+GenerateCDRules::usage =
+  "GenerateCDRules[dim, chart] generates CD to Derivative conversion rules for \
+dim-dimensional spacetime. Eliminates hardcoded rule duplication and enables easy \
+extension to higher dimensions.";
+
 ConvertCDToDerivatives::usage =
   "ConvertCDToDerivatives[expr, chart] converts covariant derivative operators \
 (CD) to explicit Mathematica Derivative form.";
+
+ConvertCDToDerivatives::incomplete =
+  "CD conversion did not fully converge after `1` iterations. Remaining CD operators may exist.";
 
 ExtractFieldHead::usage =
   "ExtractFieldHead[field] extracts the tensor head from an applied field \
@@ -33,6 +58,13 @@ like phi[] or A[-a].";
 ExtractNumericCoefficient::usage =
   "ExtractNumericCoefficient[term, fieldName] extracts the numeric coefficient \
 from a term containing the named field.";
+
+ExtractNumericCoefficient::symbolic =
+  "Symbolic coefficient `1` found for field `2`. Storing as metadata.";
+
+ExtractCoefficientWithSymbolic::usage =
+  "ExtractCoefficientWithSymbolic[term, fieldName] extracts coefficient preserving \
+both numeric value and symbolic expression. Returns <|\"numeric\" -> N, \"symbolic\" -> S|>.";
 
 EvaluateEpsilonComponents::usage =
   "EvaluateEpsilonComponents[expr, chart] evaluates Levi-Civita (epsilon) tensor \
@@ -44,12 +76,36 @@ permutations, -1 for odd permutations, 0 for repeated indices.";
 
 Begin["`Private`"];
 
+(* === xAct Introspection Helpers === *)
+(* Use xAct's type-checking functions instead of fragile string matching *)
+(* Wrapped in Quiet to handle inputs that xAct doesn't expect *)
+
+(* Check if expr is a Christoffel symbol using xAct introspection *)
+IsChristoffelSymbol[expr_] := Quiet[
+  TrueQ[xAct`xTensor`ChristoffelQ[expr]],
+  {xAct`xTensor`ChristoffelQ::argx, General::stop}
+];
+
+(* Check if expr is a covariant derivative operator using xAct introspection *)
+IsCovDOperator[expr_] := Quiet[
+  TrueQ[xAct`xTensor`CovDQ[Head[expr]]],
+  {xAct`xTensor`CovDQ::argx, General::stop}
+];
+
+(* Check if expr is an epsilon (Levi-Civita) tensor using xAct introspection *)
+(* Falls back to string matching for cases xAct doesn't recognize *)
+IsEpsilonTensor[expr_] := Quiet[
+  TrueQ[xAct`xTensor`EpsilonQ[expr]] ||
+  TrueQ[xAct`xTensor`EpsilonQ[Head[expr]]],
+  {xAct`xTensor`EpsilonQ::argx, General::stop}
+];
+
 (* === Christoffel Symbol Removal === *)
 (* In flat Minkowski space, Christoffel symbols vanish *)
-(* Uses context-independent pattern matching to handle different xAct contexts *)
+(* Uses xAct introspection for reliable detection *)
 
 RemoveChristoffelSymbols[expr_] :=
-  expr /. f_[__] /; StringMatchQ[ToString[f], "*Christoffel*"] -> 0;
+  expr /. f_[__] /; IsChristoffelSymbol[f] -> 0;
 
 (* === Minkowski Metric Evaluation === *)
 (* Evaluates metric components for signature (-1, +1, +1, ...) *)
@@ -77,122 +133,125 @@ EvaluateMinkowskiMetric[expr_, chart_] :=
 
 GetCoordinateSymbols[chart_] := Module[{coordSyms},
   coordSyms = ScalarsOfChart[chart];
-  (* If ScalarsOfChart returns unevaluated, use default 1+1D coordinates *)
+  (* If ScalarsOfChart returns unevaluated, warn user and use default 1+1D coordinates *)
   If[Head[coordSyms] === ScalarsOfChart,
+    Message[GetCoordinateSymbols::fallback, chart];
     coordSyms = {t[], x[]}
   ];
   coordSyms
+];
+
+(* === Dimension Validation === *)
+(* Validates that dimension is within supported range for CD conversion rules *)
+$MaxSupportedDimension = 4;  (* Currently 3+1D is the maximum *)
+
+ValidateDimension[dim_Integer] := Module[{},
+  If[dim > $MaxSupportedDimension,
+    Message[ValidateDimension::unsupported, dim, $MaxSupportedDimension];
+    False,
+    True
+  ]
 ];
 
 (* === Dimension Inference from Chart === *)
 (* Returns the number of coordinates (spacetime dimension) from the chart *)
 (* This is the single source of truth for dimension throughout the pipeline *)
 
-GetChartDimension[chart_] := Module[{coords},
+GetChartDimension[chart_] := Module[{coords, dim},
   coords = ScalarsOfChart[chart];
   If[Head[coords] === ScalarsOfChart,
+    Message[GetChartDimension::fallback, chart];
     2,  (* Default to 1+1D if chart not properly defined *)
-    Length[coords]
+    dim = Length[coords];
+    ValidateDimension[dim];
+    dim
   ]
+];
+
+(* === Dynamic CD Rule Generation === *)
+(* Generates CD→Derivative rules dynamically for any dimension up to $MaxSupportedDimension *)
+(* This eliminates the 80+ hardcoded rules and enables easy extension to higher dimensions *)
+
+GenerateCDRules[dim_Integer, chart_] := Module[
+  {rules, isCDlike},
+
+  (* Validate dimension *)
+  If[!ValidateDimension[dim], Return[{}]];
+
+  (* CD-like operator check using xAct introspection *)
+  (* Falls back to string matching for edge cases xAct doesn't handle *)
+  isCDlike[x_] := IsCovDOperator[x] || StringMatchQ[ToString[Head[x]], "*CD*"];
+
+  (* Generate rules for all combinations:
+     - Each coordinate index: 0 to dim-1
+     - Both chart signs: chart and -chart (contravariant and covariant)
+     - Each Derivative arity: 2 to dim (handles promotion from lower to higher arity) *)
+
+  rules = Flatten[Table[
+    With[{idx = i, chartSign = s, arity = a},
+      {
+        (* Rule for applying CD to bare symbol: f[{idx, chartSign*chart}][g_Symbol[args]] *)
+        f_[{idx, chartSign*chart}][g_Symbol[args__]] /; isCDlike[f[{idx, chartSign*chart}]] :>
+          With[{newOrders = ReplacePart[ConstantArray[0, arity], idx + 1 -> 1]},
+            Derivative[Sequence @@ newOrders][g][args]
+          ],
+
+        (* Rule for applying CD to existing Derivative of MATCHING arity *)
+        f_[{idx, chartSign*chart}][Derivative[orders__][g_][args__]] /;
+          isCDlike[f[{idx, chartSign*chart}]] && Length[{orders}] == arity :>
+          With[{newOrders = ReplacePart[{orders}, idx + 1 -> {orders}[[idx + 1]] + 1]},
+            Derivative[Sequence @@ newOrders][g][args]
+          ],
+
+        (* Rule for PROMOTING lower-arity Derivative to this arity (for indices beyond current arity) *)
+        If[idx >= arity - 1 && arity > 2,
+          f_[{idx, chartSign*chart}][Derivative[orders__][g_][args__]] /;
+            isCDlike[f[{idx, chartSign*chart}]] && Length[{orders}] < arity :>
+            With[{paddedOrders = PadRight[{orders}, arity, 0]},
+              With[{newOrders = ReplacePart[paddedOrders, idx + 1 -> paddedOrders[[idx + 1]] + 1]},
+                Derivative[Sequence @@ newOrders][g][args]
+              ]
+            ],
+          Nothing
+        ]
+      }
+    ],
+    {i, 0, dim - 1},      (* Coordinate indices *)
+    {s, {1, -1}},         (* Chart signs: contravariant (1) and covariant (-1) *)
+    {a, 2, dim}           (* Derivative arities *)
+  ]];
+
+  (* Remove Nothing entries from conditional rules *)
+  DeleteCases[rules, Nothing]
 ];
 
 (* === Covariant Derivative to Explicit Derivative Conversion === *)
 (* Converts CD[{i, -chart}][f[args]] to Derivative[...][f][args] form *)
-(* Handles both covariant (-chart) and contravariant (chart) indices *)
-(* Supports 1+1D (indices 0,1), 2+1D (indices 0,1,2), and 3+1D (indices 0,1,2,3) *)
-(* Uses FixedPoint to handle nested derivative expressions *)
+(* Now uses dynamically generated rules via GenerateCDRules *)
+(* Supports any dimension up to $MaxSupportedDimension *)
 
 ConvertCDToDerivatives[expr_, chart_] := Module[
-  {replaceCDfunc, isCDlike},
+  {dim, rules, result, maxIter = 20, isCDlike},
 
-  (* Function to check if something is a CD-like operator *)
-  (* Uses string matching to be context-independent *)
-  isCDlike[x_] := StringMatchQ[ToString[Head[x]], "*CD*"];
+  (* Get dimension from chart *)
+  dim = GetChartDimension[chart];
 
-  replaceCDfunc[e_] := e /. {
-    (* === 1+1D rules (2-argument Derivative) === *)
-    (* Covariant index: {i, -chart} *)
-    f_[{0, -chart}][g_Symbol[args__]] /; isCDlike[f[{0, -chart}]] :>
-      Derivative[1, 0][g][args],
-    f_[{1, -chart}][g_Symbol[args__]] /; isCDlike[f[{1, -chart}]] :>
-      Derivative[0, 1][g][args],
-    f_[{0, -chart}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{0, -chart}]] :>
-      Derivative[n + 1, m][g][args],
-    f_[{1, -chart}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{1, -chart}]] :>
-      Derivative[n, m + 1][g][args],
-    (* Contravariant index: {i, chart} *)
-    f_[{0, chart}][g_Symbol[args__]] /; isCDlike[f[{0, chart}]] :>
-      Derivative[1, 0][g][args],
-    f_[{1, chart}][g_Symbol[args__]] /; isCDlike[f[{1, chart}]] :>
-      Derivative[0, 1][g][args],
-    f_[{0, chart}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{0, chart}]] :>
-      Derivative[n + 1, m][g][args],
-    f_[{1, chart}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{1, chart}]] :>
-      Derivative[n, m + 1][g][args],
+  (* Generate rules dynamically for this dimension *)
+  rules = GenerateCDRules[dim, chart];
 
-    (* === 2+1D rules (3-argument Derivative for index 2 = y) === *)
-    (* These rules convert 2-arg Derivative to 3-arg when index 2 is encountered *)
-    (* Covariant index 2: {2, -chart} *)
-    f_[{2, -chart}][g_Symbol[args__]] /; isCDlike[f[{2, -chart}]] :>
-      Derivative[0, 0, 1][g][args],
-    f_[{2, -chart}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{2, -chart}]] :>
-      Derivative[n, m, 1][g][args],
-    f_[{2, -chart}][Derivative[n_, m_, p_][g_][args__]] /; isCDlike[f[{2, -chart}]] :>
-      Derivative[n, m, p + 1][g][args],
-    (* Contravariant index 2: {2, chart} *)
-    f_[{2, chart}][g_Symbol[args__]] /; isCDlike[f[{2, chart}]] :>
-      Derivative[0, 0, 1][g][args],
-    f_[{2, chart}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{2, chart}]] :>
-      Derivative[n, m, 1][g][args],
-    f_[{2, chart}][Derivative[n_, m_, p_][g_][args__]] /; isCDlike[f[{2, chart}]] :>
-      Derivative[n, m, p + 1][g][args],
-    (* Also handle 3-arg derivatives with indices 0 and 1 *)
-    f_[{0, -chart}][Derivative[n_, m_, p_][g_][args__]] /; isCDlike[f[{0, -chart}]] :>
-      Derivative[n + 1, m, p][g][args],
-    f_[{1, -chart}][Derivative[n_, m_, p_][g_][args__]] /; isCDlike[f[{1, -chart}]] :>
-      Derivative[n, m + 1, p][g][args],
-    f_[{0, chart}][Derivative[n_, m_, p_][g_][args__]] /; isCDlike[f[{0, chart}]] :>
-      Derivative[n + 1, m, p][g][args],
-    f_[{1, chart}][Derivative[n_, m_, p_][g_][args__]] /; isCDlike[f[{1, chart}]] :>
-      Derivative[n, m + 1, p][g][args],
+  (* CD-like operator check for convergence validation using xAct introspection *)
+  (* Falls back to string matching for edge cases xAct doesn't handle *)
+  isCDlike[x_] := IsCovDOperator[x] || StringMatchQ[ToString[Head[x]], "*CD*"];
 
-    (* === 3+1D rules (4-argument Derivative for index 3 = z) === *)
-    (* These rules convert 3-arg Derivative to 4-arg when index 3 is encountered *)
-    (* Covariant index 3: {3, -chart} *)
-    f_[{3, -chart}][g_Symbol[args__]] /; isCDlike[f[{3, -chart}]] :>
-      Derivative[0, 0, 0, 1][g][args],
-    f_[{3, -chart}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{3, -chart}]] :>
-      Derivative[n, m, 0, 1][g][args],
-    f_[{3, -chart}][Derivative[n_, m_, p_][g_][args__]] /; isCDlike[f[{3, -chart}]] :>
-      Derivative[n, m, p, 1][g][args],
-    f_[{3, -chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{3, -chart}]] :>
-      Derivative[n, m, p, q + 1][g][args],
-    (* Contravariant index 3: {3, chart} *)
-    f_[{3, chart}][g_Symbol[args__]] /; isCDlike[f[{3, chart}]] :>
-      Derivative[0, 0, 0, 1][g][args],
-    f_[{3, chart}][Derivative[n_, m_][g_][args__]] /; isCDlike[f[{3, chart}]] :>
-      Derivative[n, m, 0, 1][g][args],
-    f_[{3, chart}][Derivative[n_, m_, p_][g_][args__]] /; isCDlike[f[{3, chart}]] :>
-      Derivative[n, m, p, 1][g][args],
-    f_[{3, chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{3, chart}]] :>
-      Derivative[n, m, p, q + 1][g][args],
-    (* Handle 4-arg derivatives with indices 0, 1, 2 *)
-    f_[{0, -chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{0, -chart}]] :>
-      Derivative[n + 1, m, p, q][g][args],
-    f_[{1, -chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{1, -chart}]] :>
-      Derivative[n, m + 1, p, q][g][args],
-    f_[{2, -chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{2, -chart}]] :>
-      Derivative[n, m, p + 1, q][g][args],
-    f_[{0, chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{0, chart}]] :>
-      Derivative[n + 1, m, p, q][g][args],
-    f_[{1, chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{1, chart}]] :>
-      Derivative[n, m + 1, p, q][g][args],
-    f_[{2, chart}][Derivative[n_, m_, p_, q_][g_][args__]] /; isCDlike[f[{2, chart}]] :>
-      Derivative[n, m, p + 1, q][g][args]
-  };
+  (* Apply rules repeatedly until fixed point *)
+  result = FixedPoint[# /. rules &, expr, maxIter];
 
-  (* Apply repeatedly until fixed point (max 10 iterations) *)
-  FixedPoint[replaceCDfunc, expr, 10]
+  (* Warn if CD-like operators remain after conversion *)
+  If[!FreeQ[result, f_ /; isCDlike[f]],
+    Message[ConvertCDToDerivatives::incomplete, maxIter]
+  ];
+
+  result
 ];
 
 (* === Field Head Extraction === *)
@@ -244,6 +303,49 @@ ExtractNumericCoefficient[term_, fieldName_] := Module[
   ]
 ];
 
+(* === Symbolic Coefficient Extraction === *)
+(* Extracts coefficient preserving both numeric value and symbolic expression *)
+(* Returns an Association with "numeric" and "symbolic" keys *)
+
+ExtractCoefficientWithSymbolic[term_, fieldName_] := Module[
+  {coeff},
+
+  (* Replace field and its derivatives with 1 to extract coefficient *)
+  coeff = term /. {
+    (* Match Derivative[...][f][args] form (applied derivatives) *)
+    Derivative[__][f_][__] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
+    (* Match f[args] form (bare field with numeric suffix like A0, A1) *)
+    f_[__] /; StringMatchQ[ToString[f], ToString[fieldName] ~~ DigitCharacter ...] :> 1,
+    (* Direct field match *)
+    fieldName -> 1,
+    _Derivative[__][fieldName] -> 1
+  };
+
+  (* Simplify *)
+  coeff = Simplify[coeff];
+
+  (* Return Association with numeric value and symbolic expression *)
+  Which[
+    NumericQ[coeff],
+      <|"numeric" -> N[coeff], "symbolic" -> None|>,
+    (* Negative symbolic coefficient: -m2 *)
+    MatchQ[coeff, Times[-1, _Symbol]],
+      Message[ExtractNumericCoefficient::symbolic, coeff, fieldName];
+      <|"numeric" -> -1.0, "symbolic" -> ToString[coeff]|>,
+    (* Positive symbolic coefficient: m2 *)
+    MatchQ[coeff, _Symbol],
+      Message[ExtractNumericCoefficient::symbolic, coeff, fieldName];
+      <|"numeric" -> 1.0, "symbolic" -> ToString[coeff]|>,
+    (* Try numeric evaluation *)
+    NumericQ[Quiet[N[coeff]]],
+      <|"numeric" -> Quiet[N[coeff]], "symbolic" -> None|>,
+    (* Complex symbolic expression *)
+    True,
+      Message[ExtractNumericCoefficient::symbolic, coeff, fieldName];
+      <|"numeric" -> 1.0, "symbolic" -> ToString[coeff]|>
+  ]
+];
+
 (* === Levi-Civita (Epsilon) Tensor Evaluation === *)
 (* Evaluates epsilon tensor components to numeric ±1 values *)
 (* For Minkowski signature (-,+,+,...), the sign conventions are: *)
@@ -267,24 +369,40 @@ MinkowskiMetricFactor[idx_Integer] := If[idx == 0, -1, 1];
 (* Handles epsilon tensors created by xAct's DefMetric (e.g., epsiloneta, epsiloneta3) *)
 (* General approach: identify all epsilon patterns and compute based on index positions *)
 EvaluateEpsilonComponents[expr_, chart_] := Module[
-  {rules, isEpsilon, evaluateEpsilon3, evaluateEpsilon2},
+  {rules, isEpsilon, evaluateEpsilon4, evaluateEpsilon3, evaluateEpsilon2},
 
-  (* Pattern to check if a symbol name contains "epsilon" *)
-  isEpsilon[s_] := StringMatchQ[ToString[s], "*epsilon*", IgnoreCase -> True];
+  (* Check if symbol is an epsilon tensor using xAct introspection *)
+  (* Falls back to string matching for edge cases xAct doesn't handle *)
+  isEpsilon[s_] := IsEpsilonTensor[s] || StringMatchQ[ToString[s], "*epsilon*", IgnoreCase -> True];
 
   (*
-     For 3D epsilon with mixed indices:
-     Start from fully covariant ε_ijk = -Signature[{i,j,k}] (Minkowski convention)
+     For epsilon tensors with mixed indices:
+     Start from fully covariant ε_{ijk...} = -Signature[{i,j,k,...}] (Minkowski convention)
      Each raised index multiplies by η^ii (the metric component)
 
      Example: ε_{i j}^{k} = ε_{i j m} η^{m k}
        For i=0, j=1, k=0: ε_{0 1 m} η^{m 0} = ε_{0 1 0} η^{0 0} = 0 * (-1) = 0
        For i=0, j=1, k=2: ε_{0 1 m} η^{m 2} = ε_{0 1 2} η^{2 2} = (-1) * (+1) = -1
 
-     But when xAct puts indices, the third slot being chart (not -chart) means raised.
+     When xAct puts indices, chart (not -chart) means raised index.
      So {i, -chart}, {j, -chart}, {k, chart} means ε_{i j}^k
   *)
 
+  (* 4D epsilon tensor evaluation (for 3+1D spacetime) *)
+  evaluateEpsilon4[i_, j_, k_, l_, isUp1_, isUp2_, isUp3_, isUp4_] := Module[
+    {baseValue, metricFactor},
+    (* Base: fully covariant Levi-Civita for Minkowski = -Signature *)
+    baseValue = -LeviCivitaValue[{i, j, k, l}];
+    (* Metric factors for raised indices *)
+    metricFactor = 1;
+    If[isUp1, metricFactor *= MinkowskiMetricFactor[i]];
+    If[isUp2, metricFactor *= MinkowskiMetricFactor[j]];
+    If[isUp3, metricFactor *= MinkowskiMetricFactor[k]];
+    If[isUp4, metricFactor *= MinkowskiMetricFactor[l]];
+    baseValue * metricFactor
+  ];
+
+  (* 3D epsilon tensor evaluation (for 2+1D spacetime) *)
   evaluateEpsilon3[i_, j_, k_, isUp1_, isUp2_, isUp3_] := Module[
     {baseValue, metricFactor},
     (* Base: fully covariant Levi-Civita for Minkowski = -Signature *)
@@ -297,6 +415,7 @@ EvaluateEpsilonComponents[expr_, chart_] := Module[
     baseValue * metricFactor
   ];
 
+  (* 2D epsilon tensor evaluation (for 1+1D spacetime) *)
   evaluateEpsilon2[i_, j_, isUp1_, isUp2_] := Module[
     {baseValue, metricFactor},
     baseValue = -LeviCivitaValue[{i, j}];
@@ -307,13 +426,20 @@ EvaluateEpsilonComponents[expr_, chart_] := Module[
   ];
 
   rules = {
-    (* 3D epsilon with any combination of up/down indices *)
-    (* Match pattern: f[{i, ±chart}, {j, ±chart}, {k, ±chart}] where f is epsilon-like *)
+    (* 4D epsilon with any combination of up/down indices (for 3+1D spacetime) *)
+    f_Symbol[{i_Integer, s1_}, {j_Integer, s2_}, {k_Integer, s3_}, {l_Integer, s4_}] /;
+      isEpsilon[f] &&
+      MemberQ[{chart, -chart}, s1] && MemberQ[{chart, -chart}, s2] &&
+      MemberQ[{chart, -chart}, s3] && MemberQ[{chart, -chart}, s4] :>
+      evaluateEpsilon4[i, j, k, l, s1 === chart, s2 === chart, s3 === chart, s4 === chart],
+
+    (* 3D epsilon with any combination of up/down indices (for 2+1D spacetime) *)
     f_Symbol[{i_Integer, s1_}, {j_Integer, s2_}, {k_Integer, s3_}] /;
-      isEpsilon[f] && MemberQ[{chart, -chart}, s1] && MemberQ[{chart, -chart}, s2] && MemberQ[{chart, -chart}, s3] :>
+      isEpsilon[f] &&
+      MemberQ[{chart, -chart}, s1] && MemberQ[{chart, -chart}, s2] && MemberQ[{chart, -chart}, s3] :>
       evaluateEpsilon3[i, j, k, s1 === chart, s2 === chart, s3 === chart],
 
-    (* 2D epsilon with any combination of up/down indices *)
+    (* 2D epsilon with any combination of up/down indices (for 1+1D spacetime) *)
     f_Symbol[{i_Integer, s1_}, {j_Integer, s2_}] /;
       isEpsilon[f] && MemberQ[{chart, -chart}, s1] && MemberQ[{chart, -chart}, s2] :>
       evaluateEpsilon2[i, j, s1 === chart, s2 === chart]

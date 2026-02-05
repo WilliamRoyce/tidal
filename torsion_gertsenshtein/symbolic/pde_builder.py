@@ -9,6 +9,8 @@ comes from the specification that was derived from the Lagrangian.
 
 from __future__ import annotations
 
+import re
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 from pde import FieldCollection, PDEBase, ScalarField
@@ -31,6 +33,90 @@ if TYPE_CHECKING:
     from torsion_gertsenshtein.utils import BCDescriptor
 
     NumericArray = NDArray[np.float64]
+
+
+@dataclass(frozen=True)
+class ParsedFieldName:
+    """Parsed field name components.
+
+    Supports multiple field naming conventions:
+    - standard: A_0, phi_1 (base_index)
+    - tensor: stress_xy_0, u_x_1 (base_component_index)
+    - compact: phi0, A1 (base+digits)
+    - simple: phi, psi (letters only, index defaults to 0)
+    """
+
+    base: str
+    index: int
+    format: str
+
+    @classmethod
+    def parse(cls, name: str) -> "ParsedFieldName":
+        """Parse field name auto-detecting format.
+
+        Parameters
+        ----------
+        name : str
+            Field name to parse.
+
+        Returns
+        -------
+        ParsedFieldName
+            Parsed components with base, index, and format.
+        """
+        # Standard format: A_0, phi_1
+        match = re.match(r"^([a-zA-Z]+)_([0-9]+)$", name)
+        if match:
+            return cls(base=match.group(1), index=int(match.group(2)), format="standard")
+
+        # Tensor format: stress_xy_0, u_x_1 (greedy match for base)
+        match = re.match(r"^(.+)_([0-9]+)$", name)
+        if match:
+            return cls(base=match.group(1), index=int(match.group(2)), format="tensor")
+
+        # Compact format: phi0, A1
+        match = re.match(r"^([a-zA-Z]+)([0-9]+)$", name)
+        if match:
+            return cls(base=match.group(1), index=int(match.group(2)), format="compact")
+
+        # Simple format: phi, psi (no index, defaults to 0)
+        if re.match(r"^[a-zA-Z]+$", name):
+            return cls(base=name, index=0, format="simple")
+
+        # Fallback
+        return cls(base=name, index=0, format="unknown")
+
+    def to_momentum_name(self) -> str:
+        """Convert to momentum field name."""
+        return f"pi_{self.index}"
+
+
+def parse_momentum_field_name(field_name: str) -> int | None:
+    """Parse momentum field name and return index.
+
+    Supports both pi_N and piN formats.
+
+    Parameters
+    ----------
+    field_name : str
+        Momentum field name like "pi_0", "pi0", "pi_1", "pi1".
+
+    Returns
+    -------
+    int | None
+        Index if valid momentum field name, None otherwise.
+    """
+    # Standard format: pi_N
+    match = re.match(r"^pi_([0-9]+)$", field_name)
+    if match:
+        return int(match.group(1))
+
+    # Compact format: piN
+    match = re.match(r"^pi([0-9]+)$", field_name)
+    if match:
+        return int(match.group(1))
+
+    return None
 
 
 class PDEFromSpec(PDEBase):
@@ -196,6 +282,14 @@ class PDEFromSpec(PDEBase):
             d2_z = grad_z.gradient(bc=bc)[2]
             assert isinstance(d2_z, ScalarField)
             return d2_z
+        if operator_name == "biharmonic":
+            # ∇⁴f = ∇²(∇²f) = laplacian(laplacian(f))
+            # Used for plate theory and thin-shell mechanics
+            lap = field.laplace(bc=bc)
+            assert isinstance(lap, ScalarField)
+            bilap = lap.laplace(bc=bc)
+            assert isinstance(bilap, ScalarField)
+            return bilap
 
         msg = f"Unknown operator: {operator_name}"
         raise ValueError(msg)
@@ -210,8 +304,14 @@ class PDEFromSpec(PDEBase):
         This is valid because d_t A = pi, so d_x(d_t A) = d_x(pi).
 
         The state is organized as: [field_0, pi_0, field_1, pi_1, ...]
-        - Regular fields (A_0, A_1) are at even indices: state[2*i]
-        - Momentum fields (pi_0, pi_1) are at odd indices: state[2*i + 1]
+        - Regular fields (A_0, phi_0, phi0, etc.) are at even indices: state[2*i]
+        - Momentum fields (pi_0, pi0, pi_1, pi1, etc.) are at odd indices: state[2*i + 1]
+
+        Supports flexible field naming conventions:
+        - Standard: A_0, phi_1
+        - Compact: A0, phi1, pi0, pi1
+        - Tensor: stress_xy_0
+        - Simple: phi (index defaults to 0)
 
         Parameters
         ----------
@@ -219,8 +319,8 @@ class PDEFromSpec(PDEBase):
             Current state with interleaved field/momentum pairs.
         field_name : str
             Name of the field to retrieve. Can be:
-            - Regular field name like "A_0", "phi_0"
-            - Momentum field name like "pi_0", "pi_1"
+            - Regular field name like "A_0", "phi_0", "phi0"
+            - Momentum field name like "pi_0", "pi_1", "pi0", "pi1"
 
         Returns
         -------
@@ -232,41 +332,32 @@ class PDEFromSpec(PDEBase):
         ValueError
             If the field name is not recognized.
         """
-        # Check if this is a momentum field reference (pi_0, pi_1, etc.)
-        if field_name.startswith("pi_"):
-            parts = field_name.split("_")
-            # Validate format: exactly "pi_N" where N is numeric
-            if len(parts) != 2:  # noqa: PLR2004
-                msg = (
-                    f"Invalid momentum field format: '{field_name}'. "
-                    f"Expected 'pi_N' where N is a numeric index (e.g., 'pi_0', 'pi_1')."
-                )
-                raise ValueError(msg)
+        # Check if this is a momentum field reference (pi_0, pi0, etc.)
+        # First check if it looks like a momentum field (starts with "pi")
+        if field_name.startswith("pi"):
+            momentum_idx = parse_momentum_field_name(field_name)
+            if momentum_idx is not None:
+                if not (0 <= momentum_idx < self.n_components):
+                    msg = (
+                        f"Momentum field index {momentum_idx} out of range. "
+                        f"This system has {self.n_components} components "
+                        f"(valid indices: 0 to {self.n_components - 1}). "
+                        f"Field reference: '{field_name}'."
+                    )
+                    raise ValueError(msg)
 
-            idx_str = parts[1]
-            if not idx_str.isdigit():
-                msg = (
-                    f"Invalid momentum field index in '{field_name}'. "
-                    f"Expected numeric index, got '{idx_str}'."
-                )
-                raise ValueError(msg)
+                # Momentum is at odd indices: state[2*i + 1]
+                momentum = state[2 * momentum_idx + 1]
+                assert isinstance(momentum, ScalarField)
+                return momentum
+            # If it looks like momentum but couldn't be parsed, raise clear error
+            msg = (
+                f"Invalid momentum field format: '{field_name}'. "
+                f"Expected 'pi_N' or 'piN' where N is a numeric index (e.g., 'pi_0', 'pi0')."
+            )
+            raise ValueError(msg)
 
-            idx = int(idx_str)
-            if not (0 <= idx < self.n_components):
-                msg = (
-                    f"Momentum field index {idx} out of range. "
-                    f"This system has {self.n_components} components "
-                    f"(valid indices: 0 to {self.n_components - 1}). "
-                    f"Field reference: '{field_name}'."
-                )
-                raise ValueError(msg)
-
-            # Momentum is at odd indices: state[2*i + 1]
-            momentum = state[2 * idx + 1]
-            assert isinstance(momentum, ScalarField)
-            return momentum
-
-        # Regular field lookup
+        # Regular field lookup - first try direct name match
         target_idx = self._component_name_to_index.get(field_name)
         if target_idx is not None:
             # Field is at even indices: state[2*i]

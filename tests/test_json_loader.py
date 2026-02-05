@@ -47,7 +47,7 @@ def em_json_data() -> dict[str, Any]:
         "equations": [
             {
                 "field": "A_0",
-                "lhs": "d2_t(A_0)",
+                "lhs": {"expression": "d2_t(A_0)", "order": {"time": 2, "space": 0}},
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
@@ -57,7 +57,7 @@ def em_json_data() -> dict[str, Any]:
             },
             {
                 "field": "A_1",
-                "lhs": "d2_t(A_1)",
+                "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2, "space": 0}},
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
@@ -83,7 +83,7 @@ def kg_json_data() -> dict[str, Any]:
         "equations": [
             {
                 "field": "phi",
-                "lhs": "d2_t(phi)",
+                "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
@@ -136,7 +136,7 @@ class TestComponentEquation:
         """Test creating ComponentEquation for wave-type equation."""
         data = {
             "field": "A_0",
-            "lhs": "d2_t(A_0)",
+            "lhs": {"expression": "d2_t(A_0)", "order": {"time": 2, "space": 0}},
             "rhs": {
                 "type": "linear_combination",
                 "terms": [
@@ -159,7 +159,7 @@ class TestComponentEquation:
         """Test equation with mass term."""
         data = {
             "field": "phi",
-            "lhs": "d2_t(phi)",
+            "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
             "rhs": {
                 "type": "linear_combination",
                 "terms": [
@@ -187,7 +187,7 @@ class TestComponentEquation:
         """Test that unsupported RHS type raises ValueError."""
         data: dict[str, Any] = {
             "field": "phi",
-            "lhs": "d2_t(phi)",
+            "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
             "rhs": {"type": "nonlinear", "terms": []},
         }
         with pytest.raises(ValueError, match="Unsupported RHS type"):
