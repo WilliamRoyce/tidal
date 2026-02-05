@@ -181,7 +181,8 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     # Top row: A_0 and A_1 evolution
     # Get time snapshots
     times = [0, len(storage) // 3, 2 * len(storage) // 3, len(storage) - 1]
-    colors = plt.cm.viridis(np.linspace(0.2, 0.8, len(times)))
+    cmap = plt.get_cmap("viridis")
+    colors = cmap(np.linspace(0.2, 0.8, len(times)))
 
     # A_0 evolution
     ax = axes[0, 0]

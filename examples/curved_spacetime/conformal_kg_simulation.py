@@ -168,7 +168,8 @@ def main() -> None:  # noqa: PLR0914, PLR0915
 
     # Field evolution
     times = [0, len(storage) // 3, 2 * len(storage) // 3, len(storage) - 1]
-    colors = plt.cm.viridis(np.linspace(0.2, 0.8, len(times)))
+    cmap = plt.get_cmap("viridis")
+    colors = cmap(np.linspace(0.2, 0.8, len(times)))
 
     ax = axes[0, 0]
     for i, t_idx in enumerate(times):

@@ -187,7 +187,8 @@ def main() -> None:  # noqa: PLR0914, PLR0915
 
     # Field evolution
     times = [0, len(storage) // 3, 2 * len(storage) // 3, len(storage) - 1]
-    colors = plt.cm.viridis(np.linspace(0.2, 0.8, len(times)))
+    cmap = plt.get_cmap("viridis")
+    colors = cmap(np.linspace(0.2, 0.8, len(times)))
 
     ax = axes[0, 0]
     for i, t_idx in enumerate(times):
@@ -223,8 +224,9 @@ def main() -> None:  # noqa: PLR0914, PLR0915
 
     # Expected exponential decay from Hubble friction
     # For 1+1D (n=1), energy decays as exp(-H*t)
-    t_array = np.array(time_values)
-    expected_energies = energies[0] * np.exp(-hubble_param * t_array)
+    # Note: time_values and energies types come from MemoryStorage iteration
+    t_array = np.array(time_values)  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
+    expected_energies = energies[0] * np.exp(-hubble_param * t_array)  # pyright: ignore[reportUnknownVariableType]
     ax.plot(
         time_values, expected_energies, "r--", linewidth=1.5, label=r"$\sim e^{-Ht}$ [1+1D]"
     )
