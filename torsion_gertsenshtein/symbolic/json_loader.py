@@ -172,6 +172,65 @@ class EquationSystem:
                 msg = f"mass_matrix row {i} length {len(row)} != n_components {self.n_components}"
                 raise ValueError(msg)
 
+        # Validate field references in equation terms
+        self._validate_field_references()
+
+    def _validate_field_references(self) -> None:
+        """Validate that all field references in equation terms are valid.
+
+        Field references can be:
+        - Regular field names (e.g., "A_0", "A_1", "phi")
+        - Momentum field names (e.g., "pi_0", "pi_1") for mixed time-space derivatives
+
+        Raises
+        ------
+        ValueError
+            If a field reference is invalid.
+        """
+        valid_fields = set(self.component_names)
+
+        for eq in self.equations:
+            for term in eq.rhs_terms:
+                field_ref = term.field
+
+                # Check for momentum field reference (pi_*)
+                if field_ref.startswith("pi_"):
+                    parts = field_ref.split("_")
+                    if len(parts) != 2:  # noqa: PLR2004
+                        msg = (
+                            f"Invalid momentum field reference '{field_ref}' "
+                            f"in equation for {eq.field_name}. "
+                            f"Expected format 'pi_N' where N is a numeric index."
+                        )
+                        raise ValueError(msg)
+
+                    idx_str = parts[1]
+                    if not idx_str.isdigit():
+                        msg = (
+                            f"Invalid momentum field index in '{field_ref}' "
+                            f"(equation for {eq.field_name}). "
+                            f"Expected numeric index, got '{idx_str}'."
+                        )
+                        raise ValueError(msg)
+
+                    idx = int(idx_str)
+                    if not (0 <= idx < self.n_components):
+                        msg = (
+                            f"Momentum field index {idx} out of range in '{field_ref}' "
+                            f"(equation for {eq.field_name}). "
+                            f"Valid indices: 0 to {self.n_components - 1}."
+                        )
+                        raise ValueError(msg)
+                else:
+                    # Regular field reference
+                    if field_ref not in valid_fields:
+                        msg = (
+                            f"Unknown field reference '{field_ref}' "
+                            f"in equation for {eq.field_name}. "
+                            f"Valid fields: {sorted(valid_fields)}."
+                        )
+                        raise ValueError(msg)
+
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:
         """Create an EquationSystem from a dictionary (parsed JSON)."""

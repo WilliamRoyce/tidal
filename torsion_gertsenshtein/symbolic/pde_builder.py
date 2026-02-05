@@ -133,8 +133,98 @@ class PDEFromSpec(PDEBase):
             component = grad[2]
             assert isinstance(component, ScalarField)
             return component
+        if operator_name == "cross_derivative_xy":
+            # d/dx d/dy f = d/dx (d/dy f)
+            # This is NOT a laplacian - it's a cross spatial derivative
+            if field.grid.dim < 2:  # noqa: PLR2004
+                msg = "cross_derivative_xy requires at least 2D grid"
+                raise ValueError(msg)
+            # First compute d/dy
+            grad_y = field.gradient(bc=bc)[1]
+            assert isinstance(grad_y, ScalarField)
+            # Then compute d/dx of that
+            grad_xy = grad_y.gradient(bc=bc)[0]
+            assert isinstance(grad_xy, ScalarField)
+            return grad_xy
 
         msg = f"Unknown operator: {operator_name}"
+        raise ValueError(msg)
+
+    def _get_field_from_state(
+        self, state: FieldCollection, field_name: str
+    ) -> ScalarField:
+        """Get a field from state by name, supporting both field and momentum names.
+
+        For mixed time-space derivatives like d_t d_x A, the Wolfram pipeline
+        expresses these as gradients of momentum fields (e.g., gradient_x(pi_0)).
+        This is valid because d_t A = pi, so d_x(d_t A) = d_x(pi).
+
+        The state is organized as: [field_0, pi_0, field_1, pi_1, ...]
+        - Regular fields (A_0, A_1) are at even indices: state[2*i]
+        - Momentum fields (pi_0, pi_1) are at odd indices: state[2*i + 1]
+
+        Parameters
+        ----------
+        state : FieldCollection
+            Current state with interleaved field/momentum pairs.
+        field_name : str
+            Name of the field to retrieve. Can be:
+            - Regular field name like "A_0", "phi_0"
+            - Momentum field name like "pi_0", "pi_1"
+
+        Returns
+        -------
+        ScalarField
+            The requested field from the state.
+
+        Raises
+        ------
+        ValueError
+            If the field name is not recognized.
+        """
+        # Check if this is a momentum field reference (pi_0, pi_1, etc.)
+        if field_name.startswith("pi_"):
+            parts = field_name.split("_")
+            # Validate format: exactly "pi_N" where N is numeric
+            if len(parts) != 2:  # noqa: PLR2004
+                msg = (
+                    f"Invalid momentum field format: '{field_name}'. "
+                    f"Expected 'pi_N' where N is a numeric index (e.g., 'pi_0', 'pi_1')."
+                )
+                raise ValueError(msg)
+
+            idx_str = parts[1]
+            if not idx_str.isdigit():
+                msg = (
+                    f"Invalid momentum field index in '{field_name}'. "
+                    f"Expected numeric index, got '{idx_str}'."
+                )
+                raise ValueError(msg)
+
+            idx = int(idx_str)
+            if not (0 <= idx < self.n_components):
+                msg = (
+                    f"Momentum field index {idx} out of range. "
+                    f"This system has {self.n_components} components "
+                    f"(valid indices: 0 to {self.n_components - 1}). "
+                    f"Field reference: '{field_name}'."
+                )
+                raise ValueError(msg)
+
+            # Momentum is at odd indices: state[2*i + 1]
+            momentum = state[2 * idx + 1]
+            assert isinstance(momentum, ScalarField)
+            return momentum
+
+        # Regular field lookup
+        target_idx = self._component_name_to_index.get(field_name)
+        if target_idx is not None:
+            # Field is at even indices: state[2*i]
+            field = state[2 * target_idx]
+            assert isinstance(field, ScalarField)
+            return field
+
+        msg = f"Unknown field name: {field_name}"
         raise ValueError(msg)
 
     def _compute_rhs_for_component(
@@ -176,16 +266,10 @@ class PDEFromSpec(PDEBase):
         # Sum all terms from the specification
         for term in eq.rhs_terms:
             # Find which field this term operates on
+            # Supports both regular fields (A_0, phi_0) and momentum fields (pi_0, pi_1)
+            # Momentum field support enables mixed time-space derivative handling
             target_field_name = term.field
-            target_idx = self._component_name_to_index.get(target_field_name)
-
-            if target_idx is None:
-                msg = f"Unknown field in equation: {target_field_name}"
-                raise ValueError(msg)
-
-            # Get the field (not momentum) for this component
-            target_field = state[2 * target_idx]
-            assert isinstance(target_field, ScalarField)
+            target_field = self._get_field_from_state(state, target_field_name)
 
             # Apply the operator
             operated = self._get_operator(term.operator, target_field, bc)

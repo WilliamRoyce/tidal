@@ -30,11 +30,9 @@ DecomposeToComponents[eom_, field_, chart_] :=
 DecomposeToComponents[eom_, field_, chart_, additionalFields_List] := Module[
   {dim, components, indices, componentEq, result, fieldHead, fieldRank, allFieldHeads},
 
-  (* Get the dimension - use a simple robust approach *)
-  (* For spatial dimension in 1+1D (t,x), we have 2 total dimensions *)
-  (* The simplest approach: just use 2 for now, since both examples are 1+1D *)
-  (* TODO: Make this more general by extracting from manifold/chart properly *)
-  dim = 2;
+  (* Get the dimension dynamically from the chart *)
+  (* ScalarsOfChart returns the coordinate symbols, e.g., {t[], x[]} or {t[], x[], y[]} *)
+  dim = Length[ScalarsOfChart[chart]];
 
   (* Determine field rank using SlotsOfTensor *)
   (* Extract field head from applied form like phi[] or A[-a] *)
@@ -52,6 +50,11 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List] := Module[
 
     (* In flat Minkowski space, Christoffel symbols vanish *)
     componentEq = RemoveChristoffelSymbols[componentEq];
+    componentEq = Expand[componentEq];
+
+    (* Evaluate epsilon tensor components to numeric ±1 values *)
+    (* This handles Chern-Simons and other topological terms with Levi-Civita *)
+    componentEq = EvaluateEpsilonComponents[componentEq, chart];
     componentEq = Expand[componentEq];
 
     (* Get coordinate symbols *)
@@ -153,14 +156,19 @@ ExtractVectorComponent[eom_, field_, chart_, componentIndex_] := Module[
   componentEq = RemoveChristoffelSymbols[componentEq];
   componentEq = Expand[componentEq];
 
-  (* Step 6: Get coordinate symbols from chart *)
+  (* Step 6: Evaluate epsilon tensor components to numeric ±1 values *)
+  (* This handles Chern-Simons and other topological terms with Levi-Civita *)
+  componentEq = EvaluateEpsilonComponents[componentEq, chart];
+  componentEq = Expand[componentEq];
+
+  (* Step 7: Get coordinate symbols from chart *)
   coordSyms = GetCoordinateSymbols[chart];
 
-  (* Step 7: Evaluate metric components for Minkowski signature (-1, +1) *)
+  (* Step 8: Evaluate metric components for Minkowski signature (-1, +1) *)
   componentEq = EvaluateMinkowskiMetric[componentEq, chart];
   componentEq = Expand[componentEq];
 
-  (* Step 8: Convert field components to scalar functions *)
+  (* Step 9: Convert field components to scalar functions *)
   (* Replace A[{i, -chart}] with symbolic component names like A0, A1 *)
   With[{ch = chart, fh = fieldHead, cs = coordSyms},
     componentEq = componentEq /. {
@@ -169,7 +177,7 @@ ExtractVectorComponent[eom_, field_, chart_, componentIndex_] := Module[
     }
   ];
 
-  (* Step 9: Convert coordinate derivatives to explicit Derivative form *)
+  (* Step 10: Convert coordinate derivatives to explicit Derivative form *)
   componentEq = ConvertCDToDerivatives[componentEq, chart];
 
   (* Expand *)

@@ -352,3 +352,166 @@ class TestLoadEquationSystem:
         system = load_equation_system(str(em_json_path))
         num_em_components = 2
         assert system.n_components == num_em_components
+
+
+# === Phase 4: Field Reference Validation Tests ===
+
+
+class TestFieldReferenceValidation:
+    """Tests for field reference validation in equation terms."""
+
+    def test_valid_regular_field_references(self) -> None:
+        """Test that valid regular field references pass validation."""
+        system = EquationSystem(
+            n_components=2,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("A_0", "A_1"),
+            equations=(
+                ComponentEquation(
+                    "A_0",
+                    0,
+                    2,
+                    (
+                        OperatorTerm(1.0, "laplacian", "A_0"),
+                        OperatorTerm(0.5, "gradient_x", "A_1"),  # Cross-field ref
+                    ),
+                ),
+                ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+            ),
+            mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={},
+        )
+        # Should not raise - valid references
+        assert system.n_components == 2  # noqa: PLR2004
+
+    def test_valid_momentum_field_references(self) -> None:
+        """Test that valid momentum field references (pi_*) pass validation."""
+        system = EquationSystem(
+            n_components=2,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("A_0", "A_1"),
+            equations=(
+                ComponentEquation(
+                    "A_0",
+                    0,
+                    2,
+                    (
+                        OperatorTerm(1.0, "laplacian", "A_0"),
+                        OperatorTerm(0.5, "gradient_x", "pi_1"),  # Momentum reference
+                    ),
+                ),
+                ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+            ),
+            mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={},
+        )
+        # Should not raise - valid momentum reference
+        assert system.n_components == 2  # noqa: PLR2004
+
+    def test_invalid_regular_field_reference_raises(self) -> None:
+        """Test that invalid regular field reference raises ValueError."""
+        with pytest.raises(ValueError, match="Unknown field reference 'B_0'"):
+            EquationSystem(
+                n_components=2,
+                dimension=2,
+                spatial_dimension=1,
+                component_names=("A_0", "A_1"),
+                equations=(
+                    ComponentEquation(
+                        "A_0",
+                        0,
+                        2,
+                        (
+                            OperatorTerm(1.0, "laplacian", "B_0"),  # Invalid field
+                        ),
+                    ),
+                    ComponentEquation(
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                    ),
+                ),
+                mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+                coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+                metadata={},
+            )
+
+    def test_momentum_reference_out_of_range_raises(self) -> None:
+        """Test that out-of-range momentum reference raises ValueError."""
+        with pytest.raises(ValueError, match="out of range"):
+            EquationSystem(
+                n_components=2,
+                dimension=3,
+                spatial_dimension=2,
+                component_names=("A_0", "A_1"),
+                equations=(
+                    ComponentEquation(
+                        "A_0",
+                        0,
+                        2,
+                        (
+                            OperatorTerm(1.0, "gradient_x", "pi_5"),  # Out of range
+                        ),
+                    ),
+                    ComponentEquation(
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                    ),
+                ),
+                mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+                coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+                metadata={},
+            )
+
+    def test_malformed_momentum_reference_raises(self) -> None:
+        """Test that malformed momentum reference raises ValueError."""
+        # Non-numeric index
+        with pytest.raises(ValueError, match="numeric index"):
+            EquationSystem(
+                n_components=2,
+                dimension=3,
+                spatial_dimension=2,
+                component_names=("A_0", "A_1"),
+                equations=(
+                    ComponentEquation(
+                        "A_0",
+                        0,
+                        2,
+                        (
+                            OperatorTerm(1.0, "gradient_x", "pi_abc"),  # Non-numeric
+                        ),
+                    ),
+                    ComponentEquation(
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                    ),
+                ),
+                mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+                coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+                metadata={},
+            )
+
+        # Wrong format (too many underscores)
+        with pytest.raises(ValueError, match="pi_N"):
+            EquationSystem(
+                n_components=2,
+                dimension=3,
+                spatial_dimension=2,
+                component_names=("A_0", "A_1"),
+                equations=(
+                    ComponentEquation(
+                        "A_0",
+                        0,
+                        2,
+                        (
+                            OperatorTerm(1.0, "gradient_x", "pi_0_extra"),  # Wrong format
+                        ),
+                    ),
+                    ComponentEquation(
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                    ),
+                ),
+                mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+                coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+                metadata={},
+            )
