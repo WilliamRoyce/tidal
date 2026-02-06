@@ -6,7 +6,7 @@ This package provides:
 - `vectorfield`: Multi-component field simulations
 """
 
-__version__ = "0.2.3"
+__version__ = "0.2.4"
 
 try:
     from .plot_pgf import check_tex_available, pgf_available
