@@ -222,7 +222,7 @@ class TestDistanceComputation:
         ic = GaussianPulse(amplitude=1.0, width=2.0)
 
         # Test distance from center (accessing protected method for testing)
-        distances = ic._compute_distances_from_center(  # noqa: SLF001
+        distances = ic._compute_distances_from_center(
             grid, center=[5.0, 5.0]
         )  # pyright: ignore[reportPrivateUsage]
 

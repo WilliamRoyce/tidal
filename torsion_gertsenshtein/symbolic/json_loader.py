@@ -52,13 +52,11 @@ def is_known_operator(name: str) -> bool:
     and dynamic patterns for generic Nth-order derivatives
     (derivative_3_x, derivative_5_y, derivative_2x_1y, ...).
     """
-    if name in _STATIC_OPERATORS:
-        return True
-    if _GENERIC_SINGLE_AXIS_RE.match(name):
-        return True
-    if _GENERIC_MULTI_AXIS_RE.match(name):
-        return True
-    return False
+    return (
+        name in _STATIC_OPERATORS
+        or bool(_GENERIC_SINGLE_AXIS_RE.match(name))
+        or bool(_GENERIC_MULTI_AXIS_RE.match(name))
+    )
 
 
 @dataclass(frozen=True)
@@ -428,7 +426,7 @@ class EquationSystem:
         """Coordinate names, inferred from dimension if not set explicitly."""
         if self.coordinates:
             return self.coordinates
-        return ("t",) + ("x", "y", "z")[: self.spatial_dimension]
+        return ("t", *("x", "y", "z")[: self.spatial_dimension])
 
     @property
     def spatial_coordinates(self) -> tuple[str, ...]:
@@ -436,7 +434,7 @@ class EquationSystem:
         return self.effective_coordinates[1:]
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:
+    def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914
         """Create an EquationSystem from a dictionary (parsed JSON).
 
         Raises

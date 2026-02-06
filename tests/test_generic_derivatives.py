@@ -30,10 +30,9 @@ from torsion_gertsenshtein.symbolic.json_loader import (
 )
 from torsion_gertsenshtein.symbolic.pde_builder import (
     PDEFromSpec,
-    _op_nth_derivative,
+    _op_nth_derivative,  # noqa: PLC2701 - test verifies generic derivative factory
     create_initial_state,
 )
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -401,7 +400,7 @@ class TestBackwardCompat:
         field = ScalarField(grid_1d_coarse, data=np.sin(k * x))
         bc = "periodic"
 
-        # These should all resolve from the static registry
+        # These should all resolve from the static registry (test verifies backward compatibility)
         PDEFromSpec._get_operator("laplacian", field, bc)
         PDEFromSpec._get_operator("identity", field, bc)
         PDEFromSpec._get_operator("gradient_x", field, bc)

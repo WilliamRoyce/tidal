@@ -28,6 +28,7 @@ from pathlib import Path
 from typing import cast
 
 OUTPUT_FILENAME = "sphere_kg_output.png"
+ENERGY_CONSERVATION_THRESHOLD = 0.1  # Relative energy change threshold for conservation check
 
 import matplotlib as mpl
 
@@ -175,7 +176,7 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     print(f"  Initial energy proxy: {initial_energy:.2f}")
     print(f"  Final energy proxy: {final_energy:.2f}")
     print(f"  Relative energy change: {energy_change:.4f}")
-    if energy_change < 0.1:
+    if energy_change < ENERGY_CONSERVATION_THRESHOLD:
         print("  Energy approximately conserved (no Hubble friction)")
     else:
         print("  Note: Energy change may be due to boundary effects")

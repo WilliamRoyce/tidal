@@ -3,20 +3,27 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
-from numpy.testing import assert_allclose
 from pde import CartesianGrid, FieldCollection, ScalarField
 
 from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
 from torsion_gertsenshtein.utils import normalize_solve_result
 
+if TYPE_CHECKING:
+    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+
 SPHERE_JSON = Path(__file__).parent.parent / "examples" / "data" / "sphere_kg.json"
+
+# Physics constants for validation
+EXPECTED_SPACETIME_DIM = 3  # 2+1D: time + 2 spatial dimensions
+EXPECTED_SPATIAL_DIM = 2  # Stereographic coordinates on S²
 
 
 @pytest.fixture
-def sphere_spec():
+def sphere_spec() -> EquationSystem:
     """Load the sphere KG equation specification."""
     if not SPHERE_JSON.exists():
         pytest.skip("sphere_kg.json not found (run sphere_kg.wls first)")
@@ -26,35 +33,35 @@ def sphere_spec():
 class TestSphereKGSpec:
     """Tests for sphere KG equation specification."""
 
-    def test_spec_loads(self, sphere_spec) -> None:
+    def test_spec_loads(self, sphere_spec: EquationSystem) -> None:
         """Sphere KG spec loads without errors."""
         assert sphere_spec.n_components == 1
-        assert sphere_spec.dimension == 3
-        assert sphere_spec.spatial_dimension == 2
+        assert sphere_spec.dimension == EXPECTED_SPACETIME_DIM
+        assert sphere_spec.spatial_dimension == EXPECTED_SPATIAL_DIM
 
-    def test_has_position_dependent_terms(self, sphere_spec) -> None:
+    def test_has_position_dependent_terms(self, sphere_spec: EquationSystem) -> None:
         """Sphere KG should have position-dependent coefficient terms."""
         eq = sphere_spec.equations[0]
         pos_dep_terms = [t for t in eq.rhs_terms if t.position_dependent]
         assert len(pos_dep_terms) > 0, "Expected position-dependent terms from Christoffels"
 
-    def test_no_time_dependent_terms(self, sphere_spec) -> None:
+    def test_no_time_dependent_terms(self, sphere_spec: EquationSystem) -> None:
         """Static metric should produce no time-dependent coefficients."""
         eq = sphere_spec.equations[0]
         time_dep_terms = [t for t in eq.rhs_terms if t.time_dependent]
         assert len(time_dep_terms) == 0, "Static metric should have no time-dependent terms"
 
-    def test_has_laplacian_operators(self, sphere_spec) -> None:
+    def test_has_laplacian_operators(self, sphere_spec: EquationSystem) -> None:
         """Sphere KG should use laplacian_x and laplacian_y operators."""
         eq = sphere_spec.equations[0]
         operators = {t.operator for t in eq.rhs_terms}
         assert "laplacian_x" in operators
         assert "laplacian_y" in operators
 
-    def test_coordinate_dependent_contains_x_y(self, sphere_spec) -> None:
+    def test_coordinate_dependent_contains_x_y(self, sphere_spec: EquationSystem) -> None:
         """Position-dependent terms should reference x and/or y coordinates."""
         eq = sphere_spec.equations[0]
-        all_coord_deps = set()
+        all_coord_deps: set[str] = set()
         for t in eq.rhs_terms:
             all_coord_deps.update(t.coordinate_dependent)
         # Should have x and y (spatial coords), not t
@@ -87,8 +94,9 @@ class TestSphereKGSimulation:
         )
         phi = ScalarField(grid, data=0.0)
         pi = ScalarField(grid, data=0.0)
-        x = np.asarray(grid.cell_coords[..., 0])
-        y = np.asarray(grid.cell_coords[..., 1])
+        # py-pde lacks complete type stubs for grid.cell_coords
+        x = np.asarray(grid.cell_coords[..., 0])  # pyright: ignore[reportUnknownArgumentType,reportUnknownVariableType]
+        y = np.asarray(grid.cell_coords[..., 1])  # pyright: ignore[reportUnknownArgumentType,reportUnknownVariableType]
         phi.data[:] = np.exp(-(x**2 + y**2) / 2)
         state = FieldCollection([phi, pi])
 
@@ -112,8 +120,9 @@ class TestSphereKGSimulation:
         # Two initial pulses: one at center (south pole), one off-center
         phi = ScalarField(grid, data=0.0)
         pi = ScalarField(grid, data=0.0)
-        x = np.asarray(grid.cell_coords[..., 0])
-        y = np.asarray(grid.cell_coords[..., 1])
+        # py-pde lacks complete type stubs for grid.cell_coords
+        x = np.asarray(grid.cell_coords[..., 0])  # pyright: ignore[reportUnknownArgumentType,reportUnknownVariableType]
+        y = np.asarray(grid.cell_coords[..., 1])  # pyright: ignore[reportUnknownArgumentType,reportUnknownVariableType]
         phi.data[:] = np.exp(-(x**2 + y**2) / 0.5)
         state = FieldCollection([phi, pi])
 
@@ -132,7 +141,7 @@ class TestSphereKGSimulation:
         center_val = abs(rhs_data[center, center])
         # Check at an off-center point
         edge_idx = grid.shape[0] - 2  # Near edge
-        edge_val = abs(rhs_data[edge_idx, center])
+        abs(rhs_data[edge_idx, center])
         # Edge could be zero if Gaussian has decayed, but center should be non-zero
         assert center_val > 0, "RHS at center should be non-zero"
 

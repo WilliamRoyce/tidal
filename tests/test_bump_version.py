@@ -35,7 +35,7 @@ class TestVersionValidation:
         ]
         bumper = VersionBumper("0.0.0", dry_run=True)
         for version in valid_versions:
-            assert bumper._is_valid_version(version), f"Should accept {version}"  # noqa: SLF001
+            assert bumper._is_valid_version(version), f"Should accept {version}"
 
     def test_invalid_versions(self) -> None:
         """Test that invalid versions are rejected."""
@@ -51,7 +51,7 @@ class TestVersionValidation:
         ]
         bumper = VersionBumper("0.0.0", dry_run=True)
         for version in invalid_versions:
-            assert not bumper._is_valid_version(version), f"Should reject {version}"  # noqa: SLF001
+            assert not bumper._is_valid_version(version), f"Should reject {version}"
 
 
 class TestFileUpdates:
@@ -107,7 +107,7 @@ date-released: 2026-01-01
         )
         monkeypatch.setattr(bumper, "citation_cff", mock_project / "CITATION.cff")
 
-        versions = bumper._get_all_current_versions()  # noqa: SLF001
+        versions = bumper._get_all_current_versions()
 
         assert versions["pyproject.toml"] == "0.1.0"
         assert versions["__init__.py"] == "0.1.0"
@@ -121,7 +121,7 @@ date-released: 2026-01-01
         init_path = mock_project / "torsion_gertsenshtein" / "__init__.py"
         monkeypatch.setattr(bumper, "init_py", init_path)
 
-        bumper._update_init_py()  # noqa: SLF001
+        bumper._update_init_py()
 
         content = init_path.read_text()
         assert '__version__ = "0.2.0"' in content
@@ -140,7 +140,7 @@ date-released: 2026-01-01
         scripts.bump_version.has_tomli_w = False
 
         try:
-            bumper._update_pyproject_toml()  # noqa: SLF001
+            bumper._update_pyproject_toml()
             content = pyproject_path.read_text()
             assert 'version = "0.2.0"' in content
         finally:
@@ -160,7 +160,7 @@ date-released: 2026-01-01
         scripts.bump_version.has_ruamel_yaml = False
 
         try:
-            bumper._update_citation_cff("2026-02-06")  # noqa: SLF001
+            bumper._update_citation_cff("2026-02-06")
             content = citation_path.read_text()
             assert "version: 0.2.0" in content
             # Date might have quotes depending on parser
@@ -194,7 +194,7 @@ class TestBackupRestore:
         monkeypatch.setattr(bumper, "init_py", test_file)
         monkeypatch.setattr(bumper, "citation_cff", test_file)
 
-        bumper._create_backups()  # noqa: SLF001
+        bumper._create_backups()
 
         # Check backup exists
         backup_file = test_file.with_suffix(".txt.bak")
@@ -214,7 +214,7 @@ class TestBackupRestore:
         monkeypatch.setattr(bumper, "init_py", test_file)
         monkeypatch.setattr(bumper, "citation_cff", test_file)
 
-        bumper._create_backups()  # noqa: SLF001
+        bumper._create_backups()
 
         # Modify the original file
         test_file.write_text("modified content")

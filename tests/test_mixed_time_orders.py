@@ -26,8 +26,9 @@ from torsion_gertsenshtein.symbolic.pde_builder import (
     PDEFromSpec,
     create_initial_state,
 )
+from torsion_gertsenshtein.utils import normalize_solve_result
 
-# ruff: noqa: SLF001  # Tests need to access private methods
+# Tests need to access private methods
 
 
 # === Fixtures ===
@@ -323,8 +324,6 @@ class TestFirstOrderEvolution:
         self, heat_spec: EquationSystem, grid_1d: CartesianGrid
     ) -> None:
         """Heat equation: Gaussian pulse should spread over time."""
-        from torsion_gertsenshtein.utils import normalize_solve_result
-
         pde = PDEFromSpec(heat_spec)
 
         x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
@@ -529,7 +528,7 @@ class TestCreateInitialStateMixed:
             momentum_data={"phi": np.ones(64) * 5.0},
         )
 
-        # Layout: [phi, pi_phi, chi]
+        # State contains 3 slots: phi, pi_phi, and chi
         num_mixed_slots = 3
         assert len(state) == num_mixed_slots
         assert_allclose(state[0].data, phi_data)

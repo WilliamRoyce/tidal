@@ -82,13 +82,13 @@ class TestDivisionByZeroFix:
     def test_choose_writer_handles_zero_t_end(self) -> None:
         """_choose_writer should handle t_end=0 without division by zero."""
         # This should not raise ZeroDivisionError
-        writer, ext = AnimationBuilder._choose_writer(snap_count=10, t_end=0.0)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        writer, ext = AnimationBuilder._choose_writer(snap_count=10, t_end=0.0)  # pyright: ignore[reportPrivateUsage]
         assert writer.fps == 1
         assert ext in {".mp4", ".gif"}
 
     def test_choose_writer_normal_case(self) -> None:
         """_choose_writer should work normally for positive t_end."""
-        writer, ext = AnimationBuilder._choose_writer(snap_count=100, t_end=20.0)  # noqa: SLF001  # pyright: ignore[reportPrivateUsage]
+        writer, ext = AnimationBuilder._choose_writer(snap_count=100, t_end=20.0)  # pyright: ignore[reportPrivateUsage]
         # fps should be calculated based on snap_count and t_end
         assert writer.fps >= 1
         assert ext in {".mp4", ".gif"}

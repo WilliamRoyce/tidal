@@ -22,7 +22,7 @@ from torsion_gertsenshtein.symbolic.pde_builder import (
 )
 from torsion_gertsenshtein.utils import normalize_solve_result
 
-# ruff: noqa: SLF001  # Tests need to access private methods
+# Tests need to access private methods
 
 # === Fixtures ===
 
@@ -1325,7 +1325,8 @@ class TestPositionDependentCoefficients:
         assert result.shape == (16, 16)
 
         # Verify coefficient values match formula at actual cell coordinates
-        x_coords = np.asarray(grid.cell_coords[..., 0])
+        # py-pde lacks complete type stubs for grid.cell_coords
+        x_coords = np.asarray(grid.cell_coords[..., 0])  # pyright: ignore[reportUnknownArgumentType,reportUnknownVariableType]
 
         # At grid center (nearest x=0): coefficient x^2/(2*R^2) should be small
         center_x = grid.shape[0] // 2
@@ -1446,7 +1447,7 @@ class TestPositionDependentCoefficients:
             metadata={},
         )
         pde = PDEFromSpec(spec)
-        result = pde._mathematica_to_python("x()^2 + y()^2")  # noqa: SLF001
+        result = pde._mathematica_to_python("x()^2 + y()^2")
         assert "x()" not in result
         assert "y()" not in result
         assert "x**2" in result
@@ -1473,7 +1474,7 @@ class TestPositionDependentCoefficients:
             coordinates=("t", "r", "theta"),
         )
         pde = PDEFromSpec(spec)
-        result = pde._mathematica_to_python("r()^2 + theta()")  # noqa: SLF001
+        result = pde._mathematica_to_python("r()^2 + theta()")
         assert "r()" not in result
         assert "theta()" not in result
         assert "r**2" in result
@@ -1515,8 +1516,9 @@ class TestPositionDependentCoefficients:
         # Create initial state
         phi = ScalarField(grid, data=0.0)
         pi = ScalarField(grid, data=0.0)
-        x = np.asarray(grid.cell_coords[..., 0])
-        y = np.asarray(grid.cell_coords[..., 1])
+        # py-pde lacks complete type stubs for grid.cell_coords
+        x = np.asarray(grid.cell_coords[..., 0])  # pyright: ignore[reportUnknownArgumentType,reportUnknownVariableType]
+        y = np.asarray(grid.cell_coords[..., 1])  # pyright: ignore[reportUnknownArgumentType,reportUnknownVariableType]
         phi.data[:] = np.exp(-(x**2 + y**2) / 2)
         state = FieldCollection([phi, pi])
 

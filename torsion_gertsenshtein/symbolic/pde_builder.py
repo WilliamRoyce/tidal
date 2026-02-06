@@ -10,6 +10,7 @@ comes from the specification that was derived from the Lagrangian.
 from __future__ import annotations
 
 import re
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
@@ -350,7 +351,6 @@ class PDEFromSpec(PDEBase):
                 return self._parameters[sym]
 
             # Symbolic coefficient present but not resolvable from parameters
-            import warnings
 
             warnings.warn(
                 f"Symbolic coefficient '{sym[:80]}' could not be resolved from "
@@ -472,7 +472,7 @@ class PDEFromSpec(PDEBase):
             spatial_coords = self.spec.spatial_coordinates
             coords = grid.cell_coords  # type: ignore[union-attr]
             for i, name in enumerate(spatial_coords[: grid.num_axes]):  # type: ignore[union-attr]
-                namespace[name] = np.asarray(coords[..., i])
+                namespace[name] = np.asarray(coords[..., i])  # pyright: ignore[reportUnknownArgumentType]
 
         # Validate all symbols can be resolved
         identifiers = set(re.findall(r"\b[a-zA-Z_]\w*\b", py_expr))
@@ -805,8 +805,8 @@ class PDEFromSpec(PDEBase):
         virtual_momenta: dict[str, ScalarField] = {}
         for i, eq in enumerate(self.spec.equations):
             if eq.time_derivative_order == 1:
-                virtual_momenta[eq.field_name] = (
-                    self._compute_rhs_for_component(i, state, bc, t)
+                virtual_momenta[eq.field_name] = self._compute_rhs_for_component(
+                    i, state, bc, t
                 )
 
         # Pass 2: Build the full rates array using slot maps
@@ -927,11 +927,10 @@ def create_initial_state(
                 fields.append(ScalarField(grid, data=field_data[name]))
             else:
                 fields.append(ScalarField(grid, data=0.0))
+        # Momentum slot (only for second-order components)
+        elif name in momentum_data:
+            fields.append(ScalarField(grid, data=momentum_data[name]))
         else:
-            # Momentum slot (only for second-order components)
-            if name in momentum_data:
-                fields.append(ScalarField(grid, data=momentum_data[name]))
-            else:
-                fields.append(ScalarField(grid, data=0.0))
+            fields.append(ScalarField(grid, data=0.0))
 
     return FieldCollection(fields)

@@ -126,7 +126,6 @@ class TestEvolution3D:
         """3D sinusoidal field: verify directional laplacians sum correctly."""
         pde = build_pde_from_json(kg_3d_json_path, parameters={"m2": 0.0})
 
-        # phi = sin(kx*x) * sin(ky*y) * sin(kz*z)
         x = cast("np.ndarray", grid_3d.cell_coords[..., 0])
         y = cast("np.ndarray", grid_3d.cell_coords[..., 1])
         z = cast("np.ndarray", grid_3d.cell_coords[..., 2])

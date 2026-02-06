@@ -797,8 +797,8 @@ class TestCoordinateDependentTerms:
 class TestEquationSystemCoordinates:
     """Tests for EquationSystem coordinate handling."""
 
-    def _make_spec(self, **kwargs: Any) -> EquationSystem:
-        """Helper to create a minimal EquationSystem."""
+    def _make_spec(self, **kwargs: Any) -> EquationSystem:  # noqa: ANN401 - test helper accepts any EquationSystem parameters
+        """Create a minimal EquationSystem with customizable fields."""
         defaults: dict[str, Any] = {
             "n_components": 1,
             "dimension": 2,
