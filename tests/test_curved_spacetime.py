@@ -8,6 +8,7 @@ including:
 """
 
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pytest
@@ -36,18 +37,22 @@ class TestFirstDerivativeTimeOperator:
         return load_equation_system(json_path)
 
     @pytest.fixture
-    def grid_1d(self) -> CartesianGrid:
-        """Create a simple 1D grid."""
-        return CartesianGrid(bounds=[(0, 10)], shape=[32], periodic=True)
+    def grid_2d(self) -> CartesianGrid:
+        """Create a simple 2D grid for 2+1D de Sitter."""
+        return CartesianGrid(bounds=[(0, 10), (0, 10)], shape=[32, 32], periodic=True)
 
-    def test_de_sitter_has_first_derivative_t(self, de_sitter_spec: EquationSystem) -> None:
+    def test_de_sitter_has_first_derivative_t(
+        self, de_sitter_spec: EquationSystem
+    ) -> None:
         """Verify de Sitter spec contains first_derivative_t operator."""
         eq = de_sitter_spec.equations[0]
         operators = [term.operator for term in eq.rhs_terms]
         assert "first_derivative_t" in operators
 
-    def test_first_derivative_t_term_structure(self, de_sitter_spec: EquationSystem) -> None:
-        """Verify first_derivative_t term has correct structure for 1+1D."""
+    def test_first_derivative_t_term_structure(
+        self, de_sitter_spec: EquationSystem
+    ) -> None:
+        """Verify first_derivative_t term has correct structure for 2+1D."""
         eq = de_sitter_spec.equations[0]
         first_deriv_term = next(
             term for term in eq.rhs_terms if term.operator == "first_derivative_t"
@@ -55,32 +60,34 @@ class TestFirstDerivativeTimeOperator:
 
         # Should have symbolic coefficient for Hubble friction
         assert first_deriv_term.coefficient_symbolic is not None
-        # For 1+1D (n=1 spatial dim), coefficient should be -H, not -2H
-        assert first_deriv_term.coefficient_symbolic == "-H"
+        # For 2+1D (n=2 spatial dims), coefficient is -(n-1)*H = -H
+        assert first_deriv_term.coefficient_symbolic == "-dSH"
 
     def test_first_derivative_t_evolution(
-        self, de_sitter_spec: EquationSystem, grid_1d: CartesianGrid
+        self, de_sitter_spec: EquationSystem, grid_2d: CartesianGrid
     ) -> None:
         """Test that first_derivative_t correctly uses momentum field."""
-        pde = PDEFromSpec(de_sitter_spec, parameters={"H": 0.1, "m2": 1.0})
+        pde = PDEFromSpec(de_sitter_spec, parameters={"dSH": 0.1, "dSm2": 1.0})
 
         # Create state with field=0, momentum=1
-        field = ScalarField(grid_1d, data=0.0, label="phi")
-        momentum = ScalarField(grid_1d, data=1.0, label="pi")
+        field = ScalarField(grid_2d, data=0.0, label="phi")
+        momentum = ScalarField(grid_2d, data=1.0, label="pi")
         state = FieldCollection([field, momentum])
 
         # Compute evolution rate
         rates = pde.evolution_rate(state, t=0.0)
 
         # d/dt momentum should include contribution from first_derivative_t
-        # first_derivative_t(phi) returns pi, coefficient is -2*H = -0.2
-        # So this term contributes -0.2 * 1.0 = -0.2 to d(momentum)/dt
+        # first_derivative_t(phi) returns pi, coefficient is -dSH = -0.1
+        # So this term contributes -0.1 * 1.0 = -0.1 to d(momentum)/dt
         d_momentum_dt = rates[1]
 
         # The momentum rate should be negative (Hubble friction)
         # Note: there are other terms too (laplacian, mass), but with phi=0
         # only the first_derivative_t term contributes
-        assert np.all(d_momentum_dt.data < 0), "Hubble friction should give negative rate"
+        assert np.all(d_momentum_dt.data < 0), (
+            "Hubble friction should give negative rate"
+        )
 
 
 class TestTimeDependentCoefficients:
@@ -118,8 +125,8 @@ class TestTimeDependentCoefficients:
         assert term.time_dependent is False
 
     def test_resolve_coefficient_hubble(self, de_sitter_spec: EquationSystem) -> None:
-        """Test coefficient resolution for Hubble friction term in 1+1D."""
-        pde = PDEFromSpec(de_sitter_spec, parameters={"H": 0.5, "m2": 1.0})
+        """Test coefficient resolution for Hubble friction term in 2+1D."""
+        pde = PDEFromSpec(de_sitter_spec, parameters={"dSH": 0.5, "dSm2": 1.0})
 
         # Find the first_derivative_t term
         eq = de_sitter_spec.equations[0]
@@ -127,16 +134,16 @@ class TestTimeDependentCoefficients:
             term for term in eq.rhs_terms if term.operator == "first_derivative_t"
         )
 
-        # Resolve at t=0 (time doesn't matter for -H which is constant)
-        # For 1+1D (n=1), the symbolic coefficient is "-H", should resolve to -0.5
+        # Resolve at t=0 (time doesn't matter for -dSH which is constant)
+        # For 2+1D (n=2), the symbolic coefficient is "-dSH", should resolve to -0.5
         coeff = pde._resolve_coefficient_at_time(hubble_term, t=0.0)  # noqa: SLF001
 
-        # Should be -H = -0.5 (not -2H which is for 2+1D)
-        assert coeff == pytest.approx(-0.5, rel=0.01)  # Tightened tolerance from 10% to 1%
+        # Should be -dSH = -0.5
+        assert coeff == pytest.approx(-0.5, rel=0.01)
 
 
 class TestDeSitterSimulation:
-    """Integration tests for de Sitter simulation."""
+    """Integration tests for de Sitter simulation (2+1D)."""
 
     @pytest.fixture
     def de_sitter_spec(self) -> EquationSystem:
@@ -147,23 +154,25 @@ class TestDeSitterSimulation:
         return load_equation_system(json_path)
 
     @pytest.fixture
-    def grid_1d(self) -> CartesianGrid:
-        """Create a 1D grid."""
-        return CartesianGrid(bounds=[(0, 50)], shape=[128], periodic=True)
+    def grid_2d(self) -> CartesianGrid:
+        """Create a 2D grid for 2+1D de Sitter."""
+        return CartesianGrid(bounds=[(0, 50), (0, 50)], shape=[64, 64], periodic=True)
 
     def test_de_sitter_energy_decreases(
-        self, de_sitter_spec: EquationSystem, grid_1d: CartesianGrid
+        self, de_sitter_spec: EquationSystem, grid_2d: CartesianGrid
     ) -> None:
         """Test that energy decreases due to Hubble friction."""
-        pde = PDEFromSpec(de_sitter_spec, parameters={"H": 0.2, "m2": 1.0})
+        pde = PDEFromSpec(de_sitter_spec, parameters={"dSH": 0.2, "dSm2": 1.0})
 
-        # Create Gaussian initial condition
+        # Create 2D Gaussian initial condition
         # py-pde cell_coords lacks type stubs
-        x = np.asarray(grid_1d.cell_coords[..., 0])  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
-        gaussian = np.exp(-((x - 25) ** 2) / (2 * 3**2))
+        coords = np.asarray(grid_2d.cell_coords)  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
+        x = cast("np.ndarray", coords[..., 0])
+        y = cast("np.ndarray", coords[..., 1])
+        gaussian = np.exp(-((x - 25) ** 2 + (y - 25) ** 2) / (2 * 3**2))
 
-        field = ScalarField(grid_1d, data=gaussian, label="phi")
-        momentum = ScalarField(grid_1d, data=0.0, label="pi")
+        field = ScalarField(grid_2d, data=gaussian, label="phi")
+        momentum = ScalarField(grid_2d, data=0.0, label="pi")
         state = FieldCollection([field, momentum])
 
         # Compute energy proxy
@@ -184,18 +193,20 @@ class TestDeSitterSimulation:
         assert final_energy < initial_energy, "Hubble friction should decrease energy"
 
     def test_de_sitter_amplitude_decays(
-        self, de_sitter_spec: EquationSystem, grid_1d: CartesianGrid
+        self, de_sitter_spec: EquationSystem, grid_2d: CartesianGrid
     ) -> None:
         """Test that amplitude decays due to Hubble friction."""
-        pde = PDEFromSpec(de_sitter_spec, parameters={"H": 0.3, "m2": 0.5})
+        pde = PDEFromSpec(de_sitter_spec, parameters={"dSH": 0.3, "dSm2": 0.5})
 
-        # Create Gaussian initial condition
+        # Create 2D Gaussian initial condition
         # py-pde cell_coords lacks type stubs
-        x = np.asarray(grid_1d.cell_coords[..., 0])  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
-        gaussian = np.exp(-((x - 25) ** 2) / (2 * 3**2))
+        coords = np.asarray(grid_2d.cell_coords)  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
+        x = cast("np.ndarray", coords[..., 0])
+        y = cast("np.ndarray", coords[..., 1])
+        gaussian = np.exp(-((x - 25) ** 2 + (y - 25) ** 2) / (2 * 3**2))
 
-        field = ScalarField(grid_1d, data=gaussian, label="phi")
-        momentum = ScalarField(grid_1d, data=0.0, label="pi")
+        field = ScalarField(grid_2d, data=gaussian, label="phi")
+        momentum = ScalarField(grid_2d, data=0.0, label="pi")
         state = FieldCollection([field, momentum])
 
         initial_max = np.max(np.abs(state[0].data))

@@ -549,3 +549,151 @@ class TestFieldReferenceValidation:
                 coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
                 metadata={},
             )
+
+
+# === Phase 8A: Operator Registry Sync Test ===
+
+
+class TestOperatorRegistrySync:
+    """Validate KNOWN_OPERATORS and _OPERATOR_REGISTRY stay consistent."""
+
+    def test_all_registry_operators_are_known(self) -> None:
+        """Every operator in _OPERATOR_REGISTRY must be in KNOWN_OPERATORS."""
+        from torsion_gertsenshtein.symbolic.json_loader import KNOWN_OPERATORS
+        from torsion_gertsenshtein.symbolic.pde_builder import _OPERATOR_REGISTRY
+
+        unknown = set(_OPERATOR_REGISTRY.keys()) - KNOWN_OPERATORS
+        assert unknown == set(), (
+            f"Operators in _OPERATOR_REGISTRY but not in KNOWN_OPERATORS: {sorted(unknown)}. "
+            "Add them to KNOWN_OPERATORS in json_loader.py."
+        )
+
+    def test_known_minus_registry_is_only_first_derivative_t(self) -> None:
+        """The only KNOWN_OPERATOR not in _OPERATOR_REGISTRY is first_derivative_t."""
+        from torsion_gertsenshtein.symbolic.json_loader import KNOWN_OPERATORS
+        from torsion_gertsenshtein.symbolic.pde_builder import _OPERATOR_REGISTRY
+
+        special_cased = KNOWN_OPERATORS - set(_OPERATOR_REGISTRY.keys())
+        assert special_cased == {"first_derivative_t"}, (
+            f"Expected only {{'first_derivative_t'}} to be special-cased, "
+            f"but got: {sorted(special_cased)}"
+        )
+
+
+# === Phase 8D: Python Validation Tests ===
+
+
+class TestValidationErrors:
+    """Tests for fail-fast validation in json_loader."""
+
+    def test_duplicate_field_names_raises(self) -> None:
+        """Duplicate field names in JSON should raise ValueError."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+            "fields": [
+                {"name": "phi", "index": 0},
+                {"name": "phi", "index": 1},  # Duplicate
+            ],
+            "equations": [
+                {
+                    "field": "phi",
+                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [{"coefficient": 1.0, "operator": "laplacian", "field": "phi"}],
+                    },
+                },
+                {
+                    "field": "phi",
+                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [{"coefficient": 1.0, "operator": "laplacian", "field": "phi"}],
+                    },
+                },
+            ],
+        }
+        with pytest.raises(ValueError, match="Duplicate field names"):
+            EquationSystem.from_dict(data)
+
+    def test_unknown_operator_raises(self) -> None:
+        """Unknown operator in RHS term should raise ValueError."""
+        data = {"coefficient": 1.0, "operator": "teleportation", "field": "phi"}
+        with pytest.raises(ValueError, match="Unknown operator.*teleportation"):
+            OperatorTerm.from_dict(data)
+
+    def test_missing_required_keys_raises(self) -> None:
+        """Missing required keys in RHS term should raise ValueError."""
+        # Missing 'operator'
+        data: dict[str, Any] = {"coefficient": 1.0, "field": "phi"}
+        with pytest.raises(ValueError, match="missing required keys"):
+            OperatorTerm.from_dict(data)
+
+        # Missing 'coefficient' and 'field'
+        data2: dict[str, Any] = {"operator": "laplacian"}
+        with pytest.raises(ValueError, match="missing required keys"):
+            OperatorTerm.from_dict(data2)
+
+    def test_mismatched_mass_matrix_rows_raises(self) -> None:
+        """Mass matrix with wrong number of rows should raise ValueError."""
+        with pytest.raises(ValueError, match="mass_matrix rows"):
+            EquationSystem(
+                n_components=2,
+                dimension=2,
+                spatial_dimension=1,
+                component_names=("A_0", "A_1"),
+                equations=(
+                    ComponentEquation("A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)),
+                    ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+                ),
+                mass_matrix=((0.0, 0.0),),  # 1 row instead of 2
+                coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+                metadata={},
+            )
+
+    def test_mismatched_mass_matrix_cols_raises(self) -> None:
+        """Mass matrix with wrong number of columns should raise ValueError."""
+        with pytest.raises(ValueError, match="mass_matrix row 0 length"):
+            EquationSystem(
+                n_components=2,
+                dimension=2,
+                spatial_dimension=1,
+                component_names=("A_0", "A_1"),
+                equations=(
+                    ComponentEquation("A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)),
+                    ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+                ),
+                mass_matrix=((0.0,), (0.0,)),  # 1 col instead of 2
+                coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+                metadata={},
+            )
+
+    def test_mismatched_coupling_matrix_raises(self) -> None:
+        """Coupling matrix with wrong dimensions should raise ValueError."""
+        with pytest.raises(ValueError, match="coupling_matrix rows"):
+            EquationSystem(
+                n_components=2,
+                dimension=2,
+                spatial_dimension=1,
+                component_names=("A_0", "A_1"),
+                equations=(
+                    ComponentEquation("A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)),
+                    ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+                ),
+                mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+                coupling_matrix=((0.0, 0.0), (0.0, 0.0), (0.0, 0.0)),  # 3 rows
+                metadata={},
+            )
+
+    def test_unknown_field_in_equation_raises(self) -> None:
+        """Field in equation that doesn't exist in fields_lookup should raise ValueError."""
+        data: dict[str, Any] = {
+            "field": "nonexistent",
+            "lhs": {"expression": "d2_t(nonexistent)", "order": {"time": 2, "space": 0}},
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [{"coefficient": 1.0, "operator": "laplacian", "field": "phi"}],
+            },
+        }
+        with pytest.raises(ValueError, match="Unknown field 'nonexistent'"):
+            ComponentEquation.from_dict(data, {"phi": 0})

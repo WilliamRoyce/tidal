@@ -235,6 +235,38 @@ TestTrue["BuildTermResult has symbolic key with arg",
   KeyExistsQ[term2, "coefficient_symbolic"]];
 TestCase["BuildTermResult symbolic value", "m2", term2["coefficient_symbolic"]];
 
+(* === Test 13: Fail-Fast Throws in ExportJSON (Phase 8C) === *)
+Print[""];
+Print["Test 13: Fail-Fast Throws in ExportJSON"];
+
+(* Test ParseFieldName Throw on invalid name *)
+thrown1 = Catch[
+  TorsionGertsenshtein`ExportJSON`ParseFieldName["123invalid!!!"]
+];
+TestTrue["ParseFieldName throws on invalid name",
+  StringQ[thrown1] && StringContainsQ[thrown1, "ParseFieldName"]];
+
+(* Test ExtractLHSCoefficient Throw on non-derivative term *)
+thrown2 = Catch[
+  TorsionGertsenshtein`ExportJSON`ExtractLHSCoefficient[phi0[t, x]]
+];
+TestTrue["ExtractLHSCoefficient throws on non-derivative term",
+  StringQ[thrown2] && StringContainsQ[thrown2, "ExtractLHSCoefficient"]];
+
+(* Test ClassifyOperatorType Throw on unsupported derivative order *)
+(* Order 3 derivative is not supported *)
+testOrder3 = Derivative[0, 3][phi0][t, x];
+thrown3 = Catch[
+  TorsionGertsenshtein`ExportJSON`ClassifyOperatorType[testOrder3]
+];
+TestTrue["ClassifyOperatorType throws on unsupported order (3)",
+  StringQ[thrown3] && StringContainsQ[thrown3, "ClassifyOperatorType"]];
+
+(* Note: ParseMultiFieldRHS Throw is a guard for future code paths where *)
+(* IdentifyMultiFieldTerm might return Nothing for some terms. Currently *)
+(* IdentifyMultiFieldTerm always produces output (uses default field), so *)
+(* the zero-terms condition is unreachable from tests without mocking. *)
+
 (* === Exit === *)
 Print[""];
 ExitWithTestStatus[];

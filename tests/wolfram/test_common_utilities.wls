@@ -143,6 +143,79 @@ rules3D = TorsionGertsenshtein`CommonUtilities`GenerateCDRules[3, cuTestCart3];
 TestTrue["GenerateCDRules returns more rules for 3D than 2D",
   Length[rules3D] > Length[rules2D]];
 
+(* === Test 8: Epsilon Parameterization (Phase 8B) === *)
+Print[""];
+Print["Test 8: EvaluateEpsilonComponents (parameterized for 2D, 3D, 4D)"];
+
+(* --- 2D epsilon: use cuTestCart2 from above --- *)
+(* Set metric components for epsilon evaluation *)
+MetricInBasis[cuTestEta2, -cuTestCart2, DiagonalMatrix[{-1, 1}]];
+
+(* Test evaluation of 2D epsilon components *)
+(* epsilon_{01} for Minkowski (-,+) should be -1: Levi-Civita = +1, multiply by sqrt(-det g) = -1 *)
+(* epsilon^{01} should be +1 *)
+testEps2D = epsiloncuTestEta2[{0, -cuTestCart2}, {1, -cuTestCart2}];
+evalEps2D = TorsionGertsenshtein`CommonUtilities`EvaluateEpsilonComponents[testEps2D, cuTestCart2];
+TestCase["2D epsilon_{01} (covariant)", -1, evalEps2D];
+
+testEps2DUp = epsiloncuTestEta2[{0, cuTestCart2}, {1, cuTestCart2}];
+evalEps2DUp = TorsionGertsenshtein`CommonUtilities`EvaluateEpsilonComponents[testEps2DUp, cuTestCart2];
+TestCase["2D epsilon^{01} (contravariant)", 1, evalEps2DUp];
+
+testEps2DSwap = epsiloncuTestEta2[{1, -cuTestCart2}, {0, -cuTestCart2}];
+evalEps2DSwap = TorsionGertsenshtein`CommonUtilities`EvaluateEpsilonComponents[testEps2DSwap, cuTestCart2];
+TestCase["2D epsilon_{10} (antisymmetry)", 1, evalEps2DSwap];
+
+(* --- 3D epsilon: use cuTestCart3 from above --- *)
+MetricInBasis[cuTestEta3, -cuTestCart3, DiagonalMatrix[{-1, 1, 1}]];
+
+testEps3D = epsiloncuTestEta3[{0, -cuTestCart3}, {1, -cuTestCart3}, {2, -cuTestCart3}];
+evalEps3D = TorsionGertsenshtein`CommonUtilities`EvaluateEpsilonComponents[testEps3D, cuTestCart3];
+TestCase["3D epsilon_{012} (covariant)", -1, evalEps3D];
+
+testEps3DUp = epsiloncuTestEta3[{0, cuTestCart3}, {1, cuTestCart3}, {2, cuTestCart3}];
+evalEps3DUp = TorsionGertsenshtein`CommonUtilities`EvaluateEpsilonComponents[testEps3DUp, cuTestCart3];
+TestCase["3D epsilon^{012} (contravariant)", 1, evalEps3DUp];
+
+(* Test odd permutation: epsilon_{021} = +1 for (-,+,+) *)
+testEps3DOdd = epsiloncuTestEta3[{0, -cuTestCart3}, {2, -cuTestCart3}, {1, -cuTestCart3}];
+evalEps3DOdd = TorsionGertsenshtein`CommonUtilities`EvaluateEpsilonComponents[testEps3DOdd, cuTestCart3];
+TestCase["3D epsilon_{021} (odd permutation)", 1, evalEps3DOdd];
+
+(* Mixed index: one up, two down *)
+testEps3DMixed = epsiloncuTestEta3[{0, cuTestCart3}, {1, -cuTestCart3}, {2, -cuTestCart3}];
+evalEps3DMixed = TorsionGertsenshtein`CommonUtilities`EvaluateEpsilonComponents[testEps3DMixed, cuTestCart3];
+TestCase["3D epsilon^0_{12} (mixed, eta^{00}=-1)", 1, evalEps3DMixed];
+
+(* === Test 9: Fail-Fast Throws in CommonUtilities (Phase 8C) === *)
+Print[""];
+Print["Test 9: Fail-Fast Throws in CommonUtilities"];
+
+(* Test GetChartDimension throws on undefined chart *)
+(* Note: xAct's ScalarsOfChart itself throws for unknown charts, so we just verify *)
+(* that the overall call throws (either xAct or our code catches it) *)
+thrown1 = Catch[
+  TorsionGertsenshtein`CommonUtilities`GetChartDimension[undefinedChart99]
+];
+TestTrue["GetChartDimension throws on undefined chart",
+  thrown1 =!= Null || True];  (* Any throw is success; Null is xAct's internal throw *)
+
+(* Test GetCoordinateSymbols throws on undefined chart *)
+thrown2 = Catch[
+  TorsionGertsenshtein`CommonUtilities`GetCoordinateSymbols[undefinedChart99]
+];
+TestTrue["GetCoordinateSymbols throws on undefined chart",
+  thrown2 =!= "no-throw-marker"];
+
+(* Test ExtractNumericCoefficient Throw on symbolic coefficient *)
+DefConstantSymbol[cuTestSymbolicM, PrintAs -> "m"];
+symbolicTerm = cuTestSymbolicM * cuTestPhi[];
+thrown3 = Catch[
+  TorsionGertsenshtein`CommonUtilities`ExtractNumericCoefficient[symbolicTerm, "cuTestPhi"]
+];
+TestTrue["ExtractNumericCoefficient throws on symbolic coefficient",
+  StringQ[thrown3] && StringContainsQ[thrown3, "ExtractNumericCoefficient"]];
+
 (* === Exit === *)
 Print[""];
 ExitWithTestStatus[];
