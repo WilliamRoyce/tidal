@@ -7,6 +7,7 @@ field equations that were derived symbolically from Lagrangians.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -14,9 +15,9 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
-#: Set of all operators supported by the pipeline.
+#: Set of static operators supported by the pipeline.
 #: Validated at JSON load time to catch typos early.
-KNOWN_OPERATORS: frozenset[str] = frozenset(
+_STATIC_OPERATORS: frozenset[str] = frozenset(
     {
         "identity",
         "laplacian",
@@ -33,6 +34,29 @@ KNOWN_OPERATORS: frozenset[str] = frozenset(
         "biharmonic",
     }
 )
+
+#: Pattern for generic single-axis Nth-order derivatives: derivative_3_x, derivative_5_y, etc.
+_GENERIC_SINGLE_AXIS_RE = re.compile(r"^derivative_(\d+)_([xyz])$")
+
+#: Pattern for generic multi-axis derivatives: derivative_2x_1y, derivative_3x_2z, etc.
+_GENERIC_MULTI_AXIS_RE = re.compile(r"^derivative_(\d+[xyz](?:_\d+[xyz])*)$")
+
+# Backward-compatible alias
+KNOWN_OPERATORS: frozenset[str] = _STATIC_OPERATORS
+
+
+def is_known_operator(name: str) -> bool:
+    """Check whether an operator name is recognized.
+
+    Accepts both static operators (identity, laplacian, gradient_x, ...)
+    and dynamic patterns for generic Nth-order derivatives
+    (derivative_3_x, derivative_5_y, derivative_2x_1y, ...).
+    """
+    return (
+        name in _STATIC_OPERATORS
+        or bool(_GENERIC_SINGLE_AXIS_RE.match(name))
+        or bool(_GENERIC_MULTI_AXIS_RE.match(name))
+    )
 
 
 @dataclass(frozen=True)
@@ -106,6 +130,10 @@ class OperatorTerm:
         Whether the coefficient depends on time. For curved spacetime, terms
         like -2H∂_t φ (Hubble friction) have time-dependent coefficients when
         the conformal factor Ω(t) varies with time. Default False for flat spacetime.
+    coordinate_dependent : tuple[str, ...]
+        Coordinate names the coefficient depends on (e.g., ("x", "y") for
+        position-dependent coefficients on curved spatial surfaces, or ("t",)
+        for time-dependent). Empty tuple for constant coefficients.
     """
 
     coefficient: float
@@ -113,6 +141,16 @@ class OperatorTerm:
     field: str
     coefficient_symbolic: str | None = None
     time_dependent: bool = False
+    coordinate_dependent: tuple[str, ...] = ()
+
+    @property
+    def position_dependent(self) -> bool:
+        """Whether the coefficient depends on spatial coordinates.
+
+        A coordinate is spatial if it is not the time coordinate ``"t"``.
+        This works for any coordinate naming convention (Cartesian, spherical, etc.).
+        """
+        return bool(set(self.coordinate_dependent) - {"t"})
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> OperatorTerm:
@@ -132,10 +170,11 @@ class OperatorTerm:
             raise ValueError(msg)
 
         operator = str(data["operator"])
-        if operator not in KNOWN_OPERATORS:
+        if not is_known_operator(operator):
             msg = (
                 f"Unknown operator '{operator}'. "
-                f"Known operators: {sorted(KNOWN_OPERATORS)}"
+                f"Known static operators: {sorted(_STATIC_OPERATORS)}. "
+                f"Dynamic patterns: derivative_N_x, derivative_Nx_My (N,M=integers, x,y,z=axes)."
             )
             raise ValueError(msg)
 
@@ -145,6 +184,7 @@ class OperatorTerm:
             field=str(data["field"]),
             coefficient_symbolic=data.get("coefficient_symbolic"),
             time_dependent=bool(data.get("time_dependent", False)),
+            coordinate_dependent=tuple(data.get("coordinate_dependent", ())),
         )
 
 
@@ -240,6 +280,10 @@ class EquationSystem:
         Coupling matrix for field interactions.
     metadata : dict[str, Any]
         Additional metadata (source, gauge, etc.)
+    coordinates : tuple[str, ...]
+        Coordinate names from JSON spacetime.coordinates (e.g., ("t", "x", "y")).
+        Defaults to empty tuple; use ``effective_coordinates`` for a guaranteed
+        non-empty result that infers names from dimension when not set.
     """
 
     n_components: int
@@ -250,6 +294,7 @@ class EquationSystem:
     mass_matrix: tuple[tuple[float, ...], ...]
     coupling_matrix: tuple[tuple[float, ...], ...]
     metadata: dict[str, Any]
+    coordinates: tuple[str, ...] = ()
 
     def __post_init__(self) -> None:
         """Validate the equation system.
@@ -348,8 +393,48 @@ class EquationSystem:
                     )
                     raise ValueError(msg)
 
+    @property
+    def time_orders(self) -> tuple[int, ...]:
+        """Per-component time derivative orders."""
+        return tuple(eq.time_derivative_order for eq in self.equations)
+
+    @property
+    def state_size(self) -> int:
+        """Total number of state fields.
+
+        Second-order components contribute 2 slots (field + momentum).
+        First-order and constraint components contribute 1 slot (field only).
+        """
+        return sum(2 if t >= 2 else 1 for t in self.time_orders)  # noqa: PLR2004
+
+    @property
+    def state_layout(self) -> tuple[tuple[str, str], ...]:
+        """State vector layout as (field_name, slot_type) tuples.
+
+        slot_type is "field" or "momentum". Second-order components produce
+        two entries (field, momentum); first-order/constraint produce one (field).
+        """
+        layout: list[tuple[str, str]] = []
+        for eq in self.equations:
+            layout.append((eq.field_name, "field"))
+            if eq.time_derivative_order >= 2:  # noqa: PLR2004
+                layout.append((eq.field_name, "momentum"))
+        return tuple(layout)
+
+    @property
+    def effective_coordinates(self) -> tuple[str, ...]:
+        """Coordinate names, inferred from dimension if not set explicitly."""
+        if self.coordinates:
+            return self.coordinates
+        return ("t", *("x", "y", "z")[: self.spatial_dimension])
+
+    @property
+    def spatial_coordinates(self) -> tuple[str, ...]:
+        """Spatial coordinate names (all except first, which is time)."""
+        return self.effective_coordinates[1:]
+
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:
+    def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914
         """Create an EquationSystem from a dictionary (parsed JSON).
 
         Raises
@@ -412,6 +497,9 @@ class EquationSystem:
         # Extract metadata
         metadata = dict(data.get("metadata", {}))
 
+        # Extract coordinate names
+        coordinates = tuple(str(c) for c in spacetime.get("coordinates", []))
+
         return cls(
             n_components=n_components,
             dimension=dimension,
@@ -421,6 +509,7 @@ class EquationSystem:
             mass_matrix=mass_matrix,
             coupling_matrix=coupling_matrix,
             metadata=metadata,
+            coordinates=coordinates,
         )
 
 

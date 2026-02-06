@@ -136,7 +136,7 @@ class TestTimeDependentCoefficients:
 
         # Resolve at t=0 (time doesn't matter for -dSH which is constant)
         # For 2+1D (n=2), the symbolic coefficient is "-dSH", should resolve to -0.5
-        coeff = pde._resolve_coefficient_at_time(hubble_term, t=0.0)  # noqa: SLF001
+        coeff = pde._resolve_coefficient_at_point(hubble_term, t=0.0)
 
         # Should be -dSH = -0.5
         assert coeff == pytest.approx(-0.5, rel=0.01)

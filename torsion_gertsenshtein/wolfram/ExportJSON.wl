@@ -115,6 +115,17 @@ IdentifyDirectionalLaplacian::usage =
 spatial direction. Returns \"laplacian_x\", \"laplacian_y\", \"laplacian_z\", or False. \
 Used for anisotropic equations like Navier-Cauchy where d^2_x and d^2_y have different coefficients.";
 
+(* Generic derivative order support (Phase 12) *)
+ExtractSpatialDerivativeProfile::usage =
+  "ExtractSpatialDerivativeProfile[term] extracts the spatial derivative orders from a \
+Derivative[dt, dx, dy, ...] pattern. Returns a list of non-negative integers representing \
+the derivative order in each spatial axis (time slot excluded). E.g., Derivative[0,3,0] -> {3,0}.";
+
+BuildGenericOperatorName::usage =
+  "BuildGenericOperatorName[spatialOrders] builds an operator name string from a list of \
+spatial derivative orders. Single-axis: {3,0} -> \"derivative_3_x\", {0,5} -> \"derivative_5_y\". \
+Multi-axis: {2,1} -> \"derivative_2x_1y\". Axis names: 1->x, 2->y, 3->z.";
+
 (* First-order time derivative detection for curved spacetime *)
 IsFirstOrderTimeDerivative::usage =
   "IsFirstOrderTimeDerivative[term] returns True if term contains exactly a first-order \
@@ -123,9 +134,10 @@ time derivative (no spatial derivatives). Used to detect Hubble friction terms l
 
 (* Term identification and building *)
 BuildTermResult::usage =
-  "BuildTermResult[coeff, operator, field, symbolicCoeff:None, timeDependent:False] builds a term result \
+  "BuildTermResult[coeff, operator, field, symbolicCoeff:None, timeDependent:False, coordDeps:{}] builds a term result \
 Association with keys \"coefficient\", \"operator\", \"field\". Optionally includes \
-\"coefficient_symbolic\" when symbolicCoeff is not None, and \"time_dependent\" when timeDependent is True.";
+\"coefficient_symbolic\" when symbolicCoeff is not None, \"time_dependent\" when timeDependent is True, \
+and \"coordinate_dependent\" when coordDeps is non-empty.";
 
 IdentifyMultiFieldTerm::usage =
   "IdentifyMultiFieldTerm[term, currentFieldName, allFieldNames] analyzes a \
@@ -145,7 +157,7 @@ with \"field\" and \"head\" keys, or uses defaultField if no match found.";
 
 ExtractTermCoefficient::usage =
   "ExtractTermCoefficient[term, fieldHead, targetField] extracts the numeric coefficient \
-and optional symbolic coefficient from a term. Returns {numericCoeff, symbolicCoeff, isTimeDependent}.";
+and optional symbolic coefficient from a term. Returns {numericCoeff, symbolicCoeff, isTimeDependent, coordDeps}.";
 
 ExtractTermCoefficient::symbolic =
   "Symbolic (non-numeric) coefficient `1` found for field `2`. Storing as symbolic coefficient in JSON.";
@@ -610,10 +622,11 @@ IdentifyDirectionalLaplacian[term_] := Module[{},
   ]
 ];
 
-(* Helper to build term result with optional symbolic coefficient and time dependence *)
+(* Helper to build term result with optional symbolic coefficient and coordinate dependence *)
 (* Only includes "coefficient_symbolic" key when symbolicCoeff is not None *)
 (* Only includes "time_dependent" key when timeDependent is True *)
-BuildTermResult[coeff_, op_, field_, symbCoeff_:None, timeDependent_:False] := Module[{result},
+(* Only includes "coordinate_dependent" key when coordDeps is non-empty *)
+BuildTermResult[coeff_, op_, field_, symbCoeff_:None, timeDependent_:False, coordDeps_:{}] := Module[{result},
   result = <|
     "coefficient" -> N[coeff],
     "operator" -> op,
@@ -625,17 +638,23 @@ BuildTermResult[coeff_, op_, field_, symbCoeff_:None, timeDependent_:False] := M
   If[timeDependent === True,
     result["time_dependent"] = True
   ];
+  If[Length[coordDeps] > 0,
+    result["coordinate_dependent"] = coordDeps
+  ];
   result
 ];
 
-(* Check if a coefficient expression depends on coordinate symbols *)
+(* Return the list of coordinate names that a coefficient depends on *)
 (* Coordinate symbols from xCoba appear as f[] (zero-argument function calls) *)
-(* After LHS normalization, the only surviving coordinate is typically time *)
-(* Used to flag terms that need time-dependent evaluation in Python *)
-IsTimeDependentCoefficient[coeffExpr_] := Module[{coordSyms},
+(* Returns e.g. {"t"}, {"x", "y"}, or {} for constant coefficients *)
+IsCoordinateDependentCoefficient[coeffExpr_] := Module[{coordSyms},
   coordSyms = Cases[coeffExpr, f_Symbol[] :> f, {0, Infinity}];
-  Length[coordSyms] > 0
+  Union[ToString /@ coordSyms]
 ];
+
+(* Backward-compatible boolean: True if any coordinate dependence *)
+IsTimeDependentCoefficient[coeffExpr_] :=
+  Length[IsCoordinateDependentCoefficient[coeffExpr]] > 0;
 
 (* === Refactored Helper Functions for IdentifyMultiFieldTerm === *)
 (* Phase 3, Issue 10: Split 144-line function into smaller, testable units *)
@@ -693,10 +712,12 @@ MatchFieldToHeads[functionHeads_List, allFieldNames_List, defaultField_String] :
 ];
 
 (* Extract coefficient from term given the field head *)
-(* Returns {numericCoeff, symbolicCoeff, isTimeDependent} *)
-(* where symbolicCoeff is None or a string, isTimeDependent is True/False *)
+(* Returns {numericCoeff, symbolicCoeff, isTimeDependent, coordDeps} *)
+(* where symbolicCoeff is None or a string, isTimeDependent is True/False, *)
+(* coordDeps is a list of coordinate name strings e.g. {"t"}, {"x", "y"} *)
 ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
-  {rawCoeff, coefficient = 1.0, symbolicCoeff = None, isTimeDependent = False},
+  {rawCoeff, coefficient = 1.0, symbolicCoeff = None,
+   isTimeDependent = False, coordDeps = {}},
 
   rawCoeff = term /. {
     (* Replace Derivative[...][field][args] with 1 *)
@@ -706,8 +727,9 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
   };
   rawCoeff = Simplify[rawCoeff];
 
-  (* Check for time dependence in coefficient *)
-  isTimeDependent = IsTimeDependentCoefficient[rawCoeff];
+  (* Check for coordinate dependence in coefficient *)
+  coordDeps = IsCoordinateDependentCoefficient[rawCoeff];
+  isTimeDependent = MemberQ[coordDeps, "t"];
 
   (* Determine numeric coefficient and symbolic representation *)
   (* Use InputForm for ToString to get clean, machine-parseable strings *)
@@ -729,16 +751,16 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
     NumericQ[Quiet[N[rawCoeff]]],
       coefficient = Quiet[N[rawCoeff]];
       symbolicCoeff = None,
-    (* Complex symbolic expression (possibly time-dependent) *)
+    (* Complex symbolic expression (possibly coordinate-dependent) *)
     True,
       coefficient = 1.0;
       symbolicCoeff = ToString[rawCoeff, InputForm];
-      If[!isTimeDependent,
+      If[Length[coordDeps] == 0,
         Message[ExtractTermCoefficient::symbolic, rawCoeff, targetField]
       ]
   ];
 
-  {coefficient, symbolicCoeff, isTimeDependent}
+  {coefficient, symbolicCoeff, isTimeDependent, coordDeps}
 ];
 
 (* Count the total derivative order of a term *)
@@ -759,6 +781,69 @@ CountDerivativeOrder[term_] := Module[
     ]
   ];
   maxOrder
+];
+
+(* === Phase 12: Generic Derivative Order Support === *)
+(* Extract spatial derivative orders from a term *)
+(* Returns a list of non-negative integers: {dx_order, dy_order, dz_order, ...} *)
+(* Time slot (first in Derivative[dt, dx, ...]) is excluded *)
+ExtractSpatialDerivativeProfile[term_] := Module[{profiles = {}},
+  Cases[term,
+    Derivative[orders__][_][__] :> Module[{orderList = Rest[{orders}]},
+      AppendTo[profiles, orderList]
+    ],
+    {0, Infinity}
+  ];
+  If[Length[profiles] == 0,
+    (* Also check unapplied Derivative[orders][f] *)
+    Cases[term,
+      Derivative[orders__][_] :> Module[{orderList = Rest[{orders}]},
+        AppendTo[profiles, orderList]
+      ],
+      {0, Infinity}
+    ]
+  ];
+  If[Length[profiles] == 0,
+    Throw[StringJoin[
+      "ExtractSpatialDerivativeProfile: No Derivative pattern found in term '",
+      ToString[term, InputForm], "'."
+    ]]
+  ];
+  profiles[[1]]
+];
+
+(* Build operator name from spatial derivative orders *)
+(* Single-axis: {3,0} -> "derivative_3_x", {0,5} -> "derivative_5_y" *)
+(* Multi-axis: {2,1} -> "derivative_2x_1y" *)
+BuildGenericOperatorName[spatialOrders_List] := Module[
+  {nonzero, axisNames = {"x", "y", "z"}, parts},
+
+  (* Collect {axisIndex, order} pairs for nonzero spatial orders *)
+  nonzero = {};
+  Do[
+    If[i <= Length[spatialOrders] && spatialOrders[[i]] > 0,
+      AppendTo[nonzero, {i, spatialOrders[[i]]}]
+    ],
+    {i, 1, Min[Length[spatialOrders], 3]}
+  ];
+
+  If[Length[nonzero] == 0,
+    Throw[StringJoin[
+      "BuildGenericOperatorName: No nonzero spatial derivatives in profile {",
+      StringJoin[Riffle[ToString /@ spatialOrders, ", "]], "}."
+    ]]
+  ];
+
+  If[Length[nonzero] == 1,
+    (* Single axis: derivative_N_x *)
+    StringJoin["derivative_", ToString[nonzero[[1, 2]]], "_", axisNames[[nonzero[[1, 1]]]]],
+    (* Multi-axis: derivative_2x_1y *)
+    parts = Table[
+      StringJoin[ToString[pair[[2]]], axisNames[[pair[[1]]]]],
+      {pair, nonzero}
+    ];
+    StringJoin["derivative_", Riffle[parts, "_"]]
+  ]
 ];
 
 (* Classify operator type based on derivative structure *)
@@ -811,12 +896,13 @@ ClassifyOperatorType[term_] := Module[
     Return[{"biharmonic", False}]
   ];
 
-  (* Unknown operator type - fail explicitly *)
-  Throw[StringJoin[
-    "ClassifyOperatorType: Unsupported derivative order ", ToString[orderDerivatives],
-    " in term '", ToString[term, InputForm], "'. ",
-    "Supported orders: 0 (identity), 1 (gradient), 2 (laplacian/cross), 4 (biharmonic)."
-  ]]
+  (* Generic higher-order derivatives (Phase 12) *)
+  (* Handles orders 3, 5, 6+ by extracting per-axis derivative profile *)
+  Module[{spatialProfile, genericName},
+    spatialProfile = ExtractSpatialDerivativeProfile[term];
+    genericName = BuildGenericOperatorName[spatialProfile];
+    Return[{genericName, False}]
+  ]
 ];
 
 (* === Main Function: Identify operator and target field === *)
@@ -824,7 +910,7 @@ ClassifyOperatorType[term_] := Module[
 
 IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
   {functionHeads, matchResult, targetField, foundFieldHead,
-   coeffResult, coefficient, symbolicCoeff, isTimeDependent,
+   coeffResult, coefficient, symbolicCoeff, isTimeDependent, coordDeps,
    operatorResult, operator, isMixedTimeSpace},
 
   (* Step 1: Extract function heads from term *)
@@ -835,16 +921,18 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
   targetField = matchResult[[1]];
   foundFieldHead = matchResult[[2]];
 
-  (* Step 3: Extract coefficient (now includes time-dependence check) *)
+  (* Step 3: Extract coefficient (includes coordinate-dependence check) *)
   If[foundFieldHead =!= Null,
     coeffResult = ExtractTermCoefficient[term, foundFieldHead, targetField];
     coefficient = coeffResult[[1]];
     symbolicCoeff = coeffResult[[2]];
-    isTimeDependent = coeffResult[[3]],
+    isTimeDependent = coeffResult[[3]];
+    coordDeps = coeffResult[[4]],
     (* Fallback if no field head found *)
     coefficient = 1.0;
     symbolicCoeff = None;
-    isTimeDependent = False
+    isTimeDependent = False;
+    coordDeps = {}
   ];
 
   (* Step 4: Classify operator type *)
@@ -857,8 +945,8 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
     targetField = FieldToMomentumName[targetField]
   ];
 
-  (* Build and return result with time-dependence flag *)
-  BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent]
+  (* Build and return result with coordinate-dependence info *)
+  BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent, coordDeps]
 ];
 
 (* === Equation Conversion === *)

@@ -9,11 +9,12 @@ comes from the specification that was derived from the Lagrangian.
 
 from __future__ import annotations
 
-import math
 import re
+import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 from pde import FieldCollection, PDEBase, ScalarField
 from typing_extensions import override
 
@@ -28,7 +29,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    import numpy as np
     from numpy.typing import NDArray
     from pde.grids.base import GridBase
     from pde.pdes.base import TState
@@ -101,6 +101,37 @@ def _op_biharmonic(field: ScalarField, bc: BCDescriptor) -> ScalarField:
     bilap = lap.laplace(bc=bc)
     assert isinstance(bilap, ScalarField)
     return bilap
+
+
+def _op_nth_derivative(
+    axis: int, order: int
+) -> Callable[[ScalarField, BCDescriptor], ScalarField]:
+    """Create a handler for Nth-order derivative along a single axis.
+
+    Applies gradient in the given axis direction ``order`` times.
+    E.g., order=3, axis=0 computes ∂³f/∂x³.
+    """
+
+    def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:
+        result: ScalarField = field
+        for _ in range(order):
+            grad = result.gradient(bc=bc)
+            component = grad[axis]
+            assert isinstance(component, ScalarField)
+            result = component
+        return result
+
+    return _handler
+
+
+#: Map axis letter to axis index.
+_AXIS_INDEX: dict[str, int] = {"x": 0, "y": 1, "z": 2}
+
+#: Minimum grid dimension required for each axis.
+_AXIS_MIN_DIM: dict[str, int] = {"x": 1, "y": 2, "z": 3}
+
+#: Regex for parsing generic single-axis derivative names.
+_GENERIC_SINGLE_RE = re.compile(r"^derivative_(\d+)_([xyz])$")
 
 
 #: Registry mapping operator names to (handler, min_dimension) pairs.
@@ -215,12 +246,18 @@ class PDEFromSpec(PDEBase):
     specification. NO physics is hardcoded - all equation structure comes
     from the EquationSystem that was derived from a Lagrangian.
 
-    The state is organized as a FieldCollection with 2 * n_components fields:
-        [field_0, momentum_0, field_1, momentum_1, ...]
+    The state layout is determined by each component's time derivative order:
+    - Second-order (wave, time_order>=2): [field_i, momentum_i] pair
+    - First-order (heat/diffusion, time_order=1): [field_i] only
+    - Constraint (elliptic, time_order=0): [field_i] only (no evolution)
 
-    For each component i, the evolution equations are:
+    For second-order components:
         d/dt field_i = momentum_i
-        d/dt momentum_i = sum of RHS terms from specification
+        d/dt momentum_i = RHS from specification
+    For first-order components:
+        d/dt field_i = RHS from specification
+    For constraint components:
+        d/dt field_i = 0
 
     Parameters
     ----------
@@ -278,6 +315,15 @@ class PDEFromSpec(PDEBase):
         }
         self._parameters = parameters or {}
 
+        # Build slot maps from state_layout for mixed time-order support
+        self._field_slot_map: dict[str, int] = {}
+        self._momentum_slot_map: dict[str, int] = {}
+        for slot_idx, (name, slot_type) in enumerate(spec.state_layout):
+            if slot_type == "field":
+                self._field_slot_map[name] = slot_idx
+            else:
+                self._momentum_slot_map[name] = slot_idx
+
     def _resolve_coefficient(self, term: OperatorTerm) -> float:
         """Resolve the effective coefficient for a term.
 
@@ -304,17 +350,26 @@ class PDEFromSpec(PDEBase):
             if sym in self._parameters:
                 return self._parameters[sym]
 
+            # Symbolic coefficient present but not resolvable from parameters
+
+            warnings.warn(
+                f"Symbolic coefficient '{sym[:80]}' could not be resolved from "
+                f"parameters {sorted(self._parameters.keys())}. "
+                f"Falling back to numeric coefficient {term.coefficient}. "
+                f"This may indicate unevaluated expressions in the JSON.",
+                stacklevel=2,
+            )
+
         # Default: use numeric coefficient from JSON
         return term.coefficient
 
-    @staticmethod
-    def _mathematica_to_python(expr: str) -> str:
+    def _mathematica_to_python(self, expr: str) -> str:
         """Convert Mathematica InputForm expression to evaluable Python.
 
         Handles common Mathematica syntax:
         - ``E^(...)`` to ``exp(...)`` (Euler's number)
         - ``Sin[x]`` to ``sin(x)``, ``Cos[x]`` to ``cos(x)``, etc.
-        - ``t[]`` to ``t`` (xCoba coordinate symbols)
+        - ``t[]`` to ``t`` (xCoba coordinate symbols, using actual coordinate names)
         - Mathematica brackets ``[``, ``]`` to Python parens ``(``, ``)``
         - Multiplication, grouping, negation are already Python-compatible
 
@@ -343,15 +398,29 @@ class PDEFromSpec(PDEBase):
             result = re.sub(rf"\b{mma_func}\b", py_func, result)
         # Mathematica brackets to Python parens (after function renaming)
         result = result.replace("[", "(").replace("]", ")")
-        # t() -> t — xCoba coordinate symbols appear as zero-arg function calls
-        return result.replace("t()", "t")
+        # Mathematica ^ to Python ** (AFTER E^ -> exp to avoid double-conversion)
+        result = result.replace("^", "**")
+        # xCoba coordinate symbols appear as zero-arg function calls: t() -> t, x() -> x, etc.
+        # Uses actual coordinate names from the equation system (not hardcoded x/y/z).
+        for coord in self.spec.effective_coordinates:
+            result = result.replace(f"{coord}()", coord)
+        return result
 
-    def _resolve_coefficient_at_time(self, term: OperatorTerm, t: float) -> float:
-        """Resolve a potentially time-dependent coefficient at time t.
+    def _resolve_coefficient_at_point(
+        self,
+        term: OperatorTerm,
+        t: float,
+        grid: GridBase | None = None,
+    ) -> float | NumericArray:
+        """Resolve a potentially coordinate-dependent coefficient.
 
-        Converts the Mathematica symbolic coefficient to a Python expression,
-        substitutes parameter values and current time, then evaluates.
-        This is general and works for any symbolic coefficient expression.
+        Handles constant, time-dependent, and position-dependent coefficients
+        in a single unified code path. Uses numpy functions throughout so that
+        the same evaluation works for both scalar (time-only) and array
+        (position-dependent) results.
+
+        Returns a scalar ``float`` for constant or time-only coefficients, or a
+        ``numpy.ndarray`` (same shape as the grid) for position-dependent ones.
 
         Parameters
         ----------
@@ -359,56 +428,75 @@ class PDEFromSpec(PDEBase):
             The term whose coefficient to resolve.
         t : float
             Current simulation time.
+        grid : GridBase | None
+            Simulation grid. Required when the term is position-dependent.
 
         Returns
         -------
-        float
-            The effective coefficient value at time t.
+        float | NumericArray
+            Scalar or grid-shaped array of coefficient values.
 
         Raises
         ------
         ValueError
-            If required parameters are missing or expression cannot be evaluated.
+            If required parameters/grid are missing or expression cannot be evaluated.
         """
-        # For non-time-dependent terms, use standard resolution
-        if not term.time_dependent:
+        # Fast path: no coordinate dependence → use simple parameter lookup
+        if not term.time_dependent and not term.position_dependent:
             return self._resolve_coefficient(term)
+
+        # Position-dependent: need grid for spatial coordinates
+        if term.position_dependent and grid is None:
+            msg = (
+                f"Position-dependent coefficient '{term.coefficient_symbolic}' "
+                f"requires grid info but no grid was provided."
+            )
+            raise ValueError(msg)
 
         sym = term.coefficient_symbolic or ""
         py_expr = self._mathematica_to_python(sym)
 
-        # Build evaluation namespace: parameters + time + math functions
+        # Build evaluation namespace with numpy functions (work on scalars AND arrays)
         namespace: dict[str, Any] = dict(self._parameters)
         namespace["t"] = t
-        namespace["exp"] = math.exp
-        namespace["sin"] = math.sin
-        namespace["cos"] = math.cos
-        namespace["tan"] = math.tan
-        namespace["log"] = math.log
-        namespace["sqrt"] = math.sqrt
-        namespace["abs"] = abs
+        namespace["exp"] = np.exp
+        namespace["sin"] = np.sin
+        namespace["cos"] = np.cos
+        namespace["tan"] = np.tan
+        namespace["log"] = np.log
+        namespace["sqrt"] = np.sqrt
+        namespace["abs"] = np.abs
 
-        # Check that all symbols in the expression can be resolved
+        # Inject spatial coordinates from grid when position-dependent
+        if term.position_dependent:
+            spatial_coords = self.spec.spatial_coordinates
+            coords = grid.cell_coords  # type: ignore[union-attr]
+            for i, name in enumerate(spatial_coords[: grid.num_axes]):  # type: ignore[union-attr]
+                namespace[name] = np.asarray(coords[..., i])  # pyright: ignore[reportUnknownArgumentType]
+
+        # Validate all symbols can be resolved
         identifiers = set(re.findall(r"\b[a-zA-Z_]\w*\b", py_expr))
-        identifiers -= {"exp", "sin", "cos", "tan", "log", "sqrt", "abs", "t"}
+        builtin_names = {"exp", "sin", "cos", "tan", "log", "sqrt", "abs"}
+        coord_vars = set(self.spec.effective_coordinates)
+        identifiers -= builtin_names | coord_vars
         missing = identifiers - set(self._parameters.keys())
         if missing:
             msg = (
-                f"Parameters {sorted(missing)} are required for time-dependent "
-                f"coefficient '{sym}'. Pass them via "
-                f"parameters={{{', '.join(repr(k) + ': value' for k in sorted(missing))}}} "
-                f"to PDEFromSpec or build_pde_from_json."
+                f"Parameters {sorted(missing)} are required for "
+                f"coordinate-dependent coefficient '{sym}'. "
+                f"Pass them via parameters={{...}} to PDEFromSpec or build_pde_from_json."
             )
             raise ValueError(msg)
 
         try:
             result = eval(py_expr, {"__builtins__": {}}, namespace)  # noqa: S307
+            if isinstance(result, np.ndarray):
+                return np.asarray(result, dtype=np.float64)
             return float(result)
         except Exception as e:
             msg = (
-                f"Cannot evaluate time-dependent coefficient '{sym}' "
-                f"(Python form: '{py_expr}') with parameters {self._parameters} "
-                f"at t={t}: {e}"
+                f"Cannot evaluate coordinate-dependent coefficient '{sym}' "
+                f"(Python form: '{py_expr}') at t={t}: {e}"
             )
             raise ValueError(msg) from e
 
@@ -442,11 +530,21 @@ class PDEFromSpec(PDEBase):
         """
         entry = _OPERATOR_REGISTRY.get(operator_name)
         if entry is None:
-            msg = (
-                f"Unknown operator: '{operator_name}'. "
-                f"Known operators: {sorted(_OPERATOR_REGISTRY.keys())}"
-            )
-            raise ValueError(msg)
+            # Try dynamic resolution for generic Nth-order derivatives
+            m = _GENERIC_SINGLE_RE.match(operator_name)
+            if m:
+                order = int(m.group(1))
+                axis_letter = m.group(2)
+                axis = _AXIS_INDEX[axis_letter]
+                min_dim = _AXIS_MIN_DIM[axis_letter]
+                entry = (_op_nth_derivative(axis, order), min_dim)
+            else:
+                msg = (
+                    f"Unknown operator: '{operator_name}'. "
+                    f"Known operators: {sorted(_OPERATOR_REGISTRY.keys())}. "
+                    f"Dynamic patterns: derivative_N_x (N=integer, x/y/z=axis)."
+                )
+                raise ValueError(msg)
 
         handler, min_dim = entry
         if field.grid.dim < min_dim:
@@ -459,7 +557,10 @@ class PDEFromSpec(PDEBase):
         return handler(field, bc)
 
     def _get_field_from_state(
-        self, state: FieldCollection, field_name: str
+        self,
+        state: FieldCollection,
+        field_name: str,
+        virtual_momenta: dict[str, ScalarField] | None = None,
     ) -> ScalarField:
         """Get a field from state by name, supporting both field and momentum names.
 
@@ -467,24 +568,26 @@ class PDEFromSpec(PDEBase):
         expresses these as gradients of momentum fields (e.g., gradient_x(pi_0)).
         This is valid because d_t A = pi, so d_x(d_t A) = d_x(pi).
 
-        The state is organized as: [field_0, pi_0, field_1, pi_1, ...]
-        - Regular fields (A_0, phi_0, phi0, etc.) are at even indices: state[2*i]
-        - Momentum fields (pi_0, pi0, pi_1, pi1, etc.) are at odd indices: state[2*i + 1]
+        State layout is determined by ``spec.state_layout``:
+        - Second-order components have [field, momentum] pairs
+        - First-order components have [field] only (no momentum in state)
 
-        Supports flexible field naming conventions:
-        - Standard: A_0, phi_1
-        - Compact: A0, phi1, pi0, pi1
-        - Tensor: stress_xy_0
-        - Simple: phi (index defaults to 0)
+        For first-order components, ``pi_N`` references are resolved via the
+        ``virtual_momenta`` dict, which contains the computed RHS of those
+        first-order equations (since d_t(field) = RHS for first-order PDEs).
 
         Parameters
         ----------
         state : FieldCollection
-            Current state with interleaved field/momentum pairs.
+            Current state with fields ordered by state_layout.
         field_name : str
             Name of the field to retrieve. Can be:
             - Regular field name like "A_0", "phi_0", "phi0"
             - Momentum field name like "pi_0", "pi_1", "pi0", "pi1"
+        virtual_momenta : dict[str, ScalarField] | None
+            Pre-computed RHS fields for first-order components, keyed by
+            component name. Used when ``pi_N`` references a first-order
+            component that has no momentum state variable.
 
         Returns
         -------
@@ -494,10 +597,9 @@ class PDEFromSpec(PDEBase):
         Raises
         ------
         ValueError
-            If the field name is not recognized.
+            If the field name is not recognized or momentum is unavailable.
         """
         # Check if this is a momentum field reference (pi_0, pi0, etc.)
-        # First check if it looks like a momentum field (starts with "pi")
         if field_name.startswith("pi"):
             momentum_idx = parse_momentum_field_name(field_name)
             if momentum_idx is not None:
@@ -510,10 +612,27 @@ class PDEFromSpec(PDEBase):
                     )
                     raise ValueError(msg)
 
-                # Momentum is at odd indices: state[2*i + 1]
-                momentum = state[2 * momentum_idx + 1]
-                assert isinstance(momentum, ScalarField)
-                return momentum
+                # Look up the component name for this index, then find its momentum slot
+                comp_name = self.spec.component_names[momentum_idx]
+                slot = self._momentum_slot_map.get(comp_name)
+                if slot is not None:
+                    # Second-order component: momentum is a state variable
+                    momentum = state[slot]
+                    assert isinstance(momentum, ScalarField)
+                    return momentum
+
+                # First-order component: check virtual_momenta
+                if virtual_momenta is not None and comp_name in virtual_momenta:
+                    return virtual_momenta[comp_name]
+
+                eq = self.spec.equations[momentum_idx]
+                msg = (
+                    f"Momentum field '{field_name}' referenced but component "
+                    f"'{comp_name}' has time_derivative_order={eq.time_derivative_order} "
+                    f"(no momentum in state, and no virtual momentum computed). "
+                    f"This may indicate a circular dependency between first-order components."
+                )
+                raise ValueError(msg)
             # If it looks like momentum but couldn't be parsed, raise clear error
             msg = (
                 f"Invalid momentum field format: '{field_name}'. "
@@ -521,11 +640,10 @@ class PDEFromSpec(PDEBase):
             )
             raise ValueError(msg)
 
-        # Regular field lookup - first try direct name match
-        target_idx = self._component_name_to_index.get(field_name)
-        if target_idx is not None:
-            # Field is at even indices: state[2*i]
-            field = state[2 * target_idx]
+        # Regular field lookup via slot map
+        slot = self._field_slot_map.get(field_name)
+        if slot is not None:
+            field = state[slot]
             assert isinstance(field, ScalarField)
             return field
 
@@ -538,8 +656,9 @@ class PDEFromSpec(PDEBase):
         state: FieldCollection,
         bc: BCDescriptor,
         t: float = 0.0,
+        virtual_momenta: dict[str, ScalarField] | None = None,
     ) -> ScalarField:
-        """Compute the RHS for a single component's momentum equation.
+        """Compute the RHS for a single component's equation.
 
         This method evaluates all terms in the component's equation specification
         and sums them together.
@@ -554,11 +673,15 @@ class PDEFromSpec(PDEBase):
             Boundary condition specification.
         t : float
             Current simulation time (for time-dependent coefficients in curved spacetime).
+        virtual_momenta : dict[str, ScalarField] | None
+            Pre-computed RHS fields for first-order components. When a term
+            references ``first_derivative_t`` or ``pi_N`` for a first-order
+            component, the virtual momentum is used instead of a state variable.
 
         Returns
         -------
         ScalarField
-            The computed RHS for d/dt momentum_i.
+            The computed RHS.
 
         Raises
         ------
@@ -573,34 +696,49 @@ class PDEFromSpec(PDEBase):
 
         # Sum all terms from the specification
         for term in eq.rhs_terms:
-            # Find which field this term operates on
-            # Supports both regular fields (A_0, phi_0) and momentum fields (pi_0, pi_1)
-            # Momentum field support enables mixed time-space derivative handling
             target_field_name = term.field
 
             # Handle first_derivative_t operator specially
-            # For d_t(field_i) = momentum_i, so first_derivative_t(field) returns momentum
+            # d_t(field) = momentum (second-order) or RHS (first-order via virtual_momenta)
             if term.operator == "first_derivative_t":
-                # Get the field index for this term's target field
                 target_idx = self._component_name_to_index.get(target_field_name)
-                if target_idx is not None:
-                    # Momentum is at odd indices: state[2*i + 1]
-                    momentum = state[2 * target_idx + 1]
-                    assert isinstance(momentum, ScalarField)
-                    operated = momentum.copy()
-                else:
+                if target_idx is None:
                     msg = f"Unknown field for first_derivative_t: {target_field_name}"
                     raise ValueError(msg)
+
+                comp_name = self.spec.component_names[target_idx]
+
+                # Try state momentum slot first (second-order fields)
+                slot = self._momentum_slot_map.get(comp_name)
+                if slot is not None:
+                    momentum = state[slot]
+                    assert isinstance(momentum, ScalarField)
+                    operated = momentum.copy()
+                elif virtual_momenta is not None and comp_name in virtual_momenta:
+                    operated = virtual_momenta[comp_name].copy()
+                else:
+                    eq_target = self.spec.equations[target_idx]
+                    msg = (
+                        f"first_derivative_t references '{target_field_name}' "
+                        f"but it has time_derivative_order={eq_target.time_derivative_order} "
+                        f"and no virtual momentum was computed."
+                    )
+                    raise ValueError(msg)
             else:
-                # Standard operator handling
-                target_field = self._get_field_from_state(state, target_field_name)
+                # Standard operator handling (passes virtual_momenta for pi_N resolution)
+                target_field = self._get_field_from_state(
+                    state, target_field_name, virtual_momenta
+                )
                 operated = self._get_operator(term.operator, target_field, bc)
 
-            # Resolve coefficient (use time-dependent resolution if needed)
-            coefficient = self._resolve_coefficient_at_time(term, t)
+            # Resolve coefficient (supports time- and position-dependent)
+            coefficient = self._resolve_coefficient_at_point(term, t, grid)
 
             # Add coefficient * operated to result
-            contribution = coefficient * operated
+            if isinstance(coefficient, np.ndarray):
+                contribution = ScalarField(grid, data=coefficient * operated.data)
+            else:
+                contribution = coefficient * operated
             result += contribution
 
         return result
@@ -613,14 +751,19 @@ class PDEFromSpec(PDEBase):
     ) -> FieldCollection:
         """Compute the time derivatives for all fields.
 
-        For each component i:
-            d/dt field_i = momentum_i
-            d/dt momentum_i = RHS from specification
+        Supports mixed time-derivative orders:
+        - Second-order (wave): d/dt field = momentum, d/dt momentum = RHS
+        - First-order (heat/diffusion): d/dt field = RHS
+        - Constraint (elliptic, order=0): d/dt field = 0
+
+        For first-order components, the computed RHS is stored as a "virtual
+        momentum" so that second-order equations referencing ``pi_N`` or
+        ``first_derivative_t`` of a first-order component can access it.
 
         Parameters
         ----------
         state : FieldCollection
-            Current state with 2 * n_components fields.
+            Current state with ``spec.state_size`` fields.
         t : float
             Current time. Used for time-dependent coefficients in curved spacetime
             (e.g., Hubble friction in de Sitter expansion).
@@ -633,10 +776,10 @@ class PDEFromSpec(PDEBase):
         Raises
         ------
         ValueError
-            If the state does not have exactly 2 * n_components fields.
+            If the state size or grid dimension does not match the spec.
         """
         assert isinstance(state, FieldCollection)
-        expected_fields = 2 * self.n_components
+        expected_fields = self.spec.state_size
         if len(state) != expected_fields:
             msg = f"Expected {expected_fields} fields, got {len(state)}"
             raise ValueError(msg)
@@ -654,25 +797,41 @@ class PDEFromSpec(PDEBase):
             raise ValueError(msg)
 
         bc = infer_bc_from_grid(state.grid)
-        rates: list[ScalarField] = []
+        grid = state.grid
 
-        for i in range(self.n_components):
-            field_i = state[2 * i]
-            momentum_i = state[2 * i + 1]
+        # Pass 1: Compute RHS for first-order components.
+        # These become "virtual momenta" that second-order equations can reference
+        # via pi_N or first_derivative_t operators.
+        virtual_momenta: dict[str, ScalarField] = {}
+        for i, eq in enumerate(self.spec.equations):
+            if eq.time_derivative_order == 1:
+                virtual_momenta[eq.field_name] = self._compute_rhs_for_component(
+                    i, state, bc, t
+                )
 
-            assert isinstance(field_i, ScalarField)
-            assert isinstance(momentum_i, ScalarField)
+        # Pass 2: Build the full rates array using slot maps
+        rates: list[ScalarField | None] = [None] * expected_fields
 
-            # d/dt field_i = momentum_i
-            d_field_dt = momentum_i.copy()
+        for i, eq in enumerate(self.spec.equations):
+            field_slot = self._field_slot_map[eq.field_name]
 
-            # d/dt momentum_i = RHS from specification
-            # Pass current time for time-dependent coefficients (curved spacetime)
-            d_momentum_dt = self._compute_rhs_for_component(i, state, bc, t)
+            if eq.time_derivative_order >= 2:  # noqa: PLR2004
+                # Second-order: d/dt field = momentum, d/dt momentum = RHS
+                momentum_slot = self._momentum_slot_map[eq.field_name]
+                momentum = state[momentum_slot]
+                assert isinstance(momentum, ScalarField)
+                rates[field_slot] = momentum.copy()
+                rates[momentum_slot] = self._compute_rhs_for_component(
+                    i, state, bc, t, virtual_momenta
+                )
+            elif eq.time_derivative_order == 1:
+                # First-order: d/dt field = RHS (already computed in Pass 1)
+                rates[field_slot] = virtual_momenta[eq.field_name]
+            else:
+                # Constraint (order=0): no time evolution
+                rates[field_slot] = ScalarField(grid, data=0.0)
 
-            rates.extend((d_field_dt, d_momentum_dt))
-
-        return FieldCollection(rates)
+        return FieldCollection(rates)  # type: ignore[arg-type]
 
     def _cache_key(self) -> dict[str, Any]:
         """Return a cache key for this PDE.
@@ -734,6 +893,10 @@ def create_initial_state(
 ) -> FieldCollection:
     """Create initial state for a PDEFromSpec simulation.
 
+    The state layout is determined by ``spec.state_layout``:
+    - Second-order components get [field, momentum] pairs
+    - First-order/constraint components get [field] only
+
     Parameters
     ----------
     grid : GridBase
@@ -745,31 +908,29 @@ def create_initial_state(
         Components not specified default to zero.
     momentum_data : dict[str, NDArray] | None
         Initial data for each momentum component. Keys are component names.
-        Components not specified default to zero.
+        Components not specified default to zero. Ignored for first-order
+        and constraint components (which have no momentum slot).
 
     Returns
     -------
     FieldCollection
-        Initial state with 2 * n_components fields.
+        Initial state with ``spec.state_size`` fields.
     """
     field_data = field_data or {}
     momentum_data = momentum_data or {}
 
     fields: list[ScalarField] = []
 
-    for name in spec.component_names:
-        # Field
-        if name in field_data:
-            field = ScalarField(grid, data=field_data[name])
+    for name, slot_type in spec.state_layout:
+        if slot_type == "field":
+            if name in field_data:
+                fields.append(ScalarField(grid, data=field_data[name]))
+            else:
+                fields.append(ScalarField(grid, data=0.0))
+        # Momentum slot (only for second-order components)
+        elif name in momentum_data:
+            fields.append(ScalarField(grid, data=momentum_data[name]))
         else:
-            field = ScalarField(grid, data=0.0)
-
-        # Momentum
-        if name in momentum_data:
-            momentum = ScalarField(grid, data=momentum_data[name])
-        else:
-            momentum = ScalarField(grid, data=0.0)
-
-        fields.extend((field, momentum))
+            fields.append(ScalarField(grid, data=0.0))
 
     return FieldCollection(fields)

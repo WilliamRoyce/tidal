@@ -50,7 +50,10 @@
 						"operator":"identity",
 						"field":"dSphi_0",
 						"coefficient_symbolic":"-(dSm2*E^(2*dSH*t[]))",
-						"time_dependent":true
+						"time_dependent":true,
+						"coordinate_dependent":[
+							"t"
+						]
 					},
 					{
 						"coefficient":1.0,
