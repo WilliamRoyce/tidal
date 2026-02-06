@@ -52,66 +52,56 @@
 					{
 						"coefficient":1.0,
 						"operator":"identity",
-						"field":"A_0"
+						"field":"A_0",
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {0, cart3}, {0, -cart3}]*ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_0",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {0, cart3}, {0, -cart3}] ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {0, cart3}, {0, -cart3}]*ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_0",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {0, cart3}, {0, -cart3}] ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$2849])"
-					},
-					{
-						"coefficient":1.0,
-						"operator":"identity",
-						"field":"A_0",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {0, cart3}, {0, -cart3}] ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$2849])"
-					},
-					{
-						"coefficient":-0.5,
-						"operator":"identity",
-						"field":"A_1"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {0, cart3}, {0, -cart3}]*ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_1",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {0, cart3}, {1, -cart3}] ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {0, cart3}, {1, -cart3}]*ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_1",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {0, cart3}, {1, -cart3}] ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {0, cart3}, {1, -cart3}]*ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_1",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {0, cart3}, {1, -cart3}] ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {0, cart3}, {1, -cart3}]*ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_2",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {0, cart3}, {2, -cart3}] ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {0, cart3}, {2, -cart3}]*ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_2",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {0, cart3}, {2, -cart3}] ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {0, cart3}, {2, -cart3}]*ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_2",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {0, cart3}, {2, -cart3}] ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {0, cart3}, {2, -cart3}]*ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":0.5,
@@ -121,6 +111,16 @@
 					{
 						"coefficient":1.0,
 						"operator":"laplacian_x",
+						"field":"A_0"
+					},
+					{
+						"coefficient":-0.5,
+						"operator":"gradient_y",
+						"field":"A_1"
+					},
+					{
+						"coefficient":1.0,
+						"operator":"laplacian_y",
 						"field":"A_0"
 					}
 				]
@@ -139,83 +139,83 @@
 				"type":"linear_combination",
 				"terms":[
 					{
-						"coefficient":-0.5,
+						"coefficient":1.0,
 						"operator":"identity",
-						"field":"A_0"
+						"field":"A_0",
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {1, cart3}, {0, -cart3}]*ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_0",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {1, cart3}, {0, -cart3}] ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {1, cart3}, {0, -cart3}]*ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_0",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {1, cart3}, {0, -cart3}] ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$2849])"
-					},
-					{
-						"coefficient":1.0,
-						"operator":"identity",
-						"field":"A_0",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {1, cart3}, {0, -cart3}] ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$2849])"
-					},
-					{
-						"coefficient":1.0,
-						"operator":"identity",
-						"field":"A_1"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {1, cart3}, {0, -cart3}]*ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_1",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {1, cart3}, {1, -cart3}] ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {1, cart3}, {1, -cart3}]*ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_1",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {1, cart3}, {1, -cart3}] ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {1, cart3}, {1, -cart3}]*ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_1",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {1, cart3}, {1, -cart3}] ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {1, cart3}, {1, -cart3}]*ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_2",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {1, cart3}, {2, -cart3}] ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {1, cart3}, {2, -cart3}]*ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_2",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {1, cart3}, {2, -cart3}] ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {1, cart3}, {2, -cart3}]*ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_2",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {1, cart3}, {2, -cart3}] ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$2849])"
-					},
-					{
-						"coefficient":-1.0,
-						"operator":"gradient_x",
-						"field":"A_2"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {1, cart3}, {2, -cart3}]*ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":0.5,
-						"operator":"gradient_x",
+						"operator":"first_derivative_t",
 						"field":"A_2"
 					},
 					{
 						"coefficient":-1.0,
 						"operator":"gradient_x",
 						"field":"pi_0"
+					},
+					{
+						"coefficient":-0.5,
+						"operator":"gradient_y",
+						"field":"A_0"
+					},
+					{
+						"coefficient":1.0,
+						"operator":"laplacian_y",
+						"field":"A_1"
+					},
+					{
+						"coefficient":-1.0,
+						"operator":"cross_derivative_xy",
+						"field":"A_2"
 					}
 				]
 			}
@@ -236,55 +236,55 @@
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_0",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {2, cart3}, {0, -cart3}] ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {2, cart3}, {0, -cart3}]*ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_0",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {2, cart3}, {0, -cart3}] ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {2, cart3}, {0, -cart3}]*ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_0",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {2, cart3}, {0, -cart3}] ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {2, cart3}, {0, -cart3}]*ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_1",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {2, cart3}, {1, -cart3}] ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {2, cart3}, {1, -cart3}]*ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_1",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {2, cart3}, {1, -cart3}] ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {2, cart3}, {1, -cart3}]*ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_1",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {2, cart3}, {1, -cart3}] ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {2, cart3}, {1, -cart3}]*ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_2",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {2, cart3}, {2, -cart3}] ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {2, cart3}, {2, -cart3}]*ChristoffelCD3PDcart3[{0, cart3}, {0, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_2",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {2, cart3}, {2, -cart3}] ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {2, cart3}, {2, -cart3}]*ChristoffelCD3PDcart3[{1, cart3}, {1, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":1.0,
 						"operator":"identity",
 						"field":"A_2",
-						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$2849, {2, cart3}, {2, -cart3}] ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$2849])"
+						"coefficient_symbolic":"-(ChristoffelCD3PDcart3[j$22916, {2, cart3}, {2, -cart3}]*ChristoffelCD3PDcart3[{2, cart3}, {2, -cart3}, -j$22916])"
 					},
 					{
 						"coefficient":0.5,
@@ -292,24 +292,24 @@
 						"field":"A_0"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"gradient_x",
-						"field":"A_1"
-					},
-					{
 						"coefficient":1.0,
 						"operator":"laplacian_x",
 						"field":"A_2"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"gradient_x",
-						"field":"A_0"
+						"coefficient":-0.5,
+						"operator":"first_derivative_t",
+						"field":"A_1"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"gradient_x",
+						"coefficient":-1.0,
+						"operator":"cross_derivative_xy",
 						"field":"A_1"
+					},
+					{
+						"coefficient":-1.0,
+						"operator":"gradient_y",
+						"field":"pi_0"
 					}
 				]
 			}

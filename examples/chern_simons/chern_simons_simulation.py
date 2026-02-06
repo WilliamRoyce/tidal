@@ -165,19 +165,19 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     # Initial state
     vmax = max(initial_a1, 0.1)
     im0 = axes[0, 0].imshow(
-        initial[0].data.T, origin="lower", cmap="RdBu", vmin=-vmax, vmax=vmax
+        initial[0].data.T, origin="lower", cmap="bwr", vmin=-vmax, vmax=vmax
     )
     axes[0, 0].set_title("Initial A_0")
     plt.colorbar(im0, ax=axes[0, 0])
 
     im1 = axes[0, 1].imshow(
-        initial[2].data.T, origin="lower", cmap="RdBu", vmin=-vmax, vmax=vmax
+        initial[2].data.T, origin="lower", cmap="bwr", vmin=-vmax, vmax=vmax
     )
     axes[0, 1].set_title("Initial A_1")
     plt.colorbar(im1, ax=axes[0, 1])
 
     im2 = axes[0, 2].imshow(
-        initial[4].data.T, origin="lower", cmap="RdBu", vmin=-vmax, vmax=vmax
+        initial[4].data.T, origin="lower", cmap="bwr", vmin=-vmax, vmax=vmax
     )
     axes[0, 2].set_title("Initial A_2")
     plt.colorbar(im2, ax=axes[0, 2])
@@ -185,19 +185,19 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     # Final state
     vmax_f = max(final_a0, final_a1, final_a2, 0.1)
     im3 = axes[1, 0].imshow(
-        final[0].data.T, origin="lower", cmap="RdBu", vmin=-vmax_f, vmax=vmax_f
+        final[0].data.T, origin="lower", cmap="bwr", vmin=-vmax_f, vmax=vmax_f
     )
     axes[1, 0].set_title(f"Final A_0 (t={t_end})")
     plt.colorbar(im3, ax=axes[1, 0])
 
     im4 = axes[1, 1].imshow(
-        final[2].data.T, origin="lower", cmap="RdBu", vmin=-vmax_f, vmax=vmax_f
+        final[2].data.T, origin="lower", cmap="bwr", vmin=-vmax_f, vmax=vmax_f
     )
     axes[1, 1].set_title(f"Final A_1 (t={t_end})")
     plt.colorbar(im4, ax=axes[1, 1])
 
     im5 = axes[1, 2].imshow(
-        final[4].data.T, origin="lower", cmap="RdBu", vmin=-vmax_f, vmax=vmax_f
+        final[4].data.T, origin="lower", cmap="bwr", vmin=-vmax_f, vmax=vmax_f
     )
     axes[1, 2].set_title(f"Final A_2 (t={t_end})")
     plt.colorbar(im5, ax=axes[1, 2])
