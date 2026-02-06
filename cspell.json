@@ -103,6 +103,7 @@
     "xticks",
     "ydata",
     "ylim",
+    "yscale",
     "ytick",
     "yticklabels",
     "yticks",
