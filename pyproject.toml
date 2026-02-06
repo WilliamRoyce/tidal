@@ -91,9 +91,27 @@ unfixable = ["T201"]
 
 
 [tool.ruff.lint.extend-per-file-ignores]
-"tests/**/*" = ["PLR6301", "PLR0914", "D101", "D102", "D103", "D104", "D205"]
+"tests/**/*" = [
+    "PLR6301",
+    "PLR0914",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "D205",
+    "SLF001",
+]
 "examples/**/*" = ["INP001", "T201", "E402"]
-"scripts/**/*" = ["INP001", "T201", "D101", "D102", "D103", "D104", "S607", "S603"]
+"scripts/**/*" = [
+    "INP001",
+    "T201",
+    "D101",
+    "D102",
+    "D103",
+    "D104",
+    "S607",
+    "S603",
+]
 "docs/**/*" = ["INP001", "I002"]
 "torsion_gertsenshtein/kgsim/animation_builder.py" = [
     "EXE002",
