@@ -1229,3 +1229,300 @@ class TestParameterizedCoefficients:
         # Different mass should lead to different evolution
         # (higher mass = faster oscillation for Klein-Gordon)
         assert not np.allclose(final_low, final_high, rtol=0.01)
+
+
+class TestPositionDependentCoefficients:
+    """Tests for position-dependent (spatially varying) coefficients."""
+
+    def test_resolve_coefficient_at_point_constant(self) -> None:
+        """Constant coefficient returns float."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(2.5, "laplacian", "phi"),),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+        result = pde._resolve_coefficient_at_point(term, t=0.0)
+        assert isinstance(result, float)
+        assert result == 2.5  # noqa: PLR2004
+
+    def test_resolve_coefficient_at_point_time_dependent(self) -> None:
+        """Time-only dependent coefficient returns float."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0, "identity", "phi",
+                            coefficient_symbolic="E^(2*dSH*t())",
+                            time_dependent=True,
+                            coordinate_dependent=("t",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec, parameters={"dSH": 0.1})
+        term = spec.equations[0].rhs_terms[0]
+        result = pde._resolve_coefficient_at_point(term, t=1.0)
+        assert isinstance(result, float)
+        assert_allclose(result, np.exp(0.2), rtol=1e-10)
+
+    def test_resolve_coefficient_at_point_position_dependent(self) -> None:
+        """Position-dependent coefficient returns ndarray."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0, "laplacian_x", "phi",
+                            coefficient_symbolic="x()**2/(2*sphR**2)",
+                            coordinate_dependent=("x",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        grid = CartesianGrid(bounds=[(-4, 4), (-4, 4)], shape=[16, 16], periodic=True)
+        pde = PDEFromSpec(spec, parameters={"sphR": 2.0})
+        term = spec.equations[0].rhs_terms[0]
+
+        result = pde._resolve_coefficient_at_point(term, t=0.0, grid=grid)
+        assert isinstance(result, np.ndarray)
+        assert result.shape == (16, 16)
+
+        # Verify coefficient values match formula at actual cell coordinates
+        x_coords = np.asarray(grid.cell_coords[..., 0])
+
+        # At grid center (nearest x=0): coefficient x^2/(2*R^2) should be small
+        center_x = grid.shape[0] // 2
+        x_at_center = x_coords[center_x, 0]
+        expected_center = x_at_center**2 / (2 * 2.0**2)
+        assert_allclose(result[center_x, 0], expected_center, rtol=1e-10)
+
+        # At a point away from center: verify formula
+        idx = grid.shape[0] - 2
+        x_val = x_coords[idx, 0]
+        expected = x_val**2 / (2 * 2.0**2)
+        assert_allclose(result[idx, 0], expected, rtol=1e-10)
+
+    def test_resolve_coefficient_position_dependent_no_grid_raises(self) -> None:
+        """Position-dependent coefficient without grid raises ValueError."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0, "laplacian_x", "phi",
+                            coefficient_symbolic="x()**2",
+                            coordinate_dependent=("x",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+
+        with pytest.raises(ValueError, match="requires grid"):
+            pde._resolve_coefficient_at_point(term, t=0.0, grid=None)
+
+    def test_resolve_coefficient_missing_parameter_raises(self) -> None:
+        """Position-dependent coefficient with missing parameter raises ValueError."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0, "laplacian_x", "phi",
+                            coefficient_symbolic="x()**2/(2*sphR**2)",
+                            coordinate_dependent=("x",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        grid = CartesianGrid(bounds=[(-4, 4), (-4, 4)], shape=[8, 8], periodic=True)
+        pde = PDEFromSpec(spec)  # No parameters!
+        term = spec.equations[0].rhs_terms[0]
+
+        with pytest.raises(ValueError, match="sphR"):
+            pde._resolve_coefficient_at_point(term, t=0.0, grid=grid)
+
+    def test_mathematica_to_python_power(self) -> None:
+        """Test _mathematica_to_python converts ^ to **."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(1.0, "laplacian", "phi"),),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("sphR^2")
+        assert "**" in result
+        assert "^" not in result
+
+    def test_mathematica_to_python_coordinates(self) -> None:
+        """Test _mathematica_to_python converts x()/y() to x/y using spec coordinates."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(1.0, "laplacian", "phi"),),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("x()^2 + y()^2")  # noqa: SLF001
+        assert "x()" not in result
+        assert "y()" not in result
+        assert "x**2" in result
+        assert "y**2" in result
+
+    def test_mathematica_to_python_non_cartesian(self) -> None:
+        """Test _mathematica_to_python handles non-Cartesian coordinate names."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(1.0, "laplacian", "phi"),),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=("t", "r", "theta"),
+        )
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("r()^2 + theta()")  # noqa: SLF001
+        assert "r()" not in result
+        assert "theta()" not in result
+        assert "r**2" in result
+        assert "theta" in result
+
+    def test_evolution_with_position_dependent_coefficients(self) -> None:
+        """Test that evolution runs with position-dependent coefficients."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        # Constant laplacian_x
+                        OperatorTerm(0.25, "laplacian_x", "phi"),
+                        # Position-dependent laplacian_x
+                        OperatorTerm(
+                            1.0, "laplacian_x", "phi",
+                            coefficient_symbolic="x()**2/(2*R**2)",
+                            coordinate_dependent=("x",),
+                        ),
+                        # Constant laplacian_y
+                        OperatorTerm(0.25, "laplacian_y", "phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        grid = CartesianGrid(bounds=[(-4, 4), (-4, 4)], shape=[32, 32], periodic=True)
+        pde = PDEFromSpec(spec, parameters={"R": 2.0})
+
+        # Create initial state
+        phi = ScalarField(grid, data=0.0)
+        pi = ScalarField(grid, data=0.0)
+        x = np.asarray(grid.cell_coords[..., 0])
+        y = np.asarray(grid.cell_coords[..., 1])
+        phi.data[:] = np.exp(-(x**2 + y**2) / 2)
+        state = FieldCollection([phi, pi])
+
+        # Evolve - should not crash
+        result = pde.solve(state, t_range=0.5, dt=0.01, scheme="runge-kutta")
+        result = normalize_solve_result(result)
+
+        # Final state should differ from initial (evolution happened)
+        assert not np.allclose(result[0].data, phi.data, rtol=0.01)

@@ -695,3 +695,190 @@ class TestValidationErrors:
         }
         with pytest.raises(ValueError, match="Unknown field 'nonexistent'"):
             ComponentEquation.from_dict(data, {"phi": 0})
+
+
+class TestCoordinateDependentTerms:
+    """Tests for coordinate_dependent field on OperatorTerm."""
+
+    def test_coordinate_dependent_default_empty(self) -> None:
+        """OperatorTerm defaults to empty coordinate_dependent tuple."""
+        term = OperatorTerm(1.0, "laplacian", "phi_0")
+        assert term.coordinate_dependent == ()
+        assert not term.position_dependent
+
+    def test_coordinate_dependent_spatial(self) -> None:
+        """OperatorTerm with spatial coordinate_dependent is position_dependent."""
+        term = OperatorTerm(
+            1.0, "laplacian_x", "phi_0",
+            coefficient_symbolic="x()^2/(2*sphR^2)",
+            coordinate_dependent=("x",),
+        )
+        assert term.coordinate_dependent == ("x",)
+        assert term.position_dependent
+
+    def test_coordinate_dependent_time_only(self) -> None:
+        """OperatorTerm with only time dependence is NOT position_dependent."""
+        term = OperatorTerm(
+            1.0, "identity", "phi_0",
+            coefficient_symbolic="E^(2*dSH*t())",
+            time_dependent=True,
+            coordinate_dependent=("t",),
+        )
+        assert term.coordinate_dependent == ("t",)
+        assert not term.position_dependent
+        assert term.time_dependent
+
+    def test_coordinate_dependent_mixed(self) -> None:
+        """OperatorTerm with both spatial and time is position_dependent."""
+        term = OperatorTerm(
+            1.0, "identity", "phi_0",
+            coefficient_symbolic="x()*t()",
+            time_dependent=True,
+            coordinate_dependent=("x", "t"),
+        )
+        assert term.position_dependent
+        assert term.time_dependent
+
+    def test_from_dict_with_coordinate_dependent(self) -> None:
+        """OperatorTerm.from_dict parses coordinate_dependent field."""
+        data = {
+            "coefficient": 1.0,
+            "operator": "laplacian_x",
+            "field": "phi_0",
+            "coefficient_symbolic": "x()^2/(2*sphR^2)",
+            "coordinate_dependent": ["x"],
+        }
+        term = OperatorTerm.from_dict(data)
+        assert term.coordinate_dependent == ("x",)
+        assert term.position_dependent
+
+    def test_from_dict_without_coordinate_dependent(self) -> None:
+        """OperatorTerm.from_dict defaults to empty when field absent."""
+        data = {
+            "coefficient": 1.0,
+            "operator": "laplacian",
+            "field": "phi_0",
+        }
+        term = OperatorTerm.from_dict(data)
+        assert term.coordinate_dependent == ()
+        assert not term.position_dependent
+
+    def test_from_dict_multi_coordinate(self) -> None:
+        """OperatorTerm.from_dict with multiple coordinate dependencies."""
+        data = {
+            "coefficient": 1.0,
+            "operator": "laplacian_x",
+            "field": "phi_0",
+            "coefficient_symbolic": "(x()^2*y()^2)/(2*sphR^4)",
+            "coordinate_dependent": ["x", "y"],
+        }
+        term = OperatorTerm.from_dict(data)
+        assert term.coordinate_dependent == ("x", "y")
+        assert term.position_dependent
+
+    def test_position_dependent_non_cartesian(self) -> None:
+        """position_dependent works for non-Cartesian coordinate names."""
+        term = OperatorTerm(
+            1.0, "laplacian", "phi_0",
+            coordinate_dependent=("r", "theta"),
+        )
+        assert term.position_dependent
+
+    def test_position_dependent_only_t(self) -> None:
+        """A term depending only on 't' is NOT position_dependent."""
+        term = OperatorTerm(
+            1.0, "identity", "phi_0",
+            coordinate_dependent=("t",),
+            time_dependent=True,
+        )
+        assert not term.position_dependent
+
+
+class TestEquationSystemCoordinates:
+    """Tests for EquationSystem coordinate handling."""
+
+    def _make_spec(self, **kwargs: Any) -> EquationSystem:
+        """Helper to create a minimal EquationSystem."""
+        defaults: dict[str, Any] = {
+            "n_components": 1,
+            "dimension": 2,
+            "spatial_dimension": 1,
+            "component_names": ("phi",),
+            "equations": (
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(1.0, "laplacian", "phi"),),
+                ),
+            ),
+            "mass_matrix": ((0.0,),),
+            "coupling_matrix": ((0.0,),),
+            "metadata": {},
+        }
+        defaults.update(kwargs)
+        return EquationSystem(**defaults)
+
+    def test_effective_coordinates_inferred_1d(self) -> None:
+        """1+1D spec without explicit coordinates infers ('t', 'x')."""
+        spec = self._make_spec(dimension=2, spatial_dimension=1)
+        assert spec.effective_coordinates == ("t", "x")
+        assert spec.spatial_coordinates == ("x",)
+
+    def test_effective_coordinates_inferred_2d(self) -> None:
+        """2+1D spec without explicit coordinates infers ('t', 'x', 'y')."""
+        spec = self._make_spec(dimension=3, spatial_dimension=2)
+        assert spec.effective_coordinates == ("t", "x", "y")
+        assert spec.spatial_coordinates == ("x", "y")
+
+    def test_effective_coordinates_explicit(self) -> None:
+        """Explicit coordinates are used as-is."""
+        spec = self._make_spec(
+            dimension=3, spatial_dimension=2,
+            coordinates=("t", "r", "theta"),
+        )
+        assert spec.effective_coordinates == ("t", "r", "theta")
+        assert spec.spatial_coordinates == ("r", "theta")
+
+    def test_coordinates_from_json(self) -> None:
+        """from_dict extracts coordinates from JSON spacetime."""
+        data = {
+            "spacetime": {
+                "dimension": 3,
+                "signature": [-1, 1, 1],
+                "coordinates": ["t", "x", "y"],
+            },
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [{
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [{"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}],
+                },
+            }],
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.coordinates == ("t", "x", "y")
+        assert spec.effective_coordinates == ("t", "x", "y")
+
+    def test_coordinates_default_empty_from_json(self) -> None:
+        """from_dict defaults to empty tuple when coordinates absent."""
+        data = {
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+            },
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [{
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [{"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}],
+                },
+            }],
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.coordinates == ()
+        assert spec.effective_coordinates == ("t", "x")
