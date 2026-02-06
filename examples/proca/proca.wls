@@ -22,7 +22,6 @@ Print["Loading pipeline modules..."];
 pipelinePath = FileNameJoin[{DirectoryName[$InputFileName], "..", "..", "torsion_gertsenshtein", "wolfram"}];
 Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];
 Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];
-Get[FileNameJoin[{pipelinePath, "Linearize.wl"}]];
 Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];
 Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];
 
