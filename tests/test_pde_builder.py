@@ -888,8 +888,8 @@ class TestChernSimonsIntegration:
 
         pde = build_pde_from_json(cs_json_path)
 
-        # Create state with Gaussian pulse in A_1
-        # State layout: A_0, pi_0, A_1, pi_1, A_2, pi_2
+        # A_0 is first-order (no momentum slot), A_1 and A_2 are second-order
+        # State layout: A_0, A_1, pi_1, A_2, pi_2 (5 fields total)
         x = cast("np.ndarray", grid_2d.cell_coords[..., 0])
         y = cast("np.ndarray", grid_2d.cell_coords[..., 1])
         a1_data = np.exp(-((x - 5) ** 2 + (y - 5) ** 2) / 2)
@@ -897,7 +897,6 @@ class TestChernSimonsIntegration:
         state = FieldCollection(
             [
                 ScalarField(grid_2d, data=0.0),  # A_0
-                ScalarField(grid_2d, data=0.0),  # pi_0
                 ScalarField(grid_2d, data=a1_data),  # A_1 (Gaussian)
                 ScalarField(grid_2d, data=0.0),  # pi_1
                 ScalarField(grid_2d, data=0.0),  # A_2
@@ -908,14 +907,14 @@ class TestChernSimonsIntegration:
         # Compute evolution rate - should not raise
         rates = pde.evolution_rate(state)
 
-        num_cs_states = 6
+        num_cs_states = 5
         assert len(rates) == num_cs_states
 
         # d/dt A_1 = pi_1 = 0
-        assert_allclose(rates[2].data, 0.0, atol=1e-10)
+        assert_allclose(rates[1].data, 0.0, atol=1e-10)
 
         # d/dt pi_1 should include laplacian(A_1) contribution (non-zero)
-        assert np.max(np.abs(rates[3].data)) > 0
+        assert np.max(np.abs(rates[2].data)) > 0
 
     def test_chern_simons_simulation_short(
         self, cs_json_path: Path, grid_2d: CartesianGrid
@@ -926,7 +925,8 @@ class TestChernSimonsIntegration:
 
         pde = build_pde_from_json(cs_json_path)
 
-        # Create minimal initial state
+        # A_0 is first-order (no momentum slot), A_1 and A_2 are second-order
+        # State layout: A_0, A_1, pi_1, A_2, pi_2 (5 fields total)
         x = cast("np.ndarray", grid_2d.cell_coords[..., 0])
         y = cast("np.ndarray", grid_2d.cell_coords[..., 1])
         a0_data = np.exp(-((x - 5) ** 2 + (y - 5) ** 2) / 4)
@@ -934,7 +934,6 @@ class TestChernSimonsIntegration:
         state = FieldCollection(
             [
                 ScalarField(grid_2d, data=a0_data),  # A_0
-                ScalarField(grid_2d, data=0.0),  # pi_0
                 ScalarField(grid_2d, data=0.0),  # A_1
                 ScalarField(grid_2d, data=0.0),  # pi_1
                 ScalarField(grid_2d, data=0.0),  # A_2
@@ -948,7 +947,7 @@ class TestChernSimonsIntegration:
 
         # Solution should exist and have correct shape
         assert sol.data is not None
-        num_cs_states = 6
+        num_cs_states = 5
         assert len(sol.data) == num_cs_states
 
 
