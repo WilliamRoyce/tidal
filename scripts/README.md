@@ -139,6 +139,56 @@ Expected output includes:
 
 Scripts for local development and testing workflows.
 
+### Version Management
+
+Update version numbers across all project files atomically:
+
+```bash
+# Interactive mode (prompts for new version)
+python scripts/bump_version.py
+
+# Direct mode - specify version
+python scripts/bump_version.py 0.3.0
+
+# Preview changes without modifying files
+python scripts/bump_version.py 0.3.0 --dry-run
+
+# Automatically create git commit after updating
+python scripts/bump_version.py 0.3.0 --commit
+
+# Allow running with uncommitted changes
+python scripts/bump_version.py 0.3.0 --allow-dirty
+```
+
+The script updates version numbers in:
+- `pyproject.toml` - Package version metadata
+- `torsion_gertsenshtein/__init__.py` - Python module `__version__`
+- `CITATION.cff` - Citation metadata (version + release date)
+- `uv.lock` - Regenerated via `uv lock` command
+
+**Features:**
+- ✅ Validates semantic versioning format (X.Y.Z or X.Y.Z-suffix)
+- ✅ Creates `.bak` backups before modification
+- ✅ Automatic rollback on failure
+- ✅ Detects and reports version inconsistencies
+- ✅ Updates CITATION.cff release date automatically
+- ✅ Optional git commit with conventional format
+
+**Example workflow:**
+```bash
+# Check current version and preview changes
+python scripts/bump_version.py 0.3.0 --dry-run
+
+# Apply changes
+python scripts/bump_version.py 0.3.0
+
+# Review and commit
+git diff
+git add -A && git commit -m "chore: bump version to 0.3.0"
+git tag v0.3.0
+git push && git push --tags
+```
+
 ### Testing
 
 ```bash
@@ -175,6 +225,7 @@ Scripts for local development and testing workflows.
 | `install-xact-xcoba.sh`     | Installs xAct/xCoba with GLIBC compatibility      |
 | `verify-wolfram-setup.sh`   | Comprehensive verification of all components      |
 | `xact_smoke.wl`             | Wolfram Language smoke test for xAct/xCoba        |
+| `bump_version.py`           | Atomic version updates across project files       |
 | `run_wolfram_tests.sh`      | Run all Wolfram unit tests                        |
 | `run_examples.sh`           | Regenerate JSON files from example derivations    |
 | `full_test.sh`              | Run complete test suite (Python + Wolfram)        |
