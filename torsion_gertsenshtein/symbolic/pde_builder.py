@@ -9,11 +9,11 @@ comes from the specification that was derived from the Lagrangian.
 
 from __future__ import annotations
 
-import math
 import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
 from pde import FieldCollection, PDEBase, ScalarField
 from typing_extensions import override
 
@@ -28,7 +28,6 @@ if TYPE_CHECKING:
     from collections.abc import Callable
     from pathlib import Path
 
-    import numpy as np
     from numpy.typing import NDArray
     from pde.grids.base import GridBase
     from pde.pdes.base import TState
@@ -350,17 +349,27 @@ class PDEFromSpec(PDEBase):
             if sym in self._parameters:
                 return self._parameters[sym]
 
+            # Symbolic coefficient present but not resolvable from parameters
+            import warnings
+
+            warnings.warn(
+                f"Symbolic coefficient '{sym[:80]}' could not be resolved from "
+                f"parameters {sorted(self._parameters.keys())}. "
+                f"Falling back to numeric coefficient {term.coefficient}. "
+                f"This may indicate unevaluated expressions in the JSON.",
+                stacklevel=2,
+            )
+
         # Default: use numeric coefficient from JSON
         return term.coefficient
 
-    @staticmethod
-    def _mathematica_to_python(expr: str) -> str:
+    def _mathematica_to_python(self, expr: str) -> str:
         """Convert Mathematica InputForm expression to evaluable Python.
 
         Handles common Mathematica syntax:
         - ``E^(...)`` to ``exp(...)`` (Euler's number)
         - ``Sin[x]`` to ``sin(x)``, ``Cos[x]`` to ``cos(x)``, etc.
-        - ``t[]`` to ``t`` (xCoba coordinate symbols)
+        - ``t[]`` to ``t`` (xCoba coordinate symbols, using actual coordinate names)
         - Mathematica brackets ``[``, ``]`` to Python parens ``(``, ``)``
         - Multiplication, grouping, negation are already Python-compatible
 
@@ -389,15 +398,29 @@ class PDEFromSpec(PDEBase):
             result = re.sub(rf"\b{mma_func}\b", py_func, result)
         # Mathematica brackets to Python parens (after function renaming)
         result = result.replace("[", "(").replace("]", ")")
-        # t() -> t — xCoba coordinate symbols appear as zero-arg function calls
-        return result.replace("t()", "t")
+        # Mathematica ^ to Python ** (AFTER E^ -> exp to avoid double-conversion)
+        result = result.replace("^", "**")
+        # xCoba coordinate symbols appear as zero-arg function calls: t() -> t, x() -> x, etc.
+        # Uses actual coordinate names from the equation system (not hardcoded x/y/z).
+        for coord in self.spec.effective_coordinates:
+            result = result.replace(f"{coord}()", coord)
+        return result
 
-    def _resolve_coefficient_at_time(self, term: OperatorTerm, t: float) -> float:
-        """Resolve a potentially time-dependent coefficient at time t.
+    def _resolve_coefficient_at_point(
+        self,
+        term: OperatorTerm,
+        t: float,
+        grid: GridBase | None = None,
+    ) -> float | NumericArray:
+        """Resolve a potentially coordinate-dependent coefficient.
 
-        Converts the Mathematica symbolic coefficient to a Python expression,
-        substitutes parameter values and current time, then evaluates.
-        This is general and works for any symbolic coefficient expression.
+        Handles constant, time-dependent, and position-dependent coefficients
+        in a single unified code path. Uses numpy functions throughout so that
+        the same evaluation works for both scalar (time-only) and array
+        (position-dependent) results.
+
+        Returns a scalar ``float`` for constant or time-only coefficients, or a
+        ``numpy.ndarray`` (same shape as the grid) for position-dependent ones.
 
         Parameters
         ----------
@@ -405,56 +428,75 @@ class PDEFromSpec(PDEBase):
             The term whose coefficient to resolve.
         t : float
             Current simulation time.
+        grid : GridBase | None
+            Simulation grid. Required when the term is position-dependent.
 
         Returns
         -------
-        float
-            The effective coefficient value at time t.
+        float | NumericArray
+            Scalar or grid-shaped array of coefficient values.
 
         Raises
         ------
         ValueError
-            If required parameters are missing or expression cannot be evaluated.
+            If required parameters/grid are missing or expression cannot be evaluated.
         """
-        # For non-time-dependent terms, use standard resolution
-        if not term.time_dependent:
+        # Fast path: no coordinate dependence → use simple parameter lookup
+        if not term.time_dependent and not term.position_dependent:
             return self._resolve_coefficient(term)
+
+        # Position-dependent: need grid for spatial coordinates
+        if term.position_dependent and grid is None:
+            msg = (
+                f"Position-dependent coefficient '{term.coefficient_symbolic}' "
+                f"requires grid info but no grid was provided."
+            )
+            raise ValueError(msg)
 
         sym = term.coefficient_symbolic or ""
         py_expr = self._mathematica_to_python(sym)
 
-        # Build evaluation namespace: parameters + time + math functions
+        # Build evaluation namespace with numpy functions (work on scalars AND arrays)
         namespace: dict[str, Any] = dict(self._parameters)
         namespace["t"] = t
-        namespace["exp"] = math.exp
-        namespace["sin"] = math.sin
-        namespace["cos"] = math.cos
-        namespace["tan"] = math.tan
-        namespace["log"] = math.log
-        namespace["sqrt"] = math.sqrt
-        namespace["abs"] = abs
+        namespace["exp"] = np.exp
+        namespace["sin"] = np.sin
+        namespace["cos"] = np.cos
+        namespace["tan"] = np.tan
+        namespace["log"] = np.log
+        namespace["sqrt"] = np.sqrt
+        namespace["abs"] = np.abs
 
-        # Check that all symbols in the expression can be resolved
+        # Inject spatial coordinates from grid when position-dependent
+        if term.position_dependent:
+            spatial_coords = self.spec.spatial_coordinates
+            coords = grid.cell_coords  # type: ignore[union-attr]
+            for i, name in enumerate(spatial_coords[: grid.num_axes]):  # type: ignore[union-attr]
+                namespace[name] = np.asarray(coords[..., i])
+
+        # Validate all symbols can be resolved
         identifiers = set(re.findall(r"\b[a-zA-Z_]\w*\b", py_expr))
-        identifiers -= {"exp", "sin", "cos", "tan", "log", "sqrt", "abs", "t"}
+        builtin_names = {"exp", "sin", "cos", "tan", "log", "sqrt", "abs"}
+        coord_vars = set(self.spec.effective_coordinates)
+        identifiers -= builtin_names | coord_vars
         missing = identifiers - set(self._parameters.keys())
         if missing:
             msg = (
-                f"Parameters {sorted(missing)} are required for time-dependent "
-                f"coefficient '{sym}'. Pass them via "
-                f"parameters={{{', '.join(repr(k) + ': value' for k in sorted(missing))}}} "
-                f"to PDEFromSpec or build_pde_from_json."
+                f"Parameters {sorted(missing)} are required for "
+                f"coordinate-dependent coefficient '{sym}'. "
+                f"Pass them via parameters={{...}} to PDEFromSpec or build_pde_from_json."
             )
             raise ValueError(msg)
 
         try:
             result = eval(py_expr, {"__builtins__": {}}, namespace)  # noqa: S307
+            if isinstance(result, np.ndarray):
+                return np.asarray(result, dtype=np.float64)
             return float(result)
         except Exception as e:
             msg = (
-                f"Cannot evaluate time-dependent coefficient '{sym}' "
-                f"(Python form: '{py_expr}') with parameters {self._parameters} "
-                f"at t={t}: {e}"
+                f"Cannot evaluate coordinate-dependent coefficient '{sym}' "
+                f"(Python form: '{py_expr}') at t={t}: {e}"
             )
             raise ValueError(msg) from e
 
@@ -689,11 +731,14 @@ class PDEFromSpec(PDEBase):
                 )
                 operated = self._get_operator(term.operator, target_field, bc)
 
-            # Resolve coefficient (use time-dependent resolution if needed)
-            coefficient = self._resolve_coefficient_at_time(term, t)
+            # Resolve coefficient (supports time- and position-dependent)
+            coefficient = self._resolve_coefficient_at_point(term, t, grid)
 
             # Add coefficient * operated to result
-            contribution = coefficient * operated
+            if isinstance(coefficient, np.ndarray):
+                contribution = ScalarField(grid, data=coefficient * operated.data)
+            else:
+                contribution = coefficient * operated
             result += contribution
 
         return result

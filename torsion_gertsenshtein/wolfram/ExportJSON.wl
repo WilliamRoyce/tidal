@@ -134,9 +134,10 @@ time derivative (no spatial derivatives). Used to detect Hubble friction terms l
 
 (* Term identification and building *)
 BuildTermResult::usage =
-  "BuildTermResult[coeff, operator, field, symbolicCoeff:None, timeDependent:False] builds a term result \
+  "BuildTermResult[coeff, operator, field, symbolicCoeff:None, timeDependent:False, coordDeps:{}] builds a term result \
 Association with keys \"coefficient\", \"operator\", \"field\". Optionally includes \
-\"coefficient_symbolic\" when symbolicCoeff is not None, and \"time_dependent\" when timeDependent is True.";
+\"coefficient_symbolic\" when symbolicCoeff is not None, \"time_dependent\" when timeDependent is True, \
+and \"coordinate_dependent\" when coordDeps is non-empty.";
 
 IdentifyMultiFieldTerm::usage =
   "IdentifyMultiFieldTerm[term, currentFieldName, allFieldNames] analyzes a \
@@ -156,7 +157,7 @@ with \"field\" and \"head\" keys, or uses defaultField if no match found.";
 
 ExtractTermCoefficient::usage =
   "ExtractTermCoefficient[term, fieldHead, targetField] extracts the numeric coefficient \
-and optional symbolic coefficient from a term. Returns {numericCoeff, symbolicCoeff, isTimeDependent}.";
+and optional symbolic coefficient from a term. Returns {numericCoeff, symbolicCoeff, isTimeDependent, coordDeps}.";
 
 ExtractTermCoefficient::symbolic =
   "Symbolic (non-numeric) coefficient `1` found for field `2`. Storing as symbolic coefficient in JSON.";
@@ -621,10 +622,11 @@ IdentifyDirectionalLaplacian[term_] := Module[{},
   ]
 ];
 
-(* Helper to build term result with optional symbolic coefficient and time dependence *)
+(* Helper to build term result with optional symbolic coefficient and coordinate dependence *)
 (* Only includes "coefficient_symbolic" key when symbolicCoeff is not None *)
 (* Only includes "time_dependent" key when timeDependent is True *)
-BuildTermResult[coeff_, op_, field_, symbCoeff_:None, timeDependent_:False] := Module[{result},
+(* Only includes "coordinate_dependent" key when coordDeps is non-empty *)
+BuildTermResult[coeff_, op_, field_, symbCoeff_:None, timeDependent_:False, coordDeps_:{}] := Module[{result},
   result = <|
     "coefficient" -> N[coeff],
     "operator" -> op,
@@ -636,17 +638,23 @@ BuildTermResult[coeff_, op_, field_, symbCoeff_:None, timeDependent_:False] := M
   If[timeDependent === True,
     result["time_dependent"] = True
   ];
+  If[Length[coordDeps] > 0,
+    result["coordinate_dependent"] = coordDeps
+  ];
   result
 ];
 
-(* Check if a coefficient expression depends on coordinate symbols *)
+(* Return the list of coordinate names that a coefficient depends on *)
 (* Coordinate symbols from xCoba appear as f[] (zero-argument function calls) *)
-(* After LHS normalization, the only surviving coordinate is typically time *)
-(* Used to flag terms that need time-dependent evaluation in Python *)
-IsTimeDependentCoefficient[coeffExpr_] := Module[{coordSyms},
+(* Returns e.g. {"t"}, {"x", "y"}, or {} for constant coefficients *)
+IsCoordinateDependentCoefficient[coeffExpr_] := Module[{coordSyms},
   coordSyms = Cases[coeffExpr, f_Symbol[] :> f, {0, Infinity}];
-  Length[coordSyms] > 0
+  Union[ToString /@ coordSyms]
 ];
+
+(* Backward-compatible boolean: True if any coordinate dependence *)
+IsTimeDependentCoefficient[coeffExpr_] :=
+  Length[IsCoordinateDependentCoefficient[coeffExpr]] > 0;
 
 (* === Refactored Helper Functions for IdentifyMultiFieldTerm === *)
 (* Phase 3, Issue 10: Split 144-line function into smaller, testable units *)
@@ -704,10 +712,12 @@ MatchFieldToHeads[functionHeads_List, allFieldNames_List, defaultField_String] :
 ];
 
 (* Extract coefficient from term given the field head *)
-(* Returns {numericCoeff, symbolicCoeff, isTimeDependent} *)
-(* where symbolicCoeff is None or a string, isTimeDependent is True/False *)
+(* Returns {numericCoeff, symbolicCoeff, isTimeDependent, coordDeps} *)
+(* where symbolicCoeff is None or a string, isTimeDependent is True/False, *)
+(* coordDeps is a list of coordinate name strings e.g. {"t"}, {"x", "y"} *)
 ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
-  {rawCoeff, coefficient = 1.0, symbolicCoeff = None, isTimeDependent = False},
+  {rawCoeff, coefficient = 1.0, symbolicCoeff = None,
+   isTimeDependent = False, coordDeps = {}},
 
   rawCoeff = term /. {
     (* Replace Derivative[...][field][args] with 1 *)
@@ -717,8 +727,9 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
   };
   rawCoeff = Simplify[rawCoeff];
 
-  (* Check for time dependence in coefficient *)
-  isTimeDependent = IsTimeDependentCoefficient[rawCoeff];
+  (* Check for coordinate dependence in coefficient *)
+  coordDeps = IsCoordinateDependentCoefficient[rawCoeff];
+  isTimeDependent = MemberQ[coordDeps, "t"];
 
   (* Determine numeric coefficient and symbolic representation *)
   (* Use InputForm for ToString to get clean, machine-parseable strings *)
@@ -740,16 +751,16 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
     NumericQ[Quiet[N[rawCoeff]]],
       coefficient = Quiet[N[rawCoeff]];
       symbolicCoeff = None,
-    (* Complex symbolic expression (possibly time-dependent) *)
+    (* Complex symbolic expression (possibly coordinate-dependent) *)
     True,
       coefficient = 1.0;
       symbolicCoeff = ToString[rawCoeff, InputForm];
-      If[!isTimeDependent,
+      If[Length[coordDeps] == 0,
         Message[ExtractTermCoefficient::symbolic, rawCoeff, targetField]
       ]
   ];
 
-  {coefficient, symbolicCoeff, isTimeDependent}
+  {coefficient, symbolicCoeff, isTimeDependent, coordDeps}
 ];
 
 (* Count the total derivative order of a term *)
@@ -899,7 +910,7 @@ ClassifyOperatorType[term_] := Module[
 
 IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
   {functionHeads, matchResult, targetField, foundFieldHead,
-   coeffResult, coefficient, symbolicCoeff, isTimeDependent,
+   coeffResult, coefficient, symbolicCoeff, isTimeDependent, coordDeps,
    operatorResult, operator, isMixedTimeSpace},
 
   (* Step 1: Extract function heads from term *)
@@ -910,16 +921,18 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
   targetField = matchResult[[1]];
   foundFieldHead = matchResult[[2]];
 
-  (* Step 3: Extract coefficient (now includes time-dependence check) *)
+  (* Step 3: Extract coefficient (includes coordinate-dependence check) *)
   If[foundFieldHead =!= Null,
     coeffResult = ExtractTermCoefficient[term, foundFieldHead, targetField];
     coefficient = coeffResult[[1]];
     symbolicCoeff = coeffResult[[2]];
-    isTimeDependent = coeffResult[[3]],
+    isTimeDependent = coeffResult[[3]];
+    coordDeps = coeffResult[[4]],
     (* Fallback if no field head found *)
     coefficient = 1.0;
     symbolicCoeff = None;
-    isTimeDependent = False
+    isTimeDependent = False;
+    coordDeps = {}
   ];
 
   (* Step 4: Classify operator type *)
@@ -932,8 +945,8 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
     targetField = FieldToMomentumName[targetField]
   ];
 
-  (* Build and return result with time-dependence flag *)
-  BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent]
+  (* Build and return result with coordinate-dependence info *)
+  BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent, coordDeps]
 ];
 
 (* === Equation Conversion === *)

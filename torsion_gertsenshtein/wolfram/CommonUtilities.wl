@@ -301,9 +301,13 @@ EvaluateChristoffelComponents[expr_, chart_, covd_:None, metricMatrix_:None] := 
 
   If[covd === None || covd === False,
     (* Flat space: all Christoffels = 0 *)
+    (* Use broad pattern to catch Christoffels with unresolved dummy indices.
+       TraceBasisDummy doesn't always trace dummies inside products of
+       Christoffel symbols (they're not proper tensors), leaving abstract
+       indices like j$12345 instead of {Integer, ±chart}. Since ALL
+       Christoffels vanish in flat space, match any applied Christoffel. *)
     result = expr /. {
-      f_[{i_Integer, s1:(chart | -chart)}, {j_Integer, s2:(chart | -chart)}, {k_Integer, s3:(chart | -chart)}] /;
-        IsChristoffelSymbol[f] :> 0
+      f_[__] /; IsChristoffelSymbol[f] :> 0
     };
     Return[result]
   ];
