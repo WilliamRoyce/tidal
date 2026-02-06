@@ -41,15 +41,10 @@ DecomposeToComponents::usage =
 motion into individual scalar component equations. Returns a list of \
 {component_index, component_equation} pairs. \
 Options: \"ComputeChristoffels\" -> True computes Christoffel symbols from the \
-metric definition using xAct (for curved spacetimes). Default is False (flat space).";
+metric definition using xAct (for curved spacetimes). Default is False (flat space). \
+\"MetricMatrix\" -> matrix provides an explicit metric matrix for curved spacetime \
+evaluation (e.g., Omega^2 * DiagonalMatrix[{-1, 1}]). Default is None (flat Minkowski).";
 
-ExtractOperatorStructure::usage =
-  "ExtractOperatorStructure[componentEq, field, chart] analyzes a component \
-equation and returns its structure: {coefficient, operator_type, target_field}.";
-
-IdentifyOperator::usage =
-  "IdentifyOperator[expr, field, chart] identifies if the expression is a \
-known operator (laplacian, identity, gradient, etc.) applied to the field.";
 
 Begin["`Private`"];
 
@@ -57,24 +52,26 @@ Begin["`Private`"];
 
 (* Options for DecomposeToComponents *)
 Options[DecomposeToComponents] = {
-  "ComputeChristoffels" -> False  (* Set True for curved spacetimes *)
+  "ComputeChristoffels" -> False,  (* Set True for curved spacetimes *)
+  "MetricMatrix" -> None  (* Explicit metric matrix for curved spacetime evaluation *)
 };
 
 (* 3-arg signature: eom, field, chart (no additional fields, default options) *)
 DecomposeToComponents[eom_, field_, chart_] :=
-  DecomposeToComponents[eom, field, chart, {}, "ComputeChristoffels" -> False];
+  DecomposeToComponents[eom, field, chart, {}, "ComputeChristoffels" -> False, "MetricMatrix" -> None];
 
 (* 4-arg signature: eom, field, chart, additionalFields (default options) *)
 DecomposeToComponents[eom_, field_, chart_, additionalFields_List] :=
-  DecomposeToComponents[eom, field, chart, additionalFields, "ComputeChristoffels" -> False];
+  DecomposeToComponents[eom, field, chart, additionalFields, "ComputeChristoffels" -> False, "MetricMatrix" -> None];
 
 (* Full signature with options *)
 DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsPattern[]] := Module[
   {dim, components, indices, componentEq, result, fieldHead, fieldRank, allFieldHeads,
-   computeChristoffels},
+   computeChristoffels, metricMatrix},
 
-  (* Get option value for Christoffel computation *)
+  (* Get option values *)
   computeChristoffels = OptionValue["ComputeChristoffels"];
+  metricMatrix = OptionValue["MetricMatrix"];
 
   (* Get the dimension dynamically from the chart *)
   (* ScalarsOfChart returns the coordinate symbols, e.g., {t[], x[]} or {t[], x[], y[]} *)
@@ -91,11 +88,30 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
   (* For a scalar field, there's only one component *)
   If[fieldRank === 0,
     (* Scalar field - evaluate in coordinates *)
-    componentEq = ToBasis[chart][eom];
+
+    (* For curved spacetime: use xAct's ChangeCovD + ChristoffelToGradMetric
+       to replace CovD and Christoffel symbols with PD and metric derivatives.
+       This must happen BEFORE ToBasis, on the abstract tensor expression. *)
+    If[computeChristoffels === True && metricMatrix =!= None,
+      (* Detect the covariant derivative operator from the equation using xAct's CovDQ *)
+      Module[{covdOps, covdOp},
+        covdOps = Cases[eom, (f_)[_][_] /; CovDQ[f] :> f, {0, Infinity}] // DeleteDuplicates;
+        If[Length[covdOps] > 0,
+          covdOp = covdOps[[1]];
+          componentEq = ExpandChristoffelsToMetricDerivatives[eom, covdOp, chart],
+          componentEq = eom
+        ]
+      ],
+      componentEq = eom
+    ];
+
+    componentEq = ToBasis[chart][componentEq];
     componentEq = TraceBasisDummy[componentEq];
 
-    (* Evaluate Christoffel symbols (0 for flat Minkowski, or computed from metric for curved) *)
-    componentEq = EvaluateChristoffelComponents[componentEq, chart, computeChristoffels];
+    (* For flat spacetime: set all Christoffel symbols to 0 *)
+    If[computeChristoffels =!= True,
+      componentEq = EvaluateChristoffelComponents[componentEq, chart, False]
+    ];
     componentEq = Expand[componentEq];
 
     (* Evaluate epsilon tensor components to numeric ±1 values *)
@@ -107,9 +123,20 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
     Module[{coordSyms},
       coordSyms = GetCoordinateSymbols[chart];
 
-      (* Evaluate metric components (Minkowski signature for flat, or from definition for curved) *)
-      componentEq = EvaluateMinkowskiMetric[componentEq, chart];
+      (* Evaluate metric components *)
+      (* If MetricMatrix is provided, use actual metric values (curved spacetime) *)
+      (* Otherwise, use flat Minkowski signature (-1, +1, +1, ...) *)
+      If[metricMatrix =!= None,
+        componentEq = EvaluateMetricComponents[componentEq, chart, metricMatrix],
+        componentEq = EvaluateMinkowskiMetric[componentEq, chart]
+      ];
       componentEq = Expand[componentEq];
+
+      (* For curved spacetime: evaluate partial derivatives of metric components *)
+      If[metricMatrix =!= None,
+        componentEq = EvaluatePDMetric[componentEq, chart, metricMatrix];
+        componentEq = Expand[componentEq]
+      ];
 
       (* Replace ALL scalar fields with functions of coordinates *)
       (* This ensures cross-field terms are properly transformed *)
@@ -136,22 +163,25 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
     result = Table[
       {
         idx,
-        ExtractVectorComponent[eom, field, chart, idx, computeChristoffels]
+        ExtractVectorComponent[eom, field, chart, idx, additionalFields, computeChristoffels, metricMatrix]
       },
       {idx, 0, dim - 1}
     ];
     Return[result]
   ];
 
-  (* For higher-rank tensors, iterate over all index combinations *)
-  (* This is a simplified version - extend as needed *)
-  Print["Warning: Higher-rank tensor decomposition not fully implemented"];
-  {{0, eom}}
+  (* Higher-rank tensors: fail explicitly rather than returning incorrect data *)
+  Throw[StringJoin[
+    "DecomposeToComponents: Rank-", ToString[fieldRank],
+    " tensor decomposition is not supported. ",
+    "Only scalar (rank 0) and vector (rank 1) fields are currently implemented. ",
+    "Field: ", ToString[fieldHead]
+  ]]
 ];
 
 (* === Vector Component Extraction === *)
 
-ExtractVectorComponent[eom_, field_, chart_, componentIndex_, computeChristoffels_:False] := Module[
+ExtractVectorComponent[eom_, field_, chart_, componentIndex_, additionalFields_List:{}, computeChristoffels_:False, metricMatrix_:None] := Module[
   {componentEq, freeIdx, fieldHead, coordSyms, basisIdx},
 
   (*
@@ -210,8 +240,11 @@ ExtractVectorComponent[eom_, field_, chart_, componentIndex_, computeChristoffel
   (* Step 7: Get coordinate symbols from chart *)
   coordSyms = GetCoordinateSymbols[chart];
 
-  (* Step 8: Evaluate metric components for Minkowski signature (-1, +1) *)
-  componentEq = EvaluateMinkowskiMetric[componentEq, chart];
+  (* Step 8: Evaluate metric components *)
+  If[metricMatrix =!= None,
+    componentEq = EvaluateMetricComponents[componentEq, chart, metricMatrix],
+    componentEq = EvaluateMinkowskiMetric[componentEq, chart]
+  ];
   componentEq = Expand[componentEq];
 
   (* Step 9: Convert field components to scalar functions *)
@@ -221,6 +254,28 @@ ExtractVectorComponent[eom_, field_, chart_, componentIndex_, computeChristoffel
       fh[{i_Integer, -ch}] :> Symbol[ToString[fh] <> ToString[Abs[i]]][Sequence @@ cs],
       fh[{i_Integer, ch}] :> Symbol[ToString[fh] <> ToString[Abs[i]]][Sequence @@ cs]
     }
+  ];
+
+  (* Step 9b: Transform additional coupled fields to coordinate form *)
+  (* Handles both scalar and vector additional fields *)
+  Do[
+    Module[{afh = ExtractFieldHead[af], afRank},
+      afRank = Length[SlotsOfTensor[afh]];
+      If[afRank == 0,
+        (* Scalar additional field: replace afh[] with afh0[coords...] *)
+        componentEq = componentEq /. {
+          afh[] :> Symbol[ToString[afh] <> "0"][Sequence @@ coordSyms]
+        },
+        (* Vector additional field: replace afh[{i, ±chart}] with afhi[coords...] *)
+        With[{ch = chart, cs = coordSyms},
+          componentEq = componentEq /. {
+            afh[{i_Integer, -ch}] :> Symbol[ToString[afh] <> ToString[Abs[i]]][Sequence @@ cs],
+            afh[{i_Integer, ch}] :> Symbol[ToString[afh] <> ToString[Abs[i]]][Sequence @@ cs]
+          }
+        ]
+      ]
+    ],
+    {af, additionalFields}
   ];
 
   (* Step 10: Convert coordinate derivatives to explicit Derivative form *)
@@ -250,78 +305,6 @@ FindFreeIndicesLocal[expr_] := Module[
   freeIndices = Complement[allIndices, dummyPairs, ChangeIndex /@ dummyPairs];
 
   freeIndices
-];
-
-(* === Operator Structure Extraction === *)
-
-ExtractOperatorStructure[componentEq_, field_, chart_] := Module[
-  {terms, operatorTerms},
-
-  (* Split equation into additive terms *)
-  terms = If[Head[componentEq] === Plus,
-    List @@ componentEq,
-    {componentEq}
-  ];
-
-  (* Analyze each term *)
-  operatorTerms = Map[
-    AnalyzeTerm[#, field, chart] &,
-    terms
-  ];
-
-  operatorTerms
-];
-
-AnalyzeTerm[term_, field_, chart_] := Module[
-  {coefficient, operator, targetField},
-
-  (* Default structure *)
-  coefficient = 1;
-  operator = "unknown";
-  targetField = ToString[field];
-
-  (* Check for mass-like term: coefficient * field *)
-  If[FreeQ[term, Derivative] && !FreeQ[term, field],
-    coefficient = term /. field -> 1;
-    operator = "identity";
-    Return[<|"coefficient" -> coefficient, "operator" -> operator, "field" -> targetField|>]
-  ];
-
-  (* Check for Laplacian-like term *)
-  (* In coordinates, Laplacian appears as second derivatives *)
-  If[!FreeQ[term, Derivative[2, 0]] || !FreeQ[term, Derivative[0, 2]],
-    (* This is a second derivative - likely part of Laplacian or d'Alembertian *)
-    coefficient = ExtractNumericCoefficient[term, field];
-    operator = "laplacian";  (* or "spatial_derivative" for more precision *)
-    Return[<|"coefficient" -> coefficient, "operator" -> operator, "field" -> targetField|>]
-  ];
-
-  (* Fallback *)
-  <|"coefficient" -> 1, "operator" -> "unknown", "field" -> targetField|>
-];
-
-(* === Operator Identification === *)
-
-IdentifyOperator[expr_, field_, chart_] := Module[
-  {},
-
-  (* Check for d'Alembertian (wave operator) *)
-  (* In 1+1D with signature (-,+): Box = -d^2/dt^2 + d^2/dx^2 *)
-
-  (* Check for Laplacian (spatial only) *)
-  (* In 1D: Laplacian = d^2/dx^2 *)
-
-  (* Check for identity *)
-  If[expr === field || expr === field[],
-    Return["identity"]
-  ];
-
-  (* Check for gradient *)
-  If[MatchQ[expr, Derivative[1, 0][field] | Derivative[0, 1][field]],
-    Return["gradient"]
-  ];
-
-  "unknown"
 ];
 
 End[];

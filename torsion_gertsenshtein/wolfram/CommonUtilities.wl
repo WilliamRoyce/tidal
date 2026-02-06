@@ -45,10 +45,15 @@ Use EvaluateChristoffelComponents[expr, chart, True] to compute from xAct's metr
 definition (for non-flat metrics).";
 
 ComputeChristoffelFromMetric::usage =
-  "ComputeChristoffelFromMetric[chart] computes Christoffel symbol components \
-using xAct's ComponentValue to extract the values computed from the metric definition. \
+  "ComputeChristoffelFromMetric[chart, covd] computes Christoffel symbol components \
+using xAct's TraceBasisDummy. Returns a 3D array where christoffel[[a+1, b+1, c+1]] = Gamma^a_bc.";
+
+ComputeChristoffelFromMetricMatrix::usage =
+  "ComputeChristoffelFromMetricMatrix[chart, metricMatrix] computes Christoffel symbols \
+directly from the metric matrix using the standard formula: \
+Gamma^a_{bc} = (1/2) g^{ad} (d_b g_{dc} + d_c g_{bd} - d_d g_{bc}). \
 Returns a 3D array where christoffel[[a+1, b+1, c+1]] = Gamma^a_bc. \
-No hardcoded values - all results derived from the metric via xAct.";
+Works for any metric including time-dependent ones.";
 
 RemoveChristoffelSymbols::usage =
   "RemoveChristoffelSymbols[expr] sets all Christoffel symbol terms to zero \
@@ -57,6 +62,23 @@ RemoveChristoffelSymbols::usage =
 EvaluateMinkowskiMetric::usage =
   "EvaluateMinkowskiMetric[expr, chart] evaluates metric components for \
 Minkowski signature (-1, +1, ...) in the given chart.";
+
+EvaluateMetricComponents::usage =
+  "EvaluateMetricComponents[expr, chart, metricMatrix] evaluates metric \
+components from an explicit metric matrix. Computes the inverse metric and \
+substitutes both covariant and contravariant components. Used for curved \
+spacetime metrics (e.g., conformal g_ab = Omega^2 eta_ab).";
+
+EvaluatePDMetric::usage =
+  "EvaluatePDMetric[expr, chart, metricMatrix] evaluates partial derivatives \
+of metric components by substituting the known metric values and differentiating. \
+For example, PD_0[g_{11}] -> D[metricMatrix[[2,2]], coords[[1]]].";
+
+ExpandChristoffelsToMetricDerivatives::usage =
+  "ExpandChristoffelsToMetricDerivatives[eom, covd, chart] uses xAct's ChangeCovD \
+and ChristoffelToGradMetric to replace covariant derivatives and Christoffel \
+symbols with partial derivatives and metric components. This is the general \
+approach for curved spacetimes where Christoffel symbols are non-trivial.";
 
 GetCoordinateSymbols::usage =
   "GetCoordinateSymbols[chart] returns the coordinate scalar symbols from the \
@@ -236,13 +258,48 @@ ComputeChristoffelFromMetric[chart_, covd_] := Module[
   components
 ];
 
+(* Compute Christoffel symbols directly from the metric matrix using the standard formula:
+     Gamma^a_{bc} = (1/2) g^{ad} (d_b g_{dc} + d_c g_{bd} - d_d g_{bc})
+   This is fully general and works for any metric, including time-dependent ones. *)
+ComputeChristoffelFromMetricMatrix[chart_, metricMatrix_] := Module[
+  {dim, coords, invMetric, dg, components},
+
+  dim = Length[metricMatrix];
+  coords = GetCoordinateSymbols[chart];
+
+  (* Compute inverse metric *)
+  invMetric = Simplify[Inverse[metricMatrix]];
+
+  (* Compute partial derivatives of metric: dg[[i, j, k]] = d_k g_{ij} *)
+  (* Indices are 1-based here *)
+  dg = Table[
+    Simplify[D[metricMatrix[[i, j]], coords[[k]]]],
+    {i, dim}, {j, dim}, {k, dim}
+  ];
+
+  (* Gamma^a_{bc} = (1/2) g^{ad} (d_b g_{dc} + d_c g_{bd} - d_d g_{bc}) *)
+  (* Note: Table indices are 1-based, so a,b,c,d range from 1 to dim *)
+  components = Table[
+    Simplify[Sum[
+      1/2 * invMetric[[aa, dd]] * (dg[[dd, cc, bb]] + dg[[bb, dd, cc]] - dg[[bb, cc, dd]]),
+      {dd, dim}
+    ]],
+    {aa, dim}, {bb, dim}, {cc, dim}
+  ];
+
+  components
+];
+
 (* Evaluate Christoffel components to their numeric/symbolic values *)
-(* Optional third argument: covariant derivative symbol (required for curved space computation) *)
-(* If not provided, assumes flat space and returns 0 for all Christoffels *)
-EvaluateChristoffelComponents[expr_, chart_, covd_:None] := Module[
+(* Third argument controls behavior:
+     None or False -> flat space, all Christoffels = 0
+     True -> compute from metric (requires metricMatrix in 4th argument)
+     covdSymbol -> use that CovD symbol to compute via xAct's TraceBasisDummy *)
+(* Fourth argument (optional): explicit metric matrix for direct computation *)
+EvaluateChristoffelComponents[expr_, chart_, covd_:None, metricMatrix_:None] := Module[
   {result, christoffelValues},
 
-  If[covd === None,
+  If[covd === None || covd === False,
     (* Flat space: all Christoffels = 0 *)
     result = expr /. {
       f_[{i_Integer, s1:(chart | -chart)}, {j_Integer, s2:(chart | -chart)}, {k_Integer, s3:(chart | -chart)}] /;
@@ -251,14 +308,24 @@ EvaluateChristoffelComponents[expr_, chart_, covd_:None] := Module[
     Return[result]
   ];
 
-  (* Compute Christoffel values from xAct's metric definition *)
-  (* PREREQUISITE: MetricInBasis must have been called to set metric components *)
-  christoffelValues = ComputeChristoffelFromMetric[chart, covd];
+  (* Compute Christoffel values *)
+  If[covd === True,
+    (* Compute directly from the metric matrix using the standard formula *)
+    If[metricMatrix === None,
+      Throw["EvaluateChristoffelComponents: covd=True requires a MetricMatrix. \
+Pass the metric matrix as the 4th argument."]
+    ];
+    christoffelValues = ComputeChristoffelFromMetricMatrix[chart, metricMatrix],
+    (* Explicit CovD symbol provided - use xAct's TraceBasisDummy *)
+    christoffelValues = ComputeChristoffelFromMetric[chart, covd]
+  ];
 
   (* Substitute computed values into expression *)
+  (* Note: xCoba uses negative indices for covariant components, e.g., {-2, -chart} means index 2 covariant.
+     Use Abs[] to extract the actual index value for array lookup. *)
   result = expr /. {
     f_[{a_Integer, s1:(chart | -chart)}, {b_Integer, s2:(chart | -chart)}, {c_Integer, s3:(chart | -chart)}] /;
-      IsChristoffelSymbol[f] :> christoffelValues[[a+1, b+1, c+1]]
+      IsChristoffelSymbol[f] :> christoffelValues[[Abs[a]+1, Abs[b]+1, Abs[c]+1]]
   };
 
   Simplify[result]
@@ -272,22 +339,77 @@ RemoveChristoffelSymbols[expr_] :=
 (* Evaluates metric components for signature (-1, +1, +1, ...) *)
 (* Handles both covariant indices {i, chart} and contravariant {i, -chart} *)
 
-EvaluateMinkowskiMetric[expr_, chart_] :=
+EvaluateMinkowskiMetric[expr_, chart_] := Module[
+  {dim, minkowskiMatrix},
+  (* Build Minkowski metric dynamically based on chart dimension *)
+  dim = GetChartDimension[chart];
+  minkowskiMatrix = DiagonalMatrix[Join[{-1}, ConstantArray[1, dim - 1]]];
+  (* Delegate to the general metric component evaluator *)
+  EvaluateMetricComponents[expr, chart, minkowskiMatrix]
+];
+
+(* === General Metric Component Evaluation === *)
+(* Evaluates metric components from an explicit metric matrix. *)
+(* Unlike EvaluateMinkowskiMetric which hardcodes flat (-1,+1,+1,...), *)
+(* this computes the inverse metric from the given matrix and substitutes *)
+(* both covariant and contravariant components. *)
+(* Used for curved spacetime metrics (e.g., conformal g_ab = Omega^2 eta_ab). *)
+
+EvaluateMetricComponents[expr_, chart_, metricMatrix_] := Module[
+  {dim, invMatrix, rules},
+  dim = Length[metricMatrix];
+  invMatrix = Simplify[Inverse[metricMatrix]];
+  rules = Flatten[{
+    (* Contravariant g^{ij}: positive chart basis *)
+    Table[
+      _Symbol[{i, chart}, {j, chart}] -> Simplify[invMatrix[[i + 1, j + 1]]],
+      {i, 0, dim - 1}, {j, 0, dim - 1}
+    ],
+    (* Covariant g_{ij}: negative chart basis *)
+    Table[
+      _Symbol[{i, -chart}, {j, -chart}] -> Simplify[metricMatrix[[i + 1, j + 1]]],
+      {i, 0, dim - 1}, {j, 0, dim - 1}
+    ]
+  }];
+  expr /. rules
+];
+
+(* === Partial Derivative of Metric Evaluation === *)
+(* Evaluates PD_i[g_{jk}] by substituting known metric components and differentiating *)
+(* This is needed after ChristoffelToGradMetric expands Christoffels into metric derivatives *)
+
+EvaluatePDMetric[expr_, chart_, metricMatrix_] := Module[
+  {dim, coords},
+  dim = Length[metricMatrix];
+  coords = GetCoordinateSymbols[chart];
+
+  (* Evaluate PD of covariant metric: PD_i[g_{jk}] -> D[g_{jk}, coords[[i+1]]] *)
+  (* The pattern matches PDchart[{i, -chart}][metric[{j, sign*chart}, {k, sign*chart}]] *)
   expr /. {
-    (* Diagonal components: -1 for time (index 0), +1 for space *)
-    _Symbol[{0, chart}, {0, chart}] -> -1,
-    _Symbol[{1, chart}, {1, chart}] -> 1,
-    _Symbol[{2, chart}, {2, chart}] -> 1,
-    _Symbol[{3, chart}, {3, chart}] -> 1,
-    (* Also handle negative chart (covariant basis) *)
-    _Symbol[{0, -chart}, {0, -chart}] -> -1,
-    _Symbol[{1, -chart}, {1, -chart}] -> 1,
-    _Symbol[{2, -chart}, {2, -chart}] -> 1,
-    _Symbol[{3, -chart}, {3, -chart}] -> 1,
-    (* Off-diagonal components: all zero (use conditional for efficiency) *)
-    _Symbol[{i_Integer, chart}, {j_Integer, chart}] /; i != j -> 0,
-    _Symbol[{i_Integer, -chart}, {j_Integer, -chart}] /; i != j -> 0
-  };
+    pd_[{i_Integer, -chart}][g_[{j_Integer, s1:(chart | -chart)}, {k_Integer, s2:(chart | -chart)}]] /;
+      IsCovDOperator[pd] || StringMatchQ[ToString[pd], "PD*"] :>
+      Simplify[D[metricMatrix[[Abs[j] + 1, Abs[k] + 1]], coords[[i + 1]]]]
+  }
+];
+
+(* === Christoffel Expansion via xAct === *)
+(* Uses xAct's ChangeCovD and ChristoffelToGradMetric to replace covariant derivatives
+   and Christoffel symbols with partial derivatives and metric components.
+   This is the general approach for curved spacetimes. *)
+
+ExpandChristoffelsToMetricDerivatives[eom_, covd_, chart_] := Module[
+  {step1, step2, pdChart},
+  (* Get the PD operator for this chart: xCoba names it PD<chartName> *)
+  pdChart = Symbol["PD" <> ToString[chart]];
+
+  (* ChangeCovD: CovD -> PD + Christoffel *)
+  step1 = ChangeCovD[eom, covd, pdChart];
+
+  (* ChristoffelToGradMetric: Christoffel -> metric derivatives *)
+  step2 = ChristoffelToGradMetric[step1];
+
+  step2
+];
 
 (* === Coordinate Symbol Extraction === *)
 (* Gets coordinate scalars from chart, with fallback for unevaluated cases *)
@@ -362,17 +484,25 @@ GenerateCDRules[dim_Integer, chart_] := Module[
     With[{idx = i, chartSign = s, arity = a},
       {
         (* Rule for applying CD to bare symbol: f[{idx, chartSign*chart}][g_Symbol[args]] *)
-        f_[{idx, chartSign*chart}][g_Symbol[args__]] /; isCDlike[f[{idx, chartSign*chart}]] :>
-          With[{newOrders = ReplacePart[ConstantArray[0, arity], idx + 1 -> 1]},
-            Derivative[Sequence @@ newOrders][g][args]
-          ],
+        (* Only generate when idx < arity, otherwise idx+1 exceeds array bounds *)
+        If[idx < arity,
+          f_[{idx, chartSign*chart}][g_Symbol[args__]] /; isCDlike[f[{idx, chartSign*chart}]] :>
+            With[{newOrders = ReplacePart[ConstantArray[0, arity], idx + 1 -> 1]},
+              Derivative[Sequence @@ newOrders][g][args]
+            ],
+          Nothing
+        ],
 
         (* Rule for applying CD to existing Derivative of MATCHING arity *)
-        f_[{idx, chartSign*chart}][Derivative[orders__][g_][args__]] /;
-          isCDlike[f[{idx, chartSign*chart}]] && Length[{orders}] == arity :>
-          With[{newOrders = ReplacePart[{orders}, idx + 1 -> {orders}[[idx + 1]] + 1]},
-            Derivative[Sequence @@ newOrders][g][args]
-          ],
+        (* Only generate when idx < arity *)
+        If[idx < arity,
+          f_[{idx, chartSign*chart}][Derivative[orders__][g_][args__]] /;
+            isCDlike[f[{idx, chartSign*chart}]] && Length[{orders}] == arity :>
+            With[{newOrders = ReplacePart[{orders}, idx + 1 -> {orders}[[idx + 1]] + 1]},
+              Derivative[Sequence @@ newOrders][g][args]
+            ],
+          Nothing
+        ],
 
         (* Rule for PROMOTING lower-arity Derivative to this arity (for indices beyond current arity) *)
         If[idx >= arity - 1 && arity > 2,
@@ -412,14 +542,26 @@ ConvertCDToDerivatives[expr_, chart_] := Module[
 
   (* CD-like operator check for convergence validation using xAct introspection *)
   (* Falls back to string matching for edge cases xAct doesn't handle *)
-  isCDlike[x_] := IsCovDOperator[x] || StringMatchQ[ToString[Head[x]], "*CD*"];
+  (* Excludes Christoffel symbols (which contain "CD" in their name but are connection *)
+  (* coefficients, not covariant derivative operators) *)
+  isCDlike[x_] := Module[{h = Head[x], hStr},
+    If[IsChristoffelSymbol[h], Return[False]];
+    hStr = ToString[h];
+    If[StringMatchQ[hStr, "*Christoffel*"], Return[False]];
+    IsCovDOperator[x] || StringMatchQ[hStr, "*CD*"]
+  ];
 
   (* Apply rules repeatedly until fixed point *)
   result = FixedPoint[# /. rules &, expr, maxIter];
 
-  (* Warn if CD-like operators remain after conversion *)
+  (* Fail if CD-like operators remain after conversion *)
   If[!FreeQ[result, f_ /; isCDlike[f]],
-    Message[ConvertCDToDerivatives::incomplete, maxIter]
+    Message[ConvertCDToDerivatives::incomplete, maxIter];
+    Throw[StringJoin[
+      "ConvertCDToDerivatives: Conversion did not fully converge after ",
+      ToString[maxIter], " iterations. Unconverted CD operators remain in expression. ",
+      "This may indicate unsupported derivative patterns or missing conversion rules."
+    ]]
   ];
 
   result
@@ -430,6 +572,25 @@ ConvertCDToDerivatives[expr_, chart_] := Module[
 
 ExtractFieldHead[field_] := If[Head[field] === Symbol, field, Head[field]];
 
+(* === Shared Field Replacement Rules === *)
+(* Used by both ExtractNumericCoefficient and ExtractCoefficientWithSymbolic *)
+(* Replaces all occurrences of the named field (and its derivatives) with 1, *)
+(* leaving just the coefficient. *)
+
+fieldReplacementRules[fieldName_] := {
+  (* Match Derivative[...][f][args] form (applied derivatives) *)
+  Derivative[__][f_][__] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
+  (* Match f[args] form (bare field with numeric suffix like A0, A1) *)
+  f_[__] /; StringMatchQ[ToString[f], ToString[fieldName] ~~ DigitCharacter ...] :> 1,
+  (* Match f[] form (scalar tensor with no arguments, like phi[]) *)
+  f_[] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
+  (* Match f[index] form (vector tensor with one index, like A[-a]) *)
+  f_[_] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
+  (* Direct field match *)
+  fieldName -> 1,
+  _Derivative[__][fieldName] -> 1
+};
+
 (* === Numeric Coefficient Extraction === *)
 (* Extracts numeric coefficient from a term containing the named field *)
 (* Unified version combining logic from ComponentDecompose and ExportJSON *)
@@ -437,23 +598,7 @@ ExtractFieldHead[field_] := If[Head[field] === Symbol, field, Head[field]];
 ExtractNumericCoefficient[term_, fieldName_] := Module[
   {coeff},
 
-  (* Replace field and its derivatives with 1 to extract coefficient *)
-  coeff = term /. {
-    (* Match Derivative[...][f][args] form (applied derivatives) *)
-    Derivative[__][f_][__] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
-    (* Match f[args] form (bare field with numeric suffix like A0, A1) *)
-    f_[__] /; StringMatchQ[ToString[f], ToString[fieldName] ~~ DigitCharacter ...] :> 1,
-    (* Match f[] form (scalar tensor with no arguments, like phi[]) *)
-    f_[] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
-    (* Match f[index] form (vector tensor with one index, like A[-a]) *)
-    f_[_] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
-    (* Direct field match *)
-    fieldName -> 1,
-    _Derivative[__][fieldName] -> 1
-  };
-
-  (* Simplify *)
-  coeff = Simplify[coeff];
+  coeff = Simplify[term /. fieldReplacementRules[fieldName]];
 
   (* Handle various coefficient forms - fail explicitly for unresolved symbolic coefficients *)
   Which[
@@ -477,23 +622,7 @@ ExtractNumericCoefficient[term_, fieldName_] := Module[
 ExtractCoefficientWithSymbolic[term_, fieldName_] := Module[
   {coeff},
 
-  (* Replace field and its derivatives with 1 to extract coefficient *)
-  coeff = term /. {
-    (* Match Derivative[...][f][args] form (applied derivatives) *)
-    Derivative[__][f_][__] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
-    (* Match f[args] form (bare field with numeric suffix like A0, A1) *)
-    f_[__] /; StringMatchQ[ToString[f], ToString[fieldName] ~~ DigitCharacter ...] :> 1,
-    (* Match f[] form (scalar tensor with no arguments, like phi[]) *)
-    f_[] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
-    (* Match f[index] form (vector tensor with one index, like A[-a]) *)
-    f_[_] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
-    (* Direct field match *)
-    fieldName -> 1,
-    _Derivative[__][fieldName] -> 1
-  };
-
-  (* Simplify *)
-  coeff = Simplify[coeff];
+  coeff = Simplify[term /. fieldReplacementRules[fieldName]];
 
   (* Return Association with numeric value and symbolic expression *)
   Which[
@@ -540,7 +669,7 @@ MinkowskiMetricFactor[idx_Integer] := If[idx == 0, -1, 1];
 (* Handles epsilon tensors created by xAct's DefMetric (e.g., epsiloneta, epsiloneta3) *)
 (* General approach: identify all epsilon patterns and compute based on index positions *)
 EvaluateEpsilonComponents[expr_, chart_] := Module[
-  {rules, isEpsilon, evaluateEpsilon4, evaluateEpsilon3, evaluateEpsilon2},
+  {rules, isEpsilon, evaluateEpsilonN},
 
   (* Check if symbol is an epsilon tensor using xAct introspection *)
   (* Falls back to string matching for edge cases xAct doesn't handle *)
@@ -559,61 +688,29 @@ EvaluateEpsilonComponents[expr_, chart_] := Module[
      So {i, -chart}, {j, -chart}, {k, chart} means ε_{i j}^k
   *)
 
-  (* 4D epsilon tensor evaluation (for 3+1D spacetime) *)
-  evaluateEpsilon4[i_, j_, k_, l_, isUp1_, isUp2_, isUp3_, isUp4_] := Module[
+  (* Dimension-agnostic epsilon tensor evaluation *)
+  (* Works for any dimension: extracts indices and up/down flags from argument list *)
+  evaluateEpsilonN[indices_List, isUpFlags_List] := Module[
     {baseValue, metricFactor},
     (* Base: fully covariant Levi-Civita for Minkowski = -Signature *)
-    baseValue = -LeviCivitaValue[{i, j, k, l}];
-    (* Metric factors for raised indices *)
-    metricFactor = 1;
-    If[isUp1, metricFactor *= MinkowskiMetricFactor[i]];
-    If[isUp2, metricFactor *= MinkowskiMetricFactor[j]];
-    If[isUp3, metricFactor *= MinkowskiMetricFactor[k]];
-    If[isUp4, metricFactor *= MinkowskiMetricFactor[l]];
+    baseValue = -LeviCivitaValue[indices];
+    (* Metric factors for raised indices: each raised index i contributes η^{ii} *)
+    metricFactor = Product[
+      If[isUpFlags[[k]], MinkowskiMetricFactor[indices[[k]]], 1],
+      {k, Length[indices]}
+    ];
     baseValue * metricFactor
   ];
 
-  (* 3D epsilon tensor evaluation (for 2+1D spacetime) *)
-  evaluateEpsilon3[i_, j_, k_, isUp1_, isUp2_, isUp3_] := Module[
-    {baseValue, metricFactor},
-    (* Base: fully covariant Levi-Civita for Minkowski = -Signature *)
-    baseValue = -LeviCivitaValue[{i, j, k}];
-    (* Metric factors for raised indices *)
-    metricFactor = 1;
-    If[isUp1, metricFactor *= MinkowskiMetricFactor[i]];
-    If[isUp2, metricFactor *= MinkowskiMetricFactor[j]];
-    If[isUp3, metricFactor *= MinkowskiMetricFactor[k]];
-    baseValue * metricFactor
-  ];
-
-  (* 2D epsilon tensor evaluation (for 1+1D spacetime) *)
-  evaluateEpsilon2[i_, j_, isUp1_, isUp2_] := Module[
-    {baseValue, metricFactor},
-    baseValue = -LeviCivitaValue[{i, j}];
-    metricFactor = 1;
-    If[isUp1, metricFactor *= MinkowskiMetricFactor[i]];
-    If[isUp2, metricFactor *= MinkowskiMetricFactor[j]];
-    baseValue * metricFactor
-  ];
-
+  (* Single dimension-agnostic rule: matches any epsilon tensor with integer basis indices *)
   rules = {
-    (* 4D epsilon with any combination of up/down indices (for 3+1D spacetime) *)
-    f_Symbol[{i_Integer, s1_}, {j_Integer, s2_}, {k_Integer, s3_}, {l_Integer, s4_}] /;
+    f_Symbol[args__] /;
       isEpsilon[f] &&
-      MemberQ[{chart, -chart}, s1] && MemberQ[{chart, -chart}, s2] &&
-      MemberQ[{chart, -chart}, s3] && MemberQ[{chart, -chart}, s4] :>
-      evaluateEpsilon4[i, j, k, l, s1 === chart, s2 === chart, s3 === chart, s4 === chart],
-
-    (* 3D epsilon with any combination of up/down indices (for 2+1D spacetime) *)
-    f_Symbol[{i_Integer, s1_}, {j_Integer, s2_}, {k_Integer, s3_}] /;
-      isEpsilon[f] &&
-      MemberQ[{chart, -chart}, s1] && MemberQ[{chart, -chart}, s2] && MemberQ[{chart, -chart}, s3] :>
-      evaluateEpsilon3[i, j, k, s1 === chart, s2 === chart, s3 === chart],
-
-    (* 2D epsilon with any combination of up/down indices (for 1+1D spacetime) *)
-    f_Symbol[{i_Integer, s1_}, {j_Integer, s2_}] /;
-      isEpsilon[f] && MemberQ[{chart, -chart}, s1] && MemberQ[{chart, -chart}, s2] :>
-      evaluateEpsilon2[i, j, s1 === chart, s2 === chart]
+      MatchQ[{args}, {Repeated[{_Integer, chart | -chart}]}] :>
+      evaluateEpsilonN[
+        {args}[[All, 1]],  (* Extract integer indices *)
+        Map[# === chart &, {args}[[All, 2]]]  (* True if raised (chart), False if lowered (-chart) *)
+      ]
   };
 
   (* Apply rules repeatedly until no more matches *)

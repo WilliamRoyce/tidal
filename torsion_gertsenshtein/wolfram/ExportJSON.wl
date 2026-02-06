@@ -37,10 +37,6 @@ BeginPackage["TorsionGertsenshtein`ExportJSON`",
   {"TorsionGertsenshtein`CommonUtilities`"}];
 
 (* Public symbols *)
-ExportEquationSystem::usage =
-  "ExportEquationSystem[componentEqs, metadata, outputPath] exports the \
-component equations to a JSON file compatible with the Python pipeline.";
-
 BuildJSONStructure::usage =
   "BuildJSONStructure[componentEqs, metadata] builds the JSON Association \
 structure from component equations and metadata.";
@@ -87,6 +83,12 @@ IsMixedTimeSpaceDerivative::usage =
 derivatives (e.g., Derivative[1,1,0] for d_t d_x). Used to detect terms that should \
 be converted to momentum gradients. Supports 1+1D, 2+1D, and 3+1D.";
 
+ExtractLHSCoefficient::usage =
+  "ExtractLHSCoefficient[term] extracts the scalar coefficient multiplying a \
+Derivative[...][f][...] subexpression. Works for any dimension and any derivative \
+pattern. Returns coeff such that term = coeff * Derivative[...][f][...]. \
+Used by LHS normalization to divide out non-unit time-derivative coefficients.";
+
 IdentifyGradientDirection::usage =
   "IdentifyGradientDirection[term] returns the gradient direction (\"gradient_x\", \
 \"gradient_y\", or \"gradient_z\") based on derivative structure. Time slot must be 0 \
@@ -126,7 +128,7 @@ Association with keys \"coefficient\", \"operator\", \"field\". Optionally inclu
 \"coefficient_symbolic\" when symbolicCoeff is not None, and \"time_dependent\" when timeDependent is True.";
 
 IdentifyMultiFieldTerm::usage =
-  "IdentifyMultiFieldTerm[term, currentFieldName, allFieldNames, metadata] analyzes a \
+  "IdentifyMultiFieldTerm[term, currentFieldName, allFieldNames] analyzes a \
 single term and returns an Association with \"coefficient\", \"operator\", and \"field\" keys. \
 Detects: laplacian, directional laplacians, gradients, cross-derivatives, identity, and \
 momentum gradient terms from mixed time-space derivatives.";
@@ -143,8 +145,10 @@ with \"field\" and \"head\" keys, or uses defaultField if no match found.";
 
 ExtractTermCoefficient::usage =
   "ExtractTermCoefficient[term, fieldHead, targetField] extracts the numeric coefficient \
-and optional symbolic coefficient from a term. Returns an Association with \"numeric\" \
-and \"symbolic\" keys.";
+and optional symbolic coefficient from a term. Returns {numericCoeff, symbolicCoeff, isTimeDependent}.";
+
+ExtractTermCoefficient::symbolic =
+  "Symbolic (non-numeric) coefficient `1` found for field `2`. Storing as symbolic coefficient in JSON.";
 
 ClassifyOperatorType::usage =
   "ClassifyOperatorType[term] classifies the differential operator in a term. Returns \
@@ -155,55 +159,16 @@ Begin["`Private`"];
 
 (* === JSON Structure Building === *)
 
+(* Single-field BuildJSONStructure delegates to multi-field version *)
+(* Converts {index, equation} pairs to {fieldName, equation} pairs *)
 BuildJSONStructure[componentEqs_, metadata_Association] := Module[
-  {json, fields, equations},
-
-  (* Extract field information from component equations *)
-  fields = Table[
-    <|
-      "name" -> metadata["field_prefix"] <> "_" <> ToString[eq[[1]]],
-      "index" -> eq[[1]],
-      "is_dynamical" -> True
-    |>,
+  {fieldEquations, prefix},
+  prefix = metadata["field_prefix"];
+  fieldEquations = Table[
+    {prefix <> "_" <> ToString[eq[[1]]], eq[[2]]},
     {eq, componentEqs}
   ];
-
-  (* Convert equations to JSON format *)
-  equations = Table[
-    EquationToJSON[
-      eq[[2]],
-      metadata["field_prefix"] <> "_" <> ToString[eq[[1]]],
-      eq[[1]],
-      metadata
-    ],
-    {eq, componentEqs}
-  ];
-
-  (* Build full JSON structure *)
-  json = <|
-    "metadata" -> <|
-      "source" -> "xAct",
-      "lagrangian_expr" -> Lookup[metadata, "lagrangian_expr", ""],
-      "derived_from" -> "Euler-Lagrange",
-      "gauge" -> Lookup[metadata, "gauge", "none"],
-      "linearized" -> Lookup[metadata, "linearized", True]
-    |>,
-    "spacetime" -> <|
-      "dimension" -> Lookup[metadata, "dimension", 2],
-      "signature" -> Lookup[metadata, "signature", {-1, 1}],
-      "coordinates" -> Lookup[metadata, "coordinates", {"t", "x"}]
-    |>,
-    "fields" -> fields,
-    "equations" -> equations,
-    "coupling" -> <|
-      "mass_matrix" -> Lookup[metadata, "mass_matrix",
-        ConstantArray[0.0, {Length[componentEqs], Length[componentEqs]}]],
-      "coupling_matrix" -> Lookup[metadata, "coupling_matrix",
-        ConstantArray[0.0, {Length[componentEqs], Length[componentEqs]}]]
-    |>
-  |>;
-
-  json
+  BuildMultiFieldJSONStructure[fieldEquations, metadata]
 ];
 
 (* === Multi-Field JSON Structure Building === *)
@@ -294,14 +259,22 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   (* by IdentifyMultiFieldTerm (e.g., d_t d_x A -> gradient_x(pi)) *)
   rhs = Total[Select[terms, !ContainsTimeDerivative[#, lhsTimeOrder] &]];
 
-  If[Length[timeDerivTerm] > 0 &&
-     Head[timeDerivTerm[[1]]] === Times &&
-     timeDerivTerm[[1]][[1]] == 1,
-    rhs = -rhs
+  (* LHS normalization: extract time-derivative coefficient and normalize RHS *)
+  (* For |lhsCoeff| = 1: rhs = non-time terms as-is (handles both VarD and direct construction) *)
+  (* For non-unit lhsCoeff (curved spacetime): rhs = -non_time_terms / lhsCoeff *)
+  (*   Example: lhsCoeff = -Omega^{-2} gives rhs = Omega^2 * non_time_terms *)
+  Module[{lhsCoeff},
+    lhsCoeff = If[Length[timeDerivTerm] > 0,
+      ExtractLHSCoefficient[timeDerivTerm[[1]]],
+      -1
+    ];
+    If[Abs[lhsCoeff] =!= 1,
+      rhs = Simplify[-rhs / lhsCoeff]
+    ]
   ];
 
   (* Parse RHS with cross-field detection *)
-  rhsTerms = ParseMultiFieldRHS[rhs, fieldName, allFieldNames, metadata];
+  rhsTerms = ParseMultiFieldRHS[rhs, fieldName, allFieldNames];
 
   (* Build structured LHS for flexible PDE types *)
   lhsStructure = BuildLHSStructure[fieldName, lhsTimeOrder];
@@ -317,11 +290,11 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
 ];
 
 (* Parse RHS with cross-field reference detection *)
-ParseMultiFieldRHS[eq_, currentFieldName_, allFieldNames_, metadata_] := Module[
+ParseMultiFieldRHS[eq_, currentFieldName_, allFieldNames_] := Module[
   {terms, parsedTerms},
 
   terms = If[Head[eq] === Plus, List @@ eq, {eq}];
-  parsedTerms = Map[IdentifyMultiFieldTerm[#, currentFieldName, allFieldNames, metadata] &, terms];
+  parsedTerms = Map[IdentifyMultiFieldTerm[#, currentFieldName, allFieldNames] &, terms];
   parsedTerms = DeleteCases[parsedTerms, Nothing];
 
   (* Fail explicitly if no terms were parsed - do not inject ghost equations *)
@@ -386,6 +359,23 @@ ContainsTimeDerivative[term_, minOrder_:2] := Module[{},
     (* Default: no time derivative of required order *)
     True, False
   ]
+];
+
+(* Extract the coefficient of the LHS time derivative term *)
+(* For flat spacetime: term = -Derivative[2,0][f][t,x], returns -1 *)
+(* For curved spacetime: term = -Exp[-2Ht]*Derivative[2,0,0][f][t,x,y], returns -Exp[-2Ht] *)
+(* This generalizes the ad-hoc sign-flip logic to handle arbitrary LHS coefficients *)
+ExtractLHSCoefficient[term_] := Module[{derivParts, derivPart},
+  derivParts = Cases[{term}, Derivative[__][_][__], {0, Infinity}];
+  If[Length[derivParts] == 0,
+    Throw[StringJoin[
+      "ExtractLHSCoefficient: No Derivative found in LHS term '",
+      ToString[term, InputForm], "'. Cannot extract time-derivative coefficient."
+    ]]
+  ];
+  derivPart = derivParts[[1]];
+  If[term === derivPart, Return[1]];
+  Simplify[term / derivPart]
 ];
 
 (* Check for mixed time-space derivatives that shouldn't be on RHS *)
@@ -502,9 +492,11 @@ ParseFieldName[name_String] := Module[{match},
     Return[<|"base" -> name, "index" -> 0, "format" -> "simple"|>]
   ];
 
-  (* Fallback: treat as simple with index 0 *)
-  Print["Warning: Could not parse field name '", name, "'. Treating as simple field with index 0."];
-  <|"base" -> name, "index" -> 0, "format" -> "unknown"|>
+  (* No format matched - fail explicitly *)
+  Throw[StringJoin[
+    "ParseFieldName: Cannot parse field name '", name, "'. ",
+    "Expected one of: standard (A_0), tensor (stress_xy_0), compact (phi0), or simple (phi)."
+  ]]
 ];
 
 (* Map field name to momentum field name *)
@@ -636,12 +628,13 @@ BuildTermResult[coeff_, op_, field_, symbCoeff_:None, timeDependent_:False] := M
   result
 ];
 
-(* Check if a coefficient expression depends on time coordinate *)
+(* Check if a coefficient expression depends on coordinate symbols *)
+(* Coordinate symbols from xCoba appear as f[] (zero-argument function calls) *)
+(* After LHS normalization, the only surviving coordinate is typically time *)
 (* Used to flag terms that need time-dependent evaluation in Python *)
-IsTimeDependentCoefficient[coeffExpr_] := Module[{},
-  (* Check for t[] (applied coordinate symbol) or t (bare symbol) *)
-  (* Coordinate symbols from xCoba appear as t[] when evaluated *)
-  !FreeQ[coeffExpr, t[]] || !FreeQ[coeffExpr, t] && !NumericQ[coeffExpr]
+IsTimeDependentCoefficient[coeffExpr_] := Module[{coordSyms},
+  coordSyms = Cases[coeffExpr, f_Symbol[] :> f, {0, Infinity}];
+  Length[coordSyms] > 0
 ];
 
 (* === Refactored Helper Functions for IdentifyMultiFieldTerm === *)
@@ -680,10 +673,11 @@ MatchFieldToHeads[functionHeads_List, allFieldNames_List, defaultField_String] :
         (* Extract base: "cplPhi0" -> "cplphi", "csA2" -> "csa" (lowercase, no digits) *)
         headBase = ToLowerCase[StringReplace[head, RegularExpression["\\d+$"] -> ""]];
 
-        (* Match if: head contains field base name AND ends with field index *)
+        (* Match if: head ends with field base name AND trailing digits match field index *)
+        (* Using StringEndsQ instead of StringContainsQ to prevent "A" matching "alpha", "eta" *)
         If[Length[headDigits] > 0 &&
            headDigits[[-1]] === fieldIndex &&
-           StringContainsQ[headBase, fieldBase],
+           StringEndsQ[headBase, fieldBase],
           matchedField = fn;
           foundFieldHead = head;
           Break[]
@@ -716,6 +710,7 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
   isTimeDependent = IsTimeDependentCoefficient[rawCoeff];
 
   (* Determine numeric coefficient and symbolic representation *)
+  (* Use InputForm for ToString to get clean, machine-parseable strings *)
   Which[
     NumericQ[rawCoeff],
       coefficient = N[rawCoeff];
@@ -723,13 +718,13 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
     (* Negative symbolic: -m2 -> -1.0, store "-m2" *)
     MatchQ[rawCoeff, Times[-1, _Symbol]],
       coefficient = -1.0;
-      symbolicCoeff = ToString[rawCoeff];
-      Message[ExtractNumericCoefficient::symbolic, rawCoeff, targetField],
+      symbolicCoeff = ToString[rawCoeff, InputForm];
+      Message[ExtractTermCoefficient::symbolic, rawCoeff, targetField],
     (* Positive symbolic: m2 -> 1.0, store "m2" *)
     MatchQ[rawCoeff, _Symbol],
       coefficient = 1.0;
-      symbolicCoeff = ToString[rawCoeff];
-      Message[ExtractNumericCoefficient::symbolic, rawCoeff, targetField],
+      symbolicCoeff = ToString[rawCoeff, InputForm];
+      Message[ExtractTermCoefficient::symbolic, rawCoeff, targetField],
     (* Try numeric evaluation *)
     NumericQ[Quiet[N[rawCoeff]]],
       coefficient = Quiet[N[rawCoeff]];
@@ -737,13 +732,33 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
     (* Complex symbolic expression (possibly time-dependent) *)
     True,
       coefficient = 1.0;
-      symbolicCoeff = ToString[rawCoeff];
+      symbolicCoeff = ToString[rawCoeff, InputForm];
       If[!isTimeDependent,
-        Message[ExtractNumericCoefficient::symbolic, rawCoeff, targetField]
+        Message[ExtractTermCoefficient::symbolic, rawCoeff, targetField]
       ]
   ];
 
   {coefficient, symbolicCoeff, isTimeDependent}
+];
+
+(* Count the total derivative order of a term *)
+(* Returns the maximum total order of any Derivative expression found *)
+CountDerivativeOrder[term_] := Module[
+  {maxOrder},
+  maxOrder = 0;
+  (* Check for Derivative[n][f][args] patterns (applied derivatives) *)
+  Cases[term,
+    Derivative[orders__][_][__] :> (maxOrder = Max[maxOrder, Total[{orders}]]),
+    {0, Infinity}
+  ];
+  (* Also check for unapplied Derivative[n][f] patterns *)
+  If[maxOrder == 0,
+    Cases[term,
+      Derivative[orders__][_] :> (maxOrder = Max[maxOrder, Total[{orders}]]),
+      {0, Infinity}
+    ]
+  ];
+  maxOrder
 ];
 
 (* Classify operator type based on derivative structure *)
@@ -791,14 +806,23 @@ ClassifyOperatorType[term_] := Module[
     Return[{IdentifyGradientDirection[term], False}]
   ];
 
-  (* Unknown operator type *)
-  {"unknown", False}
+  (* Fourth-order spatial derivatives (biharmonic) *)
+  If[orderDerivatives == 4,
+    Return[{"biharmonic", False}]
+  ];
+
+  (* Unknown operator type - fail explicitly *)
+  Throw[StringJoin[
+    "ClassifyOperatorType: Unsupported derivative order ", ToString[orderDerivatives],
+    " in term '", ToString[term, InputForm], "'. ",
+    "Supported orders: 0 (identity), 1 (gradient), 2 (laplacian/cross), 4 (biharmonic)."
+  ]]
 ];
 
 (* === Main Function: Identify operator and target field === *)
 (* Refactored to use helper functions above *)
 
-IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_, metadata_] := Module[
+IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
   {functionHeads, matchResult, targetField, foundFieldHead,
    coeffResult, coefficient, symbolicCoeff, isTimeDependent,
    operatorResult, operator, isMixedTimeSpace},
@@ -840,190 +864,10 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_, metadata_] := M
 (* === Equation Conversion === *)
 
 (* Phase 2, Issue 6: Now supports parabolic (d_t), elliptic (no time), and hyperbolic (d2_t) PDEs *)
-EquationToJSON[componentEq_, fieldName_, fieldIndex_, metadata_] := Module[
-  {terms, rhsTerms, rhs, timeDerivTerm, lhsTimeOrder, lhsStructure},
-
-  (* The equation from ComponentDecompose is in the form:
-     d²/dx² field - d²/dt² field = 0
-     We need to rearrange to: d²/dt² field = d²/dx² field (RHS)
-
-     In component form: Derivative[0,2][f][t,x] - Derivative[2,0][f][t,x] = 0
-     Time derivative: Derivative[2,0] or Derivative[n,0] where first slot is time
-     Spatial derivative: Derivative[0,m] or Derivative[0,n] where second slot is space *)
-
-  (* Split into additive terms *)
-  terms = If[Head[componentEq] === Plus, List @@ componentEq, {componentEq}];
-
-  (* Detect the time derivative order to determine PDE type *)
-  (* elliptic (0), parabolic (1), hyperbolic (2+) *)
-  lhsTimeOrder = DetectLHSTimeOrder[componentEq];
-
-  (* Use dimension-agnostic helpers for time derivative detection *)
-  (* Works for both 1+1D (2-arg Derivative) and 2+1D (3-arg Derivative) *)
-  timeDerivTerm = Select[terms, ContainsTimeDerivative[#, lhsTimeOrder] &];
-
-  (* RHS = everything except pure time derivatives of detected order, with sign flip if time deriv was negative *)
-  (* From eq: spatial - time = 0, we get: time = spatial *)
-  (* Mixed time-space derivatives ARE included - they get converted to momentum gradients *)
-  rhs = Total[Select[terms, !ContainsTimeDerivative[#, lhsTimeOrder] &]];
-
-  (* If time derivative term was negative, RHS keeps its sign *)
-  (* If time derivative term was positive, RHS flips sign *)
-  (* In wave equation: Derivative[0,2] - Derivative[2,0] = 0 *)
-  (* Time term coefficient is -1, so RHS = spatial (positive) *)
-  If[Length[timeDerivTerm] > 0 &&
-     Head[timeDerivTerm[[1]]] === Times &&
-     timeDerivTerm[[1]][[1]] == 1,  (* positive time derivative coefficient *)
-    rhs = -rhs
-  ];
-
-  (* Parse RHS for operator identification *)
-  rhsTerms = ParseEquationRHS[rhs, fieldName, metadata];
-
-  (* Build structured LHS for flexible PDE types *)
-  lhsStructure = BuildLHSStructure[fieldName, lhsTimeOrder];
-
-  <|
-    "field" -> fieldName,
-    "lhs" -> lhsStructure,  (* Now structured: {"expression": "...", "order": {...}} *)
-    "rhs" -> <|
-      "type" -> "linear_combination",
-      "terms" -> rhsTerms
-    |>
-  |>
-];
-
-ParseEquationRHS[eq_, fieldName_, metadata_] := Module[
-  {terms, parsedTerms, fieldPattern},
-
-  (* Parse the actual symbolic structure instead of assuming wave equation *)
-
-  parsedTerms = {};
-
-  (* Extract the field name without index suffix for pattern matching *)
-  (* fieldName is like "A_0", extract "A" *)
-  fieldPattern = StringSplit[fieldName, "_"][[1]];
-
-  (* Split equation into additive terms *)
-  terms = If[Head[eq] === Plus, List @@ eq, {eq}];
-
-  (* Analyze each term to identify operator and coefficient *)
-  (* Pass both the pattern for matching and the full field name for output *)
-  parsedTerms = Map[IdentifyOperatorTerm[#, fieldPattern, fieldName, metadata] &, terms];
-
-  (* Filter out any Nothing entries *)
-  parsedTerms = DeleteCases[parsedTerms, Nothing];
-
-  (* Fail explicitly if no terms were parsed - do not inject ghost equations *)
-  If[Length[parsedTerms] === 0,
-    Throw[StringJoin[
-      "ParseEquationRHS: No terms parsed from RHS for field '", fieldName, "'. ",
-      "RHS expression: ", ToString[eq], ". ",
-      "Check that the equation is properly expanded and contains recognizable operators."
-    ]]
-  ];
-
-  parsedTerms
-];
-
-(* Identify operator type and coefficient for a single term *)
-(* fieldPattern is for matching (e.g., "A"), fullFieldName is for output (e.g., "A_0") *)
-IdentifyOperatorTerm[term_, fieldPattern_, fullFieldName_, metadata_] := Module[
-  {coefficient, operator, targetField, orderDerivatives},
-
-  (* Initialize *)
-  operator = "unknown";
-  coefficient = 1.0;
-  targetField = fullFieldName;  (* Use the full component name in output *)
-
-  (* Check for field without derivatives (mass-like term) *)
-  If[FreeQ[term, Derivative],
-    (* This is a mass or identity term *)
-    operator = "identity";
-    (* Extract coefficient using pattern for matching *)
-    coefficient = ExtractNumericCoefficient[term, fieldPattern];
-    Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
-  ];
-
-  (* Check for second derivatives (Laplacian or d'Alembertian) *)
-  (* In component form after ToBasis, these appear as explicit coordinate derivatives *)
-
-  (* Count derivative order *)
-  orderDerivatives = CountDerivativeOrder[term];
-
-  If[orderDerivatives == 2,
-    (* Second derivatives - check for directional Laplacians first *)
-    Module[{dirLap = IdentifyDirectionalLaplacian[term], crossDeriv},
-      If[dirLap =!= False,
-        operator = dirLap;
-        coefficient = ExtractNumericCoefficient[term, fieldPattern];
-        Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
-      ];
-      (* Check for cross-derivative (xy, xz, yz) *)
-      crossDeriv = IdentifySpatialCrossDerivative[term];
-      If[crossDeriv =!= False,
-        operator = crossDeriv;  (* Returns "cross_derivative_xy", "cross_derivative_xz", or "cross_derivative_yz" *)
-        coefficient = ExtractNumericCoefficient[term, fieldPattern];
-        Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
-      ];
-      (* Fallback: generic Laplacian *)
-      operator = "laplacian";
-      coefficient = ExtractNumericCoefficient[term, fieldPattern];
-      Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
-    ]
-  ];
-
-  If[orderDerivatives == 1,
-    (* First derivatives indicate gradient - distinguish x vs y direction *)
-    operator = IdentifyGradientDirection[term];
-    coefficient = ExtractNumericCoefficient[term, fieldPattern];
-    Return[<|"coefficient" -> N[coefficient], "operator" -> operator, "field" -> targetField|>]
-  ];
-
-  (* If we can't identify it, return unknown *)
-  Print["Warning: Could not identify operator for term: ", term];
-  <|"coefficient" -> 1.0, "operator" -> "unknown", "field" -> targetField|>
-];
-
-(* Count the order of derivatives in a term *)
-CountDerivativeOrder[term_] := Module[
-  {maxOrder},
-
-  (* Find all Derivative expressions and get maximum order *)
-  maxOrder = 0;
-
-  (* Check for Derivative[n][f][args] patterns (applied derivatives) *)
-  Cases[term,
-    Derivative[orders__][_][__] :> (maxOrder = Max[maxOrder, Total[{orders}]]),
-    {0, Infinity}
-  ];
-
-  (* Also check for unapplied Derivative[n][f] patterns *)
-  If[maxOrder == 0,
-    Cases[term,
-      Derivative[orders__][_] :> (maxOrder = Max[maxOrder, Total[{orders}]]),
-      {0, Infinity}
-    ]
-  ];
-
-  maxOrder
-];
-
-(* === File Export === *)
-
-ExportEquationSystem[componentEqs_, metadata_Association, outputPath_String] := Module[
-  {json, jsonString},
-
-  (* Build JSON structure *)
-  json = BuildJSONStructure[componentEqs, metadata];
-
-  (* Export to file *)
-  Export[outputPath, json, "JSON"];
-
-  Print["Exported equation system to: ", outputPath];
-
-  json
-];
+(* Single-field EquationToJSON delegates to multi-field version *)
+(* This avoids code duplication while maintaining backward compatibility *)
+EquationToJSON[componentEq_, fieldName_, fieldIndex_, metadata_] :=
+  EquationToJSONMultiField[componentEq, fieldName, fieldIndex, {fieldName}, metadata];
 
 End[];
 EndPackage[];

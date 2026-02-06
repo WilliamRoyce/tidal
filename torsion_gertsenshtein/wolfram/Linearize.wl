@@ -79,6 +79,10 @@ Begin["`Private`"];
 LinearizeEquation[eom_, field_, background_: 0, covd_: CD] := Module[
   {linearized, pertField, expandedEOM, firstOrderTerms},
 
+  Print["Warning: LinearizeEquation is deprecated. ",
+        "For linear Lagrangians, VarD already produces the linear EOM. ",
+        "For nonlinear theories, use xPert's PertExpand directly."];
+
   (* If equation is already linear in field, return as-is *)
   If[IsLinear[eom, field],
     Return[eom]
@@ -195,9 +199,9 @@ IsLinear[expr_, field_] := Module[
     Return[Exponent[expr, field] <= 1]
   ];
 
-  (* For expressions with derivatives, check if all field appearances are degree 1 *)
-  (* This is a heuristic - VarD should produce linear results for linear Lagrangians *)
-  True  (* Conservative: assume linear if we can't determine otherwise *)
+  (* Cannot determine linearity for non-polynomial expressions *)
+  (* Conservative: assume nonlinear to avoid silently skipping linearization *)
+  False
 ];
 
 End[];

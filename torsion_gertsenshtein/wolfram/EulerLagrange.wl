@@ -41,8 +41,9 @@ equation for the given field from the Lagrangian density. Returns an expression 
 equal to zero (the equation of motion).";
 
 VariationalDerivative::usage =
-  "VariationalDerivative[lagrangian, field, covd] computes the functional \
-derivative dL/d(field) - D_a[dL/d(D_a field)].";
+  "DEPRECATED: VariationalDerivative[lagrangian, field, covd] is a manual fallback \
+that only handles first-order Lagrangians. Use VarD[field, covd][lagrangian] directly \
+from xAct`xTensor` instead, which handles arbitrary-order Lagrangians correctly.";
 
 SetupSpacetime::usage =
   "SetupSpacetime[dim, signature] sets up a spacetime manifold with the given \
@@ -89,20 +90,23 @@ SetupSpacetime[dim_Integer, signature_Integer] := Module[
 EulerLagrangeEquation[lagrangian_, field_, covd_] := Module[
   {eom},
 
-  (* Try xTensor's VarD first *)
+  (* Use xTensor's VarD for the variational derivative *)
   (* VarD uses curried syntax: VarD[field, covd][expr] *)
   eom = VarD[field, covd][lagrangian];
 
-  (* Check if VarD returned unevaluated - if so, use manual computation *)
+  (* Fail if VarD returned unevaluated — do NOT silently fall back *)
   If[Head[eom] === VarD,
-    (* VarD failed - fall back to manual Euler-Lagrange *)
-    Print["VarD returned unevaluated - using manual Euler-Lagrange computation"];
-    eom = VariationalDerivative[lagrangian, field, covd],
-
-    (* VarD worked - apply canonical simplifications *)
-    eom = ToCanonical[eom];
-    eom = ContractMetric[eom]
+    Throw[StringJoin[
+      "EulerLagrangeEquation: VarD returned unevaluated for field '",
+      ToString[field], "'. ",
+      "Ensure xAct is loaded and the field is properly defined on the manifold. ",
+      "Check that the field has the correct rank and the covariant derivative matches the metric."
+    ]]
   ];
+
+  (* VarD succeeded - apply canonical simplifications *)
+  eom = ToCanonical[eom];
+  eom = ContractMetric[eom];
 
   eom
 ];
