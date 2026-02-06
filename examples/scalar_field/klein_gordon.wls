@@ -15,7 +15,6 @@ Print["Loading pipeline modules..."];
 pipelinePath = FileNameJoin[{DirectoryName[$InputFileName], "..", "..", "torsion_gertsenshtein", "wolfram"}];
 Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];
 Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];
-Get[FileNameJoin[{pipelinePath, "Linearize.wl"}]];
 Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];
 Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];
 
@@ -26,26 +25,26 @@ Print["Step 1: Setting up 1+1D Minkowski spacetime..."];
 (* Use unique names to avoid conflicts *)
 $DefInfoQ = False;  (* Suppress definition info messages *)
 
-(* Define manifold and metric *)
-DefManifold[M2, 2, {a, b, c, d, e, f}];
-DefMetric[-1, etaMetric[-a, -b], CD, SymbolOfCovD -> {";", "\[Del]"}, PrintAs -> "\[Eta]"];
+(* Define manifold and metric (with defensive checks for kernel reuse) *)
+If[!xTensorQ[M2],
+  DefManifold[M2, 2, {a, b, c, d, e, f}];
+  DefMetric[-1, etaMetric[-a, -b], CD, SymbolOfCovD -> {";", "\[Del]"}, PrintAs -> "\[Eta]"];
+  DefChart[cart, M2, {0, 1}, {t[], x[]}];
+  MetricInBasis[etaMetric, -cart, DiagonalMatrix[{-1, 1}]];
+  ,
+  Print["   Using existing manifold M2"];
+];
 Print["   Manifold: M2 (2D)"];
 Print["   Metric: Minkowski \[Eta]_ab with signature (-,+)"];
 Print["   Covariant derivative: CD"];
-
-(* Setup coordinate chart for component extraction later *)
-DefChart[cart, M2, {0, 1}, {t[], x[]}];
 Print["   Coordinates: {t, x}"];
-
-(* Set Minkowski metric components *)
-MetricInBasis[etaMetric, -cart, DiagonalMatrix[{-1, 1}]];
 Print["   Metric components: diag(-1, +1)"];
 
 (* === Step 2: Define the Scalar Field === *)
 Print[""];
 Print["Step 2: Defining scalar field phi..."];
 
-DefTensor[phi[], M2];
+If[!xTensorQ[phi], DefTensor[phi[], M2]];
 (* Use numeric value for mass parameter (unit mass in natural units) *)
 m2 = 1.0;
 Print["   Scalar field: phi"];

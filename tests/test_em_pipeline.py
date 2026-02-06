@@ -292,6 +292,83 @@ class TestFullPipelineWorkflow:
         assert params.spatial_dimension == spec.spatial_dimension
 
 
+class TestCoupledScalarsPipeline:
+    """Tests for coupled scalar fields pipeline with inter-field coupling."""
+
+    @pytest.fixture
+    def coupled_json_path(self) -> Path:
+        """Path to the coupled scalars JSON file."""
+        return Path(__file__).parent.parent / "examples" / "data" / "coupled_scalars.json"
+
+    def test_load_coupled_spec(self, coupled_json_path: Path) -> None:
+        """Test that coupled scalars specification loads correctly."""
+        if not coupled_json_path.exists():
+            pytest.skip(f"Test file not found: {coupled_json_path}")
+
+        spec = load_equation_system(coupled_json_path)
+
+        # Should have 2 fields (phi and chi)
+        assert spec.n_components == 2  # noqa: PLR2004
+        assert spec.component_names == ("phi_0", "chi_0")
+
+        # Each equation should have 3 terms (laplacian, mass, coupling)
+        for eq in spec.equations:
+            term_count = 3
+            assert len(eq.rhs_terms) == term_count
+
+    def test_cross_field_coupling_detected(self, coupled_json_path: Path) -> None:
+        """Test that cross-field coupling terms are properly parsed."""
+        if not coupled_json_path.exists():
+            pytest.skip(f"Test file not found: {coupled_json_path}")
+
+        spec = load_equation_system(coupled_json_path)
+
+        # Check phi equation has term referencing chi
+        phi_eq = next(eq for eq in spec.equations if eq.field_name == "phi_0")
+        chi_terms = [t for t in phi_eq.rhs_terms if t.field == "chi_0"]
+        assert len(chi_terms) == 1
+        assert chi_terms[0].coefficient == -0.5  # noqa: PLR2004
+        assert chi_terms[0].operator == "identity"
+
+        # Check chi equation has term referencing phi
+        chi_eq = next(eq for eq in spec.equations if eq.field_name == "chi_0")
+        phi_terms = [t for t in chi_eq.rhs_terms if t.field == "phi_0"]
+        assert len(phi_terms) == 1
+        assert phi_terms[0].coefficient == -0.5  # noqa: PLR2004
+        assert phi_terms[0].operator == "identity"
+
+    def test_coupled_energy_transfer(
+        self, coupled_json_path: Path, grid_1d: CartesianGrid
+    ) -> None:
+        """Test that energy transfers between coupled fields."""
+        if not coupled_json_path.exists():
+            pytest.skip(f"Test file not found: {coupled_json_path}")
+
+        spec = load_equation_system(coupled_json_path)
+        pde = build_pde_from_json(coupled_json_path)
+
+        # Create initial state with pulse in phi, chi=0
+        pulse = ComponentGaussianPulse(
+            center=(50.0,),
+            width=5.0,
+            amplitude=1.0,
+            active_components={"phi_0": 1.0},
+        )
+        initial = pulse.create(grid_1d, spec)
+
+        # Verify chi starts at zero
+        assert_allclose(initial.data[2], 0.0, atol=1e-10)
+
+        # Run simulation
+        t_end = 10.0
+        result = pde.solve(initial, t_range=t_end, dt=0.01)
+        sol = normalize_solve_result(result)
+
+        # Chi should have gained energy from coupling
+        chi_max = np.max(np.abs(sol.data[2]))
+        assert chi_max > 0.01  # noqa: PLR2004
+
+
 class TestEdgeCases:
     """Edge case and error handling tests."""
 

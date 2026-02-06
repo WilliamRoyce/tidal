@@ -1,0 +1,80 @@
+name: Documentation Issue
+description: Report documentation problems or suggest improvements
+title: "[Docs]: "
+labels: ["documentation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Help us improve the documentation!
+
+  - type: input
+    id: location
+    attributes:
+      label: Documentation Location
+      description: Which file or section has the issue?
+      placeholder: "README.md, line 123 OR docs/MEMORY.md, 'Levi-Civita' section"
+    validations:
+      required: true
+
+  - type: dropdown
+    id: issue-type
+    attributes:
+      label: Type of Issue
+      options:
+        - Unclear / Confusing
+        - Incorrect / Wrong
+        - Missing / Incomplete
+        - Outdated
+        - Typo / Grammar
+        - Code example doesn't work
+      multiple: true
+    validations:
+      required: true
+
+  - type: textarea
+    id: current-content
+    attributes:
+      label: Current Content
+      description: Quote the problematic documentation if possible
+      render: markdown
+
+  - type: textarea
+    id: suggested-improvement
+    attributes:
+      label: Suggested Improvement
+      description: How should it be changed?
+      placeholder: |
+        Suggested rewording:
+        "The Levi-Civita tensor is automatically created by DefMetric..."
+
+  - type: textarea
+    id: related-code
+    attributes:
+      label: Related Code or Examples
+      description: Link to related code that might help clarify
+      placeholder: "See torsion_gertsenshtein/wolfram/CommonUtilities.wl:123"
+
+  - type: dropdown
+    id: audience
+    attributes:
+      label: Who is Affected?
+      description: Which users would benefit from this fix?
+      options:
+        - Beginners / New users
+        - xAct/Wolfram users
+        - Python/py-pde users
+        - Contributors
+        - All users
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission Checks
+      options:
+        - label: I have identified the specific location of the issue
+          required: true
+        - label: I have searched existing issues to avoid duplicates
+          required: true

@@ -14,6 +14,75 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+#: Set of all operators supported by the pipeline.
+#: Validated at JSON load time to catch typos early.
+KNOWN_OPERATORS: frozenset[str] = frozenset(
+    {
+        "identity",
+        "laplacian",
+        "laplacian_x",
+        "laplacian_y",
+        "laplacian_z",
+        "gradient_x",
+        "gradient_y",
+        "gradient_z",
+        "cross_derivative_xy",
+        "cross_derivative_xz",
+        "cross_derivative_yz",
+        "first_derivative_t",
+        "biharmonic",
+    }
+)
+
+
+@dataclass(frozen=True)
+class LHSStructure:
+    """Structure describing the left-hand side of a PDE.
+
+    Supports different PDE types:
+    - Elliptic (time_order=0): ∇²φ = f (Poisson, Laplace)
+    - Parabolic (time_order=1): ∂_t φ = ... (heat, diffusion)
+    - Hyperbolic (time_order=2): ∂²_t φ = ... (wave)
+    - Higher order: ∂^n_t φ = ...
+
+    Attributes
+    ----------
+    expression : str
+        String representation (e.g., "d2_t(phi_0)", "d_t(phi)", "phi").
+    time_order : int
+        Order of time derivative on LHS (0, 1, 2, or higher).
+    space_order : int
+        Order of space derivative on LHS (usually 0).
+    """
+
+    expression: str
+    time_order: int
+    space_order: int = 0
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> LHSStructure:
+        """Create LHSStructure from structured JSON data.
+
+        Expected format: {"expression": "...", "order": {"time": N, "space": 0}}
+
+        Parameters
+        ----------
+        data : Mapping[str, Any]
+            The structured LHS data from JSON.
+
+        Returns
+        -------
+        LHSStructure
+            Parsed LHS structure.
+        """
+        expression = str(data.get("expression", ""))
+        order = data.get("order", {})
+        time_order = int(order.get("time", 2))  # Default to 2 for hyperbolic
+        space_order = int(order.get("space", 0))
+        return cls(
+            expression=expression, time_order=time_order, space_order=space_order
+        )
+
 
 @dataclass(frozen=True)
 class OperatorTerm:
@@ -29,19 +98,53 @@ class OperatorTerm:
         Name of the differential operator ("laplacian", "identity", "gradient_x", etc.)
     field : str
         Name of the field this operator acts on.
+    coefficient_symbolic : str | None
+        Optional symbolic name for the coefficient (e.g., "m2", "-kappa").
+        When present, the coefficient can be overridden at runtime by passing
+        a parameters dict to the PDE constructor.
+    time_dependent : bool
+        Whether the coefficient depends on time. For curved spacetime, terms
+        like -2H∂_t φ (Hubble friction) have time-dependent coefficients when
+        the conformal factor Ω(t) varies with time. Default False for flat spacetime.
     """
 
     coefficient: float
     operator: str
     field: str
+    coefficient_symbolic: str | None = None
+    time_dependent: bool = False
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> OperatorTerm:
-        """Create an OperatorTerm from a dictionary."""
+        """Create an OperatorTerm from a dictionary.
+
+        Raises
+        ------
+        ValueError
+            If required keys are missing or operator is unknown.
+        """
+        required_keys = {"coefficient", "operator", "field"}
+        missing = required_keys - set(data.keys())
+        if missing:
+            msg = (
+                f"RHS term missing required keys: {sorted(missing)}. Got: {dict(data)}"
+            )
+            raise ValueError(msg)
+
+        operator = str(data["operator"])
+        if operator not in KNOWN_OPERATORS:
+            msg = (
+                f"Unknown operator '{operator}'. "
+                f"Known operators: {sorted(KNOWN_OPERATORS)}"
+            )
+            raise ValueError(msg)
+
         return cls(
             coefficient=float(data["coefficient"]),
-            operator=str(data["operator"]),
+            operator=operator,
             field=str(data["field"]),
+            coefficient_symbolic=data.get("coefficient_symbolic"),
+            time_dependent=bool(data.get("time_dependent", False)),
         )
 
 
@@ -83,13 +186,10 @@ class ComponentEquation:
         field_name = str(data["field"])
 
         # Parse LHS to determine time derivative order
-        lhs = str(data["lhs"])
-        if "d2_t" in lhs:
-            time_derivative_order = 2
-        elif "d_t" in lhs:
-            time_derivative_order = 1
-        else:
-            time_derivative_order = 0
+        # Requires structured format: {"expression": "...", "order": {"time": N, "space": 0}}
+        lhs_data = data["lhs"]  # Required field
+        lhs_structure = LHSStructure.from_dict(lhs_data)
+        time_derivative_order = lhs_structure.time_order
 
         # Parse RHS terms
         rhs_data = data["rhs"]
@@ -101,9 +201,18 @@ class ComponentEquation:
             OperatorTerm.from_dict(term_data) for term_data in rhs_data["terms"]
         )
 
+        # Validate field_name exists in fields_lookup - no silent fallback to 0
+        if field_name not in fields_lookup:
+            valid_fields = list(fields_lookup.keys())
+            msg = (
+                f"Unknown field '{field_name}' in equation. "
+                f"Valid fields are: {valid_fields}"
+            )
+            raise ValueError(msg)
+
         return cls(
             field_name=field_name,
-            field_index=fields_lookup.get(field_name, 0),
+            field_index=fields_lookup[field_name],
             time_derivative_order=time_derivative_order,
             rhs_terms=rhs_terms,
         )
@@ -172,9 +281,82 @@ class EquationSystem:
                 msg = f"mass_matrix row {i} length {len(row)} != n_components {self.n_components}"
                 raise ValueError(msg)
 
+        if len(self.coupling_matrix) != self.n_components:
+            msg = f"coupling_matrix rows {len(self.coupling_matrix)} != n_components {self.n_components}"
+            raise ValueError(msg)
+
+        for i, row in enumerate(self.coupling_matrix):
+            if len(row) != self.n_components:
+                msg = f"coupling_matrix row {i} length {len(row)} != n_components {self.n_components}"
+                raise ValueError(msg)
+
+        # Validate field references in equation terms
+        self._validate_field_references()
+
+    def _validate_field_references(self) -> None:
+        """Validate that all field references in equation terms are valid.
+
+        Field references can be:
+        - Regular field names (e.g., "A_0", "A_1", "phi")
+        - Momentum field names (e.g., "pi_0", "pi_1") for mixed time-space derivatives
+
+        Raises
+        ------
+        ValueError
+            If a field reference is invalid.
+        """
+        valid_fields = set(self.component_names)
+
+        for eq in self.equations:
+            for term in eq.rhs_terms:
+                field_ref = term.field
+
+                # Check for momentum field reference (pi_*)
+                if field_ref.startswith("pi_"):
+                    parts = field_ref.split("_")
+                    if len(parts) != 2:  # noqa: PLR2004
+                        msg = (
+                            f"Invalid momentum field reference '{field_ref}' "
+                            f"in equation for {eq.field_name}. "
+                            f"Expected format 'pi_N' where N is a numeric index."
+                        )
+                        raise ValueError(msg)
+
+                    idx_str = parts[1]
+                    if not idx_str.isdigit():
+                        msg = (
+                            f"Invalid momentum field index in '{field_ref}' "
+                            f"(equation for {eq.field_name}). "
+                            f"Expected numeric index, got '{idx_str}'."
+                        )
+                        raise ValueError(msg)
+
+                    idx = int(idx_str)
+                    if not (0 <= idx < self.n_components):
+                        msg = (
+                            f"Momentum field index {idx} out of range in '{field_ref}' "
+                            f"(equation for {eq.field_name}). "
+                            f"Valid indices: 0 to {self.n_components - 1}."
+                        )
+                        raise ValueError(msg)
+                # Regular field reference
+                elif field_ref not in valid_fields:
+                    msg = (
+                        f"Unknown field reference '{field_ref}' "
+                        f"in equation for {eq.field_name}. "
+                        f"Valid fields: {sorted(valid_fields)}."
+                    )
+                    raise ValueError(msg)
+
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:
-        """Create an EquationSystem from a dictionary (parsed JSON)."""
+        """Create an EquationSystem from a dictionary (parsed JSON).
+
+        Raises
+        ------
+        ValueError
+            If the JSON data is invalid or component references are inconsistent.
+        """
         # Extract spacetime info
         spacetime = data["spacetime"]
         dimension = int(spacetime["dimension"])
@@ -184,6 +366,17 @@ class EquationSystem:
         fields_data = data["fields"]
         component_names = tuple(f["name"] for f in fields_data)
         n_components = len(component_names)
+
+        # Validate field name uniqueness
+        if len(component_names) != len(set(component_names)):
+            seen: set[str] = set()
+            duplicates: list[str] = []
+            for name in component_names:
+                if name in seen:
+                    duplicates.append(name)
+                seen.add(name)
+            msg = f"Duplicate field names: {duplicates}"
+            raise ValueError(msg)
 
         # Build field name -> index lookup
         fields_lookup = {f["name"]: f["index"] for f in fields_data}
@@ -195,17 +388,24 @@ class EquationSystem:
         )
 
         # Parse coupling matrices
+        # Note: Using list comprehension to avoid Python mutable aliasing bug
+        # where [[0.0] * n] * n creates shared row references
         coupling_data = data.get("coupling", {})
+
+        def _default_zero_matrix(n: int) -> list[list[float]]:
+            """Create a proper zero matrix without shared row references."""
+            return [[0.0 for _ in range(n)] for _ in range(n)]
+
         mass_matrix = tuple(
             tuple(float(x) for x in row)
             for row in coupling_data.get(
-                "mass_matrix", [[0.0] * n_components] * n_components
+                "mass_matrix", _default_zero_matrix(n_components)
             )
         )
         coupling_matrix = tuple(
             tuple(float(x) for x in row)
             for row in coupling_data.get(
-                "coupling_matrix", [[0.0] * n_components] * n_components
+                "coupling_matrix", _default_zero_matrix(n_components)
             )
         )
 

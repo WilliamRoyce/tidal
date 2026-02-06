@@ -135,15 +135,51 @@ Expected output includes:
 - Riemann tensor antisymmetry verification
 - "SMOKE TEST PASSED" message
 
+## Development Utility Scripts
+
+Scripts for local development and testing workflows.
+
+### Testing
+
+```bash
+# Run all Wolfram unit tests
+./scripts/run_wolfram_tests.sh
+
+# Run full test suite (Python + Wolfram)
+./scripts/full_test.sh
+```
+
+### Regenerating Equations
+
+```bash
+# Regenerate all JSON equation files from Lagrangians
+./scripts/run_examples.sh
+```
+
+### Validation
+
+```bash
+# End-to-end pipeline validation (derive → JSON → simulate)
+./scripts/validate_pipeline.sh
+
+# Check Wolfram module syntax (no tests, just load verification)
+./scripts/lint_wolfram.sh
+```
+
 ## Files
 
-| Script                      | Purpose                                      |
-| --------------------------- | -------------------------------------------- |
-| `install-wolfram-engine.sh` | Downloads and installs Wolfram Engine        |
-| `activate-wolfram.sh`       | Helps with license activation                |
-| `install-xact-xcoba.sh`     | Installs xAct/xCoba with GLIBC compatibility |
-| `verify-wolfram-setup.sh`   | Comprehensive verification of all components |
-| `xact_smoke.wl`             | Wolfram Language smoke test for xAct/xCoba   |
+| Script                      | Purpose                                           |
+| --------------------------- | ------------------------------------------------- |
+| `install-wolfram-engine.sh` | Downloads and installs Wolfram Engine             |
+| `activate-wolfram.sh`       | Helps with license activation                     |
+| `install-xact-xcoba.sh`     | Installs xAct/xCoba with GLIBC compatibility      |
+| `verify-wolfram-setup.sh`   | Comprehensive verification of all components      |
+| `xact_smoke.wl`             | Wolfram Language smoke test for xAct/xCoba        |
+| `run_wolfram_tests.sh`      | Run all Wolfram unit tests                        |
+| `run_examples.sh`           | Regenerate JSON files from example derivations    |
+| `full_test.sh`              | Run complete test suite (Python + Wolfram)        |
+| `validate_pipeline.sh`      | End-to-end pipeline validation                    |
+| `lint_wolfram.sh`           | Check Wolfram module syntax                       |
 
 ## Environment Variables
 

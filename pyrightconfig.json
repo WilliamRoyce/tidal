@@ -1,0 +1,12 @@
+{
+  "typeCheckingMode": "strict",
+  "include": ["tests", "torsion_gertsenshtein", "examples"],
+  "reportImplicitOverride": true,
+  "reportUnknownMemberType": false,
+  "executionEnvironments": [
+    {
+      "root": "tests",
+      "reportPrivateUsage": false
+    }
+  ]
+}

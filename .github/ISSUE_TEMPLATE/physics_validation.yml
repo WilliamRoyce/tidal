@@ -1,0 +1,89 @@
+name: Physics Validation Issue
+description: Report physics/equation discrepancies or validation concerns
+title: "[Physics]: "
+labels: ["physics", "validation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Report physics or equation issues here. This is for theoretical correctness, not code bugs.
+
+  - type: textarea
+    id: equation-concern
+    attributes:
+      label: Equation or Derivation in Question
+      description: Which equation or derivation appears incorrect?
+      placeholder: |
+        The Klein-Gordon equation component for phi_0 in curved spacetime
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected-physics
+    attributes:
+      label: Expected Physics Behavior
+      description: What should the correct physics be?
+      placeholder: |
+        Based on [reference], the Hubble friction term should be -3H∂_t φ for 3+1D
+    validations:
+      required: true
+
+  - type: textarea
+    id: observed-behavior
+    attributes:
+      label: Observed Simulation/Computation Behavior
+      description: What does the current implementation produce?
+      placeholder: |
+        The JSON shows -H∂_t φ instead of -3H∂_t φ
+    validations:
+      required: true
+
+  - type: textarea
+    id: lagrangian
+    attributes:
+      label: Lagrangian Used
+      description: Provide the Lagrangian or xAct code if relevant
+      render: mathematica
+      placeholder: |
+        L = -1/2 g^{μν} ∂_μφ ∂_νφ - 1/2 m² φ²
+
+  - type: textarea
+    id: reference-material
+    attributes:
+      label: Reference Material
+      description: Papers, textbooks, or other sources supporting your claim
+      placeholder: |
+        - Wald, "General Relativity", Section 4.3
+        - arXiv:1234.5678
+        - Standard result in field theory texts
+
+  - type: dropdown
+    id: dimension
+    attributes:
+      label: Spacetime Dimension
+      description: Which dimension is this issue in?
+      options:
+        - 1+1D
+        - 2+1D
+        - 3+1D
+        - General / All dimensions
+    validations:
+      required: true
+
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact on Simulations
+      description: Does this affect numerical results? How significantly?
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission Checks
+      options:
+        - label: I have checked the physics derivation in the relevant .wls file
+          required: false
+        - label: I have provided references supporting my claim
+          required: true
+        - label: This is about physics correctness, not a code bug
+          required: true

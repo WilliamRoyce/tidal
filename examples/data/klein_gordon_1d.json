@@ -27,7 +27,10 @@
 	"equations":[
 		{
 			"field":"phi_0",
-			"lhs":"d2_t(phi_0)",
+			"lhs":{
+				"expression":"d2_t(phi_0)",
+				"order":{"time":2,"space":0}
+			},
 			"rhs":{
 				"type":"linear_combination",
 				"terms":[

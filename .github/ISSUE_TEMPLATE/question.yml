@@ -1,0 +1,59 @@
+name: Question / Support
+description: Ask a question or request help
+title: "[Question]: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ask a question about using the project!
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What would you like to know?
+      placeholder: How do I...?
+    validations:
+      required: true
+
+  - type: dropdown
+    id: topic
+    attributes:
+      label: Topic Area
+      options:
+        - Getting Started
+        - Lagrangian Derivation (Wolfram/xAct)
+        - PDE Simulation (py-pde)
+        - JSON Schema / Format
+        - Example Usage
+        - Dev Container Setup
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: what-tried
+    attributes:
+      label: What Have You Tried?
+      description: Have you consulted the documentation or tried any solutions?
+      placeholder: |
+        - I read the README section on...
+        - I tried running...
+        - I looked at the example...
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional Context
+      description: Any other information that might help us answer your question
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-submission Checks
+      options:
+        - label: I have read the README and CONTRIBUTING.md
+          required: true
+        - label: I have searched existing issues for similar questions
+          required: true

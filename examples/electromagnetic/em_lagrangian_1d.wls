@@ -15,7 +15,6 @@ Print["Loading pipeline modules..."];
 pipelinePath = FileNameJoin[{DirectoryName[$InputFileName], "..", "..", "torsion_gertsenshtein", "wolfram"}];
 Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];
 Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];
-Get[FileNameJoin[{pipelinePath, "Linearize.wl"}]];
 Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];
 Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];
 
@@ -23,16 +22,17 @@ Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];
 Print[""];
 Print["Step 1: Setting up 1+1D Minkowski spacetime..."];
 
-DefManifold[M2, 2, {a, b, c, d, e, f, g, h}];
-DefMetric[-1, eta[-a, -b], CD,
-  SymbolOfCovD -> {";", "\[Del]"},
-  PrintAs -> "\[Eta]"];
-
-(* Define coordinate chart: {t, x} *)
-DefChart[cart, M2, {0, 1}, {t[], x[]}];
-
-(* Set Minkowski metric components: diag(-1, +1) *)
-MetricInBasis[eta, -cart, DiagonalMatrix[{-1, 1}]];
+(* Define manifold and metric (with defensive checks for kernel reuse) *)
+If[!xTensorQ[M2],
+  DefManifold[M2, 2, {a, b, c, d, e, f, g, h}];
+  DefMetric[-1, eta[-a, -b], CD,
+    SymbolOfCovD -> {";", "\[Del]"},
+    PrintAs -> "\[Eta]"];
+  DefChart[cart, M2, {0, 1}, {t[], x[]}];
+  MetricInBasis[eta, -cart, DiagonalMatrix[{-1, 1}]];
+  ,
+  Print["   Using existing manifold M2"];
+];
 
 Print["   Manifold: M2 (1+1 dimensional)"];
 Print["   Metric: Minkowski \[Eta]_ab with signature (-,+)"];
@@ -43,7 +43,7 @@ Print[""];
 Print["Step 2: Defining vector potential A_a and field strength F_ab..."];
 
 (* Vector potential A_a *)
-DefTensor[A[-a], M2, PrintAs -> "A"];
+If[!xTensorQ[A], DefTensor[A[-a], M2, PrintAs -> "A"]];
 
 (* Field strength tensor F_ab = d_a A_b - d_b A_a (antisymmetric) *)
 DefTensor[F[-a, -b], M2, Antisymmetric[{-a, -b}], PrintAs -> "F"];
