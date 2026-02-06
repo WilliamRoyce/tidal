@@ -250,26 +250,26 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   (* Same logic as EquationToJSON but with cross-field awareness *)
   terms = If[Head[componentEq] === Plus, List @@ componentEq, {componentEq}];
 
-  (* Detect the time derivative order to determine PDE type *)
+  (* Detect the time derivative order of the CURRENT field to determine PDE type *)
+  (* Field-aware: only considers time derivatives of fieldName, not cross-field terms *)
   (* elliptic (0), parabolic (1), hyperbolic (2+) *)
-  lhsTimeOrder = DetectLHSTimeOrder[componentEq];
+  lhsTimeOrder = DetectLHSTimeOrder[componentEq, fieldName];
 
-  (* For backward compatibility, default to order 2 (hyperbolic) if detection fails *)
-  If[lhsTimeOrder == 0 && !FreeQ[componentEq, Derivative],
-    (* Equation has derivatives but no time derivatives - likely constraint or elliptic *)
-    (* Keep as 0 for elliptic PDEs *)
-    Null,
-    (* Use detected order for parabolic/hyperbolic *)
-    Null
+  (* Separate LHS (own-field time derivatives) from RHS *)
+  If[lhsTimeOrder == 0,
+    (* Elliptic/constraint: no time derivatives of this field — entire equation is RHS *)
+    timeDerivTerm = {};
+    rhs = componentEq;
+    ,
+    (* Parabolic/Hyperbolic: separate own-field time derivatives from RHS *)
+    (* Only time derivatives of the CURRENT field are LHS candidates *)
+    (* Cross-field time derivatives (e.g., d2_t(h_4) in h_0's equation) stay on RHS *)
+    timeDerivTerm = Select[terms, ContainsOwnTimeDerivative[#, fieldName, lhsTimeOrder] &];
+    (* RHS = everything EXCEPT own-field time derivatives of detected order *)
+    (* Mixed time-space derivatives ARE included - they get converted to momentum gradients *)
+    (* by IdentifyMultiFieldTerm (e.g., d_t d_x A -> gradient_x(pi)) *)
+    rhs = Total[Select[terms, !ContainsOwnTimeDerivative[#, fieldName, lhsTimeOrder] &]];
   ];
-
-  (* Use dimension-agnostic helpers for time derivative detection *)
-  (* Works for both 1+1D (2-arg Derivative) and 2+1D (3-arg Derivative) *)
-  timeDerivTerm = Select[terms, ContainsTimeDerivative[#, lhsTimeOrder] &];
-  (* RHS = everything EXCEPT pure time derivatives of detected order *)
-  (* Mixed time-space derivatives ARE included - they get converted to momentum gradients *)
-  (* by IdentifyMultiFieldTerm (e.g., d_t d_x A -> gradient_x(pi)) *)
-  rhs = Total[Select[terms, !ContainsTimeDerivative[#, lhsTimeOrder] &]];
 
   (* LHS normalization: extract time-derivative coefficient and normalize RHS *)
   (* For |lhsCoeff| = 1: rhs = non-time terms as-is (handles both VarD and direct construction) *)
@@ -341,6 +341,43 @@ DetectLHSTimeOrder[equation_] := Module[{terms, maxOrder},
   Max[maxOrder, 0]
 ];
 
+(* === Field-Aware LHS Detection (for multi-field cross-coupled equations) === *)
+
+(* Check if a function head string matches a specific field name *)
+(* Uses same StringEndsQ+digit logic as MatchFieldToHeads *)
+(* Example: FunctionMatchesField["gwH0", "h_0"] -> True *)
+(* Example: FunctionMatchesField["gwH4", "h_0"] -> False *)
+FunctionMatchesField[headStr_String, fieldName_String] := Module[
+  {fieldParts, fieldBase, fieldIndex, headDigits, headBase},
+  fieldParts = StringSplit[fieldName, "_"];
+  If[Length[fieldParts] < 2, Return[False]];
+  fieldBase = ToLowerCase[First[fieldParts]];
+  fieldIndex = Last[fieldParts];
+  headDigits = StringCases[headStr, RegularExpression["\\d+$"]];
+  headBase = ToLowerCase[StringReplace[headStr, RegularExpression["\\d+$"] -> ""]];
+  Length[headDigits] > 0 && headDigits[[-1]] === fieldIndex && StringEndsQ[headBase, fieldBase]
+];
+
+(* Field-aware overload: only considers time derivatives of the specified field *)
+(* This is critical for multi-field systems where cross-field time derivatives *)
+(* (e.g., d2_t(h_4) appearing in h_0's equation) must NOT be classified as LHS *)
+DetectLHSTimeOrder[equation_, fieldName_String] := Module[
+  {terms, fieldTermOrders, maxOrder},
+  terms = If[Head[equation] === Plus, List @@ equation, {equation}];
+  (* For each term, get time derivative order ONLY if it applies to the current field *)
+  fieldTermOrders = Map[
+    Function[term, Module[{derivs},
+      derivs = Cases[term,
+        Derivative[n_, ___][f_][___] /; FunctionMatchesField[ToString[f], fieldName] :> n,
+        {0, Infinity}];
+      If[Length[derivs] == 0, 0, Max[derivs]]
+    ]],
+    terms
+  ];
+  maxOrder = If[Length[fieldTermOrders] == 0, 0, Max[fieldTermOrders]];
+  Max[maxOrder, 0]
+];
+
 (* Build structured LHS representation *)
 (* Supports variable time derivative orders for different PDE types *)
 BuildLHSStructure[fieldName_String, timeOrder_Integer] := <|
@@ -371,6 +408,18 @@ ContainsTimeDerivative[term_, minOrder_:2] := Module[{},
     (* Default: no time derivative of required order *)
     True, False
   ]
+];
+
+(* Field-aware time derivative check: only matches derivatives of the CURRENT field *)
+(* Unlike ContainsTimeDerivative, this ignores cross-field time derivatives *)
+(* Example: ContainsOwnTimeDerivative[-Derivative[2,0,0,0][gwH4][t,x,y,z], "h_0", 2] -> False *)
+(* Example: ContainsOwnTimeDerivative[-Derivative[2,0,0,0][gwH0][t,x,y,z], "h_0", 2] -> True *)
+ContainsOwnTimeDerivative[term_, fieldName_String, minOrder_Integer] := Module[
+  {matchingDerivs},
+  matchingDerivs = Cases[term,
+    Derivative[n_, ___][f_][___] /; n >= minOrder && FunctionMatchesField[ToString[f], fieldName],
+    {0, Infinity}];
+  Length[matchingDerivs] > 0
 ];
 
 (* Extract the coefficient of the LHS time derivative term *)

@@ -799,15 +799,19 @@ class PDEFromSpec(PDEBase):
         bc = infer_bc_from_grid(state.grid)
         grid = state.grid
 
-        # Pass 1: Compute RHS for first-order components.
-        # These become "virtual momenta" that second-order equations can reference
-        # via pi_N or first_derivative_t operators.
+        # Pass 1: Compute virtual momenta for non-second-order components.
+        # First-order components: their RHS becomes the "virtual momentum"
+        # that other equations can reference via pi_N or first_derivative_t.
+        # Constraint (order=0) components: d_t(field) = 0 by definition,
+        # so their virtual momentum is zero.
         virtual_momenta: dict[str, ScalarField] = {}
         for i, eq in enumerate(self.spec.equations):
             if eq.time_derivative_order == 1:
                 virtual_momenta[eq.field_name] = self._compute_rhs_for_component(
                     i, state, bc, t
                 )
+            elif eq.time_derivative_order == 0:
+                virtual_momenta[eq.field_name] = ScalarField(grid, data=0.0)
 
         # Pass 2: Build the full rates array using slot maps
         rates: list[ScalarField | None] = [None] * expected_fields

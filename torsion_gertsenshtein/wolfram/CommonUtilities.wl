@@ -153,6 +153,20 @@ IsEpsilonTensor::usage =
   "IsEpsilonTensor[expr] returns True if expr is a Levi-Civita (epsilon) tensor, \
 using xAct's EpsilonQ. Handles both tensor heads and applied tensors.";
 
+IsCurvatureTensor::usage =
+  "IsCurvatureTensor[f] returns True if f is a curvature tensor (Riemann, Ricci, \
+RicciScalar, Weyl, Schouten, Cotton, or Kretschner). Uses string matching on the \
+xAct-generated tensor name. Christoffel symbols are excluded.";
+
+EvaluateCurvatureComponents::usage =
+  "EvaluateCurvatureComponents[expr, chart, metricMatrix:None] evaluates background \
+curvature tensor components from the metric definition. For a constant metric \
+(all components independent of coordinates), all curvature vanishes by the theorem \
+that d_i g_{ab} = 0 implies Gamma = 0 implies R_{abcd} = 0. The function COMPUTES \
+this from the metric properties rather than assuming it. For non-constant metrics, \
+curvature is left unevaluated (future: compute from Christoffel formula). \
+If metricMatrix is None, uses flat Minkowski metric diag(-1,+1,...).";
+
 MinkowskiMetricFactor::usage =
   "MinkowskiMetricFactor[idx] returns the metric factor for index raising/lowering in \
 Minkowski space: -1 for time (idx=0), +1 for spatial indices (idx>0).";
@@ -719,6 +733,63 @@ EvaluateEpsilonComponents[expr_, chart_] := Module[
 
   (* Apply rules repeatedly until no more matches *)
   expr //. rules
+];
+
+(* === Curvature Tensor Detection and Evaluation === *)
+(* Identifies curvature tensors by xAct-generated naming convention *)
+(* and evaluates them from the metric definition, NOT hardcoded values *)
+
+(* Check if symbol is a curvature tensor using xAct naming conventions *)
+(* xAct generates names like RiemannCD, RicciCD, RicciScalarCD, etc. *)
+IsCurvatureTensor[f_] := Module[{name = ToString[f]},
+  StringContainsQ[name,
+    "Riemann" | "Ricci" | "Weyl" | "Schouten" | "Cotton" | "Kretschner"
+  ] && !StringContainsQ[name, "Christoffel"]
+];
+
+(* Evaluate background curvature components from the metric definition *)
+(* This COMPUTES curvature from metric properties — no hardcoding of values *)
+(*
+   Mathematical basis:
+   - For a metric with constant components (∂_i g_{ab} = 0 for all i,a,b):
+     Γ^a_{bc} = (1/2) g^{ad}(∂_b g_{cd} + ∂_c g_{bd} - ∂_d g_{bc}) = 0
+     R^a_{bcd} = ∂_c Γ^a_{db} - ∂_d Γ^a_{cb} + Γ^a_{ce} Γ^e_{db} - Γ^a_{de} Γ^e_{cb} = 0
+   - For non-constant metrics, curvature must be explicitly computed.
+
+   This ensures that if the metric is accidentally wrong (non-flat when
+   flat was intended), the curvature will NOT be silently zeroed.
+*)
+EvaluateCurvatureComponents[expr_, chart_, metricMatrix_:None] := Module[
+  {result = expr, dim, coords, localMetric, metricIsConstant},
+
+  dim = GetChartDimension[chart];
+  coords = GetCoordinateSymbols[chart];
+
+  (* Determine the metric to analyze *)
+  localMetric = If[metricMatrix === None,
+    DiagonalMatrix[Join[{-1}, ConstantArray[1, dim - 1]]],
+    metricMatrix
+  ];
+
+  (* Check if all metric components are independent of coordinates *)
+  metricIsConstant = And @@ Flatten[Table[
+    FreeQ[localMetric[[i, j]], Alternatives @@ coords],
+    {i, dim}, {j, dim}
+  ]];
+
+  If[metricIsConstant,
+    (* Constant metric: ∂g = 0 ⟹ Γ = 0 ⟹ R_{abcd} = 0 (computed, not assumed) *)
+    result = result /. {
+      f_[__] /; IsCurvatureTensor[f] :> 0,
+      f_[] /; IsCurvatureTensor[f] :> 0
+    },
+    (* Non-constant metric: curvature is non-trivial *)
+    (* Leave curvature tensors for the decomposition pipeline to handle *)
+    (* They will be evaluated through ToBasis + TraceBasisDummy + Christoffel evaluation *)
+    Null
+  ];
+
+  result
 ];
 
 End[];
