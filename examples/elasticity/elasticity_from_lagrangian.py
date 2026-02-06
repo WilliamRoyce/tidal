@@ -154,28 +154,28 @@ def main() -> None:
 
     # ux displacement
     im0 = axes[0, 0].imshow(
-        final_state[0].data.T, origin="lower", cmap="RdBu", aspect="equal"
+        final_state[0].data.T, origin="lower", cmap="bwr", aspect="equal"
     )
     axes[0, 0].set_title("ux (horizontal displacement)")
     plt.colorbar(im0, ax=axes[0, 0])
 
     # ux velocity
     im1 = axes[0, 1].imshow(
-        final_state[1].data.T, origin="lower", cmap="RdBu", aspect="equal"
+        final_state[1].data.T, origin="lower", cmap="bwr", aspect="equal"
     )
     axes[0, 1].set_title("∂ux/∂t (horizontal velocity)")
     plt.colorbar(im1, ax=axes[0, 1])
 
     # uy displacement
     im2 = axes[1, 0].imshow(
-        final_state[2].data.T, origin="lower", cmap="RdBu", aspect="equal"
+        final_state[2].data.T, origin="lower", cmap="bwr", aspect="equal"
     )
     axes[1, 0].set_title("uy (vertical displacement)")
     plt.colorbar(im2, ax=axes[1, 0])
 
     # uy velocity
     im3 = axes[1, 1].imshow(
-        final_state[3].data.T, origin="lower", cmap="RdBu", aspect="equal"
+        final_state[3].data.T, origin="lower", cmap="bwr", aspect="equal"
     )
     axes[1, 1].set_title("∂uy/∂t (vertical velocity)")
     plt.colorbar(im3, ax=axes[1, 1])
