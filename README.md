@@ -370,7 +370,7 @@ See [`scripts/README.md`](scripts/README.md) for detailed setup instructions.
 
 ## License
 
-No LICENSE file included in this repository. Add a LICENSE file if you intend to open-source this work, before distributing artifacts or accepting external contributions.
+This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
 
 ---
 
