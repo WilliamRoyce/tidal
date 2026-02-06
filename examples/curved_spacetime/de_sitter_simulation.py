@@ -136,7 +136,7 @@ def main() -> None:  # noqa: PLR0914, PLR0915
         t_range=t_end,
         dt=dt,
         scheme="runge-kutta",  # RK4 for better numerical stability
-        tracker=storage.tracker(1.0),  # Store every 1.0 time units
+        tracker=storage.tracker(0.2),  # Store every 0.2 time units
     )
     result = normalize_solve_result(result)
 
@@ -171,7 +171,11 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     else:
         print("  Note: For small H or short time, damping may be subtle")
 
-    # Energy-like quantity (will decrease due to Hubble friction)
+    # Energy proxy: bare-mass Hamiltonian E = ½∫(π² + m²φ²) dx
+    # Note: With time-dependent mass m²·exp(2Ht), no simple energy functional
+    # decays monotonically — the growing cross-term m²(e^{2Ht}-1)∫φπ causes
+    # oscillations. We use this proxy only for text output; the plot uses
+    # amplitude decay which IS monotonic and clearly shows Hubble friction.
     def compute_energy(snapshot: FieldCollection) -> float:
         phi_data = snapshot[0].data
         pi_data = snapshot[1].data
@@ -222,27 +226,49 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     ax.set_title(rf"Final $\phi$ (t={t_end:.0f})")
     plt.colorbar(im, ax=ax, label=r"$\phi$")
 
-    # Energy decay
+    # Amplitude and field-norm decay (monotonic indicators of Hubble damping)
+    # Note: No simple energy proxy decays as exp(-Ht) for this equation because
+    # the time-dependent mass m²·exp(2Ht) introduces a growing cross-term in
+    # dE/dt. Amplitude and ∫φ² are unambiguous decay indicators.
     ax = axes[1, 0]
-    energies = []
-    time_values = []
-    for t_idx in range(len(storage)):
-        snapshot = cast("FieldCollection", storage[t_idx])
-        energies.append(compute_energy(snapshot))
-        time_values.append(t_idx)
+    time_values = list(storage.times)
+    amplitudes = [
+        float(np.max(np.abs(cast("FieldCollection", storage[i])[0].data)))
+        for i in range(len(storage))
+    ]
+    field_norms = [
+        float(np.sum(cast("FieldCollection", storage[i])[0].data ** 2))
+        for i in range(len(storage))
+    ]
 
-    ax.plot(time_values, energies, "b-", linewidth=2, label="Simulation")
-
-    # Expected exponential decay from Hubble friction
-    t_array = np.array(time_values)  # pyright: ignore[reportUnknownArgumentType, reportUnknownVariableType]
-    expected_energies = energies[0] * np.exp(-hubble_param * t_array)  # pyright: ignore[reportUnknownVariableType]
+    t_array = np.array(time_values)
     ax.plot(
-        time_values, expected_energies, "r--", linewidth=1.5, label=r"$\sim e^{-Ht}$"
+        time_values,
+        np.array(amplitudes) / amplitudes[0],
+        "b-",
+        linewidth=2,
+        label=r"max$|\phi|$ / max$|\phi_0|$",
+    )
+    ax.plot(
+        time_values,
+        np.array(field_norms) / field_norms[0],
+        "g-",
+        linewidth=2,
+        label=r"$\int\phi^2 / \int\phi_0^2$",
     )
 
-    ax.set_xlabel("Snapshot index")
-    ax.set_ylabel("Total 'energy'")
-    ax.set_title(f"Energy decay from Hubble friction (H={hubble_param})")
+    # Reference: amplitude decay exp(-Ht/2) for weakly damped oscillator
+    ax.plot(
+        time_values,
+        np.exp(-0.5 * hubble_param * t_array),
+        "r--",
+        linewidth=1.5,
+        label=r"$e^{-Ht/2}$",
+    )
+
+    ax.set_xlabel("Time")
+    ax.set_ylabel("Normalized quantity")
+    ax.set_title(f"Hubble damping (H={hubble_param})")
     ax.legend()
     ax.grid(visible=True, alpha=0.3)
 
@@ -267,7 +293,7 @@ def main() -> None:  # noqa: PLR0914, PLR0915
             x_1d,
             snapshot[0].data[:, center_idx],
             color=colors[i],
-            label=f"t={t_idx:.0f}",
+            label=f"t={time_values[t_idx]:.0f}",
             alpha=0.8,
         )
     ax.set_xlabel("x")

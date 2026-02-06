@@ -151,7 +151,7 @@ def _run_simulation(
     print("  (Coupled evolution with mode-mixing)")
     storage = MemoryStorage()
     tracker: TrackerBase = storage.tracker(interrupts=0.5)
-    pde.solve(initial_state, t_range=t_end, dt=0.01, tracker=tracker)
+    pde.solve(initial_state, t_range=t_end, dt=0.01, scheme="runge-kutta", tracker=tracker)
     print(f"  Stored {len(storage)} snapshots")
     print()
     return storage
