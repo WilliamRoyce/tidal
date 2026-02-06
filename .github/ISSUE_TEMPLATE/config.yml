@@ -1,8 +1,8 @@
-blank_issues_enabled: false
+blank_issues_enabled: true
 contact_links:
-  - name: 📚 Documentation
-    url: https://github.com/WilliamRoyce/torsion-gertsenshtein/blob/main/README.md
-    about: Read the README, CONTRIBUTING.md, and docs/ directory first
-  - name: 💬 Discussions
+  - name: Documentation
+    url: https://github.com/WilliamRoyce/torsion-gertsenshtein/tree/main/docs
+    about: Check the documentation for usage guides and troubleshooting
+  - name: Discussions
     url: https://github.com/WilliamRoyce/torsion-gertsenshtein/discussions
-    about: For general discussions, ideas, and community chat (if enabled)
+    about: Ask questions and discuss ideas with the community
