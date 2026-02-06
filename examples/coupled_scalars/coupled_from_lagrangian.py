@@ -92,7 +92,9 @@ def _load_spec(json_path: Path) -> EquationSystem:
         for term in eq.rhs_terms:
             if term.field != eq.field_name and term.operator == "identity":
                 has_coupling = True
-                print(f"  Cross-field coupling detected: {eq.field_name} ← {term.field}")
+                print(
+                    f"  Cross-field coupling detected: {eq.field_name} ← {term.field}"
+                )
                 break
 
     if has_coupling:
@@ -232,7 +234,7 @@ def _plot_results(simulation: SimulationData, _spec: EquationSystem) -> None:  #
         aspect="auto",
         origin="lower",
         extent=[0, simulation.times[-1], 0, 100],
-        cmap="RdBu_r",
+        cmap="bwr_r",
         vmin=-vmax,
         vmax=vmax,
     )
@@ -254,7 +256,7 @@ def _plot_results(simulation: SimulationData, _spec: EquationSystem) -> None:  #
         aspect="auto",
         origin="lower",
         extent=[0, simulation.times[-1], 0, 100],
-        cmap="RdBu_r",
+        cmap="bwr_r",
         vmin=-vmax_chi,
         vmax=vmax_chi,
     )
@@ -265,10 +267,24 @@ def _plot_results(simulation: SimulationData, _spec: EquationSystem) -> None:  #
 
     # Initial and final profiles
     ax = axes[0, 2]
-    ax.plot(simulation.x, _get_component(simulation.snapshots[0], 0), "b-", label="φ(t=0)")
-    ax.plot(simulation.x, _get_component(simulation.snapshots[-1], 0), "b--", label=f"φ(t={simulation.times[-1]:.1f})")
-    ax.plot(simulation.x, _get_component(simulation.snapshots[0], 2), "r-", label="χ(t=0)")
-    ax.plot(simulation.x, _get_component(simulation.snapshots[-1], 2), "r--", label=f"χ(t={simulation.times[-1]:.1f})")
+    ax.plot(
+        simulation.x, _get_component(simulation.snapshots[0], 0), "b-", label="φ(t=0)"
+    )
+    ax.plot(
+        simulation.x,
+        _get_component(simulation.snapshots[-1], 0),
+        "b--",
+        label=f"φ(t={simulation.times[-1]:.1f})",
+    )
+    ax.plot(
+        simulation.x, _get_component(simulation.snapshots[0], 2), "r-", label="χ(t=0)"
+    )
+    ax.plot(
+        simulation.x,
+        _get_component(simulation.snapshots[-1], 2),
+        "r--",
+        label=f"χ(t={simulation.times[-1]:.1f})",
+    )
     ax.set_xlabel("x")
     ax.set_ylabel("Field value")
     ax.set_title("Field Profiles")
@@ -315,16 +331,38 @@ def _plot_results(simulation: SimulationData, _spec: EquationSystem) -> None:  #
 
     # Coupling information
     ax = axes[1, 2]
-    ax.text(0.5, 0.8, "Coupled System Parameters:", transform=ax.transAxes,
-            fontsize=12, ha="center", weight="bold")
-    ax.text(0.5, 0.6, "m²ᵩ = 1.0 (ω₀ = 1)", transform=ax.transAxes,
-            fontsize=11, ha="center")
-    ax.text(0.5, 0.45, "m²ᵪ = 4.0 (ω₀ = 2)", transform=ax.transAxes,
-            fontsize=11, ha="center")
-    ax.text(0.5, 0.3, "g = 0.5 (coupling)", transform=ax.transAxes,
-            fontsize=11, ha="center")
-    ax.text(0.5, 0.1, "Normal modes: ω₁ ≈ 0.92, ω₂ ≈ 2.04", transform=ax.transAxes,
-            fontsize=10, ha="center", style="italic")
+    ax.text(
+        0.5,
+        0.8,
+        "Coupled System Parameters:",
+        transform=ax.transAxes,
+        fontsize=12,
+        ha="center",
+        weight="bold",
+    )
+    ax.text(
+        0.5, 0.6, "m²ᵩ = 1.0 (ω₀ = 1)", transform=ax.transAxes, fontsize=11, ha="center"
+    )
+    ax.text(
+        0.5,
+        0.45,
+        "m²ᵪ = 4.0 (ω₀ = 2)",
+        transform=ax.transAxes,
+        fontsize=11,
+        ha="center",
+    )
+    ax.text(
+        0.5, 0.3, "g = 0.5 (coupling)", transform=ax.transAxes, fontsize=11, ha="center"
+    )
+    ax.text(
+        0.5,
+        0.1,
+        "Normal modes: ω₁ ≈ 0.92, ω₂ ≈ 2.04",
+        transform=ax.transAxes,
+        fontsize=10,
+        ha="center",
+        style="italic",
+    )
     ax.axis("off")
 
     plt.tight_layout()
