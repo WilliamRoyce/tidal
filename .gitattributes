@@ -1,0 +1,48 @@
+# Git attributes for consistent line endings and file handling
+# This ensures cross-platform compatibility (Windows/Linux/Mac)
+
+# Auto-detect text files and normalize line endings to LF
+* text=auto eol=lf
+
+# Python files
+*.py text eol=lf
+*.pyi text eol=lf
+
+# Wolfram Language files
+*.wl text eol=lf
+*.wls text eol=lf
+*.m text eol=lf
+*.nb -text
+
+# Shell scripts
+*.sh text eol=lf
+
+# Config files
+*.json text eol=lf
+*.toml text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.txt text eol=lf
+
+# Documentation
+*.rst text eol=lf
+
+# Binary files
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.pdf binary
+*.gif binary
+*.ico binary
+
+# Lock files (treat as binary to avoid merge conflicts)
+uv.lock binary
+*.lock binary
+
+# Archives
+*.zip binary
+*.tar binary
+*.gz binary
+*.tgz binary
+*.bz2 binary

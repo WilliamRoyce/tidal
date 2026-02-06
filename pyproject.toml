@@ -1,6 +1,6 @@
 [project]
 name = "torsion_gertsenshtein"
-version = "0.2.1"
+version = "0.2.2"
 description = "Linearized PDE simulations for electromagnetic-gravitational wave conversion research"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"
@@ -18,6 +18,11 @@ keywords = [
     "general-relativity",
     "torsion",
     "gertsenshtein",
+    "symbolic-computation",
+    "xact",
+    "wolfram",
+    "field-theory",
+    "lagrangian",
 ]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -25,6 +30,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Other",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Scientific/Engineering :: Mathematics",
     "Typing :: Typed",
@@ -44,6 +50,7 @@ dependencies = [
 Homepage = "https://github.com/WilliamRoyce/torsion-gertsenshtein"
 Documentation = "https://williamroyce.github.io/torsion-gertsenshtein/"
 Repository = "https://github.com/WilliamRoyce/torsion-gertsenshtein"
+Issues = "https://github.com/WilliamRoyce/torsion-gertsenshtein/issues"
 Changelog = "https://github.com/WilliamRoyce/torsion-gertsenshtein/blob/main/CHANGELOG.md"
 
 [dependency-groups]
