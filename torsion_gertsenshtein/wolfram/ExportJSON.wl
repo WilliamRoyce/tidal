@@ -115,6 +115,17 @@ IdentifyDirectionalLaplacian::usage =
 spatial direction. Returns \"laplacian_x\", \"laplacian_y\", \"laplacian_z\", or False. \
 Used for anisotropic equations like Navier-Cauchy where d^2_x and d^2_y have different coefficients.";
 
+(* Generic derivative order support (Phase 12) *)
+ExtractSpatialDerivativeProfile::usage =
+  "ExtractSpatialDerivativeProfile[term] extracts the spatial derivative orders from a \
+Derivative[dt, dx, dy, ...] pattern. Returns a list of non-negative integers representing \
+the derivative order in each spatial axis (time slot excluded). E.g., Derivative[0,3,0] -> {3,0}.";
+
+BuildGenericOperatorName::usage =
+  "BuildGenericOperatorName[spatialOrders] builds an operator name string from a list of \
+spatial derivative orders. Single-axis: {3,0} -> \"derivative_3_x\", {0,5} -> \"derivative_5_y\". \
+Multi-axis: {2,1} -> \"derivative_2x_1y\". Axis names: 1->x, 2->y, 3->z.";
+
 (* First-order time derivative detection for curved spacetime *)
 IsFirstOrderTimeDerivative::usage =
   "IsFirstOrderTimeDerivative[term] returns True if term contains exactly a first-order \
@@ -761,6 +772,69 @@ CountDerivativeOrder[term_] := Module[
   maxOrder
 ];
 
+(* === Phase 12: Generic Derivative Order Support === *)
+(* Extract spatial derivative orders from a term *)
+(* Returns a list of non-negative integers: {dx_order, dy_order, dz_order, ...} *)
+(* Time slot (first in Derivative[dt, dx, ...]) is excluded *)
+ExtractSpatialDerivativeProfile[term_] := Module[{profiles = {}},
+  Cases[term,
+    Derivative[orders__][_][__] :> Module[{orderList = Rest[{orders}]},
+      AppendTo[profiles, orderList]
+    ],
+    {0, Infinity}
+  ];
+  If[Length[profiles] == 0,
+    (* Also check unapplied Derivative[orders][f] *)
+    Cases[term,
+      Derivative[orders__][_] :> Module[{orderList = Rest[{orders}]},
+        AppendTo[profiles, orderList]
+      ],
+      {0, Infinity}
+    ]
+  ];
+  If[Length[profiles] == 0,
+    Throw[StringJoin[
+      "ExtractSpatialDerivativeProfile: No Derivative pattern found in term '",
+      ToString[term, InputForm], "'."
+    ]]
+  ];
+  profiles[[1]]
+];
+
+(* Build operator name from spatial derivative orders *)
+(* Single-axis: {3,0} -> "derivative_3_x", {0,5} -> "derivative_5_y" *)
+(* Multi-axis: {2,1} -> "derivative_2x_1y" *)
+BuildGenericOperatorName[spatialOrders_List] := Module[
+  {nonzero, axisNames = {"x", "y", "z"}, parts},
+
+  (* Collect {axisIndex, order} pairs for nonzero spatial orders *)
+  nonzero = {};
+  Do[
+    If[i <= Length[spatialOrders] && spatialOrders[[i]] > 0,
+      AppendTo[nonzero, {i, spatialOrders[[i]]}]
+    ],
+    {i, 1, Min[Length[spatialOrders], 3]}
+  ];
+
+  If[Length[nonzero] == 0,
+    Throw[StringJoin[
+      "BuildGenericOperatorName: No nonzero spatial derivatives in profile {",
+      StringJoin[Riffle[ToString /@ spatialOrders, ", "]], "}."
+    ]]
+  ];
+
+  If[Length[nonzero] == 1,
+    (* Single axis: derivative_N_x *)
+    StringJoin["derivative_", ToString[nonzero[[1, 2]]], "_", axisNames[[nonzero[[1, 1]]]]],
+    (* Multi-axis: derivative_2x_1y *)
+    parts = Table[
+      StringJoin[ToString[pair[[2]]], axisNames[[pair[[1]]]]],
+      {pair, nonzero}
+    ];
+    StringJoin["derivative_", Riffle[parts, "_"]]
+  ]
+];
+
 (* Classify operator type based on derivative structure *)
 (* Returns {operatorName, shouldConvertToMomentum} *)
 ClassifyOperatorType[term_] := Module[
@@ -811,12 +885,13 @@ ClassifyOperatorType[term_] := Module[
     Return[{"biharmonic", False}]
   ];
 
-  (* Unknown operator type - fail explicitly *)
-  Throw[StringJoin[
-    "ClassifyOperatorType: Unsupported derivative order ", ToString[orderDerivatives],
-    " in term '", ToString[term, InputForm], "'. ",
-    "Supported orders: 0 (identity), 1 (gradient), 2 (laplacian/cross), 4 (biharmonic)."
-  ]]
+  (* Generic higher-order derivatives (Phase 12) *)
+  (* Handles orders 3, 5, 6+ by extracting per-axis derivative profile *)
+  Module[{spatialProfile, genericName},
+    spatialProfile = ExtractSpatialDerivativeProfile[term];
+    genericName = BuildGenericOperatorName[spatialProfile];
+    Return[{genericName, False}]
+  ]
 ];
 
 (* === Main Function: Identify operator and target field === *)

@@ -18,7 +18,7 @@
        → Extract components (A_0[t,x], A_1[t,x], ...)
 
    KEY FEATURES:
-     - Supports scalar and vector fields
+     - Supports scalar, vector, and rank-2 tensor fields
      - additionalFields parameter for cross-field coupling (e.g., pass {chi[]}
        when decomposing phi to ensure chi transforms to coordinate form)
      - Dimension-agnostic: uses GetChartDimension instead of hardcoded values
@@ -170,11 +170,37 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
     Return[result]
   ];
 
-  (* Higher-rank tensors: fail explicitly rather than returning incorrect data *)
+  (* For a rank-2 tensor field h[-a,-b], extract each independent component *)
+  If[fieldRank === 2,
+    Module[{symQ, componentPairs},
+      (* Check for non-trivial symmetry (symmetric or antisymmetric) *)
+      symQ = (SymmetryGroupOfTensor[fieldHead] =!= StrongGenSet[{}, GenSet[]]);
+
+      componentPairs = If[symQ,
+        (* Symmetric: upper triangle {i,j} with j >= i *)
+        Flatten[Table[{i, j}, {i, 0, dim - 1}, {j, i, dim - 1}], 1],
+        (* Non-symmetric: all pairs *)
+        Flatten[Table[{i, j}, {i, 0, dim - 1}, {j, 0, dim - 1}], 1]
+      ];
+
+      result = Table[
+        {
+          idx - 1,
+          ExtractRank2Component[eom, field, chart,
+            componentPairs[[idx, 1]], componentPairs[[idx, 2]],
+            additionalFields, computeChristoffels, metricMatrix]
+        },
+        {idx, 1, Length[componentPairs]}
+      ];
+      Return[result]
+    ]
+  ];
+
+  (* Rank 3+: fail explicitly *)
   Throw[StringJoin[
     "DecomposeToComponents: Rank-", ToString[fieldRank],
     " tensor decomposition is not supported. ",
-    "Only scalar (rank 0) and vector (rank 1) fields are currently implemented. ",
+    "Only scalar (rank 0), vector (rank 1), and rank-2 tensor fields are implemented. ",
     "Field: ", ToString[fieldHead]
   ]]
 ];
@@ -285,6 +311,153 @@ ExtractVectorComponent[eom_, field_, chart_, componentIndex_, additionalFields_L
   componentEq = Expand[componentEq];
 
   componentEq
+];
+
+(* === Rank-2 Tensor Component Extraction === *)
+
+ExtractRank2Component[eom_, field_, chart_, idx1_, idx2_,
+  additionalFields_List:{}, computeChristoffels_:False, metricMatrix_:None] := Module[
+  {componentEq, fieldHead, coordSyms, dim, allFieldHeads},
+
+  (*
+     For a rank-2 equation EOM[-a,-b] = 0, extract the (idx1,idx2) component.
+
+     Strategy is the same as ExtractVectorComponent but with TWO free indices:
+     1. Find two free indices in the EOM
+     2. Replace them with specific basis indices {idx1, -chart} and {idx2, -chart}
+     3-8. Same pipeline: ToBasis → TraceBasisDummy → Christoffels → Epsilon → Metric
+     9. Replace rank-2 field components with scalar functions (flat sequential naming)
+     10. Transform additional fields (scalar, vector, or rank-2)
+     11. ConvertCDToDerivatives
+  *)
+
+  fieldHead = ExtractFieldHead[field];
+
+  (* Step 1: Find the two free indices *)
+  Module[{allIndices, freeIdxList, basisIdx1, basisIdx2},
+    allIndices = List @@ IndicesOf[][eom];
+    freeIdxList = Select[allIndices, !MemberQ[allIndices, ChangeIndex[#]] &];
+    If[Length[freeIdxList] < 2,
+      Throw[StringJoin[
+        "ExtractRank2Component: Expected at least 2 free indices, found ",
+        ToString[Length[freeIdxList]], " in expression: ", ToString[Short[eom]]
+      ]]
+    ];
+
+    (* Step 2: Replace free indices with specific basis indices *)
+    basisIdx1 = If[DownIndexQ[freeIdxList[[1]]],
+      {idx1, -chart}, {idx1, chart}];
+    basisIdx2 = If[DownIndexQ[freeIdxList[[2]]],
+      {idx2, -chart}, {idx2, chart}];
+    componentEq = eom /. {
+      freeIdxList[[1]] -> basisIdx1,
+      freeIdxList[[2]] -> basisIdx2
+    };
+  ];
+
+  (* Step 3: Apply ToBasis *)
+  componentEq = ToBasis[chart][componentEq];
+
+  (* Step 4: TraceBasisDummy *)
+  componentEq = TraceBasisDummy[componentEq];
+
+  (* Step 5: Evaluate Christoffel symbols *)
+  componentEq = EvaluateChristoffelComponents[componentEq, chart, computeChristoffels];
+  componentEq = Expand[componentEq];
+
+  (* Step 6: Evaluate epsilon tensors *)
+  componentEq = EvaluateEpsilonComponents[componentEq, chart];
+  componentEq = Expand[componentEq];
+
+  (* Step 7: Get coordinate symbols *)
+  coordSyms = GetCoordinateSymbols[chart];
+  dim = Length[coordSyms];
+
+  (* Step 8: Evaluate metric components *)
+  If[metricMatrix =!= None,
+    componentEq = EvaluateMetricComponents[componentEq, chart, metricMatrix],
+    componentEq = EvaluateMinkowskiMetric[componentEq, chart]
+  ];
+  componentEq = Expand[componentEq];
+
+  If[metricMatrix =!= None,
+    componentEq = EvaluatePDMetric[componentEq, chart, metricMatrix];
+    componentEq = Expand[componentEq]
+  ];
+
+  (* Step 9: Convert all field components to scalar functions *)
+  allFieldHeads = Join[{fieldHead}, ExtractFieldHead /@ additionalFields];
+
+  Do[
+    Module[{fh = afh, fhRank = Length[SlotsOfTensor[afh]]},
+      Which[
+        fhRank === 0,
+          componentEq = componentEq /. {
+            fh[] :> Symbol[ToString[fh] <> "0"][Sequence @@ coordSyms]
+          },
+
+        fhRank === 1,
+          With[{ch = chart, cs = coordSyms},
+            componentEq = componentEq /. {
+              fh[{i_Integer, -ch}] :> Symbol[ToString[fh] <> ToString[Abs[i]]][Sequence @@ cs],
+              fh[{i_Integer, ch}] :> Symbol[ToString[fh] <> ToString[Abs[i]]][Sequence @@ cs]
+            }
+          ],
+
+        fhRank === 2,
+          componentEq = ReplaceRank2FieldComponents[componentEq, fh, chart, coordSyms, dim],
+
+        True,
+          Throw["ExtractRank2Component: Unsupported additional field rank " <> ToString[fhRank]]
+      ]
+    ],
+    {afh, allFieldHeads}
+  ];
+
+  (* Step 10: Convert coordinate derivatives *)
+  componentEq = ConvertCDToDerivatives[componentEq, chart];
+  Expand[componentEq]
+];
+
+(* Helper: Replace rank-2 field basis indices with flat sequential scalar functions *)
+(* For symmetric h in dim=2: h[{0,-ch},{0,-ch}] -> h0[t,x], h[{0,-ch},{1,-ch}] -> h1[t,x], h[{1,-ch},{1,-ch}] -> h2[t,x] *)
+ReplaceRank2FieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module[
+  {result = expr, symQ, pairs},
+
+  symQ = (SymmetryGroupOfTensor[fh] =!= StrongGenSet[{}, GenSet[]]);
+  pairs = If[symQ,
+    Flatten[Table[{ii, jj}, {ii, 0, dim - 1}, {jj, ii, dim - 1}], 1],
+    Flatten[Table[{ii, jj}, {ii, 0, dim - 1}, {jj, 0, dim - 1}], 1]
+  ];
+
+  With[{ch = chart, cs = coordSyms},
+    Do[
+      Module[{pair = pairs[[k]], seqIdx = k - 1, sym},
+        sym = Symbol[ToString[fh] <> ToString[seqIdx]];
+
+        (* All index configurations: down-down, up-up, mixed *)
+        result = result /. {
+          fh[{pair[[1]], -ch}, {pair[[2]], -ch}] :> sym[Sequence @@ cs],
+          fh[{pair[[1]], ch}, {pair[[2]], ch}] :> sym[Sequence @@ cs],
+          fh[{pair[[1]], ch}, {pair[[2]], -ch}] :> sym[Sequence @@ cs],
+          fh[{pair[[1]], -ch}, {pair[[2]], ch}] :> sym[Sequence @@ cs]
+        };
+
+        (* For symmetric: also map swapped indices to same component *)
+        If[symQ && pair[[1]] =!= pair[[2]],
+          result = result /. {
+            fh[{pair[[2]], -ch}, {pair[[1]], -ch}] :> sym[Sequence @@ cs],
+            fh[{pair[[2]], ch}, {pair[[1]], ch}] :> sym[Sequence @@ cs],
+            fh[{pair[[2]], ch}, {pair[[1]], -ch}] :> sym[Sequence @@ cs],
+            fh[{pair[[2]], -ch}, {pair[[1]], ch}] :> sym[Sequence @@ cs]
+          }
+        ]
+      ],
+      {k, 1, Length[pairs]}
+    ]
+  ];
+
+  result
 ];
 
 (* Helper: Find free (non-dummy) indices in an expression *)
