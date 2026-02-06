@@ -78,12 +78,11 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     print()
     print("Step 4: Creating initial conditions...")
 
-    # Initial state: 6 fields = 3 components * (field + momentum)
-    # State layout: A_0, pi_0, A_1, pi_1, A_2, pi_2
+    # A_0 is first-order (no momentum slot), A_1 and A_2 are second-order
+    # State layout: A_0, A_1, pi_1, A_2, pi_2 (5 fields total)
 
     # Start with zero fields
     a0 = ScalarField(grid, data=0.0, label="A_0")
-    pi0 = ScalarField(grid, data=0.0, label="pi_0")
     a1 = ScalarField(grid, data=0.0, label="A_1")
     pi1 = ScalarField(grid, data=0.0, label="pi_1")
     a2 = ScalarField(grid, data=0.0, label="A_2")
@@ -104,7 +103,7 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     )
     a1.data[:] = gaussian
 
-    state = FieldCollection([a0, pi0, a1, pi1, a2, pi2])
+    state = FieldCollection([a0, a1, pi1, a2, pi2])
     print(f"  Gaussian pulse in A_1 at center ({center_x}, {center_y})")
     print(f"  Width: {width}, Amplitude: {amplitude}")
 
@@ -134,14 +133,14 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     initial = cast("FieldCollection", storage[0])
     final = cast("FieldCollection", storage[-1])
 
-    # Extract field amplitudes
+    # Extract field amplitudes (state layout: A_0, A_1, pi_1, A_2, pi_2)
     initial_a0 = np.max(np.abs(initial[0].data))
-    initial_a1 = np.max(np.abs(initial[2].data))
-    initial_a2 = np.max(np.abs(initial[4].data))
+    initial_a1 = np.max(np.abs(initial[1].data))
+    initial_a2 = np.max(np.abs(initial[3].data))
 
     final_a0 = np.max(np.abs(final[0].data))
-    final_a1 = np.max(np.abs(final[2].data))
-    final_a2 = np.max(np.abs(final[4].data))
+    final_a1 = np.max(np.abs(final[1].data))
+    final_a2 = np.max(np.abs(final[3].data))
 
     print(
         f"  Initial: max|A_0| = {initial_a0:.3f}, max|A_1| = {initial_a1:.3f}, max|A_2| = {initial_a2:.3f}"
@@ -162,7 +161,7 @@ def main() -> None:  # noqa: PLR0915, PLR0914
 
     fig, axes = plt.subplots(2, 3, figsize=(15, 10))
 
-    # Initial state
+    # Initial state (state layout: A_0, A_1, pi_1, A_2, pi_2)
     vmax = max(initial_a1, 0.1)
     im0 = axes[0, 0].imshow(
         initial[0].data.T, origin="lower", cmap="bwr", vmin=-vmax, vmax=vmax
@@ -171,13 +170,13 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     plt.colorbar(im0, ax=axes[0, 0])
 
     im1 = axes[0, 1].imshow(
-        initial[2].data.T, origin="lower", cmap="bwr", vmin=-vmax, vmax=vmax
+        initial[1].data.T, origin="lower", cmap="bwr", vmin=-vmax, vmax=vmax
     )
     axes[0, 1].set_title("Initial A_1")
     plt.colorbar(im1, ax=axes[0, 1])
 
     im2 = axes[0, 2].imshow(
-        initial[4].data.T, origin="lower", cmap="bwr", vmin=-vmax, vmax=vmax
+        initial[3].data.T, origin="lower", cmap="bwr", vmin=-vmax, vmax=vmax
     )
     axes[0, 2].set_title("Initial A_2")
     plt.colorbar(im2, ax=axes[0, 2])
@@ -191,13 +190,13 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     plt.colorbar(im3, ax=axes[1, 0])
 
     im4 = axes[1, 1].imshow(
-        final[2].data.T, origin="lower", cmap="bwr", vmin=-vmax_f, vmax=vmax_f
+        final[1].data.T, origin="lower", cmap="bwr", vmin=-vmax_f, vmax=vmax_f
     )
     axes[1, 1].set_title(f"Final A_1 (t={t_end})")
     plt.colorbar(im4, ax=axes[1, 1])
 
     im5 = axes[1, 2].imshow(
-        final[4].data.T, origin="lower", cmap="bwr", vmin=-vmax_f, vmax=vmax_f
+        final[3].data.T, origin="lower", cmap="bwr", vmin=-vmax_f, vmax=vmax_f
     )
     axes[1, 2].set_title(f"Final A_2 (t={t_end})")
     plt.colorbar(im5, ax=axes[1, 2])
