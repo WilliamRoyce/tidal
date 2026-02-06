@@ -27,7 +27,6 @@ Print["Loading pipeline modules..."];
 pipelinePath = FileNameJoin[{DirectoryName[$InputFileName], "..", "..", "torsion_gertsenshtein", "wolfram"}];
 Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];
 Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];
-Get[FileNameJoin[{pipelinePath, "Linearize.wl"}]];
 Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];
 Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];
 
@@ -111,47 +110,38 @@ Print["   For constant Omega=", Omega0, ":"];
 Print["     - Kinetic term unchanged (g^ab CD_a phi CD_b phi = Omega^{-2} eta^ab partial_a phi partial_b phi)"];
 Print["     - Mass term scaled: m^2 -> m_eff^2 = m^2 * Omega^2 = ", m2 * Omega0^2];
 
-(* === Step 4: Construct the Wave Equation Directly === *)
+(* === Step 4: Construct the Wave Equation === *)
 Print[""];
-Print["Step 4: Constructing wave equation directly..."];
+Print["Step 4: Constructing wave equation..."];
 
 (*
-   NOTE: The current EulerLagrangeEquation module doesn't properly handle
-   the sqrt(-g) factor for curved spacetime Lagrangian variations.
-   For Phase 1, we construct the wave equation directly from known physics.
-
    For conformal metric g_ab = Omega^2 eta_ab:
-   Box_g phi = (1/sqrt(-g)) d_a(sqrt(-g) g^ab d_b phi)
+   Box_g phi = g^ab nabla_a nabla_b phi
 
-   With constant Omega, this simplifies (Christoffels = 0) to:
-   Box_g phi = g^ab d_a d_b phi = (1/Omega^2) eta^ab d_a d_b phi
-             = (1/Omega^2) (-d^2_t + d^2_x) phi
+   With constant Omega, Christoffel symbols = 0, so nabla = partial.
+   The inverse metric g^ab = Omega^{-2} eta^ab appears in the equation.
 
-   So Box_g phi - m^2 phi = 0 becomes:
-   (1/Omega^2) (-d^2_t + d^2_x) phi - m^2 phi = 0
+   The pipeline handles this via MetricMatrix option:
+   - EvaluateMetricComponents substitutes actual g^{ab} values (including Omega^{-2})
+   - ExportJSON normalizes by the LHS time-derivative coefficient
+   - Result: d2_t phi = d2_x phi - m_eff^2 phi where m_eff^2 = m^2 * Omega^2
 
-   Multiplying by Omega^2:
-   -d^2_t phi + d^2_x phi - m^2 Omega^2 phi = 0
-
-   Rearranging for wave equation form:
-   d^2_t phi = d^2_x phi - m_eff^2 phi  where m_eff^2 = m^2 Omega^2
+   This is the general approach - no need to pre-compute mEffSquared manually.
 *)
 
-(* Effective mass squared *)
-mEffSquared = m2 * Omega0^2;
-Print["   Effective mass: m_eff^2 = m^2 * Omega^2 = ", mEffSquared];
-
-(* Construct wave equation in abstract tensor form *)
-(* We use the standard d'Alembertian structure but with effective mass *)
-(* Box phi - m_eff^2 phi = 0, where Box uses the CONFORMAL metric *)
-waveEq = confG[b, c] confCD[-b][confCD[-c][confPhi[]]] - mEffSquared confPhi[];
-Print["   Wave equation (abstract): ", waveEq, " = 0"];
+(* Construct wave equation with bare mass m^2 *)
+(* The pipeline will handle the conformal factor via MetricMatrix *)
+waveEq = confG[b, c] confCD[-b][confCD[-c][confPhi[]]] - m2 confPhi[];
+Print["   Wave equation (abstract): Box_g phi - m^2 phi = 0"];
+Print["   Pipeline will normalize: d2_t phi = d2_x phi - m_eff^2 phi"];
+Print["   where m_eff^2 = m^2 * Omega^2 = ", m2 * Omega0^2];
 
 (* === Step 5: Extract Components === *)
 Print[""];
 Print["Step 5: Decomposing to components..."];
 
-componentEqs = DecomposeToComponents[waveEq, confPhi[], confCart];
+componentEqs = DecomposeToComponents[waveEq, confPhi[], confCart, {},
+  "MetricMatrix" -> confMetricComponents];
 Print["   Component equations: ", Length[componentEqs]];
 Print["   Result: ", componentEqs];
 
@@ -196,8 +186,8 @@ Print["=== Summary ==="];
 Print["Conformal metric: g_ab = ", Omega0^2, " * eta_ab"];
 Print["For CONSTANT Omega, Christoffel symbols = 0"];
 Print["Klein-Gordon equation: Box_g phi - m^2 phi = 0"];
-Print["In coordinates: ", Omega0^(-2), " * (d2_t phi - d2_x phi) - m^2 phi = 0"];
-Print["Rearranging: d2_t phi = d2_x phi - m_eff^2 phi"];
+Print["Pipeline handles: actual metric g^{ab} -> LHS normalization -> operator detection"];
+Print["Result: d2_t phi = d2_x phi - m_eff^2 phi"];
 Print["   where m_eff^2 = m^2 * Omega^2 = ", m2 * Omega0^2];
 Print[""];
 Print["Verification: This should match flat Klein-Gordon with m^2 = 4"];

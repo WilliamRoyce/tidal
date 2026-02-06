@@ -213,14 +213,18 @@ def main() -> None:  # noqa: PLR0914, PLR0915
 
         # Proper Hamiltonian: H = ½∫[π² + (∂_x φ)² + m_eff²φ²] dx
         m_eff_sq = 4.0  # From conformal factor Ω=2: m_eff² = m² * Ω² = 1 * 4
-        energy = np.sum(0.5 * pi_data**2 + 0.5 * grad_phi**2 + 0.5 * m_eff_sq * phi_data**2)
+        energy = np.sum(
+            0.5 * pi_data**2 + 0.5 * grad_phi**2 + 0.5 * m_eff_sq * phi_data**2
+        )
         energies.append(energy)
         time_values.append(t_idx)
 
     ax.plot(time_values, energies, "b-", linewidth=2)
     ax.set_xlabel("Snapshot index")
     ax.set_ylabel("Total Energy")
-    ax.set_title(r"Hamiltonian $H = \frac{1}{2}\int[\pi^2 + (\nabla\phi)^2 + m_{eff}^2\phi^2]dx$")
+    ax.set_title(
+        r"Hamiltonian $H = \frac{1}{2}\int[\pi^2 + (\nabla\phi)^2 + m_{eff}^2\phi^2]dx$"
+    )
     ax.grid(visible=True, alpha=0.3)
 
     # Space-time diagram
@@ -237,7 +241,7 @@ def main() -> None:  # noqa: PLR0914, PLR0915
         aspect="auto",
         origin="lower",
         extent=[0, 100, 0, n_snapshots],
-        cmap="RdBu_r",
+        cmap="bwr_r",
         vmin=-amplitude,
         vmax=amplitude,
     )
