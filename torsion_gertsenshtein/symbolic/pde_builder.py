@@ -25,6 +25,7 @@ from torsion_gertsenshtein.symbolic.json_loader import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
     import numpy as np
@@ -47,11 +48,11 @@ def _op_laplacian(field: ScalarField, bc: BCDescriptor) -> ScalarField:
     return field.laplace(bc=bc)
 
 
-def _op_identity(field: ScalarField, bc: BCDescriptor) -> ScalarField:
+def _op_identity(field: ScalarField, _bc: BCDescriptor) -> ScalarField:
     return field.copy()
 
 
-def _op_gradient(axis: int):
+def _op_gradient(axis: int) -> Callable[[ScalarField, BCDescriptor], ScalarField]:
     """Create a gradient handler for a specific axis."""
 
     def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:
@@ -63,7 +64,9 @@ def _op_gradient(axis: int):
     return _handler
 
 
-def _op_directional_laplacian(axis: int):
+def _op_directional_laplacian(
+    axis: int,
+) -> Callable[[ScalarField, BCDescriptor], ScalarField]:
     """Create a directional Laplacian handler (∂²/∂x_i²)."""
 
     def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:
@@ -76,7 +79,9 @@ def _op_directional_laplacian(axis: int):
     return _handler
 
 
-def _op_cross_derivative(axis1: int, axis2: int):
+def _op_cross_derivative(
+    axis1: int, axis2: int
+) -> Callable[[ScalarField, BCDescriptor], ScalarField]:
     """Create a cross derivative handler (∂²/∂x_i ∂x_j)."""
 
     def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:

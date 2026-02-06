@@ -8,11 +8,15 @@ from typing import Any
 import pytest
 
 from torsion_gertsenshtein.symbolic.json_loader import (
+    KNOWN_OPERATORS,
     ComponentEquation,
     EquationSystem,
     OperatorTerm,
     load_equation_system,
     validate_json_schema,
+)
+from torsion_gertsenshtein.symbolic.pde_builder import (
+    _OPERATOR_REGISTRY,  # noqa: PLC2701
 )
 
 # === Fixtures ===
@@ -559,9 +563,6 @@ class TestOperatorRegistrySync:
 
     def test_all_registry_operators_are_known(self) -> None:
         """Every operator in _OPERATOR_REGISTRY must be in KNOWN_OPERATORS."""
-        from torsion_gertsenshtein.symbolic.json_loader import KNOWN_OPERATORS
-        from torsion_gertsenshtein.symbolic.pde_builder import _OPERATOR_REGISTRY
-
         unknown = set(_OPERATOR_REGISTRY.keys()) - KNOWN_OPERATORS
         assert unknown == set(), (
             f"Operators in _OPERATOR_REGISTRY but not in KNOWN_OPERATORS: {sorted(unknown)}. "
@@ -570,9 +571,6 @@ class TestOperatorRegistrySync:
 
     def test_known_minus_registry_is_only_first_derivative_t(self) -> None:
         """The only KNOWN_OPERATOR not in _OPERATOR_REGISTRY is first_derivative_t."""
-        from torsion_gertsenshtein.symbolic.json_loader import KNOWN_OPERATORS
-        from torsion_gertsenshtein.symbolic.pde_builder import _OPERATOR_REGISTRY
-
         special_cased = KNOWN_OPERATORS - set(_OPERATOR_REGISTRY.keys())
         assert special_cased == {"first_derivative_t"}, (
             f"Expected only {{'first_derivative_t'}} to be special-cased, "
@@ -619,7 +617,7 @@ class TestValidationErrors:
     def test_unknown_operator_raises(self) -> None:
         """Unknown operator in RHS term should raise ValueError."""
         data = {"coefficient": 1.0, "operator": "teleportation", "field": "phi"}
-        with pytest.raises(ValueError, match="Unknown operator.*teleportation"):
+        with pytest.raises(ValueError, match=r"Unknown operator.*teleportation"):
             OperatorTerm.from_dict(data)
 
     def test_missing_required_keys_raises(self) -> None:
