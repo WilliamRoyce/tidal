@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from pde import FieldCollection, PDEBase, ScalarField
+from scipy import special
 from typing_extensions import override
 
 from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
@@ -363,15 +364,81 @@ class PDEFromSpec(PDEBase):
         # Default: use numeric coefficient from JSON
         return term.coefficient
 
+    def _convert_power_function(self, expr: str) -> str:
+        """Convert Power[base, exponent] to (base)**(exponent).
+
+        Handles nested expressions in both arguments. Must run before bracket
+        conversion ([] → ()).
+
+        Parameters
+        ----------
+        expr : str
+            Expression potentially containing Power[...] syntax.
+
+        Returns
+        -------
+        str
+            Expression with Power[...] converted to (...)**(...).
+        """
+        # Pattern: Power[<arg1>, <arg2>] where args may contain nested brackets
+        # (?:[^[\]]|\[[^\]]*\]) matches either non-bracket chars or [...] pairs
+        pattern = r"Power\[((?:[^[\]]|\[[^\]]*\])*),\s*((?:[^[\]]|\[[^\]]*\])*)\]"
+
+        def replacer(match: re.Match[str]) -> str:
+            base = match.group(1).strip()
+            exp = match.group(2).strip()
+            return f"({base})**({exp})"
+
+        # Multiple passes for nested Power calls
+        prev = None
+        result = expr
+        while prev != result:
+            prev = result
+            result = re.sub(pattern, replacer, result)
+        return result
+
+    def _convert_arctan2(self, expr: str) -> str:
+        """Convert ArcTan[x, y] to arctan2(y, x) with argument swap.
+
+        Mathematica's ArcTan[x, y] computes atan2(y, x), so arguments must
+        be swapped during conversion to match NumPy's arctan2(y, x) signature.
+
+        Parameters
+        ----------
+        expr : str
+            Expression potentially containing ArcTan[x, y] syntax.
+
+        Returns
+        -------
+        str
+            Expression with ArcTan[x, y] converted to arctan2(y, x).
+        """
+        # Pattern: ArcTan[<arg1>, <arg2>] - must handle before generic function conversion
+        pattern = r"ArcTan\[((?:[^[\],]|\[[^\]]*\])*),\s*((?:[^[\]]|\[[^\]]*\])*)\]"
+
+        def replacer(match: re.Match[str]) -> str:
+            x = match.group(1).strip()
+            y = match.group(2).strip()
+            return f"arctan2({y}, {x})"  # Swap x and y!
+
+        return re.sub(pattern, replacer, expr)
+
     def _mathematica_to_python(self, expr: str) -> str:
         """Convert Mathematica InputForm expression to evaluable Python.
 
         Handles common Mathematica syntax:
         - ``E^(...)`` to ``exp(...)`` (Euler's number)
+        - ``Power[x,y]`` to ``(x)**(y)`` (function form of exponentiation)
         - ``Sin[x]`` to ``sin(x)``, ``Cos[x]`` to ``cos(x)``, etc.
+        - ``ArcSin[x]`` to ``arcsin(x)``, ``ArcCos[x]`` to ``arccos(x)``, etc.
+        - ``ArcTan[x, y]`` to ``arctan2(y, x)`` (note argument order swap!)
+        - ``Sinh[x]`` to ``sinh(x)``, ``Cosh[x]`` to ``cosh(x)``, etc.
+        - ``ArcSinh[x]`` to ``arcsinh(x)``, ``ArcCosh[x]`` to ``arccosh(x)``, etc.
+        - ``Erf[x]`` to ``erf(x)`` (scipy.special)
+        - ``BesselJ[n, x]`` to ``jv(n, x)``, ``BesselY[n, x]`` to ``yv(n, x)``
         - ``t[]`` to ``t`` (xCoba coordinate symbols, using actual coordinate names)
         - Mathematica brackets ``[``, ``]`` to Python parens ``(``, ``)``
-        - Multiplication, grouping, negation are already Python-compatible
+        - Mathematica ``^`` to Python ``**``
 
         Parameters
         ----------
@@ -384,26 +451,58 @@ class PDEFromSpec(PDEBase):
             Python-evaluable expression string.
         """
         result = expr
-        # E^(...) -> exp(...) — Mathematica's Euler number raised to a power
+
+        # Step 1: E^(...) → exp(...) — Mathematica's Euler number
         result = re.sub(r"\bE\^", "exp", result)
-        # Common math functions: Sin[x] -> sin(x), etc.
-        for mma_func, py_func in [
+
+        # Step 2: Power[x, y] → (x)**(y) — must handle before bracket conversion
+        result = self._convert_power_function(result)
+
+        # Step 3: ArcTan[x, y] → arctan2(y, x) — special 2-arg case with swap
+        # Must handle before generic function conversion
+        result = self._convert_arctan2(result)
+
+        # Step 4: Function name conversions (batch)
+        function_map = [
+            # Basic trig
             ("Sin", "sin"),
             ("Cos", "cos"),
             ("Tan", "tan"),
+            # Inverse trig (1-arg)
+            ("ArcSin", "arcsin"),
+            ("ArcCos", "arccos"),
+            ("ArcTan", "arctan"),  # 1-arg version only (2-arg handled above)
+            # Hyperbolic
+            ("Sinh", "sinh"),
+            ("Cosh", "cosh"),
+            ("Tanh", "tanh"),
+            # Inverse hyperbolic
+            ("ArcSinh", "arcsinh"),
+            ("ArcCosh", "arccosh"),
+            ("ArcTanh", "arctanh"),
+            # Other
             ("Log", "log"),
             ("Sqrt", "sqrt"),
             ("Abs", "abs"),
-        ]:
+            # Special functions (scipy.special)
+            ("Erf", "erf"),
+            ("BesselJ", "jv"),
+            ("BesselY", "yv"),
+        ]
+        for mma_func, py_func in function_map:
             result = re.sub(rf"\b{mma_func}\b", py_func, result)
-        # Mathematica brackets to Python parens (after function renaming)
+
+        # Step 5: Mathematica brackets to Python parens (after function renaming)
         result = result.replace("[", "(").replace("]", ")")
-        # Mathematica ^ to Python ** (AFTER E^ -> exp to avoid double-conversion)
+
+        # Step 6: Mathematica ^ to Python ** (AFTER E^ → exp to avoid double-conversion)
         result = result.replace("^", "**")
-        # xCoba coordinate symbols appear as zero-arg function calls: t() -> t, x() -> x, etc.
-        # Uses actual coordinate names from the equation system (not hardcoded x/y/z).
+
+        # Step 7: xCoba coordinate symbols: t() → t, x() → x, etc.
+        # Uses actual coordinate names from equation system (not hardcoded x/y/z).
         for coord in self.spec.effective_coordinates:
             result = result.replace(f"{coord}()", coord)
+
         return result
 
     def _resolve_coefficient_at_point(
@@ -456,16 +555,35 @@ class PDEFromSpec(PDEBase):
         sym = term.coefficient_symbolic or ""
         py_expr = self._mathematica_to_python(sym)
 
-        # Build evaluation namespace with numpy functions (work on scalars AND arrays)
+        # Build evaluation namespace with numpy/scipy functions (work on scalars AND arrays)
         namespace: dict[str, Any] = dict(self._parameters)
         namespace["t"] = t
         namespace["exp"] = np.exp
+        # Basic trig
         namespace["sin"] = np.sin
         namespace["cos"] = np.cos
         namespace["tan"] = np.tan
+        # Inverse trig
+        namespace["arcsin"] = np.arcsin
+        namespace["arccos"] = np.arccos
+        namespace["arctan"] = np.arctan
+        namespace["arctan2"] = np.arctan2
+        # Hyperbolic
+        namespace["sinh"] = np.sinh
+        namespace["cosh"] = np.cosh
+        namespace["tanh"] = np.tanh
+        # Inverse hyperbolic
+        namespace["arcsinh"] = np.arcsinh
+        namespace["arccosh"] = np.arccosh
+        namespace["arctanh"] = np.arctanh
+        # Other
         namespace["log"] = np.log
         namespace["sqrt"] = np.sqrt
         namespace["abs"] = np.abs
+        # Special functions (scipy.special)
+        namespace["erf"] = special.erf
+        namespace["jv"] = special.jv  # BesselJ
+        namespace["yv"] = special.yv  # BesselY
 
         # Inject spatial coordinates from grid when position-dependent
         if term.position_dependent:
@@ -476,7 +594,11 @@ class PDEFromSpec(PDEBase):
 
         # Validate all symbols can be resolved
         identifiers = set(re.findall(r"\b[a-zA-Z_]\w*\b", py_expr))
-        builtin_names = {"exp", "sin", "cos", "tan", "log", "sqrt", "abs"}
+        # Derive builtin names from namespace (all math functions, excluding parameters and t)
+        builtin_names = set(namespace.keys()) - set(self._parameters.keys()) - {"t"}
+        # Exclude coordinate variables if position-dependent
+        if term.position_dependent:
+            builtin_names -= set(self.spec.spatial_coordinates)
         coord_vars = set(self.spec.effective_coordinates)
         identifiers -= builtin_names | coord_vars
         missing = identifiers - set(self._parameters.keys())

@@ -1528,3 +1528,236 @@ class TestPositionDependentCoefficients:
 
         # Final state should differ from initial (evolution happened)
         assert not np.allclose(result[0].data, phi.data, rtol=0.01)
+
+
+class TestMathematicaFunctionConversion:
+    """Test _mathematica_to_python conversion for extended mathematical functions."""
+
+    def make_spec(self) -> EquationSystem:
+        """Helper to create minimal EquationSystem for conversion testing."""
+        return EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(1.0, "laplacian", "phi"),),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=("t", "x", "y"),
+        )
+
+    # ===== Inverse Trigonometric =====
+
+    def test_arcsin_conversion(self) -> None:
+        """Test ArcSin[x] → arcsin(x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("ArcSin[x]")
+        assert result == "arcsin(x)"
+
+    def test_arccos_conversion(self) -> None:
+        """Test ArcCos[x] → arccos(x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("ArcCos[x]")
+        assert result == "arccos(x)"
+
+    def test_arctan_conversion(self) -> None:
+        """Test ArcTan[x] → arctan(x) (1-arg version)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("ArcTan[x]")
+        assert result == "arctan(x)"
+
+    def test_arctan2_conversion(self) -> None:
+        """Test ArcTan[x, y] → arctan2(y, x) with argument swap."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("ArcTan[x, y]")
+        # Critical: arguments must be swapped!
+        assert result == "arctan2(y, x)"
+
+        # Also test with coordinates
+        result2 = pde._mathematica_to_python("ArcTan[x[], y[]]")
+        # After bracket and coordinate conversion: arctan2(y, x)
+        assert "arctan2" in result2
+        assert "y" in result2
+        assert "x" in result2
+
+    # ===== Hyperbolic =====
+
+    def test_sinh_conversion(self) -> None:
+        """Test Sinh[x] → sinh(x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Sinh[x]")
+        assert result == "sinh(x)"
+
+    def test_cosh_conversion(self) -> None:
+        """Test Cosh[x] → cosh(x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Cosh[x]")
+        assert result == "cosh(x)"
+
+    def test_tanh_conversion(self) -> None:
+        """Test Tanh[x] → tanh(x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Tanh[x]")
+        assert result == "tanh(x)"
+
+    # ===== Inverse Hyperbolic =====
+
+    def test_arcsinh_conversion(self) -> None:
+        """Test ArcSinh[x] → arcsinh(x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("ArcSinh[x]")
+        assert result == "arcsinh(x)"
+
+    def test_arccosh_conversion(self) -> None:
+        """Test ArcCosh[x] → arccosh(x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("ArcCosh[x]")
+        assert result == "arccosh(x)"
+
+    def test_arctanh_conversion(self) -> None:
+        """Test ArcTanh[x] → arctanh(x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("ArcTanh[x]")
+        assert result == "arctanh(x)"
+
+    # ===== Power Function =====
+
+    def test_power_function_conversion(self) -> None:
+        """Test Power[x, y] → (x)**(y)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Power[x, 2]")
+        assert "**" in result
+        assert "Power" not in result
+        assert "x" in result
+        assert "2" in result
+
+        # Test with nested expression
+        result2 = pde._mathematica_to_python("Power[Sin[x], 2]")
+        assert "sin(x)" in result2
+        assert "**" in result2
+        assert "Power" not in result2
+
+    # ===== Special Functions (Phase 2) =====
+
+    def test_erf_conversion(self) -> None:
+        """Test Erf[x] → erf(x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Erf[x]")
+        assert result == "erf(x)"
+
+    def test_besselj_conversion(self) -> None:
+        """Test BesselJ[n, x] → jv(n, x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("BesselJ[0, x]")
+        assert result == "jv(0, x)"
+
+    def test_bessely_conversion(self) -> None:
+        """Test BesselY[n, x] → yv(n, x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("BesselY[2, x]")
+        assert result == "yv(2, x)"
+
+    # ===== Edge Cases =====
+
+    def test_nested_functions(self) -> None:
+        """Test nested function calls: Sin[ArcCos[x]]."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Sin[ArcCos[x]]")
+        assert result == "sin(arccos(x))"
+
+    def test_multiple_new_functions(self) -> None:
+        """Test expression with multiple new functions."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Sinh[t[]] + ArcTan[x, y]^2")
+        assert "sinh(t)" in result
+        assert "arctan2(y, x)" in result
+        assert "**2" in result
+
+    def test_new_functions_with_coordinates(self) -> None:
+        """Test new functions with coordinate symbols."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Cosh[x[]] * ArcSin[y[]]")
+        # After conversion: cosh(x) * arcsin(y)
+        assert "cosh(x)" in result
+        assert "arcsin(y)" in result
+        assert "[]" not in result
+
+    # ===== Integration Test =====
+
+    def test_coefficient_evaluation_with_new_functions(self) -> None:
+        """Integration test: full coefficient resolution with new math functions."""
+        # Create term with position-dependent coefficient using new functions
+        # Use: sinh(t) + arctan2(y, x)
+        term = OperatorTerm(
+            coefficient=1.0,
+            operator="laplacian",
+            field="phi",
+            coefficient_symbolic="Sinh[t[]] + ArcTan[x[], y[]]",
+            coordinate_dependent=("x", "y", "t"),
+        )
+
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(term,),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=("t", "x", "y"),
+        )
+
+        grid = CartesianGrid([(0, 2 * np.pi), (0, 2 * np.pi)], [8, 8], periodic=True)
+        pde = PDEFromSpec(spec, parameters={})
+
+        # Resolve coefficient at t=1.0
+        result = pde._resolve_coefficient_at_point(term, t=1.0, grid=grid)
+
+        # Should be ndarray with shape matching grid
+        assert isinstance(result, np.ndarray)
+        assert result.shape == grid.shape
+
+        # Verify numerical correctness at a sample point
+        # At grid point [4, 4] (middle): coords ≈ (π, π)
+        # arctan2(π, π) ≈ π/4 ≈ 0.7854
+        # sinh(1.0) ≈ 1.1752
+        # Sum ≈ 1.9606
+        mid_val = result[4, 4]
+        # Get actual coordinate values at this grid point
+        x_coord = grid.cell_coords[4, 4, 0]  # type: ignore[index]
+        y_coord = grid.cell_coords[4, 4, 1]  # type: ignore[index]
+        expected = np.sinh(1.0) + np.arctan2(y_coord, x_coord)
+        assert_allclose(mid_val, expected, rtol=1e-10)
