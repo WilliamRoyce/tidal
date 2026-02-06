@@ -14,6 +14,26 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+#: Set of all operators supported by the pipeline.
+#: Validated at JSON load time to catch typos early.
+KNOWN_OPERATORS: frozenset[str] = frozenset(
+    {
+        "identity",
+        "laplacian",
+        "laplacian_x",
+        "laplacian_y",
+        "laplacian_z",
+        "gradient_x",
+        "gradient_y",
+        "gradient_z",
+        "cross_derivative_xy",
+        "cross_derivative_xz",
+        "cross_derivative_yz",
+        "first_derivative_t",
+        "biharmonic",
+    }
+)
+
 
 @dataclass(frozen=True)
 class LHSStructure:
@@ -96,10 +116,32 @@ class OperatorTerm:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> OperatorTerm:
-        """Create an OperatorTerm from a dictionary."""
+        """Create an OperatorTerm from a dictionary.
+
+        Raises
+        ------
+        ValueError
+            If required keys are missing or operator is unknown.
+        """
+        required_keys = {"coefficient", "operator", "field"}
+        missing = required_keys - set(data.keys())
+        if missing:
+            msg = (
+                f"RHS term missing required keys: {sorted(missing)}. Got: {dict(data)}"
+            )
+            raise ValueError(msg)
+
+        operator = str(data["operator"])
+        if operator not in KNOWN_OPERATORS:
+            msg = (
+                f"Unknown operator '{operator}'. "
+                f"Known operators: {sorted(KNOWN_OPERATORS)}"
+            )
+            raise ValueError(msg)
+
         return cls(
             coefficient=float(data["coefficient"]),
-            operator=str(data["operator"]),
+            operator=operator,
             field=str(data["field"]),
             coefficient_symbolic=data.get("coefficient_symbolic"),
             time_dependent=bool(data.get("time_dependent", False)),
@@ -239,6 +281,15 @@ class EquationSystem:
                 msg = f"mass_matrix row {i} length {len(row)} != n_components {self.n_components}"
                 raise ValueError(msg)
 
+        if len(self.coupling_matrix) != self.n_components:
+            msg = f"coupling_matrix rows {len(self.coupling_matrix)} != n_components {self.n_components}"
+            raise ValueError(msg)
+
+        for i, row in enumerate(self.coupling_matrix):
+            if len(row) != self.n_components:
+                msg = f"coupling_matrix row {i} length {len(row)} != n_components {self.n_components}"
+                raise ValueError(msg)
+
         # Validate field references in equation terms
         self._validate_field_references()
 
@@ -299,7 +350,13 @@ class EquationSystem:
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:
-        """Create an EquationSystem from a dictionary (parsed JSON)."""
+        """Create an EquationSystem from a dictionary (parsed JSON).
+
+        Raises
+        ------
+        ValueError
+            If the JSON data is invalid or component references are inconsistent.
+        """
         # Extract spacetime info
         spacetime = data["spacetime"]
         dimension = int(spacetime["dimension"])
@@ -309,6 +366,17 @@ class EquationSystem:
         fields_data = data["fields"]
         component_names = tuple(f["name"] for f in fields_data)
         n_components = len(component_names)
+
+        # Validate field name uniqueness
+        if len(component_names) != len(set(component_names)):
+            seen: set[str] = set()
+            duplicates: list[str] = []
+            for name in component_names:
+                if name in seen:
+                    duplicates.append(name)
+                seen.add(name)
+            msg = f"Duplicate field names: {duplicates}"
+            raise ValueError(msg)
 
         # Build field name -> index lookup
         fields_lookup = {f["name"]: f["index"] for f in fields_data}
@@ -330,7 +398,9 @@ class EquationSystem:
 
         mass_matrix = tuple(
             tuple(float(x) for x in row)
-            for row in coupling_data.get("mass_matrix", _default_zero_matrix(n_components))
+            for row in coupling_data.get(
+                "mass_matrix", _default_zero_matrix(n_components)
+            )
         )
         coupling_matrix = tuple(
             tuple(float(x) for x in row)

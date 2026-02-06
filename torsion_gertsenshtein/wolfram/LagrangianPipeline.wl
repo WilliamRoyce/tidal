@@ -1,5 +1,9 @@
 (* ::Package:: *)
 (*
+   DEPRECATED: This module is no longer used. All examples inline the pipeline
+   steps directly (EulerLagrangeEquation → DecomposeToComponents → BuildMultiFieldJSONStructure).
+   Kept for reference only — the ASCII architecture diagram below remains useful documentation.
+
    MODULE: LagrangianPipeline.wl
    PURPOSE: Main entry point for the Lagrangian-to-PDE pipeline
 
