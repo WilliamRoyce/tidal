@@ -1,24 +1,26 @@
 {
 	"metadata":{
 		"source":"xAct",
-		"lagrangian_expr":"-1\/2 g^ab d_a phi d_b phi - 1\/2 m^2 phi^2",
-		"derived_from":"Curved spacetime KG",
+		"lagrangian_expr":"-1\/2 g^ab nabla_a phi nabla_b phi - 1\/2 m^2 phi^2",
+		"derived_from":"Euler-Lagrange",
 		"gauge":"none",
 		"linearized":true,
 		"parameters":{
-			"H":0.1,
-			"m2":1.0
+			"dSH":0.1,
+			"dSm2":1.0
 		}
 	},
 	"spacetime":{
-		"dimension":2,
+		"dimension":3,
 		"signature":[
 			-1,
+			1,
 			1
 		],
 		"coordinates":[
 			"t",
-			"x"
+			"x",
+			"y"
 		],
 		"metric_type":"conformal_flat",
 		"conformal_factor":"exp(H*t)"
@@ -45,20 +47,26 @@
 				"terms":[
 					{
 						"coefficient":1.0,
-						"operator":"laplacian",
+						"operator":"identity",
+						"field":"dSphi_0",
+						"coefficient_symbolic":"-(dSm2*E^(2*dSH*t[]))",
+						"time_dependent":true
+					},
+					{
+						"coefficient":1.0,
+						"operator":"laplacian_x",
 						"field":"dSphi_0"
 					},
 					{
 						"coefficient":-1.0,
 						"operator":"first_derivative_t",
 						"field":"dSphi_0",
-						"coefficient_symbolic":"-H"
+						"coefficient_symbolic":"-dSH"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"identity",
-						"field":"dSphi_0",
-						"coefficient_symbolic":"-m2"
+						"coefficient":1.0,
+						"operator":"laplacian_y",
+						"field":"dSphi_0"
 					}
 				]
 			}
