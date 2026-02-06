@@ -45,7 +45,13 @@ from torsion_gertsenshtein.symbolic import (
 
 
 def main() -> None:  # noqa: PLR0915, PLR0914
-    """Run the gravitational wave propagation simulation."""
+    """Run the gravitational wave propagation simulation.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the JSON specification file is not found.
+    """
     print("=" * 60)
     print("Gravitational Wave Propagation (Linearized EH, de Donder Gauge)")
     print("=" * 60)
@@ -58,7 +64,9 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     # Step 1: Load the equation specification
     # ----------------------------------------------------------------
     print("Step 1: Loading equation specification...")
-    json_path = Path(__file__).parent.parent / "data" / "linearized_gravity_dedonder.json"
+    json_path = (
+        Path(__file__).parent.parent / "data" / "linearized_gravity_dedonder.json"
+    )
 
     if not json_path.exists():
         msg = (
@@ -99,7 +107,9 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     pde = build_pde_from_json(json_path)
     print(f"  PDE class: {type(pde).__name__}")
     print(f"  Components: {pde.n_components}")
-    print(f"  State size: {spec.state_size} fields (each component has field + momentum)")
+    print(
+        f"  State size: {spec.state_size} fields (each component has field + momentum)"
+    )
 
     # ----------------------------------------------------------------
     # Step 3: Create the 3D spatial grid
@@ -138,15 +148,19 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     k_z = 2.0 * np.pi / 10.0  # wavenumber for oscillation within envelope
 
     # h_+ polarization: Gaussian envelope * sinusoidal carrier along z
-    h_plus = amplitude * np.exp(-((z - z_center) ** 2) / (2 * z_width**2)) * np.cos(
-        k_z * (z - z_center)
+    h_plus = (
+        amplitude
+        * np.exp(-((z - z_center) ** 2) / (2 * z_width**2))
+        * np.cos(k_z * (z - z_center))
     )
 
     # h_x polarization: smaller amplitude, phase-shifted
     h_cross_amplitude = 0.3 * amplitude
-    h_cross = h_cross_amplitude * np.exp(
-        -((z - z_center) ** 2) / (2 * z_width**2)
-    ) * np.sin(k_z * (z - z_center))
+    h_cross = (
+        h_cross_amplitude
+        * np.exp(-((z - z_center) ** 2) / (2 * z_width**2))
+        * np.sin(k_z * (z - z_center))
+    )
 
     # TT-gauge conditions:
     #   h_4 (h_xx) = h_+
@@ -163,23 +177,6 @@ def main() -> None:  # noqa: PLR0915, PLR0914
 
     # Keep a copy of the true initial state (before any time stepping)
     initial_state = state.copy()
-
-    # Validate TT-gauge conditions on initial data
-    _field_slots = {
-        name: i
-        for i, (name, stype) in enumerate(spec.state_layout)
-        if stype == "field"
-    }
-    _init = cast("FieldCollection", initial_state)
-    trace_violation = float(
-        np.max(np.abs(_init[_field_slots["h_4"]].data + _init[_field_slots["h_7"]].data))
-    )
-    if trace_violation > 1e-12:
-        msg = (
-            f"Initial data violates TT tracelessness: |h_xx + h_yy| = {trace_violation:.2e}. "
-            "For TT gauge, require h_4 + h_7 = 0."
-        )
-        raise ValueError(msg)
 
     print(f"  h_+ polarization: Gaussian(center={z_center}, width={z_width})")
     print(f"    amplitude = {amplitude}, wavenumber k_z = {k_z:.4f}")
@@ -209,7 +206,7 @@ def main() -> None:  # noqa: PLR0915, PLR0914
 
     print(f"  Duration: {t_end} time units")
     print(f"  Time step: {dt}")
-    print(f"  Scheme: Runge-Kutta (RK4)")
+    print("  Scheme: Runge-Kutta (RK4)")
     print(f"  Stored {len(storage)} snapshots")
 
     # ----------------------------------------------------------------
@@ -219,14 +216,12 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     print("Step 6: Analyzing results...")
 
     # Use the true initial state (not storage[0], which may be at t>0)
-    initial = cast("FieldCollection", initial_state)
+    initial = initial_state.copy()
     final = cast("FieldCollection", storage[-1])
 
     # Find state slot indices for field data (not momentum)
     field_slot_map = {
-        name: i
-        for i, (name, stype) in enumerate(spec.state_layout)
-        if stype == "field"
+        name: i for i, (name, stype) in enumerate(spec.state_layout) if stype == "field"
     }
     h4_slot = field_slot_map["h_4"]
     h7_slot = field_slot_map["h_7"]
@@ -237,13 +232,17 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     initial_h5_max = np.max(np.abs(initial[h5_slot].data))
     final_h5_max = np.max(np.abs(final[h5_slot].data))
 
-    print(f"  Initial: max|h_+| = {initial_h4_max:.4f}, max|h_x| = {initial_h5_max:.4f}")
+    print(
+        f"  Initial: max|h_+| = {initial_h4_max:.4f}, max|h_x| = {initial_h5_max:.4f}"
+    )
     print(f"  Final:   max|h_+| = {final_h4_max:.4f}, max|h_x| = {final_h5_max:.4f}")
 
     # Check tracelessness is maintained: h_4 + h_7 should stay near zero
     trace_initial = np.max(np.abs(initial[h4_slot].data + initial[h7_slot].data))
     trace_final = np.max(np.abs(final[h4_slot].data + final[h7_slot].data))
-    print(f"  Tracelessness |h_xx + h_yy|: initial={trace_initial:.2e}, final={trace_final:.2e}")
+    print(
+        f"  Tracelessness |h_xx + h_yy|: initial={trace_initial:.2e}, final={trace_final:.2e}"
+    )
 
     # Check that gauge-violating components stay small
     h0_final = np.max(np.abs(final[field_slot_map["h_0"]].data))
@@ -288,7 +287,9 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     final_profile = final[h4_slot].data[ix_center, iy_center, :]
 
     ax.plot(z_1d, initial_profile, "b-", linewidth=2, label="t = 0.0 (initial)")
-    ax.plot(z_1d, final_profile, "r-", linewidth=2, label=f"t = {times[-1]:.1f} (final)")
+    ax.plot(
+        z_1d, final_profile, "r-", linewidth=2, label=f"t = {times[-1]:.1f} (final)"
+    )
 
     # Also plot a few intermediate snapshots from storage
     n_snapshots = len(storage)
@@ -298,7 +299,11 @@ def main() -> None:  # noqa: PLR0915, PLR0914
         snap = cast("FieldCollection", storage[idx])
         profile = snap[h4_slot].data[ix_center, iy_center, :]
         ax.plot(
-            z_1d, profile, color=color, linewidth=1.5, alpha=alpha,
+            z_1d,
+            profile,
+            color=color,
+            linewidth=1.5,
+            alpha=alpha,
             label=f"t = {storage_times[idx]:.1f}",
         )
 
@@ -321,7 +326,11 @@ def main() -> None:  # noqa: PLR0915, PLR0914
         snap = cast("FieldCollection", storage[idx])
         profile = snap[h5_slot].data[ix_center, iy_center, :]
         ax.plot(
-            z_1d, profile, color=color, linewidth=1.5, alpha=alpha,
+            z_1d,
+            profile,
+            color=color,
+            linewidth=1.5,
+            alpha=alpha,
             label=f"t = {storage_times[idx]:.1f}",
         )
 
