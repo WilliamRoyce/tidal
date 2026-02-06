@@ -3,6 +3,7 @@
   "version": "0.2",
   "language": "en",
   "words": [
+    "afhi",
     "argx",
     "arities",
     "atleast",
@@ -123,7 +124,11 @@
     "trange",
     "tqdm"
   ],
-  "flagWords": ["hte", "teh", "wolfrom"],
+  "flagWords": [
+    "hte",
+    "teh",
+    "wolfrom"
+  ],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [
