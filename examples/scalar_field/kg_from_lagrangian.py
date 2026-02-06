@@ -244,7 +244,7 @@ def _plot_results(simulation: SimulationData, spec: EquationSystem) -> None:
         aspect="auto",
         origin="lower",
         extent=[0, simulation.times[-1], 0, 100],
-        cmap="RdBu_r",
+        cmap="bwr_r",
         vmin=-np.max(np.abs(phi_history)),
         vmax=np.max(np.abs(phi_history)),
     )
