@@ -708,8 +708,17 @@ MinkowskiMetricFactor[idx_Integer] := If[idx == 0, -1, 1];
 (* Evaluate epsilon tensor components in expression *)
 (* Handles epsilon tensors created by xAct's DefMetric (e.g., epsiloneta, epsiloneta3) *)
 (* General approach: identify all epsilon patterns and compute based on index positions *)
-EvaluateEpsilonComponents[expr_, chart_] := Module[
-  {rules, isEpsilon, evaluateEpsilonN},
+EvaluateEpsilonComponents[expr_, chart_] :=
+  EvaluateEpsilonComponents[expr, chart, None];
+
+EvaluateEpsilonComponents[expr_, chart_, metricMatrix_] := Module[
+  {rules, isEpsilon, evaluateEpsilonN, detFactor},
+
+  (* For general metrics, ε_{ij...} = -√|det(g)| * Signature({i,j,...}) *)
+  (* For Minkowski det(g) = -1, so √|det(g)| = 1 (no effect) *)
+  detFactor = If[metricMatrix === None, 1,
+    Simplify[Sqrt[Abs[Det[metricMatrix]]]]
+  ];
 
   (* Check if symbol is an epsilon tensor using xAct introspection *)
   (* Falls back to string matching for edge cases xAct doesn't handle *)
@@ -732,8 +741,8 @@ EvaluateEpsilonComponents[expr_, chart_] := Module[
   (* Works for any dimension: extracts indices and up/down flags from argument list *)
   evaluateEpsilonN[indices_List, isUpFlags_List] := Module[
     {baseValue, metricFactor},
-    (* Base: fully covariant Levi-Civita for Minkowski = -Signature *)
-    baseValue = -LeviCivitaValue[indices];
+    (* Base: fully covariant Levi-Civita = -√|det(g)| * Signature({indices}) *)
+    baseValue = -detFactor * LeviCivitaValue[indices];
     (* Metric factors for raised indices: each raised index i contributes η^{ii} *)
     metricFactor = Product[
       If[isUpFlags[[k]], MinkowskiMetricFactor[indices[[k]]], 1],
