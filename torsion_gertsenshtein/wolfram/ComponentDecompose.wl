@@ -40,10 +40,11 @@ DecomposeToComponents::usage =
   "DecomposeToComponents[eom, field, chart] decomposes the tensor equation of \
 motion into individual scalar component equations. Returns a list of \
 {component_index, component_equation} pairs. \
-Options: \"ComputeChristoffels\" -> True computes Christoffel symbols from the \
-metric definition using xAct (for curved spacetimes). Default is False (flat space). \
-\"MetricMatrix\" -> matrix provides an explicit metric matrix for curved spacetime \
-evaluation (e.g., Omega^2 * DiagonalMatrix[{-1, 1}]). Default is None (flat Minkowski).";
+Options: \"ComputeChristoffels\" -> Automatic (default) auto-detects from metric type, \
+or True/False for explicit override. \"MetricMatrix\" -> matrix provides an explicit \
+metric matrix for curved spacetime evaluation (e.g., Omega^2 * DiagonalMatrix[{-1, 1}]). \
+Default is None (flat Minkowski). Auto-detection: constant metrics have Christoffels = 0, \
+non-constant metrics trigger explicit Christoffel computation.";
 
 ExtractTensorComponent::usage =
   "ExtractTensorComponent[eom, field, chart, componentIndices, additionalFields, \
@@ -71,6 +72,10 @@ rank-0 -> {{}}, rank-1 -> {{0},{1},...}, symmetric rank-2 -> upper triangle, \
 non-symmetric rank-2 -> all pairs. For rank >= 3, returns all tuples (symmetry \
 reduction not yet implemented for rank 3+).";
 
+(* Error messages *)
+DecomposeToComponents::badopt =
+  "Invalid value for option \"ComputeChristoffels\": `1`. Expected Automatic, True, or False.";
+
 
 Begin["`Private`"];
 
@@ -78,26 +83,52 @@ Begin["`Private`"];
 
 (* Options for DecomposeToComponents *)
 Options[DecomposeToComponents] = {
-  "ComputeChristoffels" -> False,  (* Set True for curved spacetimes *)
+  "ComputeChristoffels" -> Automatic,  (* Automatic (default), True, or False *)
   "MetricMatrix" -> None  (* Explicit metric matrix for curved spacetime evaluation *)
 };
 
 (* 3-arg signature: eom, field, chart (no additional fields, default options) *)
 DecomposeToComponents[eom_, field_, chart_] :=
-  DecomposeToComponents[eom, field, chart, {}, "ComputeChristoffels" -> False, "MetricMatrix" -> None];
+  DecomposeToComponents[eom, field, chart, {}, "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None];
 
 (* 4-arg signature: eom, field, chart, additionalFields (default options) *)
 DecomposeToComponents[eom_, field_, chart_, additionalFields_List] :=
-  DecomposeToComponents[eom, field, chart, additionalFields, "ComputeChristoffels" -> False, "MetricMatrix" -> None];
+  DecomposeToComponents[eom, field, chart, additionalFields, "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None];
 
 (* Full signature with options *)
 DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsPattern[]] := Module[
   {dim, components, indices, componentEq, result, fieldHead, fieldRank, allFieldHeads,
-   computeChristoffels, metricMatrix},
+   computeChristoffels, metricMatrix, computeChristoffelsOption, shouldComputeChristoffels,
+   coords},
 
   (* Get option values *)
-  computeChristoffels = OptionValue["ComputeChristoffels"];
+  computeChristoffelsOption = OptionValue["ComputeChristoffels"];
   metricMatrix = OptionValue["MetricMatrix"];
+
+  (* Auto-detect whether Christoffel computation is needed *)
+  coords = GetCoordinateSymbols[chart];
+  shouldComputeChristoffels = Which[
+    (* Explicit user override: True *)
+    computeChristoffelsOption === True, True,
+
+    (* Explicit user override: False *)
+    computeChristoffelsOption === False, False,
+
+    (* Automatic detection (default) *)
+    computeChristoffelsOption === Automatic,
+      If[metricMatrix === None,
+        False,  (* No metric → flat Minkowski space *)
+        IsNonConstantMetric[metricMatrix, coords]  (* Auto-detect from metric *)
+      ],
+
+    (* Fallback for invalid option *)
+    True,
+      Message[DecomposeToComponents::badopt, "ComputeChristoffels"];
+      False
+  ];
+
+  (* Use the auto-detected/overridden value for the rest of the pipeline *)
+  computeChristoffels = shouldComputeChristoffels;
 
   (* Get the dimension dynamically from the chart via memoized wrapper *)
   dim = GetChartDimension[chart];
