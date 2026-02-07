@@ -195,6 +195,19 @@ def _parse_multi_axis_spec(spec: str) -> list[tuple[int, int]]:
         axis_letter = match.group(2)
         axis = {"x": 0, "y": 1, "z": 2}[axis_letter]
         result.append((axis, order))
+
+    # Detect duplicate axes — e.g. "2x_1x_1y" has x twice
+    seen_axes: set[int] = set()
+    for axis, _order in result:
+        if axis in seen_axes:
+            axis_name = {0: "x", 1: "y", 2: "z"}[axis]
+            msg = (
+                f"Duplicate axis '{axis_name}' in multi-axis derivative spec: '{spec}'. "
+                f"Combine orders for the same axis into a single entry."
+            )
+            raise ValueError(msg)
+        seen_axes.add(axis)
+
     return sorted(result, key=operator.itemgetter(0))
 
 
@@ -254,7 +267,9 @@ _OPERATOR_REGISTRY: dict[str, tuple[Any, int]] = {
     "cross_derivative_xz": (_op_cross_derivative(0, 2), 3),
     "cross_derivative_yz": (_op_cross_derivative(1, 2), 3),
     "biharmonic": (_op_biharmonic, 1),
-    # Note: first_derivative_t is handled specially in _compute_rhs_for_component
+    # first_derivative_t is handled specially in _compute_rhs_for_component.
+    # This sentinel entry ensures _get_operator gives a clear error if called directly.
+    "first_derivative_t": (None, 1),
 }
 
 
@@ -481,8 +496,6 @@ class PDEFromSpec(PDEBase):
         ValueError
             If the operator name is not recognized.
         """
-        if operator_name == "first_derivative_t":
-            return 1
         entry = _OPERATOR_REGISTRY.get(operator_name)
         if entry is not None:
             return entry[1]
@@ -694,6 +707,9 @@ class PDEFromSpec(PDEBase):
         - ``ArcSinh[x]`` to ``arcsinh(x)``, ``ArcCosh[x]`` to ``arccosh(x)``, etc.
         - ``Erf[x]`` to ``erf(x)`` (scipy.special)
         - ``BesselJ[n, x]`` to ``jv(n, x)``, ``BesselY[n, x]`` to ``yv(n, x)``
+        - ``Rational[p, q]`` to ``(p)/(q)`` (exact fractions from xAct InputForm)
+        - ``Pi`` to ``np.pi`` (mathematical constant)
+        - ``Sign[x]`` to ``np.sign(x)``, ``Max[a,b]`` to ``np.maximum(a,b)``
         - ``t[]`` to ``t`` (xCoba coordinate symbols, using actual coordinate names)
         - Mathematica brackets ``[``, ``]`` to Python parens ``(``, ``)``
         - Mathematica ``^`` to Python ``**``
@@ -719,6 +735,13 @@ class PDEFromSpec(PDEBase):
         # Step 3: ArcTan[x, y] → arctan2(y, x) — special 2-arg case with swap
         # Must handle before generic function conversion
         result = self._convert_arctan2(result)
+
+        # Step 3.5: Rational[p, q] → (p)/(q) — Mathematica exact fractions
+        # xAct outputs Rational[1,2] for 1/2 in InputForm. Must handle before
+        # bracket conversion since Rational uses Mathematica brackets.
+        result = re.sub(
+            r"Rational\[([^,\]]+),\s*([^,\]]+)\]", r"(\1)/(\2)", result
+        )
 
         # Step 4: Function name conversions (batch)
         function_map = [
@@ -746,6 +769,9 @@ class PDEFromSpec(PDEBase):
             ("Log", "log"),
             ("Sqrt", "sqrt"),
             ("Abs", "abs"),
+            ("Sign", "np.sign"),
+            ("Max", "np.maximum"),
+            ("Min", "np.minimum"),
             # Special functions (scipy.special)
             ("Erf", "erf"),
             ("BesselJ", "jv"),
@@ -753,6 +779,9 @@ class PDEFromSpec(PDEBase):
         ]
         for mma_func, py_func in function_map:
             result = re.sub(rf"\b{mma_func}\b", py_func, result)
+
+        # Step 4.5: Pi → np.pi — Mathematica constant (before bracket conversion)
+        result = re.sub(r"\bPi\b", "np.pi", result)
 
         # Step 5: Mathematica brackets to Python parens (after function renaming)
         result = result.replace("[", "(").replace("]", ")")
@@ -973,6 +1002,16 @@ class PDEFromSpec(PDEBase):
                     raise ValueError(msg)
 
         handler, min_dim = entry
+
+        # Sentinel check: some operators (first_derivative_t) are in the registry
+        # but handled specially elsewhere — they cannot be applied as spatial operators.
+        if handler is None:
+            msg = (
+                f"Operator '{operator_name}' cannot be applied as a spatial operator. "
+                f"It is handled specially in _compute_rhs_for_component."
+            )
+            raise RuntimeError(msg)
+
         if field.grid.dim < min_dim:
             msg = (
                 f"Operator '{operator_name}' requires at least {min_dim}D grid, "
