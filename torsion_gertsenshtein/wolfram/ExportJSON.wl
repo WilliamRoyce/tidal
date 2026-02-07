@@ -869,15 +869,19 @@ ExtractSpatialDerivativeProfile[term_] := Module[{profile},
 (* Single-axis: {3,0} -> "derivative_3_x", {0,5} -> "derivative_5_y" *)
 (* Multi-axis: {2,1} -> "derivative_2x_1y" *)
 BuildGenericOperatorName[spatialOrders_List] := Module[
-  {nonzero, axisNames = {"x", "y", "z"}, parts},
+  {nonzero, axisNames = {"x", "y", "z", "w", "v", "u"}, parts},
 
   (* Collect {axisIndex, order} pairs for nonzero spatial orders *)
   nonzero = {};
   Do[
     If[i <= Length[spatialOrders] && spatialOrders[[i]] > 0,
+      If[i > Length[axisNames],
+        Throw["BuildGenericOperatorName: Spatial dimension " <> ToString[i] <>
+              " exceeds maximum supported (" <> ToString[Length[axisNames]] <> ")."]
+      ];
       AppendTo[nonzero, {i, spatialOrders[[i]]}]
     ],
-    {i, 1, Min[Length[spatialOrders], 3]}
+    {i, 1, Length[spatialOrders]}
   ];
 
   If[Length[nonzero] == 0,
@@ -903,7 +907,7 @@ BuildGenericOperatorName[spatialOrders_List] := Module[
 (* Uses canonical names for common cases (gradient, laplacian, cross_derivative) *)
 (* and delegates to BuildGenericOperatorName for higher-order/mixed cases *)
 ClassifySpatialProfile[spatialOrders_List] := Module[
-  {totalOrder, nonzeroPositions, axisNames = {"x", "y", "z"}},
+  {totalOrder, nonzeroPositions, axisNames = {"x", "y", "z", "w", "v", "u"}},
 
   totalOrder = Total[spatialOrders];
   nonzeroPositions = Flatten[Position[spatialOrders, _?(# > 0 &)]];
