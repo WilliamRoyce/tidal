@@ -19,6 +19,7 @@ from pde import CartesianGrid, FieldCollection, ScalarField
 
 from torsion_gertsenshtein.symbolic.json_loader import (
     ComponentEquation,
+    ConstraintSolverConfig,
     EquationSystem,
     OperatorTerm,
 )
@@ -370,6 +371,46 @@ class TestConstraintEvolution:
         rates = pde.evolution_rate(state)
         assert len(rates) == 1
         assert_allclose(rates[0].data, 0.0)
+
+    def test_constraint_eps_configurable(self) -> None:
+        """constraint_eps parameter controls the Laplacian zero-check threshold."""
+        # Equation with a very small Laplacian coefficient
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(
+                            coefficient=1e-10,
+                            operator="laplacian",
+                            field="phi",
+                        ),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(enabled=True),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={"source": "test"},
+        )
+        # Default eps=1e-14 should accept coeff=1e-10
+        pde_ok = PDEFromSpec(spec)
+        assert pde_ok._constraint_eps == 1e-14  # noqa: SLF001
+
+        # Tight eps=1e-8 should reject coeff=1e-10
+        import pytest  # noqa: PLC0415
+
+        with pytest.raises(ValueError, match="effectively zero"):
+            pde_reject = PDEFromSpec(spec, constraint_eps=1e-8)
+            grid = CartesianGrid([(0, 10)], 16, periodic=True)
+            state = FieldCollection([ScalarField(grid, data=1.0)])
+            pde_reject.evolution_rate(state)
 
 
 class TestMixedOrderEvolution:
