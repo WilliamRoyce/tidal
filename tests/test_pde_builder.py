@@ -1769,6 +1769,54 @@ class TestMathematicaFunctionConversion:
         expected = np.sinh(1.0) + np.arctan2(y_coord, x_coord)
         assert_allclose(mid_val, expected, rtol=1e-10)
 
+    # ===== Rational, Pi, Sign, Max, Min =====
+
+    def test_rational_conversion(self) -> None:
+        """Test Rational[p, q] → (p)/(q)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Rational[1, 2]")
+        assert result == "(1)/(2)"
+
+    def test_rational_nested(self) -> None:
+        """Test Rational in a larger expression."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Rational[3, 4]*x()^2")
+        assert "(3)/(4)" in result
+        assert "x**2" in result
+
+    def test_pi_conversion(self) -> None:
+        """Test Pi → np.pi."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("2*Pi*x()")
+        assert "np.pi" in result
+        assert "2*np.pi*x" == result
+
+    def test_rational_pi_combined(self) -> None:
+        """Test Rational[3, 4]*Pi → (3)/(4)*np.pi."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Rational[3, 4]*Pi")
+        assert "(3)/(4)*np.pi" == result
+
+    def test_sign_conversion(self) -> None:
+        """Test Sign[x] → np.sign(x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Sign[x()]")
+        assert result == "np.sign(x)"
+
+    def test_max_min_conversion(self) -> None:
+        """Test Max/Min → np.maximum/np.minimum."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result_max = pde._mathematica_to_python("Max[x[], 0]")
+        assert "np.maximum(x, 0)" == result_max
+        result_min = pde._mathematica_to_python("Min[x[], 1]")
+        assert "np.minimum(x, 1)" == result_min
+
 
 class TestCachingOptimizations:
     """Tests for Issue #89 caching and memoization optimizations."""
