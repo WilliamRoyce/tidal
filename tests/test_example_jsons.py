@@ -32,6 +32,7 @@ _DEFAULT_PARAMS: dict[str, dict[str, float]] = {
     "sphere_kg.json": {"sphm2": 1.0, "sphR": 1.0},
     "spherical_kg.json": {"spm2": 1.0},
     "conformal_kg_static.json": {},
+    "massive_3form.json": {"m2": 1.0},
 }
 
 # Grid sizes per spatial dimension (small for speed).
