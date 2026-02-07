@@ -10,10 +10,11 @@ comes from the specification that was derived from the Lagrangian.
 from __future__ import annotations
 
 import math
+import operator
 import re
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, SupportsFloat, cast
 
 import numpy as np
 from pde import FieldCollection, PDEBase, ScalarField
@@ -194,7 +195,7 @@ def _parse_multi_axis_spec(spec: str) -> list[tuple[int, int]]:
         axis_letter = match.group(2)
         axis = {"x": 0, "y": 1, "z": 2}[axis_letter]
         result.append((axis, order))
-    return sorted(result, key=lambda x: x[0])
+    return sorted(result, key=operator.itemgetter(0))
 
 
 def _op_multi_axis_derivative(
@@ -442,8 +443,14 @@ class PDEFromSpec(PDEBase):
         self._preresolved: dict[tuple[int, int], float] = {}
         for eq_idx, eq in enumerate(spec.equations):
             for term_idx, term in enumerate(eq.rhs_terms):
-                if not term.time_dependent and not term.position_dependent and self._is_resolvable(term):
-                    self._preresolved[eq_idx, term_idx] = self._resolve_coefficient(term)
+                if (
+                    not term.time_dependent
+                    and not term.position_dependent
+                    and self._is_resolvable(term)
+                ):
+                    self._preresolved[eq_idx, term_idx] = self._resolve_coefficient(
+                        term
+                    )
 
         # B5: Cache boundary conditions and grid coordinates (populated on first call)
         self._cached_bc: BCDescriptor | None = None
@@ -794,13 +801,20 @@ class PDEFromSpec(PDEBase):
 
         Raises ValueError for complex, NaN, or Inf results with clear
         diagnostic messages pointing to the source expression.
+
+        Raises
+        ------
+        TypeError
+            If the result is complex.
+        ValueError
+            If the result is NaN or Inf.
         """
         if isinstance(result, complex):
             msg = (
                 f"Coefficient '{sym}' evaluated to complex number {result} "
                 f"(from '{py_expr}'). Only real-valued coefficients are supported."
             )
-            raise ValueError(msg)
+            raise TypeError(msg)
 
         if isinstance(result, np.ndarray):
             arr = np.asarray(result, dtype=np.float64)
@@ -818,7 +832,7 @@ class PDEFromSpec(PDEBase):
                 raise ValueError(msg)
             return arr
 
-        scalar = float(result)
+        scalar = float(cast("SupportsFloat", result))
         if math.isnan(scalar):
             msg = (
                 f"Coefficient '{sym}' evaluated to NaN "
@@ -1143,9 +1157,7 @@ class PDEFromSpec(PDEBase):
 
         # If all BCs are periodic and grid is periodic, use shorthand
         all_periodic = all(
-            config.boundary_conditions.get(
-                coord, BoundaryCondition("periodic")
-            ).type
+            config.boundary_conditions.get(coord, BoundaryCondition("periodic")).type
             == "periodic"
             for coord in spatial_coords
         )
@@ -1167,9 +1179,15 @@ class PDEFromSpec(PDEBase):
             elif bc_config.type == "periodic":
                 bc_dict[coord] = "periodic"
             elif bc_config.type == "dirichlet":
-                bc_dict[coord] = {"value": bc_config.value if bc_config.value is not None else 0.0}
+                bc_dict[coord] = {
+                    "value": bc_config.value if bc_config.value is not None else 0.0
+                }
             elif bc_config.type == "neumann":
-                bc_dict[coord] = {"derivative": bc_config.derivative if bc_config.derivative is not None else 0.0}
+                bc_dict[coord] = {
+                    "derivative": bc_config.derivative
+                    if bc_config.derivative is not None
+                    else 0.0
+                }
 
         return bc_dict
 

@@ -1807,7 +1807,9 @@ class TestCachingOptimizations:
                     time_derivative_order=2,
                     rhs_terms=(
                         term,
-                        OperatorTerm(-1.0, "identity", "phi", coefficient_symbolic="-m2"),
+                        OperatorTerm(
+                            -1.0, "identity", "phi", coefficient_symbolic="-m2"
+                        ),
                     ),
                 ),
             ),
@@ -1935,10 +1937,12 @@ class TestCachingOptimizations:
         spec = self._make_spec()
         pde = PDEFromSpec(spec, parameters={"m2": 1.0})
         grid = CartesianGrid([(0, 10)], [16], periodic=True)
-        state = FieldCollection([
-            ScalarField(grid, data=0.0),
-            ScalarField(grid, data=0.0),
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=0.0),
+            ]
+        )
         assert pde._cached_bc is None
         pde.evolution_rate(state, t=0.0)
         assert pde._cached_bc is not None
@@ -1994,10 +1998,12 @@ class TestCachingOptimizations:
         )
         pde = PDEFromSpec(spec, parameters={"H": 0.5})
         grid = CartesianGrid([(0, 10)], [16], periodic=True)
-        state = FieldCollection([
-            ScalarField(grid, data=1.0),
-            ScalarField(grid, data=0.0),
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=1.0),
+                ScalarField(grid, data=0.0),
+            ]
+        )
         bc = "periodic"
 
         # Both terms resolve to the same value at t=1.0
@@ -2041,7 +2047,9 @@ class TestCachingOptimizations:
             coordinates=("t", "x", "y"),
         )
         pde = PDEFromSpec(spec, parameters={})
-        grid = CartesianGrid([(0.5, 5), (0, 2 * np.pi)], [16, 16], periodic=[False, True])
+        grid = CartesianGrid(
+            [(0.5, 5), (0, 2 * np.pi)], [16, 16], periodic=[False, True]
+        )
 
         term = spec.equations[0].rhs_terms[0]
 
@@ -2056,7 +2064,10 @@ class TestCachingOptimizations:
             for i, name in enumerate(spatial_coords[: grid.num_axes])
         }
         val_from_arrays = pde._resolve_coefficient_at_point(
-            term, t=0.0, grid=grid, coord_arrays=coord_arrays  # pyright: ignore[reportUnknownArgumentType]
+            term,
+            t=0.0,
+            grid=grid,
+            coord_arrays=coord_arrays,  # pyright: ignore[reportUnknownArgumentType]
         )
 
         # Both paths should produce identical results
@@ -2184,8 +2195,8 @@ class TestEvalValidation:
 
     def test_validate_eval_result_scalar_valid(self) -> None:
         """_validate_eval_result passes through valid float."""
-        result = PDEFromSpec._validate_eval_result(3.14, "test", "3.14")
-        assert result == 3.14  # noqa: PLR2004
+        result = PDEFromSpec._validate_eval_result(6.7, "test", "6.7")
+        assert result == 6.7  # noqa: PLR2004
 
     def test_validate_eval_result_scalar_nan(self) -> None:
         """_validate_eval_result rejects NaN scalar."""
