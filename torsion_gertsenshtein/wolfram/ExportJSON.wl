@@ -824,23 +824,11 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
 ];
 
 (* Count the total derivative order of a term *)
-(* Returns the maximum total order of any Derivative expression found *)
-CountDerivativeOrder[term_] := Module[
-  {maxOrder},
-  maxOrder = 0;
-  (* Check for Derivative[n][f][args] patterns (applied derivatives) *)
-  Cases[term,
-    Derivative[orders__][_][__] :> (maxOrder = Max[maxOrder, Total[{orders}]]),
-    {0, Infinity}
-  ];
-  (* Also check for unapplied Derivative[n][f] patterns *)
-  If[maxOrder == 0,
-    Cases[term,
-      Derivative[orders__][_] :> (maxOrder = Max[maxOrder, Total[{orders}]]),
-      {0, Infinity}
-    ]
-  ];
-  maxOrder
+(* Returns the total order of the Derivative expression found, or 0 if none *)
+(* Delegates to ExtractDerivativeProfile to avoid duplicating extraction logic *)
+CountDerivativeOrder[term_] := Module[{profile},
+  profile = ExtractDerivativeProfile[term];
+  If[Length[profile] == 0, 0, Total[profile]]
 ];
 
 (* === Phase 12: Generic Derivative Order Support === *)
