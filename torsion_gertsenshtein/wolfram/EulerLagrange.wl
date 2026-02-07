@@ -8,8 +8,7 @@
 
    DATA FLOW:
      Lagrangian density L[φ, ∂φ, ∂²φ, ...]
-       → VariationalDerivative (functional derivative δL/δφ)
-       → EulerLagrangeEquation (compute ∂L/∂φ - D_a[∂L/∂(D_a φ)] + ... = 0)
+       → EulerLagrangeEquation (uses xAct VarD for functional derivative δL/δφ)
        → Equation of motion (tensor form)
 
    KEY FEATURES:
@@ -39,11 +38,6 @@ EulerLagrangeEquation::usage =
   "EulerLagrangeEquation[lagrangian, field, covd] computes the Euler-Lagrange \
 equation for the given field from the Lagrangian density. Returns an expression \
 equal to zero (the equation of motion).";
-
-VariationalDerivative::usage =
-  "DEPRECATED: VariationalDerivative[lagrangian, field, covd] is a manual fallback \
-that only handles first-order Lagrangians. Use VarD[field, covd][lagrangian] directly \
-from xAct`xTensor` instead, which handles arbitrary-order Lagrangians correctly.";
 
 SetupSpacetime::usage =
   "SetupSpacetime[dim, signature] sets up a spacetime manifold with the given \
@@ -109,45 +103,6 @@ EulerLagrangeEquation[lagrangian_, field_, covd_] := Module[
   eom = ContractMetric[eom];
 
   eom
-];
-
-(* Manual Euler-Lagrange Computation *)
-(* Implements: δL/δfield = ∂L/∂field - ∇_a(∂L/∂(∇_a field)) = 0 *)
-(* This provides a fallback if VarD is not working *)
-
-VariationalDerivative[lagrangian_, field_, covd_] := Module[
-  {directTerm, derivativeTerm, result, isScalar, derivLag, a, b},
-
-  (* Direct term: ∂L/∂field *)
-  directTerm = D[lagrangian, field];
-
-  (* Determine if scalar or vector field *)
-  (* Scalar field: phi[] - has no indices *)
-  (* Vector field: A[-a] - has one index *)
-  (* Check for indices by looking for AbstractIndexQ patterns *)
-  isScalar = FreeQ[field, _?AbstractIndexQ];
-
-  (* Derivative term: -∇_a (∂L/∂(∇_a field)) *)
-  derivativeTerm = If[isScalar,
-    (* Scalar field: φ[] *)
-    (* Compute -∇_a (∂L/∂(∇_a φ)) *)
-    derivLag = D[lagrangian, covd[-a][field]];
-    -covd[-a][derivLag],
-
-    (* Vector or tensor field *)
-    (* For vector A[-a]: Compute -∇_b (∂L/∂(∇_b A_a)) *)
-    derivLag = D[lagrangian, covd[-b][field]];
-    -covd[-b][derivLag]
-  ];
-
-  (* Euler-Lagrange equation: δL/δfield = 0 *)
-  result = directTerm + derivativeTerm;
-
-  (* Simplify using xTensor *)
-  result = ToCanonical[result];
-  result = ContractMetric[result];
-
-  result
 ];
 
 End[];
