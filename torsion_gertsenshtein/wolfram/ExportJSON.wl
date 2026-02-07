@@ -145,6 +145,22 @@ single term and returns an Association with \"coefficient\", \"operator\", and \
 Detects: laplacian, directional laplacians, gradients, cross-derivatives, identity, and \
 momentum gradient terms from mixed time-space derivatives.";
 
+ConstraintSolverHints::usage =
+  "ConstraintSolverHints[fieldName, timeOrder, metadata] builds a constraint_solver \
+Association for constraint equations (timeOrder=0) when metadata contains \
+\"solve_constraints\" -> True. Returns Nothing for non-constraint equations or when \
+solver is not requested. Boundary conditions come from metadata key \
+\"constraint_boundary_conditions\".";
+
+ExtractMassCouplingFromEquations::usage =
+  "ExtractMassCouplingFromEquations[equations, allFieldNames] scans the already-built \
+equation JSON Associations for identity operator terms and builds mass_matrix and \
+coupling_matrix. Returns an Association with keys \"mass_matrix\", \"coupling_matrix\", \
+and optionally \"mass_matrix_symbolic\" and \"coupling_matrix_symbolic\" when any \
+symbolic coefficients are present. Convention: matrix[i][j] = -(coefficient of \
+identity(field_j) in equation_i).";
+
+
 (* Refactored helper functions (Phase 3, Issue 10) *)
 ExtractFunctionHeads::usage =
   "ExtractFunctionHeads[term] extracts all function head names from an expression. \
@@ -183,10 +199,61 @@ BuildJSONStructure[componentEqs_, metadata_Association] := Module[
   BuildMultiFieldJSONStructure[fieldEquations, metadata]
 ];
 
+(* === Auto-compute mass/coupling matrices from equation terms === *)
+(* Scans the already-built equation Associations for identity operator terms *)
+(* and extracts mass_matrix (diagonal: own-field mass) and coupling_matrix *)
+(* (off-diagonal: cross-field coupling). *)
+(* Convention: matrix[i][j] = -(coefficient of identity(field_j) in equation_i) *)
+(* This ensures mass^2 is positive for standard Lagrangians where RHS has -m^2*phi. *)
+
+ExtractMassCouplingFromEquations[equations_List, allFieldNames_List] := Module[
+  {nFields, mass, coupling, massSymbolic, couplingSymbolic,
+   terms, fieldRef, j, coeff, symb, hasSymbolicMass, hasSymbolicCoupling},
+
+  nFields = Length[allFieldNames];
+  mass = ConstantArray[0.0, {nFields, nFields}];
+  coupling = ConstantArray[0.0, {nFields, nFields}];
+  massSymbolic = ConstantArray[Null, {nFields, nFields}];
+  couplingSymbolic = ConstantArray[Null, {nFields, nFields}];
+
+  Do[
+    terms = equations[[i]]["rhs"]["terms"];
+    Do[
+      If[term["operator"] === "identity",
+        fieldRef = term["field"];
+        j = FirstPosition[allFieldNames, fieldRef, Missing["NotFound"]];
+        If[!MissingQ[j],
+          j = j[[1]];
+          coeff = -N[term["coefficient"]];
+          symb = Lookup[term, "coefficient_symbolic", Null];
+          If[i === j,
+            mass[[i, j]] += coeff;
+            If[symb =!= Null, massSymbolic[[i, j]] = symb],
+            coupling[[i, j]] += coeff;
+            If[symb =!= Null, couplingSymbolic[[i, j]] = symb]
+          ]
+        ]
+      ],
+      {term, terms}
+    ],
+    {i, nFields}
+  ];
+
+  hasSymbolicMass = AnyTrue[Flatten[massSymbolic], # =!= Null &];
+  hasSymbolicCoupling = AnyTrue[Flatten[couplingSymbolic], # =!= Null &];
+
+  <|
+    "mass_matrix" -> mass,
+    "coupling_matrix" -> coupling,
+    "mass_matrix_symbolic" -> If[hasSymbolicMass, massSymbolic, Null],
+    "coupling_matrix_symbolic" -> If[hasSymbolicCoupling, couplingSymbolic, Null]
+  |>
+];
+
 (* === Multi-Field JSON Structure Building === *)
 
 BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Module[
-  {json, fields, equations, allFieldNames, nFields},
+  {json, fields, equations, allFieldNames, nFields, autoMatrices, couplingSection},
 
   (* fieldEquations format: {{"phi_0", eqPhi}, {"chi_0", eqChi}, ...} *)
   allFieldNames = fieldEquations[[All, 1]];
@@ -215,6 +282,30 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
     {i, nFields}
   ];
 
+  (* Auto-compute mass/coupling matrices from equation identity terms *)
+  autoMatrices = ExtractMassCouplingFromEquations[equations, allFieldNames];
+
+  (* Warn if user metadata provides matrices — they will be ignored *)
+  If[KeyExistsQ[metadata, "mass_matrix"],
+    Print["WARNING: Ignoring user-provided mass_matrix in metadata. ",
+          "Using auto-computed values from equation identity terms."]
+  ];
+  If[KeyExistsQ[metadata, "coupling_matrix"],
+    Print["WARNING: Ignoring user-provided coupling_matrix in metadata. ",
+          "Using auto-computed values from equation identity terms."]
+  ];
+
+  couplingSection = <|
+    "mass_matrix" -> autoMatrices["mass_matrix"],
+    "coupling_matrix" -> autoMatrices["coupling_matrix"]
+  |>;
+  If[autoMatrices["mass_matrix_symbolic"] =!= Null,
+    couplingSection["mass_matrix_symbolic"] = autoMatrices["mass_matrix_symbolic"]
+  ];
+  If[autoMatrices["coupling_matrix_symbolic"] =!= Null,
+    couplingSection["coupling_matrix_symbolic"] = autoMatrices["coupling_matrix_symbolic"]
+  ];
+
   (* Build full JSON structure *)
   json = <|
     "metadata" -> <|
@@ -231,12 +322,7 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
     |>,
     "fields" -> fields,
     "equations" -> equations,
-    "coupling" -> <|
-      "mass_matrix" -> Lookup[metadata, "mass_matrix",
-        ConstantArray[0.0, {nFields, nFields}]],
-      "coupling_matrix" -> Lookup[metadata, "coupling_matrix",
-        ConstantArray[0.0, {nFields, nFields}]]
-    |>
+    "coupling" -> couplingSection
   |>;
 
   json
@@ -250,26 +336,26 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   (* Same logic as EquationToJSON but with cross-field awareness *)
   terms = If[Head[componentEq] === Plus, List @@ componentEq, {componentEq}];
 
-  (* Detect the time derivative order to determine PDE type *)
+  (* Detect the time derivative order of the CURRENT field to determine PDE type *)
+  (* Field-aware: only considers time derivatives of fieldName, not cross-field terms *)
   (* elliptic (0), parabolic (1), hyperbolic (2+) *)
-  lhsTimeOrder = DetectLHSTimeOrder[componentEq];
+  lhsTimeOrder = DetectLHSTimeOrder[componentEq, fieldName];
 
-  (* For backward compatibility, default to order 2 (hyperbolic) if detection fails *)
-  If[lhsTimeOrder == 0 && !FreeQ[componentEq, Derivative],
-    (* Equation has derivatives but no time derivatives - likely constraint or elliptic *)
-    (* Keep as 0 for elliptic PDEs *)
-    Null,
-    (* Use detected order for parabolic/hyperbolic *)
-    Null
+  (* Separate LHS (own-field time derivatives) from RHS *)
+  If[lhsTimeOrder == 0,
+    (* Elliptic/constraint: no time derivatives of this field — entire equation is RHS *)
+    timeDerivTerm = {};
+    rhs = componentEq;
+    ,
+    (* Parabolic/Hyperbolic: separate own-field time derivatives from RHS *)
+    (* Only time derivatives of the CURRENT field are LHS candidates *)
+    (* Cross-field time derivatives (e.g., d2_t(h_4) in h_0's equation) stay on RHS *)
+    timeDerivTerm = Select[terms, ContainsOwnTimeDerivative[#, fieldName, lhsTimeOrder] &];
+    (* RHS = everything EXCEPT own-field time derivatives of detected order *)
+    (* Mixed time-space derivatives ARE included - they get converted to momentum gradients *)
+    (* by IdentifyMultiFieldTerm (e.g., d_t d_x A -> gradient_x(pi)) *)
+    rhs = Total[Select[terms, !ContainsOwnTimeDerivative[#, fieldName, lhsTimeOrder] &]];
   ];
-
-  (* Use dimension-agnostic helpers for time derivative detection *)
-  (* Works for both 1+1D (2-arg Derivative) and 2+1D (3-arg Derivative) *)
-  timeDerivTerm = Select[terms, ContainsTimeDerivative[#, lhsTimeOrder] &];
-  (* RHS = everything EXCEPT pure time derivatives of detected order *)
-  (* Mixed time-space derivatives ARE included - they get converted to momentum gradients *)
-  (* by IdentifyMultiFieldTerm (e.g., d_t d_x A -> gradient_x(pi)) *)
-  rhs = Total[Select[terms, !ContainsTimeDerivative[#, lhsTimeOrder] &]];
 
   (* LHS normalization: extract time-derivative coefficient and normalize RHS *)
   (* For |lhsCoeff| = 1: rhs = non-time terms as-is (handles both VarD and direct construction) *)
@@ -291,14 +377,24 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   (* Build structured LHS for flexible PDE types *)
   lhsStructure = BuildLHSStructure[fieldName, lhsTimeOrder];
 
-  <|
-    "field" -> fieldName,
-    "lhs" -> lhsStructure,  (* Now structured: {"expression": "...", "order": {...}} *)
-    "rhs" -> <|
-      "type" -> "linear_combination",
-      "terms" -> rhsTerms
-    |>
-  |>
+  Module[{result, constraintHints},
+    result = <|
+      "field" -> fieldName,
+      "lhs" -> lhsStructure,  (* Now structured: {"expression": "...", "order": {...}} *)
+      "rhs" -> <|
+        "type" -> "linear_combination",
+        "terms" -> rhsTerms
+      |>
+    |>;
+
+    (* Add constraint_solver hints for elliptic equations when enabled *)
+    constraintHints = ConstraintSolverHints[fieldName, lhsTimeOrder, metadata];
+    If[constraintHints =!= Nothing,
+      result["constraint_solver"] = constraintHints
+    ];
+
+    result
+  ]
 ];
 
 (* Parse RHS with cross-field reference detection *)
@@ -341,6 +437,43 @@ DetectLHSTimeOrder[equation_] := Module[{terms, maxOrder},
   Max[maxOrder, 0]
 ];
 
+(* === Field-Aware LHS Detection (for multi-field cross-coupled equations) === *)
+
+(* Check if a function head string matches a specific field name *)
+(* Uses same StringEndsQ+digit logic as MatchFieldToHeads *)
+(* Example: FunctionMatchesField["gwH0", "h_0"] -> True *)
+(* Example: FunctionMatchesField["gwH4", "h_0"] -> False *)
+FunctionMatchesField[headStr_String, fieldName_String] := Module[
+  {fieldParts, fieldBase, fieldIndex, headDigits, headBase},
+  fieldParts = StringSplit[fieldName, "_"];
+  If[Length[fieldParts] < 2, Return[False]];
+  fieldBase = ToLowerCase[First[fieldParts]];
+  fieldIndex = Last[fieldParts];
+  headDigits = StringCases[headStr, RegularExpression["\\d+$"]];
+  headBase = ToLowerCase[StringReplace[headStr, RegularExpression["\\d+$"] -> ""]];
+  Length[headDigits] > 0 && headDigits[[-1]] === fieldIndex && StringEndsQ[headBase, fieldBase]
+];
+
+(* Field-aware overload: only considers time derivatives of the specified field *)
+(* This is critical for multi-field systems where cross-field time derivatives *)
+(* (e.g., d2_t(h_4) appearing in h_0's equation) must NOT be classified as LHS *)
+DetectLHSTimeOrder[equation_, fieldName_String] := Module[
+  {terms, fieldTermOrders, maxOrder},
+  terms = If[Head[equation] === Plus, List @@ equation, {equation}];
+  (* For each term, get time derivative order ONLY if it applies to the current field *)
+  fieldTermOrders = Map[
+    Function[term, Module[{derivs},
+      derivs = Cases[term,
+        Derivative[n_, ___][f_][___] /; FunctionMatchesField[ToString[f], fieldName] :> n,
+        {0, Infinity}];
+      If[Length[derivs] == 0, 0, Max[derivs]]
+    ]],
+    terms
+  ];
+  maxOrder = If[Length[fieldTermOrders] == 0, 0, Max[fieldTermOrders]];
+  Max[maxOrder, 0]
+];
+
 (* Build structured LHS representation *)
 (* Supports variable time derivative orders for different PDE types *)
 BuildLHSStructure[fieldName_String, timeOrder_Integer] := <|
@@ -371,6 +504,18 @@ ContainsTimeDerivative[term_, minOrder_:2] := Module[{},
     (* Default: no time derivative of required order *)
     True, False
   ]
+];
+
+(* Field-aware time derivative check: only matches derivatives of the CURRENT field *)
+(* Unlike ContainsTimeDerivative, this ignores cross-field time derivatives *)
+(* Example: ContainsOwnTimeDerivative[-Derivative[2,0,0,0][gwH4][t,x,y,z], "h_0", 2] -> False *)
+(* Example: ContainsOwnTimeDerivative[-Derivative[2,0,0,0][gwH0][t,x,y,z], "h_0", 2] -> True *)
+ContainsOwnTimeDerivative[term_, fieldName_String, minOrder_Integer] := Module[
+  {matchingDerivs},
+  matchingDerivs = Cases[term,
+    Derivative[n_, ___][f_][___] /; n >= minOrder && FunctionMatchesField[ToString[f], fieldName],
+    {0, Infinity}];
+  Length[matchingDerivs] > 0
 ];
 
 (* Extract the coefficient of the LHS time derivative term *)
@@ -947,6 +1092,37 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
 
   (* Build and return result with coordinate-dependence info *)
   BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent, coordDeps]
+];
+
+(* === Constraint Solver Hints (Issue #91) === *)
+(* Builds constraint_solver JSON section for elliptic constraint equations *)
+(* Only produces output when: timeOrder == 0 AND metadata has "solve_constraints" -> True *)
+(* Returns Nothing when not applicable, so it integrates cleanly with Association building *)
+
+ConstraintSolverHints[fieldName_String, timeOrder_Integer, metadata_Association] := Module[
+  {enableSolver, bcHints, bcAssoc},
+
+  (* Only applicable to constraint equations (time_order = 0) *)
+  If[timeOrder =!= 0, Return[Nothing]];
+
+  enableSolver = TrueQ[Lookup[metadata, "solve_constraints", False]];
+  If[!enableSolver, Return[Nothing]];
+
+  (* Build boundary conditions from metadata *)
+  bcHints = Lookup[metadata, "constraint_boundary_conditions", <||>];
+
+  (* Convert to JSON-compatible format *)
+  (* Input format: <|"x" -> <|"type" -> "periodic"|>, "y" -> <|"type" -> "dirichlet", "value" -> 0.0|>|> *)
+  bcAssoc = If[AssociationQ[bcHints],
+    bcHints,
+    <||>
+  ];
+
+  <|
+    "enabled" -> True,
+    "method" -> "poisson",
+    "boundary_conditions" -> bcAssoc
+  |>
 ];
 
 (* === Equation Conversion === *)

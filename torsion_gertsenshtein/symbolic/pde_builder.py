@@ -16,10 +16,13 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from pde import FieldCollection, PDEBase, ScalarField
+from scipy import special  # type: ignore[reportMissingTypeStubs]
 from typing_extensions import override
 
 from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
 from torsion_gertsenshtein.symbolic.json_loader import (
+    BoundaryCondition,
+    ConstraintSolverConfig,
     EquationSystem,
     OperatorTerm,
     load_equation_system,
@@ -363,15 +366,84 @@ class PDEFromSpec(PDEBase):
         # Default: use numeric coefficient from JSON
         return term.coefficient
 
+    @staticmethod
+    def _convert_power_function(expr: str) -> str:
+        """Convert Power[base, exponent] to (base)**(exponent).
+
+        Handles nested expressions in both arguments. Must run before bracket
+        conversion ([] → ()).
+
+        Parameters
+        ----------
+        expr : str
+            Expression potentially containing Power[...] syntax.
+
+        Returns
+        -------
+        str
+            Expression with Power[...] converted to (...)**(...).
+        """
+        # Pattern: Power[<arg1>, <arg2>] where args may contain nested brackets
+        # (?:[^[\]]|\[[^\]]*\]) matches either non-bracket chars or [...] pairs
+        pattern = r"Power\[((?:[^[\]]|\[[^\]]*\])*),\s*((?:[^[\]]|\[[^\]]*\])*)\]"
+
+        def replacer(match: re.Match[str]) -> str:
+            base = match.group(1).strip()
+            exp = match.group(2).strip()
+            return f"({base})**({exp})"
+
+        # Multiple passes for nested Power calls
+        prev = None
+        result = expr
+        while prev != result:
+            prev = result
+            result = re.sub(pattern, replacer, result)
+        return result
+
+    @staticmethod
+    def _convert_arctan2(expr: str) -> str:
+        """Convert ArcTan[x, y] to arctan2(y, x) with argument swap.
+
+        Mathematica's ArcTan[x, y] computes atan2(y, x), so arguments must
+        be swapped during conversion to match NumPy's arctan2(y, x) signature.
+
+        Parameters
+        ----------
+        expr : str
+            Expression potentially containing ArcTan[x, y] syntax.
+
+        Returns
+        -------
+        str
+            Expression with ArcTan[x, y] converted to arctan2(y, x).
+        """
+        # Pattern: ArcTan[<arg1>, <arg2>] - must handle before generic function conversion
+        pattern = r"ArcTan\[((?:[^[\],]|\[[^\]]*\])*),\s*((?:[^[\]]|\[[^\]]*\])*)\]"
+
+        def replacer(match: re.Match[str]) -> str:
+            x = match.group(1).strip()
+            y = match.group(2).strip()
+            return f"arctan2({y}, {x})"  # Swap x and y!
+
+        return re.sub(pattern, replacer, expr)
+
     def _mathematica_to_python(self, expr: str) -> str:
         """Convert Mathematica InputForm expression to evaluable Python.
 
         Handles common Mathematica syntax:
         - ``E^(...)`` to ``exp(...)`` (Euler's number)
-        - ``Sin[x]`` to ``sin(x)``, ``Cos[x]`` to ``cos(x)``, etc.
+        - ``Power[x,y]`` to ``(x)**(y)`` (function form of exponentiation)
+        - ``Sin[x]`` to ``sin(x)``, ``Cos[x]`` to ``cos(x)``, ``Tan[x]`` to ``tan(x)``
+        - ``Cot[x]`` to ``cot(x)``, ``Sec[x]`` to ``sec(x)``, ``Csc[x]`` to ``csc(x)``
+        - ``ArcSin[x]`` to ``arcsin(x)``, ``ArcCos[x]`` to ``arccos(x)``, etc.
+        - ``ArcTan[x, y]`` to ``arctan2(y, x)`` (note argument order swap!)
+        - ``Sinh[x]`` to ``sinh(x)``, ``Cosh[x]`` to ``cosh(x)``, etc.
+        - ``ArcSinh[x]`` to ``arcsinh(x)``, ``ArcCosh[x]`` to ``arccosh(x)``, etc.
+        - ``Erf[x]`` to ``erf(x)`` (scipy.special)
+        - ``BesselJ[n, x]`` to ``jv(n, x)``, ``BesselY[n, x]`` to ``yv(n, x)``
         - ``t[]`` to ``t`` (xCoba coordinate symbols, using actual coordinate names)
         - Mathematica brackets ``[``, ``]`` to Python parens ``(``, ``)``
-        - Multiplication, grouping, negation are already Python-compatible
+        - Mathematica ``^`` to Python ``**``
 
         Parameters
         ----------
@@ -384,29 +456,65 @@ class PDEFromSpec(PDEBase):
             Python-evaluable expression string.
         """
         result = expr
-        # E^(...) -> exp(...) — Mathematica's Euler number raised to a power
+
+        # Step 1: E^(...) → exp(...) — Mathematica's Euler number
         result = re.sub(r"\bE\^", "exp", result)
-        # Common math functions: Sin[x] -> sin(x), etc.
-        for mma_func, py_func in [
+
+        # Step 2: Power[x, y] → (x)**(y) — must handle before bracket conversion
+        result = self._convert_power_function(result)
+
+        # Step 3: ArcTan[x, y] → arctan2(y, x) — special 2-arg case with swap
+        # Must handle before generic function conversion
+        result = self._convert_arctan2(result)
+
+        # Step 4: Function name conversions (batch)
+        function_map = [
+            # Basic trig
             ("Sin", "sin"),
             ("Cos", "cos"),
             ("Tan", "tan"),
+            # Reciprocal trig
+            ("Cot", "cot"),
+            ("Sec", "sec"),
+            ("Csc", "csc"),
+            # Inverse trig (1-arg)
+            ("ArcSin", "arcsin"),
+            ("ArcCos", "arccos"),
+            ("ArcTan", "arctan"),  # 1-arg version only (2-arg handled above)
+            # Hyperbolic
+            ("Sinh", "sinh"),
+            ("Cosh", "cosh"),
+            ("Tanh", "tanh"),
+            # Inverse hyperbolic
+            ("ArcSinh", "arcsinh"),
+            ("ArcCosh", "arccosh"),
+            ("ArcTanh", "arctanh"),
+            # Other
             ("Log", "log"),
             ("Sqrt", "sqrt"),
             ("Abs", "abs"),
-        ]:
+            # Special functions (scipy.special)
+            ("Erf", "erf"),
+            ("BesselJ", "jv"),
+            ("BesselY", "yv"),
+        ]
+        for mma_func, py_func in function_map:
             result = re.sub(rf"\b{mma_func}\b", py_func, result)
-        # Mathematica brackets to Python parens (after function renaming)
+
+        # Step 5: Mathematica brackets to Python parens (after function renaming)
         result = result.replace("[", "(").replace("]", ")")
-        # Mathematica ^ to Python ** (AFTER E^ -> exp to avoid double-conversion)
+
+        # Step 6: Mathematica ^ to Python ** (AFTER E^ → exp to avoid double-conversion)
         result = result.replace("^", "**")
-        # xCoba coordinate symbols appear as zero-arg function calls: t() -> t, x() -> x, etc.
-        # Uses actual coordinate names from the equation system (not hardcoded x/y/z).
+
+        # Step 7: xCoba coordinate symbols: t() → t, x() → x, etc.
+        # Uses actual coordinate names from equation system (not hardcoded x/y/z).
         for coord in self.spec.effective_coordinates:
             result = result.replace(f"{coord}()", coord)
+
         return result
 
-    def _resolve_coefficient_at_point(
+    def _resolve_coefficient_at_point(  # noqa: PLR0915
         self,
         term: OperatorTerm,
         t: float,
@@ -456,16 +564,39 @@ class PDEFromSpec(PDEBase):
         sym = term.coefficient_symbolic or ""
         py_expr = self._mathematica_to_python(sym)
 
-        # Build evaluation namespace with numpy functions (work on scalars AND arrays)
+        # Build evaluation namespace with numpy/scipy functions (work on scalars AND arrays)
         namespace: dict[str, Any] = dict(self._parameters)
         namespace["t"] = t
         namespace["exp"] = np.exp
+        # Basic trig
         namespace["sin"] = np.sin
         namespace["cos"] = np.cos
         namespace["tan"] = np.tan
+        # Reciprocal trig (no direct numpy equivalents)
+        namespace["cot"] = lambda x: np.cos(x) / np.sin(x)  # type: ignore[reportUnknownLambdaType]
+        namespace["sec"] = lambda x: 1.0 / np.cos(x)  # type: ignore[reportUnknownLambdaType]
+        namespace["csc"] = lambda x: 1.0 / np.sin(x)  # type: ignore[reportUnknownLambdaType]
+        # Inverse trig
+        namespace["arcsin"] = np.arcsin
+        namespace["arccos"] = np.arccos
+        namespace["arctan"] = np.arctan
+        namespace["arctan2"] = np.arctan2
+        # Hyperbolic
+        namespace["sinh"] = np.sinh
+        namespace["cosh"] = np.cosh
+        namespace["tanh"] = np.tanh
+        # Inverse hyperbolic
+        namespace["arcsinh"] = np.arcsinh
+        namespace["arccosh"] = np.arccosh
+        namespace["arctanh"] = np.arctanh
+        # Other
         namespace["log"] = np.log
         namespace["sqrt"] = np.sqrt
         namespace["abs"] = np.abs
+        # Special functions (scipy.special)
+        namespace["erf"] = special.erf
+        namespace["jv"] = special.jv  # BesselJ
+        namespace["yv"] = special.yv  # BesselY
 
         # Inject spatial coordinates from grid when position-dependent
         if term.position_dependent:
@@ -476,7 +607,11 @@ class PDEFromSpec(PDEBase):
 
         # Validate all symbols can be resolved
         identifiers = set(re.findall(r"\b[a-zA-Z_]\w*\b", py_expr))
-        builtin_names = {"exp", "sin", "cos", "tan", "log", "sqrt", "abs"}
+        # Derive builtin names from namespace (all math functions, excluding parameters and t)
+        builtin_names = set(namespace.keys()) - set(self._parameters.keys()) - {"t"}
+        # Exclude coordinate variables if position-dependent
+        if term.position_dependent:
+            builtin_names -= set(self.spec.spatial_coordinates)
         coord_vars = set(self.spec.effective_coordinates)
         identifiers -= builtin_names | coord_vars
         missing = identifiers - set(self._parameters.keys())
@@ -743,6 +878,184 @@ class PDEFromSpec(PDEBase):
 
         return result
 
+    def _build_constraint_bc(
+        self,
+        config: ConstraintSolverConfig,
+        grid: GridBase,
+    ) -> Any:  # noqa: ANN401
+        """Convert a ConstraintSolverConfig to a py-pde boundary condition.
+
+        Parameters
+        ----------
+        config : ConstraintSolverConfig
+            Constraint solver configuration with per-axis BCs.
+        grid : GridBase
+            The simulation grid (used to check periodicity).
+
+        Returns
+        -------
+        str | dict
+            py-pde boundary condition descriptor.
+        """
+        spatial_coords = self.spec.spatial_coordinates
+
+        # If all BCs are periodic and grid is periodic, use shorthand
+        all_periodic = all(
+            config.boundary_conditions.get(
+                coord, BoundaryCondition("periodic")
+            ).type
+            == "periodic"
+            for coord in spatial_coords
+        )
+        if all_periodic and hasattr(grid, "periodic") and all(grid.periodic):
+            return "auto_periodic_neumann"
+
+        # Build explicit per-axis BC dict using coordinate names
+        # py-pde expects: {"x": bc_x, "y": bc_y} where bc is "periodic"
+        # or {"value": V} or {"derivative": D}
+        bc_dict: dict[str, Any] = {}
+        for i, coord in enumerate(spatial_coords):
+            bc_config = config.boundary_conditions.get(coord)
+            if bc_config is None:
+                # Default: periodic if grid is periodic on this axis, else Neumann
+                if hasattr(grid, "periodic") and grid.periodic[i]:
+                    bc_dict[coord] = "periodic"
+                else:
+                    bc_dict[coord] = {"derivative": 0.0}
+            elif bc_config.type == "periodic":
+                bc_dict[coord] = "periodic"
+            elif bc_config.type == "dirichlet":
+                bc_dict[coord] = {"value": bc_config.value if bc_config.value is not None else 0.0}
+            elif bc_config.type == "neumann":
+                bc_dict[coord] = {"derivative": bc_config.derivative if bc_config.derivative is not None else 0.0}
+
+        return bc_dict
+
+    def _solve_constraint_equation(
+        self,
+        component_idx: int,
+        state: FieldCollection,
+        bc: BCDescriptor,
+        t: float,
+    ) -> FieldCollection:
+        """Solve an elliptic constraint equation and update the state.
+
+        For constraint equations in the form::
+
+            0 = laplacian_coeff * laplacian(field) + source_terms
+
+        This rearranges to standard Poisson form::
+
+            nabla^2 field = -source_terms / laplacian_coeff
+
+        and solves using py-pde's ``solve_poisson_equation``.
+
+        Parameters
+        ----------
+        component_idx : int
+            Index of the constraint equation in ``spec.equations``.
+        state : FieldCollection
+            Current state. A new FieldCollection is returned with the
+            constraint field replaced by the solution.
+        bc : BCDescriptor
+            Boundary conditions for evaluating source-term operators.
+        t : float
+            Current time (for time-dependent source coefficients).
+
+        Returns
+        -------
+        FieldCollection
+            Updated state with the constraint field solved.
+
+        Raises
+        ------
+        ValueError
+            If the equation lacks a ``laplacian(field)`` term or the
+            Poisson solver fails.
+        """
+        from pde import solve_poisson_equation  # noqa: PLC0415, I001  # type: ignore[reportUnknownVariableType]
+
+        eq = self.spec.equations[component_idx]
+        grid = state.grid
+        field_slot = self._field_slot_map[eq.field_name]
+
+        # Separate RHS into the laplacian-of-self term and source terms
+        laplacian_coeff: float | None = None
+        source_terms: list[OperatorTerm] = []
+
+        for term in eq.rhs_terms:
+            if term.operator == "laplacian" and term.field == eq.field_name:
+                if laplacian_coeff is not None:
+                    msg = (
+                        f"Multiple laplacian({eq.field_name}) terms in constraint "
+                        f"equation. Expected exactly one."
+                    )
+                    raise ValueError(msg)
+                laplacian_coeff = self._resolve_coefficient(term)
+            else:
+                source_terms.append(term)
+
+        # Validate equation structure
+        if laplacian_coeff is None:
+            msg = (
+                f"Constraint equation for {eq.field_name} lacks a "
+                f"laplacian({eq.field_name}) term. "
+                f"The elliptic solver requires the form: "
+                f"laplacian(field) + source = 0."
+            )
+            raise ValueError(msg)
+
+        if abs(laplacian_coeff) < 1e-14:  # noqa: PLR2004
+            msg = (
+                f"Laplacian coefficient for {eq.field_name} is effectively "
+                f"zero ({laplacian_coeff}). Cannot solve elliptic equation."
+            )
+            raise ValueError(msg)
+
+        # Compute source: S = sum(coeff_i * operator_i(field_i))
+        rhs_source = ScalarField(grid, data=0.0)
+        for term in source_terms:
+            target_field = self._get_field_from_state(state, term.field)
+            operated = self._get_operator(term.operator, target_field, bc)
+            coefficient = self._resolve_coefficient_at_point(term, t, grid)
+
+            if isinstance(coefficient, np.ndarray):
+                contribution = ScalarField(grid, data=coefficient * operated.data)
+            else:
+                contribution = coefficient * operated
+            rhs_source += contribution
+
+        # Rearrange 0 = laplacian_coeff * nabla^2(phi) + S into the standard
+        # Poisson form nabla^2(phi) = rhs, giving rhs = -S / laplacian_coeff.
+        poisson_rhs = -rhs_source / laplacian_coeff
+        assert isinstance(poisson_rhs, ScalarField), (
+            f"Expected ScalarField for Poisson RHS, got {type(poisson_rhs).__name__}"
+        )
+
+        # Build boundary conditions for the Poisson solver
+        solver_bc = self._build_constraint_bc(eq.constraint_solver, grid)
+
+        try:
+            solution = solve_poisson_equation(
+                rhs=poisson_rhs,
+                bc=solver_bc,
+                label=eq.field_name,
+            )
+        except Exception as e:
+            rhs_max = float(np.max(np.abs(poisson_rhs.data)))
+            msg = (
+                f"Poisson solver failed for constraint {eq.field_name}:\n"
+                f"  RHS max |f|: {rhs_max:.3e}\n"
+                f"  BC: {solver_bc}\n"
+                f"  Error: {e}"
+            )
+            raise ValueError(msg) from e
+
+        # Update state in-place so dynamical equations (Pass 2) see the
+        # solved constraint field via cross-field references.
+        state[field_slot].data[:] = solution.data
+        return state
+
     @override
     def evolution_rate(
         self,
@@ -799,15 +1112,23 @@ class PDEFromSpec(PDEBase):
         bc = infer_bc_from_grid(state.grid)
         grid = state.grid
 
-        # Pass 1: Compute RHS for first-order components.
-        # These become "virtual momenta" that second-order equations can reference
-        # via pi_N or first_derivative_t operators.
+        # Pass 1: Compute virtual momenta for non-second-order components.
+        # First-order components: their RHS becomes the "virtual momentum"
+        # that other equations can reference via pi_N or first_derivative_t.
+        # Constraint (order=0) components: d_t(field) = 0 by definition,
+        # so their virtual momentum is zero.  When a constraint has
+        # constraint_solver.enabled, it is solved elliptically first so
+        # that dynamical equations see the updated constraint field.
         virtual_momenta: dict[str, ScalarField] = {}
         for i, eq in enumerate(self.spec.equations):
             if eq.time_derivative_order == 1:
                 virtual_momenta[eq.field_name] = self._compute_rhs_for_component(
                     i, state, bc, t
                 )
+            elif eq.time_derivative_order == 0:
+                if eq.constraint_solver.enabled:
+                    state = self._solve_constraint_equation(i, state, bc, t)
+                virtual_momenta[eq.field_name] = ScalarField(grid, data=0.0)
 
         # Pass 2: Build the full rates array using slot maps
         rates: list[ScalarField | None] = [None] * expected_fields

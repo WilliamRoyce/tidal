@@ -253,19 +253,127 @@ thrown2 = Catch[
 TestTrue["ExtractLHSCoefficient throws on non-derivative term",
   StringQ[thrown2] && StringContainsQ[thrown2, "ExtractLHSCoefficient"]];
 
-(* Test ClassifyOperatorType Throw on unsupported derivative order *)
-(* Order 3 derivative is not supported *)
+(* Test ClassifyOperatorType handles order-3 derivative via generic fallback *)
 testOrder3 = Derivative[0, 3][phi0][t, x];
-thrown3 = Catch[
-  TorsionGertsenshtein`ExportJSON`ClassifyOperatorType[testOrder3]
-];
-TestTrue["ClassifyOperatorType throws on unsupported order (3)",
-  StringQ[thrown3] && StringContainsQ[thrown3, "ClassifyOperatorType"]];
+result3 = TorsionGertsenshtein`ExportJSON`ClassifyOperatorType[testOrder3];
+TestTrue["ClassifyOperatorType handles order-3 derivative generically",
+  result3[[1]] === "derivative_3_x" && result3[[2]] === False];
 
 (* Note: ParseMultiFieldRHS Throw is a guard for future code paths where *)
 (* IdentifyMultiFieldTerm might return Nothing for some terms. Currently *)
 (* IdentifyMultiFieldTerm always produces output (uses default field), so *)
 (* the zero-terms condition is unreachable from tests without mocking. *)
+
+(* === Test Group: ExtractMassCouplingFromEquations === *)
+Print[""];
+Print["Test Group: ExtractMassCouplingFromEquations"];
+
+(* Test: Single field with mass term *)
+(* Simulates: d2_t(phi_0) = laplacian(phi_0) - 1.0 * identity(phi_0) *)
+singleFieldEqs = {
+  <|
+    "rhs" -> <|
+      "terms" -> {
+        <|"coefficient" -> 1.0, "operator" -> "laplacian", "field" -> "phi_0"|>,
+        <|"coefficient" -> -1.0, "operator" -> "identity", "field" -> "phi_0"|>
+      }
+    |>
+  |>
+};
+singleResult = TorsionGertsenshtein`ExportJSON`ExtractMassCouplingFromEquations[
+  singleFieldEqs, {"phi_0"}
+];
+TestCase["Single field mass_matrix",
+  {{1.0}}, singleResult["mass_matrix"]];
+TestCase["Single field coupling_matrix",
+  {{0.0}}, singleResult["coupling_matrix"]];
+TestTrue["Single field no symbolic mass",
+  singleResult["mass_matrix_symbolic"] === Null];
+
+(* Test: Multi-field with cross-coupling *)
+(* Simulates coupled_scalars: phi has -1.0*phi - 0.5*chi, chi has -0.5*phi - 4.0*chi *)
+multiFieldEqs = {
+  <|
+    "rhs" -> <|
+      "terms" -> {
+        <|"coefficient" -> 1.0, "operator" -> "laplacian_x", "field" -> "phi_0"|>,
+        <|"coefficient" -> -1.0, "operator" -> "identity", "field" -> "phi_0"|>,
+        <|"coefficient" -> -0.5, "operator" -> "identity", "field" -> "chi_0"|>
+      }
+    |>
+  |>,
+  <|
+    "rhs" -> <|
+      "terms" -> {
+        <|"coefficient" -> 1.0, "operator" -> "laplacian_x", "field" -> "chi_0"|>,
+        <|"coefficient" -> -4.0, "operator" -> "identity", "field" -> "chi_0"|>,
+        <|"coefficient" -> -0.5, "operator" -> "identity", "field" -> "phi_0"|>
+      }
+    |>
+  |>
+};
+multiResult = TorsionGertsenshtein`ExportJSON`ExtractMassCouplingFromEquations[
+  multiFieldEqs, {"phi_0", "chi_0"}
+];
+TestCase["Multi-field mass_matrix diagonal",
+  {{1.0, 0.0}, {0.0, 4.0}}, multiResult["mass_matrix"]];
+TestCase["Multi-field coupling_matrix off-diagonal",
+  {{0.0, 0.5}, {0.5, 0.0}}, multiResult["coupling_matrix"]];
+
+(* Test: Massless field — no identity terms *)
+masslessEqs = {
+  <|
+    "rhs" -> <|
+      "terms" -> {
+        <|"coefficient" -> 1.0, "operator" -> "laplacian", "field" -> "A_0"|>
+      }
+    |>
+  |>
+};
+masslessResult = TorsionGertsenshtein`ExportJSON`ExtractMassCouplingFromEquations[
+  masslessEqs, {"A_0"}
+];
+TestCase["Massless field mass_matrix",
+  {{0.0}}, masslessResult["mass_matrix"]];
+TestCase["Massless field coupling_matrix",
+  {{0.0}}, masslessResult["coupling_matrix"]];
+
+(* Test: Symbolic coefficient *)
+symbolicEqs = {
+  <|
+    "rhs" -> <|
+      "terms" -> {
+        <|"coefficient" -> -1.0, "operator" -> "identity", "field" -> "phi_0",
+          "coefficient_symbolic" -> "-procaMassSquared"|>
+      }
+    |>
+  |>
+};
+symbolicResult = TorsionGertsenshtein`ExportJSON`ExtractMassCouplingFromEquations[
+  symbolicEqs, {"phi_0"}
+];
+TestCase["Symbolic mass_matrix numeric value",
+  {{1.0}}, symbolicResult["mass_matrix"]];
+TestTrue["Symbolic mass_matrix_symbolic populated",
+  symbolicResult["mass_matrix_symbolic"] =!= Null &&
+  symbolicResult["mass_matrix_symbolic"][[1, 1]] === "-procaMassSquared"];
+
+(* Test: Identity term referencing momentum field (pi_0) — should be ignored *)
+momentumEqs = {
+  <|
+    "rhs" -> <|
+      "terms" -> {
+        <|"coefficient" -> 1.0, "operator" -> "gradient_x", "field" -> "pi_0"|>,
+        <|"coefficient" -> -2.0, "operator" -> "identity", "field" -> "A_0"|>
+      }
+    |>
+  |>
+};
+momentumResult = TorsionGertsenshtein`ExportJSON`ExtractMassCouplingFromEquations[
+  momentumEqs, {"A_0"}
+];
+TestCase["Momentum ref ignored, own mass extracted",
+  {{2.0}}, momentumResult["mass_matrix"]];
 
 (* === Exit === *)
 Print[""];

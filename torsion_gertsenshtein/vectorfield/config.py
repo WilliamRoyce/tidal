@@ -83,9 +83,17 @@ class ComponentFieldParams:
         ComponentFieldParams
             Configuration extracted from the specification.
         """
-        # Check if massless by examining mass matrix diagonal
+        # Check if massless by examining mass matrix diagonal.
+        # Also check symbolic matrix: a symbolic mass entry (e.g., for
+        # coordinate-dependent mass) means the field is NOT massless even
+        # if the numeric placeholder is ambiguous.
         is_massless = all(
-            spec.mass_matrix[i][i] == 0.0 for i in range(spec.n_components)
+            spec.mass_matrix[i][i] == 0.0
+            and (
+                not spec.mass_matrix_symbolic
+                or spec.mass_matrix_symbolic[i][i] is None
+            )
+            for i in range(spec.n_components)
         )
 
         return cls(

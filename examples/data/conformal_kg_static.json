@@ -54,7 +54,7 @@
 	"coupling":{
 		"mass_matrix":[
 			[
-				0.0
+				4.0
 			]
 		],
 		"coupling_matrix":[

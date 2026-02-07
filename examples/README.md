@@ -156,6 +156,48 @@ Both examples demonstrate that **different Lagrangians produce different field e
 
 ---
 
+### 3. Curvilinear Coordinate Examples (Polar, Spherical, Cylindrical)
+
+These examples demonstrate that the pipeline handles non-Cartesian coordinate systems purely through the metric definition. Coordinate names remain generic (`x`, `y`, `z`) while the metric encodes the geometry. All Christoffel corrections are computed automatically by xAct.
+
+#### Polar Coordinates (2+1D)
+
+**Metric**: `ds² = -dt² + dx² + x² dy²` (x=r, y=θ)
+
+```bash
+# Stage 1: Derive from Lagrangian
+wolframscript -file examples/polar_kg/polar_kg.wls
+
+# Stage 2: Simulate
+python examples/polar_kg/polar_kg_simulation.py
+```
+
+**Key features**: `gradient_x` with 1/r coefficient, `laplacian_y` with 1/r², mixed periodic BCs.
+
+#### Spherical Coordinates (3+1D)
+
+**Metric**: `ds² = -dt² + dx² + x² dy² + x² sin²(y) dz²` (x=r, y=θ, z=φ)
+
+```bash
+wolframscript -file examples/spherical_kg/spherical_kg.wls
+python examples/spherical_kg/spherical_kg_simulation.py
+```
+
+**Key features**: 6 RHS terms, trigonometric coefficients (`Cot`, `Csc`), `gradient_y` with cot(θ)/r².
+
+#### Cylindrical Coordinates (3+1D)
+
+**Metric**: `ds² = -dt² + dx² + x² dy² + dz²` (x=r, y=θ, z=z)
+
+```bash
+wolframscript -file examples/cylindrical_kg/cylindrical_kg.wls
+python examples/cylindrical_kg/cylindrical_kg_simulation.py
+```
+
+**Key features**: Mixed curved (r, θ) and flat (z) spatial directions, `laplacian_z` with constant coefficient.
+
+---
+
 ## Validation
 
 Run the full validation suite:
@@ -200,17 +242,23 @@ The pipeline handles the rest automatically!
 examples/
 ├── README.md                      # This file
 ├── data/                          # Generated JSON specifications
-│   ├── em_1d.json                # EM equations (from Stage 1)
-│   └── klein_gordon_1d.json      # KG equations (from Stage 1)
-├── electromagnetic/               # EM field examples
-│   ├── em_lagrangian_1d.wls     # Stage 1: Derive from Lagrangian
-│   └── em_from_lagrangian.py     # Stage 2: Simulate
-├── scalar_field/                  # Scalar field examples
-│   ├── klein_gordon.wls          # Stage 1: Derive from Lagrangian
-│   └── kg_from_lagrangian.py     # Stage 2: Simulate
-└── outputs/                       # Visualization outputs
-    ├── em_from_lagrangian_output.png
-    └── kg_from_lagrangian_output.png
+│   ├── em_1d.json                # EM equations
+│   ├── klein_gordon_1d.json      # KG equations
+│   ├── polar_kg.json             # KG in polar coordinates
+│   ├── spherical_kg.json         # KG in spherical coordinates
+│   └── cylindrical_kg.json       # KG in cylindrical coordinates
+├── electromagnetic/               # EM field (1+1D)
+├── scalar_field/                  # Scalar field (1+1D)
+├── coupled_scalars/               # Coupled scalar fields (1+1D)
+├── chern_simons/                  # Chern-Simons gauge theory (2+1D)
+├── elasticity/                    # Anisotropic elasticity (2+1D)
+├── curved_spacetime/              # De Sitter spacetime (2+1D)
+├── sphere_kg/                     # KG on 2-sphere, stereographic (2+1D)
+├── polar_kg/                      # KG in polar coordinates (2+1D)
+├── spherical_kg/                  # KG in spherical coordinates (3+1D)
+├── cylindrical_kg/                # KG in cylindrical coordinates (3+1D)
+├── gravitational_waves/           # Linearized gravity (3+1D)
+└── electrostatics/                # Poisson equation, constraint solver
 ```
 
 ---

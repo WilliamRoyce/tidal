@@ -40,9 +40,9 @@
 		{
 			"field":"A_0",
 			"lhs":{
-				"expression":"d_t(A_0)",
+				"expression":"A_0",
 				"order":{
-					"time":1,
+					"time":0,
 					"space":0
 				}
 			},
@@ -60,6 +60,11 @@
 						"field":"A_0"
 					},
 					{
+						"coefficient":-1.0,
+						"operator":"gradient_x",
+						"field":"pi_1"
+					},
+					{
 						"coefficient":-0.5,
 						"operator":"gradient_y",
 						"field":"A_1"
@@ -68,6 +73,11 @@
 						"coefficient":1.0,
 						"operator":"laplacian_y",
 						"field":"A_0"
+					},
+					{
+						"coefficient":-1.0,
+						"operator":"gradient_y",
+						"field":"pi_2"
 					}
 				]
 			}

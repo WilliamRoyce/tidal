@@ -168,9 +168,8 @@ metadata = <|
   "dimension" -> 3,
   "signature" -> {-1, 1, 1},
   "coordinates" -> {"t", "x", "y"},
-  "parameters" -> {"rho" -> rho, "lambda" -> lambda, "mu" -> mu},
-  "mass_matrix" -> {{0.0, 0.0}, {0.0, 0.0}},
-  "coupling_matrix" -> {{0.0, 0.0}, {0.0, 0.0}}
+  "parameters" -> {"rho" -> rho, "lambda" -> lambda, "mu" -> mu}
+  (* mass_matrix and coupling_matrix are auto-computed from equation identity terms *)
 |>;
 
 (* Build JSON using multi-field pipeline *)

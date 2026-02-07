@@ -147,9 +147,9 @@ def coupled_rank2_spec() -> EquationSystem:
             (0.0, 0.0, 0.0),
         ),
         coupling_matrix=(
+            (0.0, 0.0, 1.0),
             (0.0, 0.0, 0.0),
-            (0.0, 0.0, 0.0),
-            (0.0, 0.0, 0.0),
+            (1.0, 0.0, 0.0),
         ),
         metadata={"source": "test", "type": "coupled_rank2"},
     )

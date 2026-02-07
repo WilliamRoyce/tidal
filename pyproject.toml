@@ -1,6 +1,6 @@
 [project]
 name = "torsion_gertsenshtein"
-version = "0.2.4"
+version = "0.2.6"
 description = "Linearized PDE simulations for electromagnetic-gravitational wave conversion research"
 readme = "README.md"
 requires-python = ">=3.11,<3.12"

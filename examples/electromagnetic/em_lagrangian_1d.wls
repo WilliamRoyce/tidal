@@ -143,7 +143,7 @@ scriptDir = DirectoryName[$InputFileName];
 If[scriptDir === "",
   scriptDir = Directory[]
 ];
-outputDir = FileNameJoin[{scriptDir, "..", "..", "..", "examples", "data"}];
+outputDir = FileNameJoin[{scriptDir, "..", "data"}];
 If[!DirectoryQ[outputDir],
   CreateDirectory[outputDir]
 ];
