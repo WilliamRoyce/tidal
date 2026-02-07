@@ -8,6 +8,7 @@ importtime.log
 third_party/
 .claude
 wolfram_test_output.txt
+.coverage
 
 # Wolfram installers / license artifacts (never commit)
 Wolfram*.sh
