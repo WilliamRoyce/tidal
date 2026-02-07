@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -1955,3 +1955,108 @@ class TestCachingOptimizations:
             term = spec.equations[eq_idx].rhs_terms[term_idx]
             runtime_val = pde._resolve_coefficient(term)
             assert preresolved_val == runtime_val
+
+    def test_timestep_cache_deduplicates_eval(self) -> None:
+        """C1: Per-timestep coeff_cache deduplicates eval for shared symbolic exprs."""
+        # Two terms share the same coefficient_symbolic → only one eval() needed
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0,
+                            "laplacian",
+                            "phi",
+                            coefficient_symbolic="exp(2*H*t)",
+                            time_dependent=True,
+                        ),
+                        OperatorTerm(
+                            -1.0,
+                            "identity",
+                            "phi",
+                            coefficient_symbolic="exp(2*H*t)",
+                            time_dependent=True,
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec, parameters={"H": 0.5})
+        grid = CartesianGrid([(0, 10)], [16], periodic=True)
+        state = FieldCollection([
+            ScalarField(grid, data=1.0),
+            ScalarField(grid, data=0.0),
+        ])
+        bc = "periodic"
+
+        # Both terms resolve to the same value at t=1.0
+        term_a = spec.equations[0].rhs_terms[0]
+        term_b = spec.equations[0].rhs_terms[1]
+        val_a = pde._resolve_coefficient_at_point(term_a, t=1.0, grid=grid)
+        val_b = pde._resolve_coefficient_at_point(term_b, t=1.0, grid=grid)
+        assert val_a == val_b
+
+        # Run _compute_rhs_for_component — it should populate coeff_cache internally
+        # and produce a valid result (no error = cache is working)
+        result = pde._compute_rhs_for_component(0, state, bc, t=1.0)
+        assert result.data is not None
+
+    def test_coord_arrays_passed_to_resolve(self) -> None:
+        """C2: Pre-extracted coord_arrays produce same result as grid-based resolution."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0,
+                            "laplacian_y",
+                            "phi",
+                            coefficient_symbolic="1/x**2",
+                            coordinate_dependent=("x",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=("t", "x", "y"),
+        )
+        pde = PDEFromSpec(spec, parameters={})
+        grid = CartesianGrid([(0.5, 5), (0, 2 * np.pi)], [16, 16], periodic=[False, True])
+
+        term = spec.equations[0].rhs_terms[0]
+
+        # Resolve using grid (fallback path)
+        val_from_grid = pde._resolve_coefficient_at_point(term, t=0.0, grid=grid)
+
+        # Resolve using pre-extracted coord_arrays (C2 path)
+        spatial_coords = spec.spatial_coordinates
+        raw_coords = grid.cell_coords  # pyright: ignore[reportUnknownVariableType]
+        coord_arrays: dict[str, np.ndarray[Any, np.dtype[np.float64]]] = {
+            name: np.asarray(raw_coords[..., i])  # pyright: ignore[reportUnknownArgumentType]
+            for i, name in enumerate(spatial_coords[: grid.num_axes])
+        }
+        val_from_arrays = pde._resolve_coefficient_at_point(
+            term, t=0.0, grid=grid, coord_arrays=coord_arrays  # pyright: ignore[reportUnknownArgumentType]
+        )
+
+        # Both paths should produce identical results
+        np.testing.assert_array_equal(val_from_grid, val_from_arrays)

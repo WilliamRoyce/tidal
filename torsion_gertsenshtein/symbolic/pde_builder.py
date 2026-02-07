@@ -600,11 +600,12 @@ class PDEFromSpec(PDEBase):
 
         return result
 
-    def _resolve_coefficient_at_point(
+    def _resolve_coefficient_at_point(  # noqa: C901
         self,
         term: OperatorTerm,
         t: float,
         grid: GridBase | None = None,
+        coord_arrays: dict[str, NumericArray] | None = None,
     ) -> float | NumericArray:
         """Resolve a potentially coordinate-dependent coefficient.
 
@@ -658,12 +659,15 @@ class PDEFromSpec(PDEBase):
         namespace: dict[str, Any] = dict(self._base_namespace)
         namespace["t"] = t
 
-        # Inject spatial coordinates from grid when position-dependent
+        # C2: Inject spatial coordinates — use pre-extracted arrays if available
         if term.position_dependent:
-            spatial_coords = self.spec.spatial_coordinates
-            coords = grid.cell_coords  # type: ignore[union-attr]
-            for i, name in enumerate(spatial_coords[: grid.num_axes]):  # type: ignore[union-attr]
-                namespace[name] = np.asarray(coords[..., i])  # pyright: ignore[reportUnknownArgumentType]
+            if coord_arrays is not None:
+                namespace.update(coord_arrays)
+            else:
+                spatial_coords = self.spec.spatial_coordinates
+                coords = grid.cell_coords  # type: ignore[union-attr]
+                for i, name in enumerate(spatial_coords[: grid.num_axes]):  # type: ignore[union-attr]
+                    namespace[name] = np.asarray(coords[..., i])  # pyright: ignore[reportUnknownArgumentType]
 
         # Validate all symbols can be resolved
         identifiers = set(re.findall(r"\b[a-zA-Z_]\w*\b", py_expr))
@@ -845,7 +849,7 @@ class PDEFromSpec(PDEBase):
         msg = f"Unknown field name: {field_name}"
         raise ValueError(msg)
 
-    def _compute_rhs_for_component(
+    def _compute_rhs_for_component(  # noqa: C901, PLR0912, PLR0914
         self,
         component_idx: int,
         state: FieldCollection,
@@ -885,6 +889,20 @@ class PDEFromSpec(PDEBase):
         """
         eq = self.spec.equations[component_idx]
         grid = state.grid
+
+        # C2: Pre-extract spatial coordinate arrays once for all position-dependent terms
+        coord_arrays: dict[str, NumericArray] | None = None
+        if any(term.position_dependent for term in eq.rhs_terms):
+            spatial_coords = self.spec.spatial_coordinates
+            raw_coords = grid.cell_coords  # pyright: ignore[reportUnknownVariableType]
+            coord_arrays = {
+                name: np.asarray(raw_coords[..., i])  # pyright: ignore[reportUnknownArgumentType]
+                for i, name in enumerate(spatial_coords[: grid.num_axes])
+            }
+
+        # C1: Per-timestep coefficient cache — same symbolic expression at
+        # same (t, grid) produces the same value, so deduplicate eval() calls
+        coeff_cache: dict[str, float | NumericArray] = {}
 
         # Start with zero field
         result = ScalarField(grid, data=0.0)
@@ -926,13 +944,20 @@ class PDEFromSpec(PDEBase):
                 )
                 operated = self._get_operator(term.operator, target_field, bc)
 
-            # B4: Use pre-resolved coefficient for constant terms, otherwise resolve
+            # Resolve coefficient: B4 preresolved → C1 timestep cache → full eval
             preresolved = self._preresolved.get((component_idx, term_idx))
-            coefficient: float | NumericArray = (
-                preresolved
-                if preresolved is not None
-                else self._resolve_coefficient_at_point(term, t, grid)
-            )
+            if preresolved is not None:
+                coefficient: float | NumericArray = preresolved
+            else:
+                cache_key = term.coefficient_symbolic
+                if cache_key is not None and cache_key in coeff_cache:
+                    coefficient = coeff_cache[cache_key]
+                else:
+                    coefficient = self._resolve_coefficient_at_point(
+                        term, t, grid, coord_arrays=coord_arrays
+                    )
+                    if cache_key is not None:
+                        coeff_cache[cache_key] = coefficient
 
             # Add coefficient * operated to result
             if isinstance(coefficient, np.ndarray):
