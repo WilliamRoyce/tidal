@@ -350,7 +350,7 @@ ExtractRank2Component[eom_, field_, chart_, idx1_, idx2_,
 (* Respects symmetries where implemented *)
 
 EnumerateComponentTuples[fieldHead_, dim_] := Module[
-  {rank, symQ},
+  {rank, symGroup, allTuples, isCanonical},
 
   rank = Length[SlotsOfTensor[fieldHead]];
 
@@ -362,19 +362,27 @@ EnumerateComponentTuples[fieldHead_, dim_] := Module[
       Table[{i}, {i, 0, dim - 1}],
 
     rank >= 2,
-      (* Check for non-trivial symmetry (symmetric or antisymmetric) *)
-      symQ = (SymmetryGroupOfTensor[fieldHead] =!= StrongGenSet[{}, GenSet[]]);
-      If[rank === 2,
-        If[symQ,
-          (* Symmetric rank-2: upper triangle *)
-          Flatten[Table[{i, j}, {i, 0, dim - 1}, {j, i, dim - 1}], 1],
-          (* Non-symmetric rank-2: all pairs *)
-          Flatten[Table[{i, j}, {i, 0, dim - 1}, {j, 0, dim - 1}], 1]
-        ],
-        (* Rank 3+: all tuples (symmetry reduction not yet implemented) *)
-        (* To add symmetry support for rank 3+, use SymmetryGroupOfTensor *)
-        (* to identify independent components and eliminate redundant ones *)
-        Tuples[Range[0, dim - 1], rank]
+      allTuples = Tuples[Range[0, dim - 1], rank];
+      symGroup = SymmetryGroupOfTensor[fieldHead];
+
+      If[symGroup === StrongGenSet[{}, GenSet[]],
+        (* No symmetry: keep all tuples *)
+        allTuples,
+
+        (* Has symmetry: keep only canonical representatives.
+           A tuple is canonical if no permutation from the symmetry group
+           maps it to a lexicographically smaller tuple.  For symmetric
+           indices this keeps non-decreasing sequences; for antisymmetric
+           indices this keeps strictly increasing sequences (and drops
+           tuples with repeated indices, which are zero). *)
+        isCanonical[tuple_] := Module[{perms, permuted},
+          perms = GroupElements[PermutationGroup[symGroup]];
+          AllTrue[perms, (
+            permuted = tuple[[PermutationList[#, rank]]];
+            OrderedQ[{tuple, permuted}] || tuple === permuted
+          ) &]
+        ];
+        Select[allTuples, isCanonical]
       ],
 
     True,
