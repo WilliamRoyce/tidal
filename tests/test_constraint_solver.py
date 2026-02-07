@@ -10,6 +10,8 @@ Tests that the pipeline correctly handles:
 
 from __future__ import annotations
 
+from typing import cast
+
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
@@ -23,7 +25,6 @@ from torsion_gertsenshtein.symbolic.json_loader import (
     OperatorTerm,
 )
 from torsion_gertsenshtein.symbolic.pde_builder import PDEFromSpec
-
 
 # === Fixtures ===
 
@@ -43,9 +44,7 @@ def grid_1d_nonperiodic() -> CartesianGrid:
 @pytest.fixture
 def grid_2d_periodic() -> CartesianGrid:
     """2D periodic grid."""
-    return CartesianGrid(
-        [(0, 2 * np.pi), (0, 2 * np.pi)], [32, 32], periodic=True
-    )
+    return CartesianGrid([(0, 2 * np.pi), (0, 2 * np.pi)], [32, 32], periodic=True)
 
 
 def _make_poisson_spec(
@@ -54,7 +53,7 @@ def _make_poisson_spec(
     bcs: dict[str, BoundaryCondition] | None = None,
     extra_source: OperatorTerm | None = None,
 ) -> EquationSystem:
-    """Helper to create a Poisson-type constraint spec.
+    """Create a Poisson-type constraint spec.
 
     Equation: 0 = laplacian(phi) + source_terms
     """
@@ -170,9 +169,7 @@ class TestConstraintSolverValidation:
                         field_name="phi",
                         field_index=0,
                         time_derivative_order=2,
-                        rhs_terms=(
-                            OperatorTerm(1.0, "laplacian", "phi"),
-                        ),
+                        rhs_terms=(OperatorTerm(1.0, "laplacian", "phi"),),
                         constraint_solver=ConstraintSolverConfig(enabled=True),
                     ),
                 ),
@@ -194,9 +191,7 @@ class TestConstraintSolverValidation:
                         field_name="phi",
                         field_index=0,
                         time_derivative_order=1,
-                        rhs_terms=(
-                            OperatorTerm(1.0, "laplacian", "phi"),
-                        ),
+                        rhs_terms=(OperatorTerm(1.0, "laplacian", "phi"),),
                         constraint_solver=ConstraintSolverConfig(enabled=True),
                     ),
                 ),
@@ -274,13 +269,11 @@ class TestPoissonSolver:
                     field_name="rho",
                     field_index=1,
                     time_derivative_order=2,
-                    rhs_terms=(
-                        OperatorTerm(0.0, "identity", "rho"),
-                    ),
+                    rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
                 ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
-            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, -1.0), (0.0, 0.0)),
             metadata={},
         )
 
@@ -289,15 +282,17 @@ class TestPoissonSolver:
 
         # rho = -sin(x) so that: 0 = nabla^2(phi) + (-sin(x))
         # => nabla^2(phi) = sin(x) => phi = -sin(x)
-        x = np.asarray(grid.cell_coords[..., 0])
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
         rho_data = -np.sin(x)
 
         # State: [phi, rho, pi_rho] (constraint + wave)
-        state = FieldCollection([
-            ScalarField(grid, data=0.0),       # phi (to be solved)
-            ScalarField(grid, data=rho_data),   # rho (source)
-            ScalarField(grid, data=0.0),        # pi_rho (momentum)
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),  # phi (to be solved)
+                ScalarField(grid, data=rho_data),  # rho (source)
+                ScalarField(grid, data=0.0),  # pi_rho (momentum)
+            ]
+        )
 
         # Calling evolution_rate triggers the constraint solver
         pde.evolution_rate(state, t=0.0)
@@ -327,9 +322,7 @@ class TestPoissonSolver:
                     field_name="phi",
                     field_index=0,
                     time_derivative_order=0,
-                    rhs_terms=(
-                        OperatorTerm(1.0, "laplacian", "phi"),
-                    ),
+                    rhs_terms=(OperatorTerm(1.0, "laplacian", "phi"),),
                     constraint_solver=ConstraintSolverConfig(
                         enabled=True,
                         boundary_conditions={
@@ -365,13 +358,11 @@ class TestPoissonSolver:
                     field_name="phi",
                     field_index=0,
                     time_derivative_order=0,
-                    rhs_terms=(
-                        OperatorTerm(1.0, "identity", "phi"),
-                    ),
+                    rhs_terms=(OperatorTerm(1.0, "identity", "phi"),),
                     constraint_solver=ConstraintSolverConfig(enabled=True),
                 ),
             ),
-            mass_matrix=((0.0,),),
+            mass_matrix=((-1.0,),),
             coupling_matrix=((0.0,),),
             metadata={},
         )
@@ -402,7 +393,7 @@ class TestPoissonSolver:
                     constraint_solver=ConstraintSolverConfig(enabled=True),
                 ),
             ),
-            mass_matrix=((0.0,),),
+            mass_matrix=((-1.0,),),
             coupling_matrix=((0.0,),),
             metadata={},
         )
@@ -445,9 +436,7 @@ class TestPoissonSolver:
         with pytest.raises(ValueError, match="Multiple laplacian"):
             pde.evolution_rate(state, t=0.0)
 
-    def test_constraint_rate_still_zero(
-        self, grid_1d_periodic: CartesianGrid
-    ) -> None:
+    def test_constraint_rate_still_zero(self, grid_1d_periodic: CartesianGrid) -> None:
         """Even with solver enabled, evolution rate for constraint is zero."""
         spec = _make_poisson_spec(solver_enabled=True)
         pde = PDEFromSpec(spec)
@@ -494,13 +483,11 @@ class TestPoissonSolver2D:
                     field_name="rho",
                     field_index=1,
                     time_derivative_order=2,
-                    rhs_terms=(
-                        OperatorTerm(0.0, "identity", "rho"),
-                    ),
+                    rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
                 ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
-            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, -1.0), (0.0, 0.0)),
             metadata={},
         )
 
@@ -509,17 +496,18 @@ class TestPoissonSolver2D:
 
         # rho = -2*sin(x)*sin(y) so nabla^2(phi) = 2*sin(x)*sin(y)
         # => phi = -sin(x)*sin(y)
-        coords = grid.cell_coords
-        x = np.asarray(coords[..., 0])
-        y = np.asarray(coords[..., 1])
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+        y = cast("np.ndarray", grid.cell_coords[..., 1])
         rho_data = -2 * np.sin(x) * np.sin(y)
 
         # State: [phi, rho, pi_rho]
-        state = FieldCollection([
-            ScalarField(grid, data=0.0),
-            ScalarField(grid, data=rho_data),
-            ScalarField(grid, data=0.0),
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=rho_data),
+                ScalarField(grid, data=0.0),
+            ]
+        )
 
         pde.evolution_rate(state, t=0.0)
 
@@ -540,9 +528,7 @@ class TestPoissonSolver2D:
 class TestBackwardCompatibility:
     """Ensure existing constraint behavior is unchanged."""
 
-    def test_frozen_constraint_default(
-        self, grid_1d_periodic: CartesianGrid
-    ) -> None:
+    def test_frozen_constraint_default(self, grid_1d_periodic: CartesianGrid) -> None:
         """Constraint without solver config remains frozen (d/dt = 0)."""
         spec = EquationSystem(
             n_components=1,
@@ -554,9 +540,7 @@ class TestBackwardCompatibility:
                     field_name="phi",
                     field_index=0,
                     time_derivative_order=0,
-                    rhs_terms=(
-                        OperatorTerm(1.0, "laplacian", "phi"),
-                    ),
+                    rhs_terms=(OperatorTerm(1.0, "laplacian", "phi"),),
                     # No constraint_solver -> defaults to disabled
                 ),
             ),
@@ -568,7 +552,7 @@ class TestBackwardCompatibility:
         grid = grid_1d_periodic
         pde = PDEFromSpec(spec)
 
-        x = np.asarray(grid.cell_coords[..., 0])
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
         initial_data = np.sin(x)
         state = FieldCollection([ScalarField(grid, data=initial_data)])
 
@@ -588,7 +572,7 @@ class TestBackwardCompatibility:
         pde = PDEFromSpec(spec)
 
         grid = grid_1d_periodic
-        x = np.asarray(grid.cell_coords[..., 0])
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
         initial_data = np.sin(x)
         state = FieldCollection([ScalarField(grid, data=initial_data)])
 
@@ -605,8 +589,6 @@ class TestJSONParsing:
 
     def test_constraint_solver_from_json_dict(self) -> None:
         """Load a constraint solver config from a JSON-like dict."""
-        from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
-
         data = {
             "spacetime": {
                 "dimension": 2,
@@ -651,8 +633,6 @@ class TestJSONParsing:
 
     def test_json_without_constraint_solver(self) -> None:
         """JSON without constraint_solver defaults to disabled."""
-        from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
-
         data = {
             "spacetime": {"dimension": 2},
             "fields": [{"name": "phi", "index": 0}],

@@ -1129,13 +1129,12 @@ class TestParameterizedCoefficients:
                     field_name="phi",
                     field_index=0,
                     time_derivative_order=2,
-                    rhs_terms=(
-                        OperatorTerm(1.0, "identity", "phi", "kappa"),
-                    ),
+                    rhs_terms=(OperatorTerm(1.0, "identity", "phi", "kappa"),),
                 ),
             ),
-            mass_matrix=((0.0,),),
+            mass_matrix=((-1.0,),),
             coupling_matrix=((0.0,),),
+            mass_matrix_symbolic=(("kappa",),),
             metadata={},
         )
         pde = PDEFromSpec(spec, parameters={"kappa": 2.5})
@@ -1156,13 +1155,12 @@ class TestParameterizedCoefficients:
                     field_name="phi",
                     field_index=0,
                     time_derivative_order=2,
-                    rhs_terms=(
-                        OperatorTerm(1.5, "identity", "phi", "unknown_param"),
-                    ),
+                    rhs_terms=(OperatorTerm(1.5, "identity", "phi", "unknown_param"),),
                 ),
             ),
-            mass_matrix=((0.0,),),
+            mass_matrix=((-1.5,),),
             coupling_matrix=((0.0,),),
+            mass_matrix_symbolic=(("unknown_param",),),
             metadata={},
         )
         pde = PDEFromSpec(spec, parameters={"m2": 1.0})  # Different param
@@ -1206,14 +1204,18 @@ class TestParameterizedCoefficients:
         x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
         initial_data = np.exp(-((x - 50) ** 2) / 50)
 
-        state_low = FieldCollection([
-            ScalarField(grid_1d, data=initial_data.copy()),
-            ScalarField(grid_1d, data=0.0),  # momentum
-        ])
-        state_high = FieldCollection([
-            ScalarField(grid_1d, data=initial_data.copy()),
-            ScalarField(grid_1d, data=0.0),
-        ])
+        state_low = FieldCollection(
+            [
+                ScalarField(grid_1d, data=initial_data.copy()),
+                ScalarField(grid_1d, data=0.0),  # momentum
+            ]
+        )
+        state_high = FieldCollection(
+            [
+                ScalarField(grid_1d, data=initial_data.copy()),
+                ScalarField(grid_1d, data=0.0),
+            ]
+        )
 
         # Evolve briefly
         result_low = pde_low_mass.solve(state_low, t_range=1.0, dt=0.01)
@@ -1273,7 +1275,9 @@ class TestPositionDependentCoefficients:
                     time_derivative_order=2,
                     rhs_terms=(
                         OperatorTerm(
-                            1.0, "identity", "phi",
+                            1.0,
+                            "identity",
+                            "phi",
                             coefficient_symbolic="E^(2*dSH*t())",
                             time_dependent=True,
                             coordinate_dependent=("t",),
@@ -1281,8 +1285,9 @@ class TestPositionDependentCoefficients:
                     ),
                 ),
             ),
-            mass_matrix=((0.0,),),
+            mass_matrix=((-1.0,),),
             coupling_matrix=((0.0,),),
+            mass_matrix_symbolic=(("E^(2*dSH*t())",),),
             metadata={},
         )
         pde = PDEFromSpec(spec, parameters={"dSH": 0.1})
@@ -1305,7 +1310,9 @@ class TestPositionDependentCoefficients:
                     time_derivative_order=2,
                     rhs_terms=(
                         OperatorTerm(
-                            1.0, "laplacian_x", "phi",
+                            1.0,
+                            "laplacian_x",
+                            "phi",
                             coefficient_symbolic="x()**2/(2*sphR**2)",
                             coordinate_dependent=("x",),
                         ),
@@ -1354,7 +1361,9 @@ class TestPositionDependentCoefficients:
                     time_derivative_order=2,
                     rhs_terms=(
                         OperatorTerm(
-                            1.0, "laplacian_x", "phi",
+                            1.0,
+                            "laplacian_x",
+                            "phi",
                             coefficient_symbolic="x()**2",
                             coordinate_dependent=("x",),
                         ),
@@ -1385,7 +1394,9 @@ class TestPositionDependentCoefficients:
                     time_derivative_order=2,
                     rhs_terms=(
                         OperatorTerm(
-                            1.0, "laplacian_x", "phi",
+                            1.0,
+                            "laplacian_x",
+                            "phi",
                             coefficient_symbolic="x()**2/(2*sphR**2)",
                             coordinate_dependent=("x",),
                         ),
@@ -1497,7 +1508,9 @@ class TestPositionDependentCoefficients:
                         OperatorTerm(0.25, "laplacian_x", "phi"),
                         # Position-dependent laplacian_x
                         OperatorTerm(
-                            1.0, "laplacian_x", "phi",
+                            1.0,
+                            "laplacian_x",
+                            "phi",
                             coefficient_symbolic="x()**2/(2*R**2)",
                             coordinate_dependent=("x",),
                         ),
@@ -1534,7 +1547,7 @@ class TestMathematicaFunctionConversion:
     """Test _mathematica_to_python conversion for extended mathematical functions."""
 
     def make_spec(self) -> EquationSystem:
-        """Helper to create minimal EquationSystem for conversion testing."""
+        """Create minimal EquationSystem for conversion testing."""
         return EquationSystem(
             n_components=1,
             dimension=3,
@@ -1757,7 +1770,7 @@ class TestMathematicaFunctionConversion:
         # Sum ≈ 1.9606
         mid_val = result[4, 4]
         # Get actual coordinate values at this grid point
-        x_coord = grid.cell_coords[4, 4, 0]  # type: ignore[index]
-        y_coord = grid.cell_coords[4, 4, 1]  # type: ignore[index]
+        x_coord = cast("np.ndarray", grid.cell_coords[4, 4, 0])  # type: ignore[index]
+        y_coord = cast("np.ndarray", grid.cell_coords[4, 4, 1])  # type: ignore[index]
         expected = np.sinh(1.0) + np.arctan2(y_coord, x_coord)
         assert_allclose(mid_val, expected, rtol=1e-10)

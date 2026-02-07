@@ -882,3 +882,283 @@ class TestEquationSystemCoordinates:
         spec = EquationSystem.from_dict(data)
         assert spec.coordinates == ()
         assert spec.effective_coordinates == ("t", "x")
+
+
+class TestAutoComputedMatrices:
+    """Tests for auto-computed mass_matrix and coupling_matrix from terms."""
+
+    def test_single_field_mass_from_identity(self) -> None:
+        """Identity term coefficient populates mass_matrix diagonal."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [{
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                        {"coefficient": -3.0, "operator": "identity", "field": "phi_0"},
+                    ],
+                },
+            }],
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.mass_matrix == ((3.0,),)
+        assert spec.coupling_matrix == ((0.0,),)
+
+    def test_multi_field_cross_coupling(self) -> None:
+        """Cross-field identity terms populate coupling_matrix off-diagonal."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [
+                {"name": "phi_0", "index": 0},
+                {"name": "chi_0", "index": 1},
+            ],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                            {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
+                            {"coefficient": -0.5, "operator": "identity", "field": "chi_0"},
+                        ],
+                    },
+                },
+                {
+                    "field": "chi_0",
+                    "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "chi_0"},
+                            {"coefficient": -4.0, "operator": "identity", "field": "chi_0"},
+                            {"coefficient": -0.5, "operator": "identity", "field": "phi_0"},
+                        ],
+                    },
+                },
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.mass_matrix == ((1.0, 0.0), (0.0, 4.0))
+        assert spec.coupling_matrix == ((0.0, 0.5), (0.5, 0.0))
+
+    def test_massless_field_zero_matrix(self) -> None:
+        """No identity terms produces zero matrices."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "A_0", "index": 0}],
+            "equations": [{
+                "field": "A_0",
+                "lhs": {"expression": "d2_t(A_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
+                    ],
+                },
+            }],
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.mass_matrix == ((0.0,),)
+        assert spec.coupling_matrix == ((0.0,),)
+
+    def test_json_mass_matrix_ignored(self) -> None:
+        """Auto-computation overrides whatever mass_matrix JSON provides."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [{
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                        {"coefficient": -2.0, "operator": "identity", "field": "phi_0"},
+                    ],
+                },
+            }],
+            # JSON says 99.0 — auto-computation should override to 2.0
+            "coupling": {"mass_matrix": [[99.0]], "coupling_matrix": [[0.0]]},
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.mass_matrix == ((2.0,),)
+
+    def test_momentum_refs_ignored_in_matrix(self) -> None:
+        """Identity terms referencing pi_N should not populate matrices."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "A_0", "index": 0}],
+            "equations": [{
+                "field": "A_0",
+                "lhs": {"expression": "d2_t(A_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "gradient_x", "field": "pi_0"},
+                        {"coefficient": -5.0, "operator": "identity", "field": "A_0"},
+                    ],
+                },
+            }],
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.mass_matrix == ((5.0,),)
+
+    def test_symbolic_matrix_from_terms(self) -> None:
+        """Symbolic mass matrix is auto-computed from term coefficient_symbolic."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [{
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": -1.0, "operator": "identity", "field": "phi_0",
+                         "coefficient_symbolic": "-procaMassSquared"},
+                    ],
+                },
+            }],
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.mass_matrix == ((1.0,),)
+        # Symbolic is auto-computed from term, not from JSON coupling section
+        assert spec.mass_matrix_symbolic == (("-procaMassSquared",),)
+
+    def test_symbolic_matrix_without_json_coupling(self) -> None:
+        """Symbolic is available even when JSON has no mass_matrix_symbolic."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [{
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                        {"coefficient": 1.0, "operator": "identity", "field": "phi_0",
+                         "coefficient_symbolic": "-(dSm2*E^(2*dSH*t[]))"},
+                    ],
+                },
+            }],
+            # No mass_matrix_symbolic in coupling — auto-compute from terms
+            "coupling": {"mass_matrix": [[0.0]], "coupling_matrix": [[0.0]]},
+        }
+        spec = EquationSystem.from_dict(data)
+        # Numeric is unreliable for time-dependent terms, but follows convention
+        assert spec.mass_matrix == ((-1.0,),)
+        # Symbolic is the authoritative value, preserved from term
+        assert spec.mass_matrix_symbolic == (("-(dSm2*E^(2*dSH*t[]))",),)
+
+    def test_no_symbolic_for_constant_coefficients(self) -> None:
+        """Constant identity terms produce no symbolic matrix."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [{
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": -2.0, "operator": "identity", "field": "phi_0"},
+                    ],
+                },
+            }],
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.mass_matrix == ((2.0,),)
+        # No symbolic since term has no coefficient_symbolic
+        assert spec.mass_matrix_symbolic == ()
+
+
+# === Integration tests with real JSON files ===
+
+_DATA_DIR = Path(__file__).resolve().parent.parent / "examples" / "data"
+
+
+def _load_json(name: str) -> dict[str, Any]:
+    """Load a JSON file from examples/data/ as a dict."""
+    import json
+
+    path = _DATA_DIR / name
+    with path.open() as f:
+        return json.load(f)
+
+
+@pytest.mark.skipif(
+    not _DATA_DIR.exists(), reason="examples/data/ not found"
+)
+class TestAutoComputedMatricesIntegration:
+    """Verify auto-computed matrices from real JSON example files."""
+
+    def test_klein_gordon_1d_mass(self) -> None:
+        """KG has m²=1.0 from identity term."""
+        spec = EquationSystem.from_dict(_load_json("klein_gordon_1d.json"))
+        assert spec.mass_matrix == ((1.0,),)
+        assert spec.coupling_matrix == ((0.0,),)
+
+    def test_coupled_scalars_mass_and_coupling(self) -> None:
+        """Coupled scalars: m_phi²=1, m_chi²=4, g=0.5."""
+        spec = EquationSystem.from_dict(_load_json("coupled_scalars.json"))
+        assert spec.mass_matrix == ((1.0, 0.0), (0.0, 4.0))
+        assert spec.coupling_matrix == ((0.0, 0.5), (0.5, 0.0))
+
+    def test_em_massless(self) -> None:
+        """EM has no mass — identity terms absent."""
+        spec = EquationSystem.from_dict(_load_json("em_1d.json"))
+        assert spec.mass_matrix == ((0.0, 0.0), (0.0, 0.0))
+
+    def test_proca_symbolic_mass(self) -> None:
+        """Proca has symbolic mass -procaMassSquared per component."""
+        spec = EquationSystem.from_dict(_load_json("proca_1d.json"))
+        assert spec.mass_matrix == ((1.0, 0.0), (0.0, 1.0))
+        assert spec.mass_matrix_symbolic != ()
+        assert spec.mass_matrix_symbolic[0][0] == "-procaMassSquared"
+        assert spec.mass_matrix_symbolic[1][1] == "-procaMassSquared"
+
+    def test_de_sitter_symbolic_time_dependent(self) -> None:
+        """De Sitter KG has time-dependent symbolic mass."""
+        spec = EquationSystem.from_dict(_load_json("de_sitter_kg.json"))
+        assert spec.mass_matrix_symbolic != ()
+        assert spec.mass_matrix_symbolic[0][0] is not None
+        assert "dSm2" in spec.mass_matrix_symbolic[0][0]
+
+    def test_conformal_kg_mass(self) -> None:
+        """Conformal KG with Omega²=4 gives effective mass 4.0."""
+        spec = EquationSystem.from_dict(_load_json("conformal_kg_static.json"))
+        assert spec.mass_matrix == ((4.0,),)
+
+    def test_navier_cauchy_massless(self) -> None:
+        """Navier-Cauchy elasticity is massless."""
+        spec = EquationSystem.from_dict(_load_json("navier_cauchy_2d.json"))
+        assert all(
+            spec.mass_matrix[i][j] == 0.0 for i in range(2) for j in range(2)
+        )
+
+    def test_chern_simons_massless(self) -> None:
+        """Chern-Simons 3-component gauge field is massless."""
+        spec = EquationSystem.from_dict(_load_json("chern_simons_3d.json"))
+        assert all(
+            spec.mass_matrix[i][j] == 0.0 for i in range(3) for j in range(3)
+        )
+
+    def test_linearized_gravity_dedonder_massless(self) -> None:
+        """De Donder linearized gravity: 10 massless wave equations."""
+        spec = EquationSystem.from_dict(
+            _load_json("linearized_gravity_dedonder.json")
+        )
+        assert all(spec.mass_matrix[i][i] == 0.0 for i in range(10))
+
+    def test_sphere_kg_symbolic_mass(self) -> None:
+        """Sphere KG has symbolic mass -sphm2."""
+        spec = EquationSystem.from_dict(_load_json("sphere_kg.json"))
+        assert spec.mass_matrix_symbolic != ()
+        assert spec.mass_matrix_symbolic[0][0] is not None

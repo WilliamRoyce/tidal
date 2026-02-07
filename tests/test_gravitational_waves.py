@@ -17,11 +17,12 @@ Gauge-unfixed system (structural verification only):
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
-from pde import CartesianGrid, ScalarField
+from pde import CartesianGrid
 
 from torsion_gertsenshtein.symbolic.json_loader import (
     EquationSystem,
@@ -29,8 +30,10 @@ from torsion_gertsenshtein.symbolic.json_loader import (
 )
 from torsion_gertsenshtein.symbolic.pde_builder import (
     PDEFromSpec,
+    build_pde_from_json,
     create_initial_state,
 )
+from torsion_gertsenshtein.utils import normalize_solve_result
 
 DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
 DEDONDER_JSON = DATA_DIR / "linearized_gravity_dedonder.json"
@@ -75,7 +78,9 @@ class TestDeDonderSpec:
         """10 second-order fields -> 20 state slots (field + momentum each)."""
         assert spec.state_size == 20
 
-    def test_each_equation_has_three_laplacian_terms(self, spec: EquationSystem) -> None:
+    def test_each_equation_has_three_laplacian_terms(
+        self, spec: EquationSystem
+    ) -> None:
         """Each de Donder equation is Box[h] = 0, meaning 3 directional laplacians."""
         expected_operators = {"laplacian_x", "laplacian_y", "laplacian_z"}
         for eq in spec.equations:
@@ -97,9 +102,10 @@ class TestDeDonderSpec:
         for eq in spec.equations:
             for term in eq.rhs_terms:
                 assert_allclose(
-                    term.coefficient, 1.0,
+                    term.coefficient,
+                    1.0,
                     err_msg=f"Field {eq.field_name}, operator {term.operator}: "
-                            f"coeff {term.coefficient} != 1.0",
+                    f"coeff {term.coefficient} != 1.0",
                 )
 
     def test_metadata(self, spec: EquationSystem) -> None:
@@ -118,31 +124,41 @@ class TestDeDonderPDE:
     def grid(self) -> CartesianGrid:
         """Coarse 3D grid for testing."""
         return CartesianGrid(
-            [(-5, 5), (-5, 5), (-5, 5)], [8, 8, 8], periodic=True,
+            [(-5, 5), (-5, 5), (-5, 5)],
+            [8, 8, 8],
+            periodic=True,
         )
 
     def test_pde_builds_from_json(self) -> None:
         """PDE should build from JSON without errors."""
-        from torsion_gertsenshtein.symbolic.pde_builder import build_pde_from_json
         pde = build_pde_from_json(DEDONDER_JSON)
         assert isinstance(pde, PDEFromSpec)
 
     def test_initial_state_creation(
-        self, spec: EquationSystem, grid: CartesianGrid,
+        self,
+        spec: EquationSystem,
+        grid: CartesianGrid,
     ) -> None:
         """Initial state should have 20 fields (10 field + 10 momentum)."""
         state = create_initial_state(grid, spec)
         assert len(state) == 20
 
     def test_initial_state_with_data(
-        self, spec: EquationSystem, grid: CartesianGrid,
+        self,
+        spec: EquationSystem,
+        grid: CartesianGrid,
     ) -> None:
         """Should accept initial field data for specific components."""
         # Set up a Gaussian pulse in h_4 (h_{xx}) and h_7 (h_{yy})
-        x, y, z = grid.cell_coords[..., 0], grid.cell_coords[..., 1], grid.cell_coords[..., 2]
+        x, y, z = (
+            cast("np.ndarray", grid.cell_coords[..., 0]),
+            cast("np.ndarray", grid.cell_coords[..., 1]),
+            cast("np.ndarray", grid.cell_coords[..., 2]),
+        )
         gaussian = np.exp(-(x**2 + y**2 + z**2) / 2.0)
         state = create_initial_state(
-            grid, spec,
+            grid,
+            spec,
             field_data={"h_4": gaussian, "h_7": -gaussian},
         )
         # h_4 should be nonzero
@@ -150,7 +166,9 @@ class TestDeDonderPDE:
         assert np.max(np.abs(h4_field.data)) > 0.1
 
     def test_evolution_rate_shape(
-        self, spec: EquationSystem, grid: CartesianGrid,
+        self,
+        spec: EquationSystem,
+        grid: CartesianGrid,
     ) -> None:
         """Evolution rate should produce 20 fields matching state layout."""
         pde = PDEFromSpec(spec)
@@ -159,21 +177,29 @@ class TestDeDonderPDE:
         assert len(rate) == 20
 
     def test_short_simulation_stable(
-        self, spec: EquationSystem, grid: CartesianGrid,
+        self,
+        spec: EquationSystem,
+        grid: CartesianGrid,
     ) -> None:
         """Short RK4 simulation should remain bounded."""
         pde = PDEFromSpec(spec)
 
         # Initialize a simple Gaussian in one component
-        x, y, z = grid.cell_coords[..., 0], grid.cell_coords[..., 1], grid.cell_coords[..., 2]
+        x, y, z = (
+            cast("np.ndarray", grid.cell_coords[..., 0]),
+            cast("np.ndarray", grid.cell_coords[..., 1]),
+            cast("np.ndarray", grid.cell_coords[..., 2]),
+        )
         gaussian = 0.01 * np.exp(-(x**2 + y**2 + z**2) / 2.0)
         state = create_initial_state(
-            grid, spec,
+            grid,
+            spec,
             field_data={"h_4": gaussian},
         )
 
         # Very short simulation with RK4
         result = pde.solve(state, t_range=0.1, dt=0.02, scheme="runge-kutta")
+        result = normalize_solve_result(result)
         final = result
 
         # Check that the solution hasn't blown up
@@ -182,7 +208,8 @@ class TestDeDonderPDE:
             assert max_val < 100.0, f"Solution blew up: max |field| = {max_val}"
 
     def test_wave_speed_c_equals_1(
-        self, spec: EquationSystem,
+        self,
+        spec: EquationSystem,
     ) -> None:
         """The wave speed for Box[h] = 0 should be c = 1.
 
@@ -191,7 +218,7 @@ class TestDeDonderPDE:
         We verify the operator coefficients sum to give c² = 1.
         """
         for eq in spec.equations:
-            total_coeff = sum(term.coefficient for term in eq.rhs_terms)
+            sum(term.coefficient for term in eq.rhs_terms)
             # In 3D, laplacian = d²_x + d²_y + d²_z, each with coefficient 1
             # Total effective c² per direction = 1 for each direction
             for term in eq.rhs_terms:
@@ -264,10 +291,7 @@ class TestGaugeUnfixedSpec:
         for eq in spec.equations:
             for term in eq.rhs_terms:
                 # Check for reference to different field (not pi_ momentum)
-                if (
-                    term.field != eq.field_name
-                    and not term.field.startswith("pi_")
-                ):
+                if term.field != eq.field_name and not term.field.startswith("pi_"):
                     has_cross_coupling = True
                     break
             if has_cross_coupling:
@@ -294,8 +318,7 @@ class TestGaugeUnfixedSpec:
         """Gauge-unfixed equations should use multiple operator types."""
         all_operators: set[str] = set()
         for eq in spec.equations:
-            for term in eq.rhs_terms:
-                all_operators.add(term.operator)
+            all_operators.update(term.operator for term in eq.rhs_terms)
 
         # Should have directional laplacians, gradients, cross-derivatives
         assert "laplacian_x" in all_operators
@@ -336,7 +359,6 @@ class TestGaugeUnfixedSpec:
 
     def test_pde_builds(self) -> None:
         """PDE should build from gauge-unfixed JSON without errors."""
-        from torsion_gertsenshtein.symbolic.pde_builder import build_pde_from_json
         pde = build_pde_from_json(UNFIXED_JSON)
         assert isinstance(pde, PDEFromSpec)
 
@@ -358,11 +380,15 @@ class TestDeDonderPhysics:
         """1D-like 3D grid for wave propagation test (propagation along z)."""
         # Fine resolution along z, minimal in x,y
         return CartesianGrid(
-            [(-1, 1), (-1, 1), (-10, 10)], [4, 4, 64], periodic=True,
+            [(-1, 1), (-1, 1), (-10, 10)],
+            [4, 4, 64],
+            periodic=True,
         )
 
     def test_tt_compatible_initial_data(
-        self, spec: EquationSystem, grid: CartesianGrid,
+        self,
+        spec: EquationSystem,
+        grid: CartesianGrid,
     ) -> None:
         """TT-gauge compatible initial data should propagate correctly.
 
@@ -371,17 +397,19 @@ class TestDeDonderPhysics:
         - h_5 (h_{xy}) is the x polarization
         - All other components zero (TT gauge)
         """
-        z = grid.cell_coords[..., 2]
+        z = cast("np.ndarray", grid.cell_coords[..., 2])
         # Gaussian wave packet for h_+ polarization
-        h_plus = 0.01 * np.exp(-z**2 / 2.0)
+        h_plus = 0.01 * np.exp(-(z**2) / 2.0)
 
         state = create_initial_state(
-            grid, spec,
+            grid,
+            spec,
             field_data={"h_4": h_plus, "h_7": -h_plus},
         )
 
         pde = PDEFromSpec(spec)
         result = pde.solve(state, t_range=0.5, dt=0.01, scheme="runge-kutta")
+        result = normalize_solve_result(result)
 
         # After propagation, h_4 and h_7 should still be equal and opposite
         # (tracelessness maintained by the wave equation)
@@ -392,23 +420,29 @@ class TestDeDonderPhysics:
 
         # h_4 = -h_7 should be maintained (TT tracelessness)
         assert_allclose(
-            h4_data, -h7_data, atol=1e-6,
+            h4_data,
+            -h7_data,
+            atol=1e-6,
             err_msg="TT tracelessness h_{xx} = -h_{yy} not maintained",
         )
 
     def test_energy_conservation_short_time(
-        self, spec: EquationSystem,
+        self,
+        spec: EquationSystem,
     ) -> None:
         """Total field energy should be approximately conserved."""
         grid = CartesianGrid(
-            [(-5, 5), (-5, 5), (-5, 5)], [8, 8, 8], periodic=True,
+            [(-5, 5), (-5, 5), (-5, 5)],
+            [8, 8, 8],
+            periodic=True,
         )
         pde = PDEFromSpec(spec)
 
-        z = grid.cell_coords[..., 2]
-        h_plus = 0.01 * np.exp(-z**2 / 2.0)
+        z = cast("np.ndarray", grid.cell_coords[..., 2])
+        h_plus = 0.01 * np.exp(-(z**2) / 2.0)
         state = create_initial_state(
-            grid, spec,
+            grid,
+            spec,
             field_data={"h_4": h_plus},
         )
 
@@ -416,6 +450,7 @@ class TestDeDonderPhysics:
         initial_energy = sum(np.sum(f.data**2) for f in state)
 
         result = pde.solve(state, t_range=0.2, dt=0.05, scheme="runge-kutta")
+        result = normalize_solve_result(result)
         final_energy = sum(np.sum(f.data**2) for f in result)
 
         # Energy should be conserved to within ~15% on this coarse 8³ grid

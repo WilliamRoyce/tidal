@@ -134,7 +134,7 @@ def mixed_spec() -> EquationSystem:
             ),
         ),
         mass_matrix=((0.0, 0.0), (0.0, 0.0)),
-        coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+        coupling_matrix=((0.0, 0.0), (-1.0, 0.0)),
         metadata={"source": "test", "type": "mixed"},
     )
 
