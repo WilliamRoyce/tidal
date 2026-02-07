@@ -10,7 +10,7 @@ View the `torsion_gertsenshtein` package documentation [here](https://williamroy
 
 A research codebase for exploring **electromagnetic ↔ gravitational wave conversion** (Gertsenshtein effect) and potential **amplification mechanisms** in gravity theories with **torsion** (Poincaré gauge theory; parity-even quadratic invariants). The repository includes:
 
-- **A lightweight PDE sandbox** (built on [`py-pde`]) for rapid prototyping and numerics with **267 passing tests** (100% pass rate).
+- **A lightweight PDE sandbox** (built on [`py-pde`]) for rapid prototyping and numerics with **496 passing Python tests + ~100 Wolfram tests**.
 - A symbolic pipeline (Mathematica + xAct) for **deriving linearized field equations** and exporting them to Python-friendly forms.
 - Documentation and experiments for **mixing mechanisms** and **hyperbolicity/causality checks** relevant to the effect.
 
@@ -26,7 +26,7 @@ A research codebase for exploring **electromagnetic ↔ gravitational wave conve
 - **2D coupled simulations**: full support for coupled field evolution in 2D with visualization showing energy transfer between fields; dimension-agnostic PDE implementations work seamlessly with any grid dimensionality.
 - **Animation and visualization**: side-by-side spacetime plots (φ(x,t) heatmaps), 1D evolution animations (φ(x) vs time), 2D field evolution with dual-panel animations showing both coupled fields, and high-fps video export (MP4 via ffmpeg or GIF fallback).
 - **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), Wolfram Engine 14.3 with xAct tensor framework, optional ffmpeg; Sphinx docs skeleton; type-checked codebase with pytest test suite.
-- **Professional development infrastructure**: 267 tests (81 Wolfram + 186 Python, 100% pass rate), 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution.
+- **Professional development infrastructure**: 496 Python tests + ~100 Wolfram tests, 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution.
 
 This README describes the current capabilities, how to run the examples, and planned improvements.
 
@@ -76,7 +76,7 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 
 ## Recent Improvements
 
-- **Phase 4: Pipeline Robustness & Testing (February 2026)**: ✅ **ALL CRITICAL IMPLEMENTATION COMPLETE**. Fixed Wolfram test symbol conflicts (DefMetric syntax, coefficient extraction, xAct introspection). Created 5 development utility scripts (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`) for streamlined workflows. Completed module header documentation for all Wolfram modules with PURPOSE, DEPENDENCIES, and DATA FLOW sections. **267 tests passing** (81 Wolfram + 186 Python, 100% pass rate). Robust kernel caching handling. See [CHANGELOG.md](CHANGELOG.md) for Phase 4 details.
+- **Phase 4-13: Pipeline Evolution (February 2026)**: ✅ **ALL CRITICAL IMPLEMENTATION COMPLETE**. Fixed Wolfram test symbol conflicts, created 5 development utility scripts, completed module header documentation. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **Recent issues**: Eval validation (#68), mixed time-spatial derivatives (#79), unified derivative classification (#85), operator dimension validation (#75), 3+1D Klein-Gordon example (#71). **496 Python tests + ~100 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
 - **Lagrangian-to-PDE pipeline (February 2026)**: Complete symbolic derivation pipeline implemented with Mathematica/xAct → JSON → Python/py-pde. Fixed component extraction (free index detection with `IndicesOf[]`), operator identification (laplacian vs identity/mass terms), and RHS extraction. Created EM and Klein-Gordon examples demonstrating massless vs massive field dynamics. Added comprehensive documentation proving zero hardcoded physics in numerical layer. See [CHANGELOG.md](CHANGELOG.md) for detailed Phase 11 implementation notes.
 - **2D coupled-field support**: `multi_gaussian_2d` initializer for N-field systems on 2D grids; dimension-agnostic coordinate handling for both 1D and 2D; comprehensive test suite for 2D coupled dynamics (symmetry preservation, energy transfer, decoupled limits).
 - **Enhanced coordinate handling**: automatic detection of coordinate array format (flattened vs grid-shaped) in `gaussian_pulse` and `multi_gaussian_2d`; works seamlessly with different py-pde grid configurations.
@@ -89,10 +89,10 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 ## Future Development
 
 - **Continuous Integration**: GitHub Actions workflow for automated Wolfram test execution on pull requests.
-- **Extended physics examples**: Coupled EM/torsion systems, gauge theory implementations, non-Abelian field theories.
-- **Expand to 3+1D**: Test full 4D spacetime with 3 spatial dimensions (current support: 1+1D and 2+1D).
-- **Higher-rank tensor support**: Extend beyond scalars and vectors (requires component extraction improvements).
+- **Extended physics examples**: Coupled EM/torsion systems, non-Abelian field theories, Yang-Mills gauge theories.
 - **Gallery of example runs** with parameter sweeps, convergence studies, and performance benchmarks.
+- **Advanced gauge automation**: Lorenz/Coulomb gauge fixing in Wolfram layer.
+- **Nonlinear extensions**: Beyond linear perturbation theory.
 
 ---
 
@@ -155,6 +155,9 @@ uv run python examples/klein_gordon/2field_coupled.py
 
 # **NEW** Coupled two-field KG system in 2D (animated dual-panel evolution)
 uv run python examples/klein_gordon/2d_2field_coupled.py
+
+# **NEW** 3+1D Klein-Gordon example (full 4D spacetime)
+uv run python examples/scalar_field_3d/kg_3d_simulation.py
 ```
 
 Outputs are written to `outputs/` (created automatically if missing).
@@ -180,6 +183,13 @@ wolframscript -file klein_gordon.wls
 
 # Klein-Gordon: Stage 2 (simulate massive field with dispersion)
 uv run python examples/scalar_field/kg_from_lagrangian.py
+
+# Klein-Gordon 3+1D: Stage 1 (derive from Lagrangian in full 4D spacetime)
+cd examples/scalar_field_3d
+wolframscript -file klein_gordon_3d.wls
+
+# Klein-Gordon 3+1D: Stage 2 (simulate in 3D space)
+uv run python examples/scalar_field_3d/kg_3d_simulation.py
 ```
 
 **Key Features:**
@@ -188,6 +198,7 @@ uv run python examples/scalar_field/kg_from_lagrangian.py
 - **Symbolic derivation**: Mathematica/xAct computes Euler-Lagrange equations
 - **JSON interface**: Well-defined schema for equation specification
 - **Dynamic PDE construction**: Python builds solver from specification
+- **Full dimensional support**: 1+1D, 2+1D, and 3+1D spacetime examples
 - **Verified examples**: EM (massless) vs Klein-Gordon (massive) demonstrate different physics from different Lagrangians
 
 See [examples/README.md](examples/README.md) for complete documentation and verification that the Python layer contains zero hardcoded physics.
@@ -218,7 +229,7 @@ If `ffmpeg` is unavailable, the example falls back to a GIF via Pillow.
 
 ## Tests
 
-The project includes a comprehensive test suite with **267 tests** (186 Python + 81 Wolfram) achieving **100% pass rate**.
+The project includes a comprehensive test suite with **496 Python tests + ~100 Wolfram tests**.
 
 ### Python Tests (186 tests)
 
