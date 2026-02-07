@@ -55,6 +55,12 @@ Gamma^a_{bc} = (1/2) g^{ad} (d_b g_{dc} + d_c g_{bd} - d_d g_{bc}). \
 Returns a 3D array where christoffel[[a+1, b+1, c+1]] = Gamma^a_bc. \
 Works for any metric including time-dependent ones.";
 
+IsNonConstantMetric::usage =
+  "IsNonConstantMetric[metricMatrix, coords] returns True if any metric component \
+depends on the given coordinate symbols (spatial or temporal). Used for automatic \
+detection of whether Christoffel symbol computation is required: constant metrics \
+have all Christoffels = 0, while non-constant metrics require explicit computation.";
+
 RemoveChristoffelSymbols::usage =
   "RemoveChristoffelSymbols[expr] sets all Christoffel symbol terms to zero \
 (valid for flat Minkowski space). Legacy function; prefer EvaluateChristoffelComponents.";
@@ -304,6 +310,22 @@ ComputeChristoffelFromMetricMatrix[chart_, metricMatrix_] := Module[
   components
 ];
 
+(* Auto-detect whether metric is non-constant (requires Christoffel computation) *)
+(* Returns True if any metric component depends on coordinates, False if constant *)
+IsNonConstantMetric[metricMatrix_, coords_List] := Module[
+  {dim, hasCoordDependence},
+
+  dim = Length[metricMatrix];
+
+  (* Check if any metric component has coordinate dependence *)
+  hasCoordDependence = Or @@ Flatten[Table[
+    !FreeQ[metricMatrix[[i, j]], Alternatives @@ coords],
+    {i, dim}, {j, dim}
+  ]];
+
+  hasCoordDependence
+];
+
 (* Evaluate Christoffel components to their numeric/symbolic values *)
 (* Third argument controls behavior:
      None or False -> flat space, all Christoffels = 0
@@ -446,7 +468,7 @@ GetCoordinateSymbols[chart_] := GetCoordinateSymbols[chart] = Module[{coordSyms}
 
 (* === Dimension Validation === *)
 (* Validates that dimension is within supported range for CD conversion rules *)
-$MaxSupportedDimension = 4;  (* Currently 3+1D is the maximum *)
+$MaxSupportedDimension = 7;  (* Up to 6+1D spacetime; axis letters: x,y,z,w,v,u *)
 
 ValidateDimension[dim_Integer] := Module[{},
   If[dim > $MaxSupportedDimension,

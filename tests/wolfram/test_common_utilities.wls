@@ -247,6 +247,55 @@ memoR3 = TorsionGertsenshtein`CommonUtilities`GenerateCDRules[3, cuTestCart3];
 memoR4 = TorsionGertsenshtein`CommonUtilities`GenerateCDRules[3, cuTestCart3];
 TestCase["GenerateCDRules memoization consistent (3D)", memoR3, memoR4];
 
+(* === Test 16: IsNonConstantMetric === *)
+Print[""];
+Print["Test 16: IsNonConstantMetric - Auto-detection of metric coordinate dependence"];
+
+(* Setup coordinate symbols *)
+coords2D = {t[], x[]};
+coords3D = {t[], x[], y[]};
+
+(* Test 1: Constant Minkowski metric *)
+metricFlat2D = DiagonalMatrix[{-1, 1}];
+TestTrue["IsNonConstantMetric[flat 2D Minkowski] = False",
+  !TorsionGertsenshtein`CommonUtilities`IsNonConstantMetric[metricFlat2D, coords2D]];
+
+metricFlat3D = DiagonalMatrix[{-1, 1, 1}];
+TestTrue["IsNonConstantMetric[flat 3D Minkowski] = False",
+  !TorsionGertsenshtein`CommonUtilities`IsNonConstantMetric[metricFlat3D, coords3D]];
+
+(* Test 2: Position-dependent metric (polar coordinates) *)
+metricPolar = DiagonalMatrix[{-1, 1, x[]^2}];
+TestTrue["IsNonConstantMetric[polar: x^2] = True",
+  TorsionGertsenshtein`CommonUtilities`IsNonConstantMetric[metricPolar, coords3D]];
+
+(* Test 3: Time-dependent metric (de Sitter) *)
+H = 1;  (* Hubble parameter *)
+metricDeSitter = DiagonalMatrix[{-Exp[2*H*t[]], Exp[2*H*t[]], Exp[2*H*t[]]}];
+TestTrue["IsNonConstantMetric[de Sitter: exp(H*t)] = True",
+  TorsionGertsenshtein`CommonUtilities`IsNonConstantMetric[metricDeSitter, coords3D]];
+
+(* Test 4: Static conformal metric (constant conformal factor) *)
+Omega = 2;
+metricConformal = Omega^2 * DiagonalMatrix[{-1, 1, 1}];
+TestTrue["IsNonConstantMetric[conformal: Omega^2 with constant Omega] = False",
+  !TorsionGertsenshtein`CommonUtilities`IsNonConstantMetric[metricConformal, coords3D]];
+
+(* Test 5: Trigonometric dependence (sphere coordinates) *)
+metricSphere = DiagonalMatrix[{-1, 1, Sin[x[]]^2}];
+TestTrue["IsNonConstantMetric[sphere: sin(x)^2] = True",
+  TorsionGertsenshtein`CommonUtilities`IsNonConstantMetric[metricSphere, coords3D]];
+
+(* Test 6: Non-diagonal with position dependence *)
+metricNonDiag = {{-1, 0, 0}, {0, 1, x[]}, {0, x[], 1}};
+TestTrue["IsNonConstantMetric[non-diagonal with x dependence] = True",
+  TorsionGertsenshtein`CommonUtilities`IsNonConstantMetric[metricNonDiag, coords3D]];
+
+(* Test 7: Non-diagonal but constant *)
+metricNonDiagConst = {{-1, 0, 0}, {0, 1, 0.5}, {0, 0.5, 1}};
+TestTrue["IsNonConstantMetric[non-diagonal constant] = False",
+  !TorsionGertsenshtein`CommonUtilities`IsNonConstantMetric[metricNonDiagConst, coords3D]];
+
 (* === Exit === *)
 Print[""];
 ExitWithTestStatus[];
