@@ -10,6 +10,7 @@ Usage:
 
 import subprocess  # noqa: S404
 import sys
+from typing import Any
 
 ISSUES = [
     # CRITICAL BUGS & SECURITY
@@ -101,7 +102,6 @@ Catch Wolfram pipeline breakage before merging, ensure JSON generation correctne
 """,
         "labels": ["ci-cd", "priority: critical", "testing"],
     },
-
     # CRITICAL FEATURES
     {
         "title": "Support Rank-3+ Tensor Decomposition",
@@ -184,7 +184,6 @@ Listed in MEMORY.md as "Future Priority #3".
 """,
         "labels": ["enhancement", "priority: critical", "gauge-theory", "wolfram"],
     },
-
     # HIGH PRIORITY
     {
         "title": "Add Animation Module Test Coverage",
@@ -308,7 +307,6 @@ Users can generate JSON programmatically, troubleshoot schema errors, extend for
 """,
         "labels": ["documentation", "priority: high", "json-schema"],
     },
-
     # MEDIUM PRIORITY
     {
         "title": "Add Tests for Observers, Profiling, Runners Modules",
@@ -467,7 +465,6 @@ Ensures JSON stays synchronized with Wolfram code.
 """,
         "labels": ["ci-cd", "priority: medium", "validation"],
     },
-
     # LOW PRIORITY
     {
         "title": "Refactor ContainsTimeDerivative and IsMixedTimeSpaceDerivative",
@@ -559,7 +556,7 @@ Constraint equations (time_order=0) just return zero evolution. No mechanism to 
 ]
 
 
-def create_issue(issue_data: dict, *, dry_run: bool = False) -> None:
+def create_issue(issue_data: dict[str, Any], *, dry_run: bool = False) -> None:
     """Create a GitHub issue using gh CLI."""
     title = issue_data["title"]
     body = issue_data["body"]
@@ -573,12 +570,7 @@ def create_issue(issue_data: dict, *, dry_run: bool = False) -> None:
         return
 
     # Create issue using gh CLI
-    cmd = [
-        "gh", "issue", "create",
-        "--title", title,
-        "--body", body,
-        "--label", labels
-    ]
+    cmd = ["gh", "issue", "create", "--title", title, "--body", body, "--label", labels]
 
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True)
