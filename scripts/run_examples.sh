@@ -21,6 +21,15 @@ EXAMPLES=(
     "examples/chern_simons/chern_simons.wls"
     "examples/elasticity/navier_cauchy.wls"
     "examples/proca/proca.wls"
+    "examples/curved_spacetime/de_sitter_kg.wls"
+    "examples/curved_spacetime/conformal_kg_static.wls"
+    "examples/electrostatics/electrostatics.wls"
+    "examples/sphere_kg/sphere_kg.wls"
+    "examples/polar_kg/polar_kg.wls"
+    "examples/spherical_kg/spherical_kg.wls"
+    "examples/cylindrical_kg/cylindrical_kg.wls"
+    "examples/gravitational_waves/linearized_gravity.wls"
+    "examples/scalar_field_3d/klein_gordon_3d.wls"
 )
 
 PASSED=0
