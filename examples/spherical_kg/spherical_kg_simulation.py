@@ -220,7 +220,7 @@ def _analyze_results(result: SimulationResult) -> None:
     print()
 
 
-def _plot_results(result: SimulationResult) -> None:
+def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     print("Step 7: Generating visualization...")
 
     storage = result.storage

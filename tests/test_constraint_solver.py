@@ -104,7 +104,7 @@ class TestBoundaryConditionParsing:
     def test_dirichlet_bc(self) -> None:
         bc = BoundaryCondition.from_dict({"type": "dirichlet", "value": 1.5})
         assert bc.type == "dirichlet"
-        assert bc.value == 1.5
+        assert bc.value == 1.5  # noqa: PLR2004
 
     def test_neumann_bc(self) -> None:
         bc = BoundaryCondition.from_dict({"type": "neumann", "derivative": 0.0})
@@ -285,7 +285,7 @@ class TestPoissonSolver:
         x = cast("np.ndarray", grid.cell_coords[..., 0])
         rho_data = -np.sin(x)
 
-        # State: [phi, rho, pi_rho] (constraint + wave)
+        # Fields: phi (to be solved), rho (source), pi_rho (momentum)
         state = FieldCollection(
             [
                 ScalarField(grid, data=0.0),  # phi (to be solved)
@@ -500,7 +500,7 @@ class TestPoissonSolver2D:
         y = cast("np.ndarray", grid.cell_coords[..., 1])
         rho_data = -2 * np.sin(x) * np.sin(y)
 
-        # State: [phi, rho, pi_rho]
+        # Fields: phi (to be solved), rho (source), pi_rho (momentum)
         state = FieldCollection(
             [
                 ScalarField(grid, data=0.0),

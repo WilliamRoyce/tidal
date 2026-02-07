@@ -8,10 +8,8 @@ Usage:
     python scripts/create_github_issues.py [--dry-run]
 """
 
-import json
-import subprocess
+import subprocess  # noqa: S404
 import sys
-from pathlib import Path
 
 ISSUES = [
     # CRITICAL BUGS & SECURITY
@@ -411,7 +409,7 @@ Validates coordinate-independence, enables realistic physics (e.g., black hole s
 1. **Convergence studies:** Verify solution converges as grid/dt refined
 2. **Stability bounds:** Test extreme parameters (m→0, m≫1, strong coupling)
 3. **CFL violation:** Ensure solver fails gracefully with too-large dt
-4. **Grid extremes:** Very large (10k+ points), very small (8-16 points), anisotropic (1000×10)
+4. **Grid extremes:** Very large (10k+ points), very small (8-16 points), anisotropic (1000x10)
 
 ## Example Test
 ```python
@@ -561,14 +559,14 @@ Constraint equations (time_order=0) just return zero evolution. No mechanism to 
 ]
 
 
-def create_issue(issue_data: dict, dry_run: bool = False) -> None:
+def create_issue(issue_data: dict, *, dry_run: bool = False) -> None:
     """Create a GitHub issue using gh CLI."""
     title = issue_data["title"]
     body = issue_data["body"]
     labels = ",".join(issue_data["labels"])
 
     if dry_run:
-        print(f"\n{'='*80}")
+        print(f"\n{'=' * 80}")
         print(f"Title: {title}")
         print(f"Labels: {labels}")
         print(f"\nBody:\n{body}")
@@ -594,16 +592,16 @@ def create_issue(issue_data: dict, dry_run: bool = False) -> None:
         sys.exit(1)
 
 
-def main():
+def main() -> None:
     dry_run = "--dry-run" in sys.argv
 
     if dry_run:
         print("DRY RUN MODE - No issues will be created")
         print(f"Total issues to create: {len(ISSUES)}")
 
-    print(f"\n{'='*80}")
+    print(f"\n{'=' * 80}")
     print("Creating GitHub Issues for Torsion-Gertsenshtein Pipeline")
-    print(f"{'='*80}\n")
+    print(f"{'=' * 80}\n")
 
     for i, issue in enumerate(ISSUES, 1):
         print(f"[{i}/{len(ISSUES)}] {issue['title']}")
@@ -612,7 +610,7 @@ def main():
     if not dry_run:
         print(f"\n✓ Successfully created {len(ISSUES)} issues!")
     else:
-        print(f"\nDry run complete. Run without --dry-run to create issues.")
+        print("\nDry run complete. Run without --dry-run to create issues.")
 
 
 if __name__ == "__main__":

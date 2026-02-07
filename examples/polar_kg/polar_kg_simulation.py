@@ -51,6 +51,7 @@ PULSE_WIDTH = 0.5
 PULSE_AMPLITUDE = 1.0
 T_END = 8.0
 DT = 0.005
+ENERGY_THRESHOLD = 0.15
 
 
 @dataclass(frozen=True)
@@ -210,14 +211,14 @@ def _analyze_results(result: SimulationResult) -> None:
     print(f"  Initial energy proxy: {initial_energy:.2f}")
     print(f"  Final energy proxy:   {final_energy:.2f}")
     print(f"  Relative change:      {energy_change:.4f}")
-    if energy_change < 0.15:
+    if energy_change < ENERGY_THRESHOLD:
         print("  Energy approximately conserved (flat space, static metric)")
     else:
         print("  Note: Energy change may be due to boundary effects")
     print()
 
 
-def _plot_results(result: SimulationResult) -> None:
+def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     print("Step 7: Generating visualization...")
 
     storage = result.storage

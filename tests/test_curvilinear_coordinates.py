@@ -9,13 +9,17 @@ Verifies that the pipeline correctly handles non-Cartesian coordinate metrics:
 from __future__ import annotations
 
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pytest
-from numpy.testing import assert_allclose
 from pde import CartesianGrid, FieldCollection, ScalarField
 
-from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
+from torsion_gertsenshtein.symbolic import (
+    EquationSystem,
+    build_pde_from_json,
+    load_equation_system,
+)
 
 DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
 
@@ -26,25 +30,25 @@ DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
 class TestPolarKG:
     """Tests for polar coordinate Klein-Gordon (2+1D)."""
 
-    @pytest.fixture()
-    def spec(self):
+    @pytest.fixture
+    def spec(self) -> EquationSystem:
         return load_equation_system(DATA_DIR / "polar_kg.json")
 
-    def test_dimension(self, spec):
-        assert spec.dimension == 3
-        assert spec.spatial_dimension == 2
+    def test_dimension(self, spec: EquationSystem) -> None:
+        assert spec.dimension == 3  # noqa: PLR2004
+        assert spec.spatial_dimension == 2  # noqa: PLR2004
 
-    def test_coordinates(self, spec):
+    def test_coordinates(self, spec: EquationSystem) -> None:
         assert spec.coordinates == ("t", "x", "y")
 
-    def test_single_equation(self, spec):
+    def test_single_equation(self, spec: EquationSystem) -> None:
         assert len(spec.equations) == 1
 
-    def test_time_order(self, spec):
+    def test_time_order(self, spec: EquationSystem) -> None:
         eq = spec.equations[0]
-        assert eq.time_derivative_order == 2
+        assert eq.time_derivative_order == 2  # noqa: PLR2004
 
-    def test_operator_types(self, spec):
+    def test_operator_types(self, spec: EquationSystem) -> None:
         eq = spec.equations[0]
         operators = {t.operator for t in eq.rhs_terms}
         assert "laplacian_x" in operators  # d2_r
@@ -52,7 +56,7 @@ class TestPolarKG:
         assert "laplacian_y" in operators  # (1/r^2) d2_theta
         assert "identity" in operators  # mass term
 
-    def test_gradient_x_position_dependent(self, spec):
+    def test_gradient_x_position_dependent(self, spec: EquationSystem) -> None:
         """The (1/r) gradient_x coefficient must be position-dependent on x."""
         eq = spec.equations[0]
         grad_terms = [t for t in eq.rhs_terms if t.operator == "gradient_x"]
@@ -60,7 +64,7 @@ class TestPolarKG:
         assert grad_terms[0].position_dependent
         assert "x" in grad_terms[0].coordinate_dependent
 
-    def test_laplacian_y_position_dependent(self, spec):
+    def test_laplacian_y_position_dependent(self, spec: EquationSystem) -> None:
         """The (1/r^2) laplacian_y coefficient must be position-dependent on x."""
         eq = spec.equations[0]
         lap_y_terms = [t for t in eq.rhs_terms if t.operator == "laplacian_y"]
@@ -68,24 +72,20 @@ class TestPolarKG:
         assert lap_y_terms[0].position_dependent
         assert "x" in lap_y_terms[0].coordinate_dependent
 
-    def test_laplacian_x_constant(self, spec):
+    def test_laplacian_x_constant(self, spec: EquationSystem) -> None:
         """The d2_r term has constant coefficient 1."""
         eq = spec.equations[0]
         lap_x_terms = [t for t in eq.rhs_terms if t.operator == "laplacian_x"]
         assert len(lap_x_terms) == 1
         assert not lap_x_terms[0].position_dependent
 
-    def test_build_pde(self):
-        pde = build_pde_from_json(
-            DATA_DIR / "polar_kg.json", parameters={"polm2": 1.0}
-        )
+    def test_build_pde(self) -> None:
+        pde = build_pde_from_json(DATA_DIR / "polar_kg.json", parameters={"polm2": 1.0})
         assert pde is not None
 
-    def test_evolution_rate_runs(self):
+    def test_evolution_rate_runs(self) -> None:
         """evolution_rate() executes without error on a mixed-periodic grid."""
-        pde = build_pde_from_json(
-            DATA_DIR / "polar_kg.json", parameters={"polm2": 1.0}
-        )
+        pde = build_pde_from_json(DATA_DIR / "polar_kg.json", parameters={"polm2": 1.0})
         grid = CartesianGrid(
             bounds=[(0.5, 5.0), (0, 2 * np.pi)],
             shape=[16, 16],
@@ -97,22 +97,20 @@ class TestPolarKG:
 
         rates = pde.evolution_rate(state, t=0.0)
         assert rates is not None
-        assert len(rates) == 2
+        assert len(rates) == 2  # noqa: PLR2004
         # d_t(pi) should be non-zero for non-trivial phi (mass term: -m^2 * phi)
         assert not np.allclose(rates[1].data, 0.0)
 
-    def test_coefficient_value_gradient_x(self):
+    def test_coefficient_value_gradient_x(self) -> None:
         """Verify the 1/r gradient coefficient evaluates correctly."""
-        pde = build_pde_from_json(
-            DATA_DIR / "polar_kg.json", parameters={"polm2": 0.0}
-        )
+        pde = build_pde_from_json(DATA_DIR / "polar_kg.json", parameters={"polm2": 0.0})
         grid = CartesianGrid(
             bounds=[(1.0, 5.0), (0, 2 * np.pi)],
             shape=[8, 8],
             periodic=[False, True],
         )
         # Set up a field with d_r phi = 1 everywhere (linear in r)
-        r = np.asarray(grid.cell_coords[..., 0])
+        r = cast("np.ndarray", grid.cell_coords[..., 0])
         phi = ScalarField(grid, data=r, label="polphi_0")
         pi = ScalarField(grid, data=0.0, label="pi_0")
         state = FieldCollection([phi, pi])
@@ -130,21 +128,21 @@ class TestPolarKG:
 class TestSphericalKG:
     """Tests for spherical coordinate Klein-Gordon (3+1D)."""
 
-    @pytest.fixture()
-    def spec(self):
+    @pytest.fixture
+    def spec(self) -> EquationSystem:
         return load_equation_system(DATA_DIR / "spherical_kg.json")
 
-    def test_dimension(self, spec):
-        assert spec.dimension == 4
-        assert spec.spatial_dimension == 3
+    def test_dimension(self, spec: EquationSystem) -> None:
+        assert spec.dimension == 4  # noqa: PLR2004
+        assert spec.spatial_dimension == 3  # noqa: PLR2004
 
-    def test_coordinates(self, spec):
+    def test_coordinates(self, spec: EquationSystem) -> None:
         assert spec.coordinates == ("t", "x", "y", "z")
 
-    def test_single_equation(self, spec):
+    def test_single_equation(self, spec: EquationSystem) -> None:
         assert len(spec.equations) == 1
 
-    def test_operator_types(self, spec):
+    def test_operator_types(self, spec: EquationSystem) -> None:
         eq = spec.equations[0]
         operators = {t.operator for t in eq.rhs_terms}
         assert "laplacian_x" in operators  # d2_r
@@ -154,12 +152,12 @@ class TestSphericalKG:
         assert "laplacian_z" in operators  # csc^2(theta)/r^2 d2_phi
         assert "identity" in operators  # mass term
 
-    def test_six_terms(self, spec):
+    def test_six_terms(self, spec: EquationSystem) -> None:
         """Spherical coordinates produce 6 terms in the wave equation."""
         eq = spec.equations[0]
-        assert len(eq.rhs_terms) == 6
+        assert len(eq.rhs_terms) == 6  # noqa: PLR2004
 
-    def test_gradient_y_depends_on_x_and_y(self, spec):
+    def test_gradient_y_depends_on_x_and_y(self, spec: EquationSystem) -> None:
         """The cot(theta)/r^2 coefficient depends on both x (r) and y (theta)."""
         eq = spec.equations[0]
         grad_y_terms = [t for t in eq.rhs_terms if t.operator == "gradient_y"]
@@ -169,7 +167,7 @@ class TestSphericalKG:
         assert "x" in deps
         assert "y" in deps
 
-    def test_laplacian_z_depends_on_x_and_y(self, spec):
+    def test_laplacian_z_depends_on_x_and_y(self, spec: EquationSystem) -> None:
         """The csc^2(theta)/r^2 coefficient depends on both x and y."""
         eq = spec.equations[0]
         lap_z_terms = [t for t in eq.rhs_terms if t.operator == "laplacian_z"]
@@ -179,13 +177,13 @@ class TestSphericalKG:
         assert "x" in deps
         assert "y" in deps
 
-    def test_build_pde(self):
+    def test_build_pde(self) -> None:
         pde = build_pde_from_json(
             DATA_DIR / "spherical_kg.json", parameters={"spm2": 0.0}
         )
         assert pde is not None
 
-    def test_evolution_rate_runs(self):
+    def test_evolution_rate_runs(self) -> None:
         """evolution_rate() executes on a 3D grid with trig coefficients."""
         pde = build_pde_from_json(
             DATA_DIR / "spherical_kg.json", parameters={"spm2": 0.0}
@@ -201,11 +199,11 @@ class TestSphericalKG:
 
         rates = pde.evolution_rate(state, t=0.0)
         assert rates is not None
-        assert len(rates) == 2
+        assert len(rates) == 2  # noqa: PLR2004
         assert np.all(np.isfinite(rates[0].data))
         assert np.all(np.isfinite(rates[1].data))
 
-    def test_cot_csc_conversion(self):
+    def test_cot_csc_conversion(self) -> None:
         """Verify Cot and Csc are correctly converted and evaluated."""
         pde = build_pde_from_json(
             DATA_DIR / "spherical_kg.json", parameters={"spm2": 0.0}
@@ -231,21 +229,21 @@ class TestSphericalKG:
 class TestCylindricalKG:
     """Tests for cylindrical coordinate Klein-Gordon (3+1D)."""
 
-    @pytest.fixture()
-    def spec(self):
+    @pytest.fixture
+    def spec(self) -> EquationSystem:
         return load_equation_system(DATA_DIR / "cylindrical_kg.json")
 
-    def test_dimension(self, spec):
-        assert spec.dimension == 4
-        assert spec.spatial_dimension == 3
+    def test_dimension(self, spec: EquationSystem) -> None:
+        assert spec.dimension == 4  # noqa: PLR2004
+        assert spec.spatial_dimension == 3  # noqa: PLR2004
 
-    def test_coordinates(self, spec):
+    def test_coordinates(self, spec: EquationSystem) -> None:
         assert spec.coordinates == ("t", "x", "y", "z")
 
-    def test_single_equation(self, spec):
+    def test_single_equation(self, spec: EquationSystem) -> None:
         assert len(spec.equations) == 1
 
-    def test_operator_types(self, spec):
+    def test_operator_types(self, spec: EquationSystem) -> None:
         eq = spec.equations[0]
         operators = {t.operator for t in eq.rhs_terms}
         assert "laplacian_x" in operators  # d2_r
@@ -254,19 +252,19 @@ class TestCylindricalKG:
         assert "laplacian_z" in operators  # d2_z (flat, constant coeff)
         assert "identity" in operators  # mass term
 
-    def test_five_terms(self, spec):
+    def test_five_terms(self, spec: EquationSystem) -> None:
         """Cylindrical coordinates produce 5 terms."""
         eq = spec.equations[0]
-        assert len(eq.rhs_terms) == 5
+        assert len(eq.rhs_terms) == 5  # noqa: PLR2004
 
-    def test_laplacian_z_constant(self, spec):
+    def test_laplacian_z_constant(self, spec: EquationSystem) -> None:
         """The z-direction Laplacian has constant coefficient (flat direction)."""
         eq = spec.equations[0]
         lap_z_terms = [t for t in eq.rhs_terms if t.operator == "laplacian_z"]
         assert len(lap_z_terms) == 1
         assert not lap_z_terms[0].position_dependent
 
-    def test_gradient_x_position_dependent(self, spec):
+    def test_gradient_x_position_dependent(self, spec: EquationSystem) -> None:
         """The (1/r) gradient_x coefficient is position-dependent on x."""
         eq = spec.equations[0]
         grad_terms = [t for t in eq.rhs_terms if t.operator == "gradient_x"]
@@ -274,13 +272,13 @@ class TestCylindricalKG:
         assert grad_terms[0].position_dependent
         assert "x" in grad_terms[0].coordinate_dependent
 
-    def test_build_pde(self):
+    def test_build_pde(self) -> None:
         pde = build_pde_from_json(
             DATA_DIR / "cylindrical_kg.json", parameters={"cylm2": 0.0}
         )
         assert pde is not None
 
-    def test_evolution_rate_runs(self):
+    def test_evolution_rate_runs(self) -> None:
         """evolution_rate() executes on a 3D grid with mixed periodic BCs."""
         pde = build_pde_from_json(
             DATA_DIR / "cylindrical_kg.json", parameters={"cylm2": 0.0}
@@ -296,7 +294,7 @@ class TestCylindricalKG:
 
         rates = pde.evolution_rate(state, t=0.0)
         assert rates is not None
-        assert len(rates) == 2
+        assert len(rates) == 2  # noqa: PLR2004
         assert np.all(np.isfinite(rates[0].data))
         assert np.all(np.isfinite(rates[1].data))
 
@@ -308,14 +306,14 @@ class TestCurvilinearCommon:
     """Tests that apply across all curvilinear coordinate examples."""
 
     @pytest.mark.parametrize(
-        ("json_file", "params", "expected_dim"),
+        ("json_file", "expected_dim"),
         [
-            ("polar_kg.json", {"polm2": 0.0}, 3),
-            ("spherical_kg.json", {"spm2": 0.0}, 4),
-            ("cylindrical_kg.json", {"cylm2": 0.0}, 4),
+            ("polar_kg.json", 3),
+            ("spherical_kg.json", 4),
+            ("cylindrical_kg.json", 4),
         ],
     )
-    def test_json_loads(self, json_file, params, expected_dim):
+    def test_json_loads(self, json_file: str, expected_dim: int) -> None:
         spec = load_equation_system(DATA_DIR / json_file)
         assert spec.dimension == expected_dim
 
@@ -327,38 +325,38 @@ class TestCurvilinearCommon:
             ("cylindrical_kg.json", {"cylm2": 0.0}),
         ],
     )
-    def test_pde_builds(self, json_file, params):
+    def test_pde_builds(self, json_file: str, params: dict[str, float]) -> None:
         pde = build_pde_from_json(DATA_DIR / json_file, parameters=params)
         assert pde is not None
 
     @pytest.mark.parametrize(
-        ("json_file", "params", "n_terms"),
+        ("json_file", "n_terms"),
         [
-            ("polar_kg.json", {"polm2": 0.0}, 4),
-            ("spherical_kg.json", {"spm2": 0.0}, 6),
-            ("cylindrical_kg.json", {"cylm2": 0.0}, 5),
+            ("polar_kg.json", 4),
+            ("spherical_kg.json", 6),
+            ("cylindrical_kg.json", 5),
         ],
     )
-    def test_term_counts(self, json_file, params, n_terms):
+    def test_term_counts(self, json_file: str, n_terms: int) -> None:
         spec = load_equation_system(DATA_DIR / json_file)
         eq = spec.equations[0]
         assert len(eq.rhs_terms) == n_terms
 
-    def test_polar_has_no_gradient_y(self):
+    def test_polar_has_no_gradient_y(self) -> None:
         """Polar coordinates should NOT have a gradient_y term (no angular Christoffel)."""
         spec = load_equation_system(DATA_DIR / "polar_kg.json")
         eq = spec.equations[0]
         operators = {t.operator for t in eq.rhs_terms}
         assert "gradient_y" not in operators
 
-    def test_cylindrical_has_no_gradient_y(self):
+    def test_cylindrical_has_no_gradient_y(self) -> None:
         """Cylindrical coordinates should NOT have a gradient_y term."""
         spec = load_equation_system(DATA_DIR / "cylindrical_kg.json")
         eq = spec.equations[0]
         operators = {t.operator for t in eq.rhs_terms}
         assert "gradient_y" not in operators
 
-    def test_spherical_has_gradient_y(self):
+    def test_spherical_has_gradient_y(self) -> None:
         """Spherical coordinates SHOULD have a gradient_y term (cot(theta) correction)."""
         spec = load_equation_system(DATA_DIR / "spherical_kg.json")
         eq = spec.equations[0]
@@ -372,7 +370,7 @@ class TestCurvilinearCommon:
 class TestReciprocalTrigFunctions:
     """Tests for Cot, Sec, Csc conversion in _mathematica_to_python."""
 
-    def test_cot_evaluation(self):
+    def test_cot_evaluation(self) -> None:
         """Cot[y[]] should evaluate to cos(y)/sin(y)."""
         pde = build_pde_from_json(
             DATA_DIR / "spherical_kg.json", parameters={"spm2": 0.0}
@@ -381,7 +379,7 @@ class TestReciprocalTrigFunctions:
         py_expr = pde._mathematica_to_python("Cot[y[]]")
         assert "cot" in py_expr
 
-    def test_csc_evaluation(self):
+    def test_csc_evaluation(self) -> None:
         """Csc[y[]]^2 should evaluate to 1/sin(y)^2."""
         pde = build_pde_from_json(
             DATA_DIR / "spherical_kg.json", parameters={"spm2": 0.0}

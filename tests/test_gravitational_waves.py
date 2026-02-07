@@ -53,15 +53,15 @@ class TestDeDonderSpec:
         return load_equation_system(DEDONDER_JSON)
 
     def test_dimension(self, spec: EquationSystem) -> None:
-        assert spec.dimension == 4
-        assert spec.spatial_dimension == 3
+        assert spec.dimension == 4  # noqa: PLR2004
+        assert spec.spatial_dimension == 3  # noqa: PLR2004
 
     def test_coordinates(self, spec: EquationSystem) -> None:
         assert spec.coordinates == ("t", "x", "y", "z")
 
     def test_component_count(self, spec: EquationSystem) -> None:
         """Symmetric rank-2 in 4D has 10 independent components."""
-        assert spec.n_components == 10
+        assert spec.n_components == 10  # noqa: PLR2004
 
     def test_component_names(self, spec: EquationSystem) -> None:
         expected = tuple(f"h_{i}" for i in range(10))
@@ -70,13 +70,13 @@ class TestDeDonderSpec:
     def test_all_second_order(self, spec: EquationSystem) -> None:
         """All de Donder equations should be second-order in time."""
         for eq in spec.equations:
-            assert eq.time_derivative_order == 2, (
+            assert eq.time_derivative_order == 2, (  # noqa: PLR2004
                 f"Field {eq.field_name} has time order {eq.time_derivative_order}, expected 2"
             )
 
     def test_state_size(self, spec: EquationSystem) -> None:
         """10 second-order fields -> 20 state slots (field + momentum each)."""
-        assert spec.state_size == 20
+        assert spec.state_size == 20  # noqa: PLR2004
 
     def test_each_equation_has_three_laplacian_terms(
         self, spec: EquationSystem
@@ -141,7 +141,7 @@ class TestDeDonderPDE:
     ) -> None:
         """Initial state should have 20 fields (10 field + 10 momentum)."""
         state = create_initial_state(grid, spec)
-        assert len(state) == 20
+        assert len(state) == 20  # noqa: PLR2004
 
     def test_initial_state_with_data(
         self,
@@ -163,7 +163,7 @@ class TestDeDonderPDE:
         )
         # h_4 should be nonzero
         h4_field = state[spec.state_layout.index(("h_4", "field"))]
-        assert np.max(np.abs(h4_field.data)) > 0.1
+        assert np.max(np.abs(h4_field.data)) > 0.1  # noqa: PLR2004
 
     def test_evolution_rate_shape(
         self,
@@ -174,7 +174,7 @@ class TestDeDonderPDE:
         pde = PDEFromSpec(spec)
         state = create_initial_state(grid, spec)
         rate = pde.evolution_rate(state, t=0)
-        assert len(rate) == 20
+        assert len(rate) == 20  # noqa: PLR2004
 
     def test_short_simulation_stable(
         self,
@@ -205,7 +205,7 @@ class TestDeDonderPDE:
         # Check that the solution hasn't blown up
         for field in final:
             max_val = np.max(np.abs(field.data))
-            assert max_val < 100.0, f"Solution blew up: max |field| = {max_val}"
+            assert max_val < 100.0, f"Solution blew up: max |field| = {max_val}"  # noqa: PLR2004
 
     def test_wave_speed_c_equals_1(
         self,
@@ -244,11 +244,11 @@ class TestGaugeUnfixedSpec:
         return load_equation_system(UNFIXED_JSON)
 
     def test_dimension(self, spec: EquationSystem) -> None:
-        assert spec.dimension == 4
-        assert spec.spatial_dimension == 3
+        assert spec.dimension == 4  # noqa: PLR2004
+        assert spec.spatial_dimension == 3  # noqa: PLR2004
 
     def test_component_count(self, spec: EquationSystem) -> None:
-        assert spec.n_components == 10
+        assert spec.n_components == 10  # noqa: PLR2004
 
     def test_component_names(self, spec: EquationSystem) -> None:
         expected = tuple(f"h_{i}" for i in range(10))
@@ -268,7 +268,7 @@ class TestGaugeUnfixedSpec:
         orders = {eq.field_name: eq.time_derivative_order for eq in spec.equations}
         unique_orders = set(orders.values())
         # Should have at least two different time orders (0 and 2)
-        assert len(unique_orders) >= 2, (
+        assert len(unique_orders) >= 2, (  # noqa: PLR2004
             f"Expected mixed time orders, got only {unique_orders}"
         )
         # h_0 (Hamiltonian constraint) should be elliptic (order 0)
@@ -277,10 +277,10 @@ class TestGaugeUnfixedSpec:
             f"got {orders['h_0']}"
         )
         # Evolution equations should be second-order
-        assert 2 in unique_orders, "Expected some second-order (evolution) equations"
+        assert 2 in unique_orders, "Expected some second-order (evolution) equations"  # noqa: PLR2004
         # Diagonal spatial components h_4 (h_xx), h_7 (h_yy), h_9 (h_zz) are evolution
         for i in (4, 7, 9):
-            assert orders[f"h_{i}"] == 2, (
+            assert orders[f"h_{i}"] == 2, (  # noqa: PLR2004
                 f"Expected h_{i} (evolution equation) to have time_order 2, "
                 f"got {orders[f'h_{i}']}"
             )
@@ -455,7 +455,7 @@ class TestDeDonderPhysics:
 
         # Energy should be conserved to within ~15% on this coarse 8³ grid
         rel_change = abs(final_energy - initial_energy) / max(initial_energy, 1e-15)
-        assert rel_change < 0.15, (
+        assert rel_change < 0.15, (  # noqa: PLR2004
             f"Energy changed by {rel_change:.1%} (initial={initial_energy:.6f}, "
             f"final={final_energy:.6f})"
         )

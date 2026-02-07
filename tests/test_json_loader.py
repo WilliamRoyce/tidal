@@ -1086,7 +1086,7 @@ _DATA_DIR = Path(__file__).resolve().parent.parent / "examples" / "data"
 
 def _load_json(name: str) -> dict[str, Any]:
     """Load a JSON file from examples/data/ as a dict."""
-    import json
+    import json  # noqa: PLC0415
 
     path = _DATA_DIR / name
     with path.open() as f:

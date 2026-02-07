@@ -138,9 +138,8 @@ def _create_initial_state(
 
     print(f"  rho max: {np.max(np.abs(rho_data)):.4f}")
 
-    # State: [phi, rho, pi_rho]
-    # phi starts at zero and will be solved via constraint solver
-    # rho is frozen (time_order=2 with zero evolution)
+    # Fields: phi (potential, starts at zero, solved via constraint), rho (charge
+    # density, frozen), pi_rho (momentum, zero evolution)
     state = FieldCollection(
         [
             ScalarField(grid, data=0.0, label="phi"),
@@ -223,7 +222,7 @@ def _plot_results(result: SimulationResult) -> None:
     fig, axes = plt.subplots(1, 3, figsize=(15, 4))
 
     fig.suptitle(
-        "Electrostatics: Poisson Equation ∇²φ = -ρ\n"
+        "Electrostatics: Poisson Equation nabla^2(phi) = -rho\n"
         "Constraint Solver Integration (Issue #91)",
         fontsize=14,
     )
@@ -241,10 +240,10 @@ def _plot_results(result: SimulationResult) -> None:
         ],
         cmap="RdBu_r",
     )
-    ax.set_title("Charge density ρ(x,y)")
+    ax.set_title("Charge density rho(x,y)")
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    fig.colorbar(im0, ax=ax, label="ρ")
+    fig.colorbar(im0, ax=ax, label="rho")
 
     # Potential
     ax = axes[1]

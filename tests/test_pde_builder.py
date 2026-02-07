@@ -1725,7 +1725,7 @@ class TestMathematicaFunctionConversion:
     def test_coefficient_evaluation_with_new_functions(self) -> None:
         """Integration test: full coefficient resolution with new math functions."""
         # Create term with position-dependent coefficient using new functions
-        # Use: sinh(t) + arctan2(y, x)
+        # Coefficient expression: sinh(t) combined with arctan2(y, x)
         term = OperatorTerm(
             coefficient=1.0,
             operator="laplacian",

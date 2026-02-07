@@ -447,23 +447,7 @@ class EquationSystem:
             msg = f"equations length {len(self.equations)} != n_components {self.n_components}"
             raise ValueError(msg)
 
-        if len(self.mass_matrix) != self.n_components:
-            msg = f"mass_matrix rows {len(self.mass_matrix)} != n_components {self.n_components}"
-            raise ValueError(msg)
-
-        for i, row in enumerate(self.mass_matrix):
-            if len(row) != self.n_components:
-                msg = f"mass_matrix row {i} length {len(row)} != n_components {self.n_components}"
-                raise ValueError(msg)
-
-        if len(self.coupling_matrix) != self.n_components:
-            msg = f"coupling_matrix rows {len(self.coupling_matrix)} != n_components {self.n_components}"
-            raise ValueError(msg)
-
-        for i, row in enumerate(self.coupling_matrix):
-            if len(row) != self.n_components:
-                msg = f"coupling_matrix row {i} length {len(row)} != n_components {self.n_components}"
-                raise ValueError(msg)
+        self._validate_matrix_dimensions()
 
         # Validate field references in equation terms
         self._validate_field_references()
@@ -475,7 +459,7 @@ class EquationSystem:
             self.equations, self.component_names
         )
         if self.mass_matrix != expected_mass or self.coupling_matrix != expected_coupling:
-            import warnings
+            import warnings  # noqa: PLC0415
 
             warnings.warn(
                 "mass_matrix/coupling_matrix inconsistent with identity operator terms. "
@@ -484,6 +468,26 @@ class EquationSystem:
                 "Use EquationSystem.from_dict() for auto-computation.",
                 stacklevel=2,
             )
+
+    def _validate_matrix_dimensions(self) -> None:
+        """Validate mass and coupling matrix dimensions match n_components.
+
+        Raises
+        ------
+        ValueError
+            If any matrix has wrong number of rows or columns.
+        """
+        for name, matrix in [
+            ("mass_matrix", self.mass_matrix),
+            ("coupling_matrix", self.coupling_matrix),
+        ]:
+            if len(matrix) != self.n_components:
+                msg = f"{name} rows {len(matrix)} != n_components {self.n_components}"
+                raise ValueError(msg)
+            for i, row in enumerate(matrix):
+                if len(row) != self.n_components:
+                    msg = f"{name} row {i} length {len(row)} != n_components {self.n_components}"
+                    raise ValueError(msg)
 
     def _validate_field_references(self) -> None:
         """Validate that all field references in equation terms are valid.

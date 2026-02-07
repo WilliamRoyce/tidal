@@ -366,7 +366,8 @@ class PDEFromSpec(PDEBase):
         # Default: use numeric coefficient from JSON
         return term.coefficient
 
-    def _convert_power_function(self, expr: str) -> str:
+    @staticmethod
+    def _convert_power_function(expr: str) -> str:
         """Convert Power[base, exponent] to (base)**(exponent).
 
         Handles nested expressions in both arguments. Must run before bracket
@@ -399,7 +400,8 @@ class PDEFromSpec(PDEBase):
             result = re.sub(pattern, replacer, result)
         return result
 
-    def _convert_arctan2(self, expr: str) -> str:
+    @staticmethod
+    def _convert_arctan2(expr: str) -> str:
         """Convert ArcTan[x, y] to arctan2(y, x) with argument swap.
 
         Mathematica's ArcTan[x, y] computes atan2(y, x), so arguments must
@@ -512,7 +514,7 @@ class PDEFromSpec(PDEBase):
 
         return result
 
-    def _resolve_coefficient_at_point(
+    def _resolve_coefficient_at_point(  # noqa: PLR0915
         self,
         term: OperatorTerm,
         t: float,
@@ -880,7 +882,7 @@ class PDEFromSpec(PDEBase):
         self,
         config: ConstraintSolverConfig,
         grid: GridBase,
-    ) -> Any:
+    ) -> Any:  # noqa: ANN401
         """Convert a ConstraintSolverConfig to a py-pde boundary condition.
 
         Parameters
@@ -971,7 +973,7 @@ class PDEFromSpec(PDEBase):
             If the equation lacks a ``laplacian(field)`` term or the
             Poisson solver fails.
         """
-        from pde import solve_poisson_equation
+        from pde import solve_poisson_equation  # noqa: PLC0415
 
         eq = self.spec.equations[component_idx]
         grid = state.grid
@@ -1003,7 +1005,7 @@ class PDEFromSpec(PDEBase):
             )
             raise ValueError(msg)
 
-        if abs(laplacian_coeff) < 1e-14:
+        if abs(laplacian_coeff) < 1e-14:  # noqa: PLR2004
             msg = (
                 f"Laplacian coefficient for {eq.field_name} is effectively "
                 f"zero ({laplacian_coeff}). Cannot solve elliptic equation."
@@ -1023,10 +1025,8 @@ class PDEFromSpec(PDEBase):
                 contribution = coefficient * operated
             rhs_source += contribution
 
-        # The equation is: 0 = laplacian_coeff * ∇²φ + S
-        # Rearranging:     ∇²φ = -S / laplacian_coeff
-        # py-pde solves:   ∇²u = f  (where f is the rhs argument)
-        # So:              f = -S / laplacian_coeff
+        # Rearrange 0 = laplacian_coeff * nabla^2(phi) + S into the standard
+        # Poisson form nabla^2(phi) = rhs, giving rhs = -S / laplacian_coeff.
         poisson_rhs = -rhs_source / laplacian_coeff
 
         # Build boundary conditions for the Poisson solver
