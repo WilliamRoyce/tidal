@@ -345,12 +345,69 @@ ExtractRank2Component[eom_, field_, chart_, idx1_, idx2_,
   ExtractTensorComponent[eom, field, chart, {idx1, idx2},
     additionalFields, computeChristoffels, metricMatrix];
 
+(* === Symmetry Reduction Helpers === *)
+(* These are package-private helpers for EnumerateComponentTuples.
+   Defined at package scope (not inside Module) to avoid Mathematica's
+   Module variable localization issues with cross-referencing SetDelayed
+   function definitions.
+
+   IMPORTANT: xAct's Cycles is xAct`xPerm`Cycles, NOT System`Cycles.
+   All pattern matching and head comparisons must use the fully-qualified
+   name to avoid symbol context mismatches. *)
+
+(* Apply a single xAct cycle {a1,a2,...,an} to a tuple:
+   maps position a1->a2, a2->a3, ..., an->a1 *)
+applyCycleToTuple[tuple_, cycle_List] := Module[{result = tuple, n = Length[cycle]},
+  Do[
+    result[[ cycle[[Mod[k, n] + 1]] ]] = tuple[[ cycle[[k]] ]],
+    {k, 1, n}
+  ];
+  result
+];
+
+(* Apply an xAct Cycles[{i,j,...}, ...] to a tuple.
+   Each argument of Cycles is a single cycle list.
+   xAct uses Cycles[{i,j}] (single-brace), NOT Mathematica's
+   Cycles[{{i,j}}] (double-brace). *)
+applyPermToTuple[tuple_, cyc_xAct`xPerm`Cycles] := Module[{result = tuple},
+  Do[result = applyCycleToTuple[result, cyc[[k]]], {k, Length[cyc]}];
+  result
+];
+
+(* Parse an xAct symmetry generator into {sign, xAct`xPerm`Cycles[...]}
+   Generators have the form:
+     Cycles[{i,j}]    = symmetric swap (sign +1)
+     -Cycles[{i,j}]   = antisymmetric swap (sign -1) *)
+extractGenSignAndPerm[gen_] := Which[
+  Head[gen] === xAct`xPerm`Cycles, {1, gen},
+  Head[gen] === Times && gen[[1]] === -1 && Head[gen[[2]]] === xAct`xPerm`Cycles, {-1, gen[[2]]},
+  True, {1, xAct`xPerm`Cycles[{}]}  (* identity fallback *)
+];
+
+(* Check if a tuple is the canonical representative under given generators *)
+isCanonicalTuple[tuple_, gens_List] := AllTrue[gens, Module[
+  {sp = extractGenSignAndPerm[#], sign, perm, permuted},
+  sign = sp[[1]];
+  perm = sp[[2]];
+  permuted = applyPermToTuple[tuple, perm];
+  Which[
+    (* Antisymmetric with equal indices at swapped positions = zero component *)
+    sign == -1 && permuted === tuple, False,
+    (* Fixed point under this generator *)
+    permuted === tuple, True,
+    (* Canonical: original <= permuted lexicographically *)
+    OrderedQ[{tuple, permuted}], True,
+    (* Not canonical: permuted < original *)
+    True, False
+  ]
+] &];
+
 (* === Component Enumeration === *)
 (* Returns list of independent component index tuples for any tensor rank *)
-(* Respects symmetries where implemented *)
+(* Respects symmetries: symmetric → upper triangle, antisymmetric → strictly increasing, etc. *)
 
 EnumerateComponentTuples[fieldHead_, dim_] := Module[
-  {rank, symGroup, allTuples, isCanonical},
+  {rank, symGroup, gens, allTuples},
 
   rank = Length[SlotsOfTensor[fieldHead]];
 
@@ -369,20 +426,9 @@ EnumerateComponentTuples[fieldHead_, dim_] := Module[
         (* No symmetry: keep all tuples *)
         allTuples,
 
-        (* Has symmetry: keep only canonical representatives.
-           A tuple is canonical if no permutation from the symmetry group
-           maps it to a lexicographically smaller tuple.  For symmetric
-           indices this keeps non-decreasing sequences; for antisymmetric
-           indices this keeps strictly increasing sequences (and drops
-           tuples with repeated indices, which are zero). *)
-        isCanonical[tuple_] := Module[{perms, permuted},
-          perms = GroupElements[PermutationGroup[symGroup]];
-          AllTrue[perms, (
-            permuted = tuple[[PermutationList[#, rank]]];
-            OrderedQ[{tuple, permuted}] || tuple === permuted
-          ) &]
-        ];
-        Select[allTuples, isCanonical]
+        (* Has symmetry: extract generators and filter to canonical reps *)
+        gens = List @@ symGroup[[2]];  (* Extract generators from GenSet[...] *)
+        Select[allTuples, isCanonicalTuple[#, gens] &]
       ],
 
     True,

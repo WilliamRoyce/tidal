@@ -22,7 +22,7 @@
      - 1+1D: 2 coordinates (t, x)
      - 2+1D: 3 coordinates (t, x, y)
      - 3+1D: 4 coordinates (t, x, y, z)
-     - $MaxSupportedDimension = 4 (extensible with GenerateCDRules)
+     - $MaxSupportedDimension = 7 (up to 6+1D; axis letters: x,y,z,w,v,u)
 
    SIGN CONVENTIONS (Minkowski):
      - Metric signature: (-1, +1, +1, ...)
@@ -101,15 +101,15 @@ GetChartDimension::fallback =
   "Chart `1` dimension could not be determined. Defaulting to 2 (1+1D).";
 
 ValidateDimension::usage =
-  "ValidateDimension[dim] checks if dimension is within supported range (≤4). \
+  "ValidateDimension[dim] checks if dimension is within supported range (≤7, up to 6+1D). \
 Returns True if valid, False otherwise.";
 
 ValidateDimension::unsupported =
   "Dimension `1` exceeds supported maximum of `2`. CD conversion rules may be incomplete.";
 
 $MaxSupportedDimension::usage =
-  "$MaxSupportedDimension is the maximum spacetime dimension (currently 4 for 3+1D) \
-supported by the CD conversion rules.";
+  "$MaxSupportedDimension is the maximum spacetime dimension (currently 7 for 6+1D) \
+supported by the CD conversion rules. Axis letters: x,y,z,w,v,u.";
 
 GenerateCDRules::usage =
   "GenerateCDRules[dim, chart] generates CD to Derivative conversion rules for \
