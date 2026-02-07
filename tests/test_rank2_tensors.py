@@ -313,3 +313,103 @@ class TestRank2CreateInitialState:
         assert_allclose(state[3].data, 0.0)
         assert_allclose(state[4].data, 0.0)
         assert_allclose(state[5].data, 0.0)
+
+
+class TestRank3TensorSupport:
+    """Smoke tests for rank-3 tensor component handling.
+
+    Rank-3 tensors in 2D decompose into 8 scalar components (non-symmetric).
+    The Python pipeline treats them identically to any other N-component system.
+    """
+
+    @pytest.fixture
+    def rank3_2d_spec(self) -> EquationSystem:
+        """Rank-3 tensor in 1+1D: 4 of 8 components as wave equations.
+
+        Simplified test: 4 components with laplacian, verifying the Python
+        pipeline handles arbitrary component counts from higher-rank tensors.
+        """
+        n = 4
+        names = tuple(f"T_{i}" for i in range(n))
+        equations = tuple(
+            ComponentEquation(
+                field_name=names[i],
+                field_index=i,
+                time_derivative_order=2,
+                rhs_terms=(
+                    OperatorTerm(
+                        coefficient=1.0, operator="laplacian", field=names[i]
+                    ),
+                ),
+            )
+            for i in range(n)
+        )
+        zero_row = tuple(0.0 for _ in range(n))
+        return EquationSystem(
+            n_components=n,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=names,
+            equations=equations,
+            mass_matrix=tuple(zero_row for _ in range(n)),
+            coupling_matrix=tuple(zero_row for _ in range(n)),
+            metadata={"source": "test", "type": "rank3_tensor"},
+        )
+
+    def test_rank3_state_size(self, rank3_2d_spec: EquationSystem) -> None:
+        """4 second-order components -> state_size = 8."""
+        assert rank3_2d_spec.n_components == 4  # noqa: PLR2004
+        assert rank3_2d_spec.state_size == 8  # noqa: PLR2004
+
+    def test_rank3_state_layout(self, rank3_2d_spec: EquationSystem) -> None:
+        """Layout alternates field/momentum for each component."""
+        layout = rank3_2d_spec.state_layout
+        assert len(layout) == 8  # noqa: PLR2004
+        assert layout[0] == ("T_0", "field")
+        assert layout[1] == ("T_0", "momentum")
+        assert layout[6] == ("T_3", "field")
+        assert layout[7] == ("T_3", "momentum")
+
+    def test_rank3_evolution(
+        self, rank3_2d_spec: EquationSystem, grid_1d: CartesianGrid
+    ) -> None:
+        """Evolution rate has correct shape for 4-component rank-3 system."""
+        pde = PDEFromSpec(rank3_2d_spec, parameters={})
+        state = create_initial_state(grid_1d, rank3_2d_spec)
+        # Set non-zero data for first component
+        state[0].data[:] = np.sin(2 * np.pi * np.linspace(0, 10, 32) / 10)
+        rates = pde.evolution_rate(state, t=0)
+        assert len(rates) == 8  # noqa: PLR2004
+
+    def test_rank3_8_components(self, grid_1d: CartesianGrid) -> None:
+        """Full rank-3 in 2D: 8 components all evolving independently."""
+        n = 8
+        names = tuple(f"T_{i}" for i in range(n))
+        equations = tuple(
+            ComponentEquation(
+                field_name=names[i],
+                field_index=i,
+                time_derivative_order=2,
+                rhs_terms=(
+                    OperatorTerm(
+                        coefficient=1.0, operator="laplacian", field=names[i]
+                    ),
+                ),
+            )
+            for i in range(n)
+        )
+        zero_row = tuple(0.0 for _ in range(n))
+        spec = EquationSystem(
+            n_components=n,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=names,
+            equations=equations,
+            mass_matrix=tuple(zero_row for _ in range(n)),
+            coupling_matrix=tuple(zero_row for _ in range(n)),
+            metadata={"source": "test", "type": "rank3_full"},
+        )
+        assert spec.n_components == 8  # noqa: PLR2004
+        assert spec.state_size == 16  # noqa: PLR2004
+        state = create_initial_state(grid_1d, spec)
+        assert len(state) == 16  # noqa: PLR2004

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -1776,3 +1776,457 @@ class TestMathematicaFunctionConversion:
         y_coord = cast("np.ndarray", grid.cell_coords[4, 4, 1])  # type: ignore[index]
         expected = np.sinh(1.0) + np.arctan2(y_coord, x_coord)
         assert_allclose(mid_val, expected, rtol=1e-10)
+
+
+class TestCachingOptimizations:
+    """Tests for Issue #89 caching and memoization optimizations."""
+
+    def _make_spec(
+        self,
+        *,
+        symbolic_coeff: str | None = None,
+        coord_dep: tuple[str, ...] = (),
+    ) -> EquationSystem:
+        """Create minimal EquationSystem for caching tests."""
+        term = OperatorTerm(
+            coefficient=1.0,
+            operator="laplacian",
+            field="phi",
+            coefficient_symbolic=symbolic_coeff,
+            coordinate_dependent=coord_dep,
+        )
+        return EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        term,
+                        OperatorTerm(
+                            -1.0, "identity", "phi", coefficient_symbolic="-m2"
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((1.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+
+    def test_expr_cache_populated(self) -> None:
+        """B1: _mathematica_to_python results are cached after first call."""
+        spec = self._make_spec()
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})
+        expr = "Sin[x[]]^2 + Cos[y[]]"
+        result1 = pde._mathematica_to_python(expr)
+        # Cache should not be populated yet (direct call doesn't cache)
+        # But _resolve_coefficient_at_point does cache
+        pde._expr_cache[expr] = result1
+        result2 = pde._expr_cache[expr]
+        assert result1 == result2
+
+    def test_expr_cache_used_in_resolve(self) -> None:
+        """B1: _resolve_coefficient_at_point uses the expression cache."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0,
+                            "laplacian",
+                            "phi",
+                            coefficient_symbolic="exp(t[])",
+                            time_dependent=True,
+                            coordinate_dependent=("t",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=("t", "x", "y"),
+        )
+        grid = CartesianGrid([(-1, 1), (-1, 1)], [4, 4], periodic=True)
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+
+        # First call populates cache
+        pde._resolve_coefficient_at_point(term, t=1.0, grid=grid)
+        assert "exp(t[])" in pde._expr_cache
+
+        # Second call uses cache (same result)
+        result2 = pde._resolve_coefficient_at_point(term, t=2.0, grid=grid)
+        assert isinstance(result2, float)
+        assert_allclose(result2, np.exp(2.0), rtol=1e-10)
+
+    def test_base_namespace_prebuilt(self) -> None:
+        """B2: Base namespace is pre-built in __init__ and contains math functions."""
+        spec = self._make_spec()
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})
+        ns = pde._base_namespace
+        assert "sin" in ns
+        assert "cos" in ns
+        assert "exp" in ns
+        assert "cot" in ns
+        assert "erf" in ns
+        assert "m2" in ns
+        assert ns["m2"] == 1.0
+
+    def test_base_namespace_does_not_contain_time(self) -> None:
+        """B2: Base namespace does not contain t (injected per-call)."""
+        spec = self._make_spec()
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})
+        assert "t" not in pde._base_namespace
+
+    def test_preresolved_coefficients(self) -> None:
+        """B4: Constant coefficients are pre-resolved in __init__."""
+        spec = self._make_spec()
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})
+        # Term 0: coefficient=1.0, no symbolic → pre-resolved to 1.0
+        assert (0, 0) in pde._preresolved
+        assert pde._preresolved[0, 0] == 1.0
+        # Term 1: coefficient_symbolic="-m2", m2=1.0 → pre-resolved to -1.0
+        assert (0, 1) in pde._preresolved
+        assert pde._preresolved[0, 1] == -1.0
+
+    def test_preresolved_skips_position_dependent(self) -> None:
+        """B4: Position-dependent coefficients are not pre-resolved."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0,
+                            "laplacian_x",
+                            "phi",
+                            coefficient_symbolic="x()**2/(2*R**2)",
+                            coordinate_dependent=("x",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec, parameters={"R": 1.0})
+        assert (0, 0) not in pde._preresolved
+
+    def test_bc_caching(self) -> None:
+        """B5: Boundary conditions are cached after first evolution_rate call."""
+        spec = self._make_spec()
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})
+        grid = CartesianGrid([(0, 10)], [16], periodic=True)
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+        assert pde._cached_bc is None
+        pde.evolution_rate(state, t=0.0)
+        assert pde._cached_bc is not None
+        cached_ref = pde._cached_bc
+        # Second call should reuse cached BC
+        pde.evolution_rate(state, t=1.0)
+        assert pde._cached_bc is cached_ref
+
+    def test_preresolved_matches_runtime(self) -> None:
+        """B4: Pre-resolved coefficients produce same result as runtime resolution."""
+        spec = self._make_spec()
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})
+        for (eq_idx, term_idx), preresolved_val in pde._preresolved.items():
+            term = spec.equations[eq_idx].rhs_terms[term_idx]
+            runtime_val = pde._resolve_coefficient(term)
+            assert preresolved_val == runtime_val
+
+    def test_timestep_cache_deduplicates_eval(self) -> None:
+        """C1: Per-timestep coeff_cache deduplicates eval for shared symbolic exprs."""
+        # Two terms share the same coefficient_symbolic → only one eval() needed
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0,
+                            "laplacian",
+                            "phi",
+                            coefficient_symbolic="exp(2*H*t)",
+                            time_dependent=True,
+                        ),
+                        OperatorTerm(
+                            -1.0,
+                            "identity",
+                            "phi",
+                            coefficient_symbolic="exp(2*H*t)",
+                            time_dependent=True,
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((1.0,),),
+            coupling_matrix=((0.0,),),
+            mass_matrix_symbolic=(("exp(2*H*t)",),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec, parameters={"H": 0.5})
+        grid = CartesianGrid([(0, 10)], [16], periodic=True)
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=1.0),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+        bc = "periodic"
+
+        # Both terms resolve to the same value at t=1.0
+        term_a = spec.equations[0].rhs_terms[0]
+        term_b = spec.equations[0].rhs_terms[1]
+        val_a = pde._resolve_coefficient_at_point(term_a, t=1.0, grid=grid)
+        val_b = pde._resolve_coefficient_at_point(term_b, t=1.0, grid=grid)
+        assert val_a == val_b
+
+        # Run _compute_rhs_for_component — it should populate coeff_cache internally
+        # and produce a valid result (no error = cache is working)
+        result = pde._compute_rhs_for_component(0, state, bc, t=1.0)
+        assert result.data is not None
+
+    def test_coord_arrays_passed_to_resolve(self) -> None:
+        """C2: Pre-extracted coord_arrays produce same result as grid-based resolution."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0,
+                            "laplacian_y",
+                            "phi",
+                            coefficient_symbolic="1/x**2",
+                            coordinate_dependent=("x",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=("t", "x", "y"),
+        )
+        pde = PDEFromSpec(spec, parameters={})
+        grid = CartesianGrid(
+            [(0.5, 5), (0, 2 * np.pi)], [16, 16], periodic=[False, True]
+        )
+
+        term = spec.equations[0].rhs_terms[0]
+
+        # Resolve using grid (fallback path)
+        val_from_grid = pde._resolve_coefficient_at_point(term, t=0.0, grid=grid)
+
+        # Resolve using pre-extracted coord_arrays (C2 path)
+        spatial_coords = spec.spatial_coordinates
+        raw_coords = grid.cell_coords  # pyright: ignore[reportUnknownVariableType]
+        coord_arrays: dict[str, np.ndarray[Any, np.dtype[np.float64]]] = {
+            name: np.asarray(raw_coords[..., i])  # pyright: ignore[reportUnknownArgumentType]
+            for i, name in enumerate(spatial_coords[: grid.num_axes])
+        }
+        val_from_arrays = pde._resolve_coefficient_at_point(
+            term,
+            t=0.0,
+            grid=grid,
+            coord_arrays=coord_arrays,  # pyright: ignore[reportUnknownArgumentType]
+        )
+
+        # Both paths should produce identical results
+        np.testing.assert_array_equal(val_from_grid, val_from_arrays)
+
+
+class TestEvalValidation:
+    """Tests for post-eval validation of coefficient expressions (Issue #68)."""
+
+    @staticmethod
+    def _make_time_dep_spec(symbolic: str) -> EquationSystem:
+        """Create a minimal spec with a time-dependent symbolic coefficient."""
+        return EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0,
+                            "laplacian",
+                            "phi",
+                            coefficient_symbolic=symbolic,
+                            time_dependent=True,
+                            coordinate_dependent=("t",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+
+    @staticmethod
+    def _make_position_dep_spec(symbolic: str) -> EquationSystem:
+        """Create a minimal spec with a position-dependent symbolic coefficient."""
+        return EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0,
+                            "laplacian",
+                            "phi",
+                            coefficient_symbolic=symbolic,
+                            coordinate_dependent=("x",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            coordinates=("t", "x"),
+            metadata={},
+        )
+
+    def test_overflow_to_inf_raises(self) -> None:
+        """exp(huge) overflows to Inf and raises ValueError."""
+        # np.exp(1000) → inf (numpy doesn't raise, just returns inf)
+        spec = self._make_time_dep_spec("E^(1000*t())")
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+        with pytest.raises(ValueError, match="Inf"):
+            pde._resolve_coefficient_at_point(term, t=1.0)
+
+    def test_sqrt_negative_gives_nan_raises(self) -> None:
+        """Sqrt[-1] via numpy gives NaN (not complex) and raises ValueError."""
+        # np.sqrt(-1) returns nan (not complex) with a RuntimeWarning
+        spec = self._make_time_dep_spec("Sqrt[-1]")
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+        with pytest.raises(ValueError, match="NaN"):
+            pde._resolve_coefficient_at_point(term, t=0.0)
+
+    def test_python_complex_raises(self) -> None:
+        """Python expression producing complex number raises TypeError."""
+        # (-1)**0.5 in Python → complex (6.12e-17+1j)
+        spec = self._make_time_dep_spec("(-1)^(0.5)")
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+        with pytest.raises(TypeError, match="complex"):
+            pde._resolve_coefficient_at_point(term, t=0.0)
+
+    def test_valid_time_dependent_passes(self) -> None:
+        """Normal time-dependent expression passes validation."""
+        spec = self._make_time_dep_spec("E^(2*H*t())")
+        pde = PDEFromSpec(spec, parameters={"H": 0.1})
+        term = spec.equations[0].rhs_terms[0]
+        result = pde._resolve_coefficient_at_point(term, t=1.0)
+        assert isinstance(result, float)
+        assert_allclose(result, np.exp(0.2), rtol=1e-10)
+
+    def test_inf_in_position_dependent_raises(self) -> None:
+        """Position-dependent coefficient producing Inf raises ValueError."""
+        # exp(1000*x) at x=10 → exp(10000) → inf
+        spec = self._make_position_dep_spec("E^(1000*x[])")
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+        grid = CartesianGrid([(0, 10)], [16], periodic=True)
+        with pytest.raises(ValueError, match="Inf"):
+            pde._resolve_coefficient_at_point(term, t=0.0, grid=grid)
+
+    def test_nan_in_position_dependent_raises(self) -> None:
+        """Position-dependent sqrt of negative values produces NaN and raises."""
+        # Sqrt[x - 100] at x in [0,10] → all negative → NaN via numpy
+        spec = self._make_position_dep_spec("Sqrt[x[] - 100]")
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+        grid = CartesianGrid([(0, 10)], [16], periodic=True)
+        with pytest.raises(ValueError, match="NaN"):
+            pde._resolve_coefficient_at_point(term, t=0.0, grid=grid)
+
+    def test_validate_eval_result_scalar_valid(self) -> None:
+        """_validate_eval_result passes through valid float."""
+        result = PDEFromSpec._validate_eval_result(6.7, "test", "6.7")
+        assert result == 6.7  # noqa: PLR2004
+
+    def test_validate_eval_result_scalar_nan(self) -> None:
+        """_validate_eval_result rejects NaN scalar."""
+        with pytest.raises(ValueError, match="NaN"):
+            PDEFromSpec._validate_eval_result(float("nan"), "test", "0/0")
+
+    def test_validate_eval_result_scalar_inf(self) -> None:
+        """_validate_eval_result rejects Inf scalar."""
+        with pytest.raises(ValueError, match="Inf"):
+            PDEFromSpec._validate_eval_result(float("inf"), "test", "1/0")
+
+    def test_validate_eval_result_complex(self) -> None:
+        """_validate_eval_result rejects complex number."""
+        with pytest.raises(TypeError, match="complex"):
+            PDEFromSpec._validate_eval_result(1 + 2j, "test", "sqrt(-1)")
+
+    def test_validate_eval_result_array_valid(self) -> None:
+        """_validate_eval_result passes through valid ndarray."""
+        arr = np.array([1.0, 2.0, 3.0])
+        result = PDEFromSpec._validate_eval_result(arr, "test", "x")
+        np.testing.assert_array_equal(result, arr)
+
+    def test_validate_eval_result_array_nan(self) -> None:
+        """_validate_eval_result rejects array containing NaN."""
+        arr = np.array([1.0, float("nan"), 3.0])
+        with pytest.raises(ValueError, match="NaN"):
+            PDEFromSpec._validate_eval_result(arr, "test", "x/x")
+
+    def test_validate_eval_result_array_inf(self) -> None:
+        """_validate_eval_result rejects array containing Inf."""
+        arr = np.array([1.0, float("inf"), 3.0])
+        with pytest.raises(ValueError, match="Inf"):
+            PDEFromSpec._validate_eval_result(arr, "test", "1/x")

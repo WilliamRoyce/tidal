@@ -9,10 +9,12 @@ comes from the specification that was derived from the Lagrangian.
 
 from __future__ import annotations
 
+import math
+import operator
 import re
 import warnings
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, SupportsFloat, cast
 
 import numpy as np
 from pde import FieldCollection, PDEBase, ScalarField
@@ -42,6 +44,18 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------------
+# Pre-compiled regex patterns for field name parsing (avoid re-compilation
+# on every call to ParsedFieldName.parse / parse_momentum_field_name)
+# ---------------------------------------------------------------------------
+_STANDARD_FORMAT_RE = re.compile(r"^([a-zA-Z]+)_([0-9]+)$")
+_TENSOR_FORMAT_RE = re.compile(r"^(.+)_([0-9]+)$")
+_COMPACT_FORMAT_RE = re.compile(r"^([a-zA-Z]+)([0-9]+)$")
+_SIMPLE_FORMAT_RE = re.compile(r"^[a-zA-Z]+$")
+_MOMENTUM_STANDARD_RE = re.compile(r"^pi_([0-9]+)$")
+_MOMENTUM_COMPACT_RE = re.compile(r"^pi([0-9]+)$")
+
+
+# ---------------------------------------------------------------------------
 # Operator registry: maps operator name -> (handler, min_grid_dimension)
 # Each handler takes (field: ScalarField, bc: BCDescriptor) -> ScalarField
 # ---------------------------------------------------------------------------
@@ -61,7 +75,9 @@ def _op_gradient(axis: int) -> Callable[[ScalarField, BCDescriptor], ScalarField
     def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:
         grad = field.gradient(bc=bc)
         component = grad[axis]
-        assert isinstance(component, ScalarField)
+        if not isinstance(component, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+            msg = f"Expected ScalarField from gradient, got {type(component).__name__}"
+            raise TypeError(msg)
         return component
 
     return _handler
@@ -74,9 +90,13 @@ def _op_directional_laplacian(
 
     def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:
         grad = field.gradient(bc=bc)[axis]
-        assert isinstance(grad, ScalarField)
+        if not isinstance(grad, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+            msg = f"Expected ScalarField from gradient, got {type(grad).__name__}"
+            raise TypeError(msg)
         d2 = grad.gradient(bc=bc)[axis]
-        assert isinstance(d2, ScalarField)
+        if not isinstance(d2, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+            msg = f"Expected ScalarField from gradient, got {type(d2).__name__}"
+            raise TypeError(msg)
         return d2
 
     return _handler
@@ -89,20 +109,34 @@ def _op_cross_derivative(
 
     def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:
         grad_j = field.gradient(bc=bc)[axis2]
-        assert isinstance(grad_j, ScalarField)
+        if not isinstance(grad_j, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+            msg = f"Expected ScalarField from gradient, got {type(grad_j).__name__}"
+            raise TypeError(msg)
         grad_ij = grad_j.gradient(bc=bc)[axis1]
-        assert isinstance(grad_ij, ScalarField)
+        if not isinstance(grad_ij, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+            msg = f"Expected ScalarField from gradient, got {type(grad_ij).__name__}"
+            raise TypeError(msg)
         return grad_ij
 
     return _handler
 
 
 def _op_biharmonic(field: ScalarField, bc: BCDescriptor) -> ScalarField:
-    """Biharmonic operator: ∇⁴f = ∇²(∇²f)."""
+    """Biharmonic operator: ∇⁴f = ∇²(∇²f).
+
+    Raises
+    ------
+    TypeError
+        If intermediate results are not ``ScalarField``.
+    """
     lap = field.laplace(bc=bc)
-    assert isinstance(lap, ScalarField)
+    if not isinstance(lap, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+        msg = f"Expected ScalarField from laplace, got {type(lap).__name__}"
+        raise TypeError(msg)
     bilap = lap.laplace(bc=bc)
-    assert isinstance(bilap, ScalarField)
+    if not isinstance(bilap, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+        msg = f"Expected ScalarField from laplace, got {type(bilap).__name__}"
+        raise TypeError(msg)
     return bilap
 
 
@@ -120,8 +154,70 @@ def _op_nth_derivative(
         for _ in range(order):
             grad = result.gradient(bc=bc)
             component = grad[axis]
-            assert isinstance(component, ScalarField)
+            if not isinstance(component, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+                msg = f"Expected ScalarField from gradient, got {type(component).__name__}"
+                raise TypeError(msg)
             result = component
+        return result
+
+    return _handler
+
+
+def _parse_multi_axis_spec(spec: str) -> list[tuple[int, int]]:
+    """Parse a multi-axis derivative spec into (axis_index, order) pairs.
+
+    Parameters
+    ----------
+    spec : str
+        Multi-axis spec like ``"2x_1y"``, ``"3x_2z"``, ``"1x_1y_1z"``.
+
+    Returns
+    -------
+    list[tuple[int, int]]
+        List of (axis_index, order) pairs, sorted by axis index.
+
+    Raises
+    ------
+    ValueError
+        If the spec cannot be parsed or contains invalid axis names.
+    """
+    parts = spec.split("_")
+    result: list[tuple[int, int]] = []
+    for part in parts:
+        match = re.match(r"^(\d+)([xyz])$", part)
+        if not match:
+            msg = (
+                f"Invalid multi-axis derivative part: '{part}'. "
+                f"Expected format like '2x', '1y', '3z'."
+            )
+            raise ValueError(msg)
+        order = int(match.group(1))
+        axis_letter = match.group(2)
+        axis = {"x": 0, "y": 1, "z": 2}[axis_letter]
+        result.append((axis, order))
+    return sorted(result, key=operator.itemgetter(0))
+
+
+def _op_multi_axis_derivative(
+    axes_and_orders: list[tuple[int, int]],
+) -> Callable[[ScalarField, BCDescriptor], ScalarField]:
+    """Create a handler for multi-axis mixed spatial derivatives.
+
+    Applies gradients sequentially for each (axis, order) pair.
+    E.g., for ``derivative_2x_1y``: applies gradient in y once, then
+    gradient in x twice, giving d^2/dx^2 d/dy.
+    """
+
+    def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:
+        result: ScalarField = field
+        for axis, order in axes_and_orders:
+            for _ in range(order):
+                grad = result.gradient(bc=bc)
+                component = grad[axis]
+                if not isinstance(component, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+                    msg = f"Expected ScalarField from gradient, got {type(component).__name__}"
+                    raise TypeError(msg)
+                result = component
         return result
 
     return _handler
@@ -133,8 +229,14 @@ _AXIS_INDEX: dict[str, int] = {"x": 0, "y": 1, "z": 2}
 #: Minimum grid dimension required for each axis.
 _AXIS_MIN_DIM: dict[str, int] = {"x": 1, "y": 2, "z": 3}
 
+#: Map axis index back to letter (for dimension lookup).
+_AXIS_LETTER: dict[int, str] = {0: "x", 1: "y", 2: "z"}
+
 #: Regex for parsing generic single-axis derivative names.
 _GENERIC_SINGLE_RE = re.compile(r"^derivative_(\d+)_([xyz])$")
+
+#: Regex for parsing generic multi-axis derivative names.
+_GENERIC_MULTI_RE = re.compile(r"^derivative_(\d+[xyz](?:_\d+[xyz])*)$")
 
 
 #: Registry mapping operator names to (handler, min_dimension) pairs.
@@ -186,24 +288,24 @@ class ParsedFieldName:
             Parsed components with base, index, and format.
         """
         # Standard format: A_0, phi_1
-        match = re.match(r"^([a-zA-Z]+)_([0-9]+)$", name)
+        match = _STANDARD_FORMAT_RE.match(name)
         if match:
             return cls(
                 base=match.group(1), index=int(match.group(2)), format="standard"
             )
 
         # Tensor format: stress_xy_0, u_x_1 (greedy match for base)
-        match = re.match(r"^(.+)_([0-9]+)$", name)
+        match = _TENSOR_FORMAT_RE.match(name)
         if match:
             return cls(base=match.group(1), index=int(match.group(2)), format="tensor")
 
         # Compact format: phi0, A1
-        match = re.match(r"^([a-zA-Z]+)([0-9]+)$", name)
+        match = _COMPACT_FORMAT_RE.match(name)
         if match:
             return cls(base=match.group(1), index=int(match.group(2)), format="compact")
 
         # Simple format: phi, psi (no index, defaults to 0)
-        if re.match(r"^[a-zA-Z]+$", name):
+        if _SIMPLE_FORMAT_RE.match(name):
             return cls(base=name, index=0, format="simple")
 
         # Fallback
@@ -230,12 +332,12 @@ def parse_momentum_field_name(field_name: str) -> int | None:
         Index if valid momentum field name, None otherwise.
     """
     # Standard format: pi_N
-    match = re.match(r"^pi_([0-9]+)$", field_name)
+    match = _MOMENTUM_STANDARD_RE.match(field_name)
     if match:
         return int(match.group(1))
 
     # Compact format: piN
-    match = re.match(r"^pi([0-9]+)$", field_name)
+    match = _MOMENTUM_COMPACT_RE.match(field_name)
     if match:
         return int(match.group(1))
 
@@ -327,6 +429,46 @@ class PDEFromSpec(PDEBase):
             else:
                 self._momentum_slot_map[name] = slot_idx
 
+        # B1: Cache for _mathematica_to_python() results (same symbolic expr → same output)
+        self._expr_cache: dict[str, str] = {}
+
+        # B2: Pre-build the static part of the coefficient namespace (math functions,
+        # parameters). Only t and grid coordinates change per-call.
+        self._base_namespace: dict[str, Any] = self._build_base_namespace()
+
+        # B4: Pre-resolve constant coefficients (not position- or time-dependent).
+        # Only pre-resolve when the symbolic coefficient is absent or resolvable
+        # from the provided parameters — avoids emitting premature warnings for
+        # terms whose symbolic cannot be resolved (the warning fires at runtime).
+        self._preresolved: dict[tuple[int, int], float] = {}
+        for eq_idx, eq in enumerate(spec.equations):
+            for term_idx, term in enumerate(eq.rhs_terms):
+                if (
+                    not term.time_dependent
+                    and not term.position_dependent
+                    and self._is_resolvable(term)
+                ):
+                    self._preresolved[eq_idx, term_idx] = self._resolve_coefficient(
+                        term
+                    )
+
+        # B5: Cache boundary conditions and grid coordinates (populated on first call)
+        self._cached_bc: BCDescriptor | None = None
+        self._cached_grid_id: int | None = None
+
+    def _is_resolvable(self, term: OperatorTerm) -> bool:
+        """Check whether a term's coefficient can be resolved without warnings.
+
+        Returns True if the term has no symbolic coefficient, or if its symbolic
+        coefficient (possibly negated) matches a key in the parameters dict.
+        """
+        sym = term.coefficient_symbolic
+        if sym is None:
+            return True
+        if sym.startswith("-") and sym[1:] in self._parameters:
+            return True
+        return sym in self._parameters
+
     def _resolve_coefficient(self, term: OperatorTerm) -> float:
         """Resolve the effective coefficient for a term.
 
@@ -365,6 +507,46 @@ class PDEFromSpec(PDEBase):
 
         # Default: use numeric coefficient from JSON
         return term.coefficient
+
+    def _build_base_namespace(self) -> dict[str, Any]:
+        """Build the static part of the coefficient evaluation namespace.
+
+        Contains numpy/scipy math functions and user-provided parameters.
+        The time variable ``t`` and spatial grid coordinates are injected
+        per-call in ``_resolve_coefficient_at_point``.
+        """
+        ns: dict[str, Any] = dict(self._parameters)
+        ns["exp"] = np.exp
+        # Basic trig
+        ns["sin"] = np.sin
+        ns["cos"] = np.cos
+        ns["tan"] = np.tan
+        # Reciprocal trig (no direct numpy equivalents)
+        ns["cot"] = lambda x: np.cos(x) / np.sin(x)  # type: ignore[reportUnknownLambdaType]
+        ns["sec"] = lambda x: 1.0 / np.cos(x)  # type: ignore[reportUnknownLambdaType]
+        ns["csc"] = lambda x: 1.0 / np.sin(x)  # type: ignore[reportUnknownLambdaType]
+        # Inverse trig
+        ns["arcsin"] = np.arcsin
+        ns["arccos"] = np.arccos
+        ns["arctan"] = np.arctan
+        ns["arctan2"] = np.arctan2
+        # Hyperbolic
+        ns["sinh"] = np.sinh
+        ns["cosh"] = np.cosh
+        ns["tanh"] = np.tanh
+        # Inverse hyperbolic
+        ns["arcsinh"] = np.arcsinh
+        ns["arccosh"] = np.arccosh
+        ns["arctanh"] = np.arctanh
+        # Other
+        ns["log"] = np.log
+        ns["sqrt"] = np.sqrt
+        ns["abs"] = np.abs
+        # Special functions (scipy.special)
+        ns["erf"] = special.erf
+        ns["jv"] = special.jv  # BesselJ
+        ns["yv"] = special.yv  # BesselY
+        return ns
 
     @staticmethod
     def _convert_power_function(expr: str) -> str:
@@ -514,11 +696,12 @@ class PDEFromSpec(PDEBase):
 
         return result
 
-    def _resolve_coefficient_at_point(  # noqa: PLR0915
+    def _resolve_coefficient_at_point(
         self,
         term: OperatorTerm,
         t: float,
         grid: GridBase | None = None,
+        coord_arrays: dict[str, NumericArray] | None = None,
     ) -> float | NumericArray:
         """Resolve a potentially coordinate-dependent coefficient.
 
@@ -562,48 +745,25 @@ class PDEFromSpec(PDEBase):
             raise ValueError(msg)
 
         sym = term.coefficient_symbolic or ""
-        py_expr = self._mathematica_to_python(sym)
 
-        # Build evaluation namespace with numpy/scipy functions (work on scalars AND arrays)
-        namespace: dict[str, Any] = dict(self._parameters)
+        # B1: Use cached Mathematica→Python conversion
+        if sym not in self._expr_cache:
+            self._expr_cache[sym] = self._mathematica_to_python(sym)
+        py_expr = self._expr_cache[sym]
+
+        # B2: Clone pre-built base namespace and inject dynamic variables
+        namespace: dict[str, Any] = dict(self._base_namespace)
         namespace["t"] = t
-        namespace["exp"] = np.exp
-        # Basic trig
-        namespace["sin"] = np.sin
-        namespace["cos"] = np.cos
-        namespace["tan"] = np.tan
-        # Reciprocal trig (no direct numpy equivalents)
-        namespace["cot"] = lambda x: np.cos(x) / np.sin(x)  # type: ignore[reportUnknownLambdaType]
-        namespace["sec"] = lambda x: 1.0 / np.cos(x)  # type: ignore[reportUnknownLambdaType]
-        namespace["csc"] = lambda x: 1.0 / np.sin(x)  # type: ignore[reportUnknownLambdaType]
-        # Inverse trig
-        namespace["arcsin"] = np.arcsin
-        namespace["arccos"] = np.arccos
-        namespace["arctan"] = np.arctan
-        namespace["arctan2"] = np.arctan2
-        # Hyperbolic
-        namespace["sinh"] = np.sinh
-        namespace["cosh"] = np.cosh
-        namespace["tanh"] = np.tanh
-        # Inverse hyperbolic
-        namespace["arcsinh"] = np.arcsinh
-        namespace["arccosh"] = np.arccosh
-        namespace["arctanh"] = np.arctanh
-        # Other
-        namespace["log"] = np.log
-        namespace["sqrt"] = np.sqrt
-        namespace["abs"] = np.abs
-        # Special functions (scipy.special)
-        namespace["erf"] = special.erf
-        namespace["jv"] = special.jv  # BesselJ
-        namespace["yv"] = special.yv  # BesselY
 
-        # Inject spatial coordinates from grid when position-dependent
+        # C2: Inject spatial coordinates — use pre-extracted arrays if available
         if term.position_dependent:
-            spatial_coords = self.spec.spatial_coordinates
-            coords = grid.cell_coords  # type: ignore[union-attr]
-            for i, name in enumerate(spatial_coords[: grid.num_axes]):  # type: ignore[union-attr]
-                namespace[name] = np.asarray(coords[..., i])  # pyright: ignore[reportUnknownArgumentType]
+            if coord_arrays is not None:
+                namespace.update(coord_arrays)
+            else:
+                spatial_coords = self.spec.spatial_coordinates
+                coords = grid.cell_coords  # type: ignore[union-attr]
+                for i, name in enumerate(spatial_coords[: grid.num_axes]):  # type: ignore[union-attr]
+                    namespace[name] = np.asarray(coords[..., i])  # pyright: ignore[reportUnknownArgumentType]
 
         # Validate all symbols can be resolved
         identifiers = set(re.findall(r"\b[a-zA-Z_]\w*\b", py_expr))
@@ -625,15 +785,67 @@ class PDEFromSpec(PDEBase):
 
         try:
             result = eval(py_expr, {"__builtins__": {}}, namespace)  # noqa: S307
-            if isinstance(result, np.ndarray):
-                return np.asarray(result, dtype=np.float64)
-            return float(result)
         except Exception as e:
             msg = (
                 f"Cannot evaluate coordinate-dependent coefficient '{sym}' "
                 f"(Python form: '{py_expr}') at t={t}: {e}"
             )
             raise ValueError(msg) from e
+        return self._validate_eval_result(result, sym, py_expr)
+
+    @staticmethod
+    def _validate_eval_result(
+        result: object, sym: str, py_expr: str
+    ) -> float | NumericArray:
+        """Validate and coerce an eval() result to float or ndarray.
+
+        Raises ValueError for complex, NaN, or Inf results with clear
+        diagnostic messages pointing to the source expression.
+
+        Raises
+        ------
+        TypeError
+            If the result is complex.
+        ValueError
+            If the result is NaN or Inf.
+        """
+        if isinstance(result, complex):
+            msg = (
+                f"Coefficient '{sym}' evaluated to complex number {result} "
+                f"(from '{py_expr}'). Only real-valued coefficients are supported."
+            )
+            raise TypeError(msg)
+
+        if isinstance(result, np.ndarray):
+            arr = np.asarray(result, dtype=np.float64)
+            if np.any(np.isnan(arr)):
+                msg = (
+                    f"Coefficient '{sym}' produced NaN values "
+                    f"(from '{py_expr}'). Check for 0/0 or invalid operations."
+                )
+                raise ValueError(msg)
+            if np.any(np.isinf(arr)):
+                msg = (
+                    f"Coefficient '{sym}' produced Inf values "
+                    f"(from '{py_expr}'). Check for division by zero."
+                )
+                raise ValueError(msg)
+            return arr
+
+        scalar = float(cast("SupportsFloat", result))
+        if math.isnan(scalar):
+            msg = (
+                f"Coefficient '{sym}' evaluated to NaN "
+                f"(from '{py_expr}'). Check for 0/0 or invalid operations."
+            )
+            raise ValueError(msg)
+        if math.isinf(scalar):
+            msg = (
+                f"Coefficient '{sym}' evaluated to Inf "
+                f"(from '{py_expr}'). Check for division by zero."
+            )
+            raise ValueError(msg)
+        return scalar
 
     @staticmethod
     def _get_operator(
@@ -674,12 +886,20 @@ class PDEFromSpec(PDEBase):
                 min_dim = _AXIS_MIN_DIM[axis_letter]
                 entry = (_op_nth_derivative(axis, order), min_dim)
             else:
-                msg = (
-                    f"Unknown operator: '{operator_name}'. "
-                    f"Known operators: {sorted(_OPERATOR_REGISTRY.keys())}. "
-                    f"Dynamic patterns: derivative_N_x (N=integer, x/y/z=axis)."
-                )
-                raise ValueError(msg)
+                # Try multi-axis pattern: derivative_2x_1y, derivative_1x_1y_1z
+                m_multi = _GENERIC_MULTI_RE.match(operator_name)
+                if m_multi:
+                    axes_and_orders = _parse_multi_axis_spec(m_multi.group(1))
+                    max_axis = max(axis for axis, _ in axes_and_orders)
+                    min_dim = _AXIS_MIN_DIM[_AXIS_LETTER[max_axis]]
+                    entry = (_op_multi_axis_derivative(axes_and_orders), min_dim)
+                else:
+                    msg = (
+                        f"Unknown operator: '{operator_name}'. "
+                        f"Known operators: {sorted(_OPERATOR_REGISTRY.keys())}. "
+                        f"Dynamic patterns: derivative_N_x, derivative_Nx_My."
+                    )
+                    raise ValueError(msg)
 
         handler, min_dim = entry
         if field.grid.dim < min_dim:
@@ -731,6 +951,8 @@ class PDEFromSpec(PDEBase):
 
         Raises
         ------
+        TypeError
+            If a state element is not a ``ScalarField``.
         ValueError
             If the field name is not recognized or momentum is unavailable.
         """
@@ -753,7 +975,9 @@ class PDEFromSpec(PDEBase):
                 if slot is not None:
                     # Second-order component: momentum is a state variable
                     momentum = state[slot]
-                    assert isinstance(momentum, ScalarField)
+                    if not isinstance(momentum, ScalarField):
+                        msg = f"Expected ScalarField for momentum, got {type(momentum).__name__}"
+                        raise TypeError(msg)
                     return momentum
 
                 # First-order component: check virtual_momenta
@@ -779,13 +1003,15 @@ class PDEFromSpec(PDEBase):
         slot = self._field_slot_map.get(field_name)
         if slot is not None:
             field = state[slot]
-            assert isinstance(field, ScalarField)
+            if not isinstance(field, ScalarField):
+                msg = f"Expected ScalarField, got {type(field).__name__}"
+                raise TypeError(msg)
             return field
 
         msg = f"Unknown field name: {field_name}"
         raise ValueError(msg)
 
-    def _compute_rhs_for_component(
+    def _compute_rhs_for_component(  # noqa: C901, PLR0912, PLR0914
         self,
         component_idx: int,
         state: FieldCollection,
@@ -820,17 +1046,33 @@ class PDEFromSpec(PDEBase):
 
         Raises
         ------
+        TypeError
+            If a state element is not a ``ScalarField``.
         ValueError
             If a field or operator cannot be resolved.
         """
         eq = self.spec.equations[component_idx]
         grid = state.grid
 
+        # C2: Pre-extract spatial coordinate arrays once for all position-dependent terms
+        coord_arrays: dict[str, NumericArray] | None = None
+        if any(term.position_dependent for term in eq.rhs_terms):
+            spatial_coords = self.spec.spatial_coordinates
+            raw_coords = grid.cell_coords  # pyright: ignore[reportUnknownVariableType]
+            coord_arrays = {
+                name: np.asarray(raw_coords[..., i])  # pyright: ignore[reportUnknownArgumentType]
+                for i, name in enumerate(spatial_coords[: grid.num_axes])
+            }
+
+        # C1: Per-timestep coefficient cache — same symbolic expression at
+        # same (t, grid) produces the same value, so deduplicate eval() calls
+        coeff_cache: dict[str, float | NumericArray] = {}
+
         # Start with zero field
         result = ScalarField(grid, data=0.0)
 
         # Sum all terms from the specification
-        for term in eq.rhs_terms:
+        for term_idx, term in enumerate(eq.rhs_terms):
             target_field_name = term.field
 
             # Handle first_derivative_t operator specially
@@ -847,7 +1089,9 @@ class PDEFromSpec(PDEBase):
                 slot = self._momentum_slot_map.get(comp_name)
                 if slot is not None:
                     momentum = state[slot]
-                    assert isinstance(momentum, ScalarField)
+                    if not isinstance(momentum, ScalarField):
+                        msg = f"Expected ScalarField for momentum, got {type(momentum).__name__}"
+                        raise TypeError(msg)
                     operated = momentum.copy()
                 elif virtual_momenta is not None and comp_name in virtual_momenta:
                     operated = virtual_momenta[comp_name].copy()
@@ -866,8 +1110,20 @@ class PDEFromSpec(PDEBase):
                 )
                 operated = self._get_operator(term.operator, target_field, bc)
 
-            # Resolve coefficient (supports time- and position-dependent)
-            coefficient = self._resolve_coefficient_at_point(term, t, grid)
+            # Resolve coefficient: B4 preresolved → C1 timestep cache → full eval
+            preresolved = self._preresolved.get((component_idx, term_idx))
+            if preresolved is not None:
+                coefficient: float | NumericArray = preresolved
+            else:
+                cache_key = term.coefficient_symbolic
+                if cache_key is not None and cache_key in coeff_cache:
+                    coefficient = coeff_cache[cache_key]
+                else:
+                    coefficient = self._resolve_coefficient_at_point(
+                        term, t, grid, coord_arrays=coord_arrays
+                    )
+                    if cache_key is not None:
+                        coeff_cache[cache_key] = coefficient
 
             # Add coefficient * operated to result
             if isinstance(coefficient, np.ndarray):
@@ -901,9 +1157,7 @@ class PDEFromSpec(PDEBase):
 
         # If all BCs are periodic and grid is periodic, use shorthand
         all_periodic = all(
-            config.boundary_conditions.get(
-                coord, BoundaryCondition("periodic")
-            ).type
+            config.boundary_conditions.get(coord, BoundaryCondition("periodic")).type
             == "periodic"
             for coord in spatial_coords
         )
@@ -925,9 +1179,15 @@ class PDEFromSpec(PDEBase):
             elif bc_config.type == "periodic":
                 bc_dict[coord] = "periodic"
             elif bc_config.type == "dirichlet":
-                bc_dict[coord] = {"value": bc_config.value if bc_config.value is not None else 0.0}
+                bc_dict[coord] = {
+                    "value": bc_config.value if bc_config.value is not None else 0.0
+                }
             elif bc_config.type == "neumann":
-                bc_dict[coord] = {"derivative": bc_config.derivative if bc_config.derivative is not None else 0.0}
+                bc_dict[coord] = {
+                    "derivative": bc_config.derivative
+                    if bc_config.derivative is not None
+                    else 0.0
+                }
 
         return bc_dict
 
@@ -969,6 +1229,8 @@ class PDEFromSpec(PDEBase):
 
         Raises
         ------
+        TypeError
+            If the Poisson RHS is not a ``ScalarField``.
         ValueError
             If the equation lacks a ``laplacian(field)`` term or the
             Poisson solver fails.
@@ -1028,9 +1290,9 @@ class PDEFromSpec(PDEBase):
         # Rearrange 0 = laplacian_coeff * nabla^2(phi) + S into the standard
         # Poisson form nabla^2(phi) = rhs, giving rhs = -S / laplacian_coeff.
         poisson_rhs = -rhs_source / laplacian_coeff
-        assert isinstance(poisson_rhs, ScalarField), (
-            f"Expected ScalarField for Poisson RHS, got {type(poisson_rhs).__name__}"
-        )
+        if not isinstance(poisson_rhs, ScalarField):
+            msg = f"Expected ScalarField for Poisson RHS, got {type(poisson_rhs).__name__}"
+            raise TypeError(msg)
 
         # Build boundary conditions for the Poisson solver
         solver_bc = self._build_constraint_bc(eq.constraint_solver, grid)
@@ -1057,7 +1319,7 @@ class PDEFromSpec(PDEBase):
         return state
 
     @override
-    def evolution_rate(
+    def evolution_rate(  # noqa: C901, PLR0912
         self,
         state: TState,
         t: float = 0.0,
@@ -1088,10 +1350,14 @@ class PDEFromSpec(PDEBase):
 
         Raises
         ------
+        TypeError
+            If ``state`` is not a ``FieldCollection``.
         ValueError
             If the state size or grid dimension does not match the spec.
         """
-        assert isinstance(state, FieldCollection)
+        if not isinstance(state, FieldCollection):
+            msg = f"Expected FieldCollection, got {type(state).__name__}"
+            raise TypeError(msg)
         expected_fields = self.spec.state_size
         if len(state) != expected_fields:
             msg = f"Expected {expected_fields} fields, got {len(state)}"
@@ -1109,8 +1375,13 @@ class PDEFromSpec(PDEBase):
             )
             raise ValueError(msg)
 
-        bc = infer_bc_from_grid(state.grid)
+        # B5: Cache boundary conditions (same grid always produces same BCs)
         grid = state.grid
+        grid_id = id(grid)
+        if self._cached_bc is None or self._cached_grid_id != grid_id:
+            self._cached_bc = infer_bc_from_grid(grid)
+            self._cached_grid_id = grid_id
+        bc = self._cached_bc
 
         # Pass 1: Compute virtual momenta for non-second-order components.
         # First-order components: their RHS becomes the "virtual momentum"
@@ -1140,7 +1411,9 @@ class PDEFromSpec(PDEBase):
                 # Second-order: d/dt field = momentum, d/dt momentum = RHS
                 momentum_slot = self._momentum_slot_map[eq.field_name]
                 momentum = state[momentum_slot]
-                assert isinstance(momentum, ScalarField)
+                if not isinstance(momentum, ScalarField):
+                    msg = f"Expected ScalarField for momentum, got {type(momentum).__name__}"
+                    raise TypeError(msg)
                 rates[field_slot] = momentum.copy()
                 rates[momentum_slot] = self._compute_rhs_for_component(
                     i, state, bc, t, virtual_momenta

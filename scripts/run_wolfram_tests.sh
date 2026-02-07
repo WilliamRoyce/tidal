@@ -19,6 +19,7 @@ TESTS=(
     "tests/wolfram/test_euler_lagrange.wls"
     "tests/wolfram/test_common_utilities.wls"
     "tests/wolfram/test_export_json.wls"
+    "tests/wolfram/test_component_decompose.wls"
 )
 
 PASSED=0

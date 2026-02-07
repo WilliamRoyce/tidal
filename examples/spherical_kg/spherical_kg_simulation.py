@@ -51,13 +51,13 @@ if TYPE_CHECKING:
 OUTPUT_FILENAME = "spherical_kg_output.png"
 R_MIN = 0.5
 R_MAX = 8.0
-THETA_MIN = 0.2  # Avoid theta=0 singularity (sin(0)=0)
-THETA_MAX = np.pi - 0.2  # Avoid theta=pi singularity
+THETA_MIN = 0.05  # Avoid theta=0 singularity (sin(0)=0)
+THETA_MAX = np.pi - 0.05  # Avoid theta=pi singularity
 PHI_MIN = 0.0
 PHI_MAX = 2 * np.pi
-GRID_NR = 48
-GRID_NTHETA = 32
-GRID_NPHI = 48
+GRID_NR = 64
+GRID_NTHETA = 64
+GRID_NPHI = 64
 MASS_SQUARED = 0.0  # Massless for clean 1/r decay test
 PULSE_RADIUS = 3.0
 PULSE_WIDTH = 0.6
@@ -178,7 +178,7 @@ def _run_simulation(
     result = pde.solve(  # type: ignore[union-attr]
         state,
         t_range=T_END,
-        dt=DT,
+        dt=DT,  # Let the solver choose adaptive time steps
         solver="scipy",
         method="RK45",
         tracker=storage.tracker(0.5),

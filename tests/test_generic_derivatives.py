@@ -31,6 +31,7 @@ from torsion_gertsenshtein.symbolic.json_loader import (
 from torsion_gertsenshtein.symbolic.pde_builder import (
     PDEFromSpec,
     _op_nth_derivative,  # noqa: PLC2701 - test verifies generic derivative factory
+    _parse_multi_axis_spec,  # noqa: PLC2701 - test verifies multi-axis parser
     create_initial_state,
 )
 
@@ -197,9 +198,7 @@ class TestIsKnownOperator:
 class TestNthDerivativeOperator:
     """Tests for _op_nth_derivative factory function."""
 
-    def test_first_derivative_matches_gradient(
-        self, grid_1d: CartesianGrid
-    ) -> None:
+    def test_first_derivative_matches_gradient(self, grid_1d: CartesianGrid) -> None:
         """_op_nth_derivative(0, 1) should match gradient_x."""
         x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
         k = 2 * np.pi / 10
@@ -214,9 +213,7 @@ class TestNthDerivativeOperator:
 
         assert_allclose(result_nth.data, result_grad.data, atol=1e-10)
 
-    def test_second_derivative_analytical(
-        self, grid_1d: CartesianGrid
-    ) -> None:
+    def test_second_derivative_analytical(self, grid_1d: CartesianGrid) -> None:
         """_op_nth_derivative(0, 2) on sin(kx) gives -k^2 sin(kx)."""
         x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
         k = 2 * np.pi / 10
@@ -406,3 +403,61 @@ class TestBackwardCompat:
         PDEFromSpec._get_operator("gradient_x", field, bc)
         PDEFromSpec._get_operator("laplacian_x", field, bc)
         PDEFromSpec._get_operator("biharmonic", field, bc)
+
+
+# ---------------------------------------------------------------------------
+# Multi-axis derivative support (Issue #79)
+# ---------------------------------------------------------------------------
+
+
+class TestMultiAxisDerivatives:
+    """Tests for multi-axis derivative parsing and resolution."""
+
+    def test_parse_multi_axis_spec_2x_1y(self) -> None:
+        """Parse '2x_1y' into [(0, 2), (1, 1)]."""
+        result = _parse_multi_axis_spec("2x_1y")
+        assert result == [(0, 2), (1, 1)]
+
+    def test_parse_multi_axis_spec_1x_1y_1z(self) -> None:
+        """Parse '1x_1y_1z' into [(0, 1), (1, 1), (2, 1)]."""
+        result = _parse_multi_axis_spec("1x_1y_1z")
+        assert result == [(0, 1), (1, 1), (2, 1)]
+
+    def test_parse_multi_axis_spec_3x_2z(self) -> None:
+        """Parse '3x_2z' into [(0, 3), (2, 2)]."""
+        result = _parse_multi_axis_spec("3x_2z")
+        assert result == [(0, 3), (2, 2)]
+
+    def test_parse_multi_axis_spec_invalid_axis(self) -> None:
+        """Invalid axis letter raises ValueError."""
+        with pytest.raises(ValueError, match="Invalid multi-axis"):
+            _parse_multi_axis_spec("2w")
+
+    def test_derivative_2x_1y_resolves_2d(self, grid_2d: CartesianGrid) -> None:
+        """derivative_2x_1y resolves on a 2D grid (uniform field -> 0)."""
+        field = ScalarField(grid_2d, data=1.0)
+        result = PDEFromSpec._get_operator("derivative_2x_1y", field, "periodic")
+        assert_allclose(result.data, 0.0, atol=1e-10)
+
+    def test_derivative_2x_1y_requires_2d(self, grid_1d_coarse: CartesianGrid) -> None:
+        """derivative_2x_1y on a 1D grid raises ValueError."""
+        field = ScalarField(grid_1d_coarse, data=1.0)
+        with pytest.raises(ValueError, match="requires at least 2D"):
+            PDEFromSpec._get_operator("derivative_2x_1y", field, "periodic")
+
+    def test_derivative_2x_1y_numerical(self, grid_2d: CartesianGrid) -> None:
+        """derivative_2x_1y on sin(kx*x)*sin(ky*y).
+
+        d^2/dx^2 d/dy [sin(kx*x)*sin(ky*y)]
+        = d^2/dx^2 [sin(kx*x)*ky*cos(ky*y)]
+        = -kx^2 * ky * sin(kx*x) * cos(ky*y)
+        """
+        x = cast("np.ndarray", grid_2d.cell_coords[..., 0])
+        y = cast("np.ndarray", grid_2d.cell_coords[..., 1])
+        kx = 2 * np.pi / 10
+        ky = 2 * np.pi / 10
+
+        field = ScalarField(grid_2d, data=np.sin(kx * x) * np.sin(ky * y))
+        result = PDEFromSpec._get_operator("derivative_2x_1y", field, "periodic")
+        expected = -(kx**2) * ky * np.sin(kx * x) * np.cos(ky * y)
+        assert_allclose(result.data, expected, rtol=0.1)

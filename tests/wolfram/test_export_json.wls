@@ -375,6 +375,121 @@ momentumResult = TorsionGertsenshtein`ExportJSON`ExtractMassCouplingFromEquation
 TestCase["Momentum ref ignored, own mass extracted",
   {{2.0}}, momentumResult["mass_matrix"]];
 
+(* === Test Group: ClassifySpatialProfile (Issue #79) === *)
+Print[""];
+Print["Test Group: ClassifySpatialProfile"];
+
+csp1 = TorsionGertsenshtein`ExportJSON`ClassifySpatialProfile[{1, 0}];
+TestCase["ClassifySpatialProfile {1,0} -> gradient_x", "gradient_x", csp1];
+
+csp2 = TorsionGertsenshtein`ExportJSON`ClassifySpatialProfile[{0, 1}];
+TestCase["ClassifySpatialProfile {0,1} -> gradient_y", "gradient_y", csp2];
+
+csp3 = TorsionGertsenshtein`ExportJSON`ClassifySpatialProfile[{2, 0}];
+TestCase["ClassifySpatialProfile {2,0} -> laplacian_x", "laplacian_x", csp3];
+
+csp4 = TorsionGertsenshtein`ExportJSON`ClassifySpatialProfile[{0, 2}];
+TestCase["ClassifySpatialProfile {0,2} -> laplacian_y", "laplacian_y", csp4];
+
+csp5 = TorsionGertsenshtein`ExportJSON`ClassifySpatialProfile[{1, 1}];
+TestCase["ClassifySpatialProfile {1,1} -> cross_derivative_xy",
+  "cross_derivative_xy", csp5];
+
+csp6 = TorsionGertsenshtein`ExportJSON`ClassifySpatialProfile[{1, 0, 1}];
+TestCase["ClassifySpatialProfile {1,0,1} -> cross_derivative_xz",
+  "cross_derivative_xz", csp6];
+
+csp7 = TorsionGertsenshtein`ExportJSON`ClassifySpatialProfile[{0, 1, 1}];
+TestCase["ClassifySpatialProfile {0,1,1} -> cross_derivative_yz",
+  "cross_derivative_yz", csp7];
+
+csp8 = TorsionGertsenshtein`ExportJSON`ClassifySpatialProfile[{3, 0}];
+TestCase["ClassifySpatialProfile {3,0} -> derivative_3_x",
+  "derivative_3_x", csp8];
+
+csp9 = TorsionGertsenshtein`ExportJSON`ClassifySpatialProfile[{2, 1}];
+TestCase["ClassifySpatialProfile {2,1} -> derivative_2x_1y",
+  "derivative_2x_1y", csp9];
+
+(* All-zeros should throw *)
+cspThrown = Catch[TorsionGertsenshtein`ExportJSON`ClassifySpatialProfile[{0, 0}]];
+TestTrue["ClassifySpatialProfile {0,0} throws",
+  StringQ[cspThrown] && StringContainsQ[cspThrown, "ClassifySpatialProfile"]];
+
+(* === Test Group: ExtractSpatialOperatorFromMixed (Issue #79) === *)
+Print[""];
+Print["Test Group: ExtractSpatialOperatorFromMixed"];
+
+(* Define a test symbol for derivative expressions *)
+If[!ValueQ[testf], testf[t_, x_] := 0; testf[t_, x_, y_] := 0; testf[t_, x_, y_, z_] := 0];
+
+(* Backward compat: single spatial direction *)
+esom1 = TorsionGertsenshtein`ExportJSON`ExtractSpatialOperatorFromMixed[
+  Derivative[1, 1, 0][testf][t, x, y]];
+TestCase["ExtractSpatialOperatorFromMixed d_t d_x -> gradient_x",
+  "gradient_x", esom1];
+
+esom2 = TorsionGertsenshtein`ExportJSON`ExtractSpatialOperatorFromMixed[
+  Derivative[1, 0, 1][testf][t, x, y]];
+TestCase["ExtractSpatialOperatorFromMixed d_t d_y -> gradient_y",
+  "gradient_y", esom2];
+
+(* Bug fixes: multi-spatial mixed derivatives *)
+esom3 = TorsionGertsenshtein`ExportJSON`ExtractSpatialOperatorFromMixed[
+  Derivative[1, 1, 1][testf][t, x, y]];
+TestCase["ExtractSpatialOperatorFromMixed d_t d_x d_y -> cross_derivative_xy",
+  "cross_derivative_xy", esom3];
+
+esom4 = TorsionGertsenshtein`ExportJSON`ExtractSpatialOperatorFromMixed[
+  Derivative[1, 2, 0][testf][t, x, y]];
+TestCase["ExtractSpatialOperatorFromMixed d_t d2_x -> laplacian_x",
+  "laplacian_x", esom4];
+
+esom5 = TorsionGertsenshtein`ExportJSON`ExtractSpatialOperatorFromMixed[
+  Derivative[1, 0, 2][testf][t, x, y]];
+TestCase["ExtractSpatialOperatorFromMixed d_t d2_y -> laplacian_y",
+  "laplacian_y", esom5];
+
+(* Generic multi-axis *)
+esom6 = TorsionGertsenshtein`ExportJSON`ExtractSpatialOperatorFromMixed[
+  Derivative[1, 2, 1][testf][t, x, y]];
+TestCase["ExtractSpatialOperatorFromMixed d_t d2_x d_y -> derivative_2x_1y",
+  "derivative_2x_1y", esom6];
+
+(* 1+1D backward compat *)
+esom7 = TorsionGertsenshtein`ExportJSON`ExtractSpatialOperatorFromMixed[
+  Derivative[1, 1][testf][t, x]];
+TestCase["ExtractSpatialOperatorFromMixed 1+1D d_t d_x -> gradient_x",
+  "gradient_x", esom7];
+
+(* 3+1D *)
+esom8 = TorsionGertsenshtein`ExportJSON`ExtractSpatialOperatorFromMixed[
+  Derivative[1, 0, 0, 1][testf][t, x, y, z]];
+TestCase["ExtractSpatialOperatorFromMixed 3+1D d_t d_z -> gradient_z",
+  "gradient_z", esom8];
+
+(* Time order != 1 should throw *)
+esomThrown = Catch[TorsionGertsenshtein`ExportJSON`ExtractSpatialOperatorFromMixed[
+  Derivative[2, 1, 0][testf][t, x, y]]];
+TestTrue["ExtractSpatialOperatorFromMixed throws on time order 2",
+  StringQ[esomThrown] && StringContainsQ[esomThrown, "Time derivative order"]];
+
+(* === End-to-end: ClassifyOperatorType for mixed derivatives (Issue #79) === *)
+Print[""];
+Print["Test Group: ClassifyOperatorType mixed derivative fixes"];
+
+{opMixedXY, isMixedXY} = TorsionGertsenshtein`ExportJSON`ClassifyOperatorType[
+  Derivative[1, 1, 1][testf][t, x, y]];
+TestCase["ClassifyOperatorType d_t d_x d_y -> cross_derivative_xy",
+  "cross_derivative_xy", opMixedXY];
+TestTrue["ClassifyOperatorType d_t d_x d_y sets momentum flag", isMixedXY];
+
+{opMixedLapX, isMixedLapX} = TorsionGertsenshtein`ExportJSON`ClassifyOperatorType[
+  Derivative[1, 2, 0][testf][t, x, y]];
+TestCase["ClassifyOperatorType d_t d2_x -> laplacian_x",
+  "laplacian_x", opMixedLapX];
+TestTrue["ClassifyOperatorType d_t d2_x sets momentum flag", isMixedLapX];
+
 (* === Exit === *)
 Print[""];
 ExitWithTestStatus[];

@@ -147,28 +147,27 @@
   ],
   "ignoreWords": [
     "bfdadc",
+    "CDTM",
     "eeef",
+    "esom",
     "fbca",
+    "isort",
     "pytest",
     "pyright",
     "pydata",
     "pylint",
     "pydocstyle",
     "numpy",
-    "isort",
     "ndarray",
     "xlabel",
     "ylabel",
     "pyproject",
     "scipy",
+    "testf",
     "trange",
     "tqdm"
   ],
-  "flagWords": [
-    "hte",
-    "teh",
-    "wolfrom"
-  ],
+  "flagWords": ["hte", "teh", "wolfrom"],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [
