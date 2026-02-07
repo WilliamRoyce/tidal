@@ -174,8 +174,10 @@ curvature is left unevaluated (future: compute from Christoffel formula). \
 If metricMatrix is None, uses flat Minkowski metric diag(-1,+1,...).";
 
 MinkowskiMetricFactor::usage =
-  "MinkowskiMetricFactor[idx] returns the metric factor for index raising/lowering in \
-Minkowski space: -1 for time (idx=0), +1 for spatial indices (idx>0).";
+  "MinkowskiMetricFactor[idx] returns the metric factor for index raising/lowering \
+using the default Minkowski signature (-,+,+,...): -1 for time (idx=0), +1 for spatial \
+indices (idx>0). MinkowskiMetricFactor[idx, signature] uses the explicit signature list, \
+e.g. {-1,1,1} for mostly plus or {1,-1,-1} for mostly minus.";
 
 Begin["`Private`"];
 
@@ -701,9 +703,11 @@ LeviCivitaValue[indices_List] := Module[{n = Length[indices]},
   ]
 ];
 
-(* Helper: Compute metric factor for raising/lowering indices in Minkowski space *)
-(* For signature (-,+,+,...): η^00 = -1, η^11 = η^22 = ... = +1 *)
+(* Helper: Compute metric factor for raising/lowering indices *)
+(* 1-arg form: default Minkowski signature (-,+,+,...) *)
 MinkowskiMetricFactor[idx_Integer] := If[idx == 0, -1, 1];
+(* 2-arg form: explicit signature list, e.g. {-1,1,1} or {1,-1,-1} *)
+MinkowskiMetricFactor[idx_Integer, signature_List] := signature[[idx + 1]];
 
 (* Evaluate epsilon tensor components in expression *)
 (* Handles epsilon tensors created by xAct's DefMetric (e.g., epsiloneta, epsiloneta3) *)
