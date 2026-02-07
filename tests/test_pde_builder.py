@@ -1098,17 +1098,15 @@ class TestParameterizedCoefficients:
         # "-m2" with m2=0.25 should give -0.25
         assert resolved == -0.25  # noqa: PLR2004
 
-    def test_resolve_coefficient_without_parameter(
+    def test_resolve_coefficient_without_parameter_raises(
         self, spec_with_symbolic: EquationSystem
     ) -> None:
-        """Test _resolve_coefficient uses numeric default when no parameter."""
+        """Test _resolve_coefficient raises when symbolic param not provided."""
         pde = PDEFromSpec(spec_with_symbolic)  # No parameters
         term = spec_with_symbolic.equations[0].rhs_terms[1]
 
-        with pytest.warns(UserWarning, match="could not be resolved"):
-            resolved = pde._resolve_coefficient(term)
-        # Should use the numeric coefficient from the term
-        assert resolved == -1.0
+        with pytest.raises(ValueError, match="could not be resolved"):
+            pde._resolve_coefficient(term)
 
     def test_resolve_coefficient_positive_symbolic(self) -> None:
         """Test _resolve_coefficient with positive symbolic coefficient."""
@@ -1136,8 +1134,8 @@ class TestParameterizedCoefficients:
         resolved = pde._resolve_coefficient(term)
         assert resolved == 2.5  # noqa: PLR2004
 
-    def test_resolve_coefficient_unmatched_symbolic(self) -> None:
-        """Test _resolve_coefficient falls back to numeric for unknown symbolic."""
+    def test_resolve_coefficient_unmatched_symbolic_raises(self) -> None:
+        """Test _resolve_coefficient raises when symbolic doesn't match any param."""
         spec = EquationSystem(
             n_components=1,
             dimension=2,
@@ -1159,10 +1157,8 @@ class TestParameterizedCoefficients:
         pde = PDEFromSpec(spec, parameters={"m2": 1.0})  # Different param
         term = spec.equations[0].rhs_terms[0]
 
-        with pytest.warns(UserWarning, match="could not be resolved"):
-            resolved = pde._resolve_coefficient(term)
-        # Should fall back to numeric 1.5
-        assert resolved == 1.5  # noqa: PLR2004
+        with pytest.raises(ValueError, match="could not be resolved"):
+            pde._resolve_coefficient(term)
 
     def test_build_pde_from_json_with_parameters(self, kg_json_path: Path) -> None:
         """Test build_pde_from_json accepts parameters dict."""
