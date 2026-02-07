@@ -296,11 +296,13 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     )
     plt.tight_layout()
 
-    output_path = Path(__file__).parent / OUTPUT_FILENAME
-    fig.savefig(output_path, dpi=150)
+    output_dir = Path(__file__).parent.parent.parent / "outputs"
+    output_dir.mkdir(exist_ok=True, parents=True)
+    output_path = output_dir / OUTPUT_FILENAME
+    plt.savefig(output_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
 
-    print(f"  Plot saved to: {output_path}")
+    print(f"  Saved plot to: {output_path}")
 
     print()
     print("*** 3+1D Klein-Gordon simulation complete! ***")
