@@ -61,14 +61,14 @@ class TestLoad3DJSON:
         assert spec.dimension == 4  # noqa: PLR2004
         assert spec.spatial_dimension == 3  # noqa: PLR2004
         assert spec.n_components == 1
-        assert spec.component_names == ("phi",)
+        assert spec.component_names == ("phi_0",)
 
     def test_kg_3d_equations(self, kg_3d_json_path: Path) -> None:
         """Test that equations have expected operators."""
         spec = load_equation_system(kg_3d_json_path)
         eq = spec.equations[0]
 
-        assert eq.field_name == "phi"
+        assert eq.field_name == "phi_0"
         assert eq.time_derivative_order == 2  # noqa: PLR2004
 
         operators = {term.operator for term in eq.rhs_terms}
@@ -187,7 +187,7 @@ class TestSimulation3D:
         state = create_initial_state(
             grid_3d_small,
             pde.spec,
-            field_data={"phi": phi_data},
+            field_data={"phi_0": phi_data},
         )
 
         # Run very short simulation
