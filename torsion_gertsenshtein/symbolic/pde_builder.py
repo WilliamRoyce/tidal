@@ -74,7 +74,9 @@ def _op_gradient(axis: int) -> Callable[[ScalarField, BCDescriptor], ScalarField
     def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:
         grad = field.gradient(bc=bc)
         component = grad[axis]
-        assert isinstance(component, ScalarField)
+        if not isinstance(component, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+            msg = f"Expected ScalarField from gradient, got {type(component).__name__}"
+            raise TypeError(msg)
         return component
 
     return _handler
@@ -87,9 +89,13 @@ def _op_directional_laplacian(
 
     def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:
         grad = field.gradient(bc=bc)[axis]
-        assert isinstance(grad, ScalarField)
+        if not isinstance(grad, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+            msg = f"Expected ScalarField from gradient, got {type(grad).__name__}"
+            raise TypeError(msg)
         d2 = grad.gradient(bc=bc)[axis]
-        assert isinstance(d2, ScalarField)
+        if not isinstance(d2, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+            msg = f"Expected ScalarField from gradient, got {type(d2).__name__}"
+            raise TypeError(msg)
         return d2
 
     return _handler
@@ -102,20 +108,34 @@ def _op_cross_derivative(
 
     def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:
         grad_j = field.gradient(bc=bc)[axis2]
-        assert isinstance(grad_j, ScalarField)
+        if not isinstance(grad_j, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+            msg = f"Expected ScalarField from gradient, got {type(grad_j).__name__}"
+            raise TypeError(msg)
         grad_ij = grad_j.gradient(bc=bc)[axis1]
-        assert isinstance(grad_ij, ScalarField)
+        if not isinstance(grad_ij, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+            msg = f"Expected ScalarField from gradient, got {type(grad_ij).__name__}"
+            raise TypeError(msg)
         return grad_ij
 
     return _handler
 
 
 def _op_biharmonic(field: ScalarField, bc: BCDescriptor) -> ScalarField:
-    """Biharmonic operator: ∇⁴f = ∇²(∇²f)."""
+    """Biharmonic operator: ∇⁴f = ∇²(∇²f).
+
+    Raises
+    ------
+    TypeError
+        If intermediate results are not ``ScalarField``.
+    """
     lap = field.laplace(bc=bc)
-    assert isinstance(lap, ScalarField)
+    if not isinstance(lap, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+        msg = f"Expected ScalarField from laplace, got {type(lap).__name__}"
+        raise TypeError(msg)
     bilap = lap.laplace(bc=bc)
-    assert isinstance(bilap, ScalarField)
+    if not isinstance(bilap, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+        msg = f"Expected ScalarField from laplace, got {type(bilap).__name__}"
+        raise TypeError(msg)
     return bilap
 
 
@@ -133,7 +153,9 @@ def _op_nth_derivative(
         for _ in range(order):
             grad = result.gradient(bc=bc)
             component = grad[axis]
-            assert isinstance(component, ScalarField)
+            if not isinstance(component, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+                msg = f"Expected ScalarField from gradient, got {type(component).__name__}"
+                raise TypeError(msg)
             result = component
         return result
 
@@ -191,7 +213,9 @@ def _op_multi_axis_derivative(
             for _ in range(order):
                 grad = result.gradient(bc=bc)
                 component = grad[axis]
-                assert isinstance(component, ScalarField)
+                if not isinstance(component, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
+                    msg = f"Expected ScalarField from gradient, got {type(component).__name__}"
+                    raise TypeError(msg)
                 result = component
         return result
 
@@ -665,7 +689,7 @@ class PDEFromSpec(PDEBase):
 
         return result
 
-    def _resolve_coefficient_at_point(  # noqa: C901
+    def _resolve_coefficient_at_point(
         self,
         term: OperatorTerm,
         t: float,
@@ -913,6 +937,8 @@ class PDEFromSpec(PDEBase):
 
         Raises
         ------
+        TypeError
+            If a state element is not a ``ScalarField``.
         ValueError
             If the field name is not recognized or momentum is unavailable.
         """
@@ -935,7 +961,9 @@ class PDEFromSpec(PDEBase):
                 if slot is not None:
                     # Second-order component: momentum is a state variable
                     momentum = state[slot]
-                    assert isinstance(momentum, ScalarField)
+                    if not isinstance(momentum, ScalarField):
+                        msg = f"Expected ScalarField for momentum, got {type(momentum).__name__}"
+                        raise TypeError(msg)
                     return momentum
 
                 # First-order component: check virtual_momenta
@@ -961,7 +989,9 @@ class PDEFromSpec(PDEBase):
         slot = self._field_slot_map.get(field_name)
         if slot is not None:
             field = state[slot]
-            assert isinstance(field, ScalarField)
+            if not isinstance(field, ScalarField):
+                msg = f"Expected ScalarField, got {type(field).__name__}"
+                raise TypeError(msg)
             return field
 
         msg = f"Unknown field name: {field_name}"
@@ -1002,6 +1032,8 @@ class PDEFromSpec(PDEBase):
 
         Raises
         ------
+        TypeError
+            If a state element is not a ``ScalarField``.
         ValueError
             If a field or operator cannot be resolved.
         """
@@ -1043,7 +1075,9 @@ class PDEFromSpec(PDEBase):
                 slot = self._momentum_slot_map.get(comp_name)
                 if slot is not None:
                     momentum = state[slot]
-                    assert isinstance(momentum, ScalarField)
+                    if not isinstance(momentum, ScalarField):
+                        msg = f"Expected ScalarField for momentum, got {type(momentum).__name__}"
+                        raise TypeError(msg)
                     operated = momentum.copy()
                 elif virtual_momenta is not None and comp_name in virtual_momenta:
                     operated = virtual_momenta[comp_name].copy()
@@ -1177,6 +1211,8 @@ class PDEFromSpec(PDEBase):
 
         Raises
         ------
+        TypeError
+            If the Poisson RHS is not a ``ScalarField``.
         ValueError
             If the equation lacks a ``laplacian(field)`` term or the
             Poisson solver fails.
@@ -1236,9 +1272,9 @@ class PDEFromSpec(PDEBase):
         # Rearrange 0 = laplacian_coeff * nabla^2(phi) + S into the standard
         # Poisson form nabla^2(phi) = rhs, giving rhs = -S / laplacian_coeff.
         poisson_rhs = -rhs_source / laplacian_coeff
-        assert isinstance(poisson_rhs, ScalarField), (
-            f"Expected ScalarField for Poisson RHS, got {type(poisson_rhs).__name__}"
-        )
+        if not isinstance(poisson_rhs, ScalarField):
+            msg = f"Expected ScalarField for Poisson RHS, got {type(poisson_rhs).__name__}"
+            raise TypeError(msg)
 
         # Build boundary conditions for the Poisson solver
         solver_bc = self._build_constraint_bc(eq.constraint_solver, grid)
@@ -1265,7 +1301,7 @@ class PDEFromSpec(PDEBase):
         return state
 
     @override
-    def evolution_rate(  # noqa: C901
+    def evolution_rate(  # noqa: C901, PLR0912
         self,
         state: TState,
         t: float = 0.0,
@@ -1296,10 +1332,14 @@ class PDEFromSpec(PDEBase):
 
         Raises
         ------
+        TypeError
+            If ``state`` is not a ``FieldCollection``.
         ValueError
             If the state size or grid dimension does not match the spec.
         """
-        assert isinstance(state, FieldCollection)
+        if not isinstance(state, FieldCollection):
+            msg = f"Expected FieldCollection, got {type(state).__name__}"
+            raise TypeError(msg)
         expected_fields = self.spec.state_size
         if len(state) != expected_fields:
             msg = f"Expected {expected_fields} fields, got {len(state)}"
@@ -1353,7 +1393,9 @@ class PDEFromSpec(PDEBase):
                 # Second-order: d/dt field = momentum, d/dt momentum = RHS
                 momentum_slot = self._momentum_slot_map[eq.field_name]
                 momentum = state[momentum_slot]
-                assert isinstance(momentum, ScalarField)
+                if not isinstance(momentum, ScalarField):
+                    msg = f"Expected ScalarField for momentum, got {type(momentum).__name__}"
+                    raise TypeError(msg)
                 rates[field_slot] = momentum.copy()
                 rates[momentum_slot] = self._compute_rhs_for_component(
                     i, state, bc, t, virtual_momenta
