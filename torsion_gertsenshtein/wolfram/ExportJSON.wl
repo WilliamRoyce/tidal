@@ -505,20 +505,10 @@ BuildLHSStructure[fieldName_String, timeOrder_Integer] := <|
 
 (* Detect if a term contains time derivatives of at least order minOrder *)
 (* Time index is always the first slot in Derivative[dt, dx, ...] *)
-(* Supports: 1+1D (2-arg), 2+1D (3-arg), 3+1D (4-arg), and higher dimensions *)
-ContainsTimeDerivative[term_, minOrder_:2] := Module[{},
-  Which[
-    (* 3+1D: Derivative[n, m, p, q] - first slot n is time *)
-    !FreeQ[term, Derivative[n_, _, _, _][_][___] /; n >= minOrder], True,
-    (* 2+1D: Derivative[n, m, p] - first slot n is time *)
-    !FreeQ[term, Derivative[n_, _, _][_][___] /; n >= minOrder], True,
-    (* 1+1D: Derivative[n, m] - first slot n is time *)
-    !FreeQ[term, Derivative[n_, _][_][___] /; n >= minOrder], True,
-    (* Generic: any arity with first slot >= minOrder *)
-    !FreeQ[term, Derivative[n_, ___][_][___] /; n >= minOrder], True,
-    (* Default: no time derivative of required order *)
-    True, False
-  ]
+(* Dimension-agnostic: delegates to ExtractDerivativeProfile *)
+ContainsTimeDerivative[term_, minOrder_:2] := Module[{profile},
+  profile = ExtractDerivativeProfile[term];
+  Length[profile] >= 1 && First[profile] >= minOrder
 ];
 
 (* Field-aware time derivative check: only matches derivatives of the CURRENT field *)
@@ -641,31 +631,16 @@ FieldToMomentumName[fieldName_String] := Module[{parsed},
 (* spatial operators on the momentum field: d_t d_x phi = d_x(pi), *)
 (* d_t d_x d_y phi = d_x d_y(pi) = cross_derivative_xy(pi), etc. *)
 ExtractSpatialOperatorFromMixed[term_] := Module[
-  {allProfiles, orders, timeOrder, spatialOrders},
-
-  (* Extract all Derivative order lists from the term *)
-  allProfiles = Cases[term,
-    Derivative[o__][_][__] :> {o},
-    {0, Infinity}
-  ];
-  (* Also check unapplied Derivative[orders][f] *)
-  If[Length[allProfiles] == 0,
-    allProfiles = Cases[term,
-      Derivative[o__][_] :> {o},
-      {0, Infinity}
-    ]
-  ];
-  If[Length[allProfiles] == 0,
+  {profile, timeOrder, spatialOrders},
+  profile = ExtractDerivativeProfile[term];
+  If[Length[profile] == 0,
     Throw[StringJoin[
       "ExtractSpatialOperatorFromMixed: No Derivative pattern found in term '",
       ToString[term, InputForm], "'."
     ]]
   ];
-
-  orders = allProfiles[[1]];
-  timeOrder = First[orders];
-  spatialOrders = Rest[orders];
-
+  timeOrder = First[profile];
+  spatialOrders = Rest[profile];
   (* Validate time order is exactly 1 *)
   (* d_t phi = pi is well-defined, but d2_t phi is the LHS (acceleration) *)
   If[timeOrder != 1,
@@ -677,7 +652,6 @@ ExtractSpatialOperatorFromMixed[term_] := Module[
       "momentum spatial operators (d_t phi = pi)."
     ]]
   ];
-
   ClassifySpatialProfile[spatialOrders]
 ];
 
