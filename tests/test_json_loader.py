@@ -621,6 +621,44 @@ class TestOperatorRegistrySync:
         )
 
 
+class TestRegisterOperator:
+    """Tests for the custom operator registration API."""
+
+    def test_register_and_use_custom_operator(self) -> None:
+        """Registered operator is accepted by is_known_operator and usable in PDE."""
+        from pde import CartesianGrid, ScalarField
+
+        from torsion_gertsenshtein.symbolic.json_loader import (
+            _CUSTOM_OPERATORS,
+            is_known_operator,
+        )
+        from torsion_gertsenshtein.symbolic.pde_builder import (
+            _OPERATOR_REGISTRY,
+            register_operator,
+        )
+
+        name = "_test_custom_op"
+
+        def _handler(field: ScalarField, bc: object) -> ScalarField:
+            return field * 2.0  # type: ignore[return-value]
+
+        try:
+            register_operator(name, _handler, min_dim=1)
+            assert is_known_operator(name)
+            assert name in _OPERATOR_REGISTRY
+        finally:
+            # Clean up so other tests aren't affected
+            _OPERATOR_REGISTRY.pop(name, None)
+            _CUSTOM_OPERATORS.discard(name)
+
+    def test_register_shadow_builtin_raises(self) -> None:
+        """Registering an operator that shadows a built-in raises ValueError."""
+        from torsion_gertsenshtein.symbolic.pde_builder import register_operator
+
+        with pytest.raises(ValueError, match="shadows a built-in"):
+            register_operator("laplacian", lambda f, bc: f, min_dim=1)
+
+
 # === Phase 8D: Python Validation Tests ===
 
 
