@@ -433,6 +433,11 @@ class TestMultiAxisDerivatives:
         with pytest.raises(ValueError, match="Invalid multi-axis"):
             _parse_multi_axis_spec("2w")
 
+    def test_parse_multi_axis_spec_duplicate_axis_raises(self) -> None:
+        """Duplicate axis (e.g. '2x_1x_1y') raises ValueError."""
+        with pytest.raises(ValueError, match="Duplicate axis 'x'"):
+            _parse_multi_axis_spec("2x_1x_1y")
+
     def test_derivative_2x_1y_resolves_2d(self, grid_2d: CartesianGrid) -> None:
         """derivative_2x_1y resolves on a 2D grid (uniform field -> 0)."""
         field = ScalarField(grid_2d, data=1.0)
