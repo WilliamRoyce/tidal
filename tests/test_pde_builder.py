@@ -1113,7 +1113,8 @@ class TestParameterizedCoefficients:
         pde = PDEFromSpec(spec_with_symbolic)  # No parameters
         term = spec_with_symbolic.equations[0].rhs_terms[1]
 
-        resolved = pde._resolve_coefficient(term)
+        with pytest.warns(UserWarning, match="could not be resolved"):
+            resolved = pde._resolve_coefficient(term)
         # Should use the numeric coefficient from the term
         assert resolved == -1.0
 
@@ -1166,7 +1167,8 @@ class TestParameterizedCoefficients:
         pde = PDEFromSpec(spec, parameters={"m2": 1.0})  # Different param
         term = spec.equations[0].rhs_terms[0]
 
-        resolved = pde._resolve_coefficient(term)
+        with pytest.warns(UserWarning, match="could not be resolved"):
+            resolved = pde._resolve_coefficient(term)
         # Should fall back to numeric 1.5
         assert resolved == 1.5  # noqa: PLR2004
 

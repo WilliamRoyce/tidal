@@ -93,7 +93,7 @@ class TestEvolution3D:
         self, kg_3d_json_path: Path, grid_3d_small: CartesianGrid
     ) -> None:
         """Evolution rate has correct number of fields on 3D grid."""
-        pde = build_pde_from_json(kg_3d_json_path)
+        pde = build_pde_from_json(kg_3d_json_path, parameters={"m2": 1.0})
         state = create_initial_state(grid_3d_small, pde.spec)
 
         rates = pde.evolution_rate(state)
