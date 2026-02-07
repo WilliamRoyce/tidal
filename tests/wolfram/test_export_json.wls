@@ -548,6 +548,57 @@ TestTrue["IsFirstOrderTimeDerivative 3+1D",
   TorsionGertsenshtein`ExportJSON`IsFirstOrderTimeDerivative[
     Derivative[1, 0, 0, 0][testf][t, x, y, z]]];
 
+(* === Test Group: CountDerivativeOrder === *)
+Print[""];
+Print["Test Group: CountDerivativeOrder"];
+
+TestCase["CountDerivativeOrder: second spatial derivative",
+  2, TorsionGertsenshtein`ExportJSON`CountDerivativeOrder[
+    Derivative[0, 2][testf][t, x]]];
+
+TestCase["CountDerivativeOrder: mixed 3-arg sum of orders",
+  3, TorsionGertsenshtein`ExportJSON`CountDerivativeOrder[
+    Derivative[1, 1, 1][testf][t, x, y]]];
+
+TestCase["CountDerivativeOrder: no derivative returns 0",
+  0, TorsionGertsenshtein`ExportJSON`CountDerivativeOrder[
+    testf[t, x]]];
+
+(* === Test Group: BuildGenericOperatorName === *)
+Print[""];
+Print["Test Group: BuildGenericOperatorName"];
+
+TestCase["BuildGenericOperatorName: single-axis third order",
+  "derivative_3_x",
+  TorsionGertsenshtein`ExportJSON`BuildGenericOperatorName[{3, 0}]];
+
+TestCase["BuildGenericOperatorName: multi-axis mixed",
+  "derivative_2x_1y",
+  TorsionGertsenshtein`ExportJSON`BuildGenericOperatorName[{2, 1}]];
+
+(* === Test Group: ExtractSpatialDerivativeProfile === *)
+Print[""];
+Print["Test Group: ExtractSpatialDerivativeProfile"];
+
+TestCase["ExtractSpatialDerivativeProfile: strips time slot",
+  {2, 0},
+  TorsionGertsenshtein`ExportJSON`ExtractSpatialDerivativeProfile[
+    Derivative[1, 2, 0][testf][t, x, y]]];
+
+TestTrue["ExtractSpatialDerivativeProfile: throws on no derivative",
+  StringQ[Catch[
+    TorsionGertsenshtein`ExportJSON`ExtractSpatialDerivativeProfile[
+      testf[t, x]]]]];
+
+(* === Test Group: ExtractDerivativeProfile edge cases === *)
+Print[""];
+Print["Test Group: ExtractDerivativeProfile edge cases"];
+
+TestCase["ExtractDerivativeProfile: unapplied Derivative",
+  {1, 2},
+  TorsionGertsenshtein`ExportJSON`ExtractDerivativeProfile[
+    Derivative[1, 2][testf]]];
+
 (* === Exit === *)
 Print[""];
 ExitWithTestStatus[];
