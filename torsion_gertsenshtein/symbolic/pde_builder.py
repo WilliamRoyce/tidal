@@ -42,6 +42,18 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------------
+# Pre-compiled regex patterns for field name parsing (avoid re-compilation
+# on every call to ParsedFieldName.parse / parse_momentum_field_name)
+# ---------------------------------------------------------------------------
+_STANDARD_FORMAT_RE = re.compile(r"^([a-zA-Z]+)_([0-9]+)$")
+_TENSOR_FORMAT_RE = re.compile(r"^(.+)_([0-9]+)$")
+_COMPACT_FORMAT_RE = re.compile(r"^([a-zA-Z]+)([0-9]+)$")
+_SIMPLE_FORMAT_RE = re.compile(r"^[a-zA-Z]+$")
+_MOMENTUM_STANDARD_RE = re.compile(r"^pi_([0-9]+)$")
+_MOMENTUM_COMPACT_RE = re.compile(r"^pi([0-9]+)$")
+
+
+# ---------------------------------------------------------------------------
 # Operator registry: maps operator name -> (handler, min_grid_dimension)
 # Each handler takes (field: ScalarField, bc: BCDescriptor) -> ScalarField
 # ---------------------------------------------------------------------------
@@ -186,24 +198,24 @@ class ParsedFieldName:
             Parsed components with base, index, and format.
         """
         # Standard format: A_0, phi_1
-        match = re.match(r"^([a-zA-Z]+)_([0-9]+)$", name)
+        match = _STANDARD_FORMAT_RE.match(name)
         if match:
             return cls(
                 base=match.group(1), index=int(match.group(2)), format="standard"
             )
 
         # Tensor format: stress_xy_0, u_x_1 (greedy match for base)
-        match = re.match(r"^(.+)_([0-9]+)$", name)
+        match = _TENSOR_FORMAT_RE.match(name)
         if match:
             return cls(base=match.group(1), index=int(match.group(2)), format="tensor")
 
         # Compact format: phi0, A1
-        match = re.match(r"^([a-zA-Z]+)([0-9]+)$", name)
+        match = _COMPACT_FORMAT_RE.match(name)
         if match:
             return cls(base=match.group(1), index=int(match.group(2)), format="compact")
 
         # Simple format: phi, psi (no index, defaults to 0)
-        if re.match(r"^[a-zA-Z]+$", name):
+        if _SIMPLE_FORMAT_RE.match(name):
             return cls(base=name, index=0, format="simple")
 
         # Fallback
@@ -230,12 +242,12 @@ def parse_momentum_field_name(field_name: str) -> int | None:
         Index if valid momentum field name, None otherwise.
     """
     # Standard format: pi_N
-    match = re.match(r"^pi_([0-9]+)$", field_name)
+    match = _MOMENTUM_STANDARD_RE.match(field_name)
     if match:
         return int(match.group(1))
 
     # Compact format: piN
-    match = re.match(r"^pi([0-9]+)$", field_name)
+    match = _MOMENTUM_COMPACT_RE.match(field_name)
     if match:
         return int(match.group(1))
 
@@ -327,6 +339,40 @@ class PDEFromSpec(PDEBase):
             else:
                 self._momentum_slot_map[name] = slot_idx
 
+        # B1: Cache for _mathematica_to_python() results (same symbolic expr → same output)
+        self._expr_cache: dict[str, str] = {}
+
+        # B2: Pre-build the static part of the coefficient namespace (math functions,
+        # parameters). Only t and grid coordinates change per-call.
+        self._base_namespace: dict[str, Any] = self._build_base_namespace()
+
+        # B4: Pre-resolve constant coefficients (not position- or time-dependent).
+        # Only pre-resolve when the symbolic coefficient is absent or resolvable
+        # from the provided parameters — avoids emitting premature warnings for
+        # terms whose symbolic cannot be resolved (the warning fires at runtime).
+        self._preresolved: dict[tuple[int, int], float] = {}
+        for eq_idx, eq in enumerate(spec.equations):
+            for term_idx, term in enumerate(eq.rhs_terms):
+                if not term.time_dependent and not term.position_dependent and self._is_resolvable(term):
+                    self._preresolved[eq_idx, term_idx] = self._resolve_coefficient(term)
+
+        # B5: Cache boundary conditions and grid coordinates (populated on first call)
+        self._cached_bc: BCDescriptor | None = None
+        self._cached_grid_id: int | None = None
+
+    def _is_resolvable(self, term: OperatorTerm) -> bool:
+        """Check whether a term's coefficient can be resolved without warnings.
+
+        Returns True if the term has no symbolic coefficient, or if its symbolic
+        coefficient (possibly negated) matches a key in the parameters dict.
+        """
+        sym = term.coefficient_symbolic
+        if sym is None:
+            return True
+        if sym.startswith("-") and sym[1:] in self._parameters:
+            return True
+        return sym in self._parameters
+
     def _resolve_coefficient(self, term: OperatorTerm) -> float:
         """Resolve the effective coefficient for a term.
 
@@ -365,6 +411,46 @@ class PDEFromSpec(PDEBase):
 
         # Default: use numeric coefficient from JSON
         return term.coefficient
+
+    def _build_base_namespace(self) -> dict[str, Any]:
+        """Build the static part of the coefficient evaluation namespace.
+
+        Contains numpy/scipy math functions and user-provided parameters.
+        The time variable ``t`` and spatial grid coordinates are injected
+        per-call in ``_resolve_coefficient_at_point``.
+        """
+        ns: dict[str, Any] = dict(self._parameters)
+        ns["exp"] = np.exp
+        # Basic trig
+        ns["sin"] = np.sin
+        ns["cos"] = np.cos
+        ns["tan"] = np.tan
+        # Reciprocal trig (no direct numpy equivalents)
+        ns["cot"] = lambda x: np.cos(x) / np.sin(x)  # type: ignore[reportUnknownLambdaType]
+        ns["sec"] = lambda x: 1.0 / np.cos(x)  # type: ignore[reportUnknownLambdaType]
+        ns["csc"] = lambda x: 1.0 / np.sin(x)  # type: ignore[reportUnknownLambdaType]
+        # Inverse trig
+        ns["arcsin"] = np.arcsin
+        ns["arccos"] = np.arccos
+        ns["arctan"] = np.arctan
+        ns["arctan2"] = np.arctan2
+        # Hyperbolic
+        ns["sinh"] = np.sinh
+        ns["cosh"] = np.cosh
+        ns["tanh"] = np.tanh
+        # Inverse hyperbolic
+        ns["arcsinh"] = np.arcsinh
+        ns["arccosh"] = np.arccosh
+        ns["arctanh"] = np.arctanh
+        # Other
+        ns["log"] = np.log
+        ns["sqrt"] = np.sqrt
+        ns["abs"] = np.abs
+        # Special functions (scipy.special)
+        ns["erf"] = special.erf
+        ns["jv"] = special.jv  # BesselJ
+        ns["yv"] = special.yv  # BesselY
+        return ns
 
     @staticmethod
     def _convert_power_function(expr: str) -> str:
@@ -514,7 +600,7 @@ class PDEFromSpec(PDEBase):
 
         return result
 
-    def _resolve_coefficient_at_point(  # noqa: PLR0915
+    def _resolve_coefficient_at_point(
         self,
         term: OperatorTerm,
         t: float,
@@ -562,41 +648,15 @@ class PDEFromSpec(PDEBase):
             raise ValueError(msg)
 
         sym = term.coefficient_symbolic or ""
-        py_expr = self._mathematica_to_python(sym)
 
-        # Build evaluation namespace with numpy/scipy functions (work on scalars AND arrays)
-        namespace: dict[str, Any] = dict(self._parameters)
+        # B1: Use cached Mathematica→Python conversion
+        if sym not in self._expr_cache:
+            self._expr_cache[sym] = self._mathematica_to_python(sym)
+        py_expr = self._expr_cache[sym]
+
+        # B2: Clone pre-built base namespace and inject dynamic variables
+        namespace: dict[str, Any] = dict(self._base_namespace)
         namespace["t"] = t
-        namespace["exp"] = np.exp
-        # Basic trig
-        namespace["sin"] = np.sin
-        namespace["cos"] = np.cos
-        namespace["tan"] = np.tan
-        # Reciprocal trig (no direct numpy equivalents)
-        namespace["cot"] = lambda x: np.cos(x) / np.sin(x)  # type: ignore[reportUnknownLambdaType]
-        namespace["sec"] = lambda x: 1.0 / np.cos(x)  # type: ignore[reportUnknownLambdaType]
-        namespace["csc"] = lambda x: 1.0 / np.sin(x)  # type: ignore[reportUnknownLambdaType]
-        # Inverse trig
-        namespace["arcsin"] = np.arcsin
-        namespace["arccos"] = np.arccos
-        namespace["arctan"] = np.arctan
-        namespace["arctan2"] = np.arctan2
-        # Hyperbolic
-        namespace["sinh"] = np.sinh
-        namespace["cosh"] = np.cosh
-        namespace["tanh"] = np.tanh
-        # Inverse hyperbolic
-        namespace["arcsinh"] = np.arcsinh
-        namespace["arccosh"] = np.arccosh
-        namespace["arctanh"] = np.arctanh
-        # Other
-        namespace["log"] = np.log
-        namespace["sqrt"] = np.sqrt
-        namespace["abs"] = np.abs
-        # Special functions (scipy.special)
-        namespace["erf"] = special.erf
-        namespace["jv"] = special.jv  # BesselJ
-        namespace["yv"] = special.yv  # BesselY
 
         # Inject spatial coordinates from grid when position-dependent
         if term.position_dependent:
@@ -830,7 +890,7 @@ class PDEFromSpec(PDEBase):
         result = ScalarField(grid, data=0.0)
 
         # Sum all terms from the specification
-        for term in eq.rhs_terms:
+        for term_idx, term in enumerate(eq.rhs_terms):
             target_field_name = term.field
 
             # Handle first_derivative_t operator specially
@@ -866,8 +926,13 @@ class PDEFromSpec(PDEBase):
                 )
                 operated = self._get_operator(term.operator, target_field, bc)
 
-            # Resolve coefficient (supports time- and position-dependent)
-            coefficient = self._resolve_coefficient_at_point(term, t, grid)
+            # B4: Use pre-resolved coefficient for constant terms, otherwise resolve
+            preresolved = self._preresolved.get((component_idx, term_idx))
+            coefficient: float | NumericArray = (
+                preresolved
+                if preresolved is not None
+                else self._resolve_coefficient_at_point(term, t, grid)
+            )
 
             # Add coefficient * operated to result
             if isinstance(coefficient, np.ndarray):
@@ -1057,7 +1122,7 @@ class PDEFromSpec(PDEBase):
         return state
 
     @override
-    def evolution_rate(
+    def evolution_rate(  # noqa: C901
         self,
         state: TState,
         t: float = 0.0,
@@ -1109,8 +1174,13 @@ class PDEFromSpec(PDEBase):
             )
             raise ValueError(msg)
 
-        bc = infer_bc_from_grid(state.grid)
+        # B5: Cache boundary conditions (same grid always produces same BCs)
         grid = state.grid
+        grid_id = id(grid)
+        if self._cached_bc is None or self._cached_grid_id != grid_id:
+            self._cached_bc = infer_bc_from_grid(grid)
+            self._cached_grid_id = grid_id
+        bc = self._cached_bc
 
         # Pass 1: Compute virtual momenta for non-second-order components.
         # First-order components: their RHS becomes the "virtual momentum"

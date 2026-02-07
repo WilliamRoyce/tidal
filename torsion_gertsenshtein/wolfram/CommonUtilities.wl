@@ -432,7 +432,7 @@ ExpandChristoffelsToMetricDerivatives[eom_, covd_, chart_] := Module[
 (* === Coordinate Symbol Extraction === *)
 (* Gets coordinate scalars from chart, with fallback for unevaluated cases *)
 
-GetCoordinateSymbols[chart_] := Module[{coordSyms},
+GetCoordinateSymbols[chart_] := GetCoordinateSymbols[chart] = Module[{coordSyms},
   coordSyms = ScalarsOfChart[chart];
   (* If ScalarsOfChart returns unevaluated, fail with clear error - no silent fallback *)
   If[Head[coordSyms] === ScalarsOfChart,
@@ -460,7 +460,7 @@ ValidateDimension[dim_Integer] := Module[{},
 (* Returns the number of coordinates (spacetime dimension) from the chart *)
 (* This is the single source of truth for dimension throughout the pipeline *)
 
-GetChartDimension[chart_] := Module[{coords, dim},
+GetChartDimension[chart_] := GetChartDimension[chart] = Module[{coords, dim},
   coords = ScalarsOfChart[chart];
   (* If ScalarsOfChart returns unevaluated, fail with clear error - no silent fallback to 2 *)
   If[Head[coords] === ScalarsOfChart,
@@ -483,7 +483,7 @@ GetChartDimension[chart_] := Module[{coords, dim},
 (* Generates CD→Derivative rules dynamically for any dimension up to $MaxSupportedDimension *)
 (* This eliminates the 80+ hardcoded rules and enables easy extension to higher dimensions *)
 
-GenerateCDRules[dim_Integer, chart_] := Module[
+GenerateCDRules[dim_Integer, chart_] := GenerateCDRules[dim, chart] = Module[
   {rules, isCDlike},
 
   (* Validate dimension *)

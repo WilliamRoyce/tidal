@@ -1,20 +1,21 @@
 cff-version: 1.2.0
 message: "If you use this software, please cite it as below."
 title: "Torsion-Gertsenshtein Lagrangian-to-PDE Pipeline"
-abstract: "A symbolic physics pipeline for deriving PDEs from Lagrangians using xAct/Mathematica
+abstract:
+  "A symbolic physics pipeline for deriving PDEs from Lagrangians using xAct/Mathematica
   and simulating them with py-pde."
 authors:
-- family-names: "Royce"
-  given-names: "W"
+  - family-names: "Royce"
+    given-names: "William"
 version: 0.2.6
-date-released: '2026-02-07'
+date-released: "2026-02-07"
 license: MIT
 repository-code: "https://github.com/WilliamRoyce/torsion-gertsenshtein"
 keywords:
-- "symbolic computation"
-- "tensor calculus"
-- "field theory"
-- "partial differential equations"
-- "xAct"
-- "electromagnetic-gravitational conversion"
-- "Gertsenshtein effect"
+  - "symbolic computation"
+  - "tensor calculus"
+  - "field theory"
+  - "partial differential equations"
+  - "xAct"
+  - "electromagnetic-gravitational conversion"
+  - "Gertsenshtein effect"

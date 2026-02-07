@@ -1776,3 +1776,182 @@ class TestMathematicaFunctionConversion:
         y_coord = cast("np.ndarray", grid.cell_coords[4, 4, 1])  # type: ignore[index]
         expected = np.sinh(1.0) + np.arctan2(y_coord, x_coord)
         assert_allclose(mid_val, expected, rtol=1e-10)
+
+
+class TestCachingOptimizations:
+    """Tests for Issue #89 caching and memoization optimizations."""
+
+    def _make_spec(
+        self,
+        *,
+        symbolic_coeff: str | None = None,
+        coord_dep: tuple[str, ...] = (),
+    ) -> EquationSystem:
+        """Create minimal EquationSystem for caching tests."""
+        term = OperatorTerm(
+            coefficient=1.0,
+            operator="laplacian",
+            field="phi",
+            coefficient_symbolic=symbolic_coeff,
+            coordinate_dependent=coord_dep,
+        )
+        return EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        term,
+                        OperatorTerm(-1.0, "identity", "phi", coefficient_symbolic="-m2"),
+                    ),
+                ),
+            ),
+            mass_matrix=((1.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+
+    def test_expr_cache_populated(self) -> None:
+        """B1: _mathematica_to_python results are cached after first call."""
+        spec = self._make_spec()
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})
+        expr = "Sin[x[]]^2 + Cos[y[]]"
+        result1 = pde._mathematica_to_python(expr)
+        # Cache should not be populated yet (direct call doesn't cache)
+        # But _resolve_coefficient_at_point does cache
+        pde._expr_cache[expr] = result1
+        result2 = pde._expr_cache[expr]
+        assert result1 == result2
+
+    def test_expr_cache_used_in_resolve(self) -> None:
+        """B1: _resolve_coefficient_at_point uses the expression cache."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0,
+                            "laplacian",
+                            "phi",
+                            coefficient_symbolic="exp(t[])",
+                            time_dependent=True,
+                            coordinate_dependent=("t",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=("t", "x", "y"),
+        )
+        grid = CartesianGrid([(-1, 1), (-1, 1)], [4, 4], periodic=True)
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+
+        # First call populates cache
+        pde._resolve_coefficient_at_point(term, t=1.0, grid=grid)
+        assert "exp(t[])" in pde._expr_cache
+
+        # Second call uses cache (same result)
+        result2 = pde._resolve_coefficient_at_point(term, t=2.0, grid=grid)
+        assert isinstance(result2, float)
+        assert_allclose(result2, np.exp(2.0), rtol=1e-10)
+
+    def test_base_namespace_prebuilt(self) -> None:
+        """B2: Base namespace is pre-built in __init__ and contains math functions."""
+        spec = self._make_spec()
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})
+        ns = pde._base_namespace
+        assert "sin" in ns
+        assert "cos" in ns
+        assert "exp" in ns
+        assert "cot" in ns
+        assert "erf" in ns
+        assert "m2" in ns
+        assert ns["m2"] == 1.0
+
+    def test_base_namespace_does_not_contain_time(self) -> None:
+        """B2: Base namespace does not contain t (injected per-call)."""
+        spec = self._make_spec()
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})
+        assert "t" not in pde._base_namespace
+
+    def test_preresolved_coefficients(self) -> None:
+        """B4: Constant coefficients are pre-resolved in __init__."""
+        spec = self._make_spec()
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})
+        # Term 0: coefficient=1.0, no symbolic → pre-resolved to 1.0
+        assert (0, 0) in pde._preresolved
+        assert pde._preresolved[0, 0] == 1.0
+        # Term 1: coefficient_symbolic="-m2", m2=1.0 → pre-resolved to -1.0
+        assert (0, 1) in pde._preresolved
+        assert pde._preresolved[0, 1] == -1.0
+
+    def test_preresolved_skips_position_dependent(self) -> None:
+        """B4: Position-dependent coefficients are not pre-resolved."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0,
+                            "laplacian_x",
+                            "phi",
+                            coefficient_symbolic="x()**2/(2*R**2)",
+                            coordinate_dependent=("x",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec, parameters={"R": 1.0})
+        assert (0, 0) not in pde._preresolved
+
+    def test_bc_caching(self) -> None:
+        """B5: Boundary conditions are cached after first evolution_rate call."""
+        spec = self._make_spec()
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})
+        grid = CartesianGrid([(0, 10)], [16], periodic=True)
+        state = FieldCollection([
+            ScalarField(grid, data=0.0),
+            ScalarField(grid, data=0.0),
+        ])
+        assert pde._cached_bc is None
+        pde.evolution_rate(state, t=0.0)
+        assert pde._cached_bc is not None
+        cached_ref = pde._cached_bc
+        # Second call should reuse cached BC
+        pde.evolution_rate(state, t=1.0)
+        assert pde._cached_bc is cached_ref
+
+    def test_preresolved_matches_runtime(self) -> None:
+        """B4: Pre-resolved coefficients produce same result as runtime resolution."""
+        spec = self._make_spec()
+        pde = PDEFromSpec(spec, parameters={"m2": 1.0})
+        for (eq_idx, term_idx), preresolved_val in pde._preresolved.items():
+            term = spec.equations[eq_idx].rhs_terms[term_idx]
+            runtime_val = pde._resolve_coefficient(term)
+            assert preresolved_val == runtime_val

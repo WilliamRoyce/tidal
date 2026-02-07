@@ -93,9 +93,8 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
   computeChristoffels = OptionValue["ComputeChristoffels"];
   metricMatrix = OptionValue["MetricMatrix"];
 
-  (* Get the dimension dynamically from the chart *)
-  (* ScalarsOfChart returns the coordinate symbols, e.g., {t[], x[]} or {t[], x[], y[]} *)
-  dim = Length[ScalarsOfChart[chart]];
+  (* Get the dimension dynamically from the chart via memoized wrapper *)
+  dim = GetChartDimension[chart];
 
   (* Determine field rank using SlotsOfTensor *)
   (* Extract field head from applied form like phi[] or A[-a] *)

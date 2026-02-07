@@ -216,6 +216,37 @@ thrown3 = Catch[
 TestTrue["ExtractNumericCoefficient throws on symbolic coefficient",
   StringQ[thrown3] && StringContainsQ[thrown3, "ExtractNumericCoefficient"]];
 
+(* === Test 10: Memoization Consistency (Issue #89) === *)
+Print[""];
+Print["Test 10: Memoization Consistency"];
+
+(* GetChartDimension: repeated calls return identical results *)
+memoD1 = TorsionGertsenshtein`CommonUtilities`GetChartDimension[cuTestCart2];
+memoD2 = TorsionGertsenshtein`CommonUtilities`GetChartDimension[cuTestCart2];
+TestCase["GetChartDimension memoization consistent (2D)", memoD1, memoD2];
+
+memoD3 = TorsionGertsenshtein`CommonUtilities`GetChartDimension[cuTestCart3];
+memoD4 = TorsionGertsenshtein`CommonUtilities`GetChartDimension[cuTestCart3];
+TestCase["GetChartDimension memoization consistent (3D)", memoD3, memoD4];
+
+(* GetCoordinateSymbols: repeated calls return identical results *)
+memoC1 = TorsionGertsenshtein`CommonUtilities`GetCoordinateSymbols[cuTestCart2];
+memoC2 = TorsionGertsenshtein`CommonUtilities`GetCoordinateSymbols[cuTestCart2];
+TestCase["GetCoordinateSymbols memoization consistent (2D)", memoC1, memoC2];
+
+memoC3 = TorsionGertsenshtein`CommonUtilities`GetCoordinateSymbols[cuTestCart3];
+memoC4 = TorsionGertsenshtein`CommonUtilities`GetCoordinateSymbols[cuTestCart3];
+TestCase["GetCoordinateSymbols memoization consistent (3D)", memoC3, memoC4];
+
+(* GenerateCDRules: repeated calls return identical results *)
+memoR1 = TorsionGertsenshtein`CommonUtilities`GenerateCDRules[2, cuTestCart2];
+memoR2 = TorsionGertsenshtein`CommonUtilities`GenerateCDRules[2, cuTestCart2];
+TestCase["GenerateCDRules memoization consistent (2D)", memoR1, memoR2];
+
+memoR3 = TorsionGertsenshtein`CommonUtilities`GenerateCDRules[3, cuTestCart3];
+memoR4 = TorsionGertsenshtein`CommonUtilities`GenerateCDRules[3, cuTestCart3];
+TestCase["GenerateCDRules memoization consistent (3D)", memoR3, memoR4];
+
 (* === Exit === *)
 Print[""];
 ExitWithTestStatus[];
