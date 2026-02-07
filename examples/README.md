@@ -158,7 +158,7 @@ Both examples demonstrate that **different Lagrangians produce different field e
 
 ### 3. Curvilinear Coordinate Examples (Polar, Spherical, Cylindrical)
 
-These examples demonstrate that the pipeline handles non-Cartesian coordinate systems purely through the metric definition. Coordinate names remain generic (`x`, `y`, `z`) while the metric encodes the geometry. All Christoffel corrections are computed automatically by xAct.
+These examples demonstrate that the pipeline handles non-Cartesian coordinate systems purely through the metric definition. Coordinate names remain generic (`x`, `y`, `z`) while the metric encodes the geometry. Christoffel corrections are auto-detected from metric type: constant metrics have Γ=0, non-constant metrics (position/time-dependent) trigger explicit Christoffel computation via the standard formula.
 
 #### Polar Coordinates (2+1D)
 
