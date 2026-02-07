@@ -198,9 +198,7 @@ class TestIsKnownOperator:
 class TestNthDerivativeOperator:
     """Tests for _op_nth_derivative factory function."""
 
-    def test_first_derivative_matches_gradient(
-        self, grid_1d: CartesianGrid
-    ) -> None:
+    def test_first_derivative_matches_gradient(self, grid_1d: CartesianGrid) -> None:
         """_op_nth_derivative(0, 1) should match gradient_x."""
         x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
         k = 2 * np.pi / 10
@@ -215,9 +213,7 @@ class TestNthDerivativeOperator:
 
         assert_allclose(result_nth.data, result_grad.data, atol=1e-10)
 
-    def test_second_derivative_analytical(
-        self, grid_1d: CartesianGrid
-    ) -> None:
+    def test_second_derivative_analytical(self, grid_1d: CartesianGrid) -> None:
         """_op_nth_derivative(0, 2) on sin(kx) gives -k^2 sin(kx)."""
         x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
         k = 2 * np.pi / 10
@@ -443,9 +439,7 @@ class TestMultiAxisDerivatives:
         result = PDEFromSpec._get_operator("derivative_2x_1y", field, "periodic")
         assert_allclose(result.data, 0.0, atol=1e-10)
 
-    def test_derivative_2x_1y_requires_2d(
-        self, grid_1d_coarse: CartesianGrid
-    ) -> None:
+    def test_derivative_2x_1y_requires_2d(self, grid_1d_coarse: CartesianGrid) -> None:
         """derivative_2x_1y on a 1D grid raises ValueError."""
         field = ScalarField(grid_1d_coarse, data=1.0)
         with pytest.raises(ValueError, match="requires at least 2D"):
@@ -458,9 +452,8 @@ class TestMultiAxisDerivatives:
         = d^2/dx^2 [sin(kx*x)*ky*cos(ky*y)]
         = -kx^2 * ky * sin(kx*x) * cos(ky*y)
         """
-        coords = grid_2d.cell_coords
-        x = cast("np.ndarray", coords[..., 0])
-        y = cast("np.ndarray", coords[..., 1])
+        x = cast("np.ndarray", grid_2d.cell_coords[..., 0])
+        y = cast("np.ndarray", grid_2d.cell_coords[..., 1])
         kx = 2 * np.pi / 10
         ky = 2 * np.pi / 10
 

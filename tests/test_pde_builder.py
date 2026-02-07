@@ -2156,12 +2156,12 @@ class TestEvalValidation:
             pde._resolve_coefficient_at_point(term, t=0.0)
 
     def test_python_complex_raises(self) -> None:
-        """Python expression producing complex number raises ValueError."""
+        """Python expression producing complex number raises TypeError."""
         # (-1)**0.5 in Python → complex (6.12e-17+1j)
         spec = self._make_time_dep_spec("(-1)^(0.5)")
         pde = PDEFromSpec(spec)
         term = spec.equations[0].rhs_terms[0]
-        with pytest.raises(ValueError, match="complex"):
+        with pytest.raises(TypeError, match="complex"):
             pde._resolve_coefficient_at_point(term, t=0.0)
 
     def test_valid_time_dependent_passes(self) -> None:
@@ -2210,7 +2210,7 @@ class TestEvalValidation:
 
     def test_validate_eval_result_complex(self) -> None:
         """_validate_eval_result rejects complex number."""
-        with pytest.raises(ValueError, match="complex"):
+        with pytest.raises(TypeError, match="complex"):
             PDEFromSpec._validate_eval_result(1 + 2j, "test", "sqrt(-1)")
 
     def test_validate_eval_result_array_valid(self) -> None:
