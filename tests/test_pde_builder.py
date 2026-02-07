@@ -2061,3 +2061,161 @@ class TestCachingOptimizations:
 
         # Both paths should produce identical results
         np.testing.assert_array_equal(val_from_grid, val_from_arrays)
+
+
+class TestEvalValidation:
+    """Tests for post-eval validation of coefficient expressions (Issue #68)."""
+
+    @staticmethod
+    def _make_time_dep_spec(symbolic: str) -> EquationSystem:
+        """Create a minimal spec with a time-dependent symbolic coefficient."""
+        return EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0,
+                            "laplacian",
+                            "phi",
+                            coefficient_symbolic=symbolic,
+                            time_dependent=True,
+                            coordinate_dependent=("t",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+
+    @staticmethod
+    def _make_position_dep_spec(symbolic: str) -> EquationSystem:
+        """Create a minimal spec with a position-dependent symbolic coefficient."""
+        return EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0,
+                            "laplacian",
+                            "phi",
+                            coefficient_symbolic=symbolic,
+                            coordinate_dependent=("x",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            coordinates=("t", "x"),
+            metadata={},
+        )
+
+    def test_overflow_to_inf_raises(self) -> None:
+        """exp(huge) overflows to Inf and raises ValueError."""
+        # np.exp(1000) → inf (numpy doesn't raise, just returns inf)
+        spec = self._make_time_dep_spec("E^(1000*t())")
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+        with pytest.raises(ValueError, match="Inf"):
+            pde._resolve_coefficient_at_point(term, t=1.0)
+
+    def test_sqrt_negative_gives_nan_raises(self) -> None:
+        """Sqrt[-1] via numpy gives NaN (not complex) and raises ValueError."""
+        # np.sqrt(-1) returns nan (not complex) with a RuntimeWarning
+        spec = self._make_time_dep_spec("Sqrt[-1]")
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+        with pytest.raises(ValueError, match="NaN"):
+            pde._resolve_coefficient_at_point(term, t=0.0)
+
+    def test_python_complex_raises(self) -> None:
+        """Python expression producing complex number raises ValueError."""
+        # (-1)**0.5 in Python → complex (6.12e-17+1j)
+        spec = self._make_time_dep_spec("(-1)^(0.5)")
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+        with pytest.raises(ValueError, match="complex"):
+            pde._resolve_coefficient_at_point(term, t=0.0)
+
+    def test_valid_time_dependent_passes(self) -> None:
+        """Normal time-dependent expression passes validation."""
+        spec = self._make_time_dep_spec("E^(2*H*t())")
+        pde = PDEFromSpec(spec, parameters={"H": 0.1})
+        term = spec.equations[0].rhs_terms[0]
+        result = pde._resolve_coefficient_at_point(term, t=1.0)
+        assert isinstance(result, float)
+        assert_allclose(result, np.exp(0.2), rtol=1e-10)
+
+    def test_inf_in_position_dependent_raises(self) -> None:
+        """Position-dependent coefficient producing Inf raises ValueError."""
+        # exp(1000*x) at x=10 → exp(10000) → inf
+        spec = self._make_position_dep_spec("E^(1000*x[])")
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+        grid = CartesianGrid([(0, 10)], [16], periodic=True)
+        with pytest.raises(ValueError, match="Inf"):
+            pde._resolve_coefficient_at_point(term, t=0.0, grid=grid)
+
+    def test_nan_in_position_dependent_raises(self) -> None:
+        """Position-dependent sqrt of negative values produces NaN and raises."""
+        # Sqrt[x - 100] at x in [0,10] → all negative → NaN via numpy
+        spec = self._make_position_dep_spec("Sqrt[x[] - 100]")
+        pde = PDEFromSpec(spec)
+        term = spec.equations[0].rhs_terms[0]
+        grid = CartesianGrid([(0, 10)], [16], periodic=True)
+        with pytest.raises(ValueError, match="NaN"):
+            pde._resolve_coefficient_at_point(term, t=0.0, grid=grid)
+
+    def test_validate_eval_result_scalar_valid(self) -> None:
+        """_validate_eval_result passes through valid float."""
+        result = PDEFromSpec._validate_eval_result(3.14, "test", "3.14")
+        assert result == 3.14  # noqa: PLR2004
+
+    def test_validate_eval_result_scalar_nan(self) -> None:
+        """_validate_eval_result rejects NaN scalar."""
+        with pytest.raises(ValueError, match="NaN"):
+            PDEFromSpec._validate_eval_result(float("nan"), "test", "0/0")
+
+    def test_validate_eval_result_scalar_inf(self) -> None:
+        """_validate_eval_result rejects Inf scalar."""
+        with pytest.raises(ValueError, match="Inf"):
+            PDEFromSpec._validate_eval_result(float("inf"), "test", "1/0")
+
+    def test_validate_eval_result_complex(self) -> None:
+        """_validate_eval_result rejects complex number."""
+        with pytest.raises(ValueError, match="complex"):
+            PDEFromSpec._validate_eval_result(1 + 2j, "test", "sqrt(-1)")
+
+    def test_validate_eval_result_array_valid(self) -> None:
+        """_validate_eval_result passes through valid ndarray."""
+        arr = np.array([1.0, 2.0, 3.0])
+        result = PDEFromSpec._validate_eval_result(arr, "test", "x")
+        np.testing.assert_array_equal(result, arr)
+
+    def test_validate_eval_result_array_nan(self) -> None:
+        """_validate_eval_result rejects array containing NaN."""
+        arr = np.array([1.0, float("nan"), 3.0])
+        with pytest.raises(ValueError, match="NaN"):
+            PDEFromSpec._validate_eval_result(arr, "test", "x/x")
+
+    def test_validate_eval_result_array_inf(self) -> None:
+        """_validate_eval_result rejects array containing Inf."""
+        arr = np.array([1.0, float("inf"), 3.0])
+        with pytest.raises(ValueError, match="Inf"):
+            PDEFromSpec._validate_eval_result(arr, "test", "1/x")

@@ -9,6 +9,7 @@ comes from the specification that was derived from the Lagrangian.
 
 from __future__ import annotations
 
+import math
 import re
 import warnings
 from dataclasses import dataclass
@@ -689,15 +690,60 @@ class PDEFromSpec(PDEBase):
 
         try:
             result = eval(py_expr, {"__builtins__": {}}, namespace)  # noqa: S307
-            if isinstance(result, np.ndarray):
-                return np.asarray(result, dtype=np.float64)
-            return float(result)
         except Exception as e:
             msg = (
                 f"Cannot evaluate coordinate-dependent coefficient '{sym}' "
                 f"(Python form: '{py_expr}') at t={t}: {e}"
             )
             raise ValueError(msg) from e
+        return self._validate_eval_result(result, sym, py_expr)
+
+    @staticmethod
+    def _validate_eval_result(
+        result: object, sym: str, py_expr: str
+    ) -> float | NumericArray:
+        """Validate and coerce an eval() result to float or ndarray.
+
+        Raises ValueError for complex, NaN, or Inf results with clear
+        diagnostic messages pointing to the source expression.
+        """
+        if isinstance(result, complex):
+            msg = (
+                f"Coefficient '{sym}' evaluated to complex number {result} "
+                f"(from '{py_expr}'). Only real-valued coefficients are supported."
+            )
+            raise ValueError(msg)
+
+        if isinstance(result, np.ndarray):
+            arr = np.asarray(result, dtype=np.float64)
+            if np.any(np.isnan(arr)):
+                msg = (
+                    f"Coefficient '{sym}' produced NaN values "
+                    f"(from '{py_expr}'). Check for 0/0 or invalid operations."
+                )
+                raise ValueError(msg)
+            if np.any(np.isinf(arr)):
+                msg = (
+                    f"Coefficient '{sym}' produced Inf values "
+                    f"(from '{py_expr}'). Check for division by zero."
+                )
+                raise ValueError(msg)
+            return arr
+
+        scalar = float(result)
+        if math.isnan(scalar):
+            msg = (
+                f"Coefficient '{sym}' evaluated to NaN "
+                f"(from '{py_expr}'). Check for 0/0 or invalid operations."
+            )
+            raise ValueError(msg)
+        if math.isinf(scalar):
+            msg = (
+                f"Coefficient '{sym}' evaluated to Inf "
+                f"(from '{py_expr}'). Check for division by zero."
+            )
+            raise ValueError(msg)
+        return scalar
 
     @staticmethod
     def _get_operator(
