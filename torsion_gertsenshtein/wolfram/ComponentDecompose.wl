@@ -55,8 +55,14 @@ This is the unified pipeline used by all ranks.";
 ReplaceTensorFieldComponents::usage =
   "ReplaceTensorFieldComponents[expr, fieldHead, chart, coordSyms, dim] replaces \
 basis-indexed tensor field components with named scalar functions. Works for any \
-rank: scalar (rank 0), vector (rank 1), rank-2 tensors. Extensible to higher ranks \
-by adding replacement patterns for the desired rank.";
+rank: scalar (rank 0), vector (rank 1), rank-2 tensors (with symmetry), and \
+rank 3+ tensors (all components, symmetry reduction not yet implemented).";
+
+ReplaceHigherRankFieldComponents::usage =
+  "ReplaceHigherRankFieldComponents[expr, fieldHead, chart, coordSyms, dim] replaces \
+basis-indexed rank-3+ tensor components with flat sequential scalar functions. \
+Generates replacement rules for all 2^rank index sign configurations per component \
+tuple. Example: rank-3 T in dim=2 produces T0..T7 (8 components).";
 
 EnumerateComponentTuples::usage =
   "EnumerateComponentTuples[fieldHead, dim] returns a list of independent component \
@@ -371,14 +377,14 @@ ReplaceTensorFieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module[
     rank === 2,
       result = ReplaceRank2FieldComponents[result, fh, chart, coordSyms, dim],
 
+    rank >= 3,
+      result = ReplaceHigherRankFieldComponents[result, fh, chart, coordSyms, dim],
+
     True,
-      (* Clear extension point for higher ranks *)
+      (* Should not reach here - all ranks >= 0 are handled *)
       Throw[StringJoin[
-        "ReplaceTensorFieldComponents: Rank-", ToString[rank],
-        " field replacement is not yet implemented for field '", ToString[fh], "'. ",
-        "To add support: extend this function with component enumeration and ",
-        "replacement rules for rank-", ToString[rank], " tensors, following the ",
-        "pattern of ReplaceRank2FieldComponents."
+        "ReplaceTensorFieldComponents: Unexpected rank ", ToString[rank],
+        " for field '", ToString[fh], "'."
       ]]
   ];
 
@@ -420,6 +426,37 @@ ReplaceRank2FieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module[
         ]
       ],
       {k, 1, Length[pairs]}
+    ]
+  ];
+
+  result
+];
+
+(* Helper: Replace rank-N (N>=3) field basis indices with flat sequential scalar functions *)
+(* Follows the same pattern as ReplaceRank2FieldComponents but for arbitrary rank *)
+(* For rank-3 non-symmetric T in dim=2: T[{0,-ch},{0,-ch},{0,-ch}] -> T0[t,x], etc. *)
+ReplaceHigherRankFieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module[
+  {result = expr, rank, tuples},
+
+  rank = Length[SlotsOfTensor[fh]];
+  tuples = EnumerateComponentTuples[fh, dim];
+
+  With[{ch = chart, cs = coordSyms},
+    Do[
+      Module[{tuple = tuples[[k]], seqIdx = k - 1, sym, indexConfigs},
+        sym = Symbol[ToString[fh] <> ToString[seqIdx]];
+
+        (* Generate all 2^rank index sign configurations (chart/-chart per slot) *)
+        indexConfigs = Tuples[{ch, -ch}, rank];
+        Do[
+          Module[{pattern},
+            pattern = Table[{tuple[[n]], config[[n]]}, {n, rank}];
+            result = result /. {fh @@ pattern :> sym[Sequence @@ cs]}
+          ],
+          {config, indexConfigs}
+        ]
+      ],
+      {k, 1, Length[tuples]}
     ]
   ];
 

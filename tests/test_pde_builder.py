@@ -1987,8 +1987,9 @@ class TestCachingOptimizations:
                     ),
                 ),
             ),
-            mass_matrix=((0.0,),),
+            mass_matrix=((1.0,),),
             coupling_matrix=((0.0,),),
+            mass_matrix_symbolic=(("exp(2*H*t)",),),
             metadata={},
         )
         pde = PDEFromSpec(spec, parameters={"H": 0.5})
