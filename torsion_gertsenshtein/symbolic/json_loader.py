@@ -318,7 +318,13 @@ class ComponentEquation:
     )
 
     def __post_init__(self) -> None:
-        """Validate constraint_solver is only enabled for time_order=0."""
+        """Validate constraint_solver is only enabled for time_order=0.
+
+        Raises
+        ------
+        ValueError
+            If constraint_solver.enabled is True but time_derivative_order is not 0.
+        """
         if self.constraint_solver.enabled and self.time_derivative_order != 0:
             msg = (
                 f"constraint_solver.enabled=true is only valid for time_order=0 "
@@ -417,6 +423,8 @@ class EquationSystem:
     coupling_matrix: tuple[tuple[float, ...], ...]
     metadata: dict[str, Any]
     coordinates: tuple[str, ...] = ()
+    mass_matrix_symbolic: tuple[tuple[str | None, ...], ...] = ()
+    coupling_matrix_symbolic: tuple[tuple[str | None, ...], ...] = ()
 
     def __post_init__(self) -> None:
         """Validate the equation system.
@@ -459,6 +467,23 @@ class EquationSystem:
 
         # Validate field references in equation terms
         self._validate_field_references()
+
+        # Verify mass/coupling matrix consistency with identity operator terms.
+        # Warns (does not error) if manually constructed EquationSystem has
+        # matrices that don't match the convention: matrix[i][j] = -(identity coeff).
+        expected_mass, expected_coupling, _, _ = self._compute_matrices_from_terms(
+            self.equations, self.component_names
+        )
+        if self.mass_matrix != expected_mass or self.coupling_matrix != expected_coupling:
+            import warnings
+
+            warnings.warn(
+                "mass_matrix/coupling_matrix inconsistent with identity operator terms. "
+                f"Expected mass={expected_mass}, coupling={expected_coupling}; "
+                f"got mass={self.mass_matrix}, coupling={self.coupling_matrix}. "
+                "Use EquationSystem.from_dict() for auto-computation.",
+                stacklevel=2,
+            )
 
     def _validate_field_references(self) -> None:
         """Validate that all field references in equation terms are valid.
@@ -514,6 +539,75 @@ class EquationSystem:
                         f"Valid fields: {sorted(valid_fields)}."
                     )
                     raise ValueError(msg)
+
+    @staticmethod
+    def _compute_matrices_from_terms(
+        equations: tuple[ComponentEquation, ...],
+        component_names: tuple[str, ...],
+    ) -> tuple[
+        tuple[tuple[float, ...], ...],
+        tuple[tuple[float, ...], ...],
+        tuple[tuple[str | None, ...], ...],
+        tuple[tuple[str | None, ...], ...],
+    ]:
+        """Extract mass and coupling matrices from identity operator terms.
+
+        Scans each equation's RHS terms for ``identity`` operators acting on
+        known field names (not momentum references like ``pi_N``).
+
+        Convention: ``matrix[i][j] = -(coefficient)`` where ``coefficient``
+        is the numeric coefficient of the ``identity(field_j)`` term in
+        equation *i*.  This makes mass² positive for the standard Lagrangian
+        sign convention ``∂²_t φ = … - m² φ``.
+
+        When a term has ``coefficient_symbolic``, it is stored as the
+        authoritative representation of that matrix entry. The symbolic
+        expression is preserved as-is from the term (not evaluated) so that
+        it can be resolved at runtime with actual parameter values.
+
+        Returns
+        -------
+        tuple
+            ``(mass_matrix, coupling_matrix, mass_symbolic, coupling_symbolic)``
+            Numeric matrices as nested float tuples; symbolic matrices as
+            nested ``str | None`` tuples (empty tuple if no symbolic entries).
+        """
+        n = len(component_names)
+        mass: list[list[float]] = [[0.0] * n for _ in range(n)]
+        coupling: list[list[float]] = [[0.0] * n for _ in range(n)]
+        mass_sym: list[list[str | None]] = [[None] * n for _ in range(n)]
+        coupling_sym: list[list[str | None]] = [[None] * n for _ in range(n)]
+        name_to_idx = {name: i for i, name in enumerate(component_names)}
+        has_symbolic = False
+
+        for i, eq in enumerate(equations):
+            for term in eq.rhs_terms:
+                if term.operator == "identity" and term.field in name_to_idx:
+                    j = name_to_idx[term.field]
+                    neg_coeff = -term.coefficient
+                    if i == j:
+                        mass[i][j] += neg_coeff
+                        if term.coefficient_symbolic is not None:
+                            mass_sym[i][j] = term.coefficient_symbolic
+                            has_symbolic = True
+                    else:
+                        coupling[i][j] += neg_coeff
+                        if term.coefficient_symbolic is not None:
+                            coupling_sym[i][j] = term.coefficient_symbolic
+                            has_symbolic = True
+
+        mass_sym_t: tuple[tuple[str | None, ...], ...] = ()
+        coupling_sym_t: tuple[tuple[str | None, ...], ...] = ()
+        if has_symbolic:
+            mass_sym_t = tuple(tuple(row) for row in mass_sym)
+            coupling_sym_t = tuple(tuple(row) for row in coupling_sym)
+
+        return (
+            tuple(tuple(row) for row in mass),
+            tuple(tuple(row) for row in coupling),
+            mass_sym_t,
+            coupling_sym_t,
+        )
 
     @property
     def time_orders(self) -> tuple[int, ...]:
@@ -594,27 +688,18 @@ class EquationSystem:
             for eq_data in data["equations"]
         )
 
-        # Parse coupling matrices
-        # Note: Using list comprehension to avoid Python mutable aliasing bug
-        # where [[0.0] * n] * n creates shared row references
-        coupling_data = data.get("coupling", {})
-
-        def _default_zero_matrix(n: int) -> list[list[float]]:
-            """Create a proper zero matrix without shared row references."""
-            return [[0.0 for _ in range(n)] for _ in range(n)]
-
-        mass_matrix = tuple(
-            tuple(float(x) for x in row)
-            for row in coupling_data.get(
-                "mass_matrix", _default_zero_matrix(n_components)
-            )
-        )
-        coupling_matrix = tuple(
-            tuple(float(x) for x in row)
-            for row in coupling_data.get(
-                "coupling_matrix", _default_zero_matrix(n_components)
-            )
-        )
+        # Auto-compute mass/coupling matrices from identity operator terms.
+        # This is the authoritative source — JSON values are ignored in favour
+        # of values derived from the equation terms themselves.
+        # Symbolic expressions are extracted from per-term coefficient_symbolic
+        # and preserved unevaluated — they are only resolved at runtime when
+        # actual parameter values are supplied to the PDE solver.
+        (
+            mass_matrix,
+            coupling_matrix,
+            mass_matrix_symbolic,
+            coupling_matrix_symbolic,
+        ) = cls._compute_matrices_from_terms(equations, component_names)
 
         # Extract metadata
         metadata = dict(data.get("metadata", {}))
@@ -632,6 +717,8 @@ class EquationSystem:
             coupling_matrix=coupling_matrix,
             metadata=metadata,
             coordinates=coordinates,
+            mass_matrix_symbolic=mass_matrix_symbolic,
+            coupling_matrix_symbolic=coupling_matrix_symbolic,
         )
 
 

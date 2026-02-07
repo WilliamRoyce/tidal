@@ -152,6 +152,14 @@ Association for constraint equations (timeOrder=0) when metadata contains \
 solver is not requested. Boundary conditions come from metadata key \
 \"constraint_boundary_conditions\".";
 
+ExtractMassCouplingFromEquations::usage =
+  "ExtractMassCouplingFromEquations[equations, allFieldNames] scans the already-built \
+equation JSON Associations for identity operator terms and builds mass_matrix and \
+coupling_matrix. Returns an Association with keys \"mass_matrix\", \"coupling_matrix\", \
+and optionally \"mass_matrix_symbolic\" and \"coupling_matrix_symbolic\" when any \
+symbolic coefficients are present. Convention: matrix[i][j] = -(coefficient of \
+identity(field_j) in equation_i).";
+
 
 (* Refactored helper functions (Phase 3, Issue 10) *)
 ExtractFunctionHeads::usage =
@@ -191,10 +199,61 @@ BuildJSONStructure[componentEqs_, metadata_Association] := Module[
   BuildMultiFieldJSONStructure[fieldEquations, metadata]
 ];
 
+(* === Auto-compute mass/coupling matrices from equation terms === *)
+(* Scans the already-built equation Associations for identity operator terms *)
+(* and extracts mass_matrix (diagonal: own-field mass) and coupling_matrix *)
+(* (off-diagonal: cross-field coupling). *)
+(* Convention: matrix[i][j] = -(coefficient of identity(field_j) in equation_i) *)
+(* This ensures mass^2 is positive for standard Lagrangians where RHS has -m^2*phi. *)
+
+ExtractMassCouplingFromEquations[equations_List, allFieldNames_List] := Module[
+  {nFields, mass, coupling, massSymbolic, couplingSymbolic,
+   terms, fieldRef, j, coeff, symb, hasSymbolicMass, hasSymbolicCoupling},
+
+  nFields = Length[allFieldNames];
+  mass = ConstantArray[0.0, {nFields, nFields}];
+  coupling = ConstantArray[0.0, {nFields, nFields}];
+  massSymbolic = ConstantArray[Null, {nFields, nFields}];
+  couplingSymbolic = ConstantArray[Null, {nFields, nFields}];
+
+  Do[
+    terms = equations[[i]]["rhs"]["terms"];
+    Do[
+      If[term["operator"] === "identity",
+        fieldRef = term["field"];
+        j = FirstPosition[allFieldNames, fieldRef, Missing["NotFound"]];
+        If[!MissingQ[j],
+          j = j[[1]];
+          coeff = -N[term["coefficient"]];
+          symb = Lookup[term, "coefficient_symbolic", Null];
+          If[i === j,
+            mass[[i, j]] += coeff;
+            If[symb =!= Null, massSymbolic[[i, j]] = symb],
+            coupling[[i, j]] += coeff;
+            If[symb =!= Null, couplingSymbolic[[i, j]] = symb]
+          ]
+        ]
+      ],
+      {term, terms}
+    ],
+    {i, nFields}
+  ];
+
+  hasSymbolicMass = AnyTrue[Flatten[massSymbolic], # =!= Null &];
+  hasSymbolicCoupling = AnyTrue[Flatten[couplingSymbolic], # =!= Null &];
+
+  <|
+    "mass_matrix" -> mass,
+    "coupling_matrix" -> coupling,
+    "mass_matrix_symbolic" -> If[hasSymbolicMass, massSymbolic, Null],
+    "coupling_matrix_symbolic" -> If[hasSymbolicCoupling, couplingSymbolic, Null]
+  |>
+];
+
 (* === Multi-Field JSON Structure Building === *)
 
 BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Module[
-  {json, fields, equations, allFieldNames, nFields},
+  {json, fields, equations, allFieldNames, nFields, autoMatrices, couplingSection},
 
   (* fieldEquations format: {{"phi_0", eqPhi}, {"chi_0", eqChi}, ...} *)
   allFieldNames = fieldEquations[[All, 1]];
@@ -223,6 +282,30 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
     {i, nFields}
   ];
 
+  (* Auto-compute mass/coupling matrices from equation identity terms *)
+  autoMatrices = ExtractMassCouplingFromEquations[equations, allFieldNames];
+
+  (* Warn if user metadata provides matrices — they will be ignored *)
+  If[KeyExistsQ[metadata, "mass_matrix"],
+    Print["WARNING: Ignoring user-provided mass_matrix in metadata. ",
+          "Using auto-computed values from equation identity terms."]
+  ];
+  If[KeyExistsQ[metadata, "coupling_matrix"],
+    Print["WARNING: Ignoring user-provided coupling_matrix in metadata. ",
+          "Using auto-computed values from equation identity terms."]
+  ];
+
+  couplingSection = <|
+    "mass_matrix" -> autoMatrices["mass_matrix"],
+    "coupling_matrix" -> autoMatrices["coupling_matrix"]
+  |>;
+  If[autoMatrices["mass_matrix_symbolic"] =!= Null,
+    couplingSection["mass_matrix_symbolic"] = autoMatrices["mass_matrix_symbolic"]
+  ];
+  If[autoMatrices["coupling_matrix_symbolic"] =!= Null,
+    couplingSection["coupling_matrix_symbolic"] = autoMatrices["coupling_matrix_symbolic"]
+  ];
+
   (* Build full JSON structure *)
   json = <|
     "metadata" -> <|
@@ -239,12 +322,7 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
     |>,
     "fields" -> fields,
     "equations" -> equations,
-    "coupling" -> <|
-      "mass_matrix" -> Lookup[metadata, "mass_matrix",
-        ConstantArray[0.0, {nFields, nFields}]],
-      "coupling_matrix" -> Lookup[metadata, "coupling_matrix",
-        ConstantArray[0.0, {nFields, nFields}]]
-    |>
+    "coupling" -> couplingSection
   |>;
 
   json

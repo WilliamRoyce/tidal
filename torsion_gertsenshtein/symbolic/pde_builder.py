@@ -431,7 +431,8 @@ class PDEFromSpec(PDEBase):
         Handles common Mathematica syntax:
         - ``E^(...)`` to ``exp(...)`` (Euler's number)
         - ``Power[x,y]`` to ``(x)**(y)`` (function form of exponentiation)
-        - ``Sin[x]`` to ``sin(x)``, ``Cos[x]`` to ``cos(x)``, etc.
+        - ``Sin[x]`` to ``sin(x)``, ``Cos[x]`` to ``cos(x)``, ``Tan[x]`` to ``tan(x)``
+        - ``Cot[x]`` to ``cot(x)``, ``Sec[x]`` to ``sec(x)``, ``Csc[x]`` to ``csc(x)``
         - ``ArcSin[x]`` to ``arcsin(x)``, ``ArcCos[x]`` to ``arccos(x)``, etc.
         - ``ArcTan[x, y]`` to ``arctan2(y, x)`` (note argument order swap!)
         - ``Sinh[x]`` to ``sinh(x)``, ``Cosh[x]`` to ``cosh(x)``, etc.
@@ -470,6 +471,10 @@ class PDEFromSpec(PDEBase):
             ("Sin", "sin"),
             ("Cos", "cos"),
             ("Tan", "tan"),
+            # Reciprocal trig
+            ("Cot", "cot"),
+            ("Sec", "sec"),
+            ("Csc", "csc"),
             # Inverse trig (1-arg)
             ("ArcSin", "arcsin"),
             ("ArcCos", "arccos"),
@@ -565,6 +570,10 @@ class PDEFromSpec(PDEBase):
         namespace["sin"] = np.sin
         namespace["cos"] = np.cos
         namespace["tan"] = np.tan
+        # Reciprocal trig (no direct numpy equivalents)
+        namespace["cot"] = lambda x: np.cos(x) / np.sin(x)
+        namespace["sec"] = lambda x: 1.0 / np.cos(x)
+        namespace["csc"] = lambda x: 1.0 / np.sin(x)
         # Inverse trig
         namespace["arcsin"] = np.arcsin
         namespace["arccos"] = np.arccos
