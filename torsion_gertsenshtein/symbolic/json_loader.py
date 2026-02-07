@@ -16,6 +16,13 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+#: Canonical spatial axis letters, ordered by dimension index.
+#: Supports up to 6 spatial dimensions (sufficient for all foreseeable physics).
+AXIS_LETTERS: tuple[str, ...] = ("x", "y", "z", "w", "v", "u")
+
+#: Character class matching all known axis letters (for regex construction).
+_AXIS_RE_CLASS = "[" + "".join(AXIS_LETTERS) + "]"
+
 #: Set of static operators supported by the pipeline.
 #: Validated at JSON load time to catch typos early.
 _STATIC_OPERATORS: frozenset[str] = frozenset(
@@ -37,24 +44,34 @@ _STATIC_OPERATORS: frozenset[str] = frozenset(
 )
 
 #: Pattern for generic single-axis Nth-order derivatives: derivative_3_x, derivative_5_y, etc.
-_GENERIC_SINGLE_AXIS_RE = re.compile(r"^derivative_(\d+)_([xyz])$")
+_GENERIC_SINGLE_AXIS_RE = re.compile(
+    r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$"
+)
 
 #: Pattern for generic multi-axis derivatives: derivative_2x_1y, derivative_3x_2z, etc.
-_GENERIC_MULTI_AXIS_RE = re.compile(r"^derivative_(\d+[xyz](?:_\d+[xyz])*)$")
+_GENERIC_MULTI_AXIS_RE = re.compile(
+    r"^derivative_(\d+" + _AXIS_RE_CLASS + r"(?:_\d+" + _AXIS_RE_CLASS + r")*)$"
+)
 
 # Backward-compatible alias
 KNOWN_OPERATORS: frozenset[str] = _STATIC_OPERATORS
+
+#: Mutable set of user-registered custom operators.
+#: Populated via ``register_operator()`` in pde_builder.py.
+_CUSTOM_OPERATORS: set[str] = set()
 
 
 def is_known_operator(name: str) -> bool:
     """Check whether an operator name is recognized.
 
-    Accepts both static operators (identity, laplacian, gradient_x, ...)
+    Accepts static operators (identity, laplacian, gradient_x, ...),
+    user-registered custom operators (via ``register_operator``),
     and dynamic patterns for generic Nth-order derivatives
     (derivative_3_x, derivative_5_y, derivative_2x_1y, ...).
     """
     return (
         name in _STATIC_OPERATORS
+        or name in _CUSTOM_OPERATORS
         or bool(_GENERIC_SINGLE_AXIS_RE.match(name))
         or bool(_GENERIC_MULTI_AXIS_RE.match(name))
     )
