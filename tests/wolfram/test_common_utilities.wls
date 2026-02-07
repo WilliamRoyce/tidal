@@ -62,7 +62,8 @@ Print["Test 2: ValidateDimension"];
 
 TestTrue["ValidateDimension[2] is True", TorsionGertsenshtein`CommonUtilities`ValidateDimension[2]];
 TestTrue["ValidateDimension[4] is True", TorsionGertsenshtein`CommonUtilities`ValidateDimension[4]];
-TestTrue["ValidateDimension[5] is False", !TorsionGertsenshtein`CommonUtilities`ValidateDimension[5]];
+TestTrue["ValidateDimension[7] is True", TorsionGertsenshtein`CommonUtilities`ValidateDimension[7]];
+TestTrue["ValidateDimension[8] is False", !TorsionGertsenshtein`CommonUtilities`ValidateDimension[8]];
 
 (* === Test 3: LeviCivitaValue === *)
 Print[""];

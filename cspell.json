@@ -90,6 +90,7 @@
     "Proca",
     "pycache",
     "Pylance",
+    "Ramond",
     "rcfonts",
     "Recompiles",
     "remsf",
@@ -167,7 +168,11 @@
     "trange",
     "tqdm"
   ],
-  "flagWords": ["hte", "teh", "wolfrom"],
+  "flagWords": [
+    "hte",
+    "teh",
+    "wolfrom"
+  ],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [
