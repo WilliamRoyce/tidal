@@ -95,10 +95,19 @@ IdentifyGradientDirection::usage =
 for pure spatial gradients. Defaults to \"gradient_x\" if detection fails.";
 
 (* Spatial derivative classification *)
-ExtractSpatialGradientFromMixed::usage =
-  "ExtractSpatialGradientFromMixed[term] extracts the spatial gradient direction \
-from a mixed time-space derivative term. Returns \"gradient_x\", \"gradient_y\", or \
-\"gradient_z\". Warns if term has multiple spatial derivatives (e.g., d_t d_x d_y).";
+ClassifySpatialProfile::usage =
+  "ClassifySpatialProfile[spatialOrders] maps a spatial derivative order list to a \
+canonical operator name. {1,0} -> \"gradient_x\", {2,0} -> \"laplacian_x\", \
+{0,2} -> \"laplacian_y\", {1,1} -> \"cross_derivative_xy\", \
+{3,0} -> \"derivative_3_x\", {2,1} -> \"derivative_2x_1y\". \
+Delegates to BuildGenericOperatorName for non-canonical cases.";
+
+ExtractSpatialOperatorFromMixed::usage =
+  "ExtractSpatialOperatorFromMixed[term] classifies the spatial operator in a \
+mixed time-space derivative term. Strips the time order (must be exactly 1) and \
+classifies the spatial part using ClassifySpatialProfile. Returns canonical operator \
+names like \"gradient_x\", \"laplacian_x\", \"cross_derivative_xy\", etc. \
+Throws if time order is not 1.";
 
 IsSpatialCrossDerivative::usage =
   "IsSpatialCrossDerivative[term] returns True if term contains a spatial cross-derivative \
@@ -664,53 +673,50 @@ FieldToMomentumName[fieldName_String] := Module[{parsed},
   "pi_" <> ToString[parsed["index"]]
 ];
 
-(* Extract spatial gradient direction from mixed time-space derivative *)
-(* Derivative[1, 1, 0] (d_t d_x) -> "gradient_x" *)
-(* Derivative[1, 0, 1] (d_t d_y) -> "gradient_y" *)
-(* Derivative[1, 0, 0, 1] (d_t d_z) -> "gradient_z" *)
-(* These represent d_x(pi) or d_y(pi) or d_z(pi) since d_t phi = pi *)
-(*
-   WARNING: Mixed time + cross-spatial derivatives like d_t d_x d_y or d_t d_x d_z
-   cannot be simply represented as gradient(pi). They require cross_derivative(pi).
-   For now, we default to gradient_x with a warning.
-*)
-ExtractSpatialGradientFromMixed[term_] := Module[{},
-  (* Check for problematic mixed time + multiple spatial derivatives *)
-  If[!FreeQ[term, Derivative[n_, m_, p_, q_][_][___] /; n > 0 && Count[{m, p, q}, _?(# > 0 &)] > 1],
-    Print["Warning: Mixed time + cross-spatial derivative in 3+1D detected. ",
-          "Cannot exactly represent as momentum gradient. Using gradient_x(pi)."];
+(* Classify spatial operator in a mixed time-space derivative *)
+(* Strips the time order (must be exactly 1) and classifies the spatial part *)
+(* using ClassifySpatialProfile. Since d_t phi = pi, mixed derivatives become *)
+(* spatial operators on the momentum field: d_t d_x phi = d_x(pi), *)
+(* d_t d_x d_y phi = d_x d_y(pi) = cross_derivative_xy(pi), etc. *)
+ExtractSpatialOperatorFromMixed[term_] := Module[
+  {allProfiles, orders, timeOrder, spatialOrders},
+
+  (* Extract all Derivative order lists from the term *)
+  allProfiles = Cases[term,
+    Derivative[o__][_][__] :> {o},
+    {0, Infinity}
   ];
-  If[!FreeQ[term, Derivative[n_, m_, p_][_][___] /; n > 0 && m > 0 && p > 0],
-    Print["Warning: Mixed time + cross-spatial derivative detected (e.g., d_t d_x d_y). ",
-          "This term cannot be exactly represented as a simple momentum gradient. ",
-          "Approximating as gradient_x(pi). Consider gauge-fixing to eliminate such terms."];
+  (* Also check unapplied Derivative[orders][f] *)
+  If[Length[allProfiles] == 0,
+    allProfiles = Cases[term,
+      Derivative[o__][_] :> {o},
+      {0, Infinity}
+    ]
+  ];
+  If[Length[allProfiles] == 0,
+    Throw[StringJoin[
+      "ExtractSpatialOperatorFromMixed: No Derivative pattern found in term '",
+      ToString[term, InputForm], "'."
+    ]]
   ];
 
-  Which[
-    (* 3+1D: z-only gradient (fourth slot > 0, second and third = 0, with time) *)
-    !FreeQ[term, Derivative[n_, 0, 0, m_][_][___] /; n > 0 && m > 0], "gradient_z",
-    (* 3+1D: y-only gradient (third slot > 0, second and fourth = 0, with time) *)
-    !FreeQ[term, Derivative[n_, 0, m_, 0][_][___] /; n > 0 && m > 0], "gradient_y",
-    (* 3+1D: x-only gradient (second slot > 0, third and fourth = 0, with time) *)
-    !FreeQ[term, Derivative[n_, m_, 0, 0][_][___] /; n > 0 && m > 0], "gradient_x",
-    (* 2+1D: Check y-only gradient first (third slot > 0, second slot = 0, with time) *)
-    !FreeQ[term, Derivative[n_, 0, m_][_][___] /; n > 0 && m > 0], "gradient_y",
-    (* 2+1D: x-only gradient (second slot > 0, third slot = 0, with time) *)
-    !FreeQ[term, Derivative[n_, m_, 0][_][___] /; n > 0 && m > 0], "gradient_x",
-    (* 2+1D: Both x and y present - default to gradient_x (warning above) *)
-    !FreeQ[term, Derivative[n_, m_, p_][_][___] /; n > 0 && m > 0 && p > 0], "gradient_x",
-    (* Fallback for other 2+1D/3+1D patterns - second slot nonzero *)
-    !FreeQ[term, Derivative[n_, m_, _][_][___] /; n > 0 && m > 0], "gradient_x",
-    (* 1+1D: Only x exists (second slot > 0 with first slot > 0) *)
-    !FreeQ[term, Derivative[n_, m_][_][___] /; n > 0 && m > 0], "gradient_x",
-    (* Fail explicitly if spatial gradient direction cannot be determined *)
-    True,
-      Throw[StringJoin[
-        "ExtractSpatialGradientFromMixed: Cannot extract spatial gradient from mixed derivative '",
-        ToString[term], "'. ",
-        "Expected pattern Derivative[time>0, spatial...] with at least one nonzero spatial slot."
-      ]]
-  ]
+  orders = allProfiles[[1]];
+  timeOrder = First[orders];
+  spatialOrders = Rest[orders];
+
+  (* Validate time order is exactly 1 *)
+  (* d_t phi = pi is well-defined, but d2_t phi is the LHS (acceleration) *)
+  If[timeOrder != 1,
+    Throw[StringJoin[
+      "ExtractSpatialOperatorFromMixed: Time derivative order is ",
+      ToString[timeOrder], " (expected 1) in term '",
+      ToString[term, InputForm], "'. ",
+      "Only first-order time mixed derivatives can be converted to ",
+      "momentum spatial operators (d_t phi = pi)."
+    ]]
+  ];
+
+  ClassifySpatialProfile[spatialOrders]
 ];
 
 (* Check if term contains a spatial cross-derivative (d_x d_y, d_x d_z, d_y d_z) *)
@@ -991,6 +997,42 @@ BuildGenericOperatorName[spatialOrders_List] := Module[
   ]
 ];
 
+(* Map spatial derivative order list to canonical operator name *)
+(* Uses canonical names for common cases (gradient, laplacian, cross_derivative) *)
+(* and delegates to BuildGenericOperatorName for higher-order/mixed cases *)
+ClassifySpatialProfile[spatialOrders_List] := Module[
+  {totalOrder, nonzeroPositions, axisNames = {"x", "y", "z"}},
+
+  totalOrder = Total[spatialOrders];
+  nonzeroPositions = Flatten[Position[spatialOrders, _?(# > 0 &)]];
+
+  If[totalOrder == 0,
+    Throw["ClassifySpatialProfile: All spatial orders are zero. " <>
+          "No spatial derivative to classify."]
+  ];
+
+  Which[
+    (* Single axis with order 1 -> gradient *)
+    Length[nonzeroPositions] == 1 && spatialOrders[[nonzeroPositions[[1]]]] == 1,
+      "gradient_" <> axisNames[[nonzeroPositions[[1]]]],
+
+    (* Single axis with order 2 -> directional laplacian *)
+    Length[nonzeroPositions] == 1 && spatialOrders[[nonzeroPositions[[1]]]] == 2,
+      "laplacian_" <> axisNames[[nonzeroPositions[[1]]]],
+
+    (* Two axes, each with order 1 -> cross_derivative *)
+    Length[nonzeroPositions] == 2 &&
+      spatialOrders[[nonzeroPositions[[1]]]] == 1 &&
+      spatialOrders[[nonzeroPositions[[2]]]] == 1,
+      "cross_derivative_" <> axisNames[[nonzeroPositions[[1]]]] <>
+                             axisNames[[nonzeroPositions[[2]]]],
+
+    (* General case -> delegate to BuildGenericOperatorName *)
+    True,
+      BuildGenericOperatorName[spatialOrders]
+  ]
+];
+
 (* Classify operator type based on derivative structure *)
 (* Returns {operatorName, shouldConvertToMomentum} *)
 ClassifyOperatorType[term_] := Module[
@@ -1011,7 +1053,7 @@ ClassifyOperatorType[term_] := Module[
   (* Check for mixed time-space derivatives *)
   (* Mixed derivatives like d_t d_x A become gradient_x(pi) since d_t A = pi *)
   If[IsMixedTimeSpaceDerivative[term],
-    Return[{ExtractSpatialGradientFromMixed[term], True}]
+    Return[{ExtractSpatialOperatorFromMixed[term], True}]
   ];
 
   (* Check derivative order for pure spatial derivatives *)

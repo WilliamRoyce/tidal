@@ -140,14 +140,78 @@ def _op_nth_derivative(
     return _handler
 
 
+def _parse_multi_axis_spec(spec: str) -> list[tuple[int, int]]:
+    """Parse a multi-axis derivative spec into (axis_index, order) pairs.
+
+    Parameters
+    ----------
+    spec : str
+        Multi-axis spec like ``"2x_1y"``, ``"3x_2z"``, ``"1x_1y_1z"``.
+
+    Returns
+    -------
+    list[tuple[int, int]]
+        List of (axis_index, order) pairs, sorted by axis index.
+
+    Raises
+    ------
+    ValueError
+        If the spec cannot be parsed or contains invalid axis names.
+    """
+    parts = spec.split("_")
+    result: list[tuple[int, int]] = []
+    for part in parts:
+        match = re.match(r"^(\d+)([xyz])$", part)
+        if not match:
+            msg = (
+                f"Invalid multi-axis derivative part: '{part}'. "
+                f"Expected format like '2x', '1y', '3z'."
+            )
+            raise ValueError(msg)
+        order = int(match.group(1))
+        axis_letter = match.group(2)
+        axis = {"x": 0, "y": 1, "z": 2}[axis_letter]
+        result.append((axis, order))
+    return sorted(result, key=lambda x: x[0])
+
+
+def _op_multi_axis_derivative(
+    axes_and_orders: list[tuple[int, int]],
+) -> Callable[[ScalarField, BCDescriptor], ScalarField]:
+    """Create a handler for multi-axis mixed spatial derivatives.
+
+    Applies gradients sequentially for each (axis, order) pair.
+    E.g., for ``derivative_2x_1y``: applies gradient in y once, then
+    gradient in x twice, giving d^2/dx^2 d/dy.
+    """
+
+    def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:
+        result: ScalarField = field
+        for axis, order in axes_and_orders:
+            for _ in range(order):
+                grad = result.gradient(bc=bc)
+                component = grad[axis]
+                assert isinstance(component, ScalarField)
+                result = component
+        return result
+
+    return _handler
+
+
 #: Map axis letter to axis index.
 _AXIS_INDEX: dict[str, int] = {"x": 0, "y": 1, "z": 2}
 
 #: Minimum grid dimension required for each axis.
 _AXIS_MIN_DIM: dict[str, int] = {"x": 1, "y": 2, "z": 3}
 
+#: Map axis index back to letter (for dimension lookup).
+_AXIS_LETTER: dict[int, str] = {0: "x", 1: "y", 2: "z"}
+
 #: Regex for parsing generic single-axis derivative names.
 _GENERIC_SINGLE_RE = re.compile(r"^derivative_(\d+)_([xyz])$")
+
+#: Regex for parsing generic multi-axis derivative names.
+_GENERIC_MULTI_RE = re.compile(r"^derivative_(\d+[xyz](?:_\d+[xyz])*)$")
 
 
 #: Registry mapping operator names to (handler, min_dimension) pairs.
@@ -784,12 +848,20 @@ class PDEFromSpec(PDEBase):
                 min_dim = _AXIS_MIN_DIM[axis_letter]
                 entry = (_op_nth_derivative(axis, order), min_dim)
             else:
-                msg = (
-                    f"Unknown operator: '{operator_name}'. "
-                    f"Known operators: {sorted(_OPERATOR_REGISTRY.keys())}. "
-                    f"Dynamic patterns: derivative_N_x (N=integer, x/y/z=axis)."
-                )
-                raise ValueError(msg)
+                # Try multi-axis pattern: derivative_2x_1y, derivative_1x_1y_1z
+                m_multi = _GENERIC_MULTI_RE.match(operator_name)
+                if m_multi:
+                    axes_and_orders = _parse_multi_axis_spec(m_multi.group(1))
+                    max_axis = max(axis for axis, _ in axes_and_orders)
+                    min_dim = _AXIS_MIN_DIM[_AXIS_LETTER[max_axis]]
+                    entry = (_op_multi_axis_derivative(axes_and_orders), min_dim)
+                else:
+                    msg = (
+                        f"Unknown operator: '{operator_name}'. "
+                        f"Known operators: {sorted(_OPERATOR_REGISTRY.keys())}. "
+                        f"Dynamic patterns: derivative_N_x, derivative_Nx_My."
+                    )
+                    raise ValueError(msg)
 
         handler, min_dim = entry
         if field.grid.dim < min_dim:
