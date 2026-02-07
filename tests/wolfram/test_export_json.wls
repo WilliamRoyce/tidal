@@ -490,6 +490,64 @@ TestCase["ClassifyOperatorType d_t d2_x -> laplacian_x",
   "laplacian_x", opMixedLapX];
 TestTrue["ClassifyOperatorType d_t d2_x sets momentum flag", isMixedLapX];
 
+(* === Test Group: ExtractDerivativeProfile === *)
+Print[""];
+Print["Test Group: ExtractDerivativeProfile"];
+
+(* 1+1D *)
+edp1 = TorsionGertsenshtein`ExportJSON`ExtractDerivativeProfile[
+  Derivative[2, 0][phi0][t, x]];
+TestCase["ExtractDerivativeProfile 1+1D d2_t", {2, 0}, edp1];
+
+(* 2+1D *)
+edp2 = TorsionGertsenshtein`ExportJSON`ExtractDerivativeProfile[
+  Derivative[0, 1, 1][phi0][t, x, y]];
+TestCase["ExtractDerivativeProfile 2+1D d_x d_y", {0, 1, 1}, edp2];
+
+(* 3+1D *)
+edp3 = TorsionGertsenshtein`ExportJSON`ExtractDerivativeProfile[
+  Derivative[1, 0, 0, 1][testf][t, x, y, z]];
+TestCase["ExtractDerivativeProfile 3+1D d_t d_z", {1, 0, 0, 1}, edp3];
+
+(* No derivative -> {} *)
+edp4 = TorsionGertsenshtein`ExportJSON`ExtractDerivativeProfile[
+  phi0[t, x]];
+TestCase["ExtractDerivativeProfile no derivative returns {}", {}, edp4];
+
+(* With coefficient *)
+edp5 = TorsionGertsenshtein`ExportJSON`ExtractDerivativeProfile[
+  3.0 * Derivative[1, 2][phi0][t, x]];
+TestCase["ExtractDerivativeProfile with coefficient", {1, 2}, edp5];
+
+(* === Test Group: 3+1D wrapper coverage === *)
+Print[""];
+Print["Test Group: 3+1D wrapper coverage"];
+
+(* 3+1D gradient_z *)
+gradZ3D = TorsionGertsenshtein`ExportJSON`IdentifyGradientDirection[
+  Derivative[0, 0, 0, 1][testf][t, x, y, z]];
+TestCase["IdentifyGradientDirection 3+1D d_z", "gradient_z", gradZ3D];
+
+(* 3+1D laplacian_z *)
+lapZ3D = TorsionGertsenshtein`ExportJSON`IdentifyDirectionalLaplacian[
+  Derivative[0, 0, 0, 2][testf][t, x, y, z]];
+TestCase["IdentifyDirectionalLaplacian 3+1D d2_z", "laplacian_z", lapZ3D];
+
+(* 3+1D cross_derivative_xz *)
+crossXZ3D = TorsionGertsenshtein`ExportJSON`IdentifySpatialCrossDerivative[
+  Derivative[0, 1, 0, 1][testf][t, x, y, z]];
+TestCase["IdentifySpatialCrossDerivative 3+1D d_x d_z", "cross_derivative_xz", crossXZ3D];
+
+(* 3+1D IsMixedTimeSpaceDerivative *)
+TestTrue["IsMixedTimeSpaceDerivative 3+1D d_t d_x",
+  TorsionGertsenshtein`ExportJSON`IsMixedTimeSpaceDerivative[
+    Derivative[1, 1, 0, 0][testf][t, x, y, z]]];
+
+(* 3+1D IsFirstOrderTimeDerivative *)
+TestTrue["IsFirstOrderTimeDerivative 3+1D",
+  TorsionGertsenshtein`ExportJSON`IsFirstOrderTimeDerivative[
+    Derivative[1, 0, 0, 0][testf][t, x, y, z]]];
+
 (* === Exit === *)
 Print[""];
 ExitWithTestStatus[];
