@@ -36,6 +36,8 @@ from torsion_gertsenshtein.utils import normalize_solve_result
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
+    from torsion_gertsenshtein.symbolic.pde_builder import PDEFromSpec
+
     NumericArray = NDArray[np.float64]
 
 OUTPUT_FILENAME = "polar_kg_output.png"
@@ -109,7 +111,7 @@ def _load_spec(json_path: Path) -> None:
     print()
 
 
-def _build_pde(json_path: Path) -> object:
+def _build_pde(json_path: Path) -> PDEFromSpec:
     print("Step 2: Building PDE from specification...")
     pde = build_pde_from_json(json_path, parameters={"polm2": MASS_SQUARED})
     print(f"  PDE class: {type(pde).__name__}")
@@ -156,7 +158,7 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
 
 
 def _run_simulation(
-    pde: object, grid: CartesianGrid, state: FieldCollection
+    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection
 ) -> SimulationResult:
     print("Step 5: Running simulation...")
 

@@ -251,7 +251,7 @@ class ConstraintSolverConfig:
     enabled: bool = False
     method: str = "poisson"
     boundary_conditions: dict[str, BoundaryCondition] = dataclass_field(
-        default_factory=dict
+        default_factory=lambda: {}  # noqa: PIE807  # type: dict[str, BoundaryCondition]
     )
 
     @classmethod

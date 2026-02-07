@@ -16,7 +16,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 from pde import FieldCollection, PDEBase, ScalarField
-from scipy import special
+from scipy import special  # type: ignore[reportMissingTypeStubs]
 from typing_extensions import override
 
 from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
@@ -573,9 +573,9 @@ class PDEFromSpec(PDEBase):
         namespace["cos"] = np.cos
         namespace["tan"] = np.tan
         # Reciprocal trig (no direct numpy equivalents)
-        namespace["cot"] = lambda x: np.cos(x) / np.sin(x)
-        namespace["sec"] = lambda x: 1.0 / np.cos(x)
-        namespace["csc"] = lambda x: 1.0 / np.sin(x)
+        namespace["cot"] = lambda x: np.cos(x) / np.sin(x)  # type: ignore[reportUnknownLambdaType]
+        namespace["sec"] = lambda x: 1.0 / np.cos(x)  # type: ignore[reportUnknownLambdaType]
+        namespace["csc"] = lambda x: 1.0 / np.sin(x)  # type: ignore[reportUnknownLambdaType]
         # Inverse trig
         namespace["arcsin"] = np.arcsin
         namespace["arccos"] = np.arccos
@@ -973,7 +973,7 @@ class PDEFromSpec(PDEBase):
             If the equation lacks a ``laplacian(field)`` term or the
             Poisson solver fails.
         """
-        from pde import solve_poisson_equation  # noqa: PLC0415
+        from pde import solve_poisson_equation  # noqa: PLC0415, I001  # type: ignore[reportUnknownVariableType]
 
         eq = self.spec.equations[component_idx]
         grid = state.grid
@@ -1028,6 +1028,9 @@ class PDEFromSpec(PDEBase):
         # Rearrange 0 = laplacian_coeff * nabla^2(phi) + S into the standard
         # Poisson form nabla^2(phi) = rhs, giving rhs = -S / laplacian_coeff.
         poisson_rhs = -rhs_source / laplacian_coeff
+        assert isinstance(poisson_rhs, ScalarField), (
+            f"Expected ScalarField for Poisson RHS, got {type(poisson_rhs).__name__}"
+        )
 
         # Build boundary conditions for the Poisson solver
         solver_bc = self._build_constraint_bc(eq.constraint_solver, grid)

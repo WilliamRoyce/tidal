@@ -454,7 +454,7 @@ class TestDeDonderPhysics:
         final_energy = sum(np.sum(f.data**2) for f in result)
 
         # Energy should be conserved to within ~15% on this coarse 8³ grid
-        rel_change = abs(final_energy - initial_energy) / max(initial_energy, 1e-15)
+        rel_change = abs(final_energy - initial_energy) / max(float(initial_energy), 1e-15)
         assert rel_change < 0.15, (  # noqa: PLR2004
             f"Energy changed by {rel_change:.1%} (initial={initial_energy:.6f}, "
             f"final={final_energy:.6f})"
