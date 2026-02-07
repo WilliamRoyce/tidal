@@ -320,3 +320,48 @@ class TestAnalyticalSolutions:
             expected_pi / expected_norm,
             atol=0.15,
         )
+
+
+# ---------------------------------------------------------------------------
+# #20: CFL / stability diagnostics
+# ---------------------------------------------------------------------------
+
+
+class TestCFLStability:
+    """Verify CFL condition checker detects unstable configurations."""
+
+    def test_stable_dt_returns_no_warnings(
+        self, wave_spec: EquationSystem
+    ) -> None:
+        """Small dt relative to dx produces no warnings."""
+        pde = PDEFromSpec(wave_spec)
+        grid = CartesianGrid([(0, 10)], 128, periodic=True)
+        # dx = 10/128 ≈ 0.078, c=1 → CFL limit ≈ 0.078
+        dt = 0.01
+        warnings = pde.check_stability(dt, grid)
+        assert warnings == []
+
+    def test_unstable_dt_returns_warning(
+        self, wave_spec: EquationSystem
+    ) -> None:
+        """Large dt relative to dx triggers CFL warning."""
+        pde = PDEFromSpec(wave_spec)
+        grid = CartesianGrid([(0, 10)], 128, periodic=True)
+        # dx ≈ 0.078, c=1 → CFL limit ≈ 0.078, dt=0.5 >> limit
+        dt = 0.5
+        warnings = pde.check_stability(dt, grid)
+        assert len(warnings) == 1
+        assert "CFL violated" in warnings[0]
+        assert "phi" in warnings[0]
+
+    def test_kg_cfl_includes_wave_speed(
+        self, kg_spec: EquationSystem
+    ) -> None:
+        """KG equation CFL check uses the Laplacian coefficient."""
+        pde = PDEFromSpec(kg_spec, parameters={"m2": 4.0})
+        grid = CartesianGrid([(0, 10)], 64, periodic=True)
+        # dx = 10/64 ≈ 0.156, laplacian coeff = 1.0 → c = 1.0
+        # CFL limit ≈ 0.156
+        dt = 0.001
+        warnings = pde.check_stability(dt, grid)
+        assert warnings == []
