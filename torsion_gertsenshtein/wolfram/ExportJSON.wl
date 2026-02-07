@@ -1034,8 +1034,28 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
     targetField = FieldToMomentumName[targetField]
   ];
 
-  (* Build and return result with coordinate-dependence info *)
-  BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent, coordDeps]
+  (* Step 5: Detect nonlinear (field-dependent) coefficients *)
+  (* In a linear term, the field head should appear exactly once (bare or in Derivative). *)
+  (* More than one occurrence means the coefficient depends on the field itself. *)
+  Module[{fieldOccurrences, termResult},
+    fieldOccurrences = Length[Cases[term,
+      (f_Symbol[__] /; MemberQ[allFieldNames, ToString[f]]) |
+      (Derivative[__][f_][__] /; MemberQ[allFieldNames, ToString[f]]),
+      {0, Infinity}
+    ]];
+
+    (* Build term result *)
+    termResult = BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent, coordDeps];
+
+    (* Attach warning if nonlinear *)
+    If[fieldOccurrences > 1,
+      Print["WARNING: Nonlinear (field-dependent) coefficient detected in term for field '",
+        targetField, "'. The linear PDE solver will treat this as a constant coefficient."];
+      termResult["warning"] = "nonlinear_coefficient"
+    ];
+
+    termResult
+  ]
 ];
 
 (* === Constraint Solver Hints (Issue #91) === *)
