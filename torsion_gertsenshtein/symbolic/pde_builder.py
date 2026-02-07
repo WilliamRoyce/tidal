@@ -21,6 +21,8 @@ from typing_extensions import override
 
 from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
 from torsion_gertsenshtein.symbolic.json_loader import (
+    BoundaryCondition,
+    ConstraintSolverConfig,
     EquationSystem,
     OperatorTerm,
     load_equation_system,
@@ -865,6 +867,183 @@ class PDEFromSpec(PDEBase):
 
         return result
 
+    def _build_constraint_bc(
+        self,
+        config: ConstraintSolverConfig,
+        grid: GridBase,
+    ) -> Any:
+        """Convert a ConstraintSolverConfig to a py-pde boundary condition.
+
+        Parameters
+        ----------
+        config : ConstraintSolverConfig
+            Constraint solver configuration with per-axis BCs.
+        grid : GridBase
+            The simulation grid (used to check periodicity).
+
+        Returns
+        -------
+        str | dict
+            py-pde boundary condition descriptor.
+        """
+        spatial_coords = self.spec.spatial_coordinates
+
+        # If all BCs are periodic and grid is periodic, use shorthand
+        all_periodic = all(
+            config.boundary_conditions.get(
+                coord, BoundaryCondition("periodic")
+            ).type
+            == "periodic"
+            for coord in spatial_coords
+        )
+        if all_periodic and hasattr(grid, "periodic") and all(grid.periodic):
+            return "auto_periodic_neumann"
+
+        # Build explicit per-axis BC dict using coordinate names
+        # py-pde expects: {"x": bc_x, "y": bc_y} where bc is "periodic"
+        # or {"value": V} or {"derivative": D}
+        bc_dict: dict[str, Any] = {}
+        for i, coord in enumerate(spatial_coords):
+            bc_config = config.boundary_conditions.get(coord)
+            if bc_config is None:
+                # Default: periodic if grid is periodic on this axis, else Neumann
+                if hasattr(grid, "periodic") and grid.periodic[i]:
+                    bc_dict[coord] = "periodic"
+                else:
+                    bc_dict[coord] = {"derivative": 0.0}
+            elif bc_config.type == "periodic":
+                bc_dict[coord] = "periodic"
+            elif bc_config.type == "dirichlet":
+                bc_dict[coord] = {"value": bc_config.value if bc_config.value is not None else 0.0}
+            elif bc_config.type == "neumann":
+                bc_dict[coord] = {"derivative": bc_config.derivative if bc_config.derivative is not None else 0.0}
+
+        return bc_dict
+
+    def _solve_constraint_equation(
+        self,
+        component_idx: int,
+        state: FieldCollection,
+        bc: BCDescriptor,
+        t: float,
+    ) -> FieldCollection:
+        """Solve an elliptic constraint equation and update the state.
+
+        For constraint equations in the form::
+
+            0 = laplacian_coeff * laplacian(field) + source_terms
+
+        This rearranges to standard Poisson form::
+
+            nabla^2 field = -source_terms / laplacian_coeff
+
+        and solves using py-pde's ``solve_poisson_equation``.
+
+        Parameters
+        ----------
+        component_idx : int
+            Index of the constraint equation in ``spec.equations``.
+        state : FieldCollection
+            Current state. A new FieldCollection is returned with the
+            constraint field replaced by the solution.
+        bc : BCDescriptor
+            Boundary conditions for evaluating source-term operators.
+        t : float
+            Current time (for time-dependent source coefficients).
+
+        Returns
+        -------
+        FieldCollection
+            Updated state with the constraint field solved.
+
+        Raises
+        ------
+        ValueError
+            If the equation lacks a ``laplacian(field)`` term or the
+            Poisson solver fails.
+        """
+        from pde import solve_poisson_equation
+
+        eq = self.spec.equations[component_idx]
+        grid = state.grid
+        field_slot = self._field_slot_map[eq.field_name]
+
+        # Separate RHS into the laplacian-of-self term and source terms
+        laplacian_coeff: float | None = None
+        source_terms: list[OperatorTerm] = []
+
+        for term in eq.rhs_terms:
+            if term.operator == "laplacian" and term.field == eq.field_name:
+                if laplacian_coeff is not None:
+                    msg = (
+                        f"Multiple laplacian({eq.field_name}) terms in constraint "
+                        f"equation. Expected exactly one."
+                    )
+                    raise ValueError(msg)
+                laplacian_coeff = self._resolve_coefficient(term)
+            else:
+                source_terms.append(term)
+
+        # Validate equation structure
+        if laplacian_coeff is None:
+            msg = (
+                f"Constraint equation for {eq.field_name} lacks a "
+                f"laplacian({eq.field_name}) term. "
+                f"The elliptic solver requires the form: "
+                f"laplacian(field) + source = 0."
+            )
+            raise ValueError(msg)
+
+        if abs(laplacian_coeff) < 1e-14:
+            msg = (
+                f"Laplacian coefficient for {eq.field_name} is effectively "
+                f"zero ({laplacian_coeff}). Cannot solve elliptic equation."
+            )
+            raise ValueError(msg)
+
+        # Compute source: S = sum(coeff_i * operator_i(field_i))
+        rhs_source = ScalarField(grid, data=0.0)
+        for term in source_terms:
+            target_field = self._get_field_from_state(state, term.field)
+            operated = self._get_operator(term.operator, target_field, bc)
+            coefficient = self._resolve_coefficient_at_point(term, t, grid)
+
+            if isinstance(coefficient, np.ndarray):
+                contribution = ScalarField(grid, data=coefficient * operated.data)
+            else:
+                contribution = coefficient * operated
+            rhs_source += contribution
+
+        # The equation is: 0 = laplacian_coeff * ∇²φ + S
+        # Rearranging:     ∇²φ = -S / laplacian_coeff
+        # py-pde solves:   ∇²u = f  (where f is the rhs argument)
+        # So:              f = -S / laplacian_coeff
+        poisson_rhs = -rhs_source / laplacian_coeff
+
+        # Build boundary conditions for the Poisson solver
+        solver_bc = self._build_constraint_bc(eq.constraint_solver, grid)
+
+        try:
+            solution = solve_poisson_equation(
+                rhs=poisson_rhs,
+                bc=solver_bc,
+                label=eq.field_name,
+            )
+        except Exception as e:
+            rhs_max = float(np.max(np.abs(poisson_rhs.data)))
+            msg = (
+                f"Poisson solver failed for constraint {eq.field_name}:\n"
+                f"  RHS max |f|: {rhs_max:.3e}\n"
+                f"  BC: {solver_bc}\n"
+                f"  Error: {e}"
+            )
+            raise ValueError(msg) from e
+
+        # Update state in-place so dynamical equations (Pass 2) see the
+        # solved constraint field via cross-field references.
+        state[field_slot].data[:] = solution.data
+        return state
+
     @override
     def evolution_rate(
         self,
@@ -925,7 +1104,9 @@ class PDEFromSpec(PDEBase):
         # First-order components: their RHS becomes the "virtual momentum"
         # that other equations can reference via pi_N or first_derivative_t.
         # Constraint (order=0) components: d_t(field) = 0 by definition,
-        # so their virtual momentum is zero.
+        # so their virtual momentum is zero.  When a constraint has
+        # constraint_solver.enabled, it is solved elliptically first so
+        # that dynamical equations see the updated constraint field.
         virtual_momenta: dict[str, ScalarField] = {}
         for i, eq in enumerate(self.spec.equations):
             if eq.time_derivative_order == 1:
@@ -933,6 +1114,8 @@ class PDEFromSpec(PDEBase):
                     i, state, bc, t
                 )
             elif eq.time_derivative_order == 0:
+                if eq.constraint_solver.enabled:
+                    state = self._solve_constraint_equation(i, state, bc, t)
                 virtual_momenta[eq.field_name] = ScalarField(grid, data=0.0)
 
         # Pass 2: Build the full rates array using slot maps

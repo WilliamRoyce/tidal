@@ -145,6 +145,14 @@ single term and returns an Association with \"coefficient\", \"operator\", and \
 Detects: laplacian, directional laplacians, gradients, cross-derivatives, identity, and \
 momentum gradient terms from mixed time-space derivatives.";
 
+ConstraintSolverHints::usage =
+  "ConstraintSolverHints[fieldName, timeOrder, metadata] builds a constraint_solver \
+Association for constraint equations (timeOrder=0) when metadata contains \
+\"solve_constraints\" -> True. Returns Nothing for non-constraint equations or when \
+solver is not requested. Boundary conditions come from metadata key \
+\"constraint_boundary_conditions\".";
+
+
 (* Refactored helper functions (Phase 3, Issue 10) *)
 ExtractFunctionHeads::usage =
   "ExtractFunctionHeads[term] extracts all function head names from an expression. \
@@ -291,14 +299,24 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   (* Build structured LHS for flexible PDE types *)
   lhsStructure = BuildLHSStructure[fieldName, lhsTimeOrder];
 
-  <|
-    "field" -> fieldName,
-    "lhs" -> lhsStructure,  (* Now structured: {"expression": "...", "order": {...}} *)
-    "rhs" -> <|
-      "type" -> "linear_combination",
-      "terms" -> rhsTerms
-    |>
-  |>
+  Module[{result, constraintHints},
+    result = <|
+      "field" -> fieldName,
+      "lhs" -> lhsStructure,  (* Now structured: {"expression": "...", "order": {...}} *)
+      "rhs" -> <|
+        "type" -> "linear_combination",
+        "terms" -> rhsTerms
+      |>
+    |>;
+
+    (* Add constraint_solver hints for elliptic equations when enabled *)
+    constraintHints = ConstraintSolverHints[fieldName, lhsTimeOrder, metadata];
+    If[constraintHints =!= Nothing,
+      result["constraint_solver"] = constraintHints
+    ];
+
+    result
+  ]
 ];
 
 (* Parse RHS with cross-field reference detection *)
@@ -996,6 +1014,37 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
 
   (* Build and return result with coordinate-dependence info *)
   BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent, coordDeps]
+];
+
+(* === Constraint Solver Hints (Issue #91) === *)
+(* Builds constraint_solver JSON section for elliptic constraint equations *)
+(* Only produces output when: timeOrder == 0 AND metadata has "solve_constraints" -> True *)
+(* Returns Nothing when not applicable, so it integrates cleanly with Association building *)
+
+ConstraintSolverHints[fieldName_String, timeOrder_Integer, metadata_Association] := Module[
+  {enableSolver, bcHints, bcAssoc},
+
+  (* Only applicable to constraint equations (time_order = 0) *)
+  If[timeOrder =!= 0, Return[Nothing]];
+
+  enableSolver = TrueQ[Lookup[metadata, "solve_constraints", False]];
+  If[!enableSolver, Return[Nothing]];
+
+  (* Build boundary conditions from metadata *)
+  bcHints = Lookup[metadata, "constraint_boundary_conditions", <||>];
+
+  (* Convert to JSON-compatible format *)
+  (* Input format: <|"x" -> <|"type" -> "periodic"|>, "y" -> <|"type" -> "dirichlet", "value" -> 0.0|>|> *)
+  bcAssoc = If[AssociationQ[bcHints],
+    bcHints,
+    <||>
+  ];
+
+  <|
+    "enabled" -> True,
+    "method" -> "poisson",
+    "boundary_conditions" -> bcAssoc
+  |>
 ];
 
 (* === Equation Conversion === *)

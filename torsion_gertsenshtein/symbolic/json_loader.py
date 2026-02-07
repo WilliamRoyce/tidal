@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass
+from dataclasses import field as dataclass_field
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -188,6 +189,104 @@ class OperatorTerm:
         )
 
 
+_VALID_BC_TYPES: frozenset[str] = frozenset({"periodic", "dirichlet", "neumann"})
+
+
+@dataclass(frozen=True)
+class BoundaryCondition:
+    """Boundary condition for one spatial axis.
+
+    Attributes
+    ----------
+    type : str
+        One of "periodic", "dirichlet", or "neumann".
+    value : float | None
+        Fixed value for Dirichlet BCs.
+    derivative : float | None
+        Fixed normal derivative for Neumann BCs.
+    """
+
+    type: str
+    value: float | None = None
+    derivative: float | None = None
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> BoundaryCondition:
+        """Create a BoundaryCondition from a dictionary.
+
+        Raises
+        ------
+        ValueError
+            If the BC type is not recognized.
+        """
+        bc_type = str(data["type"])
+        if bc_type not in _VALID_BC_TYPES:
+            msg = f"Unknown BC type: {bc_type!r}. Valid types: {sorted(_VALID_BC_TYPES)}"
+            raise ValueError(msg)
+        return cls(
+            type=bc_type,
+            value=data.get("value"),
+            derivative=data.get("derivative"),
+        )
+
+
+@dataclass(frozen=True)
+class ConstraintSolverConfig:
+    """Configuration for elliptic constraint solving.
+
+    When ``enabled`` is True, the constraint equation is solved at each
+    timestep using py-pde's Poisson solver rather than remaining frozen.
+
+    Attributes
+    ----------
+    enabled : bool
+        Whether to solve the constraint elliptically. Default False
+        preserves existing frozen-constraint behavior.
+    method : str
+        Solver method. Currently only ``"poisson"`` is supported.
+    boundary_conditions : dict[str, BoundaryCondition]
+        Per-axis boundary conditions (e.g., ``{"x": ..., "y": ...}``).
+    """
+
+    enabled: bool = False
+    method: str = "poisson"
+    boundary_conditions: dict[str, BoundaryCondition] = dataclass_field(
+        default_factory=dict
+    )
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any] | None) -> ConstraintSolverConfig:
+        """Create from a dictionary or return default (disabled).
+
+        Parameters
+        ----------
+        data : Mapping[str, Any] | None
+            Parsed ``constraint_solver`` block from JSON, or None.
+
+        Returns
+        -------
+        ConstraintSolverConfig
+            Configuration instance.
+        """
+        if data is None:
+            return cls()
+
+        enabled = bool(data.get("enabled", False))
+        method = str(data.get("method", "poisson"))
+
+        bc_data = data.get("boundary_conditions", {})
+        boundary_conditions = {
+            axis: BoundaryCondition.from_dict(bc_dict)
+            for axis, bc_dict in bc_data.items()
+        }
+
+        return cls(
+            enabled=enabled,
+            method=method,
+            boundary_conditions=boundary_conditions,
+        )
+
+
 @dataclass(frozen=True)
 class ComponentEquation:
     """Equation of motion for a single field component.
@@ -205,12 +304,28 @@ class ComponentEquation:
         Order of the time derivative on the LHS (2 for wave equations).
     rhs_terms : tuple[OperatorTerm, ...]
         Terms on the RHS of the equation.
+    constraint_solver : ConstraintSolverConfig
+        Configuration for elliptic constraint solving. Only meaningful
+        when ``time_derivative_order == 0``.
     """
 
     field_name: str
     field_index: int
     time_derivative_order: int
     rhs_terms: tuple[OperatorTerm, ...]
+    constraint_solver: ConstraintSolverConfig = dataclass_field(
+        default_factory=ConstraintSolverConfig
+    )
+
+    def __post_init__(self) -> None:
+        """Validate constraint_solver is only enabled for time_order=0."""
+        if self.constraint_solver.enabled and self.time_derivative_order != 0:
+            msg = (
+                f"constraint_solver.enabled=true is only valid for time_order=0 "
+                f"(constraint equations), but {self.field_name} has "
+                f"time_order={self.time_derivative_order}"
+            )
+            raise ValueError(msg)
 
     @classmethod
     def from_dict(
@@ -221,7 +336,8 @@ class ComponentEquation:
         Raises
         ------
         ValueError
-            If the RHS type is not "linear_combination".
+            If the RHS type is not "linear_combination", or if
+            constraint_solver is enabled for a non-constraint equation.
         """
         field_name = str(data["field"])
 
@@ -250,11 +366,17 @@ class ComponentEquation:
             )
             raise ValueError(msg)
 
+        # Parse constraint solver config
+        constraint_solver = ConstraintSolverConfig.from_dict(
+            data.get("constraint_solver")
+        )
+
         return cls(
             field_name=field_name,
             field_index=fields_lookup[field_name],
             time_derivative_order=time_derivative_order,
             rhs_terms=rhs_terms,
+            constraint_solver=constraint_solver,
         )
 
 

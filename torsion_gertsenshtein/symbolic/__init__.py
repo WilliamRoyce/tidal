@@ -5,7 +5,9 @@ field equations derived symbolically from Lagrangians via Mathematica/xAct.
 """
 
 from torsion_gertsenshtein.symbolic.json_loader import (
+    BoundaryCondition,
     ComponentEquation,
+    ConstraintSolverConfig,
     EquationSystem,
     OperatorTerm,
     load_equation_system,
@@ -17,7 +19,9 @@ from torsion_gertsenshtein.symbolic.pde_builder import (
 )
 
 __all__ = [
+    "BoundaryCondition",
     "ComponentEquation",
+    "ConstraintSolverConfig",
     "EquationSystem",
     "OperatorTerm",
     "PDEFromSpec",
