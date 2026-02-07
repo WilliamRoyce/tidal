@@ -179,6 +179,17 @@ class OperatorTerm:
             )
             raise ValueError(msg)
 
+        # Check for nonlinear coefficient warning from Wolfram export
+        if data.get("warning") == "nonlinear_coefficient":
+            import warnings
+
+            warnings.warn(
+                f"Term '{operator}' on field '{data['field']}' has a "
+                f"field-dependent (nonlinear) coefficient. The linear PDE "
+                f"solver will treat it as a constant, producing wrong physics.",
+                stacklevel=2,
+            )
+
         return cls(
             coefficient=float(data["coefficient"]),
             operator=operator,
@@ -742,6 +753,18 @@ def _validate_spacetime(spacetime: dict[str, Any]) -> None:
     if not isinstance(spacetime["dimension"], int):
         msg = "spacetime.dimension must be an integer"
         raise TypeError(msg)
+    # Validate signature contains only ±1 and matches dimension
+    if "signature" in spacetime:
+        sig = spacetime["signature"]
+        if not isinstance(sig, list) or not all(s in (-1, 1) for s in sig):
+            msg = "spacetime.signature must be a list of +1 or -1 values"
+            raise ValueError(msg)
+        if len(sig) != spacetime["dimension"]:
+            msg = (
+                f"spacetime.signature length ({len(sig)}) "
+                f"must match dimension ({spacetime['dimension']})"
+            )
+            raise ValueError(msg)
 
 
 def _validate_fields(fields: list[Any]) -> None:
@@ -759,6 +782,11 @@ def _validate_fields(fields: list[Any]) -> None:
         if not isinstance(field, dict) or "name" not in field:
             msg = f"fields[{i}] must be a dict with 'name' key"
             raise ValueError(msg)
+    # Validate field indices are unique (when present)
+    indices = [f["index"] for f in fields if "index" in f]
+    if len(indices) != len(set(indices)):
+        msg = f"Field indices must be unique, got: {indices}"
+        raise ValueError(msg)
 
 
 def _validate_equations(equations: list[Any]) -> None:
@@ -798,6 +826,16 @@ def validate_json_schema(data: Mapping[str, Any]) -> None:
     _validate_spacetime(data["spacetime"])
     _validate_fields(data["fields"])
     _validate_equations(data["equations"])
+
+    # Cross-validate: equation field references must exist in fields list
+    field_names = {f["name"] for f in data["fields"]}
+    for i, eq in enumerate(data["equations"]):
+        if eq["field"] not in field_names:
+            msg = (
+                f"equations[{i}].field '{eq['field']}' "
+                f"not found in fields list: {sorted(field_names)}"
+            )
+            raise ValueError(msg)
 
 
 def load_equation_system(json_path: Path | str) -> EquationSystem:
