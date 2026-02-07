@@ -456,6 +456,77 @@ class PDEFromSpec(PDEBase):
         self._cached_bc: BCDescriptor | None = None
         self._cached_grid_id: int | None = None
 
+        # Validate operator dimension requirements against spec at construction time
+        self._validate_operator_dimensions()
+
+    @staticmethod
+    def _operator_min_dim(operator_name: str) -> int:
+        """Return minimum spatial grid dimension required by an operator.
+
+        Uses the same resolution logic as ``_get_operator`` (static registry
+        then dynamic regex patterns) but without needing a grid or field.
+
+        Parameters
+        ----------
+        operator_name : str
+            Operator name (e.g. ``"gradient_y"``, ``"derivative_3_z"``).
+
+        Returns
+        -------
+        int
+            Minimum spatial dimension (1, 2, or 3).
+
+        Raises
+        ------
+        ValueError
+            If the operator name is not recognized.
+        """
+        if operator_name == "first_derivative_t":
+            return 1
+        entry = _OPERATOR_REGISTRY.get(operator_name)
+        if entry is not None:
+            return entry[1]
+        m = _GENERIC_SINGLE_RE.match(operator_name)
+        if m:
+            return _AXIS_MIN_DIM[m.group(2)]
+        m_multi = _GENERIC_MULTI_RE.match(operator_name)
+        if m_multi:
+            axes_and_orders = _parse_multi_axis_spec(m_multi.group(1))
+            max_axis = max(axis for axis, _ in axes_and_orders)
+            return _AXIS_MIN_DIM[_AXIS_LETTER[max_axis]]
+        msg = (
+            f"Unknown operator: '{operator_name}'. "
+            f"Known operators: {sorted(_OPERATOR_REGISTRY.keys())}. "
+            f"Dynamic patterns: derivative_N_x, derivative_Nx_My."
+        )
+        raise ValueError(msg)
+
+    def _validate_operator_dimensions(self) -> None:
+        """Validate all operators are compatible with the spec's spatial dimension.
+
+        Called during ``__init__`` to fail fast when a JSON spec contains
+        operators that require more spatial dimensions than the spec provides
+        (e.g. ``gradient_z`` in a 2+1D spacetime).
+
+        Raises
+        ------
+        ValueError
+            If any operator requires more dimensions than ``spec.spatial_dimension``.
+        """
+        spatial_dim = self.spec.spatial_dimension
+        for eq in self.spec.equations:
+            for term in eq.rhs_terms:
+                min_dim = self._operator_min_dim(term.operator)
+                if min_dim > spatial_dim:
+                    msg = (
+                        f"Operator '{term.operator}' in equation for "
+                        f"'{eq.field_name}' requires at least {min_dim}D "
+                        f"spatial grid, but the spec has "
+                        f"spatial_dimension={spatial_dim} "
+                        f"(from {self.spec.dimension}D spacetime)."
+                    )
+                    raise ValueError(msg)
+
     def _is_resolvable(self, term: OperatorTerm) -> bool:
         """Check whether a term's coefficient can be resolved without warnings.
 

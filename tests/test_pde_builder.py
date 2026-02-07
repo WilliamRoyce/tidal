@@ -283,16 +283,8 @@ class TestPDEFromSpec:
             metadata={},
         )
 
-        pde = PDEFromSpec(spec)
-        state = FieldCollection(
-            [
-                ScalarField(grid_1d_small, data=1.0),
-                ScalarField(grid_1d_small, data=0.0),
-            ]
-        )
-
         with pytest.raises(ValueError, match="Unknown operator"):
-            pde.evolution_rate(state)
+            PDEFromSpec(spec)
 
 
 # === build_pde_from_json Tests ===
@@ -2230,3 +2222,96 @@ class TestEvalValidation:
         arr = np.array([1.0, float("inf"), 3.0])
         with pytest.raises(ValueError, match="Inf"):
             PDEFromSpec._validate_eval_result(arr, "test", "1/x")
+
+
+class TestOperatorDimensionValidation:
+    """Tests for early operator-dimension validation at construction time (Issue #75)."""
+
+    @staticmethod
+    def _make_spec(
+        operator: str,
+        spatial_dim: int,
+        field_name: str = "phi",
+    ) -> EquationSystem:
+        """Create a minimal spec with a single operator and given spatial dimension."""
+        dimension = spatial_dim + 1  # spacetime = spatial + time
+        coords = ("t", "x", "y", "z")[:dimension]
+        return EquationSystem(
+            n_components=1,
+            dimension=dimension,
+            spatial_dimension=spatial_dim,
+            component_names=(field_name,),
+            equations=(
+                ComponentEquation(
+                    field_name=field_name,
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(1.0, operator, field_name),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=coords,
+        )
+
+    def test_operator_dim_mismatch_at_construction(self) -> None:
+        """gradient_z in a 2D spatial spec raises at construction, not runtime."""
+        spec = self._make_spec("gradient_z", spatial_dim=2)
+        with pytest.raises(ValueError, match="requires at least 3D"):
+            PDEFromSpec(spec)
+
+    def test_laplacian_z_mismatch_at_construction(self) -> None:
+        """laplacian_z in a 1D spatial spec raises at construction."""
+        spec = self._make_spec("laplacian_z", spatial_dim=1)
+        with pytest.raises(ValueError, match="requires at least 3D"):
+            PDEFromSpec(spec)
+
+    def test_cross_derivative_xz_mismatch(self) -> None:
+        """cross_derivative_xz in a 2D spatial spec raises at construction."""
+        spec = self._make_spec("cross_derivative_xz", spatial_dim=2)
+        with pytest.raises(ValueError, match="requires at least 3D"):
+            PDEFromSpec(spec)
+
+    def test_gradient_y_valid_in_2d(self) -> None:
+        """gradient_y in a 2D spatial spec succeeds."""
+        spec = self._make_spec("gradient_y", spatial_dim=2)
+        pde = PDEFromSpec(spec)
+        assert pde.spec.spatial_dimension == 2
+
+    def test_laplacian_valid_in_1d(self) -> None:
+        """laplacian in a 1D spatial spec succeeds."""
+        spec = self._make_spec("laplacian", spatial_dim=1)
+        pde = PDEFromSpec(spec)
+        assert pde.spec.spatial_dimension == 1
+
+    def test_operator_min_dim_static_registry(self) -> None:
+        """_operator_min_dim returns correct values for static operators."""
+        assert PDEFromSpec._operator_min_dim("identity") == 1
+        assert PDEFromSpec._operator_min_dim("laplacian") == 1
+        assert PDEFromSpec._operator_min_dim("gradient_x") == 1
+        assert PDEFromSpec._operator_min_dim("gradient_y") == 2
+        assert PDEFromSpec._operator_min_dim("gradient_z") == 3
+        assert PDEFromSpec._operator_min_dim("laplacian_y") == 2
+        assert PDEFromSpec._operator_min_dim("cross_derivative_xy") == 2
+        assert PDEFromSpec._operator_min_dim("cross_derivative_xz") == 3
+        assert PDEFromSpec._operator_min_dim("biharmonic") == 1
+        assert PDEFromSpec._operator_min_dim("first_derivative_t") == 1
+
+    def test_operator_min_dim_dynamic_single(self) -> None:
+        """_operator_min_dim resolves dynamic single-axis patterns."""
+        assert PDEFromSpec._operator_min_dim("derivative_3_x") == 1
+        assert PDEFromSpec._operator_min_dim("derivative_3_y") == 2
+        assert PDEFromSpec._operator_min_dim("derivative_3_z") == 3
+
+    def test_operator_min_dim_dynamic_multi(self) -> None:
+        """_operator_min_dim resolves dynamic multi-axis patterns."""
+        assert PDEFromSpec._operator_min_dim("derivative_2x_1y") == 2
+        assert PDEFromSpec._operator_min_dim("derivative_1x_1z") == 3
+
+    def test_operator_min_dim_unknown_raises(self) -> None:
+        """_operator_min_dim raises for unrecognized operators."""
+        with pytest.raises(ValueError, match="Unknown operator"):
+            PDEFromSpec._operator_min_dim("nonexistent_op")
