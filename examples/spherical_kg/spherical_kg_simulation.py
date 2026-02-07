@@ -53,9 +53,9 @@ THETA_MIN = 0.2  # Avoid theta=0 singularity (sin(0)=0)
 THETA_MAX = np.pi - 0.2  # Avoid theta=pi singularity
 PHI_MIN = 0.0
 PHI_MAX = 2 * np.pi
-GRID_NR = 32
-GRID_NTHETA = 16
-GRID_NPHI = 32
+GRID_NR = 48
+GRID_NTHETA = 32
+GRID_NPHI = 48
 MASS_SQUARED = 0.0  # Massless for clean 1/r decay test
 PULSE_RADIUS = 3.0
 PULSE_WIDTH = 0.6
@@ -138,10 +138,10 @@ def _create_grid() -> CartesianGrid:
     )
     print(f"  r range: [{R_MIN}, {R_MAX}]")
     print(f"  theta range: [{THETA_MIN:.1f}, {THETA_MAX:.1f}] (avoiding poles)")
-    print(f"  phi range: [0, 2*pi]")
+    print(f"  phi range: [{PHI_MIN}, {PHI_MAX}]")
     print(f"  Resolution: {GRID_NR} x {GRID_NTHETA} x {GRID_NPHI}")
     print(f"  Total cells: {GRID_NR * GRID_NTHETA * GRID_NPHI}")
-    print(f"  Boundary: r=Neumann, theta=Neumann, phi=periodic")
+    print("  Boundary: r=Neumann, theta=Neumann, phi=periodic")
     print()
     return grid
 
@@ -167,7 +167,9 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
     return state
 
 
-def _run_simulation(pde: object, grid: CartesianGrid, state: FieldCollection) -> SimulationResult:
+def _run_simulation(
+    pde: object, grid: CartesianGrid, state: FieldCollection
+) -> SimulationResult:
     print("Step 5: Running simulation...")
 
     storage = MemoryStorage()
@@ -175,7 +177,8 @@ def _run_simulation(pde: object, grid: CartesianGrid, state: FieldCollection) ->
         state,
         t_range=T_END,
         dt=DT,
-        scheme="runge-kutta",
+        solver="scipy",
+        method="RK45",
         tracker=storage.tracker(0.5),
     )
     result = normalize_solve_result(result)
@@ -184,7 +187,7 @@ def _run_simulation(pde: object, grid: CartesianGrid, state: FieldCollection) ->
     theta = cast("np.ndarray", grid.cell_coords[..., 1])
     phi_coord = cast("np.ndarray", grid.cell_coords[..., 2])
 
-    print(f"  Duration: {T_END} time units, dt={DT}")
+    print(f"  Duration: {T_END} time units, solver=scipy/RK45")
     print(f"  Stored {len(storage)} snapshots")
     print()
 
@@ -235,7 +238,7 @@ def _plot_results(result: SimulationResult) -> None:
     ax = axes[0, 0]
     vmax = PULSE_AMPLITUDE
     r_1d = cast("np.ndarray", grid.cell_coords[:, 0, 0, 0])
-    theta_1d = cast("np.ndarray", grid.cell_coords[0, :, 0, 1])
+    cast("np.ndarray", grid.cell_coords[0, :, 0, 1])
     im = ax.imshow(
         initial[0].data[:, :, phi_mid].T,
         origin="lower",
@@ -244,6 +247,7 @@ def _plot_results(result: SimulationResult) -> None:
         vmax=vmax,
         extent=[R_MIN, R_MAX, THETA_MIN, THETA_MAX],
         aspect="auto",
+        interpolation="bilinear",
     )
     ax.set_xlabel("r")
     ax.set_ylabel("theta")
@@ -261,6 +265,7 @@ def _plot_results(result: SimulationResult) -> None:
         vmax=final_vmax,
         extent=[R_MIN, R_MAX, THETA_MIN, THETA_MAX],
         aspect="auto",
+        interpolation="bilinear",
     )
     ax.set_xlabel("r")
     ax.set_ylabel("theta")

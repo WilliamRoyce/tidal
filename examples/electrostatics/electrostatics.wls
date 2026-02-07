@@ -91,9 +91,11 @@ json = <|
       |>
     |>
   },
+  (* mass_matrix and coupling_matrix: auto-computed by Python from identity terms *)
+  (* phi eq has identity(rho) with coeff 1.0 → coupling[0][1] = -1.0 *)
   "coupling" -> <|
     "mass_matrix" -> {{0.0, 0.0}, {0.0, 0.0}},
-    "coupling_matrix" -> {{0.0, 0.0}, {0.0, 0.0}}
+    "coupling_matrix" -> {{0.0, -1.0}, {0.0, 0.0}}
   |>
 |>;
 

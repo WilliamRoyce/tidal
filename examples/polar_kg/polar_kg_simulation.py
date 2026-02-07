@@ -43,8 +43,8 @@ R_MIN = 0.5
 R_MAX = 10.0
 THETA_MIN = 0.0
 THETA_MAX = 2 * np.pi
-GRID_NR = 64
-GRID_NTHETA = 64
+GRID_NR = 128
+GRID_NTHETA = 128
 MASS_SQUARED = 0.5
 PULSE_RADIUS = 3.0
 PULSE_WIDTH = 0.5
@@ -125,9 +125,9 @@ def _create_grid() -> CartesianGrid:
         periodic=[False, True],  # r: bounded, theta: periodic
     )
     print(f"  r range: [{R_MIN}, {R_MAX}]")
-    print(f"  theta range: [0, 2*pi]")
+    print("  theta range: [0, 2*pi]")
     print(f"  Resolution: {GRID_NR} x {GRID_NTHETA}")
-    print(f"  Boundary: r=Neumann, theta=periodic")
+    print("  Boundary: r=Neumann, theta=periodic")
     print()
     return grid
 
@@ -136,7 +136,7 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
     print("Step 4: Creating initial conditions...")
 
     r = cast("np.ndarray", grid.cell_coords[..., 0])
-    theta = cast("np.ndarray", grid.cell_coords[..., 1])
+    cast("np.ndarray", grid.cell_coords[..., 1])
 
     # Gaussian ring at r = PULSE_RADIUS, uniform in theta
     gaussian_ring = PULSE_AMPLITUDE * np.exp(
@@ -154,7 +154,9 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
     return state
 
 
-def _run_simulation(pde: object, grid: CartesianGrid, state: FieldCollection) -> SimulationResult:
+def _run_simulation(
+    pde: object, grid: CartesianGrid, state: FieldCollection
+) -> SimulationResult:
     print("Step 5: Running simulation...")
 
     storage = MemoryStorage()
@@ -162,7 +164,8 @@ def _run_simulation(pde: object, grid: CartesianGrid, state: FieldCollection) ->
         state,
         t_range=T_END,
         dt=DT,
-        scheme="runge-kutta",
+        solver="scipy",
+        method="RK45",
         tracker=storage.tracker(0.2),
     )
     result = normalize_solve_result(result)
@@ -170,7 +173,7 @@ def _run_simulation(pde: object, grid: CartesianGrid, state: FieldCollection) ->
     r = cast("np.ndarray", grid.cell_coords[..., 0])
     theta = cast("np.ndarray", grid.cell_coords[..., 1])
 
-    print(f"  Duration: {T_END} time units, dt={DT}")
+    print(f"  Duration: {T_END} time units, solver=scipy/RK45")
     print(f"  Stored {len(storage)} snapshots")
     print()
 
@@ -219,42 +222,46 @@ def _plot_results(result: SimulationResult) -> None:
 
     storage = result.storage
     grid = result.grid
-    r = result.r_coords
-    theta = result.theta_coords
 
     initial = cast("FieldCollection", storage[0])
     final = cast("FieldCollection", storage[-1])
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
-    # Convert to Cartesian for 2D plots
-    x_cart = r * np.cos(theta)
-    y_cart = r * np.sin(theta)
-
-    # Initial field in polar (r, theta) coordinates
+    # Initial field in native (r, theta) coordinates using imshow
     ax = axes[0, 0]
     vmax = PULSE_AMPLITUDE
-    im = ax.pcolormesh(
-        x_cart, y_cart, initial[0].data,
-        cmap="bwr_r", vmin=-vmax, vmax=vmax, shading="auto",
+    im = ax.imshow(
+        initial[0].data.T,
+        origin="lower",
+        cmap="bwr_r",
+        vmin=-vmax,
+        vmax=vmax,
+        extent=[R_MIN, R_MAX, THETA_MIN, THETA_MAX],
+        aspect="auto",
+        interpolation="bilinear",
     )
-    ax.set_xlabel("x = r cos(theta)")
-    ax.set_ylabel("y = r sin(theta)")
+    ax.set_xlabel("r")
+    ax.set_ylabel("theta")
     ax.set_title("Initial phi (t=0)")
-    ax.set_aspect("equal")
     fig.colorbar(im, ax=ax, label="phi")
 
-    # Final field
+    # Final field in native (r, theta) coordinates
     ax = axes[0, 1]
     final_vmax = max(float(np.max(np.abs(final[0].data))), 0.01)
-    im = ax.pcolormesh(
-        x_cart, y_cart, final[0].data,
-        cmap="bwr_r", vmin=-final_vmax, vmax=final_vmax, shading="auto",
+    im = ax.imshow(
+        final[0].data.T,
+        origin="lower",
+        cmap="bwr_r",
+        vmin=-final_vmax,
+        vmax=final_vmax,
+        extent=[R_MIN, R_MAX, THETA_MIN, THETA_MAX],
+        aspect="auto",
+        interpolation="bilinear",
     )
-    ax.set_xlabel("x = r cos(theta)")
-    ax.set_ylabel("y = r sin(theta)")
+    ax.set_xlabel("r")
+    ax.set_ylabel("theta")
     ax.set_title(f"Final phi (t={T_END:.0f})")
-    ax.set_aspect("equal")
     fig.colorbar(im, ax=ax, label="phi")
 
     # Radial cross-section at theta=0 over time

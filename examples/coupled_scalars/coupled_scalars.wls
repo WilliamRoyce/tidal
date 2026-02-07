@@ -127,9 +127,8 @@ metadata = <|
   "linearized" -> True,
   "dimension" -> 2,
   "signature" -> {-1, 1},
-  "coordinates" -> {"t", "x"},
-  "mass_matrix" -> {{N[mPhi2], 0.0}, {0.0, N[mChi2]}},
-  "coupling_matrix" -> {{0.0, N[gCpl]}, {N[gCpl], 0.0}}
+  "coordinates" -> {"t", "x"}
+  (* mass_matrix and coupling_matrix are auto-computed from equation identity terms *)
 |>;
 
 (* Build JSON using multi-field pipeline *)

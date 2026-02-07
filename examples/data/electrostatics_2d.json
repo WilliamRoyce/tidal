@@ -1,72 +1,118 @@
 {
-	"metadata": {
-		"source": "analytical",
-		"lagrangian_expr": "1/2 (nabla phi)^2 + rho * phi",
-		"derived_from": "Euler-Lagrange",
-		"gauge": "none",
-		"linearized": true,
-		"construction": "analytical"
+	"metadata":{
+		"source":"analytical",
+		"lagrangian_expr":"1\/2 (nabla phi)^2 + rho * phi",
+		"derived_from":"Euler-Lagrange",
+		"gauge":"none",
+		"linearized":true,
+		"construction":"analytical"
 	},
-	"spacetime": {
-		"dimension": 3,
-		"signature": [-1, 1, 1],
-		"coordinates": ["t", "x", "y"]
+	"spacetime":{
+		"dimension":3,
+		"signature":[
+			-1,
+			1,
+			1
+		],
+		"coordinates":[
+			"t",
+			"x",
+			"y"
+		]
 	},
-	"fields": [
-		{"name": "phi", "index": 0, "is_dynamical": true},
-		{"name": "rho", "index": 1, "is_dynamical": true}
-	],
-	"equations": [
+	"fields":[
 		{
-			"field": "phi",
-			"lhs": {
-				"expression": "phi",
-				"order": {"time": 0, "space": 0}
+			"name":"phi",
+			"index":0,
+			"is_dynamical":true
+		},
+		{
+			"name":"rho",
+			"index":1,
+			"is_dynamical":true
+		}
+	],
+	"equations":[
+		{
+			"field":"phi",
+			"lhs":{
+				"expression":"phi",
+				"order":{
+					"time":0,
+					"space":0
+				}
 			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
+			"rhs":{
+				"type":"linear_combination",
+				"terms":[
 					{
-						"coefficient": 1.0,
-						"operator": "laplacian",
-						"field": "phi"
+						"coefficient":1.0,
+						"operator":"laplacian",
+						"field":"phi"
 					},
 					{
-						"coefficient": 1.0,
-						"operator": "identity",
-						"field": "rho"
+						"coefficient":1.0,
+						"operator":"identity",
+						"field":"rho"
 					}
 				]
 			},
-			"constraint_solver": {
-				"enabled": true,
-				"method": "poisson",
-				"boundary_conditions": {
-					"x": {"type": "dirichlet", "value": 0.0},
-					"y": {"type": "dirichlet", "value": 0.0}
+			"constraint_solver":{
+				"enabled":true,
+				"method":"poisson",
+				"boundary_conditions":{
+					"x":{
+						"type":"dirichlet",
+						"value":0.0
+					},
+					"y":{
+						"type":"dirichlet",
+						"value":0.0
+					}
 				}
 			}
 		},
 		{
-			"field": "rho",
-			"lhs": {
-				"expression": "d2_t(rho)",
-				"order": {"time": 2, "space": 0}
+			"field":"rho",
+			"lhs":{
+				"expression":"d2_t(rho)",
+				"order":{
+					"time":2,
+					"space":0
+				}
 			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
+			"rhs":{
+				"type":"linear_combination",
+				"terms":[
 					{
-						"coefficient": 0.0,
-						"operator": "identity",
-						"field": "rho"
+						"coefficient":0.0,
+						"operator":"identity",
+						"field":"rho"
 					}
 				]
 			}
 		}
 	],
-	"coupling": {
-		"mass_matrix": [[0.0, 0.0], [0.0, 0.0]],
-		"coupling_matrix": [[0.0, 0.0], [0.0, 0.0]]
+	"coupling":{
+		"mass_matrix":[
+			[
+				0.0,
+				0.0
+			],
+			[
+				0.0,
+				0.0
+			]
+		],
+		"coupling_matrix":[
+			[
+				0.0,
+				-1.0
+			],
+			[
+				0.0,
+				0.0
+			]
+		]
 	}
 }

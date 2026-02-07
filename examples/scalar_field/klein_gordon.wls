@@ -113,7 +113,7 @@ jsonOutput = BuildJSONStructure[componentEqs, metadata];
 Print["   JSON structure created using pipeline"];
 
 (* Export JSON *)
-outputPath = FileNameJoin[{DirectoryName[$InputFileName], "..", "..", "..", "examples", "data"}];
+outputPath = FileNameJoin[{DirectoryName[$InputFileName], "..", "data"}];
 If[!DirectoryQ[outputPath], CreateDirectory[outputPath]];
 jsonFile = FileNameJoin[{outputPath, "klein_gordon_1d.json"}];
 

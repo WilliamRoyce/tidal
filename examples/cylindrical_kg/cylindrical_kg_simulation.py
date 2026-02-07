@@ -42,6 +42,8 @@ from torsion_gertsenshtein.utils import normalize_solve_result
 if TYPE_CHECKING:
     from numpy.typing import NDArray
 
+    from torsion_gertsenshtein.symbolic.pde_builder import PDEFromSpec
+
     NumericArray = NDArray[np.float64]
 
 OUTPUT_FILENAME = "cylindrical_kg_output.png"
@@ -51,9 +53,9 @@ THETA_MIN = 0.0
 THETA_MAX = 2 * np.pi
 Z_MIN = -5.0
 Z_MAX = 5.0
-GRID_NR = 32
-GRID_NTHETA = 32
-GRID_NZ = 32
+GRID_NR = 48
+GRID_NTHETA = 48
+GRID_NZ = 48
 MASS_SQUARED = 0.0
 PULSE_RADIUS = 3.0
 PULSE_Z_CENTER = 0.0
@@ -120,7 +122,7 @@ def _load_spec(json_path: Path) -> None:
     print()
 
 
-def _build_pde(json_path: Path) -> object:
+def _build_pde(json_path: Path) -> PDEFromSpec:
     print("Step 2: Building PDE from specification...")
     pde = build_pde_from_json(json_path, parameters={"cylm2": MASS_SQUARED})
     print(f"  PDE class: {type(pde).__name__}")
@@ -137,11 +139,11 @@ def _create_grid() -> CartesianGrid:
         periodic=[False, True, False],  # r: bounded, theta: periodic, z: bounded
     )
     print(f"  r range: [{R_MIN}, {R_MAX}]")
-    print(f"  theta range: [0, 2*pi]")
+    print("  theta range: [0, 2*pi]")
     print(f"  z range: [{Z_MIN}, {Z_MAX}]")
     print(f"  Resolution: {GRID_NR} x {GRID_NTHETA} x {GRID_NZ}")
     print(f"  Total cells: {GRID_NR * GRID_NTHETA * GRID_NZ}")
-    print(f"  Boundary: r=Neumann, theta=periodic, z=Neumann")
+    print("  Boundary: r=Neumann, theta=periodic, z=Neumann")
     print()
     return grid
 
@@ -170,7 +172,9 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
     return state
 
 
-def _run_simulation(pde: object, grid: CartesianGrid, state: FieldCollection) -> SimulationResult:
+def _run_simulation(
+    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection
+) -> SimulationResult:
     print("Step 5: Running simulation...")
 
     storage = MemoryStorage()
@@ -178,7 +182,8 @@ def _run_simulation(pde: object, grid: CartesianGrid, state: FieldCollection) ->
         state,
         t_range=T_END,
         dt=DT,
-        scheme="runge-kutta",
+        solver="scipy",
+        method="RK45",
         tracker=storage.tracker(0.5),
     )
     result = normalize_solve_result(result)
@@ -187,7 +192,7 @@ def _run_simulation(pde: object, grid: CartesianGrid, state: FieldCollection) ->
     theta = cast("np.ndarray", grid.cell_coords[..., 1])
     z = cast("np.ndarray", grid.cell_coords[..., 2])
 
-    print(f"  Duration: {T_END} time units, dt={DT}")
+    print(f"  Duration: {T_END} time units, solver=scipy/RK45")
     print(f"  Stored {len(storage)} snapshots")
     print()
 
@@ -219,7 +224,7 @@ def _analyze_results(result: SimulationResult) -> None:
     print()
 
 
-def _plot_results(result: SimulationResult) -> None:
+def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     print("Step 7: Generating visualization...")
 
     storage = result.storage
@@ -247,6 +252,7 @@ def _plot_results(result: SimulationResult) -> None:
         vmax=vmax,
         extent=[R_MIN, R_MAX, Z_MIN, Z_MAX],
         aspect="auto",
+        interpolation="bilinear",
     )
     ax.set_xlabel("r")
     ax.set_ylabel("z")
@@ -264,6 +270,7 @@ def _plot_results(result: SimulationResult) -> None:
         vmax=final_vmax,
         extent=[R_MIN, R_MAX, Z_MIN, Z_MAX],
         aspect="auto",
+        interpolation="bilinear",
     )
     ax.set_xlabel("r")
     ax.set_ylabel("z")
