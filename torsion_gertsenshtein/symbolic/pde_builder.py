@@ -453,6 +453,8 @@ class PDEFromSpec(PDEBase):
         self,
         spec: EquationSystem,
         parameters: dict[str, float] | None = None,
+        *,
+        constraint_eps: float = 1e-14,
     ) -> None:
         """Initialize PDE from equation specification.
 
@@ -469,6 +471,9 @@ class PDEFromSpec(PDEBase):
             For time-dependent coefficients in curved spacetime, all symbols
             appearing in the coefficient expression must be provided here.
             The expressions are evaluated by substituting these values.
+        constraint_eps : float
+            Tolerance for determining whether a Laplacian coefficient is
+            effectively zero in the constraint solver.  Default ``1e-14``.
         """
         super().__init__()
         self.spec = spec
@@ -477,6 +482,7 @@ class PDEFromSpec(PDEBase):
             name: i for i, name in enumerate(spec.component_names)
         }
         self._parameters = parameters or {}
+        self._constraint_eps = constraint_eps
 
         # Build slot maps from state_layout for mixed time-order support
         self._field_slot_map: dict[str, int] = {}
@@ -1421,7 +1427,7 @@ class PDEFromSpec(PDEBase):
             )
             raise ValueError(msg)
 
-        if abs(laplacian_coeff) < 1e-14:  # noqa: PLR2004
+        if abs(laplacian_coeff) < self._constraint_eps:
             msg = (
                 f"Laplacian coefficient for {eq.field_name} is effectively "
                 f"zero ({laplacian_coeff}). Cannot solve elliptic equation."
@@ -1472,8 +1478,100 @@ class PDEFromSpec(PDEBase):
         state[field_slot].data[:] = solution.data
         return state
 
+    def _evolve_constraints(
+        self,
+        state: TState,
+        bc: BCDescriptor,
+        t: float,
+    ) -> tuple[TState, dict[str, ScalarField]]:
+        """Solve constraint equations (time_derivative_order=0).
+
+        Constraints are solved elliptically when enabled, updating the state
+        in-place so that dynamical equations see the resolved fields.
+
+        Returns
+        -------
+        tuple[TState, dict[str, ScalarField]]
+            Updated state and virtual momenta dict with zero entries for
+            each constraint field.
+        """
+        grid = state.grid
+        virtual_momenta: dict[str, ScalarField] = {}
+        for i, eq in enumerate(self.spec.equations):
+            if eq.time_derivative_order == 0:
+                if eq.constraint_solver.enabled:
+                    state = self._solve_constraint_equation(i, state, bc, t)
+                virtual_momenta[eq.field_name] = ScalarField(grid, data=0.0)
+        return state, virtual_momenta
+
+    def _evolve_first_order(
+        self,
+        state: TState,
+        bc: BCDescriptor,
+        t: float,
+        virtual_momenta: dict[str, ScalarField],
+    ) -> dict[str, ScalarField]:
+        """Compute virtual momenta for first-order components.
+
+        The RHS of each first-order equation becomes a "virtual momentum"
+        that second-order equations can reference via ``pi_N`` or
+        ``first_derivative_t``.  This runs after constraints are solved
+        so that first-order equations see updated constraint fields.
+
+        Returns
+        -------
+        dict[str, ScalarField]
+            Updated virtual momenta dict including first-order entries.
+        """
+        for i, eq in enumerate(self.spec.equations):
+            if eq.time_derivative_order == 1:
+                virtual_momenta[eq.field_name] = self._compute_rhs_for_component(
+                    i, state, bc, t
+                )
+        return virtual_momenta
+
+    def _evolve_second_order(
+        self,
+        state: TState,
+        bc: BCDescriptor,
+        t: float,
+        virtual_momenta: dict[str, ScalarField],
+        rates: list[ScalarField | None],
+    ) -> list[ScalarField | None]:
+        """Compute rates for all components from the virtual momenta.
+
+        - Second-order: d/dt field = momentum, d/dt momentum = RHS
+        - First-order: d/dt field = virtual momentum (already computed)
+        - Constraint: d/dt field = 0
+
+        Returns
+        -------
+        list[ScalarField | None]
+            Populated rates array.
+        """
+        grid = state.grid
+        for i, eq in enumerate(self.spec.equations):
+            field_slot = self._field_slot_map[eq.field_name]
+
+            if eq.time_derivative_order >= 2:  # noqa: PLR2004
+                momentum_slot = self._momentum_slot_map[eq.field_name]
+                momentum = state[momentum_slot]
+                if not isinstance(momentum, ScalarField):
+                    msg = f"Expected ScalarField for momentum, got {type(momentum).__name__}"
+                    raise TypeError(msg)
+                rates[field_slot] = momentum.copy()
+                rates[momentum_slot] = self._compute_rhs_for_component(
+                    i, state, bc, t, virtual_momenta
+                )
+            elif eq.time_derivative_order == 1:
+                rates[field_slot] = virtual_momenta[eq.field_name]
+            else:
+                rates[field_slot] = ScalarField(grid, data=0.0)
+
+        return rates
+
     @override
-    def evolution_rate(  # noqa: C901, PLR0912
+    def evolution_rate(
         self,
         state: TState,
         t: float = 0.0,
@@ -1537,54 +1635,76 @@ class PDEFromSpec(PDEBase):
             self._cached_grid_id = grid_id
         bc = self._cached_bc
 
-        # Pass 1a: Solve all constraint equations first so that dynamical
-        # equations (first-order and second-order) see the updated fields.
-        # Constraints (order=0): d_t(field) = 0 by definition, with
-        # virtual momentum zero.  When constraint_solver.enabled, the
-        # field value is determined elliptically.
-        virtual_momenta: dict[str, ScalarField] = {}
-        for i, eq in enumerate(self.spec.equations):
-            if eq.time_derivative_order == 0:
-                if eq.constraint_solver.enabled:
-                    state = self._solve_constraint_equation(i, state, bc, t)
-                virtual_momenta[eq.field_name] = ScalarField(grid, data=0.0)
+        # Pass 1a: Solve constraints
+        state, virtual_momenta = self._evolve_constraints(state, bc, t)
 
-        # Pass 1b: Compute virtual momenta for first-order components.
-        # Their RHS becomes the "virtual momentum" that other equations can
-        # reference via pi_N or first_derivative_t.  This runs after
-        # constraints are solved so that first-order equations see updated
-        # constraint fields.
-        for i, eq in enumerate(self.spec.equations):
-            if eq.time_derivative_order == 1:
-                virtual_momenta[eq.field_name] = self._compute_rhs_for_component(
-                    i, state, bc, t
-                )
+        # Pass 1b: Compute first-order virtual momenta
+        virtual_momenta = self._evolve_first_order(state, bc, t, virtual_momenta)
 
-        # Pass 2: Build the full rates array using slot maps
+        # Pass 2: Build the full rates array
         rates: list[ScalarField | None] = [None] * expected_fields
-
-        for i, eq in enumerate(self.spec.equations):
-            field_slot = self._field_slot_map[eq.field_name]
-
-            if eq.time_derivative_order >= 2:  # noqa: PLR2004
-                # Second-order: d/dt field = momentum, d/dt momentum = RHS
-                momentum_slot = self._momentum_slot_map[eq.field_name]
-                momentum = state[momentum_slot]
-                if not isinstance(momentum, ScalarField):
-                    msg = f"Expected ScalarField for momentum, got {type(momentum).__name__}"
-                    raise TypeError(msg)
-                rates[field_slot] = momentum.copy()
-                rates[momentum_slot] = self._compute_rhs_for_component(
-                    i, state, bc, t, virtual_momenta
-                )
-            elif eq.time_derivative_order == 1:
-                # First-order: d/dt field = RHS (already computed in Pass 1)
-                rates[field_slot] = virtual_momenta[eq.field_name]
-            else:
-                # Constraint (order=0): no time evolution
-                rates[field_slot] = ScalarField(grid, data=0.0)
+        rates = self._evolve_second_order(state, bc, t, virtual_momenta, rates)
 
         return FieldCollection(rates)  # type: ignore[arg-type]
+
+    def check_stability(self, dt: float, grid: GridBase) -> list[str]:
+        """Check CFL / stability conditions for explicit time-stepping.
+
+        Estimates maximum wave speeds and diffusivities from the equation
+        coefficients and checks whether ``dt`` satisfies the CFL condition.
+
+        Parameters
+        ----------
+        dt : float
+            Proposed time step.
+        grid : GridBase
+            The spatial grid (used for cell spacing).
+
+        Returns
+        -------
+        list[str]
+            Warning messages for any violated conditions. Empty if stable.
+        """
+        warnings: list[str] = []
+        dx_min = min(grid.discretization)
+
+        for eq in self.spec.equations:
+            if eq.time_derivative_order < 2:  # noqa: PLR2004
+                continue
+
+            # Estimate max wave speed from laplacian coefficients
+            max_laplacian_coeff = 0.0
+            max_diffusive_coeff = 0.0
+            for term in eq.rhs_terms:
+                coeff_abs = abs(term.coefficient)
+                if term.operator == "laplacian" and term.field == eq.field_name:
+                    max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
+                elif term.operator.startswith("laplacian_"):
+                    max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
+                elif term.operator == "biharmonic":
+                    max_diffusive_coeff = max(max_diffusive_coeff, coeff_abs)
+
+            # CFL for wave equation: dt < dx / c where c = sqrt(laplacian_coeff)
+            if max_laplacian_coeff > 0:
+                c_max = math.sqrt(max_laplacian_coeff)
+                cfl_limit = dx_min / c_max
+                if dt > cfl_limit:
+                    warnings.append(
+                        f"CFL violated for {eq.field_name}: "
+                        f"dt={dt:.3e} > dx/c={cfl_limit:.3e} "
+                        f"(c={c_max:.3e}, dx={dx_min:.3e})"
+                    )
+
+            # Stability for biharmonic: dt < dx^4 / (2 * coeff)
+            if max_diffusive_coeff > 0:
+                biharm_limit = dx_min**4 / (2 * max_diffusive_coeff)
+                if dt > biharm_limit:
+                    warnings.append(
+                        f"Biharmonic stability violated for {eq.field_name}: "
+                        f"dt={dt:.3e} > dx^4/(2D)={biharm_limit:.3e}"
+                    )
+
+        return warnings
 
     def _cache_key(self) -> dict[str, Any]:
         """Return a cache key for this PDE.
@@ -1602,6 +1722,8 @@ class PDEFromSpec(PDEBase):
 def build_pde_from_json(
     json_path: Path | str,
     parameters: dict[str, float] | None = None,
+    *,
+    constraint_eps: float = 1e-14,
 ) -> PDEFromSpec:
     """Build a PDE from a JSON equation specification file.
 
@@ -1617,6 +1739,9 @@ def build_pde_from_json(
         Optional parameter values to override symbolic coefficients.
         Keys are symbolic names (e.g., "m2", "kappa"), values are numeric.
         Example: {"m2": 0.5, "kappa": 1.0}
+    constraint_eps : float
+        Tolerance for the constraint solver's Laplacian coefficient check.
+        Default ``1e-14``.
 
     Returns
     -------
@@ -1635,7 +1760,7 @@ def build_pde_from_json(
     >>> pde = build_pde_from_json("examples/data/proca_1d.json", parameters={"m2": 2.0})
     """
     spec = load_equation_system(json_path)
-    return PDEFromSpec(spec, parameters=parameters)
+    return PDEFromSpec(spec, parameters=parameters, constraint_eps=constraint_eps)
 
 
 def create_initial_state(
