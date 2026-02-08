@@ -103,9 +103,19 @@ unfixable = ["T201"]
     "D104",
     "D205",
     "SLF001",
+    "PLC0415",
+    "PLC2701",
+    "PLR0904",
+    "PLR0913",
+    "PLR0917",
+    "PLR2004",
+    "FBT001",
+    "S108",
+    "ARG002",
 ]
 "examples/**/*" = ["INP001", "T201", "E402"]
-"torsion_gertsenshtein/cli/**/*" = ["T201"]
+"torsion_gertsenshtein/cli/**/*" = ["T201", "PLC0415"]
+"torsion_gertsenshtein/cli/_derive.py" = ["T201", "PLC0415", "S404", "S603", "S607"]
 "scripts/**/*" = [
     "INP001",
     "T201",
