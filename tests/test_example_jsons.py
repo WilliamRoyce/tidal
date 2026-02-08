@@ -62,7 +62,7 @@ class TestExampleJSON:
         """JSON loads without schema errors."""
         spec = load_equation_system(json_path)
         assert spec.n_components >= 1
-        assert spec.dimension >= 2  # at least 1+1D
+        assert spec.dimension >= 2  # at least 1+1D  # noqa: PLR2004
         assert len(spec.equations) == spec.n_components
 
     def test_build_and_evolve(self, json_path: Path) -> None:

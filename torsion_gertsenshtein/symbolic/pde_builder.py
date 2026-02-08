@@ -22,12 +22,12 @@ from typing_extensions import override
 
 from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
 from torsion_gertsenshtein.symbolic.json_loader import (
+    _CUSTOM_OPERATORS,
     AXIS_LETTERS,
     BoundaryCondition,
     ConstraintSolverConfig,
     EquationSystem,
     OperatorTerm,
-    _CUSTOM_OPERATORS,
     load_equation_system,
 )
 
@@ -245,7 +245,7 @@ _AXIS_INDEX: dict[str, int] = {letter: i for i, letter in enumerate(AXIS_LETTERS
 _AXIS_MIN_DIM: dict[str, int] = {letter: i + 1 for i, letter in enumerate(AXIS_LETTERS)}
 
 #: Map axis index back to letter.
-_AXIS_LETTER: dict[int, str] = {i: letter for i, letter in enumerate(AXIS_LETTERS)}
+_AXIS_LETTER: dict[int, str] = dict(enumerate(AXIS_LETTERS))
 
 #: Character class matching all known axis letters.
 _AXIS_RE_CLASS = "[" + "".join(AXIS_LETTERS) + "]"
@@ -618,6 +618,11 @@ class PDEFromSpec(PDEBase):
         -------
         float
             The effective coefficient value.
+
+        Raises
+        ------
+        ValueError
+            If a symbolic coefficient cannot be resolved from parameters.
         """
         if term.coefficient_symbolic is not None:
             sym = term.coefficient_symbolic
@@ -1024,6 +1029,8 @@ class PDEFromSpec(PDEBase):
         ------
         ValueError
             If the operator is not recognized or the grid dimension is too low.
+        RuntimeError
+            If the operator is in the registry but cannot be applied as a spatial operator.
         """
         entry = _OPERATOR_REGISTRY.get(operator_name)
         if entry is None:
@@ -1548,6 +1555,11 @@ class PDEFromSpec(PDEBase):
         -------
         list[ScalarField | None]
             Populated rates array.
+
+        Raises
+        ------
+        TypeError
+            If momentum field is not a ScalarField.
         """
         grid = state.grid
         for i, eq in enumerate(self.spec.equations):
@@ -1677,9 +1689,7 @@ class PDEFromSpec(PDEBase):
             max_diffusive_coeff = 0.0
             for term in eq.rhs_terms:
                 coeff_abs = abs(term.coefficient)
-                if term.operator == "laplacian" and term.field == eq.field_name:
-                    max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
-                elif term.operator.startswith("laplacian_"):
+                if (term.operator == "laplacian" and term.field == eq.field_name) or term.operator.startswith("laplacian_"):
                     max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
                 elif term.operator == "biharmonic":
                     max_diffusive_coeff = max(max_diffusive_coeff, coeff_abs)

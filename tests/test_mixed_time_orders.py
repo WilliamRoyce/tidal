@@ -401,15 +401,15 @@ class TestConstraintEvolution:
         )
         # Default eps=1e-14 should accept coeff=1e-10
         pde_ok = PDEFromSpec(spec)
-        assert pde_ok._constraint_eps == 1e-14  # noqa: SLF001
+        assert pde_ok._constraint_eps == 1e-14  # noqa: PLR2004
 
         # Tight eps=1e-8 should reject coeff=1e-10
         import pytest  # noqa: PLC0415
 
+        pde_reject = PDEFromSpec(spec, constraint_eps=1e-8)
+        grid = CartesianGrid([(0, 10)], 16, periodic=True)
+        state = FieldCollection([ScalarField(grid, data=1.0)])
         with pytest.raises(ValueError, match="effectively zero"):
-            pde_reject = PDEFromSpec(spec, constraint_eps=1e-8)
-            grid = CartesianGrid([(0, 10)], 16, periodic=True)
-            state = FieldCollection([ScalarField(grid, data=1.0)])
             pde_reject.evolution_rate(state)
 
 

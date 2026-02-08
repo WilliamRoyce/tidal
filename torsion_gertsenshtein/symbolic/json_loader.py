@@ -198,7 +198,7 @@ class OperatorTerm:
 
         # Check for nonlinear coefficient warning from Wolfram export
         if data.get("warning") == "nonlinear_coefficient":
-            import warnings
+            import warnings  # noqa: PLC0415
 
             warnings.warn(
                 f"Term '{operator}' on field '{data['field']}' has a "
@@ -773,7 +773,7 @@ def _validate_spacetime(spacetime: dict[str, Any]) -> None:
     # Validate signature contains only ±1 and matches dimension
     if "signature" in spacetime:
         sig = spacetime["signature"]
-        if not isinstance(sig, list) or not all(s in (-1, 1) for s in sig):
+        if not isinstance(sig, list) or not all(s in {-1, 1} for s in sig):
             msg = "spacetime.signature must be a list of +1 or -1 values"
             raise ValueError(msg)
         if len(sig) != spacetime["dimension"]:
