@@ -310,7 +310,7 @@ class TestBuildPDEFromJSON:
         if not kg_json_path.exists():
             pytest.skip(f"Test file not found: {kg_json_path}")
 
-        pde = build_pde_from_json(kg_json_path)
+        pde = build_pde_from_json(kg_json_path, parameters={"m2": 1.0})
 
         assert isinstance(pde, PDEFromSpec)
         num_kg_components = 1

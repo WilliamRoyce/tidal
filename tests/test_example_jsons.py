@@ -24,6 +24,7 @@ EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "data"
 # Default parameters for JSONs with symbolic coefficients.
 # Keys are JSON filenames; values are parameter dicts.
 _DEFAULT_PARAMS: dict[str, dict[str, float]] = {
+    "klein_gordon_1d.json": {"m2": 1.0},
     "klein_gordon_3d.json": {"m2": 1.0},
     "proca_1d.json": {"procaMassSquared": 1.0},
     "de_sitter_kg.json": {"dSm2": 1.0, "dSH": 0.1},

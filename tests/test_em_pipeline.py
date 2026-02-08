@@ -168,7 +168,7 @@ class TestKGPipelineValidation:
             pytest.skip(f"Test file not found: {kg_json_path}")
 
         spec = load_equation_system(kg_json_path)
-        pde = build_pde_from_json(kg_json_path)
+        pde = build_pde_from_json(kg_json_path, parameters={"m2": 1.0})
 
         # Initialize with uniform phi = 1
         initial = create_initial_state(
@@ -194,7 +194,7 @@ class TestKGPipelineValidation:
 
         # Create PDE from pipeline
         spec = load_equation_system(kg_json_path)
-        pipeline_pde = build_pde_from_json(kg_json_path)
+        pipeline_pde = build_pde_from_json(kg_json_path, parameters={"m2": 1.0})
 
         # Create existing KleinGordonPDE
         # Note: The JSON has m^2 = 1, so m = 1
