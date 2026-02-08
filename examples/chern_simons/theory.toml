@@ -17,4 +17,4 @@ names = ["kappa"]
 expression = "-1/2 * (CD[-a][A[-b]] eta[a, c] eta[b, d] CD[-c][A[-d]] - CD[-a][A[-b]] eta[a, d] eta[b, c] CD[-c][A[-d]]) + kappa/2 * epsiloneta[a, b, c] * A[-a] * CD[-b][A[-c]]"
 
 [output]
-path = "examples/data/chern_simons_3d.json"
+path = "../data/chern_simons_3d.json"

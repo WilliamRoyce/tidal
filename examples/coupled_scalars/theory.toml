@@ -20,4 +20,4 @@ names = ["mPhi2", "mChi2", "gCpl"]
 expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - mPhi2/2 phi[]^2 - 1/2 CD[-a][chi[]] eta[a, b] CD[-b][chi[]] - mChi2/2 chi[]^2 - gCpl phi[] chi[]"
 
 [output]
-path = "examples/data/coupled_scalars.json"
+path = "../data/coupled_scalars.json"

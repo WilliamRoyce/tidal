@@ -14,4 +14,4 @@ type = "vector"
 expression = "-1/2 * (CD[-a][A[-b]] eta[a, c] eta[b, d] CD[-c][A[-d]] - CD[-a][A[-b]] eta[a, d] eta[b, c] CD[-c][A[-d]])"
 
 [output]
-path = "examples/data/em_1d.json"
+path = "../data/em_1d.json"
