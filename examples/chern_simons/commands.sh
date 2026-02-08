@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Chern-Simons 2+1D example
 # See also: chern_simons.wls (manual derivation), chern_simons_simulation.py (Python simulation)
+#
+# To run manually:  cd examples/chern_simons && tg derive theory.toml
 
 set -euo pipefail
+cd "$(dirname "$0")"
 
 # Derive equations from Lagrangian (requires wolframscript)
 tg derive theory.toml

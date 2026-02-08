@@ -5,8 +5,11 @@
 # NOTE: The derive step uses stereographic projection coordinates with
 # position-dependent metric. The manual .wls script is required for derivation.
 # The simulate step works fully via CLI (all periodic BCs, 2D Cartesian grid).
+#
+# To run manually:  cd examples/sphere_kg
 
 set -euo pipefail
+cd "$(dirname "$0")"
 
 # Derive equations (manual .wls only — stereographic projection metric)
 # tg derive sphere_kg.wls    # pass-through to wolframscript

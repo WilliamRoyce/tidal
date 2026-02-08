@@ -5,8 +5,11 @@
 # NOTE: The elasticity Lagrangian uses component-level expressions (not covariant
 # tensor notation) because the Lame parameters break Lorentz invariance. The derive
 # step requires the manual .wls script; no TOML config is provided.
+#
+# To run manually:  cd examples/elasticity
 
 set -euo pipefail
+cd "$(dirname "$0")"
 
 # Derive equations (manual .wls only — no TOML equivalent)
 # tg derive navier_cauchy.wls    # pass-through to wolframscript

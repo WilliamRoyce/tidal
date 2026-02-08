@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Klein-Gordon 1+1D example
 # See also: klein_gordon.wls (manual derivation), kg_from_lagrangian.py (Python simulation)
+#
+# To run manually:  cd examples/scalar_field && tg derive theory.toml
 
 set -euo pipefail
+cd "$(dirname "$0")"
 
 # Derive equations from Lagrangian (requires wolframscript)
 tg derive theory.toml
@@ -22,4 +25,5 @@ tg simulate ../data/klein_gordon_1d.json \
   --ic gaussian \
   --ic-width 5.0 \
   --t-end 30.0 \
-  --dt 0.01
+  --dt 0.01 \
+  --snapshots 0.1

@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Coupled Scalars 1+1D example
 # See also: coupled_scalars.wls (manual derivation), coupled_from_lagrangian.py (Python simulation)
+#
+# To run manually:  cd examples/coupled_scalars && tg derive theory.toml
 
 set -euo pipefail
+cd "$(dirname "$0")"
 
 # Derive equations from Lagrangian (requires wolframscript)
 tg derive theory.toml

@@ -5,8 +5,11 @@
 # NOTE: The derive step uses cylindrical coordinates (r, theta, z) with a
 # coordinate-dependent metric. The manual .wls script is required for derivation.
 # The simulation works via CLI with --bc and --ic formula flags.
+#
+# To run manually:  cd examples/cylindrical_kg
 
 set -euo pipefail
+cd "$(dirname "$0")"
 
 # Derive equations (manual .wls only — curvilinear coordinates)
 # tg derive cylindrical_kg.wls    # pass-through to wolframscript

@@ -4,8 +4,11 @@
 #
 # Electrostatics solves the Poisson equation (no time evolution).
 # Use --mode constraint for single-step constraint solving.
+#
+# To run manually:  cd examples/electrostatics
 
 set -euo pipefail
+cd "$(dirname "$0")"
 
 # Derive equations (manual .wls only — Poisson equation)
 # tg derive electrostatics.wls    # pass-through to wolframscript

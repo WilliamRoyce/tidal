@@ -6,8 +6,11 @@
 # coordinate-dependent metric and trigonometric coefficient functions.
 # The manual .wls script is required for derivation (no TOML equivalent).
 # The simulation works via CLI with --bc and --ic formula flags.
+#
+# To run manually:  cd examples/spherical_kg
 
 set -euo pipefail
+cd "$(dirname "$0")"
 
 # Derive equations (manual .wls only — curvilinear coordinates)
 # tg derive spherical_kg.wls    # pass-through to wolframscript

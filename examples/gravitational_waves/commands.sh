@@ -7,8 +7,11 @@
 # The derive step requires the manual .wls script.
 # The simulation uses --ic formula for TT-gauge initial conditions.
 # For the full multi-component TT-gauge setup, see gw_simulation.py.
+#
+# To run manually:  cd examples/gravitational_waves
 
 set -euo pipefail
+cd "$(dirname "$0")"
 
 # Derive equations (manual .wls only — xPert linearization)
 # tg derive linearized_gravity.wls    # pass-through to wolframscript

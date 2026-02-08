@@ -5,8 +5,11 @@
 # NOTE: The derive step uses polar coordinates (r, theta) with a coordinate-dependent
 # metric. The manual .wls script is required for derivation (no TOML equivalent).
 # The simulation works via CLI with --bc and --ic formula flags.
+#
+# To run manually:  cd examples/polar_kg
 
 set -euo pipefail
+cd "$(dirname "$0")"
 
 # Derive equations (manual .wls only — curvilinear coordinates)
 # tg derive polar_kg.wls    # pass-through to wolframscript

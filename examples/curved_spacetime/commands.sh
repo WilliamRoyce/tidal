@@ -2,8 +2,11 @@
 # CLI equivalents for the Curved Spacetime examples
 # See also: de_sitter_kg.wls, conformal_kg_static.wls (manual derivations)
 #           de_sitter_simulation.py, conformal_kg_simulation.py (Python simulations)
+#
+# To run manually:  cd examples/curved_spacetime && tg derive de_sitter.toml
 
 set -euo pipefail
+cd "$(dirname "$0")"
 
 ### De Sitter Klein-Gordon (2+1D, expanding universe) ###
 

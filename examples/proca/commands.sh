@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Proca (massive vector) 1+1D example
 # See also: proca.wls (manual derivation), proca_simulation.py (Python simulation)
+#
+# To run manually:  cd examples/proca && tg derive theory.toml
 
 set -euo pipefail
+cd "$(dirname "$0")"
 
 # Derive equations from Lagrangian (requires wolframscript)
 tg derive theory.toml
