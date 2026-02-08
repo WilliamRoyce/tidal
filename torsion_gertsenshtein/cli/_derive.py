@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import shutil
 import subprocess
+import sys
 import tempfile
 import tomllib
 from dataclasses import dataclass
@@ -610,12 +611,12 @@ def _run_wolframscript(script_path: Path) -> int:
         Exit code from wolframscript.
     """
     if shutil.which("wolframscript") is None:
-        print("Error: 'wolframscript' not found on PATH.")
-        print()
-        print("Install Wolfram Engine (free for development):")
-        print("  https://www.wolfram.com/engine/")
-        print()
-        print("Or use --dry-run to see the generated script without execution.")
+        print("Error: 'wolframscript' not found on PATH.", file=sys.stderr)
+        print(file=sys.stderr)
+        print("Install Wolfram Engine (free for development):", file=sys.stderr)
+        print("  https://www.wolfram.com/engine/", file=sys.stderr)
+        print(file=sys.stderr)
+        print("Or use --dry-run to see the generated script without execution.", file=sys.stderr)
         return 1
 
     print(f"Running: wolframscript -file {script_path}")
@@ -696,7 +697,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:
                     f"Validation: JSON loaded successfully ({spec.n_components} components)"
                 )
             except Exception as exc:  # noqa: BLE001
-                print(f"\nWarning: JSON validation failed: {exc}")
+                print(f"\nWarning: JSON validation failed: {exc}", file=sys.stderr)
                 ret = 1
 
     return ret
@@ -717,7 +718,7 @@ def derive_command(args: Namespace) -> int:
     """
     config_path = Path(args.config)
     if not config_path.exists():
-        print(f"Error: file not found: {config_path}")
+        print(f"Error: file not found: {config_path}", file=sys.stderr)
         return 1
 
     ext = config_path.suffix.lower()
@@ -729,6 +730,7 @@ def derive_command(args: Namespace) -> int:
         return _derive_from_toml(config_path, args)
 
     print(
-        f"Error: unsupported file extension '{ext}'. Use .toml for config or .wls for script."
+        f"Error: unsupported file extension '{ext}'. Use .toml for config or .wls for script.",
+        file=sys.stderr,
     )
     return 1

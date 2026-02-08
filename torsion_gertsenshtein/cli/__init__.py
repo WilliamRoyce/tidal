@@ -37,6 +37,14 @@ def _build_parser() -> argparse.ArgumentParser:
             "Generate equations of motion from a Lagrangian. "
             "Accepts a TOML config file (.toml) or a Wolfram script (.wls)."
         ),
+        epilog=(
+            "Examples:\n"
+            "  tg derive theory.toml                     # run derivation\n"
+            "  tg derive theory.toml --dry-run            # preview .wls without running\n"
+            "  tg derive theory.toml --save-script eq.wls # save generated script\n"
+            "  tg derive script.wls                       # run existing .wls directly"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     derive_parser.add_argument(
         "config",
@@ -65,6 +73,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "inspect",
         help="Display equation system information from JSON",
         description="Load a JSON specification and display its contents.",
+        epilog=(
+            "Examples:\n"
+            "  tg inspect examples/data/klein_gordon_1d.json\n"
+            "  tg inspect spec.json --params    # show default parameter values"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     inspect_parser.add_argument(
         "json_path",
@@ -81,6 +95,14 @@ def _build_parser() -> argparse.ArgumentParser:
         "simulate",
         help="Run PDE simulation from JSON specification",
         description="Build and run a PDE simulation from a JSON equation specification.",
+        epilog=(
+            "Examples:\n"
+            "  tg simulate spec.json --param m2=1.0 --t-end 10\n"
+            "  tg simulate spec.json --ic gaussian --ic-width 2.0 --output result.png\n"
+            "  tg simulate spec.json --mode constraint --bc dirichlet\n"
+            "  tg simulate spec.json --ic formula --ic-formula 'exp(-(x-5)**2)'"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     sim_parser.add_argument(
         "json_path",
@@ -179,7 +201,7 @@ def _build_parser() -> argparse.ArgumentParser:
     # Output
     sim_parser.add_argument(
         "--output", default=None, metavar="PATH",
-        help="Output file path (default: outputs/{stem}_output.png)",
+        help="Output file path (default: {spec_dir}/{stem}_output.png)",
     )
     sim_parser.add_argument(
         "--format",
@@ -199,6 +221,12 @@ def _build_parser() -> argparse.ArgumentParser:
         "list",
         help="List available JSON specifications",
         description="Scan a directory for JSON equation specifications and display summaries.",
+        epilog=(
+            "Examples:\n"
+            "  tg list                          # scan default examples/data/\n"
+            "  tg list --dir /path/to/specs      # scan custom directory"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     list_parser.add_argument(
         "--dir",
@@ -232,6 +260,11 @@ def _dispatch(args: argparse.Namespace) -> int:
     -------
     int
         Exit code from the command handler.
+
+    Raises
+    ------
+    ValueError
+        If ``args.command`` is not a recognized subcommand.
     """
     if args.command == "derive":
         from torsion_gertsenshtein.cli._derive import derive_command
@@ -249,7 +282,8 @@ def _dispatch(args: argparse.Namespace) -> int:
         from torsion_gertsenshtein.cli._list import list_command
 
         return list_command(args)
-    return 0
+    msg = f"Unknown command: {args.command}"
+    raise ValueError(msg)
 
 
 def main(argv: list[str] | None = None) -> int:

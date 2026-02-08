@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import re
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -215,7 +216,7 @@ def inspect_command(args: Namespace) -> int:
     """
     json_path = Path(args.json_path)
     if not json_path.exists():
-        print(f"Error: file not found: {json_path}")
+        print(f"Error: file not found: {json_path}", file=sys.stderr)
         return 1
 
     spec = load_equation_system(json_path)

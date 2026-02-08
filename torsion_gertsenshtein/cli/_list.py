@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -45,7 +46,7 @@ def list_command(args: Namespace) -> int:
     scan_dir = Path(args.dir) if args.dir else _find_examples_dir()
 
     if not scan_dir.is_dir():
-        print(f"Error: directory not found: {scan_dir}")
+        print(f"Error: directory not found: {scan_dir}", file=sys.stderr)
         return 1
 
     json_files = sorted(scan_dir.glob("*.json"))

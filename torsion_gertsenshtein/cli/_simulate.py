@@ -106,7 +106,8 @@ def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:
                 params[key] = float(val)  # type: ignore[arg-type]
             except (ValueError, TypeError):
                 print(
-                    f"  Warning: metadata parameter '{key}' has non-numeric value {val!r}, skipping"
+                    f"  Warning: metadata parameter '{key}' has non-numeric value {val!r}, skipping",
+                    file=sys.stderr,
                 )
 
     # Override with CLI params
@@ -187,7 +188,11 @@ def _parse_single_bound(s: str) -> tuple[float, float]:
         msg = f"Invalid bound format: '{s}'. Expected LO:HI (e.g. 0:20)"
         raise ValueError(msg)
     lo_str, hi_str = s.split(":", 1)
-    return float(lo_str), float(hi_str)
+    lo, hi = float(lo_str), float(hi_str)
+    if lo >= hi:
+        msg = f"Invalid bound: lower ({lo}) must be less than upper ({hi})"
+        raise ValueError(msg)
+    return lo, hi
 
 
 _VALID_BC_TYPES = {"periodic", "neumann", "dirichlet"}
@@ -237,12 +242,15 @@ def _parse_bc(raw: str | None, *, periodic: bool, spatial_dim: int) -> bool | li
     return [bc == "periodic" for bc in bc_list]
 
 
-def _build_grid(args: Namespace, spec: EquationSystem) -> CartesianGrid:
-    """Build a CartesianGrid from CLI arguments."""
+def _build_grid(
+    args: Namespace,
+    spec: EquationSystem,
+    bounds: list[tuple[float, float]],
+) -> CartesianGrid:
+    """Build a CartesianGrid from CLI arguments and pre-parsed bounds."""
     from pde import CartesianGrid
 
     shape = _parse_grid_shape(args.grid_shape, spec.spatial_dimension)
-    bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
     periodic = _parse_bc(args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension)
 
     return CartesianGrid(
@@ -788,7 +796,7 @@ def simulate_command(args: Namespace) -> int:
 
     json_path = Path(args.json_path)
     if not json_path.exists():
-        print(f"Error: file not found: {json_path}")
+        print(f"Error: file not found: {json_path}", file=sys.stderr)
         return 1
 
     # Step 1: Load spec
@@ -808,13 +816,12 @@ def simulate_command(args: Namespace) -> int:
     pde = build_pde_from_json(json_path, parameters=params)
 
     # Step 4: Create grid
-    grid = _build_grid(args, spec)
+    bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
+    grid = _build_grid(args, spec, bounds)
     print(f"  Grid: {'x'.join(str(s) for s in grid.shape)}, bounds: {grid.axes_bounds}")
 
     # Step 5: Initial conditions
-    state = _build_initial_state(
-        args, grid, spec, _parse_bounds(args.bounds, spec.spatial_dimension)
-    )
+    state = _build_initial_state(args, grid, spec, bounds)
     initial_state = state.copy()
     print(f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}")
 
