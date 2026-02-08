@@ -23,59 +23,48 @@ class TestMainEntryPoint:
         with pytest.raises(SystemExit, match="0"):
             main(["--version"])
 
+    def test_module_invocation(self) -> None:
+        """``python -m torsion_gertsenshtein.cli`` should be importable."""
+        import torsion_gertsenshtein.cli.__main__  # noqa: F401
+
 
 class TestInspectCommand:
-    def test_inspect_klein_gordon_1d(self, capsys: pytest.CaptureFixture[str]) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    @pytest.mark.parametrize(
+        ("fixture_name", "dim_label", "fields", "expected_strs"),
+        [
+            ("klein_gordon_1d_json", "1+1D", 1, ["phi_0"]),
+            ("massive_3form_json", "3+1D", 4, ["C_0", "C_3", "m2"]),
+            ("coupled_scalars_json", "1+1D", 2, ["phi_0", "chi_0"]),
+        ],
+    )
+    def test_inspect_specs(
+        self,
+        fixture_name: str,
+        dim_label: str,
+        fields: int,
+        expected_strs: list[str],
+        capsys: pytest.CaptureFixture[str],
+        request: pytest.FixtureRequest,
+    ) -> None:
+        json_path: Path = request.getfixturevalue(fixture_name)
         ret = main(["inspect", str(json_path)])
         assert ret == 0
 
         out = capsys.readouterr().out
-        assert "Spacetime:" in out
-        assert "1+1D" in out
-        assert "phi_0" in out
-
-    def test_inspect_massive_3form(self, capsys: pytest.CaptureFixture[str]) -> None:
-        json_path = EXAMPLES_DIR / "massive_3form.json"
-        if not json_path.exists():
-            pytest.skip("massive_3form.json not found")
-
-        ret = main(["inspect", str(json_path)])
-        assert ret == 0
-
-        out = capsys.readouterr().out
-        assert "4 components" in out
-        assert "C_0" in out
-        assert "C_3" in out
-        assert "m2" in out
-        assert "3+1D" in out
-
-    def test_inspect_coupled_scalars(self, capsys: pytest.CaptureFixture[str]) -> None:
-        json_path = EXAMPLES_DIR / "coupled_scalars.json"
-        if not json_path.exists():
-            pytest.skip("coupled_scalars.json not found")
-
-        ret = main(["inspect", str(json_path)])
-        assert ret == 0
-
-        out = capsys.readouterr().out
-        assert "2 components" in out
-        assert "phi_0" in out
-        assert "chi_0" in out
+        assert dim_label in out
+        if fields > 1:
+            assert f"{fields} components" in out
+        for s in expected_strs:
+            assert s in out
 
     def test_inspect_nonexistent_file(self) -> None:
         ret = main(["inspect", "/nonexistent/file.json"])
         assert ret == 1
 
-    def test_inspect_with_params_flag(self, capsys: pytest.CaptureFixture[str]) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
-        ret = main(["inspect", str(json_path), "--params"])
+    def test_inspect_with_params_flag(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        ret = main(["inspect", str(klein_gordon_1d_json), "--params"])
         assert ret == 0
 
 
@@ -101,25 +90,21 @@ class TestListCommand:
 
 
 class TestSimulateCommand:
-    def test_simulate_1d_summary(self, capsys: pytest.CaptureFixture[str]) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
-        ret = main(["simulate", str(json_path), "--t-end", "1.0", "--no-plot"])
+    def test_simulate_1d_summary(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        ret = main(["simulate", str(klein_gordon_1d_json), "--t-end", "1.0", "--no-plot"])
         assert ret == 0
 
         out = capsys.readouterr().out
         assert "Results:" in out
         assert "phi_0" in out
 
-    def test_simulate_with_params(self, capsys: pytest.CaptureFixture[str]) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_3d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_3d.json not found")
-
+    def test_simulate_with_params(
+        self, klein_gordon_3d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_3d_json),
             "--param", "m2=1.0",
             "--t-end", "0.5",
             "--grid-shape", "8",
@@ -130,67 +115,52 @@ class TestSimulateCommand:
         out = capsys.readouterr().out
         assert "Results:" in out
 
-    def test_simulate_png_output(self, tmp_path: Path) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    def test_simulate_png_output(
+        self, klein_gordon_1d_json: Path, tmp_path: Path
+    ) -> None:
         output = tmp_path / "test_output.png"
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_1d_json),
             "--t-end", "0.5",
             "--output", str(output),
         ])
         assert ret == 0
         assert output.exists()
 
-    def test_simulate_npz_output(self, tmp_path: Path) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    def test_simulate_npz_output(
+        self, klein_gordon_1d_json: Path, tmp_path: Path
+    ) -> None:
         output = tmp_path / "test_output.npz"
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_1d_json),
             "--t-end", "0.5",
             "--output", str(output),
         ])
         assert ret == 0
         assert output.exists()
 
-    def test_simulate_zero_ic(self, capsys: pytest.CaptureFixture[str]) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
+    # --- IC types (parametrized) ---
 
+    @pytest.mark.parametrize("ic_type", ["gaussian", "plane-wave", "zero"])
+    def test_simulate_ic_types(
+        self,
+        klein_gordon_1d_json: Path,
+        ic_type: str,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
         ret = main([
-            "simulate", str(json_path),
-            "--ic", "zero",
+            "simulate", str(klein_gordon_1d_json),
+            "--ic", ic_type,
             "--t-end", "0.5",
             "--no-plot",
         ])
         assert ret == 0
 
-    def test_simulate_plane_wave_ic(self, capsys: pytest.CaptureFixture[str]) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    def test_simulate_gaussian_custom(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         ret = main([
-            "simulate", str(json_path),
-            "--ic", "plane-wave",
-            "--t-end", "0.5",
-            "--no-plot",
-        ])
-        assert ret == 0
-
-    def test_simulate_gaussian_ic(self, capsys: pytest.CaptureFixture[str]) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
-        ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_1d_json),
             "--ic", "gaussian",
             "--ic-width", "1.5",
             "--ic-amplitude", "2.0",
@@ -202,13 +172,11 @@ class TestSimulateCommand:
         out = capsys.readouterr().out
         assert "Results:" in out
 
-    def test_simulate_off_center_gaussian(self, capsys: pytest.CaptureFixture[str]) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    def test_simulate_off_center_gaussian(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_1d_json),
             "--ic", "gaussian",
             "--ic-center", "30.0",
             "--ic-width", "3.0",
@@ -220,14 +188,12 @@ class TestSimulateCommand:
         out = capsys.readouterr().out
         assert "Results:" in out
 
-    def test_simulate_chern_simons_constraint(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_simulate_chern_simons_constraint(
+        self, chern_simons_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Test simulation of a system with constraint (time_order=0) + dynamical fields."""
-        json_path = EXAMPLES_DIR / "chern_simons_3d.json"
-        if not json_path.exists():
-            pytest.skip("chern_simons_3d.json not found")
-
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(chern_simons_json),
             "--t-end", "0.5",
             "--grid-shape", "8",
             "--no-plot",
@@ -238,21 +204,13 @@ class TestSimulateCommand:
         assert "Results:" in out
         assert "A_0" in out
 
-    def test_simulate_invalid_param_format(self) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
-        ret = main(["simulate", str(json_path), "--param", "bad_no_equals", "--no-plot"])
+    def test_simulate_invalid_param_format(self, klein_gordon_1d_json: Path) -> None:
+        ret = main(["simulate", str(klein_gordon_1d_json), "--param", "bad_no_equals", "--no-plot"])
         assert ret == 1
 
-    def test_simulate_invalid_ic_component(self) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    def test_simulate_invalid_ic_component(self, klein_gordon_1d_json: Path) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_1d_json),
             "--ic-component", "nonexistent_field",
             "--t-end", "0.5",
             "--no-plot",
@@ -263,13 +221,11 @@ class TestSimulateCommand:
         ret = main(["simulate", "/nonexistent/file.json", "--no-plot"])
         assert ret == 1
 
-    def test_simulate_custom_grid(self, capsys: pytest.CaptureFixture[str]) -> None:
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    def test_simulate_custom_grid(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_1d_json),
             "--grid-shape", "32",
             "--bounds", "0:20",
             "--t-end", "0.5",
@@ -279,28 +235,22 @@ class TestSimulateCommand:
 
     # --- Feature: --bc (mixed boundary conditions) ---
 
-    def test_simulate_bc_single(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test --bc with a single BC type applied to all axes."""
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    def test_simulate_bc_single(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_1d_json),
             "--bc", "neumann",
             "--t-end", "0.5",
             "--no-plot",
         ])
         assert ret == 0
 
-    def test_simulate_bc_mixed_2d(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test --bc with mixed per-axis BCs on a 2D system."""
-        json_path = EXAMPLES_DIR / "polar_kg.json"
-        if not json_path.exists():
-            pytest.skip("polar_kg.json not found")
-
+    def test_simulate_bc_mixed_2d(
+        self, polar_kg_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(polar_kg_json),
             "--bc", "neumann,periodic",
             "--grid-shape", "16",
             "--bounds", "0.5:8,0:6.28",
@@ -313,44 +263,42 @@ class TestSimulateCommand:
         ])
         assert ret == 0
 
-    def test_simulate_bc_invalid_type(self) -> None:
-        """Test --bc with invalid BC type."""
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    def test_simulate_bc_invalid_type(self, klein_gordon_1d_json: Path) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_1d_json),
             "--bc", "invalid_bc",
             "--t-end", "0.5",
             "--no-plot",
         ])
         assert ret == 1
 
-    def test_simulate_bc_wrong_count(self) -> None:
-        """Test --bc with wrong number of values for dimension."""
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    def test_simulate_bc_wrong_count(self, klein_gordon_1d_json: Path) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_1d_json),
             "--bc", "neumann,periodic",  # 2 values for 1D
             "--t-end", "0.5",
             "--no-plot",
         ])
         assert ret == 1
 
+    def test_simulate_bc_dirichlet(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--bc", "dirichlet",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+
     # --- Feature: --ic formula ---
 
-    def test_simulate_formula_ic(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test --ic formula with a math expression."""
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    def test_simulate_formula_ic(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_1d_json),
             "--ic", "formula",
             "--ic-formula", "np.exp(-((x - 5)**2) / 2)",
             "--t-end", "0.5",
@@ -361,14 +309,11 @@ class TestSimulateCommand:
         out = capsys.readouterr().out
         assert "Results:" in out
 
-    def test_simulate_formula_ic_2d(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test --ic formula on a 2D grid."""
-        json_path = EXAMPLES_DIR / "polar_kg.json"
-        if not json_path.exists():
-            pytest.skip("polar_kg.json not found")
-
+    def test_simulate_formula_ic_2d(
+        self, polar_kg_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(polar_kg_json),
             "--ic", "formula",
             "--ic-formula", "np.exp(-((x - 3)**2 + (y - pi)**2) / 0.5**2)",
             "--grid-shape", "16",
@@ -380,28 +325,20 @@ class TestSimulateCommand:
         ])
         assert ret == 0
 
-    def test_simulate_formula_ic_missing_expr(self) -> None:
-        """Test --ic formula without --ic-formula raises error."""
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    def test_simulate_formula_ic_missing_expr(self, klein_gordon_1d_json: Path) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_1d_json),
             "--ic", "formula",
             "--t-end", "0.5",
             "--no-plot",
         ])
         assert ret == 1
 
-    def test_simulate_formula_ic_constant(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test --ic formula with a scalar constant (broadcasts to grid)."""
-        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
-        if not json_path.exists():
-            pytest.skip("klein_gordon_1d.json not found")
-
+    def test_simulate_formula_ic_constant(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(klein_gordon_1d_json),
             "--ic", "formula",
             "--ic-formula", "0.5",
             "--t-end", "0.5",
@@ -409,16 +346,24 @@ class TestSimulateCommand:
         ])
         assert ret == 0
 
+    def test_simulate_formula_ic_undefined_var(self, klein_gordon_1d_json: Path) -> None:
+        """Formula with undefined variable should fail."""
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--ic", "formula",
+            "--ic-formula", "badvar * 2",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 1
+
     # --- Feature: --mode constraint ---
 
-    def test_simulate_constraint_mode(self, capsys: pytest.CaptureFixture[str]) -> None:
-        """Test --mode constraint for single constraint solve (electrostatics)."""
-        json_path = EXAMPLES_DIR / "electrostatics_2d.json"
-        if not json_path.exists():
-            pytest.skip("electrostatics_2d.json not found")
-
+    def test_simulate_constraint_mode(
+        self, electrostatics_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         ret = main([
-            "simulate", str(json_path),
+            "simulate", str(electrostatics_json),
             "--mode", "constraint",
             "--grid-shape", "16",
             "--bc", "dirichlet",
@@ -430,6 +375,56 @@ class TestSimulateCommand:
 
         out = capsys.readouterr().out
         assert "Constraint solve complete" in out
+
+    # --- Solver options ---
+
+    def test_simulate_explicit_dt(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--dt", "0.01",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+    def test_simulate_scipy_scheme(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Verify scipy solver uses py-pde ScipySolver."""
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--scheme", "scipy",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+    def test_simulate_custom_snapshots(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--snapshots", "0.25",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+    # --- 3D simulation ---
+
+    def test_simulate_3d(
+        self, klein_gordon_3d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        ret = main([
+            "simulate", str(klein_gordon_3d_json),
+            "--param", "m2=1.0",
+            "--grid-shape", "8",
+            "--t-end", "0.2",
+            "--no-plot",
+        ])
+        assert ret == 0
 
 
 class TestDeriveCommand:
@@ -490,7 +485,7 @@ path = "output.json"
 """)
         script_path = tmp_path / "generated.wls"
         # Just save the script, don't run (wolframscript may not be available)
-        ret = main(["derive", str(config), "--save-script", str(script_path)])
+        main(["derive", str(config), "--save-script", str(script_path)])
         # May return 1 if wolframscript not found, but script should be saved
         assert script_path.exists()
 
