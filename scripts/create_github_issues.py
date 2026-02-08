@@ -163,10 +163,12 @@ Validates dimension-generalization claims, provides template for users.
     {
         "title": "Implement Automatic Gauge Fixing",
         "body": """## Current State
-`DeDonderGaugeRules` infrastructure exists but returns empty rules `{}`. Users must manually apply gauge conditions.
+`DeDonderGaugeRules` and `ApplyGaugeSimplification` were removed in Phase 11 Review as
+non-functional stubs. Users must manually apply gauge conditions. The gravitational wave
+example applies TT gauge analytically before pipeline export.
 
 ## Location
-`torsion_gertsenshtein/wolfram/Linearize.wl` (lines 170-191)
+`torsion_gertsenshtein/wolfram/Linearize.wl` — gauge fixing not yet implemented
 
 ## Impact
 - Gauge theory examples cannot derive gauge-fixed equations of motion automatically
@@ -328,28 +330,24 @@ Users can generate JSON programmatically, troubleshoot schema errors, extend for
     },
     {
         "title": "Handle Mixed Time-Space Cross-Derivatives Properly",
-        "body": """## Problem
-Terms like `∂_t ∂_x ∂_y` (time + 2 spatial) converted to momentum gradient with warning. `ExtractSpatialGradientFromMixed` defaults to `gradient_x(pi)` but loses direction info. In 2+1D, `Derivative[1,1,1]` is ambiguous.
+        "body": """## Status: RESOLVED (Issue #79)
 
-## Location
-`torsion_gertsenshtein/wolfram/ExportJSON.wl` (lines 533-542)
+Resolved by `ClassifySpatialProfile` + `ExtractSpatialOperatorFromMixed` in ExportJSON.wl.
+Mixed time-spatial derivatives like `Derivative[1,1,1]` (d_t d_x d_y) now correctly produce
+`cross_derivative_xy(pi)`. Python multi-axis handler (`_op_multi_axis_derivative`) supports
+generic patterns like `derivative_2x_1y`.
 
-## Current Handling
-```mathematica
-Print["WARNING: Multiple spatial derivatives..."];
-(* Falls back to first spatial direction *)
-```
+## Original Problem
+Terms like `∂_t ∂_x ∂_y` were converted to momentum gradient with warning.
+`ExtractSpatialGradientFromMixed` (now `ExtractSpatialOperatorFromMixed`) defaulted
+to `gradient_x(pi)` but lost direction info.
 
-## Better Approach
-1. Detect pattern `Derivative[1, dx, dy, ...]` where dx+dy+... > 1
-2. Generate nested operators: `gradient_y(gradient_x(pi_0))`
-3. Or create new operator type: `mixed_derivative_xy_t`
-4. Validate in Python that nested operators are supported
-
-## Impact
-Currently minor (no examples hit this case), but blocks complex elasticity/fluid dynamics.
+## Resolution
+- `ClassifySpatialProfile[spatialOrders]` maps spatial derivative profiles to canonical operator names
+- `ExtractSpatialOperatorFromMixed[term]` strips time order (validates == 1), delegates to ClassifySpatialProfile
+- Python: `_parse_multi_axis_spec` + `_op_multi_axis_derivative` handle generic multi-axis operators
 """,
-        "labels": ["bug", "priority: medium", "wolfram", "derivatives"],
+        "labels": ["bug", "priority: medium", "wolfram", "derivatives", "resolved"],
     },
     {
         "title": "Expand _mathematica_to_python Function Set",

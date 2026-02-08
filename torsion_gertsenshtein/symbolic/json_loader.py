@@ -16,6 +16,13 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+#: Canonical spatial axis letters, ordered by dimension index.
+#: Supports up to 6 spatial dimensions (sufficient for all foreseeable physics).
+AXIS_LETTERS: tuple[str, ...] = ("x", "y", "z", "w", "v", "u")
+
+#: Character class matching all known axis letters (for regex construction).
+_AXIS_RE_CLASS = "[" + "".join(AXIS_LETTERS) + "]"
+
 #: Set of static operators supported by the pipeline.
 #: Validated at JSON load time to catch typos early.
 _STATIC_OPERATORS: frozenset[str] = frozenset(
@@ -37,24 +44,34 @@ _STATIC_OPERATORS: frozenset[str] = frozenset(
 )
 
 #: Pattern for generic single-axis Nth-order derivatives: derivative_3_x, derivative_5_y, etc.
-_GENERIC_SINGLE_AXIS_RE = re.compile(r"^derivative_(\d+)_([xyz])$")
+_GENERIC_SINGLE_AXIS_RE = re.compile(
+    r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$"
+)
 
 #: Pattern for generic multi-axis derivatives: derivative_2x_1y, derivative_3x_2z, etc.
-_GENERIC_MULTI_AXIS_RE = re.compile(r"^derivative_(\d+[xyz](?:_\d+[xyz])*)$")
+_GENERIC_MULTI_AXIS_RE = re.compile(
+    r"^derivative_(\d+" + _AXIS_RE_CLASS + r"(?:_\d+" + _AXIS_RE_CLASS + r")*)$"
+)
 
 # Backward-compatible alias
 KNOWN_OPERATORS: frozenset[str] = _STATIC_OPERATORS
+
+#: Mutable set of user-registered custom operators.
+#: Populated via ``register_operator()`` in pde_builder.py.
+_CUSTOM_OPERATORS: set[str] = set()
 
 
 def is_known_operator(name: str) -> bool:
     """Check whether an operator name is recognized.
 
-    Accepts both static operators (identity, laplacian, gradient_x, ...)
+    Accepts static operators (identity, laplacian, gradient_x, ...),
+    user-registered custom operators (via ``register_operator``),
     and dynamic patterns for generic Nth-order derivatives
     (derivative_3_x, derivative_5_y, derivative_2x_1y, ...).
     """
     return (
         name in _STATIC_OPERATORS
+        or name in _CUSTOM_OPERATORS
         or bool(_GENERIC_SINGLE_AXIS_RE.match(name))
         or bool(_GENERIC_MULTI_AXIS_RE.match(name))
     )
@@ -178,6 +195,17 @@ class OperatorTerm:
                 f"Dynamic patterns: derivative_N_x, derivative_Nx_My (N,M=integers, x,y,z=axes)."
             )
             raise ValueError(msg)
+
+        # Check for nonlinear coefficient warning from Wolfram export
+        if data.get("warning") == "nonlinear_coefficient":
+            import warnings  # noqa: PLC0415
+
+            warnings.warn(
+                f"Term '{operator}' on field '{data['field']}' has a "
+                f"field-dependent (nonlinear) coefficient. The linear PDE "
+                f"solver will treat it as a constant, producing wrong physics.",
+                stacklevel=2,
+            )
 
         return cls(
             coefficient=float(data["coefficient"]),
@@ -742,6 +770,18 @@ def _validate_spacetime(spacetime: dict[str, Any]) -> None:
     if not isinstance(spacetime["dimension"], int):
         msg = "spacetime.dimension must be an integer"
         raise TypeError(msg)
+    # Validate signature contains only ±1 and matches dimension
+    if "signature" in spacetime:
+        sig: list[int] = spacetime["signature"]
+        if not isinstance(sig, list) or not all(s in {-1, 1} for s in sig):  # type: ignore[reportUnnecessaryIsInstance]
+            msg = "spacetime.signature must be a list of +1 or -1 values"
+            raise ValueError(msg)
+        if len(sig) != spacetime["dimension"]:
+            msg = (
+                f"spacetime.signature length ({len(sig)}) "
+                f"must match dimension ({spacetime['dimension']})"
+            )
+            raise ValueError(msg)
 
 
 def _validate_fields(fields: list[Any]) -> None:
@@ -759,6 +799,11 @@ def _validate_fields(fields: list[Any]) -> None:
         if not isinstance(field, dict) or "name" not in field:
             msg = f"fields[{i}] must be a dict with 'name' key"
             raise ValueError(msg)
+    # Validate field indices are unique (when present)
+    indices = [f["index"] for f in fields if "index" in f]
+    if len(indices) != len(set(indices)):
+        msg = f"Field indices must be unique, got: {indices}"
+        raise ValueError(msg)
 
 
 def _validate_equations(equations: list[Any]) -> None:
@@ -798,6 +843,16 @@ def validate_json_schema(data: Mapping[str, Any]) -> None:
     _validate_spacetime(data["spacetime"])
     _validate_fields(data["fields"])
     _validate_equations(data["equations"])
+
+    # Cross-validate: equation field references must exist in fields list
+    field_names = {f["name"] for f in data["fields"]}
+    for i, eq in enumerate(data["equations"]):
+        if eq["field"] not in field_names:
+            msg = (
+                f"equations[{i}].field '{eq['field']}' "
+                f"not found in fields list: {sorted(field_names)}"
+            )
+            raise ValueError(msg)
 
 
 def load_equation_system(json_path: Path | str) -> EquationSystem:

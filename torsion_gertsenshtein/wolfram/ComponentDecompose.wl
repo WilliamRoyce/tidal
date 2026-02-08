@@ -40,10 +40,11 @@ DecomposeToComponents::usage =
   "DecomposeToComponents[eom, field, chart] decomposes the tensor equation of \
 motion into individual scalar component equations. Returns a list of \
 {component_index, component_equation} pairs. \
-Options: \"ComputeChristoffels\" -> True computes Christoffel symbols from the \
-metric definition using xAct (for curved spacetimes). Default is False (flat space). \
-\"MetricMatrix\" -> matrix provides an explicit metric matrix for curved spacetime \
-evaluation (e.g., Omega^2 * DiagonalMatrix[{-1, 1}]). Default is None (flat Minkowski).";
+Options: \"ComputeChristoffels\" -> Automatic (default) auto-detects from metric type, \
+or True/False for explicit override. \"MetricMatrix\" -> matrix provides an explicit \
+metric matrix for curved spacetime evaluation (e.g., Omega^2 * DiagonalMatrix[{-1, 1}]). \
+Default is None (flat Minkowski). Auto-detection: constant metrics have Christoffels = 0, \
+non-constant metrics trigger explicit Christoffel computation.";
 
 ExtractTensorComponent::usage =
   "ExtractTensorComponent[eom, field, chart, componentIndices, additionalFields, \
@@ -71,6 +72,10 @@ rank-0 -> {{}}, rank-1 -> {{0},{1},...}, symmetric rank-2 -> upper triangle, \
 non-symmetric rank-2 -> all pairs. For rank >= 3, returns all tuples (symmetry \
 reduction not yet implemented for rank 3+).";
 
+(* Error messages *)
+DecomposeToComponents::badopt =
+  "Invalid value for option \"ComputeChristoffels\": `1`. Expected Automatic, True, or False.";
+
 
 Begin["`Private`"];
 
@@ -78,26 +83,52 @@ Begin["`Private`"];
 
 (* Options for DecomposeToComponents *)
 Options[DecomposeToComponents] = {
-  "ComputeChristoffels" -> False,  (* Set True for curved spacetimes *)
+  "ComputeChristoffels" -> Automatic,  (* Automatic (default), True, or False *)
   "MetricMatrix" -> None  (* Explicit metric matrix for curved spacetime evaluation *)
 };
 
 (* 3-arg signature: eom, field, chart (no additional fields, default options) *)
 DecomposeToComponents[eom_, field_, chart_] :=
-  DecomposeToComponents[eom, field, chart, {}, "ComputeChristoffels" -> False, "MetricMatrix" -> None];
+  DecomposeToComponents[eom, field, chart, {}, "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None];
 
 (* 4-arg signature: eom, field, chart, additionalFields (default options) *)
 DecomposeToComponents[eom_, field_, chart_, additionalFields_List] :=
-  DecomposeToComponents[eom, field, chart, additionalFields, "ComputeChristoffels" -> False, "MetricMatrix" -> None];
+  DecomposeToComponents[eom, field, chart, additionalFields, "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None];
 
 (* Full signature with options *)
 DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsPattern[]] := Module[
   {dim, components, indices, componentEq, result, fieldHead, fieldRank, allFieldHeads,
-   computeChristoffels, metricMatrix},
+   computeChristoffels, metricMatrix, computeChristoffelsOption, shouldComputeChristoffels,
+   coords},
 
   (* Get option values *)
-  computeChristoffels = OptionValue["ComputeChristoffels"];
+  computeChristoffelsOption = OptionValue["ComputeChristoffels"];
   metricMatrix = OptionValue["MetricMatrix"];
+
+  (* Auto-detect whether Christoffel computation is needed *)
+  coords = GetCoordinateSymbols[chart];
+  shouldComputeChristoffels = Which[
+    (* Explicit user override: True *)
+    computeChristoffelsOption === True, True,
+
+    (* Explicit user override: False *)
+    computeChristoffelsOption === False, False,
+
+    (* Automatic detection (default) *)
+    computeChristoffelsOption === Automatic,
+      If[metricMatrix === None,
+        False,  (* No metric → flat Minkowski space *)
+        IsNonConstantMetric[metricMatrix, coords]  (* Auto-detect from metric *)
+      ],
+
+    (* Fallback for invalid option *)
+    True,
+      Message[DecomposeToComponents::badopt, "ComputeChristoffels"];
+      False
+  ];
+
+  (* Use the auto-detected/overridden value for the rest of the pipeline *)
+  computeChristoffels = shouldComputeChristoffels;
 
   (* Get the dimension dynamically from the chart via memoized wrapper *)
   dim = GetChartDimension[chart];
@@ -314,12 +345,69 @@ ExtractRank2Component[eom_, field_, chart_, idx1_, idx2_,
   ExtractTensorComponent[eom, field, chart, {idx1, idx2},
     additionalFields, computeChristoffels, metricMatrix];
 
+(* === Symmetry Reduction Helpers === *)
+(* These are package-private helpers for EnumerateComponentTuples.
+   Defined at package scope (not inside Module) to avoid Mathematica's
+   Module variable localization issues with cross-referencing SetDelayed
+   function definitions.
+
+   IMPORTANT: xAct's Cycles is xAct`xPerm`Cycles, NOT System`Cycles.
+   All pattern matching and head comparisons must use the fully-qualified
+   name to avoid symbol context mismatches. *)
+
+(* Apply a single xAct cycle {a1,a2,...,an} to a tuple:
+   maps position a1->a2, a2->a3, ..., an->a1 *)
+applyCycleToTuple[tuple_, cycle_List] := Module[{result = tuple, n = Length[cycle]},
+  Do[
+    result[[ cycle[[Mod[k, n] + 1]] ]] = tuple[[ cycle[[k]] ]],
+    {k, 1, n}
+  ];
+  result
+];
+
+(* Apply an xAct Cycles[{i,j,...}, ...] to a tuple.
+   Each argument of Cycles is a single cycle list.
+   xAct uses Cycles[{i,j}] (single-brace), NOT Mathematica's
+   Cycles[{{i,j}}] (double-brace). *)
+applyPermToTuple[tuple_, cyc_xAct`xPerm`Cycles] := Module[{result = tuple},
+  Do[result = applyCycleToTuple[result, cyc[[k]]], {k, Length[cyc]}];
+  result
+];
+
+(* Parse an xAct symmetry generator into {sign, xAct`xPerm`Cycles[...]}
+   Generators have the form:
+     Cycles[{i,j}]    = symmetric swap (sign +1)
+     -Cycles[{i,j}]   = antisymmetric swap (sign -1) *)
+extractGenSignAndPerm[gen_] := Which[
+  Head[gen] === xAct`xPerm`Cycles, {1, gen},
+  Head[gen] === Times && gen[[1]] === -1 && Head[gen[[2]]] === xAct`xPerm`Cycles, {-1, gen[[2]]},
+  True, {1, xAct`xPerm`Cycles[{}]}  (* identity fallback *)
+];
+
+(* Check if a tuple is the canonical representative under given generators *)
+isCanonicalTuple[tuple_, gens_List] := AllTrue[gens, Module[
+  {sp = extractGenSignAndPerm[#], sign, perm, permuted},
+  sign = sp[[1]];
+  perm = sp[[2]];
+  permuted = applyPermToTuple[tuple, perm];
+  Which[
+    (* Antisymmetric with equal indices at swapped positions = zero component *)
+    sign == -1 && permuted === tuple, False,
+    (* Fixed point under this generator *)
+    permuted === tuple, True,
+    (* Canonical: original <= permuted lexicographically *)
+    OrderedQ[{tuple, permuted}], True,
+    (* Not canonical: permuted < original *)
+    True, False
+  ]
+] &];
+
 (* === Component Enumeration === *)
 (* Returns list of independent component index tuples for any tensor rank *)
-(* Respects symmetries where implemented *)
+(* Respects symmetries: symmetric → upper triangle, antisymmetric → strictly increasing, etc. *)
 
 EnumerateComponentTuples[fieldHead_, dim_] := Module[
-  {rank, symQ},
+  {rank, symGroup, gens, allTuples},
 
   rank = Length[SlotsOfTensor[fieldHead]];
 
@@ -331,19 +419,16 @@ EnumerateComponentTuples[fieldHead_, dim_] := Module[
       Table[{i}, {i, 0, dim - 1}],
 
     rank >= 2,
-      (* Check for non-trivial symmetry (symmetric or antisymmetric) *)
-      symQ = (SymmetryGroupOfTensor[fieldHead] =!= StrongGenSet[{}, GenSet[]]);
-      If[rank === 2,
-        If[symQ,
-          (* Symmetric rank-2: upper triangle *)
-          Flatten[Table[{i, j}, {i, 0, dim - 1}, {j, i, dim - 1}], 1],
-          (* Non-symmetric rank-2: all pairs *)
-          Flatten[Table[{i, j}, {i, 0, dim - 1}, {j, 0, dim - 1}], 1]
-        ],
-        (* Rank 3+: all tuples (symmetry reduction not yet implemented) *)
-        (* To add symmetry support for rank 3+, use SymmetryGroupOfTensor *)
-        (* to identify independent components and eliminate redundant ones *)
-        Tuples[Range[0, dim - 1], rank]
+      allTuples = Tuples[Range[0, dim - 1], rank];
+      symGroup = SymmetryGroupOfTensor[fieldHead];
+
+      If[symGroup === StrongGenSet[{}, GenSet[]],
+        (* No symmetry: keep all tuples *)
+        allTuples,
+
+        (* Has symmetry: extract generators and filter to canonical reps *)
+        gens = List @@ symGroup[[2]];  (* Extract generators from GenSet[...] *)
+        Select[allTuples, isCanonicalTuple[#, gens] &]
       ],
 
     True,

@@ -259,7 +259,8 @@ class TestPDEFromSpec:
         with pytest.raises(ValueError, match="Expected 4 fields"):
             pde.evolution_rate(state)
 
-    def test_unknown_operator_raises(self, grid_1d_small: CartesianGrid) -> None:
+    @pytest.mark.usefixtures("grid_1d_small")
+    def test_unknown_operator_raises(self) -> None:
         """Test that unknown operator raises ValueError."""
         spec = EquationSystem(
             n_components=1,
@@ -283,16 +284,8 @@ class TestPDEFromSpec:
             metadata={},
         )
 
-        pde = PDEFromSpec(spec)
-        state = FieldCollection(
-            [
-                ScalarField(grid_1d_small, data=1.0),
-                ScalarField(grid_1d_small, data=0.0),
-            ]
-        )
-
         with pytest.raises(ValueError, match="Unknown operator"):
-            pde.evolution_rate(state)
+            PDEFromSpec(spec)
 
 
 # === build_pde_from_json Tests ===
@@ -1106,17 +1099,15 @@ class TestParameterizedCoefficients:
         # "-m2" with m2=0.25 should give -0.25
         assert resolved == -0.25  # noqa: PLR2004
 
-    def test_resolve_coefficient_without_parameter(
+    def test_resolve_coefficient_without_parameter_raises(
         self, spec_with_symbolic: EquationSystem
     ) -> None:
-        """Test _resolve_coefficient uses numeric default when no parameter."""
+        """Test _resolve_coefficient raises when symbolic param not provided."""
         pde = PDEFromSpec(spec_with_symbolic)  # No parameters
         term = spec_with_symbolic.equations[0].rhs_terms[1]
 
-        with pytest.warns(UserWarning, match="could not be resolved"):
-            resolved = pde._resolve_coefficient(term)
-        # Should use the numeric coefficient from the term
-        assert resolved == -1.0
+        with pytest.raises(ValueError, match="could not be resolved"):
+            pde._resolve_coefficient(term)
 
     def test_resolve_coefficient_positive_symbolic(self) -> None:
         """Test _resolve_coefficient with positive symbolic coefficient."""
@@ -1144,8 +1135,8 @@ class TestParameterizedCoefficients:
         resolved = pde._resolve_coefficient(term)
         assert resolved == 2.5  # noqa: PLR2004
 
-    def test_resolve_coefficient_unmatched_symbolic(self) -> None:
-        """Test _resolve_coefficient falls back to numeric for unknown symbolic."""
+    def test_resolve_coefficient_unmatched_symbolic_raises(self) -> None:
+        """Test _resolve_coefficient raises when symbolic doesn't match any param."""
         spec = EquationSystem(
             n_components=1,
             dimension=2,
@@ -1167,10 +1158,8 @@ class TestParameterizedCoefficients:
         pde = PDEFromSpec(spec, parameters={"m2": 1.0})  # Different param
         term = spec.equations[0].rhs_terms[0]
 
-        with pytest.warns(UserWarning, match="could not be resolved"):
-            resolved = pde._resolve_coefficient(term)
-        # Should fall back to numeric 1.5
-        assert resolved == 1.5  # noqa: PLR2004
+        with pytest.raises(ValueError, match="could not be resolved"):
+            pde._resolve_coefficient(term)
 
     def test_build_pde_from_json_with_parameters(self, kg_json_path: Path) -> None:
         """Test build_pde_from_json accepts parameters dict."""
@@ -1545,7 +1534,7 @@ class TestPositionDependentCoefficients:
         assert not np.allclose(result[0].data, phi.data, rtol=0.01)
 
 
-class TestMathematicaFunctionConversion:
+class TestMathematicaFunctionConversion:  # noqa: PLR0904
     """Test _mathematica_to_python conversion for extended mathematical functions."""
 
     def make_spec(self) -> EquationSystem:
@@ -1776,6 +1765,54 @@ class TestMathematicaFunctionConversion:
         y_coord = cast("np.ndarray", grid.cell_coords[4, 4, 1])  # type: ignore[index]
         expected = np.sinh(1.0) + np.arctan2(y_coord, x_coord)
         assert_allclose(mid_val, expected, rtol=1e-10)
+
+    # ===== Rational, Pi, Sign, Max, Min =====
+
+    def test_rational_conversion(self) -> None:
+        """Test Rational[p, q] → (p)/(q)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Rational[1, 2]")
+        assert result == "(1)/(2)"
+
+    def test_rational_nested(self) -> None:
+        """Test Rational in a larger expression."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Rational[3, 4]*x()^2")
+        assert "(3)/(4)" in result
+        assert "x**2" in result
+
+    def test_pi_conversion(self) -> None:
+        """Test Pi → np.pi."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("2*Pi*x()")
+        assert "np.pi" in result
+        assert result == "2*np.pi*x"
+
+    def test_rational_pi_combined(self) -> None:
+        """Test Rational[3, 4]*Pi → (3)/(4)*np.pi."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Rational[3, 4]*Pi")
+        assert result == "(3)/(4)*np.pi"
+
+    def test_sign_conversion(self) -> None:
+        """Test Sign[x] → np.sign(x)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result = pde._mathematica_to_python("Sign[x()]")
+        assert result == "np.sign(x)"
+
+    def test_max_min_conversion(self) -> None:
+        """Test Max/Min → np.maximum/np.minimum."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        result_max = pde._mathematica_to_python("Max[x[], 0]")
+        assert result_max == "np.maximum(x, 0)"
+        result_min = pde._mathematica_to_python("Min[x[], 1]")
+        assert result_min == "np.minimum(x, 1)"
 
 
 class TestCachingOptimizations:
@@ -2230,3 +2267,96 @@ class TestEvalValidation:
         arr = np.array([1.0, float("inf"), 3.0])
         with pytest.raises(ValueError, match="Inf"):
             PDEFromSpec._validate_eval_result(arr, "test", "1/x")
+
+
+class TestOperatorDimensionValidation:
+    """Tests for early operator-dimension validation at construction time (Issue #75)."""
+
+    @staticmethod
+    def _make_spec(
+        operator: str,
+        spatial_dim: int,
+        field_name: str = "phi",
+    ) -> EquationSystem:
+        """Create a minimal spec with a single operator and given spatial dimension."""
+        dimension = spatial_dim + 1  # spacetime = spatial + time
+        coords = ("t", "x", "y", "z")[:dimension]
+        return EquationSystem(
+            n_components=1,
+            dimension=dimension,
+            spatial_dimension=spatial_dim,
+            component_names=(field_name,),
+            equations=(
+                ComponentEquation(
+                    field_name=field_name,
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(1.0, operator, field_name),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=coords,
+        )
+
+    def test_operator_dim_mismatch_at_construction(self) -> None:
+        """gradient_z in a 2D spatial spec raises at construction, not runtime."""
+        spec = self._make_spec("gradient_z", spatial_dim=2)
+        with pytest.raises(ValueError, match="requires at least 3D"):
+            PDEFromSpec(spec)
+
+    def test_laplacian_z_mismatch_at_construction(self) -> None:
+        """laplacian_z in a 1D spatial spec raises at construction."""
+        spec = self._make_spec("laplacian_z", spatial_dim=1)
+        with pytest.raises(ValueError, match="requires at least 3D"):
+            PDEFromSpec(spec)
+
+    def test_cross_derivative_xz_mismatch(self) -> None:
+        """cross_derivative_xz in a 2D spatial spec raises at construction."""
+        spec = self._make_spec("cross_derivative_xz", spatial_dim=2)
+        with pytest.raises(ValueError, match="requires at least 3D"):
+            PDEFromSpec(spec)
+
+    def test_gradient_y_valid_in_2d(self) -> None:
+        """gradient_y in a 2D spatial spec succeeds."""
+        spec = self._make_spec("gradient_y", spatial_dim=2)
+        pde = PDEFromSpec(spec)
+        assert pde.spec.spatial_dimension == 2  # noqa: PLR2004
+
+    def test_laplacian_valid_in_1d(self) -> None:
+        """Laplacian in a 1D spatial spec succeeds."""
+        spec = self._make_spec("laplacian", spatial_dim=1)
+        pde = PDEFromSpec(spec)
+        assert pde.spec.spatial_dimension == 1
+
+    def test_operator_min_dim_static_registry(self) -> None:
+        """_operator_min_dim returns correct values for static operators."""
+        assert PDEFromSpec._operator_min_dim("identity") == 1
+        assert PDEFromSpec._operator_min_dim("laplacian") == 1
+        assert PDEFromSpec._operator_min_dim("gradient_x") == 1
+        assert PDEFromSpec._operator_min_dim("gradient_y") == 2  # noqa: PLR2004
+        assert PDEFromSpec._operator_min_dim("gradient_z") == 3  # noqa: PLR2004
+        assert PDEFromSpec._operator_min_dim("laplacian_y") == 2  # noqa: PLR2004
+        assert PDEFromSpec._operator_min_dim("cross_derivative_xy") == 2  # noqa: PLR2004
+        assert PDEFromSpec._operator_min_dim("cross_derivative_xz") == 3  # noqa: PLR2004
+        assert PDEFromSpec._operator_min_dim("biharmonic") == 1
+        assert PDEFromSpec._operator_min_dim("first_derivative_t") == 1
+
+    def test_operator_min_dim_dynamic_single(self) -> None:
+        """_operator_min_dim resolves dynamic single-axis patterns."""
+        assert PDEFromSpec._operator_min_dim("derivative_3_x") == 1
+        assert PDEFromSpec._operator_min_dim("derivative_3_y") == 2  # noqa: PLR2004
+        assert PDEFromSpec._operator_min_dim("derivative_3_z") == 3  # noqa: PLR2004
+
+    def test_operator_min_dim_dynamic_multi(self) -> None:
+        """_operator_min_dim resolves dynamic multi-axis patterns."""
+        assert PDEFromSpec._operator_min_dim("derivative_2x_1y") == 2  # noqa: PLR2004
+        assert PDEFromSpec._operator_min_dim("derivative_1x_1z") == 3  # noqa: PLR2004
+
+    def test_operator_min_dim_unknown_raises(self) -> None:
+        """_operator_min_dim raises for unrecognized operators."""
+        with pytest.raises(ValueError, match="Unknown operator"):
+            PDEFromSpec._operator_min_dim("nonexistent_op")

@@ -159,12 +159,19 @@ class TestIsKnownOperator:
         assert is_known_operator("derivative_2x_1y")
         assert is_known_operator("derivative_3x_2z")
 
+    def test_extended_axes_accepted(self) -> None:
+        """Extended axis letters (w, v, u) for higher dimensions are accepted."""
+        assert is_known_operator("derivative_3_w")
+        assert is_known_operator("derivative_2_v")
+        assert is_known_operator("derivative_1_u")
+        assert is_known_operator("derivative_2w_1v")
+
     def test_unknown_operators_rejected(self) -> None:
         """Unknown operator names are rejected."""
         assert not is_known_operator("unknown")
-        assert not is_known_operator("gradient_w")
+        assert not is_known_operator("gradient_q")  # invalid axis
         assert not is_known_operator("derivative_x_3")  # wrong order
-        assert not is_known_operator("derivative_3_w")  # invalid axis
+        assert not is_known_operator("derivative_3_q")  # invalid axis
         assert not is_known_operator("")
         assert not is_known_operator("derivative__x")  # missing number
 
@@ -428,10 +435,20 @@ class TestMultiAxisDerivatives:
         result = _parse_multi_axis_spec("3x_2z")
         assert result == [(0, 3), (2, 2)]
 
+    def test_parse_multi_axis_spec_extended_axis(self) -> None:
+        """Extended axis letter w (4th spatial dim) is accepted."""
+        result = _parse_multi_axis_spec("2w")
+        assert result == [(3, 2)]
+
     def test_parse_multi_axis_spec_invalid_axis(self) -> None:
         """Invalid axis letter raises ValueError."""
         with pytest.raises(ValueError, match="Invalid multi-axis"):
-            _parse_multi_axis_spec("2w")
+            _parse_multi_axis_spec("2q")
+
+    def test_parse_multi_axis_spec_duplicate_axis_raises(self) -> None:
+        """Duplicate axis (e.g. '2x_1x_1y') raises ValueError."""
+        with pytest.raises(ValueError, match="Duplicate axis 'x'"):
+            _parse_multi_axis_spec("2x_1x_1y")
 
     def test_derivative_2x_1y_resolves_2d(self, grid_2d: CartesianGrid) -> None:
         """derivative_2x_1y resolves on a 2D grid (uniform field -> 0)."""
@@ -461,3 +478,84 @@ class TestMultiAxisDerivatives:
         result = PDEFromSpec._get_operator("derivative_2x_1y", field, "periodic")
         expected = -(kx**2) * ky * np.sin(kx * x) * np.cos(ky * y)
         assert_allclose(result.data, expected, rtol=0.1)
+
+
+# ---------------------------------------------------------------------------
+# Biharmonic operator tests (Plan item #4)
+# ---------------------------------------------------------------------------
+
+
+class TestBiharmonicOperator:
+    """Tests for the biharmonic operator ∇⁴ = ∇²(∇²)."""
+
+    def test_biharmonic_analytical_1d(self, grid_1d: CartesianGrid) -> None:
+        """∇⁴ sin(kx) = k⁴ sin(kx) in 1D."""
+        x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
+        k = 2 * np.pi / 10
+        field = ScalarField(grid_1d, data=np.sin(k * x))
+        bc = "periodic"
+
+        result = PDEFromSpec._get_operator("biharmonic", field, bc)
+        expected = (k**4) * np.sin(k * x)
+        assert_allclose(result.data, expected, rtol=0.01)
+
+    def test_biharmonic_uniform_field(self, grid_1d: CartesianGrid) -> None:
+        """∇⁴(constant) = 0."""
+        field = ScalarField(grid_1d, data=5.0)
+        result = PDEFromSpec._get_operator("biharmonic", field, "periodic")
+        assert_allclose(result.data, 0.0, atol=1e-10)
+
+    def test_biharmonic_2d(self, grid_2d: CartesianGrid) -> None:
+        """∇⁴ sin(kx)*sin(ky) = (kx²+ky²)² sin(kx)*sin(ky) in 2D."""
+        x = cast("np.ndarray", grid_2d.cell_coords[..., 0])
+        y = cast("np.ndarray", grid_2d.cell_coords[..., 1])
+        kx = 2 * np.pi / 10
+        ky = 2 * np.pi / 10
+        field = ScalarField(grid_2d, data=np.sin(kx * x) * np.sin(ky * y))
+        bc = "periodic"
+
+        result = PDEFromSpec._get_operator("biharmonic", field, bc)
+        # ∇²f = -(kx²+ky²)f, so ∇⁴f = (kx²+ky²)²f
+        expected = (kx**2 + ky**2) ** 2 * np.sin(kx * x) * np.sin(ky * y)
+        assert_allclose(result.data, expected, rtol=0.02)
+
+    def test_biharmonic_evolution_beam_equation(
+        self, grid_1d: CartesianGrid
+    ) -> None:
+        """Evolve d²u/dt² = -∇⁴u (Euler-Bernoulli beam) for one timestep.
+
+        For u = sin(kx), RHS = -k⁴ sin(kx).
+        After one timestep, momentum should decrease (negative acceleration).
+        """
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("u",),
+            equations=(
+                ComponentEquation(
+                    field_name="u",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(-1.0, "biharmonic", "u"),),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={"description": "beam equation"},
+        )
+        pde = PDEFromSpec(spec)
+        x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
+        k = 2 * np.pi / 10
+
+        # Initial: u = sin(kx), pi = 0
+        u_field = ScalarField(grid_1d, data=np.sin(k * x))
+        pi_field = ScalarField(grid_1d, data=0.0)
+        state = FieldCollection([u_field, pi_field])
+
+        rates = pde.evolution_rate(state)
+        # d_t u = pi = 0
+        assert_allclose(rates[0].data, 0.0, atol=1e-10)
+        # d_t pi = -∇⁴u = -k⁴ sin(kx)
+        expected_accel = -(k**4) * np.sin(k * x)
+        assert_allclose(rates[1].data, expected_accel, rtol=0.01)

@@ -12,7 +12,6 @@ from __future__ import annotations
 import math
 import operator
 import re
-import warnings
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, SupportsFloat, cast
 
@@ -23,6 +22,8 @@ from typing_extensions import override
 
 from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
 from torsion_gertsenshtein.symbolic.json_loader import (
+    _CUSTOM_OPERATORS,  # type: ignore[reportPrivateUsage]
+    AXIS_LETTERS,
     BoundaryCondition,
     ConstraintSolverConfig,
     EquationSystem,
@@ -181,10 +182,11 @@ def _parse_multi_axis_spec(spec: str) -> list[tuple[int, int]]:
     ValueError
         If the spec cannot be parsed or contains invalid axis names.
     """
+    axis_pattern = re.compile(r"^(\d+)(" + _AXIS_RE_CLASS + r")$")
     parts = spec.split("_")
     result: list[tuple[int, int]] = []
     for part in parts:
-        match = re.match(r"^(\d+)([xyz])$", part)
+        match = axis_pattern.match(part)
         if not match:
             msg = (
                 f"Invalid multi-axis derivative part: '{part}'. "
@@ -193,8 +195,21 @@ def _parse_multi_axis_spec(spec: str) -> list[tuple[int, int]]:
             raise ValueError(msg)
         order = int(match.group(1))
         axis_letter = match.group(2)
-        axis = {"x": 0, "y": 1, "z": 2}[axis_letter]
+        axis = _AXIS_INDEX[axis_letter]
         result.append((axis, order))
+
+    # Detect duplicate axes — e.g. "2x_1x_1y" has x twice
+    seen_axes: set[int] = set()
+    for axis, _order in result:
+        if axis in seen_axes:
+            axis_name = _AXIS_LETTER[axis]
+            msg = (
+                f"Duplicate axis '{axis_name}' in multi-axis derivative spec: '{spec}'. "
+                f"Combine orders for the same axis into a single entry."
+            )
+            raise ValueError(msg)
+        seen_axes.add(axis)
+
     return sorted(result, key=operator.itemgetter(0))
 
 
@@ -223,20 +238,27 @@ def _op_multi_axis_derivative(
     return _handler
 
 
-#: Map axis letter to axis index.
-_AXIS_INDEX: dict[str, int] = {"x": 0, "y": 1, "z": 2}
+#: Map axis letter to axis index (derived from AXIS_LETTERS in json_loader).
+_AXIS_INDEX: dict[str, int] = {letter: i for i, letter in enumerate(AXIS_LETTERS)}
 
 #: Minimum grid dimension required for each axis.
-_AXIS_MIN_DIM: dict[str, int] = {"x": 1, "y": 2, "z": 3}
+_AXIS_MIN_DIM: dict[str, int] = {letter: i + 1 for i, letter in enumerate(AXIS_LETTERS)}
 
-#: Map axis index back to letter (for dimension lookup).
-_AXIS_LETTER: dict[int, str] = {0: "x", 1: "y", 2: "z"}
+#: Map axis index back to letter.
+_AXIS_LETTER: dict[int, str] = dict(enumerate(AXIS_LETTERS))
+
+#: Character class matching all known axis letters.
+_AXIS_RE_CLASS = "[" + "".join(AXIS_LETTERS) + "]"
 
 #: Regex for parsing generic single-axis derivative names.
-_GENERIC_SINGLE_RE = re.compile(r"^derivative_(\d+)_([xyz])$")
+_GENERIC_SINGLE_RE = re.compile(
+    r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$"
+)
 
 #: Regex for parsing generic multi-axis derivative names.
-_GENERIC_MULTI_RE = re.compile(r"^derivative_(\d+[xyz](?:_\d+[xyz])*)$")
+_GENERIC_MULTI_RE = re.compile(
+    r"^derivative_(\d+" + _AXIS_RE_CLASS + r"(?:_\d+" + _AXIS_RE_CLASS + r")*)$"
+)
 
 
 #: Registry mapping operator names to (handler, min_dimension) pairs.
@@ -254,8 +276,44 @@ _OPERATOR_REGISTRY: dict[str, tuple[Any, int]] = {
     "cross_derivative_xz": (_op_cross_derivative(0, 2), 3),
     "cross_derivative_yz": (_op_cross_derivative(1, 2), 3),
     "biharmonic": (_op_biharmonic, 1),
-    # Note: first_derivative_t is handled specially in _compute_rhs_for_component
+    # first_derivative_t is handled specially in _compute_rhs_for_component.
+    # This sentinel entry ensures _get_operator gives a clear error if called directly.
+    "first_derivative_t": (None, 1),
 }
+
+
+def register_operator(
+    name: str,
+    handler: Callable[[ScalarField, BCDescriptor], ScalarField],
+    min_dim: int = 1,
+) -> None:
+    """Register a custom spatial operator for use in the PDE pipeline.
+
+    The operator becomes available both for JSON validation (``is_known_operator``)
+    and for runtime evaluation (``PDEFromSpec._get_operator``).
+
+    Parameters
+    ----------
+    name : str
+        Operator name as it appears in JSON (e.g., ``"my_diffusion"``).
+    handler : callable
+        Function with signature ``(field: ScalarField, bc) -> ScalarField``.
+    min_dim : int
+        Minimum spatial grid dimension required for this operator.
+
+    Raises
+    ------
+    ValueError
+        If *name* would shadow a built-in operator.
+    """
+    if name in _OPERATOR_REGISTRY:
+        msg = (
+            f"Cannot register operator '{name}': "
+            f"it shadows a built-in operator. Choose a different name."
+        )
+        raise ValueError(msg)
+    _OPERATOR_REGISTRY[name] = (handler, min_dim)
+    _CUSTOM_OPERATORS.add(name)
 
 
 @dataclass(frozen=True)
@@ -395,6 +453,8 @@ class PDEFromSpec(PDEBase):
         self,
         spec: EquationSystem,
         parameters: dict[str, float] | None = None,
+        *,
+        constraint_eps: float = 1e-14,
     ) -> None:
         """Initialize PDE from equation specification.
 
@@ -411,6 +471,9 @@ class PDEFromSpec(PDEBase):
             For time-dependent coefficients in curved spacetime, all symbols
             appearing in the coefficient expression must be provided here.
             The expressions are evaluated by substituting these values.
+        constraint_eps : float
+            Tolerance for determining whether a Laplacian coefficient is
+            effectively zero in the constraint solver.  Default ``1e-14``.
         """
         super().__init__()
         self.spec = spec
@@ -419,6 +482,7 @@ class PDEFromSpec(PDEBase):
             name: i for i, name in enumerate(spec.component_names)
         }
         self._parameters = parameters or {}
+        self._constraint_eps = constraint_eps
 
         # Build slot maps from state_layout for mixed time-order support
         self._field_slot_map: dict[str, int] = {}
@@ -456,6 +520,75 @@ class PDEFromSpec(PDEBase):
         self._cached_bc: BCDescriptor | None = None
         self._cached_grid_id: int | None = None
 
+        # Validate operator dimension requirements against spec at construction time
+        self._validate_operator_dimensions()
+
+    @staticmethod
+    def _operator_min_dim(operator_name: str) -> int:
+        """Return minimum spatial grid dimension required by an operator.
+
+        Uses the same resolution logic as ``_get_operator`` (static registry
+        then dynamic regex patterns) but without needing a grid or field.
+
+        Parameters
+        ----------
+        operator_name : str
+            Operator name (e.g. ``"gradient_y"``, ``"derivative_3_z"``).
+
+        Returns
+        -------
+        int
+            Minimum spatial dimension (1, 2, or 3).
+
+        Raises
+        ------
+        ValueError
+            If the operator name is not recognized.
+        """
+        entry = _OPERATOR_REGISTRY.get(operator_name)
+        if entry is not None:
+            return entry[1]
+        m = _GENERIC_SINGLE_RE.match(operator_name)
+        if m:
+            return _AXIS_MIN_DIM[m.group(2)]
+        m_multi = _GENERIC_MULTI_RE.match(operator_name)
+        if m_multi:
+            axes_and_orders = _parse_multi_axis_spec(m_multi.group(1))
+            max_axis = max(axis for axis, _ in axes_and_orders)
+            return _AXIS_MIN_DIM[_AXIS_LETTER[max_axis]]
+        msg = (
+            f"Unknown operator: '{operator_name}'. "
+            f"Known operators: {sorted(_OPERATOR_REGISTRY.keys())}. "
+            f"Dynamic patterns: derivative_N_x, derivative_Nx_My."
+        )
+        raise ValueError(msg)
+
+    def _validate_operator_dimensions(self) -> None:
+        """Validate all operators are compatible with the spec's spatial dimension.
+
+        Called during ``__init__`` to fail fast when a JSON spec contains
+        operators that require more spatial dimensions than the spec provides
+        (e.g. ``gradient_z`` in a 2+1D spacetime).
+
+        Raises
+        ------
+        ValueError
+            If any operator requires more dimensions than ``spec.spatial_dimension``.
+        """
+        spatial_dim = self.spec.spatial_dimension
+        for eq in self.spec.equations:
+            for term in eq.rhs_terms:
+                min_dim = self._operator_min_dim(term.operator)
+                if min_dim > spatial_dim:
+                    msg = (
+                        f"Operator '{term.operator}' in equation for "
+                        f"'{eq.field_name}' requires at least {min_dim}D "
+                        f"spatial grid, but the spec has "
+                        f"spatial_dimension={spatial_dim} "
+                        f"(from {self.spec.dimension}D spacetime)."
+                    )
+                    raise ValueError(msg)
+
     def _is_resolvable(self, term: OperatorTerm) -> bool:
         """Check whether a term's coefficient can be resolved without warnings.
 
@@ -485,6 +618,11 @@ class PDEFromSpec(PDEBase):
         -------
         float
             The effective coefficient value.
+
+        Raises
+        ------
+        ValueError
+            If a symbolic coefficient cannot be resolved from parameters.
         """
         if term.coefficient_symbolic is not None:
             sym = term.coefficient_symbolic
@@ -495,17 +633,18 @@ class PDEFromSpec(PDEBase):
             if sym in self._parameters:
                 return self._parameters[sym]
 
-            # Symbolic coefficient present but not resolvable from parameters
-
-            warnings.warn(
+            # Symbolic coefficient present but not resolvable from parameters.
+            # Fail fast: wrong physics that looks right is worse than a crash.
+            msg = (
                 f"Symbolic coefficient '{sym[:80]}' could not be resolved from "
                 f"parameters {sorted(self._parameters.keys())}. "
-                f"Falling back to numeric coefficient {term.coefficient}. "
-                f"This may indicate unevaluated expressions in the JSON.",
-                stacklevel=2,
+                f"Pass the required parameter via "
+                f"parameters={{'{sym.lstrip('-')}': <value>}} to "
+                f"PDEFromSpec or build_pde_from_json."
             )
+            raise ValueError(msg)
 
-        # Default: use numeric coefficient from JSON
+        # Default: use numeric coefficient from JSON (no symbolic → purely numeric term)
         return term.coefficient
 
     def _build_base_namespace(self) -> dict[str, Any]:
@@ -623,6 +762,9 @@ class PDEFromSpec(PDEBase):
         - ``ArcSinh[x]`` to ``arcsinh(x)``, ``ArcCosh[x]`` to ``arccosh(x)``, etc.
         - ``Erf[x]`` to ``erf(x)`` (scipy.special)
         - ``BesselJ[n, x]`` to ``jv(n, x)``, ``BesselY[n, x]`` to ``yv(n, x)``
+        - ``Rational[p, q]`` to ``(p)/(q)`` (exact fractions from xAct InputForm)
+        - ``Pi`` to ``np.pi`` (mathematical constant)
+        - ``Sign[x]`` to ``np.sign(x)``, ``Max[a,b]`` to ``np.maximum(a,b)``
         - ``t[]`` to ``t`` (xCoba coordinate symbols, using actual coordinate names)
         - Mathematica brackets ``[``, ``]`` to Python parens ``(``, ``)``
         - Mathematica ``^`` to Python ``**``
@@ -648,6 +790,13 @@ class PDEFromSpec(PDEBase):
         # Step 3: ArcTan[x, y] → arctan2(y, x) — special 2-arg case with swap
         # Must handle before generic function conversion
         result = self._convert_arctan2(result)
+
+        # Step 3.5: Rational[p, q] → (p)/(q) — Mathematica exact fractions
+        # xAct outputs Rational[1,2] for 1/2 in InputForm. Must handle before
+        # bracket conversion since Rational uses Mathematica brackets.
+        result = re.sub(
+            r"Rational\[([^,\]]+),\s*([^,\]]+)\]", r"(\1)/(\2)", result
+        )
 
         # Step 4: Function name conversions (batch)
         function_map = [
@@ -675,6 +824,9 @@ class PDEFromSpec(PDEBase):
             ("Log", "log"),
             ("Sqrt", "sqrt"),
             ("Abs", "abs"),
+            ("Sign", "np.sign"),
+            ("Max", "np.maximum"),
+            ("Min", "np.minimum"),
             # Special functions (scipy.special)
             ("Erf", "erf"),
             ("BesselJ", "jv"),
@@ -682,6 +834,9 @@ class PDEFromSpec(PDEBase):
         ]
         for mma_func, py_func in function_map:
             result = re.sub(rf"\b{mma_func}\b", py_func, result)
+
+        # Step 4.5: Pi → np.pi — Mathematica constant (before bracket conversion)
+        result = re.sub(r"\bPi\b", "np.pi", result)
 
         # Step 5: Mathematica brackets to Python parens (after function renaming)
         result = result.replace("[", "(").replace("]", ")")
@@ -763,7 +918,7 @@ class PDEFromSpec(PDEBase):
                 spatial_coords = self.spec.spatial_coordinates
                 coords = grid.cell_coords  # type: ignore[union-attr]
                 for i, name in enumerate(spatial_coords[: grid.num_axes]):  # type: ignore[union-attr]
-                    namespace[name] = np.asarray(coords[..., i])  # pyright: ignore[reportUnknownArgumentType]
+                    namespace[name] = np.asarray(coords[..., i], dtype=np.float64)  # pyright: ignore[reportUnknownArgumentType]
 
         # Validate all symbols can be resolved
         identifiers = set(re.findall(r"\b[a-zA-Z_]\w*\b", py_expr))
@@ -874,6 +1029,8 @@ class PDEFromSpec(PDEBase):
         ------
         ValueError
             If the operator is not recognized or the grid dimension is too low.
+        RuntimeError
+            If the operator is in the registry but cannot be applied as a spatial operator.
         """
         entry = _OPERATOR_REGISTRY.get(operator_name)
         if entry is None:
@@ -902,6 +1059,16 @@ class PDEFromSpec(PDEBase):
                     raise ValueError(msg)
 
         handler, min_dim = entry
+
+        # Sentinel check: some operators (first_derivative_t) are in the registry
+        # but handled specially elsewhere — they cannot be applied as spatial operators.
+        if handler is None:
+            msg = (
+                f"Operator '{operator_name}' cannot be applied as a spatial operator. "
+                f"It is handled specially in _compute_rhs_for_component."
+            )
+            raise RuntimeError(msg)
+
         if field.grid.dim < min_dim:
             msg = (
                 f"Operator '{operator_name}' requires at least {min_dim}D grid, "
@@ -1060,7 +1227,7 @@ class PDEFromSpec(PDEBase):
             spatial_coords = self.spec.spatial_coordinates
             raw_coords = grid.cell_coords  # pyright: ignore[reportUnknownVariableType]
             coord_arrays = {
-                name: np.asarray(raw_coords[..., i])  # pyright: ignore[reportUnknownArgumentType]
+                name: np.asarray(raw_coords[..., i], dtype=np.float64)  # pyright: ignore[reportUnknownArgumentType]
                 for i, name in enumerate(spatial_coords[: grid.num_axes])
             }
 
@@ -1267,7 +1434,7 @@ class PDEFromSpec(PDEBase):
             )
             raise ValueError(msg)
 
-        if abs(laplacian_coeff) < 1e-14:  # noqa: PLR2004
+        if abs(laplacian_coeff) < self._constraint_eps:
             msg = (
                 f"Laplacian coefficient for {eq.field_name} is effectively "
                 f"zero ({laplacian_coeff}). Cannot solve elliptic equation."
@@ -1318,8 +1485,130 @@ class PDEFromSpec(PDEBase):
         state[field_slot].data[:] = solution.data
         return state
 
+    def _evolve_constraints(
+        self,
+        state: TState,
+        bc: BCDescriptor,
+        t: float,
+    ) -> tuple[TState, dict[str, ScalarField]]:
+        """Solve constraint equations (time_derivative_order=0).
+
+        Constraints are solved elliptically when enabled, updating the state
+        in-place so that dynamical equations see the resolved fields.
+
+        Returns
+        -------
+        tuple[TState, dict[str, ScalarField]]
+            Updated state and virtual momenta dict with zero entries for
+            each constraint field.
+
+        Raises
+        ------
+        TypeError
+            If state is not a FieldCollection.
+        """
+        # Type narrowing: constraints require FieldCollection
+        if not isinstance(state, FieldCollection):
+            msg = "Constraint solving requires FieldCollection state"
+            raise TypeError(msg)
+
+        grid = state.grid
+        virtual_momenta: dict[str, ScalarField] = {}
+        for i, eq in enumerate(self.spec.equations):
+            if eq.time_derivative_order == 0:
+                if eq.constraint_solver.enabled:
+                    state = self._solve_constraint_equation(i, state, bc, t)
+                virtual_momenta[eq.field_name] = ScalarField(grid, data=0.0)
+        return state, virtual_momenta
+
+    def _evolve_first_order(
+        self,
+        state: TState,
+        bc: BCDescriptor,
+        t: float,
+        virtual_momenta: dict[str, ScalarField],
+    ) -> dict[str, ScalarField]:
+        """Compute virtual momenta for first-order components.
+
+        The RHS of each first-order equation becomes a "virtual momentum"
+        that second-order equations can reference via ``pi_N`` or
+        ``first_derivative_t``.  This runs after constraints are solved
+        so that first-order equations see updated constraint fields.
+
+        Returns
+        -------
+        dict[str, ScalarField]
+            Updated virtual momenta dict including first-order entries.
+
+        Raises
+        ------
+        TypeError
+            If state is not a FieldCollection.
+        """
+        # Type narrowing: RHS computation requires FieldCollection
+        if not isinstance(state, FieldCollection):
+            msg = "First-order evolution requires FieldCollection state"
+            raise TypeError(msg)
+
+        for i, eq in enumerate(self.spec.equations):
+            if eq.time_derivative_order == 1:
+                virtual_momenta[eq.field_name] = self._compute_rhs_for_component(
+                    i, state, bc, t
+                )
+        return virtual_momenta
+
+    def _evolve_second_order(
+        self,
+        state: TState,
+        bc: BCDescriptor,
+        t: float,
+        virtual_momenta: dict[str, ScalarField],
+        rates: list[ScalarField | None],
+    ) -> list[ScalarField | None]:
+        """Compute rates for all components from the virtual momenta.
+
+        - Second-order: d/dt field = momentum, d/dt momentum = RHS
+        - First-order: d/dt field = virtual momentum (already computed)
+        - Constraint: d/dt field = 0
+
+        Returns
+        -------
+        list[ScalarField | None]
+            Populated rates array.
+
+        Raises
+        ------
+        TypeError
+            If momentum field is not a ScalarField or state is not FieldCollection.
+        """
+        # Type narrowing: second-order evolution requires FieldCollection
+        if not isinstance(state, FieldCollection):
+            msg = "Second-order evolution requires FieldCollection state"
+            raise TypeError(msg)
+
+        grid = state.grid
+        for i, eq in enumerate(self.spec.equations):
+            field_slot = self._field_slot_map[eq.field_name]
+
+            if eq.time_derivative_order >= 2:  # noqa: PLR2004
+                momentum_slot = self._momentum_slot_map[eq.field_name]
+                momentum = state[momentum_slot]
+                if not isinstance(momentum, ScalarField):
+                    msg = f"Expected ScalarField for momentum, got {type(momentum).__name__}"
+                    raise TypeError(msg)
+                rates[field_slot] = momentum.copy()
+                rates[momentum_slot] = self._compute_rhs_for_component(
+                    i, state, bc, t, virtual_momenta
+                )
+            elif eq.time_derivative_order == 1:
+                rates[field_slot] = virtual_momenta[eq.field_name]
+            else:
+                rates[field_slot] = ScalarField(grid, data=0.0)
+
+        return rates
+
     @override
-    def evolution_rate(  # noqa: C901, PLR0912
+    def evolution_rate(
         self,
         state: TState,
         t: float = 0.0,
@@ -1383,49 +1672,74 @@ class PDEFromSpec(PDEBase):
             self._cached_grid_id = grid_id
         bc = self._cached_bc
 
-        # Pass 1: Compute virtual momenta for non-second-order components.
-        # First-order components: their RHS becomes the "virtual momentum"
-        # that other equations can reference via pi_N or first_derivative_t.
-        # Constraint (order=0) components: d_t(field) = 0 by definition,
-        # so their virtual momentum is zero.  When a constraint has
-        # constraint_solver.enabled, it is solved elliptically first so
-        # that dynamical equations see the updated constraint field.
-        virtual_momenta: dict[str, ScalarField] = {}
-        for i, eq in enumerate(self.spec.equations):
-            if eq.time_derivative_order == 1:
-                virtual_momenta[eq.field_name] = self._compute_rhs_for_component(
-                    i, state, bc, t
-                )
-            elif eq.time_derivative_order == 0:
-                if eq.constraint_solver.enabled:
-                    state = self._solve_constraint_equation(i, state, bc, t)
-                virtual_momenta[eq.field_name] = ScalarField(grid, data=0.0)
+        # Pass 1a: Solve constraints
+        state, virtual_momenta = self._evolve_constraints(state, bc, t)
 
-        # Pass 2: Build the full rates array using slot maps
+        # Pass 1b: Compute first-order virtual momenta
+        virtual_momenta = self._evolve_first_order(state, bc, t, virtual_momenta)
+
+        # Pass 2: Build the full rates array
         rates: list[ScalarField | None] = [None] * expected_fields
-
-        for i, eq in enumerate(self.spec.equations):
-            field_slot = self._field_slot_map[eq.field_name]
-
-            if eq.time_derivative_order >= 2:  # noqa: PLR2004
-                # Second-order: d/dt field = momentum, d/dt momentum = RHS
-                momentum_slot = self._momentum_slot_map[eq.field_name]
-                momentum = state[momentum_slot]
-                if not isinstance(momentum, ScalarField):
-                    msg = f"Expected ScalarField for momentum, got {type(momentum).__name__}"
-                    raise TypeError(msg)
-                rates[field_slot] = momentum.copy()
-                rates[momentum_slot] = self._compute_rhs_for_component(
-                    i, state, bc, t, virtual_momenta
-                )
-            elif eq.time_derivative_order == 1:
-                # First-order: d/dt field = RHS (already computed in Pass 1)
-                rates[field_slot] = virtual_momenta[eq.field_name]
-            else:
-                # Constraint (order=0): no time evolution
-                rates[field_slot] = ScalarField(grid, data=0.0)
+        rates = self._evolve_second_order(state, bc, t, virtual_momenta, rates)
 
         return FieldCollection(rates)  # type: ignore[arg-type]
+
+    def check_stability(self, dt: float, grid: GridBase) -> list[str]:
+        """Check CFL / stability conditions for explicit time-stepping.
+
+        Estimates maximum wave speeds and diffusivities from the equation
+        coefficients and checks whether ``dt`` satisfies the CFL condition.
+
+        Parameters
+        ----------
+        dt : float
+            Proposed time step.
+        grid : GridBase
+            The spatial grid (used for cell spacing).
+
+        Returns
+        -------
+        list[str]
+            Warning messages for any violated conditions. Empty if stable.
+        """
+        warnings: list[str] = []
+        dx_min = min(grid.discretization)
+
+        for eq in self.spec.equations:
+            if eq.time_derivative_order < 2:  # noqa: PLR2004
+                continue
+
+            # Estimate max wave speed from laplacian coefficients
+            max_laplacian_coeff = 0.0
+            max_diffusive_coeff = 0.0
+            for term in eq.rhs_terms:
+                coeff_abs = abs(term.coefficient)
+                if (term.operator == "laplacian" and term.field == eq.field_name) or term.operator.startswith("laplacian_"):
+                    max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
+                elif term.operator == "biharmonic":
+                    max_diffusive_coeff = max(max_diffusive_coeff, coeff_abs)
+
+            # CFL for wave equation: dt < dx / c where c = sqrt(laplacian_coeff)
+            if max_laplacian_coeff > 0:
+                c_max = math.sqrt(max_laplacian_coeff)
+                cfl_limit = dx_min / c_max
+                if dt > cfl_limit:
+                    warnings.append(
+                        f"CFL violated for {eq.field_name}: "
+                        f"dt={dt:.3e} > dx/c={cfl_limit:.3e} "
+                        f"(c={c_max:.3e}, dx={dx_min:.3e})"
+                    )
+
+            # Stability for biharmonic: dt < dx^4 / (2 * coeff)
+            if max_diffusive_coeff > 0:
+                biharm_limit = dx_min**4 / (2 * max_diffusive_coeff)
+                if dt > biharm_limit:
+                    warnings.append(
+                        f"Biharmonic stability violated for {eq.field_name}: "
+                        f"dt={dt:.3e} > dx^4/(2D)={biharm_limit:.3e}"
+                    )
+
+        return warnings
 
     def _cache_key(self) -> dict[str, Any]:
         """Return a cache key for this PDE.
@@ -1443,6 +1757,8 @@ class PDEFromSpec(PDEBase):
 def build_pde_from_json(
     json_path: Path | str,
     parameters: dict[str, float] | None = None,
+    *,
+    constraint_eps: float = 1e-14,
 ) -> PDEFromSpec:
     """Build a PDE from a JSON equation specification file.
 
@@ -1458,6 +1774,9 @@ def build_pde_from_json(
         Optional parameter values to override symbolic coefficients.
         Keys are symbolic names (e.g., "m2", "kappa"), values are numeric.
         Example: {"m2": 0.5, "kappa": 1.0}
+    constraint_eps : float
+        Tolerance for the constraint solver's Laplacian coefficient check.
+        Default ``1e-14``.
 
     Returns
     -------
@@ -1476,7 +1795,7 @@ def build_pde_from_json(
     >>> pde = build_pde_from_json("examples/data/proca_1d.json", parameters={"m2": 2.0})
     """
     spec = load_equation_system(json_path)
-    return PDEFromSpec(spec, parameters=parameters)
+    return PDEFromSpec(spec, parameters=parameters, constraint_eps=constraint_eps)
 
 
 def create_initial_state(

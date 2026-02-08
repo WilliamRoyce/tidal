@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -18,6 +18,9 @@ from torsion_gertsenshtein.symbolic.json_loader import (
 from torsion_gertsenshtein.symbolic.pde_builder import (
     _OPERATOR_REGISTRY,  # noqa: PLC2701
 )
+
+if TYPE_CHECKING:
+    from pde import ScalarField
 
 # === Fixtures ===
 
@@ -346,6 +349,49 @@ class TestValidateJsonSchema:
         with pytest.raises(ValueError, match="fields must be non-empty"):
             validate_json_schema(data)
 
+    def test_invalid_signature_values(self) -> None:
+        """Test that signature with non ±1 values raises ValueError."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 2]},
+            "fields": [{"name": "phi"}],
+            "equations": [{"field": "phi", "rhs": {"type": "linear_combination", "terms": []}}],
+        }
+        with pytest.raises(ValueError, match="signature must be a list of"):
+            validate_json_schema(data)
+
+    def test_signature_dimension_mismatch(self) -> None:
+        """Test that signature length != dimension raises ValueError."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1, 1]},
+            "fields": [{"name": "phi"}],
+            "equations": [{"field": "phi", "rhs": {"type": "linear_combination", "terms": []}}],
+        }
+        with pytest.raises(ValueError, match=r"signature length.*must match dimension"):
+            validate_json_schema(data)
+
+    def test_duplicate_field_indices(self) -> None:
+        """Test that duplicate field indices raise ValueError."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2},
+            "fields": [{"name": "phi", "index": 0}, {"name": "chi", "index": 0}],
+            "equations": [
+                {"field": "phi", "rhs": {"type": "linear_combination", "terms": []}},
+                {"field": "chi", "rhs": {"type": "linear_combination", "terms": []}},
+            ],
+        }
+        with pytest.raises(ValueError, match="Field indices must be unique"):
+            validate_json_schema(data)
+
+    def test_equation_references_nonexistent_field(self) -> None:
+        """Test that equation referencing unknown field raises ValueError."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2},
+            "fields": [{"name": "phi"}],
+            "equations": [{"field": "nonexistent", "rhs": {"type": "linear_combination", "terms": []}}],
+        }
+        with pytest.raises(ValueError, match="not found in fields list"):
+            validate_json_schema(data)
+
 
 # === File Loading Tests ===
 
@@ -569,13 +615,51 @@ class TestOperatorRegistrySync:
             "Add them to KNOWN_OPERATORS in json_loader.py."
         )
 
-    def test_known_minus_registry_is_only_first_derivative_t(self) -> None:
-        """The only KNOWN_OPERATOR not in _OPERATOR_REGISTRY is first_derivative_t."""
+    def test_all_known_operators_in_registry(self) -> None:
+        """Every KNOWN_OPERATOR has an entry in _OPERATOR_REGISTRY."""
         special_cased = KNOWN_OPERATORS - set(_OPERATOR_REGISTRY.keys())
-        assert special_cased == {"first_derivative_t"}, (
-            f"Expected only {{'first_derivative_t'}} to be special-cased, "
-            f"but got: {sorted(special_cased)}"
+        assert special_cased == set(), (
+            f"KNOWN_OPERATORS not in _OPERATOR_REGISTRY: {sorted(special_cased)}. "
+            "Add them to _OPERATOR_REGISTRY (use None handler for special-cased operators)."
         )
+
+
+class TestRegisterOperator:
+    """Tests for the custom operator registration API."""
+
+    def test_register_and_use_custom_operator(self) -> None:
+        """Registered operator is accepted by is_known_operator and usable in PDE."""
+        from torsion_gertsenshtein.symbolic.json_loader import (  # noqa: PLC0415
+            _CUSTOM_OPERATORS,  # noqa: PLC2701
+            is_known_operator,
+        )
+        from torsion_gertsenshtein.symbolic.pde_builder import (  # noqa: PLC0415
+            _OPERATOR_REGISTRY,  # noqa: PLC2701
+            register_operator,
+        )
+
+        name = "_test_custom_op"
+
+        def _handler(field: ScalarField, _bc: object) -> ScalarField:
+            return field * 2.0  # type: ignore[return-value]
+
+        try:
+            register_operator(name, _handler, min_dim=1)
+            assert is_known_operator(name)
+            assert name in _OPERATOR_REGISTRY
+        finally:
+            # Clean up so other tests aren't affected
+            _OPERATOR_REGISTRY.pop(name, None)
+            _CUSTOM_OPERATORS.discard(name)
+
+    def test_register_shadow_builtin_raises(self) -> None:
+        """Registering an operator that shadows a built-in raises ValueError."""
+        from torsion_gertsenshtein.symbolic.pde_builder import (  # noqa: PLC0415
+            register_operator,
+        )
+
+        with pytest.raises(ValueError, match="shadows a built-in"):
+            register_operator("laplacian", lambda f, _bc: f, min_dim=1)
 
 
 # === Phase 8D: Python Validation Tests ===

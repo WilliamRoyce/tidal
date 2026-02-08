@@ -136,6 +136,87 @@ The JSON file is the contract between symbolic and numerical layers:
 }
 ```
 
+## Phase 12: Auto-Computed Mass/Coupling Matrices
+
+As of Phase 12 (February 2026), mass and coupling matrices are **automatically computed** from equation terms, eliminating the need for manual matrix specification.
+
+### Matrix Convention
+
+```
+mass_matrix[i][j] = -(coefficient of identity(field_j) in equation_i)
+coupling_matrix[i][j] = -(coefficient of identity(field_j) in equation_i, where i≠j)
+```
+
+### Symbolic Coefficient Preservation
+
+The pipeline preserves both numeric and symbolic forms of coefficients:
+
+```json
+{
+  "coefficient": -1.0,
+  "coefficient_symbolic": "-m2",
+  "operator": "identity",
+  "field": "phi_0"
+}
+```
+
+This enables **runtime parameter sweeps** without regenerating JSON files — symbolic coefficients are evaluated dynamically using the `_mathematica_to_python` expression evaluator.
+
+### Auto-Computation Workflow
+
+**Wolfram Side (`ExportJSON.wl`):**
+- `ExtractMassCouplingFromEquations[fieldEquations]` parses RHS terms
+- Identifies identity operator terms for each field
+- Extracts both numeric and symbolic coefficients
+- Exports `mass_matrix`, `coupling_matrix`, `mass_matrix_symbolic`, `coupling_matrix_symbolic`
+
+**Python Side (`json_loader.py`):**
+- `EquationSystem.from_dict()` calls `_compute_matrices_from_terms()`
+- Returns 4-tuple: `(mass_numeric, coupling_numeric, mass_symbolic, coupling_symbolic)`
+- Defense-in-depth: Both Wolfram and Python compute matrices to catch inconsistencies
+- `__post_init__` guard: UserWarning if constructor-provided matrices differ from computed values
+
+### Example: Coupled Scalars with Symbolic Coefficients
+
+```mathematica
+(* Wolfram: Define Lagrangian with symbolic parameters *)
+L = 1/2 D[-a][phi[]] eta[a,b] D[-b][phi[]] - 1/2 m_phi^2 phi[]^2 +
+    1/2 D[-a][chi[]] eta[a,b] D[-b][chi[]] - 1/2 m_chi^2 chi[]^2 -
+    g phi[] chi[]
+```
+
+**Generated JSON:**
+```json
+{
+  "equations": [
+    {
+      "field": "phi_0",
+      "rhs": {
+        "terms": [
+          {"coefficient": -1.0, "coefficient_symbolic": "-m_phi2", "operator": "identity", "field": "phi_0"},
+          {"coefficient": -0.5, "coefficient_symbolic": "-g", "operator": "identity", "field": "chi_0"},
+          {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"}
+        ]
+      }
+    }
+  ],
+  "coupling": {
+    "mass_matrix": [[1.0, 0.0], [0.0, 4.0]],
+    "mass_matrix_symbolic": [["m_phi2", "0"], ["0", "m_chi2"]],
+    "coupling_matrix": [[0.0, 0.5], [0.5, 0.0]],
+    "coupling_matrix_symbolic": [["0", "g"], ["g", "0"]]
+  }
+}
+```
+
+**Python Simulation:**
+```python
+# Sweep coupling parameter without regenerating JSON
+for g_value in [0.1, 0.5, 1.0, 2.0]:
+    pde = build_pde_from_json("coupled_scalars.json", parameters={"g": g_value, "m_phi2": 1.0, "m_chi2": 4.0})
+    result = pde.solve(initial_state, t_range=10.0)
+```
+
 ## Examples
 
 ### Klein-Gordon (Validation)

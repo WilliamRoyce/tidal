@@ -105,7 +105,6 @@ Print[""];
 Print["Step 4: Decomposing to components using pipeline..."];
 
 componentEqs = DecomposeToComponents[waveEq, polphi[], polcart, {},
-  "ComputeChristoffels" -> True,
   "MetricMatrix" -> polMetricMatrix];
 
 Print["   Component equations: ", Length[componentEqs]];

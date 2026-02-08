@@ -158,7 +158,7 @@ Both examples demonstrate that **different Lagrangians produce different field e
 
 ### 3. Curvilinear Coordinate Examples (Polar, Spherical, Cylindrical)
 
-These examples demonstrate that the pipeline handles non-Cartesian coordinate systems purely through the metric definition. Coordinate names remain generic (`x`, `y`, `z`) while the metric encodes the geometry. All Christoffel corrections are computed automatically by xAct.
+These examples demonstrate that the pipeline handles non-Cartesian coordinate systems purely through the metric definition. Coordinate names remain generic (`x`, `y`, `z`) while the metric encodes the geometry. Christoffel corrections are auto-detected from metric type: constant metrics have Γ=0, non-constant metrics (position/time-dependent) trigger explicit Christoffel computation via the standard formula.
 
 #### Polar Coordinates (2+1D)
 
@@ -195,6 +195,43 @@ python examples/cylindrical_kg/cylindrical_kg_simulation.py
 ```
 
 **Key features**: Mixed curved (r, θ) and flat (z) spatial directions, `laplacian_z` with constant coefficient.
+
+---
+
+### 4. Klein-Gordon 3+1D (Full 4D Spacetime)
+
+**Lagrangian**: `L = -1/2 η^{ab} ∂_a φ ∂_b φ - 1/2 m² φ²`
+
+**Spacetime**: 3+1D flat Minkowski, signature (-,+,+,+), coordinates (t,x,y,z)
+
+**Stage 1 - Derivation**:
+```bash
+cd examples/scalar_field_3d
+wolframscript -file klein_gordon_3d.wls
+```
+- Derives Klein-Gordon equation in full 4D spacetime
+- Decomposes to: `∂²φ/∂t² = ∂²φ/∂x² + ∂²φ/∂y² + ∂²φ/∂z² - m²φ`
+- Exports to: `examples/data/klein_gordon_3d.json`
+
+**Stage 2 - Simulation**:
+```bash
+python examples/scalar_field_3d/kg_3d_simulation.py
+```
+- Loads equation specification from JSON
+- 32³ = 32,768 cell 3D grid with periodic boundary conditions
+- 3D Gaussian pulse at rest (momentum = 0)
+- Runge-Kutta (RK4) time integration
+- Output: `outputs/kg_3d_output.png` (4-panel visualization)
+
+**Visualization**:
+- Panel 1: φ(z) profile at x=y=center (initial vs final)
+- Panel 2: x-y slice of initial field at z=center
+- Panel 3: x-y slice of final field at z=center
+- Panel 4: max|φ| over time (amplitude decay curve)
+
+**Physics**: Massive scalar field in 3D space exhibits spherical wave propagation with amplitude decay ~ 1/r. Initial peak 0.964 decays to 0.362 (ratio ~0.375) as pulse spreads outward.
+
+**Key features**: Full 3+1D pipeline demonstration, directional laplacians (`laplacian_x`, `laplacian_y`, `laplacian_z`), 3D spatial visualization.
 
 ---
 
@@ -244,11 +281,13 @@ examples/
 ├── data/                          # Generated JSON specifications
 │   ├── em_1d.json                # EM equations
 │   ├── klein_gordon_1d.json      # KG equations
+│   ├── klein_gordon_3d.json      # KG equations (3+1D)
 │   ├── polar_kg.json             # KG in polar coordinates
 │   ├── spherical_kg.json         # KG in spherical coordinates
 │   └── cylindrical_kg.json       # KG in cylindrical coordinates
 ├── electromagnetic/               # EM field (1+1D)
 ├── scalar_field/                  # Scalar field (1+1D)
+├── scalar_field_3d/               # Scalar field (3+1D)
 ├── coupled_scalars/               # Coupled scalar fields (1+1D)
 ├── chern_simons/                  # Chern-Simons gauge theory (2+1D)
 ├── elasticity/                    # Anisotropic elasticity (2+1D)

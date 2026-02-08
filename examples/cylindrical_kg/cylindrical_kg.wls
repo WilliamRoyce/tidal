@@ -94,7 +94,6 @@ Print[""];
 Print["Step 4: Decomposing to components using pipeline..."];
 
 componentEqs = DecomposeToComponents[waveEq, cylphi[], cylcart, {},
-  "ComputeChristoffels" -> True,
   "MetricMatrix" -> cylMetricMatrix];
 
 Print["   Component equations: ", Length[componentEqs]];

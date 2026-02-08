@@ -1,5 +1,276 @@
 # Changelog
 
+## Issue #71: 3+1D Klein-Gordon Working Example (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Created complete end-to-end 3+1D Klein-Gordon example demonstrating full 4D spacetime support with Wolfram derivation and Python simulation.
+
+**Files Created:**
+- `examples/scalar_field_3d/klein_gordon_3d.wls` — Wolfram derivation script (4D manifold, Minkowski metric)
+- `examples/scalar_field_3d/kg_3d_simulation.py` — Python simulation (32³ grid, 4-panel visualization)
+
+**Files Updated:**
+- `examples/data/klein_gordon_3d.json` — Replaced hand-written version with pipeline-derived format
+- `tests/test_3d_validation.py` — Updated field name from `"phi"` to `"phi_0"`
+
+**Key Features:**
+- Full Lagrangian → Euler-Lagrange → Component decomposition → JSON → Simulation pipeline in 3+1D
+- Uses KG-prefixed xAct symbols (`kgM4`, `kgEta`, `kgCD`, `kgCart`) to avoid kernel conflicts
+- Symbolic mass parameter `m2 = Symbol["m2"]` resolved at simulation time
+- 32³ = 32,768 cell grid with periodic boundary conditions
+- 4-panel visualization: z-profile (initial/final), x-y slices (initial/final), amplitude decay over time
+- Demonstrates expected 3D physics: Gaussian pulse amplitude decays from 0.964 to 0.362 (ratio ~0.375)
+
+**Impact:** Proves 3+1D capabilities are fully functional end-to-end, not just claimed.
+
+**Tests:** 496 Python tests passing (including updated test_3d_validation.py)
+
+---
+
+## Issue #75: Operator Dimension Validation at Construction Time (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Added two-stage validation to fail fast when operators require dimensions not supported by the equation specification, catching errors at PDE construction instead of runtime.
+
+**Implementation:**
+
+**New Methods:**
+- `PDEFromSpec._operator_min_dim(operator_name: str) -> int` — Static method returning minimum spatial dimension required by an operator
+- `PDEFromSpec._validate_operator_dimensions()` — Instance method validating all operators in spec against spatial dimension
+
+**Validation Logic:**
+- Explicit registry: `gradient_z`, `laplacian_z`, `cross_derivative_xz` require 3D
+- Dynamic patterns: `derivative_N_z` requires 3D, `derivative_Nx_My` requires 2D if y present
+- Fail-fast: Raises `ValueError` at `__init__` with clear message indicating which operator and field failed
+
+**Test Coverage:**
+- 9 new tests in `TestOperatorDimensionValidation`
+- Updated `test_unknown_operator_raises` to expect error at construction
+
+**Example Error:**
+```
+ValueError: Operator 'gradient_z' in equation for 'phi_0' requires at least 3D spatial grid,
+but the spec has spatial_dimension=2 (from 3D spacetime).
+```
+
+**Impact:** Developer experience improvement — errors caught immediately with clear diagnostic messages instead of cryptic runtime failures.
+
+**Tests:** 496 Python tests passing (9 new)
+
+---
+
+## Issue #67: Replace assert isinstance with Explicit TypeErrors (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Replaced 15 `assert isinstance(...)` statements in `pde_builder.py` with explicit `if not isinstance(...): raise TypeError(...)` checks to prevent silent failures when Python runs with `-O` optimization flag.
+
+**Changes:**
+- 15 isinstance checks converted to explicit TypeError raises
+- 9 `# pyright: ignore[reportUnnecessaryIsInstance]` comments added (pyright doesn't understand the pattern)
+- 4 docstrings updated to document raised TypeErrors
+- 2 tests updated to expect TypeError instead of ValueError for complex numbers
+- 1 pyright fix: `float(cast("SupportsFloat", result))` for line 835
+
+**Linting Fixes:**
+- ruff EM102: Extracted 15 inline f-strings to `msg = f"..."` variables
+- ruff DOC501: Added TypeError to 5 method docstrings
+- ruff TRY004: Changed ValueError to TypeError for complex number check (autofix side effect)
+- Removed stale `# noqa: C901`, added `PLR0912` to `evolution_rate`
+
+**Rationale:** Python's `-O` flag strips all assert statements for performance. Using assert for validation means code silently breaks in production when optimizations are enabled.
+
+**Tests:** 487 Python tests passing after changes
+
+---
+
+## Issue #85: Unified Derivative Classification (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Refactored 5 dimension-specific derivative wrappers into a single dimension-agnostic `ExtractDerivativeProfile` function, saving ~108 lines of code and improving maintainability.
+
+**Replaced Functions:**
+- `Extract1DSpatialDerivativeForm` (1+1D specific)
+- `Extract2DSpatialDerivativeForm` (2+1D specific)
+- `Extract3DSpatialDerivativeForm` (3+1D specific)
+- `ExtractTimeDerivativeOrder` (dimension-agnostic but redundant)
+- `ExtractSpatialDerivativeOrders` (dimension-agnostic but redundant)
+
+**New Unified Function:**
+```mathematica
+ExtractDerivativeProfile[term_, dim_] := Module[{...},
+  (* Returns: <|"time" -> n, "space" -> {m_x, m_y, m_z, ...}|> *)
+]
+```
+
+**Key Improvements:**
+- Single source of truth for derivative classification across all dimensions
+- Handles 1+1D (2-arg), 2+1D (3-arg), 3+1D (4-arg) Derivative forms uniformly
+- Eliminates code duplication and dimension-specific logic branches
+- ~108 lines of code removed
+
+**Test Coverage:**
+- 10 new Wolfram tests in `test_common_utilities.wls` covering 1D/2D/3D cases
+- All 496 Python tests passing after refactor
+
+**Impact:** Cleaner codebase, easier to extend to 4+1D or higher dimensions in the future.
+
+---
+
+## Issue #79: Mixed Time-Spatial Derivatives (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Added support for mixed time-space derivative terms like `∂_t ∂_x A` (common in Hubble friction, curved spacetime, and momentum gradient terms).
+
+**Wolfram Side:**
+- `ClassifySpatialProfile[spatialOrders]` — Identifies gradient direction from spatial derivative pattern
+- `ExtractSpatialOperatorFromMixed[term, dim]` — Extracts spatial operator name from mixed derivative term
+
+**Python Side:**
+- Multi-axis handler in `_apply_operator` for `gradient_x(pi_i)` terms
+- Validates that referenced momentum field exists
+- Applies spatial gradient to time derivative (momentum) field
+
+**Use Cases:**
+- Hubble friction: `H * ∂_t φ` appears as `gradient_t(phi)` → handled as `first_derivative_t`
+- Momentum gradients: `∂_x (∂_t φ)` appears as `gradient_x(pi_i)` in curved spacetime
+
+**Test Coverage:**
+- Wolfram tests for mixed derivative classification
+- Python tests for momentum field references
+
+**Impact:** Enables realistic curved spacetime simulations (de Sitter, conformal, S²) with proper friction terms.
+
+**Tests:** All 496 Python tests passing
+
+---
+
+## Issue #68: Eval Validation for Coefficient Expressions (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Added `_validate_eval_result` guard to catch NaN, Inf, and complex values in coefficient evaluation, preventing silent physics errors from invalid mathematical expressions.
+
+**Implementation:**
+```python
+def _validate_eval_result(self, result: complex, expression: str, context: dict) -> None:
+    """Validate that evaluated coefficient is finite and real."""
+    if np.isnan(result):
+        msg = f"Coefficient expression '{expression}' evaluated to NaN with {context}"
+        raise ValueError(msg)
+    if np.isinf(result):
+        msg = f"Coefficient expression '{expression}' evaluated to Inf with {context}"
+        raise ValueError(msg)
+    if np.iscomplex(result) or result.imag != 0:
+        msg = f"Coefficient must be real, got {result} from '{expression}' with {context}"
+        raise TypeError(msg)
+```
+
+**Called From:**
+- `_resolve_coefficient_at_point` (position-dependent coefficients)
+- After every `eval()` of Mathematica expressions
+
+**Test Coverage:**
+- 13 new tests in `TestEvalValidation`:
+  - `test_validate_eval_result_nan` / `test_nan_in_position_dependent_raises`
+  - `test_validate_eval_result_inf` / `test_inf_in_position_dependent_raises` / `test_overflow_to_inf_raises`
+  - `test_validate_eval_result_complex` / `test_sqrt_negative_gives_nan_raises`
+  - `test_validate_eval_result_valid_float` / `test_validate_eval_result_valid_int` / `test_validate_eval_result_zero`
+
+**Impact:** Physics errors (like `1/0` or `sqrt(-1)` in coefficients) now fail loudly with clear diagnostics instead of producing silent NaN propagation.
+
+**Tests:** 496 Python tests passing (13 new)
+
+---
+
+## Phase 13: Rank 3+ Tensor Support (February 2026)
+
+**Status:** ✅ COMPLETE (Issue #70)
+
+**Summary:** Extended component extraction to support rank-3 and higher tensors (epsilon tensors, Riemann curvature, field strength tensors, etc.).
+
+**New Function:**
+```mathematica
+ReplaceHigherRankFieldComponents[componentEq_, fieldTemplate_, chart_] := Module[{...},
+  (* Detects rank-3+ tensors and replaces with component functions *)
+  (* Example: epsilon[a,b,c] -> epsilon012[t,x,y] *)
+]
+```
+
+**Supported Ranks:**
+- Rank 0: Scalars (phi[])
+- Rank 1: Vectors (A[-a])
+- Rank 2: 2-tensors (h[-a,-b])
+- **Rank 3+: NEW** — Epsilon tensors (ε[-a,-b,-c]), Riemann tensors (R[-a,-b,-c,-d])
+
+**Integration:**
+- Called automatically in `DecomposeToComponents` after standard rank-1/2 replacement
+- Uses xAct introspection to detect tensor rank
+- Constructs component names from index values
+
+**Test Coverage:**
+- 27 new Wolfram tests in `test_component_decompose.wls`
+- 4 new Python tests for higher-rank tensor JSON loading
+
+**Impact:** Enables topological field theories (Chern-Simons with ε_{abc}), gravitational theories (Riemann curvature), and non-Abelian gauge theories.
+
+**Tests:** ~100 Wolfram tests + 496 Python tests passing (31 new across both)
+
+---
+
+## Phase 12: Auto-Computed Mass/Coupling Matrices (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Automated computation of mass and coupling matrices from equation terms with symbolic coefficient preservation, eliminating manual matrix construction and enabling runtime parameter sweeps.
+
+**Convention:**
+```
+mass_matrix[i][j] = -(coefficient of identity(field_j) in equation_i)
+coupling_matrix[i][j] = -(coefficient of identity(field_j) in equation_i, where i≠j)
+```
+
+**Implementation:**
+
+**Wolfram Side (`ExportJSON.wl`):**
+- `ExtractMassCouplingFromEquations[fieldEquations]` — Parses RHS terms to extract matrix coefficients
+- Preserves symbolic expressions: `"coefficient": -1.0, "coefficient_symbolic": "-m2"`
+- Defense-in-depth: Both numeric and symbolic coefficients exported
+
+**Python Side (`json_loader.py`):**
+- `EquationSystem._compute_matrices_from_terms` — Computes matrices from equation terms at load time
+- Returns 4-tuple: `(mass_numeric, coupling_numeric, mass_symbolic, coupling_symbolic)`
+- `__post_init__` guard: UserWarning if constructor-provided matrices inconsistent with terms
+
+**Symbolic Preservation:**
+- `mass_matrix_symbolic` / `coupling_matrix_symbolic` preserve exact Mathematica expressions
+- Evaluated at runtime using `_mathematica_to_python` expression evaluator
+- Enables parameter sweeps without re-deriving equations
+
+**Test Coverage:**
+- 453 tests passing after Phase 12 implementation
+- Tests for matrix auto-computation, symbolic preservation, consistency validation
+
+**Impact:** Users can sweep parameters (`m2`, `g`, `H`) in simulations without regenerating JSON — symbolic coefficients evaluated dynamically.
+
+**Example:**
+```json
+{
+  "coefficient": 1.0,
+  "coefficient_symbolic": "m2",
+  "operator": "identity",
+  "field": "phi_0"
+}
+```
+
+**Tests:** 453 Python + Wolfram tests passing after implementation
+
+---
+
 ## Phase 4: Pipeline Robustness & Testing (February 2026)
 
 ### 🎯 Overview

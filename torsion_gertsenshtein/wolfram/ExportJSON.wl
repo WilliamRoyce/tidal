@@ -125,10 +125,16 @@ spatial direction. Returns \"laplacian_x\", \"laplacian_y\", \"laplacian_z\", or
 Used for anisotropic equations like Navier-Cauchy where d^2_x and d^2_y have different coefficients.";
 
 (* Generic derivative order support (Phase 12) *)
+ExtractDerivativeProfile::usage =
+  "ExtractDerivativeProfile[term] extracts the full derivative order profile from a \
+Derivative[dt, dx, dy, ...] pattern. Returns a list {dt, dx, dy, ...} including \
+the time slot. E.g., Derivative[1,2,0] -> {1,2,0}. Returns {} if no Derivative found.";
+
 ExtractSpatialDerivativeProfile::usage =
   "ExtractSpatialDerivativeProfile[term] extracts the spatial derivative orders from a \
 Derivative[dt, dx, dy, ...] pattern. Returns a list of non-negative integers representing \
-the derivative order in each spatial axis (time slot excluded). E.g., Derivative[0,3,0] -> {3,0}.";
+the derivative order in each spatial axis (time slot excluded). E.g., Derivative[0,3,0] -> {3,0}. \
+Delegates to ExtractDerivativeProfile and takes Rest.";
 
 BuildGenericOperatorName::usage =
   "BuildGenericOperatorName[spatialOrders] builds an operator name string from a list of \
@@ -499,20 +505,10 @@ BuildLHSStructure[fieldName_String, timeOrder_Integer] := <|
 
 (* Detect if a term contains time derivatives of at least order minOrder *)
 (* Time index is always the first slot in Derivative[dt, dx, ...] *)
-(* Supports: 1+1D (2-arg), 2+1D (3-arg), 3+1D (4-arg), and higher dimensions *)
-ContainsTimeDerivative[term_, minOrder_:2] := Module[{},
-  Which[
-    (* 3+1D: Derivative[n, m, p, q] - first slot n is time *)
-    !FreeQ[term, Derivative[n_, _, _, _][_][___] /; n >= minOrder], True,
-    (* 2+1D: Derivative[n, m, p] - first slot n is time *)
-    !FreeQ[term, Derivative[n_, _, _][_][___] /; n >= minOrder], True,
-    (* 1+1D: Derivative[n, m] - first slot n is time *)
-    !FreeQ[term, Derivative[n_, _][_][___] /; n >= minOrder], True,
-    (* Generic: any arity with first slot >= minOrder *)
-    !FreeQ[term, Derivative[n_, ___][_][___] /; n >= minOrder], True,
-    (* Default: no time derivative of required order *)
-    True, False
-  ]
+(* Dimension-agnostic: delegates to ExtractDerivativeProfile *)
+ContainsTimeDerivative[term_, minOrder_:2] := Module[{profile},
+  profile = ExtractDerivativeProfile[term];
+  Length[profile] >= 1 && First[profile] >= minOrder
 ];
 
 (* Field-aware time derivative check: only matches derivatives of the CURRENT field *)
@@ -546,78 +542,34 @@ ExtractLHSCoefficient[term_] := Module[{derivParts, derivPart},
 
 (* Check for mixed time-space derivatives that shouldn't be on RHS *)
 (* Returns True if term has BOTH time AND space derivatives *)
-(* Supports: 1+1D (2-arg), 2+1D (3-arg), 3+1D (4-arg) *)
-IsMixedTimeSpaceDerivative[term_] := Module[{},
-  Which[
-    (* 3+1D: first slot > 0 AND (any spatial slot > 0) *)
-    !FreeQ[term, Derivative[n_, m_, p_, q_][_][___] /; n > 0 && (m > 0 || p > 0 || q > 0)], True,
-    (* 2+1D: first slot > 0 AND (second OR third slot > 0) *)
-    !FreeQ[term, Derivative[n_, m_, p_][_][___] /; n > 0 && (m > 0 || p > 0)], True,
-    (* 1+1D: first slot > 0 AND second slot > 0 *)
-    !FreeQ[term, Derivative[n_, m_][_][___] /; n > 0 && m > 0], True,
-    (* Default: not a mixed derivative *)
-    True, False
-  ]
+(* Dimension-agnostic: delegates to ExtractDerivativeProfile *)
+IsMixedTimeSpaceDerivative[term_] := Module[{profile},
+  profile = ExtractDerivativeProfile[term];
+  Length[profile] >= 2 && First[profile] > 0 && Max[Rest[profile]] > 0
 ];
 
 (* Identify gradient direction from derivative structure *)
-(* In 1+1D: Derivative[dt, dx] - second slot is x *)
-(* In 2+1D: Derivative[dt, dx, dy] - second slot is x, third is y *)
-(* In 3+1D: Derivative[dt, dx, dy, dz] - second=x, third=y, fourth=z *)
-(* IMPORTANT: First slot (time) must be 0 for pure spatial gradients *)
-IdentifyGradientDirection[term_] := Module[{},
-  Which[
-    (* 3+1D: Check for gradient_z first (fourth slot nonzero, others zero) *)
-    (* Pattern: Derivative[0, 0, 0, n_] where n > 0 *)
-    !FreeQ[term, Derivative[0, 0, 0, n_][_][___] /; n > 0], "gradient_z",
-
-    (* 3+1D: gradient_y (third slot nonzero, fourth zero) *)
-    (* Pattern: Derivative[0, 0, n_, 0] where n > 0 *)
-    !FreeQ[term, Derivative[0, 0, n_, 0][_][___] /; n > 0], "gradient_y",
-
-    (* 3+1D: gradient_x (second slot nonzero, third and fourth zero) *)
-    (* Pattern: Derivative[0, n_, 0, 0] where n > 0 *)
-    !FreeQ[term, Derivative[0, n_, 0, 0][_][___] /; n > 0], "gradient_x",
-
-    (* 2+1D: Check for gradient_y first (third slot nonzero) *)
-    (* Pattern: Derivative[0, 0, n_] where n > 0 - MUST have first slot = 0 *)
-    (* This ensures we only match pure spatial gradients, not mixed time-space *)
-    !FreeQ[term, Derivative[0, 0, n_][_][___] /; n > 0], "gradient_y",
-
-    (* 2+1D: gradient_x (second slot nonzero, third is zero) *)
-    (* Pattern: Derivative[0, n_, 0] where n > 0 - MUST have first slot = 0 *)
-    !FreeQ[term, Derivative[0, n_, 0][_][___] /; n > 0], "gradient_x",
-
-    (* 1+1D: only gradient_x exists (second slot) *)
-    (* Pattern: Derivative[0, n_] where n > 0 - MUST have first slot = 0 *)
-    !FreeQ[term, Derivative[0, n_][_][___] /; n > 0], "gradient_x",
-
-    (* Fail explicitly if gradient direction cannot be determined *)
-    True,
-      Throw[StringJoin[
-        "IdentifyGradientDirection: Cannot determine gradient direction for term '",
-        ToString[term], "'. ",
-        "Expected Derivative[0, n_, ...] pattern for pure spatial gradient."
-      ]]
-  ]
+(* Dimension-agnostic: delegates to ExtractDerivativeProfile + ClassifySpatialProfile *)
+IdentifyGradientDirection[term_] := Module[{profile},
+  profile = ExtractDerivativeProfile[term];
+  If[Length[profile] < 2,
+    Throw[StringJoin[
+      "IdentifyGradientDirection: Cannot determine gradient direction for term '",
+      ToString[term], "'. ",
+      "Expected Derivative[0, n_, ...] pattern for pure spatial gradient."
+    ]]
+  ];
+  ClassifySpatialProfile[Rest[profile]]
 ];
 
 (* === First-Order Time Derivative Detection (Phase 2 Curved Spacetime) === *)
 
 (* Detect pure first-order time derivative: Derivative[1, 0, ...] with no spatial derivatives *)
 (* Used for Hubble friction terms in curved spacetime: -2H∂_t φ *)
-(* Returns True only if time order = 1 AND all spatial orders = 0 *)
-IsFirstOrderTimeDerivative[term_] := Module[{},
-  Which[
-    (* 3+1D: Derivative[1, 0, 0, 0] - first-order time, no space *)
-    !FreeQ[term, Derivative[1, 0, 0, 0][_][___]], True,
-    (* 2+1D: Derivative[1, 0, 0] - first-order time, no space *)
-    !FreeQ[term, Derivative[1, 0, 0][_][___]], True,
-    (* 1+1D: Derivative[1, 0] - first-order time, no space *)
-    !FreeQ[term, Derivative[1, 0][_][___]], True,
-    (* Default: not a pure first-order time derivative *)
-    True, False
-  ]
+(* Dimension-agnostic: delegates to ExtractDerivativeProfile *)
+IsFirstOrderTimeDerivative[term_] := Module[{profile},
+  profile = ExtractDerivativeProfile[term];
+  Length[profile] >= 2 && First[profile] == 1 && Max[Rest[profile]] == 0
 ];
 
 (* === Phase 4: Momentum Gradient Helpers === *)
@@ -679,31 +631,16 @@ FieldToMomentumName[fieldName_String] := Module[{parsed},
 (* spatial operators on the momentum field: d_t d_x phi = d_x(pi), *)
 (* d_t d_x d_y phi = d_x d_y(pi) = cross_derivative_xy(pi), etc. *)
 ExtractSpatialOperatorFromMixed[term_] := Module[
-  {allProfiles, orders, timeOrder, spatialOrders},
-
-  (* Extract all Derivative order lists from the term *)
-  allProfiles = Cases[term,
-    Derivative[o__][_][__] :> {o},
-    {0, Infinity}
-  ];
-  (* Also check unapplied Derivative[orders][f] *)
-  If[Length[allProfiles] == 0,
-    allProfiles = Cases[term,
-      Derivative[o__][_] :> {o},
-      {0, Infinity}
-    ]
-  ];
-  If[Length[allProfiles] == 0,
+  {profile, timeOrder, spatialOrders},
+  profile = ExtractDerivativeProfile[term];
+  If[Length[profile] == 0,
     Throw[StringJoin[
       "ExtractSpatialOperatorFromMixed: No Derivative pattern found in term '",
       ToString[term, InputForm], "'."
     ]]
   ];
-
-  orders = allProfiles[[1]];
-  timeOrder = First[orders];
-  spatialOrders = Rest[orders];
-
+  timeOrder = First[profile];
+  spatialOrders = Rest[profile];
   (* Validate time order is exactly 1 *)
   (* d_t phi = pi is well-defined, but d2_t phi is the LHS (acceleration) *)
   If[timeOrder != 1,
@@ -715,7 +652,6 @@ ExtractSpatialOperatorFromMixed[term_] := Module[
       "momentum spatial operators (d_t phi = pi)."
     ]]
   ];
-
   ClassifySpatialProfile[spatialOrders]
 ];
 
@@ -727,50 +663,23 @@ ExtractSpatialOperatorFromMixed[term_] := Module[
 IsSpatialCrossDerivative[term_] := IdentifySpatialCrossDerivative[term] =!= False;
 
 (* New version that returns the specific operator name *)
-IdentifySpatialCrossDerivative[term_] := Module[{},
-  Which[
-    (* 3+1D: cross_derivative_yz (third and fourth slots > 0, second = 0) *)
-    !FreeQ[term, Derivative[0, 0, m_, p_][_][___] /; m > 0 && p > 0], "cross_derivative_yz",
-    (* 3+1D: cross_derivative_xz (second and fourth slots > 0, third = 0) *)
-    !FreeQ[term, Derivative[0, m_, 0, p_][_][___] /; m > 0 && p > 0], "cross_derivative_xz",
-    (* 3+1D: cross_derivative_xy (second and third slots > 0, fourth = 0) *)
-    !FreeQ[term, Derivative[0, m_, p_, 0][_][___] /; m > 0 && p > 0], "cross_derivative_xy",
-    (* 2+1D: cross_derivative_xy (second and third slots > 0) *)
-    !FreeQ[term, Derivative[0, m_, p_][_][___] /; m > 0 && p > 0], "cross_derivative_xy",
-    (* Not a cross-derivative *)
-    True, False
-  ]
+(* Dimension-agnostic: delegates to ExtractDerivativeProfile + ClassifySpatialProfile *)
+IdentifySpatialCrossDerivative[term_] := Module[{profile, result},
+  profile = ExtractDerivativeProfile[term];
+  If[Length[profile] < 2 || First[profile] =!= 0, Return[False]];
+  result = ClassifySpatialProfile[Rest[profile]];
+  If[StringMatchQ[result, "cross_derivative_" ~~ __], result, False]
 ];
 
 (* === Phase 5 (Elasticity): Directional Laplacian Detection === *)
 (* Identifies pure second derivatives in a single spatial direction *)
 (* Returns: "laplacian_x", "laplacian_y", "laplacian_z", or False *)
-(* Used for anisotropic equations like Navier-Cauchy where ∂²_x and ∂²_y have different coefficients *)
-(* Supports 1+1D (2-arg), 2+1D (3-arg), and 3+1D (4-arg) Derivative forms *)
-
-IdentifyDirectionalLaplacian[term_] := Module[{},
-  Which[
-    (* 3+1D: Derivative[0, 0, 0, 2] = pure ∂²/∂z² *)
-    !FreeQ[term, Derivative[0, 0, 0, 2][_][___]], "laplacian_z",
-
-    (* 3+1D: Derivative[0, 0, 2, 0] = pure ∂²/∂y² (no x or z derivative) *)
-    !FreeQ[term, Derivative[0, 0, 2, 0][_][___]], "laplacian_y",
-
-    (* 3+1D: Derivative[0, 2, 0, 0] = pure ∂²/∂x² (no y or z derivative) *)
-    !FreeQ[term, Derivative[0, 2, 0, 0][_][___]], "laplacian_x",
-
-    (* 2+1D: Derivative[0, 2, 0] = pure ∂²/∂x² (no y derivative) *)
-    !FreeQ[term, Derivative[0, 2, 0][_][___]], "laplacian_x",
-
-    (* 2+1D: Derivative[0, 0, 2] = pure ∂²/∂y² (no x derivative) *)
-    !FreeQ[term, Derivative[0, 0, 2][_][___]], "laplacian_y",
-
-    (* 1+1D: Derivative[0, 2] = pure ∂²/∂x² (only spatial dimension) *)
-    !FreeQ[term, Derivative[0, 2][_][___]], "laplacian_x",
-
-    (* Default: not a pure directional Laplacian *)
-    True, False
-  ]
+(* Dimension-agnostic: delegates to ExtractDerivativeProfile + ClassifySpatialProfile *)
+IdentifyDirectionalLaplacian[term_] := Module[{profile, result},
+  profile = ExtractDerivativeProfile[term];
+  If[Length[profile] < 2 || First[profile] =!= 0, Return[False]];
+  result = ClassifySpatialProfile[Rest[profile]];
+  If[StringMatchQ[result, "laplacian_" ~~ _], result, False]
 ];
 
 (* Helper to build term result with optional symbolic coefficient and coordinate dependence *)
@@ -915,67 +824,64 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
 ];
 
 (* Count the total derivative order of a term *)
-(* Returns the maximum total order of any Derivative expression found *)
-CountDerivativeOrder[term_] := Module[
-  {maxOrder},
-  maxOrder = 0;
-  (* Check for Derivative[n][f][args] patterns (applied derivatives) *)
-  Cases[term,
-    Derivative[orders__][_][__] :> (maxOrder = Max[maxOrder, Total[{orders}]]),
-    {0, Infinity}
-  ];
-  (* Also check for unapplied Derivative[n][f] patterns *)
-  If[maxOrder == 0,
-    Cases[term,
-      Derivative[orders__][_] :> (maxOrder = Max[maxOrder, Total[{orders}]]),
-      {0, Infinity}
-    ]
-  ];
-  maxOrder
+(* Returns the total order of the Derivative expression found, or 0 if none *)
+(* Delegates to ExtractDerivativeProfile to avoid duplicating extraction logic *)
+CountDerivativeOrder[term_] := Module[{profile},
+  profile = ExtractDerivativeProfile[term];
+  If[Length[profile] == 0, 0, Total[profile]]
 ];
 
 (* === Phase 12: Generic Derivative Order Support === *)
-(* Extract spatial derivative orders from a term *)
-(* Returns a list of non-negative integers: {dx_order, dy_order, dz_order, ...} *)
-(* Time slot (first in Derivative[dt, dx, ...]) is excluded *)
-ExtractSpatialDerivativeProfile[term_] := Module[{profiles = {}},
+
+(* Extract full derivative order profile from a term *)
+(* Returns {dt, dx, dy, ...} including the time slot *)
+(* Returns {} if no Derivative pattern found *)
+ExtractDerivativeProfile[term_] := Module[{profiles = {}},
   Cases[term,
-    Derivative[orders__][_][__] :> Module[{orderList = Rest[{orders}]},
-      AppendTo[profiles, orderList]
-    ],
+    Derivative[orders__][_][__] :> AppendTo[profiles, {orders}],
     {0, Infinity}
   ];
   If[Length[profiles] == 0,
-    (* Also check unapplied Derivative[orders][f] *)
     Cases[term,
-      Derivative[orders__][_] :> Module[{orderList = Rest[{orders}]},
-        AppendTo[profiles, orderList]
-      ],
+      Derivative[orders__][_] :> AppendTo[profiles, {orders}],
       {0, Infinity}
     ]
   ];
-  If[Length[profiles] == 0,
+  If[Length[profiles] == 0, Return[{}]];
+  profiles[[1]]
+];
+
+(* Extract spatial derivative orders from a term *)
+(* Delegates to ExtractDerivativeProfile and takes Rest (strips time slot) *)
+(* Throws if no Derivative pattern found *)
+ExtractSpatialDerivativeProfile[term_] := Module[{profile},
+  profile = ExtractDerivativeProfile[term];
+  If[Length[profile] == 0,
     Throw[StringJoin[
       "ExtractSpatialDerivativeProfile: No Derivative pattern found in term '",
       ToString[term, InputForm], "'."
     ]]
   ];
-  profiles[[1]]
+  Rest[profile]
 ];
 
 (* Build operator name from spatial derivative orders *)
 (* Single-axis: {3,0} -> "derivative_3_x", {0,5} -> "derivative_5_y" *)
 (* Multi-axis: {2,1} -> "derivative_2x_1y" *)
 BuildGenericOperatorName[spatialOrders_List] := Module[
-  {nonzero, axisNames = {"x", "y", "z"}, parts},
+  {nonzero, axisNames = {"x", "y", "z", "w", "v", "u"}, parts},
 
   (* Collect {axisIndex, order} pairs for nonzero spatial orders *)
   nonzero = {};
   Do[
     If[i <= Length[spatialOrders] && spatialOrders[[i]] > 0,
+      If[i > Length[axisNames],
+        Throw["BuildGenericOperatorName: Spatial dimension " <> ToString[i] <>
+              " exceeds maximum supported (" <> ToString[Length[axisNames]] <> ")."]
+      ];
       AppendTo[nonzero, {i, spatialOrders[[i]]}]
     ],
-    {i, 1, Min[Length[spatialOrders], 3]}
+    {i, 1, Length[spatialOrders]}
   ];
 
   If[Length[nonzero] == 0,
@@ -1001,7 +907,7 @@ BuildGenericOperatorName[spatialOrders_List] := Module[
 (* Uses canonical names for common cases (gradient, laplacian, cross_derivative) *)
 (* and delegates to BuildGenericOperatorName for higher-order/mixed cases *)
 ClassifySpatialProfile[spatialOrders_List] := Module[
-  {totalOrder, nonzeroPositions, axisNames = {"x", "y", "z"}},
+  {totalOrder, nonzeroPositions, axisNames = {"x", "y", "z", "w", "v", "u"}},
 
   totalOrder = Total[spatialOrders];
   nonzeroPositions = Flatten[Position[spatialOrders, _?(# > 0 &)]];
@@ -1132,8 +1038,28 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
     targetField = FieldToMomentumName[targetField]
   ];
 
-  (* Build and return result with coordinate-dependence info *)
-  BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent, coordDeps]
+  (* Step 5: Detect nonlinear (field-dependent) coefficients *)
+  (* In a linear term, the field head should appear exactly once (bare or in Derivative). *)
+  (* More than one occurrence means the coefficient depends on the field itself. *)
+  Module[{fieldOccurrences, termResult},
+    fieldOccurrences = Length[Cases[term,
+      (f_Symbol[__] /; MemberQ[allFieldNames, ToString[f]]) |
+      (Derivative[__][f_][__] /; MemberQ[allFieldNames, ToString[f]]),
+      {0, Infinity}
+    ]];
+
+    (* Build term result *)
+    termResult = BuildTermResult[coefficient, operator, targetField, symbolicCoeff, isTimeDependent, coordDeps];
+
+    (* Attach warning if nonlinear *)
+    If[fieldOccurrences > 1,
+      Print["WARNING: Nonlinear (field-dependent) coefficient detected in term for field '",
+        targetField, "'. The linear PDE solver will treat this as a constant coefficient."];
+      termResult["warning"] = "nonlinear_coefficient"
+    ];
+
+    termResult
+  ]
 ];
 
 (* === Constraint Solver Hints (Issue #91) === *)

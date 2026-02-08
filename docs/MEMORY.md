@@ -133,7 +133,7 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 
 ### Regression Testing
 - Run existing 1+1D examples after Wolfram changes: `wolframscript -file examples/*/*.wls`
-- Run pytest suite: `uv run pytest tests/` (expect 156 passing)
+- Run pytest suite: `uv run pytest tests/` (expect 496 Python tests + ~100 Wolfram tests passing)
 - Check for dimension hardcoding in error messages
 
 ### Verification Pattern
@@ -156,14 +156,20 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 - 2+1D: CartesianGrid with 2D bounds (t is time, x and y are spatial)
 - Always use periodic BCs for wave equations
 
-## Future Improvements Needed
+## Completed Improvements
 
 1. ~~**Automate epsilon tensor handling:**~~ ✅ DONE - `EvaluateEpsilonComponents` in CommonUtilities.wl
-2. **Improve time derivative detection in 2+1D:** Current pattern `Derivative[n_, 0][_]` is 1+1D only
-3. **Generalize to 3+1D:** Test full 4D spacetime with 3 spatial dimensions
-4. **Gauge fixing:** Automate Lorenz/Coulomb gauge application in Wolfram
-5. **Higher-rank tensors:** Extend beyond vectors (currently scalars and vectors work)
-6. **Clean JSON output for 2+1D:** Remove spurious cross-Laplacian terms from mixed derivatives
+2. ~~**Generalize to 3+1D:**~~ ✅ DONE - Full 4D spacetime with 3 spatial dimensions (gravitational_waves, scalar_field_3d)
+3. ~~**Higher-rank tensors:**~~ ✅ DONE - Phase 13: Rank 3+ tensor support (Issue #70)
+4. ~~**Time derivative detection in 2+1D:**~~ ✅ DONE - Issue #79: Mixed time-spatial derivatives
+5. ~~**Unified derivative classification:**~~ ✅ DONE - Issue #85: Dimension-agnostic `ExtractDerivativeProfile`
+
+## Future Improvements Needed
+
+1. **Gauge fixing:** Automate Lorenz/Coulomb gauge application in Wolfram
+2. **Clean JSON output for 2+1D:** Remove spurious cross-Laplacian terms from mixed derivatives (low priority)
+3. **Nonlinear extensions:** Beyond linear perturbation theory
+4. **Continuous Integration:** GitHub Actions for automated Wolfram test execution
 
 ## Quick Reference
 

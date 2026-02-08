@@ -20,6 +20,7 @@ TESTS=(
     "tests/wolfram/test_common_utilities.wls"
     "tests/wolfram/test_export_json.wls"
     "tests/wolfram/test_component_decompose.wls"
+    "tests/wolfram/test_linearize.wls"
 )
 
 PASSED=0

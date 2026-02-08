@@ -22,7 +22,7 @@
      - 1+1D: 2 coordinates (t, x)
      - 2+1D: 3 coordinates (t, x, y)
      - 3+1D: 4 coordinates (t, x, y, z)
-     - $MaxSupportedDimension = 4 (extensible with GenerateCDRules)
+     - $MaxSupportedDimension = 7 (up to 6+1D; axis letters: x,y,z,w,v,u)
 
    SIGN CONVENTIONS (Minkowski):
      - Metric signature: (-1, +1, +1, ...)
@@ -54,6 +54,12 @@ directly from the metric matrix using the standard formula: \
 Gamma^a_{bc} = (1/2) g^{ad} (d_b g_{dc} + d_c g_{bd} - d_d g_{bc}). \
 Returns a 3D array where christoffel[[a+1, b+1, c+1]] = Gamma^a_bc. \
 Works for any metric including time-dependent ones.";
+
+IsNonConstantMetric::usage =
+  "IsNonConstantMetric[metricMatrix, coords] returns True if any metric component \
+depends on the given coordinate symbols (spatial or temporal). Used for automatic \
+detection of whether Christoffel symbol computation is required: constant metrics \
+have all Christoffels = 0, while non-constant metrics require explicit computation.";
 
 RemoveChristoffelSymbols::usage =
   "RemoveChristoffelSymbols[expr] sets all Christoffel symbol terms to zero \
@@ -95,15 +101,15 @@ GetChartDimension::fallback =
   "Chart `1` dimension could not be determined. Defaulting to 2 (1+1D).";
 
 ValidateDimension::usage =
-  "ValidateDimension[dim] checks if dimension is within supported range (≤4). \
+  "ValidateDimension[dim] checks if dimension is within supported range (≤7, up to 6+1D). \
 Returns True if valid, False otherwise.";
 
 ValidateDimension::unsupported =
   "Dimension `1` exceeds supported maximum of `2`. CD conversion rules may be incomplete.";
 
 $MaxSupportedDimension::usage =
-  "$MaxSupportedDimension is the maximum spacetime dimension (currently 4 for 3+1D) \
-supported by the CD conversion rules.";
+  "$MaxSupportedDimension is the maximum spacetime dimension (currently 7 for 6+1D) \
+supported by the CD conversion rules. Axis letters: x,y,z,w,v,u.";
 
 GenerateCDRules::usage =
   "GenerateCDRules[dim, chart] generates CD to Derivative conversion rules for \
@@ -168,8 +174,10 @@ curvature is left unevaluated (future: compute from Christoffel formula). \
 If metricMatrix is None, uses flat Minkowski metric diag(-1,+1,...).";
 
 MinkowskiMetricFactor::usage =
-  "MinkowskiMetricFactor[idx] returns the metric factor for index raising/lowering in \
-Minkowski space: -1 for time (idx=0), +1 for spatial indices (idx>0).";
+  "MinkowskiMetricFactor[idx] returns the metric factor for index raising/lowering \
+using the default Minkowski signature (-,+,+,...): -1 for time (idx=0), +1 for spatial \
+indices (idx>0). MinkowskiMetricFactor[idx, signature] uses the explicit signature list, \
+e.g. {-1,1,1} for mostly plus or {1,-1,-1} for mostly minus.";
 
 Begin["`Private`"];
 
@@ -302,6 +310,22 @@ ComputeChristoffelFromMetricMatrix[chart_, metricMatrix_] := Module[
   ];
 
   components
+];
+
+(* Auto-detect whether metric is non-constant (requires Christoffel computation) *)
+(* Returns True if any metric component depends on coordinates, False if constant *)
+IsNonConstantMetric[metricMatrix_, coords_List] := Module[
+  {dim, hasCoordDependence},
+
+  dim = Length[metricMatrix];
+
+  (* Check if any metric component has coordinate dependence *)
+  hasCoordDependence = Or @@ Flatten[Table[
+    !FreeQ[metricMatrix[[i, j]], Alternatives @@ coords],
+    {i, dim}, {j, dim}
+  ]];
+
+  hasCoordDependence
 ];
 
 (* Evaluate Christoffel components to their numeric/symbolic values *)
@@ -446,7 +470,7 @@ GetCoordinateSymbols[chart_] := GetCoordinateSymbols[chart] = Module[{coordSyms}
 
 (* === Dimension Validation === *)
 (* Validates that dimension is within supported range for CD conversion rules *)
-$MaxSupportedDimension = 4;  (* Currently 3+1D is the maximum *)
+$MaxSupportedDimension = 7;  (* Up to 6+1D spacetime; axis letters: x,y,z,w,v,u *)
 
 ValidateDimension[dim_Integer] := Module[{},
   If[dim > $MaxSupportedDimension,
@@ -679,15 +703,26 @@ LeviCivitaValue[indices_List] := Module[{n = Length[indices]},
   ]
 ];
 
-(* Helper: Compute metric factor for raising/lowering indices in Minkowski space *)
-(* For signature (-,+,+,...): η^00 = -1, η^11 = η^22 = ... = +1 *)
+(* Helper: Compute metric factor for raising/lowering indices *)
+(* 1-arg form: default Minkowski signature (-,+,+,...) *)
 MinkowskiMetricFactor[idx_Integer] := If[idx == 0, -1, 1];
+(* 2-arg form: explicit signature list, e.g. {-1,1,1} or {1,-1,-1} *)
+MinkowskiMetricFactor[idx_Integer, signature_List] := signature[[idx + 1]];
 
 (* Evaluate epsilon tensor components in expression *)
 (* Handles epsilon tensors created by xAct's DefMetric (e.g., epsiloneta, epsiloneta3) *)
 (* General approach: identify all epsilon patterns and compute based on index positions *)
-EvaluateEpsilonComponents[expr_, chart_] := Module[
-  {rules, isEpsilon, evaluateEpsilonN},
+EvaluateEpsilonComponents[expr_, chart_] :=
+  EvaluateEpsilonComponents[expr, chart, None];
+
+EvaluateEpsilonComponents[expr_, chart_, metricMatrix_] := Module[
+  {rules, isEpsilon, evaluateEpsilonN, detFactor},
+
+  (* For general metrics, ε_{ij...} = -√|det(g)| * Signature({i,j,...}) *)
+  (* For Minkowski det(g) = -1, so √|det(g)| = 1 (no effect) *)
+  detFactor = If[metricMatrix === None, 1,
+    Simplify[Sqrt[Abs[Det[metricMatrix]]]]
+  ];
 
   (* Check if symbol is an epsilon tensor using xAct introspection *)
   (* Falls back to string matching for edge cases xAct doesn't handle *)
@@ -710,8 +745,8 @@ EvaluateEpsilonComponents[expr_, chart_] := Module[
   (* Works for any dimension: extracts indices and up/down flags from argument list *)
   evaluateEpsilonN[indices_List, isUpFlags_List] := Module[
     {baseValue, metricFactor},
-    (* Base: fully covariant Levi-Civita for Minkowski = -Signature *)
-    baseValue = -LeviCivitaValue[indices];
+    (* Base: fully covariant Levi-Civita = -√|det(g)| * Signature({indices}) *)
+    baseValue = -detFactor * LeviCivitaValue[indices];
     (* Metric factors for raised indices: each raised index i contributes η^{ii} *)
     metricFactor = Product[
       If[isUpFlags[[k]], MinkowskiMetricFactor[indices[[k]]], 1],
