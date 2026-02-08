@@ -1,0 +1,20 @@
+[theory]
+name = "Proca"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[constants]
+names = ["procaMassSquared"]
+
+[lagrangian]
+# Massive vector: -1/2 (dA)^2 - 1/2 m^2 A^2 (Lorenz gauge automatic for m != 0)
+expression = "-1/2 CD[-a][A[-b]] eta[a, c] eta[b, d] CD[-c][A[-d]] - procaMassSquared/2 A[-a] eta[a, b] A[-b]"
+
+[output]
+path = "examples/data/proca_1d.json"

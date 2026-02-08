@@ -1,0 +1,19 @@
+[theory]
+name = "Klein-Gordon"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["m2"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - m2/2 phi[]^2"
+
+[output]
+path = "examples/data/klein_gordon_1d.json"

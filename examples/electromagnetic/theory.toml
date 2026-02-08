@@ -1,0 +1,17 @@
+[theory]
+name = "Electromagnetism"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[lagrangian]
+# L = -1/4 F_ab F^ab, expanded (no auxiliary F tensor)
+expression = "-1/2 * (CD[-a][A[-b]] eta[a, c] eta[b, d] CD[-c][A[-d]] - CD[-a][A[-b]] eta[a, d] eta[b, c] CD[-c][A[-d]])"
+
+[output]
+path = "examples/data/em_1d.json"
