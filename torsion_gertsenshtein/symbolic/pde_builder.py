@@ -22,7 +22,7 @@ from typing_extensions import override
 
 from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
 from torsion_gertsenshtein.symbolic.json_loader import (
-    _CUSTOM_OPERATORS,
+    _CUSTOM_OPERATORS,  # type: ignore[reportPrivateUsage]
     AXIS_LETTERS,
     BoundaryCondition,
     ConstraintSolverConfig,
@@ -1501,7 +1501,17 @@ class PDEFromSpec(PDEBase):
         tuple[TState, dict[str, ScalarField]]
             Updated state and virtual momenta dict with zero entries for
             each constraint field.
+
+        Raises
+        ------
+        TypeError
+            If state is not a FieldCollection.
         """
+        # Type narrowing: constraints require FieldCollection
+        if not isinstance(state, FieldCollection):
+            msg = "Constraint solving requires FieldCollection state"
+            raise TypeError(msg)
+
         grid = state.grid
         virtual_momenta: dict[str, ScalarField] = {}
         for i, eq in enumerate(self.spec.equations):
@@ -1529,7 +1539,17 @@ class PDEFromSpec(PDEBase):
         -------
         dict[str, ScalarField]
             Updated virtual momenta dict including first-order entries.
+
+        Raises
+        ------
+        TypeError
+            If state is not a FieldCollection.
         """
+        # Type narrowing: RHS computation requires FieldCollection
+        if not isinstance(state, FieldCollection):
+            msg = "First-order evolution requires FieldCollection state"
+            raise TypeError(msg)
+
         for i, eq in enumerate(self.spec.equations):
             if eq.time_derivative_order == 1:
                 virtual_momenta[eq.field_name] = self._compute_rhs_for_component(
@@ -1559,8 +1579,13 @@ class PDEFromSpec(PDEBase):
         Raises
         ------
         TypeError
-            If momentum field is not a ScalarField.
+            If momentum field is not a ScalarField or state is not FieldCollection.
         """
+        # Type narrowing: second-order evolution requires FieldCollection
+        if not isinstance(state, FieldCollection):
+            msg = "Second-order evolution requires FieldCollection state"
+            raise TypeError(msg)
+
         grid = state.grid
         for i, eq in enumerate(self.spec.equations):
             field_slot = self._field_slot_map[eq.field_name]

@@ -772,8 +772,8 @@ def _validate_spacetime(spacetime: dict[str, Any]) -> None:
         raise TypeError(msg)
     # Validate signature contains only ±1 and matches dimension
     if "signature" in spacetime:
-        sig = spacetime["signature"]
-        if not isinstance(sig, list) or not all(s in {-1, 1} for s in sig):
+        sig: list[int] = spacetime["signature"]
+        if not isinstance(sig, list) or not all(s in {-1, 1} for s in sig):  # type: ignore[reportUnnecessaryIsInstance]
             msg = "spacetime.signature must be a list of +1 or -1 values"
             raise ValueError(msg)
         if len(sig) != spacetime["dimension"]:

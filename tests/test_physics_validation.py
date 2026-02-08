@@ -7,12 +7,12 @@ implementations, and numerical issues that structural tests miss.
 
 from __future__ import annotations
 
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
-from pde import CartesianGrid, FieldCollection, ScalarField
+from pde import CartesianGrid, FieldCollection, ScalarField, VectorField
 
 from torsion_gertsenshtein.symbolic.json_loader import (
     ComponentEquation,
@@ -20,6 +20,9 @@ from torsion_gertsenshtein.symbolic.json_loader import (
     OperatorTerm,
 )
 from torsion_gertsenshtein.symbolic.pde_builder import PDEFromSpec, create_initial_state
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -41,15 +44,15 @@ def _wave_hamiltonian(state: FieldCollection, grid: CartesianGrid) -> float:
     float
         Total energy (Hamiltonian).
     """
-    phi = state[0]
-    pi = state[1]
+    phi = cast("ScalarField", state[0])
+    pi = cast("ScalarField", state[1])
     dx = grid.discretization[0]
 
     # Kinetic: ½ π²
     kinetic = 0.5 * np.sum(pi.data**2) * dx
 
     # Gradient: ½ |∇φ|², using centered differences
-    grad = phi.gradient(bc="periodic")
+    grad: VectorField = phi.gradient(bc="periodic")
     grad_sq = sum(np.sum(g.data**2) for g in grad) * dx  # type: ignore[union-attr]
 
     return float(kinetic + 0.5 * grad_sq)
@@ -59,12 +62,12 @@ def _kg_hamiltonian(
     state: FieldCollection, grid: CartesianGrid, m2: float
 ) -> float:
     """Compute H = ½ ∫ (π² + |∇φ|² + m²φ²) dx for the Klein-Gordon equation."""
-    phi = state[0]
-    pi = state[1]
+    phi = cast("ScalarField", state[0])
+    pi = cast("ScalarField", state[1])
     dx = grid.discretization[0]
 
     kinetic = 0.5 * np.sum(pi.data**2) * dx
-    grad = phi.gradient(bc="periodic")
+    grad: VectorField = phi.gradient(bc="periodic")
     gradient_energy = 0.5 * sum(np.sum(g.data**2) for g in grad) * dx  # type: ignore[union-attr]
     mass_energy = 0.5 * m2 * np.sum(phi.data**2) * dx
 
@@ -160,7 +163,7 @@ class TestEnergyConservation:
         dt = 0.001
         for _ in range(200):
             rates = pde.evolution_rate(state, t=0.0)
-            new_fields = []
+            new_fields: list[ScalarField] = []
             for field, rate in zip(state, rates, strict=False):
                 new_data = field.data + dt * rate.data
                 new_fields.append(ScalarField(grid, data=new_data))
@@ -194,7 +197,7 @@ class TestEnergyConservation:
         dt = 0.001
         for _ in range(200):
             rates = pde.evolution_rate(state, t=0.0)
-            new_fields = []
+            new_fields: list[ScalarField] = []
             for field, rate in zip(state, rates, strict=False):
                 new_fields.append(ScalarField(grid, data=field.data + dt * rate.data))
             state = FieldCollection(new_fields)
@@ -415,14 +418,14 @@ class TestMassive3Form:
         grid = CartesianGrid(
             [(0, 10), (0, 10), (0, 10)], 16, periodic=True
         )
-        coords = grid.cell_coords
+        coords: np.ndarray = grid.cell_coords  # type: ignore[reportUnknownVariableType]
         kx = 2 * np.pi / 10  # one wavelength across the domain
 
         # State layout is interleaved: [C_0, pi_0, C_1, pi_1, C_2, pi_2, C_3, pi_3]
         # Set all C_i = cos(kx * x), all pi_i = 0
-        cos_data = np.cos(kx * coords[..., 0])
+        cos_data: NDArray[np.float64] = np.cos(kx * coords[..., 0])  # type: ignore[reportUnknownArgumentType]
         names = massive_3form_spec.component_names
-        field_data = dict.fromkeys(names, cos_data)
+        field_data: dict[str, NDArray[np.float64]] = dict.fromkeys(names, cos_data)
         state = create_initial_state(grid, massive_3form_spec, field_data=field_data)
 
         rates = pde.evolution_rate(state, t=0.0)
@@ -431,7 +434,7 @@ class TestMassive3Form:
         # rate[2*i]   = d_t C_i = pi_i = 0
         # rate[2*i+1] = d_t pi_i = ∇²C_i - m²C_i
         omega_sq = kx**2 + m2
-        expected = -omega_sq * np.cos(kx * coords[..., 0])
+        expected = -omega_sq * np.cos(kx * coords[..., 0])  # type: ignore[reportUnknownArgumentType]
 
         for i in range(len(names)):
             assert_allclose(rates[2 * i].data, 0.0, atol=1e-10)
@@ -450,12 +453,14 @@ class TestMassive3Form:
         grid = CartesianGrid(
             [(0, 10), (0, 10), (0, 10)], 16, periodic=True
         )
-        coords = grid.cell_coords
+        coords: np.ndarray = grid.cell_coords  # type: ignore[reportUnknownVariableType]
 
         # State layout: [C_0, pi_0, C_1, pi_1, C_2, pi_2, C_3, pi_3]
         # Set only C_0 = Gaussian, everything else = 0
         names = massive_3form_spec.component_names
-        gaussian = np.exp(-np.sum((coords - 5.0) ** 2, axis=-1) / 2)
+        gaussian: NDArray[np.float64] = np.exp(  # type: ignore[reportUnknownArgumentType]
+            -np.sum((coords - 5.0) ** 2, axis=-1) / 2  # type: ignore[reportUnknownArgumentType]
+        )
         field_data = {names[0]: gaussian}
         state = create_initial_state(grid, massive_3form_spec, field_data=field_data)
 
