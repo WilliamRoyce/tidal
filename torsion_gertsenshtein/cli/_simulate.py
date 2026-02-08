@@ -403,12 +403,12 @@ def _generate_output(args: Namespace, ctx: _PlotContext) -> None:
     if fmt == "summary":
         return
 
-    # Determine output path
+    # Determine output path (default: next to JSON spec file)
     if args.output is not None:
         output_path = Path(args.output)
     else:
-        stem = Path(args.json_path).stem
-        output_path = Path("outputs") / f"{stem}_output.png"
+        json_file = Path(args.json_path).resolve()
+        output_path = json_file.parent / f"{json_file.stem}_output.png"
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -847,7 +847,7 @@ def simulate_command(args: Namespace) -> int:
     )
     storage = MemoryStorage()
     tracker = storage.tracker(
-        args.snapshots if args.snapshots is not None else args.t_end / 20.0
+        args.snapshots if args.snapshots is not None else args.t_end / 100.0
     )
     if args.scheme == "scipy":
         # py-pde's ScipySolver is a separate solver class, not a scheme of ExplicitSolver

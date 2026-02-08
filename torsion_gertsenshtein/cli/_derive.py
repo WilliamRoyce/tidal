@@ -294,6 +294,7 @@ class _WlsContext:
     output_path: str
     lagrangian_expr: str
     is_multi: bool
+    pipeline_path: str
 
 
 def _wls_header(ctx: _WlsContext) -> list[str]:
@@ -308,15 +309,22 @@ def _wls_header(ctx: _WlsContext) -> list[str]:
     ]
 
 
-def _wls_packages() -> list[str]:
-    """Generate xAct package loading and pipeline import lines."""
+def _wls_packages(pipeline_path: str) -> list[str]:
+    """Generate xAct package loading and pipeline import lines.
+
+    Parameters
+    ----------
+    pipeline_path : str
+        Absolute path to the ``torsion_gertsenshtein/wolfram/`` directory.
+    """
+    escaped = pipeline_path.replace("\\", "\\\\").replace('"', '\\"')
     return [
         "(* Load xAct packages *)",
         "<< xAct`xTensor`;",
         "<< xAct`xCoba`;",
         "",
         "(* Load pipeline modules *)",
-        'pipelinePath = FileNameJoin[{DirectoryName[$InputFileName], "..", "..", "torsion_gertsenshtein", "wolfram"}];',
+        f'pipelinePath = "{escaped}";',
         'Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];',
         'Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];',
         'Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];',
@@ -495,14 +503,9 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
         "",
     ]
 
-    # Build JSON
-    if ctx.is_multi or any(f["type"] != "scalar" or f.get("rank", 0) > 0 for f in ctx.fields):
-        lines.append(
-            "jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];"
-        )
-    else:
-        lines.append("jsonStructure = BuildJSONStructure[componentEqs, metadata];")
-    lines.append("")
+    # Build JSON — always use multi-field builder since fieldEquations
+    # is constructed with proper labels by both single and multi-field paths
+    lines.extend(("jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];", ""))
 
     # Export
     escaped_output = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')
@@ -524,7 +527,12 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
     return lines
 
 
-def generate_wls(config: dict[str, Any], output_override: str | None = None) -> str:
+def generate_wls(
+    config: dict[str, Any],
+    output_override: str | None = None,
+    *,
+    config_dir: Path | None = None,
+) -> str:
     """Generate a complete .wls script from a TOML config.
 
     Parameters
@@ -533,6 +541,9 @@ def generate_wls(config: dict[str, Any], output_override: str | None = None) -> 
         Parsed TOML configuration.
     output_override : str | None
         Override output JSON path.
+    config_dir : Path | None
+        Directory of the TOML config file.  Relative output paths are resolved
+        against this directory (falls back to CWD if *None*).
 
     Returns
     -------
@@ -545,6 +556,16 @@ def generate_wls(config: dict[str, Any], output_override: str | None = None) -> 
     prefix = _make_prefix(config)
     dim = config["spacetime"]["dimension"]
 
+    # Resolve pipeline path to absolute so the WLS script works from any location
+    wolfram_dir = Path(__file__).resolve().parent.parent / "wolfram"
+
+    # Resolve output path to absolute — relative paths resolve against config_dir
+    raw_output = output_override or config.get("output", {}).get("path", "output.json")
+    resolved_output = Path(raw_output)
+    if not resolved_output.is_absolute():
+        base = config_dir if config_dir is not None else Path.cwd()
+        resolved_output = (base / resolved_output).resolve()
+
     ctx = _WlsContext(
         prefix=prefix,
         dim=dim,
@@ -556,14 +577,15 @@ def generate_wls(config: dict[str, Any], output_override: str | None = None) -> 
         cd=f"{prefix}CD",
         chart=f"{prefix}Cart",
         theory_name=config.get("theory", {}).get("name", "Custom Theory"),
-        output_path=output_override or config.get("output", {}).get("path", "output.json"),
+        output_path=str(resolved_output),
         lagrangian_expr=config["lagrangian"]["expression"].strip(),
         is_multi=len(config["fields"]) > 1,
+        pipeline_path=str(wolfram_dir),
     )
 
     lines: list[str] = []
     lines.extend(_wls_header(ctx))
-    lines.extend(_wls_packages())
+    lines.extend(_wls_packages(ctx.pipeline_path))
     lines.extend(_wls_spacetime(config, ctx))
     lines.extend(_wls_fields(ctx))
     lines.extend(_wls_lagrangian(ctx))
@@ -626,7 +648,9 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:
     with config_path.open("rb") as f:
         config = tomllib.load(f)
 
-    script_content = generate_wls(config, output_override=args.output)
+    script_content = generate_wls(
+        config, output_override=args.output, config_dir=config_path.parent.resolve()
+    )
 
     if args.dry_run:
         print(script_content)

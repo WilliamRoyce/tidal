@@ -174,7 +174,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     sim_parser.add_argument(
         "--snapshots", type=float, default=None, metavar="DT",
-        help="Snapshot interval (default: t_end/20)",
+        help="Snapshot interval (default: t_end/100)",
     )
     # Output
     sim_parser.add_argument(
