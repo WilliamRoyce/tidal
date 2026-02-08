@@ -46,6 +46,9 @@ dependencies = [
     "wolframclient>=1.4.0,<2.0",
 ]
 
+[project.scripts]
+tg = "torsion_gertsenshtein.cli:main"
+
 [project.urls]
 Homepage = "https://github.com/WilliamRoyce/torsion-gertsenshtein"
 Documentation = "https://williamroyce.github.io/torsion-gertsenshtein/"
@@ -102,6 +105,7 @@ unfixable = ["T201"]
     "SLF001",
 ]
 "examples/**/*" = ["INP001", "T201", "E402"]
+"torsion_gertsenshtein/cli/**/*" = ["T201"]
 "scripts/**/*" = [
     "INP001",
     "T201",
