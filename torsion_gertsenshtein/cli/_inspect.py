@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+import json
 import re
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING
-
-from torsion_gertsenshtein.symbolic.json_loader import load_equation_system
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -201,6 +200,74 @@ def _print_equations(spec: object) -> None:
     print()
 
 
+def _build_json_output(spec: object, *, show_params: bool) -> dict[str, Any]:
+    """Build a JSON-serializable dict from an EquationSystem.
+
+    Parameters
+    ----------
+    spec : EquationSystem
+        The loaded equation system.
+    show_params : bool
+        Whether to include default parameter values from metadata.
+
+    Returns
+    -------
+    dict[str, Any]
+        JSON-serializable representation of the equation system.
+
+    Raises
+    ------
+    TypeError
+        If *spec* is not an ``EquationSystem`` instance.
+    """
+    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+
+    if not isinstance(spec, EquationSystem):
+        msg = f"Expected EquationSystem, got {type(spec).__name__}"
+        raise TypeError(msg)
+
+    equations: list[dict[str, Any]] = []
+    for eq in spec.equations:
+        terms = [
+            {
+                "coefficient": term.coefficient,
+                "coefficient_symbolic": term.coefficient_symbolic,
+                "operator": term.operator,
+                "field": term.field,
+            }
+            for term in eq.rhs_terms
+        ]
+        equations.append({
+            "field_name": eq.field_name,
+            "time_derivative_order": eq.time_derivative_order,
+            "terms": terms,
+        })
+
+    result: dict[str, Any] = {
+        "spacetime": {
+            "dimension": spec.dimension,
+            "spatial_dimension": spec.spatial_dimension,
+            "coordinates": list(spec.effective_coordinates),
+        },
+        "fields": list(spec.component_names),
+        "equations": equations,
+        "parameters": {
+            "required": dict(sorted(discover_parameters(spec).items())),
+        },
+        "mass_matrix": [list(row) for row in spec.mass_matrix],
+        "coupling_matrix": [list(row) for row in spec.coupling_matrix],
+    }
+
+    if spec.metadata.get("signature"):
+        result["spacetime"]["signature"] = list(spec.metadata["signature"])
+    if spec.metadata.get("lagrangian_expr"):
+        result["lagrangian"] = spec.metadata["lagrangian_expr"]
+    if show_params and spec.metadata.get("parameters"):
+        result["parameters"]["defaults"] = dict(spec.metadata["parameters"])
+
+    return result
+
+
 def inspect_command(args: Namespace) -> int:
     """Execute the inspect command.
 
@@ -214,12 +281,19 @@ def inspect_command(args: Namespace) -> int:
     int
         Exit code.
     """
+    from torsion_gertsenshtein.symbolic.json_loader import load_equation_system
+
     json_path = Path(args.json_path)
     if not json_path.exists():
         print(f"Error: file not found: {json_path}", file=sys.stderr)
         return 1
 
     spec = load_equation_system(json_path)
+
+    if args.json_output:
+        data = _build_json_output(spec, show_params=args.params)
+        print(json.dumps(data, indent=2))
+        return 0
 
     _print_header(spec)
     _print_spacetime(spec)

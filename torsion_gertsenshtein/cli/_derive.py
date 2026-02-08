@@ -682,16 +682,19 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:
 
     # Post-validate output JSON if wolframscript succeeded
     if ret == 0:
-        output_path = args.output or config.get("output", {}).get(
+        raw_output = args.output or config.get("output", {}).get(
             "path", "output.json"
         )
-        if Path(output_path).exists():
+        resolved = Path(raw_output)
+        if not resolved.is_absolute():
+            resolved = (config_path.parent.resolve() / resolved).resolve()
+        if resolved.exists():
             try:
                 from torsion_gertsenshtein.symbolic.json_loader import (
                     load_equation_system,
                 )
 
-                spec = load_equation_system(output_path)
+                spec = load_equation_system(resolved)
                 print()
                 print(
                     f"Validation: JSON loaded successfully ({spec.n_components} components)"

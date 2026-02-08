@@ -6,6 +6,7 @@ Entry point: ``tg`` command with subcommands:
 - ``tg inspect``  — Display equation system information from JSON
 - ``tg simulate`` — Run PDE simulation from JSON specification
 - ``tg list``     — List available JSON specifications
+- ``tg validate`` — Validate a JSON equation specification
 """
 
 from __future__ import annotations
@@ -89,6 +90,12 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Show default parameter values from metadata",
     )
+    inspect_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Output machine-readable JSON instead of human-readable text",
+    )
 
     # --- simulate ---
     sim_parser = sub.add_parser(
@@ -99,7 +106,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "Examples:\n"
             "  tg simulate spec.json --param m2=1.0 --t-end 10\n"
             "  tg simulate spec.json --ic gaussian --ic-width 2.0 --output result.png\n"
-            "  tg simulate spec.json --mode constraint --bc dirichlet\n"
+            "  tg simulate spec.json --mode constraint --bc neumann\n"
             "  tg simulate spec.json --ic formula --ic-formula 'exp(-(x-5)**2)'"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
@@ -139,7 +146,7 @@ def _build_parser() -> argparse.ArgumentParser:
         "--bc",
         default=None,
         metavar="BC[,BC,BC]",
-        help="Per-axis boundary conditions: periodic, neumann, dirichlet (comma-separated). Overrides --periodic.",
+        help="Per-axis boundary conditions: periodic, neumann (comma-separated). Overrides --periodic.",
     )
     # Initial conditions
     sim_parser.add_argument(
@@ -215,6 +222,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Print summary only, skip visualization",
     )
+    sim_parser.add_argument(
+        "--quiet", "-q",
+        action="store_true",
+        help="Suppress progress messages (results and errors still shown)",
+    )
 
     # --- list ---
     list_parser = sub.add_parser(
@@ -235,16 +247,33 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Directory to scan (default: examples/data/)",
     )
 
+    # --- validate ---
+    validate_parser = sub.add_parser(
+        "validate",
+        help="Validate a JSON equation specification",
+        description="Check a JSON specification for errors (unknown operators, bad references, etc.).",
+        epilog=(
+            "Examples:\n"
+            "  tg validate examples/data/klein_gordon_1d.json\n"
+            "  tg validate spec.json"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    validate_parser.add_argument(
+        "json_path",
+        help="Path to the JSON equation specification to validate",
+    )
+
     return parser
 
 
 def _get_version() -> str:
-    """Return the package version string."""
-    try:
-        from torsion_gertsenshtein import __version__
+    """Return the package version string from installed metadata."""
+    from importlib.metadata import PackageNotFoundError, version
 
-        return str(__version__)
-    except (ImportError, AttributeError):
+    try:
+        return version("torsion_gertsenshtein")
+    except PackageNotFoundError:
         return "unknown"
 
 
@@ -282,6 +311,10 @@ def _dispatch(args: argparse.Namespace) -> int:
         from torsion_gertsenshtein.cli._list import list_command
 
         return list_command(args)
+    if args.command == "validate":
+        from torsion_gertsenshtein.cli._validate import validate_command
+
+        return validate_command(args)
     msg = f"Unknown command: {args.command}"
     raise ValueError(msg)
 

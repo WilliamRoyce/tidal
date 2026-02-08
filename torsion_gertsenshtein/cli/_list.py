@@ -6,8 +6,6 @@ import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from torsion_gertsenshtein.cli._inspect import discover_parameters
-
 if TYPE_CHECKING:
     from argparse import Namespace
 
@@ -41,6 +39,7 @@ def list_command(args: Namespace) -> int:
     int
         Exit code.
     """
+    from torsion_gertsenshtein.cli._inspect import discover_parameters
     from torsion_gertsenshtein.symbolic.json_loader import load_equation_system
 
     scan_dir = Path(args.dir) if args.dir else _find_examples_dir()
