@@ -131,9 +131,8 @@ class TestParseBC:
             ("periodic", True, 1, [True]),
             ("periodic", True, 2, [True, True]),
             ("neumann", True, 1, [False]),
-            ("dirichlet", True, 1, [False]),
             ("neumann,periodic", False, 2, [False, True]),
-            ("periodic,neumann,dirichlet", True, 3, [True, False, False]),
+            ("periodic,neumann,neumann", True, 3, [True, False, False]),
         ],
     )
     def test_valid(
@@ -144,6 +143,11 @@ class TestParseBC:
         expected: bool | list[bool],
     ) -> None:
         assert _parse_bc(raw, periodic=periodic, spatial_dim=dim) == expected
+
+    def test_dirichlet_rejected(self) -> None:
+        """Dirichlet BC is not supported by py-pde and should raise a clear error."""
+        with pytest.raises(ValueError, match=r"Dirichlet.*not supported"):
+            _parse_bc("dirichlet", periodic=True, spatial_dim=1)
 
     def test_invalid_bc_type(self) -> None:
         with pytest.raises(ValueError, match="Invalid boundary condition"):
@@ -238,3 +242,59 @@ class TestInferOutputFormat:
     def test_no_plot_takes_priority(self) -> None:
         """--no-plot should win even if --format or --output is given."""
         assert _infer_output_format(_make_args(no_plot=True, output_format="npz")) == "summary"
+
+
+class TestValidateFormulaAst:
+    """Tests for _validate_formula_ast AST-based formula validation."""
+
+    def test_valid_simple_expression(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        _validate_formula_ast("x + 1", {"x"})
+
+    def test_valid_function_calls(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        _validate_formula_ast("sin(x) + cos(y)", {"sin", "cos", "x", "y"})
+
+    def test_valid_numpy_attribute(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        _validate_formula_ast("np.exp(-x**2)", {"np", "x"})
+
+    def test_rejects_unknown_name(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        with pytest.raises(ValueError, match="Disallowed name 'badvar'"):
+            _validate_formula_ast("badvar * 2", {"x"})
+
+    def test_rejects_attribute_access(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        with pytest.raises(ValueError, match="Attribute access not allowed"):
+            _validate_formula_ast("x.__class__", {"x"})
+
+    def test_rejects_import_name(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        with pytest.raises(ValueError, match="Disallowed name '__import__'"):
+            _validate_formula_ast("__import__('os')", {"x"})
+
+    def test_rejects_lambda(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        with pytest.raises(TypeError, match=r"Disallowed construct.*Lambda"):
+            _validate_formula_ast("(lambda: 1)()", {"x"})
+
+    def test_valid_ternary(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        _validate_formula_ast("x if x > 0 else -x", {"x"})
+
+    def test_valid_complex_math(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        _validate_formula_ast(
+            "exp(-((x - 5)**2 + (y - pi)**2) / 0.5**2)",
+            {"exp", "x", "y", "pi"},
+        )

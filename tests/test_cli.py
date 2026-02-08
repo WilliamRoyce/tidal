@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import subprocess
+import sys
 from pathlib import Path
 from typing import ClassVar
 
@@ -27,6 +29,17 @@ class TestMainEntryPoint:
     def test_module_invocation(self) -> None:
         """``python -m torsion_gertsenshtein.cli`` should be importable."""
         import torsion_gertsenshtein.cli.__main__  # noqa: F401
+
+    def test_entry_point_subprocess(self) -> None:
+        """The ``tg`` entry point should be callable as a subprocess."""
+        result = subprocess.run(
+            [sys.executable, "-m", "torsion_gertsenshtein.cli", "--version"],
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        assert result.returncode == 0
+        assert "tg" in result.stdout
 
 
 class TestInspectCommand:
@@ -67,6 +80,37 @@ class TestInspectCommand:
     ) -> None:
         ret = main(["inspect", str(klein_gordon_1d_json), "--params"])
         assert ret == 0
+
+    def test_inspect_json_output(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """--json should output valid, parseable JSON."""
+        import json
+
+        ret = main(["inspect", str(klein_gordon_1d_json), "--json"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        data = json.loads(out)
+        assert data["spacetime"]["dimension"] == 2
+        assert data["spacetime"]["spatial_dimension"] == 1
+        assert "phi_0" in data["fields"]
+        assert len(data["equations"]) == 1
+        assert "mass_matrix" in data
+        assert "coupling_matrix" in data
+
+    def test_inspect_json_with_params(
+        self, coupled_scalars_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """--json --params should include default parameter values."""
+        import json
+
+        ret = main(["inspect", str(coupled_scalars_json), "--json", "--params"])
+        assert ret == 0
+
+        data = json.loads(capsys.readouterr().out)
+        assert "required" in data["parameters"]
+        assert len(data["fields"]) == 2
 
 
 class TestListCommand:
@@ -289,9 +333,10 @@ class TestSimulateCommand:
         ])
         assert ret == 1
 
-    def test_simulate_bc_dirichlet(
+    def test_simulate_bc_dirichlet_rejected(
         self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
+        """Dirichlet BC is not supported by py-pde; should fail with clear error."""
         ret = main([
             "simulate", str(klein_gordon_1d_json),
             "--param", "m2=1.0",
@@ -299,7 +344,10 @@ class TestSimulateCommand:
             "--t-end", "0.5",
             "--no-plot",
         ])
-        assert ret == 0
+        assert ret == 1
+        err = capsys.readouterr().err
+        assert "Dirichlet" in err
+        assert "not supported" in err
 
     # --- Feature: --ic formula ---
 
@@ -368,6 +416,19 @@ class TestSimulateCommand:
         ])
         assert ret == 1
 
+    def test_simulate_formula_ic_attribute_access_rejected(
+        self, klein_gordon_1d_json: Path,
+    ) -> None:
+        """Formula with attribute access should be rejected by AST validator."""
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--ic", "formula",
+            "--ic-formula", "x.__class__.__name__",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 1
+
     # --- Feature: --mode constraint ---
 
     def test_simulate_constraint_mode(
@@ -377,7 +438,7 @@ class TestSimulateCommand:
             "simulate", str(electrostatics_json),
             "--mode", "constraint",
             "--grid-shape", "16",
-            "--bc", "dirichlet",
+            "--bc", "neumann",
             "--ic", "gaussian",
             "--ic-component", "rho",
             "--no-plot",
@@ -439,6 +500,130 @@ class TestSimulateCommand:
             "--no-plot",
         ])
         assert ret == 0
+
+    # --- Edge-case validation ---
+
+    def test_simulate_explicit_format_flag(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Explicit --format flag should work for all formats."""
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
+            "--t-end", "0.5",
+            "--format", "summary",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Results:" in out
+
+    def test_simulate_periodic_flag(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """--no-periodic should produce non-periodic (Neumann) BCs."""
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
+            "--no-periodic",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+    def test_simulate_wavevector_custom(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """--ic-wavevector should override default wavevector for plane-wave."""
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
+            "--ic", "plane-wave",
+            "--ic-wavevector", "0.5",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+    def test_simulate_ic_center_wrong_dim(self, klein_gordon_1d_json: Path) -> None:
+        """--ic-center with wrong dimension count should fail."""
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
+            "--ic-center", "5.0,5.0",  # 2 values for 1D
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 1
+
+    def test_simulate_snapshots_nonpositive(self, klein_gordon_1d_json: Path) -> None:
+        """--snapshots with zero or negative value should fail."""
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
+            "--snapshots", "0",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 1
+
+    def test_simulate_dt_nonpositive(self, klein_gordon_1d_json: Path) -> None:
+        """--dt with zero or negative value should fail."""
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
+            "--dt", "-0.1",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 1
+
+    def test_simulate_t_end_nonpositive(self, klein_gordon_1d_json: Path) -> None:
+        """--t-end with zero or negative value should fail."""
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
+            "--t-end", "0",
+            "--no-plot",
+        ])
+        assert ret == 1
+
+    # --- Feature: --quiet ---
+
+    def test_simulate_quiet_suppresses_progress(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """--quiet should suppress progress messages but keep results."""
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
+            "--t-end", "0.5",
+            "--no-plot",
+            "--quiet",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        # Results should still appear
+        assert "Results:" in out
+        # Progress messages should NOT appear
+        assert "Loading equation specification" not in out
+        assert "Building PDE" not in out
+        assert "Running simulation" not in out
+
+    def test_simulate_quiet_short_flag(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """-q should work as shorthand for --quiet."""
+        ret = main([
+            "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
+            "--t-end", "0.5",
+            "--no-plot",
+            "-q",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Results:" in out
+        assert "Loading equation specification" not in out
 
 
 class TestDeriveCommand:
@@ -706,3 +891,44 @@ expression = "phi[]^2"
 """)
         ret = main(["derive", str(config), "--dry-run"])
         assert ret == 1
+
+
+class TestValidateCommand:
+    """Tests for ``tg validate``."""
+
+    def test_validate_valid_spec(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        ret = main(["validate", str(klein_gordon_1d_json)])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "OK" in out
+
+    def test_validate_nonexistent_file(self) -> None:
+        ret = main(["validate", "nonexistent_file.json"])
+        assert ret == 1
+
+    def test_validate_invalid_json(self, tmp_path: Path) -> None:
+        bad_json = tmp_path / "bad.json"
+        bad_json.write_text("{ not valid json }", encoding="utf-8")
+        ret = main(["validate", str(bad_json)])
+        assert ret == 1
+
+    def test_validate_warns_on_missing_param_defaults(
+        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """KG 1D has m2 parameter with no default — should produce warning."""
+        main(["validate", str(klein_gordon_1d_json)])
+        err = capsys.readouterr().err
+        assert "WARNING" in err
+        assert "m2" in err
+
+    def test_validate_coupled_scalars(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Coupled scalars spec should validate successfully."""
+        spec_path = EXAMPLES_DIR / "coupled_scalars.json"
+        if not spec_path.exists():
+            pytest.skip("coupled_scalars.json not found")
+        ret = main(["validate", str(spec_path)])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "OK" in out
