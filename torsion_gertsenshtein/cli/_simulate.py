@@ -120,17 +120,60 @@ def _parse_single_bound(s: str) -> tuple[float, float]:
     return float(lo_str), float(hi_str)
 
 
+_VALID_BC_TYPES = {"periodic", "neumann", "dirichlet"}
+
+
+def _parse_bc(raw: str | None, periodic: bool, spatial_dim: int) -> bool | list[bool]:
+    """Parse --bc argument into periodic specification for CartesianGrid.
+
+    Parameters
+    ----------
+    raw : str | None
+        Raw --bc argument (e.g. "neumann,periodic").
+    periodic : bool
+        Value from --periodic flag (used when --bc is None).
+    spatial_dim : int
+        Number of spatial dimensions.
+
+    Returns
+    -------
+    bool | list[bool]
+        Single bool or per-axis list for CartesianGrid periodic parameter.
+    """
+    if raw is None:
+        return periodic
+
+    bc_list = [b.strip().lower() for b in raw.split(",")]
+
+    if len(bc_list) == 1:
+        bc_list = bc_list * spatial_dim
+    elif len(bc_list) != spatial_dim:
+        msg = (
+            f"--bc expects 1 or {spatial_dim} values "
+            f"(got {len(bc_list)}). Example: --bc neumann,periodic"
+        )
+        raise ValueError(msg)
+
+    for bc in bc_list:
+        if bc not in _VALID_BC_TYPES:
+            msg = f"Invalid boundary condition: '{bc}'. Must be one of: {', '.join(sorted(_VALID_BC_TYPES))}"
+            raise ValueError(msg)
+
+    return [bc == "periodic" for bc in bc_list]
+
+
 def _build_grid(args: Namespace, spec: EquationSystem) -> CartesianGrid:
     """Build a CartesianGrid from CLI arguments."""
     from pde import CartesianGrid
 
     shape = _parse_grid_shape(args.grid_shape, spec.spatial_dimension)
     bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
+    periodic = _parse_bc(args.bc, args.periodic, spec.spatial_dimension)
 
     return CartesianGrid(
         bounds=bounds,
         shape=shape,
-        periodic=args.periodic,
+        periodic=periodic,
     )
 
 
@@ -208,6 +251,25 @@ def _build_initial_state(
             momentum_data={component: momentum_arr},
         )
 
+    if ic_type == "formula":
+        if args.ic_formula is None:
+            msg = "--ic=formula requires --ic-formula=EXPR"
+            raise ValueError(msg)
+
+        coords = spec.spatial_coordinates
+        namespace: dict[str, object] = {"np": np, "pi": np.pi}
+        for i, name in enumerate(coords):
+            namespace[name] = grid.cell_coords[..., i]
+
+        field_arr = eval(args.ic_formula, {"__builtins__": {}}, namespace)  # noqa: S307
+        field_arr = np.asarray(field_arr, dtype=float)
+
+        # Broadcast scalar results to grid shape
+        if field_arr.shape == ():
+            field_arr = np.full(grid.shape, float(field_arr))
+
+        return create_initial_state(grid, spec, field_data={component: field_arr})
+
     msg = f"Unknown IC type: {ic_type}"
     raise ValueError(msg)
 
@@ -260,6 +322,26 @@ def _generate_output(
         _save_npz(output_path, spec, storage, grid)
     else:
         _save_plot(output_path, spec, storage, grid, initial_state, params)
+
+
+def _print_constraint_summary(
+    spec: EquationSystem,
+    initial: FieldCollection,
+    solved: FieldCollection,
+    params: dict[str, float],
+) -> None:
+    """Print constraint-solve summary to stdout."""
+    print()
+    print("Results (constraint solve):")
+    print(f"  Parameters: {params}")
+    print()
+
+    slots = _field_slots(spec)
+    for name in spec.component_names:
+        slot = slots[name]
+        init_peak = float(np.max(np.abs(initial[slot].data)))
+        solved_peak = float(np.max(np.abs(solved[slot].data)))
+        print(f"  {name}: peak {init_peak:.4f} → {solved_peak:.4f}")
 
 
 def _print_summary(
@@ -613,6 +695,28 @@ def simulate_command(args: Namespace) -> int:
     state = _build_initial_state(args, grid, spec, bounds)
     initial_state = state.copy()
     print(f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}")
+
+    # Constraint-only mode: single constraint solve, no time evolution
+    if args.mode == "constraint":
+        print("Solving constraints...")
+        pde.evolution_rate(state, t=0.0)
+        print("  Constraint solve complete.")
+
+        # Print result summary (no time evolution → no storage/snapshots)
+        _print_constraint_summary(spec, initial_state, state, params)
+
+        if not args.no_plot and args.output is not None:
+            output_path = Path(args.output)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            if output_path.suffix == ".npz":
+                slots = _field_slots(spec)
+                field_data: dict[str, np.ndarray] = {}
+                for name in spec.component_names:
+                    field_data[name] = state[slots[name]].data
+                np.savez(output_path, **field_data)
+                print(f"  Saved data to: {output_path}")
+
+        return 0
 
     # Step 6: Determine dt
     dt = args.dt

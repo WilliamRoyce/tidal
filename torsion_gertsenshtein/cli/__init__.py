@@ -111,12 +111,24 @@ def _build_parser() -> argparse.ArgumentParser:
         default=True,
         help="Use periodic boundary conditions (default: True)",
     )
+    sim_parser.add_argument(
+        "--bc",
+        default=None,
+        metavar="BC[,BC,BC]",
+        help="Per-axis boundary conditions: periodic, neumann, dirichlet (comma-separated). Overrides --periodic.",
+    )
     # Initial conditions
     sim_parser.add_argument(
         "--ic",
-        choices=["gaussian", "plane-wave", "zero"],
+        choices=["gaussian", "plane-wave", "zero", "formula"],
         default="gaussian",
         help="Initial condition type (default: gaussian)",
+    )
+    sim_parser.add_argument(
+        "--ic-formula",
+        default=None,
+        metavar="EXPR",
+        help="Math expression for --ic=formula. Variables: coordinate names (e.g. x,y,z), np (numpy), pi.",
     )
     sim_parser.add_argument(
         "--ic-center", default=None, metavar="X[,X,X]",
@@ -137,6 +149,13 @@ def _build_parser() -> argparse.ArgumentParser:
     sim_parser.add_argument(
         "--ic-wavevector", default=None, metavar="K[,K,K]",
         help="Wavevector for plane-wave IC (e.g. 0.1,0.0,0.0)",
+    )
+    # Mode
+    sim_parser.add_argument(
+        "--mode",
+        choices=["evolve", "constraint"],
+        default="evolve",
+        help="'evolve' = time evolution (default), 'constraint' = single constraint solve",
     )
     # Solver
     sim_parser.add_argument(
