@@ -5,9 +5,8 @@
 # NOTE: This example uses xPert linearization of the Einstein equations,
 # which requires a separate workflow beyond what `tg derive` TOML supports.
 # The derive step requires the manual .wls script.
-# The simulation uses custom TT-gauge initial conditions (plane-wave packet)
-# that are not yet expressible via CLI IC presets.
-# The Python script is recommended for full-fidelity simulation.
+# The simulation uses --ic formula for TT-gauge initial conditions.
+# For the full multi-component TT-gauge setup, see gw_simulation.py.
 
 set -euo pipefail
 
@@ -17,14 +16,17 @@ set -euo pipefail
 # Inspect the equation system (10 components: h_00..h_33)
 tg inspect ../data/linearized_gravity.json
 
-# Approximate simulation with Gaussian IC (not TT-gauge)
-# For proper TT-gauge initial conditions, use gw_simulation.py
+# Simulate with TT-gauge h_plus (h_4 = h_xx) initial condition
+# This applies a Gaussian-modulated cosine wave packet along z
 tg simulate ../data/linearized_gravity.json \
   --grid-shape 4,4,64 \
   --bounds 0:4,0:4,0:40 \
   --periodic \
-  --ic gaussian \
-  --ic-component h_5 \
-  --ic-width 3.0 \
+  --ic formula \
+  --ic-formula "np.exp(-(z - 20.0)**2 / 18.0) * np.cos(0.6283 * (z - 20.0))" \
+  --ic-component h_4 \
   --t-end 15.0 \
   --dt 0.01
+
+# For full TT-gauge IC with h_plus, h_cross, and h_yy = -h_plus,
+# use the Python script: python gw_simulation.py

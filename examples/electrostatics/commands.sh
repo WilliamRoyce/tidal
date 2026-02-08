@@ -2,9 +2,8 @@
 # CLI equivalents for the Electrostatics 2D example
 # See also: electrostatics.wls (manual derivation), electrostatics_simulation.py (Python simulation)
 #
-# NOTE: Electrostatics solves the Poisson equation (no time evolution).
-# The `tg simulate` command is designed for time-dependent PDEs and cannot
-# directly solve elliptic/static problems. Use the Python script instead.
+# Electrostatics solves the Poisson equation (no time evolution).
+# Use --mode constraint for single-step constraint solving.
 
 set -euo pipefail
 
@@ -14,6 +13,13 @@ set -euo pipefail
 # Inspect the equation system
 tg inspect ../data/electrostatics_2d.json
 
-# NOTE: `tg simulate` is not applicable — electrostatics is a boundary-value
-# problem (Poisson equation), not an initial-value problem. See the Python
-# script electrostatics_simulation.py for the iterative relaxation solver.
+# Solve constraint (Poisson equation for phi given charge density rho)
+# Gaussian charge density at origin, Dirichlet BCs (phi=0 at boundary)
+tg simulate ../data/electrostatics_2d.json \
+  --mode constraint \
+  --grid-shape 64 \
+  --bounds -5:5 \
+  --bc dirichlet \
+  --ic formula \
+  --ic-formula "-np.exp(-(x**2 + y**2) / 0.5)" \
+  --ic-component rho
