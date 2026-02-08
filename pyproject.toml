@@ -184,6 +184,9 @@ build-backend = "setuptools.build_meta"
 [tool.setuptools]
 package-dir = { "" = "." }
 
+[tool.setuptools.package-data]
+torsion_gertsenshtein = ["py.typed"]
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["torsion_gertsenshtein*"]
