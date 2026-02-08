@@ -298,3 +298,26 @@ class TestValidateFormulaAst:
             "exp(-((x - 5)**2 + (y - pi)**2) / 0.5**2)",
             {"exp", "x", "y", "pi"},
         )
+
+    def test_rejects_list_comprehension(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        with pytest.raises(TypeError, match=r"Disallowed construct.*ListComp"):
+            _validate_formula_ast("[i for i in x]", {"x", "i"})
+
+    def test_rejects_walrus_operator(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        with pytest.raises(TypeError, match=r"Disallowed construct.*NamedExpr"):
+            _validate_formula_ast("(y := x + 1)", {"x", "y"})
+
+    def test_rejects_nested_attribute(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        with pytest.raises(ValueError, match="Attribute access not allowed"):
+            _validate_formula_ast("x.a.b", {"x"})
+
+    def test_allows_subscript_slicing(self) -> None:
+        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+
+        _validate_formula_ast("x[0:5]", {"x"})

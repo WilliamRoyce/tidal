@@ -30,6 +30,18 @@ class TestMainEntryPoint:
         """``python -m torsion_gertsenshtein.cli`` should be importable."""
         import torsion_gertsenshtein.cli.__main__  # noqa: F401
 
+    def test_get_version_fallback(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """_get_version() should return 'unknown' when package is not installed."""
+        from importlib.metadata import PackageNotFoundError
+
+        from torsion_gertsenshtein.cli import _get_version
+
+        def _raise(_name: str) -> str:
+            raise PackageNotFoundError
+
+        monkeypatch.setattr("importlib.metadata.version", _raise)
+        assert _get_version() == "unknown"
+
     def test_entry_point_subprocess(self) -> None:
         """The ``tg`` entry point should be callable as a subprocess."""
         result = subprocess.run(
@@ -172,6 +184,21 @@ class TestSimulateCommand:
         ])
         assert ret == 0
         assert output.exists()
+
+    def test_simulate_2d_plot_output(
+        self, chern_simons_json: Path, tmp_path: Path,
+    ) -> None:
+        """2D spec should produce a non-empty PNG file (exercises plot_2d path)."""
+        output = tmp_path / "cs_2d.png"
+        ret = main([
+            "simulate", str(chern_simons_json),
+            "--grid-shape", "8",
+            "--t-end", "0.2",
+            "--output", str(output),
+        ])
+        assert ret == 0
+        assert output.exists()
+        assert output.stat().st_size > 0
 
     def test_simulate_npz_output(
         self, klein_gordon_1d_json: Path, tmp_path: Path
@@ -932,3 +959,70 @@ class TestValidateCommand:
         assert ret == 0
         out = capsys.readouterr().out
         assert "OK" in out
+
+    def test_validate_unknown_operator(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """JSON with unknown operator should fail validation."""
+        import json
+
+        spec = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"operator": "nonexistent_op", "field": "phi_0", "coefficient": 1.0}
+                        ],
+                    },
+                }
+            ],
+        }
+        spec_path = tmp_path / "bad_op.json"
+        spec_path.write_text(json.dumps(spec), encoding="utf-8")
+        ret = main(["validate", str(spec_path)])
+        assert ret == 1
+        err = capsys.readouterr().err
+        assert "Unknown operator" in err
+        assert "nonexistent_op" in err
+
+    def test_validate_bad_field_reference(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """JSON with unknown field reference should fail validation."""
+        import json
+
+        spec = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"operator": "identity", "field": "chi_99", "coefficient": 1.0}
+                        ],
+                    },
+                }
+            ],
+        }
+        spec_path = tmp_path / "bad_ref.json"
+        spec_path.write_text(json.dumps(spec), encoding="utf-8")
+        ret = main(["validate", str(spec_path)])
+        assert ret == 1
+        err = capsys.readouterr().err
+        assert "Unknown field reference" in err
+        assert "chi_99" in err
+
+    def test_validate_directory_instead_of_file(
+        self, tmp_path: Path,
+    ) -> None:
+        """Passing a directory path should fail validation."""
+        ret = main(["validate", str(tmp_path)])
+        assert ret == 1
