@@ -202,6 +202,24 @@ class TestSimulateCommand:
         out = capsys.readouterr().out
         assert "Results:" in out
 
+    def test_simulate_off_center_gaussian(self, capsys: pytest.CaptureFixture[str]) -> None:
+        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
+        if not json_path.exists():
+            pytest.skip("klein_gordon_1d.json not found")
+
+        ret = main([
+            "simulate", str(json_path),
+            "--ic", "gaussian",
+            "--ic-center", "30.0",
+            "--ic-width", "3.0",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "Results:" in out
+
     def test_simulate_chern_simons_constraint(self, capsys: pytest.CaptureFixture[str]) -> None:
         """Test simulation of a system with constraint (time_order=0) + dynamical fields."""
         json_path = EXAMPLES_DIR / "chern_simons_3d.json"
