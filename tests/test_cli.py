@@ -569,6 +569,54 @@ path = "output.json"
         assert "DefConstantSymbol[m2]" in out
 
 
+class TestDeriveAbsolutePaths:
+    """Verify generated WLS scripts use absolute paths (not $InputFileName-relative)."""
+
+    _MINIMAL_CONFIG: dict[str, object] = {
+        "theory": {"name": "Test Scalar"},
+        "spacetime": {"dimension": 2, "metric": "minkowski"},
+        "fields": [{"name": "phi", "type": "scalar"}],
+        "lagrangian": {"expression": "-1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"},
+        "output": {"path": "output.json"},
+    }
+
+    def test_pipeline_path_is_absolute(self) -> None:
+        from torsion_gertsenshtein.cli._derive import generate_wls
+
+        script = generate_wls(self._MINIMAL_CONFIG)
+        assert "$InputFileName" not in script
+        assert "/torsion_gertsenshtein/wolfram" in script
+
+    def test_output_path_is_absolute(self) -> None:
+        from torsion_gertsenshtein.cli._derive import generate_wls
+
+        script = generate_wls(self._MINIMAL_CONFIG, config_dir=Path("/project"))
+        # The output path "output.json" should be resolved to /project/output.json
+        assert '"/project/output.json"' in script
+
+    def test_output_override_absolute(self) -> None:
+        from torsion_gertsenshtein.cli._derive import generate_wls
+
+        script = generate_wls(self._MINIMAL_CONFIG, output_override="/tmp/test.json")
+        assert '"/tmp/test.json"' in script
+
+    def test_output_path_resolves_relative_to_config_dir(self, tmp_path: Path) -> None:
+        from torsion_gertsenshtein.cli._derive import generate_wls
+
+        # Create config_dir = tmp_path/sub/
+        config_dir = tmp_path / "sub"
+        config_dir.mkdir()
+
+        config = {
+            **self._MINIMAL_CONFIG,
+            "output": {"path": "../data/out.json"},
+        }
+        script = generate_wls(config, config_dir=config_dir)
+        # ../data/out.json relative to tmp_path/sub → tmp_path/data/out.json
+        expected = str(tmp_path / "data" / "out.json")
+        assert f'"{expected}"' in script
+
+
 class TestDeriveValidation:
     def test_missing_spacetime(self, tmp_path: Path) -> None:
         config = tmp_path / "bad.toml"
