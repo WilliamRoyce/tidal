@@ -277,6 +277,160 @@ class TestSimulateCommand:
         ])
         assert ret == 0
 
+    # --- Feature: --bc (mixed boundary conditions) ---
+
+    def test_simulate_bc_single(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test --bc with a single BC type applied to all axes."""
+        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
+        if not json_path.exists():
+            pytest.skip("klein_gordon_1d.json not found")
+
+        ret = main([
+            "simulate", str(json_path),
+            "--bc", "neumann",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+    def test_simulate_bc_mixed_2d(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test --bc with mixed per-axis BCs on a 2D system."""
+        json_path = EXAMPLES_DIR / "polar_kg.json"
+        if not json_path.exists():
+            pytest.skip("polar_kg.json not found")
+
+        ret = main([
+            "simulate", str(json_path),
+            "--bc", "neumann,periodic",
+            "--grid-shape", "16",
+            "--bounds", "0.5:8,0:6.28",
+            "--ic", "gaussian",
+            "--ic-center", "3.0,3.14",
+            "--ic-width", "0.5",
+            "--t-end", "0.5",
+            "--dt", "0.01",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+    def test_simulate_bc_invalid_type(self) -> None:
+        """Test --bc with invalid BC type."""
+        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
+        if not json_path.exists():
+            pytest.skip("klein_gordon_1d.json not found")
+
+        ret = main([
+            "simulate", str(json_path),
+            "--bc", "invalid_bc",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 1
+
+    def test_simulate_bc_wrong_count(self) -> None:
+        """Test --bc with wrong number of values for dimension."""
+        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
+        if not json_path.exists():
+            pytest.skip("klein_gordon_1d.json not found")
+
+        ret = main([
+            "simulate", str(json_path),
+            "--bc", "neumann,periodic",  # 2 values for 1D
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 1
+
+    # --- Feature: --ic formula ---
+
+    def test_simulate_formula_ic(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test --ic formula with a math expression."""
+        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
+        if not json_path.exists():
+            pytest.skip("klein_gordon_1d.json not found")
+
+        ret = main([
+            "simulate", str(json_path),
+            "--ic", "formula",
+            "--ic-formula", "np.exp(-((x - 5)**2) / 2)",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "Results:" in out
+
+    def test_simulate_formula_ic_2d(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test --ic formula on a 2D grid."""
+        json_path = EXAMPLES_DIR / "polar_kg.json"
+        if not json_path.exists():
+            pytest.skip("polar_kg.json not found")
+
+        ret = main([
+            "simulate", str(json_path),
+            "--ic", "formula",
+            "--ic-formula", "np.exp(-((x - 3)**2 + (y - pi)**2) / 0.5**2)",
+            "--grid-shape", "16",
+            "--bounds", "0.5:8,0:6.28",
+            "--bc", "neumann,periodic",
+            "--t-end", "0.5",
+            "--dt", "0.01",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+    def test_simulate_formula_ic_missing_expr(self) -> None:
+        """Test --ic formula without --ic-formula raises error."""
+        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
+        if not json_path.exists():
+            pytest.skip("klein_gordon_1d.json not found")
+
+        ret = main([
+            "simulate", str(json_path),
+            "--ic", "formula",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 1
+
+    def test_simulate_formula_ic_constant(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test --ic formula with a scalar constant (broadcasts to grid)."""
+        json_path = EXAMPLES_DIR / "klein_gordon_1d.json"
+        if not json_path.exists():
+            pytest.skip("klein_gordon_1d.json not found")
+
+        ret = main([
+            "simulate", str(json_path),
+            "--ic", "formula",
+            "--ic-formula", "0.5",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+    # --- Feature: --mode constraint ---
+
+    def test_simulate_constraint_mode(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """Test --mode constraint for single constraint solve (electrostatics)."""
+        json_path = EXAMPLES_DIR / "electrostatics_2d.json"
+        if not json_path.exists():
+            pytest.skip("electrostatics_2d.json not found")
+
+        ret = main([
+            "simulate", str(json_path),
+            "--mode", "constraint",
+            "--grid-shape", "16",
+            "--bc", "dirichlet",
+            "--ic", "gaussian",
+            "--ic-component", "rho",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "Constraint solve complete" in out
+
 
 class TestDeriveCommand:
     def test_derive_toml_dry_run(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
