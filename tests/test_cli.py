@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 
@@ -93,7 +94,7 @@ class TestSimulateCommand:
     def test_simulate_1d_summary(
         self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        ret = main(["simulate", str(klein_gordon_1d_json), "--t-end", "1.0", "--no-plot"])
+        ret = main(["simulate", str(klein_gordon_1d_json), "--param", "m2=1.0", "--t-end", "1.0", "--no-plot"])
         assert ret == 0
 
         out = capsys.readouterr().out
@@ -121,6 +122,7 @@ class TestSimulateCommand:
         output = tmp_path / "test_output.png"
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--t-end", "0.5",
             "--output", str(output),
         ])
@@ -133,6 +135,7 @@ class TestSimulateCommand:
         output = tmp_path / "test_output.npz"
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--t-end", "0.5",
             "--output", str(output),
         ])
@@ -150,6 +153,7 @@ class TestSimulateCommand:
     ) -> None:
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--ic", ic_type,
             "--t-end", "0.5",
             "--no-plot",
@@ -161,6 +165,7 @@ class TestSimulateCommand:
     ) -> None:
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--ic", "gaussian",
             "--ic-width", "1.5",
             "--ic-amplitude", "2.0",
@@ -177,6 +182,7 @@ class TestSimulateCommand:
     ) -> None:
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--ic", "gaussian",
             "--ic-center", "30.0",
             "--ic-width", "3.0",
@@ -226,6 +232,7 @@ class TestSimulateCommand:
     ) -> None:
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--grid-shape", "32",
             "--bounds", "0:20",
             "--t-end", "0.5",
@@ -240,6 +247,7 @@ class TestSimulateCommand:
     ) -> None:
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--bc", "neumann",
             "--t-end", "0.5",
             "--no-plot",
@@ -286,6 +294,7 @@ class TestSimulateCommand:
     ) -> None:
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--bc", "dirichlet",
             "--t-end", "0.5",
             "--no-plot",
@@ -299,6 +308,7 @@ class TestSimulateCommand:
     ) -> None:
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--ic", "formula",
             "--ic-formula", "np.exp(-((x - 5)**2) / 2)",
             "--t-end", "0.5",
@@ -339,6 +349,7 @@ class TestSimulateCommand:
     ) -> None:
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--ic", "formula",
             "--ic-formula", "0.5",
             "--t-end", "0.5",
@@ -383,6 +394,7 @@ class TestSimulateCommand:
     ) -> None:
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--dt", "0.01",
             "--t-end", "0.5",
             "--no-plot",
@@ -395,6 +407,7 @@ class TestSimulateCommand:
         """Verify scipy solver uses py-pde ScipySolver."""
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--scheme", "scipy",
             "--t-end", "0.5",
             "--no-plot",
@@ -406,6 +419,7 @@ class TestSimulateCommand:
     ) -> None:
         ret = main([
             "simulate", str(klein_gordon_1d_json),
+            "--param", "m2=1.0",
             "--snapshots", "0.25",
             "--t-end", "0.5",
             "--no-plot",
@@ -572,7 +586,7 @@ path = "output.json"
 class TestDeriveAbsolutePaths:
     """Verify generated WLS scripts use absolute paths (not $InputFileName-relative)."""
 
-    _MINIMAL_CONFIG: dict[str, object] = {
+    _MINIMAL_CONFIG: ClassVar[dict[str, object]] = {
         "theory": {"name": "Test Scalar"},
         "spacetime": {"dimension": 2, "metric": "minkowski"},
         "fields": [{"name": "phi", "type": "scalar"}],

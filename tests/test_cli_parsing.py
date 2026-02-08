@@ -6,12 +6,17 @@ independently from the full simulation pipeline.
 
 from __future__ import annotations
 
+from argparse import Namespace
+from types import SimpleNamespace
+
 import pytest
 
 from torsion_gertsenshtein.cli._simulate import (
+    _infer_output_format,
     _parse_bc,
     _parse_bounds,
     _parse_grid_shape,
+    _parse_params,
     _parse_single_bound,
 )
 
@@ -103,11 +108,15 @@ class TestParseSingleBound:
         with pytest.raises(ValueError, match="could not convert"):
             _parse_single_bound("abc:def")
 
-    def test_inverted_bounds_parsed(self) -> None:
-        """Inverted bounds parse successfully (validation is elsewhere)."""
-        lo, hi = _parse_single_bound("20:0")
-        assert lo == 20.0
-        assert hi == 0.0
+    def test_inverted_bounds_rejected(self) -> None:
+        """Inverted bounds (lo >= hi) should raise ValueError."""
+        with pytest.raises(ValueError, match=r"lower.*must be less than upper"):
+            _parse_single_bound("20:0")
+
+    def test_equal_bounds_rejected(self) -> None:
+        """Equal bounds (lo == hi) should raise ValueError."""
+        with pytest.raises(ValueError, match=r"lower.*must be less than upper"):
+            _parse_single_bound("5:5")
 
 
 # ==================== _parse_bc ====================
@@ -148,3 +157,84 @@ class TestParseBC:
         """--bc should override --periodic flag."""
         result = _parse_bc("neumann", periodic=True, spatial_dim=1)
         assert result == [False]
+
+
+# ==================== _parse_params ====================
+
+
+def _make_spec_stub(metadata: dict[str, object] | None = None) -> object:
+    """Create a minimal spec-like object with a metadata dict."""
+    return SimpleNamespace(metadata=metadata or {})
+
+
+class TestParseParams:
+    def test_empty_list_no_metadata(self) -> None:
+        spec = _make_spec_stub()
+        assert _parse_params([], spec) == {}  # type: ignore[arg-type]
+
+    def test_metadata_defaults_loaded(self) -> None:
+        spec = _make_spec_stub({"parameters": {"m2": 1.0, "g": 0.5}})
+        result = _parse_params([], spec)  # type: ignore[arg-type]
+        assert result == {"m2": 1.0, "g": 0.5}
+
+    def test_cli_overrides_metadata(self) -> None:
+        spec = _make_spec_stub({"parameters": {"m2": 1.0}})
+        result = _parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
+        assert result == {"m2": 2.0}
+
+    def test_missing_equals_raises(self) -> None:
+        spec = _make_spec_stub()
+        with pytest.raises(ValueError, match="KEY=VALUE"):
+            _parse_params(["bad_no_equals"], spec)  # type: ignore[arg-type]
+
+    def test_non_numeric_value_raises(self) -> None:
+        spec = _make_spec_stub()
+        with pytest.raises(ValueError, match="Must be a number"):
+            _parse_params(["m2=abc"], spec)  # type: ignore[arg-type]
+
+    def test_non_numeric_metadata_skipped(self, capsys: pytest.CaptureFixture[str]) -> None:
+        spec = _make_spec_stub({"parameters": {"note": "not a number", "m2": 1.0}})
+        result = _parse_params([], spec)  # type: ignore[arg-type]
+        assert result == {"m2": 1.0}
+        assert "Warning" in capsys.readouterr().err
+
+    def test_no_parameters_key_in_metadata(self) -> None:
+        spec = _make_spec_stub({"source": "xAct"})
+        assert _parse_params([], spec) == {}  # type: ignore[arg-type]
+
+
+# ==================== _infer_output_format ====================
+
+
+def _make_args(**kwargs: object) -> Namespace:
+    """Create a Namespace with defaults for _infer_output_format."""
+    defaults = {"no_plot": False, "output_format": None, "output": None}
+    defaults.update(kwargs)
+    return Namespace(**defaults)
+
+
+class TestInferOutputFormat:
+    def test_no_plot_returns_summary(self) -> None:
+        assert _infer_output_format(_make_args(no_plot=True)) == "summary"
+
+    def test_explicit_format_wins(self) -> None:
+        assert _infer_output_format(_make_args(output_format="npz")) == "npz"
+
+    def test_npz_extension(self) -> None:
+        assert _infer_output_format(_make_args(output="foo.npz")) == "npz"
+
+    def test_png_extension(self) -> None:
+        assert _infer_output_format(_make_args(output="foo.png")) == "png"
+
+    def test_svg_extension(self) -> None:
+        assert _infer_output_format(_make_args(output="foo.svg")) == "png"
+
+    def test_pdf_extension(self) -> None:
+        assert _infer_output_format(_make_args(output="foo.pdf")) == "png"
+
+    def test_no_output_defaults_png(self) -> None:
+        assert _infer_output_format(_make_args()) == "png"
+
+    def test_no_plot_takes_priority(self) -> None:
+        """--no-plot should win even if --format or --output is given."""
+        assert _infer_output_format(_make_args(no_plot=True, output_format="npz")) == "summary"
