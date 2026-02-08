@@ -5,6 +5,7 @@
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked: pyright](https://img.shields.io/badge/type%20checked-pyright-informational)](https://github.com/microsoft/pyright)
+[![Coverage](https://img.shields.io/badge/coverage-check%20CI-brightgreen)](https://github.com/WilliamRoyce/torsion-gertsenshtein/actions)
 
 View the `torsion_gertsenshtein` package documentation [here](https://williamroyce.github.io/torsion-gertsenshtein/).
 
@@ -231,7 +232,7 @@ If `ffmpeg` is unavailable, the example falls back to a GIF via Pillow.
 
 The project includes a comprehensive test suite with **496 Python tests + ~100 Wolfram tests**.
 
-### Python Tests (186 tests)
+### Python Tests (561 tests)
 
 ```bash
 # Run all Python tests with pytest
@@ -240,8 +241,15 @@ uv run pytest -v
 # Run a specific test module
 uv run pytest tests/test_py_pde_smoke.py -v
 
-# Run with coverage report
+# Run with coverage report (HTML)
 uv run pytest --cov=torsion_gertsenshtein --cov-report=html
+open htmlcov/index.html  # View detailed HTML report
+
+# Run with coverage report (terminal)
+uv run pytest --cov=torsion_gertsenshtein --cov-report=term-missing
+
+# Run with coverage report (XML for CI)
+uv run pytest --cov=torsion_gertsenshtein --cov-report=xml
 ```
 
 ### Wolfram Tests (81 tests)
