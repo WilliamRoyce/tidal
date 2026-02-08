@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from torsion_gertsenshtein.cli._inspect import _discover_parameters
+from torsion_gertsenshtein.cli._inspect import discover_parameters
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -70,7 +70,7 @@ def list_command(args: Namespace) -> int:
         field_word = "field" if n_fields == 1 else "fields"
         field_str = f"{n_fields} {field_word}"
 
-        params = _discover_parameters(spec)
+        params = discover_parameters(spec)
         if params:
             param_str = "params: " + ", ".join(sorted(params))
         else:

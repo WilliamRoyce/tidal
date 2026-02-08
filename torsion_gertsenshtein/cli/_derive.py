@@ -7,10 +7,15 @@ import shutil
 import subprocess
 import tempfile
 import tomllib
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 _VALID_FIELD_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9]*$")
+
+_MIN_DIM = 2
+_MAX_DIM = 7
+_MIN_PREFIX_LEN = 2
 
 if TYPE_CHECKING:
     from argparse import Namespace
@@ -35,56 +40,111 @@ _MINKOWSKI_SIGNATURES: dict[int, list[int]] = {
 }
 
 
+# --- Validation ---
+
+
+def _validate_spacetime(config: dict[str, Any]) -> None:
+    """Validate [spacetime] section of TOML config.
+
+    Raises
+    ------
+    ValueError
+        If dimension is missing, non-integer, or out of range.
+    """
+    dim = config["spacetime"].get("dimension")
+    if dim is None:
+        msg = "[spacetime] must specify 'dimension'"
+        raise ValueError(msg)
+    if not isinstance(dim, int) or dim < _MIN_DIM or dim > _MAX_DIM:
+        msg = f"[spacetime].dimension must be integer {_MIN_DIM}-{_MAX_DIM}, got: {dim}"
+        raise ValueError(msg)
+
+
+def _validate_single_field(field: dict[str, Any], index: int, dim: int) -> None:
+    """Validate a single [[fields]] entry.
+
+    Raises
+    ------
+    ValueError
+        If field definition is missing required keys or has invalid values.
+    """
+    if "name" not in field:
+        msg = f"[[fields]] entry {index} missing 'name'"
+        raise ValueError(msg)
+    fname = field["name"]
+    if not _VALID_FIELD_NAME.match(fname):
+        msg = f"Field name '{fname}' must be alphanumeric starting with a letter"
+        raise ValueError(msg)
+    if "type" not in field:
+        msg = f"[[fields]] entry {index} ('{fname}') missing 'type'"
+        raise ValueError(msg)
+    ftype = field["type"]
+    if ftype not in {"scalar", "vector", "tensor"}:
+        msg = f"Unknown field type '{ftype}' for '{fname}'. Use: scalar, vector, tensor"
+        raise ValueError(msg)
+    if ftype == "tensor":
+        if "rank" not in field:
+            msg = f"Tensor field '{fname}' must specify 'rank'"
+            raise ValueError(msg)
+        if "symmetry" not in field:
+            msg = f"Tensor field '{fname}' must specify 'symmetry' (e.g. 'antisymmetric', 'symmetric', 'none')"
+            raise ValueError(msg)
+        if field["rank"] > dim:
+            msg = f"Tensor field '{fname}' rank {field['rank']} exceeds spacetime dimension {dim}"
+            raise ValueError(msg)
+
+
+def _validate_fields(config: dict[str, Any]) -> None:
+    """Validate [[fields]] entries of TOML config.
+
+    Raises
+    ------
+    ValueError
+        If fields are missing, empty, or have invalid entries.
+    """
+    if "fields" not in config or not config["fields"]:
+        msg = "Must define at least one [[fields]] entry"
+        raise ValueError(msg)
+
+    dim = config["spacetime"]["dimension"]
+    for i, field in enumerate(config["fields"]):
+        _validate_single_field(field, i, dim)
+
+
+def _validate_lagrangian(config: dict[str, Any]) -> None:
+    """Validate [lagrangian] section of TOML config.
+
+    Raises
+    ------
+    ValueError
+        If expression is missing or empty.
+    """
+    expr = config["lagrangian"].get("expression")
+    if not expr or not expr.strip():
+        msg = "[lagrangian].expression must be a non-empty string"
+        raise ValueError(msg)
+
+
 def _validate_config(config: dict[str, Any]) -> None:
-    """Validate TOML config structure."""
+    """Validate TOML config structure.
+
+    Raises
+    ------
+    ValueError
+        If any required section or field is missing or invalid.
+    """
     required_sections = ["spacetime", "lagrangian"]
     for section in required_sections:
         if section not in config:
             msg = f"Missing required section: [{section}]"
             raise ValueError(msg)
 
-    dim = config["spacetime"].get("dimension")
-    if dim is None:
-        msg = "[spacetime] must specify 'dimension'"
-        raise ValueError(msg)
-    if not isinstance(dim, int) or dim < 2 or dim > 7:
-        msg = f"[spacetime].dimension must be integer 2-7, got: {dim}"
-        raise ValueError(msg)
+    _validate_spacetime(config)
+    _validate_fields(config)
+    _validate_lagrangian(config)
 
-    if "fields" not in config or not config["fields"]:
-        msg = "Must define at least one [[fields]] entry"
-        raise ValueError(msg)
 
-    for i, field in enumerate(config["fields"]):
-        if "name" not in field:
-            msg = f"[[fields]] entry {i} missing 'name'"
-            raise ValueError(msg)
-        fname = field["name"]
-        if not _VALID_FIELD_NAME.match(fname):
-            msg = f"Field name '{fname}' must be alphanumeric starting with a letter"
-            raise ValueError(msg)
-        if "type" not in field:
-            msg = f"[[fields]] entry {i} ('{fname}') missing 'type'"
-            raise ValueError(msg)
-        ftype = field["type"]
-        if ftype not in {"scalar", "vector", "tensor"}:
-            msg = f"Unknown field type '{ftype}' for '{fname}'. Use: scalar, vector, tensor"
-            raise ValueError(msg)
-        if ftype == "tensor":
-            if "rank" not in field:
-                msg = f"Tensor field '{fname}' must specify 'rank'"
-                raise ValueError(msg)
-            if "symmetry" not in field:
-                msg = f"Tensor field '{fname}' must specify 'symmetry' (e.g. 'antisymmetric', 'symmetric', 'none')"
-                raise ValueError(msg)
-            if field["rank"] > dim:
-                msg = f"Tensor field '{fname}' rank {field['rank']} exceeds spacetime dimension {dim}"
-                raise ValueError(msg)
-
-    expr = config["lagrangian"].get("expression")
-    if not expr or not expr.strip():
-        msg = "[lagrangian].expression must be a non-empty string"
-        raise ValueError(msg)
+# --- Code generation helpers ---
 
 
 def _make_prefix(config: dict[str, Any]) -> str:
@@ -95,11 +155,17 @@ def _make_prefix(config: dict[str, Any]) -> str:
     # Take initials of first 2-3 words, lowercase
     words = name.split()
     prefix = "".join(w[0].lower() for w in words[:3])
-    return prefix if len(prefix) >= 2 else "tg"
+    return prefix if len(prefix) >= _MIN_PREFIX_LEN else "tg"
 
 
 def _generate_metric_code(config: dict[str, Any], prefix: str) -> str:
-    """Generate Wolfram code for metric definition."""
+    """Generate Wolfram code for metric definition.
+
+    Raises
+    ------
+    ValueError
+        If metric type is unknown or dimension mismatch in diagonal/matrix.
+    """
     dim = config["spacetime"]["dimension"]
     metric_type = config["spacetime"].get("metric", "minkowski")
 
@@ -124,7 +190,7 @@ def _generate_metric_code(config: dict[str, Any], prefix: str) -> str:
         if len(matrix) != dim:
             msg = f"[spacetime].matrix must be {dim}x{dim}"
             raise ValueError(msg)
-        rows = []
+        rows: list[str] = []
         for row in matrix:
             if len(row) != dim:
                 msg = f"[spacetime].matrix rows must have {dim} entries"
@@ -208,6 +274,256 @@ def _substitute_field_names(
     return result.replace("CD ]", f"{prefix}CD ]")
 
 
+# --- WLS script generation ---
+
+
+@dataclass(frozen=True)
+class _WlsContext:
+    """Shared context for WLS script generation helpers."""
+
+    prefix: str
+    dim: int
+    fields: list[dict[str, Any]]
+    constants: list[str]
+    coords: list[str]
+    manifold: str
+    metric: str
+    cd: str
+    chart: str
+    theory_name: str
+    output_path: str
+    lagrangian_expr: str
+    is_multi: bool
+
+
+def _wls_header(ctx: _WlsContext) -> list[str]:
+    """Generate script header lines."""
+    return [
+        "#!/usr/bin/env wolframscript",
+        f"(* Auto-generated by tg derive: {ctx.theory_name} *)",
+        "",
+        f'Print["=== {ctx.theory_name} ==="];',
+        'Print[""];',
+        "",
+    ]
+
+
+def _wls_packages() -> list[str]:
+    """Generate xAct package loading and pipeline import lines."""
+    return [
+        "(* Load xAct packages *)",
+        "<< xAct`xTensor`;",
+        "<< xAct`xCoba`;",
+        "",
+        "(* Load pipeline modules *)",
+        'pipelinePath = FileNameJoin[{DirectoryName[$InputFileName], "..", "..", "torsion_gertsenshtein", "wolfram"}];',
+        'Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];',
+        'Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];',
+        'Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];',
+        'Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];',
+        "",
+        "$DefInfoQ = False;",
+        "",
+    ]
+
+
+def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
+    """Generate spacetime definition lines (manifold, metric, chart)."""
+    coord_funcs = ", ".join(f"{c}[]" for c in ctx.coords)
+    indices = ", ".join(str(i) for i in range(ctx.dim))
+    idx_str = ", ".join(_INDEX_LETTERS[: min(ctx.dim + 4, 8)])
+
+    return [
+        f"(* Step 1: Define {ctx.dim}D spacetime *)",
+        f"If[!xTensorQ[{ctx.manifold}],",
+        f"  DefManifold[{ctx.manifold}, {ctx.dim}, {{{idx_str}}}]",
+        "];",
+        "",
+        f"If[!MetricQ[{ctx.metric}],",
+        f"  DefMetric[-1, {ctx.metric}[-a, -b], {ctx.cd},",
+        '    SymbolOfCovD -> {";", "\\[Del]"},',
+        '    PrintAs -> "\\[Eta]"]',
+        "];",
+        "",
+        f"If[!ChartQ[{ctx.chart}],",
+        f"  DefChart[{ctx.chart}, {ctx.manifold}, {{{indices}}}, {{{coord_funcs}}}]",
+        "];",
+        "",
+        _generate_metric_code(config, ctx.prefix),
+        f"MetricInBasis[{ctx.metric}, -{ctx.chart}, {ctx.prefix}MetricMatrix];",
+        "",
+    ]
+
+
+def _wls_fields(ctx: _WlsContext) -> list[str]:
+    """Generate field definitions and constant symbol declarations."""
+    lines: list[str] = ["(* Step 2: Define fields *)"]
+    for field in ctx.fields:
+        lines.extend((_generate_field_def(field, ctx.prefix, ctx.manifold), ""))
+
+    if ctx.constants:
+        lines.append("(* Define constant symbols *)")
+        lines.extend(
+            f"If[!ConstantSymbolQ[{c}], DefConstantSymbol[{c}]];" for c in ctx.constants
+        )
+        lines.append("")
+
+    return lines
+
+
+def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
+    """Generate Lagrangian definition lines."""
+    prefixed = _substitute_field_names(ctx.lagrangian_expr, ctx.fields, ctx.prefix)
+    return [
+        "(* Step 3: Lagrangian *)",
+        f"{ctx.prefix}Lagrangian = (",
+        f"  {prefixed}",
+        ");",
+        "",
+        f'Print["Lagrangian: ", {ctx.prefix}Lagrangian];',
+        "",
+    ]
+
+
+def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
+    """Generate Euler-Lagrange, decomposition, and export lines for multi-field."""
+    lines: list[str] = ["(* Step 4: Euler-Lagrange equations *)"]
+
+    for field in ctx.fields:
+        fname = field["name"]
+        fexpr = _field_expression(field, ctx.prefix)
+        eom_var = f"eom{fname.capitalize()}"
+        lines.extend((
+            f"{eom_var} = VarD[{fexpr}, {ctx.cd}][{ctx.prefix}Lagrangian];",
+            f"{eom_var} = ToCanonical[{eom_var}];",
+            f"{eom_var} = ContractMetric[{eom_var}, {ctx.metric}];",
+            f'Print["EOM {fname}: ", {eom_var}];',
+            "",
+        ))
+
+    # Step 5: Decompose
+    lines.append("(* Step 5: Decompose to components *)")
+    for i, field in enumerate(ctx.fields):
+        fname = field["name"]
+        fexpr = _field_expression(field, ctx.prefix)
+        eom_var = f"eom{fname.capitalize()}"
+        comp_var = f"comp{fname.capitalize()}"
+
+        other_exprs = [
+            _field_expression(f, ctx.prefix) for j, f in enumerate(ctx.fields) if j != i
+        ]
+        others_str = ", ".join(other_exprs) if other_exprs else ""
+
+        lines.extend((
+            f"{comp_var} = DecomposeToComponents[{eom_var}, {fexpr}, {ctx.chart}, {{{others_str}}}];",
+            f'Print["{fname} components: ", Length[{comp_var}]];',
+            "",
+        ))
+
+    # Step 6: Export
+    lines.extend(("(* Step 6: Build and export JSON *)", "fieldEquations = Flatten[{"))
+    for i, field in enumerate(ctx.fields):
+        fname = field["name"]
+        comp_var = f"comp{fname.capitalize()}"
+        comma = "," if i < len(ctx.fields) - 1 else ""
+        lines.append(
+            f'  Table[{{"{fname}_" <> ToString[{comp_var}[[k, 1]]], {comp_var}[[k, 2]]}}, {{k, Length[{comp_var}]}}]{comma}'
+        )
+    lines.extend(("}, 1];", ""))
+
+    return lines
+
+
+def _wls_euler_lagrange_single(ctx: _WlsContext) -> list[str]:
+    """Generate Euler-Lagrange, decomposition, and export lines for single field."""
+    field = ctx.fields[0]
+    fname = field["name"]
+    fexpr = _field_expression(field, ctx.prefix)
+
+    return [
+        "(* Step 4: Euler-Lagrange equations *)",
+        f"eom = EulerLagrangeEquation[{ctx.prefix}Lagrangian, {fexpr}, {ctx.cd}];",
+        'Print["EOM: ", eom];',
+        "",
+        "(* Step 5: Decompose to components *)",
+        f"componentEqs = DecomposeToComponents[eom, {fexpr}, {ctx.chart}];",
+        'Print["Components: ", Length[componentEqs]];',
+        "",
+        "fieldEquations = Table[",
+        f'  {{"{fname}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
+        "  {k, Length[componentEqs]}",
+        "];",
+        "",
+    ]
+
+
+def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
+    """Generate metadata and JSON export lines.
+
+    Raises
+    ------
+    ValueError
+        If dimension > 4 and no explicit signature provided.
+    """
+    sig_default = _MINKOWSKI_SIGNATURES.get(ctx.dim)
+    if sig_default is None and "signature" not in config.get("spacetime", {}):
+        msg = f"Dimension {ctx.dim}: must specify [spacetime].signature (no default for dim > 4)"
+        raise ValueError(msg)
+    sig_str = ", ".join(
+        str(s) for s in config["spacetime"].get("signature", sig_default or [])
+    )
+    coord_str = ", ".join(f'"{c}"' for c in ctx.coords)
+
+    escaped_lagrangian = (
+        ctx.lagrangian_expr.replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\n", " ")
+        .strip()
+    )
+
+    lines: list[str] = [
+        "metadata = <|",
+        '  "source" -> "xAct",',
+        f'  "lagrangian_expr" -> "{escaped_lagrangian}",',
+        '  "derived_from" -> "Euler-Lagrange",',
+        '  "gauge" -> "none",',
+        '  "linearized" -> False,',
+        f'  "dimension" -> {ctx.dim},',
+        f'  "signature" -> {{{sig_str}}},',
+        f'  "coordinates" -> {{{coord_str}}}',
+        "|>;",
+        "",
+    ]
+
+    # Build JSON
+    if ctx.is_multi or any(f["type"] != "scalar" or f.get("rank", 0) > 0 for f in ctx.fields):
+        lines.append(
+            "jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];"
+        )
+    else:
+        lines.append("jsonStructure = BuildJSONStructure[componentEqs, metadata];")
+    lines.append("")
+
+    # Export
+    escaped_output = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')
+    lines.extend((
+        f'outputPath = "{escaped_output}";',
+        "outputDir = DirectoryName[outputPath];",
+        'If[outputDir =!= "" && !DirectoryQ[outputDir], CreateDirectory[outputDir]];',
+        "",
+        'Print["JSON Output:"];',
+        'Print[ExportString[jsonStructure, "JSON"]];',
+        "",
+        'Export[outputPath, jsonStructure, "JSON"];',
+        'Print[""];',
+        'Print["Exported to: ", outputPath];',
+        "",
+        f'Print["*** {ctx.theory_name} derivation complete! ***"];',
+    ))
+
+    return lines
+
+
 def generate_wls(config: dict[str, Any], output_override: str | None = None) -> str:
     """Generate a complete .wls script from a TOML config.
 
@@ -222,245 +538,45 @@ def generate_wls(config: dict[str, Any], output_override: str | None = None) -> 
     -------
     str
         Complete Wolfram Language script.
+
     """
     _validate_config(config)
 
     prefix = _make_prefix(config)
     dim = config["spacetime"]["dimension"]
-    fields = config["fields"]
-    constants = config.get("constants", {}).get("names", [])
-    lagrangian_expr = config["lagrangian"]["expression"].strip()
-    theory_name = config.get("theory", {}).get("name", "Custom Theory")
 
-    output_path = output_override or config.get("output", {}).get("path", "output.json")
-
-    coords = _COORDS[dim]
-    coord_funcs = ", ".join(f"{c}[]" for c in coords)
-    indices = ", ".join(str(i) for i in range(dim))
-    manifold = f"{prefix}M{dim}"
-    metric = f"{prefix}Eta"
-    cd = f"{prefix}CD"
-    chart = f"{prefix}Cart"
+    ctx = _WlsContext(
+        prefix=prefix,
+        dim=dim,
+        fields=config["fields"],
+        constants=config.get("constants", {}).get("names", []),
+        coords=_COORDS[dim],
+        manifold=f"{prefix}M{dim}",
+        metric=f"{prefix}Eta",
+        cd=f"{prefix}CD",
+        chart=f"{prefix}Cart",
+        theory_name=config.get("theory", {}).get("name", "Custom Theory"),
+        output_path=output_override or config.get("output", {}).get("path", "output.json"),
+        lagrangian_expr=config["lagrangian"]["expression"].strip(),
+        is_multi=len(config["fields"]) > 1,
+    )
 
     lines: list[str] = []
-
-    # Header
-    lines.append("#!/usr/bin/env wolframscript")
-    lines.append(f"(* Auto-generated by tg derive: {theory_name} *)")
-    lines.append("")
-
-    lines.append(f'Print["=== {theory_name} ==="];')
-    lines.append('Print[""];')
-    lines.append("")
-
-    # Load packages
-    lines.append("(* Load xAct packages *)")
-    lines.append("<< xAct`xTensor`;")
-    lines.append("<< xAct`xCoba`;")
-    lines.append("")
-
-    # Load pipeline
-    lines.append("(* Load pipeline modules *)")
-    lines.append(
-        'pipelinePath = FileNameJoin[{DirectoryName[$InputFileName], "..", "..", "torsion_gertsenshtein", "wolfram"}];'
-    )
-    lines.append('Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];')
-    lines.append('Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];')
-    lines.append('Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];')
-    lines.append('Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];')
-    lines.append("")
-    lines.append("$DefInfoQ = False;")
-    lines.append("")
-
-    # Step 1: Spacetime
-    lines.append(f"(* Step 1: Define {dim}D spacetime *)")
-    idx_str = ", ".join(_INDEX_LETTERS[: min(dim + 4, 8)])
-    lines.extend(
-        (
-            f"If[!xTensorQ[{manifold}],",
-            f"  DefManifold[{manifold}, {dim}, {{{idx_str}}}]",
-            "];",
-            "",
-            f"If[!MetricQ[{metric}],",
-            f"  DefMetric[-1, {metric}[-a, -b], {cd},",
-            '    SymbolOfCovD -> {";", "\\[Del]"},',
-            '    PrintAs -> "\\[Eta]"]',
-            "];",
-            "",
-            f"If[!ChartQ[{chart}],",
-            f"  DefChart[{chart}, {manifold}, {{{indices}}}, {{{coord_funcs}}}]",
-            "];",
-            "",
-        )
-    )
-
-    metric_code = _generate_metric_code(config, prefix)
-    lines.append(metric_code)
-    lines.append(f"MetricInBasis[{metric}, -{chart}, {prefix}MetricMatrix];")
-    lines.append("")
-
-    # Step 2: Fields
-    lines.append("(* Step 2: Define fields *)")
-    for field in fields:
-        lines.extend((_generate_field_def(field, prefix, manifold), ""))
-
-    # Constants
-    if constants:
-        lines.append("(* Define constant symbols *)")
-        lines.extend(
-            f"If[!ConstantSymbolQ[{c}], DefConstantSymbol[{c}]];" for c in constants
-        )
-        lines.append("")
-
-    # Step 3: Lagrangian
-    prefixed_lagrangian = _substitute_field_names(lagrangian_expr, fields, prefix)
-    lines.append("(* Step 3: Lagrangian *)")
-    lines.append(f"{prefix}Lagrangian = (")
-    lines.append(f"  {prefixed_lagrangian}")
-    lines.append(");")
-    lines.append("")
-    lines.append(f'Print["Lagrangian: ", {prefix}Lagrangian];')
-    lines.append("")
-
-    # Step 4: Euler-Lagrange
-    lines.append("(* Step 4: Euler-Lagrange equations *)")
-
-    is_multi = len(fields) > 1
-
-    if is_multi:
-        # Multi-field: VarD for each, decompose with cross-field refs
-        for i, field in enumerate(fields):
-            fname = field["name"]
-            fexpr = _field_expression(field, prefix)
-            eom_var = f"eom{fname.capitalize()}"
-
-            lines.extend(
-                (
-                    f"{eom_var} = VarD[{fexpr}, {cd}][{prefix}Lagrangian];",
-                    f"{eom_var} = ToCanonical[{eom_var}];",
-                    f"{eom_var} = ContractMetric[{eom_var}, {metric}];",
-                    f'Print["EOM {fname}: ", {eom_var}];',
-                    "",
-                )
-            )
-
-        # Step 5: Decompose
-        lines.append("(* Step 5: Decompose to components *)")
-        for i, field in enumerate(fields):
-            fname = field["name"]
-            fexpr = _field_expression(field, prefix)
-            eom_var = f"eom{fname.capitalize()}"
-            comp_var = f"comp{fname.capitalize()}"
-
-            # Additional fields = all other fields
-            other_exprs = [
-                _field_expression(f, prefix) for j, f in enumerate(fields) if j != i
-            ]
-            others_str = ", ".join(other_exprs) if other_exprs else ""
-
-            lines.extend(
-                (
-                    f"{comp_var} = DecomposeToComponents[{eom_var}, {fexpr}, {chart}, {{{others_str}}}];",
-                    f'Print["{fname} components: ", Length[{comp_var}]];',
-                    "",
-                )
-            )
-
-        # Step 6: Export
-        lines.extend(
-            ("(* Step 6: Build and export JSON *)", "fieldEquations = Flatten[{")
-        )
-        for i, field in enumerate(fields):
-            fname = field["name"]
-            comp_var = f"comp{fname.capitalize()}"
-            comma = "," if i < len(fields) - 1 else ""
-            lines.append(
-                f'  Table[{{"{fname}_" <> ToString[{comp_var}[[k, 1]]], {comp_var}[[k, 2]]}}, {{k, Length[{comp_var}]}}]{comma}'
-            )
-        lines.extend(("}, 1];", ""))
-
+    lines.extend(_wls_header(ctx))
+    lines.extend(_wls_packages())
+    lines.extend(_wls_spacetime(config, ctx))
+    lines.extend(_wls_fields(ctx))
+    lines.extend(_wls_lagrangian(ctx))
+    if ctx.is_multi:
+        lines.extend(_wls_euler_lagrange_multi(ctx))
     else:
-        # Single field
-        field = fields[0]
-        fname = field["name"]
-        fexpr = _field_expression(field, prefix)
-
-        lines.append(f"eom = EulerLagrangeEquation[{prefix}Lagrangian, {fexpr}, {cd}];")
-        lines.append('Print["EOM: ", eom];')
-        lines.append("")
-
-        # Step 5: Decompose
-        lines.append("(* Step 5: Decompose to components *)")
-        lines.append(f"componentEqs = DecomposeToComponents[eom, {fexpr}, {chart}];")
-        lines.append('Print["Components: ", Length[componentEqs]];')
-        lines.append("")
-
-        # Format for export
-        lines.append("fieldEquations = Table[")
-        lines.append(
-            f'  {{"{fname}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},'
-        )
-        lines.append("  {k, Length[componentEqs]}")
-        lines.append("];")
-        lines.append("")
-
-    # Metadata
-    sig_default = _MINKOWSKI_SIGNATURES.get(dim)
-    if sig_default is None and "signature" not in config.get("spacetime", {}):
-        msg = f"Dimension {dim}: must specify [spacetime].signature (no default for dim > 4)"
-        raise ValueError(msg)
-    sig_str = ", ".join(
-        str(s) for s in config["spacetime"].get("signature", sig_default or [])
-    )
-    coord_str = ", ".join(f'"{c}"' for c in coords)
-
-    escaped_lagrangian = (
-        lagrangian_expr.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ").strip()
-    )
-
-    lines.extend(
-        (
-            "metadata = <|",
-            '  "source" -> "xAct",',
-            f'  "lagrangian_expr" -> "{escaped_lagrangian}",',
-            '  "derived_from" -> "Euler-Lagrange",',
-            '  "gauge" -> "none",',
-            '  "linearized" -> False,',
-            f'  "dimension" -> {dim},',
-            f'  "signature" -> {{{sig_str}}},',
-            f'  "coordinates" -> {{{coord_str}}}',
-            "|>;",
-            "",
-        )
-    )
-
-    # Build JSON
-    if is_multi or any(f["type"] != "scalar" or f.get("rank", 0) > 0 for f in fields):
-        lines.append(
-            "jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];"
-        )
-    else:
-        lines.append("jsonStructure = BuildJSONStructure[componentEqs, metadata];")
-    lines.append("")
-
-    # Export
-    escaped_output = str(output_path).replace("\\", "\\\\").replace('"', '\\"')
-    lines.append(f'outputPath = "{escaped_output}";')
-    lines.append("outputDir = DirectoryName[outputPath];")
-    lines.append(
-        'If[outputDir =!= "" && !DirectoryQ[outputDir], CreateDirectory[outputDir]];'
-    )
-    lines.append("")
-    lines.append('Print["JSON Output:"];')
-    lines.append('Print[ExportString[jsonStructure, "JSON"]];')
-    lines.append("")
-    lines.append('Export[outputPath, jsonStructure, "JSON"];')
-    lines.append('Print[""];')
-    lines.append('Print["Exported to: ", outputPath];')
-    lines.append("")
-    lines.append(f'Print["*** {theory_name} derivation complete! ***"];')
+        lines.extend(_wls_euler_lagrange_single(ctx))
+    lines.extend(_wls_metadata_and_export(config, ctx))
 
     return "\n".join(lines) + "\n"
+
+
+# --- Execution ---
 
 
 def _run_wolframscript(script_path: Path) -> int:
@@ -492,6 +608,76 @@ def _run_wolframscript(script_path: Path) -> int:
     return result.returncode
 
 
+def _derive_from_toml(config_path: Path, args: Namespace) -> int:
+    """Run derivation from a TOML config file.
+
+    Parameters
+    ----------
+    config_path : Path
+        Path to the TOML config file.
+    args : Namespace
+        Parsed CLI arguments.
+
+    Returns
+    -------
+    int
+        Exit code.
+    """
+    with config_path.open("rb") as f:
+        config = tomllib.load(f)
+
+    script_content = generate_wls(config, output_override=args.output)
+
+    if args.dry_run:
+        print(script_content)
+        return 0
+
+    if args.save_script:
+        save_path = Path(args.save_script)
+        save_path.write_text(script_content, encoding="utf-8")
+        print(f"Saved script to: {save_path}")
+        if shutil.which("wolframscript") is None:
+            print(
+                "Note: wolframscript not found. Run the script manually when available."
+            )
+            return 0
+        return _run_wolframscript(save_path)
+
+    # Use temp file
+    with tempfile.NamedTemporaryFile(
+        encoding="utf-8", mode="w", suffix=".wls", delete=False, prefix="tg_derive_"
+    ) as tmp:
+        tmp.write(script_content)
+        tmp_path = Path(tmp.name)
+
+    try:
+        ret = _run_wolframscript(tmp_path)
+    finally:
+        tmp_path.unlink(missing_ok=True)
+
+    # Post-validate output JSON if wolframscript succeeded
+    if ret == 0:
+        output_path = args.output or config.get("output", {}).get(
+            "path", "output.json"
+        )
+        if Path(output_path).exists():
+            try:
+                from torsion_gertsenshtein.symbolic.json_loader import (
+                    load_equation_system,
+                )
+
+                spec = load_equation_system(output_path)
+                print()
+                print(
+                    f"Validation: JSON loaded successfully ({spec.n_components} components)"
+                )
+            except Exception as exc:  # noqa: BLE001
+                print(f"\nWarning: JSON validation failed: {exc}")
+                ret = 1
+
+    return ret
+
+
 def derive_command(args: Namespace) -> int:
     """Execute the derive command.
 
@@ -510,68 +696,13 @@ def derive_command(args: Namespace) -> int:
         print(f"Error: file not found: {config_path}")
         return 1
 
-    # Detect mode from extension
     ext = config_path.suffix.lower()
 
     if ext == ".wls":
-        # Mode B: Script pass-through
         return _run_wolframscript(config_path)
 
     if ext in {".toml", ".tml"}:
-        # Mode A: TOML config → generate .wls → run
-        with config_path.open("rb") as f:
-            config = tomllib.load(f)
-
-        script_content = generate_wls(config, output_override=args.output)
-
-        if args.dry_run:
-            print(script_content)
-            return 0
-
-        if args.save_script:
-            save_path = Path(args.save_script)
-            save_path.write_text(script_content, encoding="utf-8")
-            print(f"Saved script to: {save_path}")
-            if shutil.which("wolframscript") is None:
-                print(
-                    "Note: wolframscript not found. Run the script manually when available."
-                )
-                return 0
-            return _run_wolframscript(save_path)
-
-        # Use temp file
-        with tempfile.NamedTemporaryFile(
-            encoding="utf-8", mode="w", suffix=".wls", delete=False, prefix="tg_derive_"
-        ) as tmp:
-            tmp.write(script_content)
-            tmp_path = Path(tmp.name)
-
-        try:
-            ret = _run_wolframscript(tmp_path)
-        finally:
-            tmp_path.unlink(missing_ok=True)
-
-        # Post-validate output JSON if wolframscript succeeded
-        if ret == 0:
-            output_path = args.output or config.get("output", {}).get(
-                "path", "output.json"
-            )
-            if Path(output_path).exists():
-                try:
-                    from torsion_gertsenshtein.symbolic.json_loader import (
-                        load_equation_system,
-                    )
-
-                    spec = load_equation_system(output_path)
-                    print()
-                    print(
-                        f"Validation: JSON loaded successfully ({spec.n_components} components)"
-                    )
-                except Exception as exc:  # noqa: BLE001
-                    print(f"\nWarning: JSON validation failed: {exc}")
-                    ret = 1
-
-        return ret
+        return _derive_from_toml(config_path, args)
 
     print(
         f"Error: unsupported file extension '{ext}'. Use .toml for config or .wls for script."

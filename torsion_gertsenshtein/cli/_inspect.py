@@ -12,13 +12,18 @@ if TYPE_CHECKING:
     from argparse import Namespace
 
 
-def _discover_parameters(spec: object) -> dict[str, list[str]]:
+def discover_parameters(spec: object) -> dict[str, list[str]]:
     """Scan all terms for symbolic coefficients and map parameter → field names.
 
     Returns
     -------
     dict[str, list[str]]
         Mapping from parameter name to list of field names that reference it.
+
+    Raises
+    ------
+    TypeError
+        If *spec* is not an ``EquationSystem`` instance.
     """
     from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
 
@@ -106,27 +111,93 @@ def _format_matrix(
         return f"zeros({n}x{n})"
 
     if is_diag:
-        if use_symbolic:
-            diag_entries = []
+        if use_symbolic and symbolic is not None:
+            diag_entries: list[str] = []
             for i in range(n):
-                s = symbolic[i][i]  # type: ignore[index]
+                s = symbolic[i][i]
                 diag_entries.append(str(s) if s is not None else str(matrix[i][i]))
             return f"diag({', '.join(diag_entries)})"
         diag_vals = [str(matrix[i][i]) for i in range(n)]
         return f"diag({', '.join(diag_vals)})"
 
     # Full matrix
-    rows = []
+    rows: list[str] = []
     for i in range(n):
-        if use_symbolic:
-            entries = []
+        if use_symbolic and symbolic is not None:
+            entries: list[str] = []
             for j in range(n):
-                s = symbolic[i][j]  # type: ignore[index]
+                s = symbolic[i][j]
                 entries.append(str(s) if s is not None else str(matrix[i][j]))
             rows.append("  [" + ", ".join(entries) + "]")
         else:
             rows.append("  [" + ", ".join(str(matrix[i][j]) for j in range(n)) + "]")
     return "\n".join(rows)
+
+
+def _print_header(spec: object) -> None:
+    """Print Lagrangian and source information."""
+    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+
+    if not isinstance(spec, EquationSystem):
+        return
+    lagrangian = spec.metadata.get("lagrangian_expr", "")
+    source = spec.metadata.get("source", "unknown")
+    derived_from = spec.metadata.get("derived_from", "")
+
+    print(
+        f"  Lagrangian: {lagrangian}"
+        if lagrangian
+        else "  (no Lagrangian expression in metadata)"
+    )
+    source_parts = [s for s in [source, derived_from] if s]
+    if source_parts:
+        print(f"  Source: {', '.join(source_parts)}")
+    print()
+
+
+def _print_spacetime(spec: object) -> None:
+    """Print spacetime dimension and coordinate information."""
+    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+
+    if not isinstance(spec, EquationSystem):
+        return
+    dim_label = f"{spec.spatial_dimension}+1D"
+    print("Spacetime:")
+    print(f"  Dimension: {spec.dimension} ({dim_label})")
+    print(f"  Coordinates: {spec.effective_coordinates}")
+    if spec.metadata.get("signature"):
+        sig = spec.metadata["signature"]
+        sig_str = ", ".join(f"{'+' if s > 0 else ''}{s}" for s in sig)
+        print(f"  Signature: ({sig_str})")
+    print()
+
+
+def _print_equations(spec: object) -> None:
+    """Print field summary and detailed equation terms."""
+    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+
+    if not isinstance(spec, EquationSystem):
+        return
+    print(
+        f"Fields ({spec.n_components} component{'s' if spec.n_components != 1 else ''}):"
+    )
+    for eq in spec.equations:
+        t_order = eq.time_derivative_order
+        dynamical = "dynamical" if t_order > 0 else "constraint"
+        print(f"  {eq.field_name:<12s} {dynamical:<12s} time_order={t_order}")
+    print()
+
+    print("Equations:")
+    for eq in spec.equations:
+        t_order = eq.time_derivative_order
+        lhs_label = f"d{t_order}_t" if t_order > 0 else "constraint"
+        terms_strs: list[str] = []
+        for term in eq.rhs_terms:
+            sym = term.coefficient_symbolic
+            coeff_str = f"[{sym}]" if sym is not None else f"{term.coefficient:+.4g}"
+            terms_strs.append(f"{coeff_str} {term.operator}({term.field})")
+        print(f"  {lhs_label}({eq.field_name}) = {' '.join(terms_strs)}")
+    print()
 
 
 def inspect_command(args: Namespace) -> int:
@@ -149,58 +220,12 @@ def inspect_command(args: Namespace) -> int:
 
     spec = load_equation_system(json_path)
 
-    # Header
-    lagrangian = spec.metadata.get("lagrangian_expr", "")
-    source = spec.metadata.get("source", "unknown")
-    derived_from = spec.metadata.get("derived_from", "")
-
-    print(
-        f"  Lagrangian: {lagrangian}"
-        if lagrangian
-        else "  (no Lagrangian expression in metadata)"
-    )
-    source_parts = [s for s in [source, derived_from] if s]
-    if source_parts:
-        print(f"  Source: {', '.join(source_parts)}")
-    print()
-
-    # Spacetime
-    dim_label = f"{spec.spatial_dimension}+1D"
-    print("Spacetime:")
-    print(f"  Dimension: {spec.dimension} ({dim_label})")
-    print(f"  Coordinates: {spec.effective_coordinates}")
-    if spec.metadata.get("signature"):
-        sig = spec.metadata["signature"]
-        sig_str = ", ".join(f"{'+' if s > 0 else ''}{s}" for s in sig)
-        print(f"  Signature: ({sig_str})")
-    print()
-
-    # Fields
-    print(
-        f"Fields ({spec.n_components} component{'s' if spec.n_components != 1 else ''}):"
-    )
-    for eq in spec.equations:
-        t_order = eq.time_derivative_order
-        dynamical = "dynamical" if t_order > 0 else "constraint"
-        print(f"  {eq.field_name:<12s} {dynamical:<12s} time_order={t_order}")
-    print()
-
-    # Equations
-    print("Equations:")
-    for eq in spec.equations:
-        t_order = eq.time_derivative_order
-        lhs_label = f"d{t_order}_t" if t_order > 0 else "constraint"
-        terms_strs = []
-        for term in eq.rhs_terms:
-            coeff = term.coefficient
-            sym = term.coefficient_symbolic
-            coeff_str = f"[{sym}]" if sym is not None else f"{coeff:+.4g}"
-            terms_strs.append(f"{coeff_str} {term.operator}({term.field})")
-        print(f"  {lhs_label}({eq.field_name}) = {' '.join(terms_strs)}")
-    print()
+    _print_header(spec)
+    _print_spacetime(spec)
+    _print_equations(spec)
 
     # Parameters
-    param_map = _discover_parameters(spec)
+    param_map = discover_parameters(spec)
     if param_map:
         print("Required parameters:")
         for param, fields in sorted(param_map.items()):

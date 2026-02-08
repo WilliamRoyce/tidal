@@ -13,6 +13,8 @@ from __future__ import annotations
 import argparse
 import sys
 
+__all__ = ["main"]
+
 
 def _build_parser() -> argparse.ArgumentParser:
     """Build the top-level argument parser with subcommands."""
@@ -218,6 +220,38 @@ def _get_version() -> str:
         return "unknown"
 
 
+def _dispatch(args: argparse.Namespace) -> int:
+    """Lazily import and run the appropriate command handler.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Parsed CLI arguments with ``command`` attribute.
+
+    Returns
+    -------
+    int
+        Exit code from the command handler.
+    """
+    if args.command == "derive":
+        from torsion_gertsenshtein.cli._derive import derive_command
+
+        return derive_command(args)
+    if args.command == "inspect":
+        from torsion_gertsenshtein.cli._inspect import inspect_command
+
+        return inspect_command(args)
+    if args.command == "simulate":
+        from torsion_gertsenshtein.cli._simulate import simulate_command
+
+        return simulate_command(args)
+    if args.command == "list":
+        from torsion_gertsenshtein.cli._list import list_command
+
+        return list_command(args)
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """CLI entry point.
 
@@ -239,27 +273,10 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     try:
-        if args.command == "derive":
-            from torsion_gertsenshtein.cli._derive import derive_command
-
-            return derive_command(args)
-        if args.command == "inspect":
-            from torsion_gertsenshtein.cli._inspect import inspect_command
-
-            return inspect_command(args)
-        if args.command == "simulate":
-            from torsion_gertsenshtein.cli._simulate import simulate_command
-
-            return simulate_command(args)
-        if args.command == "list":
-            from torsion_gertsenshtein.cli._list import list_command
-
-            return list_command(args)
+        return _dispatch(args)
     except KeyboardInterrupt:
         print("\nInterrupted.")
         return 130
     except Exception as exc:  # noqa: BLE001
         print(f"Error: {exc}", file=sys.stderr)
         return 1
-
-    return 0

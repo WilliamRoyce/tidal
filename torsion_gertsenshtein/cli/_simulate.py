@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import math
+import sys
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -11,6 +13,7 @@ import numpy as np
 if TYPE_CHECKING:
     from argparse import Namespace
 
+    from matplotlib.axes import Axes
     from pde import CartesianGrid, FieldCollection, MemoryStorage
 
     from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
@@ -23,6 +26,49 @@ _DEFAULT_SHAPES: dict[int, list[int]] = {
 }
 
 _DEFAULT_BOUND = (0.0, 10.0)
+_SPATIAL_DIM_2D = 2
+
+# CFL safety factor for auto-dt computation
+_CFL_FACTOR = 0.5
+
+# Visualization defaults
+_DPI = 150
+_VMAX_FLOOR = 0.01
+
+# Curated namespace for --ic-formula eval().
+# Includes np for backward compatibility (e.g. np.exp(...) in formulas)
+# plus named math functions for convenience.
+_FORMULA_NAMESPACE: dict[str, object] = {
+    "np": np,
+    "pi": np.pi,
+    "e": np.e,
+    "sin": np.sin,
+    "cos": np.cos,
+    "tan": np.tan,
+    "exp": np.exp,
+    "log": np.log,
+    "log10": np.log10,
+    "sqrt": np.sqrt,
+    "abs": np.abs,
+    "tanh": np.tanh,
+    "cosh": np.cosh,
+    "sinh": np.sinh,
+    "arctan": np.arctan,
+    "arctan2": np.arctan2,
+    "heaviside": np.heaviside,
+    "where": np.where,
+}
+
+
+@dataclass(frozen=True)
+class _PlotContext:
+    """Bundled context for plot generation."""
+
+    spec: EquationSystem
+    storage: MemoryStorage
+    grid: CartesianGrid
+    initial_state: FieldCollection
+    params: dict[str, float]
 
 
 def _field_slots(spec: EquationSystem) -> dict[str, int]:
@@ -43,18 +89,24 @@ def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:
     """Parse --param KEY=VAL arguments into a dict.
 
     Also merges default parameters from metadata when not overridden.
+
+    Raises
+    ------
+    ValueError
+        If parameter format is invalid or value is non-numeric.
     """
     params: dict[str, float] = {}
 
     # Start with metadata defaults
-    meta_params = spec.metadata.get("parameters", {})
+    meta_params: object = spec.metadata.get("parameters", {})
     if isinstance(meta_params, dict):
-        for k, v in meta_params.items():
+        meta_dict = cast("dict[str, object]", meta_params)
+        for key, val in meta_dict.items():
             try:
-                params[k] = float(v)
+                params[key] = float(val)  # type: ignore[arg-type]
             except (ValueError, TypeError):
                 print(
-                    f"  Warning: metadata parameter '{k}' has non-numeric value {v!r}, skipping"
+                    f"  Warning: metadata parameter '{key}' has non-numeric value {val!r}, skipping"
                 )
 
     # Override with CLI params
@@ -73,7 +125,13 @@ def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:
 
 
 def _parse_grid_shape(raw: str | None, spatial_dim: int) -> list[int]:
-    """Parse --grid-shape argument."""
+    """Parse --grid-shape argument.
+
+    Raises
+    ------
+    ValueError
+        If the number of values doesn't match spatial dimension.
+    """
     if raw is None:
         return _DEFAULT_SHAPES.get(spatial_dim, [16] * spatial_dim)
 
@@ -93,7 +151,13 @@ def _parse_grid_shape(raw: str | None, spatial_dim: int) -> list[int]:
 
 
 def _parse_bounds(raw: str | None, spatial_dim: int) -> list[tuple[float, float]]:
-    """Parse --bounds argument."""
+    """Parse --bounds argument.
+
+    Raises
+    ------
+    ValueError
+        If the number of values doesn't match spatial dimension or format is invalid.
+    """
     if raw is None:
         return [_DEFAULT_BOUND] * spatial_dim
 
@@ -112,7 +176,13 @@ def _parse_bounds(raw: str | None, spatial_dim: int) -> list[tuple[float, float]
 
 
 def _parse_single_bound(s: str) -> tuple[float, float]:
-    """Parse 'LO:HI' → (float, float)."""
+    """Parse 'LO:HI' → (float, float).
+
+    Raises
+    ------
+    ValueError
+        If format is not LO:HI.
+    """
     if ":" not in s:
         msg = f"Invalid bound format: '{s}'. Expected LO:HI (e.g. 0:20)"
         raise ValueError(msg)
@@ -123,7 +193,7 @@ def _parse_single_bound(s: str) -> tuple[float, float]:
 _VALID_BC_TYPES = {"periodic", "neumann", "dirichlet"}
 
 
-def _parse_bc(raw: str | None, periodic: bool, spatial_dim: int) -> bool | list[bool]:
+def _parse_bc(raw: str | None, *, periodic: bool, spatial_dim: int) -> bool | list[bool]:
     """Parse --bc argument into periodic specification for CartesianGrid.
 
     Parameters
@@ -139,6 +209,11 @@ def _parse_bc(raw: str | None, periodic: bool, spatial_dim: int) -> bool | list[
     -------
     bool | list[bool]
         Single bool or per-axis list for CartesianGrid periodic parameter.
+
+    Raises
+    ------
+    ValueError
+        If BC count doesn't match dimension or BC type is unknown.
     """
     if raw is None:
         return periodic
@@ -146,7 +221,7 @@ def _parse_bc(raw: str | None, periodic: bool, spatial_dim: int) -> bool | list[
     bc_list = [b.strip().lower() for b in raw.split(",")]
 
     if len(bc_list) == 1:
-        bc_list = bc_list * spatial_dim
+        bc_list *= spatial_dim
     elif len(bc_list) != spatial_dim:
         msg = (
             f"--bc expects 1 or {spatial_dim} values "
@@ -168,13 +243,47 @@ def _build_grid(args: Namespace, spec: EquationSystem) -> CartesianGrid:
 
     shape = _parse_grid_shape(args.grid_shape, spec.spatial_dimension)
     bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
-    periodic = _parse_bc(args.bc, args.periodic, spec.spatial_dimension)
+    periodic = _parse_bc(args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension)
 
     return CartesianGrid(
         bounds=bounds,
         shape=shape,
         periodic=periodic,
     )
+
+
+def _apply_formula_ic(
+    args: Namespace,
+    grid: CartesianGrid,
+    spec: EquationSystem,
+    component: str,
+) -> FieldCollection:
+    """Apply formula-based initial condition.
+
+    Raises
+    ------
+    ValueError
+        If --ic-formula expression is not provided.
+    """
+    from torsion_gertsenshtein.symbolic import create_initial_state
+
+    if args.ic_formula is None:
+        msg = "--ic=formula requires --ic-formula=EXPR"
+        raise ValueError(msg)
+
+    coords = spec.spatial_coordinates
+    namespace = dict(_FORMULA_NAMESPACE)
+    for i, name in enumerate(coords):
+        namespace[name] = grid.cell_coords[..., i]
+
+    field_arr = eval(args.ic_formula, {"__builtins__": {}}, namespace)  # noqa: S307
+    field_arr = np.asarray(field_arr, dtype=float)
+
+    # Broadcast scalar results to grid shape
+    if field_arr.shape == ():
+        field_arr = np.full(grid.shape, float(field_arr))
+
+    return create_initial_state(grid, spec, field_data={component: field_arr})
 
 
 def _build_initial_state(
@@ -187,6 +296,11 @@ def _build_initial_state(
 
     Uses ``create_initial_state`` which respects ``state_layout`` for
     mixed time-order systems (constraint + dynamical fields).
+
+    Raises
+    ------
+    ValueError
+        If component name is unknown or IC type is invalid.
     """
     from torsion_gertsenshtein.symbolic import create_initial_state
     from torsion_gertsenshtein.vectorfield.initial_conditions import (
@@ -206,7 +320,9 @@ def _build_initial_state(
 
     if ic_type == "zero":
         if args.ic_component is not None:
-            print(f"  Note: --ic-component '{args.ic_component}' is ignored for zero IC")
+            print(
+                f"  Note: --ic-component '{args.ic_component}' is ignored for zero IC"
+            )
         return create_initial_state(grid, spec)
 
     if ic_type == "gaussian":
@@ -224,7 +340,7 @@ def _build_initial_state(
             active_components={component: 1.0},
         )
         # Use create_initial_state with field_data for layout-aware IC
-        field_arr = pulse._compute_gaussian(grid)  # noqa: SLF001
+        field_arr = pulse.compute_gaussian(grid)
         return create_initial_state(grid, spec, field_data={component: field_arr})
 
     if ic_type == "plane-wave":
@@ -244,31 +360,16 @@ def _build_initial_state(
             active_components={component: 1.0},
         )
         # Use create_initial_state for layout-aware IC
-        field_arr, momentum_arr = wave._compute_plane_wave(grid)  # noqa: SLF001
+        field_arr, momentum_arr = wave.compute_plane_wave(grid)
         return create_initial_state(
-            grid, spec,
+            grid,
+            spec,
             field_data={component: field_arr},
             momentum_data={component: momentum_arr},
         )
 
     if ic_type == "formula":
-        if args.ic_formula is None:
-            msg = "--ic=formula requires --ic-formula=EXPR"
-            raise ValueError(msg)
-
-        coords = spec.spatial_coordinates
-        namespace: dict[str, object] = {"np": np, "pi": np.pi}
-        for i, name in enumerate(coords):
-            namespace[name] = grid.cell_coords[..., i]
-
-        field_arr = eval(args.ic_formula, {"__builtins__": {}}, namespace)  # noqa: S307
-        field_arr = np.asarray(field_arr, dtype=float)
-
-        # Broadcast scalar results to grid shape
-        if field_arr.shape == ():
-            field_arr = np.full(grid.shape, float(field_arr))
-
-        return create_initial_state(grid, spec, field_data={component: field_arr})
+        return _apply_formula_ic(args, grid, spec, component)
 
     msg = f"Unknown IC type: {ic_type}"
     raise ValueError(msg)
@@ -289,22 +390,15 @@ def _infer_output_format(args: Namespace) -> str:
     return "png"
 
 
-def _generate_output(
-    args: Namespace,
-    spec: EquationSystem,
-    storage: MemoryStorage,
-    grid: CartesianGrid,
-    initial_state: FieldCollection,
-    params: dict[str, float],
-) -> None:
+def _generate_output(args: Namespace, ctx: _PlotContext) -> None:
     """Generate output based on format selection."""
     fmt = _infer_output_format(args)
 
-    final = cast("FieldCollection", storage[-1])
-    times = list(storage.times)
+    final = cast("FieldCollection", ctx.storage[-1])
+    times = list(ctx.storage.times)
 
     # Always print summary
-    _print_summary(spec, initial_state, final, times, params)
+    _print_summary(ctx.spec, ctx.initial_state, final, times, ctx.params)
 
     if fmt == "summary":
         return
@@ -319,9 +413,9 @@ def _generate_output(
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if fmt == "npz":
-        _save_npz(output_path, spec, storage, grid)
+        _save_npz(output_path, ctx.spec, ctx.storage)
     else:
-        _save_plot(output_path, spec, storage, grid, initial_state, params)
+        _save_plot(output_path, ctx)
 
 
 def _print_constraint_summary(
@@ -376,7 +470,6 @@ def _save_npz(
     path: Path,
     spec: EquationSystem,
     storage: MemoryStorage,
-    grid: CartesianGrid,
 ) -> None:
     """Save simulation data as .npz file."""
     times = np.array(storage.times)
@@ -389,59 +482,86 @@ def _save_npz(
             key = f"{name}_t{t_idx}"
             field_data[key] = snapshot[slots[name]].data
 
-    np.savez(path, **field_data)
+    np.savez(str(path), **field_data)  # type: ignore[reportArgumentType]
     print(f"  Saved data to: {path}")
 
 
-def _save_plot(
-    path: Path,
+def _save_constraint_output(
+    args: Namespace,
     spec: EquationSystem,
-    storage: MemoryStorage,
-    grid: CartesianGrid,
-    initial_state: FieldCollection,
-    params: dict[str, float],
+    state: FieldCollection,
 ) -> None:
+    """Save constraint-solve output to NPZ if requested."""
+    if args.no_plot or args.output is None:
+        return
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    if output_path.suffix == ".npz":
+        slots = _field_slots(spec)
+        field_data: dict[str, np.ndarray] = {}
+        for name in spec.component_names:
+            field_data[name] = state[slots[name]].data
+        np.savez(str(output_path), **field_data)  # type: ignore[reportArgumentType]
+        print(f"  Saved data to: {output_path}")
+
+
+def _save_plot(path: Path, ctx: _PlotContext) -> None:
     """Generate and save visualization."""
     import matplotlib as mpl
 
     mpl.use("Agg")
 
-    spatial_dim = spec.spatial_dimension
+    spatial_dim = ctx.spec.spatial_dimension
 
     if spatial_dim == 1:
-        _plot_1d(path, spec, storage, grid, initial_state, params)
-    elif spatial_dim == 2:
-        _plot_2d(path, spec, storage, grid, initial_state, params)
+        _plot_1d(path, ctx)
+    elif spatial_dim == _SPATIAL_DIM_2D:
+        _plot_2d(path, ctx)
     else:
-        _plot_3d(path, spec, storage, grid, initial_state, params)
+        _plot_3d(path, ctx)
 
 
-def _plot_1d(
-    path: Path,
-    spec: EquationSystem,
-    storage: MemoryStorage,
-    grid: CartesianGrid,
-    initial_state: FieldCollection,
-    params: dict[str, float],
+# --- Shared plot helpers ---
+
+
+def _plot_amplitude_decay(
+    ax: Axes,
+    ctx: _PlotContext,
+    slot: int,
+    name: str,
+    times: list[float],
 ) -> None:
+    """Plot peak amplitude decay over time (shared by 1D/2D/3D)."""
+    peaks = [float(np.max(np.abs(ctx.initial_state[slot].data)))]
+    for t_idx in range(len(ctx.storage)):
+        snap = cast("FieldCollection", ctx.storage[t_idx])
+        peaks.append(float(np.max(np.abs(snap[slot].data))))
+    ax.plot([0.0, *times], peaks, "b-", linewidth=2)
+    ax.set_xlabel("Time")
+    ax.set_ylabel(f"max |{name}|")
+    ax.set_title("Peak amplitude")
+    ax.grid(visible=True, alpha=0.3)
+
+
+def _plot_1d(path: Path, ctx: _PlotContext) -> None:
     """1D visualization: spacetime heatmap + amplitude decay."""
     import matplotlib.pyplot as plt
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    times = list(storage.times)
-    x_coords = cast("np.ndarray", grid.cell_coords[..., 0])
-    slots = _field_slots(spec)
-    name = spec.component_names[0]
+    times = list(ctx.storage.times)
+    x_coords = cast("np.ndarray", ctx.grid.cell_coords[..., 0])
+    slots = _field_slots(ctx.spec)
+    name = ctx.spec.component_names[0]
     slot = slots[name]
 
     # Panel 1: spacetime heatmap for first field
     ax = axes[0]
-    field_data = []
-    for t_idx in range(len(storage)):
-        snap = cast("FieldCollection", storage[t_idx])
-        field_data.append(snap[slot].data)
+    heatmap_data: list[np.ndarray] = []
+    for t_idx in range(len(ctx.storage)):
+        snap = cast("FieldCollection", ctx.storage[t_idx])
+        heatmap_data.append(snap[slot].data)
 
-    heatmap = np.array(field_data)
+    heatmap = np.array(heatmap_data)
     ax.imshow(
         heatmap,
         aspect="auto",
@@ -454,57 +574,41 @@ def _plot_1d(
     ax.set_title(f"{name} spacetime evolution")
 
     # Panel 2: amplitude decay
-    ax = axes[1]
-    peaks = [float(np.max(np.abs(initial_state[slot].data)))]
-    for t_idx in range(len(storage)):
-        snap = cast("FieldCollection", storage[t_idx])
-        peaks.append(float(np.max(np.abs(snap[slot].data))))
-    ax.plot([0.0, *times], peaks, "b-", linewidth=2)
-    ax.set_xlabel("Time")
-    ax.set_ylabel(f"max |{name}|")
-    ax.set_title("Peak amplitude")
-    ax.grid(visible=True, alpha=0.3)
+    _plot_amplitude_decay(axes[1], ctx, slot, name, times)
 
-    param_str = ", ".join(f"{k}={v}" for k, v in params.items())
+    param_str = ", ".join(f"{k}={v}" for k, v in ctx.params.items())
     fig.suptitle(
-        f"{spec.component_names[0]} ({param_str})"
-        if params
-        else spec.component_names[0]
+        f"{ctx.spec.component_names[0]} ({param_str})"
+        if ctx.params
+        else ctx.spec.component_names[0]
     )
     plt.tight_layout()
-    plt.savefig(path, dpi=150, bbox_inches="tight")
+    plt.savefig(path, dpi=_DPI, bbox_inches="tight")
     plt.close(fig)
     print(f"  Saved plot to: {path}")
 
 
-def _plot_2d(
-    path: Path,
-    spec: EquationSystem,
-    storage: MemoryStorage,
-    grid: CartesianGrid,
-    initial_state: FieldCollection,
-    params: dict[str, float],
-) -> None:
+def _plot_2d(path: Path, ctx: _PlotContext) -> None:
     """2D visualization: initial + final snapshots + amplitude decay."""
     import matplotlib.pyplot as plt
 
     fig, axes = plt.subplots(1, 3, figsize=(16, 5))
-    times = list(storage.times)
-    final = cast("FieldCollection", storage[-1])
-    slots = _field_slots(spec)
-    name = spec.component_names[0]
+    times = list(ctx.storage.times)
+    final = cast("FieldCollection", ctx.storage[-1])
+    slots = _field_slots(ctx.spec)
+    name = ctx.spec.component_names[0]
     slot = slots[name]
 
-    bounds = grid.axes_bounds
+    bounds = ctx.grid.axes_bounds
 
     # Panel 1: initial x-y
     ax = axes[0]
-    init_data = initial_state[slot].data
-    vmax = max(float(np.max(np.abs(init_data))), 0.01)
+    init_data = ctx.initial_state[slot].data
+    vmax = max(float(np.max(np.abs(init_data))), _VMAX_FLOOR)
     ax.imshow(
         init_data.T,
         origin="lower",
-        extent=[bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1]],
+        extent=(bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1]),
         cmap="RdBu_r",
         vmin=-vmax,
         vmax=vmax,
@@ -516,11 +620,11 @@ def _plot_2d(
     # Panel 2: final x-y
     ax = axes[1]
     final_data = final[slot].data
-    vmax_f = max(float(np.max(np.abs(final_data))), 0.01)
+    vmax_f = max(float(np.max(np.abs(final_data))), _VMAX_FLOOR)
     ax.imshow(
         final_data.T,
         origin="lower",
-        extent=[bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1]],
+        extent=(bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1]),
         cmap="RdBu_r",
         vmin=-vmax_f,
         vmax=vmax_f,
@@ -530,53 +634,33 @@ def _plot_2d(
     ax.set_ylabel("y")
 
     # Panel 3: amplitude decay
-    ax = axes[2]
-    peaks = [float(np.max(np.abs(initial_state[slot].data)))]
-    for t_idx in range(len(storage)):
-        snap = cast("FieldCollection", storage[t_idx])
-        peaks.append(float(np.max(np.abs(snap[slot].data))))
-    ax.plot([0.0, *times], peaks, "b-", linewidth=2)
-    ax.set_xlabel("Time")
-    ax.set_ylabel(f"max |{name}|")
-    ax.set_title("Peak amplitude")
-    ax.grid(visible=True, alpha=0.3)
+    _plot_amplitude_decay(axes[2], ctx, slot, name, times)
 
-    param_str = ", ".join(f"{k}={v}" for k, v in params.items())
-    fig.suptitle(f"{name} ({param_str})" if params else name)
+    param_str = ", ".join(f"{k}={v}" for k, v in ctx.params.items())
+    fig.suptitle(f"{name} ({param_str})" if ctx.params else name)
     plt.tight_layout()
-    plt.savefig(path, dpi=150, bbox_inches="tight")
+    plt.savefig(path, dpi=_DPI, bbox_inches="tight")
     plt.close(fig)
     print(f"  Saved plot to: {path}")
 
 
-def _plot_3d(
-    path: Path,
-    spec: EquationSystem,
-    storage: MemoryStorage,
-    grid: CartesianGrid,
-    initial_state: FieldCollection,
-    params: dict[str, float],
+# --- 3D plot sub-helpers ---
+
+
+def _plot_z_profile(
+    ax: Axes,
+    ctx: _PlotContext,
+    slot: int,
+    name: str,
+    times: list[float],
 ) -> None:
-    """3D visualization: z-profile + x-y slice + amplitude decay + component check."""
-    import matplotlib.pyplot as plt
+    """Plot z-profile at center of x-y plane."""
+    n = ctx.grid.shape[0]
+    ic = n // 2
+    z_1d = cast("np.ndarray", ctx.grid.cell_coords[ic, ic, :, 2])
+    final = cast("FieldCollection", ctx.storage[-1])
 
-    n = grid.shape[0]
-    ic = n // 2  # center indices
-    times = list(storage.times)
-    final = cast("FieldCollection", storage[-1])
-    slots = _field_slots(spec)
-    name = spec.component_names[0]
-    slot = slots[name]
-
-    z_1d = cast("np.ndarray", grid.cell_coords[ic, ic, :, 2])
-    bounds = grid.axes_bounds
-
-    n_panels = 4 if spec.n_components > 1 else 3
-    fig, axes = plt.subplots(1, n_panels, figsize=(5 * n_panels, 5))
-
-    # Panel 1: z-profile
-    ax = axes[0]
-    ax.plot(z_1d, initial_state[slot].data[ic, ic, :], "b-", linewidth=2, label="t=0")
+    ax.plot(z_1d, ctx.initial_state[slot].data[ic, ic, :], "b-", linewidth=2, label="t=0")
     ax.plot(
         z_1d, final[slot].data[ic, ic, :], "r-", linewidth=2, label=f"t={times[-1]:.1f}"
     )
@@ -586,14 +670,24 @@ def _plot_3d(
     ax.legend(fontsize=8)
     ax.grid(visible=True, alpha=0.3)
 
-    # Panel 2: x-y slice initial
-    ax = axes[1]
-    init_slice = initial_state[slot].data[:, :, ic]
-    vmax = max(float(np.max(np.abs(init_slice))), 0.01)
+
+def _plot_xy_slice(
+    ax: Axes,
+    ctx: _PlotContext,
+    slot: int,
+    name: str,
+) -> None:
+    """Plot x-y slice at z=center."""
+    n = ctx.grid.shape[0]
+    ic = n // 2
+    bounds = ctx.grid.axes_bounds
+
+    init_slice = ctx.initial_state[slot].data[:, :, ic]
+    vmax = max(float(np.max(np.abs(init_slice))), _VMAX_FLOOR)
     ax.imshow(
         init_slice.T,
         origin="lower",
-        extent=[bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1]],
+        extent=(bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1]),
         cmap="RdBu_r",
         vmin=-vmax,
         vmax=vmax,
@@ -602,49 +696,79 @@ def _plot_3d(
     ax.set_xlabel("x")
     ax.set_ylabel("y")
 
-    # Panel 3: amplitude decay
-    ax = axes[2]
-    peaks = [float(np.max(np.abs(initial_state[slot].data)))]
-    for t_idx in range(len(storage)):
-        snap = cast("FieldCollection", storage[t_idx])
-        peaks.append(float(np.max(np.abs(snap[slot].data))))
-    ax.plot([0.0, *times], peaks, "b-", linewidth=2)
+
+def _plot_component_independence(
+    ax: Axes,
+    ctx: _PlotContext,
+    slots: dict[str, int],
+    times: list[float],
+) -> None:
+    """Plot amplitude of other components over time."""
+    colors = ["red", "green", "purple", "orange", "brown"]
+    for i in range(1, ctx.spec.n_components):
+        comp_name = ctx.spec.component_names[i]
+        comp_slot = slots[comp_name]
+        comp_peaks = [0.0]
+        for t_idx in range(len(ctx.storage)):
+            snap = cast("FieldCollection", ctx.storage[t_idx])
+            comp_peaks.append(float(np.max(np.abs(snap[comp_slot].data))))
+        ax.plot(
+            [0.0, *times],
+            comp_peaks,
+            color=colors[(i - 1) % len(colors)],
+            linewidth=2,
+            label=comp_name,
+        )
     ax.set_xlabel("Time")
-    ax.set_ylabel(f"max |{name}|")
-    ax.set_title("Peak amplitude")
+    ax.set_ylabel("max |field|")
+    ax.set_title("Other components")
+    ax.legend(fontsize=8)
     ax.grid(visible=True, alpha=0.3)
+    ax.ticklabel_format(style="scientific", axis="y", scilimits=(0, 0))
+
+
+def _plot_3d(path: Path, ctx: _PlotContext) -> None:
+    """3D visualization: z-profile + x-y slice + amplitude decay + component check."""
+    import matplotlib.pyplot as plt
+
+    times = list(ctx.storage.times)
+    slots = _field_slots(ctx.spec)
+    name = ctx.spec.component_names[0]
+    slot = slots[name]
+
+    n_panels = 4 if ctx.spec.n_components > 1 else 3
+    fig, axes = plt.subplots(1, n_panels, figsize=(5 * n_panels, 5))
+
+    # Panel 1: z-profile
+    _plot_z_profile(axes[0], ctx, slot, name, times)
+
+    # Panel 2: x-y slice initial
+    _plot_xy_slice(axes[1], ctx, slot, name)
+
+    # Panel 3: amplitude decay
+    _plot_amplitude_decay(axes[2], ctx, slot, name, times)
 
     # Panel 4: component independence (multi-field only)
-    if spec.n_components > 1:
-        ax = axes[3]
-        colors = ["red", "green", "purple", "orange", "brown"]
-        for i in range(1, spec.n_components):
-            comp_name = spec.component_names[i]
-            comp_slot = slots[comp_name]
-            comp_peaks = [0.0]
-            for t_idx in range(len(storage)):
-                snap = cast("FieldCollection", storage[t_idx])
-                comp_peaks.append(float(np.max(np.abs(snap[comp_slot].data))))
-            ax.plot(
-                [0.0, *times],
-                comp_peaks,
-                color=colors[(i - 1) % len(colors)],
-                linewidth=2,
-                label=comp_name,
-            )
-        ax.set_xlabel("Time")
-        ax.set_ylabel("max |field|")
-        ax.set_title("Other components")
-        ax.legend(fontsize=8)
-        ax.grid(visible=True, alpha=0.3)
-        ax.ticklabel_format(style="scientific", axis="y", scilimits=(0, 0))
+    if ctx.spec.n_components > 1:
+        _plot_component_independence(axes[3], ctx, slots, times)
 
-    param_str = ", ".join(f"{k}={v}" for k, v in params.items())
-    fig.suptitle(f"{name} ({param_str})" if params else name)
+    param_str = ", ".join(f"{k}={v}" for k, v in ctx.params.items())
+    fig.suptitle(f"{name} ({param_str})" if ctx.params else name)
     plt.tight_layout()
-    plt.savefig(path, dpi=150, bbox_inches="tight")
+    plt.savefig(path, dpi=_DPI, bbox_inches="tight")
     plt.close(fig)
     print(f"  Saved plot to: {path}")
+
+
+# --- Command entry point ---
+
+
+def _check_cfl_stability(
+    pde: object, dt: float, grid: CartesianGrid
+) -> None:
+    """Print CFL stability warnings to stderr."""
+    warnings_list = cast("list[str]", pde.check_stability(dt, grid))  # type: ignore[attr-defined]
+    sys.stderr.writelines(f"  Warning: {w}\n" for w in warnings_list)
 
 
 def simulate_command(args: Namespace) -> int:
@@ -660,10 +784,7 @@ def simulate_command(args: Namespace) -> int:
     int
         Exit code.
     """
-    from pde import MemoryStorage
-
     from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
-    from torsion_gertsenshtein.utils import normalize_solve_result
 
     json_path = Path(args.json_path)
     if not json_path.exists():
@@ -688,73 +809,69 @@ def simulate_command(args: Namespace) -> int:
 
     # Step 4: Create grid
     grid = _build_grid(args, spec)
-    bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
     print(f"  Grid: {'x'.join(str(s) for s in grid.shape)}, bounds: {grid.axes_bounds}")
 
     # Step 5: Initial conditions
-    state = _build_initial_state(args, grid, spec, bounds)
+    state = _build_initial_state(
+        args, grid, spec, _parse_bounds(args.bounds, spec.spatial_dimension)
+    )
     initial_state = state.copy()
     print(f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}")
 
     # Constraint-only mode: single constraint solve, no time evolution
     if args.mode == "constraint":
         print("Solving constraints...")
-        pde.evolution_rate(state, t=0.0)
+        pde.evolution_rate(state, t=0.0)  # type: ignore[attr-defined]
         print("  Constraint solve complete.")
-
-        # Print result summary (no time evolution → no storage/snapshots)
         _print_constraint_summary(spec, initial_state, state, params)
-
-        if not args.no_plot and args.output is not None:
-            output_path = Path(args.output)
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            if output_path.suffix == ".npz":
-                slots = _field_slots(spec)
-                field_data: dict[str, np.ndarray] = {}
-                for name in spec.component_names:
-                    field_data[name] = state[slots[name]].data
-                np.savez(output_path, **field_data)
-                print(f"  Saved data to: {output_path}")
-
+        _save_constraint_output(args, spec, state)
         return 0
 
     # Step 6: Determine dt
+    from pde import MemoryStorage
+
+    from torsion_gertsenshtein.utils import normalize_solve_result
+
     dt = args.dt
     if dt is None:
         # Auto dt from grid spacing
-        dx = min(
+        dt = _CFL_FACTOR * min(
             (b[1] - b[0]) / s for b, s in zip(grid.axes_bounds, grid.shape, strict=True)
         )
-        dt = 0.5 * dx  # CFL-safe default
 
-    # CFL stability check
-    stability_warnings = pde.check_stability(dt, grid)
-    if stability_warnings:
-        import sys
-
-        for warning in stability_warnings:
-            print(f"  Warning: {warning}", file=sys.stderr)
-
-    snapshot_interval = (
-        args.snapshots if args.snapshots is not None else args.t_end / 20.0
-    )
+    _check_cfl_stability(pde, dt, grid)
 
     # Step 7: Run simulation
     print(
         f"Running simulation (t=0 → {args.t_end}, dt={dt:.4f}, scheme={args.scheme})..."
     )
     storage = MemoryStorage()
-    result = pde.solve(
-        state,
-        t_range=args.t_end,
-        dt=dt,
-        scheme=args.scheme,
-        tracker=storage.tracker(snapshot_interval),
+    tracker = storage.tracker(
+        args.snapshots if args.snapshots is not None else args.t_end / 20.0
     )
-    normalize_solve_result(result)
+    if args.scheme == "scipy":
+        # py-pde's ScipySolver is a separate solver class, not a scheme of ExplicitSolver
+        normalize_solve_result(
+            pde.solve(  # type: ignore[attr-defined]
+                state, t_range=args.t_end, dt=dt, solver="scipy", tracker=tracker,
+            )
+        )
+    else:
+        normalize_solve_result(
+            pde.solve(  # type: ignore[attr-defined]
+                state, t_range=args.t_end, dt=dt, scheme=args.scheme, tracker=tracker,
+            )
+        )
     print(f"  {len(storage)} snapshots stored")
 
     # Step 8: Output
-    _generate_output(args, spec, storage, grid, initial_state, params)
+    ctx = _PlotContext(
+        spec=spec,
+        storage=storage,
+        grid=grid,
+        initial_state=initial_state,
+        params=params,
+    )
+    _generate_output(args, ctx)
 
     return 0
