@@ -167,7 +167,10 @@ def _build_initial_state(
         return create_initial_state(grid, spec)
 
     if ic_type == "gaussian":
-        center = tuple((lo + hi) / 2.0 for lo, hi in bounds)
+        if args.ic_center is not None:
+            center = tuple(float(c) for c in args.ic_center.split(","))
+        else:
+            center = tuple((lo + hi) / 2.0 for lo, hi in bounds)
         domain_size = min(hi - lo for lo, hi in bounds)
         width = args.ic_width if args.ic_width is not None else domain_size / 10.0
 

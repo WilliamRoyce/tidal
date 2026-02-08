@@ -119,6 +119,10 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Initial condition type (default: gaussian)",
     )
     sim_parser.add_argument(
+        "--ic-center", default=None, metavar="X[,X,X]",
+        help="Gaussian center position (default: domain midpoint)",
+    )
+    sim_parser.add_argument(
         "--ic-width", type=float, default=None, metavar="W",
         help="Gaussian width (default: domain_size/10)",
     )
