@@ -13,12 +13,12 @@ The following versions of this project are currently supported with security upd
 
 This security policy covers:
 
-- **Python Package** (`torsion_gertsenshtein/`)
+- **Python Package** (`tidal/`)
   - PDE builders and simulation code
   - JSON parsing and validation
   - Initial condition generators
 
-- **Wolfram Scripts** (`torsion_gertsenshtein/wolfram/`, `*.wls`)
+- **Wolfram Scripts** (`tidal/wolfram/`, `*.wls`)
   - xAct/Mathematica symbolic computation pipeline
   - JSON export routines
 

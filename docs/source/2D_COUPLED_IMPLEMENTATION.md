@@ -10,7 +10,7 @@ Extend the Klein-Gordon simulation capability to support coupled multi-field sys
 
 #### New Initial Condition Builder: `multi_gaussian_2d`
 
-**Location**: [initial_conditions.py](torsion_gertsenshtein/kgsim/initial_conditions.py)
+**Location**: [initial_conditions.py](tidal/kgsim/initial_conditions.py)
 
 - Creates N-field coupled systems on 2D Cartesian grids
 - Supports spatially separated or overlapping Gaussian pulses
@@ -21,7 +21,7 @@ Extend the Klein-Gordon simulation capability to support coupled multi-field sys
 **Example Usage**:
 
 ```python
-from torsion_gertsenshtein.kgsim import make_grid, multi_gaussian_2d, GridConfig
+from tidal.kgsim import make_grid, multi_gaussian_2d, GridConfig
 
 grid = make_grid(GridConfig(
     dim=2,
@@ -41,7 +41,7 @@ state = multi_gaussian_2d(
 
 #### Enhanced Coordinate Handling
 
-**Location**: [initial_conditions.py](torsion_gertsenshtein/kgsim/initial_conditions.py)
+**Location**: [initial_conditions.py](tidal/kgsim/initial_conditions.py)
 
 Updated `gaussian_pulse` to automatically detect and handle different coordinate array formats:
 
@@ -199,7 +199,7 @@ The architecture supports future extensions:
 - **Solver**: Explicit RK4 with adaptive timestepping works well for moderate-sized grids
 - **Bottleneck**: Laplacian computation (py-pde optimized, but 2D is inherently more expensive)
 
-## Implications for Torsion-Gertsenshtein Project
+## Implications for TIDAL Project
 
 ### 1. Scalar Field Sandbox
 

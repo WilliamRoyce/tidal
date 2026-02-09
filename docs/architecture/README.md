@@ -1,6 +1,6 @@
 # Architecture
 
-Visual guide to the Torsion-Gertsenshtein Lagrangian-to-PDE pipeline.
+Visual guide to the TIDAL Lagrangian-to-PDE pipeline.
 All PDEs derive from a Lagrangian via symbolic computation — no physics is hardcoded in Python.
 
 ---
@@ -64,7 +64,7 @@ flowchart LR
 
 ```mermaid
 flowchart TD
-    subgraph pkg["torsion_gertsenshtein"]
+    subgraph pkg["tidal"]
         init["__init__.py"]
 
         subgraph sym["symbolic/"]

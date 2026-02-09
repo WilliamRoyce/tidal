@@ -24,8 +24,8 @@ To enable TeX installation in the development container:
 The plotting functionality automatically falls back to standard matplotlib when TeX is not available:
 
 ```python
-from torsion_gertsenshtein import has_tex_support
-from torsion_gertsenshtein.plot_pgf import enable_pgf
+from tidal import has_tex_support
+from tidal.plot_pgf import enable_pgf
 
 # This will work with or without TeX
 enable_pgf("xelatex")  # Automatically falls back if TeX unavailable

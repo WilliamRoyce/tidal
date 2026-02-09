@@ -162,7 +162,7 @@ python scripts/bump_version.py 0.3.0 --allow-dirty
 
 The script updates version numbers in:
 - `pyproject.toml` - Package version metadata
-- `torsion_gertsenshtein/__init__.py` - Python module `__version__`
+- `tidal/__init__.py` - Python module `__version__`
 - `CITATION.cff` - Citation metadata (version + release date)
 - `uv.lock` - Regenerated via `uv lock` command
 

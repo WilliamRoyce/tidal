@@ -1,4 +1,4 @@
-# Project Memory: Torsion-Gertsenshtein Lagrangian-to-PDE Pipeline
+# Project Memory: TIDAL Lagrangian-to-PDE Pipeline
 
 ## Document Maintenance
 
@@ -65,17 +65,17 @@ This project implements a symbolic physics pipeline: Lagrangian (xAct/Mathematic
 3. **Parenthesize multi-line expressions** in .wls: `L = (term1 + term2);`
 4. **Expand field strength before decompose:** `L = -1/2 CD[-a][A[-b]] ...` (not via F substitution)
 
-## CLI (`tg` Command)
+## CLI (`tidal` Command)
 
-The `tg` CLI provides 5 subcommands with zero new dependencies:
+The `tidal` CLI provides 5 subcommands with zero new dependencies:
 
 | Command | Description |
 |---------|-------------|
-| `tg derive theory.toml` | Generate .wls from TOML, run wolframscript |
-| `tg simulate spec.json` | Full simulation with smart defaults |
-| `tg inspect spec.json` | Display equation system info |
-| `tg list` | Discover available JSON specs |
-| `tg validate spec.json` | Validate JSON spec structure |
+| `tidal derive theory.toml` | Generate .wls from TOML, run wolframscript |
+| `tidal simulate spec.json` | Full simulation with smart defaults |
+| `tidal inspect spec.json` | Display equation system info |
+| `tidal list` | Discover available JSON specs |
+| `tidal validate spec.json` | Validate JSON spec structure |
 
 **TOML Configuration:**
 - `theory.toml` with spacetime, fields, constants, Lagrangian, parameters
@@ -156,9 +156,9 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 ## Quick Reference
 
 ### File Locations
-- Wolfram modules: `torsion_gertsenshtein/wolfram/`
-- Python pipeline: `torsion_gertsenshtein/symbolic/`
-- CLI: `torsion_gertsenshtein/cli/`
+- Wolfram modules: `tidal/wolfram/`
+- Python pipeline: `tidal/symbolic/`
+- CLI: `tidal/cli/`
 - Examples: `examples/{name}/`, JSON: `examples/data/*.json`
 
 ### Key Functions (Wolfram)

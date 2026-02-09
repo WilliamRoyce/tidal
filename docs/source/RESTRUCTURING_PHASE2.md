@@ -523,14 +523,14 @@ If importing from main package (recommended):
 
 ```python
 # Already works
-from torsion_gertsenshtein.kgsim import AnimationBuilder, AnimationConfig
+from tidal.kgsim import AnimationBuilder, AnimationConfig
 ```
 
 If importing directly (still works):
 
 ```python
 # Also still works
-from torsion_gertsenshtein.kgsim.animation_builder import AnimationBuilder
+from tidal.kgsim.animation_builder import AnimationBuilder
 ```
 
 ### For Contributors
@@ -622,7 +622,7 @@ def setup_grid(periodic: bool = False):
 
 ## 9. Files Modified
 
-### Core Library Files (torsion_gertsenshtein/kgsim/)
+### Core Library Files (tidal/kgsim/)
 
 #### animation_builder.py
 

@@ -10,7 +10,7 @@ assignees: ''
 A clear and concise description of the bug.
 
 ## Location
-**Files affected:** (e.g., `torsion_gertsenshtein/symbolic/pde_builder.py:123`)
+**Files affected:** (e.g., `tidal/symbolic/pde_builder.py:123`)
 
 ## Steps to Reproduce
 1.

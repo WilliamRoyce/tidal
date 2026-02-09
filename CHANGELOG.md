@@ -28,7 +28,7 @@
 
 ---
 
-## CLI (`tg` Command) Implementation (February 2026)
+## CLI (`tidal` Command) Implementation (February 2026)
 
 **Status:** ✅ COMPLETE
 
@@ -36,11 +36,11 @@
 
 **Subcommands:**
 
-- `tg derive theory.toml` — Generate .wls from TOML config, run wolframscript to produce JSON
-- `tg simulate spec.json` — Full simulation with smart defaults, plotting, and parameter override
-- `tg inspect spec.json` — Display equation system info (fields, operators, parameters)
-- `tg list` — Discover available JSON specs in examples/data/
-- `tg validate spec.json` — Validate JSON equation specification structure
+- `tidal derive theory.toml` — Generate .wls from TOML config, run wolframscript to produce JSON
+- `tidal simulate spec.json` — Full simulation with smart defaults, plotting, and parameter override
+- `tidal inspect spec.json` — Display equation system info (fields, operators, parameters)
+- `tidal list` — Discover available JSON specs in examples/data/
+- `tidal validate spec.json` — Validate JSON equation specification structure
 
 **Key Features:**
 
@@ -62,7 +62,7 @@
 
 **Files Created:**
 
-- `torsion_gertsenshtein/cli/` — 8 modules (**init**, **main**, \_derive, \_simulate, \_inspect, \_list, \_plot, \_validate)
+- `tidal/cli/` — 8 modules (**init**, **main**, \_derive, \_simulate, \_inspect, \_list, \_plot, \_validate)
 - `tests/test_cli.py` + `tests/test_cli_parsing.py` — 147 CLI tests
 - 14 `theory.toml` files across examples
 
@@ -510,7 +510,7 @@ DefMetric[-1, elTestEta[-a, -b], elTestCD, SymbolOfCovD -> {";", "D"}, PrintAs -
 
 **2. Enhanced ExtractNumericCoefficient**
 
-**File:** [torsion_gertsenshtein/wolfram/CommonUtilities.wl](torsion_gertsenshtein/wolfram/CommonUtilities.wl:380-383)
+**File:** [tidal/wolfram/CommonUtilities.wl](tidal/wolfram/CommonUtilities.wl:380-383)
 
 ```mathematica
 (* Added patterns for xAct tensor forms *)
@@ -522,7 +522,7 @@ f_[_] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,  (* Vector: A[-
 
 **3. Fixed IsCovDOperator for Applied Forms**
 
-**File:** [torsion_gertsenshtein/wolfram/CommonUtilities.wl](torsion_gertsenshtein/wolfram/CommonUtilities.wl:139-150)
+**File:** [tidal/wolfram/CommonUtilities.wl](tidal/wolfram/CommonUtilities.wl:139-150)
 
 ```mathematica
 IsCovDOperator[expr_] := Quiet[
@@ -696,7 +696,7 @@ All Wolfram modules now have comprehensive header comments with MODULE, PURPOSE,
 
 Added `::usage` strings for 3 private helper functions in Linearize.wl for completeness.
 
-**File:** [torsion_gertsenshtein/wolfram/Linearize.wl](torsion_gertsenshtein/wolfram/Linearize.wl:48-60)
+**File:** [tidal/wolfram/Linearize.wl](tidal/wolfram/Linearize.wl:48-60)
 
 ```mathematica
 SelectLinearTerms::usage =
@@ -784,8 +784,8 @@ With `set -e`, the first form causes premature exit.
 
 | File                                               | Changes                                               |
 | -------------------------------------------------- | ----------------------------------------------------- |
-| `torsion_gertsenshtein/wolfram/CommonUtilities.wl` | Enhanced coefficient extraction, fixed IsCovDOperator |
-| `torsion_gertsenshtein/wolfram/Linearize.wl`       | Added 3 private helper usage strings                  |
+| `tidal/wolfram/CommonUtilities.wl` | Enhanced coefficient extraction, fixed IsCovDOperator |
+| `tidal/wolfram/Linearize.wl`       | Added 3 private helper usage strings                  |
 | `tests/wolfram/test_euler_lagrange.wls`            | Fixed DefMetric syntax                                |
 | `tests/wolfram/test_common_utilities.wls`          | Verified with fixed utilities                         |
 | `tests/wolfram/test_export_json.wls`               | Verified with fixed patterns                          |
@@ -859,7 +859,7 @@ Component decomposition was producing incorrect operator identification:
 
 #### Solution 1: Free Index Detection
 
-**File:** [torsion_gertsenshtein/wolfram/ComponentDecompose.wl](torsion_gertsenshtein/wolfram/ComponentDecompose.wl:68-87)
+**File:** [tidal/wolfram/ComponentDecompose.wl](tidal/wolfram/ComponentDecompose.wl:68-87)
 
 Fixed `ExtractVectorComponent` to use `IndicesOf[]` for proper free index detection:
 
@@ -885,7 +885,7 @@ Module[{allIndices, freeIndices},
 
 #### Solution 2: Context-Independent Pattern Matching
 
-**File:** [torsion_gertsenshtein/wolfram/ComponentDecompose.wl](torsion_gertsenshtein/wolfram/ComponentDecompose.wl:125-127)
+**File:** [tidal/wolfram/ComponentDecompose.wl](tidal/wolfram/ComponentDecompose.wl:125-127)
 
 Added context-independent covariant derivative detection:
 
@@ -903,7 +903,7 @@ componentEq = componentEq /. expr_ /; isCDlike[expr] &&
 
 #### Solution 3: Operator Identification Fixes
 
-**File:** [torsion_gertsenshtein/wolfram/ExportJSON.wl](torsion_gertsenshtein/wolfram/ExportJSON.wl:86-112)
+**File:** [tidal/wolfram/ExportJSON.wl](tidal/wolfram/ExportJSON.wl:86-112)
 
 Fixed RHS extraction to properly separate time derivatives from spatial operators:
 
@@ -936,7 +936,7 @@ EquationToJSON[componentEq_, fieldName_, fieldIndex_, metadata_] := Module[
 
 #### Solution 4: Derivative Order Counting
 
-**File:** [torsion_gertsenshtein/wolfram/ExportJSON.wl](torsion_gertsenshtein/wolfram/ExportJSON.wl:249-270)
+**File:** [tidal/wolfram/ExportJSON.wl](tidal/wolfram/ExportJSON.wl:249-270)
 
 Fixed `CountDerivativeOrder` to recognize applied derivatives:
 
@@ -992,8 +992,8 @@ CountDerivativeOrder[term_] := Module[{maxOrder},
 
 **Moved Files:**
 
-- `torsion_gertsenshtein/wolfram/examples/em_lagrangian_1d.wls` → [examples/electromagnetic/em_lagrangian_1d.wls](examples/electromagnetic/em_lagrangian_1d.wls)
-- `torsion_gertsenshtein/wolfram/examples/klein_gordon.wls` → [examples/scalar_field/klein_gordon.wls](examples/scalar_field/klein_gordon.wls)
+- `tidal/wolfram/examples/em_lagrangian_1d.wls` → [examples/electromagnetic/em_lagrangian_1d.wls](examples/electromagnetic/em_lagrangian_1d.wls)
+- `tidal/wolfram/examples/klein_gordon.wls` → [examples/scalar_field/klein_gordon.wls](examples/scalar_field/klein_gordon.wls)
 
 **Rationale:**
 
@@ -1106,7 +1106,7 @@ Klein-Gordon JSON (has mass term):
 
 #### Evidence 1: Python PDE Builder
 
-**File:** [torsion_gertsenshtein/symbolic/pde_builder.py](torsion_gertsenshtein/symbolic/pde_builder.py:evolution_rate)
+**File:** [tidal/symbolic/pde_builder.py](tidal/symbolic/pde_builder.py:evolution_rate)
 
 ```python
 class PDEFromSpec(PDEBase):
@@ -1400,9 +1400,9 @@ First index is time, second is space. To extract RHS:
 
 #### Python Library (No Changes Needed)
 
-- `torsion_gertsenshtein/symbolic/json_loader.py` - Already correct
-- `torsion_gertsenshtein/symbolic/pde_builder.py` - Already correct
-- `torsion_gertsenshtein/vectorfield/initial_conditions.py` - Already correct
+- `tidal/symbolic/json_loader.py` - Already correct
+- `tidal/symbolic/pde_builder.py` - Already correct
+- `tidal/vectorfield/initial_conditions.py` - Already correct
 
 **Key Point:** Python layer required zero changes. The fixes were entirely in the Mathematica symbolic layer and example scripts.
 
@@ -1487,7 +1487,7 @@ diff <(jq '.equations[0].rhs.terms' examples/data/em_1d.json) \
      <(jq '.equations[0].rhs.terms' examples/data/klein_gordon_1d.json)
 
 # Read PDE builder source to verify dynamic operator dispatch
-grep -A 10 "for term in eq.rhs_terms" torsion_gertsenshtein/symbolic/pde_builder.py
+grep -A 10 "for term in eq.rhs_terms" tidal/symbolic/pde_builder.py
 ```
 
 ---
@@ -1615,7 +1615,7 @@ This section covers the earlier Klein-Gordon simulator improvements focusing on 
 
 ### Path Traversal Protection
 
-**File:** `torsion_gertsenshtein/kgsim/animation_builder.py`
+**File:** `tidal/kgsim/animation_builder.py`
 
 Added validation in `AnimationConfig.__post_init__()` to prevent directory traversal attacks:
 
@@ -1634,7 +1634,7 @@ def __post_init__(self) -> None:
 
 ### 1. Grid Bounds Validation
 
-**File:** `torsion_gertsenshtein/kgsim/config.py`
+**File:** `tidal/kgsim/config.py`
 
 Added validation to ensure grid bounds are properly ordered:
 
@@ -1649,7 +1649,7 @@ for i, (lower, upper) in enumerate(self.bounds):
 
 ### 2. Division by Zero Fix
 
-**File:** `torsion_gertsenshtein/kgsim/animation_builder.py`
+**File:** `tidal/kgsim/animation_builder.py`
 
 Fixed potential division by zero in `_choose_writer()` when `t_end=0`:
 
@@ -1665,7 +1665,7 @@ if fps is None:
 
 ### 3. Storage Bounds Check
 
-**File:** `torsion_gertsenshtein/kgsim/animation_builder.py`
+**File:** `tidal/kgsim/animation_builder.py`
 
 Added validation before accessing animation storage:
 
@@ -1680,7 +1680,7 @@ if len(self.storage) == 0:
 
 ### 4. Center Parameter Defensive Copying
 
-**File:** `torsion_gertsenshtein/kgsim/initial_conditions.py`
+**File:** `tidal/kgsim/initial_conditions.py`
 
 Fixed mutation bug by creating defensive copies of the center parameter:
 
@@ -1698,7 +1698,7 @@ else:
 
 ### 5. Validation Order Fix
 
-**File:** `torsion_gertsenshtein/kgsim/initial_conditions.py`
+**File:** `tidal/kgsim/initial_conditions.py`
 
 Fixed validation to check for finite values before range checks:
 
@@ -1720,7 +1720,7 @@ if amplitude <= 0:
 
 ### Array Access Caching
 
-**File:** `torsion_gertsenshtein/kgsim/animation_builder.py`
+**File:** `tidal/kgsim/animation_builder.py`
 
 Optimized `create_2d_heatmap_animation()` by caching array extraction:
 
@@ -1747,7 +1747,7 @@ first_frame = all_data[0]
 
 ### 1. Magic Number Extraction
 
-**File:** `torsion_gertsenshtein/kgsim/animation_builder.py`
+**File:** `tidal/kgsim/animation_builder.py`
 
 Extracted magic numbers to named constants:
 
@@ -1761,7 +1761,7 @@ VIDEO_BITRATE = 2000  # Bitrate for FFMpeg encoding
 
 ### 2. Consistent Storage Naming
 
-**File:** `torsion_gertsenshtein/kgsim/initial_conditions.py`
+**File:** `tidal/kgsim/initial_conditions.py`
 
 Unified internal storage naming across classes:
 
@@ -1773,7 +1773,7 @@ Unified internal storage naming across classes:
 
 ### 3. Dead Code Removal
 
-**File:** `torsion_gertsenshtein/kgsim/initial_conditions.py`
+**File:** `tidal/kgsim/initial_conditions.py`
 
 Removed unused `_compute_radial_coordinates()` method (18 lines) that became obsolete after refactoring.
 
@@ -1885,7 +1885,7 @@ Added proper type annotations and type narrowing throughout:
 
 ### Grid Coordinate Extraction
 
-**File:** `torsion_gertsenshtein/kgsim/utils.py`
+**File:** `tidal/kgsim/utils.py`
 
 Added `extract_grid_coordinates()` helper function for py-pde version compatibility:
 
@@ -1900,7 +1900,7 @@ def extract_grid_coordinates(
 
 ### Boundary Condition Simplification
 
-**File:** `torsion_gertsenshtein/kgsim/utils.py`
+**File:** `tidal/kgsim/utils.py`
 
 Simplified if-else logic to ternary operator:
 
@@ -1980,10 +1980,10 @@ width = ic.width  # Consistent with GaussianPulse
 
 ### Core Changes
 
-- `torsion_gertsenshtein/kgsim/animation_builder.py`
-- `torsion_gertsenshtein/kgsim/initial_conditions.py`
-- `torsion_gertsenshtein/kgsim/config.py`
-- `torsion_gertsenshtein/kgsim/utils.py`
+- `tidal/kgsim/animation_builder.py`
+- `tidal/kgsim/initial_conditions.py`
+- `tidal/kgsim/config.py`
+- `tidal/kgsim/utils.py`
 
 ### Tests
 

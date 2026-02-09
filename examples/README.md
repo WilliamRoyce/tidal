@@ -16,23 +16,23 @@ JSON → Dynamic PDE construction → Simulation → Visualization
 
 ### CLI Workflow (Recommended)
 
-The `tg` command provides a unified interface for both stages:
+The `tidal` command provides a unified interface for both stages:
 
 ```bash
 # Derive equations from a TOML configuration
-tg derive examples/scalar_field/theory.toml
+tidal derive examples/scalar_field/theory.toml
 
 # Inspect the resulting equation system
-tg inspect examples/data/klein_gordon_1d.json
+tidal inspect examples/data/klein_gordon_1d.json
 
 # Run simulation with parameter override
-tg simulate examples/data/klein_gordon_1d.json --param m2=1.0 --ic gaussian --t-end 20
+tidal simulate examples/data/klein_gordon_1d.json --param m2=1.0 --ic gaussian --t-end 20
 
 # Discover all available JSON specs
-tg list
+tidal list
 
 # Validate a JSON spec
-tg validate examples/data/klein_gordon_1d.json
+tidal validate examples/data/klein_gordon_1d.json
 ```
 
 Each example also has a `run.sh` script demonstrating the equivalent CLI workflow.
@@ -263,7 +263,7 @@ python examples/scalar_field_3d/kg_3d_simulation.py
 **Lagrangian**: `L = -1/4 F_ab F^ab - 1/2 m² A_a A^a`
 
 ```bash
-tg derive examples/proca/theory.toml
+tidal derive examples/proca/theory.toml
 uv run python examples/proca/proca_simulation.py
 ```
 
@@ -276,7 +276,7 @@ uv run python examples/proca/proca_simulation.py
 **Lagrangian**: `L = 1/2(∂φ)² - 1/2 m_φ² φ² + 1/2(∂χ)² - 1/2 m_χ² χ² - g φ χ`
 
 ```bash
-tg derive examples/coupled_scalars/theory.toml
+tidal derive examples/coupled_scalars/theory.toml
 uv run python examples/coupled_scalars/coupled_from_lagrangian.py
 ```
 
@@ -289,7 +289,7 @@ uv run python examples/coupled_scalars/coupled_from_lagrangian.py
 **Lagrangian**: `L = -1/4 F_ab F^ab + (kappa/2) epsilon^abc A_a ∂_b A_c`
 
 ```bash
-tg derive examples/chern_simons/theory.toml
+tidal derive examples/chern_simons/theory.toml
 uv run python examples/chern_simons/chern_simons_simulation.py
 ```
 
@@ -328,7 +328,7 @@ uv run python examples/curved_spacetime/curved_spacetime_simulation.py
 **Lagrangian**: KG scalar on S² (stereographic projection)
 
 ```bash
-tg derive examples/sphere_kg/theory.toml
+tidal derive examples/sphere_kg/theory.toml
 uv run python examples/sphere_kg/sphere_kg_simulation.py
 ```
 
@@ -367,7 +367,7 @@ uv run python examples/gravitational_waves/gw_simulation.py
 **Lagrangian**: Rank-3 antisymmetric tensor with mass term
 
 ```bash
-tg derive examples/massive_3form/theory.toml
+tidal derive examples/massive_3form/theory.toml
 ```
 
 **Key features**: Rank-3 antisymmetric tensor, symmetry reduction (64 → 4 independent components), KG equation per component, `DefConstantSymbol` for mass.
@@ -379,7 +379,7 @@ tg derive examples/massive_3form/theory.toml
 **Lagrangian**: `L = KG(φ) + Maxwell(A) + Proca(A) + CS(A) + gSV φ ∂_a A^a`
 
 ```bash
-tg derive examples/scalar_vector_coupling/theory.toml
+tidal derive examples/scalar_vector_coupling/theory.toml
 uv run python examples/scalar_vector_coupling/scalar_vector_coupling_simulation.py
 ```
 
@@ -420,7 +420,7 @@ Run the full validation suite:
 cd /workspaces/torsion-gertsenshtein
 
 # Validate all JSON specs with the CLI
-tg validate examples/data/klein_gordon_1d.json
+tidal validate examples/data/klein_gordon_1d.json
 
 # Or use the legacy validation script
 python validate_implementation.py
@@ -468,8 +468,8 @@ path = "../data/my_field.json"
 Then derive and simulate:
 
 ```bash
-tg derive examples/new_field/theory.toml
-tg simulate examples/data/my_field.json --param m2=1.0 --ic gaussian
+tidal derive examples/new_field/theory.toml
+tidal simulate examples/data/my_field.json --param m2=1.0 --ic gaussian
 ```
 
 For intermediate tensors (e.g., field strength), use `[[derived_fields]]`:
@@ -559,7 +559,7 @@ examples/
 **Python** (Stage 2):
 - py-pde ≥ 0.38
 - numpy, matplotlib
-- torsion_gertsenshtein package
+- tidal package
 
 ---
 

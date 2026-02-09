@@ -211,7 +211,7 @@ result = pde.solve(
 
 ### AnisotropicKGPDE Implementation
 
-**File**: `torsion_gertsenshtein/kgsim/advanced_equations.py` (lines 48-221)
+**File**: `tidal/kgsim/advanced_equations.py` (lines 48-221)
 
 ```python
 class AnisotropicKGPDE(PDEBase):
@@ -274,7 +274,7 @@ def evolution_rate(self, state: FieldBase, t: float = 0.0) -> FieldCollection:
 
 ### HigherOrderKGPDE Implementation
 
-**File**: `torsion_gertsenshtein/kgsim/advanced_equations.py` (lines 223-389)
+**File**: `tidal/kgsim/advanced_equations.py` (lines 223-389)
 
 ```python
 class HigherOrderKGPDE(PDEBase):
@@ -333,7 +333,7 @@ def evolution_rate(self, state: FieldBase, t: float = 0.0) -> FieldCollection:
 
 ### DirectionalKGPDE Implementation
 
-**File**: `torsion_gertsenshtein/kgsim/advanced_equations.py` (lines 391-560)
+**File**: `tidal/kgsim/advanced_equations.py` (lines 391-560)
 
 ```python
 class DirectionalKGPDE(PDEBase):
@@ -387,7 +387,7 @@ def evolution_rate(self, state: FieldBase, t: float = 0.0) -> FieldCollection:
 
 ### AnisotropicHigherOrderKGPDE Implementation
 
-**File**: `torsion_gertsenshtein/kgsim/advanced_equations.py` (lines 562-707)
+**File**: `tidal/kgsim/advanced_equations.py` (lines 562-707)
 
 This combines anisotropic speeds with fourth-order dispersion:
 
@@ -599,9 +599,9 @@ Output: PDF with two panels showing $\phi(x,t)$ for both cases, enabling direct 
 Demonstrates elliptical wavefront expansion:
 
 ```python
-from torsion_gertsenshtein.kgsim import GridConfig, SimulationConfig, gaussian_pulse, make_grid, run
-from torsion_gertsenshtein.kgsim.advanced_equations import AnisotropicKGPDE
-from torsion_gertsenshtein.kgsim.animations import create_2d_heatmap_animation
+from tidal.kgsim import GridConfig, SimulationConfig, gaussian_pulse, make_grid, run
+from tidal.kgsim.advanced_equations import AnisotropicKGPDE
+from tidal.kgsim.animations import create_2d_heatmap_animation
 
 # Setup
 grid_config = GridConfig(dim=2, shape=(256, 256), bounds=((0, 200), (0, 200)), periodic=True)
@@ -628,7 +628,7 @@ create_2d_heatmap_animation(snapshots, grid, "outputs/anisotropic_2d_pulse.mp4")
 Compares standard vs. fourth-order dispersion:
 
 ```python
-from torsion_gertsenshtein.kgsim.advanced_equations import HigherOrderKGPDE
+from tidal.kgsim.advanced_equations import HigherOrderKGPDE
 
 # Standard Klein-Gordon
 pde_standard = HigherOrderKGPDE(mass=0.5, alpha_2=1.0, alpha_4=0.0)
@@ -647,7 +647,7 @@ create_spacetime_plot_adjacent(combined_snapshots, grid, "outputs/comparison.pdf
 ### Example 3: Directional Evolution
 
 ```python
-from torsion_gertsenshtein.kgsim.advanced_equations import DirectionalKGPDE
+from tidal.kgsim.advanced_equations import DirectionalKGPDE
 
 # 2D grid but only evolve in x-direction
 pde = DirectionalKGPDE(mass=0.5, active_directions=[0])
@@ -658,7 +658,7 @@ This models a quasi-1D system on a 2D computational domain.
 ### Example 4: Combined Anisotropic + Higher-Order
 
 ```python
-from torsion_gertsenshtein.kgsim.advanced_equations import AnisotropicHigherOrderKGPDE
+from tidal.kgsim.advanced_equations import AnisotropicHigherOrderKGPDE
 
 # Anisotropic speeds + fourth-order dispersion
 pde = AnisotropicHigherOrderKGPDE(
@@ -700,9 +700,9 @@ Combines directional speed variation with dispersive corrections.
 
 ### Implementation Files
 
-- `torsion_gertsenshtein/kgsim/advanced_equations.py`: All four PDE classes (915 lines, including numba methods)
-- `torsion_gertsenshtein/kgsim/utils.py`: Boundary condition inference
-- `torsion_gertsenshtein/kgsim/animations.py`: Visualization utilities with centered colormaps
+- `tidal/kgsim/advanced_equations.py`: All four PDE classes (915 lines, including numba methods)
+- `tidal/kgsim/utils.py`: Boundary condition inference
+- `tidal/kgsim/animations.py`: Visualization utilities with centered colormaps
 - `examples/klein_gordon/anisotropic_2d_pulse.py`: 2D anisotropic demonstration
 - `examples/klein_gordon/higher_order_dispersion.py`: Higher-order comparison plot
 - `tests/test_advanced_equations.py`: Comprehensive test suite (17 tests, all passing)
@@ -774,8 +774,8 @@ Comprehensive benchmarks comparing numpy vs numba backends (Intel/AMD 64-bit, Ja
 Simply specify `backend="numba"` in `SimulationConfig`:
 
 ```python
-from torsion_gertsenshtein.kgsim.config import SimulationConfig
-from torsion_gertsenshtein.kgsim.runners import run
+from tidal.kgsim.config import SimulationConfig
+from tidal.kgsim.runners import run
 
 config = SimulationConfig(
     t_end=100.0,
