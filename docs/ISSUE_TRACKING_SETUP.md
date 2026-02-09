@@ -4,8 +4,10 @@ This document explains the issue tracking system created for the TIDAL project b
 
 ## Overview
 
+> **Update (v0.3.1):** Since this document was created, 17 of 25 identified issues have been resolved. Phases 1, 3, and most of Phase 4 are complete. The project has also been renamed to TIDAL, gained a CLI tool, professional branding, and 743 Python tests. See [ROADMAP.md](ROADMAP.md) for current status of all issues.
+
 **Date Created:** February 2026
-**Total Issues Identified:** 25
+**Total Issues Identified:** 25 (17 resolved, 8 remaining)
 **Source:** Comprehensive exploration of Wolfram pipeline, Python simulation code, tests, examples, documentation, and CI/CD infrastructure
 
 ## What Was Created
@@ -36,46 +38,46 @@ Python script containing all 25 identified issues, ready to be created on GitHub
 
 ## Issue Summary by Priority
 
-### 🔴 Critical (6 issues)
+### 🔴 Critical (6 issues) — 4 resolved
 **Security, correctness, or major user impact**
 
-1. Replace Assertions with Explicit Error Handling
-2. Strengthen Mathematica Expression Evaluation Security
-3. Add Wolfram Tests to GitHub Actions CI
-4. Support Rank-3+ Tensor Decomposition
-5. Add 3+1D Spacetime Examples
-6. Implement Automatic Gauge Fixing
+1. ✅ Replace Assertions with Explicit Error Handling
+2. ✅ Strengthen Mathematica Expression Evaluation Security
+3. 🔄 Add Wolfram Tests to GitHub Actions CI
+4. ✅ Support Rank-3+ Tensor Decomposition
+5. ✅ Add 3+1D Spacetime Examples
+6. 🔄 Implement Automatic Gauge Fixing
 
-### 🟠 High Priority (5 issues)
+### 🟠 High Priority (5 issues) — 3 resolved
 **Important features or significant gaps**
 
-7. Add Animation Module Test Coverage
-8. Add Code Coverage Reporting to CI
-9. Validate Grid Dimensions During PDE Construction
-10. Improve Coefficient Resolution Performance
-11. Document JSON Schema with Detailed Guide
+7. 🔄 Add Animation Module Test Coverage
+8. ⚡ Add Code Coverage Reporting to CI (partial: runs in CI, codecov.io pending)
+9. ✅ Validate Grid Dimensions During PDE Construction
+10. ✅ Improve Coefficient Resolution Performance
+11. ✅ Document JSON Schema with Detailed Guide
 
-### 🟡 Medium Priority (7 issues)
+### 🟡 Medium Priority (7 issues) — 4 resolved
 **Improvements that enhance robustness**
 
-12. Add Tests for Observers, Profiling, Runners Modules
-13. Handle Mixed Time-Space Cross-Derivatives Properly
-14. Expand _mathematica_to_python Function Set
-15. Add Non-Cartesian Coordinate System Examples
-16. Add Convergence and Stability Stress Tests
-17. Create Architecture Diagrams
-18. Add Full Pipeline Validation to CI
+12. 🔄 Add Tests for Observers, Profiling, Runners Modules
+13. ✅ Handle Mixed Time-Space Cross-Derivatives Properly
+14. ✅ Expand _mathematica_to_python Function Set
+15. ✅ Add Non-Cartesian Coordinate System Examples
+16. ✅ Add Convergence and Stability Stress Tests
+17. 🔄 Create Architecture Diagrams
+18. 🔄 Add Full Pipeline Validation to CI
 
-### 🟢 Low Priority (7 issues)
+### 🟢 Low Priority (7 issues) — 2 resolved
 **Nice-to-have enhancements**
 
-19. Refactor ContainsTimeDerivative and IsMixedTimeSpaceDerivative
-20. Add Parameter Sweep Examples
-21. Add Python 3.12+ Testing to CI Matrix
-22. Add PGF Export Module Tests
-23. Cache Coordinate Symbols and Chart Dimension
-24. Add Debugging and Performance Tuning Guides
-25. Support Elliptic PDE Solving (Constraint Equations)
+19. ✅ Refactor ContainsTimeDerivative and IsMixedTimeSpaceDerivative
+20. 🔄 Add Parameter Sweep Examples
+21. 🔄 Add Python 3.12+ Testing to CI Matrix
+22. 🔄 Add PGF Export Module Tests
+23. 🔄 Cache Coordinate Symbols and Chart Dimension
+24. 🔄 Add Debugging and Performance Tuning Guides
+25. ✅ Support Elliptic PDE Solving (Constraint Equations)
 
 ## How to Create Issues on GitHub
 
@@ -177,11 +179,11 @@ gh label create "priority: low" --color 0e8a16
 
 See [ROADMAP.md](ROADMAP.md) for detailed phase breakdown:
 
-1. **Phase 1 (Next Sprint):** Critical fixes - assertions, security, validation
-2. **Phase 2 (1-2 Weeks):** Testing & CI - coverage, animation tests, Wolfram CI
-3. **Phase 3 (1 Month):** Features & docs - 3+1D examples, JSON schema guide
-4. **Phase 4 (2-3 Months):** Advanced features - rank-3 tensors, gauge fixing
-5. **Phase 5 (Ongoing):** Polish & optimization - refactoring, performance
+1. **Phase 1:** ✅ COMPLETE — assertions, security, validation
+2. **Phase 2:** 🔄 PRIMARY REMAINING FOCUS — coverage, animation tests, Wolfram CI
+3. **Phase 3:** ✅ COMPLETE — 3+1D examples, JSON schema guide, coefficient resolution
+4. **Phase 4:** ✅ MOSTLY COMPLETE — rank-3 tensors, mixed derivatives, curvilinear. Remaining: gauge fixing
+5. **Phase 5:** Partially complete — derivative refactor done, elliptic solving done
 
 ## Managing Issues
 
@@ -283,4 +285,4 @@ python scripts/create_github_issues.py --dry-run | less
 
 ---
 
-*This tracking system is based on comprehensive codebase exploration identifying 25 improvement areas. The project is already in excellent shape (Phase 10b complete, 323 tests passing); these are refinements toward production-grade.*
+*This tracking system is based on comprehensive codebase exploration identifying 25 improvement areas. The project is in excellent shape (v0.3.1, 743 Python tests + ~108 Wolfram tests, 17/25 issues resolved). Remaining work is primarily testing/CI infrastructure and gauge automation.*
