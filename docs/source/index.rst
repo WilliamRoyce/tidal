@@ -1,57 +1,59 @@
 TIDAL Documentation
 ====================
 
-Klein-Gordon PDE simulations for electromagnetic-gravitational wave conversion research.
+**TIDAL** (Tensor Integration and Derivation for Any Lagrangian) is a symbolic physics
+pipeline that derives PDEs from Lagrangians using xAct/Mathematica and simulates them
+numerically with py-pde. All equation structure comes from symbolic computation —
+no physics is hardcoded.
 
-Overview
---------
+Key Features
+------------
 
-The **tidal** package provides a comprehensive framework for simulating 
-Klein-Gordon equations in various configurations, including:
-
-* Single-field and multi-field coupled systems
-* Homogeneous and inhomogeneous mass distributions
-* Advanced PDE variants (anisotropic, higher-order dispersion)
-* Comprehensive visualization and animation tools
-* Type-safe configuration system with runtime validation
-
-This package is built on the `py-pde <https://py-pde.readthedocs.io/>`_ framework and 
-leverages Numba for high-performance numerical computations.
+* **Symbolic Pipeline**: Lagrangian → Euler-Lagrange → Component Decomposition → JSON → PDE Simulation
+* **CLI Tool**: ``tidal`` command with derive, simulate, inspect, list, and validate subcommands
+* **18 Working Examples**: Spanning 1+1D through 3+1D spacetimes
+* **Multi-Field Support**: Scalars, vectors, and rank-3+ tensors with cross-field coupling
+* **Curvilinear Coordinates**: Automatic Christoffel symbol computation for non-Cartesian grids
+* **Parameter Sweeps**: Override symbolic coefficients at runtime without re-deriving
+* **743 Python Tests + ~108 Wolfram Tests**: Comprehensive validation of both pipeline stages
 
 Quick Start
 -----------
 
-Install dependencies and run an example:
+Install and run:
 
 .. code-block:: bash
 
+   # Install
    uv sync --all-extras
-   uv run python examples/klein_gordon/1d_gaussian_pulse.py
 
-Features
---------
+   # List available equation specifications
+   tidal list
 
-* **Type-Safe Configuration**: Frozen dataclasses with runtime validation
-* **Comprehensive Testing**: 90+ tests with strict type checking
-* **Multiple PDE Variants**: Klein-Gordon, coupled fields, inhomogeneous, anisotropic
-* **Visualization**: Built-in animation builder with spacetime heatmaps
-* **Performance**: Numba JIT compilation for CPU-intensive operations
-* **Flexible API**: Both function-based and class-based initial condition APIs
+   # Simulate a Klein-Gordon field
+   tidal simulate examples/data/klein_gordon_1d.json --t-end 20 --ic gaussian
 
-Contents
---------
+   # Derive equations from a Lagrangian (requires wolframscript)
+   tidal derive examples/scalar_field/theory.toml --run
+
+   # Inspect an equation system
+   tidal inspect examples/data/chern_simons.json
+
+   # Run a pipeline example directly
+   uv run python examples/scalar_field/kg_from_lagrangian.py
 
 .. toctree::
    :maxdepth: 2
    :caption: User Guide
 
-   installation
+   pipeline
+   cli
    examples
-   tutorials
+   TEX_SUPPORT
 
 .. toctree::
    :maxdepth: 2
-   :caption: Implementation Details
+   :caption: Legacy Implementation Notes
 
    2D_COUPLED_IMPLEMENTATION
    ADVANCED_KLEIN_GORDON_IMPLEMENTATION
