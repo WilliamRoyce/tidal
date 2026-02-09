@@ -1,0 +1,49 @@
+# Navier-Cauchy Equations: Linear Elasticity in 2+1D
+#
+# L = (1/2) rho |du/dt|^2 - (1/2) lam (div u)^2 - mu * strain_ij * strain^ij
+#
+# Displacement vector u = (ux, uy) treated as two scalar fields.
+# Uses component-derivative notation CD[{idx, -chart}] for anisotropic coefficients.
+#
+# Expected EOMs (rho=lam=mu=1):
+#   d2t(ux) = 3*laplacian_x(ux) + 1*laplacian_y(ux) + 2*cross_derivative_xy(uy)
+#   d2t(uy) = 1*laplacian_x(uy) + 3*laplacian_y(uy) + 2*cross_derivative_xy(ux)
+
+[theory]
+name = "Navier Cauchy"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "ux"
+type = "scalar"
+
+[[fields]]
+name = "uy"
+type = "scalar"
+
+[constants]
+names = ["rho", "lam", "mu"]
+
+[lagrangian]
+# Kinetic: (rho/2)[(dt ux)^2 + (dt uy)^2]
+# Divergence: (lam/2)(dx ux + dy uy)^2
+# Strain: mu[(dx ux)^2 + (dy uy)^2 + (1/2)(dy ux + dx uy)^2]
+#
+# The -chart placeholder is replaced by the prefixed chart name at generation time.
+expression = """
+rho/2 * (CD[{0, -chart}][ux[]]^2 + CD[{0, -chart}][uy[]]^2)
+- lam/2 * (CD[{1, -chart}][ux[]] + CD[{2, -chart}][uy[]])^2
+- mu * (CD[{1, -chart}][ux[]]^2 + CD[{2, -chart}][uy[]]^2
++ 1/2 * (CD[{2, -chart}][ux[]] + CD[{1, -chart}][uy[]])^2)
+"""
+
+[parameters]
+rho = 1.0
+lam = 1.0
+mu = 1.0
+
+[output]
+path = "../data/navier_cauchy_2d.json"

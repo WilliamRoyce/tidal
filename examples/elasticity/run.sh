@@ -2,17 +2,18 @@
 # CLI equivalents for the Elasticity (Navier-Cauchy) 2+1D example
 # See also: navier_cauchy.wls (manual derivation), elasticity_from_lagrangian.py (Python simulation)
 #
-# NOTE: The elasticity Lagrangian uses component-level expressions (not covariant
-# tensor notation) because the Lame parameters break Lorentz invariance. The derive
-# step requires the manual .wls script; no TOML config is provided.
+# The elasticity Lagrangian uses component-derivative notation (CD[{idx, -chart}])
+# because the Lame parameters produce anisotropic spatial coefficients.
 #
 # To run manually:  cd examples/elasticity
 
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# Derive equations (component-level Lagrangian, .wls pass-through to wolframscript)
-tidal derive navier_cauchy.wls
+# Derive equations from TOML config (uses component-derivative -chart placeholder)
+tidal derive theory.toml
+# Alternative: derive from handwritten .wls (identical physics, numeric coefficients)
+# tidal derive navier_cauchy.wls
 
 # Inspect the equation system
 tidal inspect ../data/navier_cauchy_2d.json

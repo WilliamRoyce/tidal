@@ -344,7 +344,10 @@ def _substitute_field_names(
     # Also substitute eta and CD with prefixed versions
     result = result.replace("eta[", f"{prefix}Eta[")
     result = result.replace("CD[", f"{prefix}CD[")
-    return result.replace("CD ]", f"{prefix}CD ]")
+    result = result.replace("CD ]", f"{prefix}CD ]")
+    # Substitute chart placeholder for component-derivative notation
+    # e.g., CD[{0, -chart}][ux[]] → {prefix}CD[{0, -{prefix}Cart}][...]
+    return result.replace("-chart}", f"-{prefix}Cart}}")
 
 
 # --- WLS script generation ---

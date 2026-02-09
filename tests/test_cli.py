@@ -932,6 +932,60 @@ path = "output.json"
         assert '"MetricMatrix"' in out
         assert "DefConstantSymbol[polm2]" in out
 
+    def test_derive_chart_placeholder_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Component-derivative notation with -chart placeholder should be substituted."""
+        config = tmp_path / "elasticity.toml"
+        config.write_text("""
+[theory]
+name = "Navier Cauchy"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "ux"
+type = "scalar"
+
+[[fields]]
+name = "uy"
+type = "scalar"
+
+[constants]
+names = ["rho", "lam", "mu"]
+
+[lagrangian]
+expression = "rho/2 * (CD[{0, -chart}][ux[]]^2 + CD[{0, -chart}][uy[]]^2) - lam/2 * (CD[{1, -chart}][ux[]] + CD[{2, -chart}][uy[]])^2 - mu * (CD[{1, -chart}][ux[]]^2 + CD[{2, -chart}][uy[]]^2 + 1/2 * (CD[{2, -chart}][ux[]] + CD[{1, -chart}][uy[]])^2)"
+
+[parameters]
+rho = 1.0
+lam = 1.0
+mu = 1.0
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Lagrangian assignment should have chart placeholder substituted
+        assert "ncCD[{0, -ncCart}][ncUx[]]" in out
+        assert "ncCD[{1, -ncCart}][ncUx[]]" in out
+        # Metadata lagrangian_expr stores original expression (unsubstituted) — that's OK
+        # Field names should be prefixed
+        assert "ncUx[]" in out
+        assert "ncUy[]" in out
+        # Constants should be defined
+        assert "DefConstantSymbol[rho]" in out
+        assert "DefConstantSymbol[lam]" in out
+        assert "DefConstantSymbol[mu]" in out
+        # Multi-field: should have VarD for both fields
+        assert "VarD[ncUx[]" in out
+        assert "VarD[ncUy[]" in out
+
 
 class TestDeriveAbsolutePaths:
     """Verify generated WLS scripts use absolute paths (not $InputFileName-relative)."""
