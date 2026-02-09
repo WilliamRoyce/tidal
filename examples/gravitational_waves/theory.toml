@@ -1,0 +1,31 @@
+# Linearized Gravity: Einstein-Hilbert in 3+1D via xPert
+#
+# Linearizes the Einstein tensor around flat Minkowski background:
+#   G^(1)_ab[h] = 0  (gauge-unfixed linearized Einstein equations)
+#
+# Produces 10 component equations (symmetric rank-2 tensor in 4D).
+# Constraint structure: h_00 has no d2_t (Hamiltonian constraint),
+# h_0i are first-order (momentum constraints), h_ij are second-order (evolution).
+#
+# For simulation with de Donder gauge (10 uncoupled wave equations):
+#   tidal derive linearized_gravity.wls  (produces both gauge variants)
+
+[theory]
+name = "Linearized Gravity"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[linearization]
+expression = "Einstein[CD][-a, -b]"
+perturbation_field = "h"
+
+[output]
+path = "../data/linearized_gravity.json"

@@ -126,6 +126,44 @@ output_json = "examples/data/my_theory.json"
 diagonal = [-1, 1, "x[]^2"]
 ```
 
+### Linearization (`[linearization]`)
+
+For theories defined by linearizing a tensor expression (e.g., linearized gravity via xPert), use `[linearization]` **instead of** `[lagrangian]`. The two sections are mutually exclusive.
+
+```toml
+[linearization]
+# Tensor expression to linearize (uses CD placeholder, auto-prefixed)
+expression = "Einstein[CD][-a, -b]"
+# Which [[fields]] entry is the metric perturbation
+perturbation_field = "h"
+```
+
+This generates xPert setup (`SetupMetricPerturbation`), linearization (`LinearizeTensorExpression`), and automatic notation conversion before passing to the standard decomposition pipeline.
+
+**Example** (`examples/gravitational_waves/theory.toml`):
+
+```toml
+[theory]
+name = "Linearized Gravity"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[linearization]
+expression = "Einstein[CD][-a, -b]"
+perturbation_field = "h"
+
+[output]
+path = "../data/linearized_gravity.json"
+```
+
 ### Derived Fields
 
 For theories that need intermediate tensor definitions (e.g., the electromagnetic field strength tensor), use `[[derived_fields]]`:

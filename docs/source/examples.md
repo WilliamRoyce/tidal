@@ -76,7 +76,7 @@ uv run python examples/scalar_vector_coupling/simulation.py
 | scalar_field_3d | Yes | Yes | — |
 | spherical_kg | Yes | Yes | — |
 | cylindrical_kg | Yes | Yes | — |
-| gravitational_waves | .wls only | Yes | — |
+| gravitational_waves | Yes | Yes | — |
 | massive_3form | Yes | Yes | — |
 
 ## Legacy Klein-Gordon Examples
