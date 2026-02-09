@@ -590,7 +590,7 @@ def main() -> None:
         print(f"Total issues to create: {len(ISSUES)}")
 
     print(f"\n{'=' * 80}")
-    print("Creating GitHub Issues for Torsion-Gertsenshtein Pipeline")
+    print("Creating GitHub Issues for TIDAL Pipeline")
     print(f"{'=' * 80}\n")
 
     for i, issue in enumerate(ISSUES, 1):

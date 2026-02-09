@@ -2,7 +2,7 @@
 # notify-install-extensions.sh
 # VS Code Extension Installation Notification Creator
 # Creates a notification file with instructions for manual extension installation
-# Part of the torsion-gertsenshtein devcontainer configuration
+# Part of the TIDAL devcontainer configuration
 
 set -e
 

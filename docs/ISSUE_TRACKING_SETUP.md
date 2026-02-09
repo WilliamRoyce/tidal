@@ -1,6 +1,6 @@
 # GitHub Issue Tracking Setup
 
-This document explains the issue tracking system created for the torsion-gertsenshtein project based on comprehensive codebase analysis.
+This document explains the issue tracking system created for the TIDAL project based on comprehensive codebase analysis.
 
 ## Overview
 

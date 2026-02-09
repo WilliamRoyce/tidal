@@ -2,7 +2,7 @@
 # wolfram-activation-manager.sh
 # Wolfram Activation Backup Manager
 # Saves and restores Wolfram Engine activation to persistent storage
-# Part of the torsion-gertsenshtein devcontainer configuration
+# Part of the TIDAL devcontainer configuration
 
 set -e
 

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # setup_xact.sh
 # Interactive setup wizard for xAct 1.3.0 tensor computation packages
-# Part of the torsion-gertsenshtein devcontainer configuration
+# Part of the TIDAL devcontainer configuration
 
 set -e
 
@@ -74,7 +74,7 @@ clear
 print_header "xAct ${XACT_VERSION} Setup Wizard"
 
 echo "This interactive wizard will install the xAct tensor computation framework"
-echo "for use with Wolfram Engine in the torsion-gertsenshtein devcontainer."
+echo "for use with Wolfram Engine in the tidal devcontainer."
 echo ""
 echo "${BOLD}What is xAct?${RESET}"
 echo "  xAct is a suite of free Mathematica packages for tensor computations"

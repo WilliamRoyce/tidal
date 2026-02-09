@@ -1,6 +1,6 @@
 # DevContainer Configuration
 
-This directory contains the complete development container setup for the torsion-gertsenshtein project, with integrated Wolfram Engine 14.3 and xAct tensor computation framework.
+This directory contains the complete development container setup for the TIDAL project, with integrated Wolfram Engine 14.3 and xAct tensor computation framework.
 
 ## Directory Structure
 

@@ -1,6 +1,6 @@
 # TIDAL Pipeline Roadmap
 
-This document outlines the planned improvements and features for the torsion-gertsenshtein symbolic physics pipeline project.
+This document outlines the planned improvements and features for the TIDAL symbolic physics pipeline project.
 
 **Last Updated:** February 2026
 **Project Status:** Phase 13+ Complete, CLI done (743 Python tests + ~108 Wolfram tests)

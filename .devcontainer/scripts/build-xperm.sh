@@ -2,7 +2,7 @@
 # build-xperm.sh
 # xPerm MathLink Compiler and Installer
 # Compiles xPerm from source with current GLIBC and installs with proper library path
-# Part of the torsion-gertsenshtein devcontainer configuration
+# Part of the TIDAL devcontainer configuration
 
 set -e
 

@@ -2,7 +2,7 @@
 # fix-xperm.sh
 # xPerm MathLink Compatibility Fix
 # Patches xPerm to work without requiring GLIBC 2.38
-# Part of the torsion-gertsenshtein devcontainer configuration
+# Part of the TIDAL devcontainer configuration
 
 set -e
 

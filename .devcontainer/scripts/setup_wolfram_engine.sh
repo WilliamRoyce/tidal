@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # setup_wolfram_engine.sh
 # Interactive setup wizard for Wolfram Engine 14.3
-# Part of the torsion-gertsenshtein devcontainer configuration
+# Part of the TIDAL devcontainer configuration
 
 set -e
 
@@ -65,7 +65,7 @@ clear
 print_header "Wolfram Engine 14.3 Setup Wizard"
 
 echo "This interactive wizard will guide you through installing Wolfram Engine 14.3"
-echo "for use with the torsion-gertsenshtein devcontainer."
+echo "for use with the tidal devcontainer."
 echo ""
 echo "${BOLD}What this script does:${RESET}"
 echo "  1. Check if Wolfram Engine 14.3 is already installed"

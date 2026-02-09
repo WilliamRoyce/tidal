@@ -2,7 +2,7 @@
 # install-extensions-final.sh
 # VS Code Extension Installer
 # Installs all required VS Code extensions after server initialization
-# Part of the torsion-gertsenshtein devcontainer configuration
+# Part of the TIDAL devcontainer configuration
 
 set -e
 
@@ -61,7 +61,7 @@ print_header "VS Code Extension Installer"
 echo "Started: ${BOLD}$(date)${RESET}"
 echo ""
 echo "This script installs all required VS Code extensions for the"
-echo "torsion-gertsenshtein development environment."
+echo "tidal development environment."
 echo ""
 
 # Extension list with categories

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # validate-setup.sh
 # Comprehensive validation script for Wolfram Engine and xAct setup
-# Part of the torsion-gertsenshtein devcontainer configuration
+# Part of the TIDAL devcontainer configuration
 
 set -e
 

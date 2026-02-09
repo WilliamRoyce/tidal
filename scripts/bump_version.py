@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Version management script for torsion-gertsenshtein.
+"""Version management script for TIDAL.
 
 Updates version numbers across:
 - pyproject.toml

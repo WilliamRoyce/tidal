@@ -16,7 +16,7 @@
 
 ## Overview
 
-This document provides an in-depth technical explanation of the implementation of advanced Klein-Gordon (KG) equations in the `torsion-gertsenshtein` project. We implement four specialized PDE classes that extend beyond the standard isotropic Klein-Gordon equation:
+This document provides an in-depth technical explanation of the implementation of advanced Klein-Gordon (KG) equations in the `tidal` project. We implement four specialized PDE classes that extend beyond the standard isotropic Klein-Gordon equation:
 
 1. **AnisotropicKGPDE**: Direction-dependent wave speeds (anisotropic propagation)
 2. **HigherOrderKGPDE**: Fourth-order and sixth-order spatial derivatives

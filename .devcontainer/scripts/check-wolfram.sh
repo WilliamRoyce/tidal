@@ -2,7 +2,7 @@
 # check-wolfram.sh
 # Quick Wolfram Engine Health Check
 # Verifies Wolfram Engine installation, activation, and persistence
-# Part of the torsion-gertsenshtein devcontainer configuration
+# Part of the TIDAL devcontainer configuration
 
 set -e
 
