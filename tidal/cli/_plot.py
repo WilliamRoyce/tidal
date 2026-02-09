@@ -1,4 +1,4 @@
-"""Visualization helpers for ``tg simulate``."""
+"""Visualization helpers for ``tidal simulate``."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ if TYPE_CHECKING:
     from matplotlib.axes import Axes
     from pde import FieldCollection
 
-from torsion_gertsenshtein.cli._simulate import (
+from tidal.cli._simulate import (
     DPI,
     SPATIAL_DIM_2D,
     VMAX_FLOOR,

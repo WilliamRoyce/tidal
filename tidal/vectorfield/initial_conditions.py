@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
     from pde.grids.base import GridBase
 
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem
 
 
 @dataclass

@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem
 
 
 @dataclass(frozen=True)
@@ -33,7 +33,7 @@ class ComponentFieldParams:
 
     Examples
     --------
-    >>> from torsion_gertsenshtein.symbolic import load_equation_system
+    >>> from tidal.symbolic import load_equation_system
     >>> spec = load_equation_system("examples/data/em_1d.json")
     >>> params = ComponentFieldParams.from_equation_system(spec)
     >>> params.n_components

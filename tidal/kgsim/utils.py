@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     import numpy as np
     from pde.fields.datafield_base import DataFieldBase
 
-    from torsion_gertsenshtein.utils import BCDescriptor
+    from tidal.utils import BCDescriptor
 
 
 def natural_center(bounds: Sequence[tuple[float, float]]) -> list[float]:

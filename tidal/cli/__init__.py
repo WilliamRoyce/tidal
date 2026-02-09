@@ -1,12 +1,12 @@
 """Command-line interface for the Lagrangian-to-PDE pipeline.
 
-Entry point: ``tg`` command with subcommands:
+Entry point: ``tidal`` command with subcommands:
 
-- ``tg derive``   — Derive equations from Lagrangian via Wolfram/xAct
-- ``tg inspect``  — Display equation system information from JSON
-- ``tg simulate`` — Run PDE simulation from JSON specification
-- ``tg list``     — List available JSON specifications
-- ``tg validate`` — Validate a JSON equation specification
+- ``tidal derive``   — Derive equations from Lagrangian via Wolfram/xAct
+- ``tidal inspect``  — Display equation system information from JSON
+- ``tidal simulate`` — Run PDE simulation from JSON specification
+- ``tidal list``     — List available JSON specifications
+- ``tidal validate`` — Validate a JSON equation specification
 """
 
 from __future__ import annotations
@@ -20,7 +20,7 @@ __all__ = ["main"]
 def _build_parser() -> argparse.ArgumentParser:
     """Build the top-level argument parser with subcommands."""
     parser = argparse.ArgumentParser(
-        prog="tg",
+        prog="tidal",
         description="Lagrangian-to-PDE pipeline: derive, inspect, simulate, list.",
     )
     parser.add_argument(
@@ -40,10 +40,10 @@ def _build_parser() -> argparse.ArgumentParser:
         ),
         epilog=(
             "Examples:\n"
-            "  tg derive theory.toml                     # run derivation\n"
-            "  tg derive theory.toml --dry-run            # preview .wls without running\n"
-            "  tg derive theory.toml --save-script eq.wls # save generated script\n"
-            "  tg derive script.wls                       # run existing .wls directly"
+            "  tidal derive theory.toml                     # run derivation\n"
+            "  tidal derive theory.toml --dry-run            # preview .wls without running\n"
+            "  tidal derive theory.toml --save-script eq.wls # save generated script\n"
+            "  tidal derive script.wls                       # run existing .wls directly"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -76,8 +76,8 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Load a JSON specification and display its contents.",
         epilog=(
             "Examples:\n"
-            "  tg inspect examples/data/klein_gordon_1d.json\n"
-            "  tg inspect spec.json --params    # show default parameter values"
+            "  tidal inspect examples/data/klein_gordon_1d.json\n"
+            "  tidal inspect spec.json --params    # show default parameter values"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -104,10 +104,10 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Build and run a PDE simulation from a JSON equation specification.",
         epilog=(
             "Examples:\n"
-            "  tg simulate spec.json --param m2=1.0 --t-end 10\n"
-            "  tg simulate spec.json --ic gaussian --ic-width 2.0 --output result.png\n"
-            "  tg simulate spec.json --mode constraint --bc neumann\n"
-            "  tg simulate spec.json --ic formula --ic-formula 'exp(-(x-5)**2)'"
+            "  tidal simulate spec.json --param m2=1.0 --t-end 10\n"
+            "  tidal simulate spec.json --ic gaussian --ic-width 2.0 --output result.png\n"
+            "  tidal simulate spec.json --mode constraint --bc neumann\n"
+            "  tidal simulate spec.json --ic formula --ic-formula 'exp(-(x-5)**2)'"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -259,8 +259,8 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Scan a directory for JSON equation specifications and display summaries.",
         epilog=(
             "Examples:\n"
-            "  tg list                          # scan default examples/data/\n"
-            "  tg list --dir /path/to/specs      # scan custom directory"
+            "  tidal list                          # scan default examples/data/\n"
+            "  tidal list --dir /path/to/specs      # scan custom directory"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -278,8 +278,8 @@ def _build_parser() -> argparse.ArgumentParser:
         description="Check a JSON specification for errors (unknown operators, bad references, etc.).",
         epilog=(
             "Examples:\n"
-            "  tg validate examples/data/klein_gordon_1d.json\n"
-            "  tg validate spec.json"
+            "  tidal validate examples/data/klein_gordon_1d.json\n"
+            "  tidal validate spec.json"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -296,7 +296,7 @@ def _get_version() -> str:
     from importlib.metadata import PackageNotFoundError, version
 
     try:
-        return version("torsion_gertsenshtein")
+        return version("tidal")
     except PackageNotFoundError:
         return "unknown"
 
@@ -320,23 +320,23 @@ def _dispatch(args: argparse.Namespace) -> int:
         If ``args.command`` is not a recognized subcommand.
     """
     if args.command == "derive":
-        from torsion_gertsenshtein.cli._derive import derive_command
+        from tidal.cli._derive import derive_command
 
         return derive_command(args)
     if args.command == "inspect":
-        from torsion_gertsenshtein.cli._inspect import inspect_command
+        from tidal.cli._inspect import inspect_command
 
         return inspect_command(args)
     if args.command == "simulate":
-        from torsion_gertsenshtein.cli._simulate import simulate_command
+        from tidal.cli._simulate import simulate_command
 
         return simulate_command(args)
     if args.command == "list":
-        from torsion_gertsenshtein.cli._list import list_command
+        from tidal.cli._list import list_command
 
         return list_command(args)
     if args.command == "validate":
-        from torsion_gertsenshtein.cli._validate import validate_command
+        from tidal.cli._validate import validate_command
 
         return validate_command(args)
     msg = f"Unknown command: {args.command}"

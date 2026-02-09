@@ -38,7 +38,7 @@ from numba import (  # pyright: ignore[reportMissingTypeStubs,reportUnknownVaria
 from pde import FieldCollection, PDEBase, ScalarField
 from typing_extensions import override
 
-from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
+from tidal.kgsim.utils import infer_bc_from_grid
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence

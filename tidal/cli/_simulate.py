@@ -1,4 +1,4 @@
-"""``tg simulate`` — Run PDE simulation from a JSON specification."""
+"""``tidal simulate`` — Run PDE simulation from a JSON specification."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
     from pde import CartesianGrid, FieldCollection, MemoryStorage
 
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem
 
 # Default grid shapes per spatial dimension
 _DEFAULT_SHAPES: dict[int, list[int]] = {
@@ -127,7 +127,7 @@ def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:  # 
 
     # Warn on unknown CLI params
     if cli_keys:
-        from torsion_gertsenshtein.cli._inspect import discover_parameters
+        from tidal.cli._inspect import discover_parameters
 
         try:
             known: set[str] = set(discover_parameters(spec).keys())
@@ -385,7 +385,7 @@ def _apply_formula_ic(
     ValueError
         If --ic-formula expression is not provided or contains unsafe constructs.
     """
-    from torsion_gertsenshtein.symbolic import create_initial_state
+    from tidal.symbolic import create_initial_state
 
     if args.ic_formula is None:
         msg = "--ic=formula requires --ic-formula=EXPR"
@@ -425,8 +425,8 @@ def _build_initial_state(
     ValueError
         If component name is unknown or IC type is invalid.
     """
-    from torsion_gertsenshtein.symbolic import create_initial_state
-    from torsion_gertsenshtein.vectorfield.initial_conditions import (
+    from tidal.symbolic import create_initial_state
+    from tidal.vectorfield.initial_conditions import (
         ComponentGaussianPulse,
         ComponentPlaneWave,
     )
@@ -544,7 +544,7 @@ def _generate_output(args: Namespace, ctx: PlotContext) -> None:
     if fmt == "npz":
         _save_npz(output_path, ctx.spec, ctx.storage)
     else:
-        from torsion_gertsenshtein.cli._plot import save_plot
+        from tidal.cli._plot import save_plot
 
         save_plot(output_path, ctx)
 
@@ -677,7 +677,7 @@ def simulate_command(args: Namespace) -> int:
     int
         Exit code.
     """
-    from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
+    from tidal.symbolic import build_pde_from_json, load_equation_system
 
     json_path = Path(args.json_path)
     if not json_path.exists():
@@ -730,7 +730,7 @@ def simulate_command(args: Namespace) -> int:
 
     from pde import MemoryStorage
 
-    from torsion_gertsenshtein.utils import normalize_solve_result
+    from tidal.utils import normalize_solve_result
 
     dt = args.dt
     if dt is None:

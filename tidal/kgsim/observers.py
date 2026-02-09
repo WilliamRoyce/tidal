@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING, Any, cast
 import numpy as np
 from pde import ScalarField
 
-from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
+from tidal.kgsim.utils import infer_bc_from_grid
 
 if TYPE_CHECKING:
     from collections.abc import Callable

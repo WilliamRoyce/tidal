@@ -1,4 +1,4 @@
-"""``tg list`` — List available JSON equation specifications."""
+"""``tidal list`` — List available JSON equation specifications."""
 
 from __future__ import annotations
 
@@ -39,8 +39,8 @@ def list_command(args: Namespace) -> int:
     int
         Exit code.
     """
-    from torsion_gertsenshtein.cli._inspect import discover_parameters
-    from torsion_gertsenshtein.symbolic.json_loader import load_equation_system
+    from tidal.cli._inspect import discover_parameters
+    from tidal.symbolic.json_loader import load_equation_system
 
     scan_dir = Path(args.dir) if args.dir else _find_examples_dir()
 

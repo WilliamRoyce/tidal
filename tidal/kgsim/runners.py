@@ -18,7 +18,7 @@ from pde import (
 )
 from pde.trackers import CallbackTracker
 
-from torsion_gertsenshtein.kgsim.profiling import (
+from tidal.kgsim.profiling import (
     Timer,
     first_tick_tracker,
     perf_counter,
@@ -322,7 +322,7 @@ def run_with_snapshots(
 
     Examples
     --------
-    >>> from torsion_gertsenshtein.kgsim import (
+    >>> from tidal.kgsim import (
     ...     GridConfig, make_grid, gaussian_pulse,
     ...     InhomogeneousKGPDE, SimulationConfig, run_with_snapshots
     ... )

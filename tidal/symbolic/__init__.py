@@ -4,7 +4,7 @@ This package provides the Python-side interface for loading and processing
 field equations derived symbolically from Lagrangians via Mathematica/xAct.
 """
 
-from torsion_gertsenshtein.symbolic.json_loader import (
+from tidal.symbolic.json_loader import (
     AXIS_LETTERS,
     BoundaryCondition,
     ComponentEquation,
@@ -13,7 +13,7 @@ from torsion_gertsenshtein.symbolic.json_loader import (
     OperatorTerm,
     load_equation_system,
 )
-from torsion_gertsenshtein.symbolic.pde_builder import (
+from tidal.symbolic.pde_builder import (
     PDEFromSpec,
     build_pde_from_json,
     create_initial_state,

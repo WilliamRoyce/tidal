@@ -1,4 +1,4 @@
-"""``tg validate`` — Validate a JSON equation specification."""
+"""``tidal validate`` — Validate a JSON equation specification."""
 
 from __future__ import annotations
 
@@ -33,7 +33,7 @@ def _check_json_parse(json_path: Path) -> tuple[object | None, list[str]]:
         return None, errors
 
     try:
-        from torsion_gertsenshtein.symbolic.json_loader import load_equation_system
+        from tidal.symbolic.json_loader import load_equation_system
 
         spec = load_equation_system(json_path)
     except Exception as exc:  # noqa: BLE001
@@ -45,7 +45,7 @@ def _check_json_parse(json_path: Path) -> tuple[object | None, list[str]]:
 
 def _check_operators(spec: object) -> list[str]:
     """Check that all operators in the spec are recognized."""
-    from torsion_gertsenshtein.symbolic.json_loader import (
+    from tidal.symbolic.json_loader import (
         EquationSystem,
         is_known_operator,
     )
@@ -65,7 +65,7 @@ def _check_operators(spec: object) -> list[str]:
 
 def _check_field_references(spec: object) -> list[str]:
     """Check that all field references in terms point to existing fields."""
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem
 
     if not isinstance(spec, EquationSystem):
         return []
@@ -86,8 +86,8 @@ def _check_field_references(spec: object) -> list[str]:
 
 def _check_parameters(spec: object) -> list[str]:
     """Check for symbolic parameters that have no default values."""
-    from torsion_gertsenshtein.cli._inspect import discover_parameters
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.cli._inspect import discover_parameters
+    from tidal.symbolic.json_loader import EquationSystem
 
     if not isinstance(spec, EquationSystem):
         return []

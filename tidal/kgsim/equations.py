@@ -15,14 +15,14 @@ from numba import (  # pyright: ignore[reportMissingTypeStubs,reportUnknownVaria
 from pde import PDE, DataFieldBase, FieldCollection, PDEBase, ScalarField
 from typing_extensions import override
 
-from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
+from tidal.kgsim.utils import infer_bc_from_grid
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Sequence
 
     from numpy.typing import NDArray
 
-    from torsion_gertsenshtein.kgsim.config import MultiFieldParams
+    from tidal.kgsim.config import MultiFieldParams
 
     NumericArray = NDArray[np.float64]
 

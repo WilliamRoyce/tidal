@@ -1,4 +1,4 @@
-"""``tg inspect`` — Display equation system information from a JSON spec."""
+"""``tidal inspect`` — Display equation system information from a JSON spec."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ def discover_parameters(spec: object) -> dict[str, list[str]]:
     TypeError
         If *spec* is not an ``EquationSystem`` instance.
     """
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem
 
     if not isinstance(spec, EquationSystem):
         msg = f"Expected EquationSystem, got {type(spec).__name__}"
@@ -136,7 +136,7 @@ def _format_matrix(
 
 def _print_header(spec: object) -> None:
     """Print Lagrangian and source information."""
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem
 
     if not isinstance(spec, EquationSystem):
         return
@@ -157,7 +157,7 @@ def _print_header(spec: object) -> None:
 
 def _print_spacetime(spec: object) -> None:
     """Print spacetime dimension and coordinate information."""
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem
 
     if not isinstance(spec, EquationSystem):
         return
@@ -174,7 +174,7 @@ def _print_spacetime(spec: object) -> None:
 
 def _print_equations(spec: object) -> None:
     """Print field summary and detailed equation terms."""
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem
 
     if not isinstance(spec, EquationSystem):
         return
@@ -220,7 +220,7 @@ def _build_json_output(spec: object, *, show_params: bool) -> dict[str, Any]:
     TypeError
         If *spec* is not an ``EquationSystem`` instance.
     """
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem
 
     if not isinstance(spec, EquationSystem):
         msg = f"Expected EquationSystem, got {type(spec).__name__}"
@@ -281,7 +281,7 @@ def inspect_command(args: Namespace) -> int:
     int
         Exit code.
     """
-    from torsion_gertsenshtein.symbolic.json_loader import load_equation_system
+    from tidal.symbolic.json_loader import load_equation_system
 
     json_path = Path(args.json_path)
     if not json_path.exists():

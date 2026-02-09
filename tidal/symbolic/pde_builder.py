@@ -20,8 +20,8 @@ from pde import FieldCollection, PDEBase, ScalarField
 from scipy import special  # type: ignore[reportMissingTypeStubs]
 from typing_extensions import override
 
-from torsion_gertsenshtein.kgsim.utils import infer_bc_from_grid
-from torsion_gertsenshtein.symbolic.json_loader import (
+from tidal.kgsim.utils import infer_bc_from_grid
+from tidal.symbolic.json_loader import (
     _CUSTOM_OPERATORS,  # type: ignore[reportPrivateUsage]
     AXIS_LETTERS,
     BoundaryCondition,
@@ -39,7 +39,7 @@ if TYPE_CHECKING:
     from pde.grids.base import GridBase
     from pde.pdes.base import TState
 
-    from torsion_gertsenshtein.utils import BCDescriptor
+    from tidal.utils import BCDescriptor
 
     NumericArray = NDArray[np.float64]
 
@@ -438,8 +438,8 @@ class PDEFromSpec(PDEBase):
 
     Examples
     --------
-    >>> from torsion_gertsenshtein.symbolic import load_equation_system
-    >>> from torsion_gertsenshtein.symbolic.pde_builder import PDEFromSpec
+    >>> from tidal.symbolic import load_equation_system
+    >>> from tidal.symbolic.pde_builder import PDEFromSpec
     >>> spec = load_equation_system("examples/data/em_1d.json")
     >>> pde = PDEFromSpec(spec)
     >>> # pde can now be used with py-pde solvers

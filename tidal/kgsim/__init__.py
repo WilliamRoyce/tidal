@@ -1,16 +1,16 @@
 """Klein-Gordon equation simulation package."""
 
-from torsion_gertsenshtein.kgsim.advanced_equations import (
+from tidal.kgsim.advanced_equations import (
     AnisotropicHigherOrderKGPDE,
     AnisotropicKGPDE,
     DirectionalKGPDE,
     HigherOrderKGPDE,
 )
-from torsion_gertsenshtein.kgsim.animation_builder import (
+from tidal.kgsim.animation_builder import (
     AnimationBuilder,
     AnimationConfig,
 )
-from torsion_gertsenshtein.kgsim.config import (
+from tidal.kgsim.config import (
     AnisotropicKGParameters,
     GridConfig,
     HigherOrderKGParameters,
@@ -18,13 +18,13 @@ from torsion_gertsenshtein.kgsim.config import (
     MultiFieldParams,
     SimulationConfig,
 )
-from torsion_gertsenshtein.kgsim.equations import (
+from tidal.kgsim.equations import (
     InhomogeneousKGPDE,
     KleinGordonPDE,
     make_coupled_kg_pde,
 )
-from torsion_gertsenshtein.kgsim.grids import make_grid
-from torsion_gertsenshtein.kgsim.initial_conditions import (
+from tidal.kgsim.grids import make_grid
+from tidal.kgsim.initial_conditions import (
     GaussianPulse,
     InitialCondition,
     RingPulse2D,
@@ -34,12 +34,12 @@ from torsion_gertsenshtein.kgsim.initial_conditions import (
     plane_wave,
     ring_pulse_2d,
 )
-from torsion_gertsenshtein.kgsim.observers import total_energy_observer
-from torsion_gertsenshtein.kgsim.profiles import (
+from tidal.kgsim.observers import total_energy_observer
+from tidal.kgsim.profiles import (
     constant_field,
     step_region_1d,
 )
-from torsion_gertsenshtein.kgsim.runners import run, run_with_snapshots
+from tidal.kgsim.runners import run, run_with_snapshots
 
 __all__ = [
     "AnimationBuilder",

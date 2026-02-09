@@ -14,7 +14,7 @@ import numpy as np
 from pde import CartesianGrid, FieldCollection, ScalarField
 from typing_extensions import override
 
-from torsion_gertsenshtein.kgsim.utils import extract_grid_coordinates, natural_center
+from tidal.kgsim.utils import extract_grid_coordinates, natural_center
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -156,7 +156,7 @@ class GaussianPulse(InitialCondition):
 
     Examples
     --------
-    >>> from torsion_gertsenshtein.kgsim import make_grid, GridConfig
+    >>> from tidal.kgsim import make_grid, GridConfig
     >>> grid = make_grid(GridConfig(dim=1, shape=(64,), bounds=((0, 50),)))
     >>> ic = GaussianPulse(amplitude=1.0, width=2.0, center=[25.0])
     >>> state = ic.build(grid)
