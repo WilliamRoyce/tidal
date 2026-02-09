@@ -4,6 +4,7 @@
 Updates version numbers across:
 - pyproject.toml
 - tidal/__init__.py
+- docs/source/conf.py
 - CITATION.cff (version + date)
 - uv.lock (via uv lock regeneration)
 
@@ -79,6 +80,7 @@ class VersionBumper:
         # Files to update
         self.pyproject_toml = self.root / "pyproject.toml"
         self.init_py = self.root / "tidal" / "__init__.py"
+        self.sphinx_conf = self.root / "docs" / "source" / "conf.py"
         self.citation_cff = self.root / "CITATION.cff"
 
     def run(self) -> None:
@@ -134,7 +136,7 @@ class VersionBumper:
         print("  ✓ Version format valid (semantic versioning)")
 
         # Check all files exist
-        for file_path in [self.pyproject_toml, self.init_py, self.citation_cff]:
+        for file_path in [self.pyproject_toml, self.init_py, self.sphinx_conf, self.citation_cff]:
             if not file_path.exists():
                 msg = f"Required file not found: {file_path}\nEnsure you are running this script from the project root and that all files are present."
                 raise VersionBumpError(msg)
@@ -188,6 +190,13 @@ class VersionBumper:
         else:
             self._update_init_py()
             print("  ✓ Updated __init__.py")
+
+        # Update docs/source/conf.py
+        if self.dry_run:
+            print("  [DRY RUN] Would update docs/source/conf.py")
+        else:
+            self._update_sphinx_conf()
+            print("  ✓ Updated docs/source/conf.py")
 
         # Update CITATION.cff
         today = datetime.now().strftime("%Y-%m-%d")  # noqa: DTZ005  # Local date for citation file
@@ -299,6 +308,12 @@ class VersionBumper:
         if match:
             versions["__init__.py"] = match.group(1)
 
+        # docs/source/conf.py
+        content = self.sphinx_conf.read_text()
+        match = re.search(r'^version\s*=\s*"([^"]+)"', content, re.MULTILINE)
+        if match:
+            versions["docs/source/conf.py"] = match.group(1)
+
         # CITATION.cff
         content = self.citation_cff.read_text()
         match = re.search(r"^version:\s*(.+)$", content, re.MULTILINE)
@@ -309,7 +324,7 @@ class VersionBumper:
 
     def _create_backups(self) -> None:
         """Create .bak copies of all files before modification."""
-        for file_path in [self.pyproject_toml, self.init_py, self.citation_cff]:
+        for file_path in [self.pyproject_toml, self.init_py, self.sphinx_conf, self.citation_cff]:
             backup_path = file_path.with_suffix(file_path.suffix + ".bak")
             shutil.copy2(file_path, backup_path)
             self.backups.append(backup_path)
@@ -349,6 +364,25 @@ class VersionBumper:
             flags=re.MULTILINE,
         )
         self.init_py.write_text(updated)
+
+    def _update_sphinx_conf(self) -> None:
+        """Update version and release in docs/source/conf.py."""
+        content = self.sphinx_conf.read_text()
+        # Update version = "X.Y.Z"
+        updated = re.sub(
+            r'^(version\s*=\s*)"[^"]+"',
+            rf'\1"{self.new_version}"',
+            content,
+            flags=re.MULTILINE,
+        )
+        # Update release = "X.Y.Z"
+        updated = re.sub(
+            r'^(release\s*=\s*)"[^"]+"',
+            rf'\1"{self.new_version}"',
+            updated,
+            flags=re.MULTILINE,
+        )
+        self.sphinx_conf.write_text(updated)
 
     def _update_citation_cff(self, date: str) -> None:
         """Update version and date in CITATION.cff."""
