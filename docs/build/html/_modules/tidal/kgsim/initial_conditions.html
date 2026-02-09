@@ -1,0 +1,1370 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>tidal.kgsim.initial_conditions &#8212; TIDAL 0.3.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=e259d695"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/tidal/kgsim/initial_conditions';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="0.3.0" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../_static/TIDAL_Logo_TikZ_Figure.svg" class="logo__image only-light" alt="TIDAL 0.3.0 documentation - Home"/>
+    <img src="../../../_static/TIDAL_Logo_TikZ_Figure.svg" class="logo__image only-dark pst-js-only" alt="TIDAL 0.3.0 documentation - Home"/>
+  
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../pipeline.html">
+    Symbolic Pipeline
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../cli.html">
+    CLI Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../TEX_SUPPORT.html">
+    TeX Support Configuration
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../2D_COUPLED_IMPLEMENTATION.html">
+    Klein-Gordon 2D Coupled Simulations: Implementation Summary
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../ADVANCED_KLEIN_GORDON_IMPLEMENTATION.html">
+    Advanced Klein-Gordon Equation Implementation
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../RESTRUCTURING_PHASE2.html">
+    Phase 2 Restructuring: Code Quality and API Improvements
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../modules.html">
+    tidal
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/WilliamRoyce/torsion-gertsenshtein" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../pipeline.html">
+    Symbolic Pipeline
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../cli.html">
+    CLI Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../TEX_SUPPORT.html">
+    TeX Support Configuration
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../2D_COUPLED_IMPLEMENTATION.html">
+    Klein-Gordon 2D Coupled Simulations: Implementation Summary
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../ADVANCED_KLEIN_GORDON_IMPLEMENTATION.html">
+    Advanced Klein-Gordon Equation Implementation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../RESTRUCTURING_PHASE2.html">
+    Phase 2 Restructuring: Code Quality and API Improvements
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../modules.html">
+    tidal
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/WilliamRoyce/torsion-gertsenshtein" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="../../tidal.html" class="nav-link">tidal</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">tidal.kgsim.initial_conditions</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for tidal.kgsim.initial_conditions</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;Initial condition classes and factory functions for Klein-Gordon fields.</span>
+
+<span class="sd">This module provides both class-based (InitialCondition, GaussianPulse, RingPulse2D)</span>
+<span class="sd">and function-based (gaussian_pulse, ring_pulse_2d, plane_wave) APIs for creating</span>
+<span class="sd">initial field configurations.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">cast</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pde</span><span class="w"> </span><span class="kn">import</span> <span class="n">CartesianGrid</span><span class="p">,</span> <span class="n">FieldCollection</span><span class="p">,</span> <span class="n">ScalarField</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">override</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">tidal.kgsim.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">extract_grid_coordinates</span><span class="p">,</span> <span class="n">natural_center</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Sequence</span>
+
+
+<div class="viewcode-block" id="InitialCondition">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.InitialCondition">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">InitialCondition</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Abstract base class for Klein-Gordon initial conditions.</span>
+
+<span class="sd">    This class provides common functionality for creating initial conditions</span>
+<span class="sd">    on CartesianGrid, eliminating coordinate handling duplication across</span>
+<span class="sd">    different IC types.</span>
+
+<span class="sd">    Subclasses should implement the `_compute_phi()` and optionally</span>
+<span class="sd">    `_compute_pi()` methods to define the specific initial field profiles.</span>
+
+<span class="sd">    Serialization</span>
+<span class="sd">    -------------</span>
+<span class="sd">    Instances can be pickled/deepcopied without issues.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>  <span class="c1"># noqa: PLR6301</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Extract and normalize grid coordinates.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        grid : CartesianGrid</span>
+<span class="sd">            The computational grid</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Coordinates array in shape (N_cells, dim) for uniform handling</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">extract_grid_coordinates</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">flatten</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_distances_from_center</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">,</span> <span class="n">center</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute Euclidean distances from a center point.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        grid : CartesianGrid</span>
+<span class="sd">            The computational grid</span>
+<span class="sd">        center : Sequence[float] | None</span>
+<span class="sd">            Center coordinates. If None, uses natural_center(grid.axes_bounds)</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Flattened array of distances, shape (N_cells,)</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If center dimension does not match grid dimension</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">center</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">center</span> <span class="o">=</span> <span class="n">natural_center</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">axes_bounds</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">center</span><span class="p">)</span> <span class="o">!=</span> <span class="n">grid</span><span class="o">.</span><span class="n">dim</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;center must have length </span><span class="si">{</span><span class="n">grid</span><span class="o">.</span><span class="n">dim</span><span class="si">}</span><span class="s2">, got </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">center</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="n">coords</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_coordinates</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span>
+        <span class="n">center_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">center</span><span class="p">)</span>
+
+        <span class="c1"># Compute Euclidean distance</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">coords</span> <span class="o">-</span> <span class="n">center_arr</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">))</span>
+
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_phi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the phi field data.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        grid : CartesianGrid</span>
+<span class="sd">            The computational grid</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Flattened phi field values</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If grid dimensions are invalid</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_pi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">,</span> <span class="n">phi_data</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>  <span class="c1"># noqa: ARG002, PLR6301</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute the pi (time derivative) field data.</span>
+
+<span class="sd">        Default implementation returns zeros. Override for non-zero initial velocity.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        grid : CartesianGrid</span>
+<span class="sd">            The computational grid</span>
+<span class="sd">        phi_data : np.ndarray</span>
+<span class="sd">            Flattened phi field values</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        np.ndarray</span>
+<span class="sd">            Flattened pi field values</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">phi_data</span><span class="p">)</span>
+
+<div class="viewcode-block" id="InitialCondition.build">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.InitialCondition.build">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">build</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FieldCollection</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Build the initial condition FieldCollection.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        grid : CartesianGrid</span>
+<span class="sd">            The computational grid</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        FieldCollection</span>
+<span class="sd">            Initial state containing [phi, pi] ScalarFields</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">phi_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_phi</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span>
+        <span class="n">pi_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_pi</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">phi_data</span><span class="p">)</span>
+
+        <span class="c1"># Reshape to grid shape</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">ScalarField</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">phi_data</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;phi&quot;</span><span class="p">)</span>
+        <span class="n">pi</span> <span class="o">=</span> <span class="n">ScalarField</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">pi_data</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">shape</span><span class="p">),</span> <span class="n">label</span><span class="o">=</span><span class="s2">&quot;pi&quot;</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">FieldCollection</span><span class="p">([</span><span class="n">phi</span><span class="p">,</span> <span class="n">pi</span><span class="p">],</span> <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;phi&quot;</span><span class="p">,</span> <span class="s2">&quot;pi&quot;</span><span class="p">])</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="GaussianPulse">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.GaussianPulse">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">GaussianPulse</span><span class="p">(</span><span class="n">InitialCondition</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Gaussian pulse initial condition using the base class pattern.</span>
+
+<span class="sd">    Creates a Gaussian pulse:</span>
+<span class="sd">        phi(x) = amplitude * exp(-|x - center|^2 / (2 * width^2))</span>
+<span class="sd">        pi(x) = initial_velocity * phi(x)</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; from tidal.kgsim import make_grid, GridConfig</span>
+<span class="sd">    &gt;&gt;&gt; grid = make_grid(GridConfig(dim=1, shape=(64,), bounds=((0, 50),)))</span>
+<span class="sd">    &gt;&gt;&gt; ic = GaussianPulse(amplitude=1.0, width=2.0, center=[25.0])</span>
+<span class="sd">    &gt;&gt;&gt; state = ic.build(grid)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">amplitude</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">width</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">center</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="o">...</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">initial_velocity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">sigma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize Gaussian pulse parameters.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        amplitude : float</span>
+<span class="sd">            Peak amplitude (default: 1.0)</span>
+<span class="sd">        width : float | None</span>
+<span class="sd">            Gaussian width (standard deviation), must be positive (default: 2.0)</span>
+<span class="sd">        center : list[float] | tuple[float, ...] | None</span>
+<span class="sd">            Center coordinates. If None, uses grid center (default: None)</span>
+<span class="sd">        initial_velocity : float</span>
+<span class="sd">            Initial time derivative scaling factor (default: 0.0)</span>
+<span class="sd">        sigma : float | None</span>
+<span class="sd">            Alias for width (for consistency with RingPulse2D). Cannot be</span>
+<span class="sd">            specified together with width.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If both width and sigma are specified, or if width &lt;= 0, or if values are not finite</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        Both `width` and `sigma` refer to the Gaussian standard deviation.</span>
+<span class="sd">        The `sigma` parameter is provided for consistency with RingPulse2D naming.</span>
+<span class="sd">        If neither is specified, defaults to width=2.0.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Reject if both parameters are specified</span>
+        <span class="k">if</span> <span class="n">width</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">sigma</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Cannot specify both &#39;width&#39; and &#39;sigma&#39; parameters. Use one or the other.&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># Use sigma if provided, otherwise use width, otherwise default</span>
+        <span class="k">if</span> <span class="n">sigma</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">final_width</span> <span class="o">=</span> <span class="n">sigma</span>
+        <span class="k">elif</span> <span class="n">width</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">final_width</span> <span class="o">=</span> <span class="n">width</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">final_width</span> <span class="o">=</span> <span class="mf">2.0</span>  <span class="c1"># Default value</span>
+
+        <span class="c1"># Validate finiteness BEFORE range checks</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">amplitude</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;amplitude must be finite, got </span><span class="si">{</span><span class="n">amplitude</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">final_width</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;width must be finite, got </span><span class="si">{</span><span class="n">final_width</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">initial_velocity</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;initial_velocity must be finite, got </span><span class="si">{</span><span class="n">initial_velocity</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># Now check ranges</span>
+        <span class="k">if</span> <span class="n">final_width</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;width must be positive, got </span><span class="si">{</span><span class="n">final_width</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># Validate and copy center to prevent mutation</span>
+        <span class="n">center_copy</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">center</span><span class="p">)</span> <span class="k">if</span> <span class="n">center</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="k">else</span> <span class="kc">None</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">amplitude</span> <span class="o">=</span> <span class="n">amplitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">width</span> <span class="o">=</span> <span class="n">final_width</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">center</span> <span class="o">=</span> <span class="n">center_copy</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initial_velocity</span> <span class="o">=</span> <span class="n">initial_velocity</span>
+
+    <span class="nd">@override</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_phi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute Gaussian phi field.&quot;&quot;&quot;</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_distances_from_center</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">center</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">amplitude</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">r</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mf">2.0</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">width</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
+
+    <span class="nd">@override</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_pi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">,</span> <span class="n">phi_data</span><span class="p">:</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute pi field with initial velocity.&quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_velocity</span> <span class="o">*</span> <span class="n">phi_data</span></div>
+
+
+
+<div class="viewcode-block" id="RingPulse2D">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.RingPulse2D">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">RingPulse2D</span><span class="p">(</span><span class="n">InitialCondition</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;2D ring-shaped Gaussian pulse initial condition.</span>
+
+<span class="sd">    Creates a radially symmetric ring:</span>
+<span class="sd">        phi(r) = amplitude * exp(-(r - initial_radius)^2 / (2 * sigma^2))</span>
+
+<span class="sd">    where r is the radial distance from the grid center (midpoint of bounds).</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    &gt;&gt;&gt; grid = make_grid(GridConfig(dim=2, shape=(64, 64),</span>
+<span class="sd">    ...                             bounds=((-20, 20), (-20, 20))))</span>
+<span class="sd">    &gt;&gt;&gt; ic = RingPulse2D(amplitude=1.0, initial_radius=5.0, sigma=1.0)</span>
+<span class="sd">    &gt;&gt;&gt; state = ic.build(grid)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="o">*</span><span class="p">,</span>
+        <span class="n">amplitude</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+        <span class="n">initial_radius</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span>
+        <span class="n">sigma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">width</span><span class="p">:</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Initialize ring pulse parameters.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        amplitude : float</span>
+<span class="sd">            Peak amplitude (default: 1.0)</span>
+<span class="sd">        initial_radius : float</span>
+<span class="sd">            Radial position of the ring (default: 5.0)</span>
+<span class="sd">        sigma : float | None</span>
+<span class="sd">            Gaussian width of the ring (default: 1.0)</span>
+<span class="sd">        width : float | None</span>
+<span class="sd">            Alias for sigma (for consistency with GaussianPulse). Cannot be</span>
+<span class="sd">            specified together with sigma.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If both sigma and width are specified, or if sigma &lt;= 0,</span>
+<span class="sd">            or if initial_radius &lt; 0</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        Both `sigma` and `width` refer to the Gaussian standard deviation.</span>
+<span class="sd">        The `width` parameter is provided for consistency with GaussianPulse naming.</span>
+<span class="sd">        If neither is specified, defaults to sigma=1.0.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Reject if both parameters are specified</span>
+        <span class="k">if</span> <span class="n">width</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span> <span class="ow">and</span> <span class="n">sigma</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;Cannot specify both &#39;sigma&#39; and &#39;width&#39; parameters. Use one or the other.&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># Use width if provided, otherwise use sigma, otherwise default</span>
+        <span class="k">if</span> <span class="n">width</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">final_sigma</span> <span class="o">=</span> <span class="n">width</span>
+        <span class="k">elif</span> <span class="n">sigma</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">final_sigma</span> <span class="o">=</span> <span class="n">sigma</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">final_sigma</span> <span class="o">=</span> <span class="mf">1.0</span>  <span class="c1"># Default value</span>
+
+        <span class="c1"># Validate finiteness BEFORE range checks</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">amplitude</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;amplitude must be finite, got </span><span class="si">{</span><span class="n">amplitude</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">final_sigma</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;sigma must be finite, got </span><span class="si">{</span><span class="n">final_sigma</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">initial_radius</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;initial_radius must be finite, got </span><span class="si">{</span><span class="n">initial_radius</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># Now check ranges</span>
+        <span class="k">if</span> <span class="n">final_sigma</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;sigma must be positive, got </span><span class="si">{</span><span class="n">final_sigma</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">initial_radius</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;initial_radius must be non-negative, got </span><span class="si">{</span><span class="n">initial_radius</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">amplitude</span> <span class="o">=</span> <span class="n">amplitude</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">initial_radius</span> <span class="o">=</span> <span class="n">initial_radius</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">width</span> <span class="o">=</span> <span class="n">final_sigma</span>  <span class="c1"># Store as .width for consistency with GaussianPulse</span>
+
+    <span class="nd">@override</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_compute_phi</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Compute ring-shaped phi field centered at grid midpoint.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If grid is not 2D</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">dim</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># noqa: PLR2004</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;RingPulse2D requires 2D grid, got </span><span class="si">{</span><span class="n">grid</span><span class="o">.</span><span class="n">dim</span><span class="si">}</span><span class="s2">D&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># Use grid center instead of origin for consistency with original behavior</span>
+        <span class="n">center</span> <span class="o">=</span> <span class="n">natural_center</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">axes_bounds</span><span class="p">)</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_compute_distances_from_center</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">center</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">amplitude</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span>
+            <span class="o">-</span><span class="p">((</span><span class="n">r</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_radius</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mf">2.0</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">width</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="p">)</span></div>
+
+
+
+<span class="c1"># Keep original function-based API for backward compatibility</span>
+
+
+<div class="viewcode-block" id="gaussian_pulse">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.gaussian_pulse">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">gaussian_pulse</span><span class="p">(</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">amplitude</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">center</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">width</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">2.0</span><span class="p">,</span>
+    <span class="n">initial_velocity</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FieldCollection</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a Gaussian pulse on a CartesianGrid and its conjugate momentum.</span>
+
+<span class="sd">    The scalar field phi is defined as</span>
+<span class="sd">        phi(x) = amplitude * exp(-|x - center|^2 / (2 * width^2))</span>
+<span class="sd">    and the conjugate momentum pi is taken to be</span>
+<span class="sd">        pi(x) = initial_velocity * phi(x).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    grid : CartesianGrid</span>
+<span class="sd">        The computational grid. The function uses the grid&#39;s cell coordinates and</span>
+<span class="sd">        shape to evaluate the Gaussian and to construct ScalarField objects that</span>
+<span class="sd">        conform to the grid.</span>
+<span class="sd">    amplitude : float, optional</span>
+<span class="sd">        Peak amplitude A of the Gaussian (default: 1.0).</span>
+<span class="sd">    center : list[float] or None, optional</span>
+<span class="sd">        Coordinates of the Gaussian center x0. If None (default), the center is</span>
+<span class="sd">        chosen via natural_center(grid.axes_bounds). The length of the list must</span>
+<span class="sd">        match the dimensionality of the grid.</span>
+<span class="sd">    width : float, optional</span>
+<span class="sd">        Gaussian width (standard deviation sigma). Must be positive (default: 2.0).</span>
+<span class="sd">    initial_velocity : float, optional</span>
+<span class="sd">        Scalar factor used to set the initial momentum pi = initial_velocity * phi</span>
+<span class="sd">        (default: 0.0).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    FieldCollection</span>
+<span class="sd">        A FieldCollection containing two ScalarField objects, labeled &quot;phi&quot; and</span>
+<span class="sd">        &quot;pi&quot;, whose data arrays have the same shape as the provided grid.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - Distances are computed using Euclidean norm on the grid cell coordinates.</span>
+<span class="sd">    - This function is a convenience wrapper around the GaussianPulse class.</span>
+<span class="sd">      For more flexibility, consider using GaussianPulse directly.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    GaussianPulse : Class-based API for more extensibility and customization.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ic</span> <span class="o">=</span> <span class="n">GaussianPulse</span><span class="p">(</span>
+        <span class="n">amplitude</span><span class="o">=</span><span class="n">amplitude</span><span class="p">,</span>
+        <span class="n">width</span><span class="o">=</span><span class="n">width</span><span class="p">,</span>
+        <span class="n">center</span><span class="o">=</span><span class="n">center</span><span class="p">,</span>
+        <span class="n">initial_velocity</span><span class="o">=</span><span class="n">initial_velocity</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">ic</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ring_pulse_2d">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.ring_pulse_2d">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">ring_pulse_2d</span><span class="p">(</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">amplitude</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">initial_radius</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.0</span><span class="p">,</span>
+    <span class="n">sigma</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FieldCollection</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a 2D ring-shaped Gaussian pulse on the provided CartesianGrid.</span>
+
+<span class="sd">    The function constructs a scalar field phi defined by a circular Gaussian</span>
+<span class="sd">    envelope centered at the origin and an accompanying momentum field pi</span>
+<span class="sd">    initialized to zero. The radial profile is</span>
+
+<span class="sd">        phi(r) = amplitude * exp(- (r - initial_radius)**2 / (2 * sigma**2) )</span>
+
+<span class="sd">    where r is the distance from the origin. The fields are returned as a</span>
+<span class="sd">    FieldCollection containing two ScalarField instances labeled &quot;phi&quot; and &quot;pi&quot;.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    grid : CartesianGrid</span>
+<span class="sd">        A 2-dimensional grid object. If grid.dim != 2 a ValueError is raised.</span>
+<span class="sd">    amplitude : float, optional</span>
+<span class="sd">        Peak amplitude of the Gaussian ring (default: 1.0).</span>
+<span class="sd">    initial_radius : float, optional</span>
+<span class="sd">        Radius of the ring (distance from the origin where the Gaussian is</span>
+<span class="sd">        centered) (default: 5.0).</span>
+<span class="sd">    sigma : float, optional</span>
+<span class="sd">        Standard deviation (width) of the Gaussian envelope (default: 1.0).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    FieldCollection</span>
+<span class="sd">        A FieldCollection([phi, pi], labels=[&quot;phi&quot;, &quot;pi&quot;]) where:</span>
+<span class="sd">          - phi is a ScalarField on `grid` containing the ring Gaussian values</span>
+<span class="sd">            with shape == grid.shape, and</span>
+<span class="sd">          - pi is a ScalarField of zeros with the same shape.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - The returned phi array has the same layout/shape as grid.shape.</span>
+<span class="sd">    - Ring is centered at the grid midpoint, not the origin.</span>
+<span class="sd">    - This function is a convenience wrapper around the RingPulse2D class.</span>
+<span class="sd">      For more flexibility, consider using RingPulse2D directly.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    RingPulse2D : Class-based API for more extensibility and customization.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">ic</span> <span class="o">=</span> <span class="n">RingPulse2D</span><span class="p">(</span>
+        <span class="n">amplitude</span><span class="o">=</span><span class="n">amplitude</span><span class="p">,</span>
+        <span class="n">initial_radius</span><span class="o">=</span><span class="n">initial_radius</span><span class="p">,</span>
+        <span class="n">sigma</span><span class="o">=</span><span class="n">sigma</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">return</span> <span class="n">ic</span><span class="o">.</span><span class="n">build</span><span class="p">(</span><span class="n">grid</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="plane_wave">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.plane_wave">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">plane_wave</span><span class="p">(</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">,</span>
+    <span class="o">*</span><span class="p">,</span>
+    <span class="n">amplitude</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">k_vec</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">mass</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span><span class="p">,</span>
+    <span class="n">phase</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FieldCollection</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Create a Klein-Gordon plane-wave initial condition on a CartesianGrid.</span>
+
+<span class="sd">    The returned FieldCollection contains two ScalarField objects:</span>
+<span class="sd">    - &quot;phi&quot;:    φ(x) = A * cos(k · x + phase)</span>
+<span class="sd">    - &quot;pi&quot;:     π(x) = -A * ω * sin(k · x + phase)</span>
+
+<span class="sd">    The angular frequency ω satisfies the dispersion relation</span>
+<span class="sd">        ω^2 = |k|^2 + m^2</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    grid : CartesianGrid</span>
+<span class="sd">        Grid object providing geometry and cell coordinates. The function uses</span>
+<span class="sd">        grid.cell_coords (flattened coordinates) for evaluating the plane wave</span>
+<span class="sd">        and reshapes results to grid.shape when constructing the ScalarField</span>
+<span class="sd">        instances.</span>
+<span class="sd">    amplitude : float, optional</span>
+<span class="sd">        Amplitude A of the plane wave. Default is 1.0.</span>
+<span class="sd">    k_vec : list[float] or None, optional</span>
+<span class="sd">        Wavevector k. If None, the function chooses the fundamental mode along</span>
+<span class="sd">        the first axis with magnitude 2π / L_x (where L_x is the axis length),</span>
+<span class="sd">        and zeros for the remaining components. If provided, its length should</span>
+<span class="sd">        match grid.dim.</span>
+<span class="sd">    mass : float, optional</span>
+<span class="sd">        Mass parameter m appearing in the dispersion relation. Default is 1.0.</span>
+<span class="sd">    phase : float, optional</span>
+<span class="sd">        Global phase offset (in radians) added to k · x. Default is 0.0.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    FieldCollection</span>
+<span class="sd">        A FieldCollection containing two ScalarField objects, labeled</span>
+<span class="sd">        [&quot;phi&quot;, &quot;pi&quot;], each with data shaped to grid.shape corresponding to the</span>
+<span class="sd">        cell-centered evaluation of φ and π over the grid.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - The function computes k · x using the flattened cell coordinates returned</span>
+<span class="sd">      by grid.cell_coords; ensure those coordinates are in the desired units.</span>
+<span class="sd">    - If k_vec has a different length than grid.dim, behavior is undefined and</span>
+<span class="sd">      a mismatch will typically raise an exception when performing the dot</span>
+<span class="sd">      product or when reshaping the arrays.</span>
+<span class="sd">    - Omega is computed from k_vec and mass via the dispersion relation.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">k_vec</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="c1"># fundamental mode along x</span>
+        <span class="n">l_x</span> <span class="o">=</span> <span class="n">grid</span><span class="o">.</span><span class="n">axes_bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">grid</span><span class="o">.</span><span class="n">axes_bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">k_vec</span> <span class="o">=</span> <span class="p">[</span><span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">pi</span> <span class="o">/</span> <span class="n">l_x</span><span class="p">]</span> <span class="o">+</span> <span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">dim</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">k</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">k_vec</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+
+    <span class="n">omega</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">dot</span><span class="p">(</span><span class="n">k</span><span class="p">,</span> <span class="n">k</span><span class="p">)</span> <span class="o">+</span> <span class="n">mass</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="n">x_coordinate</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="s2">&quot;np.ndarray&quot;</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">cell_coords</span><span class="p">)</span>
+    <span class="n">phase_array</span> <span class="o">=</span> <span class="n">x_coordinate</span> <span class="o">@</span> <span class="n">k</span> <span class="o">+</span> <span class="n">phase</span>
+    <span class="n">phi_array</span> <span class="o">=</span> <span class="n">amplitude</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">cos</span><span class="p">(</span><span class="n">phase_array</span><span class="p">)</span>
+    <span class="n">pi_array</span> <span class="o">=</span> <span class="o">-</span><span class="n">amplitude</span> <span class="o">*</span> <span class="n">omega</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sin</span><span class="p">(</span><span class="n">phase_array</span><span class="p">)</span>
+
+    <span class="n">phi</span> <span class="o">=</span> <span class="n">ScalarField</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">phi_array</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+    <span class="n">pi</span> <span class="o">=</span> <span class="n">ScalarField</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">pi_array</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">shape</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">FieldCollection</span><span class="p">([</span><span class="n">phi</span><span class="p">,</span> <span class="n">pi</span><span class="p">],</span> <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;phi&quot;</span><span class="p">,</span> <span class="s2">&quot;pi&quot;</span><span class="p">])</span></div>
+
+
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_expand_param</span><span class="p">(</span>
+    <span class="n">name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">values</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="nb">float</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span> <span class="n">n</span><span class="p">:</span> <span class="nb">int</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Normalize scalar-or-sequence parameter to a 1D numpy array of length n.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    name : str</span>
+<span class="sd">        Name of the parameter (used for error messages).</span>
+<span class="sd">    values : Sequence[float] | float | None</span>
+<span class="sd">        A scalar or sequence to normalize to a 1D numpy array.</span>
+<span class="sd">        If a scalar is provided, it will be broadcast to all fields.</span>
+<span class="sd">        If a sequence is provided, it must have exactly `n` elements.</span>
+<span class="sd">    n : int</span>
+<span class="sd">        Target length of the returned array.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    np.ndarray</span>
+<span class="sd">        A 1D numpy array of length `n` containing the parameter values.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If `values` is None, or if a sequence is provided with length != `n`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">values</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must be provided&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="c1"># Check if input is a scalar (not a sequence)</span>
+    <span class="c1"># np.ndim returns 0 for scalars, &gt;0 for arrays/sequences</span>
+    <span class="n">is_scalar</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ndim</span><span class="p">(</span><span class="n">values</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span>
+
+    <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">atleast_1d</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">values</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">))</span>
+
+    <span class="c1"># Only broadcast if the original input was a scalar</span>
+    <span class="k">if</span> <span class="n">is_scalar</span> <span class="ow">and</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">n</span><span class="p">,),</span> <span class="nb">float</span><span class="p">(</span><span class="n">arr</span><span class="o">.</span><span class="n">item</span><span class="p">()),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">arr</span><span class="o">.</span><span class="n">size</span> <span class="o">!=</span> <span class="n">n</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> must have length </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2"> (got </span><span class="si">{</span><span class="n">arr</span><span class="o">.</span><span class="n">size</span><span class="si">}</span><span class="s2">), or be a scalar for broadcasting&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">arr</span>
+
+
+<div class="viewcode-block" id="multi_gaussian">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.multi_gaussian">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">multi_gaussian</span><span class="p">(</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">,</span>
+    <span class="n">amplitudes</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span>
+    <span class="n">widths</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span>
+    <span class="n">centers</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">velocities</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FieldCollection</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;1D-only multi-gaussian initializer (safe handling of shapes and broadcasting).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    grid : CartesianGrid</span>
+<span class="sd">        A 1D CartesianGrid.</span>
+<span class="sd">    amplitudes : Sequence[float]</span>
+<span class="sd">        Sequence of amplitudes, one per Gaussian.</span>
+<span class="sd">    widths : Sequence[float]</span>
+<span class="sd">        Sequence of widths (standard deviations), one per Gaussian.</span>
+<span class="sd">    centers : Sequence[float] or None, optional</span>
+<span class="sd">        Sequence of center positions (or None to use domain midpoint for each).</span>
+<span class="sd">    velocities : Sequence[float] or None, optional</span>
+<span class="sd">        Sequence of initial velocities (or None to use zeros).</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    FieldCollection</span>
+<span class="sd">        FieldCollection containing (phi, pi) pairs for each Gaussian.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If grid.dim != 1, if any width is non-positive, or if any of the</span>
+<span class="sd">        parameter sequences does not match the expected number of fields.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">dim</span> <span class="o">!=</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;multi_gaussian currently supports 1D grids only&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="n">field_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">amplitudes</span><span class="p">)</span>
+
+    <span class="c1"># validate non-empty amplitudes (prevent silent no-op with zero fields)</span>
+    <span class="k">if</span> <span class="n">field_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;amplitudes must be a non-empty sequence&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="n">amp_arr</span> <span class="o">=</span> <span class="n">_expand_param</span><span class="p">(</span><span class="s2">&quot;amplitudes&quot;</span><span class="p">,</span> <span class="n">amplitudes</span><span class="p">,</span> <span class="n">field_count</span><span class="p">)</span>
+    <span class="n">width_arr</span> <span class="o">=</span> <span class="n">_expand_param</span><span class="p">(</span><span class="s2">&quot;widths&quot;</span><span class="p">,</span> <span class="n">widths</span><span class="p">,</span> <span class="n">field_count</span><span class="p">)</span>
+
+    <span class="c1"># coordinates: ensure concrete numpy array for typing and numeric ops</span>
+    <span class="n">coords</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="s2">&quot;np.ndarray&quot;</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">cell_coords</span><span class="p">)</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">coords</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span> <span class="k">if</span> <span class="n">coords</span><span class="o">.</span><span class="n">ndim</span> <span class="o">&gt;</span> <span class="mi">1</span> <span class="k">else</span> <span class="n">coords</span>
+
+    <span class="c1"># default center: midpoint of domain</span>
+    <span class="n">mid</span> <span class="o">=</span> <span class="nb">float</span><span class="p">((</span><span class="n">x</span><span class="o">.</span><span class="n">min</span><span class="p">()</span> <span class="o">+</span> <span class="n">x</span><span class="o">.</span><span class="n">max</span><span class="p">())</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">)</span>
+    <span class="n">centers_arr</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">_expand_param</span><span class="p">(</span><span class="s2">&quot;centers&quot;</span><span class="p">,</span> <span class="n">centers</span><span class="p">,</span> <span class="n">field_count</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">centers</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="n">field_count</span><span class="p">,),</span> <span class="n">mid</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">vel_arr</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">_expand_param</span><span class="p">(</span><span class="s2">&quot;velocities&quot;</span><span class="p">,</span> <span class="n">velocities</span><span class="p">,</span> <span class="n">field_count</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">velocities</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">field_count</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">fields</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ScalarField</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">labels</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="c1"># Build fields using vectorized expression per field</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">field_count</span><span class="p">):</span>
+        <span class="n">sigma</span> <span class="o">=</span> <span class="n">width_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">sigma</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;widths must be positive&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="n">dx</span> <span class="o">=</span> <span class="n">x</span> <span class="o">-</span> <span class="n">centers_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">phi_arr</span> <span class="o">=</span> <span class="n">amp_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">dx</span> <span class="o">*</span> <span class="n">dx</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">sigma</span> <span class="o">*</span> <span class="n">sigma</span><span class="p">))</span>
+        <span class="n">pi_arr</span> <span class="o">=</span> <span class="n">vel_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">phi_arr</span>
+
+        <span class="n">fields</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="p">(</span>
+                <span class="n">ScalarField</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">phi_arr</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">shape</span><span class="p">)),</span>
+                <span class="n">ScalarField</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">pi_arr</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">shape</span><span class="p">)),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">labels</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;phi</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;pi</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">FieldCollection</span><span class="p">(</span><span class="n">fields</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="multi_gaussian_2d">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.multi_gaussian_2d">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">multi_gaussian_2d</span><span class="p">(</span>  <span class="c1"># noqa: PLR0914</span>
+    <span class="n">grid</span><span class="p">:</span> <span class="n">CartesianGrid</span><span class="p">,</span>
+    <span class="n">amplitudes</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span>
+    <span class="n">widths</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">],</span>
+    <span class="n">centers</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">tuple</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">]]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="n">velocities</span><span class="p">:</span> <span class="n">Sequence</span><span class="p">[</span><span class="nb">float</span><span class="p">]</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FieldCollection</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;2D multi-gaussian initializer for N coupled Klein-Gordon fields.</span>
+
+<span class="sd">    This function creates a FieldCollection with N field pairs (phi_i, pi_i),</span>
+<span class="sd">    each initialized as a Gaussian centered at a specified 2D position. The</span>
+<span class="sd">    Gaussian for field i has the form:</span>
+
+<span class="sd">        phi_i(x, y) = A_i * exp(-r_i^2 / (2 * sigma_i^2))</span>
+
+<span class="sd">    where r_i = sqrt((x - x_i)^2 + (y - y_i)^2) is the Euclidean distance from</span>
+<span class="sd">    the center (x_i, y_i), A_i is the amplitude, and sigma_i is the width.</span>
+
+<span class="sd">    The conjugate momentum is:</span>
+<span class="sd">        pi_i(x, y) = v_i * phi_i(x, y)</span>
+
+<span class="sd">    where v_i is the initial velocity for field i.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    grid : CartesianGrid</span>
+<span class="sd">        A 2D CartesianGrid. The function will raise ValueError if grid.dim != 2.</span>
+<span class="sd">    amplitudes : Sequence[float]</span>
+<span class="sd">        Sequence of amplitudes [A_0, A_1, ..., A_{N-1}], one per field.</span>
+<span class="sd">        Must be non-empty.</span>
+<span class="sd">    widths : Sequence[float]</span>
+<span class="sd">        Sequence of widths (standard deviations) [sigma_0, sigma_1, ..., sigma_{N-1}],</span>
+<span class="sd">        one per field. All widths must be positive.</span>
+<span class="sd">    centers : Sequence[tuple[float, float]] or None, optional</span>
+<span class="sd">        Sequence of center positions [(x_0, y_0), (x_1, y_1), ...], one per</span>
+<span class="sd">        field. If None, all fields are centered at the midpoint of the domain.</span>
+<span class="sd">    velocities : Sequence[float] or None, optional</span>
+<span class="sd">        Sequence of initial velocities [v_0, v_1, ...], one per field.</span>
+<span class="sd">        If None, all velocities are set to zero.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    FieldCollection</span>
+<span class="sd">        A FieldCollection containing 2N ScalarField objects with labels</span>
+<span class="sd">        [&quot;phi0&quot;, &quot;pi0&quot;, &quot;phi1&quot;, &quot;pi1&quot;, ..., &quot;phi{N-1}&quot;, &quot;pi{N-1}&quot;].</span>
+<span class="sd">        Each phi_i and pi_i has shape == grid.shape.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        - If grid.dim != 2.</span>
+<span class="sd">        - If amplitudes is empty.</span>
+<span class="sd">        - If any width is non-positive.</span>
+<span class="sd">        - If centers is provided but has length != len(amplitudes).</span>
+<span class="sd">        - If velocities is provided but has length != len(amplitudes).</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - This function is designed for initializing coupled Klein-Gordon systems</span>
+<span class="sd">      with spatially separated or overlapping Gaussian pulses.</span>
+<span class="sd">    - For single-field 2D Gaussians, use `gaussian_pulse` instead.</span>
+<span class="sd">    - For radial ring-shaped pulses in 2D, use `ring_pulse_2d`.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Create two Gaussians separated along the x-axis::</span>
+
+<span class="sd">        grid = make_grid(GridConfig(dim=2, shape=(128, 128),</span>
+<span class="sd">                                    bounds=((-50, 50), (-50, 50)),</span>
+<span class="sd">                                    periodic=True))</span>
+<span class="sd">        state = multi_gaussian_2d(</span>
+<span class="sd">            grid,</span>
+<span class="sd">            amplitudes=[1.0, 0.0],</span>
+<span class="sd">            widths=[5.0, 5.0],</span>
+<span class="sd">            centers=[(-10.0, 0.0), (10.0, 0.0)],</span>
+<span class="sd">        )</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">grid</span><span class="o">.</span><span class="n">dim</span> <span class="o">!=</span> <span class="mi">2</span><span class="p">:</span>  <span class="c1"># noqa: PLR2004</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;multi_gaussian_2d requires a 2D grid (grid.dim == 2)&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="n">field_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">amplitudes</span><span class="p">)</span>
+
+    <span class="c1"># Validate non-empty amplitudes</span>
+    <span class="k">if</span> <span class="n">field_count</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;amplitudes must be a non-empty sequence&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="n">amp_arr</span> <span class="o">=</span> <span class="n">_expand_param</span><span class="p">(</span><span class="s2">&quot;amplitudes&quot;</span><span class="p">,</span> <span class="n">amplitudes</span><span class="p">,</span> <span class="n">field_count</span><span class="p">)</span>
+    <span class="n">width_arr</span> <span class="o">=</span> <span class="n">_expand_param</span><span class="p">(</span><span class="s2">&quot;widths&quot;</span><span class="p">,</span> <span class="n">widths</span><span class="p">,</span> <span class="n">field_count</span><span class="p">)</span>
+
+    <span class="c1"># Get 2D coordinates - cell_coords may be either (nx, ny, 2) or (N_cells, 2) depending on py-pde version</span>
+    <span class="n">coords</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="s2">&quot;np.ndarray&quot;</span><span class="p">,</span> <span class="n">grid</span><span class="o">.</span><span class="n">cell_coords</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">coords</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">3</span> <span class="ow">and</span> <span class="n">coords</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">grid</span><span class="o">.</span><span class="n">dim</span><span class="p">:</span>  <span class="c1"># noqa: PLR2004</span>
+        <span class="c1"># Coords are in shape (nx, ny, 2) - extract x and y arrays</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">coords</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">coords</span><span class="p">[:,</span> <span class="p">:,</span> <span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">ravel</span><span class="p">()</span>
+    <span class="k">elif</span> <span class="n">coords</span><span class="o">.</span><span class="n">ndim</span> <span class="o">==</span> <span class="mi">2</span> <span class="ow">and</span> <span class="n">coords</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">==</span> <span class="n">grid</span><span class="o">.</span><span class="n">dim</span><span class="p">:</span>  <span class="c1"># noqa: PLR2004</span>
+        <span class="c1"># Coords are already flattened (N_cells, 2)</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">coords</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">]</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">coords</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Unexpected cell_coords shape: </span><span class="si">{</span><span class="n">coords</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="c1"># Default center: midpoint of domain in both dimensions</span>
+    <span class="n">mid_x</span> <span class="o">=</span> <span class="nb">float</span><span class="p">((</span><span class="n">grid</span><span class="o">.</span><span class="n">axes_bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">axes_bounds</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">)</span>
+    <span class="n">mid_y</span> <span class="o">=</span> <span class="nb">float</span><span class="p">((</span><span class="n">grid</span><span class="o">.</span><span class="n">axes_bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">grid</span><span class="o">.</span><span class="n">axes_bounds</span><span class="p">[</span><span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">])</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">)</span>
+
+    <span class="c1"># Handle centers parameter</span>
+    <span class="k">if</span> <span class="n">centers</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">centers_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span>
+            <span class="p">[(</span><span class="n">mid_x</span><span class="p">,</span> <span class="n">mid_y</span><span class="p">)</span> <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">field_count</span><span class="p">)],</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">centers</span><span class="p">)</span> <span class="o">!=</span> <span class="n">field_count</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;centers must have length </span><span class="si">{</span><span class="n">field_count</span><span class="si">}</span><span class="s2"> (one per field)&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="n">centers_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">centers</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">centers_arr</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="n">field_count</span><span class="p">,</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;centers must be a sequence of (x, y) tuples, got shape </span><span class="si">{</span><span class="n">centers_arr</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="c1"># Handle velocities parameter</span>
+    <span class="n">vel_arr</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="n">_expand_param</span><span class="p">(</span><span class="s2">&quot;velocities&quot;</span><span class="p">,</span> <span class="n">velocities</span><span class="p">,</span> <span class="n">field_count</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">velocities</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span>
+        <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">field_count</span><span class="p">,),</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="p">)</span>
+
+    <span class="n">fields</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="n">ScalarField</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">labels</span><span class="p">:</span> <span class="nb">list</span><span class="p">[</span><span class="nb">str</span> <span class="o">|</span> <span class="kc">None</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="c1"># Build fields using vectorized expressions per field</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">field_count</span><span class="p">):</span>
+        <span class="n">sigma</span> <span class="o">=</span> <span class="n">width_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">sigma</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;all widths must be positive&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># Compute Euclidean distance from center</span>
+        <span class="n">cx</span><span class="p">,</span> <span class="n">cy</span> <span class="o">=</span> <span class="n">centers_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="n">dx</span> <span class="o">=</span> <span class="n">x</span> <span class="o">-</span> <span class="n">cx</span>
+        <span class="n">dy</span> <span class="o">=</span> <span class="n">y</span> <span class="o">-</span> <span class="n">cy</span>
+        <span class="n">r_squared</span> <span class="o">=</span> <span class="n">dx</span> <span class="o">*</span> <span class="n">dx</span> <span class="o">+</span> <span class="n">dy</span> <span class="o">*</span> <span class="n">dy</span>
+
+        <span class="c1"># Gaussian profile</span>
+        <span class="n">phi_arr</span> <span class="o">=</span> <span class="n">amp_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="n">r_squared</span> <span class="o">/</span> <span class="p">(</span><span class="mf">2.0</span> <span class="o">*</span> <span class="n">sigma</span> <span class="o">*</span> <span class="n">sigma</span><span class="p">))</span>
+        <span class="n">pi_arr</span> <span class="o">=</span> <span class="n">vel_arr</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">phi_arr</span>
+
+        <span class="c1"># Reshape to grid shape and create ScalarFields</span>
+        <span class="n">fields</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+            <span class="p">(</span>
+                <span class="n">ScalarField</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">phi_arr</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">shape</span><span class="p">)),</span>
+                <span class="n">ScalarField</span><span class="p">(</span><span class="n">grid</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">pi_arr</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">grid</span><span class="o">.</span><span class="n">shape</span><span class="p">)),</span>
+            <span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">labels</span><span class="o">.</span><span class="n">extend</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;phi</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">,</span> <span class="sa">f</span><span class="s2">&quot;pi</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">])</span>
+
+    <span class="k">return</span> <span class="n">FieldCollection</span><span class="p">(</span><span class="n">fields</span><span class="p">,</span> <span class="n">labels</span><span class="o">=</span><span class="n">labels</span><span class="p">)</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>
