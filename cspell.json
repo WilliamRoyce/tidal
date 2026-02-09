@@ -177,6 +177,7 @@
     "ndarray",
     "xlabel",
     "ylabel",
+    "phim",
     "pyproject",
     "savez",
     "scipy",
