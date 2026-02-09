@@ -3,7 +3,7 @@
 # See also: linearized_gravity.wls (manual derivation), gw_simulation.py (Python simulation)
 #
 # NOTE: This example uses xPert linearization of the Einstein equations,
-# which requires a separate workflow beyond what `tg derive` TOML supports.
+# which requires a separate workflow beyond what `tidal derive` TOML supports.
 # The derive step requires the manual .wls script.
 # The simulation uses --ic formula for TT-gauge initial conditions.
 # For the full multi-component TT-gauge setup, see gw_simulation.py.
@@ -14,14 +14,14 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # Derive equations (xPert linearization, .wls pass-through to wolframscript)
-tg derive linearized_gravity.wls
+tidal derive linearized_gravity.wls
 
 # Inspect the equation system (10 components: h_00..h_33)
-tg inspect ../data/linearized_gravity.json
+tidal inspect ../data/linearized_gravity.json
 
 # Simulate with TT-gauge h_plus (h_4 = h_xx) initial condition
 # This applies a Gaussian-modulated cosine wave packet along z
-tg simulate ../data/linearized_gravity.json \
+tidal simulate ../data/linearized_gravity.json \
   --grid-shape 4,4,64 \
   --bounds 0:4,0:4,0:40 \
   --periodic \

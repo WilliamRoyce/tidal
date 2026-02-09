@@ -26,14 +26,14 @@ OUTPUT_FILENAME = "kg_3d_output.png"
 
 import matplotlib as mpl
 
-from torsion_gertsenshtein.utils import normalize_solve_result
+from tidal.utils import normalize_solve_result
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from pde import CartesianGrid, FieldCollection, MemoryStorage
 
-from torsion_gertsenshtein.symbolic import (
+from tidal.symbolic import (
     build_pde_from_json,
     create_initial_state,
     load_equation_system,

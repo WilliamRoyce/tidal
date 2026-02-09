@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pathlib
 
-from torsion_gertsenshtein.plot_pgf import enable_pgf
+from tidal.plot_pgf import enable_pgf
 
 enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
 

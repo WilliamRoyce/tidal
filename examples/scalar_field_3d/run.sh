@@ -2,19 +2,19 @@
 # CLI equivalents for the Klein-Gordon 3+1D example
 # See also: klein_gordon_3d.wls (manual derivation), kg_3d_simulation.py (Python simulation)
 #
-# To run manually:  cd examples/scalar_field_3d && tg derive theory.toml
+# To run manually:  cd examples/scalar_field_3d && tidal derive theory.toml
 
 set -euo pipefail
 cd "$(dirname "$0")"
 
 # Derive equations from Lagrangian (requires wolframscript)
-tg derive theory.toml
+tidal derive theory.toml
 
 # Inspect the equation system
-tg inspect ../data/klein_gordon_3d.json
+tidal inspect ../data/klein_gordon_3d.json
 
 # Run simulation (3D Gaussian pulse at domain center)
-tg simulate ../data/klein_gordon_3d.json \
+tidal simulate ../data/klein_gordon_3d.json \
   --param m2=1.0 \
   --grid-shape 32 \
   --bounds 0:20 \

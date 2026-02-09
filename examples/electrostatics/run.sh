@@ -11,14 +11,14 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # Derive equations (Poisson equation, .wls pass-through to wolframscript)
-tg derive electrostatics.wls
+tidal derive electrostatics.wls
 
 # Inspect the equation system
-tg inspect ../data/electrostatics_2d.json
+tidal inspect ../data/electrostatics_2d.json
 
 # Solve constraint (Poisson equation for phi given charge density rho)
 # Gaussian charge density at origin, Dirichlet BCs (phi=0 at boundary)
-tg simulate ../data/electrostatics_2d.json \
+tidal simulate ../data/electrostatics_2d.json \
   --mode constraint \
   --grid-shape 64 \
   --bounds -5:5 \
