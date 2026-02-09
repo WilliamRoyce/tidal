@@ -334,10 +334,10 @@ def _substitute_field_names(
     for field in sorted_fields:
         name = field["name"]
         prefixed = f"{prefix}{name.capitalize()}"
-        # Replace field name references (e.g., phi → tgPhi, but not inside other words)
-        # Handle: CD[-a][phi[]] → CD[-a][tgPhi[]]
-        # Handle: phi[] → tgPhi[]
-        # Handle: C[-a, -b, -c] → tgC[-a, -b, -c] (but with proper prefix)
+        # Replace field name references (e.g., phi → {prefix}Phi, but not inside other words)
+        # Handle: CD[-a][phi[]] → CD[-a][{prefix}Phi[]]
+        # Handle: phi[] → {prefix}Phi[]
+        # Handle: C[-a, -b, -c] → {prefix}C[-a, -b, -c]
         result = result.replace(f"{name}[", f"{prefixed}[")
         result = result.replace(f"{name} ", f"{prefixed} ")
 
@@ -824,7 +824,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:
 
     # Use temp file
     with tempfile.NamedTemporaryFile(
-        encoding="utf-8", mode="w", suffix=".wls", delete=False, prefix="tg_derive_"
+        encoding="utf-8", mode="w", suffix=".wls", delete=False, prefix="tidal_derive_"
     ) as tmp:
         tmp.write(script_content)
         tmp_path = Path(tmp.name)
