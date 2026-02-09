@@ -17,5 +17,8 @@ names = ["m2"]
 [lagrangian]
 expression = "-1/12 CD[-d][C[-a, -b, -c]] eta[d, h] eta[a, e] eta[b, f] eta[c, g] CD[-h][C[-e, -f, -g]] - m2/12 C[-a, -b, -c] eta[a, e] eta[b, f] eta[c, g] C[-e, -f, -g]"
 
+[parameters]
+m2 = 1.0
+
 [output]
 path = "../data/massive_3form.json"

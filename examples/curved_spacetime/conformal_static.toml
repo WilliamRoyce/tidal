@@ -17,5 +17,8 @@ names = ["m2"]
 [lagrangian]
 expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - m2/2 phi[]^2"
 
+[parameters]
+m2 = 1.0
+
 [output]
 path = "examples/data/conformal_kg_static.json"

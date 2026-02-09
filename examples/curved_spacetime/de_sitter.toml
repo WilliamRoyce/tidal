@@ -18,5 +18,9 @@ names = ["dSH", "dSm2"]
 # Minimally coupled KG in curved spacetime: Box_g phi - m^2 phi = 0
 expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - dSm2/2 phi[]^2"
 
+[parameters]
+dSH = 0.1
+dSm2 = 1.0
+
 [output]
 path = "examples/data/de_sitter_kg.json"

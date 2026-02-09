@@ -16,5 +16,8 @@ names = ["kappa"]
 # Maxwell + Chern-Simons topological term (with epsilon tensor)
 expression = "-1/2 * (CD[-a][A[-b]] eta[a, c] eta[b, d] CD[-c][A[-d]] - CD[-a][A[-b]] eta[a, d] eta[b, c] CD[-c][A[-d]]) + kappa/2 * epsiloneta[a, b, c] * A[-a] * CD[-b][A[-c]]"
 
+[parameters]
+kappa = 0.5
+
 [output]
 path = "../data/chern_simons_3d.json"
