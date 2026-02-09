@@ -28,7 +28,7 @@ class TestMainEntryPoint:
 
     def test_module_invocation(self) -> None:
         """``python -m torsion_gertsenshtein.cli`` should be importable."""
-        import torsion_gertsenshtein.cli.__main__  # noqa: F401
+        import torsion_gertsenshtein.cli.__main__  # noqa: F401  # pyright: ignore[reportUnusedImport]
 
     def test_get_version_fallback(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """_get_version() should return 'unknown' when package is not installed."""

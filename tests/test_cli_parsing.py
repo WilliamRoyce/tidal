@@ -226,7 +226,7 @@ class TestParseParams:
 
 def _make_args(**kwargs: object) -> Namespace:
     """Create a Namespace with defaults for _infer_output_format."""
-    defaults = {"no_plot": False, "output_format": None, "output": None}
+    defaults: dict[str, object] = {"no_plot": False, "output_format": None, "output": None}
     defaults.update(kwargs)
     return Namespace(**defaults)
 
