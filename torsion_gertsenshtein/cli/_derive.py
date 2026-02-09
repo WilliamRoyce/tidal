@@ -140,10 +140,10 @@ def _validate_parameters(config: dict[str, Any]) -> None:
     ValueError
         If keys aren't declared constants.
     """
-    params = config.get("parameters")
+    params: dict[str, object] | None = config.get("parameters")
     if params is None:
         return
-    if not isinstance(params, dict):
+    if not isinstance(params, dict):  # pyright: ignore[reportUnnecessaryIsInstance]
         msg = "[parameters] must be a table of key = value pairs"
         raise TypeError(msg)
     const_names = set(config.get("constants", {}).get("names", []))

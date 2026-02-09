@@ -1797,7 +1797,7 @@ def build_pde_from_json(
     spec = load_equation_system(json_path)
     # Auto-load metadata parameter defaults when none explicitly provided
     if parameters is None:
-        meta_params = spec.metadata.get("parameters")
+        meta_params: dict[str, object] | None = spec.metadata.get("parameters")
         if isinstance(meta_params, dict):
             parameters = {k: float(v) for k, v in meta_params.items() if isinstance(v, (int, float))}
     return PDEFromSpec(spec, parameters=parameters, constraint_eps=constraint_eps)

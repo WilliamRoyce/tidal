@@ -28,7 +28,7 @@ from torsion_gertsenshtein.symbolic.pde_builder import (
 )
 
 if TYPE_CHECKING:
-    from pde import GridBase
+    from pde.grids.base import GridBase
 
 _JSON_PATH = Path("examples/data/scalar_vector_coupling.json")
 _DEFAULT_PARAMS = {"phim2": 1.0, "Am2": 0.5, "kCS": 0.3, "gSV": 0.2}
@@ -46,7 +46,7 @@ def pde(spec: EquationSystem) -> PDEFromSpec:
 
 @pytest.fixture
 def grid() -> CartesianGrid:
-    return CartesianGrid([[0, 10], [0, 10]], 16, periodic=True)
+    return CartesianGrid([(0, 10), (0, 10)], 16, periodic=True)
 
 
 class TestJSONStructure:
@@ -204,8 +204,10 @@ class TestPDEEvolution:
         """A Gaussian in phi creates nonzero rates in A_1 and A_2
         via the gSV gradient coupling.
         """
-        x, y = grid.cell_coords[..., 0], grid.cell_coords[..., 1]
-        gauss = np.exp(-((x - 5) ** 2 + (y - 5) ** 2))
+        cc: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = grid.cell_coords  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        x: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = cc[..., 0]  # pyright: ignore[reportUnknownVariableType]
+        y: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = cc[..., 1]  # pyright: ignore[reportUnknownVariableType]
+        gauss = np.exp(-((x - 5) ** 2 + (y - 5) ** 2))  # pyright: ignore[reportUnknownArgumentType]
         state = create_initial_state(grid, spec, field_data={"phi_0": gauss})
 
         rates = pde.evolution_rate(state, t=0.0)
@@ -227,8 +229,10 @@ class TestPDEEvolution:
         pde = PDEFromSpec(
             spec, parameters={"phim2": 1.0, "Am2": 0.5, "kCS": 0.0, "gSV": 0.0}
         )
-        x, y = grid.cell_coords[..., 0], grid.cell_coords[..., 1]
-        gauss = np.exp(-((x - 5) ** 2 + (y - 5) ** 2))
+        cc: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = grid.cell_coords  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        x: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = cc[..., 0]  # pyright: ignore[reportUnknownVariableType]
+        y: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = cc[..., 1]  # pyright: ignore[reportUnknownVariableType]
+        gauss = np.exp(-((x - 5) ** 2 + (y - 5) ** 2))  # pyright: ignore[reportUnknownArgumentType]
         state = create_initial_state(grid, spec, field_data={"phi_0": gauss})
 
         rates = pde.evolution_rate(state, t=0.0)
@@ -244,10 +248,15 @@ class TestPDEEvolution:
         self, pde: PDEFromSpec, spec: EquationSystem, grid: GridBase
     ) -> None:
         """Short time evolution should remain finite."""
-        x, y = grid.cell_coords[..., 0], grid.cell_coords[..., 1]
-        gauss = 0.1 * np.exp(-((x - 5) ** 2 + (y - 5) ** 2))
+        cc: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = grid.cell_coords  # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
+        x: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = cc[..., 0]  # pyright: ignore[reportUnknownVariableType]
+        y: np.ndarray[tuple[int, ...], np.dtype[np.float64]] = cc[..., 1]  # pyright: ignore[reportUnknownVariableType]
+        gauss = 0.1 * np.exp(-((x - 5) ** 2 + (y - 5) ** 2))  # pyright: ignore[reportUnknownArgumentType]
         state = create_initial_state(grid, spec, field_data={"phi_0": gauss})
 
-        result = pde.solve(state, t_range=0.5, dt=0.01)
+        raw_result = pde.solve(state, t_range=0.5, dt=0.01)
+        assert raw_result is not None
+        assert not isinstance(raw_result, tuple)
+        result = raw_result
         assert np.all(np.isfinite(result.data))
         assert np.max(np.abs(result.data)) < 1e6
