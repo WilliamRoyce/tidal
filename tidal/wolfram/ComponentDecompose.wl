@@ -28,7 +28,7 @@
      List of {component_index, component_equation} pairs, where equations are
      in Derivative[dt, dx, ...][field][t, x, ...] form ready for ExportJSON.
 
-   Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline
+   Part of the TIDAL Lagrangian-to-PDE pipeline
 *)
 
 BeginPackage["TorsionGertsenshtein`ComponentDecompose`",

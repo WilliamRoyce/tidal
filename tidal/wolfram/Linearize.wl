@@ -30,7 +30,7 @@
      linEinstein = LinearizeTensorExpression[Einstein[CD][-a,-b]];
      linRicci = LinearizeTensorExpression[RicciCD[-a,-b]];
 
-   Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline
+   Part of the TIDAL Lagrangian-to-PDE pipeline
 *)
 
 BeginPackage["TorsionGertsenshtein`Linearize`", {"xAct`xTensor`", "xAct`xPert`"}];

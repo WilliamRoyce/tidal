@@ -28,7 +28,7 @@
      - Fields are dynamical (not background)
      - Boundary terms vanish (integration by parts)
 
-   Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline
+   Part of the TIDAL Lagrangian-to-PDE pipeline
 *)
 
 BeginPackage["TorsionGertsenshtein`EulerLagrange`", {"xAct`xTensor`"}];

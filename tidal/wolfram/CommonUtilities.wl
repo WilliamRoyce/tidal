@@ -29,7 +29,7 @@
      - Covariant epsilon: ε_{012...} = -1 (time index first)
      - Contravariant epsilon: ε^{012...} = +1
 
-   Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline
+   Part of the TIDAL Lagrangian-to-PDE pipeline
 *)
 
 BeginPackage["TorsionGertsenshtein`CommonUtilities`",

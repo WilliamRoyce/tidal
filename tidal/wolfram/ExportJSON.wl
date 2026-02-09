@@ -30,7 +30,7 @@
      Mixed time-space derivatives (∂_t∂_x φ) are converted to spatial gradients
      of momentum fields: gradient_x(pi_i), where pi_i = ∂_t φ_i.
 
-   Part of the torsion-gertsenshtein Lagrangian-to-PDE pipeline
+   Part of the TIDAL Lagrangian-to-PDE pipeline
 *)
 
 BeginPackage["TorsionGertsenshtein`ExportJSON`",
