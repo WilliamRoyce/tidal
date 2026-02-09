@@ -1,0 +1,98 @@
+tidal.kgsim package
+===================
+
+.. automodule:: tidal.kgsim
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+tidal.kgsim.advanced\_equations module
+--------------------------------------
+
+.. automodule:: tidal.kgsim.advanced_equations
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+tidal.kgsim.animation\_builder module
+-------------------------------------
+
+.. automodule:: tidal.kgsim.animation_builder
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+tidal.kgsim.config module
+-------------------------
+
+.. automodule:: tidal.kgsim.config
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+tidal.kgsim.equations module
+----------------------------
+
+.. automodule:: tidal.kgsim.equations
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+tidal.kgsim.grids module
+------------------------
+
+.. automodule:: tidal.kgsim.grids
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+tidal.kgsim.initial\_conditions module
+--------------------------------------
+
+.. automodule:: tidal.kgsim.initial_conditions
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+tidal.kgsim.observers module
+----------------------------
+
+.. automodule:: tidal.kgsim.observers
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+tidal.kgsim.profiles module
+---------------------------
+
+.. automodule:: tidal.kgsim.profiles
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+tidal.kgsim.profiling module
+----------------------------
+
+.. automodule:: tidal.kgsim.profiling
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+tidal.kgsim.runners module
+--------------------------
+
+.. automodule:: tidal.kgsim.runners
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+tidal.kgsim.utils module
+------------------------
+
+.. automodule:: tidal.kgsim.utils
+   :members:
+   :show-inheritance:
+   :undoc-members:

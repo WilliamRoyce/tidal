@@ -1,0 +1,26 @@
+tidal.symbolic package
+======================
+
+.. automodule:: tidal.symbolic
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+tidal.symbolic.json\_loader module
+----------------------------------
+
+.. automodule:: tidal.symbolic.json_loader
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+tidal.symbolic.pde\_builder module
+----------------------------------
+
+.. automodule:: tidal.symbolic.pde_builder
+   :members:
+   :show-inheritance:
+   :undoc-members:

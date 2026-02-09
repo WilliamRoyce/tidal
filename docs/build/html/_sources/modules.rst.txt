@@ -1,0 +1,7 @@
+tidal
+=====
+
+.. toctree::
+   :maxdepth: 4
+
+   tidal
