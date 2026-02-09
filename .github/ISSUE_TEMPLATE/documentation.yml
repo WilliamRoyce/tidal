@@ -53,7 +53,7 @@ body:
     attributes:
       label: Related Code or Examples
       description: Link to related code that might help clarify
-      placeholder: "See torsion_gertsenshtein/wolfram/CommonUtilities.wl:123"
+      placeholder: "See tidal/wolfram/CommonUtilities.wl:123"
 
   - type: dropdown
     id: audience
