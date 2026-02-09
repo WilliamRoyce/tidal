@@ -88,6 +88,7 @@ def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:
     """Parse --param KEY=VAL arguments into a dict.
 
     Also merges default parameters from metadata when not overridden.
+    Warns on CLI parameters not found in the equation spec.
 
     Raises
     ------
@@ -110,16 +111,32 @@ def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:
                 )
 
     # Override with CLI params
+    cli_keys: set[str] = set()
     for item in raw:
         if "=" not in item:
             msg = f"Invalid --param format: '{item}'. Expected KEY=VALUE (e.g. --param m2=1.0)"
             raise ValueError(msg)
         key, val_str = item.split("=", 1)
+        key = key.strip()
+        cli_keys.add(key)
         try:
-            params[key.strip()] = float(val_str.strip())
+            params[key] = float(val_str.strip())
         except ValueError:
             msg = f"Invalid parameter value: '{val_str}' for key '{key}'. Must be a number."
             raise ValueError(msg) from None
+
+    # Warn on unknown CLI params
+    if cli_keys:
+        from torsion_gertsenshtein.cli._inspect import discover_parameters
+
+        known: set[str] = set(discover_parameters(spec).keys())
+        if isinstance(meta_params, dict):
+            known |= set(cast("dict[str, object]", meta_params).keys())
+        for key in sorted(cli_keys - known):
+            print(
+                f"  Warning: parameter '{key}' not found in equation spec. Possible typo?",
+                file=sys.stderr,
+            )
 
     return params
 
@@ -491,7 +508,7 @@ def _infer_output_format(args: Namespace) -> str:
         if ext == ".npz":
             return "npz"
         if ext in {".png", ".pdf", ".jpg", ".svg"}:
-            return "png"
+            return ext.lstrip(".")
     return "png"
 
 

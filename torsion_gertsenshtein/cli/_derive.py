@@ -93,6 +93,10 @@ def _validate_single_field(field: dict[str, Any], index: int, dim: int) -> None:
         if field["rank"] > dim:
             msg = f"Tensor field '{fname}' rank {field['rank']} exceeds spacetime dimension {dim}"
             raise ValueError(msg)
+        max_rank = len(_INDEX_LETTERS)
+        if field["rank"] > max_rank:
+            msg = f"Tensor field '{fname}' rank {field['rank']} exceeds maximum supported rank {max_rank}"
+            raise ValueError(msg)
 
 
 def _validate_fields(config: dict[str, Any]) -> None:
@@ -126,6 +130,30 @@ def _validate_lagrangian(config: dict[str, Any]) -> None:
         raise ValueError(msg)
 
 
+def _validate_parameters(config: dict[str, Any]) -> None:
+    """Validate optional [parameters] section of TOML config.
+
+    Raises
+    ------
+    ValueError
+        If parameter values are non-numeric or keys aren't declared constants.
+    """
+    params = config.get("parameters")
+    if params is None:
+        return
+    if not isinstance(params, dict):
+        msg = "[parameters] must be a table of key = value pairs"
+        raise ValueError(msg)
+    const_names = set(config.get("constants", {}).get("names", []))
+    for key, val in params.items():
+        if not isinstance(val, (int, float)):
+            msg = f"[parameters].{key} must be numeric, got {type(val).__name__}"
+            raise ValueError(msg)
+        if const_names and key not in const_names:
+            msg = f"[parameters].{key} is not declared in [constants].names"
+            raise ValueError(msg)
+
+
 def _validate_config(config: dict[str, Any]) -> None:
     """Validate TOML config structure.
 
@@ -143,6 +171,7 @@ def _validate_config(config: dict[str, Any]) -> None:
     _validate_spacetime(config)
     _validate_fields(config)
     _validate_lagrangian(config)
+    _validate_parameters(config)
 
 
 # --- Code generation helpers ---
@@ -296,6 +325,7 @@ class _WlsContext:
     lagrangian_expr: str
     is_multi: bool
     pipeline_path: str
+    parameters: dict[str, float]
 
 
 def _wls_header(ctx: _WlsContext) -> list[str]:
@@ -424,7 +454,7 @@ def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
         others_str = ", ".join(other_exprs) if other_exprs else ""
 
         lines.extend((
-            f"{comp_var} = DecomposeToComponents[{eom_var}, {fexpr}, {ctx.chart}, {{{others_str}}}];",
+            f'{comp_var} = DecomposeToComponents[{eom_var}, {fexpr}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
             f'Print["{fname} components: ", Length[{comp_var}]];',
             "",
         ))
@@ -455,7 +485,7 @@ def _wls_euler_lagrange_single(ctx: _WlsContext) -> list[str]:
         'Print["EOM: ", eom];',
         "",
         "(* Step 5: Decompose to components *)",
-        f"componentEqs = DecomposeToComponents[eom, {fexpr}, {ctx.chart}];",
+        f'componentEqs = DecomposeToComponents[eom, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
         'Print["Components: ", Length[componentEqs]];',
         "",
         "fieldEquations = Table[",
@@ -507,6 +537,14 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
     # Build JSON — always use multi-field builder since fieldEquations
     # is constructed with proper labels by both single and multi-field paths
     lines.extend(("jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];", ""))
+
+    # Inject runtime parameter defaults into JSON metadata
+    if ctx.parameters:
+        param_entries = ", ".join(f'"{k}" -> {v}' for k, v in ctx.parameters.items())
+        lines.extend((
+            f'jsonStructure["metadata", "parameters"] = <|{param_entries}|>;',
+            "",
+        ))
 
     # Export
     escaped_output = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')
@@ -582,6 +620,7 @@ def generate_wls(
         lagrangian_expr=config["lagrangian"]["expression"].strip(),
         is_multi=len(config["fields"]) > 1,
         pipeline_path=str(wolfram_dir),
+        parameters={k: float(v) for k, v in config.get("parameters", {}).items()},
     )
 
     lines: list[str] = []

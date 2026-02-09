@@ -344,6 +344,11 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         print("\nInterrupted.")
         return 130
-    except Exception as exc:  # noqa: BLE001
+    except (ValueError, FileNotFoundError, TypeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
+        return 1
+    except Exception:
+        import traceback
+
+        traceback.print_exc()
         return 1
