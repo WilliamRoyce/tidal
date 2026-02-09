@@ -1,6 +1,6 @@
 """Unit tests for CLI parsing helpers.
 
-Tests the pure-function parsers in ``torsion_gertsenshtein.cli._simulate``
+Tests the pure-function parsers in ``tidal.cli._simulate``
 independently from the full simulation pipeline.
 """
 
@@ -11,7 +11,7 @@ from types import SimpleNamespace
 
 import pytest
 
-from torsion_gertsenshtein.cli._simulate import (
+from tidal.cli._simulate import (
     _infer_output_format,
     _parse_bc,
     _parse_bounds,
@@ -265,51 +265,51 @@ class TestValidateFormulaAst:
     """Tests for _validate_formula_ast AST-based formula validation."""
 
     def test_valid_simple_expression(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         _validate_formula_ast("x + 1", {"x"})
 
     def test_valid_function_calls(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         _validate_formula_ast("sin(x) + cos(y)", {"sin", "cos", "x", "y"})
 
     def test_valid_numpy_attribute(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         _validate_formula_ast("np.exp(-x**2)", {"np", "x"})
 
     def test_rejects_unknown_name(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(ValueError, match="Disallowed name 'badvar'"):
             _validate_formula_ast("badvar * 2", {"x"})
 
     def test_rejects_attribute_access(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(ValueError, match="Attribute access not allowed"):
             _validate_formula_ast("x.__class__", {"x"})
 
     def test_rejects_import_name(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(ValueError, match="Disallowed name '__import__'"):
             _validate_formula_ast("__import__('os')", {"x"})
 
     def test_rejects_lambda(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(TypeError, match=r"Disallowed construct.*Lambda"):
             _validate_formula_ast("(lambda: 1)()", {"x"})
 
     def test_valid_ternary(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         _validate_formula_ast("x if x > 0 else -x", {"x"})
 
     def test_valid_complex_math(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         _validate_formula_ast(
             "exp(-((x - 5)**2 + (y - pi)**2) / 0.5**2)",
@@ -317,24 +317,24 @@ class TestValidateFormulaAst:
         )
 
     def test_rejects_list_comprehension(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(TypeError, match=r"Disallowed construct.*ListComp"):
             _validate_formula_ast("[i for i in x]", {"x", "i"})
 
     def test_rejects_walrus_operator(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(TypeError, match=r"Disallowed construct.*NamedExpr"):
             _validate_formula_ast("(y := x + 1)", {"x", "y"})
 
     def test_rejects_nested_attribute(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(ValueError, match="Attribute access not allowed"):
             _validate_formula_ast("x.a.b", {"x"})
 
     def test_allows_subscript_slicing(self) -> None:
-        from torsion_gertsenshtein.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         _validate_formula_ast("x[0:5]", {"x"})

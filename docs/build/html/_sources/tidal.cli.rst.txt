@@ -1,0 +1,7 @@
+tidal.cli package
+=================
+
+.. automodule:: tidal.cli
+   :members:
+   :show-inheritance:
+   :undoc-members:

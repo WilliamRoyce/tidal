@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     GridConfig,
     KGParameters,
     KleinGordonPDE,
@@ -20,9 +20,9 @@ from torsion_gertsenshtein.kgsim import (
     make_grid,
     run,
 )
-from torsion_gertsenshtein.kgsim.config import MultiFieldParams
-from torsion_gertsenshtein.kgsim.equations import make_coupled_kg_pde
-from torsion_gertsenshtein.kgsim.initial_conditions import (
+from tidal.kgsim.config import MultiFieldParams
+from tidal.kgsim.equations import make_coupled_kg_pde
+from tidal.kgsim.initial_conditions import (
     gaussian_pulse,
     multi_gaussian_2d,
 )

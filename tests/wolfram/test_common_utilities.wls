@@ -11,7 +11,7 @@ Get[FileNameJoin[{DirectoryName[$InputFileName], "test_harness.wl"}]];
 (* Get pipeline path for module loading *)
 pipelinePath = FileNameJoin[{
   DirectoryName[DirectoryName[$InputFileName]],
-  "..", "torsion_gertsenshtein", "wolfram"
+  "..", "tidal", "wolfram"
 }];
 
 (* Load xAct packages *)

@@ -26,7 +26,7 @@ from pde import CartesianGrid, FieldCollection, ScalarField
 
 OUTPUT_FILENAME = "elasticity_result.png"
 
-from torsion_gertsenshtein.symbolic import build_pde_from_json
+from tidal.symbolic import build_pde_from_json
 
 
 def create_initial_displacement(grid: CartesianGrid) -> FieldCollection:

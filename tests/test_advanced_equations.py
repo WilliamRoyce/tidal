@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 from pde import CartesianGrid, FieldCollection, ScalarField, UnitGrid
 
-from torsion_gertsenshtein.kgsim.advanced_equations import (
+from tidal.kgsim.advanced_equations import (
     AnisotropicHigherOrderKGPDE,
     AnisotropicKGPDE,
     DirectionalKGPDE,

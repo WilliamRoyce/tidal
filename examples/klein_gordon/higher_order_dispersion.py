@@ -20,18 +20,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import TwoSlopeNorm
 
-from torsion_gertsenshtein.plot_pgf import enable_pgf
+from tidal.plot_pgf import enable_pgf
 
 enable_pgf("xelatex")
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     GridConfig,
     SimulationConfig,
     gaussian_pulse,
     make_grid,
     run_with_snapshots,
 )
-from torsion_gertsenshtein.kgsim.advanced_equations import HigherOrderKGPDE
+from tidal.kgsim.advanced_equations import HigherOrderKGPDE
 
 if TYPE_CHECKING:
     from pde import CartesianGrid, FieldCollection, MemoryStorage

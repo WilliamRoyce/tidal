@@ -12,14 +12,14 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # Derive equations (component-level Lagrangian, .wls pass-through to wolframscript)
-tg derive navier_cauchy.wls
+tidal derive navier_cauchy.wls
 
 # Inspect the equation system
-tg inspect ../data/navier_cauchy_2d.json
+tidal inspect ../data/navier_cauchy_2d.json
 
 # Run simulation (Gaussian pulse in ux displacement)
 # Parameters rho, lambda, mu are baked into the JSON as numeric coefficients
-tg simulate ../data/navier_cauchy_2d.json \
+tidal simulate ../data/navier_cauchy_2d.json \
   --grid-shape 64 \
   --bounds 0:10 \
   --periodic \

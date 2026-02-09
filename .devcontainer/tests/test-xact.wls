@@ -27,6 +27,6 @@ Print["✅ Coordinate chart defined: ", ChartsOfManifold[TestM]];
 
 Print[""];
 Print["*** xAct is successfully installed and functional! ***"];
-Print["Ready for tensor computations in your torsion-gertsenshtein project!"];
+Print["Ready for tensor computations in your TIDAL project!"];
 Print[""];
 Print["Note: xPerm running in pure Mathematica mode (MathLink disabled for compatibility)"];

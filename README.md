@@ -1,13 +1,20 @@
-# Torsion Gertsenshtein
+<p align="center">
+  <img src="docs/TIDAL_Logo_TikZ_Figure.svg" alt="TIDAL: Tensor Integration and Derivation for Any Lagrangian" width="500">
+</p>
+<p align="center"><em>Tensor Integration and Derivation for Any Lagrangian</em></p>
+
+<p align="center">
 
 [![CI Tests](https://github.com/WilliamRoyce/torsion-gertsenshtein/workflows/test/badge.svg)](https://github.com/WilliamRoyce/torsion-gertsenshtein/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked: pyright](https://img.shields.io/badge/type%20checked-pyright-informational)](https://github.com/microsoft/pyright)
-[![Coverage](https://img.shields.io/badge/coverage-check%20CI-brightgreen)](https://github.com/WilliamRoyce/torsion-gertsenshtein/actions)
+[![Coverage](https://img.shields.io/badge/coverage-see%20CI-brightgreen)](https://github.com/WilliamRoyce/torsion-gertsenshtein/actions/workflows/test.yml)
 
-View the `torsion_gertsenshtein` package documentation [here](https://williamroyce.github.io/torsion-gertsenshtein/).
+</p>
+
+View the `tidal` package documentation [here](https://williamroyce.github.io/torsion-gertsenshtein/).
 
 A research codebase for exploring **electromagnetic ↔ gravitational wave conversion** (Gertsenshtein effect) and potential **amplification mechanisms** in gravity theories with **torsion** (Poincaré gauge theory; parity-even quadratic invariants). The repository includes:
 
@@ -19,11 +26,22 @@ A research codebase for exploring **electromagnetic ↔ gravitational wave conve
 
 ---
 
+## Community & Support
+
+- **Questions & Ideas**: [GitHub Discussions](https://github.com/WilliamRoyce/torsion-gertsenshtein/discussions) — Ask questions, share use cases, discuss physics
+- **Bug Reports**: [Issue Tracker](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues) — Report bugs with the `bug` label
+- **Feature Requests**: [Issue Tracker](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues) — Propose features with the `enhancement` label
+- **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and workflow
+
+For more, visit the [Documentation](https://williamroyce.github.io/torsion-gertsenshtein/).
+
+---
+
 ## Current Status (usable today)
 
-- **Lagrangian-to-PDE pipeline (`torsion_gertsenshtein.symbolic`, `torsion_gertsenshtein.wolfram`)**: complete symbolic-to-numerical pipeline for deriving field equations from Lagrangian densities. Uses Mathematica/xAct for symbolic derivation (Euler-Lagrange equations, linearization, component decomposition) → JSON export → Python/py-pde for dynamic PDE construction and simulation. **Zero hardcoded physics** in numerical layer - all equations derived symbolically. Includes **18 working examples** spanning 1+1D through 3+1D: scalars, vectors, tensors (rank 3+), coupled multi-field systems, curvilinear coordinates, and curved spacetimes. See [examples/README.md](examples/README.md) for complete documentation.
-- **CLI (`tg` command)**: unified command-line interface with 5 subcommands — `tg derive` (Lagrangian → JSON via TOML config), `tg simulate` (JSON → PDE simulation with plotting), `tg inspect` (equation system info), `tg list` (discover available specs), `tg validate` (JSON spec validation). Supports `theory.toml` configs with `[[derived_fields]]` for intermediate tensor definitions (e.g., field strength F_ab). Zero new dependencies (stdlib argparse + tomllib).
-- **PDE sandbox (`torsion_gertsenshtein.kgsim`)**: lightweight PDE examples and utilities for experimenting with first-order Klein–Gordon systems built on top of the py-pde library. This repository collects a small simulation toolkit (kgsim) with helpers for grids, initial data, observers, profiling, and runs; 1D & 2D examples with snapshot/video export and animation support.
+- **Lagrangian-to-PDE pipeline (`tidal.symbolic`, `tidal.wolfram`)**: complete symbolic-to-numerical pipeline for deriving field equations from Lagrangian densities. Uses Mathematica/xAct for symbolic derivation (Euler-Lagrange equations, linearization, component decomposition) → JSON export → Python/py-pde for dynamic PDE construction and simulation. **Zero hardcoded physics** in numerical layer - all equations derived symbolically. Includes **18 working examples** spanning 1+1D through 3+1D: scalars, vectors, tensors (rank 3+), coupled multi-field systems, curvilinear coordinates, and curved spacetimes. See [examples/README.md](examples/README.md) for complete documentation.
+- **CLI (`tidal` command)**: unified command-line interface with 5 subcommands — `tidal derive` (Lagrangian → JSON via TOML config), `tidal simulate` (JSON → PDE simulation with plotting), `tidal inspect` (equation system info), `tidal list` (discover available specs), `tidal validate` (JSON spec validation). Supports `theory.toml` configs with `[[derived_fields]]` for intermediate tensor definitions (e.g., field strength F_ab). Zero new dependencies (stdlib argparse + tomllib).
+- **PDE sandbox (`tidal.kgsim`)**: lightweight PDE examples and utilities for experimenting with first-order Klein–Gordon systems built on top of the py-pde library. This repository collects a small simulation toolkit (kgsim) with helpers for grids, initial data, observers, profiling, and runs; 1D & 2D examples with snapshot/video export and animation support.
 - **Multi-field coupled systems**: support for N-field coupled Klein–Gordon PDEs with arbitrary mass matrices and coupling terms in both 1D and 2D; includes `multi_gaussian_2d` initializer for spatially separated or overlapping Gaussian pulses; test suite validates symmetry preservation, energy transfer, and decoupled limits.
 - **2D coupled simulations**: full support for coupled field evolution in 2D with visualization showing energy transfer between fields; dimension-agnostic PDE implementations work seamlessly with any grid dimensionality.
 - **Animation and visualization**: side-by-side spacetime plots (φ(x,t) heatmaps), 1D evolution animations (φ(x) vs time), 2D field evolution with dual-panel animations showing both coupled fields, and high-fps video export (MP4 via ffmpeg or GIF fallback).
@@ -78,7 +96,7 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 
 ## Recent Improvements
 
-- **Phase 4-13+ Pipeline Evolution (February 2026)**: ✅ **ALL CRITICAL IMPLEMENTATION COMPLETE**. Fixed Wolfram test symbol conflicts, created 5 development utility scripts, completed module header documentation. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **CLI**: Full `tg` command with 5 subcommands (derive, inspect, simulate, list, validate) and `theory.toml` support including `[[derived_fields]]`. **Stress tests**: Scalar-vector coupling (mixed-rank cross-field, 4 constants, 4x4 matrices), massive 3-form (rank-3 antisymmetric tensor). **743 Python tests + ~108 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
+- **Phase 4-13+ Pipeline Evolution (February 2026)**: ✅ **ALL CRITICAL IMPLEMENTATION COMPLETE**. Fixed Wolfram test symbol conflicts, created 5 development utility scripts, completed module header documentation. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **CLI**: Full `tidal` command with 5 subcommands (derive, inspect, simulate, list, validate) and `theory.toml` support including `[[derived_fields]]`. **Stress tests**: Scalar-vector coupling (mixed-rank cross-field, 4 constants, 4x4 matrices), massive 3-form (rank-3 antisymmetric tensor). **743 Python tests + ~108 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
 - **Lagrangian-to-PDE pipeline (February 2026)**: Complete symbolic derivation pipeline implemented with Mathematica/xAct → JSON → Python/py-pde. Fixed component extraction (free index detection with `IndicesOf[]`), operator identification (laplacian vs identity/mass terms), and RHS extraction. Created EM and Klein-Gordon examples demonstrating massless vs massive field dynamics. Added comprehensive documentation proving zero hardcoded physics in numerical layer. See [CHANGELOG.md](CHANGELOG.md) for detailed Phase 11 implementation notes.
 - **2D coupled-field support**: `multi_gaussian_2d` initializer for N-field systems on 2D grids; dimension-agnostic coordinate handling for both 1D and 2D; comprehensive test suite for 2D coupled dynamics (symmetry preservation, energy transfer, decoupled limits).
 - **Enhanced coordinate handling**: automatic detection of coordinate array format (flattened vs grid-shaped) in `gaussian_pulse` and `multi_gaussian_2d`; works seamlessly with different py-pde grid configurations.
@@ -112,7 +130,7 @@ uv python pin 3.11
 uv sync --all-extras
 
 # Smoke test: can we import the package and py-pde?
-uv run python -c "import torsion_gertsenshtein, pde; print('OK')"
+uv run python -c "import tidal, pde; print('OK')"
 ```
 
 ## Dev Container (VS Code / Codespaces)
@@ -173,23 +191,23 @@ The repository includes a complete symbolic-to-numerical pipeline for deriving f
 cd examples/scalar_field && bash run.sh
 
 # Or use the CLI directly:
-tg derive examples/scalar_field/theory.toml        # derive equations from Lagrangian
-tg inspect examples/data/klein_gordon_1d.json       # inspect equation structure
-tg simulate examples/data/klein_gordon_1d.json \    # simulate
+tidal derive examples/scalar_field/theory.toml        # derive equations from Lagrangian
+tidal inspect examples/data/klein_gordon_1d.json       # inspect equation structure
+tidal simulate examples/data/klein_gordon_1d.json \    # simulate
   --param m2=1.0 --ic gaussian --t-end 20
-tg list                                             # discover all available JSON specs
-tg validate examples/data/klein_gordon_1d.json      # validate JSON spec structure
+tidal list                                             # discover all available JSON specs
+tidal validate examples/data/klein_gordon_1d.json      # validate JSON spec structure
 ```
 
 **CLI Subcommands:**
 
 | Command | Description |
 |---------|-------------|
-| `tg derive theory.toml` | Generate .wls from TOML, run wolframscript to produce JSON |
-| `tg simulate spec.json` | Full simulation with plotting (supports `--param`, `--ic`, `--bc`, `--scheme`) |
-| `tg inspect spec.json` | Display equation system info (fields, operators, parameters) |
-| `tg list` | Discover all available JSON specs in `examples/data/` |
-| `tg validate spec.json` | Validate JSON equation specification structure |
+| `tidalderive theory.toml` | Generate .wls from TOML, run wolframscript to produce JSON |
+| `tidalsimulate spec.json` | Full simulation with plotting (supports `--param`, `--ic`, `--bc`, `--scheme`) |
+| `tidalinspect spec.json` | Display equation system info (fields, operators, parameters) |
+| `tidallist` | Discover all available JSON specs in `examples/data/` |
+| `tidalvalidate spec.json` | Validate JSON equation specification structure |
 
 **TOML Configuration** (`theory.toml`):
 - Define spacetime dimension, metric, fields, constants, and Lagrangian expression
@@ -257,14 +275,14 @@ uv run pytest -v
 uv run pytest tests/test_py_pde_smoke.py -v
 
 # Run with coverage report (HTML)
-uv run pytest --cov=torsion_gertsenshtein --cov-report=html
+uv run pytest --cov=tidal --cov-report=html
 open htmlcov/index.html  # View detailed HTML report
 
 # Run with coverage report (terminal)
-uv run pytest --cov=torsion_gertsenshtein --cov-report=term-missing
+uv run pytest --cov=tidal --cov-report=term-missing
 
 # Run with coverage report (XML for CI)
-uv run pytest --cov=torsion_gertsenshtein --cov-report=xml
+uv run pytest --cov=tidal --cov-report=xml
 ```
 
 ### Wolfram Tests (~108 tests)
@@ -313,7 +331,7 @@ The repo builds Sphinx docs and deploys to GitHub Pages via Actions.
 
 ```bash
 # auto-generate API docs
-uv run sphinx-apidoc --force --module-first -o docs/source/ torsion_gertsenshtein/
+uv run sphinx-apidoc --force --module-first -o docs/source/ tidal/
 
 # build HTML
 ( cd docs && make html )

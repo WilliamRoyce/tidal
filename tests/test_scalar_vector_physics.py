@@ -18,11 +18,11 @@ import numpy as np
 import pytest
 from pde import CartesianGrid
 
-from torsion_gertsenshtein.symbolic.json_loader import (
+from tidal.symbolic.json_loader import (
     EquationSystem,
     load_equation_system,
 )
-from torsion_gertsenshtein.symbolic.pde_builder import (
+from tidal.symbolic.pde_builder import (
     PDEFromSpec,
     create_initial_state,
 )
@@ -142,7 +142,7 @@ class TestSymbolicConstants:
     """Tests that all 4 symbolic constants are properly tracked."""
 
     def test_four_constants_discovered(self, spec: EquationSystem) -> None:
-        from torsion_gertsenshtein.cli._inspect import discover_parameters
+        from tidal.cli._inspect import discover_parameters
 
         params = discover_parameters(spec)
         assert "phim2" in params

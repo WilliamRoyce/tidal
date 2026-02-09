@@ -13,14 +13,14 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # Derive equations from Lagrangian (requires wolframscript)
-tg derive theory.toml
+tidal derive theory.toml
 
 # Inspect the equation system
-tg inspect ../data/spherical_kg.json
+tidal inspect ../data/spherical_kg.json
 
 # Run simulation (Gaussian shell at r=3, Neumann in r and theta, periodic in phi)
 # Coordinates: x=r, y=theta, z=phi
-tg simulate ../data/spherical_kg.json \
+tidal simulate ../data/spherical_kg.json \
   --param spm2=0.5 \
   --grid-shape 64 \
   --bounds 0.5:8,0.05:3.09,0:6.283185 \

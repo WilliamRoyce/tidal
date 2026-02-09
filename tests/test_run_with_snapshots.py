@@ -14,7 +14,7 @@ import pde as pde_module
 import pytest
 from pde import MemoryStorage
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     GridConfig,
     KGParameters,
     KleinGordonPDE,

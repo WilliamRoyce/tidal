@@ -15,12 +15,12 @@ echo "=== Wolfram Module Syntax Check ==="
 echo ""
 
 MODULES=(
-    "torsion_gertsenshtein/wolfram/CommonUtilities.wl"
-    "torsion_gertsenshtein/wolfram/ExportJSON.wl"
-    "torsion_gertsenshtein/wolfram/ComponentDecompose.wl"
-    "torsion_gertsenshtein/wolfram/EulerLagrange.wl"
-    "torsion_gertsenshtein/wolfram/Linearize.wl"
-    "torsion_gertsenshtein/wolfram/LagrangianPipeline.wl"
+    "tidal/wolfram/CommonUtilities.wl"
+    "tidal/wolfram/ExportJSON.wl"
+    "tidal/wolfram/ComponentDecompose.wl"
+    "tidal/wolfram/EulerLagrange.wl"
+    "tidal/wolfram/Linearize.wl"
+    "tidal/wolfram/LagrangianPipeline.wl"
 )
 
 PASSED=0

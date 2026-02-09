@@ -12,14 +12,14 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # Derive equations from Lagrangian (requires wolframscript)
-tg derive theory.toml
+tidal derive theory.toml
 
 # Inspect the equation system
-tg inspect ../data/cylindrical_kg.json
+tidal inspect ../data/cylindrical_kg.json
 
 # Run simulation (Gaussian ring in r-z plane, Neumann in r and z, periodic in theta)
 # Coordinates: x=r, y=theta, z=z
-tg simulate ../data/cylindrical_kg.json \
+tidal simulate ../data/cylindrical_kg.json \
   --param cylm2=0.5 \
   --grid-shape 48 \
   --bounds 0.5:8,0:6.283185,-5:5 \

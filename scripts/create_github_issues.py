@@ -20,7 +20,7 @@ ISSUES = [
 13 critical type checks use `assert isinstance(...)` statements in operator functions. Assertions are stripped with Python's `-O` optimization flag, causing silent failures in production.
 
 ## Location
-`torsion_gertsenshtein/symbolic/pde_builder.py` (lines 61, 74, 76, 89, 91, 100, 102, 120, 621, 647, 715, 781, 822)
+`tidal/symbolic/pde_builder.py` (lines 61, 74, 76, 89, 91, 100, 102, 120, 621, 647, 715, 781, 822)
 
 ## Example
 ```python
@@ -54,7 +54,7 @@ Uses `eval()` to evaluate Mathematica-generated expressions in Python with poten
 - Edge cases in namespace restrictions
 
 ## Location
-`torsion_gertsenshtein/symbolic/pde_builder.py` (line 492)
+`tidal/symbolic/pde_builder.py` (line 492)
 
 ## Current Code
 ```python
@@ -109,8 +109,8 @@ Catch Wolfram pipeline breakage before merging, ensure JSON generation correctne
 Explicit error thrown for rank ≥ 3 tensors. Only handles rank 0 (scalar), rank 1 (vector), rank 2 (tensor).
 
 ## Location
-`torsion_gertsenshtein/wolfram/ComponentDecompose.wl` (lines 377-383)
-`torsion_gertsenshtein/wolfram/ExportJSON.wl` (line 339)
+`tidal/wolfram/ComponentDecompose.wl` (lines 377-383)
+`tidal/wolfram/ExportJSON.wl` (line 339)
 
 ## Error Message
 ```mathematica
@@ -168,7 +168,7 @@ non-functional stubs. Users must manually apply gauge conditions. The gravitatio
 example applies TT gauge analytically before pipeline export.
 
 ## Location
-`torsion_gertsenshtein/wolfram/Linearize.wl` — gauge fixing not yet implemented
+`tidal/wolfram/Linearize.wl` — gauge fixing not yet implemented
 
 ## Impact
 - Gauge theory examples cannot derive gauge-fixed equations of motion automatically
@@ -193,7 +193,7 @@ Listed in MEMORY.md as "Future Priority #3".
 Animation features completely untested (250+ lines, 0 tests). FFMpeg vs Pillow writer selection could fail silently. Frame rate calculations and output path validation unchecked.
 
 ## Location
-`torsion_gertsenshtein/kgsim/animation_builder.py`
+`tidal/kgsim/animation_builder.py`
 
 ## Test Requirements
 1. AnimationBuilder initialization with various configs
@@ -219,7 +219,7 @@ Create `tests/test_animation_builder.py` with ~10-15 test cases.
 ## Implementation
 1. Add to pytest step:
    ```yaml
-   - run: uv run pytest --cov=torsion_gertsenshtein --cov-report=xml --cov-report=term
+   - run: uv run pytest --cov=tidal --cov-report=xml --cov-report=term
    ```
 2. Upload coverage to Codecov or similar service
 3. Set minimum coverage threshold (suggest 80%)
@@ -238,7 +238,7 @@ Create `tests/test_animation_builder.py` with ~10-15 test cases.
 Grid dimension validated in `evolution_rate()` (runtime) not `__init__` (construction). Mismatch causes cryptic py-pde operator errors before clear validation message. Users waste time debugging wrong issues.
 
 ## Location
-`torsion_gertsenshtein/symbolic/pde_builder.py` (lines 695, 789-797)
+`tidal/symbolic/pde_builder.py` (lines 695, 789-797)
 
 ## Current Flow
 ```python
@@ -264,7 +264,7 @@ if grid_dim != expected_dim:
 Coefficient resolution happens per-term per-timestep. Repeated evaluation of same expressions (e.g., `m2(t)` evaluated 100+ times per step). Spatial coordinates recomputed for every term.
 
 ## Location
-`torsion_gertsenshtein/symbolic/pde_builder.py` (lines 698-742)
+`tidal/symbolic/pde_builder.py` (lines 698-742)
 
 ## Current Bottleneck
 ```python
@@ -290,7 +290,7 @@ Profile `sphere_kg` example, implement caching layer for coefficients.
     {
         "title": "Document JSON Schema with Detailed Guide",
         "body": """## Problem
-JSON schema defined in code (`torsion_gertsenshtein/symbolic/json_loader.py`) but not documented. No explanation of field constraints, valid ranges, operator format. Users unclear how to extend schema or migrate old JSON.
+JSON schema defined in code (`tidal/symbolic/json_loader.py`) but not documented. No explanation of field constraints, valid ranges, operator format. Users unclear how to extend schema or migrate old JSON.
 
 ## Needed Documentation
 1. **Field-by-field reference:** Each JSON key explained with examples
@@ -355,7 +355,7 @@ to `gradient_x(pi)` but lost direction info.
 Only ~7 math functions supported: `Sqrt`, `Sin`, `Cos`, `Tan`, `Exp`, `Log`. Missing inverse trig, hyperbolic, power functions. Unknown operators silently become Python identifiers (causes NameError at runtime).
 
 ## Location
-`torsion_gertsenshtein/symbolic/pde_builder.py` (lines 390-397)
+`tidal/symbolic/pde_builder.py` (lines 390-397)
 
 ## Missing Functions
 - Inverse trig: `ArcSin`, `ArcCos`, `ArcTan`, `ArcTan2`
@@ -470,7 +470,7 @@ Ensures JSON stays synchronized with Wolfram code.
 Unify into single `ExtractDerivativeProfile` function that returns structured data: `{dt, dx, dy, dz}` instead of boolean. Reduces duplication, easier to extend to 4D.
 
 ## Location
-`torsion_gertsenshtein/wolfram/ExportJSON.wl`
+`tidal/wolfram/ExportJSON.wl`
 """,
         "labels": ["refactoring", "priority: low", "code-quality"],
     },
@@ -503,7 +503,7 @@ Add Python 3.12 test job (allow_failure: true) to detect future issues.
 PGF export functionality untested (150+ lines, 0 tests). May produce invalid LaTeX.
 
 ## Location
-`torsion_gertsenshtein/plot_pgf.py`
+`tidal/plot_pgf.py`
 
 ## Test Requirements
 - Validate PGF output is valid LaTeX
@@ -518,7 +518,7 @@ PGF export functionality untested (150+ lines, 0 tests). May produce invalid LaT
 `GetCoordinateSymbols` and `GetChartDimension` called repeatedly. Memoize results per chart to avoid repeated xAct introspection. Estimated speedup: 10-20% for large systems.
 
 ## Location
-`torsion_gertsenshtein/wolfram/CommonUtilities.wl`
+`tidal/wolfram/CommonUtilities.wl`
 """,
         "labels": ["performance", "priority: low", "optimization", "wolfram"],
     },
@@ -547,7 +547,7 @@ Constraint equations (time_order=0) just return zero evolution. No mechanism to 
 - Add example: Electrostatic potential from charge distribution
 
 ## Location
-`torsion_gertsenshtein/symbolic/pde_builder.py`
+`tidal/symbolic/pde_builder.py`
 """,
         "labels": ["enhancement", "priority: low", "elliptic-pde"],
     },
@@ -590,7 +590,7 @@ def main() -> None:
         print(f"Total issues to create: {len(ISSUES)}")
 
     print(f"\n{'=' * 80}")
-    print("Creating GitHub Issues for Torsion-Gertsenshtein Pipeline")
+    print("Creating GitHub Issues for TIDAL Pipeline")
     print(f"{'=' * 80}\n")
 
     for i, issue in enumerate(ISSUES, 1):

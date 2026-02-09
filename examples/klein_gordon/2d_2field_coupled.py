@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 from typing import TYPE_CHECKING
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     AnimationBuilder,
     AnimationConfig,
     GridConfig,

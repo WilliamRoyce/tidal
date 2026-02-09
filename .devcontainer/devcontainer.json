@@ -45,7 +45,7 @@
         "python.testing.unittestEnabled": false,
         "python.testing.pytestEnabled": true,
         "python.analysis.diagnosticMode": "openFilesOnly",
-        "python.analysis.include": ["torsion_gertsenshtein"],
+        "python.analysis.include": ["tidal"],
         "python.analysis.autoImportCompletions": true
       },
       "extensions": [

@@ -1,6 +1,6 @@
-# Torsion-Gertsenshtein Pipeline Roadmap
+# TIDAL Pipeline Roadmap
 
-This document outlines the planned improvements and features for the torsion-gertsenshtein symbolic physics pipeline project.
+This document outlines the planned improvements and features for the TIDAL symbolic physics pipeline project.
 
 **Last Updated:** February 2026
 **Project Status:** Phase 13+ Complete, CLI done (743 Python tests + ~108 Wolfram tests)
@@ -118,7 +118,7 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 | Feature | Status |
 |---------|--------|
-| CLI (`tg` command) — 5 subcommands, 147 tests | ✅ Complete |
+| CLI (`tidal` command) — 5 subcommands, 147 tests | ✅ Complete |
 | `theory.toml` configuration with `[[derived_fields]]` | ✅ Complete |
 | Scalar-vector coupling stress test (mixed-rank cross-field) | ✅ Complete |
 | Massive 3-form example (rank-3 antisymmetric tensor) | ✅ Complete |
@@ -171,7 +171,7 @@ Issues should be tagged with appropriate labels:
 
 **As of February 2026:**
 - ✅ Phase 13+ completed: All core pipeline features implemented
-- ✅ CLI (`tg` command) implemented: 5 subcommands, 147 tests, zero new dependencies
+- ✅ CLI (`tidal` command) implemented: 5 subcommands, 147 tests, zero new dependencies
 - ✅ 18 working examples spanning 1+1D through 3+1D
 - ✅ 743 Python tests + ~108 Wolfram tests passing, 0 ruff violations, 0 pyright errors
 - 🔄 Remaining: Automatic gauge fixing, Wolfram CI, parameter sweep examples

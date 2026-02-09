@@ -26,12 +26,12 @@ Mathematica/xAct          JSON              Python/py-pde
 ## Directory Structure
 
 ```
-torsion_gertsenshtein/
+tidal/
 ├── symbolic/                # Python-side symbolic processing
 │   ├── json_loader.py       # Load equations from JSON → EquationSystem
 │   ├── pde_builder.py       # Build PDEBase from spec → PDEFromSpec
 │   └── __init__.py
-├── cli/                     # CLI (`tg` command)
+├── cli/                     # CLI (`tidal` command)
 │   ├── __main__.py          # Entry point (derive/simulate/inspect/list/validate)
 │   ├── _derive.py           # TOML → .wls → wolframscript → JSON
 │   ├── _simulate.py         # JSON → PDE → solve → plot
@@ -81,8 +81,8 @@ json = ProcessLagrangian[
 
 ```python
 from pde import CartesianGrid
-from torsion_gertsenshtein.symbolic import build_pde_from_json
-from torsion_gertsenshtein.vectorfield import ComponentGaussianPulse
+from tidal.symbolic import build_pde_from_json
+from tidal.vectorfield import ComponentGaussianPulse
 
 # Load equations derived from Lagrangian
 pde = build_pde_from_json("examples/data/em_1d.json")
@@ -327,7 +327,7 @@ Checks:
 - ✅ **Gauge constraints**: Constraint equations with `time_derivative_order=0`
 - ✅ **Rank 3+ tensors**: Antisymmetric rank-3 with symmetry reduction (massive_3form)
 - ✅ **Curvilinear coordinates**: Polar, spherical, cylindrical with Christoffel auto-detection
-- ✅ **CLI**: `tg` command with derive/simulate/inspect/list/validate subcommands
+- ✅ **CLI**: `tidal` command with derive/simulate/inspect/list/validate subcommands
 - ✅ **Auto-computed matrices**: Mass/coupling matrices from identity terms (Phase 12)
 
 ## Future Extensions

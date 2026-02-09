@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     GridConfig,
     KGParameters,
     KleinGordonPDE,

@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from pde import CartesianGrid
 
-from torsion_gertsenshtein.kgsim.initial_conditions import RingPulse2D
+from tidal.kgsim.initial_conditions import RingPulse2D
 
 # ==================== Ring Centering Tests ====================
 

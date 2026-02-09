@@ -17,7 +17,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pde import PDE, FieldCollection, PolarSymGrid, ScalarField
 
-from torsion_gertsenshtein.kgsim import SimulationConfig
+from tidal.kgsim import SimulationConfig
 
 
 def create_radial_ring_pulse(

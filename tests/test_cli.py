@@ -1,4 +1,4 @@
-"""Tests for the ``tg`` command-line interface."""
+"""Tests for the ``tidal`` command-line interface."""
 
 from __future__ import annotations
 
@@ -9,7 +9,7 @@ from typing import ClassVar
 
 import pytest
 
-from torsion_gertsenshtein.cli import main
+from tidal.cli import main
 
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "data"
 
@@ -27,14 +27,14 @@ class TestMainEntryPoint:
             main(["--version"])
 
     def test_module_invocation(self) -> None:
-        """``python -m torsion_gertsenshtein.cli`` should be importable."""
-        import torsion_gertsenshtein.cli.__main__  # noqa: F401  # pyright: ignore[reportUnusedImport]
+        """``python -m tidal.cli`` should be importable."""
+        import tidal.cli.__main__  # noqa: F401  # pyright: ignore[reportUnusedImport]
 
     def test_get_version_fallback(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """_get_version() should return 'unknown' when package is not installed."""
         from importlib.metadata import PackageNotFoundError
 
-        from torsion_gertsenshtein.cli import _get_version
+        from tidal.cli import _get_version
 
         def _raise(_name: str) -> str:
             raise PackageNotFoundError
@@ -43,15 +43,15 @@ class TestMainEntryPoint:
         assert _get_version() == "unknown"
 
     def test_entry_point_subprocess(self) -> None:
-        """The ``tg`` entry point should be callable as a subprocess."""
+        """The ``tidal`` entry point should be callable as a subprocess."""
         result = subprocess.run(
-            [sys.executable, "-m", "torsion_gertsenshtein.cli", "--version"],
+            [sys.executable, "-m", "tidal.cli", "--version"],
             capture_output=True,
             text=True,
             check=False,
         )
         assert result.returncode == 0
-        assert "tg" in result.stdout
+        assert "tidal" in result.stdout
 
 
 class TestInspectCommand:
@@ -945,27 +945,27 @@ class TestDeriveAbsolutePaths:
     }
 
     def test_pipeline_path_is_absolute(self) -> None:
-        from torsion_gertsenshtein.cli._derive import generate_wls
+        from tidal.cli._derive import generate_wls
 
         script = generate_wls(self._MINIMAL_CONFIG)
         assert "$InputFileName" not in script
-        assert "/torsion_gertsenshtein/wolfram" in script
+        assert "/tidal/wolfram" in script
 
     def test_output_path_is_absolute(self) -> None:
-        from torsion_gertsenshtein.cli._derive import generate_wls
+        from tidal.cli._derive import generate_wls
 
         script = generate_wls(self._MINIMAL_CONFIG, config_dir=Path("/project"))
         # The output path "output.json" should be resolved to /project/output.json
         assert '"/project/output.json"' in script
 
     def test_output_override_absolute(self) -> None:
-        from torsion_gertsenshtein.cli._derive import generate_wls
+        from tidal.cli._derive import generate_wls
 
         script = generate_wls(self._MINIMAL_CONFIG, output_override="/tmp/test.json")
         assert '"/tmp/test.json"' in script
 
     def test_output_path_resolves_relative_to_config_dir(self, tmp_path: Path) -> None:
-        from torsion_gertsenshtein.cli._derive import generate_wls
+        from tidal.cli._derive import generate_wls
 
         # Create config_dir = tmp_path/sub/
         config_dir = tmp_path / "sub"
@@ -1059,7 +1059,7 @@ expression = "phi[]^2"
 
 
 class TestValidateCommand:
-    """Tests for ``tg validate``."""
+    """Tests for ``tidal validate``."""
 
     def test_validate_valid_spec(
         self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str],

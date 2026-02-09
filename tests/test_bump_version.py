@@ -67,11 +67,12 @@ class TestFileUpdates:
     def mock_project(self, temp_dir: Path) -> Path:
         """Create a mock project structure."""
         # Create directories
-        (temp_dir / "torsion_gertsenshtein").mkdir()
+        (temp_dir / "tidal").mkdir()
+        (temp_dir / "docs" / "source").mkdir(parents=True)
 
         # Create pyproject.toml
         pyproject_content = """[project]
-name = "torsion_gertsenshtein"
+name = "tidal"
 version = "0.1.0"
 description = "Test project"
 """
@@ -82,7 +83,17 @@ description = "Test project"
 
 __version__ = "0.1.0"
 '''
-        (temp_dir / "torsion_gertsenshtein" / "__init__.py").write_text(init_content)
+        (temp_dir / "tidal" / "__init__.py").write_text(init_content)
+
+        # Create docs/source/conf.py
+        conf_content = '''"""Sphinx configuration."""
+
+project = "TIDAL"
+author = "Test Author"
+version = "0.1.0"
+release = "0.1.0"
+'''
+        (temp_dir / "docs" / "source" / "conf.py").write_text(conf_content)
 
         # Create CITATION.cff
         citation_content = """cff-version: 1.2.0
@@ -103,7 +114,10 @@ date-released: 2026-01-01
         monkeypatch.setattr(bumper, "root", mock_project)
         monkeypatch.setattr(bumper, "pyproject_toml", mock_project / "pyproject.toml")
         monkeypatch.setattr(
-            bumper, "init_py", mock_project / "torsion_gertsenshtein" / "__init__.py"
+            bumper, "init_py", mock_project / "tidal" / "__init__.py"
+        )
+        monkeypatch.setattr(
+            bumper, "sphinx_conf", mock_project / "docs" / "source" / "conf.py"
         )
         monkeypatch.setattr(bumper, "citation_cff", mock_project / "CITATION.cff")
 
@@ -111,6 +125,7 @@ date-released: 2026-01-01
 
         assert versions["pyproject.toml"] == "0.1.0"
         assert versions["__init__.py"] == "0.1.0"
+        assert versions["docs/source/conf.py"] == "0.1.0"
         assert versions["CITATION.cff"] == "0.1.0"
 
     def test_update_init_py(
@@ -118,13 +133,27 @@ date-released: 2026-01-01
     ) -> None:
         """Test updating __init__.py version."""
         bumper = VersionBumper("0.2.0", dry_run=False)
-        init_path = mock_project / "torsion_gertsenshtein" / "__init__.py"
+        init_path = mock_project / "tidal" / "__init__.py"
         monkeypatch.setattr(bumper, "init_py", init_path)
 
         bumper._update_init_py()
 
         content = init_path.read_text()
         assert '__version__ = "0.2.0"' in content
+
+    def test_update_sphinx_conf(
+        self, mock_project: Path, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Test updating docs/source/conf.py version and release."""
+        bumper = VersionBumper("0.2.0", dry_run=False)
+        conf_path = mock_project / "docs" / "source" / "conf.py"
+        monkeypatch.setattr(bumper, "sphinx_conf", conf_path)
+
+        bumper._update_sphinx_conf()
+
+        content = conf_path.read_text()
+        assert 'version = "0.2.0"' in content
+        assert 'release = "0.2.0"' in content
 
     def test_update_pyproject_toml_regex(
         self, mock_project: Path, monkeypatch: pytest.MonkeyPatch
@@ -192,6 +221,7 @@ class TestBackupRestore:
         bumper = VersionBumper("0.2.0", dry_run=False)
         monkeypatch.setattr(bumper, "pyproject_toml", test_file)
         monkeypatch.setattr(bumper, "init_py", test_file)
+        monkeypatch.setattr(bumper, "sphinx_conf", test_file)
         monkeypatch.setattr(bumper, "citation_cff", test_file)
 
         bumper._create_backups()
@@ -212,6 +242,7 @@ class TestBackupRestore:
         bumper = VersionBumper("0.2.0", dry_run=False)
         monkeypatch.setattr(bumper, "pyproject_toml", test_file)
         monkeypatch.setattr(bumper, "init_py", test_file)
+        monkeypatch.setattr(bumper, "sphinx_conf", test_file)
         monkeypatch.setattr(bumper, "citation_cff", test_file)
 
         bumper._create_backups()
@@ -248,6 +279,7 @@ class TestErrorConditions:
         monkeypatch.setattr(bumper, "root", tmp_path)
         monkeypatch.setattr(bumper, "pyproject_toml", tmp_path / "nonexistent.toml")
         monkeypatch.setattr(bumper, "init_py", tmp_path / "nonexistent.py")
+        monkeypatch.setattr(bumper, "sphinx_conf", tmp_path / "nonexistent_conf.py")
         monkeypatch.setattr(bumper, "citation_cff", tmp_path / "nonexistent.cff")
 
         with pytest.raises(VersionBumpError, match="Required file not found"):

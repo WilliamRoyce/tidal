@@ -2,19 +2,19 @@
 # CLI equivalents for the Proca (massive vector) 1+1D example
 # See also: proca.wls (manual derivation), proca_simulation.py (Python simulation)
 #
-# To run manually:  cd examples/proca && tg derive theory.toml
+# To run manually:  cd examples/proca && tidal derive theory.toml
 
 set -euo pipefail
 cd "$(dirname "$0")"
 
 # Derive equations from Lagrangian (requires wolframscript)
-tg derive theory.toml
+tidal derive theory.toml
 
 # Inspect the equation system
-tg inspect ../data/proca_1d.json
+tidal inspect ../data/proca_1d.json
 
 # Run simulation (Gaussian pulse in A_1, Lorenz gauge automatic for m != 0)
-tg simulate ../data/proca_1d.json \
+tidal simulate ../data/proca_1d.json \
   --param procaMassSquared=1.0 \
   --grid-shape 512 \
   --bounds 0:100 \

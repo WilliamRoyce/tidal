@@ -14,7 +14,7 @@ from pathlib import Path
 import numpy as np
 from pde import CartesianGrid, FieldCollection, ScalarField
 
-from torsion_gertsenshtein.symbolic import (
+from tidal.symbolic import (
     ComponentEquation,
     EquationSystem,
     OperatorTerm,
@@ -23,7 +23,7 @@ from torsion_gertsenshtein.symbolic import (
     create_initial_state,
     load_equation_system,
 )
-from torsion_gertsenshtein.vectorfield import (
+from tidal.vectorfield import (
     ComponentFieldParams,
     ComponentGaussianPulse,
     ComponentPlaneWave,

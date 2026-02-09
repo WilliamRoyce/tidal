@@ -4,7 +4,7 @@
 
 set -e
 
-echo "Creating GitHub labels for torsion-gertsenshtein..."
+echo "Creating GitHub labels for TIDAL..."
 echo ""
 
 # Priority labels

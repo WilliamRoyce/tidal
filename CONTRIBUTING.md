@@ -1,6 +1,6 @@
-# Contributing to Torsion-Gertsenshtein
+# Contributing to TIDAL
 
-Thank you for your interest in contributing to the Torsion-Gertsenshtein project! This document provides guidelines and instructions for contributing.
+Thank you for your interest in contributing to the TIDAL project! This document provides guidelines and instructions for contributing.
 
 ## Table of Contents
 
@@ -73,8 +73,8 @@ uv run ruff check .
 uv run pyright
 
 # Verify CLI works
-tg list
-tg validate examples/data/klein_gordon_1d.json
+tidal list
+tidal validate examples/data/klein_gordon_1d.json
 
 # Run a pipeline example
 uv run python examples/scalar_field/kg_from_lagrangian.py
@@ -121,7 +121,7 @@ Branch naming conventions:
 uv run pytest
 
 # Run with coverage
-uv run pytest --cov=torsion_gertsenshtein --cov-report=html
+uv run pytest --cov=tidal --cov-report=html
 
 # Run specific test file
 uv run pytest tests/test_your_feature.py
@@ -257,7 +257,7 @@ import numpy as np
 from pde import CartesianGrid
 
 # Local
-from torsion_gertsenshtein.kgsim.config import GridConfig
+from tidal.kgsim.config import GridConfig
 
 # Type-only imports
 if TYPE_CHECKING:
@@ -295,7 +295,7 @@ from __future__ import annotations
 import pytest
 from pde import CartesianGrid
 
-from torsion_gertsenshtein.kgsim import make_grid
+from tidal.kgsim import make_grid
 
 
 def test_my_feature(grid_1d: CartesianGrid) -> None:
@@ -318,7 +318,7 @@ def test_my_feature(grid_1d: CartesianGrid) -> None:
 
 ```bash
 # Generate coverage report
-uv run pytest --cov=torsion_gertsenshtein --cov-report=html
+uv run pytest --cov=tidal --cov-report=html
 # View in browser: open htmlcov/index.html
 ```
 
@@ -349,7 +349,7 @@ If adding new features, update:
 
 ```bash
 cd docs
-uv run sphinx-apidoc -f -o source/ ../torsion_gertsenshtein/
+uv run sphinx-apidoc -f -o source/ ../tidal/
 uv run make html
 # Open build/html/index.html in browser
 ```
@@ -436,19 +436,19 @@ Closes #42
 Understanding the codebase:
 
 ```
-torsion-gertsenshtein/
-├── torsion_gertsenshtein/    # Main package
+tidal/                   # TIDAL project root
+├── tidal/    # Main package
 │   ├── symbolic/             # Lagrangian-to-PDE pipeline (Python side)
 │   │   ├── json_loader.py   # Load equations from JSON → EquationSystem
 │   │   ├── pde_builder.py   # Build PDEBase from spec → PDEFromSpec
 │   │   └── __init__.py
-│   ├── cli/                  # CLI (`tg` command)
-│   │   ├── __main__.py      # Entry point (tg derive/simulate/inspect/list/validate)
-│   │   ├── _derive.py       # tg derive: TOML → .wls → wolframscript
-│   │   ├── _simulate.py     # tg simulate: JSON → PDE → solve → plot
-│   │   ├── _inspect.py      # tg inspect: display equation system info
-│   │   ├── _list.py         # tg list: discover available JSON specs
-│   │   ├── _validate.py     # tg validate: JSON spec validation
+│   ├── cli/                  # CLI (`tidal` command)
+│   │   ├── __main__.py      # Entry point (tidal derive/simulate/inspect/list/validate)
+│   │   ├── _derive.py       # tidal derive: TOML → .wls → wolframscript
+│   │   ├── _simulate.py     # tidal simulate: JSON → PDE → solve → plot
+│   │   ├── _inspect.py      # tidal inspect: display equation system info
+│   │   ├── _list.py         # tidal list: discover available JSON specs
+│   │   ├── _validate.py     # tidal validate: JSON spec validation
 │   │   └── _plot.py         # Plotting utilities for simulate
 │   ├── wolfram/              # Mathematica/xAct pipeline modules
 │   │   ├── EulerLagrange.wl
@@ -477,4 +477,4 @@ torsion-gertsenshtein/
 
 By contributing, you agree that your contributions will be licensed under the MIT License.
 
-Thank you for contributing to Torsion-Gertsenshtein! 🎉
+Thank you for contributing to TIDAL! 🎉

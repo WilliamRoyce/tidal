@@ -32,14 +32,14 @@ ENERGY_CONSERVATION_THRESHOLD = 0.1  # Relative energy change threshold for cons
 
 import matplotlib as mpl
 
-from torsion_gertsenshtein.utils import normalize_solve_result
+from tidal.utils import normalize_solve_result
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
 
-from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
+from tidal.symbolic import build_pde_from_json, load_equation_system
 
 
 def main() -> None:  # noqa: PLR0914, PLR0915

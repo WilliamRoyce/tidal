@@ -14,15 +14,15 @@ import pytest
 from numpy.testing import assert_allclose
 from pde import CartesianGrid, FieldCollection, ScalarField
 
-from torsion_gertsenshtein.kgsim.config import KGParameters
-from torsion_gertsenshtein.kgsim.equations import KleinGordonPDE
-from torsion_gertsenshtein.symbolic import (
+from tidal.kgsim.config import KGParameters
+from tidal.kgsim.equations import KleinGordonPDE
+from tidal.symbolic import (
     build_pde_from_json,
     load_equation_system,
 )
-from torsion_gertsenshtein.symbolic.pde_builder import PDEFromSpec, create_initial_state
-from torsion_gertsenshtein.utils import normalize_solve_result
-from torsion_gertsenshtein.vectorfield import (
+from tidal.symbolic.pde_builder import PDEFromSpec, create_initial_state
+from tidal.utils import normalize_solve_result
+from tidal.vectorfield import (
     ComponentFieldParams,
     ComponentGaussianPulse,
     create_gaussian_pulse_state,

@@ -106,4 +106,4 @@ Print["  • ", If[$xpermQ, "High-performance", "Basic"], " tensor symmetry opti
 Print["  • Perturbation theory (gravitational waves, cosmology)"];
 Print["  • Numerical spacetime computations"];
 Print[""];
-Print["Your torsion-gertsenshtein project is ready for advanced GR research!"];
+Print["Your TIDAL project is ready for advanced GR research!"];

@@ -18,7 +18,7 @@ Get[FileNameJoin[{DirectoryName[$InputFileName], "test_harness.wl"}]];
 $DefInfoQ = False;
 
 (* Load the Linearize module *)
-pipelinePath = FileNameJoin[{DirectoryName[$InputFileName], "..", "..", "torsion_gertsenshtein", "wolfram"}];
+pipelinePath = FileNameJoin[{DirectoryName[$InputFileName], "..", "..", "tidal", "wolfram"}];
 Get[FileNameJoin[{pipelinePath, "Linearize.wl"}]];
 
 (* === Cleanup: Remove any existing definitions from previous runs === *)

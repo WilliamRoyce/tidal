@@ -1,0 +1,819 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>tidal.kgsim.equations &#8212; TIDAL 0.3.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=e259d695"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/tidal/kgsim/equations';</script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="0.3.0" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../_static/TIDAL_Logo_TikZ_Figure.svg" class="logo__image only-light" alt="TIDAL 0.3.0 documentation - Home"/>
+    <img src="../../../_static/TIDAL_Logo_TikZ_Figure.svg" class="logo__image only-dark pst-js-only" alt="TIDAL 0.3.0 documentation - Home"/>
+  
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../pipeline.html">
+    Symbolic Pipeline
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../cli.html">
+    CLI Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../TEX_SUPPORT.html">
+    TeX Support Configuration
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../2D_COUPLED_IMPLEMENTATION.html">
+    Klein-Gordon 2D Coupled Simulations: Implementation Summary
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../ADVANCED_KLEIN_GORDON_IMPLEMENTATION.html">
+    Advanced Klein-Gordon Equation Implementation
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../RESTRUCTURING_PHASE2.html">
+    Phase 2 Restructuring: Code Quality and API Improvements
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="../../../modules.html">
+    tidal
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/WilliamRoyce/torsion-gertsenshtein" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+        
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar hide-on-wide">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../pipeline.html">
+    Symbolic Pipeline
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../cli.html">
+    CLI Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../examples.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../TEX_SUPPORT.html">
+    TeX Support Configuration
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../2D_COUPLED_IMPLEMENTATION.html">
+    Klein-Gordon 2D Coupled Simulations: Implementation Summary
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../ADVANCED_KLEIN_GORDON_IMPLEMENTATION.html">
+    Advanced Klein-Gordon Equation Implementation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../RESTRUCTURING_PHASE2.html">
+    Phase 2 Restructuring: Code Quality and API Improvements
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="../../../modules.html">
+    tidal
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/WilliamRoyce/torsion-gertsenshtein" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="../../tidal.html" class="nav-link">tidal</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">tidal.kgsim.equations</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for tidal.kgsim.equations</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;PDE implementations for Klein-Gordon equations.</span>
+
+<span class="sd">This module provides the core PDE classes for homogeneous, inhomogeneous,</span>
+<span class="sd">and coupled Klein-Gordon systems using the py-pde framework.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">__future__</span><span class="w"> </span><span class="kn">import</span> <span class="n">annotations</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">TYPE_CHECKING</span><span class="p">,</span> <span class="n">Any</span><span class="p">,</span> <span class="n">cast</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">numba</span><span class="w"> </span><span class="kn">import</span> <span class="p">(</span>  <span class="c1"># pyright: ignore[reportMissingTypeStubs,reportUnknownVariableType]</span>
+    <span class="n">jit</span><span class="p">,</span>  <span class="c1"># pyright: ignore[reportMissingTypeStubs,reportUnknownVariableType]</span>
+<span class="p">)</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pde</span><span class="w"> </span><span class="kn">import</span> <span class="n">PDE</span><span class="p">,</span> <span class="n">DataFieldBase</span><span class="p">,</span> <span class="n">FieldCollection</span><span class="p">,</span> <span class="n">PDEBase</span><span class="p">,</span> <span class="n">ScalarField</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing_extensions</span><span class="w"> </span><span class="kn">import</span> <span class="n">override</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">tidal.kgsim.utils</span><span class="w"> </span><span class="kn">import</span> <span class="n">infer_bc_from_grid</span>
+
+<span class="k">if</span> <span class="n">TYPE_CHECKING</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">collections.abc</span><span class="w"> </span><span class="kn">import</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Sequence</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">numpy.typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">NDArray</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">tidal.kgsim.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">MultiFieldParams</span>
+
+    <span class="n">NumericArray</span> <span class="o">=</span> <span class="n">NDArray</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">]</span>
+
+    <span class="kn">from</span><span class="w"> </span><span class="nn">.config</span><span class="w"> </span><span class="kn">import</span> <span class="n">KGParameters</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+
+<span class="n">_logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="KleinGordonPDE">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.KleinGordonPDE">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">KleinGordonPDE</span><span class="p">(</span><span class="n">PDE</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Klein-Gordon equation represented in first-order (in time) form.</span>
+
+<span class="sd">    This class implements the following system of equations:</span>
+<span class="sd">        d/dt phi = pi</span>
+<span class="sd">        d/dt pi  = laplace(phi) - m^2 * phi</span>
+
+<span class="sd">    It is intended to be used with the PDE solver framework and operates on</span>
+<span class="sd">    FieldCollection objects containing two ScalarField instances: (phi, pi).</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    params : KGParameters</span>
+<span class="sd">        Parameter bundle for the Klein-Gordon equation. Only the `mass` attribute</span>
+<span class="sd">        is used; its square is stored as the internal `m2` attribute.</span>
+
+<span class="sd">    Attributes</span>
+<span class="sd">    ----------</span>
+<span class="sd">    m2 : float</span>
+<span class="sd">        Square of the Klein-Gordon mass (mass**2), computed from `params.mass`.</span>
+<span class="sd">    explicit_time_dependence : bool</span>
+<span class="sd">        Set to False to indicate the PDE has no explicit dependence on time.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    This class uses py-pde&#39;s expression-based PDE system, which automatically</span>
+<span class="sd">    provides Numba JIT compilation when `backend=&quot;numba&quot;` is specified in the</span>
+<span class="sd">    solver. The expressions are compiled at runtime for optimal performance.</span>
+<span class="sd">    No explicit `make_pde_rhs_numba` method is needed.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">explicit_time_dependence</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">params</span><span class="p">:</span> <span class="n">KGParameters</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">m2</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">mass</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">m2</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">m2</span>  <span class="c1"># retained for energy observers / metadata</span>
+
+        <span class="c1"># Expression engine: two fields named &quot;phi&quot; and &quot;pi&quot;</span>
+        <span class="c1"># d_t phi = pi</span>
+        <span class="c1"># d_t pi  = laplace(phi) - m2 * phi</span>
+        <span class="c1">#</span>
+        <span class="c1"># Note: These expressions are automatically compiled to Numba when</span>
+        <span class="c1"># backend=&quot;numba&quot; is used in the solver (e.g., pde.solve(..., backend=&quot;numba&quot;))</span>
+        <span class="n">rhs</span> <span class="o">=</span> <span class="p">{</span>
+            <span class="s2">&quot;phi&quot;</span><span class="p">:</span> <span class="s2">&quot;pi&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;pi&quot;</span><span class="p">:</span> <span class="s2">&quot;laplace(phi) - m2 * phi&quot;</span><span class="p">,</span>
+        <span class="p">}</span>
+        <span class="n">consts</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;m2&quot;</span><span class="p">:</span> <span class="n">m2</span><span class="p">}</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">consts</span><span class="o">=</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;Any&quot;</span><span class="p">,</span> <span class="n">consts</span><span class="p">))</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_cache_key</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s2">&quot;m2&quot;</span><span class="p">:</span> <span class="bp">self</span><span class="o">.</span><span class="n">m2</span><span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="InhomogeneousKGPDE">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.InhomogeneousKGPDE">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">InhomogeneousKGPDE</span><span class="p">(</span><span class="n">PDEBase</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Inhomogeneous Klein-Gordon with spatial coefficients.</span>
+
+<span class="sd">        d_t phi = pi</span>
+<span class="sd">        d_t pi  = laplace(phi) - m2(x) * phi + V(x) * phi</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - `m2_field` and `V_field` are ScalarField on the same grid as `state`.</span>
+<span class="sd">    - Unlike expression-based PDEs, this class provides an explicit Numba</span>
+<span class="sd">      implementation via the `make_pde_rhs_numba` method for optimal performance</span>
+<span class="sd">      with spatially-varying coefficients. The spatial fields are frozen at</span>
+<span class="sd">      compilation time as numpy arrays.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">explicit_time_dependence</span> <span class="o">=</span> <span class="kc">False</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">m2_field</span><span class="p">:</span> <span class="n">ScalarField</span><span class="p">,</span> <span class="n">potential_field</span><span class="p">:</span> <span class="n">ScalarField</span> <span class="o">|</span> <span class="kc">None</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">()</span>
+        <span class="k">if</span> <span class="n">potential_field</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">potential_field</span> <span class="o">=</span> <span class="n">ScalarField</span><span class="p">(</span><span class="n">m2_field</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="mf">0.0</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">m2_field</span><span class="o">.</span><span class="n">grid</span> <span class="o">!=</span> <span class="n">potential_field</span><span class="o">.</span><span class="n">grid</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;m2_field and V_field must live on the same grid&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="c1"># Normalize numeric dtype to float64 to avoid unexpected dtype/broadcast behavior</span>
+        <span class="n">m2_field</span> <span class="o">=</span> <span class="n">ScalarField</span><span class="p">(</span>
+            <span class="n">m2_field</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">m2_field</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="n">potential_field</span> <span class="o">=</span> <span class="n">ScalarField</span><span class="p">(</span>
+            <span class="n">potential_field</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">potential_field</span><span class="o">.</span><span class="n">data</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+        <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">m2_field</span> <span class="o">=</span> <span class="n">m2_field</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">potential_field</span> <span class="o">=</span> <span class="n">potential_field</span>
+
+<div class="viewcode-block" id="InhomogeneousKGPDE.evolution_rate">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.InhomogeneousKGPDE.evolution_rate">[docs]</a>
+    <span class="nd">@override</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">evolution_rate</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">FieldCollection</span> <span class="o">|</span> <span class="n">DataFieldBase</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">FieldCollection</span><span class="p">:</span>
+        <span class="c1"># runtime sanity checks to prevent silent broadcasting which leads to blow-ups</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">FieldCollection</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;state must be FieldCollection(phi, pi)&quot;</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+        <span class="n">phi</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">pi</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">phi</span><span class="p">,</span> <span class="n">ScalarField</span><span class="p">)</span> <span class="ow">or</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">pi</span><span class="p">,</span> <span class="n">ScalarField</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;state must contain ScalarField(phi) and ScalarField(pi)&quot;</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># Ensure coefficient fields live on the same grid as phi</span>
+        <span class="k">if</span> <span class="n">phi</span><span class="o">.</span><span class="n">grid</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">m2_field</span><span class="o">.</span><span class="n">grid</span> <span class="ow">or</span> <span class="n">phi</span><span class="o">.</span><span class="n">grid</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_field</span><span class="o">.</span><span class="n">grid</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;state fields and coefficient fields must live on the same grid&quot;</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="c1"># For periodic grids: pass bc=&quot;periodic&quot; to let py-pde handle it</span>
+        <span class="c1"># For non-periodic: use inferred BC or periodic as fallback</span>
+        <span class="n">periodic</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">phi</span><span class="o">.</span><span class="n">grid</span><span class="p">,</span> <span class="s2">&quot;periodic&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="c1"># Narrow the type for the type checker before calling any()</span>
+        <span class="k">if</span> <span class="n">periodic</span> <span class="ow">is</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="n">is_periodic</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">periodic</span><span class="p">,</span> <span class="p">(</span><span class="nb">list</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)):</span>
+            <span class="n">periodic_seq</span> <span class="o">=</span> <span class="n">cast</span><span class="p">(</span><span class="s2">&quot;Sequence[bool]&quot;</span><span class="p">,</span> <span class="n">periodic</span><span class="p">)</span>
+            <span class="n">is_periodic</span> <span class="o">=</span> <span class="nb">any</span><span class="p">(</span><span class="n">periodic_seq</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">is_periodic</span> <span class="o">=</span> <span class="kc">False</span>
+
+        <span class="k">if</span> <span class="n">is_periodic</span><span class="p">:</span>
+            <span class="c1"># Periodic grid: use default boundary handling (NO bc argument)</span>
+            <span class="n">_logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Using periodic boundary handling (no explicit bc)&quot;</span><span class="p">)</span>
+            <span class="n">lap_phi</span> <span class="o">=</span> <span class="n">phi</span><span class="o">.</span><span class="n">laplace</span><span class="p">(</span><span class="n">bc</span><span class="o">=</span><span class="s2">&quot;periodic&quot;</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="c1"># Non-periodic: infer appropriate BC</span>
+            <span class="n">bc</span> <span class="o">=</span> <span class="n">infer_bc_from_grid</span><span class="p">(</span><span class="n">phi</span><span class="o">.</span><span class="n">grid</span><span class="p">)</span>
+            <span class="n">lap_phi</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">phi</span><span class="o">.</span><span class="n">laplace</span><span class="p">(</span><span class="n">bc</span><span class="o">=</span><span class="s2">&quot;periodic&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">bc</span> <span class="ow">is</span> <span class="kc">None</span>
+                <span class="k">else</span> <span class="n">phi</span><span class="o">.</span><span class="n">laplace</span><span class="p">(</span><span class="n">bc</span><span class="o">=</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;Any&quot;</span><span class="p">,</span> <span class="n">bc</span><span class="p">))</span>
+            <span class="p">)</span>
+
+        <span class="n">dphi_dt</span> <span class="o">=</span> <span class="n">pi</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="n">dpi_dt</span> <span class="o">=</span> <span class="n">lap_phi</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">m2_field</span> <span class="o">*</span> <span class="n">phi</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_field</span> <span class="o">*</span> <span class="n">phi</span>
+        <span class="c1"># Ensure runtime types are ScalarField so we can safely cast for the type checker.</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">dpi_dt</span><span class="p">,</span> <span class="n">ScalarField</span><span class="p">):</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;dpi_dt computed non-ScalarField results&quot;</span>
+            <span class="k">raise</span> <span class="ne">TypeError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">FieldCollection</span><span class="p">([</span><span class="n">dphi_dt</span><span class="p">,</span> <span class="n">dpi_dt</span><span class="p">],</span> <span class="n">labels</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;phi&quot;</span><span class="p">,</span> <span class="s2">&quot;pi&quot;</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="InhomogeneousKGPDE.make_pde_rhs_numba">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.InhomogeneousKGPDE.make_pde_rhs_numba">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">make_pde_rhs_numba</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">state</span><span class="p">:</span> <span class="n">FieldCollection</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Callable</span><span class="p">[[</span><span class="n">NumericArray</span><span class="p">,</span> <span class="nb">float</span><span class="p">],</span> <span class="n">NumericArray</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Create a compiled function evaluating the right hand side of the PDE.</span>
+
+<span class="sd">        This implements spatially varying Klein-Gordon with mass and potential fields.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            state (:class:`~pde.fields.FieldCollection`):</span>
+<span class="sd">                An example for the state defining the grid and data types</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">            A function with signature `(state_data, t)`, which can be called with an</span>
+<span class="sd">            instance of :class:`~numpy.ndarray` of the state data and the time to</span>
+<span class="sd">            obtained an instance of :class:`~numpy.ndarray` giving the evolution rate.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">            The spatial coefficient fields (m2_field, potential_field) are frozen</span>
+<span class="sd">            at compilation time as numpy arrays.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="c1"># Copy spatial fields to frozen arrays</span>
+        <span class="n">m2_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">m2_field</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+        <span class="n">v_data</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">potential_field</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+
+        <span class="c1"># Get boundary conditions</span>
+        <span class="n">bc</span> <span class="o">=</span> <span class="n">infer_bc_from_grid</span><span class="p">(</span><span class="n">state</span><span class="o">.</span><span class="n">grid</span><span class="p">)</span>
+
+        <span class="c1"># Create compiled operator</span>
+        <span class="n">laplace</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">grid</span><span class="o">.</span><span class="n">make_operator</span><span class="p">(</span><span class="s2">&quot;laplace&quot;</span><span class="p">,</span> <span class="n">bc</span><span class="o">=</span><span class="n">bc</span><span class="p">,</span> <span class="n">backend</span><span class="o">=</span><span class="s2">&quot;numba&quot;</span><span class="p">)</span>  <span class="c1"># type: ignore[arg-type]</span>
+
+        <span class="nd">@jit</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">pde_rhs</span><span class="p">(</span><span class="n">state_data</span><span class="p">:</span> <span class="n">NumericArray</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">0</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">NumericArray</span><span class="p">:</span>  <span class="c1"># noqa: ARG001</span>
+<span class="w">            </span><span class="sd">&quot;&quot;&quot;Compiled helper function evaluating right hand side.&quot;&quot;&quot;</span>
+            <span class="c1"># Extract fields from state array</span>
+            <span class="n">phi_data</span> <span class="o">=</span> <span class="n">state_data</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">pi_data</span> <span class="o">=</span> <span class="n">state_data</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+            <span class="c1"># Prepare output array</span>
+            <span class="n">rate</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">empty_like</span><span class="p">(</span><span class="n">state_data</span><span class="p">)</span>
+
+            <span class="c1"># dphi/dt = pi</span>
+            <span class="n">rate</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">pi_data</span>
+
+            <span class="c1"># dpi/dt = laplace(phi) - m2(x)*phi + V(x)*phi</span>
+            <span class="n">lap_phi</span> <span class="o">=</span> <span class="n">laplace</span><span class="p">(</span><span class="n">phi_data</span><span class="p">)</span>
+            <span class="n">rate</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">lap_phi</span> <span class="o">-</span> <span class="n">m2_data</span> <span class="o">*</span> <span class="n">phi_data</span> <span class="o">+</span> <span class="n">v_data</span> <span class="o">*</span> <span class="n">phi_data</span>
+
+            <span class="k">return</span> <span class="n">rate</span>
+
+        <span class="k">return</span> <span class="n">pde_rhs</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_cache_key</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]:</span>
+        <span class="c1"># Hash by checksums to avoid serializing full arrays</span>
+        <span class="k">return</span> <span class="p">{</span>
+            <span class="s2">&quot;m2_checksum&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">m2_field</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">sum</span><span class="p">()),</span>
+            <span class="s2">&quot;V_checksum&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">potential_field</span><span class="o">.</span><span class="n">data</span><span class="o">.</span><span class="n">sum</span><span class="p">()),</span>
+        <span class="p">}</span></div>
+
+
+
+<div class="viewcode-block" id="make_coupled_kg_pde">
+<a class="viewcode-back" href="../../../tidal.kgsim.html#tidal.kgsim.make_coupled_kg_pde">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">make_coupled_kg_pde</span><span class="p">(</span><span class="n">params</span><span class="p">:</span> <span class="n">MultiFieldParams</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">PDE</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Build an expression-based PDE for N coupled Klein-Gordon fields.</span>
+
+<span class="sd">    This function builds an expression-based PDE for the following system of equations:</span>
+<span class="sd">        d_t phi_i = pi_i</span>
+<span class="sd">        d_t pi_i  = laplace(phi_i) - sum_j M2_ij * phi_j</span>
+<span class="sd">        M2 = diag(m_i^2) + coupling (assumed symmetric).</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    The returned PDE uses py-pde&#39;s expression system, which automatically provides</span>
+<span class="sd">    Numba JIT compilation when `backend=&quot;numba&quot;` is specified in the solver.</span>
+<span class="sd">    The dynamically-generated expressions are compiled at runtime for optimal</span>
+<span class="sd">    performance with coupled field systems.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    ValueError</span>
+<span class="sd">        If `coupling` is not an NxN array matching the number of masses,</span>
+<span class="sd">        if `masses` is empty, or if any mass is negative / non-finite.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">masses</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">masses</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="c1"># validation: non-empty masses</span>
+    <span class="k">if</span> <span class="n">masses</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;masses must be a non-empty sequence&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+    <span class="c1"># validation: finite, non-negative masses</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">masses</span><span class="p">)):</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;masses must contain finite numbers&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">masses</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">):</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;masses must be non-negative&quot;</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
+    <span class="n">field_count</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">masses</span><span class="o">.</span><span class="n">size</span><span class="p">)</span>
+    <span class="n">coup</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">params</span><span class="o">.</span><span class="n">coupling</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">float</span><span class="p">)</span>
+    <span class="c1"># coupling must be a 2-D square array matching the number of masses</span>
+    <span class="k">if</span> <span class="n">coup</span><span class="o">.</span><span class="n">ndim</span> <span class="o">!=</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">coup</span><span class="o">.</span><span class="n">shape</span> <span class="o">!=</span> <span class="p">(</span><span class="n">field_count</span><span class="p">,</span> <span class="n">field_count</span><span class="p">):</span>  <span class="c1"># noqa: PLR2004</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="s2">&quot;coupling must be a 2D square array with shape (N, N) matching len(masses)&quot;</span>
+        <span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+    <span class="n">mass_matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diag</span><span class="p">(</span><span class="n">masses</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">+</span> <span class="n">coup</span>
+
+    <span class="c1"># Field names</span>
+    <span class="n">phi</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;phi</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">field_count</span><span class="p">)]</span>
+    <span class="n">pi</span> <span class="o">=</span> <span class="p">[</span><span class="sa">f</span><span class="s2">&quot;pi</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">field_count</span><span class="p">)]</span>
+
+    <span class="c1"># Build RHS dict</span>
+    <span class="n">rhs</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">field_count</span><span class="p">):</span>
+        <span class="n">rhs</span><span class="p">[</span><span class="n">phi</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="o">=</span> <span class="n">pi</span><span class="p">[</span><span class="n">i</span><span class="p">]</span>
+        <span class="c1"># laplace(phi_i) - sum_j M2_ij * phi_j</span>
+        <span class="n">mix</span> <span class="o">=</span> <span class="s2">&quot; + &quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="sa">f</span><span class="s2">&quot;(-M2_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">j</span><span class="si">}</span><span class="s2">)*</span><span class="si">{</span><span class="n">phi</span><span class="p">[</span><span class="n">j</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">field_count</span><span class="p">)])</span> <span class="ow">or</span> <span class="s2">&quot;0&quot;</span>
+        <span class="n">rhs</span><span class="p">[</span><span class="n">pi</span><span class="p">[</span><span class="n">i</span><span class="p">]]</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;laplace(</span><span class="si">{</span><span class="n">phi</span><span class="p">[</span><span class="n">i</span><span class="p">]</span><span class="si">}</span><span class="s2">) + </span><span class="si">{</span><span class="n">mix</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="c1"># Constants for all M2_ij</span>
+    <span class="n">consts</span><span class="p">:</span> <span class="nb">dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">float</span><span class="p">]</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="sa">f</span><span class="s2">&quot;M2_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">j</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">:</span> <span class="nb">float</span><span class="p">(</span><span class="n">mass_matrix</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">])</span>
+        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">field_count</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">field_count</span><span class="p">)</span>
+    <span class="p">}</span>
+
+    <span class="k">return</span> <span class="n">PDE</span><span class="p">(</span><span class="n">rhs</span><span class="p">,</span> <span class="n">consts</span><span class="o">=</span><span class="n">cast</span><span class="p">(</span><span class="s2">&quot;Any&quot;</span><span class="p">,</span> <span class="n">consts</span><span class="p">))</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

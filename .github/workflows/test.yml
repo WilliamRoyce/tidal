@@ -32,7 +32,7 @@ jobs:
         run: uv run pyright
 
       - name: Run tests with coverage
-        run: uv run pytest --cov=torsion_gertsenshtein --cov-report=term-missing --cov-report=xml
+        run: uv run pytest --cov=tidal --cov-report=term-missing --cov-report=xml
 
       - name: Run cspell
         uses: streetsidesoftware/cspell-action@v7

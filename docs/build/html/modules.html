@@ -1,0 +1,644 @@
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="./" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>tidal &#8212; TIDAL 0.3.0 documentation</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=8f2a1f02" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="_static/documentation_options.js?v=e259d695"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'modules';</script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="tidal package" href="tidal.html" />
+    <link rel="prev" title="Phase 2 Restructuring: Code Quality and API Improvements" href="RESTRUCTURING_PHASE2.html" />
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="0.3.0" />
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="_static/TIDAL_Logo_TikZ_Figure.svg" class="logo__image only-light" alt="TIDAL 0.3.0 documentation - Home"/>
+    <img src="_static/TIDAL_Logo_TikZ_Figure.svg" class="logo__image only-dark pst-js-only" alt="TIDAL 0.3.0 documentation - Home"/>
+  
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    <div class="me-auto navbar-header-items__center">
+      
+        <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="pipeline.html">
+    Symbolic Pipeline
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="cli.html">
+    CLI Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="examples.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="TEX_SUPPORT.html">
+    TeX Support Configuration
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="2D_COUPLED_IMPLEMENTATION.html">
+    Klein-Gordon 2D Coupled Simulations: Implementation Summary
+  </a>
+</li>
+
+            <li class="nav-item dropdown">
+                <button class="btn dropdown-toggle nav-item" type="button"
+                data-bs-toggle="dropdown" aria-expanded="false"
+                aria-controls="pst-nav-more-links">
+                    More
+                </button>
+                <ul id="pst-nav-more-links" class="dropdown-menu">
+                    
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="ADVANCED_KLEIN_GORDON_IMPLEMENTATION.html">
+    Advanced Klein-Gordon Equation Implementation
+  </a>
+</li>
+
+
+<li class=" ">
+  <a class="nav-link dropdown-item nav-internal" href="RESTRUCTURING_PHASE2.html">
+    Phase 2 Restructuring: Code Quality and API Improvements
+  </a>
+</li>
+
+
+<li class=" current active">
+  <a class="nav-link dropdown-item nav-internal" href="#">
+    tidal
+  </a>
+</li>
+
+                </ul>
+            </li>
+            
+  </ul>
+</nav></div>
+      
+    </div>
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+        <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/WilliamRoyce/torsion-gertsenshtein" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+      <div class="sidebar-header-items__center">
+        
+          
+          
+            <div class="navbar-item">
+<nav>
+  <ul class="bd-navbar-elements navbar-nav">
+    
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="pipeline.html">
+    Symbolic Pipeline
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="cli.html">
+    CLI Reference
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="examples.html">
+    Examples
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="TEX_SUPPORT.html">
+    TeX Support Configuration
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="2D_COUPLED_IMPLEMENTATION.html">
+    Klein-Gordon 2D Coupled Simulations: Implementation Summary
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="ADVANCED_KLEIN_GORDON_IMPLEMENTATION.html">
+    Advanced Klein-Gordon Equation Implementation
+  </a>
+</li>
+
+
+<li class="nav-item ">
+  <a class="nav-link nav-internal" href="RESTRUCTURING_PHASE2.html">
+    Phase 2 Restructuring: Code Quality and API Improvements
+  </a>
+</li>
+
+
+<li class="nav-item current active">
+  <a class="nav-link nav-internal" href="#">
+    tidal
+  </a>
+</li>
+
+  </ul>
+</nav></div>
+          
+        
+      </div>
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+          <div class="navbar-item"><ul class="navbar-icon-links"
+    aria-label="Icon Links">
+        <li class="nav-item">
+          
+          
+          
+          
+          
+          
+          
+          
+          <a href="https://github.com/WilliamRoyce/torsion-gertsenshtein" title="GitHub" class="nav-link pst-navbar-icon" rel="noopener" target="_blank" data-bs-toggle="tooltip" data-bs-placement="bottom"><i class="fa-brands fa-github fa-lg" aria-hidden="true"></i>
+            <span class="sr-only">GitHub</span></a>
+        </li>
+</ul></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+<nav class="bd-docs-nav bd-links"
+     aria-label="Section Navigation">
+  <p class="bd-links__title" role="heading" aria-level="1">Section Navigation</p>
+  <div class="bd-toc-item navbar-nav"><ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="tidal.html">tidal package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2"><a class="reference internal" href="tidal.cli.html">tidal.cli package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tidal.kgsim.html">tidal.kgsim package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tidal.symbolic.html">tidal.symbolic package</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tidal.vectorfield.html">tidal.vectorfield package</a></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+      <div class="sidebar-primary-item">
+<div id="ethical-ad-placement"
+      class="flat"
+      data-ea-publisher="readthedocs"
+      data-ea-type="readthedocs-sidebar"
+      data-ea-manual="true">
+</div></div>
+  </div>
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">tidal</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="tidal">
+<h1>tidal<a class="headerlink" href="#tidal" title="Link to this heading">#</a></h1>
+<div class="toctree-wrapper compound">
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="tidal.html">tidal package</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="tidal.html#tidal.has_tex_support"><code class="docutils literal notranslate"><span class="pre">has_tex_support()</span></code></a></li>
+<li class="toctree-l2"><a class="reference internal" href="tidal.html#subpackages">Subpackages</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="tidal.cli.html">tidal.cli package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tidal.cli.html#tidal.cli.main"><code class="docutils literal notranslate"><span class="pre">main()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tidal.kgsim.html">tidal.kgsim package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.AnimationBuilder"><code class="docutils literal notranslate"><span class="pre">AnimationBuilder</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.AnimationConfig"><code class="docutils literal notranslate"><span class="pre">AnimationConfig</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.AnisotropicHigherOrderKGPDE"><code class="docutils literal notranslate"><span class="pre">AnisotropicHigherOrderKGPDE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.AnisotropicKGPDE"><code class="docutils literal notranslate"><span class="pre">AnisotropicKGPDE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.AnisotropicKGParameters"><code class="docutils literal notranslate"><span class="pre">AnisotropicKGParameters</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.DirectionalKGPDE"><code class="docutils literal notranslate"><span class="pre">DirectionalKGPDE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.GaussianPulse"><code class="docutils literal notranslate"><span class="pre">GaussianPulse</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.GridConfig"><code class="docutils literal notranslate"><span class="pre">GridConfig</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.HigherOrderKGPDE"><code class="docutils literal notranslate"><span class="pre">HigherOrderKGPDE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.HigherOrderKGParameters"><code class="docutils literal notranslate"><span class="pre">HigherOrderKGParameters</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.InhomogeneousKGPDE"><code class="docutils literal notranslate"><span class="pre">InhomogeneousKGPDE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.InitialCondition"><code class="docutils literal notranslate"><span class="pre">InitialCondition</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.KGParameters"><code class="docutils literal notranslate"><span class="pre">KGParameters</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.KleinGordonPDE"><code class="docutils literal notranslate"><span class="pre">KleinGordonPDE</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.MultiFieldParams"><code class="docutils literal notranslate"><span class="pre">MultiFieldParams</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.RingPulse2D"><code class="docutils literal notranslate"><span class="pre">RingPulse2D</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.SimulationConfig"><code class="docutils literal notranslate"><span class="pre">SimulationConfig</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.constant_field"><code class="docutils literal notranslate"><span class="pre">constant_field()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.gaussian_pulse"><code class="docutils literal notranslate"><span class="pre">gaussian_pulse()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.make_coupled_kg_pde"><code class="docutils literal notranslate"><span class="pre">make_coupled_kg_pde()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.make_grid"><code class="docutils literal notranslate"><span class="pre">make_grid()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.multi_gaussian"><code class="docutils literal notranslate"><span class="pre">multi_gaussian()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.multi_gaussian_2d"><code class="docutils literal notranslate"><span class="pre">multi_gaussian_2d()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.plane_wave"><code class="docutils literal notranslate"><span class="pre">plane_wave()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.ring_pulse_2d"><code class="docutils literal notranslate"><span class="pre">ring_pulse_2d()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.run"><code class="docutils literal notranslate"><span class="pre">run()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.run_with_snapshots"><code class="docutils literal notranslate"><span class="pre">run_with_snapshots()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.step_region_1d"><code class="docutils literal notranslate"><span class="pre">step_region_1d()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#tidal.kgsim.total_energy_observer"><code class="docutils literal notranslate"><span class="pre">total_energy_observer()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#module-tidal.kgsim.advanced_equations">tidal.kgsim.advanced_equations module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#module-tidal.kgsim.animation_builder">tidal.kgsim.animation_builder module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#module-tidal.kgsim.config">tidal.kgsim.config module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#module-tidal.kgsim.equations">tidal.kgsim.equations module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#module-tidal.kgsim.grids">tidal.kgsim.grids module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#module-tidal.kgsim.initial_conditions">tidal.kgsim.initial_conditions module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#module-tidal.kgsim.observers">tidal.kgsim.observers module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#module-tidal.kgsim.profiles">tidal.kgsim.profiles module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#module-tidal.kgsim.profiling">tidal.kgsim.profiling module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#module-tidal.kgsim.runners">tidal.kgsim.runners module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.kgsim.html#module-tidal.kgsim.utils">tidal.kgsim.utils module</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tidal.symbolic.html">tidal.symbolic package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#tidal.symbolic.BoundaryCondition"><code class="docutils literal notranslate"><span class="pre">BoundaryCondition</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#tidal.symbolic.ComponentEquation"><code class="docutils literal notranslate"><span class="pre">ComponentEquation</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#tidal.symbolic.ConstraintSolverConfig"><code class="docutils literal notranslate"><span class="pre">ConstraintSolverConfig</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#tidal.symbolic.EquationSystem"><code class="docutils literal notranslate"><span class="pre">EquationSystem</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#tidal.symbolic.OperatorTerm"><code class="docutils literal notranslate"><span class="pre">OperatorTerm</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#tidal.symbolic.PDEFromSpec"><code class="docutils literal notranslate"><span class="pre">PDEFromSpec</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#tidal.symbolic.build_pde_from_json"><code class="docutils literal notranslate"><span class="pre">build_pde_from_json()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#tidal.symbolic.create_initial_state"><code class="docutils literal notranslate"><span class="pre">create_initial_state()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#tidal.symbolic.load_equation_system"><code class="docutils literal notranslate"><span class="pre">load_equation_system()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#tidal.symbolic.register_operator"><code class="docutils literal notranslate"><span class="pre">register_operator()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#module-tidal.symbolic.json_loader">tidal.symbolic.json_loader module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.symbolic.html#module-tidal.symbolic.pde_builder">tidal.symbolic.pde_builder module</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="tidal.vectorfield.html">tidal.vectorfield package</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="tidal.vectorfield.html#tidal.vectorfield.ComponentFieldParams"><code class="docutils literal notranslate"><span class="pre">ComponentFieldParams</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.vectorfield.html#tidal.vectorfield.ComponentGaussianPulse"><code class="docutils literal notranslate"><span class="pre">ComponentGaussianPulse</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.vectorfield.html#tidal.vectorfield.ComponentPlaneWave"><code class="docutils literal notranslate"><span class="pre">ComponentPlaneWave</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.vectorfield.html#tidal.vectorfield.create_gaussian_pulse_state"><code class="docutils literal notranslate"><span class="pre">create_gaussian_pulse_state()</span></code></a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.vectorfield.html#submodules">Submodules</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.vectorfield.html#module-tidal.vectorfield.config">tidal.vectorfield.config module</a></li>
+<li class="toctree-l4"><a class="reference internal" href="tidal.vectorfield.html#module-tidal.vectorfield.initial_conditions">tidal.vectorfield.initial_conditions module</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="tidal.html#submodules">Submodules</a></li>
+<li class="toctree-l2"><a class="reference internal" href="tidal.html#module-tidal.plot_pgf">tidal.plot_pgf module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="tidal.html#tidal.plot_pgf.check_tex_available"><code class="docutils literal notranslate"><span class="pre">check_tex_available()</span></code></a></li>
+<li class="toctree-l3"><a class="reference internal" href="tidal.html#tidal.plot_pgf.enable_pgf"><code class="docutils literal notranslate"><span class="pre">enable_pgf()</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="tidal.html#module-tidal.utils">tidal.utils module</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="tidal.html#tidal.utils.normalize_solve_result"><code class="docutils literal notranslate"><span class="pre">normalize_solve_result()</span></code></a></li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="RESTRUCTURING_PHASE2.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">Phase 2 Restructuring: Code Quality and API Improvements</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="tidal.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">tidal package</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+  <div role="note" aria-label="source link">
+    <h3>This Page</h3>
+    <ul class="this-page-menu">
+      <li><a href="_sources/modules.rst.txt"
+            rel="nofollow">Show Source</a></li>
+    </ul>
+   </div></div>
+
+</div></div>
+              
+            
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+
+  <p class="sphinx-version">
+    Created using <a href="https://www.sphinx-doc.org/">Sphinx</a> 8.2.3.
+    <br/>
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+    <div class="footer-items__end">
+      
+        <div class="footer-item">
+<p class="theme-version">
+  <!-- # L10n: Setting the PST URL as an argument as this does not need to be localized -->
+  Built with the <a href="https://pydata-sphinx-theme.readthedocs.io/en/stable/index.html">PyData Sphinx Theme</a> 0.16.1.
+</p></div>
+      
+    </div>
+  
+</div>
+
+  </footer>
+  </body>
+</html>

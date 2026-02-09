@@ -22,8 +22,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pde import CartesianGrid, FieldCollection, MemoryStorage, PDEBase, ScalarField
 
-from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
-from torsion_gertsenshtein.vectorfield import (
+from tidal.symbolic import build_pde_from_json, load_equation_system
+from tidal.vectorfield import (
     ComponentGaussianPulse,
 )
 
@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
     from pde.trackers.base import TrackerBase
 
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem
 
     NumericArray = NDArray[np.float64]
 

@@ -12,14 +12,14 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # Derive equations from Lagrangian (requires wolframscript)
-tg derive theory.toml
+tidal derive theory.toml
 
 # Inspect the equation system
-tg inspect ../data/sphere_kg.json
+tidal inspect ../data/sphere_kg.json
 
 # Run simulation (2D Gaussian on stereographic plane)
 # Position-dependent wave speed from conformal factor Omega(r) = 2R^2/(R^2 + r^2)
-tg simulate ../data/sphere_kg.json \
+tidal simulate ../data/sphere_kg.json \
   --param sphR=2.0 --param sphm2=0.0 \
   --grid-shape 128 \
   --bounds -8:8 \

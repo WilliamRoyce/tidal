@@ -13,11 +13,11 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING
 
-from torsion_gertsenshtein.plot_pgf import enable_pgf
+from tidal.plot_pgf import enable_pgf
 
 enable_pgf("xelatex")
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     AnimationBuilder,
     AnimationConfig,
     GridConfig,
@@ -26,7 +26,7 @@ from torsion_gertsenshtein.kgsim import (
     make_grid,
     run_with_snapshots,
 )
-from torsion_gertsenshtein.kgsim.advanced_equations import AnisotropicKGPDE
+from tidal.kgsim.advanced_equations import AnisotropicKGPDE
 
 if TYPE_CHECKING:
     from pde import CartesianGrid, FieldCollection

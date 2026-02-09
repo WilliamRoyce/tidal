@@ -17,14 +17,14 @@ import pytest
 from numpy.testing import assert_allclose
 from pde import CartesianGrid, FieldCollection, ScalarField
 
-from torsion_gertsenshtein.symbolic.json_loader import (
+from tidal.symbolic.json_loader import (
     BoundaryCondition,
     ComponentEquation,
     ConstraintSolverConfig,
     EquationSystem,
     OperatorTerm,
 )
-from torsion_gertsenshtein.symbolic.pde_builder import PDEFromSpec
+from tidal.symbolic.pde_builder import PDEFromSpec
 
 # === Fixtures ===
 

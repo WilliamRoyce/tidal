@@ -2,7 +2,7 @@
 
 Complete reference for the JSON specification format used as the interface between the Wolfram/xAct symbolic layer and the Python/py-pde simulation layer.
 
-**Source of truth:** [`torsion_gertsenshtein/symbolic/json_loader.py`](../torsion_gertsenshtein/symbolic/json_loader.py)
+**Source of truth:** [`tidal/symbolic/json_loader.py`](../tidal/symbolic/json_loader.py)
 
 ---
 
@@ -649,7 +649,7 @@ Poisson equation solved as a constraint at each timestep:
 ### Loading and Simulating
 
 ```python
-from torsion_gertsenshtein.symbolic import load_equation_system, build_pde_from_json
+from tidal.symbolic import load_equation_system, build_pde_from_json
 
 # Load spec (validates JSON)
 spec = load_equation_system("examples/data/polar_kg.json")

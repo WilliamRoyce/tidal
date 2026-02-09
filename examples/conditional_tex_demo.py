@@ -8,8 +8,8 @@ is not installed while still providing high-quality plots when available.
 import matplotlib.pyplot as plt
 import numpy as np
 
-from torsion_gertsenshtein import has_tex_support
-from torsion_gertsenshtein.plot_pgf import enable_pgf
+from tidal import has_tex_support
+from tidal.plot_pgf import enable_pgf
 
 
 def main() -> None:

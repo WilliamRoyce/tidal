@@ -1,16 +1,16 @@
-# Code Owners for torsion-gertsenshtein project
+# Code Owners for TIDAL project
 # These owners will be automatically requested for review when someone opens a PR
 # that modifies code in the specified paths.
 #
 # More info: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Wolfram/xAct symbolic computation pipeline
-/torsion_gertsenshtein/wolfram/  @WilliamRoyce
+/tidal/wolfram/  @WilliamRoyce
 *.wls                             @WilliamRoyce
 
 # Python PDE builders and symbolic processing
-/torsion_gertsenshtein/symbolic/  @WilliamRoyce
-/torsion_gertsenshtein/kgsim/     @WilliamRoyce
+/tidal/symbolic/  @WilliamRoyce
+/tidal/kgsim/     @WilliamRoyce
 
 # Examples (physics demonstrations)
 /examples/                        @WilliamRoyce

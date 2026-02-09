@@ -15,15 +15,15 @@ import pytest
 from numpy.testing import assert_allclose
 from pde import PDE, CartesianGrid, FieldCollection, ScalarField
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     GridConfig,
     SimulationConfig,
     gaussian_pulse,
     make_grid,
 )
-from torsion_gertsenshtein.kgsim.config import KGParameters
-from torsion_gertsenshtein.kgsim.equations import KleinGordonPDE
-from torsion_gertsenshtein.kgsim.initial_conditions import multi_gaussian
+from tidal.kgsim.config import KGParameters
+from tidal.kgsim.equations import KleinGordonPDE
+from tidal.kgsim.initial_conditions import multi_gaussian
 
 if TYPE_CHECKING:
     from collections.abc import Sequence

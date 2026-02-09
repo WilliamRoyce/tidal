@@ -22,13 +22,13 @@ import pytest
 from numpy.testing import assert_allclose
 from pde import CartesianGrid, FieldCollection, ScalarField
 
-from torsion_gertsenshtein.symbolic.json_loader import (
+from tidal.symbolic.json_loader import (
     ComponentEquation,
     EquationSystem,
     OperatorTerm,
     is_known_operator,
 )
-from torsion_gertsenshtein.symbolic.pde_builder import (
+from tidal.symbolic.pde_builder import (
     PDEFromSpec,
     _op_nth_derivative,
     _parse_multi_axis_spec,

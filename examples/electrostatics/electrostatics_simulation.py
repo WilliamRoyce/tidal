@@ -29,13 +29,13 @@ import matplotlib.pyplot as plt
 import numpy as np
 from pde import CartesianGrid, FieldCollection, ScalarField
 
-from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
+from tidal.symbolic import build_pde_from_json, load_equation_system
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
     from pde import PDEBase
 
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem
 
     NumericArray = NDArray[np.float64]
 

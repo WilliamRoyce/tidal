@@ -2,7 +2,7 @@
 # test-all-xact.sh
 # Master Test Runner for xAct Package Suite
 # Runs all individual package tests and integration test
-# Part of the torsion-gertsenshtein devcontainer configuration
+# Part of the TIDAL devcontainer configuration
 
 set -e
 

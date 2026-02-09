@@ -1,0 +1,26 @@
+tidal.vectorfield package
+=========================
+
+.. automodule:: tidal.vectorfield
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Submodules
+----------
+
+tidal.vectorfield.config module
+-------------------------------
+
+.. automodule:: tidal.vectorfield.config
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+tidal.vectorfield.initial\_conditions module
+--------------------------------------------
+
+.. automodule:: tidal.vectorfield.initial_conditions
+   :members:
+   :show-inheritance:
+   :undoc-members:

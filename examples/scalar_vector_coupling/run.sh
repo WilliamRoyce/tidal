@@ -13,13 +13,13 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 # Derive equations from Lagrangian (requires wolframscript)
-tg derive theory.toml
+tidal derive theory.toml
 
 # Inspect the equation system
-tg inspect ../data/scalar_vector_coupling.json
+tidal inspect ../data/scalar_vector_coupling.json
 
 # Run simulation (Gaussian IC for phi, periodic BCs)
-tg simulate ../data/scalar_vector_coupling.json \
+tidal simulate ../data/scalar_vector_coupling.json \
   --param phim2=1.0 --param Am2=0.5 --param kCS=0.3 --param gSV=0.2 \
   --grid-shape 48 \
   --bounds 0:10,0:10 \
