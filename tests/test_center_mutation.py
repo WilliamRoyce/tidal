@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import pytest
 
-from torsion_gertsenshtein.kgsim.initial_conditions import GaussianPulse
+from tidal.kgsim.initial_conditions import GaussianPulse
 
 # ==================== Center Parameter Tests ====================
 

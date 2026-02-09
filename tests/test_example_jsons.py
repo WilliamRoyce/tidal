@@ -16,8 +16,8 @@ import numpy as np
 import pytest
 from pde import CartesianGrid
 
-from torsion_gertsenshtein.symbolic.json_loader import load_equation_system
-from torsion_gertsenshtein.symbolic.pde_builder import PDEFromSpec, create_initial_state
+from tidal.symbolic.json_loader import load_equation_system
+from tidal.symbolic.pde_builder import PDEFromSpec, create_initial_state
 
 EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "data"
 

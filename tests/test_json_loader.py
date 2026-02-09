@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, Any
 
 import pytest
 
-from torsion_gertsenshtein.symbolic.json_loader import (
+from tidal.symbolic.json_loader import (
     KNOWN_OPERATORS,
     ComponentEquation,
     EquationSystem,
@@ -15,7 +15,7 @@ from torsion_gertsenshtein.symbolic.json_loader import (
     load_equation_system,
     validate_json_schema,
 )
-from torsion_gertsenshtein.symbolic.pde_builder import (
+from tidal.symbolic.pde_builder import (
     _OPERATOR_REGISTRY,
 )
 
@@ -644,11 +644,11 @@ class TestRegisterOperator:
 
     def test_register_and_use_custom_operator(self) -> None:
         """Registered operator is accepted by is_known_operator and usable in PDE."""
-        from torsion_gertsenshtein.symbolic.json_loader import (
+        from tidal.symbolic.json_loader import (
             _CUSTOM_OPERATORS,
             is_known_operator,
         )
-        from torsion_gertsenshtein.symbolic.pde_builder import (
+        from tidal.symbolic.pde_builder import (
             _OPERATOR_REGISTRY,
             register_operator,
         )
@@ -669,7 +669,7 @@ class TestRegisterOperator:
 
     def test_register_shadow_builtin_raises(self) -> None:
         """Registering an operator that shadows a built-in raises ValueError."""
-        from torsion_gertsenshtein.symbolic.pde_builder import (
+        from tidal.symbolic.pde_builder import (
             register_operator,
         )
 

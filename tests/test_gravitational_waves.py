@@ -24,16 +24,16 @@ import pytest
 from numpy.testing import assert_allclose
 from pde import CartesianGrid
 
-from torsion_gertsenshtein.symbolic.json_loader import (
+from tidal.symbolic.json_loader import (
     EquationSystem,
     load_equation_system,
 )
-from torsion_gertsenshtein.symbolic.pde_builder import (
+from tidal.symbolic.pde_builder import (
     PDEFromSpec,
     build_pde_from_json,
     create_initial_state,
 )
-from torsion_gertsenshtein.utils import normalize_solve_result
+from tidal.utils import normalize_solve_result
 
 DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
 DEDONDER_JSON = DATA_DIR / "linearized_gravity_dedonder.json"

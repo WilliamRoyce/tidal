@@ -14,12 +14,12 @@ import numpy as np
 import pytest
 from pde import CartesianGrid, FieldCollection, ScalarField
 
-from torsion_gertsenshtein.symbolic.json_loader import (
+from tidal.symbolic.json_loader import (
     EquationSystem,
     OperatorTerm,
     load_equation_system,
 )
-from torsion_gertsenshtein.symbolic.pde_builder import PDEFromSpec
+from tidal.symbolic.pde_builder import PDEFromSpec
 
 # Path to test data
 DATA_DIR = Path(__file__).parent.parent / "examples" / "data"

@@ -16,7 +16,7 @@ import numpy as np
 import pytest
 from pde import FieldCollection, ScalarField
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     GridConfig,
     KGParameters,
     KleinGordonPDE,
@@ -25,8 +25,8 @@ from torsion_gertsenshtein.kgsim import (
     make_grid,
     run,
 )
-from torsion_gertsenshtein.kgsim.equations import InhomogeneousKGPDE
-from torsion_gertsenshtein.kgsim.profiles import step_region_1d
+from tidal.kgsim.equations import InhomogeneousKGPDE
+from tidal.kgsim.profiles import step_region_1d
 
 if TYPE_CHECKING:
     from collections.abc import Callable

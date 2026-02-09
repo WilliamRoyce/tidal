@@ -15,7 +15,7 @@ import numpy as np
 import pytest
 from pde import CartesianGrid, FieldCollection, ScalarField
 
-from torsion_gertsenshtein.symbolic import (
+from tidal.symbolic import (
     EquationSystem,
     build_pde_from_json,
     load_equation_system,

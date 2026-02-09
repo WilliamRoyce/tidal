@@ -17,12 +17,12 @@ import pytest
 from numpy.testing import assert_allclose
 from pde import CartesianGrid, FieldCollection, ScalarField
 
-from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
-from torsion_gertsenshtein.symbolic.pde_builder import (
+from tidal.symbolic import build_pde_from_json, load_equation_system
+from tidal.symbolic.pde_builder import (
     PDEFromSpec,
     create_initial_state,
 )
-from torsion_gertsenshtein.utils import normalize_solve_result
+from tidal.utils import normalize_solve_result
 
 
 @pytest.fixture

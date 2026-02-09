@@ -67,11 +67,11 @@ class TestFileUpdates:
     def mock_project(self, temp_dir: Path) -> Path:
         """Create a mock project structure."""
         # Create directories
-        (temp_dir / "torsion_gertsenshtein").mkdir()
+        (temp_dir / "tidal").mkdir()
 
         # Create pyproject.toml
         pyproject_content = """[project]
-name = "torsion_gertsenshtein"
+name = "tidal"
 version = "0.1.0"
 description = "Test project"
 """
@@ -82,7 +82,7 @@ description = "Test project"
 
 __version__ = "0.1.0"
 '''
-        (temp_dir / "torsion_gertsenshtein" / "__init__.py").write_text(init_content)
+        (temp_dir / "tidal" / "__init__.py").write_text(init_content)
 
         # Create CITATION.cff
         citation_content = """cff-version: 1.2.0
@@ -103,7 +103,7 @@ date-released: 2026-01-01
         monkeypatch.setattr(bumper, "root", mock_project)
         monkeypatch.setattr(bumper, "pyproject_toml", mock_project / "pyproject.toml")
         monkeypatch.setattr(
-            bumper, "init_py", mock_project / "torsion_gertsenshtein" / "__init__.py"
+            bumper, "init_py", mock_project / "tidal" / "__init__.py"
         )
         monkeypatch.setattr(bumper, "citation_cff", mock_project / "CITATION.cff")
 
@@ -118,7 +118,7 @@ date-released: 2026-01-01
     ) -> None:
         """Test updating __init__.py version."""
         bumper = VersionBumper("0.2.0", dry_run=False)
-        init_path = mock_project / "torsion_gertsenshtein" / "__init__.py"
+        init_path = mock_project / "tidal" / "__init__.py"
         monkeypatch.setattr(bumper, "init_py", init_path)
 
         bumper._update_init_py()

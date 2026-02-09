@@ -9,11 +9,11 @@ import numpy as np
 import pytest
 from pde import CartesianGrid, FieldCollection, ScalarField
 
-from torsion_gertsenshtein.symbolic import build_pde_from_json, load_equation_system
-from torsion_gertsenshtein.utils import normalize_solve_result
+from tidal.symbolic import build_pde_from_json, load_equation_system
+from tidal.utils import normalize_solve_result
 
 if TYPE_CHECKING:
-    from torsion_gertsenshtein.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem
 
 SPHERE_JSON = Path(__file__).parent.parent / "examples" / "data" / "sphere_kg.json"
 

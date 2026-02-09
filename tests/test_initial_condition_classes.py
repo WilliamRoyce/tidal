@@ -12,7 +12,7 @@ import numpy as np
 import pytest
 from typing_extensions import override
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     GaussianPulse,
     GridConfig,
     InitialCondition,

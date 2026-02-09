@@ -5,12 +5,12 @@ from __future__ import annotations
 import pytest
 from pde import CartesianGrid
 
-from torsion_gertsenshtein.kgsim.animation_builder import (
+from tidal.kgsim.animation_builder import (
     AnimationBuilder,
     AnimationConfig,
 )
-from torsion_gertsenshtein.kgsim.config import GridConfig
-from torsion_gertsenshtein.kgsim.grids import make_grid
+from tidal.kgsim.config import GridConfig
+from tidal.kgsim.grids import make_grid
 
 
 class TestEmptyGridValidation:

@@ -9,10 +9,10 @@ from __future__ import annotations
 
 import numpy as np
 
-from torsion_gertsenshtein.kgsim import GridConfig, SimulationConfig, make_grid, run
-from torsion_gertsenshtein.kgsim.config import MultiFieldParams
-from torsion_gertsenshtein.kgsim.equations import make_coupled_kg_pde
-from torsion_gertsenshtein.kgsim.initial_conditions import multi_gaussian
+from tidal.kgsim import GridConfig, SimulationConfig, make_grid, run
+from tidal.kgsim.config import MultiFieldParams
+from tidal.kgsim.equations import make_coupled_kg_pde
+from tidal.kgsim.initial_conditions import multi_gaussian
 
 # ==================== Coupled Field Symmetry Tests ====================
 

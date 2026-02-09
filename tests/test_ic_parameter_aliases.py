@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     GaussianPulse,
     GridConfig,
     RingPulse2D,

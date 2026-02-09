@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 from typing_extensions import override
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     GaussianPulse,
     GridConfig,
     InitialCondition,
