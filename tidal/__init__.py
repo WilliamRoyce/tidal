@@ -1,4 +1,7 @@
-"""Torsion-Gertsenshtein: Klein-Gordon PDE simulations for gravitational wave research.
+"""TIDAL: Tensor Integration and Derivation for Any Lagrangian.
+
+A symbolic physics pipeline for deriving PDEs from Lagrangians using
+xAct/Mathematica and simulating them with py-pde.
 
 This package provides:
 - `kgsim`: Klein-Gordon equation simulations
