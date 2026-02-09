@@ -794,6 +794,109 @@ path = "output.json"
         assert "Antisymmetric" in out
         assert "DefConstantSymbol[m2]" in out
 
+    def test_derive_single_field_passes_metric_matrix(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Single-field DecomposeToComponents must include MetricMatrix option."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Test Scalar"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert '"MetricMatrix"' in out
+        assert "tsMetricMatrix" in out
+
+    def test_derive_multi_field_passes_metric_matrix(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Multi-field DecomposeToComponents must include MetricMatrix option."""
+        config = tmp_path / "coupled.toml"
+        config.write_text("""
+[theory]
+name = "Coupled Scalars"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[fields]]
+name = "chi"
+type = "scalar"
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]] - 1/2 CD[-a][chi[]] eta[a,b] CD[-b][chi[]]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert '"MetricMatrix"' in out
+        assert "csMetricMatrix" in out
+
+    def test_derive_curvilinear_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Curvilinear metric with coordinate-dependent entries should generate valid WLS."""
+        config = tmp_path / "polar.toml"
+        config.write_text("""
+[theory]
+name = "Polar Klein-Gordon"
+
+[spacetime]
+dimension = 3
+metric = "diagonal"
+diagonal = [-1, 1, "x[]^2"]
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["polm2"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]] - polm2/2 phi[]^2"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Should have coordinate-dependent metric entry
+        assert "x[]^2" in out
+        # Should use DiagonalMatrix
+        assert "DiagonalMatrix" in out
+        # Should pass MetricMatrix to DecomposeToComponents
+        assert '"MetricMatrix"' in out
+        assert "DefConstantSymbol[polm2]" in out
+
 
 class TestDeriveAbsolutePaths:
     """Verify generated WLS scripts use absolute paths (not $InputFileName-relative)."""
