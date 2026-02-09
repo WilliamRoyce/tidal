@@ -1193,6 +1193,182 @@ class TestExceptionHandling:
         err = capsys.readouterr().err
         assert "Error:" in err
 
+    def test_derive_derived_field_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Derived field F should generate DefTensor, MakeRule, and substitution."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Electromagnetism"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[lagrangian]
+expression = "-1/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Derived field tensor definition
+        assert "DefTensor" in out
+        assert "Antisymmetric" in out
+        # MakeRule for substitution
+        assert "MakeRule" in out
+        assert "MetricOn" in out
+        # Substitution applied to Lagrangian
+        assert "/." in out
+        assert "ToCanonical" in out
+        assert "ContractMetric" in out
+        # VarD should vary w.r.t. A, not F
+        assert "EulerLagrangeEquation" in out
+
+    def test_derive_derived_scalar_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Derived scalar field should generate DefTensor and MakeRule."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Test Derived Scalar"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[derived_fields]]
+name = "V"
+type = "scalar"
+definition = "phi[]^2"
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - V[]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "MakeRule" in out
+        assert "Rules" in out
+
+    def test_derive_derived_field_name_collision(self, tmp_path: Path) -> None:
+        """Derived field with same name as fundamental field should fail."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad Collision"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[derived_fields]]
+name = "A"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]]"
+
+[lagrangian]
+expression = "A[-a] eta[a, b] A[-b]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_derive_derived_field_missing_definition(self, tmp_path: Path) -> None:
+        """Derived field without definition should fail."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Missing Defn"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+
+[lagrangian]
+expression = "F[-a, -b] eta[a, c] eta[b, d] F[-c, -d]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_derive_no_derived_fields_backward_compat(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Existing TOMLs without [[derived_fields]] should still work."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Plain Scalar"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Should NOT contain derived field artifacts
+        assert "MakeRule" not in out
+        assert "Derived field" not in out
+        # Normal flow should work
+        assert "EulerLagrangeEquation" in out
+
     def test_derive_rank_exceeds_max(self, tmp_path: Path) -> None:
         """Tensor rank exceeding max should be caught at config validation."""
         config = tmp_path / "theory.toml"

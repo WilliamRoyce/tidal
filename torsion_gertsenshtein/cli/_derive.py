@@ -156,6 +156,37 @@ def _validate_parameters(config: dict[str, Any]) -> None:
             raise ValueError(msg)
 
 
+def _validate_derived_fields(config: dict[str, Any]) -> None:
+    """Validate optional [[derived_fields]] entries.
+
+    Raises
+    ------
+    ValueError
+        If a derived field has invalid type/rank/symmetry, missing definition,
+        or name collision with a fundamental field.
+    """
+    derived = config.get("derived_fields", [])
+    if not derived:
+        return
+
+    dim = config["spacetime"]["dimension"]
+    fundamental_names = {f["name"] for f in config.get("fields", [])}
+
+    for i, field in enumerate(derived):
+        _validate_single_field(field, i, dim)
+
+        # Require definition
+        defn = field.get("definition")
+        if not defn or not isinstance(defn, str) or not defn.strip():
+            msg = f"[[derived_fields]] entry {i} ('{field.get('name', '?')}') must have a non-empty 'definition'"
+            raise ValueError(msg)
+
+        # Name collision check
+        if field["name"] in fundamental_names:
+            msg = f"Derived field '{field['name']}' conflicts with a fundamental [[fields]] entry"
+            raise ValueError(msg)
+
+
 def _validate_config(config: dict[str, Any]) -> None:
     """Validate TOML config structure.
 
@@ -172,6 +203,7 @@ def _validate_config(config: dict[str, Any]) -> None:
 
     _validate_spacetime(config)
     _validate_fields(config)
+    _validate_derived_fields(config)
     _validate_lagrangian(config)
     _validate_parameters(config)
 
@@ -282,13 +314,22 @@ def _field_expression(field: dict[str, Any], prefix: str) -> str:
 
 
 def _substitute_field_names(
-    expression: str, fields: list[dict[str, Any]], prefix: str
+    expression: str,
+    fields: list[dict[str, Any]],
+    prefix: str,
+    *,
+    derived_fields: list[dict[str, Any]] | None = None,
 ) -> str:
     """Replace user field names with prefixed xAct names in the Lagrangian."""
     result = expression
 
+    # Merge fundamental and derived fields for substitution
+    all_fields = list(fields)
+    if derived_fields:
+        all_fields.extend(derived_fields)
+
     # Sort by name length descending to avoid partial replacements
-    sorted_fields = sorted(fields, key=lambda f: len(f["name"]), reverse=True)
+    sorted_fields = sorted(all_fields, key=lambda f: len(f["name"]), reverse=True)
 
     for field in sorted_fields:
         name = field["name"]
@@ -328,6 +369,7 @@ class _WlsContext:
     is_multi: bool
     pipeline_path: str
     parameters: dict[str, float]
+    derived_fields: list[dict[str, Any]]
 
 
 def _wls_header(ctx: _WlsContext) -> list[str]:
@@ -412,18 +454,74 @@ def _wls_fields(ctx: _WlsContext) -> list[str]:
     return lines
 
 
+def _wls_derived_fields(ctx: _WlsContext) -> list[str]:
+    """Generate DefTensor and MakeRule for each derived field."""
+    if not ctx.derived_fields:
+        return []
+
+    lines: list[str] = ["(* Derived field definitions *)"]
+    for field in ctx.derived_fields:
+        # DefTensor (reuse existing helper)
+        lines.extend((_generate_field_def(field, ctx.prefix, ctx.manifold), ""))
+
+        # Build the MakeRule LHS: prefixed tensor with lowered indices
+        fexpr = _field_expression(field, ctx.prefix)
+        # Substitute field names in the definition
+        defn = _substitute_field_names(
+            field["definition"].strip(),
+            ctx.fields,
+            ctx.prefix,
+            derived_fields=ctx.derived_fields,
+        )
+        rule_var = f"{ctx.prefix}{field['name'].capitalize()}Rules"
+        lines.extend(
+            (
+                f"{rule_var} = MakeRule[{{{fexpr}, {defn}}}, MetricOn -> All, ContractMetrics -> True];",
+                "",
+            )
+        )
+
+    return lines
+
+
 def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
     """Generate Lagrangian definition lines."""
-    prefixed = _substitute_field_names(ctx.lagrangian_expr, ctx.fields, ctx.prefix)
-    return [
+    prefixed = _substitute_field_names(
+        ctx.lagrangian_expr, ctx.fields, ctx.prefix, derived_fields=ctx.derived_fields
+    )
+    lines = [
         "(* Step 3: Lagrangian *)",
         f"{ctx.prefix}Lagrangian = (",
         f"  {prefixed}",
         ");",
         "",
-        f'Print["Lagrangian: ", {ctx.prefix}Lagrangian];',
-        "",
     ]
+
+    if ctx.derived_fields:
+        lines.append("(* Expand derived field definitions *)")
+        for field in ctx.derived_fields:
+            rule_var = f"{ctx.prefix}{field['name'].capitalize()}Rules"
+            lines.append(
+                f"{ctx.prefix}Lagrangian = {ctx.prefix}Lagrangian /. {rule_var};"
+            )
+        lines.extend(
+            (
+                f"{ctx.prefix}Lagrangian = ToCanonical[{ctx.prefix}Lagrangian];",
+                f"{ctx.prefix}Lagrangian = ContractMetric[{ctx.prefix}Lagrangian, {ctx.metric}];",
+                "",
+                f'Print["Lagrangian (expanded): ", {ctx.prefix}Lagrangian];',
+                "",
+            )
+        )
+    else:
+        lines.extend(
+            (
+                f'Print["Lagrangian: ", {ctx.prefix}Lagrangian];',
+                "",
+            )
+        )
+
+    return lines
 
 
 def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
@@ -633,6 +731,7 @@ def generate_wls(
         is_multi=len(config["fields"]) > 1,
         pipeline_path=str(wolfram_dir),
         parameters={k: float(v) for k, v in config.get("parameters", {}).items()},
+        derived_fields=config.get("derived_fields", []),
     )
 
     lines: list[str] = []
@@ -640,6 +739,7 @@ def generate_wls(
     lines.extend(_wls_packages(ctx.pipeline_path))
     lines.extend(_wls_spacetime(config, ctx))
     lines.extend(_wls_fields(ctx))
+    lines.extend(_wls_derived_fields(ctx))
     lines.extend(_wls_lagrangian(ctx))
     if ctx.is_multi:
         lines.extend(_wls_euler_lagrange_multi(ctx))
