@@ -1,6 +1,6 @@
 # Examples
 
-TIDAL includes 17 pipeline examples and a legacy Klein-Gordon example set, spanning 1+1D through 3+1D spacetimes with scalar, vector, and tensor fields.
+TIDAL includes 18 pipeline examples and a legacy Klein-Gordon example set, spanning 1+1D through 3+1D spacetimes with scalar, vector, and tensor fields.
 
 ## Pipeline Examples
 
@@ -22,7 +22,8 @@ All pipeline examples follow the same pattern: a Wolfram script (`.wls`) derives
 | `scalar_field_3d/` | 3+1D | phi_0 | Full 4D Klein-Gordon |
 | `spherical_kg/` | 3+1D | phi_0 | Spherical coordinates, trig coefficients (Cot, Csc) |
 | `cylindrical_kg/` | 3+1D | phi_0 | Cylindrical coordinates, mixed curved/flat |
-| `gravitational_waves/` | 3+1D | h_ij | xPert linearization, TT gauge, rank-2 tensor, constraints (no TOML — uses xPert) |
+| `massive_gravity/` | 2+1D | h_ij | Linearized massive gravity, m² mass term, xPert linearization |
+| `gravitational_waves/` | 3+1D | h_ij | xPert linearization, TT gauge, rank-2 tensor, constraints |
 | `massive_3form/` | 3+1D | C_ijk | Rank-3 antisymmetric tensor, symmetry reduction 64 to 4, KG per component |
 
 ## Running Examples
@@ -76,6 +77,7 @@ uv run python examples/scalar_vector_coupling/simulation.py
 | scalar_field_3d | Yes | Yes | — |
 | spherical_kg | Yes | Yes | — |
 | cylindrical_kg | Yes | Yes | — |
+| massive_gravity | Yes | Yes | Yes |
 | gravitational_waves | Yes | Yes | — |
 | massive_3form | Yes | Yes | — |
 
