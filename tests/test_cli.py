@@ -1034,6 +1034,65 @@ path = "output.json"
         # Metadata should indicate linearized
         assert '"linearized" -> True' in out
 
+    def test_derive_massive_gravity_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Linearization with constants and metric reference generates valid WLS."""
+        config = tmp_path / "mg.toml"
+        config.write_text("""
+[theory]
+name = "Massive Gravity"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[constants]
+names = ["m2"]
+
+[linearization]
+expression = "Einstein[CD][-a, -b] + m2 eta[-a, -b]"
+perturbation_field = "h"
+
+[parameters]
+m2 = 1.0
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Should load xPert + Linearize.wl
+        assert "xAct`xPert`" in out
+        assert "Linearize.wl" in out
+        # Constant should be defined
+        assert "DefConstantSymbol[m2]" in out
+        # xPert setup
+        assert "SetupMetricPerturbation" in out
+        assert "LinearizeTensorExpression" in out
+        # Metric reference should be substituted (eta -> mgEta)
+        assert "mgEta[-a, -b]" in out
+        # Mass term preserved with constant
+        assert "m2 mgEta" in out
+        # Notation conversion
+        assert "LI[1]" in out
+        # Decomposition
+        assert "DecomposeToComponents" in out
+        # Metadata
+        assert '"linearized" -> True' in out
+        # No Euler-Lagrange path
+        assert "VarD" not in out
+        # Parameter default value in metadata
+        assert '"m2" -> 1.0' in out
+
 
 class TestDeriveAbsolutePaths:
     """Verify generated WLS scripts use absolute paths (not $InputFileName-relative)."""

@@ -1,0 +1,44 @@
+# Linearized Massive Gravity in 2+1D
+#
+# Linearizes G_ab + m^2 g_ab = 0 around flat Minkowski background:
+#   G^(1)_ab[h] + m^2 h_ab = 0
+#
+# 6 component equations (symmetric rank-2 tensor in 3D).
+# In pure 2+1D gravity there are no local degrees of freedom;
+# the mass term m^2 h_ab creates a propagating massive mode.
+#
+# The mass term linearizes as: g_ab -> eta_ab + epsilon*h_ab,
+# so the first-order part of m^2 g_ab is m^2 h_ab.
+#
+# Component structure:
+#   h_0 (h_tt): constraint (no d2_t)
+#   h_1, h_2 (h_tx, h_ty): first-order in time
+#   h_3, h_4, h_5 (h_xx, h_xy, h_yy): second-order evolution
+#
+# Dispersion: omega^2 = k^2 + m^2 (massive, subluminal)
+
+[theory]
+name = "Massive Gravity"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[constants]
+names = ["m2"]
+
+[linearization]
+expression = "Einstein[CD][-a, -b] + m2 eta[-a, -b]"
+perturbation_field = "h"
+
+[parameters]
+m2 = 1.0
+
+[output]
+path = "../data/massive_gravity_3d.json"
