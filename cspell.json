@@ -183,7 +183,9 @@
     "pyproject",
     "savez",
     "scipy",
+    "sdist",
     "testf",
+    "tomllib",
     "trange",
     "tqdm"
   ],
