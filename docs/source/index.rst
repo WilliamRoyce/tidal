@@ -1,12 +1,12 @@
-Torsion-Gertsenshtein Documentation
-=====================================
+TIDAL Documentation
+====================
 
 Klein-Gordon PDE simulations for electromagnetic-gravitational wave conversion research.
 
 Overview
 --------
 
-The **torsion-gertsenshtein** package provides a comprehensive framework for simulating 
+The **tidal** package provides a comprehensive framework for simulating 
 Klein-Gordon equations in various configurations, including:
 
 * Single-field and multi-field coupled systems

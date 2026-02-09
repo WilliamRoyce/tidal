@@ -1,4 +1,4 @@
-project = "Torsion-Gertsenshtein"
+project = "TIDAL"
 author = "William Royce"
 version = "0.0.1"
 

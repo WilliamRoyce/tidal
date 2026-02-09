@@ -3,7 +3,7 @@
 
 Updates version numbers across:
 - pyproject.toml
-- torsion_gertsenshtein/__init__.py
+- tidal/__init__.py
 - CITATION.cff (version + date)
 - uv.lock (via uv lock regeneration)
 
@@ -78,7 +78,7 @@ class VersionBumper:
 
         # Files to update
         self.pyproject_toml = self.root / "pyproject.toml"
-        self.init_py = self.root / "torsion_gertsenshtein" / "__init__.py"
+        self.init_py = self.root / "tidal" / "__init__.py"
         self.citation_cff = self.root / "CITATION.cff"
 
     def run(self) -> None:
