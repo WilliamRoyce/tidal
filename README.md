@@ -10,7 +10,7 @@
 [![Python 3.11](https://img.shields.io/badge/python-3.11-blue.svg)](https://www.python.org/downloads/)
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked: pyright](https://img.shields.io/badge/type%20checked-pyright-informational)](https://github.com/microsoft/pyright)
-[![Coverage](https://img.shields.io/badge/coverage-check%20CI-brightgreen)](https://github.com/WilliamRoyce/torsion-gertsenshtein/actions)
+[![Coverage](https://img.shields.io/badge/coverage-see%20CI-brightgreen)](https://github.com/WilliamRoyce/torsion-gertsenshtein/actions/workflows/test.yml)
 
 </p>
 
@@ -23,6 +23,17 @@ A research codebase for exploring **electromagnetic ↔ gravitational wave conve
 - Documentation and experiments for **mixing mechanisms** and **hyperbolicity/causality checks** relevant to the effect.
 
 > TL;DR: start with Klein–Gordon toy systems in 1+1D → grow to coupled EM/metric/torsion perturbations → test conversion and stability in controlled scenarios.
+
+---
+
+## Community & Support
+
+- **Questions & Ideas**: [GitHub Discussions](https://github.com/WilliamRoyce/torsion-gertsenshtein/discussions) — Ask questions, share use cases, discuss physics
+- **Bug Reports**: [Issue Tracker](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues) — Report bugs with the `bug` label
+- **Feature Requests**: [Issue Tracker](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues) — Propose features with the `enhancement` label
+- **Contributing**: See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup and workflow
+
+For more, visit the [Documentation](https://williamroyce.github.io/torsion-gertsenshtein/).
 
 ---
 
