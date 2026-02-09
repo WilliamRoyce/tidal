@@ -1,6 +1,6 @@
 {
   "typeCheckingMode": "strict",
-  "include": ["tests", "torsion_gertsenshtein", "examples"],
+  "include": ["tests", "tidal", "examples"],
   "reportImplicitOverride": true,
   "reportUnknownMemberType": false,
   "executionEnvironments": [

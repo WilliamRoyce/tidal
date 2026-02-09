@@ -1,7 +1,7 @@
 [project]
-name = "torsion_gertsenshtein"
+name = "tidal"
 version = "0.3.0"
-description = "Linearized PDE simulations for electromagnetic-gravitational wave conversion research"
+description = "TIDAL: Tensor Integration and Derivation for Any Lagrangian"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
@@ -48,7 +48,7 @@ dependencies = [
 ]
 
 [project.scripts]
-tg = "torsion_gertsenshtein.cli:main"
+tidal = "tidal.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/WilliamRoyce/torsion-gertsenshtein"
@@ -117,8 +117,8 @@ unfixable = ["T201"]
     "ARG002",
 ]
 "examples/**/*" = ["INP001", "T201", "E402"]
-"torsion_gertsenshtein/cli/**/*" = ["T201", "PLC0415"]
-"torsion_gertsenshtein/cli/_derive.py" = ["T201", "PLC0415", "S404", "S603", "S607"]
+"tidal/cli/**/*" = ["T201", "PLC0415"]
+"tidal/cli/_derive.py" = ["T201", "PLC0415", "S404", "S603", "S607"]
 "scripts/**/*" = [
     "INP001",
     "T201",
@@ -130,7 +130,7 @@ unfixable = ["T201"]
     "S603",
 ]
 "docs/**/*" = ["INP001", "I002"]
-"torsion_gertsenshtein/kgsim/animation_builder.py" = [
+"tidal/kgsim/animation_builder.py" = [
     "EXE002",
 ] # Container permission issue
 
@@ -154,7 +154,7 @@ convention = "numpy"
 testpaths = ["tests"]
 
 [tool.coverage.run]
-source = ["torsion_gertsenshtein"]
+source = ["tidal"]
 omit = ["*/tests/*", "*/__pycache__/*"]
 
 [tool.coverage.report]
@@ -173,7 +173,7 @@ precision = 2
 
 [tool.pyright]
 typeCheckingMode = "strict"
-include = ["tests", "torsion_gertsenshtein", "examples"]
+include = ["tests", "tidal", "examples"]
 reportImplicitOverride = true
 reportUnknownMemberType = false
 
@@ -185,9 +185,9 @@ build-backend = "setuptools.build_meta"
 package-dir = { "" = "." }
 
 [tool.setuptools.package-data]
-torsion_gertsenshtein = ["py.typed"]
+tidal = ["py.typed"]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["torsion_gertsenshtein*"]
+include = ["tidal*"]
 exclude = ["outputs*", "tests*", "docs*"]
