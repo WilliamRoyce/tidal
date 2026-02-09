@@ -436,7 +436,7 @@ Closes #42
 Understanding the codebase:
 
 ```
-torsion-gertsenshtein/
+tidal/                   # TIDAL project root
 ├── tidal/    # Main package
 │   ├── symbolic/             # Lagrangian-to-PDE pipeline (Python side)
 │   │   ├── json_loader.py   # Load equations from JSON → EquationSystem

@@ -9,4 +9,5 @@ exclude_patterns = []
 
 
 html_theme = "pydata_sphinx_theme"
+html_logo = "../TIDAL_Logo_TikZ_Figure.svg"
 html_static_path = []

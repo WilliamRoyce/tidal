@@ -1,4 +1,9 @@
-# TIDAL: Tensor Integration and Derivation for Any Lagrangian
+<p align="center">
+  <img src="docs/TIDAL_Logo_TikZ_Figure.svg" alt="TIDAL: Tensor Integration and Derivation for Any Lagrangian" width="500">
+</p>
+<p align="center"><em>Tensor Integration and Derivation for Any Lagrangian</em></p>
+
+<p align="center">
 
 [![CI Tests](https://github.com/WilliamRoyce/torsion-gertsenshtein/workflows/test/badge.svg)](https://github.com/WilliamRoyce/torsion-gertsenshtein/actions)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -6,6 +11,8 @@
 [![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
 [![Type checked: pyright](https://img.shields.io/badge/type%20checked-pyright-informational)](https://github.com/microsoft/pyright)
 [![Coverage](https://img.shields.io/badge/coverage-check%20CI-brightgreen)](https://github.com/WilliamRoyce/torsion-gertsenshtein/actions)
+
+</p>
 
 View the `tidal` package documentation [here](https://williamroyce.github.io/torsion-gertsenshtein/).
 
