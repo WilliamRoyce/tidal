@@ -3,11 +3,11 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from torsion_gertsenshtein.plot_pgf import enable_pgf
+from tidal.plot_pgf import enable_pgf
 
 enable_pgf("xelatex")  # or "pdflatex"/"lualatex"
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     AnimationBuilder,
     AnimationConfig,
     GridConfig,

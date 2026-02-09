@@ -15,7 +15,7 @@ import pathlib
 import matplotlib.pyplot as plt
 import numpy as np
 
-from torsion_gertsenshtein.kgsim import (
+from tidal.kgsim import (
     GridConfig,
     KGParameters,
     KleinGordonPDE,
