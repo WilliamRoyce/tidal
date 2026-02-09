@@ -63,7 +63,7 @@ uv run pre-commit install
 ### 3. Verify Setup
 
 ```bash
-# Run tests
+# Run tests (743 Python tests)
 uv run pytest
 
 # Run linter
@@ -72,8 +72,12 @@ uv run ruff check .
 # Run type checker
 uv run pyright
 
-# Run an example
-uv run python examples/klein_gordon/1d_gaussian_pulse.py
+# Verify CLI works
+tg list
+tg validate examples/data/klein_gordon_1d.json
+
+# Run a pipeline example
+uv run python examples/scalar_field/kg_from_lagrangian.py
 ```
 
 ### Dev Container (Alternative)
@@ -434,20 +438,36 @@ Understanding the codebase:
 ```
 torsion-gertsenshtein/
 ├── torsion_gertsenshtein/    # Main package
-│   └── kgsim/                # Klein-Gordon simulation subpackage
-│       ├── config.py         # Configuration dataclasses
-│       ├── equations.py      # PDE implementations
-│       ├── grids.py          # Grid construction
-│       ├── initial_conditions.py  # IC classes and functions
-│       ├── runners.py        # Simulation execution
-│       ├── observers.py      # Monitoring utilities
-│       ├── animation_builder.py   # Visualization
-│       └── ...
-├── tests/                    # Test suite
+│   ├── symbolic/             # Lagrangian-to-PDE pipeline (Python side)
+│   │   ├── json_loader.py   # Load equations from JSON → EquationSystem
+│   │   ├── pde_builder.py   # Build PDEBase from spec → PDEFromSpec
+│   │   └── __init__.py
+│   ├── cli/                  # CLI (`tg` command)
+│   │   ├── __main__.py      # Entry point (tg derive/simulate/inspect/list/validate)
+│   │   ├── _derive.py       # tg derive: TOML → .wls → wolframscript
+│   │   ├── _simulate.py     # tg simulate: JSON → PDE → solve → plot
+│   │   ├── _inspect.py      # tg inspect: display equation system info
+│   │   ├── _list.py         # tg list: discover available JSON specs
+│   │   ├── _validate.py     # tg validate: JSON spec validation
+│   │   └── _plot.py         # Plotting utilities for simulate
+│   ├── wolfram/              # Mathematica/xAct pipeline modules
+│   │   ├── EulerLagrange.wl
+│   │   ├── ComponentDecompose.wl
+│   │   ├── ExportJSON.wl
+│   │   ├── CommonUtilities.wl
+│   │   └── ...
+│   ├── vectorfield/          # Multi-component field utilities
+│   ├── kgsim/                # Legacy Klein-Gordon simulation subpackage
+│   └── utils.py              # Shared utilities
+├── tests/                    # Test suite (743 Python tests)
 │   ├── conftest.py          # Shared fixtures
-│   └── test_*.py            # Test modules
-├── examples/                 # Example scripts
-│   └── klein_gordon/        # KG-specific examples
+│   ├── test_cli.py          # CLI integration tests
+│   ├── test_cli_parsing.py  # CLI argument parsing tests
+│   ├── test_scalar_vector_physics.py  # Physics stress tests
+│   └── test_*.py            # Other test modules
+├── examples/                 # 17 pipeline examples + legacy KG
+│   ├── data/                # Generated JSON specifications (18 files)
+│   └── {example}/           # Each has .wls, run.sh; most have theory.toml, simulation.py
 ├── docs/                     # Documentation
 │   └── source/              # Sphinx source files
 └── pyproject.toml           # Project configuration

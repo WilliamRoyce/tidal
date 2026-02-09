@@ -1,5 +1,144 @@
 # Changelog
 
+## Scalar-Vector Coupling Stress Test (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** End-to-end stress test of the pipeline with mixed-rank cross-field coupling: scalar phi + vector A_mu in 2+1D, combining Klein-Gordon, Proca, Chern-Simons, and divergence coupling terms in a single Lagrangian with 4 symbolic constants.
+
+**Files Created:**
+- `examples/scalar_vector_coupling/theory.toml` — TOML config with `[[derived_fields]]` for F_ab
+- `examples/scalar_vector_coupling/scalar_vector_coupling.wls` — Wolfram derivation script
+- `examples/scalar_vector_coupling/scalar_vector_coupling_simulation.py` — Python simulation with 3x2 plot layout
+- `examples/scalar_vector_coupling/run.sh` — CLI-equivalent workflow script
+- `examples/data/scalar_vector_coupling.json` — JSON equation spec (4 fields, 4x4 matrices)
+- `tests/test_scalar_vector_physics.py` — 22 physics tests
+
+**Key Features:**
+- Mixed-rank cross-field: scalar phi_0 + vector (A_0, A_1, A_2) with cross-field first_derivative_t and gradient operators
+- 4 symbolic constants (phim2, Am2, kCS, gSV) all preserved symbolically for runtime parameter sweeps
+- 4x4 mass/coupling matrices auto-computed from identity terms
+- A_0 as constraint equation (time_derivative_order=0)
+- Demonstrates scalar→vector energy transfer via gradient coupling
+- Uses `[[derived_fields]]` TOML feature for field strength tensor F_ab
+
+**Tests:** 743 Python tests passing (22 new physics tests + 147 CLI tests)
+
+---
+
+## CLI (`tg` Command) Implementation (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Unified command-line interface for the Lagrangian-to-PDE pipeline with 5 subcommands, zero new dependencies (stdlib argparse + tomllib), and 147 CLI-specific tests.
+
+**Subcommands:**
+- `tg derive theory.toml` — Generate .wls from TOML config, run wolframscript to produce JSON
+- `tg simulate spec.json` — Full simulation with smart defaults, plotting, and parameter override
+- `tg inspect spec.json` — Display equation system info (fields, operators, parameters)
+- `tg list` — Discover available JSON specs in examples/data/
+- `tg validate spec.json` — Validate JSON equation specification structure
+
+**Key Features:**
+- `theory.toml` configuration with `[[derived_fields]]` for intermediate tensor definitions
+- IC presets: `gaussian`, `plane-wave`, `zero`, `formula` via `--ic` flag
+- Per-axis boundary conditions via `--bc neumann,periodic`
+- `--mode constraint` for single constraint solve (no time evolution)
+- `--scheme scipy` (adaptive) or `--scheme runge-kutta` (explicit)
+- `--ic-formula` hardened with AST validation
+- Version via `importlib.metadata.version()` (single source from pyproject.toml)
+- `py.typed` marker included in sdist/wheel
+
+**Architecture:**
+- `_WlsContext` dataclass bundles WLS generation state
+- `PlotContext` dataclass bundles plot arguments
+- Plotting extracted to `_plot.py` (separate from `_simulate.py`)
+- `_validate.py` for JSON spec validation
+
+**Files Created:**
+- `torsion_gertsenshtein/cli/` — 8 modules (__init__, __main__, _derive, _simulate, _inspect, _list, _plot, _validate)
+- `tests/test_cli.py` + `tests/test_cli_parsing.py` — 147 CLI tests
+- 14 `theory.toml` files across examples
+
+**Tests:** 743 Python tests passing (147 CLI tests), 0 ruff violations, 0 pyright errors
+
+---
+
+## Derived Fields TOML Feature (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Added `[[derived_fields]]` support to `theory.toml` for defining intermediate tensor fields (e.g., field strength F_ab) that are automatically expanded during Wolfram script generation.
+
+**Usage:**
+```toml
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[lagrangian]
+expression = "-1/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d]"
+```
+
+**Implementation:** `_wls_derived_fields()` generates `DefTensor` + `MakeRule`; `_wls_lagrangian()` expands definitions via `/. rules`.
+
+---
+
+## Critical Review Pass 1 (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Comprehensive review addressing fail-fast enforcement, constraint solver ordering, dynamic axis naming, operator plugin API, all-JSON parametrized tests, physics validation, and epsilon tensor fixes.
+
+**Key Changes:**
+- Fail-fast symbolic coefficient validation
+- Constraint solver ordering fixes
+- Dynamic axis naming (supports up to 6D)
+- Operator plugin API
+- All-JSON parametrised tests
+- Physics validation (energy conservation + analytical solutions)
+- Epsilon `sqrt(|det(g)|)` fix
+
+---
+
+## Critical Review Pass 2 (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Second review pass focusing on code quality, stability, and extensibility.
+
+**Key Changes:**
+- `evolution_rate` refactored into 3 helper methods
+- Configurable `constraint_eps` parameter
+- CFL `check_stability()` method
+- `MinkowskiMetricFactor` signature parameter
+- Tensor symmetry reduction for rank 3+
+
+---
+
+## Massive 3-Form Example (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** End-to-end example of rank-3 antisymmetric tensor field decomposition, demonstrating symmetry reduction from 64 to 4 independent components in 3+1D.
+
+**Key Fixes:**
+- xAct's `Cycles` context: `xAct`xPerm`Cycles` vs `System`Cycles` — all pattern matching updated
+- Explicit metric Lagrangian with `DefConstantSymbol` for mass parameter
+- `EnumerateComponentTuples` symmetry reduction for antisymmetric rank-3
+
+**Files Created:**
+- `examples/massive_3form/massive_3form.wls` — Wolfram derivation
+- `examples/massive_3form/theory.toml` — TOML config
+- `examples/data/massive_3form.json` — 4-component KG system
+
+**Tests:** 3 physics tests in dedicated test file
+
+---
+
 ## Issue #71: 3+1D Klein-Gordon Working Example (February 2026)
 
 **Status:** ✅ COMPLETE

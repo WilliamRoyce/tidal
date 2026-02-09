@@ -3,7 +3,7 @@
 This document outlines the planned improvements and features for the torsion-gertsenshtein symbolic physics pipeline project.
 
 **Last Updated:** February 2026
-**Project Status:** Phase 10b Complete (323 tests passing)
+**Project Status:** Phase 13+ Complete, CLI done (743 Python tests + ~108 Wolfram tests)
 
 ## Overview
 
@@ -16,20 +16,19 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 ## Implementation Phases
 
-### Phase 1: Critical Fixes (Next Sprint)
+### Phase 1: Critical Fixes ✅ COMPLETE
 **Goal:** Address security concerns and high-impact bugs
-**Estimated Duration:** 1-2 weeks
 
-| Issue | Priority | Type | Effort |
+| Issue | Priority | Type | Status |
 |-------|----------|------|--------|
-| [#TBD] Replace Assertions with Explicit Error Handling | 🔴 Critical | Bug | Medium |
-| [#TBD] Strengthen Mathematica Expression Evaluation Security | 🔴 Critical | Security | Medium |
-| [#TBD] Validate Grid Dimensions During PDE Construction | 🟠 High | Bug | Low |
+| [#67] Replace Assertions with Explicit Error Handling | 🔴 Critical | Bug | ✅ Done |
+| [#68] Strengthen Mathematica Expression Evaluation Security | 🔴 Critical | Security | ✅ Done |
+| [#75] Validate Grid Dimensions During PDE Construction | 🟠 High | Bug | ✅ Done |
 
-**Key Deliverables:**
-- All `assert` statements replaced with explicit error checks
-- NaN/Inf validation for coefficient evaluation
-- Grid dimension validation in `PDEFromSpec.__init__()`
+**Delivered:**
+- All `assert isinstance()` replaced with explicit `TypeError` raises (Issue #67)
+- `_validate_eval_result` checks for NaN/Inf/complex (Issue #68)
+- `_validate_operator_dimensions()` at construction time (Issue #75)
 
 ---
 
@@ -53,72 +52,78 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 ---
 
-### Phase 3: Features & Documentation (1 Month)
+### Phase 3: Features & Documentation ✅ COMPLETE
 **Goal:** Validate 3+1D support and improve user documentation
-**Estimated Duration:** 3-4 weeks
 
-| Issue | Priority | Type | Effort |
+| Issue | Priority | Type | Status |
 |-------|----------|------|--------|
-| [#TBD] Add 3+1D Spacetime Examples | 🔴 Critical | Documentation | High |
-| [#TBD] Document JSON Schema with Detailed Guide | 🟠 High | Documentation | Medium |
-| [#TBD] Improve Coefficient Resolution Performance | 🟠 High | Performance | Medium |
-| [#TBD] Create Architecture Diagrams | 🟡 Medium | Documentation | Low |
+| [#71] Add 3+1D Spacetime Examples | 🔴 Critical | Documentation | ✅ Done |
+| [#TBD] Document JSON Schema with Detailed Guide | 🟠 High | Documentation | ✅ Done |
+| [#TBD] Improve Coefficient Resolution Performance | 🟠 High | Performance | ✅ Done |
+| [#TBD] Create Architecture Diagrams | 🟡 Medium | Documentation | Deferred |
 
-**Key Deliverables:**
-- 3+1D Klein-Gordon example with visualization
+**Delivered:**
+- 3+1D Klein-Gordon example (Issue #71), plus spherical_kg, cylindrical_kg, gravitational_waves, massive_3form
 - `docs/JSON_SCHEMA_GUIDE.md` with complete field reference
-- Coefficient caching layer (10-20% speedup for `sphere_kg/`)
-- Architecture diagrams (data flow, module dependencies, state structure)
+- Unified `_resolve_coefficient_at_point` evaluator (Phase 10b)
 
 ---
 
-### Phase 4: Advanced Features (2-3 Months)
+### Phase 4: Advanced Features ✅ MOSTLY COMPLETE
 **Goal:** Implement major feature requests
-**Estimated Duration:** 8-12 weeks
 
-| Issue | Priority | Type | Effort |
+| Issue | Priority | Type | Status |
 |-------|----------|------|--------|
-| [#TBD] Support Rank-3+ Tensor Decomposition | 🔴 Critical | Feature | Very High |
-| [#TBD] Implement Automatic Gauge Fixing | 🔴 Critical | Feature | High |
-| [#TBD] Handle Mixed Time-Space Cross-Derivatives Properly | 🟡 Medium | Bug | Medium |
-| [#TBD] Expand _mathematica_to_python Function Set | 🟡 Medium | Feature | Low |
-| [#TBD] Add Non-Cartesian Coordinate System Examples | 🟡 Medium | Documentation | Medium |
-| [#TBD] Add Convergence and Stability Stress Tests | 🟡 Medium | Testing | Medium |
-| [#TBD] Add Full Pipeline Validation to CI | 🟡 Medium | CI/CD | Medium |
+| [#70] Support Rank-3+ Tensor Decomposition | 🔴 Critical | Feature | ✅ Done (Phase 13) |
+| [#TBD] Implement Automatic Gauge Fixing | 🔴 Critical | Feature | Remaining |
+| [#79] Handle Mixed Time-Space Cross-Derivatives | 🟡 Medium | Bug | ✅ Done |
+| [#TBD] Expand _mathematica_to_python Function Set | 🟡 Medium | Feature | ✅ Done |
+| [#TBD] Add Non-Cartesian Coordinate System Examples | 🟡 Medium | Documentation | ✅ Done |
+| [#TBD] Add Convergence and Stability Stress Tests | 🟡 Medium | Testing | ✅ Done |
+| [#TBD] Add Full Pipeline Validation to CI | 🟡 Medium | CI/CD | Remaining |
 
-**Key Deliverables:**
-- Rank-3+ tensor support in `ComponentDecompose.wl`
-- Lorenz and Coulomb gauge automation in `Linearize.wl`
-- Nested operator support for mixed derivatives
-- Extended Mathematica function set (inverse trig, hyperbolic, special functions)
-- Spherical/cylindrical coordinate examples
-- Convergence test suite with O(N^-2) validation
-- Weekly JSON regeneration workflow
+**Delivered:**
+- Rank-3+ tensor support: `ReplaceHigherRankFieldComponents`, massive_3form example (Phase 13)
+- Mixed time-space derivatives: `ClassifySpatialProfile`, `ExtractSpatialOperatorFromMixed` (Issue #79)
+- Curvilinear examples: polar_kg, spherical_kg, cylindrical_kg with Christoffel auto-detection
+- CFL `check_stability()`, physics validation (energy conservation + analytical solutions)
+
+**Remaining:**
+- Automatic gauge fixing (Lorenz/Coulomb in Wolfram layer)
+- Wolfram tests in GitHub Actions CI
 
 ---
 
-### Phase 5: Polish & Optimization (Ongoing)
+### Phase 5: Polish & Optimization (Partially Complete)
 **Goal:** Code quality improvements and nice-to-have features
-**Estimated Duration:** Ongoing
 
-| Issue | Priority | Type | Effort |
+| Issue | Priority | Type | Status |
 |-------|----------|------|--------|
-| [#TBD] Refactor ContainsTimeDerivative and IsMixedTimeSpaceDerivative | 🟢 Low | Refactoring | Low |
-| [#TBD] Add Parameter Sweep Examples | 🟢 Low | Documentation | Low |
-| [#TBD] Add Python 3.12+ Testing to CI Matrix | 🟢 Low | CI/CD | Very Low |
-| [#TBD] Add PGF Export Module Tests | 🟢 Low | Testing | Low |
-| [#TBD] Cache Coordinate Symbols and Chart Dimension | 🟢 Low | Performance | Low |
-| [#TBD] Add Debugging and Performance Tuning Guides | 🟢 Low | Documentation | Medium |
-| [#TBD] Support Elliptic PDE Solving (Constraint Equations) | 🟢 Low | Feature | High |
+| [#85] Refactor derivative classification | 🟢 Low | Refactoring | ✅ Done |
+| [#TBD] Add Parameter Sweep Examples | 🟢 Low | Documentation | Remaining |
+| [#TBD] Add Python 3.12+ Testing to CI Matrix | 🟢 Low | CI/CD | Remaining |
+| [#TBD] Support Elliptic PDE Solving (Constraint Equations) | 🟢 Low | Feature | ✅ Done |
 
-**Key Deliverables:**
-- Unified `ExtractDerivativeProfile` function
-- Parameter sweep example with joblib parallelization
-- Python 3.12 CI matrix (allow_failure: true)
-- PGF export test suite
-- Memoized coordinate symbol lookups (10-20% speedup)
-- `docs/DEBUGGING.md` and `docs/PERFORMANCE_TUNING.md`
-- Elliptic PDE solver integration
+**Delivered:**
+- Unified `ExtractDerivativeProfile` function (Issue #85, ~108 lines saved)
+- Elliptic PDE solving: constraint equations with `time_derivative_order=0`, `--mode constraint` CLI flag
+
+**Remaining:**
+- Parameter sweep examples
+- Python 3.12 CI matrix
+
+---
+
+### Additional Completed Work (not in original roadmap)
+
+| Feature | Status |
+|---------|--------|
+| CLI (`tg` command) — 5 subcommands, 147 tests | ✅ Complete |
+| `theory.toml` configuration with `[[derived_fields]]` | ✅ Complete |
+| Scalar-vector coupling stress test (mixed-rank cross-field) | ✅ Complete |
+| Massive 3-form example (rank-3 antisymmetric tensor) | ✅ Complete |
+| Critical Review Pass 1 & 2 (fail-fast, CFL, operator plugin API) | ✅ Complete |
+| Auto-computed mass/coupling matrices (Phase 12) | ✅ Complete |
 
 ---
 
@@ -165,9 +170,11 @@ Issues should be tagged with appropriate labels:
 ## Current Focus
 
 **As of February 2026:**
-- ✅ Phase 10b completed: Unified coefficient resolution, 323 tests passing
-- 🔄 Phase 1 planning: Critical bug fixes and security improvements
-- 📋 Issue creation in progress: All 25 issues identified and ready to track
+- ✅ Phase 13+ completed: All core pipeline features implemented
+- ✅ CLI (`tg` command) implemented: 5 subcommands, 147 tests, zero new dependencies
+- ✅ 18 working examples spanning 1+1D through 3+1D
+- ✅ 743 Python tests + ~108 Wolfram tests passing, 0 ruff violations, 0 pyright errors
+- 🔄 Remaining: Automatic gauge fixing, Wolfram CI, parameter sweep examples
 
 ---
 
