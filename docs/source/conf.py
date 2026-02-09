@@ -2,8 +2,8 @@
 
 project = "TIDAL"
 author = "William Royce"
-version = "0.3.0"
-release = "0.3.0"
+version = "0.3.1"
+release = "0.3.1"
 
 extensions = [
     "sphinx.ext.autodoc",
