@@ -168,29 +168,14 @@ Outputs are written to `outputs/` (created automatically if missing).
 The repository includes a complete symbolic-to-numerical pipeline for deriving field equations from Lagrangians and simulating them numerically:
 
 ```bash
-# Full pipeline demonstration (both EM and Klein-Gordon)
-bash examples/demo_full_pipeline.sh
+# Each example has a run.sh showing the full derive → inspect → simulate workflow:
+cd examples/scalar_field && bash run.sh
 
-# EM field: Stage 1 (derive from Lagrangian L = -1/4 F_μν F^μν)
-cd examples/electromagnetic
-wolframscript -file em_lagrangian_1d.wls
-
-# EM field: Stage 2 (simulate massless wave propagation)
-uv run python examples/electromagnetic/em_from_lagrangian.py
-
-# Klein-Gordon: Stage 1 (derive from Lagrangian L = -1/2 (∂φ)² - 1/2 m²φ²)
-cd examples/scalar_field
-wolframscript -file klein_gordon.wls
-
-# Klein-Gordon: Stage 2 (simulate massive field with dispersion)
-uv run python examples/scalar_field/kg_from_lagrangian.py
-
-# Klein-Gordon 3+1D: Stage 1 (derive from Lagrangian in full 4D spacetime)
-cd examples/scalar_field_3d
-wolframscript -file klein_gordon_3d.wls
-
-# Klein-Gordon 3+1D: Stage 2 (simulate in 3D space)
-uv run python examples/scalar_field_3d/kg_3d_simulation.py
+# Or use the CLI directly:
+tg derive examples/scalar_field/theory.toml        # derive equations from Lagrangian
+tg inspect examples/data/klein_gordon_1d.json       # inspect equation structure
+tg simulate examples/data/klein_gordon_1d.json \    # simulate
+  --param m2=1.0 --ic gaussian --t-end 20
 ```
 
 **Key Features:**
