@@ -1,0 +1,38 @@
+[theory]
+name = "Scalar-Vector Coupling"
+description = "Stress test: scalar + vector cross-field coupling with CS and divergence terms"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[constants]
+names = ["phim2", "Am2", "kCS", "gSV"]
+
+[lagrangian]
+# KG scalar + Maxwell (via derived F) + Proca mass + Chern-Simons + divergence coupling
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - phim2/2 phi[]^2 - 1/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d] - Am2/2 A[-a] eta[a, b] A[-b] + kCS/2 * epsiloneta[a, b, c] * A[-a] * CD[-b][A[-c]] + gSV phi[] eta[a, b] CD[-a][A[-b]]"
+
+[parameters]
+phim2 = 1.0
+Am2 = 0.5
+kCS = 0.3
+gSV = 0.2
+
+[output]
+path = "../data/scalar_vector_coupling.json"
