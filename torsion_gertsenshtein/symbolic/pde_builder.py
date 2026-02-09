@@ -1795,6 +1795,11 @@ def build_pde_from_json(
     >>> pde = build_pde_from_json("examples/data/proca_1d.json", parameters={"m2": 2.0})
     """
     spec = load_equation_system(json_path)
+    # Auto-load metadata parameter defaults when none explicitly provided
+    if parameters is None:
+        meta_params: dict[str, object] | None = spec.metadata.get("parameters")
+        if isinstance(meta_params, dict):
+            parameters = {k: float(v) for k, v in meta_params.items() if isinstance(v, (int, float))}
     return PDEFromSpec(spec, parameters=parameters, constraint_eps=constraint_eps)
 
 

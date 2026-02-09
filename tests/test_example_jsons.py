@@ -24,7 +24,10 @@ EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "data"
 # Default parameters for JSONs with symbolic coefficients.
 # Keys are JSON filenames; values are parameter dicts.
 _DEFAULT_PARAMS: dict[str, dict[str, float]] = {
+    "klein_gordon_1d.json": {"m2": 1.0},
     "klein_gordon_3d.json": {"m2": 1.0},
+    "coupled_scalars.json": {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5},
+    "chern_simons_3d.json": {"kappa": 0.5},
     "proca_1d.json": {"procaMassSquared": 1.0},
     "de_sitter_kg.json": {"dSm2": 1.0, "dSH": 0.1},
     "polar_kg.json": {"polm2": 1.0},
@@ -33,6 +36,7 @@ _DEFAULT_PARAMS: dict[str, dict[str, float]] = {
     "spherical_kg.json": {"spm2": 1.0},
     "conformal_kg_static.json": {},
     "massive_3form.json": {"m2": 1.0},
+    "scalar_vector_coupling.json": {"phim2": 1.0, "Am2": 0.5, "kCS": 0.3, "gSV": 0.2},
 }
 
 # Grid sizes per spatial dimension (small for speed).
@@ -62,7 +66,7 @@ class TestExampleJSON:
         """JSON loads without schema errors."""
         spec = load_equation_system(json_path)
         assert spec.n_components >= 1
-        assert spec.dimension >= 2  # at least 1+1D  # noqa: PLR2004
+        assert spec.dimension >= 2  # at least 1+1D
         assert len(spec.equations) == spec.n_components
 
     def test_build_and_evolve(self, json_path: Path) -> None:

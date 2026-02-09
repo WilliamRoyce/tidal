@@ -1,0 +1,25 @@
+[theory]
+name = "Polar Klein-Gordon"
+
+[spacetime]
+dimension = 3
+metric = "diagonal"
+# ds^2 = -dt^2 + dr^2 + r^2 d(theta)^2
+# Coordinates: {t, x, y} = {t, r, theta}
+diagonal = [-1, 1, "x[]^2"]
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["polm2"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - polm2/2 phi[]^2"
+
+[parameters]
+polm2 = 1.0
+
+[output]
+path = "../data/polar_kg.json"

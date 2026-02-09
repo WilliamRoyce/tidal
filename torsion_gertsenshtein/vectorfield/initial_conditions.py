@@ -66,7 +66,7 @@ class ComponentGaussianPulse:
             msg = "width must be positive"
             raise ValueError(msg)
 
-    def _compute_gaussian(self, grid: GridBase) -> NDArray[np.float64]:
+    def compute_gaussian(self, grid: GridBase) -> NDArray[np.float64]:
         """Compute Gaussian profile on the grid.
 
         Parameters
@@ -107,7 +107,7 @@ class ComponentGaussianPulse:
         FieldCollection
             Initial state with 2 * n_components fields (field + momentum pairs).
         """
-        gaussian = self._compute_gaussian(grid)
+        gaussian = self.compute_gaussian(grid)
 
         # Determine which components get the pulse
         if self.active_components is None:
@@ -175,7 +175,7 @@ class ComponentPlaneWave:
     phase: float = 0.0
     active_components: dict[str, float] | None = None
 
-    def _compute_plane_wave(
+    def compute_plane_wave(
         self, grid: GridBase
     ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         """Compute plane wave field and momentum on the grid.
@@ -218,7 +218,7 @@ class ComponentPlaneWave:
         FieldCollection
             Initial state with propagating plane waves.
         """
-        field_template, momentum_template = self._compute_plane_wave(grid)
+        field_template, momentum_template = self.compute_plane_wave(grid)
 
         # Determine which components get the wave
         if self.active_components is None:

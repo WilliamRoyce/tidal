@@ -1,6 +1,6 @@
 # Project Memory: Torsion-Gertsenshtein Lagrangian-to-PDE Pipeline
 
-## 📝 Document Maintenance
+## Document Maintenance
 
 **IMPORTANT:** This file should be updated throughout the project lifecycle to capture learnings and patterns.
 
@@ -11,17 +11,9 @@
 - When solving tricky bugs that reveal architectural insights
 - After making critical design decisions that affect future work
 
-**What to update:**
-- Add new patterns to relevant sections (xAct, Pipeline, Python)
-- Document workarounds and their reasons in "Known Issues & Solutions"
-- Update "Example Implementations" with new examples and their key features
-- Expand "Quick Reference" with new file locations and key functions
-- Add new sections for major features (e.g., gauge fixing, nonlinear terms)
-
 **Companion files:**
 - `troubleshooting.md` - Error patterns and debugging techniques
 - `chern-simons-notes.md` - Example-specific implementation details
-- Create similar notes files for complex examples (e.g., `yang-mills-notes.md`)
 
 ---
 
@@ -38,33 +30,58 @@ This project implements a symbolic physics pipeline: Lagrangian (xAct/Mathematic
 ### Dimension Handling (GENERALIZED)
 - **Dynamic dimension:** `ComponentDecompose.wl` now uses `dim = Length[ScalarsOfChart[chart]]` instead of hardcoded `dim = 2`
 - **Derivative conversion:** `CommonUtilities.wl` handles both 2-arg (1+1D) and 3-arg (2+1D) Derivative forms
-- **Supports:** 1+1D (t,x), 2+1D (t,x,y), extensible to 3+1D
+- **Supports:** 1+1D (t,x), 2+1D (t,x,y), 3+1D (t,x,y,z), extensible to higher
+
+### Mass/Coupling Matrix Auto-Computation (Phase 12)
+- **Convention:** `matrix[i][j] = -(coefficient of identity(field_j) in equation_i)`
+- **Wolfram:** `ExtractMassCouplingFromEquations` in ExportJSON.wl auto-computes at export
+- **Python:** `_compute_matrices_from_terms` in json_loader.py auto-computes at load (defense-in-depth)
+- **Symbolic preservation:** `mass_matrix_symbolic` / `coupling_matrix_symbolic` preserve exact Mathematica expressions; only evaluated at runtime
+
+### Christoffel Symbol Computation (Auto-Detection)
+- **Auto-detection (default):** `DecomposeToComponents[eom, field, chart, {}, "MetricMatrix" -> matrix]`
+- **Constant metric** (flat or static conformal) → All Christoffels = 0
+- **Non-constant metric** (time/position-dependent) → Compute from standard formula
+- **Override available:** `"ComputeChristoffels" -> True/False` for explicit control
 
 ## xAct/Wolfram Patterns
 
 ### Symbol Management
 - **Always check existence:** `If[!xTensorQ[M2], DefManifold[M2, ...]]`
 - **Use shared symbols:** M2, M3, eta, CD for examples to avoid conflicts
-- **Avoid random names:** Kernel caching makes RandomInteger-based names fail
 
-### Levi-Civita / Epsilon Tensors
-- **Built-in epsilon:** `DefMetric` automatically creates `epsiloneta3[-a,-b,-c]`
-- **Manual components:** Epsilon tensor values need explicit evaluation in coordinates
-- **Current limitation:** Full symbolic epsilon derivation not automated - use manual addition for CS-like terms
-- **Workaround pattern:** Derive Maxwell part symbolically, add topological terms manually with known structure
+### Epsilon Tensors (AUTOMATED)
+- `DefMetric` automatically creates `epsiloneta3[-a,-b,-c]`
+- `EvaluateEpsilonComponents` in CommonUtilities.wl → numeric ±1
+- Minkowski (-,+,+): covariant ε_012 = -1, contravariant ε^012 = +1
 
-### Field Strength Tensors
-- **Expand before decompose:** `csF[-a,-b]` must be replaced with `CD[-a][csA[-b]] - CD[-b][csA[-a]]` BEFORE `DecomposeToComponents`
-- **Index matching:** Abstract index patterns in rules don't auto-apply - construct Lagrangian directly in terms of derivatives of A
+### xAct Cycles Context (CRITICAL)
+- xAct's `Cycles` is `xAct`xPerm`Cycles`, NOT `System`Cycles`
+- All pattern matching must use `_xAct`xPerm`Cycles` and `Head[x] === xAct`xPerm`Cycles`
 
-### Lagrangian Construction
-```mathematica
-(* GOOD: Direct construction *)
-L = -1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]]
+### Lagrangian Construction Rules
+1. Use **explicit metric tensors** (`eta[a,b]`) for index raising
+2. Use **`DefConstantSymbol[m2]`** for mass/coupling constants (not bare `Symbol`)
+3. **Parenthesize multi-line expressions** in .wls: `L = (term1 + term2);`
+4. **Expand field strength before decompose:** `L = -1/2 CD[-a][A[-b]] ...` (not via F substitution)
 
-(* AVOID: Field strength with substitution *)
-L = -1/4 F[-a,-b] F[a,b]  (* Then F -> CD[A] - CD[A] doesn't reliably apply *)
-```
+## CLI (`tg` Command)
+
+The `tg` CLI provides 5 subcommands with zero new dependencies:
+
+| Command | Description |
+|---------|-------------|
+| `tg derive theory.toml` | Generate .wls from TOML, run wolframscript |
+| `tg simulate spec.json` | Full simulation with smart defaults |
+| `tg inspect spec.json` | Display equation system info |
+| `tg list` | Discover available JSON specs |
+| `tg validate spec.json` | Validate JSON spec structure |
+
+**TOML Configuration:**
+- `theory.toml` with spacetime, fields, constants, Lagrangian, parameters
+- `[[derived_fields]]` for intermediate tensors (e.g., field strength F_ab)
+- IC presets: `gaussian`, `plane-wave`, `zero`, `formula`
+- Per-axis boundary conditions via `--bc neumann,periodic`
 
 ## Pipeline Module Integration
 
@@ -78,63 +95,46 @@ Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];
 
 ### Cross-Field Decomposition
 ```mathematica
-(* For coupled fields phi and chi *)
 phiComponents = DecomposeToComponents[eomPhi, phi[], cart, {chi[]}];
 chiComponents = DecomposeToComponents[eomChi, chi[], cart, {phi[]}];
 ```
 
 ### JSON Export
 ```mathematica
-(* Multi-field format *)
 fieldEquations = {{"phi_0", eqPhi}, {"chi_0", eqChi}};
 jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 ```
 
-## Known Issues & Solutions
+## Python Operators
 
-### Issue: Component equations return 0
-**Cause:** Field strength tensor not expanded before decomposition
-**Solution:** Replace `csF` with derivative expression before calling `DecomposeToComponents`
-
-### Issue: Cross-field terms not detected
-**Cause:** Other fields not transformed to coordinate form (e.g., `cplChi[]` vs `cplChi0[t,x]`)
-**Solution:** Pass all coupled fields to `DecomposeToComponents(..., additionalFields={...})`
-
-### Issue: Coefficients all show as 1.0
-**Cause:** Pattern matching in `IdentifyMultiFieldTerm` not finding field symbols
-**Solution:** Extract function heads (not just symbols), use case-insensitive matching
-
-### Issue: "Symbol X already used as manifold"
-**Cause:** xAct kernel caching across script runs
-**Solution:** Use `xTensorQ[X]` check before `DefManifold`, reuse standard symbols (M2, M3)
-
-### Issue: Mixed 2-arg and 3-arg Derivatives in 2+1D
-**Cause:** `ConvertCDToDerivatives` creates inconsistent forms
-**Status:** Known limitation - JSON parser handles but can confuse operator detection
-**Workaround:** Manual JSON creation for complex 2+1D examples (see chern_simons_3d.json)
+`identity`, `laplacian`, `laplacian_{x,y,z}`, `gradient_{x,y,z}`, `cross_derivative_{xy,xz,yz}`, `first_derivative_t`, `biharmonic`
+- All support cross-field application and momentum (`pi_i`) references
 
 ## Example Implementations
 
-### Coupled Scalars (WORKING)
-- **File:** `examples/coupled_scalars/coupled_scalars.wls`
-- **Features:** Cross-field coupling, mass matrix, energy transfer
-- **JSON:** Auto-generated via `BuildMultiFieldJSONStructure`
-- **Key:** Pass `{chi[]}` when decomposing phi, `{phi[]}` when decomposing chi
-
-### Chern-Simons 2+1D (WORKING - AUTOMATED)
-- **File:** `examples/chern_simons/chern_simons.wls`
-- **Features:** 3D manifold, full Maxwell-CS symbolic derivation, auto epsilon evaluation
-- **JSON:** Auto-generated with gradient_x, gradient_y operators
-- **Key:** Use `epsiloneta3[a, b, c]` in Lagrangian, pipeline handles rest
-- **New functions:** `EvaluateEpsilonComponents`, `IdentifyGradientDirection`
-- **Limitation:** Mixed time-space derivatives in 2+1D need better handling
+| Example | Dim | Key Features |
+|---------|-----|--------------|
+| `scalar_field/` | 1+1D | KG, mass term, dispersion |
+| `electromagnetic/` | 1+1D | Maxwell, Lorenz gauge |
+| `proca/` | 1+1D | Massive vector (Proca mass) |
+| `coupled_scalars/` | 1+1D | Cross-field coupling, mass matrix |
+| `chern_simons/` | 2+1D | Epsilon tensor, A_0 constraint |
+| `elasticity/` | 2+1D | Anisotropic laplacian, cross_derivative_xy |
+| `curved_spacetime/` | 2+1D | Hubble friction, time-dependent coefficients |
+| `sphere_kg/` | 2+1D | Position-dependent coefficients, S² |
+| `polar_kg/` | 2+1D | Polar coordinates, Christoffel auto-detection |
+| `scalar_vector_coupling/` | 2+1D | Mixed-rank cross-field (scalar+vector), 4 constants |
+| `scalar_field_3d/` | 3+1D | Full 4D KG |
+| `spherical_kg/` | 3+1D | Spherical coordinates, trig coefficients |
+| `cylindrical_kg/` | 3+1D | Cylindrical, mixed curved/flat |
+| `gravitational_waves/` | 3+1D | xPert linearization, TT gauge, constraints |
+| `massive_3form/` | 3+1D | Rank-3 antisymmetric, symmetry reduction |
 
 ## Testing Guidelines
 
-### Regression Testing
-- Run existing 1+1D examples after Wolfram changes: `wolframscript -file examples/*/*.wls`
-- Run pytest suite: `uv run pytest tests/` (expect 496 Python tests + ~100 Wolfram tests passing)
-- Check for dimension hardcoding in error messages
+### Test Counts
+- **743 Python tests** + **~108 Wolfram tests** passing
+- Run: `uv run pytest tests/` and `./scripts/full_test.sh`
 
 ### Verification Pattern
 1. Wolfram derivation produces N component equations
@@ -143,46 +143,37 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 4. Python simulation runs without errors
 5. Physical behavior matches expectations (e.g., energy transfer)
 
-## Python Side (py-pde)
+## Known Issues & Solutions
 
-### Operators Supported
-- `identity`: field itself
-- `laplacian`: spatial Laplacian (works in 1D, 2D, 3D)
-- `gradient_x`, `gradient_y`, `gradient_z`: directional gradients
-- All operators support cross-field application
-
-### Grid Requirements
-- 1+1D: CartesianGrid with 1D bounds (t is time)
-- 2+1D: CartesianGrid with 2D bounds (t is time, x and y are spatial)
-- Always use periodic BCs for wave equations
-
-## Completed Improvements
-
-1. ~~**Automate epsilon tensor handling:**~~ ✅ DONE - `EvaluateEpsilonComponents` in CommonUtilities.wl
-2. ~~**Generalize to 3+1D:**~~ ✅ DONE - Full 4D spacetime with 3 spatial dimensions (gravitational_waves, scalar_field_3d)
-3. ~~**Higher-rank tensors:**~~ ✅ DONE - Phase 13: Rank 3+ tensor support (Issue #70)
-4. ~~**Time derivative detection in 2+1D:**~~ ✅ DONE - Issue #79: Mixed time-spatial derivatives
-5. ~~**Unified derivative classification:**~~ ✅ DONE - Issue #85: Dimension-agnostic `ExtractDerivativeProfile`
-
-## Future Improvements Needed
-
-1. **Gauge fixing:** Automate Lorenz/Coulomb gauge application in Wolfram
-2. **Clean JSON output for 2+1D:** Remove spurious cross-Laplacian terms from mixed derivatives (low priority)
-3. **Nonlinear extensions:** Beyond linear perturbation theory
-4. **Continuous Integration:** GitHub Actions for automated Wolfram test execution
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| Component equations = 0 | Field strength not expanded | Replace F with derivative expr before decompose |
+| Cross-field not detected | Fields not in coordinate form | Pass `additionalFields={...}` |
+| "Symbol X already used" | xAct kernel caching | Use `xTensorQ[X]` check before `DefManifold` |
+| Mixed 2/3-arg Derivatives | `ConvertCDToDerivatives` forms | Parser handles both |
+| xAct Cycles context | `System`Cycles` vs `xAct`xPerm`Cycles` | Use `Head[x] === xAct`xPerm`Cycles` |
 
 ## Quick Reference
 
 ### File Locations
 - Wolfram modules: `torsion_gertsenshtein/wolfram/`
 - Python pipeline: `torsion_gertsenshtein/symbolic/`
-- Examples: `examples/{scalar_field,electromagnetic,coupled_scalars,chern_simons}/`
-- Generated JSON: `examples/data/*.json`
+- CLI: `torsion_gertsenshtein/cli/`
+- Examples: `examples/{name}/`, JSON: `examples/data/*.json`
 
-### Key Functions
-- `DecomposeToComponents[eom, field, chart, additionalFields]` - Component extraction
-- `BuildMultiFieldJSONStructure[fieldEquations, metadata]` - JSON generation
-- `build_pde_from_json(json_path)` - Python PDE construction
-- `IdentifyMultiFieldTerm[term, currentField, allFields, metadata]` - Operator detection
+### Key Functions (Wolfram)
+- `DecomposeToComponents[eom, field, chart, additionalFields, "MetricMatrix" -> matrix]`
+- `BuildMultiFieldJSONStructure[fieldEquations, metadata]`
+- `ExtractMassCouplingFromEquations[fieldEquations]`
+- `IsNonConstantMetric[metricMatrix, coords]`
+- `EvaluateEpsilonComponents[epsilon, chart]`
+
+### Key Functions (Python)
+- `build_pde_from_json(json_path, parameters={...})`
+- `EquationSystem.from_dict(data)` — auto-computes mass/coupling matrices
+- `PDEFromSpec(spec, parameters=...)` — dynamic PDE construction
+- `LHSStructure.from_data(data)`, `parse_field_name(name)`
+
+---
 
 See detailed notes in: `/home/vscode/.claude/projects/-workspaces-torsion-gertsenshtein/memory/`

@@ -28,22 +28,27 @@ Mathematica/xAct          JSON              Python/py-pde
 ```
 torsion_gertsenshtein/
 ├── symbolic/                # Python-side symbolic processing
-│   ├── json_loader.py       # Load equations from JSON
-│   ├── pde_builder.py       # Build PDEBase from spec
+│   ├── json_loader.py       # Load equations from JSON → EquationSystem
+│   ├── pde_builder.py       # Build PDEBase from spec → PDEFromSpec
 │   └── __init__.py
+├── cli/                     # CLI (`tg` command)
+│   ├── __main__.py          # Entry point (derive/simulate/inspect/list/validate)
+│   ├── _derive.py           # TOML → .wls → wolframscript → JSON
+│   ├── _simulate.py         # JSON → PDE → solve → plot
+│   ├── _inspect.py          # Display equation system info
+│   ├── _list.py             # Discover available JSON specs
+│   ├── _validate.py         # JSON spec validation
+│   └── _plot.py             # Plotting utilities
 ├── vectorfield/             # Multi-component field utilities
 │   ├── config.py            # ComponentFieldParams
 │   ├── initial_conditions.py # Gaussian pulses, plane waves
 │   └── __init__.py
 └── wolfram/                 # Mathematica/xAct packages
     ├── EulerLagrange.wl     # Euler-Lagrange derivation
-    ├── Linearize.wl         # Linearization
+    ├── CommonUtilities.wl   # Shared utilities, epsilon evaluation
     ├── ComponentDecompose.wl # Decompose to components
-    ├── ExportJSON.wl        # JSON export
-    ├── LagrangianPipeline.wl # Main entry point
-    └── examples/
-        ├── klein_gordon.wls # KG validation
-        └── em_lagrangian_1d.wls # EM example
+    ├── ExportJSON.wl        # JSON export, mass/coupling extraction
+    └── LagrangianPipeline.wl # Main entry point
 ```
 
 ## Usage
@@ -245,8 +250,9 @@ Dynamically constructs PDE from equation specification:
 
 ```python
 class PDEFromSpec(PDEBase):
-    def __init__(self, spec: EquationSystem):
+    def __init__(self, spec: EquationSystem, parameters: dict | None = None):
         self.spec = spec  # All physics comes from here
+        # parameters override symbolic coefficients at runtime
 
     def evolution_rate(self, state, t=0.0):
         # Build RHS from spec.equations
@@ -314,14 +320,22 @@ Checks:
 5. **Testable**: Each layer validates independently
 6. **Extensible**: Same pipeline for scalar, vector, tensor fields
 
+## Completed Extensions
+
+- ✅ **Coupled systems**: Multi-field Lagrangians (coupled_scalars, scalar_vector_coupling)
+- ✅ **Higher dimensions**: 2+1D and 3+1D spacetimes (18 examples)
+- ✅ **Gauge constraints**: Constraint equations with `time_derivative_order=0`
+- ✅ **Rank 3+ tensors**: Antisymmetric rank-3 with symmetry reduction (massive_3form)
+- ✅ **Curvilinear coordinates**: Polar, spherical, cylindrical with Christoffel auto-detection
+- ✅ **CLI**: `tg` command with derive/simulate/inspect/list/validate subcommands
+- ✅ **Auto-computed matrices**: Mass/coupling matrices from identity terms (Phase 12)
+
 ## Future Extensions
 
-- **Coupled systems**: Multi-field Lagrangians
-- **Nonlinear theories**: Yang-Mills, Einstein-Hilbert
-- **Higher dimensions**: 2+1D, 3+1D spacetimes
-- **Gauge constraints**: Enforce constraints dynamically
+- **Nonlinear theories**: Yang-Mills, Einstein-Hilbert (beyond linear perturbation)
+- **Automatic gauge fixing**: Lorenz/Coulomb in Wolfram layer
 - **Code generation**: Generate optimized Numba kernels
-- **Automated pipeline**: `wolframclient` bridge for full automation
+- **CI**: GitHub Actions for Wolfram tests on PRs
 
 ## References
 

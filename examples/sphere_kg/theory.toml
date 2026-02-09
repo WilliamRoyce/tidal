@@ -1,0 +1,26 @@
+[theory]
+name = "Sphere Klein-Gordon"
+
+[spacetime]
+dimension = 3
+metric = "diagonal"
+# Stereographic projection: ds^2 = -dt^2 + Omega^2 (dx^2 + dy^2)
+# where Omega(x,y) = 2R^2 / (R^2 + x^2 + y^2)
+diagonal = [-1, "(2*sphR^2/(sphR^2 + x[]^2 + y[]^2))^2", "(2*sphR^2/(sphR^2 + x[]^2 + y[]^2))^2"]
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["sphR", "sphm2"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - sphm2/2 phi[]^2"
+
+[parameters]
+sphR = 1.0
+sphm2 = 0.0
+
+[output]
+path = "../data/sphere_kg.json"

@@ -45,10 +45,10 @@ Print[""];
 Print["Step 2: Defining scalar field phi..."];
 
 If[!xTensorQ[phi], DefTensor[phi[], M2]];
-(* Use numeric value for mass parameter (unit mass in natural units) *)
-m2 = 1.0;
+(* Mass parameter — kept symbolic for runtime parameterization via --param m2=... *)
+If[!ConstantSymbolQ[m2], DefConstantSymbol[m2]];
 Print["   Scalar field: phi"];
-Print["   Mass parameter: m^2 = ", m2];
+Print["   Mass parameter: m^2 (symbolic, default 1.0)"];
 
 (* === Step 3: Construct the Klein-Gordon Lagrangian === *)
 Print[""];
@@ -110,6 +110,7 @@ metadata = <|
 
 (* Build JSON using pipeline *)
 jsonOutput = BuildJSONStructure[componentEqs, metadata];
+jsonOutput["metadata", "parameters"] = <|"m2" -> 1.0|>;
 Print["   JSON structure created using pipeline"];
 
 (* Export JSON *)

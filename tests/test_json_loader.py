@@ -16,7 +16,7 @@ from torsion_gertsenshtein.symbolic.json_loader import (
     validate_json_schema,
 )
 from torsion_gertsenshtein.symbolic.pde_builder import (
-    _OPERATOR_REGISTRY,  # noqa: PLC2701
+    _OPERATOR_REGISTRY,
 )
 
 if TYPE_CHECKING:
@@ -115,7 +115,7 @@ class TestOperatorTerm:
         data = {"coefficient": 1.5, "operator": "laplacian", "field": "phi"}
         term = OperatorTerm.from_dict(data)
 
-        assert term.coefficient == 1.5  # noqa: PLR2004
+        assert term.coefficient == 1.5
         assert term.operator == "laplacian"
         assert term.field == "phi"
 
@@ -354,7 +354,9 @@ class TestValidateJsonSchema:
         data: dict[str, Any] = {
             "spacetime": {"dimension": 2, "signature": [-1, 2]},
             "fields": [{"name": "phi"}],
-            "equations": [{"field": "phi", "rhs": {"type": "linear_combination", "terms": []}}],
+            "equations": [
+                {"field": "phi", "rhs": {"type": "linear_combination", "terms": []}}
+            ],
         }
         with pytest.raises(ValueError, match="signature must be a list of"):
             validate_json_schema(data)
@@ -364,7 +366,9 @@ class TestValidateJsonSchema:
         data: dict[str, Any] = {
             "spacetime": {"dimension": 2, "signature": [-1, 1, 1]},
             "fields": [{"name": "phi"}],
-            "equations": [{"field": "phi", "rhs": {"type": "linear_combination", "terms": []}}],
+            "equations": [
+                {"field": "phi", "rhs": {"type": "linear_combination", "terms": []}}
+            ],
         }
         with pytest.raises(ValueError, match=r"signature length.*must match dimension"):
             validate_json_schema(data)
@@ -387,7 +391,12 @@ class TestValidateJsonSchema:
         data: dict[str, Any] = {
             "spacetime": {"dimension": 2},
             "fields": [{"name": "phi"}],
-            "equations": [{"field": "nonexistent", "rhs": {"type": "linear_combination", "terms": []}}],
+            "equations": [
+                {
+                    "field": "nonexistent",
+                    "rhs": {"type": "linear_combination", "terms": []},
+                }
+            ],
         }
         with pytest.raises(ValueError, match="not found in fields list"):
             validate_json_schema(data)
@@ -461,14 +470,16 @@ class TestFieldReferenceValidation:
                         OperatorTerm(0.5, "gradient_x", "A_1"),  # Cross-field ref
                     ),
                 ),
-                ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+                ComponentEquation(
+                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
             coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
             metadata={},
         )
         # Should not raise - valid references
-        assert system.n_components == 2  # noqa: PLR2004
+        assert system.n_components == 2
 
     def test_valid_momentum_field_references(self) -> None:
         """Test that valid momentum field references (pi_*) pass validation."""
@@ -487,14 +498,16 @@ class TestFieldReferenceValidation:
                         OperatorTerm(0.5, "gradient_x", "pi_1"),  # Momentum reference
                     ),
                 ),
-                ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+                ComponentEquation(
+                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
             coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
             metadata={},
         )
         # Should not raise - valid momentum reference
-        assert system.n_components == 2  # noqa: PLR2004
+        assert system.n_components == 2
 
     def test_invalid_regular_field_reference_raises(self) -> None:
         """Test that invalid regular field reference raises ValueError."""
@@ -588,7 +601,9 @@ class TestFieldReferenceValidation:
                         0,
                         2,
                         (
-                            OperatorTerm(1.0, "gradient_x", "pi_0_extra"),  # Wrong format
+                            OperatorTerm(
+                                1.0, "gradient_x", "pi_0_extra"
+                            ),  # Wrong format
                         ),
                     ),
                     ComponentEquation(
@@ -629,12 +644,12 @@ class TestRegisterOperator:
 
     def test_register_and_use_custom_operator(self) -> None:
         """Registered operator is accepted by is_known_operator and usable in PDE."""
-        from torsion_gertsenshtein.symbolic.json_loader import (  # noqa: PLC0415
-            _CUSTOM_OPERATORS,  # noqa: PLC2701
+        from torsion_gertsenshtein.symbolic.json_loader import (
+            _CUSTOM_OPERATORS,
             is_known_operator,
         )
-        from torsion_gertsenshtein.symbolic.pde_builder import (  # noqa: PLC0415
-            _OPERATOR_REGISTRY,  # noqa: PLC2701
+        from torsion_gertsenshtein.symbolic.pde_builder import (
+            _OPERATOR_REGISTRY,
             register_operator,
         )
 
@@ -654,7 +669,7 @@ class TestRegisterOperator:
 
     def test_register_shadow_builtin_raises(self) -> None:
         """Registering an operator that shadows a built-in raises ValueError."""
-        from torsion_gertsenshtein.symbolic.pde_builder import (  # noqa: PLC0415
+        from torsion_gertsenshtein.symbolic.pde_builder import (
             register_operator,
         )
 
@@ -671,7 +686,11 @@ class TestValidationErrors:
     def test_duplicate_field_names_raises(self) -> None:
         """Duplicate field names in JSON should raise ValueError."""
         data: dict[str, Any] = {
-            "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
             "fields": [
                 {"name": "phi", "index": 0},
                 {"name": "phi", "index": 1},  # Duplicate
@@ -679,18 +698,36 @@ class TestValidationErrors:
             "equations": [
                 {
                     "field": "phi",
-                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(phi)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
-                        "terms": [{"coefficient": 1.0, "operator": "laplacian", "field": "phi"}],
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi",
+                            }
+                        ],
                     },
                 },
                 {
                     "field": "phi",
-                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(phi)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
-                        "terms": [{"coefficient": 1.0, "operator": "laplacian", "field": "phi"}],
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi",
+                            }
+                        ],
                     },
                 },
             ],
@@ -725,8 +762,12 @@ class TestValidationErrors:
                 spatial_dimension=1,
                 component_names=("A_0", "A_1"),
                 equations=(
-                    ComponentEquation("A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)),
-                    ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+                    ComponentEquation(
+                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)
+                    ),
+                    ComponentEquation(
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                    ),
                 ),
                 mass_matrix=((0.0, 0.0),),  # 1 row instead of 2
                 coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -742,8 +783,12 @@ class TestValidationErrors:
                 spatial_dimension=1,
                 component_names=("A_0", "A_1"),
                 equations=(
-                    ComponentEquation("A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)),
-                    ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+                    ComponentEquation(
+                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)
+                    ),
+                    ComponentEquation(
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                    ),
                 ),
                 mass_matrix=((0.0,), (0.0,)),  # 1 col instead of 2
                 coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -759,8 +804,12 @@ class TestValidationErrors:
                 spatial_dimension=1,
                 component_names=("A_0", "A_1"),
                 equations=(
-                    ComponentEquation("A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)),
-                    ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+                    ComponentEquation(
+                        "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)
+                    ),
+                    ComponentEquation(
+                        "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                    ),
                 ),
                 mass_matrix=((0.0, 0.0), (0.0, 0.0)),
                 coupling_matrix=((0.0, 0.0), (0.0, 0.0), (0.0, 0.0)),  # 3 rows
@@ -771,10 +820,15 @@ class TestValidationErrors:
         """Field in equation that doesn't exist in fields_lookup should raise ValueError."""
         data: dict[str, Any] = {
             "field": "nonexistent",
-            "lhs": {"expression": "d2_t(nonexistent)", "order": {"time": 2, "space": 0}},
+            "lhs": {
+                "expression": "d2_t(nonexistent)",
+                "order": {"time": 2, "space": 0},
+            },
             "rhs": {
                 "type": "linear_combination",
-                "terms": [{"coefficient": 1.0, "operator": "laplacian", "field": "phi"}],
+                "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian", "field": "phi"}
+                ],
             },
         }
         with pytest.raises(ValueError, match="Unknown field 'nonexistent'"):
@@ -793,7 +847,9 @@ class TestCoordinateDependentTerms:
     def test_coordinate_dependent_spatial(self) -> None:
         """OperatorTerm with spatial coordinate_dependent is position_dependent."""
         term = OperatorTerm(
-            1.0, "laplacian_x", "phi_0",
+            1.0,
+            "laplacian_x",
+            "phi_0",
             coefficient_symbolic="x()^2/(2*sphR^2)",
             coordinate_dependent=("x",),
         )
@@ -803,7 +859,9 @@ class TestCoordinateDependentTerms:
     def test_coordinate_dependent_time_only(self) -> None:
         """OperatorTerm with only time dependence is NOT position_dependent."""
         term = OperatorTerm(
-            1.0, "identity", "phi_0",
+            1.0,
+            "identity",
+            "phi_0",
             coefficient_symbolic="E^(2*dSH*t())",
             time_dependent=True,
             coordinate_dependent=("t",),
@@ -815,7 +873,9 @@ class TestCoordinateDependentTerms:
     def test_coordinate_dependent_mixed(self) -> None:
         """OperatorTerm with both spatial and time is position_dependent."""
         term = OperatorTerm(
-            1.0, "identity", "phi_0",
+            1.0,
+            "identity",
+            "phi_0",
             coefficient_symbolic="x()*t()",
             time_dependent=True,
             coordinate_dependent=("x", "t"),
@@ -863,7 +923,9 @@ class TestCoordinateDependentTerms:
     def test_position_dependent_non_cartesian(self) -> None:
         """position_dependent works for non-Cartesian coordinate names."""
         term = OperatorTerm(
-            1.0, "laplacian", "phi_0",
+            1.0,
+            "laplacian",
+            "phi_0",
             coordinate_dependent=("r", "theta"),
         )
         assert term.position_dependent
@@ -871,7 +933,9 @@ class TestCoordinateDependentTerms:
     def test_position_dependent_only_t(self) -> None:
         """A term depending only on 't' is NOT position_dependent."""
         term = OperatorTerm(
-            1.0, "identity", "phi_0",
+            1.0,
+            "identity",
+            "phi_0",
             coordinate_dependent=("t",),
             time_dependent=True,
         )
@@ -918,7 +982,8 @@ class TestEquationSystemCoordinates:
     def test_effective_coordinates_explicit(self) -> None:
         """Explicit coordinates are used as-is."""
         spec = self._make_spec(
-            dimension=3, spatial_dimension=2,
+            dimension=3,
+            spatial_dimension=2,
             coordinates=("t", "r", "theta"),
         )
         assert spec.effective_coordinates == ("t", "r", "theta")
@@ -933,14 +998,22 @@ class TestEquationSystemCoordinates:
                 "coordinates": ["t", "x", "y"],
             },
             "fields": [{"name": "phi_0", "index": 0}],
-            "equations": [{
-                "field": "phi_0",
-                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
-                "rhs": {
-                    "type": "linear_combination",
-                    "terms": [{"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}],
-                },
-            }],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            }
+                        ],
+                    },
+                }
+            ],
         }
         spec = EquationSystem.from_dict(data)
         assert spec.coordinates == ("t", "x", "y")
@@ -954,14 +1027,22 @@ class TestEquationSystemCoordinates:
                 "signature": [-1, 1],
             },
             "fields": [{"name": "phi_0", "index": 0}],
-            "equations": [{
-                "field": "phi_0",
-                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
-                "rhs": {
-                    "type": "linear_combination",
-                    "terms": [{"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}],
-                },
-            }],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            }
+                        ],
+                    },
+                }
+            ],
         }
         spec = EquationSystem.from_dict(data)
         assert spec.coordinates == ()
@@ -976,17 +1057,27 @@ class TestAutoComputedMatrices:
         data: dict[str, Any] = {
             "spacetime": {"dimension": 2, "signature": [-1, 1]},
             "fields": [{"name": "phi_0", "index": 0}],
-            "equations": [{
-                "field": "phi_0",
-                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
-                "rhs": {
-                    "type": "linear_combination",
-                    "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
-                        {"coefficient": -3.0, "operator": "identity", "field": "phi_0"},
-                    ],
-                },
-            }],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": -3.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                }
+            ],
         }
         spec = EquationSystem.from_dict(data)
         assert spec.mass_matrix == ((3.0,),)
@@ -1007,9 +1098,21 @@ class TestAutoComputedMatrices:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
-                            {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
-                            {"coefficient": -0.5, "operator": "identity", "field": "chi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": -0.5,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
                         ],
                     },
                 },
@@ -1019,9 +1122,21 @@ class TestAutoComputedMatrices:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "chi_0"},
-                            {"coefficient": -4.0, "operator": "identity", "field": "chi_0"},
-                            {"coefficient": -0.5, "operator": "identity", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "chi_0",
+                            },
+                            {
+                                "coefficient": -4.0,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
+                            {
+                                "coefficient": -0.5,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 },
@@ -1036,16 +1151,22 @@ class TestAutoComputedMatrices:
         data: dict[str, Any] = {
             "spacetime": {"dimension": 2, "signature": [-1, 1]},
             "fields": [{"name": "A_0", "index": 0}],
-            "equations": [{
-                "field": "A_0",
-                "lhs": {"expression": "d2_t(A_0)", "order": {"time": 2}},
-                "rhs": {
-                    "type": "linear_combination",
-                    "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
-                    ],
-                },
-            }],
+            "equations": [
+                {
+                    "field": "A_0",
+                    "lhs": {"expression": "d2_t(A_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "A_0",
+                            },
+                        ],
+                    },
+                }
+            ],
         }
         spec = EquationSystem.from_dict(data)
         assert spec.mass_matrix == ((0.0,),)
@@ -1056,17 +1177,27 @@ class TestAutoComputedMatrices:
         data: dict[str, Any] = {
             "spacetime": {"dimension": 2, "signature": [-1, 1]},
             "fields": [{"name": "phi_0", "index": 0}],
-            "equations": [{
-                "field": "phi_0",
-                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
-                "rhs": {
-                    "type": "linear_combination",
-                    "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
-                        {"coefficient": -2.0, "operator": "identity", "field": "phi_0"},
-                    ],
-                },
-            }],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": -2.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                }
+            ],
             # JSON says 99.0 — auto-computation should override to 2.0
             "coupling": {"mass_matrix": [[99.0]], "coupling_matrix": [[0.0]]},
         }
@@ -1078,17 +1209,27 @@ class TestAutoComputedMatrices:
         data: dict[str, Any] = {
             "spacetime": {"dimension": 2, "signature": [-1, 1]},
             "fields": [{"name": "A_0", "index": 0}],
-            "equations": [{
-                "field": "A_0",
-                "lhs": {"expression": "d2_t(A_0)", "order": {"time": 2}},
-                "rhs": {
-                    "type": "linear_combination",
-                    "terms": [
-                        {"coefficient": 1.0, "operator": "gradient_x", "field": "pi_0"},
-                        {"coefficient": -5.0, "operator": "identity", "field": "A_0"},
-                    ],
-                },
-            }],
+            "equations": [
+                {
+                    "field": "A_0",
+                    "lhs": {"expression": "d2_t(A_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "gradient_x",
+                                "field": "pi_0",
+                            },
+                            {
+                                "coefficient": -5.0,
+                                "operator": "identity",
+                                "field": "A_0",
+                            },
+                        ],
+                    },
+                }
+            ],
         }
         spec = EquationSystem.from_dict(data)
         assert spec.mass_matrix == ((5.0,),)
@@ -1098,17 +1239,23 @@ class TestAutoComputedMatrices:
         data: dict[str, Any] = {
             "spacetime": {"dimension": 2, "signature": [-1, 1]},
             "fields": [{"name": "phi_0", "index": 0}],
-            "equations": [{
-                "field": "phi_0",
-                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
-                "rhs": {
-                    "type": "linear_combination",
-                    "terms": [
-                        {"coefficient": -1.0, "operator": "identity", "field": "phi_0",
-                         "coefficient_symbolic": "-procaMassSquared"},
-                    ],
-                },
-            }],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-procaMassSquared",
+                            },
+                        ],
+                    },
+                }
+            ],
         }
         spec = EquationSystem.from_dict(data)
         assert spec.mass_matrix == ((1.0,),)
@@ -1120,18 +1267,28 @@ class TestAutoComputedMatrices:
         data: dict[str, Any] = {
             "spacetime": {"dimension": 2, "signature": [-1, 1]},
             "fields": [{"name": "phi_0", "index": 0}],
-            "equations": [{
-                "field": "phi_0",
-                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
-                "rhs": {
-                    "type": "linear_combination",
-                    "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
-                        {"coefficient": 1.0, "operator": "identity", "field": "phi_0",
-                         "coefficient_symbolic": "-(dSm2*E^(2*dSH*t[]))"},
-                    ],
-                },
-            }],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-(dSm2*E^(2*dSH*t[]))",
+                            },
+                        ],
+                    },
+                }
+            ],
             # No mass_matrix_symbolic in coupling — auto-compute from terms
             "coupling": {"mass_matrix": [[0.0]], "coupling_matrix": [[0.0]]},
         }
@@ -1146,16 +1303,22 @@ class TestAutoComputedMatrices:
         data: dict[str, Any] = {
             "spacetime": {"dimension": 2, "signature": [-1, 1]},
             "fields": [{"name": "phi_0", "index": 0}],
-            "equations": [{
-                "field": "phi_0",
-                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
-                "rhs": {
-                    "type": "linear_combination",
-                    "terms": [
-                        {"coefficient": -2.0, "operator": "identity", "field": "phi_0"},
-                    ],
-                },
-            }],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -2.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                }
+            ],
         }
         spec = EquationSystem.from_dict(data)
         assert spec.mass_matrix == ((2.0,),)
@@ -1170,16 +1333,14 @@ _DATA_DIR = Path(__file__).resolve().parent.parent / "examples" / "data"
 
 def _load_json(name: str) -> dict[str, Any]:
     """Load a JSON file from examples/data/ as a dict."""
-    import json  # noqa: PLC0415
+    import json
 
     path = _DATA_DIR / name
     with path.open() as f:
         return json.load(f)
 
 
-@pytest.mark.skipif(
-    not _DATA_DIR.exists(), reason="examples/data/ not found"
-)
+@pytest.mark.skipif(not _DATA_DIR.exists(), reason="examples/data/ not found")
 class TestAutoComputedMatricesIntegration:
     """Verify auto-computed matrices from real JSON example files."""
 
@@ -1223,22 +1384,16 @@ class TestAutoComputedMatricesIntegration:
     def test_navier_cauchy_massless(self) -> None:
         """Navier-Cauchy elasticity is massless."""
         spec = EquationSystem.from_dict(_load_json("navier_cauchy_2d.json"))
-        assert all(
-            spec.mass_matrix[i][j] == 0.0 for i in range(2) for j in range(2)
-        )
+        assert all(spec.mass_matrix[i][j] == 0.0 for i in range(2) for j in range(2))
 
     def test_chern_simons_massless(self) -> None:
         """Chern-Simons 3-component gauge field is massless."""
         spec = EquationSystem.from_dict(_load_json("chern_simons_3d.json"))
-        assert all(
-            spec.mass_matrix[i][j] == 0.0 for i in range(3) for j in range(3)
-        )
+        assert all(spec.mass_matrix[i][j] == 0.0 for i in range(3) for j in range(3))
 
     def test_linearized_gravity_dedonder_massless(self) -> None:
         """De Donder linearized gravity: 10 massless wave equations."""
-        spec = EquationSystem.from_dict(
-            _load_json("linearized_gravity_dedonder.json")
-        )
+        spec = EquationSystem.from_dict(_load_json("linearized_gravity_dedonder.json"))
         assert all(spec.mass_matrix[i][i] == 0.0 for i in range(10))
 
     def test_sphere_kg_symbolic_mass(self) -> None:

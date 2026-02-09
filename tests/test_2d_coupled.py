@@ -83,7 +83,7 @@ class TestMultiGaussian2D:
         )
 
         # Should have 4 fields: phi0, pi0, phi1, pi1
-        assert len(state) == 4  # noqa: PLR2004
+        assert len(state) == 4
         assert state.labels == ["phi0", "pi0", "phi1", "pi1"]
 
         # All fields should have correct shape
@@ -145,8 +145,8 @@ class TestMultiGaussian2D:
         max_idx = np.unravel_index(np.argmax(phi0_data), phi0_data.shape)
 
         # Should be near the center (within a few cells)
-        assert abs(max_idx[0] - 16) < 3  # noqa: PLR2004
-        assert abs(max_idx[1] - 16) < 3  # noqa: PLR2004
+        assert abs(max_idx[0] - 16) < 3
+        assert abs(max_idx[1] - 16) < 3
 
     def test_validates_widths(self, grid_2d_small: CartesianGrid) -> None:
         """Verify multi_gaussian_2d rejects non-positive widths."""

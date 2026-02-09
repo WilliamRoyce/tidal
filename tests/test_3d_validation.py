@@ -58,8 +58,8 @@ class TestLoad3DJSON:
         """Test loading 3+1D Klein-Gordon JSON."""
         spec = load_equation_system(kg_3d_json_path)
 
-        assert spec.dimension == 4  # noqa: PLR2004
-        assert spec.spatial_dimension == 3  # noqa: PLR2004
+        assert spec.dimension == 4
+        assert spec.spatial_dimension == 3
         assert spec.n_components == 1
         assert spec.component_names == ("phi_0",)
 
@@ -69,7 +69,7 @@ class TestLoad3DJSON:
         eq = spec.equations[0]
 
         assert eq.field_name == "phi_0"
-        assert eq.time_derivative_order == 2  # noqa: PLR2004
+        assert eq.time_derivative_order == 2
 
         operators = {term.operator for term in eq.rhs_terms}
         assert "laplacian_x" in operators
@@ -83,7 +83,7 @@ class TestLoad3DJSON:
 
         assert isinstance(pde, PDEFromSpec)
         assert pde.n_components == 1
-        assert pde.spec.spatial_dimension == 3  # noqa: PLR2004
+        assert pde.spec.spatial_dimension == 3
 
 
 class TestEvolution3D:
@@ -98,7 +98,7 @@ class TestEvolution3D:
 
         rates = pde.evolution_rate(state)
 
-        assert len(rates) == 2  # noqa: PLR2004 — phi + momentum
+        assert len(rates) == 2
 
     def test_uniform_field_mass_term(
         self, kg_3d_json_path: Path, grid_3d_small: CartesianGrid
@@ -106,10 +106,12 @@ class TestEvolution3D:
         """Uniform field: laplacians = 0, so d_t pi = -m^2 phi."""
         pde = build_pde_from_json(kg_3d_json_path, parameters={"m2": 2.0})
 
-        state = FieldCollection([
-            ScalarField(grid_3d_small, data=1.0),  # phi = 1
-            ScalarField(grid_3d_small, data=0.0),  # pi = 0
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid_3d_small, data=1.0),  # phi = 1
+                ScalarField(grid_3d_small, data=0.0),  # pi = 0
+            ]
+        )
 
         rates = pde.evolution_rate(state)
 
@@ -134,10 +136,12 @@ class TestEvolution3D:
         kz = 2 * np.pi / 10.0
 
         phi_data = np.sin(kx * x) * np.sin(ky * y) * np.sin(kz * z)
-        state = FieldCollection([
-            ScalarField(grid_3d, data=phi_data),
-            ScalarField(grid_3d, data=0.0),
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid_3d, data=phi_data),
+                ScalarField(grid_3d, data=0.0),
+            ]
+        )
 
         rates = pde.evolution_rate(state)
 
@@ -147,17 +151,17 @@ class TestEvolution3D:
         # Larger tolerance for 3D operators on coarse 16^3 grid
         assert_allclose(rates[1].data, expected, rtol=0.06)
 
-    def test_grid_dimension_mismatch_raises(
-        self, kg_3d_json_path: Path
-    ) -> None:
+    def test_grid_dimension_mismatch_raises(self, kg_3d_json_path: Path) -> None:
         """Passing 2D grid to 3+1D PDE raises ValueError."""
         pde = build_pde_from_json(kg_3d_json_path)
         grid_2d = CartesianGrid([(0, 10), (0, 10)], [8, 8], periodic=True)
 
-        state = FieldCollection([
-            ScalarField(grid_2d, data=0.0),
-            ScalarField(grid_2d, data=0.0),
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid_2d, data=0.0),
+                ScalarField(grid_2d, data=0.0),
+            ]
+        )
 
         with pytest.raises(ValueError, match="Grid dimension"):
             pde.evolution_rate(state)

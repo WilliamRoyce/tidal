@@ -168,7 +168,7 @@ class TestKGPipelineValidation:
             pytest.skip(f"Test file not found: {kg_json_path}")
 
         spec = load_equation_system(kg_json_path)
-        pde = build_pde_from_json(kg_json_path)
+        pde = build_pde_from_json(kg_json_path, parameters={"m2": 1.0})
 
         # Initialize with uniform phi = 1
         initial = create_initial_state(
@@ -194,7 +194,7 @@ class TestKGPipelineValidation:
 
         # Create PDE from pipeline
         spec = load_equation_system(kg_json_path)
-        pipeline_pde = build_pde_from_json(kg_json_path)
+        pipeline_pde = build_pde_from_json(kg_json_path, parameters={"m2": 1.0})
 
         # Create existing KleinGordonPDE
         # Note: The JSON has m^2 = 1, so m = 1
@@ -298,7 +298,9 @@ class TestCoupledScalarsPipeline:
     @pytest.fixture
     def coupled_json_path(self) -> Path:
         """Path to the coupled scalars JSON file."""
-        return Path(__file__).parent.parent / "examples" / "data" / "coupled_scalars.json"
+        return (
+            Path(__file__).parent.parent / "examples" / "data" / "coupled_scalars.json"
+        )
 
     def test_load_coupled_spec(self, coupled_json_path: Path) -> None:
         """Test that coupled scalars specification loads correctly."""
@@ -308,7 +310,7 @@ class TestCoupledScalarsPipeline:
         spec = load_equation_system(coupled_json_path)
 
         # Should have 2 fields (phi and chi)
-        assert spec.n_components == 2  # noqa: PLR2004
+        assert spec.n_components == 2
         assert spec.component_names == ("phi_0", "chi_0")
 
         # Each equation should have 3 terms (laplacian, mass, coupling)
@@ -327,14 +329,14 @@ class TestCoupledScalarsPipeline:
         phi_eq = next(eq for eq in spec.equations if eq.field_name == "phi_0")
         chi_terms = [t for t in phi_eq.rhs_terms if t.field == "chi_0"]
         assert len(chi_terms) == 1
-        assert chi_terms[0].coefficient == -0.5  # noqa: PLR2004
+        assert chi_terms[0].coefficient == -0.5
         assert chi_terms[0].operator == "identity"
 
         # Check chi equation has term referencing phi
         chi_eq = next(eq for eq in spec.equations if eq.field_name == "chi_0")
         phi_terms = [t for t in chi_eq.rhs_terms if t.field == "phi_0"]
         assert len(phi_terms) == 1
-        assert phi_terms[0].coefficient == -0.5  # noqa: PLR2004
+        assert phi_terms[0].coefficient == -0.5
         assert phi_terms[0].operator == "identity"
 
     def test_coupled_energy_transfer(
@@ -366,7 +368,7 @@ class TestCoupledScalarsPipeline:
 
         # Chi should have gained energy from coupling
         chi_max = np.max(np.abs(sol.data[2]))
-        assert chi_max > 0.01  # noqa: PLR2004
+        assert chi_max > 0.01
 
 
 class TestEdgeCases:

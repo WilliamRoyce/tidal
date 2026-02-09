@@ -14,6 +14,29 @@ JSON → Dynamic PDE construction → Simulation → Visualization
 
 **Key Point**: No physics is hardcoded in Python. All equation structure comes from the JSON files that were symbolically derived from Lagrangians.
 
+### CLI Workflow (Recommended)
+
+The `tg` command provides a unified interface for both stages:
+
+```bash
+# Derive equations from a TOML configuration
+tg derive examples/scalar_field/theory.toml
+
+# Inspect the resulting equation system
+tg inspect examples/data/klein_gordon_1d.json
+
+# Run simulation with parameter override
+tg simulate examples/data/klein_gordon_1d.json --param m2=1.0 --ic gaussian --t-end 20
+
+# Discover all available JSON specs
+tg list
+
+# Validate a JSON spec
+tg validate examples/data/klein_gordon_1d.json
+```
+
+Each example also has a `run.sh` script demonstrating the equivalent CLI workflow.
+
 ---
 
 ## Available Examples
@@ -235,11 +258,171 @@ python examples/scalar_field_3d/kg_3d_simulation.py
 
 ---
 
+### 5. Proca Field (Massive Vector, 1+1D)
+
+**Lagrangian**: `L = -1/4 F_ab F^ab - 1/2 m² A_a A^a`
+
+```bash
+tg derive examples/proca/theory.toml
+uv run python examples/proca/proca_simulation.py
+```
+
+**Key features**: Massive vector field, Proca mass term, uses `[[derived_fields]]` for field strength tensor F_ab.
+
+---
+
+### 6. Coupled Scalar Fields (1+1D)
+
+**Lagrangian**: `L = 1/2(∂φ)² - 1/2 m_φ² φ² + 1/2(∂χ)² - 1/2 m_χ² χ² - g φ χ`
+
+```bash
+tg derive examples/coupled_scalars/theory.toml
+uv run python examples/coupled_scalars/coupled_from_lagrangian.py
+```
+
+**Key features**: Cross-field coupling via `identity` operator on other field, mass matrix, mode-mixing, energy transfer between fields.
+
+---
+
+### 7. Chern-Simons Gauge Theory (2+1D)
+
+**Lagrangian**: `L = -1/4 F_ab F^ab + (kappa/2) epsilon^abc A_a ∂_b A_c`
+
+```bash
+tg derive examples/chern_simons/theory.toml
+uv run python examples/chern_simons/chern_simons_simulation.py
+```
+
+**Key features**: Epsilon tensor (automated), topological mass, A_0 constraint equation (time_derivative_order=0), cross-field gradient coupling.
+
+---
+
+### 8. Elasticity (Navier-Cauchy, 2+1D)
+
+**Lagrangian**: Anisotropic elastic medium
+
+```bash
+cd examples/elasticity && bash run.sh
+uv run python examples/elasticity/elasticity_simulation.py
+```
+
+**Key features**: Anisotropic laplacian (`laplacian_x`, `laplacian_y` with different coefficients), `cross_derivative_xy` operator.
+
+---
+
+### 9. Curved Spacetime (De Sitter, 2+1D)
+
+**Lagrangian**: KG scalar on de Sitter background with conformal time
+
+```bash
+cd examples/curved_spacetime && bash run.sh
+uv run python examples/curved_spacetime/curved_spacetime_simulation.py
+```
+
+**Key features**: Time-dependent coefficients (Hubble friction `exp(2Ht)`), Christoffel auto-detection, `first_derivative_t` operator.
+
+---
+
+### 10. Klein-Gordon on 2-Sphere (2+1D)
+
+**Lagrangian**: KG scalar on S² (stereographic projection)
+
+```bash
+tg derive examples/sphere_kg/theory.toml
+uv run python examples/sphere_kg/sphere_kg_simulation.py
+```
+
+**Key features**: Position-dependent coefficients (stereographic metric), `_resolve_coefficient_at_point` evaluator.
+
+---
+
+### 11. Electrostatics (Poisson Equation, 2+1D)
+
+**Lagrangian**: Electrostatic potential energy functional
+
+```bash
+cd examples/electrostatics && bash run.sh
+uv run python examples/electrostatics/electrostatics_simulation.py
+```
+
+**Key features**: Constraint solver (time_derivative_order=0), `--mode constraint` CLI flag.
+
+---
+
+### 12. Gravitational Waves (Linearized Gravity, 3+1D)
+
+**Lagrangian**: Einstein-Hilbert linearized around Minkowski
+
+```bash
+cd examples/gravitational_waves && bash run.sh
+uv run python examples/gravitational_waves/gw_simulation.py
+```
+
+**Key features**: xPert linearization, TT gauge, constraint equations, field-aware LHS detection, 6 independent metric perturbation components.
+
+---
+
+### 13. Massive 3-Form (Rank-3 Tensor, 3+1D)
+
+**Lagrangian**: Rank-3 antisymmetric tensor with mass term
+
+```bash
+tg derive examples/massive_3form/theory.toml
+```
+
+**Key features**: Rank-3 antisymmetric tensor, symmetry reduction (64 → 4 independent components), KG equation per component, `DefConstantSymbol` for mass.
+
+---
+
+### 14. Scalar-Vector Coupling (Stress Test, 2+1D)
+
+**Lagrangian**: `L = KG(φ) + Maxwell(A) + Proca(A) + CS(A) + gSV φ ∂_a A^a`
+
+```bash
+tg derive examples/scalar_vector_coupling/theory.toml
+uv run python examples/scalar_vector_coupling/scalar_vector_coupling_simulation.py
+```
+
+**Key features**: Mixed-rank cross-field coupling (scalar + vector), 4 symbolic constants (phim2, Am2, kCS, gSV), 4x4 mass/coupling matrices, cross-field `first_derivative_t` and `gradient` operators, `[[derived_fields]]` for F_ab, A_0 constraint.
+
+---
+
+## Example Completeness
+
+| Example | `theory.toml` | `run.sh` | Simulation `.py` |
+|---------|:---:|:---:|:---:|
+| scalar_field | Y | Y | Y |
+| electromagnetic | Y | Y | Y |
+| proca | Y | Y | Y |
+| coupled_scalars | Y | Y | Y |
+| chern_simons | Y | Y | Y |
+| elasticity | N | Y | Y |
+| curved_spacetime | N | Y | Y |
+| sphere_kg | Y | Y | Y |
+| polar_kg | Y | Y | Y |
+| electrostatics | N | Y | Y |
+| scalar_vector_coupling | Y | Y | Y |
+| scalar_field_3d | Y | Y | Y |
+| spherical_kg | Y | Y | Y |
+| cylindrical_kg | Y | Y | Y |
+| gravitational_waves | N | Y | Y |
+| massive_3form | Y | Y | N |
+| klein_gordon (legacy) | N | N | N |
+
+*Note: `elasticity`, `curved_spacetime`, `electrostatics`, and `gravitational_waves` cannot have `theory.toml` because they require manual Wolfram script construction. `klein_gordon` is a legacy example directory with standalone scripts.*
+
+---
+
 ## Validation
 
 Run the full validation suite:
 ```bash
 cd /workspaces/torsion-gertsenshtein
+
+# Validate all JSON specs with the CLI
+tg validate examples/data/klein_gordon_1d.json
+
+# Or use the legacy validation script
 python validate_implementation.py
 ```
 
@@ -247,13 +430,62 @@ This verifies:
 - JSON loading and parsing
 - Dynamic PDE construction from specifications
 - Simulation produces physically correct results
-- Operators (laplacian, identity) correctly identified
+- Operators (laplacian, identity, gradient, cross_derivative, etc.) correctly identified
 
 ---
 
 ## Creating New Examples
 
-To add a new field theory:
+### Option A: TOML Configuration (Recommended)
+
+Create a `theory.toml` in `examples/new_field/`:
+
+```toml
+[theory]
+name = "My New Theory"
+
+[spacetime]
+dimension = 2  # 1+1D
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["m2"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - m2/2 phi[]^2"
+
+[parameters]
+m2 = 1.0
+
+[output]
+path = "../data/my_field.json"
+```
+
+Then derive and simulate:
+
+```bash
+tg derive examples/new_field/theory.toml
+tg simulate examples/data/my_field.json --param m2=1.0 --ic gaussian
+```
+
+For intermediate tensors (e.g., field strength), use `[[derived_fields]]`:
+
+```toml
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+```
+
+### Option B: Manual Wolfram Script
+
+For cases requiring custom Wolfram logic (gauge fixing, xPert linearization):
 
 1. **Create Mathematica script** (e.g., `examples/new_field/derive_equations.wls`):
    - Define manifold and metric
@@ -278,26 +510,42 @@ The pipeline handles the rest automatically!
 ```
 examples/
 ├── README.md                      # This file
-├── data/                          # Generated JSON specifications
+├── data/                          # Generated JSON specifications (18 files)
 │   ├── em_1d.json                # EM equations
 │   ├── klein_gordon_1d.json      # KG equations
 │   ├── klein_gordon_3d.json      # KG equations (3+1D)
+│   ├── proca_1d.json             # Proca (massive vector)
+│   ├── coupled_scalars.json      # Coupled scalar fields
+│   ├── chern_simons_3d.json      # Chern-Simons (2+1D)
+│   ├── navier_cauchy_2d.json     # Elasticity (2+1D)
+│   ├── de_sitter_kg.json         # Curved spacetime KG
+│   ├── sphere_kg.json            # KG on 2-sphere
 │   ├── polar_kg.json             # KG in polar coordinates
+│   ├── electrostatics_2d.json    # Poisson equation
+│   ├── scalar_vector_coupling.json # Scalar-vector stress test
 │   ├── spherical_kg.json         # KG in spherical coordinates
-│   └── cylindrical_kg.json       # KG in cylindrical coordinates
+│   ├── cylindrical_kg.json       # KG in cylindrical coordinates
+│   ├── linearized_gravity.json   # Gravitational waves
+│   ├── linearized_gravity_dedonder.json
+│   ├── massive_3form.json        # Rank-3 antisymmetric tensor
+│   └── conformal_kg_static.json  # Conformal scalar field
 ├── electromagnetic/               # EM field (1+1D)
 ├── scalar_field/                  # Scalar field (1+1D)
-├── scalar_field_3d/               # Scalar field (3+1D)
+├── proca/                         # Massive vector field (1+1D)
 ├── coupled_scalars/               # Coupled scalar fields (1+1D)
 ├── chern_simons/                  # Chern-Simons gauge theory (2+1D)
 ├── elasticity/                    # Anisotropic elasticity (2+1D)
 ├── curved_spacetime/              # De Sitter spacetime (2+1D)
 ├── sphere_kg/                     # KG on 2-sphere, stereographic (2+1D)
 ├── polar_kg/                      # KG in polar coordinates (2+1D)
+├── electrostatics/                # Poisson equation, constraint solver
+├── scalar_vector_coupling/        # Scalar+vector cross-field stress test (2+1D)
+├── scalar_field_3d/               # Scalar field (3+1D)
 ├── spherical_kg/                  # KG in spherical coordinates (3+1D)
 ├── cylindrical_kg/                # KG in cylindrical coordinates (3+1D)
 ├── gravitational_waves/           # Linearized gravity (3+1D)
-└── electrostatics/                # Poisson equation, constraint solver
+├── massive_3form/                 # Rank-3 antisymmetric tensor (3+1D)
+└── klein_gordon/                  # Legacy KG demo scripts (standalone)
 ```
 
 ---

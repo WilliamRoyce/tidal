@@ -99,7 +99,7 @@ class TestStorageBoundsCheck:
 
     def test_empty_storage_handled(self) -> None:
         """Animation methods should validate storage is non-empty."""
-        from pde import MemoryStorage  # noqa: PLC0415
+        from pde import MemoryStorage
 
         grid = CartesianGrid([(0, 10), (0, 10)], 10)
         storage = MemoryStorage()  # Empty storage

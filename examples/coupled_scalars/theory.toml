@@ -1,0 +1,28 @@
+[theory]
+name = "Coupled Scalars"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[fields]]
+name = "chi"
+type = "scalar"
+
+[constants]
+names = ["mPhi2", "mChi2", "gCpl"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - mPhi2/2 phi[]^2 - 1/2 CD[-a][chi[]] eta[a, b] CD[-b][chi[]] - mChi2/2 chi[]^2 - gCpl phi[] chi[]"
+
+[parameters]
+mPhi2 = 1.0
+mChi2 = 4.0
+gCpl = 0.5
+
+[output]
+path = "../data/coupled_scalars.json"

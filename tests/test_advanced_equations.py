@@ -86,7 +86,7 @@ class TestAnisotropicKGPDE:
         result = pde.evolution_rate(state, t=0.0)
 
         assert isinstance(result, FieldCollection)
-        assert len(result) == 2  # noqa: PLR2004
+        assert len(result) == 2
         assert result[0].data.shape == phi.data.shape
         assert result[1].data.shape == pi.data.shape
 
@@ -99,8 +99,8 @@ class TestHigherOrderKGPDE:
         pde = HigherOrderKGPDE(mass=1.0, alpha_2=1.0, alpha_4=0.01, alpha_6=0.001)
         assert pde.m2 == 1.0
         assert pde.alpha_2 == 1.0
-        assert pde.alpha_4 == 0.01  # noqa: PLR2004
-        assert pde.alpha_6 == 0.001  # noqa: PLR2004
+        assert pde.alpha_4 == 0.01
+        assert pde.alpha_6 == 0.001
 
     def test_produces_valid_output(self) -> None:
         """Test that higher-order PDE produces valid (finite) evolution rates."""
@@ -156,7 +156,7 @@ class TestHigherOrderKGPDE:
         result = pde.evolution_rate(state, t=0.0)
 
         assert isinstance(result, FieldCollection)
-        assert len(result) == 2  # noqa: PLR2004
+        assert len(result) == 2
         assert result[0].data.shape == phi.data.shape
         assert result[1].data.shape == pi.data.shape
 
@@ -251,7 +251,7 @@ class TestAnisotropicHigherOrderKGPDE:
         assert pde.m2 == 1.0
         np.testing.assert_array_equal(pde.speeds, [1.0, 2.0])
         assert pde.alpha_2 == 1.0
-        assert pde.alpha_4 == 0.01  # noqa: PLR2004
+        assert pde.alpha_4 == 0.01
 
     def test_invalid_speeds(self) -> None:
         """Test that invalid speeds raise ValueError."""
@@ -274,6 +274,6 @@ class TestAnisotropicHigherOrderKGPDE:
         result = pde.evolution_rate(state, t=0.0)
 
         assert isinstance(result, FieldCollection)
-        assert len(result) == 2  # noqa: PLR2004
+        assert len(result) == 2
         assert result[0].data.shape == phi.data.shape
         assert result[1].data.shape == pi.data.shape

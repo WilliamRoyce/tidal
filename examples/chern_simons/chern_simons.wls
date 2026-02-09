@@ -68,8 +68,8 @@ Print["   Definition: F_ab = D_a A_b - D_b A_a"];
 Print[""];
 Print["Step 3: Constructing full Chern-Simons Lagrangian..."];
 
-(* Define the CS coupling constant *)
-kappa = 1/2;  (* Numerical value for simulation *)
+(* Define the CS coupling constant — kept symbolic for runtime parameterization *)
+If[!ConstantSymbolQ[kappa], DefConstantSymbol[kappa]];
 
 (*
    Full Maxwell-Chern-Simons Lagrangian:
@@ -173,6 +173,7 @@ metadata = <|
 
 (* Build JSON using multi-field structure *)
 jsonStructure = BuildMultiFieldJSONStructure[fullEquations, metadata];
+jsonStructure["metadata", "parameters"] = <|"kappa" -> 0.5|>;
 
 (* === Step 7: Export JSON === *)
 Print[""];

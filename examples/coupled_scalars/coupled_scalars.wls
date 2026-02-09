@@ -57,14 +57,14 @@ If[!xTensorQ[cplChi],
   DefTensor[cplChi[], M2];
 ];
 
-(* Physical parameters (natural units) *)
-mPhi2 = 1.0;   (* m_phi^2 = 1 *)
-mChi2 = 4.0;   (* m_chi^2 = 4 *)
-gCpl = 0.5;    (* coupling constant *)
+(* Physical parameters — kept symbolic for runtime parameterization *)
+If[!ConstantSymbolQ[mPhi2], DefConstantSymbol[mPhi2]];
+If[!ConstantSymbolQ[mChi2], DefConstantSymbol[mChi2]];
+If[!ConstantSymbolQ[gCpl], DefConstantSymbol[gCpl]];
 
-Print["   Scalar field 1: phi with m_phi^2 = ", mPhi2];
-Print["   Scalar field 2: chi with m_chi^2 = ", mChi2];
-Print["   Coupling: g = ", gCpl];
+Print["   Scalar field 1: phi with m_phi^2 (symbolic, default 1.0)"];
+Print["   Scalar field 2: chi with m_chi^2 (symbolic, default 4.0)"];
+Print["   Coupling: g (symbolic, default 0.5)"];
 
 (* === Step 3: Construct the Coupled Lagrangian === *)
 Print[""];
@@ -133,6 +133,7 @@ metadata = <|
 
 (* Build JSON using multi-field pipeline *)
 jsonOutput = BuildMultiFieldJSONStructure[fieldEquations, metadata];
+jsonOutput["metadata", "parameters"] = <|"mPhi2" -> 1.0, "mChi2" -> 4.0, "gCpl" -> 0.5|>;
 Print["   JSON structure created using pipeline"];
 
 (* === Step 7: Export JSON === *)

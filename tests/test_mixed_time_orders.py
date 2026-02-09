@@ -161,9 +161,7 @@ def mixed_with_virtual_momentum_spec() -> EquationSystem:
                 field_index=0,
                 time_derivative_order=1,
                 rhs_terms=(
-                    OperatorTerm(
-                        coefficient=1.0, operator="gradient_x", field="A_1"
-                    ),
+                    OperatorTerm(coefficient=1.0, operator="gradient_x", field="A_1"),
                 ),
             ),
             ComponentEquation(
@@ -172,9 +170,7 @@ def mixed_with_virtual_momentum_spec() -> EquationSystem:
                 time_derivative_order=2,
                 rhs_terms=(
                     OperatorTerm(coefficient=1.0, operator="laplacian", field="A_1"),
-                    OperatorTerm(
-                        coefficient=0.5, operator="gradient_x", field="pi_0"
-                    ),
+                    OperatorTerm(coefficient=0.5, operator="gradient_x", field="pi_0"),
                 ),
             ),
         ),
@@ -198,8 +194,12 @@ class TestEquationSystemStateProperties:
             spatial_dimension=1,
             component_names=("A_0", "A_1"),
             equations=(
-                ComponentEquation("A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)),
-                ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+                ComponentEquation(
+                    "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)
+                ),
+                ComponentEquation(
+                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
             coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -207,7 +207,7 @@ class TestEquationSystemStateProperties:
         )
 
         assert spec.time_orders == (2, 2)
-        assert spec.state_size == 4  # noqa: PLR2004
+        assert spec.state_size == 4
         assert spec.state_layout == (
             ("A_0", "field"),
             ("A_0", "momentum"),
@@ -230,7 +230,7 @@ class TestEquationSystemStateProperties:
     def test_mixed_orders(self, mixed_spec: EquationSystem) -> None:
         """Mixed (2nd + 1st): state_size = 3 (field + momentum + field)."""
         assert mixed_spec.time_orders == (2, 1)
-        assert mixed_spec.state_size == 3  # noqa: PLR2004
+        assert mixed_spec.state_size == 3
         assert mixed_spec.state_layout == (
             ("phi", "field"),
             ("phi", "momentum"),
@@ -252,8 +252,12 @@ class TestSlotMaps:
             spatial_dimension=1,
             component_names=("A_0", "A_1"),
             equations=(
-                ComponentEquation("A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)),
-                ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+                ComponentEquation(
+                    "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)
+                ),
+                ComponentEquation(
+                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
             coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -401,10 +405,10 @@ class TestConstraintEvolution:
         )
         # Default eps=1e-14 should accept coeff=1e-10
         pde_ok = PDEFromSpec(spec)
-        assert pde_ok._constraint_eps == 1e-14  # noqa: PLR2004
+        assert pde_ok._constraint_eps == 1e-14
 
         # Tight eps=1e-8 should reject coeff=1e-10
-        import pytest  # noqa: PLC0415
+        import pytest
 
         pde_reject = PDEFromSpec(spec, constraint_eps=1e-8)
         grid = CartesianGrid([(0, 10)], 16, periodic=True)
@@ -429,11 +433,13 @@ class TestMixedOrderEvolution:
     ) -> None:
         """Mixed system: evolution_rate returns 3 rates."""
         pde = PDEFromSpec(mixed_spec)
-        state = FieldCollection([
-            ScalarField(grid_1d, data=1.0),  # phi
-            ScalarField(grid_1d, data=0.0),  # pi_phi
-            ScalarField(grid_1d, data=0.0),  # chi
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid_1d, data=1.0),  # phi
+                ScalarField(grid_1d, data=0.0),  # pi_phi
+                ScalarField(grid_1d, data=0.0),  # chi
+            ]
+        )
 
         rates = pde.evolution_rate(state)
         num_mixed_slots = 3
@@ -446,11 +452,13 @@ class TestMixedOrderEvolution:
         pde = PDEFromSpec(mixed_spec)
 
         pi_value = 2.0
-        state = FieldCollection([
-            ScalarField(grid_1d, data=0.0),  # phi
-            ScalarField(grid_1d, data=pi_value),  # pi_phi
-            ScalarField(grid_1d, data=0.0),  # chi
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid_1d, data=0.0),  # phi
+                ScalarField(grid_1d, data=pi_value),  # pi_phi
+                ScalarField(grid_1d, data=0.0),  # chi
+            ]
+        )
 
         rates = pde.evolution_rate(state)
 
@@ -464,11 +472,13 @@ class TestMixedOrderEvolution:
         pde = PDEFromSpec(mixed_spec)
 
         # phi = 3.0 uniform, chi = 0 (uniform -> laplacian = 0)
-        state = FieldCollection([
-            ScalarField(grid_1d, data=3.0),  # phi
-            ScalarField(grid_1d, data=0.0),  # pi_phi
-            ScalarField(grid_1d, data=0.0),  # chi (uniform)
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid_1d, data=3.0),  # phi
+                ScalarField(grid_1d, data=0.0),  # pi_phi
+                ScalarField(grid_1d, data=0.0),  # chi (uniform)
+            ]
+        )
 
         rates = pde.evolution_rate(state)
 
@@ -492,11 +502,13 @@ class TestVirtualMomentum:
         kx = 2 * np.pi / 10.0
         a1_data = np.sin(kx * x)
 
-        state = FieldCollection([
-            ScalarField(grid_1d, data=0.0),  # A_0
-            ScalarField(grid_1d, data=a1_data),  # A_1
-            ScalarField(grid_1d, data=0.0),  # pi_1
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid_1d, data=0.0),  # A_0
+                ScalarField(grid_1d, data=a1_data),  # A_1
+                ScalarField(grid_1d, data=0.0),  # pi_1
+            ]
+        )
 
         # Should not raise — pi_0 is resolved as virtual momentum from A_0's RHS
         rates = pde.evolution_rate(state)
@@ -524,11 +536,13 @@ class TestVirtualMomentum:
         """_get_field_from_state resolves pi_0 from virtual_momenta dict."""
         pde = PDEFromSpec(mixed_with_virtual_momentum_spec)
 
-        state = FieldCollection([
-            ScalarField(grid_1d, data=0.0),
-            ScalarField(grid_1d, data=0.0),
-            ScalarField(grid_1d, data=0.0),
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid_1d, data=0.0),
+                ScalarField(grid_1d, data=0.0),
+                ScalarField(grid_1d, data=0.0),
+            ]
+        )
 
         # Without virtual momenta, pi_0 should raise
         with pytest.raises(ValueError, match="no momentum in state"):
@@ -620,7 +634,7 @@ class TestBackwardCompatibility:
             metadata={},
         )
 
-        assert spec.state_size == 2  # noqa: PLR2004
+        assert spec.state_size == 2
         assert spec.state_layout == (("phi", "field"), ("phi", "momentum"))
 
     def test_em_state_size(self) -> None:
@@ -631,15 +645,19 @@ class TestBackwardCompatibility:
             spatial_dimension=1,
             component_names=("A_0", "A_1"),
             equations=(
-                ComponentEquation("A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)),
-                ComponentEquation("A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)),
+                ComponentEquation(
+                    "A_0", 0, 2, (OperatorTerm(1.0, "laplacian", "A_0"),)
+                ),
+                ComponentEquation(
+                    "A_1", 1, 2, (OperatorTerm(1.0, "laplacian", "A_1"),)
+                ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
             coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
             metadata={},
         )
 
-        assert spec.state_size == 4  # noqa: PLR2004
+        assert spec.state_size == 4
 
     def test_create_initial_state_backward_compat(self, grid_1d: CartesianGrid) -> None:
         """create_initial_state produces [field, momentum] pairs for second-order."""
@@ -649,7 +667,9 @@ class TestBackwardCompatibility:
             spatial_dimension=1,
             component_names=("phi",),
             equations=(
-                ComponentEquation("phi", 0, 2, (OperatorTerm(1.0, "laplacian", "phi"),)),
+                ComponentEquation(
+                    "phi", 0, 2, (OperatorTerm(1.0, "laplacian", "phi"),)
+                ),
             ),
             mass_matrix=((0.0,),),
             coupling_matrix=((0.0,),),
@@ -663,6 +683,6 @@ class TestBackwardCompatibility:
             momentum_data={"phi": np.ones(64) * 2.0},
         )
 
-        assert len(state) == 2  # noqa: PLR2004
+        assert len(state) == 2
         assert_allclose(state[0].data, 1.0)
         assert_allclose(state[1].data, 2.0)

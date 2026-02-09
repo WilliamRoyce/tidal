@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING
 
 import pytest
@@ -226,3 +227,57 @@ def coupling_matrix_symmetric() -> list[list[float]]:
         2x2 symmetric coupling matrix with off-diagonal elements = 0.2.
     """
     return [[0.0, 0.2], [0.2, 0.0]]
+
+
+# ==================== CLI JSON Spec Fixtures ====================
+
+_EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "data"
+
+
+def _cli_json_fixture(name: str) -> Path:
+    p = _EXAMPLES_DIR / name
+    if not p.exists():
+        pytest.skip(f"{name} not found")
+    return p
+
+
+@pytest.fixture
+def klein_gordon_1d_json() -> Path:
+    """Path to klein_gordon_1d.json, skip if absent."""
+    return _cli_json_fixture("klein_gordon_1d.json")
+
+
+@pytest.fixture
+def klein_gordon_3d_json() -> Path:
+    """Path to klein_gordon_3d.json, skip if absent."""
+    return _cli_json_fixture("klein_gordon_3d.json")
+
+
+@pytest.fixture
+def polar_kg_json() -> Path:
+    """Path to polar_kg.json, skip if absent."""
+    return _cli_json_fixture("polar_kg.json")
+
+
+@pytest.fixture
+def chern_simons_json() -> Path:
+    """Path to chern_simons_3d.json, skip if absent."""
+    return _cli_json_fixture("chern_simons_3d.json")
+
+
+@pytest.fixture
+def coupled_scalars_json() -> Path:
+    """Path to coupled_scalars.json, skip if absent."""
+    return _cli_json_fixture("coupled_scalars.json")
+
+
+@pytest.fixture
+def electrostatics_json() -> Path:
+    """Path to electrostatics_2d.json, skip if absent."""
+    return _cli_json_fixture("electrostatics_2d.json")
+
+
+@pytest.fixture
+def massive_3form_json() -> Path:
+    """Path to massive_3form.json, skip if absent."""
+    return _cli_json_fixture("massive_3form.json")

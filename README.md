@@ -11,7 +11,7 @@ View the `torsion_gertsenshtein` package documentation [here](https://williamroy
 
 A research codebase for exploring **electromagnetic ↔ gravitational wave conversion** (Gertsenshtein effect) and potential **amplification mechanisms** in gravity theories with **torsion** (Poincaré gauge theory; parity-even quadratic invariants). The repository includes:
 
-- **A lightweight PDE sandbox** (built on [`py-pde`]) for rapid prototyping and numerics with **496 passing Python tests + ~100 Wolfram tests**.
+- **A lightweight PDE sandbox** (built on [`py-pde`]) for rapid prototyping and numerics with **743 passing Python tests + ~108 Wolfram tests**.
 - A symbolic pipeline (Mathematica + xAct) for **deriving linearized field equations** and exporting them to Python-friendly forms.
 - Documentation and experiments for **mixing mechanisms** and **hyperbolicity/causality checks** relevant to the effect.
 
@@ -21,13 +21,14 @@ A research codebase for exploring **electromagnetic ↔ gravitational wave conve
 
 ## Current Status (usable today)
 
-- **Lagrangian-to-PDE pipeline (`torsion_gertsenshtein.symbolic`, `torsion_gertsenshtein.wolfram`)**: complete symbolic-to-numerical pipeline for deriving field equations from Lagrangian densities. Uses Mathematica/xAct for symbolic derivation (Euler-Lagrange equations, linearization, component decomposition) → JSON export → Python/py-pde for dynamic PDE construction and simulation. **Zero hardcoded physics** in numerical layer - all equations derived symbolically. Includes working examples: EM field (massless waves) and Klein-Gordon (massive scalar field with dispersion). See [examples/README.md](examples/README.md) for complete documentation.
+- **Lagrangian-to-PDE pipeline (`torsion_gertsenshtein.symbolic`, `torsion_gertsenshtein.wolfram`)**: complete symbolic-to-numerical pipeline for deriving field equations from Lagrangian densities. Uses Mathematica/xAct for symbolic derivation (Euler-Lagrange equations, linearization, component decomposition) → JSON export → Python/py-pde for dynamic PDE construction and simulation. **Zero hardcoded physics** in numerical layer - all equations derived symbolically. Includes **18 working examples** spanning 1+1D through 3+1D: scalars, vectors, tensors (rank 3+), coupled multi-field systems, curvilinear coordinates, and curved spacetimes. See [examples/README.md](examples/README.md) for complete documentation.
+- **CLI (`tg` command)**: unified command-line interface with 5 subcommands — `tg derive` (Lagrangian → JSON via TOML config), `tg simulate` (JSON → PDE simulation with plotting), `tg inspect` (equation system info), `tg list` (discover available specs), `tg validate` (JSON spec validation). Supports `theory.toml` configs with `[[derived_fields]]` for intermediate tensor definitions (e.g., field strength F_ab). Zero new dependencies (stdlib argparse + tomllib).
 - **PDE sandbox (`torsion_gertsenshtein.kgsim`)**: lightweight PDE examples and utilities for experimenting with first-order Klein–Gordon systems built on top of the py-pde library. This repository collects a small simulation toolkit (kgsim) with helpers for grids, initial data, observers, profiling, and runs; 1D & 2D examples with snapshot/video export and animation support.
 - **Multi-field coupled systems**: support for N-field coupled Klein–Gordon PDEs with arbitrary mass matrices and coupling terms in both 1D and 2D; includes `multi_gaussian_2d` initializer for spatially separated or overlapping Gaussian pulses; test suite validates symmetry preservation, energy transfer, and decoupled limits.
 - **2D coupled simulations**: full support for coupled field evolution in 2D with visualization showing energy transfer between fields; dimension-agnostic PDE implementations work seamlessly with any grid dimensionality.
 - **Animation and visualization**: side-by-side spacetime plots (φ(x,t) heatmaps), 1D evolution animations (φ(x) vs time), 2D field evolution with dual-panel animations showing both coupled fields, and high-fps video export (MP4 via ffmpeg or GIF fallback).
 - **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), Wolfram Engine 14.3 with xAct tensor framework, optional ffmpeg; Sphinx docs skeleton; type-checked codebase with pytest test suite.
-- **Professional development infrastructure**: 496 Python tests + ~100 Wolfram tests, 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution.
+- **Professional development infrastructure**: 743 Python tests + ~108 Wolfram tests, 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution. 0 ruff violations, 0 pyright errors (strict mode).
 
 This README describes the current capabilities, how to run the examples, and planned improvements.
 
@@ -63,7 +64,7 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 
 **Development Tools:**
 
-- Comprehensive test suite with 81 Wolfram unit tests covering all pipeline modules
+- Comprehensive test suite with ~108 Wolfram unit tests covering all pipeline modules
 - 5 utility scripts for workflow automation (test execution, example derivations, pipeline validation)
 - Robust kernel caching support ensuring reliable test execution across multiple runs
 
@@ -77,7 +78,7 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 
 ## Recent Improvements
 
-- **Phase 4-13: Pipeline Evolution (February 2026)**: ✅ **ALL CRITICAL IMPLEMENTATION COMPLETE**. Fixed Wolfram test symbol conflicts, created 5 development utility scripts, completed module header documentation. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **Recent issues**: Eval validation (#68), mixed time-spatial derivatives (#79), unified derivative classification (#85), operator dimension validation (#75), 3+1D Klein-Gordon example (#71). **496 Python tests + ~100 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
+- **Phase 4-13+ Pipeline Evolution (February 2026)**: ✅ **ALL CRITICAL IMPLEMENTATION COMPLETE**. Fixed Wolfram test symbol conflicts, created 5 development utility scripts, completed module header documentation. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **CLI**: Full `tg` command with 5 subcommands (derive, inspect, simulate, list, validate) and `theory.toml` support including `[[derived_fields]]`. **Stress tests**: Scalar-vector coupling (mixed-rank cross-field, 4 constants, 4x4 matrices), massive 3-form (rank-3 antisymmetric tensor). **743 Python tests + ~108 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
 - **Lagrangian-to-PDE pipeline (February 2026)**: Complete symbolic derivation pipeline implemented with Mathematica/xAct → JSON → Python/py-pde. Fixed component extraction (free index detection with `IndicesOf[]`), operator identification (laplacian vs identity/mass terms), and RHS extraction. Created EM and Klein-Gordon examples demonstrating massless vs massive field dynamics. Added comprehensive documentation proving zero hardcoded physics in numerical layer. See [CHANGELOG.md](CHANGELOG.md) for detailed Phase 11 implementation notes.
 - **2D coupled-field support**: `multi_gaussian_2d` initializer for N-field systems on 2D grids; dimension-agnostic coordinate handling for both 1D and 2D; comprehensive test suite for 2D coupled dynamics (symmetry preservation, energy transfer, decoupled limits).
 - **Enhanced coordinate handling**: automatic detection of coordinate array format (flattened vs grid-shaped) in `gaussian_pulse` and `multi_gaussian_2d`; works seamlessly with different py-pde grid configurations.
@@ -165,42 +166,56 @@ Outputs are written to `outputs/` (created automatically if missing).
 
 ### Lagrangian-to-PDE Pipeline Examples
 
-The repository includes a complete symbolic-to-numerical pipeline for deriving field equations from Lagrangians and simulating them numerically:
+The repository includes a complete symbolic-to-numerical pipeline for deriving field equations from Lagrangians and simulating them numerically. **18 examples** cover scalars, vectors, rank-3 tensors, coupled multi-field systems, curvilinear coordinates, and curved spacetimes.
 
 ```bash
-# Full pipeline demonstration (both EM and Klein-Gordon)
-bash examples/demo_full_pipeline.sh
+# Each example has a run.sh showing the full derive → inspect → simulate workflow:
+cd examples/scalar_field && bash run.sh
 
-# EM field: Stage 1 (derive from Lagrangian L = -1/4 F_μν F^μν)
-cd examples/electromagnetic
-wolframscript -file em_lagrangian_1d.wls
-
-# EM field: Stage 2 (simulate massless wave propagation)
-uv run python examples/electromagnetic/em_from_lagrangian.py
-
-# Klein-Gordon: Stage 1 (derive from Lagrangian L = -1/2 (∂φ)² - 1/2 m²φ²)
-cd examples/scalar_field
-wolframscript -file klein_gordon.wls
-
-# Klein-Gordon: Stage 2 (simulate massive field with dispersion)
-uv run python examples/scalar_field/kg_from_lagrangian.py
-
-# Klein-Gordon 3+1D: Stage 1 (derive from Lagrangian in full 4D spacetime)
-cd examples/scalar_field_3d
-wolframscript -file klein_gordon_3d.wls
-
-# Klein-Gordon 3+1D: Stage 2 (simulate in 3D space)
-uv run python examples/scalar_field_3d/kg_3d_simulation.py
+# Or use the CLI directly:
+tg derive examples/scalar_field/theory.toml        # derive equations from Lagrangian
+tg inspect examples/data/klein_gordon_1d.json       # inspect equation structure
+tg simulate examples/data/klein_gordon_1d.json \    # simulate
+  --param m2=1.0 --ic gaussian --t-end 20
+tg list                                             # discover all available JSON specs
+tg validate examples/data/klein_gordon_1d.json      # validate JSON spec structure
 ```
 
-**Key Features:**
+**CLI Subcommands:**
 
-- **No hardcoded physics**: All equations dynamically loaded from JSON
-- **Symbolic derivation**: Mathematica/xAct computes Euler-Lagrange equations
-- **JSON interface**: Well-defined schema for equation specification
-- **Dynamic PDE construction**: Python builds solver from specification
-- **Full dimensional support**: 1+1D, 2+1D, and 3+1D spacetime examples
-- **Verified examples**: EM (massless) vs Klein-Gordon (massive) demonstrate different physics from different Lagrangians
+| Command | Description |
+|---------|-------------|
+| `tg derive theory.toml` | Generate .wls from TOML, run wolframscript to produce JSON |
+| `tg simulate spec.json` | Full simulation with plotting (supports `--param`, `--ic`, `--bc`, `--scheme`) |
+| `tg inspect spec.json` | Display equation system info (fields, operators, parameters) |
+| `tg list` | Discover all available JSON specs in `examples/data/` |
+| `tg validate spec.json` | Validate JSON equation specification structure |
+
+**TOML Configuration** (`theory.toml`):
+- Define spacetime dimension, metric, fields, constants, and Lagrangian expression
+- `[[derived_fields]]` section for intermediate tensors (e.g., field strength `F_ab = CD[-a][A[-b]] - CD[-b][A[-a]]`)
+- Runtime parameters with default values in `[parameters]` section
+
+**Pipeline Examples:**
+
+| Example | Dim | Key Features |
+|---------|-----|--------------|
+| `scalar_field/` | 1+1D | Klein-Gordon, mass term, dispersion |
+| `electromagnetic/` | 1+1D | Maxwell, Lorenz gauge, massless waves |
+| `proca/` | 1+1D | Massive vector field (Proca mass) |
+| `coupled_scalars/` | 1+1D | Cross-field coupling, mass matrix, energy transfer |
+| `chern_simons/` | 2+1D | Epsilon tensor, topological mass, A_0 constraint |
+| `elasticity/` | 2+1D | Anisotropic laplacian, cross_derivative_xy |
+| `curved_spacetime/` | 2+1D | De Sitter, Hubble friction, time-dependent coefficients |
+| `sphere_kg/` | 2+1D | KG on S², position-dependent coefficients |
+| `polar_kg/` | 2+1D | Polar coordinates, Christoffel auto-detection |
+| `electrostatics/` | 2+1D | Poisson equation, constraint solver |
+| `scalar_vector_coupling/` | 2+1D | Mixed-rank cross-field (scalar+vector), 4 constants, CS+coupling |
+| `scalar_field_3d/` | 3+1D | Full 4D KG, 32^3 grid |
+| `spherical_kg/` | 3+1D | Spherical coordinates, trig coefficients |
+| `cylindrical_kg/` | 3+1D | Cylindrical coordinates, mixed curved/flat |
+| `gravitational_waves/` | 3+1D | xPert linearization, TT gauge, constraints |
+| `massive_3form/` | 3+1D | Rank-3 antisymmetric tensor, symmetry reduction |
 
 See [examples/README.md](examples/README.md) for complete documentation and verification that the Python layer contains zero hardcoded physics.
 
@@ -230,9 +245,9 @@ If `ffmpeg` is unavailable, the example falls back to a GIF via Pillow.
 
 ## Tests
 
-The project includes a comprehensive test suite with **496 Python tests + ~100 Wolfram tests**.
+The project includes a comprehensive test suite with **743 Python tests + ~108 Wolfram tests**.
 
-### Python Tests (561 tests)
+### Python Tests (743 tests)
 
 ```bash
 # Run all Python tests with pytest
@@ -252,7 +267,7 @@ uv run pytest --cov=torsion_gertsenshtein --cov-report=term-missing
 uv run pytest --cov=torsion_gertsenshtein --cov-report=xml
 ```
 
-### Wolfram Tests (81 tests)
+### Wolfram Tests (~108 tests)
 
 ```bash
 # Run all Wolfram unit tests
@@ -381,7 +396,7 @@ See [`scripts/README.md`](scripts/README.md) for detailed setup instructions.
 ## Contributing
 
 - Open an issue or submit a PR.
-- **Test requirements**: All changes must maintain 100% test pass rate (267 tests). New features require corresponding unit tests in both Python and Wolfram layers where applicable.
+- **Test requirements**: All changes must maintain 100% test pass rate (743 Python + ~108 Wolfram tests). New features require corresponding unit tests in both Python and Wolfram layers where applicable.
 - Run `./scripts/full_test.sh` before submitting PRs to verify all tests pass.
 - Follow the project's type-checking and linting conventions (keyword-only booleans, explicit type annotations, no print in library code).
 

@@ -30,8 +30,8 @@ from torsion_gertsenshtein.symbolic.json_loader import (
 )
 from torsion_gertsenshtein.symbolic.pde_builder import (
     PDEFromSpec,
-    _op_nth_derivative,  # noqa: PLC2701 - test verifies generic derivative factory
-    _parse_multi_axis_spec,  # noqa: PLC2701 - test verifies multi-axis parser
+    _op_nth_derivative,
+    _parse_multi_axis_spec,
     create_initial_state,
 )
 
@@ -519,9 +519,7 @@ class TestBiharmonicOperator:
         expected = (kx**2 + ky**2) ** 2 * np.sin(kx * x) * np.sin(ky * y)
         assert_allclose(result.data, expected, rtol=0.02)
 
-    def test_biharmonic_evolution_beam_equation(
-        self, grid_1d: CartesianGrid
-    ) -> None:
+    def test_biharmonic_evolution_beam_equation(self, grid_1d: CartesianGrid) -> None:
         """Evolve d²u/dt² = -∇⁴u (Euler-Bernoulli beam) for one timestep.
 
         For u = sin(kx), RHS = -k⁴ sin(kx).

@@ -47,10 +47,10 @@ class TestPickleSerialization:
         ic_restored = pickle.loads(pickled)  # noqa: S301
 
         # Verify parameters preserved
-        assert ic_restored.amplitude == 1.5  # noqa: PLR2004
-        assert ic_restored.width == 2.5  # noqa: PLR2004
+        assert ic_restored.amplitude == 1.5
+        assert ic_restored.width == 2.5
         assert ic_restored.center == [25.0]
-        assert ic_restored.initial_velocity == 0.1  # noqa: PLR2004
+        assert ic_restored.initial_velocity == 0.1
 
         # Verify can build after unpickle
         state_after = ic_restored.build(grid)
@@ -69,9 +69,9 @@ class TestPickleSerialization:
 
         ic_restored = pickle.loads(pickle.dumps(ic))  # noqa: S301
 
-        assert ic_restored.amplitude == 1.5  # noqa: PLR2004
-        assert ic_restored.initial_radius == 5.0  # noqa: PLR2004
-        assert ic_restored.width == 1.5  # noqa: PLR2004
+        assert ic_restored.amplitude == 1.5
+        assert ic_restored.initial_radius == 5.0
+        assert ic_restored.width == 1.5
 
         state_after = ic_restored.build(grid)
         assert np.allclose(state_before[0].data, state_after[0].data)
@@ -93,7 +93,7 @@ class TestDeepCopy:
         ic.amplitude = 999.0
 
         # Copy should be independent
-        assert ic_copy.amplitude == 2.0  # noqa: PLR2004
+        assert ic_copy.amplitude == 2.0
 
         # Copy should still work and match original output
         state_copy = ic_copy.build(grid)
@@ -140,7 +140,9 @@ class TestThreadSafety:
         assert reference is not None
         for i, result in enumerate(results[1:], start=1):
             assert result is not None
-            assert np.allclose(result, reference), f"Thread {i} produced different result"
+            assert np.allclose(result, reference), (
+                f"Thread {i} produced different result"
+            )
 
 
 # ==================== Backward Compatibility Tests ====================

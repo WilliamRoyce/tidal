@@ -1,0 +1,26 @@
+[theory]
+name = "de Sitter Klein-Gordon"
+
+[spacetime]
+dimension = 3
+metric = "diagonal"
+# g_ab = exp(2*H*t) * diag(-1, +1, +1) — de Sitter 2+1D
+diagonal = ["-Exp[2*dSH*t[]]", "Exp[2*dSH*t[]]", "Exp[2*dSH*t[]]"]
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["dSH", "dSm2"]
+
+[lagrangian]
+# Minimally coupled KG in curved spacetime: Box_g phi - m^2 phi = 0
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - dSm2/2 phi[]^2"
+
+[parameters]
+dSH = 0.1
+dSm2 = 1.0
+
+[output]
+path = "examples/data/de_sitter_kg.json"

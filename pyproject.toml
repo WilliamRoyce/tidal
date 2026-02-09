@@ -1,9 +1,9 @@
 [project]
 name = "torsion_gertsenshtein"
-version = "0.2.12"
+version = "0.3.0"
 description = "Linearized PDE simulations for electromagnetic-gravitational wave conversion research"
 readme = "README.md"
-requires-python = ">=3.11,<3.12"
+requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "William Royce" }]
 keywords = [
@@ -30,6 +30,7 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Other",
     "Topic :: Scientific/Engineering :: Physics",
     "Topic :: Scientific/Engineering :: Mathematics",
@@ -45,6 +46,9 @@ dependencies = [
     "tqdm>=4.66,<5.0",
     "wolframclient>=1.4.0,<2.0",
 ]
+
+[project.scripts]
+tg = "torsion_gertsenshtein.cli:main"
 
 [project.urls]
 Homepage = "https://github.com/WilliamRoyce/torsion-gertsenshtein"
@@ -100,8 +104,21 @@ unfixable = ["T201"]
     "D104",
     "D205",
     "SLF001",
+    "PLC0415",
+    "PLC2701",
+    "PLR0904",
+    "PLR0913",
+    "PLR0917",
+    "PLR2004",
+    "FBT001",
+    "S108",
+    "S404",
+    "S603",
+    "ARG002",
 ]
 "examples/**/*" = ["INP001", "T201", "E402"]
+"torsion_gertsenshtein/cli/**/*" = ["T201", "PLC0415"]
+"torsion_gertsenshtein/cli/_derive.py" = ["T201", "PLC0415", "S404", "S603", "S607"]
 "scripts/**/*" = [
     "INP001",
     "T201",
@@ -166,6 +183,9 @@ build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
 package-dir = { "" = "." }
+
+[tool.setuptools.package-data]
+torsion_gertsenshtein = ["py.typed"]
 
 [tool.setuptools.packages.find]
 where = ["."]

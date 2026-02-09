@@ -58,9 +58,7 @@ def _wave_hamiltonian(state: FieldCollection, grid: CartesianGrid) -> float:
     return float(kinetic + 0.5 * grad_sq)
 
 
-def _kg_hamiltonian(
-    state: FieldCollection, grid: CartesianGrid, m2: float
-) -> float:
+def _kg_hamiltonian(state: FieldCollection, grid: CartesianGrid, m2: float) -> float:
     """Compute H = ½ ∫ (π² + |∇φ|² + m²φ²) dx for the Klein-Gordon equation."""
     phi = cast("ScalarField", state[0])
     pi = cast("ScalarField", state[1])
@@ -151,10 +149,12 @@ class TestEnergyConservation:
         phi_data = np.exp(-((x - x0) ** 2) / (2 * sigma**2))
         pi_data = np.zeros_like(phi_data)
 
-        state = FieldCollection([
-            ScalarField(grid, data=phi_data),
-            ScalarField(grid, data=pi_data),
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=phi_data),
+                ScalarField(grid, data=pi_data),
+            ]
+        )
 
         h_initial = _wave_hamiltonian(state, grid)
         assert h_initial > 0, "Initial energy should be positive"
@@ -173,7 +173,7 @@ class TestEnergyConservation:
 
         # Energy should be conserved within ~1% (Euler method, small dt)
         relative_change = abs(h_final - h_initial) / h_initial
-        assert relative_change < 0.02, (  # noqa: PLR2004
+        assert relative_change < 0.02, (
             f"Energy not conserved: H_0={h_initial:.6f}, H_f={h_final:.6f}, "
             f"relative change={relative_change:.4f}"
         )
@@ -187,10 +187,12 @@ class TestEnergyConservation:
 
         # Gaussian initial data
         phi_data = np.exp(-((x - 5.0) ** 2) / (2 * 0.5**2))
-        state = FieldCollection([
-            ScalarField(grid, data=phi_data),
-            ScalarField(grid, data=0.0),
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=phi_data),
+                ScalarField(grid, data=0.0),
+            ]
+        )
 
         h_initial = _kg_hamiltonian(state, grid, m2)
 
@@ -204,7 +206,7 @@ class TestEnergyConservation:
 
         h_final = _kg_hamiltonian(state, grid, m2)
         relative_change = abs(h_final - h_initial) / h_initial
-        assert relative_change < 0.02, (  # noqa: PLR2004
+        assert relative_change < 0.02, (
             f"KG energy not conserved: relative change={relative_change:.4f}"
         )
 
@@ -229,10 +231,12 @@ class TestAnalyticalSolutions:
 
         # Initial: φ = cos(kx), π = 0
         phi_data = np.cos(k * x)
-        state = FieldCollection([
-            ScalarField(grid, data=phi_data),
-            ScalarField(grid, data=0.0),
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=phi_data),
+                ScalarField(grid, data=0.0),
+            ]
+        )
 
         rates = pde.evolution_rate(state, t=0.0)
 
@@ -255,10 +259,12 @@ class TestAnalyticalSolutions:
         k = 2 * np.pi / 10
 
         phi_data = np.cos(k * x)
-        state = FieldCollection([
-            ScalarField(grid, data=phi_data),
-            ScalarField(grid, data=0.0),
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=phi_data),
+                ScalarField(grid, data=0.0),
+            ]
+        )
 
         rates = pde.evolution_rate(state, t=0.0)
 
@@ -267,9 +273,7 @@ class TestAnalyticalSolutions:
         expected = -omega_sq * np.cos(k * x)
         assert_allclose(rates[1].data, expected, rtol=1e-3)
 
-    def test_standing_wave_quarter_period(
-        self, wave_spec: EquationSystem
-    ) -> None:
+    def test_standing_wave_quarter_period(self, wave_spec: EquationSystem) -> None:
         """A standing wave φ(0) = cos(kx), π(0) = 0 evolves to φ ≈ 0, π ≈ -ω sin(kx)
         after a quarter period T/4 = π/(2ω) where ω = k.
 
@@ -308,7 +312,7 @@ class TestAnalyticalSolutions:
 
         # Analytical: φ(t) = cos(kx)cos(ωt), π(t) = -ω cos(kx)sin(ωt)
         # At T/4: φ ≈ 0, π ≈ -ω cos(kx)
-        assert np.max(np.abs(phi.data)) < 0.15, (  # noqa: PLR2004
+        assert np.max(np.abs(phi.data)) < 0.15, (
             f"φ amplitude should be ~0 at T/4, got max |φ|={np.max(np.abs(phi.data)):.4f}"
         )
 
@@ -332,9 +336,7 @@ class TestAnalyticalSolutions:
 class TestCFLStability:
     """Verify CFL condition checker detects unstable configurations."""
 
-    def test_stable_dt_returns_no_warnings(
-        self, wave_spec: EquationSystem
-    ) -> None:
+    def test_stable_dt_returns_no_warnings(self, wave_spec: EquationSystem) -> None:
         """Small dt relative to dx produces no warnings."""
         pde = PDEFromSpec(wave_spec)
         grid = CartesianGrid([(0, 10)], 128, periodic=True)
@@ -343,9 +345,7 @@ class TestCFLStability:
         warnings = pde.check_stability(dt, grid)
         assert warnings == []
 
-    def test_unstable_dt_returns_warning(
-        self, wave_spec: EquationSystem
-    ) -> None:
+    def test_unstable_dt_returns_warning(self, wave_spec: EquationSystem) -> None:
         """Large dt relative to dx triggers CFL warning."""
         pde = PDEFromSpec(wave_spec)
         grid = CartesianGrid([(0, 10)], 128, periodic=True)
@@ -356,9 +356,7 @@ class TestCFLStability:
         assert "CFL violated" in warnings[0]
         assert "phi" in warnings[0]
 
-    def test_kg_cfl_includes_wave_speed(
-        self, kg_spec: EquationSystem
-    ) -> None:
+    def test_kg_cfl_includes_wave_speed(self, kg_spec: EquationSystem) -> None:
         """KG equation CFL check uses the Laplacian coefficient."""
         pde = PDEFromSpec(kg_spec, parameters={"m2": 4.0})
         grid = CartesianGrid([(0, 10)], 64, periodic=True)
@@ -385,9 +383,9 @@ class TestMassive3Form:
     @pytest.fixture
     def massive_3form_spec(self) -> EquationSystem:
         """Load the massive 3-form JSON generated by the Wolfram pipeline."""
-        from pathlib import Path  # noqa: PLC0415
+        from pathlib import Path
 
-        from torsion_gertsenshtein.symbolic.json_loader import (  # noqa: PLC0415
+        from torsion_gertsenshtein.symbolic.json_loader import (
             load_equation_system,
         )
 
@@ -400,10 +398,10 @@ class TestMassive3Form:
 
     def test_component_count(self, massive_3form_spec: EquationSystem) -> None:
         """Antisymmetric rank-3 in 4D: 64 raw → 4 independent components."""
-        assert massive_3form_spec.n_components == 4  # noqa: PLR2004
-        assert massive_3form_spec.dimension == 4  # noqa: PLR2004
-        assert massive_3form_spec.spatial_dimension == 3  # noqa: PLR2004
-        assert len(massive_3form_spec.equations) == 4  # noqa: PLR2004
+        assert massive_3form_spec.n_components == 4
+        assert massive_3form_spec.dimension == 4
+        assert massive_3form_spec.spatial_dimension == 3
+        assert len(massive_3form_spec.equations) == 4
 
     def test_kg_dispersion_all_components(
         self, massive_3form_spec: EquationSystem
@@ -415,9 +413,7 @@ class TestMassive3Form:
         """
         m2 = 2.0
         pde = PDEFromSpec(massive_3form_spec, parameters={"m2": m2})
-        grid = CartesianGrid(
-            [(0, 10), (0, 10), (0, 10)], 16, periodic=True
-        )
+        grid = CartesianGrid([(0, 10), (0, 10), (0, 10)], 16, periodic=True)
         coords: np.ndarray = grid.cell_coords  # type: ignore[reportUnknownVariableType]
         kx = 2 * np.pi / 10  # one wavelength across the domain
 
@@ -440,9 +436,7 @@ class TestMassive3Form:
             assert_allclose(rates[2 * i].data, 0.0, atol=1e-10)
             assert_allclose(rates[2 * i + 1].data, expected, rtol=0.1)
 
-    def test_component_independence(
-        self, massive_3form_spec: EquationSystem
-    ) -> None:
+    def test_component_independence(self, massive_3form_spec: EquationSystem) -> None:
         """Components are decoupled: exciting C_0 only leaves C_1..C_3 unchanged.
 
         Since there's no cross-field coupling, the evolution rate for
@@ -450,9 +444,7 @@ class TestMassive3Form:
         """
         m2 = 1.0
         pde = PDEFromSpec(massive_3form_spec, parameters={"m2": m2})
-        grid = CartesianGrid(
-            [(0, 10), (0, 10), (0, 10)], 16, periodic=True
-        )
+        grid = CartesianGrid([(0, 10), (0, 10), (0, 10)], 16, periodic=True)
         coords: np.ndarray = grid.cell_coords  # type: ignore[reportUnknownVariableType]
 
         # State layout: [C_0, pi_0, C_1, pi_1, C_2, pi_2, C_3, pi_3]
@@ -470,15 +462,19 @@ class TestMassive3Form:
         assert_allclose(rates[0].data, 0.0, atol=1e-10)
 
         # rate[1] = d_t pi_0 should be non-zero (Gaussian has curvature)
-        assert np.max(np.abs(rates[1].data)) > 0.01  # noqa: PLR2004
+        assert np.max(np.abs(rates[1].data)) > 0.01
 
         # C_1, C_2, C_3 and their momenta should all be exactly zero
         for i in range(1, len(names)):
             assert_allclose(
-                rates[2 * i].data, 0.0, atol=1e-14,
+                rates[2 * i].data,
+                0.0,
+                atol=1e-14,
                 err_msg=f"C_{i} rate should be zero",
             )
             assert_allclose(
-                rates[2 * i + 1].data, 0.0, atol=1e-14,
+                rates[2 * i + 1].data,
+                0.0,
+                atol=1e-14,
                 err_msg=f"pi_{i} rate should be zero",
             )

@@ -1,5 +1,155 @@
 # Changelog
 
+## Scalar-Vector Coupling Stress Test (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** End-to-end stress test of the pipeline with mixed-rank cross-field coupling: scalar phi + vector A_mu in 2+1D, combining Klein-Gordon, Proca, Chern-Simons, and divergence coupling terms in a single Lagrangian with 4 symbolic constants.
+
+**Files Created:**
+
+- `examples/scalar_vector_coupling/theory.toml` — TOML config with `[[derived_fields]]` for F_ab
+- `examples/scalar_vector_coupling/scalar_vector_coupling.wls` — Wolfram derivation script
+- `examples/scalar_vector_coupling/scalar_vector_coupling_simulation.py` — Python simulation with 3x2 plot layout
+- `examples/scalar_vector_coupling/run.sh` — CLI-equivalent workflow script
+- `examples/data/scalar_vector_coupling.json` — JSON equation spec (4 fields, 4x4 matrices)
+- `tests/test_scalar_vector_physics.py` — 22 physics tests
+
+**Key Features:**
+
+- Mixed-rank cross-field: scalar phi_0 + vector (A_0, A_1, A_2) with cross-field first_derivative_t and gradient operators
+- 4 symbolic constants (phim2, Am2, kCS, gSV) all preserved symbolically for runtime parameter sweeps
+- 4x4 mass/coupling matrices auto-computed from identity terms
+- A_0 as constraint equation (time_derivative_order=0)
+- Demonstrates scalar→vector energy transfer via gradient coupling
+- Uses `[[derived_fields]]` TOML feature for field strength tensor F_ab
+
+**Tests:** 743 Python tests passing (22 new physics tests + 147 CLI tests)
+
+---
+
+## CLI (`tg` Command) Implementation (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Unified command-line interface for the Lagrangian-to-PDE pipeline with 5 subcommands, zero new dependencies (stdlib argparse + tomllib), and 147 CLI-specific tests.
+
+**Subcommands:**
+
+- `tg derive theory.toml` — Generate .wls from TOML config, run wolframscript to produce JSON
+- `tg simulate spec.json` — Full simulation with smart defaults, plotting, and parameter override
+- `tg inspect spec.json` — Display equation system info (fields, operators, parameters)
+- `tg list` — Discover available JSON specs in examples/data/
+- `tg validate spec.json` — Validate JSON equation specification structure
+
+**Key Features:**
+
+- `theory.toml` configuration with `[[derived_fields]]` for intermediate tensor definitions
+- IC presets: `gaussian`, `plane-wave`, `zero`, `formula` via `--ic` flag
+- Per-axis boundary conditions via `--bc neumann,periodic`
+- `--mode constraint` for single constraint solve (no time evolution)
+- `--scheme scipy` (adaptive) or `--scheme runge-kutta` (explicit)
+- `--ic-formula` hardened with AST validation
+- Version via `importlib.metadata.version()` (single source from pyproject.toml)
+- `py.typed` marker included in sdist/wheel
+
+**Architecture:**
+
+- `_WlsContext` dataclass bundles WLS generation state
+- `PlotContext` dataclass bundles plot arguments
+- Plotting extracted to `_plot.py` (separate from `_simulate.py`)
+- `_validate.py` for JSON spec validation
+
+**Files Created:**
+
+- `torsion_gertsenshtein/cli/` — 8 modules (**init**, **main**, \_derive, \_simulate, \_inspect, \_list, \_plot, \_validate)
+- `tests/test_cli.py` + `tests/test_cli_parsing.py` — 147 CLI tests
+- 14 `theory.toml` files across examples
+
+**Tests:** 743 Python tests passing (147 CLI tests), 0 ruff violations, 0 pyright errors
+
+---
+
+## Derived Fields TOML Feature (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Added `[[derived_fields]]` support to `theory.toml` for defining intermediate tensor fields (e.g., field strength F_ab) that are automatically expanded during Wolfram script generation.
+
+**Usage:**
+
+```toml
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[lagrangian]
+expression = "-1/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d]"
+```
+
+**Implementation:** `_wls_derived_fields()` generates `DefTensor` + `MakeRule`; `_wls_lagrangian()` expands definitions via `/. rules`.
+
+---
+
+## Critical Review Pass 1 (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Comprehensive review addressing fail-fast enforcement, constraint solver ordering, dynamic axis naming, operator plugin API, all-JSON parametrized tests, physics validation, and epsilon tensor fixes.
+
+**Key Changes:**
+
+- Fail-fast symbolic coefficient validation
+- Constraint solver ordering fixes
+- Dynamic axis naming (supports up to 6D)
+- Operator plugin API
+- All-JSON parametrized tests
+- Physics validation (energy conservation + analytical solutions)
+- Epsilon `sqrt(|det(g)|)` fix
+
+---
+
+## Critical Review Pass 2 (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Second review pass focusing on code quality, stability, and extensibility.
+
+**Key Changes:**
+
+- `evolution_rate` refactored into 3 helper methods
+- Configurable `constraint_eps` parameter
+- CFL `check_stability()` method
+- `MinkowskiMetricFactor` signature parameter
+- Tensor symmetry reduction for rank 3+
+
+---
+
+## Massive 3-Form Example (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** End-to-end example of rank-3 antisymmetric tensor field decomposition, demonstrating symmetry reduction from 64 to 4 independent components in 3+1D.
+
+**Key Fixes:**
+
+- xAct's `Cycles` context: `xAct`xPerm`Cycles` vs `System`Cycles` — all pattern matching updated
+- Explicit metric Lagrangian with `DefConstantSymbol` for mass parameter
+- `EnumerateComponentTuples` symmetry reduction for antisymmetric rank-3
+
+**Files Created:**
+
+- `examples/massive_3form/massive_3form.wls` — Wolfram derivation
+- `examples/massive_3form/theory.toml` — TOML config
+- `examples/data/massive_3form.json` — 4-component KG system
+
+**Tests:** 3 physics tests in dedicated test file
+
+---
+
 ## Issue #71: 3+1D Klein-Gordon Working Example (February 2026)
 
 **Status:** ✅ COMPLETE
@@ -7,14 +157,17 @@
 **Summary:** Created complete end-to-end 3+1D Klein-Gordon example demonstrating full 4D spacetime support with Wolfram derivation and Python simulation.
 
 **Files Created:**
+
 - `examples/scalar_field_3d/klein_gordon_3d.wls` — Wolfram derivation script (4D manifold, Minkowski metric)
 - `examples/scalar_field_3d/kg_3d_simulation.py` — Python simulation (32³ grid, 4-panel visualization)
 
 **Files Updated:**
+
 - `examples/data/klein_gordon_3d.json` — Replaced hand-written version with pipeline-derived format
 - `tests/test_3d_validation.py` — Updated field name from `"phi"` to `"phi_0"`
 
 **Key Features:**
+
 - Full Lagrangian → Euler-Lagrange → Component decomposition → JSON → Simulation pipeline in 3+1D
 - Uses KG-prefixed xAct symbols (`kgM4`, `kgEta`, `kgCD`, `kgCart`) to avoid kernel conflicts
 - Symbolic mass parameter `m2 = Symbol["m2"]` resolved at simulation time
@@ -37,19 +190,23 @@
 **Implementation:**
 
 **New Methods:**
+
 - `PDEFromSpec._operator_min_dim(operator_name: str) -> int` — Static method returning minimum spatial dimension required by an operator
 - `PDEFromSpec._validate_operator_dimensions()` — Instance method validating all operators in spec against spatial dimension
 
 **Validation Logic:**
+
 - Explicit registry: `gradient_z`, `laplacian_z`, `cross_derivative_xz` require 3D
 - Dynamic patterns: `derivative_N_z` requires 3D, `derivative_Nx_My` requires 2D if y present
 - Fail-fast: Raises `ValueError` at `__init__` with clear message indicating which operator and field failed
 
 **Test Coverage:**
+
 - 9 new tests in `TestOperatorDimensionValidation`
 - Updated `test_unknown_operator_raises` to expect error at construction
 
 **Example Error:**
+
 ```
 ValueError: Operator 'gradient_z' in equation for 'phi_0' requires at least 3D spatial grid,
 but the spec has spatial_dimension=2 (from 3D spacetime).
@@ -68,6 +225,7 @@ but the spec has spatial_dimension=2 (from 3D spacetime).
 **Summary:** Replaced 15 `assert isinstance(...)` statements in `pde_builder.py` with explicit `if not isinstance(...): raise TypeError(...)` checks to prevent silent failures when Python runs with `-O` optimization flag.
 
 **Changes:**
+
 - 15 isinstance checks converted to explicit TypeError raises
 - 9 `# pyright: ignore[reportUnnecessaryIsInstance]` comments added (pyright doesn't understand the pattern)
 - 4 docstrings updated to document raised TypeErrors
@@ -75,6 +233,7 @@ but the spec has spatial_dimension=2 (from 3D spacetime).
 - 1 pyright fix: `float(cast("SupportsFloat", result))` for line 835
 
 **Linting Fixes:**
+
 - ruff EM102: Extracted 15 inline f-strings to `msg = f"..."` variables
 - ruff DOC501: Added TypeError to 5 method docstrings
 - ruff TRY004: Changed ValueError to TypeError for complex number check (autofix side effect)
@@ -93,6 +252,7 @@ but the spec has spatial_dimension=2 (from 3D spacetime).
 **Summary:** Refactored 5 dimension-specific derivative wrappers into a single dimension-agnostic `ExtractDerivativeProfile` function, saving ~108 lines of code and improving maintainability.
 
 **Replaced Functions:**
+
 - `Extract1DSpatialDerivativeForm` (1+1D specific)
 - `Extract2DSpatialDerivativeForm` (2+1D specific)
 - `Extract3DSpatialDerivativeForm` (3+1D specific)
@@ -100,6 +260,7 @@ but the spec has spatial_dimension=2 (from 3D spacetime).
 - `ExtractSpatialDerivativeOrders` (dimension-agnostic but redundant)
 
 **New Unified Function:**
+
 ```mathematica
 ExtractDerivativeProfile[term_, dim_] := Module[{...},
   (* Returns: <|"time" -> n, "space" -> {m_x, m_y, m_z, ...}|> *)
@@ -107,12 +268,14 @@ ExtractDerivativeProfile[term_, dim_] := Module[{...},
 ```
 
 **Key Improvements:**
+
 - Single source of truth for derivative classification across all dimensions
 - Handles 1+1D (2-arg), 2+1D (3-arg), 3+1D (4-arg) Derivative forms uniformly
 - Eliminates code duplication and dimension-specific logic branches
 - ~108 lines of code removed
 
 **Test Coverage:**
+
 - 10 new Wolfram tests in `test_common_utilities.wls` covering 1D/2D/3D cases
 - All 496 Python tests passing after refactor
 
@@ -127,19 +290,23 @@ ExtractDerivativeProfile[term_, dim_] := Module[{...},
 **Summary:** Added support for mixed time-space derivative terms like `∂_t ∂_x A` (common in Hubble friction, curved spacetime, and momentum gradient terms).
 
 **Wolfram Side:**
+
 - `ClassifySpatialProfile[spatialOrders]` — Identifies gradient direction from spatial derivative pattern
 - `ExtractSpatialOperatorFromMixed[term, dim]` — Extracts spatial operator name from mixed derivative term
 
 **Python Side:**
+
 - Multi-axis handler in `_apply_operator` for `gradient_x(pi_i)` terms
 - Validates that referenced momentum field exists
 - Applies spatial gradient to time derivative (momentum) field
 
 **Use Cases:**
+
 - Hubble friction: `H * ∂_t φ` appears as `gradient_t(phi)` → handled as `first_derivative_t`
 - Momentum gradients: `∂_x (∂_t φ)` appears as `gradient_x(pi_i)` in curved spacetime
 
 **Test Coverage:**
+
 - Wolfram tests for mixed derivative classification
 - Python tests for momentum field references
 
@@ -156,6 +323,7 @@ ExtractDerivativeProfile[term_, dim_] := Module[{...},
 **Summary:** Added `_validate_eval_result` guard to catch NaN, Inf, and complex values in coefficient evaluation, preventing silent physics errors from invalid mathematical expressions.
 
 **Implementation:**
+
 ```python
 def _validate_eval_result(self, result: complex, expression: str, context: dict) -> None:
     """Validate that evaluated coefficient is finite and real."""
@@ -171,10 +339,12 @@ def _validate_eval_result(self, result: complex, expression: str, context: dict)
 ```
 
 **Called From:**
+
 - `_resolve_coefficient_at_point` (position-dependent coefficients)
 - After every `eval()` of Mathematica expressions
 
 **Test Coverage:**
+
 - 13 new tests in `TestEvalValidation`:
   - `test_validate_eval_result_nan` / `test_nan_in_position_dependent_raises`
   - `test_validate_eval_result_inf` / `test_inf_in_position_dependent_raises` / `test_overflow_to_inf_raises`
@@ -194,6 +364,7 @@ def _validate_eval_result(self, result: complex, expression: str, context: dict)
 **Summary:** Extended component extraction to support rank-3 and higher tensors (epsilon tensors, Riemann curvature, field strength tensors, etc.).
 
 **New Function:**
+
 ```mathematica
 ReplaceHigherRankFieldComponents[componentEq_, fieldTemplate_, chart_] := Module[{...},
   (* Detects rank-3+ tensors and replaces with component functions *)
@@ -202,21 +373,24 @@ ReplaceHigherRankFieldComponents[componentEq_, fieldTemplate_, chart_] := Module
 ```
 
 **Supported Ranks:**
+
 - Rank 0: Scalars (phi[])
 - Rank 1: Vectors (A[-a])
 - Rank 2: 2-tensors (h[-a,-b])
 - **Rank 3+: NEW** — Epsilon tensors (ε[-a,-b,-c]), Riemann tensors (R[-a,-b,-c,-d])
 
 **Integration:**
+
 - Called automatically in `DecomposeToComponents` after standard rank-1/2 replacement
 - Uses xAct introspection to detect tensor rank
 - Constructs component names from index values
 
 **Test Coverage:**
+
 - 27 new Wolfram tests in `test_component_decompose.wls`
 - 4 new Python tests for higher-rank tensor JSON loading
 
-**Impact:** Enables topological field theories (Chern-Simons with ε_{abc}), gravitational theories (Riemann curvature), and non-Abelian gauge theories.
+**Impact:** Enables topological field theories (Chern-Simons with ε\_{abc}), gravitational theories (Riemann curvature), and non-Abelian gauge theories.
 
 **Tests:** ~100 Wolfram tests + 496 Python tests passing (31 new across both)
 
@@ -229,6 +403,7 @@ ReplaceHigherRankFieldComponents[componentEq_, fieldTemplate_, chart_] := Module
 **Summary:** Automated computation of mass and coupling matrices from equation terms with symbolic coefficient preservation, eliminating manual matrix construction and enabling runtime parameter sweeps.
 
 **Convention:**
+
 ```
 mass_matrix[i][j] = -(coefficient of identity(field_j) in equation_i)
 coupling_matrix[i][j] = -(coefficient of identity(field_j) in equation_i, where i≠j)
@@ -237,27 +412,32 @@ coupling_matrix[i][j] = -(coefficient of identity(field_j) in equation_i, where 
 **Implementation:**
 
 **Wolfram Side (`ExportJSON.wl`):**
+
 - `ExtractMassCouplingFromEquations[fieldEquations]` — Parses RHS terms to extract matrix coefficients
 - Preserves symbolic expressions: `"coefficient": -1.0, "coefficient_symbolic": "-m2"`
 - Defense-in-depth: Both numeric and symbolic coefficients exported
 
 **Python Side (`json_loader.py`):**
+
 - `EquationSystem._compute_matrices_from_terms` — Computes matrices from equation terms at load time
 - Returns 4-tuple: `(mass_numeric, coupling_numeric, mass_symbolic, coupling_symbolic)`
 - `__post_init__` guard: UserWarning if constructor-provided matrices inconsistent with terms
 
 **Symbolic Preservation:**
+
 - `mass_matrix_symbolic` / `coupling_matrix_symbolic` preserve exact Mathematica expressions
 - Evaluated at runtime using `_mathematica_to_python` expression evaluator
 - Enables parameter sweeps without re-deriving equations
 
 **Test Coverage:**
+
 - 453 tests passing after Phase 12 implementation
 - Tests for matrix auto-computation, symbolic preservation, consistency validation
 
 **Impact:** Users can sweep parameters (`m2`, `g`, `H`) in simulations without regenerating JSON — symbolic coefficients evaluated dynamically.
 
 **Example:**
+
 ```json
 {
   "coefficient": 1.0,
@@ -278,6 +458,7 @@ coupling_matrix[i][j] = -(coefficient of identity(field_j) in equation_i, where 
 **Status:** ✅ **ALL CRITICAL IMPLEMENTATION COMPLETE**
 
 **Total Changes:**
+
 - 4 Wolfram test files fixed (81 tests passing)
 - 3 utility functions in CommonUtilities.wl enhanced
 - 5 development utility scripts created
@@ -286,6 +467,7 @@ coupling_matrix[i][j] = -(coefficient of identity(field_j) in equation_i, where 
 - Test runner script with kernel caching support
 
 **Impact:**
+
 - **100% test pass rate** (81 Wolfram tests + 186 Python tests)
 - Robust Wolfram test infrastructure with proper xAct symbol management
 - Complete pipeline validation scripts for development workflows
@@ -296,12 +478,15 @@ coupling_matrix[i][j] = -(coefficient of identity(field_j) in equation_i, where 
 ### 🔧 Issue 18: Wolfram Test Symbol Conflicts ✅ RESOLVED
 
 #### Problem
+
 Running `./scripts/run_wolfram_tests.sh` failed with xAct kernel caching issues:
+
 - `ValidateSymbol::used: Symbol TestM2 is already used as a manifold`
 - Multiple test files defining same symbols
 - Bash arithmetic exit code issues
 
 #### Root Causes
+
 1. **DefMetric incorrect syntax**: Passing manifold instead of covariant derivative name as 3rd argument
 2. **Pattern matching gaps**: `ExtractNumericCoefficient` missing patterns for bare tensors (`f[]`, `f[_]`)
 3. **xAct introspection issues**: `IsCovDOperator` not handling applied CD forms like `CD[-a][phi[]]`
@@ -374,6 +559,7 @@ if wolframscript -file "$TEST_PATH"; then
 #### Verification Results
 
 **Before Fixes:**
+
 ```bash
 $ ./scripts/run_wolfram_tests.sh
 ValidateSymbol::used: Symbol TestM2 is already used as a manifold.
@@ -383,6 +569,7 @@ Throw::nocatch: Uncaught Throw[Null] returned to top level.
 ```
 
 **After Fixes:**
+
 ```bash
 $ ./scripts/run_wolfram_tests.sh
 === Running Wolfram Tests ===
@@ -399,6 +586,7 @@ Failed: 0
 ```
 
 **Kernel Caching Verification:**
+
 ```bash
 $ ./scripts/run_wolfram_tests.sh && ./scripts/run_wolfram_tests.sh
 # Both runs pass - kernel caching properly handled
@@ -413,27 +601,32 @@ Created 5 helper scripts to streamline local development and testing workflows.
 #### Scripts Created
 
 **1. `scripts/run_wolfram_tests.sh`**
+
 - Runs all Wolfram unit tests with summary output
 - Tracks pass/fail counts
 - Lists failed tests for debugging
 - Exit codes: 0 (all pass), 1 (any fail)
 
 **2. `scripts/run_examples.sh`**
+
 - Regenerates all JSON files from Lagrangian derivations
 - Runs: Klein-Gordon, EM, Coupled Scalars, Chern-Simons, Navier-Cauchy
 - Validates symbolic derivation pipeline
 
 **3. `scripts/full_test.sh`**
+
 - Complete test suite: Python (186 tests) + Wolfram (81 tests)
 - One-command verification before commits
 - Sequential execution with clear output separation
 
 **4. `scripts/validate_pipeline.sh`**
+
 - End-to-end pipeline validation
 - Derives Klein-Gordon equations → JSON → Python simulation
 - Validates JSON file creation and structure
 
 **5. `scripts/lint_wolfram.sh`**
+
 - Basic syntax checking for Wolfram modules
 - Loads each module and reports errors
 - Quick verification after Wolfram changes
@@ -468,24 +661,28 @@ All Wolfram modules now have comprehensive header comments with MODULE, PURPOSE,
 #### Documentation Added
 
 **ExportJSON.wl** - Complete module documentation including:
+
 - Supported operators (identity, laplacian, laplacian_x/y/z, gradient_x/y/z, cross_derivative_xy/xz/yz)
 - PDE types (elliptic, parabolic, hyperbolic) via LHS structure
 - Momentum gradient handling for mixed time-space derivatives
 - Data flow from ComponentDecompose → ExportEquationSystem
 
 **ComponentDecompose.wl** - Complete module documentation including:
+
 - Tensor to scalar component decomposition process
 - additionalFields parameter for cross-field coupling
 - Dimension-agnostic design using GetChartDimension
 - Automatic epsilon tensor evaluation for topological terms
 
 **Linearize.wl** - Complete module documentation including:
+
 - Zero background vs custom background linearization
 - Polynomial degree selection vs xPert integration
 - Gauge fixing considerations
 - Usage patterns with examples
 
 **CommonUtilities.wl** - Already had comprehensive documentation:
+
 - CD → Derivative conversion process
 - Dimension validation and max supported dimensions
 - Sign conventions for Minkowski spacetime
@@ -525,18 +722,21 @@ terms. Fallback method when xPert systematic perturbation is not applicable.";
 ### 📊 Phase 4 Summary Statistics
 
 #### Test Coverage
+
 - **Wolfram Tests:** 81 tests across 3 files (100% pass rate)
 - **Python Tests:** 186 tests (100% pass rate)
 - **Total:** 267 tests passing
 - **Kernel Caching:** Verified with consecutive runs
 
 #### Documentation
+
 - **Module Headers:** 4/4 complete (ExportJSON, ComponentDecompose, Linearize, CommonUtilities)
 - **Public API Functions:** 100% documented with `::usage` strings
 - **Private Helpers:** 3/3 documented (Linearize.wl)
 - **Scripts:** 5/5 with comprehensive README documentation
 
 #### Code Quality
+
 - **Fixed Functions:** 4 (DefMetric syntax, ExtractNumericCoefficient, ExtractCoefficientWithSymbolic, IsCovDOperator)
 - **Fixed Scripts:** 1 (run_wolfram_tests.sh bash arithmetic)
 - **New Scripts:** 5 (run_wolfram_tests, run_examples, full_test, validate_pipeline, lint_wolfram)
@@ -546,6 +746,7 @@ terms. Fallback method when xPert systematic perturbation is not applicable.";
 ### 🎓 Key Technical Insights
 
 #### DefMetric Signature
+
 ```mathematica
 DefMetric[signdet, metric[-a, -b], covd, options]
 (*         ^        ^                ^     ^
@@ -559,7 +760,9 @@ DefMetric[signdet, metric[-a, -b], covd, options]
 **Common Error:** Passing manifold as 3rd argument instead of covariant derivative name.
 
 #### xAct Applied Forms
+
 When xAct applies a covariant derivative:
+
 ```mathematica
 CD[-a][phi[]]  (* Head = CD[-a], not CD *)
 ```
@@ -567,6 +770,7 @@ CD[-a][phi[]]  (* Head = CD[-a], not CD *)
 To detect: `Head[Head[expr]]` gives the base symbol `CD`.
 
 #### Bash Arithmetic Exit Codes
+
 ```bash
 ((PASSED++))  # Returns exit 1 when PASSED=0 (falsy value)
 PASSED=$((PASSED + 1))  # Always returns exit 0
@@ -578,30 +782,32 @@ With `set -e`, the first form causes premature exit.
 
 ### 🛠️ Files Modified
 
-| File | Changes |
-|------|---------|
+| File                                               | Changes                                               |
+| -------------------------------------------------- | ----------------------------------------------------- |
 | `torsion_gertsenshtein/wolfram/CommonUtilities.wl` | Enhanced coefficient extraction, fixed IsCovDOperator |
-| `torsion_gertsenshtein/wolfram/Linearize.wl` | Added 3 private helper usage strings |
-| `tests/wolfram/test_euler_lagrange.wls` | Fixed DefMetric syntax |
-| `tests/wolfram/test_common_utilities.wls` | Verified with fixed utilities |
-| `tests/wolfram/test_export_json.wls` | Verified with fixed patterns |
-| `scripts/run_wolfram_tests.sh` | Fixed bash arithmetic, enhanced output |
-| `scripts/run_examples.sh` | NEW: Regenerate all JSON files |
-| `scripts/full_test.sh` | NEW: Complete test suite |
-| `scripts/validate_pipeline.sh` | NEW: End-to-end validation |
-| `scripts/lint_wolfram.sh` | NEW: Wolfram syntax checking |
+| `torsion_gertsenshtein/wolfram/Linearize.wl`       | Added 3 private helper usage strings                  |
+| `tests/wolfram/test_euler_lagrange.wls`            | Fixed DefMetric syntax                                |
+| `tests/wolfram/test_common_utilities.wls`          | Verified with fixed utilities                         |
+| `tests/wolfram/test_export_json.wls`               | Verified with fixed patterns                          |
+| `scripts/run_wolfram_tests.sh`                     | Fixed bash arithmetic, enhanced output                |
+| `scripts/run_examples.sh`                          | NEW: Regenerate all JSON files                        |
+| `scripts/full_test.sh`                             | NEW: Complete test suite                              |
+| `scripts/validate_pipeline.sh`                     | NEW: End-to-end validation                            |
+| `scripts/lint_wolfram.sh`                          | NEW: Wolfram syntax checking                          |
 
 ---
 
 ### ✨ Impact Summary
 
 #### Before Phase 4
+
 - ❌ Wolfram tests failing due to kernel caching issues
 - ❌ No development utility scripts
 - ❌ Incomplete documentation for private helpers
 - ❌ Manual test execution required memorizing commands
 
 #### After Phase 4
+
 - ✅ 81 Wolfram tests + 186 Python tests passing (100%)
 - ✅ 5 utility scripts for streamlined development
 - ✅ Complete documentation coverage (modules + APIs + helpers)
@@ -622,6 +828,7 @@ This section documents the completion of the symbolic Lagrangian-to-PDE simulati
 **Pipeline Status:** ✅ **FULLY FUNCTIONAL END-TO-END**
 
 **Total Changes:**
+
 - 4 Wolfram Language modules refactored
 - 2 example Lagrangian derivation scripts created
 - 2 Python simulation scripts (EM + Klein-Gordon)
@@ -630,6 +837,7 @@ This section documents the completion of the symbolic Lagrangian-to-PDE simulati
 - 100% of tests passing
 
 **Impact:**
+
 - **Zero hardcoded physics** in Python simulation layer
 - All equations derived symbolically from Lagrangians
 - Modular pipeline: Mathematica → JSON → Python
@@ -641,7 +849,9 @@ This section documents the completion of the symbolic Lagrangian-to-PDE simulati
 ### 🔧 Phase 11: Component Extraction Fixes (CRITICAL)
 
 #### Problem
+
 Component decomposition was producing incorrect operator identification:
+
 - Vector fields (EM) incorrectly identified Laplacian as "identity" operator
 - JSON showed `{"operator": "identity"}` instead of `{"operator": "laplacian"}`
 - Python simulations exhibited exponential growth instead of wave propagation
@@ -759,16 +969,18 @@ CountDerivativeOrder[term_] := Module[{maxOrder},
 #### Verification Results
 
 **Before Fix:**
+
 ```json
 // em_1d.json (WRONG)
-{"coefficient": 1.0, "operator": "identity", "field": "A_0"}
+{ "coefficient": 1.0, "operator": "identity", "field": "A_0" }
 // Python: d²/dt² A = 3*A → exponential growth
 ```
 
 **After Fix:**
+
 ```json
 // em_1d.json (CORRECT)
-{"coefficient": 1.0, "operator": "laplacian", "field": "A_0"}
+{ "coefficient": 1.0, "operator": "laplacian", "field": "A_0" }
 // Python: d²/dt² A = ∇²A → wave propagation at c=1
 ```
 
@@ -779,10 +991,12 @@ CountDerivativeOrder[term_] := Module[{maxOrder},
 #### Migration: Mathematica Scripts
 
 **Moved Files:**
+
 - `torsion_gertsenshtein/wolfram/examples/em_lagrangian_1d.wls` → [examples/electromagnetic/em_lagrangian_1d.wls](examples/electromagnetic/em_lagrangian_1d.wls)
 - `torsion_gertsenshtein/wolfram/examples/klein_gordon.wls` → [examples/scalar_field/klein_gordon.wls](examples/scalar_field/klein_gordon.wls)
 
 **Rationale:**
+
 - Keep source code directory focused on library modules
 - Co-locate Mathematica derivation scripts with Python simulation scripts
 - Improve discoverability for users exploring examples
@@ -792,12 +1006,14 @@ CountDerivativeOrder[term_] := Module[{maxOrder},
 **File Created:** [examples/scalar_field/kg_from_lagrangian.py](examples/scalar_field/kg_from_lagrangian.py)
 
 Complete Klein-Gordon simulation demonstrating:
+
 - Loading equations from `klein_gordon_1d.json` (derived from Lagrangian)
 - Dynamic PDE construction with **both** Laplacian and mass terms
 - Gaussian pulse propagation with dispersion (massive field)
 - Comparison with EM (massless field) behavior
 
 **Key Feature - Dynamic Mass Term Detection:**
+
 ```python
 # Check for mass term presence directly from JSON specification
 has_mass = any(
@@ -833,6 +1049,7 @@ else:
    - Step-by-step instructions for each example
 
 3. **Verification of No Hardcoded Physics**
+
    ```python
    # build_pde_from_json.py - Dynamic operator dispatch
    for term in eq.rhs_terms:  # From JSON spec
@@ -861,6 +1078,7 @@ else:
 2. **JSON Verification:** Extract and display operator terms
 3. **Stage 2 Execution:** Python simulation for both examples
 4. **Side-by-Side Comparison:**
+
    ```bash
    echo "EM JSON (no mass term):"
    cat em_1d.json | jq '.equations[0].rhs.terms[0]'
@@ -870,6 +1088,7 @@ else:
    ```
 
 **Output:**
+
 ```
 EM JSON (no mass term):
   {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"}
@@ -926,6 +1145,7 @@ class PDEFromSpec(PDEBase):
 ```
 
 **Key Points:**
+
 - Iterates over `eq.rhs_terms` from JSON specification
 - Operator dispatch: `self.operators[term.operator]` - looks up by string name
 - Coefficient from JSON: `term.coefficient`
@@ -934,6 +1154,7 @@ class PDEFromSpec(PDEBase):
 #### Evidence 2: Same Python Code, Different Physics
 
 **Command:**
+
 ```bash
 # EM simulation (massless)
 python examples/electromagnetic/em_from_lagrangian.py
@@ -953,30 +1174,32 @@ The only difference: JSON file content (which comes from different Lagrangians).
 #### Evidence 3: JSON Structural Difference
 
 **EM JSON (massless):**
+
 ```json
 {
   "field": "A_0",
   "rhs": {
-    "terms": [
-      {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"}
-    ]
+    "terms": [{ "coefficient": 1.0, "operator": "laplacian", "field": "A_0" }]
   }
 }
 ```
+
 → Equation: `d²A/dt² = ∇²A` (pure wave, no mass)
 
 **Klein-Gordon JSON (massive):**
+
 ```json
 {
   "field": "phi_0",
   "rhs": {
     "terms": [
-      {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
-      {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}
+      { "coefficient": -1.0, "operator": "identity", "field": "phi_0" },
+      { "coefficient": 1.0, "operator": "laplacian", "field": "phi_0" }
     ]
   }
 }
 ```
+
 → Equation: `d²φ/dt² = ∇²φ - m²φ` (wave + mass term)
 
 **Conclusion:** Python simulation layer is a **pure JSON interpreter** with zero physics knowledge.
@@ -1026,6 +1249,7 @@ All tests passed! ✅
 #### Manual Verification
 
 **EM Simulation:**
+
 ```bash
 python examples/electromagnetic/em_from_lagrangian.py
 
@@ -1054,6 +1278,7 @@ Step 6: Analyzing results...
 ```
 
 **Klein-Gordon Simulation:**
+
 ```bash
 python examples/scalar_field/kg_from_lagrangian.py
 
@@ -1103,6 +1328,7 @@ freeIndices = Select[allIndices,
 #### 2. Context-Independent Pattern Matching
 
 Mathematica packages can have symbols in different contexts:
+
 - User code: `Global`CD`
 - Package code: `TorsionGertsenshtein`CD`
 
@@ -1116,16 +1342,19 @@ isCDlike[x_] := StringMatchQ[ToString[Head[x]], "*CD*"];
 #### 3. Separation of LHS (Time) vs RHS (Space)
 
 Wave equations in 1+1D have form:
+
 ```
 ∂²φ/∂t² = ∂²φ/∂x² + other_spatial_operators
 ```
 
 In Mathematica component form:
+
 ```
 Derivative[0,2][phi][t,x] - Derivative[2,0][phi][t,x] + mass*phi = 0
 ```
 
 First index is time, second is space. To extract RHS:
+
 1. Identify time derivative: `Derivative[2,0][...]` (second derivative in first argument)
 2. Everything else goes on RHS
 3. Handle sign flip when rearranging
@@ -1144,30 +1373,30 @@ First index is time, second is space. To extract RHS:
 
 #### Wolfram Language Modules
 
-| File | Key Changes |
-|------|-------------|
+| File                    | Key Changes                                                            |
+| ----------------------- | ---------------------------------------------------------------------- |
 | `ComponentDecompose.wl` | Free index detection with `IndicesOf`, context-independent CD patterns |
-| `ExportJSON.wl` | RHS extraction fix, derivative order counting, coefficient handling |
-| `EulerLagrange.wl` | Working VarD calls (no changes needed, was already correct) |
-| `Linearize.wl` | Working linearization (no changes needed) |
+| `ExportJSON.wl`         | RHS extraction fix, derivative order counting, coefficient handling    |
+| `EulerLagrange.wl`      | Working VarD calls (no changes needed, was already correct)            |
+| `Linearize.wl`          | Working linearization (no changes needed)                              |
 
 #### Example Scripts
 
-| File | Purpose |
-|------|---------|
-| `examples/electromagnetic/em_lagrangian_1d.wls` | Stage 1: Derive Maxwell equations from EM Lagrangian |
-| `examples/scalar_field/klein_gordon.wls` | Stage 1: Derive Klein-Gordon equation from Lagrangian |
-| `examples/electromagnetic/em_from_lagrangian.py` | Stage 2: Simulate EM waves from JSON |
-| `examples/scalar_field/kg_from_lagrangian.py` | Stage 2: Simulate massive scalar field from JSON |
+| File                                             | Purpose                                               |
+| ------------------------------------------------ | ----------------------------------------------------- |
+| `examples/electromagnetic/em_lagrangian_1d.wls`  | Stage 1: Derive Maxwell equations from EM Lagrangian  |
+| `examples/scalar_field/klein_gordon.wls`         | Stage 1: Derive Klein-Gordon equation from Lagrangian |
+| `examples/electromagnetic/em_from_lagrangian.py` | Stage 2: Simulate EM waves from JSON                  |
+| `examples/scalar_field/kg_from_lagrangian.py`    | Stage 2: Simulate massive scalar field from JSON      |
 
 #### Documentation
 
-| File | Content |
-|------|---------|
-| `examples/README.md` | Complete pipeline documentation, usage examples, verification |
-| `examples/demo_full_pipeline.sh` | Automated end-to-end demonstration |
-| `examples/data/em_1d.json` | Generated: EM wave equations (massless) |
-| `examples/data/klein_gordon_1d.json` | Generated: Klein-Gordon equations (massive) |
+| File                                 | Content                                                       |
+| ------------------------------------ | ------------------------------------------------------------- |
+| `examples/README.md`                 | Complete pipeline documentation, usage examples, verification |
+| `examples/demo_full_pipeline.sh`     | Automated end-to-end demonstration                            |
+| `examples/data/em_1d.json`           | Generated: EM wave equations (massless)                       |
+| `examples/data/klein_gordon_1d.json` | Generated: Klein-Gordon equations (massive)                   |
 
 #### Python Library (No Changes Needed)
 
@@ -1215,31 +1444,39 @@ This runs both stages for EM and Klein-Gordon examples, showing JSON differences
 #### Manual Workflow: EM Example
 
 **Stage 1: Symbolic Derivation**
+
 ```bash
 cd examples/electromagnetic
 wolframscript -file em_lagrangian_1d.wls
 ```
+
 Generates: `examples/data/em_1d.json`
 
 **Stage 2: Numerical Simulation**
+
 ```bash
 python em_from_lagrangian.py
 ```
+
 Generates: `outputs/em_from_lagrangian_output.png`
 
 #### Manual Workflow: Klein-Gordon Example
 
 **Stage 1: Symbolic Derivation**
+
 ```bash
 cd examples/scalar_field
 wolframscript -file klein_gordon.wls
 ```
+
 Generates: `examples/data/klein_gordon_1d.json`
 
 **Stage 2: Numerical Simulation**
+
 ```bash
 python kg_from_lagrangian.py
 ```
+
 Generates: `outputs/kg_from_lagrangian_output.png`
 
 #### Verify No Hardcoded Physics
