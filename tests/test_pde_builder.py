@@ -1097,7 +1097,7 @@ class TestParameterizedCoefficients:
 
         resolved = pde._resolve_coefficient(term)
         # "-m2" with m2=0.25 should give -0.25
-        assert resolved == -0.25  # noqa: PLR2004
+        assert resolved == -0.25
 
     def test_resolve_coefficient_without_parameter_raises(
         self, spec_with_symbolic: EquationSystem
@@ -1133,7 +1133,7 @@ class TestParameterizedCoefficients:
         term = spec.equations[0].rhs_terms[0]
 
         resolved = pde._resolve_coefficient(term)
-        assert resolved == 2.5  # noqa: PLR2004
+        assert resolved == 2.5
 
     def test_resolve_coefficient_unmatched_symbolic_raises(self) -> None:
         """Test _resolve_coefficient raises when symbolic doesn't match any param."""
@@ -1250,7 +1250,7 @@ class TestPositionDependentCoefficients:
         term = spec.equations[0].rhs_terms[0]
         result = pde._resolve_coefficient_at_point(term, t=0.0)
         assert isinstance(result, float)
-        assert result == 2.5  # noqa: PLR2004
+        assert result == 2.5
 
     def test_resolve_coefficient_at_point_time_dependent(self) -> None:
         """Time-only dependent coefficient returns float."""
@@ -1534,7 +1534,7 @@ class TestPositionDependentCoefficients:
         assert not np.allclose(result[0].data, phi.data, rtol=0.01)
 
 
-class TestMathematicaFunctionConversion:  # noqa: PLR0904
+class TestMathematicaFunctionConversion:
     """Test _mathematica_to_python conversion for extended mathematical functions."""
 
     def make_spec(self) -> EquationSystem:
@@ -2233,7 +2233,7 @@ class TestEvalValidation:
     def test_validate_eval_result_scalar_valid(self) -> None:
         """_validate_eval_result passes through valid float."""
         result = PDEFromSpec._validate_eval_result(6.7, "test", "6.7")
-        assert result == 6.7  # noqa: PLR2004
+        assert result == 6.7
 
     def test_validate_eval_result_scalar_nan(self) -> None:
         """_validate_eval_result rejects NaN scalar."""
@@ -2291,9 +2291,7 @@ class TestOperatorDimensionValidation:
                     field_name=field_name,
                     field_index=0,
                     time_derivative_order=2,
-                    rhs_terms=(
-                        OperatorTerm(1.0, operator, field_name),
-                    ),
+                    rhs_terms=(OperatorTerm(1.0, operator, field_name),),
                 ),
             ),
             mass_matrix=((0.0,),),
@@ -2324,7 +2322,7 @@ class TestOperatorDimensionValidation:
         """gradient_y in a 2D spatial spec succeeds."""
         spec = self._make_spec("gradient_y", spatial_dim=2)
         pde = PDEFromSpec(spec)
-        assert pde.spec.spatial_dimension == 2  # noqa: PLR2004
+        assert pde.spec.spatial_dimension == 2
 
     def test_laplacian_valid_in_1d(self) -> None:
         """Laplacian in a 1D spatial spec succeeds."""
@@ -2337,24 +2335,24 @@ class TestOperatorDimensionValidation:
         assert PDEFromSpec._operator_min_dim("identity") == 1
         assert PDEFromSpec._operator_min_dim("laplacian") == 1
         assert PDEFromSpec._operator_min_dim("gradient_x") == 1
-        assert PDEFromSpec._operator_min_dim("gradient_y") == 2  # noqa: PLR2004
-        assert PDEFromSpec._operator_min_dim("gradient_z") == 3  # noqa: PLR2004
-        assert PDEFromSpec._operator_min_dim("laplacian_y") == 2  # noqa: PLR2004
-        assert PDEFromSpec._operator_min_dim("cross_derivative_xy") == 2  # noqa: PLR2004
-        assert PDEFromSpec._operator_min_dim("cross_derivative_xz") == 3  # noqa: PLR2004
+        assert PDEFromSpec._operator_min_dim("gradient_y") == 2
+        assert PDEFromSpec._operator_min_dim("gradient_z") == 3
+        assert PDEFromSpec._operator_min_dim("laplacian_y") == 2
+        assert PDEFromSpec._operator_min_dim("cross_derivative_xy") == 2
+        assert PDEFromSpec._operator_min_dim("cross_derivative_xz") == 3
         assert PDEFromSpec._operator_min_dim("biharmonic") == 1
         assert PDEFromSpec._operator_min_dim("first_derivative_t") == 1
 
     def test_operator_min_dim_dynamic_single(self) -> None:
         """_operator_min_dim resolves dynamic single-axis patterns."""
         assert PDEFromSpec._operator_min_dim("derivative_3_x") == 1
-        assert PDEFromSpec._operator_min_dim("derivative_3_y") == 2  # noqa: PLR2004
-        assert PDEFromSpec._operator_min_dim("derivative_3_z") == 3  # noqa: PLR2004
+        assert PDEFromSpec._operator_min_dim("derivative_3_y") == 2
+        assert PDEFromSpec._operator_min_dim("derivative_3_z") == 3
 
     def test_operator_min_dim_dynamic_multi(self) -> None:
         """_operator_min_dim resolves dynamic multi-axis patterns."""
-        assert PDEFromSpec._operator_min_dim("derivative_2x_1y") == 2  # noqa: PLR2004
-        assert PDEFromSpec._operator_min_dim("derivative_1x_1z") == 3  # noqa: PLR2004
+        assert PDEFromSpec._operator_min_dim("derivative_2x_1y") == 2
+        assert PDEFromSpec._operator_min_dim("derivative_1x_1z") == 3
 
     def test_operator_min_dim_unknown_raises(self) -> None:
         """_operator_min_dim raises for unrecognized operators."""

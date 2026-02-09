@@ -1,6 +1,6 @@
 def test_import() -> None:
     try:
-        import torsion_gertsenshtein  # noqa: PLC0415
+        import torsion_gertsenshtein
 
         assert torsion_gertsenshtein is not None, (
             "torsion_gertsenshtein module should not be None"

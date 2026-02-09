@@ -172,6 +172,7 @@
     "pydata",
     "pylint",
     "pydocstyle",
+    "Mult",
     "numpy",
     "ndarray",
     "xlabel",

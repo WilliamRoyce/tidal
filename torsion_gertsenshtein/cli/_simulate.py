@@ -84,7 +84,7 @@ def field_slots(spec: EquationSystem) -> dict[str, int]:
     }
 
 
-def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:
+def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:  # noqa: C901
     """Parse --param KEY=VAL arguments into a dict.
 
     Also merges default parameters from metadata when not overridden.
@@ -129,7 +129,10 @@ def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:
     if cli_keys:
         from torsion_gertsenshtein.cli._inspect import discover_parameters
 
-        known: set[str] = set(discover_parameters(spec).keys())
+        try:
+            known: set[str] = set(discover_parameters(spec).keys())
+        except TypeError:
+            known = set()
         if isinstance(meta_params, dict):
             known |= set(cast("dict[str, object]", meta_params).keys())
         for key in sorted(cli_keys - known):
@@ -214,7 +217,9 @@ def _parse_single_bound(s: str) -> tuple[float, float]:
 _VALID_BC_TYPES = {"periodic", "neumann"}
 
 
-def _parse_bc(raw: str | None, *, periodic: bool, spatial_dim: int) -> bool | list[bool]:
+def _parse_bc(
+    raw: str | None, *, periodic: bool, spatial_dim: int
+) -> bool | list[bool]:
     """Parse --bc argument into periodic specification for CartesianGrid.
 
     Parameters
@@ -273,7 +278,9 @@ def _build_grid(
     from pde import CartesianGrid
 
     shape = _parse_grid_shape(args.grid_shape, spec.spatial_dimension)
-    periodic = _parse_bc(args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension)
+    periodic = _parse_bc(
+        args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension
+    )
 
     return CartesianGrid(
         bounds=bounds,
@@ -632,9 +639,7 @@ def _save_constraint_output(
 # --- Command entry point ---
 
 
-def _check_cfl_stability(
-    pde: object, dt: float, grid: CartesianGrid
-) -> None:
+def _check_cfl_stability(pde: object, dt: float, grid: CartesianGrid) -> None:
     """Print CFL stability warnings to stderr."""
     warnings_list = cast("list[str]", pde.check_stability(dt, grid))  # type: ignore[attr-defined]
     sys.stderr.writelines(f"  Warning: {w}\n" for w in warnings_list)
@@ -748,13 +753,21 @@ def simulate_command(args: Namespace) -> int:
         # py-pde's ScipySolver is a separate solver class, not a scheme of ExplicitSolver
         normalize_solve_result(
             pde.solve(  # type: ignore[attr-defined]
-                state, t_range=args.t_end, dt=dt, solver="scipy", tracker=tracker,
+                state,
+                t_range=args.t_end,
+                dt=dt,
+                solver="scipy",
+                tracker=tracker,
             )
         )
     else:
         normalize_solve_result(
             pde.solve(  # type: ignore[attr-defined]
-                state, t_range=args.t_end, dt=dt, scheme=args.scheme, tracker=tracker,
+                state,
+                t_range=args.t_end,
+                dt=dt,
+                scheme=args.scheme,
+                tracker=tracker,
             )
         )
     log(f"  {len(storage)} snapshots stored")

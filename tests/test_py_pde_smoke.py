@@ -117,9 +117,7 @@ class TestMultiGaussianValidation:
         with pytest.raises(ValueError, match=r"(width|positive|> ?0)"):
             multi_gaussian(grid_1d, amplitudes=[1.0], widths=[bad_width])
 
-    def test_mismatched_parameter_lengths_raise(
-        self, grid_1d: CartesianGrid
-    ) -> None:
+    def test_mismatched_parameter_lengths_raise(self, grid_1d: CartesianGrid) -> None:
         """Verify multi_gaussian rejects mismatched amplitudes/widths lengths."""
         with pytest.raises(ValueError, match=r"(mismatch|length|same length)"):
             multi_gaussian(grid_1d, amplitudes=[1.0, 2.0], widths=[1.0])

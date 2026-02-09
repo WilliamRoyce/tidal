@@ -135,20 +135,22 @@ def _validate_parameters(config: dict[str, Any]) -> None:
 
     Raises
     ------
+    TypeError
+        If parameters is not a dict or contains non-numeric values.
     ValueError
-        If parameter values are non-numeric or keys aren't declared constants.
+        If keys aren't declared constants.
     """
     params = config.get("parameters")
     if params is None:
         return
     if not isinstance(params, dict):
         msg = "[parameters] must be a table of key = value pairs"
-        raise ValueError(msg)
+        raise TypeError(msg)
     const_names = set(config.get("constants", {}).get("names", []))
     for key, val in params.items():
         if not isinstance(val, (int, float)):
             msg = f"[parameters].{key} must be numeric, got {type(val).__name__}"
-            raise ValueError(msg)
+            raise TypeError(msg)
         if const_names and key not in const_names:
             msg = f"[parameters].{key} is not declared in [constants].names"
             raise ValueError(msg)
@@ -432,13 +434,15 @@ def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
         fname = field["name"]
         fexpr = _field_expression(field, ctx.prefix)
         eom_var = f"eom{fname.capitalize()}"
-        lines.extend((
-            f"{eom_var} = VarD[{fexpr}, {ctx.cd}][{ctx.prefix}Lagrangian];",
-            f"{eom_var} = ToCanonical[{eom_var}];",
-            f"{eom_var} = ContractMetric[{eom_var}, {ctx.metric}];",
-            f'Print["EOM {fname}: ", {eom_var}];',
-            "",
-        ))
+        lines.extend(
+            (
+                f"{eom_var} = VarD[{fexpr}, {ctx.cd}][{ctx.prefix}Lagrangian];",
+                f"{eom_var} = ToCanonical[{eom_var}];",
+                f"{eom_var} = ContractMetric[{eom_var}, {ctx.metric}];",
+                f'Print["EOM {fname}: ", {eom_var}];',
+                "",
+            )
+        )
 
     # Step 5: Decompose
     lines.append("(* Step 5: Decompose to components *)")
@@ -453,11 +457,13 @@ def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
         ]
         others_str = ", ".join(other_exprs) if other_exprs else ""
 
-        lines.extend((
-            f'{comp_var} = DecomposeToComponents[{eom_var}, {fexpr}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
-            f'Print["{fname} components: ", Length[{comp_var}]];',
-            "",
-        ))
+        lines.extend(
+            (
+                f'{comp_var} = DecomposeToComponents[{eom_var}, {fexpr}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
+                f'Print["{fname} components: ", Length[{comp_var}]];',
+                "",
+            )
+        )
 
     # Step 6: Export
     lines.extend(("(* Step 6: Build and export JSON *)", "fieldEquations = Flatten[{"))
@@ -536,32 +542,38 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
 
     # Build JSON — always use multi-field builder since fieldEquations
     # is constructed with proper labels by both single and multi-field paths
-    lines.extend(("jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];", ""))
+    lines.extend(
+        ("jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];", "")
+    )
 
     # Inject runtime parameter defaults into JSON metadata
     if ctx.parameters:
         param_entries = ", ".join(f'"{k}" -> {v}' for k, v in ctx.parameters.items())
-        lines.extend((
-            f'jsonStructure["metadata", "parameters"] = <|{param_entries}|>;',
-            "",
-        ))
+        lines.extend(
+            (
+                f'jsonStructure["metadata", "parameters"] = <|{param_entries}|>;',
+                "",
+            )
+        )
 
     # Export
     escaped_output = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')
-    lines.extend((
-        f'outputPath = "{escaped_output}";',
-        "outputDir = DirectoryName[outputPath];",
-        'If[outputDir =!= "" && !DirectoryQ[outputDir], CreateDirectory[outputDir]];',
-        "",
-        'Print["JSON Output:"];',
-        'Print[ExportString[jsonStructure, "JSON"]];',
-        "",
-        'Export[outputPath, jsonStructure, "JSON"];',
-        'Print[""];',
-        'Print["Exported to: ", outputPath];',
-        "",
-        f'Print["*** {ctx.theory_name} derivation complete! ***"];',
-    ))
+    lines.extend(
+        (
+            f'outputPath = "{escaped_output}";',
+            "outputDir = DirectoryName[outputPath];",
+            'If[outputDir =!= "" && !DirectoryQ[outputDir], CreateDirectory[outputDir]];',
+            "",
+            'Print["JSON Output:"];',
+            'Print[ExportString[jsonStructure, "JSON"]];',
+            "",
+            'Export[outputPath, jsonStructure, "JSON"];',
+            'Print[""];',
+            'Print["Exported to: ", outputPath];',
+            "",
+            f'Print["*** {ctx.theory_name} derivation complete! ***"];',
+        )
+    )
 
     return lines
 
@@ -655,7 +667,10 @@ def _run_wolframscript(script_path: Path) -> int:
         print("Install Wolfram Engine (free for development):", file=sys.stderr)
         print("  https://www.wolfram.com/engine/", file=sys.stderr)
         print(file=sys.stderr)
-        print("Or use --dry-run to see the generated script without execution.", file=sys.stderr)
+        print(
+            "Or use --dry-run to see the generated script without execution.",
+            file=sys.stderr,
+        )
         return 1
 
     print(f"Running: wolframscript -file {script_path}")
@@ -721,9 +736,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:
 
     # Post-validate output JSON if wolframscript succeeded
     if ret == 0:
-        raw_output = args.output or config.get("output", {}).get(
-            "path", "output.json"
-        )
+        raw_output = args.output or config.get("output", {}).get("path", "output.json")
         resolved = Path(raw_output)
         if not resolved.is_absolute():
             resolved = (config_path.parent.resolve() / resolved).resolve()

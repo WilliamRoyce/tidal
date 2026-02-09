@@ -35,8 +35,8 @@ class TestPolarKG:
         return load_equation_system(DATA_DIR / "polar_kg.json")
 
     def test_dimension(self, spec: EquationSystem) -> None:
-        assert spec.dimension == 3  # noqa: PLR2004
-        assert spec.spatial_dimension == 2  # noqa: PLR2004
+        assert spec.dimension == 3
+        assert spec.spatial_dimension == 2
 
     def test_coordinates(self, spec: EquationSystem) -> None:
         assert spec.coordinates == ("t", "x", "y")
@@ -46,7 +46,7 @@ class TestPolarKG:
 
     def test_time_order(self, spec: EquationSystem) -> None:
         eq = spec.equations[0]
-        assert eq.time_derivative_order == 2  # noqa: PLR2004
+        assert eq.time_derivative_order == 2
 
     def test_operator_types(self, spec: EquationSystem) -> None:
         eq = spec.equations[0]
@@ -97,7 +97,7 @@ class TestPolarKG:
 
         rates = pde.evolution_rate(state, t=0.0)
         assert rates is not None
-        assert len(rates) == 2  # noqa: PLR2004
+        assert len(rates) == 2
         # d_t(pi) should be non-zero for non-trivial phi (mass term: -m^2 * phi)
         assert not np.allclose(rates[1].data, 0.0)
 
@@ -133,8 +133,8 @@ class TestSphericalKG:
         return load_equation_system(DATA_DIR / "spherical_kg.json")
 
     def test_dimension(self, spec: EquationSystem) -> None:
-        assert spec.dimension == 4  # noqa: PLR2004
-        assert spec.spatial_dimension == 3  # noqa: PLR2004
+        assert spec.dimension == 4
+        assert spec.spatial_dimension == 3
 
     def test_coordinates(self, spec: EquationSystem) -> None:
         assert spec.coordinates == ("t", "x", "y", "z")
@@ -155,7 +155,7 @@ class TestSphericalKG:
     def test_six_terms(self, spec: EquationSystem) -> None:
         """Spherical coordinates produce 6 terms in the wave equation."""
         eq = spec.equations[0]
-        assert len(eq.rhs_terms) == 6  # noqa: PLR2004
+        assert len(eq.rhs_terms) == 6
 
     def test_gradient_y_depends_on_x_and_y(self, spec: EquationSystem) -> None:
         """The cot(theta)/r^2 coefficient depends on both x (r) and y (theta)."""
@@ -199,7 +199,7 @@ class TestSphericalKG:
 
         rates = pde.evolution_rate(state, t=0.0)
         assert rates is not None
-        assert len(rates) == 2  # noqa: PLR2004
+        assert len(rates) == 2
         assert np.all(np.isfinite(rates[0].data))
         assert np.all(np.isfinite(rates[1].data))
 
@@ -234,8 +234,8 @@ class TestCylindricalKG:
         return load_equation_system(DATA_DIR / "cylindrical_kg.json")
 
     def test_dimension(self, spec: EquationSystem) -> None:
-        assert spec.dimension == 4  # noqa: PLR2004
-        assert spec.spatial_dimension == 3  # noqa: PLR2004
+        assert spec.dimension == 4
+        assert spec.spatial_dimension == 3
 
     def test_coordinates(self, spec: EquationSystem) -> None:
         assert spec.coordinates == ("t", "x", "y", "z")
@@ -255,7 +255,7 @@ class TestCylindricalKG:
     def test_five_terms(self, spec: EquationSystem) -> None:
         """Cylindrical coordinates produce 5 terms."""
         eq = spec.equations[0]
-        assert len(eq.rhs_terms) == 5  # noqa: PLR2004
+        assert len(eq.rhs_terms) == 5
 
     def test_laplacian_z_constant(self, spec: EquationSystem) -> None:
         """The z-direction Laplacian has constant coefficient (flat direction)."""
@@ -294,7 +294,7 @@ class TestCylindricalKG:
 
         rates = pde.evolution_rate(state, t=0.0)
         assert rates is not None
-        assert len(rates) == 2  # noqa: PLR2004
+        assert len(rates) == 2
         assert np.all(np.isfinite(rates[0].data))
         assert np.all(np.isfinite(rates[1].data))
 

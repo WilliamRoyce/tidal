@@ -206,6 +206,20 @@ class TestParseParams:
         spec = _make_spec_stub({"source": "xAct"})
         assert _parse_params([], spec) == {}  # type: ignore[arg-type]
 
+    def test_warns_unknown_param(self, capsys: pytest.CaptureFixture[str]) -> None:
+        spec = _make_spec_stub({"parameters": {"m2": 1.0}})
+        result = _parse_params(["m2=2.0", "bogus=3.0"], spec)  # type: ignore[arg-type]
+        assert result == {"m2": 2.0, "bogus": 3.0}
+        err = capsys.readouterr().err
+        assert "bogus" in err
+        assert "not found" in err
+
+    def test_no_warning_for_known_param(self, capsys: pytest.CaptureFixture[str]) -> None:
+        spec = _make_spec_stub({"parameters": {"m2": 1.0}})
+        _parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
+        err = capsys.readouterr().err
+        assert "not found" not in err
+
 
 # ==================== _infer_output_format ====================
 
@@ -231,10 +245,13 @@ class TestInferOutputFormat:
         assert _infer_output_format(_make_args(output="foo.png")) == "png"
 
     def test_svg_extension(self) -> None:
-        assert _infer_output_format(_make_args(output="foo.svg")) == "png"
+        assert _infer_output_format(_make_args(output="foo.svg")) == "svg"
 
     def test_pdf_extension(self) -> None:
-        assert _infer_output_format(_make_args(output="foo.pdf")) == "png"
+        assert _infer_output_format(_make_args(output="foo.pdf")) == "pdf"
+
+    def test_jpg_extension(self) -> None:
+        assert _infer_output_format(_make_args(output="foo.jpg")) == "jpg"
 
     def test_no_output_defaults_png(self) -> None:
         assert _infer_output_format(_make_args()) == "png"

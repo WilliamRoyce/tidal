@@ -104,7 +104,7 @@ class TestBoundaryConditionParsing:
     def test_dirichlet_bc(self) -> None:
         bc = BoundaryCondition.from_dict({"type": "dirichlet", "value": 1.5})
         assert bc.type == "dirichlet"
-        assert bc.value == 1.5  # noqa: PLR2004
+        assert bc.value == 1.5
 
     def test_neumann_bc(self) -> None:
         bc = BoundaryCondition.from_dict({"type": "neumann", "derivative": 0.0})

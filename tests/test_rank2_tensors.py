@@ -162,8 +162,8 @@ class TestRank2StateLayout:
         self, symmetric_rank2_2d_spec: EquationSystem
     ) -> None:
         """3 second-order components -> state_size = 6."""
-        assert symmetric_rank2_2d_spec.n_components == 3  # noqa: PLR2004
-        assert symmetric_rank2_2d_spec.state_size == 6  # noqa: PLR2004
+        assert symmetric_rank2_2d_spec.n_components == 3
+        assert symmetric_rank2_2d_spec.state_size == 6
 
     def test_symmetric_state_layout(
         self, symmetric_rank2_2d_spec: EquationSystem
@@ -183,7 +183,7 @@ class TestRank2StateLayout:
         self, coupled_rank2_spec: EquationSystem
     ) -> None:
         """Mixed: 2 second-order + 1 first-order -> state_size = 5."""
-        assert coupled_rank2_spec.state_size == 5  # noqa: PLR2004
+        assert coupled_rank2_spec.state_size == 5
 
     def test_coupled_mixed_order_layout(
         self, coupled_rank2_spec: EquationSystem
@@ -212,7 +212,7 @@ class TestRank2Evolution:
         state = create_initial_state(grid_1d, symmetric_rank2_2d_spec)
 
         rates = pde.evolution_rate(state)
-        assert len(rates) == 6  # noqa: PLR2004
+        assert len(rates) == 6
 
     def test_uncoupled_components_independent(
         self,
@@ -252,16 +252,18 @@ class TestRank2Evolution:
         pde = PDEFromSpec(coupled_rank2_spec)
 
         # State: [h_0, pi_0, h_1, h_2, pi_2] (5 fields)
-        state = FieldCollection([
-            ScalarField(grid_1d, data=1.0),   # h_0 (uniform)
-            ScalarField(grid_1d, data=0.0),   # pi_0
-            ScalarField(grid_1d, data=0.0),   # h_1
-            ScalarField(grid_1d, data=2.0),   # h_2 (uniform)
-            ScalarField(grid_1d, data=0.0),   # pi_2
-        ])
+        state = FieldCollection(
+            [
+                ScalarField(grid_1d, data=1.0),  # h_0 (uniform)
+                ScalarField(grid_1d, data=0.0),  # pi_0
+                ScalarField(grid_1d, data=0.0),  # h_1
+                ScalarField(grid_1d, data=2.0),  # h_2 (uniform)
+                ScalarField(grid_1d, data=0.0),  # pi_2
+            ]
+        )
 
         rates = pde.evolution_rate(state)
-        assert len(rates) == 5  # noqa: PLR2004
+        assert len(rates) == 5
 
         # d/dt h_0 = pi_0 = 0
         assert_allclose(rates[0].data, 0.0, atol=1e-10)
@@ -291,7 +293,7 @@ class TestRank2CreateInitialState:
         state = create_initial_state(grid_1d, symmetric_rank2_2d_spec)
 
         # 3 components * 2 (field + momentum) = 6
-        assert len(state) == 6  # noqa: PLR2004
+        assert len(state) == 6
 
     def test_symmetric_with_data(
         self,
@@ -337,9 +339,7 @@ class TestRank3TensorSupport:
                 field_index=i,
                 time_derivative_order=2,
                 rhs_terms=(
-                    OperatorTerm(
-                        coefficient=1.0, operator="laplacian", field=names[i]
-                    ),
+                    OperatorTerm(coefficient=1.0, operator="laplacian", field=names[i]),
                 ),
             )
             for i in range(n)
@@ -358,13 +358,13 @@ class TestRank3TensorSupport:
 
     def test_rank3_state_size(self, rank3_2d_spec: EquationSystem) -> None:
         """4 second-order components -> state_size = 8."""
-        assert rank3_2d_spec.n_components == 4  # noqa: PLR2004
-        assert rank3_2d_spec.state_size == 8  # noqa: PLR2004
+        assert rank3_2d_spec.n_components == 4
+        assert rank3_2d_spec.state_size == 8
 
     def test_rank3_state_layout(self, rank3_2d_spec: EquationSystem) -> None:
         """Layout alternates field/momentum for each component."""
         layout = rank3_2d_spec.state_layout
-        assert len(layout) == 8  # noqa: PLR2004
+        assert len(layout) == 8
         assert layout[0] == ("T_0", "field")
         assert layout[1] == ("T_0", "momentum")
         assert layout[6] == ("T_3", "field")
@@ -379,7 +379,7 @@ class TestRank3TensorSupport:
         # Set non-zero data for first component
         state[0].data[:] = np.sin(2 * np.pi * np.linspace(0, 10, 32) / 10)
         rates = pde.evolution_rate(state, t=0)
-        assert len(rates) == 8  # noqa: PLR2004
+        assert len(rates) == 8
 
     def test_rank3_8_components(self, grid_1d: CartesianGrid) -> None:
         """Full rank-3 in 2D: 8 components all evolving independently."""
@@ -391,9 +391,7 @@ class TestRank3TensorSupport:
                 field_index=i,
                 time_derivative_order=2,
                 rhs_terms=(
-                    OperatorTerm(
-                        coefficient=1.0, operator="laplacian", field=names[i]
-                    ),
+                    OperatorTerm(coefficient=1.0, operator="laplacian", field=names[i]),
                 ),
             )
             for i in range(n)
@@ -409,7 +407,7 @@ class TestRank3TensorSupport:
             coupling_matrix=tuple(zero_row for _ in range(n)),
             metadata={"source": "test", "type": "rank3_full"},
         )
-        assert spec.n_components == 8  # noqa: PLR2004
-        assert spec.state_size == 16  # noqa: PLR2004
+        assert spec.n_components == 8
+        assert spec.state_size == 16
         state = create_initial_state(grid_1d, spec)
-        assert len(state) == 16  # noqa: PLR2004
+        assert len(state) == 16

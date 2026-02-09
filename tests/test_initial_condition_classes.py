@@ -66,14 +66,16 @@ class TestGaussianPulse:
 
         # Check peak is roughly at center
         peak_idx = np.argmax(state[0].data)
-        assert 28 < peak_idx < 36  # noqa: PLR2004
+        assert 28 < peak_idx < 36
 
         # Check amplitude
         assert np.isclose(state[0].data.max(), 1.0, atol=0.05)
 
     def test_with_velocity(self, grid_1d: CartesianGrid) -> None:
         """Verify initial velocity scales pi field correctly."""
-        ic = GaussianPulse(amplitude=1.0, width=2.0, center=[25.0], initial_velocity=0.5)
+        ic = GaussianPulse(
+            amplitude=1.0, width=2.0, center=[25.0], initial_velocity=0.5
+        )
         state = ic.build(grid_1d)
 
         assert np.allclose(state[1].data, 0.5 * state[0].data)
@@ -101,7 +103,7 @@ class TestGaussianPulse:
         state = ic.build(grid_1d)
 
         peak_idx = np.argmax(state[0].data)
-        assert 28 < peak_idx < 36  # noqa: PLR2004
+        assert 28 < peak_idx < 36
 
     def test_multiple_ics_same_grid(self, grid_1d: CartesianGrid) -> None:
         """Verify multiple ICs can use the same grid."""
@@ -222,9 +224,7 @@ class TestDistanceComputation:
         ic = GaussianPulse(amplitude=1.0, width=2.0)
 
         # Test distance from center (accessing protected method for testing)
-        distances = ic._compute_distances_from_center(
-            grid, center=[5.0, 5.0]
-        )  # pyright: ignore[reportPrivateUsage]
+        distances = ic._compute_distances_from_center(grid, center=[5.0, 5.0])  # pyright: ignore[reportPrivateUsage]
 
         assert np.all(distances >= 0)
         assert distances.min() < 1.0  # Should have points near center

@@ -65,8 +65,8 @@ class TestWidthSigmaAliases:
         assert np.allclose(state_width[1].data, state_sigma[1].data)
 
         # Both should store as width internally
-        assert ic_width.width == 2.0  # noqa: PLR2004
-        assert ic_sigma.width == 2.0  # noqa: PLR2004
+        assert ic_width.width == 2.0
+        assert ic_sigma.width == 2.0
 
     def test_gaussian_both_params_raises(self) -> None:
         """Verify specifying both width and sigma raises ValueError."""
@@ -85,8 +85,8 @@ class TestWidthSigmaAliases:
         assert np.allclose(state_sigma[1].data, state_width[1].data)
 
         # Both should store as width internally
-        assert ic_sigma.width == 1.5  # noqa: PLR2004
-        assert ic_width.width == 1.5  # noqa: PLR2004
+        assert ic_sigma.width == 1.5
+        assert ic_width.width == 1.5
 
     def test_ring_both_params_raises(self) -> None:
         """Verify specifying both sigma and width raises ValueError."""
@@ -95,7 +95,7 @@ class TestWidthSigmaAliases:
 
     @pytest.mark.parametrize("use_sigma", [True, False], ids=["sigma", "width"])
     def test_consistent_naming_across_ics(
-        self, grid_1d: CartesianGrid, grid_2d: CartesianGrid, use_sigma: bool  # noqa: FBT001
+        self, grid_1d: CartesianGrid, grid_2d: CartesianGrid, use_sigma: bool
     ) -> None:
         """Verify both ICs can use either width or sigma consistently."""
         if use_sigma:
@@ -108,10 +108,10 @@ class TestWidthSigmaAliases:
         state_gaussian = ic_gaussian.build(grid_1d)
         state_ring = ic_ring.build(grid_2d)
 
-        assert len(state_gaussian) == 2  # noqa: PLR2004
-        assert len(state_ring) == 2  # noqa: PLR2004
-        assert ic_gaussian.width == 2.0  # noqa: PLR2004
-        assert ic_ring.width == 2.0  # noqa: PLR2004
+        assert len(state_gaussian) == 2
+        assert len(state_ring) == 2
+        assert ic_gaussian.width == 2.0
+        assert ic_ring.width == 2.0
 
 
 # ==================== NaN/Inf Validation Tests ====================

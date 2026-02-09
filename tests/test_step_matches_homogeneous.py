@@ -112,7 +112,7 @@ class TestStepMatchesHomogeneous:
         [(GRID_SIZE, LENGTH, MASS, DT, STEPS, STRIDE)],
         ids=["standard"],
     )
-    def test_step_covering_grid_matches_homogeneous(  # noqa: PLR0913, PLR0917
+    def test_step_covering_grid_matches_homogeneous(
         self,
         grid_size: int,
         length: float,

@@ -162,23 +162,35 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Math expression for --ic=formula. Variables: coordinate names (e.g. x,y,z), np (numpy), pi.",
     )
     sim_parser.add_argument(
-        "--ic-center", default=None, metavar="X[,X,X]",
+        "--ic-center",
+        default=None,
+        metavar="X[,X,X]",
         help="Gaussian center position (default: domain midpoint)",
     )
     sim_parser.add_argument(
-        "--ic-width", type=float, default=None, metavar="W",
+        "--ic-width",
+        type=float,
+        default=None,
+        metavar="W",
         help="Gaussian width (default: domain_size/10)",
     )
     sim_parser.add_argument(
-        "--ic-amplitude", type=float, default=1.0, metavar="A",
+        "--ic-amplitude",
+        type=float,
+        default=1.0,
+        metavar="A",
         help="IC peak amplitude (default: 1.0)",
     )
     sim_parser.add_argument(
-        "--ic-component", default=None, metavar="NAME",
+        "--ic-component",
+        default=None,
+        metavar="NAME",
         help="Field component for IC (default: first field)",
     )
     sim_parser.add_argument(
-        "--ic-wavevector", default=None, metavar="K[,K,K]",
+        "--ic-wavevector",
+        default=None,
+        metavar="K[,K,K]",
         help="Wavevector for plane-wave IC (e.g. 0.1,0.0,0.0)",
     )
     # Mode
@@ -190,24 +202,35 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     # Solver
     sim_parser.add_argument(
-        "--t-end", type=float, default=10.0,
+        "--t-end",
+        type=float,
+        default=10.0,
         help="Simulation duration (default: 10.0)",
     )
     sim_parser.add_argument(
-        "--dt", type=float, default=None,
+        "--dt",
+        type=float,
+        default=None,
         help="Time step (default: auto from CFL)",
     )
     sim_parser.add_argument(
-        "--scheme", choices=["runge-kutta", "scipy"], default="runge-kutta",
+        "--scheme",
+        choices=["runge-kutta", "scipy"],
+        default="runge-kutta",
         help="Solver scheme (default: runge-kutta)",
     )
     sim_parser.add_argument(
-        "--snapshots", type=float, default=None, metavar="DT",
+        "--snapshots",
+        type=float,
+        default=None,
+        metavar="DT",
         help="Snapshot interval (default: t_end/100)",
     )
     # Output
     sim_parser.add_argument(
-        "--output", default=None, metavar="PATH",
+        "--output",
+        default=None,
+        metavar="PATH",
         help="Output file path (default: {spec_dir}/{stem}_output.png)",
     )
     sim_parser.add_argument(
@@ -223,7 +246,8 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Print summary only, skip visualization",
     )
     sim_parser.add_argument(
-        "--quiet", "-q",
+        "--quiet",
+        "-q",
         action="store_true",
         help="Suppress progress messages (results and errors still shown)",
     )
@@ -347,7 +371,7 @@ def main(argv: list[str] | None = None) -> int:
     except (ValueError, FileNotFoundError, TypeError) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 1
-    except Exception:
+    except RuntimeError:
         import traceback
 
         traceback.print_exc()

@@ -686,6 +686,41 @@ path = "output.json"
         assert "DefConstantSymbol[m2]" in out
         assert "EulerLagrangeEquation" in out
 
+    def test_derive_toml_dry_run_with_parameters(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Dry-run with [parameters] should inject metadata into generated WLS."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Test With Params"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["m2"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]] - m2/2 phi[]^2"
+
+[parameters]
+m2 = 1.0
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert '"m2" -> 1.0' in out
+        assert "parameters" in out.lower()
+
     def test_derive_toml_save_script(self, tmp_path: Path) -> None:
         config = tmp_path / "theory.toml"
         config.write_text("""
@@ -1045,10 +1080,29 @@ class TestValidateCommand:
         assert ret == 1
 
     def test_validate_warns_on_missing_param_defaults(
-        self, klein_gordon_1d_json: Path, capsys: pytest.CaptureFixture[str],
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """KG 1D has m2 parameter with no default — should produce warning."""
-        main(["validate", str(klein_gordon_1d_json)])
+        """A spec with symbolic coefficient but no parameter defaults should warn."""
+        import json
+
+        spec = {
+            "metadata": {"source": "test"},
+            "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [{
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+                "rhs": {"type": "linear_combination", "terms": [
+                    {"coefficient": -1.0, "operator": "identity", "field": "phi_0",
+                     "coefficient_symbolic": "-m2"},
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                ]},
+            }],
+            "coupling": {"mass_matrix": [[1.0]], "coupling_matrix": [[0.0]]},
+        }
+        spec_path = tmp_path / "no_defaults.json"
+        spec_path.write_text(json.dumps(spec), encoding="utf-8")
+        main(["validate", str(spec_path)])
         err = capsys.readouterr().err
         assert "WARNING" in err
         assert "m2" in err
@@ -1128,4 +1182,38 @@ class TestValidateCommand:
     ) -> None:
         """Passing a directory path should fail validation."""
         ret = main(["validate", str(tmp_path)])
+        assert ret == 1
+
+
+class TestExceptionHandling:
+    def test_value_error_shows_clean_message(self, capsys: pytest.CaptureFixture[str]) -> None:
+        """ValueError should produce a clean 'Error:' message, not a traceback."""
+        ret = main(["simulate", "/nonexistent/spec.json"])
+        assert ret == 1
+        err = capsys.readouterr().err
+        assert "Error:" in err
+
+    def test_derive_rank_exceeds_max(self, tmp_path: Path) -> None:
+        """Tensor rank exceeding max should be caught at config validation."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad Rank"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "T"
+type = "tensor"
+rank = 99
+
+[lagrangian]
+expression = "T[]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
         assert ret == 1
