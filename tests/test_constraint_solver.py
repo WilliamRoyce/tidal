@@ -12,7 +12,7 @@ Tests that the pipeline correctly handles:
 
 from __future__ import annotations
 
-from typing import Any, cast
+from typing import cast
 
 import numpy as np
 import pytest
@@ -37,6 +37,45 @@ from tidal.symbolic.pde_builder import (
     _build_identity_matrix,
     _build_laplacian_matrix,
 )
+
+# === Sparse matrix helpers (explicit typing for scipy stubs) ===
+
+
+def _sp_matmul(a: sparse.spmatrix, b: sparse.spmatrix) -> sparse.spmatrix:
+    """Multiply two sparse matrices with explicit return type."""
+    return cast("sparse.spmatrix", a @ b)  # type: ignore[reportOperatorIssue]
+
+
+def _sp_matvec(mat: sparse.spmatrix, vec: np.ndarray) -> np.ndarray:
+    """Multiply a sparse matrix by a dense vector."""
+    result: np.ndarray = mat @ vec  # type: ignore[reportOperatorIssue]
+    return result
+
+
+def _sp_to_dense(mat: sparse.spmatrix) -> np.ndarray:
+    """Convert sparse matrix to dense numpy array."""
+    return np.asarray(mat.toarray())  # type: ignore[reportAttributeAccessIssue]
+
+
+def _sp_nnz(mat: sparse.spmatrix) -> int:
+    """Get number of nonzero elements in sparse matrix."""
+    return int(mat.nnz)  # type: ignore[reportAttributeAccessIssue]
+
+
+def _sp_transpose(mat: sparse.spmatrix) -> sparse.spmatrix:
+    """Transpose a sparse matrix with explicit return type."""
+    return cast("sparse.spmatrix", mat.T)  # type: ignore[reportAttributeAccessIssue]
+
+
+def _sp_add(a: sparse.spmatrix, b: sparse.spmatrix) -> sparse.spmatrix:
+    """Add two sparse matrices with explicit return type."""
+    return cast("sparse.spmatrix", a + b)  # type: ignore[reportOperatorIssue]
+
+
+def _sp_sub(a: sparse.spmatrix, b: sparse.spmatrix) -> sparse.spmatrix:
+    """Subtract two sparse matrices with explicit return type."""
+    return cast("sparse.spmatrix", a - b)  # type: ignore[reportOperatorIssue]
+
 
 # === Fixtures ===
 
@@ -686,14 +725,17 @@ class TestJSONParsing:
 
 
 def _apply_matrix_to_field(
-    grid: CartesianGrid, matrix: Any, vector: Any, field: ScalarField
+    grid: CartesianGrid,
+    matrix: sparse.spmatrix,
+    vector: sparse.spmatrix,
+    field: ScalarField,
 ) -> np.ndarray:
     """Apply a sparse operator matrix to a field, returning the result array.
 
     Computes: result = matrix @ field_flat + vector_flat, then reshapes.
     """
     flat = field.data.ravel()
-    result_flat = matrix @ flat + np.asarray(vector.toarray()).ravel()
+    result_flat = _sp_matvec(matrix, flat) + _sp_to_dense(vector).ravel()
     return result_flat.reshape(grid.shape)
 
 
@@ -760,10 +802,10 @@ class TestOperatorMatrixBuilders:
         mat, vec = _build_identity_matrix(grid, bcs)
         n = int(np.prod(grid.shape))
         # Should be identity
-        diff = mat - sparse.eye(n, format="dok")
-        assert diff.nnz == 0
+        diff = _sp_sub(mat, cast("sparse.spmatrix", sparse.eye(n, format="dok")))
+        assert _sp_nnz(diff) == 0
         # Vector should be zero
-        assert vec.nnz == 0
+        assert _sp_nnz(vec) == 0
 
     # --- Laplacian ---
 
@@ -814,15 +856,15 @@ class TestOperatorMatrixBuilders:
         lx_mat, lx_vec = _build_directional_laplacian_matrix(grid, bcs, axis=0)
 
         # Should be G_x @ G_x
-        expected_mat = gx_mat @ gx_mat
-        expected_vec = gx_mat @ gx_vec + gx_vec
+        expected_mat = _sp_matmul(gx_mat, gx_mat)
+        expected_vec = _sp_add(_sp_matmul(gx_mat, gx_vec), gx_vec)
 
         rng = np.random.default_rng(42)
         field = rng.standard_normal(int(np.prod(grid.shape)))
 
-        lx_result = lx_mat @ field + np.asarray(lx_vec.toarray()).ravel()
+        lx_result = _sp_matvec(lx_mat, field) + _sp_to_dense(lx_vec).ravel()
         expected_result = (
-            expected_mat @ field + np.asarray(expected_vec.toarray()).ravel()
+            _sp_matvec(expected_mat, field) + _sp_to_dense(expected_vec).ravel()
         )
         assert_allclose(lx_result, expected_result, rtol=1e-14, atol=1e-14)
 
@@ -873,8 +915,8 @@ class TestOperatorMatrixBuilders:
         grid = CartesianGrid([(0, 1)], 16, periodic=True)
         bcs = _get_bcs(grid)
         mat, _ = _build_laplacian_matrix(grid, bcs)
-        diff = mat - mat.T
-        assert diff.nnz == 0 or abs(diff).max() < 1e-14
+        diff = _sp_sub(mat, _sp_transpose(mat))
+        assert _sp_nnz(diff) == 0 or np.max(np.abs(_sp_to_dense(diff))) < 1e-14
 
     def test_gradient_matrix_antisymmetric(self) -> None:
         """Gradient matrix should be antisymmetric for periodic BCs."""
@@ -882,9 +924,9 @@ class TestOperatorMatrixBuilders:
         bcs = _get_bcs(grid)
         mat, _ = _build_gradient_matrix(grid, bcs, axis=0)
         # G + G^T should be zero for periodic central differences
-        sym = mat + mat.T
-        if sym.nnz > 0:
-            assert abs(sym).max() < 1e-14
+        sym = _sp_add(mat, _sp_transpose(mat))
+        if _sp_nnz(sym) > 0:
+            assert np.max(np.abs(_sp_to_dense(sym))) < 1e-14
 
     def test_registry_completeness(self) -> None:
         """All operators in _OPERATOR_REGISTRY should have matrix builders."""
@@ -933,10 +975,10 @@ class TestFFTMultipliers:
 
         # Matrix approach
         mat, vec = _build_laplacian_matrix(grid, bcs)
-        mat_result = mat @ field_data + np.asarray(vec.toarray()).ravel()
+        mat_result = _sp_matvec(mat, field_data) + _sp_to_dense(vec).ravel()
 
         # FFT approach
-        k = np.fft.fftfreq(n, d=dx_array[0]) * 2 * np.pi
+        k = cast("np.ndarray", np.fft.fftfreq(n, d=dx_array[0]) * 2 * np.pi)
         multiplier = _OPERATOR_FFT_MULTIPLIERS["laplacian"]([k], dx_array)
         fft_result = np.fft.ifft(multiplier * np.fft.fft(field_data)).real
 
@@ -954,14 +996,14 @@ class TestFFTMultipliers:
         # Matrix approach
         mat, vec = _build_gradient_matrix(grid, bcs, axis=0)
         mat_result = (
-            mat @ field_data.ravel() + np.asarray(vec.toarray()).ravel()
+            _sp_matvec(mat, field_data.ravel()) + _sp_to_dense(vec).ravel()
         ).reshape(nx, ny)
 
         # FFT approach
-        kx = np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi
-        ky = np.fft.fftfreq(ny, d=dx_array[1]) * 2 * np.pi
-        KX, KY = np.meshgrid(kx, ky, indexing="ij")
-        multiplier = _OPERATOR_FFT_MULTIPLIERS["gradient_x"]([KX, KY], dx_array)
+        kx = cast("np.ndarray", np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi)
+        ky = cast("np.ndarray", np.fft.fftfreq(ny, d=dx_array[1]) * 2 * np.pi)
+        kx_grid, ky_grid = np.meshgrid(kx, ky, indexing="ij")
+        multiplier = _OPERATOR_FFT_MULTIPLIERS["gradient_x"]([kx_grid, ky_grid], dx_array)
         fft_result = np.fft.ifft2(multiplier * np.fft.fft2(field_data)).real
 
         assert_allclose(mat_result, fft_result, rtol=1e-10, atol=1e-10)
@@ -978,14 +1020,14 @@ class TestFFTMultipliers:
         # Matrix approach
         mat, vec = _build_directional_laplacian_matrix(grid, bcs, axis=0)
         mat_result = (
-            mat @ field_data.ravel() + np.asarray(vec.toarray()).ravel()
+            _sp_matvec(mat, field_data.ravel()) + _sp_to_dense(vec).ravel()
         ).reshape(nx, ny)
 
         # FFT approach
-        kx = np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi
-        ky = np.fft.fftfreq(ny, d=dx_array[1]) * 2 * np.pi
-        KX, KY = np.meshgrid(kx, ky, indexing="ij")
-        multiplier = _OPERATOR_FFT_MULTIPLIERS["laplacian_x"]([KX, KY], dx_array)
+        kx = cast("np.ndarray", np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi)
+        ky = cast("np.ndarray", np.fft.fftfreq(ny, d=dx_array[1]) * 2 * np.pi)
+        kx_grid, ky_grid = np.meshgrid(kx, ky, indexing="ij")
+        multiplier = _OPERATOR_FFT_MULTIPLIERS["laplacian_x"]([kx_grid, ky_grid], dx_array)
         fft_result = np.fft.ifft2(multiplier * np.fft.fft2(field_data)).real
 
         assert_allclose(mat_result, fft_result, rtol=1e-10, atol=1e-10)
@@ -1002,15 +1044,15 @@ class TestFFTMultipliers:
         # Matrix approach
         mat, vec = _build_cross_derivative_matrix(grid, bcs, axis1=0, axis2=1)
         mat_result = (
-            mat @ field_data.ravel() + np.asarray(vec.toarray()).ravel()
+            _sp_matvec(mat, field_data.ravel()) + _sp_to_dense(vec).ravel()
         ).reshape(nx, ny)
 
         # FFT approach
-        kx = np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi
-        ky = np.fft.fftfreq(ny, d=dx_array[1]) * 2 * np.pi
-        KX, KY = np.meshgrid(kx, ky, indexing="ij")
+        kx = cast("np.ndarray", np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi)
+        ky = cast("np.ndarray", np.fft.fftfreq(ny, d=dx_array[1]) * 2 * np.pi)
+        kx_grid, ky_grid = np.meshgrid(kx, ky, indexing="ij")
         multiplier = _OPERATOR_FFT_MULTIPLIERS["cross_derivative_xy"](
-            [KX, KY], dx_array
+            [kx_grid, ky_grid], dx_array
         )
         fft_result = np.fft.ifft2(multiplier * np.fft.fft2(field_data)).real
 
@@ -1032,7 +1074,7 @@ class TestFFTMultipliers:
         x = np.linspace(0, 2 * np.pi, n, endpoint=False) + dx_array[0] / 2
         field_data = np.sin(x)
 
-        k = np.fft.fftfreq(n, d=dx_array[0]) * 2 * np.pi
+        k = cast("np.ndarray", np.fft.fftfreq(n, d=dx_array[0]) * 2 * np.pi)
         multiplier = _OPERATOR_FFT_MULTIPLIERS["laplacian"]([k], dx_array)
         fft_result = np.fft.ifft(multiplier * np.fft.fft(field_data)).real
 
@@ -1231,6 +1273,8 @@ class TestUnifiedConstraintSolver:
         x = cast("np.ndarray", grid.cell_coords[..., 0])
         rho_data = -np.sin(x)
 
+        auto_solution = np.zeros(0)
+        poisson_solution = np.zeros(0)
         for method in ("auto", "poisson"):
             spec = EquationSystem(
                 n_components=2,
@@ -1728,7 +1772,7 @@ class TestMassiveGravityConstraints:
     """Integration tests: massive gravity constraints solved with unified solver."""
 
     @pytest.fixture
-    def massive_gravity_setup(self) -> tuple[Any, FieldCollection]:
+    def massive_gravity_setup(self) -> tuple[PDEFromSpec, FieldCollection]:
         """Load massive gravity spec and build PDE + initial state."""
         from pathlib import Path
 
@@ -1760,7 +1804,7 @@ class TestMassiveGravityConstraints:
         return pde, state
 
     def test_all_constraints_solvable(
-        self, massive_gravity_setup: tuple[Any, FieldCollection]
+        self, massive_gravity_setup: tuple[PDEFromSpec, FieldCollection]
     ) -> None:
         """All 5 massive gravity constraints solve without error."""
         pde, state = massive_gravity_setup
@@ -1773,7 +1817,7 @@ class TestMassiveGravityConstraints:
             )
 
     def test_constraint_h0_nonzero(
-        self, massive_gravity_setup: tuple[Any, FieldCollection]
+        self, massive_gravity_setup: tuple[PDEFromSpec, FieldCollection]
     ) -> None:
         """h_0 (Helmholtz constraint) is nonzero when h_4 has a Gaussian."""
         pde, state = massive_gravity_setup
@@ -1786,7 +1830,7 @@ class TestMassiveGravityConstraints:
         assert h0_max > 1e-6, f"h_0 should be nonzero, got max={h0_max}"
 
     def test_constraint_h3_h5_xy_swap(
-        self, massive_gravity_setup: tuple[Any, FieldCollection]
+        self, massive_gravity_setup: tuple[PDEFromSpec, FieldCollection]
     ) -> None:
         """h_3(x,y) = h_5(y,x) by x-y exchange symmetry."""
         pde, state = massive_gravity_setup
@@ -1805,7 +1849,7 @@ class TestMassiveGravityConstraints:
         )
 
     def test_short_simulation_stable(
-        self, massive_gravity_setup: tuple[Any, FieldCollection]
+        self, massive_gravity_setup: tuple[PDEFromSpec, FieldCollection]
     ) -> None:
         """Short simulation remains stable with active constraints."""
         from tidal.utils import normalize_solve_result
@@ -2422,7 +2466,7 @@ class TestCoupledSVDRegularization:
         # 0 = 5*psi + 0.3*phi + rho → psi = -(0.3*phi + rho)/5
         # With rho=1: 5*phi + 0.5*psi = -1, 5*psi + 0.3*phi = -1
         # From eq1: phi = (-1 - 0.5*psi)/5
-        # Sub: 5*psi + 0.3*(-1 - 0.5*psi)/5 = -1
+        # Substituting eq1 into eq2: 25*psi - 0.3 - 0.15*psi = -5
         # 25*psi - 0.3 - 0.15*psi = -5
         # 24.85*psi = -4.7
         # psi = -4.7/24.85 = -0.189135...

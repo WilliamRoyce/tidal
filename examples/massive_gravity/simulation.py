@@ -259,7 +259,8 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     ax = axes[1, 1]
     x_1d = np.linspace(0, lx, nx)
     cross_times = [0.0, period / 4, period / 2, 3 * period / 4, period]
-    colors = plt.cm.viridis(np.linspace(0, 1, len(cross_times)))  # type: ignore[attr-defined]
+    cmap = plt.get_cmap("viridis")
+    colors = cmap(np.linspace(0, 1, len(cross_times)))
     for ct, color in zip(cross_times, colors, strict=True):
         cross_idx = find_nearest_snapshot(ct)
         snap_data = cast("FieldCollection", storage[cross_idx])
