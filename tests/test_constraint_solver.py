@@ -12,13 +12,12 @@ Tests that the pipeline correctly handles:
 
 from __future__ import annotations
 
-from functools import partial
 from typing import Any, cast
 
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
-from pde import CartesianGrid, FieldCollection, ScalarField
+from pde import BoundariesBase, CartesianGrid, FieldCollection, ScalarField
 from scipy import sparse  # type: ignore[reportMissingTypeStubs]
 
 from tidal.symbolic.json_loader import (
@@ -29,15 +28,14 @@ from tidal.symbolic.json_loader import (
     OperatorTerm,
 )
 from tidal.symbolic.pde_builder import (
+    _OPERATOR_FFT_MULTIPLIERS,
+    _OPERATOR_MATRIX_REGISTRY,
     PDEFromSpec,
-    _build_biharmonic_matrix,
     _build_cross_derivative_matrix,
     _build_directional_laplacian_matrix,
     _build_gradient_matrix,
     _build_identity_matrix,
     _build_laplacian_matrix,
-    _OPERATOR_FFT_MULTIPLIERS,
-    _OPERATOR_MATRIX_REGISTRY,
 )
 
 # === Fixtures ===
@@ -699,7 +697,7 @@ def _apply_matrix_to_field(
     return result_flat.reshape(grid.shape)
 
 
-def _get_bcs(grid: CartesianGrid, bc: str = "periodic") -> Any:
+def _get_bcs(grid: CartesianGrid, bc: str = "periodic") -> BoundariesBase:
     """Get py-pde BoundaryConditions object from grid."""
     return grid.get_boundary_conditions(bc)
 
@@ -823,7 +821,9 @@ class TestOperatorMatrixBuilders:
         field = rng.standard_normal(int(np.prod(grid.shape)))
 
         lx_result = lx_mat @ field + np.asarray(lx_vec.toarray()).ravel()
-        expected_result = expected_mat @ field + np.asarray(expected_vec.toarray()).ravel()
+        expected_result = (
+            expected_mat @ field + np.asarray(expected_vec.toarray()).ravel()
+        )
         assert_allclose(lx_result, expected_result, rtol=1e-14, atol=1e-14)
 
     # --- Gradient ---
@@ -953,9 +953,9 @@ class TestFFTMultipliers:
 
         # Matrix approach
         mat, vec = _build_gradient_matrix(grid, bcs, axis=0)
-        mat_result = (mat @ field_data.ravel() + np.asarray(vec.toarray()).ravel()).reshape(
-            nx, ny
-        )
+        mat_result = (
+            mat @ field_data.ravel() + np.asarray(vec.toarray()).ravel()
+        ).reshape(nx, ny)
 
         # FFT approach
         kx = np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi
@@ -977,9 +977,9 @@ class TestFFTMultipliers:
 
         # Matrix approach
         mat, vec = _build_directional_laplacian_matrix(grid, bcs, axis=0)
-        mat_result = (mat @ field_data.ravel() + np.asarray(vec.toarray()).ravel()).reshape(
-            nx, ny
-        )
+        mat_result = (
+            mat @ field_data.ravel() + np.asarray(vec.toarray()).ravel()
+        ).reshape(nx, ny)
 
         # FFT approach
         kx = np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi
@@ -1001,15 +1001,17 @@ class TestFFTMultipliers:
 
         # Matrix approach
         mat, vec = _build_cross_derivative_matrix(grid, bcs, axis1=0, axis2=1)
-        mat_result = (mat @ field_data.ravel() + np.asarray(vec.toarray()).ravel()).reshape(
-            nx, ny
-        )
+        mat_result = (
+            mat @ field_data.ravel() + np.asarray(vec.toarray()).ravel()
+        ).reshape(nx, ny)
 
         # FFT approach
         kx = np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi
         ky = np.fft.fftfreq(ny, d=dx_array[1]) * 2 * np.pi
         KX, KY = np.meshgrid(kx, ky, indexing="ij")
-        multiplier = _OPERATOR_FFT_MULTIPLIERS["cross_derivative_xy"]([KX, KY], dx_array)
+        multiplier = _OPERATOR_FFT_MULTIPLIERS["cross_derivative_xy"](
+            [KX, KY], dx_array
+        )
         fft_result = np.fft.ifft2(multiplier * np.fft.fft2(field_data)).real
 
         assert_allclose(mat_result, fft_result, rtol=1e-10, atol=1e-10)
@@ -1298,9 +1300,7 @@ class TestUnifiedConstraintSolver:
                     field_name="phi",
                     field_index=0,
                     time_derivative_order=0,
-                    rhs_terms=(
-                        OperatorTerm(1.0, "identity", "rho"),
-                    ),
+                    rhs_terms=(OperatorTerm(1.0, "identity", "rho"),),
                     constraint_solver=ConstraintSolverConfig(enabled=True),
                 ),
                 ComponentEquation(
@@ -1406,7 +1406,9 @@ class TestUnifiedConstraintSolver:
                     constraint_solver=ConstraintSolverConfig(
                         enabled=True,
                         method="auto",
-                        boundary_conditions={"x": BoundaryCondition("dirichlet", value=0.0)},
+                        boundary_conditions={
+                            "x": BoundaryCondition("dirichlet", value=0.0)
+                        },
                     ),
                 ),
                 ComponentEquation(
@@ -1572,7 +1574,9 @@ class TestCoupledConstraints:
         )
 
         grid = CartesianGrid([(0, 1)], 16, periodic=True)
-        pde = PDEFromSpec(spec)
+        # Use tight SVD rcond for this well-conditioned algebraic system
+        # to minimize regularization error (default 0.01 gives ~1e-4 error).
+        pde = PDEFromSpec(spec, coupled_svd_rcond=1e-8)
 
         state = FieldCollection(
             [
@@ -1723,26 +1727,27 @@ class TestCoupledConstraints:
 class TestMassiveGravityConstraints:
     """Integration tests: massive gravity constraints solved with unified solver."""
 
-    @pytest.fixture()
+    @pytest.fixture
     def massive_gravity_setup(self) -> tuple[Any, FieldCollection]:
         """Load massive gravity spec and build PDE + initial state."""
         from pathlib import Path
 
         from tidal.symbolic import build_pde_from_json, load_equation_system
 
-        json_path = Path(__file__).parent.parent / "examples" / "data" / "massive_gravity_3d.json"
+        json_path = (
+            Path(__file__).parent.parent
+            / "examples"
+            / "data"
+            / "massive_gravity_3d.json"
+        )
         params = {"m2": 1.0}
         spec = load_equation_system(json_path)
         pde = build_pde_from_json(json_path, parameters=params)
 
-        grid = CartesianGrid(
-            bounds=[(0, 10), (0, 10)], shape=[16, 16], periodic=True
-        )
+        grid = CartesianGrid(bounds=[(0, 10), (0, 10)], shape=[16, 16], periodic=True)
         x = cast("np.ndarray", grid.cell_coords[..., 0])
         y = cast("np.ndarray", grid.cell_coords[..., 1])
-        gaussian = 0.5 * np.exp(
-            -((x - 5) ** 2 + (y - 5) ** 2) / (2 * 2**2)
-        )
+        gaussian = 0.5 * np.exp(-((x - 5) ** 2 + (y - 5) ** 2) / (2 * 2**2))
 
         fields: list[ScalarField] = []
         for name, slot_type in spec.state_layout:
@@ -1763,7 +1768,9 @@ class TestMassiveGravityConstraints:
         rate = pde.evolution_rate(state, t=0.0)
         # Rate should be finite
         for i in range(len(rate)):
-            assert np.all(np.isfinite(rate[i].data)), f"Rate slot {i} has non-finite values"
+            assert np.all(np.isfinite(rate[i].data)), (
+                f"Rate slot {i} has non-finite values"
+            )
 
     def test_constraint_h0_nonzero(
         self, massive_gravity_setup: tuple[Any, FieldCollection]
@@ -1854,7 +1861,8 @@ class TestCoupledFFTBlockSolve:
                         OperatorTerm(1.0, "identity", "rho"),
                     ),
                     constraint_solver=ConstraintSolverConfig(
-                        enabled=True, method="auto",
+                        enabled=True,
+                        method="auto",
                         boundary_conditions={"x": BoundaryCondition("periodic")},
                     ),
                 ),
@@ -1869,7 +1877,8 @@ class TestCoupledFFTBlockSolve:
                         OperatorTerm(1.0, "identity", "rho"),
                     ),
                     constraint_solver=ConstraintSolverConfig(
-                        enabled=True, method="auto",
+                        enabled=True,
+                        method="auto",
                         boundary_conditions={"x": BoundaryCondition("periodic")},
                     ),
                 ),
@@ -1924,7 +1933,8 @@ class TestCoupledFFTBlockSolve:
                         OperatorTerm(1.0, "identity", "rho"),
                     ),
                     constraint_solver=ConstraintSolverConfig(
-                        enabled=True, method="matrix",
+                        enabled=True,
+                        method="matrix",
                         boundary_conditions={"x": BoundaryCondition("periodic")},
                     ),
                 ),
@@ -1939,7 +1949,8 @@ class TestCoupledFFTBlockSolve:
                         OperatorTerm(1.0, "identity", "rho"),
                     ),
                     constraint_solver=ConstraintSolverConfig(
-                        enabled=True, method="matrix",
+                        enabled=True,
+                        method="matrix",
                         boundary_conditions={"x": BoundaryCondition("periodic")},
                     ),
                 ),
@@ -2013,36 +2024,28 @@ class TestConfigValidation:
     def test_zero_max_iterations_raises(self) -> None:
         """max_iterations=0 raises ValueError."""
         with pytest.raises(ValueError, match="max_iterations must be >= 1"):
-            ConstraintSolverConfig.from_dict({
-                "enabled": True, "max_iterations": 0
-            })
+            ConstraintSolverConfig.from_dict({"enabled": True, "max_iterations": 0})
 
     def test_negative_max_iterations_raises(self) -> None:
         """max_iterations=-1 raises ValueError."""
         with pytest.raises(ValueError, match="max_iterations must be >= 1"):
-            ConstraintSolverConfig.from_dict({
-                "enabled": True, "max_iterations": -1
-            })
+            ConstraintSolverConfig.from_dict({"enabled": True, "max_iterations": -1})
 
     def test_zero_tolerance_raises(self) -> None:
         """tolerance=0 raises ValueError."""
         with pytest.raises(ValueError, match="tolerance must be > 0"):
-            ConstraintSolverConfig.from_dict({
-                "enabled": True, "tolerance": 0
-            })
+            ConstraintSolverConfig.from_dict({"enabled": True, "tolerance": 0})
 
     def test_negative_tolerance_raises(self) -> None:
         """tolerance=-1 raises ValueError."""
         with pytest.raises(ValueError, match="tolerance must be > 0"):
-            ConstraintSolverConfig.from_dict({
-                "enabled": True, "tolerance": -1.0
-            })
+            ConstraintSolverConfig.from_dict({"enabled": True, "tolerance": -1.0})
 
     def test_valid_config_accepted(self) -> None:
         """Valid max_iterations and tolerance are accepted."""
-        config = ConstraintSolverConfig.from_dict({
-            "enabled": True, "max_iterations": 1, "tolerance": 1e-12
-        })
+        config = ConstraintSolverConfig.from_dict(
+            {"enabled": True, "max_iterations": 1, "tolerance": 1e-12}
+        )
         assert config.max_iterations == 1
         assert config.tolerance == 1e-12
 
@@ -2155,7 +2158,8 @@ class TestSingularCoupledSystem:
                         OperatorTerm(1.0, "identity", "rho"),
                     ),
                     constraint_solver=ConstraintSolverConfig(
-                        enabled=True, method="auto",
+                        enabled=True,
+                        method="auto",
                         boundary_conditions={"x": BoundaryCondition("periodic")},
                     ),
                 ),
@@ -2169,7 +2173,8 @@ class TestSingularCoupledSystem:
                         OperatorTerm(1.0, "identity", "rho"),
                     ),
                     constraint_solver=ConstraintSolverConfig(
-                        enabled=True, method="auto",
+                        enabled=True,
+                        method="auto",
                         boundary_conditions={"x": BoundaryCondition("periodic")},
                     ),
                 ),
@@ -2295,3 +2300,363 @@ class TestPoissonOnHelmholtzWarning:
 
         with pytest.warns(UserWarning, match="non-laplacian self-terms"):
             pde.evolution_rate(state, t=0.0)
+
+
+# === SVD Regularization Tests ===
+
+
+class TestCoupledSVDRegularization:
+    """Tests for SVD-based Tikhonov regularization in coupled FFT solver."""
+
+    def test_near_singular_produces_finite_solution(self) -> None:
+        """Near-singular coupled system produces finite solution with SVD.
+
+        Constructs a 2-field coupled system where at a specific wavenumber,
+        the coupling matrix becomes nearly singular (Helmholtz resonance).
+        Without SVD regularization, this would amplify noise; with it,
+        the solution should be finite and bounded.
+        """
+        grid = CartesianGrid([(0, 2 * np.pi)], 64, periodic=True)
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+
+        # Choose mass parameter so that self-multiplier crosses zero.
+        # For laplacian_x on periodic grid [0, 2*pi] with N=64:
+        # lap_mult(k=1) = -(sin(2*pi/(64))^2) / (2*pi/64)^2
+        dx = 2 * np.pi / 64
+        lap_k1 = -(np.sin(2 * np.pi / 64) ** 2) / dx**2
+        # Set m2 so identity coeff cancels laplacian at k=1:
+        # self_mult = m2_val * 1 + 1.0 * lap_k1 = 0 → m2_val = -lap_k1
+        m2_val = float(-lap_k1)
+
+        spec = EquationSystem(
+            n_components=3,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "psi", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(1.0, "laplacian", "phi"),
+                        OperatorTerm(m2_val, "identity", "phi"),
+                        OperatorTerm(0.01, "identity", "psi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True,
+                        method="auto",
+                        boundary_conditions={
+                            "x": BoundaryCondition("periodic"),
+                        },
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="psi",
+                    field_index=1,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(1.0, "laplacian", "psi"),
+                        OperatorTerm(3.0, "identity", "psi"),
+                        OperatorTerm(0.01, "identity", "phi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True,
+                        method="auto",
+                        boundary_conditions={
+                            "x": BoundaryCondition("periodic"),
+                        },
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="rho",
+                    field_index=2,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+                ),
+            ),
+            mass_matrix=(
+                (-m2_val, 0.0, 0.0),
+                (0.0, -3.0, 0.0),
+                (0.0, 0.0, 0.0),
+            ),
+            coupling_matrix=(
+                (0.0, -0.01, -1.0),
+                (-0.01, 0.0, -1.0),
+                (0.0, 0.0, 0.0),
+            ),
+            metadata={},
+        )
+
+        pde = PDEFromSpec(spec)
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=-np.sin(x)),  # k=1 source
+                ScalarField(grid, data=0.0),
+            ]
+        )
+
+        # SVD regularization handles the near-singular modes silently
+        # (only logs at DEBUG level; UserWarning reserved for >50% SVs).
+        pde.evolution_rate(state, t=0.0)
+
+        assert np.all(np.isfinite(state[0].data))
+        assert np.all(np.isfinite(state[1].data))
+        # Solution amplitude should be bounded (not amplified to huge values)
+        assert float(np.max(np.abs(state[0].data))) < 100.0
+
+    def test_well_conditioned_tight_rcond_accurate(self) -> None:
+        """Tight rcond gives near-exact solution for well-conditioned system.
+
+        With rcond=1e-8 (very tight regularization), the SVD solver should
+        match the exact analytical solution for a simple coupled system.
+        """
+        grid = CartesianGrid([(0, 1)], 16, periodic=True)
+
+        # Simple algebraic system (well-conditioned, no Laplacian):
+        # 0 = 5*phi + 0.5*psi + rho → phi = -(0.5*psi + rho)/5
+        # 0 = 5*psi + 0.3*phi + rho → psi = -(0.3*phi + rho)/5
+        # With rho=1: 5*phi + 0.5*psi = -1, 5*psi + 0.3*phi = -1
+        # From eq1: phi = (-1 - 0.5*psi)/5
+        # Sub: 5*psi + 0.3*(-1 - 0.5*psi)/5 = -1
+        # 25*psi - 0.3 - 0.15*psi = -5
+        # 24.85*psi = -4.7
+        # psi = -4.7/24.85 = -0.189135...
+        # phi = (-1 - 0.5*(-0.189135))/5 = (-1 + 0.09457)/5 = -0.181087...
+        expected_psi = -4.7 / 24.85
+        expected_phi = (-1 - 0.5 * expected_psi) / 5
+
+        spec = EquationSystem(
+            n_components=3,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "psi", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(5.0, "identity", "phi"),
+                        OperatorTerm(0.5, "identity", "psi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(enabled=True),
+                ),
+                ComponentEquation(
+                    field_name="psi",
+                    field_index=1,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(5.0, "identity", "psi"),
+                        OperatorTerm(0.3, "identity", "phi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(enabled=True),
+                ),
+                ComponentEquation(
+                    field_name="rho",
+                    field_index=2,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+                ),
+            ),
+            mass_matrix=(
+                (-5.0, 0.0, 0.0),
+                (0.0, -5.0, 0.0),
+                (0.0, 0.0, 0.0),
+            ),
+            coupling_matrix=(
+                (0.0, -0.5, -1.0),
+                (-0.3, 0.0, -1.0),
+                (0.0, 0.0, 0.0),
+            ),
+            metadata={},
+        )
+
+        pde = PDEFromSpec(spec, coupled_svd_rcond=1e-8)
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=1.0),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+        pde.evolution_rate(state, t=0.0)
+
+        assert_allclose(state[0].data, expected_phi, rtol=1e-10, atol=1e-10)
+        assert_allclose(state[1].data, expected_psi, rtol=1e-10, atol=1e-10)
+
+    def test_custom_rcond_accepted(self) -> None:
+        """Custom rcond value is respected and produces finite results."""
+        grid = CartesianGrid([(0, 2 * np.pi)], 32, periodic=True)
+
+        spec = EquationSystem(
+            n_components=3,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "psi", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(2.0, "identity", "phi"),
+                        OperatorTerm(1.0, "identity", "psi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(enabled=True),
+                ),
+                ComponentEquation(
+                    field_name="psi",
+                    field_index=1,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(2.0, "identity", "psi"),
+                        OperatorTerm(1.0, "identity", "phi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(enabled=True),
+                ),
+                ComponentEquation(
+                    field_name="rho",
+                    field_index=2,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+                ),
+            ),
+            mass_matrix=(
+                (-2.0, 0.0, 0.0),
+                (0.0, -2.0, 0.0),
+                (0.0, 0.0, 0.0),
+            ),
+            coupling_matrix=(
+                (0.0, -1.0, -1.0),
+                (-1.0, 0.0, -1.0),
+                (0.0, 0.0, 0.0),
+            ),
+            metadata={},
+        )
+
+        for rcond in [1e-6, 0.01, 0.1]:
+            pde = PDEFromSpec(spec, coupled_svd_rcond=rcond)
+            state = FieldCollection(
+                [
+                    ScalarField(grid, data=0.0),
+                    ScalarField(grid, data=0.0),
+                    ScalarField(grid, data=1.0),
+                    ScalarField(grid, data=0.0),
+                ]
+            )
+            pde.evolution_rate(state, t=0.0)
+            assert np.all(np.isfinite(state[0].data))
+            assert np.all(np.isfinite(state[1].data))
+
+    def test_severely_ill_conditioned_warns(self) -> None:
+        """Severely ill-conditioned system (>50% SVs regularized) emits warning.
+
+        Constructs a 3-constraint system where one field has a strong identity
+        coefficient (large max SV) while two fields have near-zero coefficients.
+        The 3x3 SVD at each wavenumber produces 3 SVs: one large (~10) and
+        two tiny (~1e-6). With rcond=0.5, alpha = 5.0, so 2 out of 3 SVs
+        per wavenumber are regularized (67% > 50%), triggering the warning.
+        """
+        grid = CartesianGrid([(0, 2 * np.pi)], 16, periodic=True)
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+
+        bc_cfg = ConstraintSolverConfig(
+            enabled=True,
+            method="auto",
+            boundary_conditions={"x": BoundaryCondition("periodic")},
+        )
+
+        spec = EquationSystem(
+            n_components=4,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "psi", "chi", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(10.0, "identity", "phi"),
+                        OperatorTerm(1e-6, "identity", "psi"),
+                        OperatorTerm(1e-6, "identity", "chi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=bc_cfg,
+                ),
+                ComponentEquation(
+                    field_name="psi",
+                    field_index=1,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(1e-6, "identity", "psi"),
+                        OperatorTerm(1e-6, "identity", "phi"),
+                        OperatorTerm(1e-6, "identity", "chi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=bc_cfg,
+                ),
+                ComponentEquation(
+                    field_name="chi",
+                    field_index=2,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(1e-6, "identity", "chi"),
+                        OperatorTerm(1e-6, "identity", "phi"),
+                        OperatorTerm(1e-6, "identity", "psi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=bc_cfg,
+                ),
+                ComponentEquation(
+                    field_name="rho",
+                    field_index=3,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+                ),
+            ),
+            mass_matrix=(
+                (-10.0, 0.0, 0.0, 0.0),
+                (0.0, -1e-6, 0.0, 0.0),
+                (0.0, 0.0, -1e-6, 0.0),
+                (0.0, 0.0, 0.0, 0.0),
+            ),
+            coupling_matrix=(
+                (0.0, -1e-6, -1e-6, -1.0),
+                (-1e-6, 0.0, -1e-6, -1.0),
+                (-1e-6, -1e-6, 0.0, -1.0),
+                (0.0, 0.0, 0.0, 0.0),
+            ),
+            metadata={},
+        )
+
+        # rcond=0.5: alpha = 0.5 * max_S(~10) = 5.0
+        # Two tiny SVs (~1e-6) per wavenumber < 5.0 → 67% regularized
+        pde = PDEFromSpec(spec, coupled_svd_rcond=0.5)
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=np.sin(x)),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+
+        with pytest.warns(UserWarning, match="ill-conditioned"):
+            pde.evolution_rate(state, t=0.0)
+
+        # Solution should still be finite (regularization prevents blowup)
+        assert np.all(np.isfinite(state[0].data))
+        assert np.all(np.isfinite(state[1].data))
+        assert np.all(np.isfinite(state[2].data))

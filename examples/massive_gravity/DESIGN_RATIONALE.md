@@ -136,7 +136,7 @@ The simulation places a Gaussian pulse in h_4 (h_xy), the only evolution equatio
 - Physics validation: center-point oscillation matches analytic `A*cos(sqrt(2*m^2)*t)`
 - 2x3 plot layout: heatmap snapshots at t=0/T/4/T/2, center oscillation, cross-sections, amplitude envelope
 
-### Constraint Handling Limitations
+### Constraint Handling and Helmholtz Resonance
 
 The gauge-unfixed massive gravity equations produce 5 constraint equations and 1 evolution equation (h_4). The constraints have diverse mathematical forms:
 
@@ -146,16 +146,13 @@ The gauge-unfixed massive gravity equations produce 5 constraint equations and 1
 | h_1, h_2 (momentum) | Partial Helmholtz | identity + one-axis laplacian |
 | h_3, h_5 (spatial) | Algebraic | identity only (no self-laplacian) |
 
-The pipeline's current constraint solver (`_solve_constraint_equation`) only handles pure Poisson equations of the form `laplacian(field) = source`. It cannot solve:
-- **Helmholtz equations** (`laplacian(phi) + lambda*phi = source`) for h_0, h_1, h_2
-- **Algebraic constraints** (`(1+m^2)*phi = source`) for h_3, h_5
-- **Coupled constraints** where h_0, h_3, h_5 depend on each other
+The unified constraint solver handles all of these via coupled FFT block solve:
+- **Cluster {h_0, h_3, h_5}**: mutually coupled via Laplacian cross-terms, solved as a 3×3 system at each wavenumber
+- **Cluster {h_1, h_2}**: coupled via cross_derivative_xy, solved as a 2×2 system
 
-With the constraint solver disabled (the default), constraint fields remain frozen at their initial values. Since h_4's evolution equation references constraint fields (h_0, pi_1, pi_2), and these are frozen at zero, h_4 evolves as a pure massive oscillator: `d2_t(h_4) = -2*m^2*h_4` with no spatial propagation.
+**Helmholtz resonance**: The h_0 constraint has self-operator `-(m² + ∇²_x + ∇²_y)`, whose Fourier-space eigenvalue is `-m² + sin²(k_x·dx)/dx² + sin²(k_y·dy)/dy²`. This crosses zero at wavenumbers where the discrete Laplacian magnitude equals m², creating a near-singular mode. Without regularization, noise at this wavenumber is amplified ~100×, feeding back into h_4's evolution via `cross_derivative_xy(h_0)` and producing exponential blowup.
 
-This is still physical (it demonstrates the massive mode frequency omega = sqrt(2*m^2)), but spatial wave propagation would require either:
-1. **De Donder gauge-fixed equations** where each component satisfies `Box h_ij + m^2 h_ij = 0` (standard massive KG with laplacian)
-2. **Extended constraint solver** supporting Helmholtz and algebraic constraints (future pipeline work)
+**SVD Tikhonov regularization**: The coupled FFT solver uses batched SVD with Tikhonov regularization to handle near-singular modes smoothly: `S_reg_inv = S / (S² + α²)` where `α = rcond × max(S)`. This attenuates rather than amplifies near-singular modes, preventing the constraint-evolution feedback instability while leaving well-conditioned modes essentially unchanged (< 0.01% error). The default `rcond = 0.01` stabilizes the massive gravity simulation with h_4 oscillating cleanly at `ω = √(2m²)`.
 
 ## 4. What This Example Validates End-to-End
 
