@@ -13,25 +13,29 @@ a propagating massive mode with dispersion relation: omega^2 = k^2 + m^2.
 
 Component structure (symmetric rank-2 in 3D, gauge-unfixed):
   h_0 (h_tt):         constraint (time_order=0, Helmholtz-type)
-  h_1 (h_tx):         constraint (time_order=0, momentum constraint)
-  h_2 (h_ty):         constraint (time_order=0, momentum constraint)
+  h_1 (h_tx):         constraint (time_order=0, partial Helmholtz)
+  h_2 (h_ty):         constraint (time_order=0, partial Helmholtz)
   h_3 (h_xx):         constraint (time_order=0, algebraic)
   h_4 (h_xy):         EVOLUTION (time_order=2, the only propagating DOF)
   h_5 (h_yy):         constraint (time_order=0, algebraic)
 
-NOTE ON CONSTRAINT COUPLING:
-  In the gauge-unfixed formulation, h_4's equation has no laplacian(h_4)
-  term — spatial coupling comes entirely through the constraint fields
-  (h_0, pi_1, pi_2). Without an active constraint solver (the current
-  Poisson solver cannot handle the Helmholtz/algebraic constraints of
-  massive gravity), each spatial point evolves as an independent massive
-  oscillator: d2_t(h_4) = -2*m^2*h_4. The Gaussian profile oscillates
-  in amplitude at frequency omega = sqrt(2*m^2) but does not propagate
-  spatially. This is still physical — it shows the massive mode frequency.
+CONSTRAINT SOLVING (unified solver):
+  All 5 constraint equations are solved at each timestep using the unified
+  constraint solver with FFT block solve for coupled constraints:
 
-  For spatial wave propagation, one would need either:
-  (a) De Donder gauge-fixed equations (Box h_ij + m^2 h_ij = 0), or
-  (b) A Helmholtz/algebraic constraint solver (future pipeline work).
+  - Cluster {h_0, h_3, h_5}: mutually coupled via Laplacian cross-terms.
+    Solved simultaneously in Fourier space as a 3x3 dense system at each
+    wavenumber. h_0 is Helmholtz-type (-m2*I - L), h_3 and h_5 are
+    algebraic (-m2*I), coupled through Laplacians.
+
+  - Cluster {h_1, h_2}: mutually coupled. h_1 is partial Helmholtz
+    (-m2*I - 0.5*L_y), h_2 is (-m2*I - 0.5*L_x), with cross_derivative
+    coupling. Their sources are zero at t=0 (depend on pi_3, pi_4, pi_5).
+
+  The constraint coupling feeds back into h_4 via cross_derivative_xy(h_0),
+  adding spatial structure to the evolution. In this gauge, h_4 oscillates
+  at approximately omega = sqrt(2*m^2) with small corrections from
+  constraints. True wave propagation requires gauge-fixing (de Donder).
 """
 
 from pathlib import Path
@@ -286,10 +290,10 @@ def main() -> None:  # noqa: PLR0915, PLR0914
 
     fig.suptitle(
         f"Massive Gravity 2+1D: m$^2$ = {mass_squared}   |   "
-        rf"$\omega = \sqrt{{2m^2}}$ = {omega:.3f}   |   "
+        rf"$\omega \approx \sqrt{{2m^2}}$ = {omega:.3f}   |   "
         f"T = {period:.2f}\n"
-        r"$\ddot{h}_{xy} = -2m^2 h_{xy}$  "
-        "(gauge-unfixed, constraints frozen — each point oscillates independently)",
+        r"$\ddot{h}_{xy} = -2m^2 h_{xy} + \partial_{xy} h_{tt}$  "
+        "(gauge-unfixed, constraints solved via FFT block)",
         fontsize=11,
     )
     plt.tight_layout()
@@ -307,14 +311,14 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     print()
     print("Key observations:")
     print("  1. h_4 (h_xy) is the ONLY evolution equation (time_order=2)")
-    print("  2. h_0-h_3, h_5 are constraints (time_order=0, frozen)")
-    print(f"  3. Each point oscillates at omega = sqrt(2*m^2) = {omega:.4f}")
+    print("  2. h_0-h_3, h_5 are constraints (solved via unified solver)")
+    print(f"  3. Oscillation at omega ~ sqrt(2*m^2) = {omega:.4f}")
     print(f"  4. Period T = {period:.4f}, simulation covers {t_end / period:.1f} periods")
     print(f"  5. Max residual vs cos(omega*t): {residual:.2e}")
     print()
-    print("  NOTE: No spatial propagation because h_4's equation has no")
-    print("  laplacian(h_4) term. Spatial coupling requires constraint")
-    print("  solving (Helmholtz/algebraic) or gauge-fixing (de Donder).")
+    print("  NOTE: Constraints feed back via cross_derivative_xy(h_0),")
+    print("  but in gauge-unfixed form, this does not produce spatial")
+    print("  propagation. True wave propagation requires gauge-fixing.")
     print("=" * 60)
 
 

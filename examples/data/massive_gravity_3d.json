@@ -116,6 +116,16 @@
 						"field":"pi_2"
 					}
 				]
+			},
+			"constraint_solver":{
+				"enabled":true,
+				"method":"auto",
+				"max_iterations":30,
+				"tolerance":1e-10,
+				"boundary_conditions":{
+					"x":{"type":"periodic"},
+					"y":{"type":"periodic"}
+				}
 			}
 		},
 		{
@@ -157,6 +167,16 @@
 						"field":"pi_4"
 					}
 				]
+			},
+			"constraint_solver":{
+				"enabled":true,
+				"method":"auto",
+				"max_iterations":30,
+				"tolerance":1e-10,
+				"boundary_conditions":{
+					"x":{"type":"periodic"},
+					"y":{"type":"periodic"}
+				}
 			}
 		},
 		{
@@ -198,6 +218,16 @@
 						"field":"pi_3"
 					}
 				]
+			},
+			"constraint_solver":{
+				"enabled":true,
+				"method":"auto",
+				"max_iterations":30,
+				"tolerance":1e-10,
+				"boundary_conditions":{
+					"x":{"type":"periodic"},
+					"y":{"type":"periodic"}
+				}
 			}
 		},
 		{
@@ -234,6 +264,16 @@
 						"field":"pi_2"
 					}
 				]
+			},
+			"constraint_solver":{
+				"enabled":true,
+				"method":"auto",
+				"max_iterations":30,
+				"tolerance":1e-10,
+				"boundary_conditions":{
+					"x":{"type":"periodic"},
+					"y":{"type":"periodic"}
+				}
 			}
 		},
 		{
@@ -306,6 +346,16 @@
 						"field":"h_3"
 					}
 				]
+			},
+			"constraint_solver":{
+				"enabled":true,
+				"method":"auto",
+				"max_iterations":30,
+				"tolerance":1e-10,
+				"boundary_conditions":{
+					"x":{"type":"periodic"},
+					"y":{"type":"periodic"}
+				}
 			}
 		}
 	],

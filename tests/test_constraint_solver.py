@@ -6,16 +6,20 @@ Tests that the pipeline correctly handles:
 - Poisson equation solving via py-pde
 - Backward compatibility with frozen constraints
 - Cross-field constraint solving
+- Operator matrix builders (unified solver infrastructure)
+- FFT operator multipliers (periodic fast-path)
 """
 
 from __future__ import annotations
 
-from typing import cast
+from functools import partial
+from typing import Any, cast
 
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
 from pde import CartesianGrid, FieldCollection, ScalarField
+from scipy import sparse  # type: ignore[reportMissingTypeStubs]
 
 from tidal.symbolic.json_loader import (
     BoundaryCondition,
@@ -24,7 +28,17 @@ from tidal.symbolic.json_loader import (
     EquationSystem,
     OperatorTerm,
 )
-from tidal.symbolic.pde_builder import PDEFromSpec
+from tidal.symbolic.pde_builder import (
+    PDEFromSpec,
+    _build_biharmonic_matrix,
+    _build_cross_derivative_matrix,
+    _build_directional_laplacian_matrix,
+    _build_gradient_matrix,
+    _build_identity_matrix,
+    _build_laplacian_matrix,
+    _OPERATOR_FFT_MULTIPLIERS,
+    _OPERATOR_MATRIX_REGISTRY,
+)
 
 # === Fixtures ===
 
@@ -125,8 +139,10 @@ class TestConstraintSolverConfig:
     def test_default_disabled(self) -> None:
         config = ConstraintSolverConfig.from_dict(None)
         assert config.enabled is False
-        assert config.method == "poisson"
+        assert config.method == "auto"
         assert config.boundary_conditions == {}
+        assert config.max_iterations == 20
+        assert config.tolerance == 1e-8
 
     def test_enabled_with_bcs(self) -> None:
         data = {
@@ -346,8 +362,8 @@ class TestPoissonSolver:
         # the solution should be uniform 0.5
         assert_allclose(state[0].data, 0.5, atol=0.05)
 
-    def test_missing_laplacian_raises(self) -> None:
-        """Constraint without laplacian(field) term should fail."""
+    def test_missing_laplacian_raises_poisson(self) -> None:
+        """Poisson solver without laplacian(field) term should fail."""
         spec = EquationSystem(
             n_components=1,
             dimension=2,
@@ -359,7 +375,9 @@ class TestPoissonSolver:
                     field_index=0,
                     time_derivative_order=0,
                     rhs_terms=(OperatorTerm(1.0, "identity", "phi"),),
-                    constraint_solver=ConstraintSolverConfig(enabled=True),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, method="poisson"
+                    ),
                 ),
             ),
             mass_matrix=((-1.0,),),
@@ -374,8 +392,8 @@ class TestPoissonSolver:
         with pytest.raises(ValueError, match="lacks a laplacian"):
             pde.evolution_rate(state, t=0.0)
 
-    def test_zero_laplacian_coefficient_raises(self) -> None:
-        """Zero laplacian coefficient should fail."""
+    def test_zero_laplacian_coefficient_raises_poisson(self) -> None:
+        """Poisson solver with zero laplacian coefficient should fail."""
         spec = EquationSystem(
             n_components=1,
             dimension=2,
@@ -390,7 +408,9 @@ class TestPoissonSolver:
                         OperatorTerm(0.0, "laplacian", "phi"),
                         OperatorTerm(1.0, "identity", "phi"),
                     ),
-                    constraint_solver=ConstraintSolverConfig(enabled=True),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, method="poisson"
+                    ),
                 ),
             ),
             mass_matrix=((-1.0,),),
@@ -405,8 +425,8 @@ class TestPoissonSolver:
         with pytest.raises(ValueError, match="effectively zero"):
             pde.evolution_rate(state, t=0.0)
 
-    def test_multiple_laplacian_terms_raises(self) -> None:
-        """Multiple laplacian(field) terms should fail."""
+    def test_multiple_laplacian_terms_raises_poisson(self) -> None:
+        """Multiple laplacian(field) terms should fail for Poisson solver."""
         spec = EquationSystem(
             n_components=1,
             dimension=2,
@@ -421,7 +441,9 @@ class TestPoissonSolver:
                         OperatorTerm(1.0, "laplacian", "phi"),
                         OperatorTerm(2.0, "laplacian", "phi"),
                     ),
-                    constraint_solver=ConstraintSolverConfig(enabled=True),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, method="poisson"
+                    ),
                 ),
             ),
             mass_matrix=((0.0,),),
@@ -660,3 +682,1131 @@ class TestJSONParsing:
         spec = EquationSystem.from_dict(data)
         eq = spec.equations[0]
         assert eq.constraint_solver.enabled is False
+
+
+# === Operator Matrix Builder Tests ===
+
+
+def _apply_matrix_to_field(
+    grid: CartesianGrid, matrix: Any, vector: Any, field: ScalarField
+) -> np.ndarray:
+    """Apply a sparse operator matrix to a field, returning the result array.
+
+    Computes: result = matrix @ field_flat + vector_flat, then reshapes.
+    """
+    flat = field.data.ravel()
+    result_flat = matrix @ flat + np.asarray(vector.toarray()).ravel()
+    return result_flat.reshape(grid.shape)
+
+
+def _get_bcs(grid: CartesianGrid, bc: str = "periodic") -> Any:
+    """Get py-pde BoundaryConditions object from grid."""
+    return grid.get_boundary_conditions(bc)
+
+
+class TestOperatorMatrixBuilders:
+    """Verify sparse matrices match function-based operators.
+
+    For each operator, we apply the matrix to a random test field and
+    compare against py-pde's function-based operator. The results must
+    match to within floating-point tolerance.
+    """
+
+    def _compare_matrix_vs_function(
+        self,
+        grid: CartesianGrid,
+        op_name: str,
+        bc: str = "periodic",
+        *,
+        rtol: float = 1e-10,
+        atol: float = 1e-10,
+    ) -> None:
+        """Compare matrix-based and function-based operator on a random field."""
+        rng = np.random.default_rng(42)
+        field = ScalarField(grid, data=rng.standard_normal(grid.shape))
+        bcs = _get_bcs(grid, bc)
+
+        # Matrix-based result
+        builder = _OPERATOR_MATRIX_REGISTRY[op_name]
+        matrix, vector = builder(grid, bcs)
+        matrix_result = _apply_matrix_to_field(grid, matrix, vector, field)
+
+        # Function-based result
+        from tidal.symbolic.pde_builder import _OPERATOR_REGISTRY
+
+        handler, _ = _OPERATOR_REGISTRY[op_name]
+        func_result = handler(field, bc).data
+
+        assert_allclose(
+            matrix_result,
+            func_result,
+            rtol=rtol,
+            atol=atol,
+            err_msg=f"Matrix vs function mismatch for {op_name} on {grid.shape} grid",
+        )
+
+    # --- Identity ---
+
+    def test_identity_1d_periodic(self) -> None:
+        grid = CartesianGrid([(0, 2 * np.pi)], 32, periodic=True)
+        self._compare_matrix_vs_function(grid, "identity")
+
+    def test_identity_2d_periodic(self) -> None:
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [16, 16], periodic=True)
+        self._compare_matrix_vs_function(grid, "identity")
+
+    def test_identity_matrix_is_diagonal(self) -> None:
+        """Identity matrix should be sparse diagonal."""
+        grid = CartesianGrid([(0, 1)], 10, periodic=True)
+        bcs = _get_bcs(grid)
+        mat, vec = _build_identity_matrix(grid, bcs)
+        n = int(np.prod(grid.shape))
+        # Should be identity
+        diff = mat - sparse.eye(n, format="dok")
+        assert diff.nnz == 0
+        # Vector should be zero
+        assert vec.nnz == 0
+
+    # --- Laplacian ---
+
+    def test_laplacian_1d_periodic(self) -> None:
+        grid = CartesianGrid([(0, 2 * np.pi)], 32, periodic=True)
+        self._compare_matrix_vs_function(grid, "laplacian")
+
+    def test_laplacian_2d_periodic(self) -> None:
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [16, 16], periodic=True)
+        self._compare_matrix_vs_function(grid, "laplacian")
+
+    def test_laplacian_1d_dirichlet(self) -> None:
+        grid = CartesianGrid([(0, 1)], 32, periodic=False)
+        self._compare_matrix_vs_function(grid, "laplacian", "dirichlet")
+
+    def test_laplacian_1d_neumann(self) -> None:
+        grid = CartesianGrid([(0, 1)], 32, periodic=False)
+        self._compare_matrix_vs_function(grid, "laplacian", "neumann")
+
+    # --- Directional Laplacian ---
+
+    def test_laplacian_x_2d_periodic(self) -> None:
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [16, 16], periodic=True)
+        self._compare_matrix_vs_function(grid, "laplacian_x")
+
+    def test_laplacian_y_2d_periodic(self) -> None:
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [16, 16], periodic=True)
+        self._compare_matrix_vs_function(grid, "laplacian_y")
+
+    def test_laplacian_x_2d_dirichlet(self) -> None:
+        grid = CartesianGrid([(0, 1)] * 2, [16, 16], periodic=False)
+        self._compare_matrix_vs_function(grid, "laplacian_x", "dirichlet")
+
+    def test_laplacian_y_2d_dirichlet(self) -> None:
+        grid = CartesianGrid([(0, 1)] * 2, [16, 16], periodic=False)
+        self._compare_matrix_vs_function(grid, "laplacian_y", "dirichlet")
+
+    def test_directional_laplacians_use_wide_stencil(self) -> None:
+        """Directional laplacians use gradient-of-gradient (wide stencil).
+
+        This differs from the compact Laplacian stencil. Verify that the
+        directional laplacian matrix is exactly G_axis @ G_axis.
+        """
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [16, 16], periodic=True)
+        bcs = _get_bcs(grid)
+
+        gx_mat, gx_vec = _build_gradient_matrix(grid, bcs, axis=0)
+        lx_mat, lx_vec = _build_directional_laplacian_matrix(grid, bcs, axis=0)
+
+        # Should be G_x @ G_x
+        expected_mat = gx_mat @ gx_mat
+        expected_vec = gx_mat @ gx_vec + gx_vec
+
+        rng = np.random.default_rng(42)
+        field = rng.standard_normal(int(np.prod(grid.shape)))
+
+        lx_result = lx_mat @ field + np.asarray(lx_vec.toarray()).ravel()
+        expected_result = expected_mat @ field + np.asarray(expected_vec.toarray()).ravel()
+        assert_allclose(lx_result, expected_result, rtol=1e-14, atol=1e-14)
+
+    # --- Gradient ---
+
+    def test_gradient_x_2d_periodic(self) -> None:
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [16, 16], periodic=True)
+        self._compare_matrix_vs_function(grid, "gradient_x")
+
+    def test_gradient_y_2d_periodic(self) -> None:
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [16, 16], periodic=True)
+        self._compare_matrix_vs_function(grid, "gradient_y")
+
+    def test_gradient_x_1d_periodic(self) -> None:
+        grid = CartesianGrid([(0, 2 * np.pi)], 32, periodic=True)
+        self._compare_matrix_vs_function(grid, "gradient_x")
+
+    def test_gradient_x_2d_dirichlet(self) -> None:
+        grid = CartesianGrid([(0, 1)] * 2, [16, 16], periodic=False)
+        self._compare_matrix_vs_function(grid, "gradient_x", "dirichlet")
+
+    # --- Cross Derivative ---
+
+    def test_cross_derivative_xy_2d_periodic(self) -> None:
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [16, 16], periodic=True)
+        self._compare_matrix_vs_function(grid, "cross_derivative_xy")
+
+    def test_cross_derivative_xy_2d_dirichlet(self) -> None:
+        grid = CartesianGrid([(0, 1)] * 2, [16, 16], periodic=False)
+        self._compare_matrix_vs_function(
+            grid, "cross_derivative_xy", "dirichlet", rtol=1e-8, atol=1e-8
+        )
+
+    # --- Biharmonic ---
+
+    def test_biharmonic_1d_periodic(self) -> None:
+        grid = CartesianGrid([(0, 2 * np.pi)], 32, periodic=True)
+        self._compare_matrix_vs_function(grid, "biharmonic")
+
+    def test_biharmonic_2d_periodic(self) -> None:
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [16, 16], periodic=True)
+        self._compare_matrix_vs_function(grid, "biharmonic")
+
+    # --- Matrix properties ---
+
+    def test_laplacian_matrix_symmetric(self) -> None:
+        """Laplacian matrix should be symmetric for periodic BCs."""
+        grid = CartesianGrid([(0, 1)], 16, periodic=True)
+        bcs = _get_bcs(grid)
+        mat, _ = _build_laplacian_matrix(grid, bcs)
+        diff = mat - mat.T
+        assert diff.nnz == 0 or abs(diff).max() < 1e-14
+
+    def test_gradient_matrix_antisymmetric(self) -> None:
+        """Gradient matrix should be antisymmetric for periodic BCs."""
+        grid = CartesianGrid([(0, 1)], 16, periodic=True)
+        bcs = _get_bcs(grid)
+        mat, _ = _build_gradient_matrix(grid, bcs, axis=0)
+        # G + G^T should be zero for periodic central differences
+        sym = mat + mat.T
+        if sym.nnz > 0:
+            assert abs(sym).max() < 1e-14
+
+    def test_registry_completeness(self) -> None:
+        """All operators in _OPERATOR_REGISTRY should have matrix builders."""
+        from tidal.symbolic.pde_builder import _OPERATOR_REGISTRY
+
+        skip = {"first_derivative_t"}  # temporal operator, not spatial
+        for name in _OPERATOR_REGISTRY:
+            if name in skip:
+                continue
+            assert name in _OPERATOR_MATRIX_REGISTRY, (
+                f"Operator '{name}' in _OPERATOR_REGISTRY has no matrix builder. "
+                f"Add it to _OPERATOR_MATRIX_REGISTRY for constraint solving."
+            )
+
+
+class TestFFTMultipliers:
+    """Verify FFT multipliers match matrix-based operators exactly.
+
+    The FFT multipliers use discrete eigenvalues of the finite-difference
+    stencils, NOT continuous Fourier symbols. This ensures the FFT fast-path
+    and sparse matrix path produce identical results on periodic grids.
+    """
+
+    def test_fft_registry_completeness(self) -> None:
+        """All matrix builders should have FFT multipliers."""
+        for name in _OPERATOR_MATRIX_REGISTRY:
+            assert name in _OPERATOR_FFT_MULTIPLIERS, (
+                f"Operator '{name}' has matrix builder but no FFT multiplier."
+            )
+
+    def test_fft_identity_trivial(self) -> None:
+        """Identity in Fourier space is just 1."""
+        k_grids = [np.array([0.0, 1.0, 2.0])]
+        dx_array = np.array([0.1])
+        result = _OPERATOR_FFT_MULTIPLIERS["identity"](k_grids, dx_array)
+        assert_allclose(result, np.ones(3))
+
+    def test_fft_matches_matrix_laplacian(self) -> None:
+        """FFT and matrix Laplacian produce same result on periodic grid."""
+        n = 64
+        grid = CartesianGrid([(0, 2 * np.pi)], n, periodic=True)
+        bcs = _get_bcs(grid)
+        dx_array = np.array(grid.discretization)
+        rng = np.random.default_rng(42)
+        field_data = rng.standard_normal(n)
+
+        # Matrix approach
+        mat, vec = _build_laplacian_matrix(grid, bcs)
+        mat_result = mat @ field_data + np.asarray(vec.toarray()).ravel()
+
+        # FFT approach
+        k = np.fft.fftfreq(n, d=dx_array[0]) * 2 * np.pi
+        multiplier = _OPERATOR_FFT_MULTIPLIERS["laplacian"]([k], dx_array)
+        fft_result = np.fft.ifft(multiplier * np.fft.fft(field_data)).real
+
+        assert_allclose(mat_result, fft_result, rtol=1e-10, atol=1e-10)
+
+    def test_fft_matches_matrix_gradient_x(self) -> None:
+        """FFT and matrix gradient_x produce same result on periodic 2D grid."""
+        nx, ny = 16, 16
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [nx, ny], periodic=True)
+        bcs = _get_bcs(grid)
+        dx_array = np.array(grid.discretization)
+        rng = np.random.default_rng(42)
+        field_data = rng.standard_normal((nx, ny))
+
+        # Matrix approach
+        mat, vec = _build_gradient_matrix(grid, bcs, axis=0)
+        mat_result = (mat @ field_data.ravel() + np.asarray(vec.toarray()).ravel()).reshape(
+            nx, ny
+        )
+
+        # FFT approach
+        kx = np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi
+        ky = np.fft.fftfreq(ny, d=dx_array[1]) * 2 * np.pi
+        KX, KY = np.meshgrid(kx, ky, indexing="ij")
+        multiplier = _OPERATOR_FFT_MULTIPLIERS["gradient_x"]([KX, KY], dx_array)
+        fft_result = np.fft.ifft2(multiplier * np.fft.fft2(field_data)).real
+
+        assert_allclose(mat_result, fft_result, rtol=1e-10, atol=1e-10)
+
+    def test_fft_matches_matrix_directional_laplacian(self) -> None:
+        """FFT and matrix laplacian_x produce same result on periodic 2D grid."""
+        nx, ny = 16, 16
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [nx, ny], periodic=True)
+        bcs = _get_bcs(grid)
+        dx_array = np.array(grid.discretization)
+        rng = np.random.default_rng(42)
+        field_data = rng.standard_normal((nx, ny))
+
+        # Matrix approach
+        mat, vec = _build_directional_laplacian_matrix(grid, bcs, axis=0)
+        mat_result = (mat @ field_data.ravel() + np.asarray(vec.toarray()).ravel()).reshape(
+            nx, ny
+        )
+
+        # FFT approach
+        kx = np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi
+        ky = np.fft.fftfreq(ny, d=dx_array[1]) * 2 * np.pi
+        KX, KY = np.meshgrid(kx, ky, indexing="ij")
+        multiplier = _OPERATOR_FFT_MULTIPLIERS["laplacian_x"]([KX, KY], dx_array)
+        fft_result = np.fft.ifft2(multiplier * np.fft.fft2(field_data)).real
+
+        assert_allclose(mat_result, fft_result, rtol=1e-10, atol=1e-10)
+
+    def test_fft_matches_matrix_cross_derivative(self) -> None:
+        """FFT and matrix cross_derivative_xy produce same result."""
+        nx, ny = 16, 16
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [nx, ny], periodic=True)
+        bcs = _get_bcs(grid)
+        dx_array = np.array(grid.discretization)
+        rng = np.random.default_rng(42)
+        field_data = rng.standard_normal((nx, ny))
+
+        # Matrix approach
+        mat, vec = _build_cross_derivative_matrix(grid, bcs, axis1=0, axis2=1)
+        mat_result = (mat @ field_data.ravel() + np.asarray(vec.toarray()).ravel()).reshape(
+            nx, ny
+        )
+
+        # FFT approach
+        kx = np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi
+        ky = np.fft.fftfreq(ny, d=dx_array[1]) * 2 * np.pi
+        KX, KY = np.meshgrid(kx, ky, indexing="ij")
+        multiplier = _OPERATOR_FFT_MULTIPLIERS["cross_derivative_xy"]([KX, KY], dx_array)
+        fft_result = np.fft.ifft2(multiplier * np.fft.fft2(field_data)).real
+
+        assert_allclose(mat_result, fft_result, rtol=1e-10, atol=1e-10)
+
+    def test_fft_biharmonic_matches_laplacian_squared(self) -> None:
+        """Biharmonic FFT multiplier = (laplacian multiplier)²."""
+        k_grids = [np.array([0.0, 1.0, 2.0, 3.0])]
+        dx_array = np.array([0.5])
+        lap_mult = _OPERATOR_FFT_MULTIPLIERS["laplacian"](k_grids, dx_array)
+        biharm_mult = _OPERATOR_FFT_MULTIPLIERS["biharmonic"](k_grids, dx_array)
+        assert_allclose(biharm_mult, lap_mult**2)
+
+    def test_fft_laplacian_converges_to_analytic(self) -> None:
+        """FFT Laplacian of sin(x) converges to -sin(x) at high resolution."""
+        n = 128
+        grid = CartesianGrid([(0, 2 * np.pi)], n, periodic=True)
+        dx_array = np.array(grid.discretization)
+        x = np.linspace(0, 2 * np.pi, n, endpoint=False) + dx_array[0] / 2
+        field_data = np.sin(x)
+
+        k = np.fft.fftfreq(n, d=dx_array[0]) * 2 * np.pi
+        multiplier = _OPERATOR_FFT_MULTIPLIERS["laplacian"]([k], dx_array)
+        fft_result = np.fft.ifft(multiplier * np.fft.fft(field_data)).real
+
+        # Should be close to -sin(x) (exact in high-res limit)
+        assert_allclose(fft_result, -field_data, rtol=1e-3, atol=1e-10)
+
+
+# === Unified Constraint Solver Tests ===
+
+
+def _make_helmholtz_spec(
+    *,
+    lambda_val: float = 1.0,
+    method: str = "auto",
+) -> EquationSystem:
+    """Create a Helmholtz constraint: 0 = laplacian(phi) + lambda*identity(phi) + source.
+
+    Two-field system: phi (constraint) + rho (evolution).
+    """
+    return EquationSystem(
+        n_components=2,
+        dimension=2,
+        spatial_dimension=1,
+        component_names=("phi", "rho"),
+        equations=(
+            ComponentEquation(
+                field_name="phi",
+                field_index=0,
+                time_derivative_order=0,
+                rhs_terms=(
+                    OperatorTerm(1.0, "laplacian", "phi"),
+                    OperatorTerm(lambda_val, "identity", "phi"),
+                    OperatorTerm(1.0, "identity", "rho"),
+                ),
+                constraint_solver=ConstraintSolverConfig(
+                    enabled=True,
+                    method=method,
+                    boundary_conditions={"x": BoundaryCondition("periodic")},
+                ),
+            ),
+            ComponentEquation(
+                field_name="rho",
+                field_index=1,
+                time_derivative_order=2,
+                rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+            ),
+        ),
+        mass_matrix=((-lambda_val, 0.0), (0.0, 0.0)),
+        coupling_matrix=((0.0, -1.0), (0.0, 0.0)),
+        metadata={},
+    )
+
+
+def _make_algebraic_spec(
+    *,
+    coeff: float = 2.0,
+    method: str = "auto",
+) -> EquationSystem:
+    """Create an algebraic constraint: 0 = coeff*identity(phi) + source.
+
+    Two-field system: phi (constraint) + rho (evolution).
+    """
+    return EquationSystem(
+        n_components=2,
+        dimension=2,
+        spatial_dimension=1,
+        component_names=("phi", "rho"),
+        equations=(
+            ComponentEquation(
+                field_name="phi",
+                field_index=0,
+                time_derivative_order=0,
+                rhs_terms=(
+                    OperatorTerm(coeff, "identity", "phi"),
+                    OperatorTerm(1.0, "identity", "rho"),
+                ),
+                constraint_solver=ConstraintSolverConfig(
+                    enabled=True,
+                    method=method,
+                    boundary_conditions={"x": BoundaryCondition("periodic")},
+                ),
+            ),
+            ComponentEquation(
+                field_name="rho",
+                field_index=1,
+                time_derivative_order=2,
+                rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+            ),
+        ),
+        mass_matrix=((-coeff, 0.0), (0.0, 0.0)),
+        coupling_matrix=((0.0, -1.0), (0.0, 0.0)),
+        metadata={},
+    )
+
+
+class TestUnifiedConstraintSolver:
+    """Test the general operator-matrix constraint solver.
+
+    These tests verify that the unified solver handles constraint types
+    beyond pure Poisson: Helmholtz, algebraic, anisotropic, and mixtures.
+    """
+
+    def test_helmholtz_1d_periodic_fft(self) -> None:
+        """Helmholtz: laplacian(phi) + lambda*phi = -rho, rho=-sin(x).
+
+        Equation: (L + lambda*I)phi = -rho = sin(x).
+        Continuous analytic: phi = sin(x) / (lambda - 1) = sin(x) for lambda=2.
+        Discrete result is close but uses discrete Laplacian eigenvalue.
+        """
+        lambda_val = 2.0
+        spec = _make_helmholtz_spec(lambda_val=lambda_val, method="fft")
+        grid = CartesianGrid([(0, 2 * np.pi)], 64, periodic=True)
+        pde = PDEFromSpec(spec)
+
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+        rho_data = -np.sin(x)
+
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=rho_data),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+
+        pde.evolution_rate(state, t=0.0)
+
+        # (L + 2I)phi = sin(x), continuous: phi = sin(x)/(2-1) = sin(x)
+        assert_allclose(state[0].data, np.sin(x), rtol=0.01, atol=0.01)
+
+    def test_helmholtz_1d_periodic_matrix(self) -> None:
+        """Helmholtz via matrix solver gives same result as FFT."""
+        lambda_val = 2.0
+        spec_fft = _make_helmholtz_spec(lambda_val=lambda_val, method="fft")
+        spec_mat = _make_helmholtz_spec(lambda_val=lambda_val, method="matrix")
+        grid = CartesianGrid([(0, 2 * np.pi)], 64, periodic=True)
+
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+        rho_data = -np.sin(x)
+
+        # FFT path
+        state_fft = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=rho_data),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+        pde_fft = PDEFromSpec(spec_fft)
+        pde_fft.evolution_rate(state_fft, t=0.0)
+
+        # Matrix path
+        state_mat = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=rho_data),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+        pde_mat = PDEFromSpec(spec_mat)
+        pde_mat.evolution_rate(state_mat, t=0.0)
+
+        # FFT and matrix should give identical results (both use discrete stencil)
+        assert_allclose(state_fft[0].data, state_mat[0].data, rtol=1e-10, atol=1e-10)
+
+    def test_algebraic_pointwise(self) -> None:
+        """Algebraic constraint: c*phi = -rho → phi = -rho/c."""
+        coeff = 3.0
+        spec = _make_algebraic_spec(coeff=coeff)
+        grid = CartesianGrid([(0, 2 * np.pi)], 32, periodic=True)
+        pde = PDEFromSpec(spec)
+
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+        rho_data = np.sin(x) + 0.5 * np.cos(2 * x)
+
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=rho_data),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+
+        pde.evolution_rate(state, t=0.0)
+
+        # 0 = coeff*phi + rho → phi = -rho/coeff
+        expected = -rho_data / coeff
+        assert_allclose(state[0].data, expected, rtol=1e-10, atol=1e-10)
+
+    def test_poisson_via_auto_matches_poisson_solver(self) -> None:
+        """Auto solver on Poisson equation matches original Poisson solver."""
+        # Create two specs: one with method="auto", one with "poisson"
+        grid = CartesianGrid([(0, 2 * np.pi)], 64, periodic=True)
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+        rho_data = -np.sin(x)
+
+        for method in ("auto", "poisson"):
+            spec = EquationSystem(
+                n_components=2,
+                dimension=2,
+                spatial_dimension=1,
+                component_names=("phi", "rho"),
+                equations=(
+                    ComponentEquation(
+                        field_name="phi",
+                        field_index=0,
+                        time_derivative_order=0,
+                        rhs_terms=(
+                            OperatorTerm(1.0, "laplacian", "phi"),
+                            OperatorTerm(1.0, "identity", "rho"),
+                        ),
+                        constraint_solver=ConstraintSolverConfig(
+                            enabled=True,
+                            method=method,
+                            boundary_conditions={"x": BoundaryCondition("periodic")},
+                        ),
+                    ),
+                    ComponentEquation(
+                        field_name="rho",
+                        field_index=1,
+                        time_derivative_order=2,
+                        rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+                    ),
+                ),
+                mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+                coupling_matrix=((0.0, -1.0), (0.0, 0.0)),
+                metadata={},
+            )
+
+            state = FieldCollection(
+                [
+                    ScalarField(grid, data=0.0),
+                    ScalarField(grid, data=rho_data),
+                    ScalarField(grid, data=0.0),
+                ]
+            )
+
+            pde = PDEFromSpec(spec)
+            pde.evolution_rate(state, t=0.0)
+
+            if method == "auto":
+                auto_solution = state[0].data.copy()
+            else:
+                poisson_solution = state[0].data.copy()
+
+        # Both are valid Poisson solutions — the Poisson equation on a periodic
+        # domain has a unique solution only up to an additive constant. The FFT
+        # solver picks the zero-mean solution; py-pde may pick a different constant.
+        # Compare after removing the mean (i.e., compare the shape, not the offset).
+        auto_centered = auto_solution - np.mean(auto_solution)
+        poisson_centered = poisson_solution - np.mean(poisson_solution)
+        assert_allclose(auto_centered, poisson_centered, rtol=1e-6, atol=1e-10)
+
+    def test_no_self_terms_raises(self) -> None:
+        """Constraint with no self-referencing terms should fail."""
+        spec = EquationSystem(
+            n_components=2,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(enabled=True),
+                ),
+                ComponentEquation(
+                    field_name="rho",
+                    field_index=1,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+                ),
+            ),
+            mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, -1.0), (0.0, 0.0)),
+            metadata={},
+        )
+
+        grid = CartesianGrid([(0, 1)], 16, periodic=True)
+        pde = PDEFromSpec(spec)
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=1.0),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+
+        with pytest.raises(ValueError, match="no self-referencing terms"):
+            pde.evolution_rate(state, t=0.0)
+
+    def test_fft_on_nonperiodic_raises(self) -> None:
+        """FFT solver on non-periodic grid should fail."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=(OperatorTerm(1.0, "laplacian", "phi"),),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, method="fft"
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+
+        grid = CartesianGrid([(0, 1)], 16, periodic=False)
+        pde = PDEFromSpec(spec)
+        state = FieldCollection([ScalarField(grid, data=0.0)])
+
+        with pytest.raises(ValueError, match="fully periodic grid"):
+            pde.evolution_rate(state, t=0.0)
+
+    def test_unknown_method_raises(self) -> None:
+        """Unknown solver method should fail in config."""
+        with pytest.raises(ValueError, match="Unknown constraint solver method"):
+            ConstraintSolverConfig.from_dict(
+                {"enabled": True, "method": "spectral_element"}
+            )
+
+    def test_method_auto_chooses_fft_for_periodic(self) -> None:
+        """method='auto' selects FFT on periodic grid."""
+        spec = _make_algebraic_spec(coeff=2.0, method="auto")
+        grid = CartesianGrid([(0, 2 * np.pi)], 32, periodic=True)
+        pde = PDEFromSpec(spec)
+
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+        rho_data = np.sin(x)
+
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=rho_data),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+
+        # Should run without error (auto selects FFT for periodic)
+        pde.evolution_rate(state, t=0.0)
+        expected = -rho_data / 2.0
+        assert_allclose(state[0].data, expected, rtol=1e-10, atol=1e-10)
+
+    def test_method_auto_chooses_matrix_for_nonperiodic(self) -> None:
+        """method='auto' selects matrix on non-periodic grid."""
+        spec = EquationSystem(
+            n_components=2,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(2.0, "identity", "phi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True,
+                        method="auto",
+                        boundary_conditions={"x": BoundaryCondition("dirichlet", value=0.0)},
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="rho",
+                    field_index=1,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+                ),
+            ),
+            mass_matrix=((-2.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, -1.0), (0.0, 0.0)),
+            metadata={},
+        )
+
+        grid = CartesianGrid([(0, 1)], 32, periodic=False)
+        pde = PDEFromSpec(spec)
+
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=1.0),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+
+        pde.evolution_rate(state, t=0.0)
+        # 2*phi + rho = 0 → phi = -rho/2 = -0.5
+        expected = -0.5 * np.ones(32)
+        assert_allclose(state[0].data, expected, rtol=1e-10, atol=1e-10)
+
+    def test_helmholtz_2d_periodic(self) -> None:
+        """Helmholtz on 2D periodic grid: laplacian(phi) + lambda*phi = -sin(x)*sin(y)."""
+        lambda_val = 3.0
+        grid = CartesianGrid([(0, 2 * np.pi)] * 2, [32, 32], periodic=True)
+
+        spec = EquationSystem(
+            n_components=2,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(1.0, "laplacian", "phi"),
+                        OperatorTerm(lambda_val, "identity", "phi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True,
+                        boundary_conditions={
+                            "x": BoundaryCondition("periodic"),
+                            "y": BoundaryCondition("periodic"),
+                        },
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="rho",
+                    field_index=1,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+                ),
+            ),
+            mass_matrix=((-lambda_val, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, -1.0), (0.0, 0.0)),
+            metadata={},
+        )
+
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+        y = cast("np.ndarray", grid.cell_coords[..., 1])
+        rho_data = -np.sin(x) * np.sin(y)
+
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=rho_data),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+
+        pde = PDEFromSpec(spec)
+        pde.evolution_rate(state, t=0.0)
+
+        # Continuous: (L + 3I)phi = sin(x)sin(y)
+        # phi = sin(x)sin(y)/(3-2) = sin(x)sin(y) (since L eigenvalue for (1,1) mode ≈ -2)
+        expected = np.sin(x) * np.sin(y)
+        assert_allclose(state[0].data, expected, rtol=0.05, atol=0.01)
+
+
+# === Coupled Constraint Tests ===
+
+
+class TestCoupledConstraints:
+    """Test Gauss-Seidel iteration for mutually-coupled constraints."""
+
+    def test_two_algebraic_coupled(self) -> None:
+        """Two coupled algebraic constraints with analytical solution.
+
+        phi:  2*phi + 0.5*psi = 0  (from source identity(psi))
+        psi:  3*psi + 1.0*phi = 0  (from source identity(phi))
+
+        Solution: phi = 0, psi = 0 (homogeneous, both start at zero source).
+        With external source rho=1:
+        phi:  2*phi + 0.5*psi + rho = 0
+        psi:  3*psi + phi + 2*rho = 0
+
+        Solution: 2*phi + 0.5*psi = -1, 3*psi + phi = -2
+        From eq1: phi = (-1 - 0.5*psi)/2
+        Substituting: 3*psi + (-1 - 0.5*psi)/2 = -2
+        6*psi - 1 - 0.5*psi = -4
+        5.5*psi = -3
+        psi = -3/5.5 = -6/11
+        phi = (-1 - 0.5*(-6/11))/2 = (-1 + 3/11)/2 = (-8/11)/2 = -4/11
+        """
+        spec = EquationSystem(
+            n_components=3,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "psi", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(2.0, "identity", "phi"),
+                        OperatorTerm(0.5, "identity", "psi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, max_iterations=50, tolerance=1e-12
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="psi",
+                    field_index=1,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(3.0, "identity", "psi"),
+                        OperatorTerm(1.0, "identity", "phi"),
+                        OperatorTerm(2.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, max_iterations=50, tolerance=1e-12
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="rho",
+                    field_index=2,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+                ),
+            ),
+            mass_matrix=((-2.0, 0.0, 0.0), (0.0, -3.0, 0.0), (0.0, 0.0, 0.0)),
+            coupling_matrix=(
+                (0.0, -0.5, -1.0),
+                (-1.0, 0.0, -2.0),
+                (0.0, 0.0, 0.0),
+            ),
+            metadata={},
+        )
+
+        grid = CartesianGrid([(0, 1)], 16, periodic=True)
+        pde = PDEFromSpec(spec)
+
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),  # phi
+                ScalarField(grid, data=0.0),  # psi
+                ScalarField(grid, data=1.0),  # rho = 1
+                ScalarField(grid, data=0.0),  # pi_rho
+            ]
+        )
+
+        pde.evolution_rate(state, t=0.0)
+
+        # Analytical: phi = -4/11, psi = -6/11
+        expected_phi = -4.0 / 11.0
+        expected_psi = -6.0 / 11.0
+        assert_allclose(state[0].data, expected_phi, rtol=1e-10, atol=1e-10)
+        assert_allclose(state[1].data, expected_psi, rtol=1e-10, atol=1e-10)
+
+    def test_uncoupled_constraints_no_iteration(self) -> None:
+        """Uncoupled constraints should not trigger Gauss-Seidel."""
+        # Two constraints that don't reference each other
+        spec = EquationSystem(
+            n_components=3,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "psi", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(2.0, "identity", "phi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(enabled=True),
+                ),
+                ComponentEquation(
+                    field_name="psi",
+                    field_index=1,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(3.0, "identity", "psi"),
+                        OperatorTerm(1.0, "identity", "rho"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(enabled=True),
+                ),
+                ComponentEquation(
+                    field_name="rho",
+                    field_index=2,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+                ),
+            ),
+            mass_matrix=((-2.0, 0.0, 0.0), (0.0, -3.0, 0.0), (0.0, 0.0, 0.0)),
+            coupling_matrix=(
+                (0.0, 0.0, -1.0),
+                (0.0, 0.0, -1.0),
+                (0.0, 0.0, 0.0),
+            ),
+            metadata={},
+        )
+
+        grid = CartesianGrid([(0, 1)], 16, periodic=True)
+        pde = PDEFromSpec(spec)
+
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=1.0),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+
+        pde.evolution_rate(state, t=0.0)
+
+        # phi = -rho/2 = -0.5, psi = -rho/3 ≈ -0.333
+        assert_allclose(state[0].data, -0.5, rtol=1e-10, atol=1e-10)
+        assert_allclose(state[1].data, -1.0 / 3.0, rtol=1e-10, atol=1e-10)
+
+    def test_non_convergence_warning(self) -> None:
+        """Non-convergence issues a warning, not an error."""
+        # Strongly coupled system with very few iterations allowed
+        spec = EquationSystem(
+            n_components=3,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "psi", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(0.1, "identity", "phi"),
+                        OperatorTerm(10.0, "identity", "psi"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, max_iterations=1, tolerance=1e-15
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="psi",
+                    field_index=1,
+                    time_derivative_order=0,
+                    rhs_terms=(
+                        OperatorTerm(0.1, "identity", "psi"),
+                        OperatorTerm(10.0, "identity", "phi"),
+                    ),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, max_iterations=1, tolerance=1e-15
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="rho",
+                    field_index=2,
+                    time_derivative_order=2,
+                    rhs_terms=(OperatorTerm(0.0, "identity", "rho"),),
+                ),
+            ),
+            mass_matrix=((-0.1, 0.0, 0.0), (0.0, -0.1, 0.0), (0.0, 0.0, 0.0)),
+            coupling_matrix=(
+                (0.0, -10.0, 0.0),
+                (-10.0, 0.0, 0.0),
+                (0.0, 0.0, 0.0),
+            ),
+            metadata={},
+        )
+
+        # Non-periodic grid forces Gauss-Seidel path (FFT requires periodic)
+        grid = CartesianGrid([(0, 1)], 8, periodic=False)
+        pde = PDEFromSpec(spec)
+
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=1.0),
+                ScalarField(grid, data=1.0),
+                ScalarField(grid, data=0.0),
+                ScalarField(grid, data=0.0),
+            ]
+        )
+
+        with pytest.warns(UserWarning, match="did not converge"):
+            pde.evolution_rate(state, t=0.0)
+
+
+class TestMassiveGravityConstraints:
+    """Integration tests: massive gravity constraints solved with unified solver."""
+
+    @pytest.fixture()
+    def massive_gravity_setup(self) -> tuple[Any, FieldCollection]:
+        """Load massive gravity spec and build PDE + initial state."""
+        from pathlib import Path
+
+        from tidal.symbolic import build_pde_from_json, load_equation_system
+
+        json_path = Path(__file__).parent.parent / "examples" / "data" / "massive_gravity_3d.json"
+        params = {"m2": 1.0}
+        spec = load_equation_system(json_path)
+        pde = build_pde_from_json(json_path, parameters=params)
+
+        grid = CartesianGrid(
+            bounds=[(0, 10), (0, 10)], shape=[16, 16], periodic=True
+        )
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+        y = cast("np.ndarray", grid.cell_coords[..., 1])
+        gaussian = 0.5 * np.exp(
+            -((x - 5) ** 2 + (y - 5) ** 2) / (2 * 2**2)
+        )
+
+        fields: list[ScalarField] = []
+        for name, slot_type in spec.state_layout:
+            sf = ScalarField(grid, data=0.0, label=f"{name}_{slot_type}")
+            if name == "h_4" and slot_type == "field":
+                sf.data[:] = gaussian
+            fields.append(sf)
+
+        state = FieldCollection(fields)
+        return pde, state
+
+    def test_all_constraints_solvable(
+        self, massive_gravity_setup: tuple[Any, FieldCollection]
+    ) -> None:
+        """All 5 massive gravity constraints solve without error."""
+        pde, state = massive_gravity_setup
+        # Should not raise
+        rate = pde.evolution_rate(state, t=0.0)
+        # Rate should be finite
+        for i in range(len(rate)):
+            assert np.all(np.isfinite(rate[i].data)), f"Rate slot {i} has non-finite values"
+
+    def test_constraint_h0_nonzero(
+        self, massive_gravity_setup: tuple[Any, FieldCollection]
+    ) -> None:
+        """h_0 (Helmholtz constraint) is nonzero when h_4 has a Gaussian."""
+        pde, state = massive_gravity_setup
+        pde.evolution_rate(state, t=0.0)
+
+        # h_0 gets a contribution from cross_derivative_xy(h_4)
+        # Find h_0 field slot
+        h0_slot = pde._field_slot_map["h_0"]
+        h0_max = float(np.max(np.abs(state[h0_slot].data)))
+        assert h0_max > 1e-6, f"h_0 should be nonzero, got max={h0_max}"
+
+    def test_constraint_h3_h5_xy_swap(
+        self, massive_gravity_setup: tuple[Any, FieldCollection]
+    ) -> None:
+        """h_3(x,y) = h_5(y,x) by x-y exchange symmetry."""
+        pde, state = massive_gravity_setup
+        pde.evolution_rate(state, t=0.0)
+
+        h3_slot = pde._field_slot_map["h_3"]
+        h5_slot = pde._field_slot_map["h_5"]
+
+        # Gaussian IC is centered and symmetric. h_3=h_xx and h_5=h_yy
+        # are related by x<->y swap: h_3(x,y) = h_5(y,x).
+        assert_allclose(
+            state[h3_slot].data,
+            state[h5_slot].data.T,
+            atol=1e-10,
+            err_msg="h_3(x,y) should equal h_5(y,x) by x-y symmetry",
+        )
+
+    def test_short_simulation_stable(
+        self, massive_gravity_setup: tuple[Any, FieldCollection]
+    ) -> None:
+        """Short simulation remains stable with active constraints."""
+        from tidal.utils import normalize_solve_result
+
+        pde, state = massive_gravity_setup
+        result = pde.solve(state, t_range=0.1, dt=0.01, scheme="runge-kutta")
+        result = normalize_solve_result(result)
+
+        # h_4 field should still be finite and not diverge
+        h4_slot = pde._field_slot_map["h_4"]
+        h4_max = float(np.max(np.abs(result[h4_slot].data)))
+        assert h4_max < 10.0, f"h_4 should not diverge, got max={h4_max}"
+        assert h4_max > 0.01, f"h_4 should not collapse to zero, got max={h4_max}"

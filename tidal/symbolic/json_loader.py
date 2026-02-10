@@ -258,12 +258,34 @@ class BoundaryCondition:
         )
 
 
+_VALID_CONSTRAINT_METHODS = frozenset({"auto", "fft", "matrix", "poisson"})
+
+
 @dataclass(frozen=True)
 class ConstraintSolverConfig:
     """Configuration for elliptic constraint solving.
 
     When ``enabled`` is True, the constraint equation is solved at each
-    timestep using py-pde's Poisson solver rather than remaining frozen.
+    timestep rather than remaining frozen at its initial value.
+
+    Solver Methods
+    --------------
+    - **"auto"** (default): Automatically selects the best solver.
+      Uses FFT for fully periodic grids (O(N log N)), sparse matrix
+      for non-periodic grids (O(N) via LU). Handles all constraint
+      types: Poisson, Helmholtz, algebraic, anisotropic, etc.
+
+    - **"fft"**: Force FFT solver. Requires fully periodic grid.
+
+    - **"matrix"**: Force sparse matrix solver. Works with any BCs.
+
+    - **"poisson"**: Original py-pde Poisson solver. Requires exactly
+      one ``laplacian(self_field)`` term. Backward compatible.
+
+    Coupled Constraint Parameters
+    ----------------------------
+    When multiple constraints reference each other's fields, the solver
+    iterates using Gauss-Seidel until convergence or ``max_iterations``.
 
     Attributes
     ----------
@@ -271,16 +293,23 @@ class ConstraintSolverConfig:
         Whether to solve the constraint elliptically. Default False
         preserves existing frozen-constraint behavior.
     method : str
-        Solver method. Currently only ``"poisson"`` is supported.
+        Solver method: "auto", "fft", "matrix", or "poisson".
     boundary_conditions : dict[str, BoundaryCondition]
         Per-axis boundary conditions (e.g., ``{"x": ..., "y": ...}``).
+    max_iterations : int
+        Maximum Gauss-Seidel iterations for coupled constraints.
+    tolerance : float
+        Convergence threshold for coupled constraint iteration.
+        Iteration stops when max|field_new - field_old| < tolerance.
     """
 
     enabled: bool = False
-    method: str = "poisson"
+    method: str = "auto"
     boundary_conditions: dict[str, BoundaryCondition] = dataclass_field(
         default_factory=lambda: {}  # noqa: PIE807  # type: dict[str, BoundaryCondition]
     )
+    max_iterations: int = 20
+    tolerance: float = 1e-8
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any] | None) -> ConstraintSolverConfig:
@@ -295,12 +324,24 @@ class ConstraintSolverConfig:
         -------
         ConstraintSolverConfig
             Configuration instance.
+
+        Raises
+        ------
+        ValueError
+            If ``method`` is not one of the recognized solver methods.
         """
         if data is None:
             return cls()
 
         enabled = bool(data.get("enabled", False))
-        method = str(data.get("method", "poisson"))
+        method = str(data.get("method", "auto"))
+
+        if method not in _VALID_CONSTRAINT_METHODS:
+            msg = (
+                f"Unknown constraint solver method '{method}'. "
+                f"Must be one of: {', '.join(sorted(_VALID_CONSTRAINT_METHODS))}."
+            )
+            raise ValueError(msg)
 
         bc_data = data.get("boundary_conditions", {})
         boundary_conditions = {
@@ -308,10 +349,15 @@ class ConstraintSolverConfig:
             for axis, bc_dict in bc_data.items()
         }
 
+        max_iterations = int(data.get("max_iterations", 20))
+        tolerance = float(data.get("tolerance", 1e-8))
+
         return cls(
             enabled=enabled,
             method=method,
             boundary_conditions=boundary_conditions,
+            max_iterations=max_iterations,
+            tolerance=tolerance,
         )
 
 
