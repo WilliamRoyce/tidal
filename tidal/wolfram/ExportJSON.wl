@@ -802,6 +802,11 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
       coefficient = -1.0;
       symbolicCoeff = ToString[rawCoeff, InputForm];
       Message[ExtractTermCoefficient::symbolic, rawCoeff, targetField],
+    (* Numeric * symbolic product: -2*m2 -> -2.0, store "-2*m2" *)
+    Head[rawCoeff] === Times && NumericQ[First[rawCoeff]],
+      coefficient = N[First[rawCoeff]];
+      symbolicCoeff = ToString[rawCoeff, InputForm];
+      Message[ExtractTermCoefficient::symbolic, rawCoeff, targetField],
     (* Positive symbolic: m2 -> 1.0, store "m2" *)
     MatchQ[rawCoeff, _Symbol],
       coefficient = 1.0;

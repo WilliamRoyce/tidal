@@ -593,14 +593,24 @@ class PDEFromSpec(PDEBase):
         """Check whether a term's coefficient can be resolved without warnings.
 
         Returns True if the term has no symbolic coefficient, or if its symbolic
-        coefficient (possibly negated) matches a key in the parameters dict.
+        coefficient (possibly negated or compound like ``-2*m2``) can be
+        evaluated from the parameters dict.
         """
         sym = term.coefficient_symbolic
         if sym is None:
             return True
         if sym.startswith("-") and sym[1:] in self._parameters:
             return True
-        return sym in self._parameters
+        if sym in self._parameters:
+            return True
+        # Try compound expression evaluation (e.g., "-2*m2")
+        try:
+            py_expr = self._mathematica_to_python(sym)
+            eval(py_expr, {"__builtins__": {}}, dict(self._base_namespace))  # noqa: S307
+        except (NameError, SyntaxError, TypeError, ValueError, ZeroDivisionError):
+            return False
+        else:
+            return True
 
     def _resolve_coefficient(self, term: OperatorTerm) -> float:
         """Resolve the effective coefficient for a term.
@@ -627,11 +637,20 @@ class PDEFromSpec(PDEBase):
         if term.coefficient_symbolic is not None:
             sym = term.coefficient_symbolic
 
-            # Check for negated symbol like "-m2"
+            # Fast path: simple parameter name or negated name
             if sym.startswith("-") and sym[1:] in self._parameters:
                 return -self._parameters[sym[1:]]
             if sym in self._parameters:
                 return self._parameters[sym]
+
+            # Compound expression: e.g., "-2*m2", "3*lambda"
+            try:
+                py_expr = self._mathematica_to_python(sym)
+                result = eval(py_expr, {"__builtins__": {}}, dict(self._base_namespace))  # noqa: S307
+            except (NameError, SyntaxError, TypeError, ValueError, ZeroDivisionError):
+                pass
+            else:
+                return float(result)
 
             # Symbolic coefficient present but not resolvable from parameters.
             # Fail fast: wrong physics that looks right is worse than a crash.

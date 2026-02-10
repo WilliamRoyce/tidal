@@ -403,13 +403,19 @@ EvaluateMetricComponents[expr_, chart_, metricMatrix_] := Module[
   invMatrix = Simplify[Inverse[metricMatrix]];
   rules = Flatten[{
     (* Contravariant g^{ij}: positive chart basis *)
+    (* Use MetricQ condition so only metric tensors are matched, not field tensors *)
+    (* With[] injects pre-computed values into Rule (avoiding RuleDelayed scoping) *)
     Table[
-      _Symbol[{i, chart}, {j, chart}] -> Simplify[invMatrix[[i + 1, j + 1]]],
+      With[{val = Simplify[invMatrix[[i + 1, j + 1]]]},
+        f_Symbol[{i, chart}, {j, chart}] /; MetricQ[f] -> val
+      ],
       {i, 0, dim - 1}, {j, 0, dim - 1}
     ],
     (* Covariant g_{ij}: negative chart basis *)
     Table[
-      _Symbol[{i, -chart}, {j, -chart}] -> Simplify[metricMatrix[[i + 1, j + 1]]],
+      With[{val = Simplify[metricMatrix[[i + 1, j + 1]]]},
+        f_Symbol[{i, -chart}, {j, -chart}] /; MetricQ[f] -> val
+      ],
       {i, 0, dim - 1}, {j, 0, dim - 1}
     ]
   }];
