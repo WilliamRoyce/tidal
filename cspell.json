@@ -175,6 +175,7 @@
     "pylint",
     "pydocstyle",
     "Mult",
+    "mghpert",
     "numpy",
     "ndarray",
     "xlabel",

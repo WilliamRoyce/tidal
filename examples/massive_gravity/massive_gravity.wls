@@ -1,12 +1,17 @@
 #!/usr/bin/env wolframscript
-(* Linearized Massive Gravity - 2+1D from Einstein + mass term *)
-(* Derives linearized equations using xPert: G^(1)_ab + m^2 h_ab = 0 *)
+(* Linearized Massive Gravity - 2+1D from Einstein - mass term *)
+(* Derives linearized equations using xPert: G^(1)_ab - m^2 h_ab = 0 *)
 (*
    Physics: Linearized massive gravity in 2+1D flat Minkowski spacetime
 
-   Starting point: Field equation G_ab + m^2 g_ab = 0
+   Starting point: Field equation G_ab - m^2 g_ab = 0
    Perturbation: g_ab = eta_ab + epsilon * h_ab (symmetric rank-2 tensor)
-   Linearization: G^(1)_ab[h] + m^2 h_ab = 0
+   Linearization: G^(1)_ab[h] - m^2 h_ab = 0
+
+   Sign convention: The MINUS on m^2 is essential. With "+", the identity
+   terms in the evolution equations get positive coefficient
+   (d2_t(h) = +m^2 h + ...), causing exponential growth (tachyonic).
+   With "-", we get d2_t(h) = -m^2 h + ... (stable Klein-Gordon).
 
    In pure 2+1D GR there are no local propagating degrees of freedom
    (the Riemann tensor is fully determined by the Ricci tensor).
@@ -24,8 +29,8 @@
 
 Print["=== Linearized Massive Gravity 2+1D ==="];
 Print[""];
-Print["Field equation: G_ab + m^2 g_ab = 0"];
-Print["Linearization: G^(1)_ab[h] + m^2 h_ab = 0"];
+Print["Field equation: G_ab - m^2 g_ab = 0"];
+Print["Linearization: G^(1)_ab[h] - m^2 h_ab = 0"];
 Print[""];
 
 (* Load xAct packages *)
@@ -105,17 +110,18 @@ Print["   Perturbation: g_ab = eta_ab + epsilon * h_ab"];
 Print["   Using xPert's DefMetricPerturbation for systematic expansion"];
 
 (* ============================================================ *)
-(* Step 4: Linearize G_ab + m^2 g_ab *)
+(* Step 4: Linearize G_ab - m^2 g_ab *)
 (* ============================================================ *)
 Print[""];
 Print["Step 4: Computing linearized equations..."];
-Print["   Linearizing: Einstein[CD][-a,-b] + m2 * eta[-a,-b]"];
+Print["   Linearizing: Einstein[CD][-a,-b] - m2 * eta[-a,-b]"];
 
-(* The key expression: Einstein tensor + mass term *)
+(* The key expression: Einstein tensor - mass term *)
 (* LinearizeTensorExpression extracts the O(epsilon) part:
    - Einstein[mgCD][-a,-b] -> G^(1)_ab[h]  (linearized Einstein tensor)
-   - m2 * mgEta[-a,-b] -> m2 * h_ab  (first-order metric perturbation) *)
-linExpr = LinearizeTensorExpression[Einstein[mgCD][-a, -b] + m2 mgEta[-a, -b]];
+   - -m2 * mgEta[-a,-b] -> -m2 * h_ab  (first-order metric perturbation)
+   The minus sign ensures stable evolution: d2_t(h) = -m^2 h + spatial *)
+linExpr = LinearizeTensorExpression[Einstein[mgCD][-a, -b] - m2 mgEta[-a, -b]];
 
 Print["   Linearized expression: ", Short[linExpr, 3]];
 
@@ -162,7 +168,7 @@ fieldEquations = Table[
 metadata = <|
   "name" -> "Linearized Massive Gravity 2+1D",
   "field_prefix" -> "h",
-  "lagrangian_expr" -> "Einstein[CD][-a,-b] + m2 * eta[-a,-b]",
+  "lagrangian_expr" -> "Einstein[CD][-a,-b] - m2 * eta[-a,-b]",
   "gauge" -> "none",
   "linearized" -> True,
   "dimension" -> 3,
@@ -198,7 +204,7 @@ Print["   Exported to: ", jsonFile];
 Print[""];
 Print["=== Summary ==="];
 Print[""];
-Print["  Linearized massive gravity in 2+1D: G^(1)_ab + m^2 h_ab = 0"];
+Print["  Linearized massive gravity in 2+1D: G^(1)_ab - m^2 h_ab = 0"];
 Print[""];
 Print["  6 component equations:"];
 Print["    h_0 (h_tt): constraint (no d2_t)"];

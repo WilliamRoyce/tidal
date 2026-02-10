@@ -1057,7 +1057,7 @@ symmetry = "symmetric"
 names = ["m2"]
 
 [linearization]
-expression = "Einstein[CD][-a, -b] + m2 eta[-a, -b]"
+expression = "Einstein[CD][-a, -b] - m2 eta[-a, -b]"
 perturbation_field = "h"
 
 [parameters]

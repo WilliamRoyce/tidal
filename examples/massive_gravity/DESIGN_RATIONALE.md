@@ -26,11 +26,11 @@ Several physically motivated examples were evaluated:
 | **Linearized Einstein-Maxwell** | Multi-field perturbation | Requires perturbation of TWO fields (metric + EM), not supported by current single-field linearization | Rejected: significant extension needed |
 | **Linearized Yang-Mills** | Non-abelian gauge theory | Requires Lie algebra structure (xTras), not in pipeline | Rejected: dependency issue |
 | **Fierz-Pauli massive gravity** (m^2 * h_ab) | Tests constants, mass terms, metric reference | Mass term is quadratic in perturbation, not a linearization of a geometric expression | Modified approach adopted |
-| **Linearized G_ab + m^2 g_ab = 0 in 2+1D** | Tests 7 distinct features vs GW, physically motivated, clean implementation | Zeroth-order background inconsistency (m^2 * eta != 0) | **Selected** (see rationale) |
+| **Linearized G_ab - m^2 g_ab = 0 in 2+1D** | Tests 7 distinct features vs GW, physically motivated, clean implementation | Zeroth-order background inconsistency (-m^2 * eta != 0) | **Selected** (see rationale) |
 
 ### Why Massive Gravity in 2+1D Won
 
-The chosen example `G^(1)_ab[h] + m^2 h_ab = 0` obtained by linearizing `Einstein[CD][-a,-b] + m2 * eta[-a,-b]` was selected because it maximizes the number of distinct pipeline features tested while remaining physically meaningful and requiring **zero code changes** to the pipeline:
+The chosen example `G^(1)_ab[h] - m^2 h_ab = 0` obtained by linearizing `Einstein[CD][-a,-b] - m2 * eta[-a,-b]` was selected because it maximizes the number of distinct pipeline features tested while remaining physically meaningful and requiring **zero code changes** to the pipeline:
 
 1. **Constants in linearization** -- `m2` as `DefConstantSymbol`, tested in Lagrangian-derived examples but never with linearization
 2. **Metric reference in expression** -- `eta[-a,-b]` exercises the `eta[` -> `{prefix}Eta[` substitution rule that already existed but was untested in the linearization context
@@ -44,11 +44,26 @@ The chosen example `G^(1)_ab[h] + m^2 h_ab = 0` obtained by linearizing `Einstei
 
 ### Background Consistency
 
-The expression `G_ab + m^2 g_ab = 0` at zeroth order gives `m^2 * eta_ab = 0`, which is inconsistent for m^2 != 0. This means Minkowski spacetime is not a solution of the full nonlinear equations. However:
+The expression `G_ab - m^2 g_ab = 0` at zeroth order gives `-m^2 * eta_ab = 0`, which is inconsistent for m^2 != 0 (Minkowski is not a solution; the true background would be de Sitter). However:
 
-- **At the linearized level**, xPert's `LinearizeTensorExpression` extracts the O(epsilon) part regardless of background consistency. It computes `G^(1)_ab + m^2 * h^(1)_ab` correctly.
+- **At the linearized level**, xPert's `LinearizeTensorExpression` extracts the O(epsilon) part regardless of background consistency. It computes `G^(1)_ab - m^2 * h^(1)_ab` correctly.
 - **This is standard practice** in massive gravity: the Fierz-Pauli mass term IS the linearized theory. The full nonlinear completion (dRGT massive gravity, etc.) is a separate question.
 - **For pipeline testing**, what matters is that the computation produces valid, simulable equations with mass terms. Background consistency is a physics question, not a pipeline question.
+
+### Sign Convention: Why MINUS m^2
+
+The sign of the mass term in the linearization expression is critical for stability:
+
+| Expression | Linearizes to | Evolution form | Behavior |
+|-----------|---------------|----------------|----------|
+| `Einstein[CD] + m2 eta` | `G^(1)_ab + m² h_ab = 0` | `d2_t(h) = +m² h + spatial` | **Exponential growth** (tachyonic) |
+| `Einstein[CD] - m2 eta` | `G^(1)_ab - m² h_ab = 0` | `d2_t(h) = -m² h + spatial` | **Stable oscillation** (Klein-Gordon) |
+
+The root cause is the sign convention of the linearized Einstein tensor: `G^(1)_ab` contains `-½ d2_t(h_ab) + ...`, so when solving for d2_t the sign of the mass term flips. The positive expression `+m²` in the original equation becomes positive on the RHS after rearranging, giving exponential growth.
+
+This was discovered during simulation testing: the initial `+ m2 eta` expression produced exponentially growing solutions visible in the peak amplitude plot. Switching to `- m2 eta` produces the physically expected dispersive behavior.
+
+**Note on Fierz-Pauli:** The true Fierz-Pauli mass term is `m²/2 (h_ab - η_ab h)` where h = η^cd h_cd is the trace. This cannot be obtained by linearizing any covariant expression, as it's intrinsically a linearized-level construction. Our expression `-m² η_ab` linearizes to `-m² h_ab` (without the trace subtraction), which only gives mass to diagonal components (h_0, h_3, h_5) since `η_ab` is diagonal. Off-diagonal components (h_1, h_2, h_4) evolve as massless wave equations. This is a simplification of Fierz-Pauli but sufficient for pipeline testing and produces qualitatively correct dispersive physics.
 
 ### Why 2+1D Specifically
 
@@ -77,14 +92,14 @@ This is directly analogous to the Proca example (massive vector), providing a na
 
 The TOML expression:
 ```toml
-expression = "Einstein[CD][-a, -b] + m2 eta[-a, -b]"
+expression = "Einstein[CD][-a, -b] - m2 eta[-a, -b]"
 ```
 
-Uses Mathematica juxtaposition multiplication (`m2 eta` without `*`), consistent with the conventions in existing Lagrangian expressions (e.g., `procaMassSquared/2 A[-a]` in Proca).
+Uses Mathematica juxtaposition multiplication (`m2 eta` without `*`), consistent with the conventions in existing Lagrangian expressions (e.g., `procaMassSquared/2 A[-a]` in Proca). The minus sign is essential for stable evolution (see "Sign Convention" above).
 
 After substitution by `_substitute_field_names` (prefix "mg"):
 ```mathematica
-Einstein[mgCD][-a, -b] + m2 mgEta[-a, -b]
+Einstein[mgCD][-a, -b] - m2 mgEta[-a, -b]
 ```
 
 Key substitution rules exercised:
@@ -108,19 +123,39 @@ The `eta[` substitution was added as part of the general substitution system but
 
 The expected JSON output has:
 - 6 equations (h_0 through h_5)
-- Mass terms appearing as `"operator": "identity"` with `"coefficient_symbolic": "m2"` or `"-m2"`
+- Mass terms appearing as `"operator": "identity"` with `"coefficient_symbolic": "-m2"`
 - Non-zero diagonal mass matrix (auto-computed from identity operators)
 - `"linearized": true` in metadata
 - `"parameters": {"m2": 1.0}` for runtime override
 
 ### Simulation Design
 
-The simulation follows the Proca simulation pattern:
-- Gaussian pulse in h_3 (h_xx, a spatial-spatial component)
+The simulation places a Gaussian pulse in h_4 (h_xy), the only evolution equation:
 - 2D spatial grid (64x64, periodic BCs)
-- RK4 time integration
-- Physics validation: peak amplitude decreases over time (dispersive spreading)
-- 2x2 plot layout: initial heatmap, final heatmap, amplitude decay, cross-section comparison
+- RK4 time integration, ~3.5 oscillation periods
+- Physics validation: center-point oscillation matches analytic `A*cos(sqrt(2*m^2)*t)`
+- 2x3 plot layout: heatmap snapshots at t=0/T/4/T/2, center oscillation, cross-sections, amplitude envelope
+
+### Constraint Handling Limitations
+
+The gauge-unfixed massive gravity equations produce 5 constraint equations and 1 evolution equation (h_4). The constraints have diverse mathematical forms:
+
+| Constraint | Type | Self-terms |
+|-----------|------|------------|
+| h_0 (Hamiltonian) | Helmholtz | identity + laplacian_x + laplacian_y |
+| h_1, h_2 (momentum) | Partial Helmholtz | identity + one-axis laplacian |
+| h_3, h_5 (spatial) | Algebraic | identity only (no self-laplacian) |
+
+The pipeline's current constraint solver (`_solve_constraint_equation`) only handles pure Poisson equations of the form `laplacian(field) = source`. It cannot solve:
+- **Helmholtz equations** (`laplacian(phi) + lambda*phi = source`) for h_0, h_1, h_2
+- **Algebraic constraints** (`(1+m^2)*phi = source`) for h_3, h_5
+- **Coupled constraints** where h_0, h_3, h_5 depend on each other
+
+With the constraint solver disabled (the default), constraint fields remain frozen at their initial values. Since h_4's evolution equation references constraint fields (h_0, pi_1, pi_2), and these are frozen at zero, h_4 evolves as a pure massive oscillator: `d2_t(h_4) = -2*m^2*h_4` with no spatial propagation.
+
+This is still physical (it demonstrates the massive mode frequency omega = sqrt(2*m^2)), but spatial wave propagation would require either:
+1. **De Donder gauge-fixed equations** where each component satisfies `Box h_ij + m^2 h_ij = 0` (standard massive KG with laplacian)
+2. **Extended constraint solver** supporting Helmholtz and algebraic constraints (future pipeline work)
 
 ## 4. What This Example Validates End-to-End
 
@@ -135,7 +170,7 @@ The simulation follows the Proca simulation pattern:
 - [x] `"linearized" -> True` in metadata
 
 ### WLS -> JSON (requires wolframscript + xPert)
-- [ ] xPert correctly linearizes `Einstein[CD] + m2 * eta` expression
+- [x] xPert correctly linearizes `Einstein[CD] - m2 * eta` expression
 - [ ] Mass term `m2 * h_ab` decomposed to identity operators per component
 - [ ] 6 component equations generated (symmetric rank-2 in 3D)
 - [ ] Mass matrix auto-computed as non-zero diagonal
@@ -154,13 +189,13 @@ The simulation follows the Proca simulation pattern:
 |--------|------------------------|--------------------|
 | **Dimension** | 3+1D (4 spacetime dims) | 2+1D (3 spacetime dims) |
 | **Components** | 10 (symmetric 4x4) | 6 (symmetric 3x3) |
-| **Expression** | `Einstein[CD][-a,-b]` | `Einstein[CD][-a,-b] + m2 eta[-a,-b]` |
+| **Expression** | `Einstein[CD][-a,-b]` | `Einstein[CD][-a,-b] - m2 eta[-a,-b]` |
 | **Constants** | None | `m2` (DefConstantSymbol) |
 | **Parameters** | None | `m2 = 1.0` (runtime) |
 | **Mass matrix** | Zero (massless) | Non-zero diagonal (massive) |
 | **Metric in expr** | No | Yes (`eta[-a,-b]`) |
 | **Physics** | Massless wave propagation | Dispersive massive propagation |
-| **Constraint count** | 4 constraints, 6 evolution | 1 constraint, 2 first-order, 3 evolution |
+| **Constraint count** | 4 constraints, 6 evolution | 5 constraints, 1 evolution (h_4) |
 | **Gauge variants** | Gauge-unfixed + de Donder + TT | Gauge-unfixed only |
-| **Simulation focus** | TT-gauge polarizations h+, hx | Dispersive spreading of h_xx |
+| **Simulation focus** | TT-gauge polarizations h+, hx | Massive oscillation of h_xy |
 | **Analogous to** | Massless photon (Maxwell) | Massive photon (Proca) |

@@ -155,13 +155,17 @@ The massive gravity example was chosen to exercise features that `gravitational_
 
 ### Physics Background
 
-In 2+1D, pure GR has no local propagating degrees of freedom (the Weyl tensor vanishes identically). Adding a mass term `m^2 h_ab` creates a propagating massive mode with dispersion relation omega^2 = k^2 + m^2.
+In 2+1D, pure GR has no local propagating degrees of freedom (the Weyl tensor vanishes identically, and the propagating DOF count is n(n-3)/2 = 0). Adding a mass term creates a propagating massive mode with dispersion relation omega^2 = k^2 + m^2.
 
-The expression `G_ab + m^2 g_ab = 0` is linearized by xPert as:
+The expression `G_ab - m^2 g_ab = 0` is linearized by xPert as:
 - `LinearizeTensorExpression[Einstein[CD][-a,-b]]` -> `G^(1)_ab[h]` (linearized Einstein)
-- `LinearizeTensorExpression[m2 * eta[-a,-b]]` -> `m2 * h_ab` (first-order metric perturbation)
+- `LinearizeTensorExpression[-m2 * eta[-a,-b]]` -> `-m2 * h_ab` (first-order metric perturbation)
 
-The background inconsistency (m^2 * eta != 0 at zeroth order) is irrelevant at the linear level -- xPert extracts the O(epsilon) part regardless. This is standard practice in massive gravity.
+**Sign convention (critical):** The MINUS sign on `m2 eta` is essential for stability. With `+`, the identity terms in the evolution equations get positive coefficient (`d2_t(h) = +m^2 h + spatial`), causing exponential growth. With `-`, we get `d2_t(h) = -m^2 h + spatial` (stable Klein-Gordon-like oscillation). This is because the linearized Einstein tensor has `-1/2 d2_t(h)` convention, which flips the sign when solving for d2_t.
+
+The background inconsistency (-m^2 * eta != 0 at zeroth order) is irrelevant at the linear level -- xPert extracts the O(epsilon) part regardless. This is standard practice in massive gravity.
+
+**Note:** The true Fierz-Pauli mass term `m^2/2 (h_ab - eta_ab h)` cannot be obtained by linearizing a covariant expression. Our simplified `-m^2 eta_ab` linearizes to `-m^2 h_ab` for diagonal components only (since eta is diagonal). Off-diagonal components (h_1, h_2, h_4) evolve as massless wave equations.
 
 ### Alternative Examples Considered
 
