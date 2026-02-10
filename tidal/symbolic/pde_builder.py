@@ -1888,6 +1888,21 @@ class PDEFromSpec(PDEBase):
             else:
                 source_terms.append(term)
 
+        # Warn if non-laplacian self-terms exist (Helmholtz-type equation)
+        non_lap_self = [
+            t for t in eq.rhs_terms
+            if t.field == eq.field_name and t.operator != "laplacian"
+        ]
+        if non_lap_self:
+            ops = [t.operator for t in non_lap_self]
+            warnings.warn(
+                f"Constraint {eq.field_name} has non-laplacian self-terms "
+                f"({ops}). The 'poisson' method only handles pure Poisson "
+                f"equations correctly. Use method='auto' for Helmholtz or "
+                f"other mixed-operator constraints.",
+                stacklevel=2,
+            )
+
         # Validate equation structure
         if laplacian_coeff is None:
             msg = (
@@ -2023,11 +2038,19 @@ class PDEFromSpec(PDEBase):
                 eq, grid, self_terms, source, bc, t
             )
 
-        # 4. Update state
+        # 4. Validate and update state
+        if not np.all(np.isfinite(solution_data)):
+            msg = (
+                f"Constraint solver for {eq.field_name} produced non-finite "
+                f"values (NaN or Inf). This typically indicates a singular or "
+                f"near-singular operator. Check equation structure and "
+                f"coefficient values."
+            )
+            raise ValueError(msg)
         state[field_slot].data[:] = solution_data
         return state
 
-    def _solve_constraint_fft(
+    def _solve_constraint_fft(  # noqa: PLR0914
         self,
         eq: ComponentEquation,
         grid: GridBase,
@@ -2093,7 +2116,10 @@ class PDEFromSpec(PDEBase):
         # is compatible (zero mean), we can set the k=0 solution mode to zero,
         # giving the unique zero-mean solution. If incompatible, we raise.
         source_hat = np.fft.fftn(-source.data)
-        singular_mask = np.abs(combined_multiplier) < self._constraint_eps
+        # Use relative threshold scaled by the operator's maximum magnitude
+        # (with floor of 1.0 to handle near-zero operators gracefully)
+        mult_scale = max(float(np.max(np.abs(combined_multiplier))), 1.0)
+        singular_mask = np.abs(combined_multiplier) < self._constraint_eps * mult_scale
         n_singular = int(np.sum(singular_mask))
 
         if n_singular > 0:
@@ -2182,7 +2208,7 @@ class PDEFromSpec(PDEBase):
 
         try:
             solution: np.ndarray = spsolve(a_csc, rhs)  # type: ignore[reportUnknownVariableType]
-        except Exception as e:
+        except (RuntimeError, ValueError) as e:
             msg = (
                 f"Matrix solver failed for constraint {eq.field_name}:\n"
                 f"  Matrix shape: {a_csc.shape}, nnz: {a_csc.nnz}\n"
@@ -2338,7 +2364,7 @@ class PDEFromSpec(PDEBase):
             enabled_indices, state, bc, t, virtual_momenta
         )
 
-    def _solve_coupled_constraints_fft(  # noqa: C901, PLR0914, PLR0915
+    def _solve_coupled_constraints_fft(  # noqa: C901, PLR0912, PLR0914, PLR0915
         self,
         enabled_indices: list[int],
         state: FieldCollection,
@@ -2414,14 +2440,13 @@ class PDEFromSpec(PDEBase):
             external_terms: list[OperatorTerm] = []
 
             for term in eq.rhs_terms:
-                # Determine the actual field name (strip pi_ prefix for momentum)
                 ref_field = term.field
-                is_momentum = ref_field.startswith(("pi_", "pi"))
-                if is_momentum:
-                    # pi_N → field h_N; if h_N is a constraint, momentum is zero
-                    idx_str = ref_field.replace("pi_", "").replace("pi", "")
-                    if idx_str.isdigit():
-                        ref_comp_name = self.spec.component_names[int(idx_str)]
+
+                # Check if this is a momentum reference (pi_N → field h_N)
+                momentum_idx = parse_momentum_field_name(ref_field)
+                if momentum_idx is not None:
+                    if 0 <= momentum_idx < self.n_components:
+                        ref_comp_name = self.spec.component_names[momentum_idx]
                         if ref_comp_name in enabled_names:
                             # Momentum of a constraint field is always zero → skip
                             continue
@@ -2441,6 +2466,14 @@ class PDEFromSpec(PDEBase):
                         )
                         raise ValueError(msg)
                     coeff = self._resolve_coefficient_at_point(term, t, grid)
+                    if isinstance(coeff, np.ndarray):
+                        msg = (
+                            f"Position-dependent coefficient on self-term "
+                            f"'{term.operator}({ref_field})' in coupled "
+                            f"constraint {eq.field_name} is not compatible "
+                            f"with FFT block solver. Use method='matrix'."
+                        )
+                        raise ValueError(msg)
                     multiplier = multiplier_fn(k_grids, dx_array)
                     m_hat[local_i, local_j] += coeff * multiplier
                 else:
@@ -2483,6 +2516,13 @@ class PDEFromSpec(PDEBase):
             eq = self.spec.equations[comp_idx]
             field_slot = self._field_slot_map[eq.field_name]
             solution = np.fft.ifftn(f_hat[local_i]).real
+            if not np.all(np.isfinite(solution)):
+                msg = (
+                    f"Coupled FFT solver for {eq.field_name} produced "
+                    f"non-finite values. The coupled system may be "
+                    f"near-singular at some wavenumber."
+                )
+                raise ValueError(msg)
             state[field_slot].data[:] = solution
 
         return state
@@ -2546,8 +2586,9 @@ class PDEFromSpec(PDEBase):
                     i, state, bc, t, virtual_momenta
                 )
 
-            # Check convergence: max|field_new - field_old| for all fields
+            # Check convergence: max|field_new - field_old| relative to field scale
             max_change = 0.0
+            max_magnitude = 0.0
             for i in enabled_indices:
                 eq = self.spec.equations[i]
                 field_slot = self._field_slot_map[eq.field_name]
@@ -2555,8 +2596,15 @@ class PDEFromSpec(PDEBase):
                     state[field_slot].data - prev_data[eq.field_name]
                 )))
                 max_change = max(max_change, change)
+                max_magnitude = max(
+                    max_magnitude,
+                    float(np.max(np.abs(state[field_slot].data))),
+                )
 
-            if max_change < tol:
+            # Use relative tolerance: scale threshold by field magnitude
+            # (with floor of 1.0 to avoid issues with near-zero fields)
+            effective_tol = tol * max(1.0, max_magnitude)
+            if max_change < effective_tol:
                 return state
 
         # Did not converge — warn but don't error

@@ -280,12 +280,16 @@ class ConstraintSolverConfig:
     - **"matrix"**: Force sparse matrix solver. Works with any BCs.
 
     - **"poisson"**: Original py-pde Poisson solver. Requires exactly
-      one ``laplacian(self_field)`` term. Backward compatible.
+      one ``laplacian(self_field)`` term with no other self-referencing
+      operators. Will warn if non-laplacian self-terms are present.
+      Backward compatible.
 
     Coupled Constraint Parameters
     ----------------------------
     When multiple constraints reference each other's fields, the solver
     iterates using Gauss-Seidel until convergence or ``max_iterations``.
+    For fully periodic grids, coupled constraints are solved exactly
+    via Fourier-space block solve (no iteration needed).
 
     Attributes
     ----------
@@ -298,9 +302,11 @@ class ConstraintSolverConfig:
         Per-axis boundary conditions (e.g., ``{"x": ..., "y": ...}``).
     max_iterations : int
         Maximum Gauss-Seidel iterations for coupled constraints.
+        Must be >= 1.
     tolerance : float
         Convergence threshold for coupled constraint iteration.
-        Iteration stops when max|field_new - field_old| < tolerance.
+        Iteration stops when max|field_new - field_old| < tolerance
+        (scaled by field magnitude for robustness). Must be > 0.
     """
 
     enabled: bool = False
@@ -350,7 +356,14 @@ class ConstraintSolverConfig:
         }
 
         max_iterations = int(data.get("max_iterations", 20))
+        if max_iterations < 1:
+            msg = f"max_iterations must be >= 1, got {max_iterations}"
+            raise ValueError(msg)
+
         tolerance = float(data.get("tolerance", 1e-8))
+        if tolerance <= 0:
+            msg = f"tolerance must be > 0, got {tolerance}"
+            raise ValueError(msg)
 
         return cls(
             enabled=enabled,
