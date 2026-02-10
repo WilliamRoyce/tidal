@@ -9,6 +9,7 @@ comes from the specification that was derived from the Lagrangian.
 
 from __future__ import annotations
 
+import logging
 import math
 import operator
 import re
@@ -19,9 +20,9 @@ from typing import TYPE_CHECKING, Any, SupportsFloat, cast
 
 import numpy as np
 from pde import FieldCollection, PDEBase, ScalarField
-from scipy import (
-    sparse,  # type: ignore[reportMissingTypeStubs]
-    special,  # type: ignore[reportMissingTypeStubs]
+from scipy import (  # type: ignore[reportMissingTypeStubs]
+    sparse,
+    special,
 )
 from scipy.sparse.linalg import spsolve  # type: ignore[reportUnknownVariableType]
 from typing_extensions import override
@@ -50,6 +51,7 @@ if TYPE_CHECKING:
 
     NumericArray = NDArray[np.float64]
 
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Pre-compiled regex patterns for field name parsing (avoid re-compilation
@@ -258,9 +260,7 @@ _AXIS_LETTER: dict[int, str] = dict(enumerate(AXIS_LETTERS))
 _AXIS_RE_CLASS = "[" + "".join(AXIS_LETTERS) + "]"
 
 #: Regex for parsing generic single-axis derivative names.
-_GENERIC_SINGLE_RE = re.compile(
-    r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$"
-)
+_GENERIC_SINGLE_RE = re.compile(r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$")
 
 #: Regex for parsing generic multi-axis derivative names.
 _GENERIC_MULTI_RE = re.compile(
@@ -558,14 +558,13 @@ _OPERATOR_MATRIX_REGISTRY: dict[str, Any] = {
 
 
 def _fft_identity(
-    k_grids: list[np.ndarray], dx_array: np.ndarray  # noqa: ARG001
+    k_grids: list[np.ndarray],
+    dx_array: np.ndarray,  # noqa: ARG001
 ) -> np.ndarray:
     return np.ones_like(k_grids[0])
 
 
-def _fft_laplacian(
-    k_grids: list[np.ndarray], dx_array: np.ndarray
-) -> np.ndarray:
+def _fft_laplacian(k_grids: list[np.ndarray], dx_array: np.ndarray) -> np.ndarray:
     """Discrete Laplacian: sum_i (2cos(k_i dx_i) - 2) / dx_i²."""
     result = np.zeros_like(k_grids[0], dtype=complex)
     for k, dx in zip(k_grids, dx_array, strict=True):
@@ -604,9 +603,7 @@ def _fft_cross_derivative(
     return g1 * g2
 
 
-def _fft_biharmonic(
-    k_grids: list[np.ndarray], dx_array: np.ndarray
-) -> np.ndarray:
+def _fft_biharmonic(k_grids: list[np.ndarray], dx_array: np.ndarray) -> np.ndarray:
     """Discrete biharmonic = (discrete laplacian)²."""
     lap = _fft_laplacian(k_grids, dx_array)
     return lap**2
@@ -767,6 +764,7 @@ class PDEFromSpec(PDEBase):
         parameters: dict[str, float] | None = None,
         *,
         constraint_eps: float = 1e-14,
+        coupled_svd_rcond: float = 0.01,
     ) -> None:
         """Initialize PDE from equation specification.
 
@@ -786,6 +784,13 @@ class PDEFromSpec(PDEBase):
         constraint_eps : float
             Tolerance for determining whether a Laplacian coefficient is
             effectively zero in the constraint solver.  Default ``1e-14``.
+        coupled_svd_rcond : float
+            Relative singular-value threshold for Tikhonov regularization
+            in the coupled FFT constraint solver.  Singular values smaller
+            than ``rcond * max(S)`` are attenuated instead of inverted
+            directly, preventing noise amplification at near-singular
+            wavenumbers (e.g., Helmholtz resonance at k² ≈ m²).
+            Default ``0.01``.
         """
         super().__init__()
         self.spec = spec
@@ -795,6 +800,7 @@ class PDEFromSpec(PDEBase):
         }
         self._parameters = parameters or {}
         self._constraint_eps = constraint_eps
+        self._coupled_svd_rcond = coupled_svd_rcond
 
         # Build slot maps from state_layout for mixed time-order support
         self._field_slot_map: dict[str, int] = {}
@@ -1125,9 +1131,7 @@ class PDEFromSpec(PDEBase):
         # Step 3.5: Rational[p, q] → (p)/(q) — Mathematica exact fractions
         # xAct outputs Rational[1,2] for 1/2 in InputForm. Must handle before
         # bracket conversion since Rational uses Mathematica brackets.
-        result = re.sub(
-            r"Rational\[([^,\]]+),\s*([^,\]]+)\]", r"(\1)/(\2)", result
-        )
+        result = re.sub(r"Rational\[([^,\]]+),\s*([^,\]]+)\]", r"(\1)/(\2)", result)
 
         # Step 4: Function name conversions (batch)
         function_map = [
@@ -1890,7 +1894,8 @@ class PDEFromSpec(PDEBase):
 
         # Warn if non-laplacian self-terms exist (Helmholtz-type equation)
         non_lap_self = [
-            t for t in eq.rhs_terms
+            t
+            for t in eq.rhs_terms
             if t.field == eq.field_name and t.operator != "laplacian"
         ]
         if non_lap_self:
@@ -2030,9 +2035,7 @@ class PDEFromSpec(PDEBase):
             raise ValueError(msg)
 
         if use_fft:
-            solution_data = self._solve_constraint_fft(
-                eq, grid, self_terms, source, t
-            )
+            solution_data = self._solve_constraint_fft(eq, grid, self_terms, source, t)
         else:
             solution_data = self._solve_constraint_matrix(
                 eq, grid, self_terms, source, bc, t
@@ -2127,7 +2130,9 @@ class PDEFromSpec(PDEBase):
             # source_hat must be zero at singular wavenumbers.
             source_at_singular = np.abs(source_hat[singular_mask])
             max_source_at_null = float(np.max(source_at_singular))
-            if max_source_at_null > self._constraint_eps * float(np.max(np.abs(source_hat))):
+            if max_source_at_null > self._constraint_eps * float(
+                np.max(np.abs(source_hat))
+            ):
                 msg = (
                     f"Constraint operator for {eq.field_name} is singular in "
                     f"Fourier space ({n_singular} null-space mode(s)). "
@@ -2202,8 +2207,7 @@ class PDEFromSpec(PDEBase):
         # Convert to CSC for efficient direct solve
         a_csc = combined_matrix.tocsc()
         rhs = (
-            np.ravel(-source.data)
-            - np.asarray(combined_vector.toarray()).ravel()  # type: ignore[reportUnknownArgumentType]
+            np.ravel(-source.data) - np.asarray(combined_vector.toarray()).ravel()  # type: ignore[reportUnknownArgumentType]
         )
 
         try:
@@ -2239,9 +2243,7 @@ class PDEFromSpec(PDEBase):
         bool
             True if mutual coupling is detected.
         """
-        enabled_fields = {
-            self.spec.equations[i].field_name for i in enabled_indices
-        }
+        enabled_fields = {self.spec.equations[i].field_name for i in enabled_indices}
         for i in enabled_indices:
             eq = self.spec.equations[i]
             _, source_terms = self._partition_constraint_terms(i)
@@ -2251,7 +2253,10 @@ class PDEFromSpec(PDEBase):
                 # Handle momentum references (pi_N → field N)
                 if ref_field.startswith("pi"):
                     momentum_idx = parse_momentum_field_name(ref_field)
-                    if momentum_idx is not None and 0 <= momentum_idx < self.n_components:
+                    if (
+                        momentum_idx is not None
+                        and 0 <= momentum_idx < self.n_components
+                    ):
                         ref_field = self.spec.component_names[momentum_idx]
                 if ref_field in enabled_fields and ref_field != eq.field_name:
                     return True
@@ -2408,9 +2413,7 @@ class PDEFromSpec(PDEBase):
         """
         grid = state.grid
         n_constraints = len(enabled_indices)
-        enabled_names = {
-            self.spec.equations[i].field_name for i in enabled_indices
-        }
+        enabled_names = {self.spec.equations[i].field_name for i in enabled_indices}
 
         # Build wavenumber grids
         dx_array = np.array(grid.discretization)
@@ -2428,9 +2431,7 @@ class PDEFromSpec(PDEBase):
         # Build M(k) coupling matrix and s(k) source vector in Fourier space
         grid_shape = tuple(grid.shape)
         # M_hat[i, j, ...grid_shape] = coupling multiplier at each k
-        m_hat = np.zeros(
-            (n_constraints, n_constraints, *grid_shape), dtype=complex
-        )
+        m_hat = np.zeros((n_constraints, n_constraints, *grid_shape), dtype=complex)
         s_hat = np.zeros((n_constraints, *grid_shape), dtype=complex)
 
         for local_i, comp_idx in enumerate(enabled_indices):
@@ -2486,30 +2487,67 @@ class PDEFromSpec(PDEBase):
                 )
                 s_hat[local_i] = np.fft.fftn(source.data)
 
-        # Solve M(k) @ f_hat(k) = -s_hat(k) at each wavenumber
-        # Transpose to (grid_shape..., n_constraints, n_constraints) for np.linalg.solve
-        # np.linalg.solve expects (..., N, N) @ (..., N) = (..., N)
-        m_hat_transposed = np.moveaxis(m_hat, [0, 1], [-2, -1])
-        s_hat_transposed = np.moveaxis(s_hat, 0, -1)
+        # Solve M(k) @ f_hat(k) = -s_hat(k) via SVD with Tikhonov regularization.
+        # This handles near-singular wavenumbers (e.g., Helmholtz resonance at
+        # k² ≈ m²) by attenuating rather than amplifying near-null modes.
+        m_hat_transposed = np.moveaxis(m_hat, [0, 1], [-2, -1])  # (..., n, n)
+        s_hat_transposed = np.moveaxis(s_hat, 0, -1)  # (..., n)
+        rhs = -s_hat_transposed  # (..., n)
 
-        # np.linalg.solve with batched inputs requires (..., m, n) for RHS,
-        # so add a trailing dimension: (..., m) -> (..., m, 1)
-        rhs = -s_hat_transposed[..., np.newaxis]
-
+        # Batched SVD: M = U @ diag(S) @ Vh at each grid point
         try:
-            f_hat_transposed = np.linalg.solve(m_hat_transposed, rhs)
+            u, s, vh = np.linalg.svd(m_hat_transposed, full_matrices=False)
         except np.linalg.LinAlgError as e:
-            field_names = [
-                self.spec.equations[i].field_name for i in enabled_indices
-            ]
+            field_names = [self.spec.equations[i].field_name for i in enabled_indices]
             msg = (
-                f"Coupled constraint system is singular in Fourier space. "
-                f"Fields: {field_names}. Error: {e}"
+                f"SVD failed for coupled constraint system in Fourier "
+                f"space. Fields: {field_names}. Error: {e}"
             )
             raise ValueError(msg) from e
 
-        # Remove the trailing dimension and move back to (n_constraints, grid...)
-        f_hat_transposed = f_hat_transposed.squeeze(-1)
+        # Tikhonov regularization: S_reg_inv = S / (S^2 + alpha^2)
+        # alpha = rcond * max(S) ensures well-conditioned modes are unaffected
+        # while near-singular modes are smoothly attenuated.
+        s_max = float(np.max(s))
+        alpha = self._coupled_svd_rcond * max(s_max, 1e-30)
+        alpha_sq = alpha * alpha
+        s_reg_inv = s / (s * s + alpha_sq)
+
+        n_regularized = int(np.sum(s < alpha))
+        total_svs = int(np.prod(s.shape))
+
+        if n_regularized > 0:
+            field_names = [self.spec.equations[i].field_name for i in enabled_indices]
+            logger.debug(
+                "Coupled FFT solver: %d/%d singular values (%.1f%%) below "
+                "Tikhonov threshold %.2e (max SV %.2e). Fields: %s.",
+                n_regularized,
+                total_svs,
+                100.0 * n_regularized / max(total_svs, 1),
+                alpha,
+                s_max,
+                field_names,
+            )
+
+            # Only emit visible warning for truly pathological systems
+            # where the majority of singular values need regularization.
+            if n_regularized > total_svs // 2:
+                warnings.warn(
+                    f"Coupled FFT solver: {n_regularized}/{total_svs} "
+                    f"singular values "
+                    f"({100.0 * n_regularized / total_svs:.0f}%) required "
+                    f"Tikhonov regularization, indicating a severely "
+                    f"ill-conditioned constraint system. "
+                    f"Fields: {field_names}.",
+                    stacklevel=2,
+                )
+
+        # Compute f = Vh^H @ diag(S_reg_inv) @ U^H @ rhs
+        u_h_rhs = np.einsum("...ji,...j->...i", u.conj(), rhs)
+        scaled = s_reg_inv * u_h_rhs
+        f_hat_transposed = np.einsum("...ji,...j->...i", vh.conj(), scaled)
+
+        # Move back to (n_constraints, grid...) layout
         f_hat = np.moveaxis(f_hat_transposed, -1, 0)
 
         for local_i, comp_idx in enumerate(enabled_indices):
@@ -2592,9 +2630,9 @@ class PDEFromSpec(PDEBase):
             for i in enabled_indices:
                 eq = self.spec.equations[i]
                 field_slot = self._field_slot_map[eq.field_name]
-                change = float(np.max(np.abs(
-                    state[field_slot].data - prev_data[eq.field_name]
-                )))
+                change = float(
+                    np.max(np.abs(state[field_slot].data - prev_data[eq.field_name]))
+                )
                 max_change = max(max_change, change)
                 max_magnitude = max(
                     max_magnitude,
@@ -2811,7 +2849,9 @@ class PDEFromSpec(PDEBase):
             max_diffusive_coeff = 0.0
             for term in eq.rhs_terms:
                 coeff_abs = abs(term.coefficient)
-                if (term.operator == "laplacian" and term.field == eq.field_name) or term.operator.startswith("laplacian_"):
+                if (
+                    term.operator == "laplacian" and term.field == eq.field_name
+                ) or term.operator.startswith("laplacian_"):
                     max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
                 elif term.operator == "biharmonic":
                     max_diffusive_coeff = max(max_diffusive_coeff, coeff_abs)
@@ -2856,6 +2896,7 @@ def build_pde_from_json(
     parameters: dict[str, float] | None = None,
     *,
     constraint_eps: float = 1e-14,
+    coupled_svd_rcond: float = 0.01,
 ) -> PDEFromSpec:
     """Build a PDE from a JSON equation specification file.
 
@@ -2874,6 +2915,9 @@ def build_pde_from_json(
     constraint_eps : float
         Tolerance for the constraint solver's Laplacian coefficient check.
         Default ``1e-14``.
+    coupled_svd_rcond : float
+        Relative singular-value threshold for Tikhonov regularization in
+        the coupled FFT constraint solver.  Default ``0.01``.
 
     Returns
     -------
@@ -2896,8 +2940,17 @@ def build_pde_from_json(
     if parameters is None:
         meta_params: dict[str, object] | None = spec.metadata.get("parameters")
         if isinstance(meta_params, dict):
-            parameters = {k: float(v) for k, v in meta_params.items() if isinstance(v, (int, float))}
-    return PDEFromSpec(spec, parameters=parameters, constraint_eps=constraint_eps)
+            parameters = {
+                k: float(v)
+                for k, v in meta_params.items()
+                if isinstance(v, (int, float))
+            }
+    return PDEFromSpec(
+        spec,
+        parameters=parameters,
+        constraint_eps=constraint_eps,
+        coupled_svd_rcond=coupled_svd_rcond,
+    )
 
 
 def create_initial_state(
