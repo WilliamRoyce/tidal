@@ -31,6 +31,7 @@ from tidal.symbolic.json_loader import (
     _CUSTOM_OPERATORS,  # type: ignore[reportPrivateUsage]
     AXIS_LETTERS,
     BoundaryCondition,
+    ComponentEquation,
     ConstraintSolverConfig,
     EquationSystem,
     OperatorTerm,
@@ -353,8 +354,8 @@ def _build_identity_matrix(
     The identity operator I satisfies I(field) = field, so its matrix
     representation is simply the identity matrix with zero BC offset.
     """
-    n = int(np.prod(grid.shape))
-    return sparse.eye(n, format="dok"), sparse.dok_matrix((n, 1))
+    n = int(np.prod(grid.shape))  # type: ignore[reportUnknownArgumentType]
+    return sparse.eye(n, format="dok"), sparse.dok_matrix((n, 1))  # type: ignore[reportUnknownArgumentType,reportReturnType]
 
 
 def _build_laplacian_matrix(
@@ -365,10 +366,15 @@ def _build_laplacian_matrix(
 
     Reuses py-pde's ``_get_laplace_matrix`` which handles all grid dimensions
     (1D, 2D, 3D) and boundary condition types (periodic, Dirichlet, Neumann).
+
+    Raises
+    ------
+    ImportError
+        If py-pde's internal ``_get_laplace_matrix`` is not available.
     """
     try:
         from pde.grids.operators.cartesian import (  # noqa: PLC0415
-            _get_laplace_matrix,
+            _get_laplace_matrix,  # noqa: PLC2701  # type: ignore[reportPrivateUsage]
         )
     except ImportError as e:
         msg = (
@@ -404,9 +410,9 @@ def _build_directional_laplacian_matrix(
     g_mat, g_vec = _build_gradient_matrix(grid, bcs, axis=axis)
     # dir_lap = G @ G: apply gradient twice along the same axis
     # G @ (G @ field + vec) + vec = G² @ field + G @ vec + vec
-    dir_lap_matrix = g_mat @ g_mat
-    dir_lap_vector = g_mat @ g_vec + g_vec
-    return dir_lap_matrix, dir_lap_vector
+    dir_lap_matrix = g_mat @ g_mat  # type: ignore[reportOperatorIssue]
+    dir_lap_vector = g_mat @ g_vec + g_vec  # type: ignore[reportOperatorIssue]
+    return dir_lap_matrix, dir_lap_vector  # type: ignore[reportUnknownVariableType]
 
 
 def _build_gradient_matrix(
@@ -421,12 +427,12 @@ def _build_gradient_matrix(
     along the target axis. Boundary conditions modify boundary rows.
     """
     shape = grid.shape
-    n = int(np.prod(shape))
+    n = int(np.prod(shape))  # type: ignore[reportUnknownArgumentType]
     dx = grid.discretization[axis]
     scale = 1.0 / (2.0 * dx)
 
-    matrix = sparse.dok_matrix((n, n))
-    vector = sparse.dok_matrix((n, 1))
+    matrix = sparse.dok_matrix((n, n))  # type: ignore[reportUnknownArgumentType]
+    vector = sparse.dok_matrix((n, 1))  # type: ignore[reportUnknownArgumentType]
 
     bc_axis = bcs[axis]
 
@@ -436,7 +442,7 @@ def _build_gradient_matrix(
         # Left neighbor: -1/(2dx)
         if multi_idx[axis] == 0:
             bc_idx = list(multi_idx)
-            bc_idx[axis] = -1
+            bc_idx[axis] = -1  # type: ignore[reportCallIssue,reportArgumentType]
             const, entries = bc_axis.get_sparse_matrix_data(tuple(bc_idx))
             vector[flat_idx, 0] += -const * scale
             for k, v in entries.items():
@@ -489,10 +495,10 @@ def _build_cross_derivative_matrix(
     # Cross derivative = G1 @ G2 (apply axis2 gradient first, then axis1)
     # For the vector: G1 @ (G2 @ field + vec2) + vec1
     #   = (G1 @ G2) @ field + G1 @ vec2 + vec1
-    cross_matrix = g1_mat @ g2_mat
-    cross_vector = g1_mat @ g2_vec + g1_vec
+    cross_matrix = g1_mat @ g2_mat  # type: ignore[reportOperatorIssue]
+    cross_vector = g1_mat @ g2_vec + g1_vec  # type: ignore[reportOperatorIssue]
 
-    return cross_matrix, cross_vector
+    return cross_matrix, cross_vector  # type: ignore[reportUnknownVariableType]
 
 
 def _build_biharmonic_matrix(
@@ -505,12 +511,11 @@ def _build_biharmonic_matrix(
     """
     lap_mat, lap_vec = _build_laplacian_matrix(grid, bcs)
 
-    # Biharmonic = L @ L
-    # For the vector: L @ (L @ field + vec) + vec = L² @ field + L @ vec + vec
-    biharm_matrix = lap_mat @ lap_mat
-    biharm_vector = lap_mat @ lap_vec + lap_vec
+    # L @ (L @ field + vec) + vec = L² @ field + L @ vec + vec
+    biharm_matrix = lap_mat @ lap_mat  # type: ignore[reportOperatorIssue]
+    biharm_vector = lap_mat @ lap_vec + lap_vec  # type: ignore[reportOperatorIssue]
 
-    return biharm_matrix, biharm_vector
+    return biharm_matrix, biharm_vector  # type: ignore[reportUnknownVariableType]
 
 
 #: Registry mapping operator names to sparse matrix builder functions.
@@ -553,7 +558,7 @@ _OPERATOR_MATRIX_REGISTRY: dict[str, Any] = {
 
 
 def _fft_identity(
-    k_grids: list[np.ndarray], dx_array: np.ndarray
+    k_grids: list[np.ndarray], dx_array: np.ndarray  # noqa: ARG001
 ) -> np.ndarray:
     return np.ones_like(k_grids[0])
 
@@ -563,7 +568,7 @@ def _fft_laplacian(
 ) -> np.ndarray:
     """Discrete Laplacian: sum_i (2cos(k_i dx_i) - 2) / dx_i²."""
     result = np.zeros_like(k_grids[0], dtype=complex)
-    for i, (k, dx) in enumerate(zip(k_grids, dx_array, strict=True)):
+    for k, dx in zip(k_grids, dx_array, strict=True):
         result += (2.0 * np.cos(k * dx) - 2.0) / dx**2
     return result
 
@@ -1714,9 +1719,9 @@ class PDEFromSpec(PDEBase):
                 source_terms.append(term)
         return self_terms, source_terms
 
-    def _compute_constraint_source(
+    def _compute_constraint_source(  # noqa: PLR0913, PLR0917
         self,
-        component_idx: int,
+        component_idx: int,  # noqa: ARG002
         state: FieldCollection,
         bc: BCDescriptor,
         t: float,
@@ -1826,7 +1831,7 @@ class PDEFromSpec(PDEBase):
             return self._solve_constraint_poisson(
                 component_idx, state, bc, t, virtual_momenta
             )
-        if method in ("auto", "fft", "matrix"):
+        if method in {"auto", "fft", "matrix"}:
             return self._solve_constraint_unified(
                 component_idx, state, bc, t, virtual_momenta
             )
@@ -1852,6 +1857,14 @@ class PDEFromSpec(PDEBase):
 
         Equation form: 0 = c * laplacian(field) + source_terms
         Rearranged to: laplacian(field) = -source_terms / c
+
+        Raises
+        ------
+        ValueError
+            If the equation lacks a laplacian self-term, has zero coefficient,
+            or the Poisson solver fails.
+        TypeError
+            If the computed RHS is not a ScalarField.
         """
         from pde import solve_poisson_equation  # noqa: PLC0415, I001  # type: ignore[reportUnknownVariableType]
 
@@ -2044,8 +2057,8 @@ class PDEFromSpec(PDEBase):
         dx_array = np.array(grid.discretization)
 
         # Build wavenumber grids
-        k_arrays = [
-            np.fft.fftfreq(n, d=dx) * 2 * np.pi
+        k_arrays: list[np.ndarray] = [
+            np.fft.fftfreq(n, d=dx) * 2 * np.pi  # type: ignore[reportUnknownMemberType]
             for n, dx in zip(grid.shape, dx_array, strict=True)
         ]
         k_grids = list(np.meshgrid(*k_arrays, indexing="ij"))
@@ -2070,7 +2083,7 @@ class PDEFromSpec(PDEBase):
                     f"'{term.operator}({eq.field_name})' is not compatible "
                     f"with FFT solver. Use method='matrix'."
                 )
-                raise ValueError(msg)
+                raise ValueError(msg)  # noqa: TRY004
 
             combined_multiplier += coeff * term_mult
 
@@ -2106,13 +2119,13 @@ class PDEFromSpec(PDEBase):
 
         return np.fft.ifftn(solution_hat).real  # type: ignore[return-value]
 
-    def _solve_constraint_matrix(
+    def _solve_constraint_matrix(  # noqa: PLR0913, PLR0917
         self,
         eq: ComponentEquation,
         grid: GridBase,
         self_terms: list[OperatorTerm],
         source: ScalarField,
-        bc: BCDescriptor,
+        bc: BCDescriptor,  # noqa: ARG002
         t: float,
     ) -> np.ndarray:
         """Solve constraint via sparse matrix assembly and direct solve.
@@ -2164,11 +2177,11 @@ class PDEFromSpec(PDEBase):
         a_csc = combined_matrix.tocsc()
         rhs = (
             np.ravel(-source.data)
-            - np.asarray(combined_vector.toarray()).ravel()
+            - np.asarray(combined_vector.toarray()).ravel()  # type: ignore[reportUnknownArgumentType]
         )
 
         try:
-            solution = spsolve(a_csc, rhs)
+            solution: np.ndarray = spsolve(a_csc, rhs)  # type: ignore[reportUnknownVariableType]
         except Exception as e:
             msg = (
                 f"Matrix solver failed for constraint {eq.field_name}:\n"
@@ -2325,7 +2338,7 @@ class PDEFromSpec(PDEBase):
             enabled_indices, state, bc, t, virtual_momenta
         )
 
-    def _solve_coupled_constraints_fft(
+    def _solve_coupled_constraints_fft(  # noqa: C901, PLR0914, PLR0915
         self,
         enabled_indices: list[int],
         state: FieldCollection,
@@ -2361,6 +2374,11 @@ class PDEFromSpec(PDEBase):
         -------
         FieldCollection
             State with solved constraint fields.
+
+        Raises
+        ------
+        ValueError
+            If an operator has no FFT multiplier or the system is singular.
         """
         grid = state.grid
         n_constraints = len(enabled_indices)
@@ -2370,8 +2388,8 @@ class PDEFromSpec(PDEBase):
 
         # Build wavenumber grids
         dx_array = np.array(grid.discretization)
-        k_arrays = [
-            np.fft.fftfreq(n, d=dx) * 2 * np.pi
+        k_arrays: list[np.ndarray] = [
+            np.fft.fftfreq(n, d=dx) * 2 * np.pi  # type: ignore[reportUnknownMemberType]
             for n, dx in zip(grid.shape, dx_array, strict=True)
         ]
         k_grids = np.meshgrid(*k_arrays, indexing="ij")
@@ -2398,7 +2416,7 @@ class PDEFromSpec(PDEBase):
             for term in eq.rhs_terms:
                 # Determine the actual field name (strip pi_ prefix for momentum)
                 ref_field = term.field
-                is_momentum = ref_field.startswith("pi_") or ref_field.startswith("pi")
+                is_momentum = ref_field.startswith(("pi_", "pi"))
                 if is_momentum:
                     # pi_N → field h_N; if h_N is a constraint, momentum is zero
                     idx_str = ref_field.replace("pi_", "").replace("pi", "")
@@ -2512,8 +2530,9 @@ class PDEFromSpec(PDEBase):
         first_config = self.spec.equations[enabled_indices[0]].constraint_solver
         max_iter = first_config.max_iterations
         tol = first_config.tolerance
+        max_change = 0.0
 
-        for iteration in range(max_iter):
+        for _iteration in range(max_iter):
             # Save current field values for convergence check
             prev_data: dict[str, np.ndarray] = {}
             for i in enabled_indices:
