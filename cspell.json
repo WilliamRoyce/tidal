@@ -165,6 +165,7 @@
     "fftn",
     "ftype",
     "funcs",
+    "gcoup",
     "ifft",
     "ifftn",
     "imag",

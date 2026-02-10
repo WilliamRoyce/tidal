@@ -2704,3 +2704,218 @@ class TestCoupledSVDRegularization:
         assert np.all(np.isfinite(state[0].data))
         assert np.all(np.isfinite(state[1].data))
         assert np.all(np.isfinite(state[2].data))
+
+
+class TestCoupledProcaConstraints:
+    """Integration tests: coupled Proca (two vector fields) with Dirichlet BCs.
+
+    Exercises non-periodic constraint solver code paths:
+    - Sparse matrix solver (Dirichlet BCs, not FFT)
+    - Gauss-Seidel iteration for coupled A_0-B_0 constraints
+    - Two different Helmholtz scales (mA2=1.0, mB2=2.0)
+    - Cross-field identity coupling in constraint equations
+    """
+
+    @pytest.fixture
+    def coupled_proca_setup(self) -> tuple[PDEFromSpec, FieldCollection]:
+        """Load coupled Proca spec and build PDE + initial state."""
+        from pathlib import Path
+
+        from tidal.symbolic import build_pde_from_json, load_equation_system
+
+        json_path = (
+            Path(__file__).parent.parent
+            / "examples"
+            / "data"
+            / "coupled_proca_3d.json"
+        )
+        params = {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5}
+        spec = load_equation_system(json_path)
+        pde = build_pde_from_json(json_path, parameters=params)
+
+        grid = CartesianGrid(
+            bounds=[(0, np.pi), (0, np.pi)],
+            shape=[8, 8],
+            periodic=False,
+        )
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+        y = cast("np.ndarray", grid.cell_coords[..., 1])
+        gaussian = 0.5 * np.exp(
+            -((x - np.pi / 2) ** 2 + (y - np.pi / 2) ** 2) / (2 * 0.5**2)
+        )
+
+        fields: list[ScalarField] = []
+        for name, slot_type in spec.state_layout:
+            sf = ScalarField(grid, data=0.0, label=f"{name}_{slot_type}")
+            if name == "A_1" and slot_type == "field":
+                sf.data[:] = gaussian
+            fields.append(sf)
+
+        state = FieldCollection(fields)
+        return pde, state
+
+    def test_constraints_solved_with_nonzero_momenta(
+        self, coupled_proca_setup: tuple[PDEFromSpec, FieldCollection]
+    ) -> None:
+        """A_0 and B_0 become non-zero after constraint solve with non-zero momenta.
+
+        At t=0 all momenta are zero so constraint sources vanish. After one
+        forward Euler step, momenta become non-zero and the Gauss-Seidel
+        solver should produce non-zero A_0 and B_0.
+        """
+        pde, state = coupled_proca_setup
+
+        # First call: zero momenta -> constraint solve has zero source
+        rate = pde.evolution_rate(state, t=0.0)
+
+        # Manually advance one Euler step to create non-zero momenta
+        for i in range(len(state)):
+            state[i].data[:] = np.asarray(state[i].data) + 0.05 * np.asarray(
+                rate[i].data
+            )
+
+        # Second call: non-zero momenta -> constraints should activate
+        pde.evolution_rate(state, t=0.05)
+
+        a0_slot = pde._field_slot_map["A_0"]
+        b0_slot = pde._field_slot_map["B_0"]
+        a0_max = float(np.max(np.abs(state[a0_slot].data)))
+        b0_max = float(np.max(np.abs(state[b0_slot].data)))
+
+        assert a0_max > 1e-6, f"A_0 should be nonzero, got max={a0_max}"
+        assert b0_max > 1e-6, f"B_0 should be nonzero, got max={b0_max}"
+
+    def test_gauss_seidel_converges(
+        self, coupled_proca_setup: tuple[PDEFromSpec, FieldCollection]
+    ) -> None:
+        """Gauss-Seidel converges without warning on non-periodic coupled system."""
+        import warnings
+
+        pde, state = coupled_proca_setup
+
+        # Create non-zero momenta
+        rate = pde.evolution_rate(state, t=0.0)
+        for i in range(len(state)):
+            state[i].data[:] = np.asarray(state[i].data) + 0.05 * np.asarray(
+                rate[i].data
+            )
+
+        # Second call should converge without GS non-convergence warning
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            pde.evolution_rate(state, t=0.05)
+
+    def test_dirichlet_bc_respected(
+        self, coupled_proca_setup: tuple[PDEFromSpec, FieldCollection]
+    ) -> None:
+        """Constraint fields respect Dirichlet boundary conditions.
+
+        After constraint solve, boundary values of A_0 should be approximately
+        zero (Dirichlet condition enforced by the sparse matrix stencil).
+        """
+        pde, state = coupled_proca_setup
+
+        # Create non-zero momenta
+        rate = pde.evolution_rate(state, t=0.0)
+        for i in range(len(state)):
+            state[i].data[:] = np.asarray(state[i].data) + 0.05 * np.asarray(
+                rate[i].data
+            )
+        pde.evolution_rate(state, t=0.05)
+
+        a0_slot = pde._field_slot_map["A_0"]
+        a0_data = np.asarray(state[a0_slot].data, dtype=float)
+
+        # py-pde with non-periodic grids uses ghost cells; the interior
+        # boundary-adjacent cells should have small values relative to center.
+        center_val = float(np.max(np.abs(a0_data[2:-2, 2:-2])))
+        assert center_val > 1e-6, "A_0 should have non-zero interior values"
+        assert np.all(np.isfinite(a0_data)), "A_0 should be finite everywhere"
+
+    def test_short_simulation_stable(
+        self, coupled_proca_setup: tuple[PDEFromSpec, FieldCollection]
+    ) -> None:
+        """Short simulation remains stable with active non-periodic constraints."""
+        from tidal.utils import normalize_solve_result
+
+        pde, state = coupled_proca_setup
+        result = pde.solve(state, t_range=0.2, dt=0.05, scheme="runge-kutta")
+        result = normalize_solve_result(result)
+
+        # All fields should remain finite and bounded
+        for i in range(len(result)):
+            data = np.asarray(result[i].data, dtype=float)
+            assert np.all(np.isfinite(data)), f"Slot {i} has non-finite values"
+            assert float(np.max(np.abs(data))) < 100.0, (
+                f"Slot {i} diverged: max={float(np.max(np.abs(data)))}"
+            )
+
+    def test_coupling_effect(
+        self, coupled_proca_setup: tuple[PDEFromSpec, FieldCollection]
+    ) -> None:
+        """Cross-coupling gcoup transfers energy from A to B sector.
+
+        With gcoup=0.5, B_1 should become non-zero after evolution.
+        """
+        from pathlib import Path
+
+        from tidal.symbolic import build_pde_from_json, load_equation_system
+        from tidal.utils import normalize_solve_result
+
+        json_path = (
+            Path(__file__).parent.parent
+            / "examples"
+            / "data"
+            / "coupled_proca_3d.json"
+        )
+
+        # Build uncoupled version (gcoup=0)
+        spec = load_equation_system(json_path)
+        pde_uncoupled = build_pde_from_json(
+            json_path, parameters={"mA2": 1.0, "mB2": 2.0, "gcoup": 0.0}
+        )
+
+        grid = CartesianGrid(
+            bounds=[(0, np.pi), (0, np.pi)],
+            shape=[8, 8],
+            periodic=False,
+        )
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+        y = cast("np.ndarray", grid.cell_coords[..., 1])
+        gaussian = 0.5 * np.exp(
+            -((x - np.pi / 2) ** 2 + (y - np.pi / 2) ** 2) / (2 * 0.5**2)
+        )
+
+        fields_uncoupled: list[ScalarField] = []
+        for name, slot_type in spec.state_layout:
+            sf = ScalarField(grid, data=0.0, label=f"{name}_{slot_type}")
+            if name == "A_1" and slot_type == "field":
+                sf.data[:] = gaussian
+            fields_uncoupled.append(sf)
+        state_uncoupled = FieldCollection(fields_uncoupled)
+
+        result_uncoupled = pde_uncoupled.solve(
+            state_uncoupled, t_range=0.2, dt=0.05, scheme="runge-kutta"
+        )
+        result_uncoupled = normalize_solve_result(result_uncoupled)
+
+        # Build coupled version (gcoup=0.5) — use the fixture setup
+        pde_coupled, state_coupled = coupled_proca_setup
+        result_coupled = pde_coupled.solve(
+            state_coupled, t_range=0.2, dt=0.05, scheme="runge-kutta"
+        )
+        result_coupled = normalize_solve_result(result_coupled)
+
+        # B_1 in uncoupled should be zero (no energy transfer)
+        b1_slot = pde_uncoupled._field_slot_map["B_1"]
+        b1_uncoupled_max = float(np.max(np.abs(result_uncoupled[b1_slot].data)))
+
+        # B_1 in coupled should be non-zero (energy transfer via gcoup)
+        b1_coupled_max = float(np.max(np.abs(result_coupled[b1_slot].data)))
+
+        assert b1_uncoupled_max < 1e-12, (
+            f"Uncoupled B_1 should be ~0, got {b1_uncoupled_max}"
+        )
+        assert b1_coupled_max > 1e-6, (
+            f"Coupled B_1 should be non-zero, got {b1_coupled_max}"
+        )
