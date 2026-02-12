@@ -718,12 +718,10 @@ def _wls_constraint_metadata(
     max_iter = cs_config.get("max_iterations", 30)
     tol = cs_config.get("tolerance", 1e-10)
 
-    # Format tolerance in Wolfram scientific notation
-    tol_str = f"{tol:.0e}".replace("e-", "*^-").replace("e+", "*^")
-    if tol_str == "1*^-10":
-        pass  # already fine
-    elif "e" in f"{tol:.0e}":
-        tol_str = f"{tol:.0e}".replace("e-0", "*^-").replace("e-", "*^-").replace("e+0", "*^").replace("e+", "*^")
+    # Format tolerance in Wolfram scientific notation: 1e-10 → 1*^-10
+    tol_str = f"{tol:.0e}"
+    tol_str = tol_str.replace("e+0", "*^").replace("e-0", "*^-")
+    tol_str = tol_str.replace("e+", "*^").replace("e-", "*^-")
 
     lines = [
         '  "solve_constraints" -> True,',
