@@ -465,8 +465,8 @@ tidal/                   # TIDAL project root
 │   ├── test_cli_parsing.py  # CLI argument parsing tests
 │   ├── test_scalar_vector_physics.py  # Physics stress tests
 │   └── test_*.py            # Other test modules
-├── examples/                 # 17 pipeline examples + legacy KG
-│   ├── data/                # Generated JSON specifications (18 files)
+├── examples/                 # 18 pipeline examples + legacy KG
+│   ├── data/                # Generated JSON specifications (20 files)
 │   └── {example}/           # Each has .wls, run.sh; most have theory.toml, simulation.py
 ├── docs/                     # Documentation
 │   └── source/              # Sphinx source files
