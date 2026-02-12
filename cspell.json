@@ -190,9 +190,11 @@
     "pydata",
     "pylint",
     "pydocstyle",
+    "mathrm",
     "matvec",
     "Mult",
     "mghpert",
+    "ncol",
     "numpy",
     "ndarray",
     "xlabel",
@@ -213,7 +215,8 @@
     "trange",
     "Tras",
     "tqdm",
-    "xpert"
+    "xpert",
+    "xytext"
   ],
   "flagWords": ["hte", "teh", "wolfrom"],
   "allowCompoundWords": true,

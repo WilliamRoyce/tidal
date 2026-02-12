@@ -207,7 +207,9 @@ def _resolve_mass_squared(
         if sym_val is not None:
             resolved = _resolve_symbolic_coeff(sym_val, data.parameters)
             if resolved is not None:
-                return float(resolved)
+                # Negate: symbolic matrix stores raw coefficient_symbolic,
+                # but convention is matrix[i][j] = -(coefficient).
+                return float(-resolved)
 
     return float(data.spec.mass_matrix[field_idx][field_idx])
 
@@ -229,7 +231,9 @@ def _resolve_coupling(
         if sym_val is not None:
             resolved = _resolve_symbolic_coeff(sym_val, data.parameters)
             if resolved is not None:
-                return float(resolved)
+                # Negate: symbolic matrix stores raw coefficient_symbolic,
+                # but convention is matrix[i][j] = -(coefficient).
+                return float(-resolved)
 
     return float(data.spec.coupling_matrix[i][j])
 
