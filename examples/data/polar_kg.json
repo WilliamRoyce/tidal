@@ -1,75 +1,75 @@
 {
-	"metadata":{
-		"source":"xAct",
-		"lagrangian_expr":"-1\/2 g^ab nabla_a phi nabla_b phi - 1\/2 m^2 phi^2",
-		"derived_from":"Euler-Lagrange",
-		"gauge":"none",
-		"linearized":true,
-		"parameters":{
-			"polm2":1.0
+	"metadata": {
+		"source": "xAct",
+		"lagrangian_expr": "-1/2 g^ab nabla_a phi nabla_b phi - 1/2 m^2 phi^2",
+		"derived_from": "Euler-Lagrange",
+		"gauge": "none",
+		"linearized": true,
+		"parameters": {
+			"polm2": 1.0
 		}
 	},
-	"spacetime":{
-		"dimension":3,
-		"signature":[
+	"spacetime": {
+		"dimension": 3,
+		"signature": [
 			-1,
 			1,
 			1
 		],
-		"coordinates":[
+		"coordinates": [
 			"t",
 			"x",
 			"y"
 		],
-		"metric_type":"polar",
-		"metric_components":"diag(-1, 1, x^2)"
+		"metric_type": "polar",
+		"metric_components": "diag(-1, 1, x^2)"
 	},
-	"fields":[
+	"fields": [
 		{
-			"name":"polphi_0",
-			"index":0,
-			"is_dynamical":true
+			"name": "polphi_0",
+			"index": 0,
+			"is_dynamical": true
 		}
 	],
-	"equations":[
+	"equations": [
 		{
-			"field":"polphi_0",
-			"lhs":{
-				"expression":"d2_t(polphi_0)",
-				"order":{
-					"time":2,
-					"space":0
+			"field": "polphi_0",
+			"lhs": {
+				"expression": "d2_t(polphi_0)",
+				"order": {
+					"time": 2,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":-1.0,
-						"operator":"identity",
-						"field":"polphi_0",
-						"coefficient_symbolic":"-polm2"
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "polphi_0",
+						"coefficient_symbolic": "-polm2"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"gradient_x",
-						"field":"polphi_0",
-						"coefficient_symbolic":"x[]^(-1)",
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "polphi_0",
+						"coefficient_symbolic": "x[]^(-1)",
+						"coordinate_dependent": [
 							"x"
 						]
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_x",
-						"field":"polphi_0"
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "polphi_0"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_y",
-						"field":"polphi_0",
-						"coefficient_symbolic":"x[]^(-2)",
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "laplacian_y",
+						"field": "polphi_0",
+						"coefficient_symbolic": "x[]^(-2)",
+						"coordinate_dependent": [
 							"x"
 						]
 					}
@@ -77,18 +77,8 @@
 			}
 		}
 	],
-	"coupling":{
-		"mass_matrix":[
-			[
-				1.0
-			]
-		],
-		"coupling_matrix":[
-			[
-				0.0
-			]
-		],
-		"mass_matrix_symbolic":[
+	"coupling": {
+		"mass_matrix_symbolic": [
 			[
 				"-polm2"
 			]

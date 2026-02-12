@@ -56,16 +56,6 @@
 		}
 	],
 	"coupling": {
-		"mass_matrix": [
-			[
-				1.0
-			]
-		],
-		"coupling_matrix": [
-			[
-				0.0
-			]
-		],
 		"mass_matrix_symbolic": [
 			[
 				"-m2"

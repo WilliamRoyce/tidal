@@ -1,1034 +1,789 @@
 {
-	"metadata":{
-		"source":"xAct",
-		"lagrangian_expr":"R * sqrt(-g)  (Einstein-Hilbert action)",
-		"derived_from":"Euler-Lagrange",
-		"gauge":"none",
-		"linearized":true
+	"metadata": {
+		"source": "xAct",
+		"lagrangian_expr": "R * sqrt(-g)  (Einstein-Hilbert action)",
+		"derived_from": "Euler-Lagrange",
+		"gauge": "none",
+		"linearized": true
 	},
-	"spacetime":{
-		"dimension":4,
-		"signature":[
+	"spacetime": {
+		"dimension": 4,
+		"signature": [
 			-1,
 			1,
 			1,
 			1
 		],
-		"coordinates":[
+		"coordinates": [
 			"t",
 			"x",
 			"y",
 			"z"
 		]
 	},
-	"fields":[
+	"fields": [
 		{
-			"name":"h_0",
-			"index":0,
-			"is_dynamical":true
+			"name": "h_0",
+			"index": 0,
+			"is_dynamical": true
 		},
 		{
-			"name":"h_1",
-			"index":1,
-			"is_dynamical":true
+			"name": "h_1",
+			"index": 1,
+			"is_dynamical": true
 		},
 		{
-			"name":"h_2",
-			"index":2,
-			"is_dynamical":true
+			"name": "h_2",
+			"index": 2,
+			"is_dynamical": true
 		},
 		{
-			"name":"h_3",
-			"index":3,
-			"is_dynamical":true
+			"name": "h_3",
+			"index": 3,
+			"is_dynamical": true
 		},
 		{
-			"name":"h_4",
-			"index":4,
-			"is_dynamical":true
+			"name": "h_4",
+			"index": 4,
+			"is_dynamical": true
 		},
 		{
-			"name":"h_5",
-			"index":5,
-			"is_dynamical":true
+			"name": "h_5",
+			"index": 5,
+			"is_dynamical": true
 		},
 		{
-			"name":"h_6",
-			"index":6,
-			"is_dynamical":true
+			"name": "h_6",
+			"index": 6,
+			"is_dynamical": true
 		},
 		{
-			"name":"h_7",
-			"index":7,
-			"is_dynamical":true
+			"name": "h_7",
+			"index": 7,
+			"is_dynamical": true
 		},
 		{
-			"name":"h_8",
-			"index":8,
-			"is_dynamical":true
+			"name": "h_8",
+			"index": 8,
+			"is_dynamical": true
 		},
 		{
-			"name":"h_9",
-			"index":9,
-			"is_dynamical":true
+			"name": "h_9",
+			"index": 9,
+			"is_dynamical": true
 		}
 	],
-	"equations":[
+	"equations": [
 		{
-			"field":"h_0",
-			"lhs":{
-				"expression":"h_0",
-				"order":{
-					"time":0,
-					"space":0
+			"field": "h_0",
+			"lhs": {
+				"expression": "h_0",
+				"order": {
+					"time": 0,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":-0.5,
-						"operator":"laplacian_x",
-						"field":"h_0"
+						"coefficient": -0.5,
+						"operator": "laplacian_x",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"laplacian_x",
-						"field":"h_4"
+						"coefficient": -0.5,
+						"operator": "laplacian_x",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"laplacian_x",
-						"field":"h_7"
+						"coefficient": -0.5,
+						"operator": "laplacian_x",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"laplacian_x",
-						"field":"h_9"
+						"coefficient": -0.5,
+						"operator": "laplacian_x",
+						"field": "h_9"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"gradient_x",
-						"field":"pi_1"
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "pi_1"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian",
-						"field":"h_4"
+						"coefficient": -1.0,
+						"operator": "laplacian",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian",
-						"field":"h_7"
+						"coefficient": -1.0,
+						"operator": "laplacian",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian",
-						"field":"h_9"
+						"coefficient": -1.0,
+						"operator": "laplacian",
+						"field": "h_9"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"laplacian_y",
-						"field":"h_0"
+						"coefficient": -0.5,
+						"operator": "laplacian_y",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"laplacian_y",
-						"field":"h_4"
+						"coefficient": -0.5,
+						"operator": "laplacian_y",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"laplacian_y",
-						"field":"h_7"
+						"coefficient": -0.5,
+						"operator": "laplacian_y",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"laplacian_y",
-						"field":"h_9"
+						"coefficient": -0.5,
+						"operator": "laplacian_y",
+						"field": "h_9"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"first_derivative_t",
-						"field":"h_3"
+						"coefficient": 1.0,
+						"operator": "first_derivative_t",
+						"field": "h_3"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"gradient_y",
-						"field":"pi_2"
+						"coefficient": 1.0,
+						"operator": "gradient_y",
+						"field": "pi_2"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"laplacian_z",
-						"field":"h_0"
+						"coefficient": -0.5,
+						"operator": "laplacian_z",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"laplacian_z",
-						"field":"h_4"
+						"coefficient": -0.5,
+						"operator": "laplacian_z",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"laplacian_z",
-						"field":"h_7"
+						"coefficient": -0.5,
+						"operator": "laplacian_z",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"laplacian_z",
-						"field":"h_9"
+						"coefficient": -0.5,
+						"operator": "laplacian_z",
+						"field": "h_9"
 					}
 				]
 			}
 		},
 		{
-			"field":"h_1",
-			"lhs":{
-				"expression":"d2_t(h_1)",
-				"order":{
-					"time":2,
-					"space":0
+			"field": "h_1",
+			"lhs": {
+				"expression": "d2_t(h_1)",
+				"order": {
+					"time": 2,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_x",
-						"field":"h_1"
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "h_1"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"gradient_x",
-						"field":"pi_7"
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "pi_7"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"gradient_x",
-						"field":"pi_9"
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "pi_9"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"gradient_x",
-						"field":"h_3"
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "h_3"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"cross_derivative_xy",
-						"field":"h_2"
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xy",
+						"field": "h_2"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"first_derivative_t",
-						"field":"h_6"
+						"coefficient": -1.0,
+						"operator": "first_derivative_t",
+						"field": "h_6"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"gradient_y",
-						"field":"pi_5"
+						"coefficient": -1.0,
+						"operator": "gradient_y",
+						"field": "pi_5"
 					}
 				]
 			}
 		},
 		{
-			"field":"h_2",
-			"lhs":{
-				"expression":"d2_t(h_2)",
-				"order":{
-					"time":2,
-					"space":0
+			"field": "h_2",
+			"lhs": {
+				"expression": "d2_t(h_2)",
+				"order": {
+					"time": 2,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":-1.0,
-						"operator":"gradient_x",
-						"field":"pi_5"
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "pi_5"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_y",
-						"field":"h_2"
+						"coefficient": -1.0,
+						"operator": "laplacian_y",
+						"field": "h_2"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"cross_derivative_xy",
-						"field":"h_1"
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xy",
+						"field": "h_1"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"first_derivative_t",
-						"field":"h_8"
+						"coefficient": -1.0,
+						"operator": "first_derivative_t",
+						"field": "h_8"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"gradient_y",
-						"field":"pi_4"
+						"coefficient": 1.0,
+						"operator": "gradient_y",
+						"field": "pi_4"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"gradient_y",
-						"field":"pi_9"
+						"coefficient": 1.0,
+						"operator": "gradient_y",
+						"field": "pi_9"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"cross_derivative_yz",
-						"field":"h_3"
+						"coefficient": -1.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_3"
 					}
 				]
 			}
 		},
 		{
-			"field":"h_3",
-			"lhs":{
-				"expression":"d2_t(h_3)",
-				"order":{
-					"time":2,
-					"space":0
+			"field": "h_3",
+			"lhs": {
+				"expression": "d2_t(h_3)",
+				"order": {
+					"time": 2,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":-1.0,
-						"operator":"gradient_x",
-						"field":"pi_6"
+						"coefficient": -1.0,
+						"operator": "gradient_x",
+						"field": "pi_6"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"first_derivative_t",
-						"field":"h_0"
+						"coefficient": 1.0,
+						"operator": "first_derivative_t",
+						"field": "h_0"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"first_derivative_t",
-						"field":"h_4"
+						"coefficient": 1.0,
+						"operator": "first_derivative_t",
+						"field": "h_4"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"first_derivative_t",
-						"field":"h_7"
+						"coefficient": 1.0,
+						"operator": "first_derivative_t",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"gradient_y",
-						"field":"pi_8"
+						"coefficient": -1.0,
+						"operator": "gradient_y",
+						"field": "pi_8"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_z",
-						"field":"h_3"
+						"coefficient": -1.0,
+						"operator": "laplacian_z",
+						"field": "h_3"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"cross_derivative_yz",
-						"field":"h_2"
+						"coefficient": -1.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_2"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"cross_derivative_xz",
-						"field":"h_1"
+						"coefficient": -1.0,
+						"operator": "cross_derivative_xz",
+						"field": "h_1"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"gradient_z",
-						"field":"pi_0"
+						"coefficient": -1.0,
+						"operator": "gradient_z",
+						"field": "pi_0"
 					}
 				]
 			}
 		},
 		{
-			"field":"h_4",
-			"lhs":{
-				"expression":"d2_t(h_4)",
-				"order":{
-					"time":2,
-					"space":0
+			"field": "h_4",
+			"lhs": {
+				"expression": "d2_t(h_4)",
+				"order": {
+					"time": 2,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":-2.0,
-						"operator":"laplacian_x",
-						"field":"h_4"
+						"coefficient": -2.0,
+						"operator": "laplacian_x",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-2.0,
-						"operator":"gradient_x",
-						"field":"pi_1"
+						"coefficient": -2.0,
+						"operator": "gradient_x",
+						"field": "pi_1"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian",
-						"field":"h_0"
+						"coefficient": -1.0,
+						"operator": "laplacian",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian",
-						"field":"h_7"
+						"coefficient": -1.0,
+						"operator": "laplacian",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian",
-						"field":"h_9"
+						"coefficient": -1.0,
+						"operator": "laplacian",
+						"field": "h_9"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_y",
-						"field":"h_0"
+						"coefficient": -1.0,
+						"operator": "laplacian_y",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_y",
-						"field":"h_4"
+						"coefficient": -1.0,
+						"operator": "laplacian_y",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_y",
-						"field":"h_7"
+						"coefficient": -1.0,
+						"operator": "laplacian_y",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_y",
-						"field":"h_9"
+						"coefficient": -1.0,
+						"operator": "laplacian_y",
+						"field": "h_9"
 					},
 					{
-						"coefficient":-2.0,
-						"operator":"gradient_x",
-						"field":"h_6"
+						"coefficient": -2.0,
+						"operator": "gradient_x",
+						"field": "h_6"
 					},
 					{
-						"coefficient":-2.0,
-						"operator":"cross_derivative_xy",
-						"field":"h_5"
+						"coefficient": -2.0,
+						"operator": "cross_derivative_xy",
+						"field": "h_5"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_z",
-						"field":"h_0"
+						"coefficient": -1.0,
+						"operator": "laplacian_z",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_z",
-						"field":"h_4"
+						"coefficient": -1.0,
+						"operator": "laplacian_z",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_z",
-						"field":"h_7"
+						"coefficient": -1.0,
+						"operator": "laplacian_z",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_z",
-						"field":"h_9"
+						"coefficient": -1.0,
+						"operator": "laplacian_z",
+						"field": "h_9"
 					}
 				]
 			}
 		},
 		{
-			"field":"h_5",
-			"lhs":{
-				"expression":"h_5",
-				"order":{
-					"time":0,
-					"space":0
+			"field": "h_5",
+			"lhs": {
+				"expression": "h_5",
+				"order": {
+					"time": 0,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":0.5,
-						"operator":"laplacian_x",
-						"field":"h_5"
+						"coefficient": 0.5,
+						"operator": "laplacian_x",
+						"field": "h_5"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"gradient_x",
-						"field":"pi_2"
+						"coefficient": 0.5,
+						"operator": "gradient_x",
+						"field": "pi_2"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"laplacian_y",
-						"field":"h_5"
+						"coefficient": 0.5,
+						"operator": "laplacian_y",
+						"field": "h_5"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"gradient_x",
-						"field":"h_8"
+						"coefficient": 0.5,
+						"operator": "gradient_x",
+						"field": "h_8"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"cross_derivative_xy",
-						"field":"h_0"
+						"coefficient": -0.5,
+						"operator": "cross_derivative_xy",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"cross_derivative_xy",
-						"field":"h_9"
+						"coefficient": -0.5,
+						"operator": "cross_derivative_xy",
+						"field": "h_9"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"gradient_y",
-						"field":"pi_1"
+						"coefficient": 0.5,
+						"operator": "gradient_y",
+						"field": "pi_1"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"cross_derivative_yz",
-						"field":"h_6"
+						"coefficient": 0.5,
+						"operator": "cross_derivative_yz",
+						"field": "h_6"
 					}
 				]
 			}
 		},
 		{
-			"field":"h_6",
-			"lhs":{
-				"expression":"h_6",
-				"order":{
-					"time":0,
-					"space":0
+			"field": "h_6",
+			"lhs": {
+				"expression": "h_6",
+				"order": {
+					"time": 0,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":0.5,
-						"operator":"laplacian_x",
-						"field":"h_6"
+						"coefficient": 0.5,
+						"operator": "laplacian_x",
+						"field": "h_6"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"gradient_x",
-						"field":"pi_3"
+						"coefficient": 0.5,
+						"operator": "gradient_x",
+						"field": "pi_3"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"gradient_x",
-						"field":"h_0"
+						"coefficient": -0.5,
+						"operator": "gradient_x",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"gradient_x",
-						"field":"h_4"
+						"coefficient": -0.5,
+						"operator": "gradient_x",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"gradient_x",
-						"field":"h_7"
+						"coefficient": -0.5,
+						"operator": "gradient_x",
+						"field": "h_7"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"cross_derivative_xy",
-						"field":"h_8"
+						"coefficient": 0.5,
+						"operator": "cross_derivative_xy",
+						"field": "h_8"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"laplacian_z",
-						"field":"h_6"
+						"coefficient": 0.5,
+						"operator": "laplacian_z",
+						"field": "h_6"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"cross_derivative_yz",
-						"field":"h_5"
+						"coefficient": 0.5,
+						"operator": "cross_derivative_yz",
+						"field": "h_5"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"cross_derivative_xz",
-						"field":"h_4"
+						"coefficient": 0.5,
+						"operator": "cross_derivative_xz",
+						"field": "h_4"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"gradient_z",
-						"field":"pi_1"
+						"coefficient": 0.5,
+						"operator": "gradient_z",
+						"field": "pi_1"
 					}
 				]
 			}
 		},
 		{
-			"field":"h_7",
-			"lhs":{
-				"expression":"d2_t(h_7)",
-				"order":{
-					"time":2,
-					"space":0
+			"field": "h_7",
+			"lhs": {
+				"expression": "d2_t(h_7)",
+				"order": {
+					"time": 2,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_x",
-						"field":"h_0"
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_x",
-						"field":"h_4"
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_x",
-						"field":"h_7"
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_x",
-						"field":"h_9"
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "h_9"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian",
-						"field":"h_0"
+						"coefficient": -1.0,
+						"operator": "laplacian",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian",
-						"field":"h_4"
+						"coefficient": -1.0,
+						"operator": "laplacian",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian",
-						"field":"h_9"
+						"coefficient": -1.0,
+						"operator": "laplacian",
+						"field": "h_9"
 					},
 					{
-						"coefficient":-2.0,
-						"operator":"laplacian_y",
-						"field":"h_7"
+						"coefficient": -2.0,
+						"operator": "laplacian_y",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-2.0,
-						"operator":"cross_derivative_xy",
-						"field":"h_5"
+						"coefficient": -2.0,
+						"operator": "cross_derivative_xy",
+						"field": "h_5"
 					},
 					{
-						"coefficient":-2.0,
-						"operator":"gradient_y",
-						"field":"pi_2"
+						"coefficient": -2.0,
+						"operator": "gradient_y",
+						"field": "pi_2"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_z",
-						"field":"h_0"
+						"coefficient": -1.0,
+						"operator": "laplacian_z",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_z",
-						"field":"h_4"
+						"coefficient": -1.0,
+						"operator": "laplacian_z",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_z",
-						"field":"h_7"
+						"coefficient": -1.0,
+						"operator": "laplacian_z",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_z",
-						"field":"h_9"
+						"coefficient": -1.0,
+						"operator": "laplacian_z",
+						"field": "h_9"
 					},
 					{
-						"coefficient":-2.0,
-						"operator":"cross_derivative_yz",
-						"field":"h_8"
+						"coefficient": -2.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_8"
 					}
 				]
 			}
 		},
 		{
-			"field":"h_8",
-			"lhs":{
-				"expression":"h_8",
-				"order":{
-					"time":0,
-					"space":0
+			"field": "h_8",
+			"lhs": {
+				"expression": "h_8",
+				"order": {
+					"time": 0,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":0.5,
-						"operator":"laplacian_y",
-						"field":"h_8"
+						"coefficient": 0.5,
+						"operator": "laplacian_y",
+						"field": "h_8"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"cross_derivative_xy",
-						"field":"h_6"
+						"coefficient": 0.5,
+						"operator": "cross_derivative_xy",
+						"field": "h_6"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"gradient_y",
-						"field":"pi_3"
+						"coefficient": 0.5,
+						"operator": "gradient_y",
+						"field": "pi_3"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"laplacian_z",
-						"field":"h_8"
+						"coefficient": 0.5,
+						"operator": "laplacian_z",
+						"field": "h_8"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"cross_derivative_yz",
-						"field":"h_0"
+						"coefficient": -0.5,
+						"operator": "cross_derivative_yz",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-0.5,
-						"operator":"cross_derivative_yz",
-						"field":"h_4"
+						"coefficient": -0.5,
+						"operator": "cross_derivative_yz",
+						"field": "h_4"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"cross_derivative_xz",
-						"field":"h_5"
+						"coefficient": 0.5,
+						"operator": "cross_derivative_xz",
+						"field": "h_5"
 					},
 					{
-						"coefficient":0.5,
-						"operator":"gradient_z",
-						"field":"pi_2"
+						"coefficient": 0.5,
+						"operator": "gradient_z",
+						"field": "pi_2"
 					}
 				]
 			}
 		},
 		{
-			"field":"h_9",
-			"lhs":{
-				"expression":"d2_t(h_9)",
-				"order":{
-					"time":2,
-					"space":0
+			"field": "h_9",
+			"lhs": {
+				"expression": "d2_t(h_9)",
+				"order": {
+					"time": 2,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_x",
-						"field":"h_0"
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_x",
-						"field":"h_4"
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_x",
-						"field":"h_7"
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_x",
-						"field":"h_9"
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "h_9"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian",
-						"field":"h_0"
+						"coefficient": -1.0,
+						"operator": "laplacian",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian",
-						"field":"h_4"
+						"coefficient": -1.0,
+						"operator": "laplacian",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian",
-						"field":"h_7"
+						"coefficient": -1.0,
+						"operator": "laplacian",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_y",
-						"field":"h_0"
+						"coefficient": -1.0,
+						"operator": "laplacian_y",
+						"field": "h_0"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_y",
-						"field":"h_4"
+						"coefficient": -1.0,
+						"operator": "laplacian_y",
+						"field": "h_4"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_y",
-						"field":"h_7"
+						"coefficient": -1.0,
+						"operator": "laplacian_y",
+						"field": "h_7"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"laplacian_y",
-						"field":"h_9"
+						"coefficient": -1.0,
+						"operator": "laplacian_y",
+						"field": "h_9"
 					},
 					{
-						"coefficient":-2.0,
-						"operator":"laplacian_z",
-						"field":"h_9"
+						"coefficient": -2.0,
+						"operator": "laplacian_z",
+						"field": "h_9"
 					},
 					{
-						"coefficient":-2.0,
-						"operator":"cross_derivative_yz",
-						"field":"h_8"
+						"coefficient": -2.0,
+						"operator": "cross_derivative_yz",
+						"field": "h_8"
 					},
 					{
-						"coefficient":-2.0,
-						"operator":"cross_derivative_xz",
-						"field":"h_6"
+						"coefficient": -2.0,
+						"operator": "cross_derivative_xz",
+						"field": "h_6"
 					},
 					{
-						"coefficient":-2.0,
-						"operator":"gradient_z",
-						"field":"pi_3"
+						"coefficient": -2.0,
+						"operator": "gradient_z",
+						"field": "pi_3"
 					}
 				]
 			}
 		}
 	],
-	"coupling":{
-		"mass_matrix":[
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			]
-		],
-		"coupling_matrix":[
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0,
-				0.0
-			]
-		]
-	}
+	"coupling": {}
 }

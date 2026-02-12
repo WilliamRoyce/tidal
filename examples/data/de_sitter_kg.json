@@ -1,92 +1,82 @@
 {
-	"metadata":{
-		"source":"xAct",
-		"lagrangian_expr":"-1\/2 g^ab nabla_a phi nabla_b phi - 1\/2 m^2 phi^2",
-		"derived_from":"Euler-Lagrange",
-		"gauge":"none",
-		"linearized":true,
-		"parameters":{
-			"dSH":0.1,
-			"dSm2":1.0
+	"metadata": {
+		"source": "xAct",
+		"lagrangian_expr": "-1/2 g^ab nabla_a phi nabla_b phi - 1/2 m^2 phi^2",
+		"derived_from": "Euler-Lagrange",
+		"gauge": "none",
+		"linearized": true,
+		"parameters": {
+			"dSH": 0.1,
+			"dSm2": 1.0
 		}
 	},
-	"spacetime":{
-		"dimension":3,
-		"signature":[
+	"spacetime": {
+		"dimension": 3,
+		"signature": [
 			-1,
 			1,
 			1
 		],
-		"coordinates":[
+		"coordinates": [
 			"t",
 			"x",
 			"y"
 		],
-		"metric_type":"conformal_flat",
-		"conformal_factor":"exp(H*t)"
+		"metric_type": "conformal_flat",
+		"conformal_factor": "exp(H*t)"
 	},
-	"fields":[
+	"fields": [
 		{
-			"name":"dSphi_0",
-			"index":0,
-			"is_dynamical":true
+			"name": "dSphi_0",
+			"index": 0,
+			"is_dynamical": true
 		}
 	],
-	"equations":[
+	"equations": [
 		{
-			"field":"dSphi_0",
-			"lhs":{
-				"expression":"d2_t(dSphi_0)",
-				"order":{
-					"time":2,
-					"space":0
+			"field": "dSphi_0",
+			"lhs": {
+				"expression": "d2_t(dSphi_0)",
+				"order": {
+					"time": 2,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":1.0,
-						"operator":"identity",
-						"field":"dSphi_0",
-						"coefficient_symbolic":"-(dSm2*E^(2*dSH*t[]))",
-						"time_dependent":true,
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "dSphi_0",
+						"coefficient_symbolic": "-(dSm2*E^(2*dSH*t[]))",
+						"time_dependent": true,
+						"coordinate_dependent": [
 							"t"
 						]
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_x",
-						"field":"dSphi_0"
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "dSphi_0"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"first_derivative_t",
-						"field":"dSphi_0",
-						"coefficient_symbolic":"-dSH"
+						"coefficient": -1.0,
+						"operator": "first_derivative_t",
+						"field": "dSphi_0",
+						"coefficient_symbolic": "-dSH"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_y",
-						"field":"dSphi_0"
+						"coefficient": 1.0,
+						"operator": "laplacian_y",
+						"field": "dSphi_0"
 					}
 				]
 			}
 		}
 	],
-	"coupling":{
-		"mass_matrix":[
-			[
-				-1.0
-			]
-		],
-		"coupling_matrix":[
-			[
-				0.0
-			]
-		],
-		"mass_matrix_symbolic":[
+	"coupling": {
+		"mass_matrix_symbolic": [
 			[
 				"-(dSm2*E^(2*dSH*t[]))"
 			]

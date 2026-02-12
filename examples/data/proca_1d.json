@@ -1,110 +1,90 @@
 {
-	"metadata":{
-		"source":"xAct",
-		"lagrangian_expr":"-1\/4 F[-a,-b] F[a,b] - 1\/2 m^2 A[-a] A[a]",
-		"derived_from":"Euler-Lagrange",
-		"gauge":"none (automatic Lorenz)",
-		"linearized":true
+	"metadata": {
+		"source": "xAct",
+		"lagrangian_expr": "-1/4 F[-a,-b] F[a,b] - 1/2 m^2 A[-a] A[a]",
+		"derived_from": "Euler-Lagrange",
+		"gauge": "none (automatic Lorenz)",
+		"linearized": true
 	},
-	"spacetime":{
-		"dimension":2,
-		"signature":[
+	"spacetime": {
+		"dimension": 2,
+		"signature": [
 			-1,
 			1
 		],
-		"coordinates":[
+		"coordinates": [
 			"t",
 			"x"
 		]
 	},
-	"fields":[
+	"fields": [
 		{
-			"name":"procaA_0",
-			"index":0,
-			"is_dynamical":true
+			"name": "procaA_0",
+			"index": 0,
+			"is_dynamical": true
 		},
 		{
-			"name":"procaA_1",
-			"index":1,
-			"is_dynamical":true
+			"name": "procaA_1",
+			"index": 1,
+			"is_dynamical": true
 		}
 	],
-	"equations":[
+	"equations": [
 		{
-			"field":"procaA_0",
-			"lhs":{
-				"expression":"d2_t(procaA_0)",
-				"order":{
-					"time":2,
-					"space":0
+			"field": "procaA_0",
+			"lhs": {
+				"expression": "d2_t(procaA_0)",
+				"order": {
+					"time": 2,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":-1.0,
-						"operator":"identity",
-						"field":"procaA_0",
-						"coefficient_symbolic":"-procaMassSquared"
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "procaA_0",
+						"coefficient_symbolic": "-procaMassSquared"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_x",
-						"field":"procaA_0"
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "procaA_0"
 					}
 				]
 			}
 		},
 		{
-			"field":"procaA_1",
-			"lhs":{
-				"expression":"d2_t(procaA_1)",
-				"order":{
-					"time":2,
-					"space":0
+			"field": "procaA_1",
+			"lhs": {
+				"expression": "d2_t(procaA_1)",
+				"order": {
+					"time": 2,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":-1.0,
-						"operator":"identity",
-						"field":"procaA_1",
-						"coefficient_symbolic":"-procaMassSquared"
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "procaA_1",
+						"coefficient_symbolic": "-procaMassSquared"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_x",
-						"field":"procaA_1"
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "procaA_1"
 					}
 				]
 			}
 		}
 	],
-	"coupling":{
-		"mass_matrix":[
-			[
-				1.0,
-				0.0
-			],
-			[
-				0.0,
-				1.0
-			]
-		],
-		"coupling_matrix":[
-			[
-				0.0,
-				0.0
-			],
-			[
-				0.0,
-				0.0
-			]
-		],
-		"mass_matrix_symbolic":[
+	"coupling": {
+		"mass_matrix_symbolic": [
 			[
 				"-procaMassSquared",
 				null
