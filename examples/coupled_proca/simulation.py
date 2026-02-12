@@ -99,7 +99,7 @@ def _create_grid() -> CartesianGrid:
     print("Step 3: Setting up 2D non-periodic grid (cavity)...")
     grid = CartesianGrid(
         bounds=[(0, np.pi), (0, np.pi)],
-        shape=[16, 16],
+        shape=[20, 20],
         periodic=False,
     )
     print("  Domain: [0, pi] x [0, pi]")
@@ -109,9 +109,7 @@ def _create_grid() -> CartesianGrid:
     return grid
 
 
-def _create_initial_state(
-    grid: CartesianGrid, spec: EquationSystem
-) -> FieldCollection:
+def _create_initial_state(grid: CartesianGrid, spec: EquationSystem) -> FieldCollection:
     """Create initial conditions: Gaussian in A_1, all else zero."""
     print("Step 4: Creating initial conditions...")
     x_coords = cast("np.ndarray", grid.cell_coords[..., 0])
@@ -166,8 +164,12 @@ def _analyze_results(pde: PDEBase, storage: MemoryStorage) -> None:
     # py-pde's RK4 copies state for intermediate steps, so constraint fields
     # (rate=0) stay at initial values in stored snapshots.
     pde.evolution_rate(final)
-    print(f"  A_0 (constraint, re-solved): max={np.max(np.abs(_get_field(final, IDX_A0))):.6f}")
-    print(f"  B_0 (constraint, re-solved): max={np.max(np.abs(_get_field(final, IDX_B0))):.6f}")
+    print(
+        f"  A_0 (constraint, re-solved): max={np.max(np.abs(_get_field(final, IDX_A0))):.6f}"
+    )
+    print(
+        f"  B_0 (constraint, re-solved): max={np.max(np.abs(_get_field(final, IDX_B0))):.6f}"
+    )
 
     b1_max = float(np.max(np.abs(_get_field(final, IDX_B1))))
     print(f"  B_1 (evolution): final max={b1_max:.6f}")
@@ -256,8 +258,14 @@ def _plot_results(  # noqa: PLR0914
     ax = axes[1, 2]
     snapshot_interval = 0.2
     times = [float(i) * snapshot_interval for i in range(len(storage))]
-    a1_max = [float(np.max(np.abs(_get_field(cast("FieldCollection", storage[i]), IDX_A1)))) for i in range(len(storage))]
-    b1_max = [float(np.max(np.abs(_get_field(cast("FieldCollection", storage[i]), IDX_B1)))) for i in range(len(storage))]
+    a1_max = [
+        float(np.max(np.abs(_get_field(cast("FieldCollection", storage[i]), IDX_A1))))
+        for i in range(len(storage))
+    ]
+    b1_max = [
+        float(np.max(np.abs(_get_field(cast("FieldCollection", storage[i]), IDX_B1))))
+        for i in range(len(storage))
+    ]
 
     ax.plot(times, a1_max, "b-", linewidth=2, label="max|A_1|")
     ax.plot(times, b1_max, "r-", linewidth=1.5, label="max|B_1|")

@@ -25,5 +25,19 @@ mA2 = 1.0
 mB2 = 2.0
 gcoup = 0.5
 
+[constraint_solver]
+enabled = true
+method = "auto"
+max_iterations = 30
+tolerance = 1e-10
+
+[constraint_solver.boundary_conditions.x]
+type = "dirichlet"
+value = 0.0
+
+[constraint_solver.boundary_conditions.y]
+type = "dirichlet"
+value = 0.0
+
 [output]
 path = "../data/coupled_proca_3d.json"
