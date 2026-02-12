@@ -173,7 +173,15 @@ metadata = <|
   "linearized" -> True,
   "dimension" -> 3,
   "signature" -> {-1, 1, 1},
-  "coordinates" -> {"t", "x", "y"}
+  "coordinates" -> {"t", "x", "y"},
+  "solve_constraints" -> True,
+  "constraint_method" -> "auto",
+  "constraint_max_iterations" -> 30,
+  "constraint_tolerance" -> 1*^-10,
+  "constraint_boundary_conditions" -> <|
+    "x" -> <|"type" -> "periodic"|>,
+    "y" -> <|"type" -> "periodic"|>
+  |>
 |>;
 
 (* Build JSON via pipeline *)

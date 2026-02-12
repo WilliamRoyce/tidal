@@ -42,5 +42,17 @@ perturbation_field = "h"
 [parameters]
 m2 = 1.0
 
+[constraint_solver]
+enabled = true
+method = "auto"
+max_iterations = 30
+tolerance = 1e-10
+
+[constraint_solver.boundary_conditions.x]
+type = "periodic"
+
+[constraint_solver.boundary_conditions.y]
+type = "periodic"
+
 [output]
 path = "../data/massive_gravity_3d.json"
