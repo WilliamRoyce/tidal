@@ -418,6 +418,7 @@ class _WlsContext:
     parameters: dict[str, float]
     derived_fields: list[dict[str, Any]]
     linearization: dict[str, Any] | None
+    constraint_solver: dict[str, Any] | None
 
 
 def _wls_header(ctx: _WlsContext) -> list[str]:
@@ -705,6 +706,52 @@ def _wls_linearization(ctx: _WlsContext) -> list[str]:
     return lines
 
 
+def _wls_constraint_metadata(
+    cs_config: dict[str, Any], spatial_coords: list[str]
+) -> list[str]:
+    """Generate Wolfram metadata lines for constraint solver configuration.
+
+    Translates the ``[constraint_solver]`` TOML section into metadata keys
+    that ``ConstraintSolverHints`` in ExportJSON.wl reads at export time.
+    """
+    method = cs_config.get("method", "auto")
+    max_iter = cs_config.get("max_iterations", 30)
+    tol = cs_config.get("tolerance", 1e-10)
+
+    # Format tolerance in Wolfram scientific notation
+    tol_str = f"{tol:.0e}".replace("e-", "*^-").replace("e+", "*^")
+    if tol_str == "1*^-10":
+        pass  # already fine
+    elif "e" in f"{tol:.0e}":
+        tol_str = f"{tol:.0e}".replace("e-0", "*^-").replace("e-", "*^-").replace("e+0", "*^").replace("e+", "*^")
+
+    lines = [
+        '  "solve_constraints" -> True,',
+        f'  "constraint_method" -> "{method}",',
+        f'  "constraint_max_iterations" -> {max_iter},',
+        f'  "constraint_tolerance" -> {tol_str},',
+    ]
+
+    # Build boundary conditions Association
+    bcs = cs_config.get("boundary_conditions", {})
+    if bcs:
+        bc_parts: list[str] = []
+        for coord in spatial_coords:
+            bc_info = bcs.get(coord, {})
+            bc_type = bc_info.get("type", "periodic")
+            if "value" in bc_info:
+                bc_parts.append(
+                    f'    "{coord}" -> <|"type" -> "{bc_type}", '
+                    f'"value" -> {bc_info["value"]}|>'
+                )
+            else:
+                bc_parts.append(f'    "{coord}" -> <|"type" -> "{bc_type}"|>')
+        bc_str = ",\n".join(bc_parts)
+        lines.append(f'  "constraint_boundary_conditions" -> <|\n{bc_str}\n  |>,')
+
+    return lines
+
+
 def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
     """Generate metadata and JSON export lines.
 
@@ -745,9 +792,18 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
         f'  "dimension" -> {ctx.dim},',
         f'  "signature" -> {{{sig_str}}},',
         f'  "coordinates" -> {{{coord_str}}}',
-        "|>;",
-        "",
     ]
+
+    # Add constraint solver metadata if configured in TOML
+    if ctx.constraint_solver is not None:
+        # Spatial coordinates are all coords except "t"
+        spatial_coords = [c for c in ctx.coords if c != "t"]
+        cs_lines = _wls_constraint_metadata(ctx.constraint_solver, spatial_coords)
+        # The last base metadata line needs a trailing comma
+        lines[-1] += ","
+        lines.extend(cs_lines)
+
+    lines.extend(["|>;", ""])
 
     # Build JSON — always use multi-field builder since fieldEquations
     # is constructed with proper labels by both single and multi-field paths
@@ -844,6 +900,7 @@ def generate_wls(
         parameters={k: float(v) for k, v in config.get("parameters", {}).items()},
         derived_fields=config.get("derived_fields", []),
         linearization=config.get("linearization"),
+        constraint_solver=config.get("constraint_solver"),
     )
 
     is_linearization = ctx.linearization is not None
