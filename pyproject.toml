@@ -186,7 +186,7 @@ build-backend = "setuptools.build_meta"
 package-dir = { "" = "." }
 
 [tool.setuptools.package-data]
-tidal = ["py.typed"]
+tidal = ["py.typed", "wolfram/*.wl"]
 
 [tool.setuptools.packages.find]
 where = ["."]

@@ -1,5 +1,180 @@
 # Changelog
 
+## Pre-Phase Hardening Pass (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Repo hygiene pass fixing one critical packaging bug, stale documentation across 8 files, and missing example listings.
+
+**Changes:**
+
+- **CRITICAL:** Added `wolfram/*.wl` to `[tool.setuptools.package-data]` in pyproject.toml — without this, `tidal derive` fails after pip install because the 5 Wolfram pipeline modules are missing from the wheel/sdist
+- Updated stale test count 743→850 across 8 documentation files (~15 occurrences)
+- Fixed CLI command names in README table (`tidalderive` → `tidal derive`, etc.)
+- Added massive_gravity and coupled_proca to README and examples/README Pipeline Examples tables
+- Updated examples/README completeness table and directory structure listing
+
+**Tests:** 850 Python tests passing
+
+---
+
+## Critical Review Pass 3 (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Hardening pass for `_resolve_symbolic_coeff` and related helpers.
+
+**Changes:**
+
+- Hardened `_resolve_symbolic_coeff` with specific exception types (no bare `except:`), `math.isfinite` validation, and debug logging
+- Simplified `_wls_constraint_metadata` tolerance formatting
+- Updated `_coalesce_directional_laplacians` docstring with `coefficient_symbolic` guard explanation
+- 8 new direct tests for `_resolve_symbolic_coeff`
+
+**Tests:** 850 Python tests passing
+
+---
+
+## Numeric Matrix Cleanup (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Removed redundant numeric `mass_matrix`/`coupling_matrix` from JSON coupling section. Only symbolic matrices remain in JSON; numeric values are auto-computed at load time.
+
+**Changes:**
+
+- Removed numeric `mass_matrix` and `coupling_matrix` arrays from ExportJSON.wl output
+- Updated 20 example JSON files to symbolic-only coupling format
+- Python `_compute_matrices_from_terms` now parameter-aware via `_resolve_symbolic_coeff` helper — resolves symbolic coefficients using metadata parameters for correct numeric values
+- `__post_init__` guard also parameter-aware
+- `tidal inspect --json` now includes symbolic matrices in output
+- 4 new tests for parameter-resolved matrix computation
+
+**Tests:** 842 Python tests passing
+
+---
+
+## Constraint Solver Pipeline Fix (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** End-to-end `[constraint_solver]` TOML support and checkerboard artifact fix.
+
+**Changes:**
+
+- `[constraint_solver]` TOML section support in `_derive.py` — `_wls_constraint_metadata()` injects `solve_constraints -> True` plus BC config into WLS metadata
+- `ConstraintSolverHints` in ExportJSON.wl now reads configurable method/iterations/tolerance from metadata
+- Both `coupled_proca` and `massive_gravity` theory.toml + .wls updated to use pipeline constraint config
+- Checkerboard fix: `_coalesce_directional_laplacians` with `coefficient_symbolic` guard, applied in both matrix and FFT solver paths
+- 10 coalescing tests + 4 CLI constraint_solver tests
+
+**Tests:** 838 Python tests passing
+
+---
+
+## Coupled Proca Example (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** First two-vector-field pipeline example: two massive Proca fields (A, B) with cross-coupling, demonstrating non-periodic constraint solving.
+
+**Files Created:**
+
+- `examples/coupled_proca/theory.toml` — TOML config with constraint_solver section
+- `examples/coupled_proca/coupled_proca.wls` — Wolfram derivation script
+- `examples/coupled_proca/simulation.py` — Python simulation with Gauss-Seidel constraint solving
+- `examples/coupled_proca/run.sh` — CLI-equivalent workflow script
+- `examples/data/coupled_proca_3d.json` — JSON equation spec (6 fields, 6×6 matrices)
+
+**Key Features:**
+
+- Two massive vector fields with cross-coupling term `g A·B`
+- Coupled Helmholtz constraints (A_0, B_0) solved simultaneously
+- Dirichlet boundary conditions (non-periodic grid)
+- Gauss-Seidel iteration fallback for non-periodic grids
+- 6×6 symbolic mass/coupling matrices
+
+**Tests:** 824 Python tests passing (5 integration + 2 example JSON tests)
+
+---
+
+## SVD Warning Two-Tier (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Improved SVD regularization logging: `logging.debug` for normal regularization (≤50% singular values regularized), `warnings.warn` only for >50% pathological cases.
+
+**Tests:** 817 Python tests passing (1 new test)
+
+---
+
+## Coupled FFT SVD Regularization (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Fixed massive gravity numerical instability where h_4 (h_xy) component blew up to ~1e8. Root cause: Helmholtz resonance at k²≈m² in the coupled FFT solver using bare `np.linalg.solve`.
+
+**Changes:**
+
+- Replaced `np.linalg.solve` with batched SVD + Tikhonov regularization: `S_reg_inv = S/(S²+α²)` where `α = rcond * max(S)`
+- New `coupled_svd_rcond` parameter (default 0.01) for controlling regularization strength
+- Applied in `_solve_coupled_fft_block` for all coupled constraint systems
+
+**Tests:** 816 Python tests passing (3 new SVD regularization tests)
+
+---
+
+## Constraint Solver Critical Review (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** Thorough review of the unified constraint solver. Fixed 5 bugs, added 5 logic improvements, and 32 new tests.
+
+**Bugs Fixed:**
+
+- Position-dependent coefficient guard in coupled FFT path
+- Relative Gauss-Seidel tolerance (was absolute, caused false convergence on large fields)
+- NaN/Inf output validation after constraint solve
+- Relative FFT singular threshold (was absolute, scale-dependent)
+- Poisson-on-Helmholtz warning when Helmholtz mass term near zero
+
+**Logic Improvements:**
+
+- Config validation for constraint solver parameters
+- `parse_momentum_field_name` utility for extracting field info from `pi_N` names
+- Narrow exception handling throughout (no bare `except:`)
+- Improved docstrings and error messages
+- Better test coverage for edge cases
+
+**Tests:** 813 Python tests passing (32 new constraint solver tests, 80 total)
+
+---
+
+## Unified Constraint Solver (February 2026)
+
+**Status:** ✅ COMPLETE
+
+**Summary:** General operator-matrix approach that handles ANY linear constraint equation: Poisson, Helmholtz, algebraic, anisotropic, mixed-operator, and coupled multi-field constraints.
+
+**Architecture:**
+
+- Sparse matrix builders for discrete Laplacian, gradient, cross-derivative, identity operators
+- FFT fast-path for periodic boundary conditions (single-field and coupled block solve)
+- Gauss-Seidel iterative fallback for non-periodic (Dirichlet/Neumann) boundaries
+- Automatic method selection based on equation structure and boundary conditions
+- Per-equation `constraint_solver` JSON block with configurable method, tolerance, iterations, and per-axis BCs
+
+**Key Features:**
+
+- Supports all operators: `identity`, `laplacian_{x,y,z}`, `gradient_{x,y,z}`, `cross_derivative_{xy,xz,yz}`, `biharmonic`
+- Coupled constraint solving: multiple constraint fields solved simultaneously via block matrix
+- Integrated with massive gravity example (5 coupled constraints: h_0 + h_1 + h_2 + h_3 cross-terms)
+- Momentum field references (`pi_N`) resolved from current PDE state
+
+**Tests:** 802 Python tests passing (48 unified constraint solver tests)
+
+---
+
 ## Scalar-Vector Coupling Stress Test (February 2026)
 
 **Status:** ✅ COMPLETE
@@ -24,7 +199,7 @@
 - Demonstrates scalar→vector energy transfer via gradient coupling
 - Uses `[[derived_fields]]` TOML feature for field strength tensor F_ab
 
-**Tests:** 743 Python tests passing (22 new physics tests + 147 CLI tests)
+**Tests:** 850 Python tests passing (22 new physics tests + 147 CLI tests)
 
 ---
 
@@ -66,7 +241,7 @@
 - `tests/test_cli.py` + `tests/test_cli_parsing.py` — 147 CLI tests
 - 14 `theory.toml` files across examples
 
-**Tests:** 743 Python tests passing (147 CLI tests), 0 ruff violations, 0 pyright errors
+**Tests:** 850 Python tests passing (147 CLI tests), 0 ruff violations, 0 pyright errors
 
 ---
 

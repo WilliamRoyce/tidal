@@ -63,7 +63,7 @@ uv run pre-commit install
 ### 3. Verify Setup
 
 ```bash
-# Run tests (743 Python tests)
+# Run tests (850 Python tests)
 uv run pytest
 
 # Run linter
@@ -459,14 +459,14 @@ tidal/                   # TIDAL project root
 │   ├── vectorfield/          # Multi-component field utilities
 │   ├── kgsim/                # Legacy Klein-Gordon simulation subpackage
 │   └── utils.py              # Shared utilities
-├── tests/                    # Test suite (743 Python tests)
+├── tests/                    # Test suite (850 Python tests)
 │   ├── conftest.py          # Shared fixtures
 │   ├── test_cli.py          # CLI integration tests
 │   ├── test_cli_parsing.py  # CLI argument parsing tests
 │   ├── test_scalar_vector_physics.py  # Physics stress tests
 │   └── test_*.py            # Other test modules
-├── examples/                 # 17 pipeline examples + legacy KG
-│   ├── data/                # Generated JSON specifications (18 files)
+├── examples/                 # 18 pipeline examples + legacy KG
+│   ├── data/                # Generated JSON specifications (20 files)
 │   └── {example}/           # Each has .wls, run.sh; most have theory.toml, simulation.py
 ├── docs/                     # Documentation
 │   └── source/              # Sphinx source files

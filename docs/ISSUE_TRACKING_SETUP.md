@@ -4,7 +4,7 @@ This document explains the issue tracking system created for the TIDAL project b
 
 ## Overview
 
-> **Update (v0.3.1):** Since this document was created, 17 of 25 identified issues have been resolved. Phases 1, 3, and most of Phase 4 are complete. The project has also been renamed to TIDAL, gained a CLI tool, professional branding, and 743 Python tests. See [ROADMAP.md](ROADMAP.md) for current status of all issues.
+> **Update (v0.3.1):** Since this document was created, 17 of 25 identified issues have been resolved. Phases 1, 3, and most of Phase 4 are complete. The project has also been renamed to TIDAL, gained a CLI tool, professional branding, and 850 Python tests. See [ROADMAP.md](ROADMAP.md) for current status of all issues.
 
 **Date Created:** February 2026
 **Total Issues Identified:** 25 (17 resolved, 8 remaining)
@@ -285,4 +285,4 @@ python scripts/create_github_issues.py --dry-run | less
 
 ---
 
-*This tracking system is based on comprehensive codebase exploration identifying 25 improvement areas. The project is in excellent shape (v0.3.1, 743 Python tests + ~108 Wolfram tests, 17/25 issues resolved). Remaining work is primarily testing/CI infrastructure and gauge automation.*
+*This tracking system is based on comprehensive codebase exploration identifying 25 improvement areas. The project is in excellent shape (v0.3.1, 850 Python tests + ~108 Wolfram tests, 17/25 issues resolved). Remaining work is primarily testing/CI infrastructure and gauge automation.*

@@ -339,14 +339,14 @@ Symbolic expressions are stored in Mathematica InputForm. Automatic conversion h
 
 ## 7. `coupling`
 
-Mass and coupling matrices extracted from `identity` operator terms.
+Mass and coupling matrices extracted from `identity` operator terms. Only symbolic matrices are stored in JSON; numeric values are auto-computed at load time from symbolic expressions and metadata parameters.
 
 | Key | Type | Required | Description |
 |-----|------|----------|-------------|
-| `mass_matrix` | array[array[float]] | **Yes** | n x n matrix |
-| `coupling_matrix` | array[array[float]] | **Yes** | n x n matrix |
-| `mass_matrix_symbolic` | array[array[string]] | No | Symbolic entries |
-| `coupling_matrix_symbolic` | array[array[string]] | No | Symbolic entries |
+| `mass_matrix_symbolic` | array[array[string\|null]] | **Yes** | n x n symbolic mass matrix entries |
+| `coupling_matrix_symbolic` | array[array[string\|null]] | **Yes** | n x n symbolic coupling matrix entries |
+
+**Note:** Prior to the Numeric Matrix Cleanup, JSON also contained numeric `mass_matrix` and `coupling_matrix` arrays. These have been removed — numeric values are now computed by `EquationSystem.from_dict()` using symbolic expressions resolved against `metadata.parameters`.
 
 ### Convention
 
@@ -356,22 +356,23 @@ matrix[i][j] = -(coefficient of identity(field_j) in equation_i)
 
 This makes mass-squared positive for the standard Lagrangian sign convention: `d2_t phi = ... - m^2 phi` produces `mass_matrix[i][i] = m^2`.
 
-- Diagonal entries (i == j) go in `mass_matrix`
-- Off-diagonal entries (i != j) go in `coupling_matrix`
+- Diagonal entries (i == j) go in `mass_matrix_symbolic`
+- Off-diagonal entries (i != j) go in `coupling_matrix_symbolic`
+- Null entries indicate zero coupling
 
 ### Auto-Computation
 
-**Important:** `EquationSystem.from_dict()` always recomputes these matrices from the equation terms. Values provided in the JSON are overridden. This ensures consistency.
+**Important:** `EquationSystem.from_dict()` always recomputes numeric matrices from the equation terms via `_compute_matrices_from_terms`. The `_resolve_symbolic_coeff` helper resolves symbolic expressions (e.g., `"-m2"`) against the `metadata.parameters` dict to produce correct numeric values.
 
 **Example (coupled scalars):**
 
-Given `phi_0` equation has term `{"coefficient": -1.0, "operator": "identity", "field": "phi_0"}` and `{"coefficient": -0.5, "operator": "identity", "field": "chi_0"}`:
+Given `phi_0` equation has term `{"coefficient": -1.0, "operator": "identity", "field": "phi_0", "coefficient_symbolic": "-m2"}` and `{"coefficient": -0.5, "operator": "identity", "field": "chi_0", "coefficient_symbolic": "-g"}`:
 
 ```json
 {
   "coupling": {
-    "mass_matrix": [[1.0, 0.0], [0.0, 4.0]],
-    "coupling_matrix": [[0.0, 0.5], [0.5, 0.0]]
+    "mass_matrix_symbolic": [["-m2", null], [null, "-mchi2"]],
+    "coupling_matrix_symbolic": [[null, "-g"], ["-g", null]]
   }
 }
 ```
@@ -380,15 +381,28 @@ Given `phi_0` equation has term `{"coefficient": -1.0, "operator": "identity", "
 
 ## 8. `constraint_solver`
 
-Per-equation configuration for elliptic constraint solving.
+Per-equation configuration for elliptic constraint solving. Supports Poisson, Helmholtz, algebraic, anisotropic, and coupled multi-field constraints.
 
 **Valid only when `lhs.order.time == 0`.** Raises `ValueError` otherwise.
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | `enabled` | boolean | `false` | Whether to solve at each timestep |
-| `method` | string | `"poisson"` | Solver method (only `"poisson"` supported) |
+| `method` | string | `"auto"` | Solver method: `"auto"` (selects best), `"poisson"`, `"fft"`, `"sparse"` |
+| `max_iterations` | integer | `100` | Max iterations for iterative solvers (Gauss-Seidel) |
+| `tolerance` | float | `1e-10` | Convergence tolerance for iterative solvers |
 | `boundary_conditions` | object | `{}` | Per-axis BCs keyed by coordinate name |
+
+### Method Selection
+
+| Method | When Used | Description |
+|--------|-----------|-------------|
+| `"auto"` | Default | FFT for periodic grids, sparse matrix for non-periodic |
+| `"fft"` | Periodic BCs | Fast spectral solve; supports coupled block solve via SVD |
+| `"sparse"` | Non-periodic BCs | Sparse matrix assembly + direct solve |
+| `"poisson"` | Legacy alias | Equivalent to `"auto"` |
+
+**Coupled constraints:** When multiple constraint equations reference each other's fields (e.g., coupled Proca A_0/B_0), the solver automatically detects coupling and solves them simultaneously via block matrix (FFT) or Gauss-Seidel iteration (sparse).
 
 ### Boundary Condition Values
 
@@ -398,15 +412,31 @@ Per-equation configuration for elliptic constraint solving.
 | `value` | float | Fixed value (Dirichlet only) |
 | `derivative` | float | Fixed normal derivative (Neumann only) |
 
-**Example:**
+**Example (Helmholtz with Dirichlet BCs):**
 ```json
 {
   "constraint_solver": {
     "enabled": true,
-    "method": "poisson",
+    "method": "auto",
+    "max_iterations": 30,
+    "tolerance": 1e-10,
     "boundary_conditions": {
       "x": {"type": "dirichlet", "value": 0.0},
       "y": {"type": "dirichlet", "value": 0.0}
+    }
+  }
+}
+```
+
+**Example (Poisson with periodic BCs):**
+```json
+{
+  "constraint_solver": {
+    "enabled": true,
+    "method": "auto",
+    "boundary_conditions": {
+      "x": {"type": "periodic"},
+      "y": {"type": "periodic"}
     }
   }
 }
@@ -479,7 +509,7 @@ Source: [`examples/data/klein_gordon_1d.json`](../examples/data/klein_gordon_1d.
       ]
     }
   }],
-  "coupling": {"mass_matrix": [[1.0]], "coupling_matrix": [[0.0]]}
+  "coupling": {"mass_matrix_symbolic": [[null]], "coupling_matrix_symbolic": [[null]]}
 }
 ```
 
@@ -516,8 +546,8 @@ Two scalar fields phi and chi with mutual coupling. Note how `phi_0`'s equation 
     }
   ],
   "coupling": {
-    "mass_matrix": [[1.0, 0.0], [0.0, 4.0]],
-    "coupling_matrix": [[0.0, 0.5], [0.5, 0.0]]
+    "mass_matrix_symbolic": [["-m2", null], [null, "-mchi2"]],
+    "coupling_matrix_symbolic": [[null, "-g"], ["-g", null]]
   }
 }
 ```

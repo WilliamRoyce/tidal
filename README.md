@@ -18,7 +18,7 @@ View the `tidal` package documentation [here](https://williamroyce.github.io/tor
 
 A research codebase for exploring **electromagnetic ↔ gravitational wave conversion** (Gertsenshtein effect) and potential **amplification mechanisms** in gravity theories with **torsion** (Poincaré gauge theory; parity-even quadratic invariants). The repository includes:
 
-- **A lightweight PDE sandbox** (built on [`py-pde`]) for rapid prototyping and numerics with **743 passing Python tests + ~108 Wolfram tests**.
+- **A lightweight PDE sandbox** (built on [`py-pde`]) for rapid prototyping and numerics with **850 passing Python tests + ~108 Wolfram tests**.
 - A symbolic pipeline (Mathematica + xAct) for **deriving linearized field equations** and exporting them to Python-friendly forms.
 - Documentation and experiments for **mixing mechanisms** and **hyperbolicity/causality checks** relevant to the effect.
 
@@ -46,7 +46,7 @@ For more, visit the [Documentation](https://williamroyce.github.io/torsion-gerts
 - **2D coupled simulations**: full support for coupled field evolution in 2D with visualization showing energy transfer between fields; dimension-agnostic PDE implementations work seamlessly with any grid dimensionality.
 - **Animation and visualization**: side-by-side spacetime plots (φ(x,t) heatmaps), 1D evolution animations (φ(x) vs time), 2D field evolution with dual-panel animations showing both coupled fields, and high-fps video export (MP4 via ffmpeg or GIF fallback).
 - **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), Wolfram Engine 14.3 with xAct tensor framework, optional ffmpeg; Sphinx docs skeleton; type-checked codebase with pytest test suite.
-- **Professional development infrastructure**: 743 Python tests + ~108 Wolfram tests, 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution. 0 ruff violations, 0 pyright errors (strict mode).
+- **Professional development infrastructure**: 850 Python tests + ~108 Wolfram tests, 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution. 0 ruff violations, 0 pyright errors (strict mode).
 
 This README describes the current capabilities, how to run the examples, and planned improvements.
 
@@ -96,7 +96,7 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 
 ## Recent Improvements
 
-- **Phase 4-13+ Pipeline Evolution (February 2026)**: ✅ **ALL CRITICAL IMPLEMENTATION COMPLETE**. Fixed Wolfram test symbol conflicts, created 5 development utility scripts, completed module header documentation. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **CLI**: Full `tidal` command with 5 subcommands (derive, inspect, simulate, list, validate) and `theory.toml` support including `[[derived_fields]]`. **Stress tests**: Scalar-vector coupling (mixed-rank cross-field, 4 constants, 4x4 matrices), massive 3-form (rank-3 antisymmetric tensor). **743 Python tests + ~108 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
+- **Phase 4-13+ Pipeline Evolution (February 2026)**: ✅ **ALL CRITICAL IMPLEMENTATION COMPLETE**. Fixed Wolfram test symbol conflicts, created 5 development utility scripts, completed module header documentation. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **CLI**: Full `tidal` command with 5 subcommands (derive, inspect, simulate, list, validate) and `theory.toml` support including `[[derived_fields]]`. **Stress tests**: Scalar-vector coupling (mixed-rank cross-field, 4 constants, 4x4 matrices), massive 3-form (rank-3 antisymmetric tensor). **850 Python tests + ~108 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
 - **Lagrangian-to-PDE pipeline (February 2026)**: Complete symbolic derivation pipeline implemented with Mathematica/xAct → JSON → Python/py-pde. Fixed component extraction (free index detection with `IndicesOf[]`), operator identification (laplacian vs identity/mass terms), and RHS extraction. Created EM and Klein-Gordon examples demonstrating massless vs massive field dynamics. Added comprehensive documentation proving zero hardcoded physics in numerical layer. See [CHANGELOG.md](CHANGELOG.md) for detailed Phase 11 implementation notes.
 - **2D coupled-field support**: `multi_gaussian_2d` initializer for N-field systems on 2D grids; dimension-agnostic coordinate handling for both 1D and 2D; comprehensive test suite for 2D coupled dynamics (symmetry preservation, energy transfer, decoupled limits).
 - **Enhanced coordinate handling**: automatic detection of coordinate array format (flattened vs grid-shaped) in `gaussian_pulse` and `multi_gaussian_2d`; works seamlessly with different py-pde grid configurations.
@@ -203,11 +203,11 @@ tidal validate examples/data/klein_gordon_1d.json      # validate JSON spec stru
 
 | Command | Description |
 |---------|-------------|
-| `tidalderive theory.toml` | Generate .wls from TOML, run wolframscript to produce JSON |
-| `tidalsimulate spec.json` | Full simulation with plotting (supports `--param`, `--ic`, `--bc`, `--scheme`) |
-| `tidalinspect spec.json` | Display equation system info (fields, operators, parameters) |
-| `tidallist` | Discover all available JSON specs in `examples/data/` |
-| `tidalvalidate spec.json` | Validate JSON equation specification structure |
+| `tidal derive theory.toml` | Generate .wls from TOML, run wolframscript to produce JSON |
+| `tidal simulate spec.json` | Full simulation with plotting (supports `--param`, `--ic`, `--bc`, `--scheme`) |
+| `tidal inspect spec.json` | Display equation system info (fields, operators, parameters) |
+| `tidal list` | Discover all available JSON specs in `examples/data/` |
+| `tidal validate spec.json` | Validate JSON equation specification structure |
 
 **TOML Configuration** (`theory.toml`):
 - Define spacetime dimension, metric, fields, constants, and Lagrangian expression
@@ -234,6 +234,8 @@ tidal validate examples/data/klein_gordon_1d.json      # validate JSON spec stru
 | `cylindrical_kg/` | 3+1D | Cylindrical coordinates, mixed curved/flat |
 | `gravitational_waves/` | 3+1D | xPert linearization, TT gauge, constraints |
 | `massive_3form/` | 3+1D | Rank-3 antisymmetric tensor, symmetry reduction |
+| `massive_gravity/` | 2+1D | Linearized massive gravity, Fierz-Pauli mass, xPert, coupled constraints |
+| `coupled_proca/` | 2+1D | Two massive vectors, coupled Helmholtz constraints, Dirichlet BCs |
 
 See [examples/README.md](examples/README.md) for complete documentation and verification that the Python layer contains zero hardcoded physics.
 
@@ -263,9 +265,9 @@ If `ffmpeg` is unavailable, the example falls back to a GIF via Pillow.
 
 ## Tests
 
-The project includes a comprehensive test suite with **743 Python tests + ~108 Wolfram tests**.
+The project includes a comprehensive test suite with **850 Python tests + ~108 Wolfram tests**.
 
-### Python Tests (743 tests)
+### Python Tests (850 tests)
 
 ```bash
 # Run all Python tests with pytest
@@ -414,7 +416,7 @@ See [`scripts/README.md`](scripts/README.md) for detailed setup instructions.
 ## Contributing
 
 - Open an issue or submit a PR.
-- **Test requirements**: All changes must maintain 100% test pass rate (743 Python + ~108 Wolfram tests). New features require corresponding unit tests in both Python and Wolfram layers where applicable.
+- **Test requirements**: All changes must maintain 100% test pass rate (850 Python + ~108 Wolfram tests). New features require corresponding unit tests in both Python and Wolfram layers where applicable.
 - Run `./scripts/full_test.sh` before submitting PRs to verify all tests pass.
 - Follow the project's type-checking and linting conventions (keyword-only booleans, explicit type annotations, no print in library code).
 
