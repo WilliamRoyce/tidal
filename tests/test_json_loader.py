@@ -12,6 +12,7 @@ from tidal.symbolic.json_loader import (
     ComponentEquation,
     EquationSystem,
     OperatorTerm,
+    _resolve_symbolic_coeff,
     load_equation_system,
     validate_json_schema,
 )
@@ -1536,3 +1537,34 @@ class TestParameterResolvedMatrices:
         # Coupling: -(gcoup) with gcoup=0.5 → -0.5
         assert spec.coupling_matrix[0][3] == pytest.approx(-0.5)
         assert spec.coupling_matrix[3][0] == pytest.approx(-0.5)
+
+
+class TestResolveSymbolicCoeff:
+    """Direct tests for _resolve_symbolic_coeff edge cases."""
+
+    def test_simple_parameter(self) -> None:
+        assert _resolve_symbolic_coeff("m2", {"m2": 5.0}) == 5.0
+
+    def test_negated_parameter(self) -> None:
+        assert _resolve_symbolic_coeff("-m2", {"m2": 5.0}) == -5.0
+
+    def test_compound_expression(self) -> None:
+        assert _resolve_symbolic_coeff("-2*m2", {"m2": 3.0}) == -6.0
+
+    def test_power_expression(self) -> None:
+        # Mathematica ^ → Python **
+        assert _resolve_symbolic_coeff("m2^2", {"m2": 3.0}) == 9.0
+
+    def test_unresolvable_returns_none(self) -> None:
+        assert _resolve_symbolic_coeff("unknown", {"m2": 1.0}) is None
+
+    def test_coordinate_dependent_returns_none(self) -> None:
+        # Mathematica coordinate syntax can't be resolved to float
+        assert _resolve_symbolic_coeff("x[]^(-2)", {"m2": 1.0}) is None
+
+    def test_division_by_zero_returns_none(self) -> None:
+        assert _resolve_symbolic_coeff("m2/0", {"m2": 1.0}) is None
+
+    def test_inf_result_returns_none(self) -> None:
+        # math.isfinite rejects Inf
+        assert _resolve_symbolic_coeff("1e309", {}) is None
