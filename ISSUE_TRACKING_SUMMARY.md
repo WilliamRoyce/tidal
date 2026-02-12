@@ -240,7 +240,7 @@ ISSUE_TRACKING_SUMMARY.md   ✅ This summary
 **Current State (v0.3.1):**
 - ✅ Phase 13+ completed (rank-3+ tensor support, mixed derivatives, curvilinear)
 - ✅ CLI (`tidal` command) implemented — 5 subcommands, 147 tests, zero new deps
-- ✅ 743 Python tests + ~108 Wolfram tests passing
+- ✅ 850 Python tests + ~108 Wolfram tests passing
 - ✅ 0 ruff violations, 0 pyright errors (strict mode)
 - ✅ 18 working examples spanning 1+1D through 3+1D
 - ✅ Project renamed to TIDAL with professional branding (logo, Makefile, COMMUNITY.md)

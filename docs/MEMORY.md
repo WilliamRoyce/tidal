@@ -133,7 +133,7 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 ## Testing Guidelines
 
 ### Test Counts
-- **743 Python tests** + **~108 Wolfram tests** passing
+- **850 Python tests** + **~108 Wolfram tests** passing
 - Run: `uv run pytest tests/` and `./scripts/full_test.sh`
 
 ### Verification Pattern

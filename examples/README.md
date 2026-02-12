@@ -387,6 +387,32 @@ uv run python examples/scalar_vector_coupling/scalar_vector_coupling_simulation.
 
 ---
 
+### 15. Massive Gravity (Linearized, 2+1D)
+
+**Field Equation**: `G^(1)_ab[h] - m^2 h_ab = 0`
+
+```bash
+tidal derive examples/massive_gravity/theory.toml
+uv run python examples/massive_gravity/simulation.py
+```
+
+**Key features**: xPert linearization, Fierz-Pauli mass term, 6 symmetric tensor components (h_tt constraint, h_tx/h_ty first-order, h_xx/h_xy/h_yy evolution), coupled constraint solver with FFT+SVD regularization, dispersion `ω²=k²+m²`.
+
+---
+
+### 16. Coupled Proca (Two Massive Vectors, 2+1D)
+
+**Lagrangian**: `L = -1/4 F^A F^A - mA²/2 A² - 1/4 F^B F^B - mB²/2 B² + g A·B`
+
+```bash
+tidal derive examples/coupled_proca/theory.toml
+uv run python examples/coupled_proca/simulation.py
+```
+
+**Key features**: Two massive vector fields with cross-coupling, coupled Helmholtz constraints (A_0, B_0), Dirichlet boundary conditions, Gauss-Seidel iteration for non-periodic grid, 6×6 mass/coupling matrices.
+
+---
+
 ## Example Completeness
 
 | Example | `theory.toml` | `run.sh` | Simulation `.py` |
@@ -407,6 +433,8 @@ uv run python examples/scalar_vector_coupling/scalar_vector_coupling_simulation.
 | cylindrical_kg | Y | Y | Y |
 | gravitational_waves | N | Y | Y |
 | massive_3form | Y | Y | N |
+| massive_gravity | Y | Y | Y |
+| coupled_proca | Y | Y | Y |
 | klein_gordon (legacy) | N | N | N |
 
 *Note: `elasticity`, `curved_spacetime`, `electrostatics`, and `gravitational_waves` cannot have `theory.toml` because they require manual Wolfram script construction. `klein_gordon` is a legacy example directory with standalone scripts.*
@@ -510,7 +538,7 @@ The pipeline handles the rest automatically!
 ```
 examples/
 ├── README.md                      # This file
-├── data/                          # Generated JSON specifications (18 files)
+├── data/                          # Generated JSON specifications (20 files)
 │   ├── em_1d.json                # EM equations
 │   ├── klein_gordon_1d.json      # KG equations
 │   ├── klein_gordon_3d.json      # KG equations (3+1D)
@@ -528,7 +556,9 @@ examples/
 │   ├── linearized_gravity.json   # Gravitational waves
 │   ├── linearized_gravity_dedonder.json
 │   ├── massive_3form.json        # Rank-3 antisymmetric tensor
-│   └── conformal_kg_static.json  # Conformal scalar field
+│   ├── conformal_kg_static.json  # Conformal scalar field
+│   ├── massive_gravity_3d.json   # Linearized massive gravity (2+1D)
+│   └── coupled_proca_3d.json     # Coupled Proca (2+1D)
 ├── electromagnetic/               # EM field (1+1D)
 ├── scalar_field/                  # Scalar field (1+1D)
 ├── proca/                         # Massive vector field (1+1D)
@@ -545,6 +575,8 @@ examples/
 ├── cylindrical_kg/                # KG in cylindrical coordinates (3+1D)
 ├── gravitational_waves/           # Linearized gravity (3+1D)
 ├── massive_3form/                 # Rank-3 antisymmetric tensor (3+1D)
+├── massive_gravity/               # Linearized massive gravity (2+1D)
+├── coupled_proca/                 # Two coupled massive vectors (2+1D)
 └── klein_gordon/                  # Legacy KG demo scripts (standalone)
 ```
 

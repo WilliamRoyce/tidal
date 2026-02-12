@@ -24,7 +24,7 @@
 - Demonstrates scalar→vector energy transfer via gradient coupling
 - Uses `[[derived_fields]]` TOML feature for field strength tensor F_ab
 
-**Tests:** 743 Python tests passing (22 new physics tests + 147 CLI tests)
+**Tests:** 850 Python tests passing (22 new physics tests + 147 CLI tests)
 
 ---
 
@@ -66,7 +66,7 @@
 - `tests/test_cli.py` + `tests/test_cli_parsing.py` — 147 CLI tests
 - 14 `theory.toml` files across examples
 
-**Tests:** 743 Python tests passing (147 CLI tests), 0 ruff violations, 0 pyright errors
+**Tests:** 850 Python tests passing (147 CLI tests), 0 ruff violations, 0 pyright errors
 
 ---
 
