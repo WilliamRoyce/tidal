@@ -537,6 +537,84 @@ _OPERATOR_MATRIX_REGISTRY: dict[str, Any] = {
 }
 
 
+def _coalesce_directional_laplacians(
+    terms: list[OperatorTerm],
+    spatial_dimension: int,
+) -> list[OperatorTerm]:
+    """Replace directional Laplacians with a compact Laplacian when safe.
+
+    When all spatial axes have ``laplacian_{axis}`` terms targeting the same
+    field with the same constant coefficient, they are mathematically equivalent
+    to a single ``laplacian`` operator.  The compact stencil couples all
+    adjacent grid points, avoiding the checkerboard decoupling that arises
+    from the wide stencil produced by composing gradient matrices (G @ G).
+
+    Guards (all must pass):
+    - All spatial axes present (e.g. ``laplacian_x`` AND ``laplacian_y`` in 2D)
+    - All target the same field
+    - All have the same numeric coefficient
+    - None are time-dependent or position-dependent
+
+    Returns the original list unchanged if any guard fails.
+    """
+    expected_axes = set(AXIS_LETTERS[:spatial_dimension])
+    expected_ops = {f"laplacian_{a}" for a in expected_axes}
+
+    # Collect directional-laplacian terms
+    dir_lap_terms: list[OperatorTerm] = []
+    other_terms: list[OperatorTerm] = []
+    for term in terms:
+        if term.operator in expected_ops:
+            dir_lap_terms.append(term)
+        else:
+            other_terms.append(term)
+
+    # Guard: need exactly the right number of directional laplacians
+    if len(dir_lap_terms) != spatial_dimension:
+        return terms
+
+    # Guard: all axes present
+    found_ops = {t.operator for t in dir_lap_terms}
+    if found_ops != expected_ops:
+        return terms
+
+    # Guard: all target the same field
+    fields = {t.field for t in dir_lap_terms}
+    if len(fields) != 1:
+        return terms
+
+    # Guard: all have the same coefficient AND coefficient_symbolic (different
+    # symbolic names may evaluate to different values at runtime even if current
+    # numerics match)
+    coeffs = {t.coefficient for t in dir_lap_terms}
+    symbolic_coeffs = {t.coefficient_symbolic for t in dir_lap_terms}
+    if len(coeffs) != 1 or len(symbolic_coeffs) != 1:
+        return terms
+
+    # Guard: none are time-dependent or position-dependent
+    if any(t.time_dependent or t.position_dependent for t in dir_lap_terms):
+        return terms
+
+    # All guards passed — coalesce into compact laplacian
+    representative = dir_lap_terms[0]
+    coalesced = OperatorTerm(
+        coefficient=representative.coefficient,
+        operator="laplacian",
+        field=representative.field,
+        coefficient_symbolic=representative.coefficient_symbolic,
+        time_dependent=False,
+        coordinate_dependent=(),
+    )
+    logger.debug(
+        "Coalesced %d directional laplacians into compact laplacian "
+        "(field=%s, coeff=%s)",
+        len(dir_lap_terms),
+        representative.field,
+        representative.coefficient,
+    )
+    return [coalesced, *other_terms]
+
+
 # ---------------------------------------------------------------------------
 # FFT operator multiplier registry: discrete Fourier-space representations
 #
@@ -2089,6 +2167,13 @@ class PDEFromSpec(PDEBase):
         ]
         k_grids = list(np.meshgrid(*k_arrays, indexing="ij"))
 
+        # Coalesce directional laplacians into compact laplacian when possible.
+        # This uses the compact FFT multiplier (2cos(k*dx)-2)/dx² which matches
+        # the standard 3-point stencil, avoiding wide-stencil truncation artifacts.
+        self_terms = _coalesce_directional_laplacians(
+            self_terms, self.spec.spatial_dimension
+        )
+
         # Sum Fourier multipliers for all self-terms
         combined_multiplier = np.zeros(grid.shape, dtype=complex)
         for term in self_terms:
@@ -2178,6 +2263,10 @@ class PDEFromSpec(PDEBase):
         """
         solver_bc = self._build_constraint_bc(eq.constraint_solver, grid)
         bcs = grid.get_boundary_conditions(solver_bc)
+
+        self_terms = _coalesce_directional_laplacians(
+            self_terms, self.spec.spatial_dimension
+        )
 
         n = int(np.prod(grid.shape))
         combined_matrix = sparse.dok_matrix((n, n))
