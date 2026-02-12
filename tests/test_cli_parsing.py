@@ -338,3 +338,65 @@ class TestValidateFormulaAst:
         from tidal.cli._simulate import _validate_formula_ast
 
         _validate_formula_ast("x[0:5]", {"x"})
+
+
+# ==================== generate_wls constraint_solver ====================
+
+
+class TestConstraintSolverToml:
+    """Tests for [constraint_solver] TOML → WLS metadata generation."""
+
+    def _generate(self, config: dict) -> str:  # type: ignore[type-arg]
+        """Generate WLS from minimal config with constraint_solver."""
+        from tidal.cli._derive import generate_wls
+
+        base: dict = {  # type: ignore[type-arg]
+            "theory": {"name": "Test"},
+            "spacetime": {"dimension": 3, "metric": "minkowski"},
+            "fields": [{"name": "phi", "type": "scalar"}],
+            "lagrangian": {
+                "expression": "CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"
+            },
+            "output": {"path": "out.json"},
+        }
+        base.update(config)
+        return generate_wls(base)
+
+    def test_constraint_solver_toml_in_wls(self) -> None:
+        """[constraint_solver] in TOML → solve_constraints -> True in WLS."""
+        wls = self._generate({"constraint_solver": {"enabled": True}})
+        assert '"solve_constraints" -> True' in wls
+
+    def test_constraint_solver_absent_no_flag(self) -> None:
+        """No [constraint_solver] → no solve_constraints in WLS."""
+        wls = self._generate({})
+        assert "solve_constraints" not in wls
+
+    def test_constraint_solver_dirichlet_bcs(self) -> None:
+        """Dirichlet BC config → correct Wolfram Association syntax."""
+        wls = self._generate({
+            "constraint_solver": {
+                "enabled": True,
+                "boundary_conditions": {
+                    "x": {"type": "dirichlet", "value": 0.0},
+                    "y": {"type": "dirichlet", "value": 0.0},
+                },
+            }
+        })
+        assert '"type" -> "dirichlet"' in wls
+        assert '"value" -> 0.0' in wls
+
+    def test_constraint_solver_periodic_bcs(self) -> None:
+        """Periodic BC config → Wolfram Association without value key."""
+        wls = self._generate({
+            "constraint_solver": {
+                "enabled": True,
+                "boundary_conditions": {
+                    "x": {"type": "periodic"},
+                    "y": {"type": "periodic"},
+                },
+            }
+        })
+        assert '"type" -> "periodic"' in wls
+        # Periodic BCs should NOT have a "value" key
+        assert '"value"' not in wls

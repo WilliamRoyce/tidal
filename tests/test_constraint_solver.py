@@ -36,6 +36,7 @@ from tidal.symbolic.pde_builder import (
     _build_gradient_matrix,
     _build_identity_matrix,
     _build_laplacian_matrix,
+    _coalesce_directional_laplacians,
 )
 
 # === Sparse matrix helpers (explicit typing for scipy stubs) ===
@@ -2919,3 +2920,214 @@ class TestCoupledProcaConstraints:
         assert b1_coupled_max > 1e-6, (
             f"Coupled B_1 should be non-zero, got {b1_coupled_max}"
         )
+
+
+# =====================================================================
+# Directional Laplacian Coalescing Tests
+# =====================================================================
+
+
+class TestDirectionalLaplacianCoalescing:
+    """Tests for _coalesce_directional_laplacians().
+
+    Verifies that directional Laplacians (laplacian_x + laplacian_y) are
+    correctly coalesced into a compact laplacian stencil when safe, and
+    that coalescing is correctly blocked by guard conditions.
+    """
+
+    def test_coalesce_2d_isotropic(self) -> None:
+        """Same field, same coeff, both axes in 2D → single laplacian."""
+        terms = [
+            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_0"),
+            OperatorTerm(coefficient=1.0, operator="laplacian_y", field="A_0"),
+        ]
+        result = _coalesce_directional_laplacians(terms, spatial_dimension=2)
+        assert len(result) == 1
+        assert result[0].operator == "laplacian"
+        assert result[0].field == "A_0"
+        assert result[0].coefficient == 1.0
+
+    def test_coalesce_3d_isotropic(self) -> None:
+        """Same field, same coeff, all three axes in 3D → single laplacian."""
+        terms = [
+            OperatorTerm(coefficient=-2.0, operator="laplacian_x", field="phi_0"),
+            OperatorTerm(coefficient=-2.0, operator="laplacian_y", field="phi_0"),
+            OperatorTerm(coefficient=-2.0, operator="laplacian_z", field="phi_0"),
+        ]
+        result = _coalesce_directional_laplacians(terms, spatial_dimension=3)
+        assert len(result) == 1
+        assert result[0].operator == "laplacian"
+        assert result[0].coefficient == -2.0
+
+    def test_no_coalesce_anisotropic(self) -> None:
+        """Different coefficients per axis → no coalescing."""
+        terms = [
+            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="u_0"),
+            OperatorTerm(coefficient=2.0, operator="laplacian_y", field="u_0"),
+        ]
+        result = _coalesce_directional_laplacians(terms, spatial_dimension=2)
+        assert len(result) == 2
+        ops = {t.operator for t in result}
+        assert ops == {"laplacian_x", "laplacian_y"}
+
+    def test_no_coalesce_partial_axes(self) -> None:
+        """Only one axis present in 2D → no coalescing."""
+        terms = [
+            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_0"),
+        ]
+        result = _coalesce_directional_laplacians(terms, spatial_dimension=2)
+        assert len(result) == 1
+        assert result[0].operator == "laplacian_x"
+
+    def test_preserves_other_terms(self) -> None:
+        """Identity and other terms are kept alongside coalesced laplacian."""
+        terms = [
+            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_0"),
+            OperatorTerm(coefficient=1.0, operator="laplacian_y", field="A_0"),
+            OperatorTerm(coefficient=-3.0, operator="identity", field="A_0"),
+        ]
+        result = _coalesce_directional_laplacians(terms, spatial_dimension=2)
+        assert len(result) == 2
+        ops = {t.operator for t in result}
+        assert ops == {"laplacian", "identity"}
+        lap = next(t for t in result if t.operator == "laplacian")
+        assert lap.coefficient == 1.0
+        ident = next(t for t in result if t.operator == "identity")
+        assert ident.coefficient == -3.0
+
+    def test_no_coalesce_position_dependent(self) -> None:
+        """Position-dependent coefficient → no coalescing."""
+        terms = [
+            OperatorTerm(
+                coefficient=1.0,
+                operator="laplacian_x",
+                field="A_0",
+                coordinate_dependent=("x",),
+            ),
+            OperatorTerm(
+                coefficient=1.0,
+                operator="laplacian_y",
+                field="A_0",
+                coordinate_dependent=("y",),
+            ),
+        ]
+        result = _coalesce_directional_laplacians(terms, spatial_dimension=2)
+        assert len(result) == 2
+        ops = {t.operator for t in result}
+        assert ops == {"laplacian_x", "laplacian_y"}
+
+    def test_coupled_proca_no_checkerboard(self) -> None:
+        """End-to-end: solve Proca constraints, verify smooth (no checkerboard).
+
+        A checkerboard artifact manifests as adjacent cells having opposite
+        signs, producing a high-frequency oscillation.  We detect this by
+        checking that the ratio of sign changes to total elements is not
+        excessive (smooth solutions have far fewer sign changes than a
+        checkerboard pattern).
+        """
+        from pathlib import Path
+
+        from tidal.symbolic import build_pde_from_json, load_equation_system
+        from tidal.utils import normalize_solve_result
+
+        json_path = (
+            Path(__file__).parent.parent / "examples" / "data" / "coupled_proca_3d.json"
+        )
+        params = {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5}
+        spec = load_equation_system(json_path)
+        pde = build_pde_from_json(json_path, parameters=params)
+
+        grid = CartesianGrid(
+            bounds=[(0, np.pi), (0, np.pi)], shape=[16, 16], periodic=False
+        )
+
+        # Build initial state with non-zero momentum to activate constraints
+        fields: list[ScalarField] = []
+        for name, slot_type in spec.state_layout:
+            sf = ScalarField(grid, data=0.0)
+            if name == "A_1" and slot_type == "field":
+                x = cast("np.ndarray", grid.cell_coords[..., 0])
+                y = cast("np.ndarray", grid.cell_coords[..., 1])
+                sf.data[:] = 0.5 * np.exp(
+                    -((x - np.pi / 2) ** 2 + (y - np.pi / 2) ** 2) / 0.5
+                )
+            fields.append(sf)
+        state = FieldCollection(fields)
+
+        # One Forward Euler step to create non-zero momenta
+        rate = pde.evolution_rate(state)
+        rate = normalize_solve_result(rate)
+        for i in range(len(state)):
+            state[i].data[:] += 0.01 * np.asarray(rate[i].data, dtype=float)
+
+        # Re-solve constraints with the non-zero momenta
+        pde.evolution_rate(state)
+
+        # Check A_0 and B_0 for checkerboard
+        a0_slot = pde._field_slot_map["A_0"]
+        b0_slot = pde._field_slot_map["B_0"]
+
+        for slot, name in [(a0_slot, "A_0"), (b0_slot, "B_0")]:
+            data = np.asarray(state[slot].data, dtype=float)
+            assert np.max(np.abs(data)) > 1e-10, (
+                f"{name} should be non-zero after constraint solve"
+            )
+
+            # Count sign changes along each axis (checkerboard indicator)
+            sign_changes_x = np.sum(np.diff(np.sign(data), axis=0) != 0)
+            sign_changes_y = np.sum(np.diff(np.sign(data), axis=1) != 0)
+            total_pairs = (data.shape[0] - 1) * data.shape[1] + data.shape[0] * (
+                data.shape[1] - 1
+            )
+
+            sign_change_ratio = (sign_changes_x + sign_changes_y) / total_pairs
+            # A checkerboard has ratio near 1.0; smooth fields have ratio < 0.5
+            assert sign_change_ratio < 0.5, (
+                f"{name} has checkerboard artifact: sign_change_ratio="
+                f"{sign_change_ratio:.3f} (expected < 0.5)"
+            )
+
+    def test_no_coalesce_different_symbolic(self) -> None:
+        """Same numeric coeff, different coefficient_symbolic → no coalesce."""
+        terms = [
+            OperatorTerm(
+                coefficient=1.0,
+                operator="laplacian_x",
+                field="A_0",
+                coefficient_symbolic="alpha",
+            ),
+            OperatorTerm(
+                coefficient=1.0,
+                operator="laplacian_y",
+                field="A_0",
+                coefficient_symbolic="beta",
+            ),
+        ]
+        result = _coalesce_directional_laplacians(terms, spatial_dimension=2)
+        assert len(result) == 2
+        ops = {t.operator for t in result}
+        assert ops == {"laplacian_x", "laplacian_y"}
+
+    def test_no_coalesce_time_dependent(self) -> None:
+        """One term time_dependent=True → no coalescing."""
+        terms = [
+            OperatorTerm(
+                coefficient=1.0,
+                operator="laplacian_x",
+                field="A_0",
+                time_dependent=True,
+            ),
+            OperatorTerm(coefficient=1.0, operator="laplacian_y", field="A_0"),
+        ]
+        result = _coalesce_directional_laplacians(terms, spatial_dimension=2)
+        assert len(result) == 2
+
+    def test_1d_coalesces(self) -> None:
+        """spatial_dimension=1, single laplacian_x → coalesces to laplacian."""
+        terms = [
+            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="phi_0"),
+        ]
+        result = _coalesce_directional_laplacians(terms, spatial_dimension=1)
+        assert len(result) == 1
+        assert result[0].operator == "laplacian"
+        assert result[0].field == "phi_0"

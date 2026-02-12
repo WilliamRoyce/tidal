@@ -1401,3 +1401,138 @@ class TestAutoComputedMatricesIntegration:
         spec = EquationSystem.from_dict(_load_json("sphere_kg.json"))
         assert spec.mass_matrix_symbolic != ()
         assert spec.mass_matrix_symbolic[0][0] is not None
+
+
+class TestParameterResolvedMatrices:
+    """Verify that numeric matrices reflect actual parameter values."""
+
+    def test_mass_matrix_resolved_with_parameters(self) -> None:
+        """Numeric mass_matrix reflects parameter values, not ±1.0 shape factors."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "coordinates": ["t", "x"]},
+            "fields": [{"name": "phi", "index": 0}],
+            "metadata": {"parameters": {"m2": 5.0}},
+            "equations": [
+                {
+                    "field": "phi",
+                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi",
+                                "coefficient_symbolic": "-m2",
+                            },
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "phi"},
+                        ],
+                    },
+                }
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        # With m2=5.0: -(-m2) = -(-5.0) = 5.0 (not 1.0 shape factor)
+        assert spec.mass_matrix == ((5.0,),)
+        assert spec.mass_matrix_symbolic == (("-m2",),)
+
+    def test_coupling_matrix_resolved_with_parameters(self) -> None:
+        """Numeric coupling_matrix reflects parameter values."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "coordinates": ["t", "x"]},
+            "fields": [{"name": "phi", "index": 0}, {"name": "chi", "index": 1}],
+            "metadata": {"parameters": {"m2": 1.0, "g": 0.3}},
+            "equations": [
+                {
+                    "field": "phi",
+                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi",
+                                "coefficient_symbolic": "-m2",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "chi",
+                                "coefficient_symbolic": "g",
+                            },
+                        ],
+                    },
+                },
+                {
+                    "field": "chi",
+                    "lhs": {"expression": "d2_t(chi)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "phi",
+                                "coefficient_symbolic": "g",
+                            },
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "chi",
+                                "coefficient_symbolic": "-m2",
+                            },
+                        ],
+                    },
+                },
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        # mass: -(-m2) = -(-1.0) = 1.0
+        assert spec.mass_matrix == ((1.0, 0.0), (0.0, 1.0))
+        # coupling[0][1] = -(g) = -0.3 (phi eq, chi field)
+        # coupling[1][0] = -(g) = -0.3 (chi eq, phi field)
+        assert spec.coupling_matrix == ((0.0, -0.3), (-0.3, 0.0))
+
+    def test_no_parameters_uses_shape_factor(self) -> None:
+        """Without parameters, numeric matrix uses raw coefficient (shape factor)."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "coordinates": ["t", "x"]},
+            "fields": [{"name": "phi", "index": 0}],
+            "metadata": {},  # No parameters
+            "equations": [
+                {
+                    "field": "phi",
+                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi",
+                                "coefficient_symbolic": "-m2",
+                            },
+                        ],
+                    },
+                }
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        # No parameters → falls back to coefficient shape factor: -(-1.0) = 1.0
+        assert spec.mass_matrix == ((1.0,),)
+
+    def test_coupled_proca_correct_masses(self) -> None:
+        """Coupled Proca: A-fields have mA2=1.0, B-fields have mB2=2.0."""
+        spec = EquationSystem.from_dict(_load_json("coupled_proca_3d.json"))
+        # A components: -(-mA2) with mA2=1.0 → 1.0
+        assert spec.mass_matrix[0][0] == pytest.approx(1.0)
+        assert spec.mass_matrix[1][1] == pytest.approx(1.0)
+        assert spec.mass_matrix[2][2] == pytest.approx(1.0)
+        # B components: -(-mB2) with mB2=2.0 → 2.0
+        assert spec.mass_matrix[3][3] == pytest.approx(2.0)
+        assert spec.mass_matrix[4][4] == pytest.approx(2.0)
+        assert spec.mass_matrix[5][5] == pytest.approx(2.0)
+        # Coupling: -(gcoup) with gcoup=0.5 → -0.5
+        assert spec.coupling_matrix[0][3] == pytest.approx(-0.5)
+        assert spec.coupling_matrix[3][0] == pytest.approx(-0.5)
