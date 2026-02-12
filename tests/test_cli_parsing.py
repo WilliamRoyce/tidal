@@ -346,11 +346,11 @@ class TestValidateFormulaAst:
 class TestConstraintSolverToml:
     """Tests for [constraint_solver] TOML → WLS metadata generation."""
 
-    def _generate(self, config: dict) -> str:  # type: ignore[type-arg]
+    def _generate(self, config: dict[str, object]) -> str:
         """Generate WLS from minimal config with constraint_solver."""
         from tidal.cli._derive import generate_wls
 
-        base: dict = {  # type: ignore[type-arg]
+        base: dict[str, object] = {
             "theory": {"name": "Test"},
             "spacetime": {"dimension": 3, "metric": "minkowski"},
             "fields": [{"name": "phi", "type": "scalar"}],
