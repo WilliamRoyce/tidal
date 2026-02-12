@@ -129,6 +129,9 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 | `cylindrical_kg/` | 3+1D | Cylindrical, mixed curved/flat |
 | `gravitational_waves/` | 3+1D | xPert linearization, TT gauge, constraints |
 | `massive_3form/` | 3+1D | Rank-3 antisymmetric, symmetry reduction |
+| `electrostatics/` | 2+1D | Poisson constraint, no time evolution |
+| `massive_gravity/` | 2+1D | Linearized massive gravity, xPert, coupled constraints, SVD regularization |
+| `coupled_proca/` | 2+1D | Two massive vectors, coupled Helmholtz, Gauss-Seidel, Dirichlet BCs |
 
 ## Testing Guidelines
 
