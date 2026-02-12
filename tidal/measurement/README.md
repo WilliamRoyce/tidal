@@ -122,8 +122,8 @@ Energy for the full coupled system at one snapshot.
 | Field | Description |
 |-------|-------------|
 | `per_field` | `dict[str, FieldEnergy]` per dynamical field |
-| `interaction` | `0.5 * sum_{i!=j} C_ij * integral(phi_i * phi_j) dV` |
-| `total` | Sum of all per-field energies + interaction |
+| `interaction` | `V_total - sum(per_field self-potentials)` — captures all coupling types |
+| `total` | Complete Hamiltonian: `kinetic + V_virial + V_constraint_self` |
 
 ### ConversionResult
 
@@ -163,35 +163,82 @@ Energy conservation diagnostic result.
 
 ## Physics
 
-### Canonical Hamiltonian Energy
+> For the full mathematical derivation, see [HAMILTONIAN.md](HAMILTONIAN.md).
 
-Per-field energy uses the canonical Hamiltonian for a scalar field:
+### Hamiltonian Energy
+
+The system Hamiltonian is reconstructed automatically from the
+Euler-Lagrange equations in the JSON spec — no manual per-system
+formulas.  The complete formula is:
+
+```
+H = 1/2 sum_{dynamical} integral pi_sim^2 dV    (kinetic)
+  + V_virial                                      (potential from EOM)
+  + V_constraint_self                              (temporal components)
+```
+
+**Per-field energy** uses the standard scalar decomposition:
 
 ```
 E_i = integral dV [ 1/2 pi_i^2 + 1/2 |grad(phi_i)|^2 + 1/2 m_ii^2 phi_i^2 ]
 ```
 
-where `pi_i` is the conjugate momentum (time derivative of `phi_i`), and
-`m_ii` is the diagonal mass matrix entry. Constraint fields
-(`time_derivative_order == 0`) are excluded — they are not dynamical
-degrees of freedom.
+where `pi_i` is the simulation momentum (time derivative of `phi_i`),
+and `m_ii` is the diagonal mass matrix entry. Constraint fields
+(`time_derivative_order == 0`) are excluded from per-field energy.
 
 **Gradient computation:** For periodic axes, the gradient uses spectral
 (FFT) differentiation (`ik * FFT(phi)`) for exact accuracy. For
 non-periodic axes, 2nd-order central finite differences are used instead.
 
+### Virial Potential
+
+The virial potential captures ALL cross-field coupling (identity,
+derivative, constraint-mediated) using Euler's homogeneous function
+theorem for degree-2 functionals:
+
+```
+V_virial = -1/2 sum_{i: dynamical} integral phi_i * RHS_i^{spatial} dV
+```
+
+where `RHS_i^{spatial}` is the right-hand side of the i-th dynamical
+equation with `first_derivative_t` (gyroscopic) and `pi_N`
+(velocity-dependent) terms excluded.
+
+### Constraint Field Self-Energy
+
+Temporal gauge components (A_0 in electrodynamics) have **negative**
+self-energy due to the Minkowski metric g^{00} = -1:
+
+```
+V_constraint = sum_{j: constraint} [-1/2 integral |grad(C_j)|^2 dV
+                                    -1/2 m_j^2 integral C_j^2 dV]
+```
+
 ### Interaction Energy
 
-Coupling between fields contributes interaction energy:
+Interaction energy is defined as the total potential minus each
+dynamical field's self-potential:
 
 ```
-E_int = 1/2 sum_{i != j} C_ij integral phi_i phi_j dV
+E_int = V_virial + V_constraint_self - sum_i (gradient_i + mass_i)
 ```
 
-where `C_ij = coupling_matrix[i][j]`. The matrix convention is:
-`matrix[i][j] = -(coefficient of identity(field_j) in equation_i)`.
-The factor of `1/2` prevents double-counting since the sum iterates
-over all ordered pairs.
+This automatically captures identity coupling, derivative coupling
+(e.g., `gSV * grad(phi) . A`), Chern-Simons terms, and
+constraint-mediated interactions.
+
+### Canonical vs. Simulation Momenta (Important!)
+
+The simulation stores `pi_sim = d_t phi` for all fields.  For scalar
+fields, this IS the canonical momentum.  For vector gauge fields,
+`pi_canonical = F^{0i} = d_t A_i - d_i A_0 != pi_sim`.
+
+However, when computing H via the Legendre transform, the cross-terms
+`(d_i A_0)(d_t A_i)` cancel exactly between the `pi * phi_dot` and
+`-L` parts.  The result uses `pi_sim` (not `pi_canonical`) with the
+gauge correction absorbed into `V_constraint_self`.  See
+[HAMILTONIAN.md](HAMILTONIAN.md) Section 2 for the full derivation.
 
 ### Conversion Probability
 
@@ -248,8 +295,12 @@ spatially varying coefficients.
 
 Fields with `time_derivative_order == 0` (e.g., `A_0` in Coulomb gauge)
 are constraint fields — they are determined by elliptic equations, not
-evolved in time. They have no conjugate momentum and contribute no
-dynamical energy. All energy functions skip these fields automatically.
+evolved in time. They have no conjugate momentum and are excluded from
+per-field energy. However, they DO contribute to the total system energy
+through `V_constraint_self` (negative gradient and mass energy due to
+the Minkowski metric g^{00} = -1). Cross-field terms involving
+constraint fields in dynamical equations are captured automatically by
+the virial formula.
 
 ### Symbolic Coefficient Resolution
 
@@ -330,7 +381,8 @@ All functions follow the project's fail-fast convention:
 
 ## Limitations and Future Work
 
-- **Position-dependent coefficients:** Energy computation requires constant `m^2` and `C_ij`. Spatially varying coefficients raise `ValueError`. Extending this requires integrating `m^2(x) phi^2(x)` on the grid (Phase 4).
+- **Position-dependent coefficients:** Energy computation requires constant `m^2` and coupling coefficients. Spatially varying coefficients raise `ValueError`. Extending this requires evaluating position-dependent coefficients at each grid point during virial integration.
+- **Quadratic Lagrangians only:** The virial formula is exact for degree-2 potentials. Higher-order (nonlinear) Lagrangians would need explicit potential density integration.
 - **CLI integration:** No `tidal measure` subcommand yet. The `PlotContext.to_simulation_data()` bridge is in place for Phase 2.
 - **Per-mode spectral conversion:** `P(k, t)` — tracking which Fourier modes participate in conversion — is planned for Phase 3.
 - **Plotting utilities:** Dedicated conversion curve and spectral waterfall plots are planned for Phase 5.
