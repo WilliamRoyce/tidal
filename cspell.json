@@ -155,6 +155,7 @@
     "bfdadc",
     "capsys",
     "CDTM",
+    "coeffs",
     "defn",
     "eeef",
     "epsilonsvc",
@@ -183,6 +184,7 @@
     "pydata",
     "pylint",
     "pydocstyle",
+    "matvec",
     "Mult",
     "mghpert",
     "numpy",
@@ -202,7 +204,8 @@
     "tomllib",
     "trange",
     "Tras",
-    "tqdm"
+    "tqdm",
+    "xpert"
   ],
   "flagWords": ["hte", "teh", "wolfrom"],
   "allowCompoundWords": true,
