@@ -19,6 +19,9 @@ from tidal.measurement._conversion import (
 from tidal.measurement._conversion import (
     compute_conversion_probability as compute_conversion_probability,
 )
+from tidal.measurement._conversion import (
+    compute_group_conversion as compute_group_conversion,
+)
 from tidal.measurement._diagnostics import (
     EnergyDiagnostics as EnergyDiagnostics,
 )
@@ -68,6 +71,7 @@ __all__ = [
     "compute_conversion_probability",
     "compute_energy_timeseries",
     "compute_field_energy",
+    "compute_group_conversion",
     "compute_mode_amplitudes",
     "compute_spectral_energy",
     "compute_spectrum",

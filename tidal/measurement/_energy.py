@@ -1,17 +1,22 @@
-"""Per-field canonical energy and interaction energy computation.
+"""Hamiltonian energy computation from Lagrangian-derived equations.
 
-Computes the Hamiltonian energy density for each field in a multi-field
-coupled system:
+Computes the complete Hamiltonian H = T + V for any quadratic Lagrangian
+by reconstructing it from the Euler-Lagrange equations in the JSON spec:
 
-    E_i = ∫ dV [ ½ π_i² + ½ |∇φ_i|² + ½ m_ii² φ_i² ]
+    H = ½ Σ_{dyn} ∫ π_sim² dV     (kinetic, using simulation momenta)
+      + V_virial                    (from dynamical fields' spatial RHS terms)
+      + V_constraint_self           (constraint field gradient + mass, sign-flipped)
 
-and the interaction energy between fields:
+The virial potential uses Euler's homogeneous function theorem for degree-2
+functionals: V = -½ Σ ∫ φ_i · RHS_i^{spatial} dV.
 
-    E_int = ½ Σ_{i≠j} C_ij ∫ φ_i φ_j dV
+Constraint fields (temporal gauge components) have NEGATIVE self-energy
+due to the Minkowski metric g^{00} = -1.  This sign flip is automatic.
 """
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -21,10 +26,17 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from tidal.measurement._io import SimulationData
+    from tidal.symbolic.json_loader import OperatorTerm
 
 # Threshold below which energy is treated as zero.  Prevents division by
 # near-zero values from floating-point integration noise.
 _ENERGY_FLOOR: float = 1e-12
+
+# Axis letter → numpy axis index (spatial axes only).
+_AXIS_MAP: dict[str, int] = {"x": 0, "y": 1, "z": 2}
+
+# Pattern for momentum field references: pi_0, pi_1, pi0, pi1, etc.
+_MOMENTUM_RE = re.compile(r"^pi_?(\d+)$")
 
 
 @dataclass(frozen=True)
@@ -58,9 +70,10 @@ class SystemEnergy:
     per_field : dict[str, FieldEnergy]
         Energy breakdown per field.
     interaction : float
-        ``0.5 * Σ_{i≠j} C_ij * ∫ φ_i φ_j dV``
+        Total potential minus per-field self-potentials.  Includes all
+        cross-field coupling (identity, derivative, constraint-mediated).
     total : float
-        Sum of all per-field energies + interaction.
+        Complete Hamiltonian: kinetic + virial potential + constraint self-energy.
     """
 
     per_field: dict[str, FieldEnergy]
@@ -69,7 +82,58 @@ class SystemEnergy:
 
 
 # ------------------------------------------------------------------
-# Gradient computation
+# Derivative helpers
+# ------------------------------------------------------------------
+
+
+def _first_derivative(
+    field: NDArray[np.float64],
+    axis: int,
+    dx: float,
+    *,
+    is_periodic: bool,
+) -> NDArray[np.float64]:
+    """Single-axis first derivative.
+
+    Uses FFT for periodic axes, ``np.gradient`` for non-periodic.
+    """
+    if is_periodic:
+        n = field.shape[axis]
+        freq = np.fft.fftfreq(n, d=dx) * (2.0 * np.pi)
+        shape = [1] * field.ndim
+        shape[axis] = n
+        ik = 1j * freq.reshape(shape)
+        fhat = np.fft.fft(field, axis=axis)
+        return np.real(np.fft.ifft(ik * fhat, axis=axis))
+
+    return np.gradient(field, dx, axis=axis)
+
+
+def _second_derivative(
+    field: NDArray[np.float64],
+    axis: int,
+    dx: float,
+    *,
+    is_periodic: bool,
+) -> NDArray[np.float64]:
+    """Single-axis second derivative.
+
+    Uses ``-k²`` in FFT for periodic axes, double ``np.gradient`` otherwise.
+    """
+    if is_periodic:
+        n = field.shape[axis]
+        freq = np.fft.fftfreq(n, d=dx) * (2.0 * np.pi)
+        shape = [1] * field.ndim
+        shape[axis] = n
+        neg_k2 = -(freq**2).reshape(shape)
+        fhat = np.fft.fft(field, axis=axis)
+        return np.real(np.fft.ifft(neg_k2 * fhat, axis=axis))
+
+    return np.gradient(np.gradient(field, dx, axis=axis), dx, axis=axis)
+
+
+# ------------------------------------------------------------------
+# Gradient energy density (used by compute_field_energy)
 # ------------------------------------------------------------------
 
 
@@ -78,32 +142,134 @@ def _gradient_energy_density(
     grid_spacing: tuple[float, ...],
     periodic: tuple[bool, ...],
 ) -> NDArray[np.float64]:
-    """Compute ``|∇φ|²`` on the grid.
-
-    For periodic axes, uses spectral (FFT) gradient for accuracy.
-    For non-periodic axes, uses 2nd-order central differences.
-    """
+    """Compute ``|∇φ|²`` on the grid."""
     grad_sq: NDArray[np.float64] = np.zeros_like(field)
-
     for axis in range(len(grid_spacing)):
-        dx = grid_spacing[axis]
-        if periodic[axis]:
-            # FFT-based gradient: exact for periodic fields
-            n = field.shape[axis]
-            freq = np.fft.fftfreq(n, d=dx) * (2.0 * np.pi)
-            # Build shape for broadcasting: (1, ..., n, ..., 1)
-            shape = [1] * field.ndim
-            shape[axis] = n
-            ik = 1j * freq.reshape(shape)
-            fhat = np.fft.fft(field, axis=axis)
-            grad_axis = np.real(np.fft.ifft(ik * fhat, axis=axis))
-        else:
-            # Finite difference gradient
-            grad_axis = np.gradient(field, dx, axis=axis)
-
+        grad_axis = _first_derivative(field, axis, grid_spacing[axis], is_periodic=periodic[axis])
         grad_sq += grad_axis**2
-
     return grad_sq
+
+
+# ------------------------------------------------------------------
+# Spatial operator application (for virial potential)
+# ------------------------------------------------------------------
+
+
+def _apply_spatial_operator(
+    operator: str,
+    field: NDArray[np.float64],
+    grid_spacing: tuple[float, ...],
+    periodic: tuple[bool, ...],
+) -> NDArray[np.float64]:
+    """Apply a named spatial operator to a field array.
+
+    Raises
+    ------
+    ValueError
+        If the operator is unknown.
+    """
+    if operator == "identity":
+        return field.copy()
+
+    # gradient_{x,y,z}
+    if operator.startswith("gradient_"):
+        axis_letter = operator[len("gradient_"):]
+        if axis_letter in _AXIS_MAP:
+            ax = _AXIS_MAP[axis_letter]
+            return _first_derivative(field, ax, grid_spacing[ax], is_periodic=periodic[ax])
+
+    # laplacian_{x,y,z}
+    if operator.startswith("laplacian_"):
+        axis_letter = operator[len("laplacian_"):]
+        if axis_letter in _AXIS_MAP:
+            ax = _AXIS_MAP[axis_letter]
+            return _second_derivative(field, ax, grid_spacing[ax], is_periodic=periodic[ax])
+
+    # laplacian (isotropic sum)
+    if operator == "laplacian":
+        result: NDArray[np.float64] = np.zeros_like(field)
+        for ax in range(len(grid_spacing)):
+            result += _second_derivative(field, ax, grid_spacing[ax], is_periodic=periodic[ax])
+        return result
+
+    # cross_derivative_{xy,xz,yz}
+    if operator.startswith("cross_derivative_"):
+        axes_str = operator[len("cross_derivative_"):]
+        if len(axes_str) == 2 and axes_str[0] in _AXIS_MAP and axes_str[1] in _AXIS_MAP:  # noqa: PLR2004
+            ax0 = _AXIS_MAP[axes_str[0]]
+            ax1 = _AXIS_MAP[axes_str[1]]
+            tmp = _first_derivative(field, ax0, grid_spacing[ax0], is_periodic=periodic[ax0])
+            return _first_derivative(tmp, ax1, grid_spacing[ax1], is_periodic=periodic[ax1])
+
+    msg = f"Unknown spatial operator for energy measurement: '{operator}'"
+    raise ValueError(msg)
+
+
+# ------------------------------------------------------------------
+# Term resolution helpers
+# ------------------------------------------------------------------
+
+
+def _is_momentum_field(field_name: str) -> bool:
+    """Check if a field name is a momentum reference (pi_N / piN)."""
+    return _MOMENTUM_RE.match(field_name) is not None
+
+
+def _resolve_term_coefficient(
+    term: OperatorTerm,
+    parameters: dict[str, float],
+) -> float:
+    """Resolve a term's numeric coefficient.
+
+    Tries symbolic resolution first, falls back to numeric.
+    No negation — RHS coefficients are already the correct sign.
+    """
+    if term.coefficient_symbolic is not None:
+        from tidal.symbolic.json_loader import (  # noqa: PLC0415
+            _resolve_symbolic_coeff,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        resolved = _resolve_symbolic_coeff(term.coefficient_symbolic, parameters)
+        if resolved is not None:
+            return float(resolved)
+
+    return float(term.coefficient)
+
+
+def _resolve_term_target(
+    data: SimulationData,
+    field_name: str,
+    t_idx: int,
+) -> NDArray[np.float64] | None:
+    """Resolve the field data a term acts on.
+
+    Returns
+    -------
+    NDArray or None
+        The field/momentum snapshot, or None if the target is a zero-momentum
+        constraint field or unresolvable.
+    """
+    # Direct field reference
+    if field_name in data.fields:
+        return data.fields[field_name][t_idx]
+
+    # Momentum reference: pi_N or piN
+    m = _MOMENTUM_RE.match(field_name)
+    if m is not None:
+        idx = int(m.group(1))
+        names = data.spec.component_names
+        if idx < len(names):
+            target_name = names[idx]
+            # Constraint field → zero momentum
+            eq = data.spec.equations[idx]
+            if eq.time_derivative_order == 0:
+                return None
+            mom = data.momenta.get(target_name)
+            if mom is not None:
+                return mom[t_idx]
+        return None
+
+    return None
 
 
 # ------------------------------------------------------------------
@@ -161,29 +327,8 @@ def compute_field_energy(
 
 
 # ------------------------------------------------------------------
-# System energy (all fields + interaction)
+# System energy (virial + constraint)
 # ------------------------------------------------------------------
-
-
-def _check_position_independent(
-    data: SimulationData, eq_idx: int, target_field: str, label: str,
-) -> None:
-    """Raise if the identity term for *target_field* in equation *eq_idx* is position-dependent.
-
-    Raises
-    ------
-    ValueError
-        If the identity operator for *target_field* has position-dependent coefficients.
-    """
-    eq = data.spec.equations[eq_idx]
-    for term in eq.rhs_terms:
-        if term.operator == "identity" and term.field == target_field and term.position_dependent:
-            msg = (
-                f"Position-dependent {label} term in equation '{eq.field_name}' "
-                f"targeting '{target_field}' — energy computation requires "
-                f"constant coefficients (coordinate_dependent={term.coordinate_dependent})"
-            )
-            raise ValueError(msg)
 
 
 def _resolve_mass_squared(
@@ -193,13 +338,27 @@ def _resolve_mass_squared(
 
     Tries symbolic resolution first (using ``data.parameters``), then
     falls back to the pre-computed numeric matrix.
+
+    Raises
+    ------
+    ValueError
+        If the mass term is position-dependent.
     """
     from tidal.symbolic.json_loader import (  # noqa: PLC0415
         _resolve_symbolic_coeff,  # pyright: ignore[reportPrivateUsage]
     )
 
-    field_name = data.spec.component_names[field_idx]
-    _check_position_independent(data, field_idx, field_name, "mass")
+    # Check for position-dependent mass term
+    eq = data.spec.equations[field_idx]
+    field_name = eq.field_name
+    for term in eq.rhs_terms:
+        if term.operator == "identity" and term.field == field_name and term.position_dependent:
+            msg = (
+                f"Position-dependent mass term in equation '{field_name}' "
+                f"— energy computation requires constant coefficients "
+                f"(coordinate_dependent={term.coordinate_dependent})"
+            )
+            raise ValueError(msg)
 
     sym_row = data.spec.mass_matrix_symbolic[field_idx] if data.spec.mass_matrix_symbolic else ()
     if field_idx < len(sym_row):
@@ -214,38 +373,111 @@ def _resolve_mass_squared(
     return float(data.spec.mass_matrix[field_idx][field_idx])
 
 
-def _resolve_coupling(
-    data: SimulationData, i: int, j: int,
+def _compute_virial_potential(
+    data: SimulationData,
+    t_idx: int,
 ) -> float:
-    """Get the off-diagonal coupling matrix entry C_ij."""
-    from tidal.symbolic.json_loader import (  # noqa: PLC0415
-        _resolve_symbolic_coeff,  # pyright: ignore[reportPrivateUsage]
-    )
+    """Virial potential from dynamical fields' spatial RHS terms.
 
-    target_field = data.spec.component_names[j]
-    _check_position_independent(data, i, target_field, "coupling")
+    ``V_virial = -½ Σ_{i: dynamical} ∫ φ_i · RHS_i^{spatial} dV``
 
-    sym_row = data.spec.coupling_matrix_symbolic[i] if data.spec.coupling_matrix_symbolic else ()
-    if j < len(sym_row):
-        sym_val = sym_row[j]
-        if sym_val is not None:
-            resolved = _resolve_symbolic_coeff(sym_val, data.parameters)
-            if resolved is not None:
-                # Negate: symbolic matrix stores raw coefficient_symbolic,
-                # but convention is matrix[i][j] = -(coefficient).
-                return float(-resolved)
+    Excludes ``first_derivative_t`` (gyroscopic, do no work) and
+    ``pi_N`` momentum references (velocity-dependent forces).
 
-    return float(data.spec.coupling_matrix[i][j])
+    Raises
+    ------
+    ValueError
+        If any term has a position-dependent coefficient.
+    """
+    dv = data.volume_element
+    potential = 0.0
+
+    for eq in data.spec.equations:
+        if eq.time_derivative_order < 2:  # noqa: PLR2004
+            continue  # skip constraints and first-order
+
+        phi_i = data.fields[eq.field_name][t_idx]
+
+        for term in eq.rhs_terms:
+            # Skip time-derivative terms (gyroscopic forces)
+            if term.operator == "first_derivative_t":
+                continue
+
+            # Skip momentum-field references (velocity-dependent)
+            if _is_momentum_field(term.field):
+                continue
+
+            # Position-dependent coefficients not yet supported
+            if term.position_dependent:
+                msg = (
+                    f"Position-dependent coefficient in equation "
+                    f"'{eq.field_name}' term '{term.operator}({term.field})' "
+                    f"— virial energy computation requires constant "
+                    f"coefficients (coordinate_dependent="
+                    f"{term.coordinate_dependent})"
+                )
+                raise ValueError(msg)
+
+            target = _resolve_term_target(data, term.field, t_idx)
+            if target is None:
+                continue
+
+            coeff = _resolve_term_coefficient(term, data.parameters)
+            operated = _apply_spatial_operator(
+                term.operator, target, data.grid_spacing, data.periodic,
+            )
+            potential += coeff * float(np.sum(phi_i * operated)) * dv
+
+    return -0.5 * potential
+
+
+def _compute_constraint_self_energy(
+    data: SimulationData,
+    t_idx: int,
+) -> float:
+    """Constraint field self-energy with sign flip (g^{00} = -1).
+
+    ``V_constraint = Σ_{j: constraint} [ -½ |∇C_j|² - ½ m_j² C_j² ] dV``
+
+    Temporal gauge components have NEGATIVE gradient and mass self-energy
+    relative to spatial/scalar fields, due to the Minkowski metric.
+    """
+    energy = 0.0
+
+    for field_idx, eq in enumerate(data.spec.equations):
+        if eq.time_derivative_order != 0:
+            continue  # only constraint fields
+        name = eq.field_name
+        if name not in data.fields:
+            continue  # constraint field not stored in data
+
+        c_field = data.fields[name][t_idx]
+        dv = data.volume_element
+
+        # Gradient: -½ ∫ |∇C|² dV  (NEGATIVE)
+        grad_sq = _gradient_energy_density(c_field, data.grid_spacing, data.periodic)
+        energy -= 0.5 * float(np.sum(grad_sq)) * dv
+
+        # Mass: -½ m² ∫ C² dV  (NEGATIVE)
+        m2 = _resolve_mass_squared(data, field_idx)
+        energy -= 0.5 * m2 * float(np.sum(c_field**2)) * dv
+
+    return energy
 
 
 def compute_system_energy(
     data: SimulationData,
     t_idx: int,
 ) -> SystemEnergy:
-    """Compute total system energy at snapshot *t_idx*.
+    """Compute total Hamiltonian energy at snapshot *t_idx*.
 
-    Skips constraint fields (``time_derivative_order == 0``) as they are
-    not dynamical degrees of freedom.
+    Uses the complete formula derived from the Lagrangian:
+
+        H = ½ Σ π_sim² + V_virial + V_constraint_self
+
+    where V_virial is computed from dynamical equations' spatial RHS terms
+    (Euler's theorem for quadratic functionals), and V_constraint_self
+    accounts for temporal gauge components' negative self-energy.
 
     Parameters
     ----------
@@ -262,13 +494,11 @@ def compute_system_energy(
         msg = f"t_idx={t_idx} out of range [0, {data.n_snapshots})"
         raise ValueError(msg)
 
-    names = data.spec.component_names
+    # Per-field canonical energy (kinetic + gradient + mass) — dynamical only
     per_field: dict[str, FieldEnergy] = {}
-
     for field_idx, eq in enumerate(data.spec.equations):
         name = eq.field_name
         if eq.time_derivative_order == 0:
-            # Constraint field — no dynamical energy
             continue
 
         field_snapshot = data.fields[name][t_idx]
@@ -276,32 +506,27 @@ def compute_system_energy(
         mom_arr = mom_snapshot[t_idx] if mom_snapshot is not None else None
 
         m2 = _resolve_mass_squared(data, field_idx)
-
         per_field[name] = compute_field_energy(
-            field_snapshot,
-            mom_arr,
-            m2,
-            data.grid_spacing,
-            data.periodic,
+            field_snapshot, mom_arr, m2, data.grid_spacing, data.periodic,
         )
 
-    # Interaction energy: 0.5 * Σ_{i≠j} C_ij * ∫ φ_i φ_j dV
-    dv = data.volume_element
-    interaction = 0.0
-    for i, eq_i in enumerate(data.spec.equations):
-        if eq_i.time_derivative_order == 0:
-            continue
-        for j, eq_j in enumerate(data.spec.equations):
-            if i == j or eq_j.time_derivative_order == 0:
-                continue
-            c_ij = _resolve_coupling(data, i, j)
-            if c_ij == 0.0:
-                continue
-            phi_i = data.fields[names[i]][t_idx]
-            phi_j = data.fields[names[j]][t_idx]
-            interaction += 0.5 * c_ij * float(np.sum(phi_i * phi_j)) * dv
+    # Virial potential from dynamical fields' spatial RHS terms
+    v_virial = _compute_virial_potential(data, t_idx)
 
-    total = sum(fe.total for fe in per_field.values()) + interaction
+    # Constraint field self-energy (negative, from g^{00} = -1)
+    v_constraint = _compute_constraint_self_energy(data, t_idx)
+
+    # Total potential = virial + constraint
+    v_total = v_virial + v_constraint
+
+    # Interaction = total potential minus per-field self-potentials
+    self_potential = sum(fe.gradient + fe.mass for fe in per_field.values())
+    interaction = v_total - self_potential
+
+    # Total energy = kinetic + total potential
+    total_kinetic = sum(fe.kinetic for fe in per_field.values())
+    total = total_kinetic + v_total
+
     return SystemEnergy(per_field=per_field, interaction=interaction, total=total)
 
 

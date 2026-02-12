@@ -22,12 +22,17 @@ from tidal.measurement import (
     compute_conversion_probability,
     compute_energy_timeseries,
     compute_field_energy,
+    compute_group_conversion,
     compute_mode_amplitudes,
     compute_spectrum,
     compute_system_energy,
 )
 from tidal.measurement._energy import (
+    _apply_spatial_operator,  # pyright: ignore[reportPrivateUsage]
+    _compute_constraint_self_energy,  # pyright: ignore[reportPrivateUsage]
+    _compute_virial_potential,  # pyright: ignore[reportPrivateUsage]
     _gradient_energy_density,  # pyright: ignore[reportPrivateUsage]
+    _is_momentum_field,  # pyright: ignore[reportPrivateUsage]
 )
 from tidal.symbolic.json_loader import (
     ComponentEquation,
@@ -741,3 +746,346 @@ class TestFromNpzAuto:
 
         with pytest.raises(ValueError, match=r"missing.*grid_spacing"):
             SimulationData.from_npz_auto(npz_path, spec)
+
+
+# ============================================================
+# Group conversion tests
+# ============================================================
+
+
+class TestGroupConversion:
+    """Test compute_group_conversion for multi-field groups."""
+
+    def test_single_source_single_target_matches_pairwise(self) -> None:
+        """Single-field groups degenerate to pairwise conversion."""
+        data = _make_sim_data_two_fields(n_snapshots=11)
+        pairwise = compute_conversion_probability(data, "phi_0", "chi_0")
+        group = compute_group_conversion(data, "phi_0", "chi_0")
+        np.testing.assert_allclose(group.probability, pairwise.probability)
+        assert group.source_field == "phi_0"
+        assert group.target_field == "chi_0"
+
+    def test_none_target_uses_all_dynamical(self) -> None:
+        """target_fields=None auto-selects all other dynamical fields."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        result = compute_group_conversion(data, "phi_0")
+        assert result.target_field == "chi_0"
+
+    def test_multi_target_explicit_equals_auto(self) -> None:
+        """Explicit target list matches auto-target."""
+        data = _make_sim_data_two_fields(n_snapshots=11)
+        explicit = compute_group_conversion(data, "phi_0", ["chi_0"])
+        auto = compute_group_conversion(data, "phi_0")
+        np.testing.assert_allclose(explicit.probability, auto.probability)
+
+    def test_overlap_raises(self) -> None:
+        """Source and target groups must not overlap."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        with pytest.raises(ValueError, match="overlap"):
+            compute_group_conversion(data, "phi_0", ["phi_0", "chi_0"])
+
+    def test_invalid_field_raises(self) -> None:
+        """Invalid field name raises ValueError."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        with pytest.raises(ValueError, match="not in spec"):
+            compute_group_conversion(data, "nonexistent")
+
+    def test_all_fields_as_source_empty_target_raises(self) -> None:
+        """All dynamical fields as source leaves empty target -> raises."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        with pytest.raises(ValueError, match="empty"):
+            compute_group_conversion(data, ["phi_0", "chi_0"])
+
+
+# ============================================================
+# Spatial operator tests
+# ============================================================
+
+
+class TestApplySpatialOperator:
+    """Test _apply_spatial_operator dispatch."""
+
+    def test_identity_returns_copy(self) -> None:
+        """Identity operator returns a copy, not the same array."""
+        field = np.array([1.0, 2.0, 3.0])
+        result = _apply_spatial_operator("identity", field, (0.1,), (True,))
+        np.testing.assert_array_equal(result, field)
+        assert result is not field  # copy, not alias
+
+    def test_gradient_x_linear(self) -> None:
+        """Gradient of a linear field f(x) = 2x gives constant 2."""
+        n = 64
+        dx = 10.0 / n
+        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
+        field = 2.0 * x  # f(x) = 2x
+
+        result = _apply_spatial_operator("gradient_x", field, (dx,), (False,))
+        np.testing.assert_allclose(result, 2.0, atol=1e-10)
+
+    def test_laplacian_x_cosine_periodic(self) -> None:
+        """Laplacian of cos(kx) = -k^2 cos(kx) for periodic FFT."""
+        n = 128
+        domain = 2.0 * np.pi
+        dx = domain / n
+        x = np.linspace(0, domain - dx, n)
+        k = 3.0
+        field = np.cos(k * x)
+
+        result = _apply_spatial_operator("laplacian_x", field, (dx,), (True,))
+        expected = -(k**2) * np.cos(k * x)
+        np.testing.assert_allclose(result, expected, atol=1e-10)
+
+    def test_laplacian_sum_of_axes(self) -> None:
+        """Isotropic laplacian = laplacian_x + laplacian_y."""
+        n = 32
+        domain = 2.0 * np.pi
+        dx = domain / n
+        x = np.linspace(0, domain - dx, n)
+        y = np.linspace(0, domain - dx, n)
+        xx, yy = np.meshgrid(x, y, indexing="ij")
+        field = np.cos(xx) + np.cos(yy)
+
+        spacing = (dx, dx)
+        periodic = (True, True)
+
+        lap_iso = _apply_spatial_operator("laplacian", field, spacing, periodic)
+        lap_x = _apply_spatial_operator("laplacian_x", field, spacing, periodic)
+        lap_y = _apply_spatial_operator("laplacian_y", field, spacing, periodic)
+
+        np.testing.assert_allclose(lap_iso, lap_x + lap_y, atol=1e-10)
+
+    def test_cross_derivative_xy(self) -> None:
+        """Cross derivative of sin(x)*sin(y) = cos(x)*cos(y)."""
+        n = 64
+        domain = 2.0 * np.pi
+        dx = domain / n
+        x = np.linspace(0, domain - dx, n)
+        y = np.linspace(0, domain - dx, n)
+        xx, yy = np.meshgrid(x, y, indexing="ij")
+        field = np.sin(xx) * np.sin(yy)
+
+        spacing = (dx, dx)
+        periodic = (True, True)
+
+        result = _apply_spatial_operator("cross_derivative_xy", field, spacing, periodic)
+        expected = np.cos(xx) * np.cos(yy)
+        np.testing.assert_allclose(result, expected, atol=1e-8)
+
+    def test_unknown_operator_raises(self) -> None:
+        """Unknown operator name raises ValueError."""
+        field = np.zeros(10)
+        with pytest.raises(ValueError, match="Unknown spatial operator"):
+            _apply_spatial_operator("unknown_op", field, (0.1,), (True,))
+
+
+class TestIsMomentumField:
+    """Test _is_momentum_field regex."""
+
+    def test_pi_underscore(self) -> None:
+        assert _is_momentum_field("pi_0") is True
+        assert _is_momentum_field("pi_1") is True
+        assert _is_momentum_field("pi_12") is True
+
+    def test_pi_no_underscore(self) -> None:
+        assert _is_momentum_field("pi0") is True
+        assert _is_momentum_field("pi1") is True
+
+    def test_regular_fields(self) -> None:
+        assert _is_momentum_field("phi_0") is False
+        assert _is_momentum_field("A_0") is False
+        assert _is_momentum_field("pi_phi") is False  # non-numeric
+
+
+# ============================================================
+# Virial potential tests
+# ============================================================
+
+
+class TestVirialPotential:
+    """Test _compute_virial_potential."""
+
+    def test_single_kg_virial_matches_canonical(self) -> None:
+        """For single KG field, virial = gradient + mass energy."""
+        data = _make_single_field_data(n_snapshots=3)
+
+        v_virial = _compute_virial_potential(data, 0)
+        fe = compute_field_energy(
+            data.fields["phi_0"][0],
+            data.momenta["phi_0"][0],
+            mass_squared=float(data.spec.mass_matrix[0][0]),
+            grid_spacing=data.grid_spacing,
+            periodic=data.periodic,
+        )
+
+        # Virial should equal gradient + mass (the total potential energy)
+        np.testing.assert_allclose(v_virial, fe.gradient + fe.mass, rtol=1e-6)
+
+    def test_coupled_oscillator_energy_still_conserved(self) -> None:
+        """Existing exact coupled-oscillator data still conserves energy."""
+        data = _make_sim_data_two_fields(n_snapshots=51)
+        _, _, _, total = compute_energy_timeseries(data)
+
+        relative_drift = np.abs(total - total[0]) / total[0]
+        assert np.max(relative_drift) < 1e-10
+
+    def test_coupled_scalars_interaction_nonzero(self) -> None:
+        """Coupled scalars should have nonzero interaction energy."""
+        data = _make_sim_data_two_fields(n_snapshots=11)
+        # At some time step, chi should be nonzero → interaction nonzero
+        se = compute_system_energy(data, 5)
+        # Total = kinetic + virial + constraint. Interaction = virial - self_potentials.
+        # For coupled uniform oscillators, the coupling term is nonzero.
+        assert se.interaction != 0.0
+
+    def test_single_field_zero_interaction(self) -> None:
+        """Single KG field has zero interaction energy."""
+        data = _make_single_field_data(n_snapshots=3)
+        se = compute_system_energy(data, 0)
+        np.testing.assert_allclose(se.interaction, 0.0, atol=1e-12)
+
+
+# ============================================================
+# Constraint self-energy tests
+# ============================================================
+
+
+def _make_constraint_spec() -> EquationSystem:
+    """Build a synthetic spec with one constraint and one dynamical field.
+
+    Mimics a simplified gauge theory: A_0 (constraint) + A_1 (dynamical).
+    """
+    # A_0 equation: constraint (time_order = 0)
+    # A_0 = laplacian_x(A_0) + 0.5 * identity(A_0)
+    a0_terms = (
+        OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_0"),
+        OperatorTerm(coefficient=0.5, operator="identity", field="A_0",
+                     coefficient_symbolic="Am2"),
+    )
+    eq_a0 = ComponentEquation(
+        field_name="A_0", field_index=0,
+        time_derivative_order=0, rhs_terms=a0_terms,
+    )
+
+    # A_1 equation: dynamical (time_order = 2)
+    # d2_t(A_1) = laplacian_x(A_1) - 0.5 * identity(A_1)
+    a1_terms = (
+        OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_1"),
+        OperatorTerm(coefficient=-0.5, operator="identity", field="A_1",
+                     coefficient_symbolic="-Am2"),
+    )
+    eq_a1 = ComponentEquation(
+        field_name="A_1", field_index=1,
+        time_derivative_order=2, rhs_terms=a1_terms,
+    )
+
+    return EquationSystem(
+        n_components=2,
+        dimension=2,
+        spatial_dimension=1,
+        equations=(eq_a0, eq_a1),
+        component_names=("A_0", "A_1"),
+        mass_matrix=((-0.5, 0.0), (0.0, 0.5)),
+        coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+        metadata={"parameters": {"Am2": 0.5}},
+        coordinates=("t", "x"),
+        mass_matrix_symbolic=(("-Am2", "0"), ("0", "Am2")),
+        coupling_matrix_symbolic=(("0", "0"), ("0", "0")),
+    )
+
+
+class TestConstraintSelfEnergy:
+    """Test _compute_constraint_self_energy."""
+
+    def test_constraint_energy_negative(self) -> None:
+        """Constraint field with nonzero gradient + mass gives negative energy."""
+        spec = _make_constraint_spec()
+        n = 64
+        dx = 10.0 / n
+        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
+
+        # A_0 = cos(kx), A_1 = 0
+        k = 2.0 * np.pi / 10.0
+        a0_field = np.cos(k * x)
+
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={"A_0": a0_field[np.newaxis, :], "A_1": np.zeros((1, n))},
+            momenta={"A_1": np.zeros((1, n))},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={"Am2": 0.5},
+        )
+
+        energy = _compute_constraint_self_energy(data, 0)
+
+        # Should be negative: -1/2 |grad(A_0)|^2 - 1/2 m^2 A_0^2
+        assert energy < 0.0
+
+    def test_no_constraints_returns_zero(self) -> None:
+        """System without constraints gives zero constraint self-energy."""
+        data = _make_single_field_data(n_snapshots=3)
+        energy = _compute_constraint_self_energy(data, 0)
+        assert energy == 0.0
+
+    def test_constraint_field_not_in_data_skipped(self) -> None:
+        """Constraint field not stored in data is silently skipped."""
+        spec = _make_constraint_spec()
+        n = 32
+
+        # Only A_1 in data, A_0 omitted
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={"A_1": np.ones((1, n))},
+            momenta={"A_1": np.zeros((1, n))},
+            grid_spacing=(10.0 / n,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={"Am2": 0.5},
+        )
+
+        energy = _compute_constraint_self_energy(data, 0)
+        assert energy == 0.0
+
+
+class TestVirialWithConstraints:
+    """Test the full energy computation with constraint fields."""
+
+    def test_total_includes_constraint_energy(self) -> None:
+        """Total system energy includes constraint self-energy."""
+        spec = _make_constraint_spec()
+        n = 64
+        dx = 10.0 / n
+        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
+
+        k = 2.0 * np.pi * 2.0 / 10.0
+        a0 = 0.5 * np.cos(k * x)
+        a1 = np.cos(k * x)
+        pi_a1 = np.zeros(n)
+
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={"A_0": a0[np.newaxis, :], "A_1": a1[np.newaxis, :]},
+            momenta={"A_1": pi_a1[np.newaxis, :]},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={"Am2": 0.5},
+        )
+
+        se = compute_system_energy(data, 0)
+
+        # Constraint self-energy should be negative (g^{00} = -1 sign flip)
+        constraint_e = _compute_constraint_self_energy(data, 0)
+        assert constraint_e < 0.0
+
+        # Total = kinetic + virial + constraint_self
+        # The interaction captures the difference between virial total
+        # and per-field self-potentials (including constraint contribution)
+        a1_self = se.per_field["A_1"].gradient + se.per_field["A_1"].mass
+        virial = _compute_virial_potential(data, 0)
+        expected_total = se.per_field["A_1"].kinetic + virial + constraint_e
+        np.testing.assert_allclose(se.total, expected_total, rtol=1e-10)

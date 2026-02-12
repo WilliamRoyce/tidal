@@ -20,6 +20,8 @@ from tidal.measurement._energy import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from numpy.typing import NDArray
 
     from tidal.measurement._io import SimulationData
@@ -147,4 +149,118 @@ def compute_conversion_probability(
         relative_energy_error=relative_error,
         source_field=source_field,
         target_field=target_field,
+    )
+
+
+def _group_energy_series(
+    data: SimulationData,
+    field_group: tuple[str, ...],
+) -> NDArray[np.float64]:
+    """Sum per-field energy timeseries across a group of fields."""
+    names = data.spec.component_names
+    total: NDArray[np.float64] = np.zeros(data.n_snapshots, dtype=np.float64)
+    for f in field_group:
+        total += _field_energy_series(data, f, _resolve_mass_squared(data, names.index(f)))
+    return total
+
+
+def _normalize_group(
+    fields: str | Sequence[str],
+) -> tuple[str, ...]:
+    """Normalize a string or sequence to a tuple of field names."""
+    if isinstance(fields, str):
+        return (fields,)
+    return tuple(fields)
+
+
+def compute_group_conversion(
+    data: SimulationData,
+    source_fields: str | Sequence[str],
+    target_fields: str | Sequence[str] | None = None,
+) -> ConversionResult:
+    """Measure energy conversion between field groups.
+
+    Computes ``P(t) = E_targets(t) / E_sources(0)`` where each energy
+    is the sum of per-field canonical energies across the group.  This is
+    the natural measurement for the Gertsenshtein effect where source and
+    target are multi-component tensor/vector field groups.
+
+    Parameters
+    ----------
+    data : SimulationData
+        Full simulation output.
+    source_fields : str or sequence of str
+        Source field name(s).  A single string is treated as a one-element
+        group.
+    target_fields : str, sequence of str, or None
+        Target field name(s).  ``None`` means all other dynamical fields
+        (``time_derivative_order >= 2``) not in *source_fields*.
+
+    Returns
+    -------
+    ConversionResult
+        ``source_field`` / ``target_field`` are comma-joined group names.
+
+    Raises
+    ------
+    ValueError
+        If any field name is invalid, if source and target overlap, if
+        the target group is empty, or if the source group has zero
+        initial energy.
+    """
+    names = data.spec.component_names
+
+    # Normalize to tuples
+    src = _normalize_group(source_fields)
+    if target_fields is None:
+        src_set = set(src)
+        tgt = tuple(f for f in data.dynamical_fields if f not in src_set)
+    else:
+        tgt = _normalize_group(target_fields)
+
+    # Validate field names
+    for name in (*src, *tgt):
+        if name not in names:
+            msg = f"Field '{name}' not in spec fields: {names}"
+            raise ValueError(msg)
+
+    # Validate no overlap and non-empty target
+    overlap = set(src) & set(tgt)
+    if overlap:
+        msg = f"Source and target groups overlap on: {sorted(overlap)}"
+        raise ValueError(msg)
+    if not tgt:
+        msg = "Target group is empty — no dynamical fields remain after excluding source"
+        raise ValueError(msg)
+
+    # Sum energies across group members
+    source_arr = _group_energy_series(data, src)
+    target_arr = _group_energy_series(data, tgt)
+    total_arr = source_arr + target_arr
+
+    e_source_0 = float(source_arr[0])
+    if e_source_0 < _ENERGY_FLOOR:
+        msg = (
+            f"Source group {src} has zero initial energy — "
+            f"cannot compute conversion probability"
+        )
+        raise ValueError(msg)
+
+    probability = target_arr / e_source_0
+    e_total_0 = float(total_arr[0])
+    relative_error: NDArray[np.float64] = (
+        (total_arr - e_total_0) / e_total_0
+        if e_total_0 >= _ENERGY_FLOOR
+        else np.zeros_like(total_arr)
+    )
+
+    return ConversionResult(
+        times=data.times.copy(),
+        probability=probability,
+        source_energy=source_arr,
+        target_energy=target_arr,
+        total_energy=total_arr,
+        relative_energy_error=relative_error,
+        source_field=",".join(src),
+        target_field=",".join(tgt),
     )
