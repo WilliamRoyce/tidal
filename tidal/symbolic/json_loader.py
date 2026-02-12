@@ -7,6 +7,8 @@ field equations that were derived symbolically from Lagrangians.
 from __future__ import annotations
 
 import json
+import logging
+import math
 import re
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
@@ -22,6 +24,8 @@ AXIS_LETTERS: tuple[str, ...] = ("x", "y", "z", "w", "v", "u")
 
 #: Character class matching all known axis letters (for regex construction).
 _AXIS_RE_CLASS = "[" + "".join(AXIS_LETTERS) + "]"
+
+logger = logging.getLogger(__name__)
 
 #: Set of static operators supported by the pipeline.
 #: Validated at JSON load time to catch typos early.
@@ -493,9 +497,19 @@ def _resolve_symbolic_coeff(
     try:
         py_expr = sym.replace("^", "**")
         result = eval(py_expr, {"__builtins__": {}}, dict(parameters))  # noqa: S307
-        return float(result)
-    except Exception:  # noqa: BLE001
+        value = float(result)
+    except (NameError, SyntaxError, TypeError, ValueError, ZeroDivisionError):
+        logger.debug(
+            "Could not resolve symbolic coefficient '%s' with parameters %s; "
+            "matrix entry will use raw numeric coefficient",
+            sym,
+            sorted(parameters.keys()),
+        )
         return None
+    # Mass/coupling entries must be finite real numbers
+    if not math.isfinite(value):
+        return None
+    return value
 
 
 @dataclass(frozen=True)
