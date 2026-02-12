@@ -553,7 +553,11 @@ def _coalesce_directional_laplacians(
     - All spatial axes present (e.g. ``laplacian_x`` AND ``laplacian_y`` in 2D)
     - All target the same field
     - All have the same numeric coefficient
-    - None are time-dependent or position-dependent
+    - All have the same ``coefficient_symbolic`` (different symbolic names may
+      evaluate differently at runtime even if current numerics match)
+    - None are time-dependent or position-dependent (the ``position_dependent``
+      check also catches coordinate-dependent symbolic coefficients like
+      ``"f(x)"`` that happen to have the same string across axes)
 
     Returns the original list unchanged if any guard fails.
     """
