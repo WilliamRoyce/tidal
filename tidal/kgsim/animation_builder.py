@@ -69,7 +69,7 @@ class AnimationBuilder:
 
     Examples
     --------
-    >>> from tidal.kgsim import AnimationBuilder, AnimationConfig
+    >>> from torsion_gertsenshtein.kgsim import AnimationBuilder, AnimationConfig
     >>> # After running simulation with run_with_snapshots()
     >>> builder = AnimationBuilder(storage, grid)
     >>> config = AnimationConfig(output_path="output/animation.mp4", title="KG Evolution")

@@ -9,15 +9,22 @@ comes from the specification that was derived from the Lagrangian.
 
 from __future__ import annotations
 
+import logging
 import math
 import operator
 import re
+import warnings
 from dataclasses import dataclass
+from functools import partial
 from typing import TYPE_CHECKING, Any, SupportsFloat, cast
 
 import numpy as np
 from pde import FieldCollection, PDEBase, ScalarField
-from scipy import special  # type: ignore[reportMissingTypeStubs]
+from scipy import (  # type: ignore[reportMissingTypeStubs]
+    sparse,
+    special,
+)
+from scipy.sparse.linalg import spsolve  # type: ignore[reportUnknownVariableType]
 from typing_extensions import override
 
 from tidal.kgsim.utils import infer_bc_from_grid
@@ -25,6 +32,7 @@ from tidal.symbolic.json_loader import (
     _CUSTOM_OPERATORS,  # type: ignore[reportPrivateUsage]
     AXIS_LETTERS,
     BoundaryCondition,
+    ComponentEquation,
     ConstraintSolverConfig,
     EquationSystem,
     OperatorTerm,
@@ -43,6 +51,7 @@ if TYPE_CHECKING:
 
     NumericArray = NDArray[np.float64]
 
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Pre-compiled regex patterns for field name parsing (avoid re-compilation
@@ -251,9 +260,7 @@ _AXIS_LETTER: dict[int, str] = dict(enumerate(AXIS_LETTERS))
 _AXIS_RE_CLASS = "[" + "".join(AXIS_LETTERS) + "]"
 
 #: Regex for parsing generic single-axis derivative names.
-_GENERIC_SINGLE_RE = re.compile(
-    r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$"
-)
+_GENERIC_SINGLE_RE = re.compile(r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$")
 
 #: Regex for parsing generic multi-axis derivative names.
 _GENERIC_MULTI_RE = re.compile(
@@ -314,6 +321,390 @@ def register_operator(
         raise ValueError(msg)
     _OPERATOR_REGISTRY[name] = (handler, min_dim)
     _CUSTOM_OPERATORS.add(name)
+
+
+# ---------------------------------------------------------------------------
+# Operator matrix builders: sparse matrix representations for constraint solving
+#
+# Each builder returns (matrix, vector) where:
+#   matrix: scipy.sparse matrix (N x N) representing the linear operator
+#   vector: scipy.sparse matrix (N x 1) for boundary condition offsets
+#
+# The convention matches py-pde's _get_laplace_matrix:
+#   operator(field) = matrix @ field_flat + vector_flat
+#
+# To solve a constraint equation with arbitrary self-referencing operators:
+#   0 = sum_i(c_i * Op_i(field)) + source
+# we assemble A = sum_i(c_i * M_i) and solve A @ field = -source.
+#
+# This unified approach handles Poisson, Helmholtz, algebraic, anisotropic,
+# and any future linear constraint type with a single code path.
+# ---------------------------------------------------------------------------
+
+# Type alias for matrix builder return type
+_MatrixAndVector = tuple[sparse.spmatrix, sparse.spmatrix]
+
+
+def _build_identity_matrix(
+    grid: Any,  # noqa: ANN401
+    bcs: Any,  # noqa: ANN401, ARG001
+) -> _MatrixAndVector:
+    """Build sparse identity matrix for the ``identity`` operator.
+
+    The identity operator I satisfies I(field) = field, so its matrix
+    representation is simply the identity matrix with zero BC offset.
+    """
+    n = int(np.prod(grid.shape))  # type: ignore[reportUnknownArgumentType]
+    return sparse.eye(n, format="dok"), sparse.dok_matrix((n, 1))  # type: ignore[reportUnknownArgumentType,reportReturnType]
+
+
+def _build_laplacian_matrix(
+    grid: Any,  # noqa: ANN401, ARG001
+    bcs: Any,  # noqa: ANN401
+) -> _MatrixAndVector:
+    """Build sparse Laplacian matrix by wrapping py-pde's internal builder.
+
+    Reuses py-pde's ``_get_laplace_matrix`` which handles all grid dimensions
+    (1D, 2D, 3D) and boundary condition types (periodic, Dirichlet, Neumann).
+
+    Raises
+    ------
+    ImportError
+        If py-pde's internal ``_get_laplace_matrix`` is not available.
+    """
+    try:
+        from pde.grids.operators.cartesian import (  # noqa: PLC0415
+            _get_laplace_matrix,  # noqa: PLC2701  # type: ignore[reportPrivateUsage]
+        )
+    except ImportError as e:
+        msg = (
+            "Cannot import py-pde's _get_laplace_matrix. "
+            "The constraint matrix solver requires py-pde >= 0.30."
+        )
+        raise ImportError(msg) from e
+    return _get_laplace_matrix(bcs)  # type: ignore[reportReturnType]
+
+
+def _build_directional_laplacian_matrix(
+    grid: Any,  # noqa: ANN401
+    bcs: Any,  # noqa: ANN401
+    *,
+    axis: int,
+) -> _MatrixAndVector:
+    """Build sparse matrix for directional Laplacian ∂²/∂x_i².
+
+    Computed as G_i @ G_i (composition of two gradient matrices along the
+    same axis). This matches the function-based operator
+    ``_op_directional_laplacian`` which applies ``field.gradient(bc)[axis]``
+    twice, using py-pde's central-difference gradient stencil.
+
+    .. note::
+
+       The resulting wide stencil [1/(4dx²), 0, -2/(4dx²), 0, 1/(4dx²)]
+       differs from the compact 3-point Laplacian stencil [1/dx², -2/dx²,
+       1/dx²] used by py-pde's ``field.laplace(bc)``.  Consequently,
+       ``laplacian_x_matrix + laplacian_y_matrix != laplacian_matrix``.
+       This is intentional — each matrix matches its corresponding
+       function-based operator exactly.
+    """
+    g_mat, g_vec = _build_gradient_matrix(grid, bcs, axis=axis)
+    # dir_lap = G @ G: apply gradient twice along the same axis
+    # G @ (G @ field + vec) + vec = G² @ field + G @ vec + vec
+    dir_lap_matrix = g_mat @ g_mat  # type: ignore[reportOperatorIssue]
+    dir_lap_vector = g_mat @ g_vec + g_vec  # type: ignore[reportOperatorIssue]
+    return dir_lap_matrix, dir_lap_vector  # type: ignore[reportUnknownVariableType]
+
+
+def _build_gradient_matrix(
+    grid: Any,  # noqa: ANN401
+    bcs: Any,  # noqa: ANN401
+    *,
+    axis: int,
+) -> _MatrixAndVector:
+    """Build sparse matrix for gradient ∂/∂x_i using central differences.
+
+    Uses the standard central difference stencil [-1/(2dx), 0, 1/(2dx)]
+    along the target axis. Boundary conditions modify boundary rows.
+    """
+    shape = grid.shape
+    n = int(np.prod(shape))  # type: ignore[reportUnknownArgumentType]
+    dx = grid.discretization[axis]
+    scale = 1.0 / (2.0 * dx)
+
+    matrix = sparse.dok_matrix((n, n))  # type: ignore[reportUnknownArgumentType]
+    vector = sparse.dok_matrix((n, 1))  # type: ignore[reportUnknownArgumentType]
+
+    bc_axis = bcs[axis]
+
+    for flat_idx in range(n):
+        multi_idx = list(np.unravel_index(flat_idx, shape))
+
+        # Left neighbor: -1/(2dx)
+        if multi_idx[axis] == 0:
+            bc_idx = list(multi_idx)
+            bc_idx[axis] = -1  # type: ignore[reportCallIssue,reportArgumentType]
+            const, entries = bc_axis.get_sparse_matrix_data(tuple(bc_idx))
+            vector[flat_idx, 0] += -const * scale
+            for k, v in entries.items():
+                neighbor_idx = list(multi_idx)
+                neighbor_idx[axis] = k
+                flat_neighbor = int(np.ravel_multi_index(neighbor_idx, shape))
+                matrix[flat_idx, flat_neighbor] += -v * scale
+        else:
+            neighbor_idx = list(multi_idx)
+            neighbor_idx[axis] -= 1
+            flat_neighbor = int(np.ravel_multi_index(neighbor_idx, shape))
+            matrix[flat_idx, flat_neighbor] += -scale
+
+        # Right neighbor: +1/(2dx)
+        if multi_idx[axis] == shape[axis] - 1:
+            bc_idx = list(multi_idx)
+            bc_idx[axis] = shape[axis]
+            const, entries = bc_axis.get_sparse_matrix_data(tuple(bc_idx))
+            vector[flat_idx, 0] += const * scale
+            for k, v in entries.items():
+                neighbor_idx = list(multi_idx)
+                neighbor_idx[axis] = k
+                flat_neighbor = int(np.ravel_multi_index(neighbor_idx, shape))
+                matrix[flat_idx, flat_neighbor] += v * scale
+        else:
+            neighbor_idx = list(multi_idx)
+            neighbor_idx[axis] += 1
+            flat_neighbor = int(np.ravel_multi_index(neighbor_idx, shape))
+            matrix[flat_idx, flat_neighbor] += scale
+
+    return matrix, vector
+
+
+def _build_cross_derivative_matrix(
+    grid: Any,  # noqa: ANN401
+    bcs: Any,  # noqa: ANN401
+    *,
+    axis1: int,
+    axis2: int,
+) -> _MatrixAndVector:
+    """Build sparse matrix for cross derivative ∂²/(∂x_i ∂x_j).
+
+    Computed as the product of two gradient matrices: G_i @ G_j.
+    This naturally handles boundary conditions since each gradient
+    matrix already incorporates BCs.
+    """
+    g1_mat, g1_vec = _build_gradient_matrix(grid, bcs, axis=axis1)
+    g2_mat, g2_vec = _build_gradient_matrix(grid, bcs, axis=axis2)
+
+    # Cross derivative = G1 @ G2 (apply axis2 gradient first, then axis1)
+    # For the vector: G1 @ (G2 @ field + vec2) + vec1
+    #   = (G1 @ G2) @ field + G1 @ vec2 + vec1
+    cross_matrix = g1_mat @ g2_mat  # type: ignore[reportOperatorIssue]
+    cross_vector = g1_mat @ g2_vec + g1_vec  # type: ignore[reportOperatorIssue]
+
+    return cross_matrix, cross_vector  # type: ignore[reportUnknownVariableType]
+
+
+def _build_biharmonic_matrix(
+    grid: Any,  # noqa: ANN401
+    bcs: Any,  # noqa: ANN401
+) -> _MatrixAndVector:
+    """Build sparse matrix for biharmonic operator ∇⁴ = ∇²(∇²).
+
+    Computed as the square of the Laplacian matrix: L @ L.
+    """
+    lap_mat, lap_vec = _build_laplacian_matrix(grid, bcs)
+
+    # L @ (L @ field + vec) + vec = L² @ field + L @ vec + vec
+    biharm_matrix = lap_mat @ lap_mat  # type: ignore[reportOperatorIssue]
+    biharm_vector = lap_mat @ lap_vec + lap_vec  # type: ignore[reportOperatorIssue]
+
+    return biharm_matrix, biharm_vector  # type: ignore[reportUnknownVariableType]
+
+
+#: Registry mapping operator names to sparse matrix builder functions.
+#: Each builder takes (grid, bcs) and returns (sparse_matrix, sparse_vector).
+#: To add constraint-solving support for a new operator, register it here.
+_OPERATOR_MATRIX_REGISTRY: dict[str, Any] = {
+    "identity": _build_identity_matrix,
+    "laplacian": _build_laplacian_matrix,
+    "laplacian_x": partial(_build_directional_laplacian_matrix, axis=0),
+    "laplacian_y": partial(_build_directional_laplacian_matrix, axis=1),
+    "laplacian_z": partial(_build_directional_laplacian_matrix, axis=2),
+    "gradient_x": partial(_build_gradient_matrix, axis=0),
+    "gradient_y": partial(_build_gradient_matrix, axis=1),
+    "gradient_z": partial(_build_gradient_matrix, axis=2),
+    "cross_derivative_xy": partial(_build_cross_derivative_matrix, axis1=0, axis2=1),
+    "cross_derivative_xz": partial(_build_cross_derivative_matrix, axis1=0, axis2=2),
+    "cross_derivative_yz": partial(_build_cross_derivative_matrix, axis1=1, axis2=2),
+    "biharmonic": _build_biharmonic_matrix,
+}
+
+
+def _coalesce_directional_laplacians(
+    terms: list[OperatorTerm],
+    spatial_dimension: int,
+) -> list[OperatorTerm]:
+    """Replace directional Laplacians with a compact Laplacian when safe.
+
+    When all spatial axes have ``laplacian_{axis}`` terms targeting the same
+    field with the same constant coefficient, they are mathematically equivalent
+    to a single ``laplacian`` operator.  The compact stencil couples all
+    adjacent grid points, avoiding the checkerboard decoupling that arises
+    from the wide stencil produced by composing gradient matrices (G @ G).
+
+    Guards (all must pass):
+    - All spatial axes present (e.g. ``laplacian_x`` AND ``laplacian_y`` in 2D)
+    - All target the same field
+    - All have the same numeric coefficient
+    - All have the same ``coefficient_symbolic`` (different symbolic names may
+      evaluate differently at runtime even if current numerics match)
+    - None are time-dependent or position-dependent (the ``position_dependent``
+      check also catches coordinate-dependent symbolic coefficients like
+      ``"f(x)"`` that happen to have the same string across axes)
+
+    Returns the original list unchanged if any guard fails.
+    """
+    expected_axes = set(AXIS_LETTERS[:spatial_dimension])
+    expected_ops = {f"laplacian_{a}" for a in expected_axes}
+
+    # Collect directional-laplacian terms
+    dir_lap_terms: list[OperatorTerm] = []
+    other_terms: list[OperatorTerm] = []
+    for term in terms:
+        if term.operator in expected_ops:
+            dir_lap_terms.append(term)
+        else:
+            other_terms.append(term)
+
+    # Guard: need exactly the right number of directional laplacians
+    if len(dir_lap_terms) != spatial_dimension:
+        return terms
+
+    # Guard: all axes present
+    found_ops = {t.operator for t in dir_lap_terms}
+    if found_ops != expected_ops:
+        return terms
+
+    # Guard: all target the same field
+    fields = {t.field for t in dir_lap_terms}
+    if len(fields) != 1:
+        return terms
+
+    # Guard: all have the same coefficient AND coefficient_symbolic (different
+    # symbolic names may evaluate to different values at runtime even if current
+    # numerics match)
+    coeffs = {t.coefficient for t in dir_lap_terms}
+    symbolic_coeffs = {t.coefficient_symbolic for t in dir_lap_terms}
+    if len(coeffs) != 1 or len(symbolic_coeffs) != 1:
+        return terms
+
+    # Guard: none are time-dependent or position-dependent
+    if any(t.time_dependent or t.position_dependent for t in dir_lap_terms):
+        return terms
+
+    # All guards passed — coalesce into compact laplacian
+    representative = dir_lap_terms[0]
+    coalesced = OperatorTerm(
+        coefficient=representative.coefficient,
+        operator="laplacian",
+        field=representative.field,
+        coefficient_symbolic=representative.coefficient_symbolic,
+        time_dependent=False,
+        coordinate_dependent=(),
+    )
+    logger.debug(
+        "Coalesced %d directional laplacians into compact laplacian "
+        "(field=%s, coeff=%s)",
+        len(dir_lap_terms),
+        representative.field,
+        representative.coefficient,
+    )
+    return [coalesced, *other_terms]
+
+
+# ---------------------------------------------------------------------------
+# FFT operator multiplier registry: discrete Fourier-space representations
+#
+# For fully periodic grids, solving constraint equations in Fourier space
+# is O(N log N) instead of O(N²) for sparse matrix solve.
+#
+# Each multiplier function takes (k_grids, dx_array) and returns the
+# discrete Fourier-space symbol of the operator. These are eigenvalues
+# of the finite-difference stencils used by py-pde, NOT the continuous
+# symbols (e.g., the Laplacian uses (2cos(k·dx)-2)/dx², not -k²).
+# This ensures the FFT path produces identical results to the matrix path.
+#
+# k_grids: list of wavenumber arrays, one per axis (angular frequency)
+# dx_array: grid discretization per axis
+#
+# The combined operator symbol is: sum_i(c_i * symbol_i(k, dx))
+# and the solution is: field_hat = source_hat / combined_symbol.
+# ---------------------------------------------------------------------------
+
+
+def _fft_identity(
+    k_grids: list[np.ndarray],
+    dx_array: np.ndarray,  # noqa: ARG001
+) -> np.ndarray:
+    return np.ones_like(k_grids[0])
+
+
+def _fft_laplacian(k_grids: list[np.ndarray], dx_array: np.ndarray) -> np.ndarray:
+    """Discrete Laplacian: sum_i (2cos(k_i dx_i) - 2) / dx_i²."""
+    result = np.zeros_like(k_grids[0], dtype=complex)
+    for k, dx in zip(k_grids, dx_array, strict=True):
+        result += (2.0 * np.cos(k * dx) - 2.0) / dx**2
+    return result
+
+
+def _fft_directional_laplacian(
+    k_grids: list[np.ndarray], dx_array: np.ndarray, *, axis: int
+) -> np.ndarray:
+    """Discrete directional laplacian = (gradient)² along one axis.
+
+    Uses the wide stencil matching _build_directional_laplacian_matrix:
+    G² eigenvalue = (i·sin(k·dx)/dx)² = -sin²(k·dx)/dx².
+    """
+    k = k_grids[axis]
+    dx = dx_array[axis]
+    return -(np.sin(k * dx) ** 2) / dx**2
+
+
+def _fft_gradient(
+    k_grids: list[np.ndarray], dx_array: np.ndarray, *, axis: int
+) -> np.ndarray:
+    """Discrete gradient: i·sin(k·dx) / dx (central difference)."""
+    k = k_grids[axis]
+    dx = dx_array[axis]
+    return 1j * np.sin(k * dx) / dx
+
+
+def _fft_cross_derivative(
+    k_grids: list[np.ndarray], dx_array: np.ndarray, *, axis1: int, axis2: int
+) -> np.ndarray:
+    """Discrete cross derivative: product of two gradient eigenvalues."""
+    g1 = _fft_gradient(k_grids, dx_array, axis=axis1)
+    g2 = _fft_gradient(k_grids, dx_array, axis=axis2)
+    return g1 * g2
+
+
+def _fft_biharmonic(k_grids: list[np.ndarray], dx_array: np.ndarray) -> np.ndarray:
+    """Discrete biharmonic = (discrete laplacian)²."""
+    lap = _fft_laplacian(k_grids, dx_array)
+    return lap**2
+
+
+_OPERATOR_FFT_MULTIPLIERS: dict[str, Any] = {
+    "identity": _fft_identity,
+    "laplacian": _fft_laplacian,
+    "laplacian_x": partial(_fft_directional_laplacian, axis=0),
+    "laplacian_y": partial(_fft_directional_laplacian, axis=1),
+    "laplacian_z": partial(_fft_directional_laplacian, axis=2),
+    "gradient_x": partial(_fft_gradient, axis=0),
+    "gradient_y": partial(_fft_gradient, axis=1),
+    "gradient_z": partial(_fft_gradient, axis=2),
+    "cross_derivative_xy": partial(_fft_cross_derivative, axis1=0, axis2=1),
+    "cross_derivative_xz": partial(_fft_cross_derivative, axis1=0, axis2=2),
+    "cross_derivative_yz": partial(_fft_cross_derivative, axis1=1, axis2=2),
+    "biharmonic": _fft_biharmonic,
+}
 
 
 @dataclass(frozen=True)
@@ -455,6 +846,7 @@ class PDEFromSpec(PDEBase):
         parameters: dict[str, float] | None = None,
         *,
         constraint_eps: float = 1e-14,
+        coupled_svd_rcond: float = 0.01,
     ) -> None:
         """Initialize PDE from equation specification.
 
@@ -474,6 +866,13 @@ class PDEFromSpec(PDEBase):
         constraint_eps : float
             Tolerance for determining whether a Laplacian coefficient is
             effectively zero in the constraint solver.  Default ``1e-14``.
+        coupled_svd_rcond : float
+            Relative singular-value threshold for Tikhonov regularization
+            in the coupled FFT constraint solver.  Singular values smaller
+            than ``rcond * max(S)`` are attenuated instead of inverted
+            directly, preventing noise amplification at near-singular
+            wavenumbers (e.g., Helmholtz resonance at k² ≈ m²).
+            Default ``0.01``.
         """
         super().__init__()
         self.spec = spec
@@ -483,6 +882,7 @@ class PDEFromSpec(PDEBase):
         }
         self._parameters = parameters or {}
         self._constraint_eps = constraint_eps
+        self._coupled_svd_rcond = coupled_svd_rcond
 
         # Build slot maps from state_layout for mixed time-order support
         self._field_slot_map: dict[str, int] = {}
@@ -593,14 +993,24 @@ class PDEFromSpec(PDEBase):
         """Check whether a term's coefficient can be resolved without warnings.
 
         Returns True if the term has no symbolic coefficient, or if its symbolic
-        coefficient (possibly negated) matches a key in the parameters dict.
+        coefficient (possibly negated or compound like ``-2*m2``) can be
+        evaluated from the parameters dict.
         """
         sym = term.coefficient_symbolic
         if sym is None:
             return True
         if sym.startswith("-") and sym[1:] in self._parameters:
             return True
-        return sym in self._parameters
+        if sym in self._parameters:
+            return True
+        # Try compound expression evaluation (e.g., "-2*m2")
+        try:
+            py_expr = self._mathematica_to_python(sym)
+            eval(py_expr, {"__builtins__": {}}, dict(self._base_namespace))  # noqa: S307
+        except (NameError, SyntaxError, TypeError, ValueError, ZeroDivisionError):
+            return False
+        else:
+            return True
 
     def _resolve_coefficient(self, term: OperatorTerm) -> float:
         """Resolve the effective coefficient for a term.
@@ -627,11 +1037,20 @@ class PDEFromSpec(PDEBase):
         if term.coefficient_symbolic is not None:
             sym = term.coefficient_symbolic
 
-            # Check for negated symbol like "-m2"
+            # Fast path: simple parameter name or negated name
             if sym.startswith("-") and sym[1:] in self._parameters:
                 return -self._parameters[sym[1:]]
             if sym in self._parameters:
                 return self._parameters[sym]
+
+            # Compound expression: e.g., "-2*m2", "3*lambda"
+            try:
+                py_expr = self._mathematica_to_python(sym)
+                result = eval(py_expr, {"__builtins__": {}}, dict(self._base_namespace))  # noqa: S307
+            except (NameError, SyntaxError, TypeError, ValueError, ZeroDivisionError):
+                pass
+            else:
+                return float(result)
 
             # Symbolic coefficient present but not resolvable from parameters.
             # Fail fast: wrong physics that looks right is worse than a crash.
@@ -794,9 +1213,7 @@ class PDEFromSpec(PDEBase):
         # Step 3.5: Rational[p, q] → (p)/(q) — Mathematica exact fractions
         # xAct outputs Rational[1,2] for 1/2 in InputForm. Must handle before
         # bracket conversion since Rational uses Mathematica brackets.
-        result = re.sub(
-            r"Rational\[([^,\]]+),\s*([^,\]]+)\]", r"(\1)/(\2)", result
-        )
+        result = re.sub(r"Rational\[([^,\]]+),\s*([^,\]]+)\]", r"(\1)/(\2)", result)
 
         # Step 4: Function name conversions (batch)
         function_map = [
@@ -1358,36 +1775,129 @@ class PDEFromSpec(PDEBase):
 
         return bc_dict
 
-    def _solve_constraint_equation(
+    def _partition_constraint_terms(
         self,
         component_idx: int,
+    ) -> tuple[list[OperatorTerm], list[OperatorTerm]]:
+        """Separate an equation's RHS into self-terms and source-terms.
+
+        A self-term is any term where ``term.field == eq.field_name`` (the
+        operator acts on the field being solved for). All other terms are
+        source-terms (cross-field contributions or momentum references).
+
+        Parameters
+        ----------
+        component_idx : int
+            Index of the constraint equation in ``spec.equations``.
+
+        Returns
+        -------
+        tuple[list[OperatorTerm], list[OperatorTerm]]
+            (self_terms, source_terms) partitioning of the RHS.
+        """
+        eq = self.spec.equations[component_idx]
+        self_terms: list[OperatorTerm] = []
+        source_terms: list[OperatorTerm] = []
+        for term in eq.rhs_terms:
+            if term.field == eq.field_name:
+                self_terms.append(term)
+            else:
+                source_terms.append(term)
+        return self_terms, source_terms
+
+    def _compute_constraint_source(  # noqa: PLR0913, PLR0917
+        self,
+        component_idx: int,  # noqa: ARG002
         state: FieldCollection,
         bc: BCDescriptor,
         t: float,
-    ) -> FieldCollection:
-        """Solve an elliptic constraint equation and update the state.
+        source_terms: list[OperatorTerm],
+        virtual_momenta: dict[str, ScalarField] | None = None,
+    ) -> ScalarField:
+        """Evaluate the cross-field source for a constraint equation.
 
-        For constraint equations in the form::
-
-            0 = laplacian_coeff * laplacian(field) + source_terms
-
-        This rearranges to standard Poisson form::
-
-            nabla^2 field = -source_terms / laplacian_coeff
-
-        and solves using py-pde's ``solve_poisson_equation``.
+        Computes S = sum_i(coeff_i * operator_i(field_i)) for all
+        source-terms (cross-field and momentum references).
 
         Parameters
         ----------
         component_idx : int
             Index of the constraint equation in ``spec.equations``.
         state : FieldCollection
-            Current state. A new FieldCollection is returned with the
-            constraint field replaced by the solution.
+            Current state (fields + momenta).
+        bc : BCDescriptor
+            Boundary conditions for operator evaluation.
+        t : float
+            Current time (for time-dependent coefficients).
+        source_terms : list[OperatorTerm]
+            The cross-field terms to evaluate.
+        virtual_momenta : dict[str, ScalarField] | None
+            Virtual momenta for constraint/first-order fields (always zero
+            for constraint fields). Needed to resolve ``pi_N`` references
+            where ``h_N`` is a constraint field.
+
+        Returns
+        -------
+        ScalarField
+            The evaluated source field.
+        """
+        grid = state.grid
+        rhs_source = ScalarField(grid, data=0.0)
+        for term in source_terms:
+            target_field = self._get_field_from_state(
+                state, term.field, virtual_momenta
+            )
+            operated = self._get_operator(term.operator, target_field, bc)
+            coefficient = self._resolve_coefficient_at_point(term, t, grid)
+
+            if isinstance(coefficient, np.ndarray):
+                contribution = ScalarField(grid, data=coefficient * operated.data)
+            else:
+                contribution = coefficient * operated
+            rhs_source += contribution
+        return rhs_source
+
+    def _solve_constraint_equation(
+        self,
+        component_idx: int,
+        state: FieldCollection,
+        bc: BCDescriptor,
+        t: float,
+        virtual_momenta: dict[str, ScalarField] | None = None,
+    ) -> FieldCollection:
+        """Solve a constraint equation and update the state.
+
+        Dispatches to the appropriate solver based on the constraint's
+        ``method`` configuration:
+
+        - **"poisson"**: Original py-pde Poisson solver. Requires exactly
+          one ``laplacian(self_field)`` self-term. Backward compatible.
+
+        - **"auto"**: Automatically selects the best solver:
+          - FFT for fully periodic grids (O(N log N))
+          - Sparse matrix for non-periodic grids (O(N) via LU)
+
+        - **"fft"**: Force FFT solver (requires periodic grid).
+
+        - **"matrix"**: Force sparse matrix solver.
+
+        The unified (auto/fft/matrix) solver handles ANY linear constraint:
+        Poisson, Helmholtz, algebraic, anisotropic, partial Helmholtz, or
+        any linear combination of spatial operators acting on the field.
+
+        Parameters
+        ----------
+        component_idx : int
+            Index of the constraint equation in ``spec.equations``.
+        state : FieldCollection
+            Current state. Updated in-place with the solved field.
         bc : BCDescriptor
             Boundary conditions for evaluating source-term operators.
         t : float
-            Current time (for time-dependent source coefficients).
+            Current time (for time-dependent coefficients).
+        virtual_momenta : dict[str, ScalarField] | None
+            Virtual momenta for constraint/first-order fields. Needed to
+            resolve ``pi_N`` references where field N is a constraint.
 
         Returns
         -------
@@ -1396,11 +1906,51 @@ class PDEFromSpec(PDEBase):
 
         Raises
         ------
-        TypeError
-            If the Poisson RHS is not a ``ScalarField``.
         ValueError
-            If the equation lacks a ``laplacian(field)`` term or the
-            Poisson solver fails.
+            If the equation has no self-referencing terms, if the operator
+            is singular, or if the solver method is unsupported.
+        """
+        eq = self.spec.equations[component_idx]
+        method = eq.constraint_solver.method
+
+        if method == "poisson":
+            return self._solve_constraint_poisson(
+                component_idx, state, bc, t, virtual_momenta
+            )
+        if method in {"auto", "fft", "matrix"}:
+            return self._solve_constraint_unified(
+                component_idx, state, bc, t, virtual_momenta
+            )
+
+        msg = (
+            f"Unknown constraint solver method '{method}' for {eq.field_name}. "
+            f"Expected 'auto', 'fft', 'matrix', or 'poisson'."
+        )
+        raise ValueError(msg)
+
+    def _solve_constraint_poisson(
+        self,
+        component_idx: int,
+        state: FieldCollection,
+        bc: BCDescriptor,
+        t: float,
+        virtual_momenta: dict[str, ScalarField] | None = None,
+    ) -> FieldCollection:
+        """Solve a Poisson-type constraint using py-pde's built-in solver.
+
+        This is the original solver, preserved for backward compatibility.
+        Requires the equation to have exactly one laplacian(self_field) term.
+
+        Equation form: 0 = c * laplacian(field) + source_terms
+        Rearranged to: laplacian(field) = -source_terms / c
+
+        Raises
+        ------
+        ValueError
+            If the equation lacks a laplacian self-term, has zero coefficient,
+            or the Poisson solver fails.
+        TypeError
+            If the computed RHS is not a ScalarField.
         """
         from pde import solve_poisson_equation  # noqa: PLC0415, I001  # type: ignore[reportUnknownVariableType]
 
@@ -1424,13 +1974,30 @@ class PDEFromSpec(PDEBase):
             else:
                 source_terms.append(term)
 
+        # Warn if non-laplacian self-terms exist (Helmholtz-type equation)
+        non_lap_self = [
+            t
+            for t in eq.rhs_terms
+            if t.field == eq.field_name and t.operator != "laplacian"
+        ]
+        if non_lap_self:
+            ops = [t.operator for t in non_lap_self]
+            warnings.warn(
+                f"Constraint {eq.field_name} has non-laplacian self-terms "
+                f"({ops}). The 'poisson' method only handles pure Poisson "
+                f"equations correctly. Use method='auto' for Helmholtz or "
+                f"other mixed-operator constraints.",
+                stacklevel=2,
+            )
+
         # Validate equation structure
         if laplacian_coeff is None:
             msg = (
                 f"Constraint equation for {eq.field_name} lacks a "
                 f"laplacian({eq.field_name}) term. "
-                f"The elliptic solver requires the form: "
-                f"laplacian(field) + source = 0."
+                f"The Poisson solver requires the form: "
+                f"laplacian(field) + source = 0. "
+                f"Use method='auto' for general constraint types."
             )
             raise ValueError(msg)
 
@@ -1441,27 +2008,17 @@ class PDEFromSpec(PDEBase):
             )
             raise ValueError(msg)
 
-        # Compute source: S = sum(coeff_i * operator_i(field_i))
-        rhs_source = ScalarField(grid, data=0.0)
-        for term in source_terms:
-            target_field = self._get_field_from_state(state, term.field)
-            operated = self._get_operator(term.operator, target_field, bc)
-            coefficient = self._resolve_coefficient_at_point(term, t, grid)
+        # Compute source
+        rhs_source = self._compute_constraint_source(
+            component_idx, state, bc, t, source_terms, virtual_momenta
+        )
 
-            if isinstance(coefficient, np.ndarray):
-                contribution = ScalarField(grid, data=coefficient * operated.data)
-            else:
-                contribution = coefficient * operated
-            rhs_source += contribution
-
-        # Rearrange 0 = laplacian_coeff * nabla^2(phi) + S into the standard
-        # Poisson form nabla^2(phi) = rhs, giving rhs = -S / laplacian_coeff.
+        # Rearrange to Poisson form: nabla^2(phi) = -S / laplacian_coeff
         poisson_rhs = -rhs_source / laplacian_coeff
         if not isinstance(poisson_rhs, ScalarField):
             msg = f"Expected ScalarField for Poisson RHS, got {type(poisson_rhs).__name__}"
             raise TypeError(msg)
 
-        # Build boundary conditions for the Poisson solver
         solver_bc = self._build_constraint_bc(eq.constraint_solver, grid)
 
         try:
@@ -1480,10 +2037,323 @@ class PDEFromSpec(PDEBase):
             )
             raise ValueError(msg) from e
 
-        # Update state in-place so dynamical equations (Pass 2) see the
-        # solved constraint field via cross-field references.
         state[field_slot].data[:] = solution.data
         return state
+
+    def _solve_constraint_unified(
+        self,
+        component_idx: int,
+        state: FieldCollection,
+        bc: BCDescriptor,
+        t: float,
+        virtual_momenta: dict[str, ScalarField] | None = None,
+    ) -> FieldCollection:
+        """Solve a general linear constraint via operator matrix assembly.
+
+        For a constraint equation of the form::
+
+            0 = sum_i(c_i * op_i(self_field)) + source_terms
+
+        This assembles the combined operator A = sum_i(c_i * M_i) where M_i
+        is the sparse matrix for op_i, and solves A @ field = -source.
+
+        This handles ANY linear constraint type: Poisson, Helmholtz,
+        algebraic, anisotropic, partial Helmholtz, and arbitrary linear
+        combinations of spatial operators.
+
+        Parameters
+        ----------
+        component_idx : int
+            Index of the constraint equation in ``spec.equations``.
+        state : FieldCollection
+            Current state (updated in-place).
+        bc : BCDescriptor
+            Boundary conditions for operator evaluation.
+        t : float
+            Current time (for time-dependent coefficients).
+        virtual_momenta : dict[str, ScalarField] | None
+            Virtual momenta for constraint/first-order fields.
+
+        Returns
+        -------
+        FieldCollection
+            Updated state with the constraint field solved.
+
+        Raises
+        ------
+        ValueError
+            If no self-terms, unknown operator, or singular operator.
+        """
+        eq = self.spec.equations[component_idx]
+        grid = state.grid
+        field_slot = self._field_slot_map[eq.field_name]
+        method = eq.constraint_solver.method
+
+        # 1. Partition terms
+        self_terms, source_terms = self._partition_constraint_terms(component_idx)
+
+        if not self_terms:
+            msg = (
+                f"Constraint equation for {eq.field_name} has no "
+                f"self-referencing terms (no operator acts on {eq.field_name}). "
+                f"Cannot solve: equation does not depend on the unknown field."
+            )
+            raise ValueError(msg)
+
+        # 2. Compute cross-field source
+        source = self._compute_constraint_source(
+            component_idx, state, bc, t, source_terms, virtual_momenta
+        )
+
+        # 3. Choose solver path
+        all_periodic = hasattr(grid, "periodic") and all(grid.periodic)
+        use_fft = (method == "fft") or (method == "auto" and all_periodic)
+
+        if method == "fft" and not all_periodic:
+            msg = (
+                f"FFT constraint solver for {eq.field_name} requires a "
+                f"fully periodic grid, but the grid is not periodic."
+            )
+            raise ValueError(msg)
+
+        if use_fft:
+            solution_data = self._solve_constraint_fft(eq, grid, self_terms, source, t)
+        else:
+            solution_data = self._solve_constraint_matrix(
+                eq, grid, self_terms, source, bc, t
+            )
+
+        # 4. Validate and update state
+        if not np.all(np.isfinite(solution_data)):
+            msg = (
+                f"Constraint solver for {eq.field_name} produced non-finite "
+                f"values (NaN or Inf). This typically indicates a singular or "
+                f"near-singular operator. Check equation structure and "
+                f"coefficient values."
+            )
+            raise ValueError(msg)
+        state[field_slot].data[:] = solution_data
+        return state
+
+    def _solve_constraint_fft(  # noqa: PLR0914
+        self,
+        eq: ComponentEquation,
+        grid: GridBase,
+        self_terms: list[OperatorTerm],
+        source: ScalarField,
+        t: float,
+    ) -> np.ndarray:
+        """Solve constraint in Fourier space (periodic grids only).
+
+        Assembles the combined operator symbol in Fourier space as
+        sum_i(c_i * symbol_i(k)), then solves field_hat = -source_hat / symbol.
+
+        Uses discrete eigenvalues of the finite-difference stencils to
+        match the matrix-based operators exactly.
+
+        Returns
+        -------
+        np.ndarray
+            The solved field data, shaped to match the grid.
+
+        Raises
+        ------
+        ValueError
+            If the combined symbol is singular (zero at any wavenumber)
+            or if an operator has no FFT multiplier.
+        """
+        dx_array = np.array(grid.discretization)
+
+        # Build wavenumber grids
+        k_arrays: list[np.ndarray] = [
+            np.fft.fftfreq(n, d=dx) * 2 * np.pi  # type: ignore[reportUnknownMemberType]
+            for n, dx in zip(grid.shape, dx_array, strict=True)
+        ]
+        k_grids = list(np.meshgrid(*k_arrays, indexing="ij"))
+
+        # Coalesce directional laplacians into compact laplacian when possible.
+        # This uses the compact FFT multiplier (2cos(k*dx)-2)/dx² which matches
+        # the standard 3-point stencil, avoiding wide-stencil truncation artifacts.
+        self_terms = _coalesce_directional_laplacians(
+            self_terms, self.spec.spatial_dimension
+        )
+
+        # Sum Fourier multipliers for all self-terms
+        combined_multiplier = np.zeros(grid.shape, dtype=complex)
+        for term in self_terms:
+            coeff = self._resolve_coefficient_at_point(term, t, grid)
+            multiplier_fn = _OPERATOR_FFT_MULTIPLIERS.get(term.operator)
+            if multiplier_fn is None:
+                msg = (
+                    f"No FFT multiplier for operator '{term.operator}'. "
+                    f"Use method='matrix' for this constraint."
+                )
+                raise ValueError(msg)
+            term_mult = multiplier_fn(k_grids, dx_array)
+
+            if isinstance(coeff, np.ndarray):
+                # Position-dependent coefficient: FFT not applicable
+                msg = (
+                    f"Position-dependent coefficient on self-term "
+                    f"'{term.operator}({eq.field_name})' is not compatible "
+                    f"with FFT solver. Use method='matrix'."
+                )
+                raise ValueError(msg)  # noqa: TRY004
+
+            combined_multiplier += coeff * term_mult
+
+        # Handle null-space at singular modes (e.g., k=0 for pure Laplacian).
+        # For Poisson-type equations on periodic grids, the zero-wavenumber
+        # mode is in the null space (Laplacian eigenvalue = 0). If the source
+        # is compatible (zero mean), we can set the k=0 solution mode to zero,
+        # giving the unique zero-mean solution. If incompatible, we raise.
+        source_hat = np.fft.fftn(-source.data)
+        # Use relative threshold scaled by the operator's maximum magnitude
+        # (with floor of 1.0 to handle near-zero operators gracefully)
+        mult_scale = max(float(np.max(np.abs(combined_multiplier))), 1.0)
+        singular_mask = np.abs(combined_multiplier) < self._constraint_eps * mult_scale
+        n_singular = int(np.sum(singular_mask))
+
+        if n_singular > 0:
+            # Check if source is compatible with the null space:
+            # source_hat must be zero at singular wavenumbers.
+            source_at_singular = np.abs(source_hat[singular_mask])
+            max_source_at_null = float(np.max(source_at_singular))
+            if max_source_at_null > self._constraint_eps * float(
+                np.max(np.abs(source_hat))
+            ):
+                msg = (
+                    f"Constraint operator for {eq.field_name} is singular in "
+                    f"Fourier space ({n_singular} null-space mode(s)). "
+                    f"The source has non-zero projection onto the null space "
+                    f"(max|source_hat|={max_source_at_null:.2e}). "
+                    f"No solution exists."
+                )
+                raise ValueError(msg)
+            # Set solution to zero at singular modes (zero-mean solution)
+            safe_multiplier = np.where(singular_mask, 1.0, combined_multiplier)
+            solution_hat = source_hat / safe_multiplier
+            solution_hat[singular_mask] = 0.0
+        else:
+            solution_hat = source_hat / combined_multiplier
+
+        return np.fft.ifftn(solution_hat).real  # type: ignore[return-value]
+
+    def _solve_constraint_matrix(  # noqa: PLR0913, PLR0917
+        self,
+        eq: ComponentEquation,
+        grid: GridBase,
+        self_terms: list[OperatorTerm],
+        source: ScalarField,
+        bc: BCDescriptor,  # noqa: ARG002
+        t: float,
+    ) -> np.ndarray:
+        """Solve constraint via sparse matrix assembly and direct solve.
+
+        Assembles A = sum_i(c_i * M_i) where M_i is the sparse matrix for
+        operator_i, then solves A @ field = -source using scipy.sparse.linalg.spsolve.
+
+        Works with any boundary conditions (periodic, Dirichlet, Neumann).
+
+        Returns
+        -------
+        np.ndarray
+            The solved field data, shaped to match the grid.
+
+        Raises
+        ------
+        ValueError
+            If an operator has no matrix builder, or the solve fails.
+        """
+        solver_bc = self._build_constraint_bc(eq.constraint_solver, grid)
+        bcs = grid.get_boundary_conditions(solver_bc)
+
+        self_terms = _coalesce_directional_laplacians(
+            self_terms, self.spec.spatial_dimension
+        )
+
+        n = int(np.prod(grid.shape))
+        combined_matrix = sparse.dok_matrix((n, n))
+        combined_vector = sparse.dok_matrix((n, 1))
+
+        for term in self_terms:
+            coeff = self._resolve_coefficient_at_point(term, t, grid)
+            builder = _OPERATOR_MATRIX_REGISTRY.get(term.operator)
+            if builder is None:
+                msg = (
+                    f"No matrix builder for operator '{term.operator}'. "
+                    f"Register it in _OPERATOR_MATRIX_REGISTRY to enable "
+                    f"constraint solving for this operator type."
+                )
+                raise ValueError(msg)
+            op_matrix, op_vector = builder(grid, bcs)
+
+            if isinstance(coeff, np.ndarray):
+                # Position-dependent coefficient: multiply each row by coeff
+                diag = sparse.diags(coeff.ravel())
+                combined_matrix += diag @ op_matrix
+                combined_vector += diag @ op_vector
+            else:
+                combined_matrix += coeff * op_matrix
+                combined_vector += coeff * op_vector
+
+        # Convert to CSC for efficient direct solve
+        a_csc = combined_matrix.tocsc()
+        rhs = (
+            np.ravel(-source.data) - np.asarray(combined_vector.toarray()).ravel()  # type: ignore[reportUnknownArgumentType]
+        )
+
+        try:
+            solution: np.ndarray = spsolve(a_csc, rhs)  # type: ignore[reportUnknownVariableType]
+        except (RuntimeError, ValueError) as e:
+            msg = (
+                f"Matrix solver failed for constraint {eq.field_name}:\n"
+                f"  Matrix shape: {a_csc.shape}, nnz: {a_csc.nnz}\n"
+                f"  RHS max: {float(np.max(np.abs(rhs))):.3e}\n"
+                f"  Error: {e}"
+            )
+            raise ValueError(msg) from e
+
+        return solution.reshape(grid.shape)  # type: ignore[return-value]
+
+    def _has_coupled_constraints(
+        self,
+        enabled_indices: list[int],
+    ) -> bool:
+        """Check if any enabled constraints reference each other's fields.
+
+        Two constraints are coupled if constraint A's source terms reference
+        constraint B's field, or vice versa. When constraints are coupled,
+        a single pass may not converge — Gauss-Seidel iteration is needed.
+
+        Parameters
+        ----------
+        enabled_indices : list[int]
+            Indices of enabled constraint equations.
+
+        Returns
+        -------
+        bool
+            True if mutual coupling is detected.
+        """
+        enabled_fields = {self.spec.equations[i].field_name for i in enabled_indices}
+        for i in enabled_indices:
+            eq = self.spec.equations[i]
+            _, source_terms = self._partition_constraint_terms(i)
+            for term in source_terms:
+                # Check if this source term references another enabled constraint
+                ref_field = term.field
+                # Handle momentum references (pi_N → field N)
+                if ref_field.startswith("pi"):
+                    momentum_idx = parse_momentum_field_name(ref_field)
+                    if (
+                        momentum_idx is not None
+                        and 0 <= momentum_idx < self.n_components
+                    ):
+                        ref_field = self.spec.component_names[momentum_idx]
+                if ref_field in enabled_fields and ref_field != eq.field_name:
+                    return True
+        return False
 
     def _evolve_constraints(
         self,
@@ -1495,6 +2365,11 @@ class PDEFromSpec(PDEBase):
 
         Constraints are solved elliptically when enabled, updating the state
         in-place so that dynamical equations see the resolved fields.
+
+        When multiple enabled constraints reference each other's fields
+        (coupled constraints), Gauss-Seidel iteration is used: constraints
+        are solved sequentially in a loop until convergence or the maximum
+        iteration count is reached.
 
         Returns
         -------
@@ -1514,12 +2389,365 @@ class PDEFromSpec(PDEBase):
 
         grid = state.grid
         virtual_momenta: dict[str, ScalarField] = {}
+
+        # Collect enabled constraint indices
+        enabled_indices: list[int] = []
         for i, eq in enumerate(self.spec.equations):
             if eq.time_derivative_order == 0:
                 if eq.constraint_solver.enabled:
-                    state = self._solve_constraint_equation(i, state, bc, t)
+                    enabled_indices.append(i)
                 virtual_momenta[eq.field_name] = ScalarField(grid, data=0.0)
+
+        if not enabled_indices:
+            return state, virtual_momenta
+
+        # Check for coupled constraints
+        if self._has_coupled_constraints(enabled_indices):
+            state = self._solve_coupled_constraints(
+                enabled_indices, state, bc, t, virtual_momenta
+            )
+        else:
+            # Uncoupled: single pass suffices
+            for i in enabled_indices:
+                state = self._solve_constraint_equation(
+                    i, state, bc, t, virtual_momenta
+                )
+
         return state, virtual_momenta
+
+    def _solve_coupled_constraints(
+        self,
+        enabled_indices: list[int],
+        state: FieldCollection,
+        bc: BCDescriptor,
+        t: float,
+        virtual_momenta: dict[str, ScalarField] | None = None,
+    ) -> FieldCollection:
+        """Solve mutually-coupled constraints via block FFT or Gauss-Seidel.
+
+        For fully periodic grids, uses Fourier-space block solve: at each
+        wavenumber k, assembles a small NxN dense matrix (N = number of
+        coupled constraints) and solves exactly. This handles arbitrary
+        coupling strength including Laplacian cross-terms.
+
+        For non-periodic grids, falls back to Gauss-Seidel iteration
+        (sequential single-field solves until convergence).
+
+        Parameters
+        ----------
+        enabled_indices : list[int]
+            Indices of enabled constraint equations.
+        state : FieldCollection
+            Current state (updated in-place during iteration).
+        bc : BCDescriptor
+            Boundary conditions.
+        t : float
+            Current time.
+        virtual_momenta : dict[str, ScalarField] | None
+            Virtual momenta for constraint/first-order fields.
+
+        Returns
+        -------
+        FieldCollection
+            State with solved constraint fields.
+        """
+        grid = state.grid
+        all_periodic = hasattr(grid, "periodic") and all(grid.periodic)
+
+        if all_periodic:
+            return self._solve_coupled_constraints_fft(
+                enabled_indices, state, bc, t, virtual_momenta
+            )
+        return self._solve_coupled_constraints_gauss_seidel(
+            enabled_indices, state, bc, t, virtual_momenta
+        )
+
+    def _solve_coupled_constraints_fft(  # noqa: C901, PLR0912, PLR0914, PLR0915
+        self,
+        enabled_indices: list[int],
+        state: FieldCollection,
+        bc: BCDescriptor,
+        t: float,
+        virtual_momenta: dict[str, ScalarField] | None = None,
+    ) -> FieldCollection:
+        """Solve coupled constraints exactly via Fourier-space block solve.
+
+        At each wavenumber k, assembles a dense NxN coupling matrix M(k)
+        where M[i,j] = sum of (coefficient * Fourier_multiplier(operator))
+        for all terms in constraint_i that reference constraint_j. Then
+        solves M(k) @ f_hat(k) = -s_hat(k) where s is the external source
+        (non-constraint field references).
+
+        This is exact (no iteration needed) and handles arbitrary coupling
+        strength. Complexity: O(N_grid * N_fields^3 * log(N_grid)).
+
+        Parameters
+        ----------
+        enabled_indices : list[int]
+            Indices of coupled constraint equations.
+        state : FieldCollection
+            Current state (updated in-place).
+        bc : BCDescriptor
+            Boundary conditions for operator evaluation.
+        t : float
+            Current time.
+        virtual_momenta : dict[str, ScalarField] | None
+            Virtual momenta for constraint/first-order fields.
+
+        Returns
+        -------
+        FieldCollection
+            State with solved constraint fields.
+
+        Raises
+        ------
+        ValueError
+            If an operator has no FFT multiplier or the system is singular.
+        """
+        grid = state.grid
+        n_constraints = len(enabled_indices)
+        enabled_names = {self.spec.equations[i].field_name for i in enabled_indices}
+
+        # Build wavenumber grids
+        dx_array = np.array(grid.discretization)
+        k_arrays: list[np.ndarray] = [
+            np.fft.fftfreq(n, d=dx) * 2 * np.pi  # type: ignore[reportUnknownMemberType]
+            for n, dx in zip(grid.shape, dx_array, strict=True)
+        ]
+        k_grids = np.meshgrid(*k_arrays, indexing="ij")
+
+        # Map constraint field names to local indices (0..n_constraints-1)
+        name_to_local: dict[str, int] = {}
+        for local_idx, comp_idx in enumerate(enabled_indices):
+            name_to_local[self.spec.equations[comp_idx].field_name] = local_idx
+
+        # Build M(k) coupling matrix and s(k) source vector in Fourier space
+        grid_shape = tuple(grid.shape)
+        # M_hat[i, j, ...grid_shape] = coupling multiplier at each k
+        m_hat = np.zeros((n_constraints, n_constraints, *grid_shape), dtype=complex)
+        s_hat = np.zeros((n_constraints, *grid_shape), dtype=complex)
+
+        for local_i, comp_idx in enumerate(enabled_indices):
+            eq = self.spec.equations[comp_idx]
+
+            # Separate terms into intra-cluster (go into M) and external (go into s)
+            external_terms: list[OperatorTerm] = []
+
+            for term in eq.rhs_terms:
+                ref_field = term.field
+
+                # Check if this is a momentum reference (pi_N → field h_N)
+                momentum_idx = parse_momentum_field_name(ref_field)
+                if momentum_idx is not None:
+                    if 0 <= momentum_idx < self.n_components:
+                        ref_comp_name = self.spec.component_names[momentum_idx]
+                        if ref_comp_name in enabled_names:
+                            # Momentum of a constraint field is always zero → skip
+                            continue
+                    # Non-constraint momentum → external source
+                    external_terms.append(term)
+                    continue
+
+                # Check if this references another constraint in the cluster
+                if ref_field in enabled_names:
+                    local_j = name_to_local[ref_field]
+                    # Get Fourier multiplier for this operator
+                    multiplier_fn = _OPERATOR_FFT_MULTIPLIERS.get(term.operator)
+                    if multiplier_fn is None:
+                        msg = (
+                            f"No FFT multiplier for operator '{term.operator}' "
+                            f"in coupled constraint {eq.field_name}."
+                        )
+                        raise ValueError(msg)
+                    coeff = self._resolve_coefficient_at_point(term, t, grid)
+                    if isinstance(coeff, np.ndarray):
+                        msg = (
+                            f"Position-dependent coefficient on self-term "
+                            f"'{term.operator}({ref_field})' in coupled "
+                            f"constraint {eq.field_name} is not compatible "
+                            f"with FFT block solver. Use method='matrix'."
+                        )
+                        raise ValueError(msg)
+                    multiplier = multiplier_fn(k_grids, dx_array)
+                    m_hat[local_i, local_j] += coeff * multiplier
+                else:
+                    external_terms.append(term)
+
+            # Compute external source in physical space, then FFT
+            if external_terms:
+                source = self._compute_constraint_source(
+                    comp_idx, state, bc, t, external_terms, virtual_momenta
+                )
+                s_hat[local_i] = np.fft.fftn(source.data)
+
+        # Solve M(k) @ f_hat(k) = -s_hat(k) via SVD with Tikhonov regularization.
+        # This handles near-singular wavenumbers (e.g., Helmholtz resonance at
+        # k² ≈ m²) by attenuating rather than amplifying near-null modes.
+        m_hat_transposed = np.moveaxis(m_hat, [0, 1], [-2, -1])  # (..., n, n)
+        s_hat_transposed = np.moveaxis(s_hat, 0, -1)  # (..., n)
+        rhs = -s_hat_transposed  # (..., n)
+
+        # Batched SVD: M = U @ diag(S) @ Vh at each grid point
+        try:
+            u, s, vh = np.linalg.svd(m_hat_transposed, full_matrices=False)
+        except np.linalg.LinAlgError as e:
+            field_names = [self.spec.equations[i].field_name for i in enabled_indices]
+            msg = (
+                f"SVD failed for coupled constraint system in Fourier "
+                f"space. Fields: {field_names}. Error: {e}"
+            )
+            raise ValueError(msg) from e
+
+        # Tikhonov regularization: S_reg_inv = S / (S^2 + alpha^2)
+        # alpha = rcond * max(S) ensures well-conditioned modes are unaffected
+        # while near-singular modes are smoothly attenuated.
+        s_max = float(np.max(s))
+        alpha = self._coupled_svd_rcond * max(s_max, 1e-30)
+        alpha_sq = alpha * alpha
+        s_reg_inv = s / (s * s + alpha_sq)
+
+        n_regularized = int(np.sum(s < alpha))
+        total_svs = int(np.prod(s.shape))
+
+        if n_regularized > 0:
+            field_names = [self.spec.equations[i].field_name for i in enabled_indices]
+            logger.debug(
+                "Coupled FFT solver: %d/%d singular values (%.1f%%) below "
+                "Tikhonov threshold %.2e (max SV %.2e). Fields: %s.",
+                n_regularized,
+                total_svs,
+                100.0 * n_regularized / max(total_svs, 1),
+                alpha,
+                s_max,
+                field_names,
+            )
+
+            # Only emit visible warning for truly pathological systems
+            # where the majority of singular values need regularization.
+            if n_regularized > total_svs // 2:
+                warnings.warn(
+                    f"Coupled FFT solver: {n_regularized}/{total_svs} "
+                    f"singular values "
+                    f"({100.0 * n_regularized / total_svs:.0f}%) required "
+                    f"Tikhonov regularization, indicating a severely "
+                    f"ill-conditioned constraint system. "
+                    f"Fields: {field_names}.",
+                    stacklevel=2,
+                )
+
+        # Compute f = Vh^H @ diag(S_reg_inv) @ U^H @ rhs
+        u_h_rhs = np.einsum("...ji,...j->...i", u.conj(), rhs)
+        scaled = s_reg_inv * u_h_rhs
+        f_hat_transposed = np.einsum("...ji,...j->...i", vh.conj(), scaled)
+
+        # Move back to (n_constraints, grid...) layout
+        f_hat = np.moveaxis(f_hat_transposed, -1, 0)
+
+        for local_i, comp_idx in enumerate(enabled_indices):
+            eq = self.spec.equations[comp_idx]
+            field_slot = self._field_slot_map[eq.field_name]
+            solution = np.fft.ifftn(f_hat[local_i]).real
+            if not np.all(np.isfinite(solution)):
+                msg = (
+                    f"Coupled FFT solver for {eq.field_name} produced "
+                    f"non-finite values. The coupled system may be "
+                    f"near-singular at some wavenumber."
+                )
+                raise ValueError(msg)
+            state[field_slot].data[:] = solution
+
+        return state
+
+    def _solve_coupled_constraints_gauss_seidel(
+        self,
+        enabled_indices: list[int],
+        state: FieldCollection,
+        bc: BCDescriptor,
+        t: float,
+        virtual_momenta: dict[str, ScalarField] | None = None,
+    ) -> FieldCollection:
+        """Solve coupled constraints via Gauss-Seidel iteration.
+
+        Each iteration solves all enabled constraints sequentially, using
+        the most recent field values (Gauss-Seidel, not Jacobi). Iteration
+        stops when:
+
+        - All fields change by less than ``tolerance`` (convergence), or
+        - ``max_iterations`` is reached (issues a warning).
+
+        Note: Gauss-Seidel may not converge for strongly-coupled systems
+        where cross-terms include Laplacian operators. For periodic grids,
+        the FFT block solver is preferred.
+
+        Parameters
+        ----------
+        enabled_indices : list[int]
+            Indices of enabled constraint equations.
+        state : FieldCollection
+            Current state (updated in-place during iteration).
+        bc : BCDescriptor
+            Boundary conditions.
+        t : float
+            Current time.
+        virtual_momenta : dict[str, ScalarField] | None
+            Virtual momenta for constraint/first-order fields.
+
+        Returns
+        -------
+        FieldCollection
+            State with solved constraint fields.
+        """
+        # Use convergence parameters from the first enabled constraint
+        first_config = self.spec.equations[enabled_indices[0]].constraint_solver
+        max_iter = first_config.max_iterations
+        tol = first_config.tolerance
+        max_change = 0.0
+
+        for _iteration in range(max_iter):
+            # Save current field values for convergence check
+            prev_data: dict[str, np.ndarray] = {}
+            for i in enabled_indices:
+                eq = self.spec.equations[i]
+                field_slot = self._field_slot_map[eq.field_name]
+                prev_data[eq.field_name] = state[field_slot].data.copy()
+
+            # Solve all constraints sequentially (Gauss-Seidel)
+            for i in enabled_indices:
+                state = self._solve_constraint_equation(
+                    i, state, bc, t, virtual_momenta
+                )
+
+            # Check convergence: max|field_new - field_old| relative to field scale
+            max_change = 0.0
+            max_magnitude = 0.0
+            for i in enabled_indices:
+                eq = self.spec.equations[i]
+                field_slot = self._field_slot_map[eq.field_name]
+                change = float(
+                    np.max(np.abs(state[field_slot].data - prev_data[eq.field_name]))
+                )
+                max_change = max(max_change, change)
+                max_magnitude = max(
+                    max_magnitude,
+                    float(np.max(np.abs(state[field_slot].data))),
+                )
+
+            # Use relative tolerance: scale threshold by field magnitude
+            # (with floor of 1.0 to avoid issues with near-zero fields)
+            effective_tol = tol * max(1.0, max_magnitude)
+            if max_change < effective_tol:
+                return state
+
+        # Did not converge — warn but don't error
+        field_names = [self.spec.equations[i].field_name for i in enabled_indices]
+        warnings.warn(
+            f"Coupled constraint iteration did not converge after "
+            f"{max_iter} iterations (max_change={max_change:.2e}, "
+            f"tolerance={tol:.2e}). Fields: {field_names}. "
+            f"Increase max_iterations or tolerance in ConstraintSolverConfig.",
+            stacklevel=2,
+        )
+        return state
 
     def _evolve_first_order(
         self,
@@ -1714,7 +2942,9 @@ class PDEFromSpec(PDEBase):
             max_diffusive_coeff = 0.0
             for term in eq.rhs_terms:
                 coeff_abs = abs(term.coefficient)
-                if (term.operator == "laplacian" and term.field == eq.field_name) or term.operator.startswith("laplacian_"):
+                if (
+                    term.operator == "laplacian" and term.field == eq.field_name
+                ) or term.operator.startswith("laplacian_"):
                     max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
                 elif term.operator == "biharmonic":
                     max_diffusive_coeff = max(max_diffusive_coeff, coeff_abs)
@@ -1759,6 +2989,7 @@ def build_pde_from_json(
     parameters: dict[str, float] | None = None,
     *,
     constraint_eps: float = 1e-14,
+    coupled_svd_rcond: float = 0.01,
 ) -> PDEFromSpec:
     """Build a PDE from a JSON equation specification file.
 
@@ -1777,6 +3008,9 @@ def build_pde_from_json(
     constraint_eps : float
         Tolerance for the constraint solver's Laplacian coefficient check.
         Default ``1e-14``.
+    coupled_svd_rcond : float
+        Relative singular-value threshold for Tikhonov regularization in
+        the coupled FFT constraint solver.  Default ``0.01``.
 
     Returns
     -------
@@ -1799,8 +3033,17 @@ def build_pde_from_json(
     if parameters is None:
         meta_params: dict[str, object] | None = spec.metadata.get("parameters")
         if isinstance(meta_params, dict):
-            parameters = {k: float(v) for k, v in meta_params.items() if isinstance(v, (int, float))}
-    return PDEFromSpec(spec, parameters=parameters, constraint_eps=constraint_eps)
+            parameters = {
+                k: float(v)
+                for k, v in meta_params.items()
+                if isinstance(v, (int, float))
+            }
+    return PDEFromSpec(
+        spec,
+        parameters=parameters,
+        constraint_eps=constraint_eps,
+        coupled_svd_rcond=coupled_svd_rcond,
+    )
 
 
 def create_initial_state(

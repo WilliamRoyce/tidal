@@ -10,8 +10,10 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# Derive equations (Poisson equation, .wls pass-through to wolframscript)
-tidal derive electrostatics.wls
+# Derive wave equation from TOML config (Lagrangian-derived)
+tidal derive theory.toml
+# Alternative: derive hand-crafted Poisson equation (constraint + source)
+# tidal derive electrostatics.wls
 
 # Inspect the equation system
 tidal inspect ../data/electrostatics_2d.json

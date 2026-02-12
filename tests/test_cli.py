@@ -932,6 +932,167 @@ path = "output.json"
         assert '"MetricMatrix"' in out
         assert "DefConstantSymbol[polm2]" in out
 
+    def test_derive_chart_placeholder_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Component-derivative notation with -chart placeholder should be substituted."""
+        config = tmp_path / "elasticity.toml"
+        config.write_text("""
+[theory]
+name = "Navier Cauchy"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "ux"
+type = "scalar"
+
+[[fields]]
+name = "uy"
+type = "scalar"
+
+[constants]
+names = ["rho", "lam", "mu"]
+
+[lagrangian]
+expression = "rho/2 * (CD[{0, -chart}][ux[]]^2 + CD[{0, -chart}][uy[]]^2) - lam/2 * (CD[{1, -chart}][ux[]] + CD[{2, -chart}][uy[]])^2 - mu * (CD[{1, -chart}][ux[]]^2 + CD[{2, -chart}][uy[]]^2 + 1/2 * (CD[{2, -chart}][ux[]] + CD[{1, -chart}][uy[]])^2)"
+
+[parameters]
+rho = 1.0
+lam = 1.0
+mu = 1.0
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Lagrangian assignment should have chart placeholder substituted
+        assert "ncCD[{0, -ncCart}][ncUx[]]" in out
+        assert "ncCD[{1, -ncCart}][ncUx[]]" in out
+        # Metadata lagrangian_expr stores original expression (unsubstituted) — that's OK
+        # Field names should be prefixed
+        assert "ncUx[]" in out
+        assert "ncUy[]" in out
+        # Constants should be defined
+        assert "DefConstantSymbol[rho]" in out
+        assert "DefConstantSymbol[lam]" in out
+        assert "DefConstantSymbol[mu]" in out
+        # Multi-field: should have VarD for both fields
+        assert "VarD[ncUx[]" in out
+        assert "VarD[ncUy[]" in out
+
+    def test_derive_linearization_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Linearization (xPert) TOML should generate valid WLS."""
+        config = tmp_path / "gw.toml"
+        config.write_text("""
+[theory]
+name = "Linearized Gravity"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[linearization]
+expression = "Einstein[CD][-a, -b]"
+perturbation_field = "h"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Should load xPert
+        assert "xAct`xPert`" in out
+        assert "Linearize.wl" in out
+        # Should have SetupMetricPerturbation
+        assert "SetupMetricPerturbation" in out
+        # Should have LinearizeTensorExpression
+        assert "LinearizeTensorExpression" in out
+        # Should have notation conversion rule
+        assert "LI[1]" in out
+        # Should have DecomposeToComponents
+        assert "DecomposeToComponents" in out
+        # CD in Einstein should be prefixed
+        assert "Einstein[lgCD]" in out
+        # Should NOT have VarD or Lagrangian
+        assert "VarD" not in out
+        # Metadata should indicate linearized
+        assert '"linearized" -> True' in out
+
+    def test_derive_massive_gravity_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Linearization with constants and metric reference generates valid WLS."""
+        config = tmp_path / "mg.toml"
+        config.write_text("""
+[theory]
+name = "Massive Gravity"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[constants]
+names = ["m2"]
+
+[linearization]
+expression = "Einstein[CD][-a, -b] - m2 eta[-a, -b]"
+perturbation_field = "h"
+
+[parameters]
+m2 = 1.0
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Should load xPert + Linearize.wl
+        assert "xAct`xPert`" in out
+        assert "Linearize.wl" in out
+        # Constant should be defined
+        assert "DefConstantSymbol[m2]" in out
+        # xPert setup
+        assert "SetupMetricPerturbation" in out
+        assert "LinearizeTensorExpression" in out
+        # Metric reference should be substituted (eta -> mgEta)
+        assert "mgEta[-a, -b]" in out
+        # Mass term preserved with constant
+        assert "m2 mgEta" in out
+        # Notation conversion
+        assert "LI[1]" in out
+        # Decomposition
+        assert "DecomposeToComponents" in out
+        # Metadata
+        assert '"linearized" -> True' in out
+        # No Euler-Lagrange path
+        assert "VarD" not in out
+        # Parameter default value in metadata
+        assert '"m2" -> 1.0' in out
+
 
 class TestDeriveAbsolutePaths:
     """Verify generated WLS scripts use absolute paths (not $InputFileName-relative)."""
@@ -1387,6 +1548,142 @@ rank = 99
 
 [lagrangian]
 expression = "T[]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    # -- [linearization] validation tests --
+
+    def test_linearization_missing_expression(self, tmp_path: Path) -> None:
+        """[linearization] without expression should fail."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[linearization]
+perturbation_field = "h"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_linearization_missing_perturbation_field(self, tmp_path: Path) -> None:
+        """[linearization] without perturbation_field should fail."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[linearization]
+expression = "Einstein[CD][-a, -b]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_linearization_unknown_perturbation_field(self, tmp_path: Path) -> None:
+        """perturbation_field not matching any [[fields]] entry should fail."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[linearization]
+expression = "Einstein[CD][-a, -b]"
+perturbation_field = "g"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_linearization_and_lagrangian_mutually_exclusive(
+        self, tmp_path: Path
+    ) -> None:
+        """Having both [lagrangian] and [linearization] should fail."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[lagrangian]
+expression = "h[]"
+
+[linearization]
+expression = "Einstein[CD][-a, -b]"
+perturbation_field = "h"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_linearization_or_lagrangian_required(self, tmp_path: Path) -> None:
+        """Config with neither [lagrangian] nor [linearization] should fail."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
 
 [output]
 path = "output.json"

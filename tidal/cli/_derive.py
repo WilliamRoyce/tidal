@@ -187,6 +187,38 @@ def _validate_derived_fields(config: dict[str, Any]) -> None:
             raise ValueError(msg)
 
 
+def _validate_linearization(config: dict[str, Any]) -> None:
+    """Validate optional ``[linearization]`` section.
+
+    Raises
+    ------
+    TypeError
+        If the section is not a table.
+    ValueError
+        If required keys are missing or ``perturbation_field`` is not declared.
+    """
+    if "linearization" not in config:
+        return
+    lin: dict[str, Any] = config["linearization"]
+    if not isinstance(lin, dict):  # pyright: ignore[reportUnnecessaryIsInstance]
+        msg = "[linearization] must be a table"
+        raise TypeError(msg)
+
+    expr = lin.get("expression")
+    if not expr or not isinstance(expr, str) or not expr.strip():
+        msg = "[linearization].expression must be a non-empty string"
+        raise ValueError(msg)
+
+    pf = lin.get("perturbation_field")
+    if not pf or not isinstance(pf, str):
+        msg = "[linearization].perturbation_field is required"
+        raise ValueError(msg)
+    field_names = {f["name"] for f in config.get("fields", [])}
+    if pf not in field_names:
+        msg = f"[linearization].perturbation_field '{pf}' not found in [[fields]]"
+        raise ValueError(msg)
+
+
 def _validate_config(config: dict[str, Any]) -> None:
     """Validate TOML config structure.
 
@@ -195,16 +227,27 @@ def _validate_config(config: dict[str, Any]) -> None:
     ValueError
         If any required section or field is missing or invalid.
     """
-    required_sections = ["spacetime", "lagrangian"]
-    for section in required_sections:
-        if section not in config:
-            msg = f"Missing required section: [{section}]"
-            raise ValueError(msg)
+    if "spacetime" not in config:
+        msg = "Missing required section: [spacetime]"
+        raise ValueError(msg)
+
+    has_lagrangian = "lagrangian" in config
+    has_linearization = "linearization" in config
+
+    if not has_lagrangian and not has_linearization:
+        msg = "Config must have either [lagrangian] or [linearization]"
+        raise ValueError(msg)
+    if has_lagrangian and has_linearization:
+        msg = "[lagrangian] and [linearization] are mutually exclusive"
+        raise ValueError(msg)
 
     _validate_spacetime(config)
     _validate_fields(config)
     _validate_derived_fields(config)
-    _validate_lagrangian(config)
+    if has_lagrangian:
+        _validate_lagrangian(config)
+    else:
+        _validate_linearization(config)
     _validate_parameters(config)
 
 
@@ -344,7 +387,11 @@ def _substitute_field_names(
     # Also substitute eta and CD with prefixed versions
     result = result.replace("eta[", f"{prefix}Eta[")
     result = result.replace("CD[", f"{prefix}CD[")
-    return result.replace("CD ]", f"{prefix}CD ]")
+    result = result.replace("CD]", f"{prefix}CD]")
+    result = result.replace("CD ]", f"{prefix}CD ]")
+    # Substitute chart placeholder for component-derivative notation
+    # e.g., CD[{0, -chart}][ux[]] → {prefix}CD[{0, -{prefix}Cart}][...]
+    return result.replace("-chart}", f"-{prefix}Cart}}")
 
 
 # --- WLS script generation ---
@@ -370,6 +417,8 @@ class _WlsContext:
     pipeline_path: str
     parameters: dict[str, float]
     derived_fields: list[dict[str, Any]]
+    linearization: dict[str, Any] | None
+    constraint_solver: dict[str, Any] | None
 
 
 def _wls_header(ctx: _WlsContext) -> list[str]:
@@ -384,30 +433,39 @@ def _wls_header(ctx: _WlsContext) -> list[str]:
     ]
 
 
-def _wls_packages(pipeline_path: str) -> list[str]:
+def _wls_packages(pipeline_path: str, *, load_xpert: bool = False) -> list[str]:
     """Generate xAct package loading and pipeline import lines.
 
     Parameters
     ----------
     pipeline_path : str
         Absolute path to the ``tidal/wolfram/`` directory.
+    load_xpert : bool
+        If *True*, also load ``xAct`xPert`` and ``Linearize.wl``.
     """
     escaped = pipeline_path.replace("\\", "\\\\").replace('"', '\\"')
-    return [
+    lines = [
         "(* Load xAct packages *)",
         "<< xAct`xTensor`;",
         "<< xAct`xCoba`;",
-        "",
-        "(* Load pipeline modules *)",
-        f'pipelinePath = "{escaped}";',
-        'Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];',
-        'Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];',
-        'Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];',
-        'Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];',
-        "",
-        "$DefInfoQ = False;",
-        "",
     ]
+    if load_xpert:
+        lines.append("<< xAct`xPert`;")
+    lines.extend(
+        (
+            "",
+            "(* Load pipeline modules *)",
+            f'pipelinePath = "{escaped}";',
+            'Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];',
+            'Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];',
+            'Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];',
+            'Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];',
+        )
+    )
+    if load_xpert:
+        lines.append('Get[FileNameJoin[{pipelinePath, "Linearize.wl"}]];')
+    lines.extend(("", "$DefInfoQ = False;", ""))
+    return lines
 
 
 def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
@@ -600,6 +658,98 @@ def _wls_euler_lagrange_single(ctx: _WlsContext) -> list[str]:
     ]
 
 
+def _wls_linearization(ctx: _WlsContext) -> list[str]:
+    """Generate xPert linearization, decomposition, and export lines."""
+    assert ctx.linearization is not None
+    lin = ctx.linearization
+    pert_field_name = lin["perturbation_field"]
+    pert_field = next(f for f in ctx.fields if f["name"] == pert_field_name)
+    fexpr = _field_expression(pert_field, ctx.prefix)
+
+    # Auto-generated internal symbols
+    pert_sym = f"{ctx.prefix}hpert"
+    eps_sym = f"{ctx.prefix}Epsilon"
+
+    # Substitute CD and field names in the expression
+    prefixed_expr = _substitute_field_names(
+        lin["expression"].strip(),
+        ctx.fields,
+        ctx.prefix,
+        derived_fields=ctx.derived_fields,
+    )
+
+    lines: list[str] = [
+        "(* Step 3: xPert metric perturbation setup *)",
+        f"{pert_sym}Tensor = SetupMetricPerturbation[{ctx.metric}, {pert_sym}, {eps_sym}];",
+        f'Print["Perturbation: metric = background + {eps_sym} * {pert_field_name}"];',
+        "",
+        "(* Step 4: Linearize tensor expression *)",
+        f"linExpr = LinearizeTensorExpression[{prefixed_expr}];",
+        'Print["Linearized expression: ", Short[linExpr, 3]];',
+        "",
+        "(* Convert xPert notation to plain tensor for pipeline *)",
+        f"linExprPlain = linExpr /. {pert_sym}[LI[1], idx__] :> {ctx.prefix}{pert_field_name.capitalize()}[idx];",
+        "linExprPlain = Simplify[linExprPlain];",
+        'Print["Converted to plain tensor: ", Short[linExprPlain, 3]];',
+        "",
+        "(* Step 5: Decompose to components *)",
+        f'componentEqs = DecomposeToComponents[linExprPlain, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
+        'Print["Components: ", Length[componentEqs]];',
+        "",
+        "fieldEquations = Table[",
+        f'  {{"{pert_field_name}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
+        "  {k, Length[componentEqs]}",
+        "];",
+        "",
+    ]
+
+    return lines
+
+
+def _wls_constraint_metadata(
+    cs_config: dict[str, Any], spatial_coords: list[str]
+) -> list[str]:
+    """Generate Wolfram metadata lines for constraint solver configuration.
+
+    Translates the ``[constraint_solver]`` TOML section into metadata keys
+    that ``ConstraintSolverHints`` in ExportJSON.wl reads at export time.
+    """
+    method = cs_config.get("method", "auto")
+    max_iter = cs_config.get("max_iterations", 30)
+    tol = cs_config.get("tolerance", 1e-10)
+
+    # Format tolerance in Wolfram scientific notation: 1e-10 → 1*^-10
+    tol_str = f"{tol:.0e}"
+    tol_str = tol_str.replace("e+0", "*^").replace("e-0", "*^-")
+    tol_str = tol_str.replace("e+", "*^").replace("e-", "*^-")
+
+    lines = [
+        '  "solve_constraints" -> True,',
+        f'  "constraint_method" -> "{method}",',
+        f'  "constraint_max_iterations" -> {max_iter},',
+        f'  "constraint_tolerance" -> {tol_str},',
+    ]
+
+    # Build boundary conditions Association
+    bcs = cs_config.get("boundary_conditions", {})
+    if bcs:
+        bc_parts: list[str] = []
+        for coord in spatial_coords:
+            bc_info = bcs.get(coord, {})
+            bc_type = bc_info.get("type", "periodic")
+            if "value" in bc_info:
+                bc_parts.append(
+                    f'    "{coord}" -> <|"type" -> "{bc_type}", '
+                    f'"value" -> {bc_info["value"]}|>'
+                )
+            else:
+                bc_parts.append(f'    "{coord}" -> <|"type" -> "{bc_type}"|>')
+        bc_str = ",\n".join(bc_parts)
+        lines.append(f'  "constraint_boundary_conditions" -> <|\n{bc_str}\n  |>,')
+
+    return lines
+
+
 def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
     """Generate metadata and JSON export lines.
 
@@ -617,26 +767,41 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
     )
     coord_str = ", ".join(f'"{c}"' for c in ctx.coords)
 
-    escaped_lagrangian = (
-        ctx.lagrangian_expr.replace("\\", "\\\\")
-        .replace('"', '\\"')
-        .replace("\n", " ")
-        .strip()
+    is_linearization = ctx.linearization is not None
+
+    if is_linearization and ctx.linearization is not None:
+        raw_expr: str = str(ctx.linearization["expression"])
+        linearized_str = "True"
+    else:
+        raw_expr = ctx.lagrangian_expr
+        linearized_str = "False"
+
+    escaped_expr = (
+        raw_expr.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ").strip()
     )
 
     lines: list[str] = [
         "metadata = <|",
         '  "source" -> "xAct",',
-        f'  "lagrangian_expr" -> "{escaped_lagrangian}",',
+        f'  "lagrangian_expr" -> "{escaped_expr}",',
         '  "derived_from" -> "Euler-Lagrange",',
         '  "gauge" -> "none",',
-        '  "linearized" -> False,',
+        f'  "linearized" -> {linearized_str},',
         f'  "dimension" -> {ctx.dim},',
         f'  "signature" -> {{{sig_str}}},',
         f'  "coordinates" -> {{{coord_str}}}',
-        "|>;",
-        "",
     ]
+
+    # Add constraint solver metadata if configured in TOML
+    if ctx.constraint_solver is not None:
+        # Spatial coordinates are all coords except "t"
+        spatial_coords = [c for c in ctx.coords if c != "t"]
+        cs_lines = _wls_constraint_metadata(ctx.constraint_solver, spatial_coords)
+        # The last base metadata line needs a trailing comma
+        lines[-1] += ","
+        lines.extend(cs_lines)
+
+    lines.extend(["|>;", ""])
 
     # Build JSON — always use multi-field builder since fieldEquations
     # is constructed with proper labels by both single and multi-field paths
@@ -727,24 +892,33 @@ def generate_wls(
         chart=f"{prefix}Cart",
         theory_name=config.get("theory", {}).get("name", "Custom Theory"),
         output_path=str(resolved_output),
-        lagrangian_expr=config["lagrangian"]["expression"].strip(),
+        lagrangian_expr=config.get("lagrangian", {}).get("expression", "").strip(),
         is_multi=len(config["fields"]) > 1,
         pipeline_path=str(wolfram_dir),
         parameters={k: float(v) for k, v in config.get("parameters", {}).items()},
         derived_fields=config.get("derived_fields", []),
+        linearization=config.get("linearization"),
+        constraint_solver=config.get("constraint_solver"),
     )
+
+    is_linearization = ctx.linearization is not None
 
     lines: list[str] = []
     lines.extend(_wls_header(ctx))
-    lines.extend(_wls_packages(ctx.pipeline_path))
+    lines.extend(_wls_packages(ctx.pipeline_path, load_xpert=is_linearization))
     lines.extend(_wls_spacetime(config, ctx))
     lines.extend(_wls_fields(ctx))
     lines.extend(_wls_derived_fields(ctx))
-    lines.extend(_wls_lagrangian(ctx))
-    if ctx.is_multi:
-        lines.extend(_wls_euler_lagrange_multi(ctx))
+
+    if is_linearization:
+        lines.extend(_wls_linearization(ctx))
     else:
-        lines.extend(_wls_euler_lagrange_single(ctx))
+        lines.extend(_wls_lagrangian(ctx))
+        if ctx.is_multi:
+            lines.extend(_wls_euler_lagrange_multi(ctx))
+        else:
+            lines.extend(_wls_euler_lagrange_single(ctx))
+
     lines.extend(_wls_metadata_and_export(config, ctx))
 
     return "\n".join(lines) + "\n"

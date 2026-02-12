@@ -304,10 +304,9 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   componentEq = EvaluateEpsilonComponents[componentEq, chart];
   componentEq = Expand[componentEq];
 
-  (* Step 7: Get coordinate symbols and evaluate metric *)
-  coordSyms = GetCoordinateSymbols[chart];
-  dim = Length[coordSyms];
-
+  (* Step 7: Evaluate metric components *)
+  (* EvaluateMetricComponents uses MetricQ condition to only match metric tensors, *)
+  (* preserving field tensors like H[{1,-chart},{1,-chart}] intact. *)
   If[metricMatrix =!= None,
     componentEq = EvaluateMetricComponents[componentEq, chart, metricMatrix],
     componentEq = EvaluateMinkowskiMetric[componentEq, chart]
@@ -319,7 +318,10 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
     componentEq = Expand[componentEq]
   ];
 
-  (* Step 8: Replace ALL tensor fields with named scalar functions *)
+  (* Step 8: Get coordinate symbols and replace ALL tensor fields with named scalar functions *)
+  coordSyms = GetCoordinateSymbols[chart];
+  dim = Length[coordSyms];
+
   allFieldHeads = Join[{fieldHead}, ExtractFieldHead /@ additionalFields];
   Do[
     componentEq = ReplaceTensorFieldComponents[componentEq, afh, chart, coordSyms, dim],

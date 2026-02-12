@@ -1,0 +1,30 @@
+# Electrostatics: Free Scalar Field in 2+1D
+#
+# L = -(1/2) (d phi)^2
+#
+# Euler-Lagrange equation: d2t(phi) = laplacian(phi)
+#
+# For the Laplace/Poisson equation (electrostatics), simulate with:
+#   tidal simulate ../data/electrostatics_laplace.json --mode constraint
+#
+# NOTE: The hand-crafted electrostatics_2d.json includes a source field rho
+# and constraint_solver metadata. This TOML derives the wave equation variant
+# via the standard Lagrangian pipeline. Both are valid starting points for
+# electrostatic simulations.
+
+[theory]
+name = "Electrostatics"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]]"
+
+[output]
+path = "../data/electrostatics_laplace.json"

@@ -1,155 +1,155 @@
 {
-	"metadata":{
-		"source":"xAct",
-		"lagrangian_expr":"-1\/2 g^ab nabla_a phi nabla_b phi - 1\/2 m^2 phi^2",
-		"derived_from":"Euler-Lagrange",
-		"gauge":"none",
-		"linearized":true,
-		"parameters":{
-			"sphR":1.0,
-			"sphm2":0.0
+	"metadata": {
+		"source": "xAct",
+		"lagrangian_expr": "-1/2 g^ab nabla_a phi nabla_b phi - 1/2 m^2 phi^2",
+		"derived_from": "Euler-Lagrange",
+		"gauge": "none",
+		"linearized": true,
+		"parameters": {
+			"sphR": 1.0,
+			"sphm2": 0.0
 		}
 	},
-	"spacetime":{
-		"dimension":3,
-		"signature":[
+	"spacetime": {
+		"dimension": 3,
+		"signature": [
 			-1,
 			1,
 			1
 		],
-		"coordinates":[
+		"coordinates": [
 			"t",
 			"x",
 			"y"
 		],
-		"metric_type":"product_conformal",
-		"conformal_factor":"2*R^2 \/ (R^2 + x^2 + y^2)"
+		"metric_type": "product_conformal",
+		"conformal_factor": "2*R^2 / (R^2 + x^2 + y^2)"
 	},
-	"fields":[
+	"fields": [
 		{
-			"name":"sphphi_0",
-			"index":0,
-			"is_dynamical":true
+			"name": "sphphi_0",
+			"index": 0,
+			"is_dynamical": true
 		}
 	],
-	"equations":[
+	"equations": [
 		{
-			"field":"sphphi_0",
-			"lhs":{
-				"expression":"d2_t(sphphi_0)",
-				"order":{
-					"time":2,
-					"space":0
+			"field": "sphphi_0",
+			"lhs": {
+				"expression": "d2_t(sphphi_0)",
+				"order": {
+					"time": 2,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":-1.0,
-						"operator":"identity",
-						"field":"sphphi_0",
-						"coefficient_symbolic":"-sphm2"
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "sphphi_0",
+						"coefficient_symbolic": "-sphm2"
 					},
 					{
-						"coefficient":0.25,
-						"operator":"laplacian_x",
-						"field":"sphphi_0"
+						"coefficient": 0.25,
+						"operator": "laplacian_x",
+						"field": "sphphi_0"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_x",
-						"field":"sphphi_0",
-						"coefficient_symbolic":"x[]^2\/(2*sphR^2)",
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "sphphi_0",
+						"coefficient_symbolic": "x[]^2/(2*sphR^2)",
+						"coordinate_dependent": [
 							"x"
 						]
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_x",
-						"field":"sphphi_0",
-						"coefficient_symbolic":"x[]^4\/(4*sphR^4)",
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "sphphi_0",
+						"coefficient_symbolic": "x[]^4/(4*sphR^4)",
+						"coordinate_dependent": [
 							"x"
 						]
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_x",
-						"field":"sphphi_0",
-						"coefficient_symbolic":"y[]^2\/(2*sphR^2)",
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "sphphi_0",
+						"coefficient_symbolic": "y[]^2/(2*sphR^2)",
+						"coordinate_dependent": [
 							"y"
 						]
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_x",
-						"field":"sphphi_0",
-						"coefficient_symbolic":"(x[]^2*y[]^2)\/(2*sphR^4)",
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "sphphi_0",
+						"coefficient_symbolic": "(x[]^2*y[]^2)/(2*sphR^4)",
+						"coordinate_dependent": [
 							"x",
 							"y"
 						]
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_x",
-						"field":"sphphi_0",
-						"coefficient_symbolic":"y[]^4\/(4*sphR^4)",
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "sphphi_0",
+						"coefficient_symbolic": "y[]^4/(4*sphR^4)",
+						"coordinate_dependent": [
 							"y"
 						]
 					},
 					{
-						"coefficient":0.25,
-						"operator":"laplacian_y",
-						"field":"sphphi_0"
+						"coefficient": 0.25,
+						"operator": "laplacian_y",
+						"field": "sphphi_0"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_y",
-						"field":"sphphi_0",
-						"coefficient_symbolic":"x[]^2\/(2*sphR^2)",
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "laplacian_y",
+						"field": "sphphi_0",
+						"coefficient_symbolic": "x[]^2/(2*sphR^2)",
+						"coordinate_dependent": [
 							"x"
 						]
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_y",
-						"field":"sphphi_0",
-						"coefficient_symbolic":"x[]^4\/(4*sphR^4)",
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "laplacian_y",
+						"field": "sphphi_0",
+						"coefficient_symbolic": "x[]^4/(4*sphR^4)",
+						"coordinate_dependent": [
 							"x"
 						]
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_y",
-						"field":"sphphi_0",
-						"coefficient_symbolic":"y[]^2\/(2*sphR^2)",
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "laplacian_y",
+						"field": "sphphi_0",
+						"coefficient_symbolic": "y[]^2/(2*sphR^2)",
+						"coordinate_dependent": [
 							"y"
 						]
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_y",
-						"field":"sphphi_0",
-						"coefficient_symbolic":"(x[]^2*y[]^2)\/(2*sphR^4)",
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "laplacian_y",
+						"field": "sphphi_0",
+						"coefficient_symbolic": "(x[]^2*y[]^2)/(2*sphR^4)",
+						"coordinate_dependent": [
 							"x",
 							"y"
 						]
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_y",
-						"field":"sphphi_0",
-						"coefficient_symbolic":"y[]^4\/(4*sphR^4)",
-						"coordinate_dependent":[
+						"coefficient": 1.0,
+						"operator": "laplacian_y",
+						"field": "sphphi_0",
+						"coefficient_symbolic": "y[]^4/(4*sphR^4)",
+						"coordinate_dependent": [
 							"y"
 						]
 					}
@@ -157,18 +157,8 @@
 			}
 		}
 	],
-	"coupling":{
-		"mass_matrix":[
-			[
-				1.0
-			]
-		],
-		"coupling_matrix":[
-			[
-				0.0
-			]
-		],
-		"mass_matrix_symbolic":[
+	"coupling": {
+		"mass_matrix_symbolic": [
 			[
 				"-sphm2"
 			]

@@ -256,6 +256,16 @@ def _build_json_output(spec: object, *, show_params: bool) -> dict[str, Any]:
         },
         "mass_matrix": [list(row) for row in spec.mass_matrix],
         "coupling_matrix": [list(row) for row in spec.coupling_matrix],
+        "mass_matrix_symbolic": (
+            [list(row) for row in spec.mass_matrix_symbolic]
+            if spec.mass_matrix_symbolic
+            else None
+        ),
+        "coupling_matrix_symbolic": (
+            [list(row) for row in spec.coupling_matrix_symbolic]
+            if spec.coupling_matrix_symbolic
+            else None
+        ),
     }
 
     if spec.metadata.get("signature"):

@@ -32,23 +32,27 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 ---
 
-### Phase 2: Testing & CI Infrastructure (1-2 Weeks)
+### Phase 2: Testing & CI Infrastructure — 🔄 PRIMARY REMAINING FOCUS
 **Goal:** Improve test coverage and CI reliability
-**Estimated Duration:** 2-3 weeks
+**Status:** Partially complete — coverage runs in CI, but key gaps remain
 
-| Issue | Priority | Type | Effort |
+| Issue | Priority | Type | Status |
 |-------|----------|------|--------|
-| [#TBD] Add Animation Module Test Coverage | 🟠 High | Testing | Medium |
-| [#TBD] Add Code Coverage Reporting to CI | 🟠 High | CI/CD | Low |
-| [#TBD] Add Wolfram Tests to GitHub Actions CI | 🔴 Critical | CI/CD | High |
-| [#TBD] Add Tests for Observers, Profiling, Runners Modules | 🟡 Medium | Testing | Medium |
+| [#TBD] Add Animation Module Test Coverage | 🟠 High | Testing | 🔄 Remaining |
+| [#TBD] Add Code Coverage Reporting to CI | 🟠 High | CI/CD | ⚡ Partial |
+| [#TBD] Add Wolfram Tests to GitHub Actions CI | 🔴 Critical | CI/CD | 🔄 Remaining |
+| [#TBD] Add Tests for Observers, Profiling, Runners Modules | 🟡 Medium | Testing | 🔄 Remaining |
 
-**Key Deliverables:**
+**Delivered so far:**
+- Coverage runs in CI (`--cov=tidal --cov-report=term-missing --cov-report=xml`)
+- Coverage badge in README (links to CI workflow)
+- Root Makefile with `make test-coverage` target
+
+**Still needed:**
 - `test_animation_builder.py` with 10-15 test cases
-- Codecov integration in GitHub Actions
+- codecov.io integration for dynamic badge and PR reports
 - Optional Wolfram test workflow (label-triggered or weekly)
 - ~20-30 tests for observers, profiling, runners modules
-- Coverage increase from ~70% to 80%+
 
 ---
 
@@ -124,6 +128,12 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 | Massive 3-form example (rank-3 antisymmetric tensor) | ✅ Complete |
 | Critical Review Pass 1 & 2 (fail-fast, CFL, operator plugin API) | ✅ Complete |
 | Auto-computed mass/coupling matrices (Phase 12) | ✅ Complete |
+| Project rename to TIDAL (package, CLI, imports, docs) | ✅ Complete |
+| TIDAL logo (SVG) in README and Sphinx docs | ✅ Complete |
+| Root Makefile with 13 convenience targets | ✅ Complete |
+| `docs/COMMUNITY.md` — community guidelines and support channels | ✅ Complete |
+| Sphinx extensions: autosummary, doctest | ✅ Complete |
+| README Community & Support section | ✅ Complete |
 
 ---
 
@@ -169,12 +179,15 @@ Issues should be tagged with appropriate labels:
 
 ## Current Focus
 
-**As of February 2026:**
+**As of v0.3.1:**
 - ✅ Phase 13+ completed: All core pipeline features implemented
 - ✅ CLI (`tidal` command) implemented: 5 subcommands, 147 tests, zero new dependencies
 - ✅ 18 working examples spanning 1+1D through 3+1D
 - ✅ 743 Python tests + ~108 Wolfram tests passing, 0 ruff violations, 0 pyright errors
-- 🔄 Remaining: Automatic gauge fixing, Wolfram CI, parameter sweep examples
+- ✅ Project renamed to TIDAL with professional branding (logo, Makefile, community docs)
+- ✅ 17 of 25 original issues resolved (68%)
+- 🔄 **Primary remaining focus:** Phase 2 (Testing & CI) — animation tests, codecov, Wolfram CI
+- 🔄 **Secondary:** Automatic gauge fixing (#6), architecture diagrams (#17), pipeline CI (#18)
 
 ---
 
@@ -233,9 +246,9 @@ This project follows [Semantic Versioning](https://semver.org/):
 - **MINOR** (0.X.0): New features (3+1D examples, JSON schema extensions)
 - **PATCH** (0.0.X): Bug fixes, documentation improvements
 
-**Current Version:** 0.2.4
-**Next Minor Release (0.3.0):** Phase 3 completion (3+1D examples, JSON schema guide)
-**Next Major Release (1.0.0):** Phase 4 completion (rank-3+ tensors, gauge automation)
+**Current Version:** 0.3.1
+**Previous Milestones:** 0.3.0 delivered Phase 3 + CLI + rename to TIDAL
+**Next Major Release (1.0.0):** Phase 2 completion (test coverage, Wolfram CI) + gauge automation
 
 ---
 

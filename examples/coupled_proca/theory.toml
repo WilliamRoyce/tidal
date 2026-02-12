@@ -1,0 +1,43 @@
+[theory]
+name = "Coupled Proca"
+description = "Two massive vector fields with cross-coupling in 2+1D cavity"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "B"
+type = "vector"
+
+[constants]
+names = ["mA2", "mB2", "gcoup"]
+
+[lagrangian]
+expression = "(-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] + 1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-d][A[-c]] - mA2/2 A[-a] eta[a,b] A[-b] - 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-c][B[-d]] + 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-d][B[-c]] - mB2/2 B[-a] eta[a,b] B[-b] + gcoup A[-a] eta[a,b] B[-b])"
+
+[parameters]
+mA2 = 1.0
+mB2 = 2.0
+gcoup = 0.5
+
+[constraint_solver]
+enabled = true
+method = "auto"
+max_iterations = 30
+tolerance = 1e-10
+
+[constraint_solver.boundary_conditions.x]
+type = "dirichlet"
+value = 0.0
+
+[constraint_solver.boundary_conditions.y]
+type = "dirichlet"
+value = 0.0
+
+[output]
+path = "../data/coupled_proca_3d.json"

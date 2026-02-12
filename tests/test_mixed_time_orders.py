@@ -396,7 +396,9 @@ class TestConstraintEvolution:
                             field="phi",
                         ),
                     ),
-                    constraint_solver=ConstraintSolverConfig(enabled=True),
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, method="poisson"
+                    ),
                 ),
             ),
             mass_matrix=((0.0,),),

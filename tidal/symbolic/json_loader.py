@@ -7,6 +7,8 @@ field equations that were derived symbolically from Lagrangians.
 from __future__ import annotations
 
 import json
+import logging
+import math
 import re
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
@@ -22,6 +24,8 @@ AXIS_LETTERS: tuple[str, ...] = ("x", "y", "z", "w", "v", "u")
 
 #: Character class matching all known axis letters (for regex construction).
 _AXIS_RE_CLASS = "[" + "".join(AXIS_LETTERS) + "]"
+
+logger = logging.getLogger(__name__)
 
 #: Set of static operators supported by the pipeline.
 #: Validated at JSON load time to catch typos early.
@@ -258,12 +262,38 @@ class BoundaryCondition:
         )
 
 
+_VALID_CONSTRAINT_METHODS = frozenset({"auto", "fft", "matrix", "poisson"})
+
+
 @dataclass(frozen=True)
 class ConstraintSolverConfig:
     """Configuration for elliptic constraint solving.
 
     When ``enabled`` is True, the constraint equation is solved at each
-    timestep using py-pde's Poisson solver rather than remaining frozen.
+    timestep rather than remaining frozen at its initial value.
+
+    Solver Methods
+    --------------
+    - **"auto"** (default): Automatically selects the best solver.
+      Uses FFT for fully periodic grids (O(N log N)), sparse matrix
+      for non-periodic grids (O(N) via LU). Handles all constraint
+      types: Poisson, Helmholtz, algebraic, anisotropic, etc.
+
+    - **"fft"**: Force FFT solver. Requires fully periodic grid.
+
+    - **"matrix"**: Force sparse matrix solver. Works with any BCs.
+
+    - **"poisson"**: Original py-pde Poisson solver. Requires exactly
+      one ``laplacian(self_field)`` term with no other self-referencing
+      operators. Will warn if non-laplacian self-terms are present.
+      Backward compatible.
+
+    Coupled Constraint Parameters
+    ----------------------------
+    When multiple constraints reference each other's fields, the solver
+    iterates using Gauss-Seidel until convergence or ``max_iterations``.
+    For fully periodic grids, coupled constraints are solved exactly
+    via Fourier-space block solve (no iteration needed).
 
     Attributes
     ----------
@@ -271,16 +301,25 @@ class ConstraintSolverConfig:
         Whether to solve the constraint elliptically. Default False
         preserves existing frozen-constraint behavior.
     method : str
-        Solver method. Currently only ``"poisson"`` is supported.
+        Solver method: "auto", "fft", "matrix", or "poisson".
     boundary_conditions : dict[str, BoundaryCondition]
         Per-axis boundary conditions (e.g., ``{"x": ..., "y": ...}``).
+    max_iterations : int
+        Maximum Gauss-Seidel iterations for coupled constraints.
+        Must be >= 1.
+    tolerance : float
+        Convergence threshold for coupled constraint iteration.
+        Iteration stops when max|field_new - field_old| < tolerance
+        (scaled by field magnitude for robustness). Must be > 0.
     """
 
     enabled: bool = False
-    method: str = "poisson"
+    method: str = "auto"
     boundary_conditions: dict[str, BoundaryCondition] = dataclass_field(
         default_factory=lambda: {}  # noqa: PIE807  # type: dict[str, BoundaryCondition]
     )
+    max_iterations: int = 20
+    tolerance: float = 1e-8
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any] | None) -> ConstraintSolverConfig:
@@ -295,12 +334,24 @@ class ConstraintSolverConfig:
         -------
         ConstraintSolverConfig
             Configuration instance.
+
+        Raises
+        ------
+        ValueError
+            If ``method`` is not one of the recognized solver methods.
         """
         if data is None:
             return cls()
 
         enabled = bool(data.get("enabled", False))
-        method = str(data.get("method", "poisson"))
+        method = str(data.get("method", "auto"))
+
+        if method not in _VALID_CONSTRAINT_METHODS:
+            msg = (
+                f"Unknown constraint solver method '{method}'. "
+                f"Must be one of: {', '.join(sorted(_VALID_CONSTRAINT_METHODS))}."
+            )
+            raise ValueError(msg)
 
         bc_data = data.get("boundary_conditions", {})
         boundary_conditions = {
@@ -308,10 +359,22 @@ class ConstraintSolverConfig:
             for axis, bc_dict in bc_data.items()
         }
 
+        max_iterations = int(data.get("max_iterations", 20))
+        if max_iterations < 1:
+            msg = f"max_iterations must be >= 1, got {max_iterations}"
+            raise ValueError(msg)
+
+        tolerance = float(data.get("tolerance", 1e-8))
+        if tolerance <= 0:
+            msg = f"tolerance must be > 0, got {tolerance}"
+            raise ValueError(msg)
+
         return cls(
             enabled=enabled,
             method=method,
             boundary_conditions=boundary_conditions,
+            max_iterations=max_iterations,
+            tolerance=tolerance,
         )
 
 
@@ -414,6 +477,41 @@ class ComponentEquation:
         )
 
 
+def _resolve_symbolic_coeff(
+    sym: str, parameters: Mapping[str, float]
+) -> float | None:
+    """Resolve a symbolic coefficient string with parameter values.
+
+    Handles simple names (``"m2"``), negated names (``"-m2"``), and
+    compound expressions (``"-2*m2"``).  Returns *None* if the expression
+    cannot be evaluated with the given parameters, so the caller can fall
+    back to the raw numeric coefficient.
+    """
+    # Fast path: negated parameter name
+    if sym.startswith("-") and sym[1:] in parameters:
+        return -parameters[sym[1:]]
+    # Fast path: direct parameter name
+    if sym in parameters:
+        return parameters[sym]
+    # Compound expression: e.g., "-2*m2", "3*lambda"
+    try:
+        py_expr = sym.replace("^", "**")
+        result = eval(py_expr, {"__builtins__": {}}, dict(parameters))  # noqa: S307
+        value = float(result)
+    except (NameError, SyntaxError, TypeError, ValueError, ZeroDivisionError):
+        logger.debug(
+            "Could not resolve symbolic coefficient '%s' with parameters %s; "
+            "matrix entry will use raw numeric coefficient",
+            sym,
+            sorted(parameters.keys()),
+        )
+        return None
+    # Mass/coupling entries must be finite real numbers
+    if not math.isfinite(value):
+        return None
+    return value
+
+
 @dataclass(frozen=True)
 class EquationSystem:
     """Complete system of field equations derived from a Lagrangian.
@@ -483,8 +581,14 @@ class EquationSystem:
         # Verify mass/coupling matrix consistency with identity operator terms.
         # Warns (does not error) if manually constructed EquationSystem has
         # matrices that don't match the convention: matrix[i][j] = -(identity coeff).
+        raw_params = self.metadata.get("parameters", {})
+        check_params: dict[str, float] = {
+            k: float(v)
+            for k, v in raw_params.items()
+            if isinstance(v, (int, float))
+        }
         expected_mass, expected_coupling, _, _ = self._compute_matrices_from_terms(
-            self.equations, self.component_names
+            self.equations, self.component_names, parameters=check_params or None
         )
         if self.mass_matrix != expected_mass or self.coupling_matrix != expected_coupling:
             import warnings  # noqa: PLC0415
@@ -576,6 +680,7 @@ class EquationSystem:
     def _compute_matrices_from_terms(
         equations: tuple[ComponentEquation, ...],
         component_names: tuple[str, ...],
+        parameters: Mapping[str, float] | None = None,
     ) -> tuple[
         tuple[tuple[float, ...], ...],
         tuple[tuple[float, ...], ...],
@@ -592,10 +697,23 @@ class EquationSystem:
         equation *i*.  This makes mass² positive for the standard Lagrangian
         sign convention ``∂²_t φ = … - m² φ``.
 
-        When a term has ``coefficient_symbolic``, it is stored as the
-        authoritative representation of that matrix entry. The symbolic
-        expression is preserved as-is from the term (not evaluated) so that
-        it can be resolved at runtime with actual parameter values.
+        When *parameters* are provided and a term has ``coefficient_symbolic``,
+        the symbolic expression is resolved with the parameter values to
+        produce the correct numeric matrix entry. Without parameters, the
+        raw numeric coefficient (a shape-factor like ±1.0) is used.
+
+        Symbolic expressions are always preserved as-is from the term (not
+        evaluated) so that they can be resolved at runtime with actual
+        parameter values.
+
+        Parameters
+        ----------
+        equations : tuple[ComponentEquation, ...]
+            Parsed component equations.
+        component_names : tuple[str, ...]
+            Names of all field components.
+        parameters : Mapping[str, float] | None
+            Default parameter values for resolving symbolic coefficients.
 
         Returns
         -------
@@ -616,7 +734,19 @@ class EquationSystem:
             for term in eq.rhs_terms:
                 if term.operator == "identity" and term.field in name_to_idx:
                     j = name_to_idx[term.field]
-                    neg_coeff = -term.coefficient
+                    # Prefer symbolic + params for numeric value; fall back
+                    # to the raw numeric coefficient (shape factor).
+                    effective_coeff = term.coefficient
+                    if (
+                        term.coefficient_symbolic is not None
+                        and parameters
+                    ):
+                        resolved = _resolve_symbolic_coeff(
+                            term.coefficient_symbolic, parameters
+                        )
+                        if resolved is not None:
+                            effective_coeff = resolved
+                    neg_coeff = -effective_coeff
                     if i == j:
                         mass[i][j] += neg_coeff
                         if term.coefficient_symbolic is not None:
@@ -720,21 +850,30 @@ class EquationSystem:
             for eq_data in data["equations"]
         )
 
+        # Extract metadata (needed early for parameter-aware matrix computation)
+        metadata = dict(data.get("metadata", {}))
+
+        # Extract default parameters from metadata (if available) so that
+        # numeric matrices reflect actual parameter values, not just ±1.0
+        # shape factors from the Wolfram pipeline.
+        raw_params = metadata.get("parameters", {})
+        default_params: dict[str, float] = {
+            k: float(v)
+            for k, v in raw_params.items()
+            if isinstance(v, (int, float))
+        }
+
         # Auto-compute mass/coupling matrices from identity operator terms.
         # This is the authoritative source — JSON values are ignored in favour
         # of values derived from the equation terms themselves.
-        # Symbolic expressions are extracted from per-term coefficient_symbolic
-        # and preserved unevaluated — they are only resolved at runtime when
-        # actual parameter values are supplied to the PDE solver.
         (
             mass_matrix,
             coupling_matrix,
             mass_matrix_symbolic,
             coupling_matrix_symbolic,
-        ) = cls._compute_matrices_from_terms(equations, component_names)
-
-        # Extract metadata
-        metadata = dict(data.get("metadata", {}))
+        ) = cls._compute_matrices_from_terms(
+            equations, component_names, parameters=default_params or None
+        )
 
         # Extract coordinate names
         coordinates = tuple(str(c) for c in spacetime.get("coordinates", []))

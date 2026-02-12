@@ -1,81 +1,70 @@
 {
-	"metadata":{
-		"source":"xAct",
-		"lagrangian_expr":"L = -1\/2 eta^{ab} d_a phi d_b phi - 1\/2 m^2 phi^2",
-		"derived_from":"Euler-Lagrange",
-		"gauge":"none",
-		"linearized":false
+	"metadata": {
+		"source": "xAct",
+		"lagrangian_expr": "L = -1/2 eta^{ab} d_a phi d_b phi - 1/2 m^2 phi^2",
+		"derived_from": "Euler-Lagrange",
+		"gauge": "none",
+		"linearized": false
 	},
-	"spacetime":{
-		"dimension":4,
-		"signature":[
+	"spacetime": {
+		"dimension": 4,
+		"signature": [
 			-1,
 			1,
 			1,
 			1
 		],
-		"coordinates":[
+		"coordinates": [
 			"t",
 			"x",
 			"y",
 			"z"
 		]
 	},
-	"fields":[
+	"fields": [
 		{
-			"name":"phi_0",
-			"index":0,
-			"is_dynamical":true
+			"name": "phi_0",
+			"index": 0,
+			"is_dynamical": true
 		}
 	],
-	"equations":[
+	"equations": [
 		{
-			"field":"phi_0",
-			"lhs":{
-				"expression":"d2_t(phi_0)",
-				"order":{
-					"time":2,
-					"space":0
+			"field": "phi_0",
+			"lhs": {
+				"expression": "d2_t(phi_0)",
+				"order": {
+					"time": 2,
+					"space": 0
 				}
 			},
-			"rhs":{
-				"type":"linear_combination",
-				"terms":[
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_x",
-						"field":"phi_0"
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "phi_0"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_y",
-						"field":"phi_0"
+						"coefficient": 1.0,
+						"operator": "laplacian_y",
+						"field": "phi_0"
 					},
 					{
-						"coefficient":1.0,
-						"operator":"laplacian_z",
-						"field":"phi_0"
+						"coefficient": 1.0,
+						"operator": "laplacian_z",
+						"field": "phi_0"
 					},
 					{
-						"coefficient":-1.0,
-						"operator":"identity",
-						"field":"phi_0",
-						"coefficient_symbolic":"-m2"
+						"coefficient": -1.0,
+						"operator": "identity",
+						"field": "phi_0",
+						"coefficient_symbolic": "-m2"
 					}
 				]
 			}
 		}
 	],
-	"coupling":{
-		"mass_matrix":[
-			[
-				1.0
-			]
-		],
-		"coupling_matrix":[
-			[
-				0.0
-			]
-		]
-	}
+	"coupling": {}
 }

@@ -310,10 +310,11 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
           "Using auto-computed values from equation identity terms."]
   ];
 
-  couplingSection = <|
-    "mass_matrix" -> autoMatrices["mass_matrix"],
-    "coupling_matrix" -> autoMatrices["coupling_matrix"]
-  |>;
+  (* Only emit symbolic matrices — numeric matrices are redundant because
+     the Wolfram pipeline cannot evaluate DefConstantSymbol values at export
+     time (they produce ±1.0 shape factors, not actual parameter values).
+     Python recomputes correct numeric matrices from terms + parameters. *)
+  couplingSection = <||>;
   If[autoMatrices["mass_matrix_symbolic"] =!= Null,
     couplingSection["mass_matrix_symbolic"] = autoMatrices["mass_matrix_symbolic"]
   ];
@@ -802,6 +803,11 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
       coefficient = -1.0;
       symbolicCoeff = ToString[rawCoeff, InputForm];
       Message[ExtractTermCoefficient::symbolic, rawCoeff, targetField],
+    (* Numeric * symbolic product: -2*m2 -> -2.0, store "-2*m2" *)
+    Head[rawCoeff] === Times && NumericQ[First[rawCoeff]],
+      coefficient = N[First[rawCoeff]];
+      symbolicCoeff = ToString[rawCoeff, InputForm];
+      Message[ExtractTermCoefficient::symbolic, rawCoeff, targetField],
     (* Positive symbolic: m2 -> 1.0, store "m2" *)
     MatchQ[rawCoeff, _Symbol],
       coefficient = 1.0;
@@ -1068,13 +1074,18 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
 (* Returns Nothing when not applicable, so it integrates cleanly with Association building *)
 
 ConstraintSolverHints[fieldName_String, timeOrder_Integer, metadata_Association] := Module[
-  {enableSolver, bcHints, bcAssoc},
+  {enableSolver, bcHints, bcAssoc, method, maxIter, tol},
 
   (* Only applicable to constraint equations (time_order = 0) *)
   If[timeOrder =!= 0, Return[Nothing]];
 
   enableSolver = TrueQ[Lookup[metadata, "solve_constraints", False]];
   If[!enableSolver, Return[Nothing]];
+
+  (* Read configurable solver parameters from metadata with defaults *)
+  method = Lookup[metadata, "constraint_method", "auto"];
+  maxIter = Lookup[metadata, "constraint_max_iterations", 30];
+  tol = Lookup[metadata, "constraint_tolerance", 1*^-10];
 
   (* Build boundary conditions from metadata *)
   bcHints = Lookup[metadata, "constraint_boundary_conditions", <||>];
@@ -1088,7 +1099,9 @@ ConstraintSolverHints[fieldName_String, timeOrder_Integer, metadata_Association]
 
   <|
     "enabled" -> True,
-    "method" -> "poisson",
+    "method" -> method,
+    "max_iterations" -> maxIter,
+    "tolerance" -> tol,
     "boundary_conditions" -> bcAssoc
   |>
 ];
