@@ -599,6 +599,42 @@ TestCase["ExtractDerivativeProfile: unapplied Derivative",
   TorsionGertsenshtein`ExportJSON`ExtractDerivativeProfile[
     Derivative[1, 2][testf]]];
 
+(* === Test Group: FieldToMomentumName global index === *)
+Print[""];
+Print["Test Group: FieldToMomentumName global index"];
+
+(* Single-base system: parse index = global index *)
+TestCase["FieldToMomentumName: single base A_0",
+  "pi_0",
+  TorsionGertsenshtein`ExportJSON`FieldToMomentumName["A_0", {"A_0", "A_1", "A_2"}]];
+
+TestCase["FieldToMomentumName: single base A_2",
+  "pi_2",
+  TorsionGertsenshtein`ExportJSON`FieldToMomentumName["A_2", {"A_0", "A_1", "A_2"}]];
+
+(* Multi-base system: parse index != global index *)
+TestCase["FieldToMomentumName: multi-base A_0 at global 1",
+  "pi_1",
+  TorsionGertsenshtein`ExportJSON`FieldToMomentumName["A_0", {"phi_0", "A_0", "A_1", "A_2"}]];
+
+TestCase["FieldToMomentumName: multi-base A_1 at global 2",
+  "pi_2",
+  TorsionGertsenshtein`ExportJSON`FieldToMomentumName["A_1", {"phi_0", "A_0", "A_1", "A_2"}]];
+
+(* Two vector bases: B_0 at global 3 *)
+TestCase["FieldToMomentumName: two vectors B_0 at global 3",
+  "pi_3",
+  TorsionGertsenshtein`ExportJSON`FieldToMomentumName["B_0", {"A_0", "A_1", "A_2", "B_0", "B_1", "B_2"}]];
+
+TestCase["FieldToMomentumName: two vectors B_1 at global 4",
+  "pi_4",
+  TorsionGertsenshtein`ExportJSON`FieldToMomentumName["B_1", {"A_0", "A_1", "A_2", "B_0", "B_1", "B_2"}]];
+
+(* Error case: field not in list *)
+TestTrue["FieldToMomentumName: throws on missing field",
+  StringQ[Catch[
+    TorsionGertsenshtein`ExportJSON`FieldToMomentumName["C_0", {"A_0", "A_1"}]]]];
+
 (* === Exit === *)
 Print[""];
 ExitWithTestStatus[];

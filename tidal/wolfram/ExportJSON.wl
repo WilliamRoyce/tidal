@@ -618,12 +618,20 @@ ParseFieldName[name_String] := Module[{match},
   ]]
 ];
 
-(* Map field name to momentum field name *)
-(* For py-pde state [field_0, pi_0, field_1, pi_1, ...], momentum is at odd indices *)
-(* Uses ParseFieldName for flexible format support *)
-FieldToMomentumName[fieldName_String] := Module[{parsed},
-  parsed = ParseFieldName[fieldName];
-  "pi_" <> ToString[parsed["index"]]
+(* Map field name to momentum field name using GLOBAL component index *)
+(* allFieldNames is the full ordered list of component names in the JSON. *)
+(* The numeric suffix in "pi_N" must be the 0-based global position, NOT *)
+(* the parse index from the field name, because multiple field bases can *)
+(* share the same parse index (e.g., phi_0 and A_0 both have index 0). *)
+FieldToMomentumName[fieldName_String, allFieldNames_List] := Module[{pos},
+  pos = FirstPosition[allFieldNames, fieldName];
+  If[MissingQ[pos],
+    Throw[StringJoin[
+      "FieldToMomentumName: field '", fieldName,
+      "' not found in field list: ", ToString[allFieldNames]
+    ]]
+  ];
+  "pi_" <> ToString[pos[[1]] - 1]  (* 0-indexed global position *)
 ];
 
 (* Classify spatial operator in a mixed time-space derivative *)
@@ -1041,7 +1049,7 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
 
   (* Convert to momentum field if mixed time-space derivative *)
   If[isMixedTimeSpace,
-    targetField = FieldToMomentumName[targetField]
+    targetField = FieldToMomentumName[targetField, allFieldNames]
   ];
 
   (* Step 5: Detect nonlinear (field-dependent) coefficients *)
