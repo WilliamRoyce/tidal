@@ -1037,7 +1037,7 @@ path = "output.json"
     def test_derive_massive_gravity_dry_run(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Linearization with constants and metric reference generates valid WLS."""
+        """Fierz-Pauli linearization with bg tensor generates valid WLS."""
         config = tmp_path / "mg.toml"
         config.write_text("""
 [theory]
@@ -1057,7 +1057,7 @@ symmetry = "symmetric"
 names = ["m2"]
 
 [linearization]
-expression = "Einstein[CD][-a, -b] - m2 eta[-a, -b]"
+expression = "Einstein[CD][-a, -b] - m2 (eta[-a, -b] - bg[-a, -b]) + m2 eta[-a, -b] eta[c, d] (eta[-c, -d] - bg[-c, -d])"
 perturbation_field = "h"
 
 [parameters]
@@ -1075,13 +1075,20 @@ path = "output.json"
         assert "Linearize.wl" in out
         # Constant should be defined
         assert "DefConstantSymbol[m2]" in out
+        # Background metric tensor defined (not perturbed by xPert)
+        assert "DefTensor[mgBg[-a, -b]" in out
+        # Explicit zero perturbation rule for bg (Unprotect/Protect required)
+        assert "Unprotect[Perturbation]" in out
+        assert "Perturbation[mgBg[__], ___] := 0" in out
+        assert "Protect[Perturbation]" in out
         # xPert setup
         assert "SetupMetricPerturbation" in out
         assert "LinearizeTensorExpression" in out
-        # Metric reference should be substituted (eta -> mgEta)
+        # Metric reference should be substituted (eta -> mgEta, bg -> mgBg)
         assert "mgEta[-a, -b]" in out
-        # Mass term preserved with constant
-        assert "m2 mgEta" in out
+        assert "mgBg[-a, -b]" in out
+        # bg -> metric replacement before decomposition
+        assert "linExprPlain = linExprPlain /. mgBg -> mgEta" in out
         # Notation conversion
         assert "LI[1]" in out
         # Decomposition
