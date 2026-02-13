@@ -194,14 +194,14 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
         componentEq = Expand[componentEq]
       ];
 
-      (* Replace ALL scalar fields with functions of coordinates *)
+      (* Replace ALL fields (any rank) with functions of coordinates *)
       (* This ensures cross-field terms are properly transformed *)
+      (* Uses ReplaceTensorFieldComponents which dispatches by rank: *)
+      (*   rank 0: fh[] -> fh0[t,x,y]  *)
+      (*   rank 1: fh[{i,-chart}] -> fhi[t,x,y]  *)
+      (*   rank 2+: full component replacement *)
       Do[
-        With[{fh = afh, cs = coordSyms},
-          componentEq = componentEq /. {
-            fh[] :> Symbol[ToString[fh] <> "0"][Sequence @@ cs]
-          }
-        ],
+        componentEq = ReplaceTensorFieldComponents[componentEq, afh, chart, coordSyms, dim],
         {afh, allFieldHeads}
       ];
 
