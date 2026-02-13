@@ -1,388 +1,409 @@
 {
-	"metadata": {
-		"source": "xAct",
-		"lagrangian_expr": "Einstein[CD][-a,-b] - m2 * eta[-a,-b]",
-		"derived_from": "Euler-Lagrange",
-		"gauge": "none",
-		"linearized": true
+	"metadata":{
+		"source":"xAct",
+		"lagrangian_expr":"Einstein[CD][-a, -b] - m2 (eta[-a, -b] - bg[-a, -b]) + m2 eta[-a, -b] eta[c, d] (eta[-c, -d] - bg[-c, -d])",
+		"derived_from":"Euler-Lagrange",
+		"gauge":"none",
+		"linearized":true,
+		"parameters":{
+			"m2":1.0
+		}
 	},
-	"spacetime": {
-		"dimension": 3,
-		"signature": [
+	"spacetime":{
+		"dimension":3,
+		"signature":[
 			-1,
 			1,
 			1
 		],
-		"coordinates": [
+		"coordinates":[
 			"t",
 			"x",
 			"y"
 		]
 	},
-	"fields": [
+	"fields":[
 		{
-			"name": "h_0",
-			"index": 0,
-			"is_dynamical": true
+			"name":"h_0",
+			"index":0,
+			"is_dynamical":true
 		},
 		{
-			"name": "h_1",
-			"index": 1,
-			"is_dynamical": true
+			"name":"h_1",
+			"index":1,
+			"is_dynamical":true
 		},
 		{
-			"name": "h_2",
-			"index": 2,
-			"is_dynamical": true
+			"name":"h_2",
+			"index":2,
+			"is_dynamical":true
 		},
 		{
-			"name": "h_3",
-			"index": 3,
-			"is_dynamical": true
+			"name":"h_3",
+			"index":3,
+			"is_dynamical":true
 		},
 		{
-			"name": "h_4",
-			"index": 4,
-			"is_dynamical": true
+			"name":"h_4",
+			"index":4,
+			"is_dynamical":true
 		},
 		{
-			"name": "h_5",
-			"index": 5,
-			"is_dynamical": true
+			"name":"h_5",
+			"index":5,
+			"is_dynamical":true
 		}
 	],
-	"equations": [
+	"equations":[
 		{
-			"field": "h_0",
-			"lhs": {
-				"expression": "h_0",
-				"order": {
-					"time": 0,
-					"space": 0
+			"field":"h_0",
+			"lhs":{
+				"expression":"h_0",
+				"order":{
+					"time":0,
+					"space":0
 				}
 			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
+			"rhs":{
+				"type":"linear_combination",
+				"terms":[
 					{
-						"coefficient": -1.0,
-						"operator": "identity",
-						"field": "h_0",
-						"coefficient_symbolic": "-m2"
+						"coefficient":-1.0,
+						"operator":"identity",
+						"field":"h_3",
+						"coefficient_symbolic":"-m2"
 					},
 					{
-						"coefficient": -1.0,
-						"operator": "laplacian_x",
-						"field": "h_0"
+						"coefficient":-1.0,
+						"operator":"identity",
+						"field":"h_5",
+						"coefficient_symbolic":"-m2"
 					},
 					{
-						"coefficient": -0.5,
-						"operator": "laplacian_x",
-						"field": "h_5"
+						"coefficient":-1.0,
+						"operator":"laplacian_x",
+						"field":"h_0"
 					},
 					{
-						"coefficient": 2.0,
-						"operator": "gradient_x",
-						"field": "pi_1"
+						"coefficient":-0.5,
+						"operator":"laplacian_x",
+						"field":"h_5"
 					},
 					{
-						"coefficient": -1.0,
-						"operator": "laplacian",
-						"field": "h_3"
+						"coefficient":2.0,
+						"operator":"gradient_x",
+						"field":"pi_1"
 					},
 					{
-						"coefficient": -1.0,
-						"operator": "laplacian",
-						"field": "h_5"
+						"coefficient":-1.0,
+						"operator":"laplacian",
+						"field":"h_3"
 					},
 					{
-						"coefficient": -1.0,
-						"operator": "laplacian_y",
-						"field": "h_0"
+						"coefficient":-1.0,
+						"operator":"laplacian",
+						"field":"h_5"
 					},
 					{
-						"coefficient": -0.5,
-						"operator": "laplacian_y",
-						"field": "h_3"
+						"coefficient":-1.0,
+						"operator":"laplacian_y",
+						"field":"h_0"
 					},
 					{
-						"coefficient": 1.0,
-						"operator": "cross_derivative_xy",
-						"field": "h_4"
+						"coefficient":-0.5,
+						"operator":"laplacian_y",
+						"field":"h_3"
 					},
 					{
-						"coefficient": 2.0,
-						"operator": "gradient_y",
-						"field": "pi_2"
+						"coefficient":1.0,
+						"operator":"cross_derivative_xy",
+						"field":"h_4"
+					},
+					{
+						"coefficient":2.0,
+						"operator":"gradient_y",
+						"field":"pi_2"
 					}
 				]
 			},
-			"constraint_solver": {
-				"enabled": true,
-				"method": "auto",
-				"max_iterations": 30,
-				"tolerance": 1e-10,
-				"boundary_conditions": {
-					"x": {
-						"type": "periodic"
+			"constraint_solver":{
+				"enabled":true,
+				"method":"auto",
+				"max_iterations":30,
+				"tolerance":1.0e-10,
+				"boundary_conditions":{
+					"x":{
+						"type":"periodic"
 					},
-					"y": {
-						"type": "periodic"
+					"y":{
+						"type":"periodic"
 					}
 				}
 			}
 		},
 		{
-			"field": "h_1",
-			"lhs": {
-				"expression": "h_1",
-				"order": {
-					"time": 0,
-					"space": 0
+			"field":"h_1",
+			"lhs":{
+				"expression":"h_1",
+				"order":{
+					"time":0,
+					"space":0
 				}
 			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
+			"rhs":{
+				"type":"linear_combination",
+				"terms":[
 					{
-						"coefficient": -1.0,
-						"operator": "identity",
-						"field": "h_1",
-						"coefficient_symbolic": "-m2"
+						"coefficient":-1.0,
+						"operator":"identity",
+						"field":"h_1",
+						"coefficient_symbolic":"-m2"
 					},
 					{
-						"coefficient": -0.5,
-						"operator": "gradient_x",
-						"field": "pi_5"
+						"coefficient":-0.5,
+						"operator":"gradient_x",
+						"field":"pi_5"
 					},
 					{
-						"coefficient": -0.5,
-						"operator": "laplacian_y",
-						"field": "h_1"
+						"coefficient":-0.5,
+						"operator":"laplacian_y",
+						"field":"h_1"
 					},
 					{
-						"coefficient": 0.5,
-						"operator": "cross_derivative_xy",
-						"field": "h_2"
+						"coefficient":0.5,
+						"operator":"cross_derivative_xy",
+						"field":"h_2"
 					},
 					{
-						"coefficient": 0.5,
-						"operator": "gradient_y",
-						"field": "pi_4"
+						"coefficient":0.5,
+						"operator":"gradient_y",
+						"field":"pi_4"
 					}
 				]
 			},
-			"constraint_solver": {
-				"enabled": true,
-				"method": "auto",
-				"max_iterations": 30,
-				"tolerance": 1e-10,
-				"boundary_conditions": {
-					"x": {
-						"type": "periodic"
+			"constraint_solver":{
+				"enabled":true,
+				"method":"auto",
+				"max_iterations":30,
+				"tolerance":1.0e-10,
+				"boundary_conditions":{
+					"x":{
+						"type":"periodic"
 					},
-					"y": {
-						"type": "periodic"
+					"y":{
+						"type":"periodic"
 					}
 				}
 			}
 		},
 		{
-			"field": "h_2",
-			"lhs": {
-				"expression": "h_2",
-				"order": {
-					"time": 0,
-					"space": 0
+			"field":"h_2",
+			"lhs":{
+				"expression":"h_2",
+				"order":{
+					"time":0,
+					"space":0
 				}
 			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
+			"rhs":{
+				"type":"linear_combination",
+				"terms":[
 					{
-						"coefficient": -1.0,
-						"operator": "identity",
-						"field": "h_2",
-						"coefficient_symbolic": "-m2"
+						"coefficient":-1.0,
+						"operator":"identity",
+						"field":"h_2",
+						"coefficient_symbolic":"-m2"
 					},
 					{
-						"coefficient": -0.5,
-						"operator": "laplacian_x",
-						"field": "h_2"
+						"coefficient":-0.5,
+						"operator":"laplacian_x",
+						"field":"h_2"
 					},
 					{
-						"coefficient": 0.5,
-						"operator": "gradient_x",
-						"field": "pi_4"
+						"coefficient":0.5,
+						"operator":"gradient_x",
+						"field":"pi_4"
 					},
 					{
-						"coefficient": 0.5,
-						"operator": "cross_derivative_xy",
-						"field": "h_1"
+						"coefficient":0.5,
+						"operator":"cross_derivative_xy",
+						"field":"h_1"
 					},
 					{
-						"coefficient": -0.5,
-						"operator": "gradient_y",
-						"field": "pi_3"
+						"coefficient":-0.5,
+						"operator":"gradient_y",
+						"field":"pi_3"
 					}
 				]
 			},
-			"constraint_solver": {
-				"enabled": true,
-				"method": "auto",
-				"max_iterations": 30,
-				"tolerance": 1e-10,
-				"boundary_conditions": {
-					"x": {
-						"type": "periodic"
+			"constraint_solver":{
+				"enabled":true,
+				"method":"auto",
+				"max_iterations":30,
+				"tolerance":1.0e-10,
+				"boundary_conditions":{
+					"x":{
+						"type":"periodic"
 					},
-					"y": {
-						"type": "periodic"
+					"y":{
+						"type":"periodic"
 					}
 				}
 			}
 		},
 		{
-			"field": "h_3",
-			"lhs": {
-				"expression": "h_3",
-				"order": {
-					"time": 0,
-					"space": 0
+			"field":"h_3",
+			"lhs":{
+				"expression":"h_3",
+				"order":{
+					"time":0,
+					"space":0
 				}
 			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
+			"rhs":{
+				"type":"linear_combination",
+				"terms":[
 					{
-						"coefficient": -1.0,
-						"operator": "identity",
-						"field": "h_3",
-						"coefficient_symbolic": "-m2"
+						"coefficient":-1.0,
+						"operator":"identity",
+						"field":"h_0",
+						"coefficient_symbolic":"-m2"
 					},
 					{
-						"coefficient": 0.5,
-						"operator": "laplacian",
-						"field": "h_5"
+						"coefficient":1.0,
+						"operator":"identity",
+						"field":"h_5",
+						"coefficient_symbolic":"m2"
 					},
 					{
-						"coefficient": 0.5,
-						"operator": "laplacian_y",
-						"field": "h_0"
+						"coefficient":0.5,
+						"operator":"laplacian",
+						"field":"h_5"
 					},
 					{
-						"coefficient": -1.0,
-						"operator": "gradient_y",
-						"field": "pi_2"
+						"coefficient":0.5,
+						"operator":"laplacian_y",
+						"field":"h_0"
+					},
+					{
+						"coefficient":-1.0,
+						"operator":"gradient_y",
+						"field":"pi_2"
 					}
 				]
 			},
-			"constraint_solver": {
-				"enabled": true,
-				"method": "auto",
-				"max_iterations": 30,
-				"tolerance": 1e-10,
-				"boundary_conditions": {
-					"x": {
-						"type": "periodic"
+			"constraint_solver":{
+				"enabled":true,
+				"method":"auto",
+				"max_iterations":30,
+				"tolerance":1.0e-10,
+				"boundary_conditions":{
+					"x":{
+						"type":"periodic"
 					},
-					"y": {
-						"type": "periodic"
+					"y":{
+						"type":"periodic"
 					}
 				}
 			}
 		},
 		{
-			"field": "h_4",
-			"lhs": {
-				"expression": "d2_t(h_4)",
-				"order": {
-					"time": 2,
-					"space": 0
+			"field":"h_4",
+			"lhs":{
+				"expression":"d2_t(h_4)",
+				"order":{
+					"time":2,
+					"space":0
 				}
 			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
+			"rhs":{
+				"type":"linear_combination",
+				"terms":[
 					{
-						"coefficient": -2.0,
-						"operator": "identity",
-						"field": "h_4",
-						"coefficient_symbolic": "-2*m2"
+						"coefficient":-2.0,
+						"operator":"identity",
+						"field":"h_4",
+						"coefficient_symbolic":"-2*m2"
 					},
 					{
-						"coefficient": 1.0,
-						"operator": "gradient_x",
-						"field": "pi_2"
+						"coefficient":1.0,
+						"operator":"gradient_x",
+						"field":"pi_2"
 					},
 					{
-						"coefficient": -1.0,
-						"operator": "cross_derivative_xy",
-						"field": "h_0"
+						"coefficient":-1.0,
+						"operator":"cross_derivative_xy",
+						"field":"h_0"
 					},
 					{
-						"coefficient": 1.0,
-						"operator": "gradient_y",
-						"field": "pi_1"
+						"coefficient":1.0,
+						"operator":"gradient_y",
+						"field":"pi_1"
 					}
 				]
 			}
 		},
 		{
-			"field": "h_5",
-			"lhs": {
-				"expression": "h_5",
-				"order": {
-					"time": 0,
-					"space": 0
+			"field":"h_5",
+			"lhs":{
+				"expression":"h_5",
+				"order":{
+					"time":0,
+					"space":0
 				}
 			},
-			"rhs": {
-				"type": "linear_combination",
-				"terms": [
+			"rhs":{
+				"type":"linear_combination",
+				"terms":[
 					{
-						"coefficient": -1.0,
-						"operator": "identity",
-						"field": "h_5",
-						"coefficient_symbolic": "-m2"
+						"coefficient":-1.0,
+						"operator":"identity",
+						"field":"h_0",
+						"coefficient_symbolic":"-m2"
 					},
 					{
-						"coefficient": 0.5,
-						"operator": "laplacian_x",
-						"field": "h_0"
+						"coefficient":1.0,
+						"operator":"identity",
+						"field":"h_3",
+						"coefficient_symbolic":"m2"
 					},
 					{
-						"coefficient": -1.0,
-						"operator": "gradient_x",
-						"field": "pi_1"
+						"coefficient":0.5,
+						"operator":"laplacian_x",
+						"field":"h_0"
 					},
 					{
-						"coefficient": 0.5,
-						"operator": "laplacian",
-						"field": "h_3"
+						"coefficient":-1.0,
+						"operator":"gradient_x",
+						"field":"pi_1"
+					},
+					{
+						"coefficient":0.5,
+						"operator":"laplacian",
+						"field":"h_3"
 					}
 				]
 			},
-			"constraint_solver": {
-				"enabled": true,
-				"method": "auto",
-				"max_iterations": 30,
-				"tolerance": 1e-10,
-				"boundary_conditions": {
-					"x": {
-						"type": "periodic"
+			"constraint_solver":{
+				"enabled":true,
+				"method":"auto",
+				"max_iterations":30,
+				"tolerance":1.0e-10,
+				"boundary_conditions":{
+					"x":{
+						"type":"periodic"
 					},
-					"y": {
-						"type": "periodic"
+					"y":{
+						"type":"periodic"
 					}
 				}
 			}
 		}
 	],
-	"coupling": {
-		"mass_matrix_symbolic": [
+	"coupling":{
+		"mass_matrix_symbolic":[
 			[
-				"-m2",
+				null,
 				null,
 				null,
 				null,
@@ -409,7 +430,7 @@
 				null,
 				null,
 				null,
-				"-m2",
+				null,
 				null,
 				null
 			],
@@ -427,7 +448,57 @@
 				null,
 				null,
 				null,
+				null
+			]
+		],
+		"coupling_matrix_symbolic":[
+			[
+				null,
+				null,
+				null,
+				"-m2",
+				null,
 				"-m2"
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				"-m2",
+				null,
+				null,
+				null,
+				null,
+				"m2"
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				"-m2",
+				null,
+				null,
+				"m2",
+				null,
+				null
 			]
 		]
 	}

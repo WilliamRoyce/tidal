@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Massive Gravity 2+1D example
+# CLI equivalents for the Massive Gravity 2+1D example (Fierz-Pauli)
 # See also: massive_gravity.wls (manual derivation), simulation.py (Python simulation)
 #
-# This example linearizes G_ab + m^2 g_ab = 0 around flat Minkowski in 2+1D.
-# The mass term m^2 h_ab gives the graviton a mass, creating a propagating DOF
-# in a dimension where pure gravity has none.
+# Fierz-Pauli mass term: G^(1)_ab - m^2 (h_ab - eta_ab h) = 0
+# The trace h = eta^cd h_cd couples diagonal metric components (h_0, h_3, h_5).
+# This is the unique ghost-free linear mass term for spin-2.
 #
 # To run manually:  cd examples/massive_gravity
 
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# Derive equations from TOML config (xPert linearization with mass term)
+# Derive equations from TOML config (xPert linearization with FP mass term)
 tidal derive theory.toml
 # Alternative: derive from handwritten Wolfram script
 # tidal derive massive_gravity.wls

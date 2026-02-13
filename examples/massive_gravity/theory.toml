@@ -1,19 +1,28 @@
-# Linearized Massive Gravity in 2+1D
+# Linearized Massive Gravity in 2+1D — Fierz-Pauli Mass Term
 #
-# Linearizes G_ab - m^2 g_ab = 0 around flat Minkowski background:
-#   G^(1)_ab[h] - m^2 h_ab = 0
+# The Fierz-Pauli mass term is the unique ghost-free linear mass term
+# for a spin-2 field.  The full nonlinear equation is:
 #
-# Sign convention: The MINUS sign on m^2 is essential for stability.
-# With "+", the identity terms get positive coefficient in the evolution
-# equations (d2_t(h) = +m^2 h + ...), causing exponential growth.
-# With "-", we get d2_t(h) = -m^2 h + ... (stable, Klein-Gordon-like).
+#   G_ab - m^2 (g_ab - bg_ab) + m^2 g_ab g^cd (g_cd - bg_cd) = 0
+#
+# where bg_ab is a non-dynamical reference metric (= Minkowski).
+# Linearizing around g_ab = eta_ab + epsilon h_ab gives:
+#
+#   G^(1)_ab[h] - m^2 (h_ab - eta_ab h) = 0
+#
+# where h = eta^cd h_cd is the trace.  The trace coupling creates
+# off-diagonal mass terms between h_0, h_3, h_5 (diagonal components).
+# Components h_1, h_2, h_4 (off-diagonal) keep simple -m^2 self-coupling.
+#
+# Ghost-freedom: Fierz-Pauli propagates 5 DOF (not 6).  Wrong relative
+# coefficient between h^2 and h_ab h^ab activates a Boulware-Deser ghost.
 #
 # 6 component equations (symmetric rank-2 tensor in 3D).
 # In pure 2+1D gravity there are no local degrees of freedom;
-# the mass term m^2 h_ab creates a propagating massive mode.
+# the mass term creates propagating massive modes.
 #
 # Component structure:
-#   h_0 (h_tt): constraint (no d2_t)
+#   h_0 (h_tt): constraint (no d2_t), driven by h_3, h_5
 #   h_1, h_2 (h_tx, h_ty): first-order in time
 #   h_3, h_4, h_5 (h_xx, h_xy, h_yy): second-order evolution
 #
@@ -36,7 +45,7 @@ symmetry = "symmetric"
 names = ["m2"]
 
 [linearization]
-expression = "Einstein[CD][-a, -b] - m2 eta[-a, -b]"
+expression = "Einstein[CD][-a, -b] - m2 (eta[-a, -b] - bg[-a, -b]) + m2 eta[-a, -b] eta[c, d] (eta[-c, -d] - bg[-c, -d])"
 perturbation_field = "h"
 
 [parameters]

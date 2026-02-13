@@ -9,6 +9,7 @@
     "biharmonic",
     "bilap",
     "blit",
+    "Boulware",
     "cbar",
     "Chern",
     "Christoffel",
@@ -28,6 +29,7 @@
     "Dchart",
     "dedonder",
     "defocuses",
+    "Deser",
     "diffusivities",
     "DJSON",
     "dphi",
@@ -221,7 +223,11 @@
     "xpert",
     "xytext"
   ],
-  "flagWords": ["hte", "teh", "wolfrom"],
+  "flagWords": [
+    "hte",
+    "teh",
+    "wolfrom"
+  ],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [
