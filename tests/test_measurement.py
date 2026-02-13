@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import warnings
 from pathlib import Path
+from typing import cast
 
 import numpy as np
 import pytest
@@ -867,7 +868,9 @@ class TestApplySpatialOperator:
         spacing = (dx, dx)
         periodic = (True, True)
 
-        result = _apply_spatial_operator("cross_derivative_xy", field, spacing, periodic)
+        result = _apply_spatial_operator(
+            "cross_derivative_xy", field, spacing, periodic
+        )
         expected = np.cos(xx) * np.cos(yy)
         np.testing.assert_allclose(result, expected, atol=1e-8)
 
@@ -954,28 +957,39 @@ def _make_constraint_spec() -> EquationSystem:
 
     Mimics a simplified gauge theory: A_0 (constraint) + A_1 (dynamical).
     """
-    # A_0 equation: constraint (time_order = 0)
-    # A_0 = laplacian_x(A_0) + 0.5 * identity(A_0)
+    # A_0: constraint (time_order=0), simplified gauge theory
     a0_terms = (
         OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_0"),
-        OperatorTerm(coefficient=0.5, operator="identity", field="A_0",
-                     coefficient_symbolic="Am2"),
+        OperatorTerm(
+            coefficient=0.5,
+            operator="identity",
+            field="A_0",
+            coefficient_symbolic="Am2",
+        ),
     )
     eq_a0 = ComponentEquation(
-        field_name="A_0", field_index=0,
-        time_derivative_order=0, rhs_terms=a0_terms,
+        field_name="A_0",
+        field_index=0,
+        time_derivative_order=0,
+        rhs_terms=a0_terms,
     )
 
     # A_1 equation: dynamical (time_order = 2)
     # d2_t(A_1) = laplacian_x(A_1) - 0.5 * identity(A_1)
     a1_terms = (
         OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_1"),
-        OperatorTerm(coefficient=-0.5, operator="identity", field="A_1",
-                     coefficient_symbolic="-Am2"),
+        OperatorTerm(
+            coefficient=-0.5,
+            operator="identity",
+            field="A_1",
+            coefficient_symbolic="-Am2",
+        ),
     )
     eq_a1 = ComponentEquation(
-        field_name="A_1", field_index=1,
-        time_derivative_order=2, rhs_terms=a1_terms,
+        field_name="A_1",
+        field_index=1,
+        time_derivative_order=2,
+        rhs_terms=a1_terms,
     )
 
     return EquationSystem(
@@ -1082,10 +1096,78 @@ class TestVirialWithConstraints:
         constraint_e = _compute_constraint_self_energy(data, 0)
         assert constraint_e < 0.0
 
-        # Total = kinetic + virial + constraint_self
-        # The interaction captures the difference between virial total
-        # and per-field self-potentials (including constraint contribution)
-        a1_self = se.per_field["A_1"].gradient + se.per_field["A_1"].mass
+        # Verify total = kinetic + virial + constraint_self
         virial = _compute_virial_potential(data, 0)
         expected_total = se.per_field["A_1"].kinetic + virial + constraint_e
         np.testing.assert_allclose(se.total, expected_total, rtol=1e-10)
+
+
+class TestScalarVectorEnergyConservation:
+    """Regression test: scalar-vector coupling conserves energy after pi_N fix.
+
+    The scalar_vector_coupling.json had wrong pi_N indices (parse index instead
+    of global index) which caused spurious -∂_x(∂_tφ) forces in A_1/A_2 equations.
+    With corrected indices, the simulation conserves the virial Hamiltonian.
+    """
+
+    def test_energy_conserved(self) -> None:
+        """Short scalar-vector simulation conserves energy to < 5%."""
+        from tidal.symbolic import build_pde_from_json, load_equation_system
+        from tidal.utils import normalize_solve_result
+
+        json_path = (
+            Path(__file__).resolve().parent.parent
+            / "examples"
+            / "data"
+            / "scalar_vector_coupling.json"
+        )
+        if not json_path.exists():
+            pytest.skip("scalar_vector_coupling.json not found")
+
+        params = {"phim2": 1.0, "Am2": 0.5, "kCS": 0.3, "gSV": 0.2}
+        spec = load_equation_system(str(json_path))
+        pde = build_pde_from_json(str(json_path), parameters=params)
+
+        grid = CartesianGrid([(0, 10), (0, 10)], [32, 32], periodic=True)
+
+        # 7-slot state: phi_0, pi_phi, A_0, A_1, pi_A1, A_2, pi_A2
+        x_coords = cast("np.ndarray", grid.cell_coords[..., 0])
+        y_coords = cast("np.ndarray", grid.cell_coords[..., 1])
+        gaussian = np.exp(-((x_coords - 5.0) ** 2 + (y_coords - 5.0) ** 2) / 2.0)
+
+        state = FieldCollection(
+            [
+                ScalarField(grid, data=gaussian, label="phi_0"),
+                ScalarField(grid, data=0.0, label="pi_phi"),
+                ScalarField(grid, data=0.0, label="A_0"),
+                ScalarField(grid, data=0.0, label="A_1"),
+                ScalarField(grid, data=0.0, label="pi_A1"),
+                ScalarField(grid, data=0.0, label="A_2"),
+                ScalarField(grid, data=0.0, label="pi_A2"),
+            ]
+        )
+
+        storage = MemoryStorage()
+        result = pde.solve(
+            state,
+            t_range=2.0,
+            dt=0.01,
+            scheme="runge-kutta",
+            tracker=storage.tracker(0.2),
+        )
+        normalize_solve_result(result)
+
+        data = SimulationData.from_storage(storage, spec, grid, params)
+
+        energies: list[float] = []
+        for t_idx in range(data.n_snapshots):
+            se = compute_system_energy(data, t_idx)
+            energies.append(se.total)
+
+        e0 = energies[0]
+        max_drift = max(abs(e - e0) for e in energies) / max(abs(e0), 1e-12)
+
+        assert max_drift < 0.05, (
+            f"Energy drift {max_drift:.2%} exceeds 5% threshold. "
+            f"This likely indicates incorrect pi_N indexing in the JSON."
+        )
