@@ -319,6 +319,29 @@ For systems with constraints (gauge theories):
    other nonlinear potentials.  These would require explicit integration
    of the potential density, not the virial shortcut.
 
+5. **Dirichlet BCs + cross_derivative: non-self-adjoint discretization**.
+   The discrete `cross_derivative_xy` operator with Dirichlet ghost
+   cells is NOT self-adjoint at boundary cells.  Specifically, the
+   matrix element `M[(0,j),(0,j+1)] = +1/(4 dx dy)` while
+   `M[(0,j+1),(0,j)] = -1/(4 dx dy)` — opposite signs.  This makes
+   the discrete curl-curl system non-Hamiltonian, so no quadratic
+   energy functional is exactly conserved.  The resulting energy drift
+   (~30%) occurs even when using py-pde's own operators to compute the
+   virial.  With periodic BCs the same system conserves energy to
+   machine precision (~1e-10).  This is a fundamental discretization
+   limitation, not a bug in the energy module.
+
+   **Affected example:** `coupled_proca/` — two massive vector fields
+   in a Dirichlet cavity.  The `measure_coupling.py` script uses a
+   relaxed threshold (0.5) and documents this as an expected limitation.
+
+   **Workarounds:**
+   - Use periodic boundary conditions where physically appropriate
+   - Use higher-resolution grids (concentrates the asymmetry to a
+     thinner boundary layer)
+   - Accept the energy drift as a discretization artifact and focus on
+     conversion probability measurements, which remain valid
+
 ## 8. Verification Cases
 
 ### Case 1: Single Klein-Gordon field
