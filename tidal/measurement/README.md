@@ -315,7 +315,13 @@ be used with different parameter values.
 | Axis Type | Method | Accuracy |
 |-----------|--------|----------|
 | Periodic | FFT spectral gradient (`ik * FFT`) | Exact (spectral) |
-| Non-periodic | `numpy.gradient` (2nd-order central) | O(dx^2) |
+| Non-periodic | Central differences with Dirichlet ghost cells | O(dx^2) |
+
+For non-periodic axes, the derivative stencils use anti-symmetric ghost
+cell padding (`f_ghost = -f_interior`) to match py-pde's Dirichlet BC
+convention. This gives `(f[i+1] - f[i-1]) / (2dx)` for first
+derivatives and `(f[i+1] - 2f[i] + f[i-1]) / dx^2` for second
+derivatives, including at boundary cells where the ghost cell is implied.
 
 ## Integration with the CLI
 
@@ -381,6 +387,7 @@ All functions follow the project's fail-fast convention:
 
 ## Limitations and Future Work
 
+- **Dirichlet BCs + cross_derivative operators:** The discrete `cross_derivative_xy` operator with Dirichlet ghost cells is NOT self-adjoint at boundary cells, making the discrete system non-Hamiltonian. Energy drift of ~30% is expected for systems with curl-curl operators (e.g., vector field theories) on non-periodic grids. With periodic BCs the same system conserves to ~1e-10. This is a fundamental discretization limitation — see [HAMILTONIAN.md](HAMILTONIAN.md) Section 7, item 5 for details. The `coupled_proca/measure_coupling.py` example documents this with a relaxed threshold.
 - **Position-dependent coefficients:** Energy computation requires constant `m^2` and coupling coefficients. Spatially varying coefficients raise `ValueError`. Extending this requires evaluating position-dependent coefficients at each grid point during virial integration.
 - **Quadratic Lagrangians only:** The virial formula is exact for degree-2 potentials. Higher-order (nonlinear) Lagrangians would need explicit potential density integration.
 - **CLI integration:** No `tidal measure` subcommand yet. The `PlotContext.to_simulation_data()` bridge is in place for Phase 2.
