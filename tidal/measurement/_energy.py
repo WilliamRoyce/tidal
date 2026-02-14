@@ -26,7 +26,7 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from tidal.measurement._io import SimulationData
-    from tidal.symbolic.json_loader import OperatorTerm
+    from tidal.symbolic.json_loader import ComponentEquation, OperatorTerm
 
 # Threshold below which energy is treated as zero.  Prevents division by
 # near-zero values from floating-point integration noise.
@@ -48,7 +48,10 @@ class FieldEnergy:
     kinetic : float
         ``0.5 * ∫ π² dV``
     gradient : float
-        ``0.5 * ∫ |∇φ|² dV``
+        ``0.5 * ∫ |∇_self φ|² dV`` — gradient energy over self-laplacian
+        axes only.  For scalar fields (full ``laplacian``), this equals
+        ``0.5 * ∫ |∇φ|² dV``.  For vector components with directional
+        laplacians (e.g. ``laplacian_y``), only the relevant axes.
     mass : float
         ``0.5 * m² * ∫ φ² dV``
     total : float
@@ -68,10 +71,11 @@ class SystemEnergy:
     Attributes
     ----------
     per_field : dict[str, FieldEnergy]
-        Energy breakdown per field.
+        Energy breakdown per field (operator-aware gradient).
     interaction : float
-        Total potential minus per-field self-potentials.  Includes all
-        cross-field coupling (identity, derivative, constraint-mediated).
+        Cross-field coupling energy: total potential minus per-field
+        self-potentials.  Uses operator-aware gradient axes, so this is
+        zero when fields are uncoupled and only one field is excited.
     total : float
         Complete Hamiltonian: kinetic + virial potential + constraint self-energy.
     """
@@ -86,6 +90,21 @@ class SystemEnergy:
 # ------------------------------------------------------------------
 
 
+def _pad_dirichlet(
+    field: NDArray[np.float64],
+    axis: int,
+) -> NDArray[np.float64]:
+    """Pad *field* with one anti-symmetric ghost cell per side on *axis*.
+
+    For Dirichlet BCs (``field = 0`` at the boundary), the ghost cell
+    value is the negative of the adjacent interior cell.  This is
+    equivalent to ``np.pad(..., mode='reflect', reflect_type='odd')``.
+    """
+    pad_width = [(0, 0)] * field.ndim
+    pad_width[axis] = (1, 1)
+    return np.pad(field, pad_width, mode="reflect", reflect_type="odd")
+
+
 def _first_derivative(
     field: NDArray[np.float64],
     axis: int,
@@ -95,7 +114,8 @@ def _first_derivative(
 ) -> NDArray[np.float64]:
     """Single-axis first derivative.
 
-    Uses FFT for periodic axes, ``np.gradient`` for non-periodic.
+    Uses FFT for periodic axes, central differences with Dirichlet
+    ghost cells for non-periodic axes.
     """
     if is_periodic:
         n = field.shape[axis]
@@ -106,7 +126,13 @@ def _first_derivative(
         fhat = np.fft.fft(field, axis=axis)
         return np.real(np.fft.ifft(ik * fhat, axis=axis))
 
-    return np.gradient(field, dx, axis=axis)
+    # Central difference with Dirichlet ghost cells: (f[i+1] - f[i-1]) / (2dx)
+    padded = _pad_dirichlet(field, axis)
+    slc_plus: list[slice] = [slice(None)] * field.ndim
+    slc_minus: list[slice] = [slice(None)] * field.ndim
+    slc_plus[axis] = slice(2, None)
+    slc_minus[axis] = slice(None, -2)
+    return (padded[tuple(slc_plus)] - padded[tuple(slc_minus)]) / (2.0 * dx)
 
 
 def _second_derivative(
@@ -118,7 +144,8 @@ def _second_derivative(
 ) -> NDArray[np.float64]:
     """Single-axis second derivative.
 
-    Uses ``-k²`` in FFT for periodic axes, double ``np.gradient`` otherwise.
+    Uses ``-k²`` in FFT for periodic axes, central differences with
+    Dirichlet ghost cells for non-periodic axes.
     """
     if is_periodic:
         n = field.shape[axis]
@@ -129,7 +156,52 @@ def _second_derivative(
         fhat = np.fft.fft(field, axis=axis)
         return np.real(np.fft.ifft(neg_k2 * fhat, axis=axis))
 
-    return np.gradient(np.gradient(field, dx, axis=axis), dx, axis=axis)
+    # Standard 3-point stencil with Dirichlet ghost cells:
+    # (f[i+1] - 2f[i] + f[i-1]) / dx²
+    padded = _pad_dirichlet(field, axis)
+    slc_center: list[slice] = [slice(None)] * field.ndim
+    slc_plus: list[slice] = [slice(None)] * field.ndim
+    slc_minus: list[slice] = [slice(None)] * field.ndim
+    slc_center[axis] = slice(1, -1)
+    slc_plus[axis] = slice(2, None)
+    slc_minus[axis] = slice(None, -2)
+    return (
+        padded[tuple(slc_plus)]
+        - 2.0 * padded[tuple(slc_center)]
+        + padded[tuple(slc_minus)]
+    ) / (dx * dx)
+
+
+# ------------------------------------------------------------------
+# Operator-aware gradient axes
+# ------------------------------------------------------------------
+
+
+def _self_gradient_axes(eq: ComponentEquation) -> list[int] | None:
+    """Return spatial axes that have self-laplacian operators in *eq*.
+
+    Inspects ``eq.rhs_terms`` for laplacian-type operators acting on the
+    equation's own field.  Returns:
+
+    - ``None`` if the equation contains a full ``laplacian`` (all axes).
+    - A sorted list of axis indices for directional laplacians
+      (e.g. ``[1]`` for ``laplacian_y``).
+
+    This is used to compute operator-aware per-field gradient energy:
+    only the gradient axes that appear as self-laplacian terms contribute
+    to per-field energy; the remaining axes contribute to interaction.
+    """
+    axes: set[int] = set()
+    for term in eq.rhs_terms:
+        if term.field != eq.field_name:
+            continue
+        if term.operator == "laplacian":
+            return None  # full laplacian → use all axes
+        if term.operator.startswith("laplacian_"):
+            letter = term.operator[len("laplacian_"):]
+            if letter in _AXIS_MAP:
+                axes.add(_AXIS_MAP[letter])
+    return sorted(axes)
 
 
 # ------------------------------------------------------------------
@@ -141,10 +213,19 @@ def _gradient_energy_density(
     field: NDArray[np.float64],
     grid_spacing: tuple[float, ...],
     periodic: tuple[bool, ...],
+    axes: list[int] | None = None,
 ) -> NDArray[np.float64]:
-    """Compute ``|∇φ|²`` on the grid."""
+    """Compute ``|∇φ|²`` on the grid.
+
+    Parameters
+    ----------
+    axes : list[int] | None
+        If ``None``, sum over all spatial axes (isotropic gradient).
+        Otherwise, sum only over the specified axis indices.
+    """
     grad_sq: NDArray[np.float64] = np.zeros_like(field)
-    for axis in range(len(grid_spacing)):
+    iter_axes = range(len(grid_spacing)) if axes is None else axes
+    for axis in iter_axes:
         grad_axis = _first_derivative(field, axis, grid_spacing[axis], is_periodic=periodic[axis])
         grad_sq += grad_axis**2
     return grad_sq
@@ -277,12 +358,14 @@ def _resolve_term_target(
 # ------------------------------------------------------------------
 
 
-def compute_field_energy(
+def compute_field_energy(  # noqa: PLR0913
     field_data: NDArray[np.float64],
     momentum_data: NDArray[np.float64] | None,
     mass_squared: float,
     grid_spacing: tuple[float, ...],
     periodic: tuple[bool, ...],
+    *,
+    gradient_axes: list[int] | None = None,
 ) -> FieldEnergy:
     """Compute canonical energy for a single field at one snapshot.
 
@@ -298,6 +381,10 @@ def compute_field_energy(
         Cell size per spatial axis.
     periodic : tuple[bool, ...]
         Per-axis periodicity.
+    gradient_axes : list[int] | None
+        Spatial axes to include in gradient energy.  ``None`` uses all
+        axes (isotropic gradient).  Pass a subset for operator-aware
+        gradient (e.g. ``[1]`` when the PDE has only ``laplacian_y``).
 
     Returns
     -------
@@ -315,8 +402,8 @@ def compute_field_energy(
     else:
         kinetic = 0.0
 
-    # Gradient energy: 0.5 * ∫ |∇φ|² dV
-    grad_sq = _gradient_energy_density(field_data, grid_spacing, periodic)
+    # Gradient energy: 0.5 * ∫ |∇φ|² dV (over specified axes)
+    grad_sq = _gradient_energy_density(field_data, grid_spacing, periodic, axes=gradient_axes)
     gradient = 0.5 * float(np.sum(grad_sq)) * dv
 
     # Mass energy: 0.5 * m² * ∫ φ² dV
@@ -494,7 +581,12 @@ def compute_system_energy(
         msg = f"t_idx={t_idx} out of range [0, {data.n_snapshots})"
         raise ValueError(msg)
 
-    # Per-field canonical energy (kinetic + gradient + mass) — dynamical only
+    # Per-field canonical energy (kinetic + gradient + mass) — dynamical only.
+    # Gradient uses operator-aware axes: only the spatial axes that appear
+    # as self-laplacian operators in each field's equation.  For scalar
+    # fields with a full ``laplacian``, this is all axes (unchanged).
+    # For vector components with directional laplacians (e.g. laplacian_y),
+    # only the corresponding axes contribute to per-field gradient energy.
     per_field: dict[str, FieldEnergy] = {}
     for field_idx, eq in enumerate(data.spec.equations):
         name = eq.field_name
@@ -506,8 +598,10 @@ def compute_system_energy(
         mom_arr = mom_snapshot[t_idx] if mom_snapshot is not None else None
 
         m2 = _resolve_mass_squared(data, field_idx)
+        axes = _self_gradient_axes(eq)
         per_field[name] = compute_field_energy(
             field_snapshot, mom_arr, m2, data.grid_spacing, data.periodic,
+            gradient_axes=axes,
         )
 
     # Virial potential from dynamical fields' spatial RHS terms
