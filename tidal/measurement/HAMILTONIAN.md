@@ -286,6 +286,32 @@ with RHS_i^{spatial} excluding `first_derivative_t` and `pi_N` terms, and:
                                            -1/2 m_j^2 integral C_j^2 dV]
 ```
 
+### Per-field decomposition (operator-aware gradient)
+
+The per-field energy uses **operator-aware** gradient axes:
+
+```
+  E_i = 1/2 pi_i^2 + 1/2 |grad_self(phi_i)|^2 + 1/2 m_i^2 phi_i^2
+```
+
+where `grad_self` includes only the spatial axes that appear as
+self-laplacian operators in field i's equation.  For scalar fields with
+a full `laplacian`, this is all axes (unchanged).  For vector field
+components with directional laplacians (e.g. A_1 has `laplacian_y`),
+only the corresponding axis contributes.
+
+**Why:** The Proca Hamiltonian has `1/2 (d_x A_2 - d_y A_1)^2`, not a
+standalone `1/2 (d_x A_1)^2` term.  Using the isotropic gradient would
+overcount per-field energy and create spurious "interaction" at t=0
+even with a single excited field.  With operator-aware gradient,
+`interaction` is genuinely zero when fields are uncoupled.
+
+The interaction energy is then:
+
+```
+  E_interaction = V_virial + V_constraint_self - sum_i (G_self_i + M_i)
+```
+
 ### Backward compatibility
 
 For systems without constraints (pure scalars, coupled scalars):
@@ -319,28 +345,39 @@ For systems with constraints (gauge theories):
    other nonlinear potentials.  These would require explicit integration
    of the potential density, not the virial shortcut.
 
-5. **Dirichlet BCs + cross_derivative: non-self-adjoint discretization**.
-   The discrete `cross_derivative_xy` operator with Dirichlet ghost
-   cells is NOT self-adjoint at boundary cells.  Specifically, the
-   matrix element `M[(0,j),(0,j+1)] = +1/(4 dx dy)` while
-   `M[(0,j+1),(0,j)] = -1/(4 dx dy)` — opposite signs.  This makes
-   the discrete curl-curl system non-Hamiltonian, so no quadratic
-   energy functional is exactly conserved.  The resulting energy drift
-   (~30%) occurs even when using py-pde's own operators to compute the
-   virial.  With periodic BCs the same system conserves energy to
-   machine precision (~1e-10).  This is a fundamental discretization
-   limitation, not a bug in the energy module.
+5. **Dirichlet BCs + cross_derivative: discrete boundary asymmetry**.
+   The **continuous** cross-derivative operator IS self-adjoint with
+   Dirichlet BCs.  Integration by parts gives:
+   `∫ φ · ∂²ψ/(∂x∂y) dV = ∫ ψ · ∂²φ/(∂x∂y) dV + [boundary terms]`
+   and all boundary terms vanish because φ = ψ = 0 on the wall.
 
-   **Affected example:** `coupled_proca/` — two massive vector fields
-   in a Dirichlet cavity.  The `measure_coupling.py` script uses a
-   relaxed threshold (0.5) and documents this as an expected limitation.
+   However, the **discrete** operator breaks this symmetry.  The 1D
+   gradient matrix D_x with Dirichlet ghost cells (`f[-1] = -f[0]`)
+   has `D_x[0,1] = +1/(2dx)` but `D_x[1,0] = -1/(2dx)`, so D_x is
+   not antisymmetric at boundary cells.  With periodic BCs, D_x IS
+   antisymmetric (all rows have the `[-1/(2dx), 0, +1/(2dx)]`
+   pattern), so the cross-derivative `G_x @ G_y` is exactly symmetric.
 
-   **Workarounds:**
-   - Use periodic boundary conditions where physically appropriate
-   - Use higher-resolution grids (concentrates the asymmetry to a
-     thinner boundary layer)
-   - Accept the energy drift as a discretization artifact and focus on
-     conversion probability measurements, which remain valid
+   The resulting energy drift is ~30% for the coupled Proca cavity.
+   Empirically, the drift does not decrease significantly between
+   20×20 and 32×32 grids — the convergence rate with resolution may
+   be complicated by constraint solver accuracy and spectral content.
+
+   **Note:** The `coupled_proca/` example now uses **periodic BCs** to
+   avoid this issue (energy conserved to ~1e-10).  See [#103](https://github.com/WilliamRoyce/torsion-gertsenshtein/issues/103)
+   for detailed analysis and future SBP remedy.
+
+   **Remedies (for users who need Dirichlet BCs):**
+   - **Infinite-domain approximation**: use periodic BCs (exact
+     conservation) or make L >> 2cT so waves never reach boundary
+   - **Cavity / bounded domain**: accept ~30% systematic error in
+     energy, or investigate SBP (summation-by-parts) boundary
+     operators for discrete conservation (future work)
+   - **Fields localized in center**: if waves never reach the walls
+     during the simulation, the boundary asymmetry is irrelevant
+   - Systems with only `laplacian` and `identity` operators (no
+     `cross_derivative`) are unaffected — the 3-point Laplacian
+     stencil IS symmetric with Dirichlet BCs
 
 ## 8. Verification Cases
 
