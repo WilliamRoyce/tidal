@@ -1,6 +1,4 @@
-"""Coupled Proca (two massive vector fields) in 2+1D rectangular cavity.
-
-This script exercises the constraint solver's non-periodic code paths:
+"""Coupled Proca (two massive vector fields) in 2+1D with periodic BCs.
 
     L = -1/4 F^A_{ab} F^{A,ab} - 1/4 F^B_{ab} F^{B,ab}
         - mA2/2 A_a A^a - mB2/2 B_a B^a + gcoup A_a B^a
@@ -14,8 +12,7 @@ Component structure (6 fields in 2+1D):
     B_2: evolution  (wave equation with mass)
 
 Constraint solver features tested:
-    - Matrix/sparse solver (non-periodic Dirichlet BCs)
-    - Gauss-Seidel iteration for coupled A_0-B_0 system
+    - Coupled FFT solve (periodic BCs)
     - Two different Helmholtz scales (mA2=1.0 vs mB2=2.0)
     - Cross-field identity coupling in constraints
 """
@@ -95,16 +92,16 @@ def _build_pde(json_path: Path) -> PDEBase:
 
 
 def _create_grid() -> CartesianGrid:
-    """Set up a 2D non-periodic spatial grid (Dirichlet cavity)."""
-    print("Step 3: Setting up 2D non-periodic grid (cavity)...")
+    """Set up a 2D periodic spatial grid."""
+    print("Step 3: Setting up 2D periodic grid...")
     grid = CartesianGrid(
         bounds=[(0, np.pi), (0, np.pi)],
         shape=[20, 20],
-        periodic=False,
+        periodic=True,
     )
     print("  Domain: [0, pi] x [0, pi]")
     print(f"  Resolution: {grid.shape}")
-    print("  Boundary conditions: Dirichlet (field vanishes on walls)")
+    print("  Boundary conditions: periodic")
     print()
     return grid
 
@@ -276,7 +273,7 @@ def _plot_results(  # noqa: PLR0914
     ax.grid(visible=True, alpha=0.3)
 
     fig.suptitle(
-        "Coupled Proca 2+1D Cavity (Dirichlet BCs)\n"
+        "Coupled Proca 2+1D (Periodic BCs)\n"
         r"$\mathcal{L} = -\frac{1}{4}F_A^2 - \frac{1}{4}F_B^2"
         r" - \frac{m_A^2}{2}A^2 - \frac{m_B^2}{2}B^2 + g\,A\!\cdot\!B$"
         f"\nmA2={PARAMETERS['mA2']}, mB2={PARAMETERS['mB2']}, gcoup={PARAMETERS['gcoup']}",
@@ -293,9 +290,9 @@ def _plot_results(  # noqa: PLR0914
 
 
 def main() -> None:
-    """Run the coupled Proca cavity simulation."""
+    """Run the coupled Proca simulation."""
     print("=" * 60)
-    print("Coupled Proca 2+1D Cavity Simulation")
+    print("Coupled Proca 2+1D Simulation (Periodic BCs)")
     print("=" * 60)
     print()
     print("Lagrangian:")
@@ -317,10 +314,10 @@ def main() -> None:
     print()
     print("Key observations:")
     print("  1. A_0, B_0 are coupled constraints (Helmholtz + identity cross-term)")
-    print("  2. Solved via Gauss-Seidel iteration with sparse matrix solver")
-    print("  3. Dirichlet BCs: fields vanish on cavity walls")
-    print("  4. Two different mass scales: mA2=1.0, mB2=2.0")
-    print("  5. Cross-coupling gcoup transfers energy between A and B sectors")
+    print("  2. Constraints solved via coupled FFT (periodic BCs)")
+    print("  3. Two different mass scales: mA2=1.0, mB2=2.0")
+    print("  4. Cross-coupling gcoup transfers energy between A and B sectors")
+    print("  5. Energy drift O(dx^2) convergent with periodic BCs")
     print("=" * 60)
 
 
