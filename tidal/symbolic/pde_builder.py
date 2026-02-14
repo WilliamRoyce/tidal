@@ -2971,18 +2971,6 @@ class PDEFromSpec(PDEBase):
 
         return warnings
 
-    def _cache_key(self) -> dict[str, Any]:
-        """Return a cache key for this PDE.
-
-        The key includes the specification metadata to ensure different
-        equation systems don't share cached operators.
-        """
-        return {
-            "n_components": self.n_components,
-            "component_names": self.spec.component_names,
-            "metadata_hash": hash(frozenset(self.spec.metadata.items())),
-        }
-
 
 def build_pde_from_json(
     json_path: Path | str,

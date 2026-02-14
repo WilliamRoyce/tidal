@@ -16,8 +16,6 @@ from tidal.kgsim import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from pde import CartesianGrid
 
 
@@ -176,57 +174,6 @@ def simulation_config_explicit() -> SimulationConfig:
         backend="numpy",
         progress=False,
     )
-
-
-# ==================== Common Test Values ====================
-
-
-@pytest.fixture
-def gaussian_widths_valid() -> list[float]:
-    """Return valid Gaussian widths for testing.
-
-    Returns
-    -------
-    list[float]
-        List of positive width values.
-    """
-    return [1.0, 2.0, 5.0]
-
-
-@pytest.fixture
-def gaussian_widths_invalid() -> list[Sequence[float]]:
-    """Invalid Gaussian widths for testing validation.
-
-    Returns
-    -------
-    list[Sequence[float]]
-        List of invalid width values (zero, negative).
-    """
-    return [[0.0], [-1.0], [-5.0]]
-
-
-@pytest.fixture
-def masses_coupled() -> list[float]:
-    """Return standard masses for coupled field tests.
-
-    Returns
-    -------
-    list[float]
-        Two-field masses [0.25, 1.0].
-    """
-    return [0.25, 1.0]
-
-
-@pytest.fixture
-def coupling_matrix_symmetric() -> list[list[float]]:
-    """Symmetric coupling matrix for coupled field tests.
-
-    Returns
-    -------
-    list[list[float]]
-        2x2 symmetric coupling matrix with off-diagonal elements = 0.2.
-    """
-    return [[0.0, 0.2], [0.2, 0.0]]
 
 
 # ==================== CLI JSON Spec Fixtures ====================

@@ -18,10 +18,11 @@
      - Automatic simplification via xAct's NoScalar and SortCovDs
 
    USAGE PATTERN:
-     {manifold, metric, cd} = SetupSpacetime[dim, signature];
-     DefTensor[phi[], manifold];  (* Define scalar field *)
-     L = -1/2 cd[-a][phi[]] cd[a][phi[]];  (* Lagrangian *)
-     eom = EulerLagrangeEquation[L, phi, cd];  (* → ∂_a∂^a φ = 0 *)
+     DefManifold[M2, 2, {a, b, c, d}];
+     DefMetric[-1, eta[-a, -b], CD];
+     DefTensor[phi[], M2];  (* Define scalar field *)
+     L = -1/2 CD[-a][phi[]] CD[a][phi[]];  (* Lagrangian *)
+     eom = EulerLagrangeEquation[L, phi, CD];  (* → ∂_a∂^a φ = 0 *)
 
    IMPLICIT ASSUMPTIONS:
      - Lagrangian is a scalar density (√-g factor assumed or handled separately)
@@ -39,35 +40,7 @@ EulerLagrangeEquation::usage =
 equation for the given field from the Lagrangian density. Returns an expression \
 equal to zero (the equation of motion).";
 
-SetupSpacetime::usage =
-  "SetupSpacetime[dim, signature] sets up a spacetime manifold with the given \
-dimension and metric signature. Returns {manifold, metric, covd}.";
-
 Begin["`Private`"];
-
-(* === Spacetime Setup Utilities === *)
-
-SetupSpacetime[dim_Integer, signature_Integer] := Module[
-  {manifold, metric, covd, indices},
-
-  (* Generate index symbols based on dimension *)
-  indices = If[dim == 2,
-    {a, b, c, d, e, f},  (* 1+1D *)
-    {a, b, c, d, e, f, g, h}  (* 3+1D or higher *)
-  ];
-
-  (* Define manifold *)
-  DefManifold[ELSpacetime, dim, indices];
-
-  (* Define metric with given signature *)
-  DefMetric[signature, ELMetric[-a, -b], ELSpacetime,
-    SymbolOfCovD -> {";", "\[Del]"}];
-
-  (* Get covariant derivative *)
-  covd = CovDOfMetric[ELMetric[-a, -b]];
-
-  {ELSpacetime, ELMetric, covd}
-];
 
 (* === Euler-Lagrange Computation === *)
 

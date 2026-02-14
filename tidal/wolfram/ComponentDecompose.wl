@@ -334,19 +334,6 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   Expand[componentEq]
 ];
 
-(* === Backward-Compatible Delegates === *)
-(* These call the unified ExtractTensorComponent so existing code still works *)
-
-ExtractVectorComponent[eom_, field_, chart_, componentIndex_,
-  additionalFields_List:{}, computeChristoffels_:False, metricMatrix_:None] :=
-  ExtractTensorComponent[eom, field, chart, {componentIndex},
-    additionalFields, computeChristoffels, metricMatrix];
-
-ExtractRank2Component[eom_, field_, chart_, idx1_, idx2_,
-  additionalFields_List:{}, computeChristoffels_:False, metricMatrix_:None] :=
-  ExtractTensorComponent[eom, field, chart, {idx1, idx2},
-    additionalFields, computeChristoffels, metricMatrix];
-
 (* === Symmetry Reduction Helpers === *)
 (* These are package-private helpers for EnumerateComponentTuples.
    Defined at package scope (not inside Module) to avoid Mathematica's
@@ -548,26 +535,6 @@ ReplaceHigherRankFieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module
   ];
 
   result
-];
-
-(* Helper: Find free (non-dummy) indices in an expression *)
-(* Renamed to avoid conflict with xPert's FindFreeIndices *)
-FindFreeIndicesLocal[expr_] := Module[
-  {allIndices, dummyPairs, freeIndices},
-
-  (* Get all indices from the expression *)
-  allIndices = Union[Cases[expr, _?AbstractIndexQ, {0, Infinity}]];
-
-  (* Identify dummy pairs (appearing twice with opposite character) *)
-  dummyPairs = Select[allIndices,
-    Count[expr, #, {0, Infinity}] > 1 &&
-    Count[expr, ChangeIndex[#], {0, Infinity}] > 0 &
-  ];
-
-  (* Free indices are those not in dummy pairs *)
-  freeIndices = Complement[allIndices, dummyPairs, ChangeIndex /@ dummyPairs];
-
-  freeIndices
 ];
 
 End[];

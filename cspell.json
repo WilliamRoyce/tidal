@@ -223,13 +223,10 @@
     "Tras",
     "tqdm",
     "xpert",
+    "xycoords",
     "xytext"
   ],
-  "flagWords": [
-    "hte",
-    "teh",
-    "wolfrom"
-  ],
+  "flagWords": ["hte", "teh", "wolfrom"],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [

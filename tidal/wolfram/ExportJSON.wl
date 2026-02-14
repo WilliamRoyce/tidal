@@ -41,10 +41,6 @@ BuildJSONStructure::usage =
   "BuildJSONStructure[componentEqs, metadata] builds the JSON Association \
 structure from component equations and metadata.";
 
-EquationToJSON::usage =
-  "EquationToJSON[componentEq, fieldName, fieldIndex] converts a single \
-component equation to JSON format.";
-
 BuildMultiFieldJSONStructure::usage =
   "BuildMultiFieldJSONStructure[fieldEquations, metadata] builds JSON for systems \
 with multiple independent fields. fieldEquations is a list of {fieldName, equation} pairs.";
@@ -108,11 +104,6 @@ mixed time-space derivative term. Strips the time order (must be exactly 1) and 
 classifies the spatial part using ClassifySpatialProfile. Returns canonical operator \
 names like \"gradient_x\", \"laplacian_x\", \"cross_derivative_xy\", etc. \
 Throws if time order is not 1.";
-
-IsSpatialCrossDerivative::usage =
-  "IsSpatialCrossDerivative[term] returns True if term contains a spatial cross-derivative \
-(d_x d_y, d_x d_z, or d_y d_z with time slot = 0). Legacy boolean wrapper around \
-IdentifySpatialCrossDerivative.";
 
 IdentifySpatialCrossDerivative::usage =
   "IdentifySpatialCrossDerivative[term] identifies spatial cross-derivatives and returns \
@@ -455,21 +446,6 @@ DetectLHSTimeOrder[equation_] := Module[{terms, maxOrder},
 
 (* === Field-Aware LHS Detection (for multi-field cross-coupled equations) === *)
 
-(* Check if a function head string matches a specific field name *)
-(* Uses same StringEndsQ+digit logic as MatchFieldToHeads *)
-(* Example: FunctionMatchesField["gwH0", "h_0"] -> True *)
-(* Example: FunctionMatchesField["gwH4", "h_0"] -> False *)
-FunctionMatchesField[headStr_String, fieldName_String] := Module[
-  {fieldParts, fieldBase, fieldIndex, headDigits, headBase},
-  fieldParts = StringSplit[fieldName, "_"];
-  If[Length[fieldParts] < 2, Return[False]];
-  fieldBase = ToLowerCase[First[fieldParts]];
-  fieldIndex = Last[fieldParts];
-  headDigits = StringCases[headStr, RegularExpression["\\d+$"]];
-  headBase = ToLowerCase[StringReplace[headStr, RegularExpression["\\d+$"] -> ""]];
-  Length[headDigits] > 0 && headDigits[[-1]] === fieldIndex && StringEndsQ[headBase, fieldBase]
-];
-
 (* Field-aware overload: only considers time derivatives of the specified field *)
 (* This is critical for multi-field systems where cross-field time derivatives *)
 (* (e.g., d2_t(h_4) appearing in h_0's equation) must NOT be classified as LHS *)
@@ -668,10 +644,7 @@ ExtractSpatialOperatorFromMixed[term_] := Module[
 (* Returns False if not a cross-derivative, or the operator name if it is *)
 (* Pattern: Derivative[0, ...] where exactly 2 spatial slots are > 0 *)
 
-(* Legacy boolean version for backward compatibility *)
-IsSpatialCrossDerivative[term_] := IdentifySpatialCrossDerivative[term] =!= False;
-
-(* New version that returns the specific operator name *)
+(* Returns the specific operator name *)
 (* Dimension-agnostic: delegates to ExtractDerivativeProfile + ClassifySpatialProfile *)
 IdentifySpatialCrossDerivative[term_] := Module[{profile, result},
   profile = ExtractDerivativeProfile[term];
@@ -837,15 +810,7 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
   {coefficient, symbolicCoeff, isTimeDependent, coordDeps}
 ];
 
-(* Count the total derivative order of a term *)
-(* Returns the total order of the Derivative expression found, or 0 if none *)
-(* Delegates to ExtractDerivativeProfile to avoid duplicating extraction logic *)
-CountDerivativeOrder[term_] := Module[{profile},
-  profile = ExtractDerivativeProfile[term];
-  If[Length[profile] == 0, 0, Total[profile]]
-];
-
-(* === Phase 12: Generic Derivative Order Support === *)
+(* === Generic Derivative Order Support === *)
 
 (* Extract full derivative order profile from a term *)
 (* Returns {dt, dx, dy, ...} including the time slot *)
@@ -1113,14 +1078,6 @@ ConstraintSolverHints[fieldName_String, timeOrder_Integer, metadata_Association]
     "boundary_conditions" -> bcAssoc
   |>
 ];
-
-(* === Equation Conversion === *)
-
-(* Phase 2, Issue 6: Now supports parabolic (d_t), elliptic (no time), and hyperbolic (d2_t) PDEs *)
-(* Single-field EquationToJSON delegates to multi-field version *)
-(* This avoids code duplication while maintaining backward compatibility *)
-EquationToJSON[componentEq_, fieldName_, fieldIndex_, metadata_] :=
-  EquationToJSONMultiField[componentEq, fieldName, fieldIndex, {fieldName}, metadata];
 
 End[];
 EndPackage[];
