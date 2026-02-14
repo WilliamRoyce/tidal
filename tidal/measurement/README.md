@@ -25,10 +25,11 @@ live `MemoryStorage` (straight from the solver) or from a saved `.npz` file.
 
 ```
 tidal/measurement/
-    __init__.py           Public API (16 exports)
+    __init__.py           Public API (21 exports)
     _io.py                SimulationData: uniform data abstraction
     _energy.py            Per-field canonical energy, interaction energy
     _conversion.py        Conversion probability P(t) = E_target(t) / E_source(0)
+    _mixing.py            Mixing length extraction and mixing spectrum
     _spectral.py          FFT spectral decomposition, mode tracking
     _diagnostics.py       Energy conservation checks, summary statistics
 ```
@@ -41,11 +42,11 @@ MemoryStorage / NPZ file
         v
   SimulationData          <-- _io.py: extracts full time history
         |
-   +---------+-----------+-----------+
-   |         |           |           |
-   v         v           v           v
- Energy   Conversion   Spectral   Diagnostics
- (_energy)  (_conversion) (_spectral) (_diagnostics)
+   +------+----------+---------+-----------+
+   |      |          |         |           |
+   v      v          v         v           v
+ Energy  Conversion  Mixing   Spectral   Diagnostics
+ (_energy) (_conv)   (_mixing) (_spectral) (_diagnostics)
 ```
 
 ## Quick Start
@@ -67,6 +68,16 @@ data = SimulationData.from_npz_auto("output.npz", spec)
 # Measure wave conversion (primary Gertsenshtein observable)
 result = compute_conversion_probability(data, "phi_0", "chi_0")
 print(f"Peak conversion: {result.probability.max():.6f}")
+
+# Extract mixing length (model-independent)
+from tidal.measurement import compute_mixing_length, compute_mixing_spectrum
+mixing = compute_mixing_length(result)
+print(f"L_mix = {mixing.mixing_length:.4f} +/- {mixing.mixing_length_uncertainty:.4f}")
+print(f"Dominant frequency: {mixing.dominant_frequency:.4f}")
+
+# Mixing spectrum — which oscillation frequencies participate?
+spectrum = compute_mixing_spectrum(result)
+print(f"Dominant freq: {spectrum.dominant_frequency:.4f}")
 
 # Check energy conservation
 diag = check_energy_conservation(data, threshold=1e-3)
@@ -139,6 +150,46 @@ Result of a conversion probability measurement.
 | `relative_energy_error` | `(E_total(t) - E_total(0)) / E_total(0)` |
 | `source_field` | Name of the source field |
 | `target_field` | Name of the target field |
+
+### MixingResult
+
+Spectral mixing length extracted from the dominant peak of the temporal FFT of
+P(t).  This correctly identifies the physically meaningful oscillation timescale
+even in multi-scale systems where rapid noise oscillations sit on top of a
+slower mixing envelope.
+
+| Field | Description |
+|-------|-------------|
+| `mixing_length` | `pi / omega_dom` — half-period of the dominant oscillation |
+| `mixing_length_uncertainty` | Propagated from FWHM: `(pi / omega^2) * fwhm` |
+| `dominant_frequency` | `omega_dom` — angular frequency of strongest spectral peak |
+| `frequency_fwhm` | FWHM of the dominant peak (rad/time) |
+| `max_conversion` | `max(P(t))` — peak conversion probability |
+| `peaks` | All detected `SpectralPeak` entries, sorted by power descending |
+
+### SpectralPeak
+
+A detected peak in the mixing power spectrum.  Each peak represents a frequency
+at which P(t) oscillates.
+
+| Field | Description |
+|-------|-------------|
+| `frequency` | Angular frequency `omega` (rad/time) |
+| `power` | `|P_hat(omega)|^2` — spectral power |
+| `mixing_length` | `pi / omega` — half-period at this frequency |
+| `fwhm` | Full width at half maximum (rad/time) |
+| `mixing_length_uncertainty` | `(pi / omega^2) * fwhm` |
+
+### MixingSpectrum
+
+Temporal frequency decomposition of P(t).
+
+| Field | Description |
+|-------|-------------|
+| `frequencies` | Angular frequencies `omega` of P(t) oscillation (excl. DC) |
+| `power` | `|P_hat(omega)|^2` at each frequency |
+| `dominant_frequency` | `omega` of strongest oscillation peak |
+| `dominant_mixing_length` | `pi / dominant_frequency` — half-period at dominant freq |
 
 ### SpectralSnapshot
 
@@ -368,10 +419,13 @@ The NPZ file contains:
 
 | Function | Returns | Description |
 |----------|---------|-------------|
-| `compute_field_energy(field, momentum, m2, spacing, periodic)` | `FieldEnergy` | Energy of one field at one snapshot |
-| `compute_system_energy(data, t_idx)` | `SystemEnergy` | Full system energy at snapshot `t_idx` |
+| `compute_field_energy(field, momentum, m2, spacing, periodic, gradient_axes=None)` | `FieldEnergy` | Energy of one field; `gradient_axes` selects operator-aware axes |
+| `compute_system_energy(data, t_idx)` | `SystemEnergy` | Full system energy at snapshot (operator-aware gradient per field) |
 | `compute_energy_timeseries(data)` | `(times, per_field, interaction, total)` | Energy at every snapshot |
 | `compute_conversion_probability(data, source, target)` | `ConversionResult` | Conversion probability `P(t)` |
+| `compute_group_conversion(data, source_fields, target_fields)` | `ConversionResult` | Multi-field group conversion |
+| `compute_mixing_length(conversion, min_prominence=0.01)` | `MixingResult` | Mixing length from dominant spectral peak of P(t) |
+| `compute_mixing_spectrum(conversion)` | `MixingSpectrum` | Temporal FFT of P(t) — all mixing frequencies |
 | `compute_spectrum(field, spacing, periodic)` | `SpectralSnapshot` | Radially-averaged power spectrum |
 | `compute_spectral_energy(field, momentum, m2, spacing, periodic)` | `(wavenumbers, energy)` | Per-mode energy `E(k)` |
 | `compute_mode_amplitudes(data, field_name)` | `(times, k, amplitudes)` | Track `|phi_hat(k)|` over time |
@@ -387,7 +441,7 @@ All functions follow the project's fail-fast convention:
 
 ## Limitations and Future Work
 
-- **Dirichlet BCs + cross_derivative operators:** The discrete `cross_derivative_xy` operator with Dirichlet ghost cells is NOT self-adjoint at boundary cells, making the discrete system non-Hamiltonian. Energy drift of ~30% is expected for systems with curl-curl operators (e.g., vector field theories) on non-periodic grids. With periodic BCs the same system conserves to ~1e-10. This is a fundamental discretization limitation — see [HAMILTONIAN.md](HAMILTONIAN.md) Section 7, item 5 for details. The `coupled_proca/measure_coupling.py` example documents this with a relaxed threshold.
+- **Dirichlet BCs + cross_derivative operators:** The continuous cross-derivative IS self-adjoint with Dirichlet BCs, but the discrete ghost-cell stencil breaks this symmetry at boundary cells, causing ~30% energy drift. With periodic BCs the discrete stencil is exactly antisymmetric and energy conserves to ~1e-10. All examples now use periodic BCs. For users who need Dirichlet BCs with `cross_derivative` operators, see [HAMILTONIAN.md](HAMILTONIAN.md) Section 7, item 5 for the full analysis and SBP as a future remedy.
 - **Position-dependent coefficients:** Energy computation requires constant `m^2` and coupling coefficients. Spatially varying coefficients raise `ValueError`. Extending this requires evaluating position-dependent coefficients at each grid point during virial integration.
 - **Quadratic Lagrangians only:** The virial formula is exact for degree-2 potentials. Higher-order (nonlinear) Lagrangians would need explicit potential density integration.
 - **CLI integration:** No `tidal measure` subcommand yet. The `PlotContext.to_simulation_data()` bridge is in place for Phase 2.

@@ -1,17 +1,16 @@
-# Coupled Proca: Two Massive Vector Fields in a Cavity
+# Coupled Proca: Two Massive Vector Fields in 2+1D
 
 ## Purpose
 
-This example is a **constraint solver stress test**, designed to exercise
-non-periodic code paths that are not covered by other examples:
+This example is a **coupled constraint solver test**, designed to exercise
+multi-field constraint solving with two distinct Helmholtz scales:
 
 | Feature | Coverage before | This example |
 |---------|----------------|--------------|
-| Coupled FFT solve (periodic) | massive_gravity | - |
-| Matrix/sparse solver (non-periodic) | electrostatics (uncoupled) | **Coupled Helmholtz** |
-| Gauss-Seidel coupled iteration | 1 unit test (algebraic only) | **Real spatial operators** |
-| Dirichlet BCs on constraints | electrostatics (uncoupled) | **Coupled system** |
+| Coupled FFT solve (periodic) | massive_gravity (single scale) | **Two different Helmholtz scales** |
+| Cross-field identity coupling | scalar_vector_coupling | **Two vector fields** |
 | Two vector fields in pipeline | None | **First example** |
+| Measurement module on vectors | scalar_vector_coupling | **Group conversion A→B** |
 
 ## Lagrangian
 
@@ -37,10 +36,10 @@ The two constraints are **coupled** through the g identity cross-terms.
 
 ## Boundary Conditions
 
-Non-periodic Dirichlet (rectangular cavity, fields vanish on walls):
-- Forces the **sparse matrix solver** path (not FFT)
-- Forces **Gauss-Seidel iteration** for coupled constraints
-- Physical interpretation: two vector fields confined in a box
+Periodic on both axes:
+- Enables the **coupled FFT solver** path for constraints
+- Energy measurement drift converges as O(dx^2) (~3% at 20x20, <1% at 48x48)
+- Physical interpretation: infinite-domain physics with periodic images
 
 ## Parameters
 
@@ -70,33 +69,12 @@ tidal derive examples/coupled_proca/theory.toml
 `measure_coupling.py` uses the measurement module to compute:
 - **Group conversion**: `A_1 -> {A_2, B_1, B_2}` energy transfer via `compute_group_conversion`
 - **Per-component breakdown**: individual `A_1 -> A_2`, `A_1 -> B_1`, `A_1 -> B_2` probabilities
-- **Energy conservation diagnostics**: with a relaxed threshold (0.5)
-
-### Energy Conservation Caveat (Dirichlet + curl-curl)
-
-The discrete `cross_derivative_xy` operator with Dirichlet ghost cells
-is **not self-adjoint** at boundary cells:
-
-```
-M[(0,j), (0,j+1)] = +1/(4 dx dy)
-M[(0,j+1), (0,j)] = -1/(4 dx dy)    ← opposite sign!
-```
-
-This makes the discrete curl-curl system non-Hamiltonian — no quadratic
-energy functional is exactly conserved.  The ~30% energy drift occurs
-even when using py-pde's own operators to compute the virial potential.
-With **periodic BCs**, the same system conserves energy to machine
-precision (~1e-10).
-
-This is a fundamental discretization limitation of `cross_derivative`
-operators on non-periodic grids, not a bug.  The measurement script
-uses a relaxed threshold and documents this as an expected artifact.
-Conversion probability measurements remain valid regardless.
+- **Energy conservation diagnostics**: O(dx^2) convergent with periodic BCs
 
 ## Validation
 
 1. **Constraints activate**: A_0, B_0 become non-zero when momenta are non-zero
 2. **Coupling works**: B_1, B_2 become non-zero (energy transfer A -> B)
 3. **Stability**: All fields remain finite and bounded
-4. **Gauss-Seidel converges**: No convergence warnings
-5. **Dirichlet respected**: Boundary values stay near zero
+4. **FFT solver converges**: Coupled constraints solved without warnings
+5. **Energy drift convergent**: O(dx^2) with resolution, ~3% at 20x20
