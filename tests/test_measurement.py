@@ -17,6 +17,8 @@ from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
 from tidal.measurement import (
     ConversionResult,
     EnergyDiagnostics,
+    MixingResult,
+    MixingSpectrum,
     SimulationData,
     SystemEnergy,
     check_energy_conservation,
@@ -24,6 +26,8 @@ from tidal.measurement import (
     compute_energy_timeseries,
     compute_field_energy,
     compute_group_conversion,
+    compute_mixing_length,
+    compute_mixing_spectrum,
     compute_mode_amplitudes,
     compute_spectrum,
     compute_system_energy,
@@ -34,6 +38,7 @@ from tidal.measurement._energy import (
     _compute_virial_potential,  # pyright: ignore[reportPrivateUsage]
     _gradient_energy_density,  # pyright: ignore[reportPrivateUsage]
     _is_momentum_field,  # pyright: ignore[reportPrivateUsage]
+    _self_gradient_axes,  # pyright: ignore[reportPrivateUsage]
 )
 from tidal.symbolic.json_loader import (
     ComponentEquation,
@@ -948,6 +953,217 @@ class TestVirialPotential:
 
 
 # ============================================================
+# Operator-aware gradient tests
+# ============================================================
+
+
+class TestSelfGradientAxes:
+    """Tests for _self_gradient_axes helper."""
+
+    def test_full_laplacian_returns_none(self) -> None:
+        """Equation with isotropic 'laplacian' → None (all axes)."""
+        terms = (OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),)
+        eq = ComponentEquation(
+            field_name="phi", field_index=0,
+            time_derivative_order=2, rhs_terms=terms,
+        )
+        assert _self_gradient_axes(eq) is None
+
+    def test_directional_laplacian_y(self) -> None:
+        """Equation with only laplacian_y → [1]."""
+        terms = (
+            OperatorTerm(coefficient=1.0, operator="laplacian_y", field="A_1"),
+            OperatorTerm(coefficient=0.5, operator="cross_derivative_xy", field="A_2"),
+            OperatorTerm(coefficient=-1.0, operator="identity", field="A_1"),
+        )
+        eq = ComponentEquation(
+            field_name="A_1", field_index=0,
+            time_derivative_order=2, rhs_terms=terms,
+        )
+        assert _self_gradient_axes(eq) == [1]
+
+    def test_directional_laplacian_x(self) -> None:
+        """Equation with only laplacian_x → [0]."""
+        terms = (
+            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_2"),
+            OperatorTerm(coefficient=-1.0, operator="identity", field="A_2"),
+        )
+        eq = ComponentEquation(
+            field_name="A_2", field_index=1,
+            time_derivative_order=2, rhs_terms=terms,
+        )
+        assert _self_gradient_axes(eq) == [0]
+
+    def test_both_directional_laplacians(self) -> None:
+        """Equation with laplacian_x + laplacian_y → [0, 1]."""
+        terms = (
+            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="phi"),
+            OperatorTerm(coefficient=1.0, operator="laplacian_y", field="phi"),
+        )
+        eq = ComponentEquation(
+            field_name="phi", field_index=0,
+            time_derivative_order=2, rhs_terms=terms,
+        )
+        assert _self_gradient_axes(eq) == [0, 1]
+
+    def test_cross_field_laplacian_ignored(self) -> None:
+        """Laplacian on a different field is not counted as self."""
+        terms = (
+            OperatorTerm(coefficient=1.0, operator="laplacian_y", field="A_1"),
+            OperatorTerm(coefficient=0.5, operator="laplacian_x", field="A_2"),
+        )
+        eq = ComponentEquation(
+            field_name="A_1", field_index=0,
+            time_derivative_order=2, rhs_terms=terms,
+        )
+        # Only laplacian_y(A_1) is self; laplacian_x(A_2) is cross-field
+        assert _self_gradient_axes(eq) == [1]
+
+    def test_no_laplacian_returns_empty(self) -> None:
+        """Equation with no laplacian at all → empty list."""
+        terms = (
+            OperatorTerm(coefficient=-1.0, operator="identity", field="phi"),
+        )
+        eq = ComponentEquation(
+            field_name="phi", field_index=0,
+            time_derivative_order=2, rhs_terms=terms,
+        )
+        assert _self_gradient_axes(eq) == []
+
+
+class TestOperatorAwareGradient:
+    """Tests for operator-aware per-field gradient in system energy."""
+
+    def test_vector_single_component_zero_interaction(self) -> None:
+        """Vector field with directional laplacian: interaction = 0 at t=0.
+
+        Mimics Proca A_1 with laplacian_y only.  When only A_1 is excited,
+        interaction should be zero because the per-field gradient only includes
+        the y-axis (matching the virial).
+        """
+        # Build a 2D spec with two fields: A_1 (laplacian_y) + A_2 (laplacian_x)
+        a1_terms = (
+            OperatorTerm(coefficient=1.0, operator="laplacian_y", field="A_1"),
+            OperatorTerm(coefficient=0.5, operator="cross_derivative_xy", field="A_2"),
+            OperatorTerm(coefficient=-1.0, operator="identity", field="A_1"),
+        )
+        a2_terms = (
+            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_2"),
+            OperatorTerm(coefficient=0.5, operator="cross_derivative_xy", field="A_1"),
+            OperatorTerm(coefficient=-1.0, operator="identity", field="A_2"),
+        )
+        eq_a1 = ComponentEquation(
+            field_name="A_1", field_index=0,
+            time_derivative_order=2, rhs_terms=a1_terms,
+        )
+        eq_a2 = ComponentEquation(
+            field_name="A_2", field_index=1,
+            time_derivative_order=2, rhs_terms=a2_terms,
+        )
+
+        spec = EquationSystem(
+            n_components=2, dimension=3, spatial_dimension=2,
+            equations=(eq_a1, eq_a2),
+            component_names=("A_1", "A_2"),
+            mass_matrix=((1.0, 0.0), (0.0, 1.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={},
+        )
+
+        # 2D grid
+        grid = CartesianGrid(
+            bounds=[(0, np.pi), (0, np.pi)], shape=[16, 16], periodic=True,
+        )
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+        y = cast("np.ndarray", grid.cell_coords[..., 1])
+        gaussian = 0.5 * np.exp(
+            -((x - np.pi / 2) ** 2 + (y - np.pi / 2) ** 2) / (2 * 0.5**2)
+        )
+
+        # State: A_1 field, A_1 momentum, A_2 field, A_2 momentum
+        fields = [
+            ScalarField(grid, data=gaussian),  # A_1 field
+            ScalarField(grid, data=0.0),        # A_1 momentum
+            ScalarField(grid, data=0.0),        # A_2 field
+            ScalarField(grid, data=0.0),        # A_2 momentum
+        ]
+        state = FieldCollection(fields)
+        storage = MemoryStorage()
+        storage.start_writing(state)
+        storage.append(state, time=0.0)
+
+        data = SimulationData.from_storage(
+            storage, spec, grid, parameters={"m2": 1.0},
+        )
+
+        se = compute_system_energy(data, 0)
+
+        # Key assertion: interaction should be ~0 (not -0.196 as with isotropic)
+        np.testing.assert_allclose(se.interaction, 0.0, atol=1e-10)
+
+        # Per-field gradient for A_1 should only include y-axis
+        # (roughly half of the full gradient)
+        assert se.per_field["A_1"].gradient > 0.0
+        assert se.per_field["A_2"].gradient == 0.0  # A_2 is zero everywhere
+
+    def test_scalar_full_laplacian_unchanged(self) -> None:
+        """Scalar field with full laplacian: gradient uses all axes (no change)."""
+        terms = (
+            OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),
+            OperatorTerm(coefficient=-1.0, operator="identity", field="phi"),
+        )
+        eq = ComponentEquation(
+            field_name="phi", field_index=0,
+            time_derivative_order=2, rhs_terms=terms,
+        )
+        spec = EquationSystem(
+            n_components=1, dimension=3, spatial_dimension=2,
+            equations=(eq,),
+            component_names=("phi",),
+            mass_matrix=((1.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+
+        grid = CartesianGrid(
+            bounds=[(0, np.pi), (0, np.pi)], shape=[16, 16], periodic=True,
+        )
+        x = cast("np.ndarray", grid.cell_coords[..., 0])
+        y = cast("np.ndarray", grid.cell_coords[..., 1])
+        gaussian = 0.5 * np.exp(
+            -((x - np.pi / 2) ** 2 + (y - np.pi / 2) ** 2) / (2 * 0.5**2)
+        )
+
+        fields = [
+            ScalarField(grid, data=gaussian),  # phi field
+            ScalarField(grid, data=0.0),        # phi momentum
+        ]
+        state = FieldCollection(fields)
+        storage = MemoryStorage()
+        storage.start_writing(state)
+        storage.append(state, time=0.0)
+
+        data = SimulationData.from_storage(
+            storage, spec, grid, parameters={"m2": 1.0},
+        )
+
+        se = compute_system_energy(data, 0)
+
+        # Interaction is zero: single scalar field with full laplacian
+        np.testing.assert_allclose(se.interaction, 0.0, atol=1e-10)
+
+        # Gradient should include both x and y axes
+        # Compare with explicit full gradient computation
+        fe_full = compute_field_energy(
+            gaussian, None, 1.0,
+            data.grid_spacing, data.periodic, gradient_axes=None,
+        )
+        np.testing.assert_allclose(
+            se.per_field["phi"].gradient, fe_full.gradient, rtol=1e-12,
+        )
+
+
+# ============================================================
 # Constraint self-energy tests
 # ============================================================
 
@@ -1171,3 +1387,232 @@ class TestScalarVectorEnergyConservation:
             f"Energy drift {max_drift:.2%} exceeds 5% threshold. "
             f"This likely indicates incorrect pi_N indexing in the JSON."
         )
+
+
+# ============================================================
+# Mixing length tests
+# ============================================================
+
+
+def _make_conversion_result(
+    times: np.ndarray,
+    probability: np.ndarray,
+) -> ConversionResult:
+    """Build a ConversionResult with synthetic data for testing."""
+    return ConversionResult(
+        times=times,
+        probability=probability,
+        source_energy=1.0 - probability,
+        target_energy=probability.copy(),
+        total_energy=np.ones_like(times),
+        relative_energy_error=np.zeros_like(times),
+        source_field="source",
+        target_field="target",
+    )
+
+
+class TestMixingLength:
+    """Tests for compute_mixing_length — spectral peak detection."""
+
+    def test_sin_squared_mixing_length(self) -> None:
+        """sin²(2t) oscillates at ω=4 → L_mix = π/4."""
+        times = np.linspace(0, 20, 1000)
+        prob = np.sin(2.0 * times) ** 2
+        conv = _make_conversion_result(times, prob)
+
+        result = compute_mixing_length(conv)
+
+        # sin²(2t) = 0.5(1 - cos(4t)), so P(t) oscillates at ω=4
+        assert isinstance(result, MixingResult)
+        assert abs(result.dominant_frequency - 4.0) / 4.0 < 0.05
+        expected_lmix = np.pi / 4.0
+        assert abs(result.mixing_length - expected_lmix) / expected_lmix < 0.05
+        assert result.max_conversion > 0.95
+
+    def test_damped_oscillation(self) -> None:
+        """Non-sin² form: damped oscillation still has a detectable peak."""
+        times = np.linspace(0, 10, 500)
+        # P(t) = (1 - e^{-t}) * 0.5 * (1 - cos(4t))
+        prob = (1.0 - np.exp(-times)) * 0.5 * (1.0 - np.cos(4.0 * times))
+        conv = _make_conversion_result(times, prob)
+
+        result = compute_mixing_length(conv)
+
+        assert result.mixing_length > 0
+        assert result.mixing_length_uncertainty > 0
+        assert result.max_conversion > 0
+
+    def test_delayed_onset_spectral(self) -> None:
+        """Delayed sin²(2(t-5)) still has ω_dom ≈ 4, same as no delay."""
+        times = np.linspace(0, 20, 1000)
+        prob = np.where(
+            times < 5.0,
+            0.0,
+            np.sin(2.0 * (times - 5.0)) ** 2,
+        )
+        conv = _make_conversion_result(times, prob)
+
+        result = compute_mixing_length(conv)
+
+        # Spectral method correctly finds ω=4 regardless of delay
+        assert abs(result.dominant_frequency - 4.0) / 4.0 < 0.10
+        expected_lmix = np.pi / 4.0
+        assert abs(result.mixing_length - expected_lmix) / expected_lmix < 0.10
+
+    def test_monotonic_raises(self) -> None:
+        """Monotonically increasing P(t) has no spectral peaks → ValueError."""
+        times = np.linspace(0, 10, 100)
+        prob = 1.0 - np.exp(-times)
+        conv = _make_conversion_result(times, prob)
+
+        with pytest.raises(ValueError, match="No spectral peaks"):
+            compute_mixing_length(conv)
+
+    def test_too_few_points_raises(self) -> None:
+        """Fewer than 3 time points → ValueError."""
+        times = np.array([0.0, 1.0])
+        prob = np.array([0.0, 0.5])
+        conv = _make_conversion_result(times, prob)
+
+        with pytest.raises(ValueError, match="at least 3"):
+            compute_mixing_length(conv)
+
+    def test_invalid_min_prominence(self) -> None:
+        """min_prominence must be in (0, 1)."""
+        times = np.linspace(0, 20, 1000)
+        prob = np.sin(2.0 * times) ** 2
+        conv = _make_conversion_result(times, prob)
+
+        with pytest.raises(ValueError, match="min_prominence"):
+            compute_mixing_length(conv, min_prominence=0.0)
+        with pytest.raises(ValueError, match="min_prominence"):
+            compute_mixing_length(conv, min_prominence=1.0)
+
+    def test_min_prominence_filtering(self) -> None:
+        """Low prominence → more peaks; high prominence → fewer peaks."""
+        omega_1, omega_2 = 2.0, 5.0
+        times = np.linspace(0, 40, 4000)
+        prob = 0.7 * np.cos(omega_1 * times) + 0.3 * np.cos(omega_2 * times)
+        # Shift to positive
+        prob = prob - prob.min() + 0.01
+        conv = _make_conversion_result(times, prob)
+
+        result_low = compute_mixing_length(conv, min_prominence=0.01)
+        result_high = compute_mixing_length(conv, min_prominence=0.5)
+
+        # Low prominence should detect more peaks than high prominence
+        assert len(result_low.peaks) >= len(result_high.peaks)
+        assert len(result_high.peaks) >= 1
+
+    def test_uncertainty_from_fwhm(self) -> None:
+        """Long timeseries with clean cos gives sharp peak → small uncertainty."""
+        omega_0 = 3.0
+        times = np.linspace(0, 100, 10000)
+        prob = 0.5 + 0.5 * np.cos(omega_0 * times)
+        conv = _make_conversion_result(times, prob)
+
+        result = compute_mixing_length(conv)
+
+        # ΔL = (π/ω²) × FWHM — verify the relationship holds
+        expected_unc = (np.pi / (result.dominant_frequency**2)) * result.frequency_fwhm
+        assert abs(result.mixing_length_uncertainty - expected_unc) < 1e-10
+        # Clean signal over long time → narrow peak → small uncertainty
+        assert result.mixing_length_uncertainty < result.mixing_length * 0.1
+
+    def test_multiple_peaks_detected(self) -> None:
+        """Two-frequency signal detects both peaks."""
+        omega_1, omega_2 = 2.0, 5.0
+        times = np.linspace(0, 40, 4000)
+        prob = 0.7 * np.cos(omega_1 * times) + 0.3 * np.cos(omega_2 * times)
+        prob = prob - prob.min() + 0.01
+        conv = _make_conversion_result(times, prob)
+
+        result = compute_mixing_length(conv, min_prominence=0.01)
+
+        assert len(result.peaks) >= 2
+        # Dominant peak should be near omega_1 (stronger component)
+        assert abs(result.peaks[0].frequency - omega_1) / omega_1 < 0.05
+
+    def test_peaks_sorted_by_power(self) -> None:
+        """Detected peaks are sorted by power descending."""
+        omega_1, omega_2 = 2.0, 5.0
+        times = np.linspace(0, 40, 4000)
+        prob = 0.7 * np.cos(omega_1 * times) + 0.3 * np.cos(omega_2 * times)
+        prob = prob - prob.min() + 0.01
+        conv = _make_conversion_result(times, prob)
+
+        result = compute_mixing_length(conv, min_prominence=0.01)
+
+        for i in range(len(result.peaks) - 1):
+            assert result.peaks[i].power >= result.peaks[i + 1].power
+
+
+class TestMixingSpectrum:
+    """Tests for compute_mixing_spectrum — temporal FFT of P(t)."""
+
+    def test_single_oscillation(self) -> None:
+        """cos(ω₀ t) has dominant peak at ω₀."""
+        omega_0 = 3.0
+        times = np.linspace(0, 20, 2000)
+        prob = 0.5 + 0.5 * np.cos(omega_0 * times)
+        conv = _make_conversion_result(times, prob)
+
+        spectrum = compute_mixing_spectrum(conv)
+
+        assert isinstance(spectrum, MixingSpectrum)
+        # Dominant frequency should be close to omega_0
+        assert abs(spectrum.dominant_frequency - omega_0) / omega_0 < 0.05
+        # Mixing length = π/ω
+        expected_lmix = np.pi / omega_0
+        assert abs(spectrum.dominant_mixing_length - expected_lmix) / expected_lmix < 0.05
+
+    def test_two_frequencies(self) -> None:
+        """Two-frequency signal shows two peaks, dominant is the stronger one."""
+        omega_1, omega_2 = 2.0, 5.0
+        times = np.linspace(0, 40, 4000)
+        prob = 0.7 * np.cos(omega_1 * times) + 0.3 * np.cos(omega_2 * times)
+        conv = _make_conversion_result(times, prob)
+
+        spectrum = compute_mixing_spectrum(conv)
+
+        # Dominant should be omega_1 (stronger component)
+        assert abs(spectrum.dominant_frequency - omega_1) / omega_1 < 0.05
+
+        # Both peaks should be visible in the spectrum
+        # Find the bin closest to omega_2
+        idx_2 = int(np.argmin(np.abs(spectrum.frequencies - omega_2)))
+        # Power at omega_2 should be substantial (not zero)
+        assert spectrum.power[idx_2] > 0.01 * spectrum.power.max()
+
+    def test_dc_excluded(self) -> None:
+        """DC bin is excluded — first frequency is positive."""
+        times = np.linspace(0, 10, 200)
+        prob = 0.5 + 0.5 * np.cos(2.0 * times)
+        conv = _make_conversion_result(times, prob)
+
+        spectrum = compute_mixing_spectrum(conv)
+
+        assert spectrum.frequencies[0] > 0.0
+
+    def test_non_uniform_timestep_raises(self) -> None:
+        """Non-uniform time spacing → ValueError."""
+        times = np.array([0.0, 1.0, 3.0, 6.0, 10.0])
+        prob = np.array([0.0, 0.5, 0.3, 0.8, 0.2])
+        conv = _make_conversion_result(times, prob)
+
+        with pytest.raises(ValueError, match="Non-uniform"):
+            compute_mixing_spectrum(conv)
+
+    def test_consistent_with_mixing_length(self) -> None:
+        """compute_mixing_length derives L_mix from the same spectrum."""
+        omega = 2.0
+        times = np.linspace(0, 20, 2000)
+        prob = np.sin(omega * times) ** 2
+        conv = _make_conversion_result(times, prob)
+
+        mixing_result = compute_mixing_length(conv)
+        spectrum = compute_mixing_spectrum(conv)
+
+        # Both use the same FFT; mixing_length = π/ω_dom from the dominant peak
+        assert abs(mixing_result.mixing_length - spectrum.dominant_mixing_length) < 0.01
+        assert abs(mixing_result.dominant_frequency - spectrum.dominant_frequency) < 0.01
