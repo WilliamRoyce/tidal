@@ -394,20 +394,20 @@ def compute_field_energy(  # noqa: PLR0913
     if momentum_data is not None:
         _validate_array(momentum_data, "momentum_data")
 
-    dv = float(np.prod(np.array(grid_spacing)))
+    dv = float(np.array(grid_spacing).prod())
 
     # Kinetic energy: 0.5 * ∫ π² dV
     if momentum_data is not None:
-        kinetic = 0.5 * float(np.sum(momentum_data**2)) * dv
+        kinetic = 0.5 * float((momentum_data**2).sum()) * dv
     else:
         kinetic = 0.0
 
     # Gradient energy: 0.5 * ∫ |∇φ|² dV (over specified axes)
     grad_sq = _gradient_energy_density(field_data, grid_spacing, periodic, axes=gradient_axes)
-    gradient = 0.5 * float(np.sum(grad_sq)) * dv
+    gradient = 0.5 * float(grad_sq.sum()) * dv
 
     # Mass energy: 0.5 * m² * ∫ φ² dV
-    mass_energy = 0.5 * mass_squared * float(np.sum(field_data**2)) * dv
+    mass_energy = 0.5 * mass_squared * float((field_data**2).sum()) * dv
 
     total = kinetic + gradient + mass_energy
     return FieldEnergy(kinetic=kinetic, gradient=gradient, mass=mass_energy, total=total)
@@ -513,7 +513,7 @@ def _compute_virial_potential(
             operated = _apply_spatial_operator(
                 term.operator, target, data.grid_spacing, data.periodic,
             )
-            potential += coeff * float(np.sum(phi_i * operated)) * dv
+            potential += coeff * float((phi_i * operated).sum()) * dv
 
     return -0.5 * potential
 
@@ -543,11 +543,11 @@ def _compute_constraint_self_energy(
 
         # Gradient: -½ ∫ |∇C|² dV  (NEGATIVE)
         grad_sq = _gradient_energy_density(c_field, data.grid_spacing, data.periodic)
-        energy -= 0.5 * float(np.sum(grad_sq)) * dv
+        energy -= 0.5 * float(grad_sq.sum()) * dv
 
         # Mass: -½ m² ∫ C² dV  (NEGATIVE)
         m2 = _resolve_mass_squared(data, field_idx)
-        energy -= 0.5 * m2 * float(np.sum(c_field**2)) * dv
+        energy -= 0.5 * m2 * float((c_field**2).sum()) * dv
 
     return energy
 
@@ -680,6 +680,6 @@ def _validate_array(arr: NDArray[np.float64], label: str) -> None:
     ValueError
         If *arr* contains NaN or Inf.
     """
-    if not np.all(np.isfinite(arr)):
+    if not np.isfinite(arr).all():
         msg = f"{label} contains NaN or Inf values"
         raise ValueError(msg)

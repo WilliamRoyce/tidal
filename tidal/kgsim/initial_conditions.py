@@ -83,7 +83,7 @@ class InitialCondition(ABC):
         center_arr = np.asarray(center)
 
         # Compute Euclidean distance
-        return np.sqrt(np.sum((coords - center_arr) ** 2, axis=1))
+        return np.sqrt(((coords - center_arr) ** 2).sum(axis=1))
 
     @abstractmethod
     def _compute_phi(self, grid: CartesianGrid) -> np.ndarray:

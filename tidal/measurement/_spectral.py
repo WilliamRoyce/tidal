@@ -99,7 +99,7 @@ def _radial_bin(
     """Radially bin *values* by ``|k|`` magnitude."""
     k_max = float(np.max(k_mag))
     if k_max == 0.0:
-        return np.array([0.0]), np.array([float(np.sum(values))])
+        return np.array([0.0]), np.array([float(values.sum())])
 
     dk = min(
         2.0 * np.pi / (field_shape[ax] * grid_spacing[ax])
@@ -114,7 +114,7 @@ def _radial_bin(
     v_flat = values.ravel()
     for b_idx in range(n_bins):
         mask = bin_indices == b_idx
-        binned[b_idx] = float(np.sum(v_flat[mask]))
+        binned[b_idx] = float(v_flat[mask].sum())
     return bin_centers, binned
 
 
@@ -191,7 +191,7 @@ def compute_spectral_energy(
     k_grid, k_mag = _build_k_grid(field_data.shape, grid_spacing)
     k_sq = sum(ki**2 for ki in k_grid)
 
-    n_total = float(np.prod(np.array(field_data.shape)))
+    n_total = float(np.array(field_data.shape).prod())
     energy_field = 0.5 * (k_sq + mass_squared) * np.abs(phi_hat) ** 2 / n_total
 
     if momentum_data is not None:

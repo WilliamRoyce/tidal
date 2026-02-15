@@ -268,10 +268,10 @@ def make_coupled_kg_pde(params: MultiFieldParams) -> PDE:
         msg = "masses must be a non-empty sequence"
         raise ValueError(msg)
     # validation: finite, non-negative masses
-    if not np.all(np.isfinite(masses)):
+    if not np.isfinite(masses).all():
         msg = "masses must contain finite numbers"
         raise ValueError(msg)
-    if np.any(masses < 0.0):
+    if (masses < 0.0).any():
         msg = "masses must be non-negative"
         raise ValueError(msg)
 
