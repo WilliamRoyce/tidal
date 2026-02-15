@@ -2,13 +2,15 @@
 
 Model-independent measurement of the characteristic energy-exchange timescale
 in coupled field systems.  The mixing length ``L_mix`` is derived from the
-dominant peak of the temporal FFT of ``P(t)`` — the half-period ``π/ω`` of
+dominant peak of the temporal FFT of ``P(t)`` — the half-period ``pi/omega`` of
 the strongest oscillation frequency.
 
 This spectral approach correctly identifies the physically meaningful
 oscillation timescale even in multi-scale systems where rapid noise
 oscillations sit on top of a slower mixing envelope.  Uncertainty is
-estimated from the full width at half maximum (FWHM) of the spectral peak.
+estimated from the half-width at half-maximum (HWHM = FWHM/2) of the
+spectral peak — this represents the distance from the peak center to
+the half-power point.
 
 The mixing spectrum is the temporal FFT of ``P(t)``, showing which oscillation
 frequencies participate in the energy exchange.  Users interpret the spectrum
@@ -33,7 +35,7 @@ class SpectralPeak:
     """A detected peak in the mixing power spectrum.
 
     Each peak represents a frequency at which ``P(t)`` oscillates.
-    The mixing length ``π/ω`` gives the half-period of energy exchange
+    The mixing length ``pi/omega`` gives the half-period of energy exchange
     at that frequency.  FWHM measures how sharply defined the
     oscillation is — a narrow peak means a coherent, well-defined
     oscillation; a broad peak means the frequency is less certain.
@@ -41,15 +43,16 @@ class SpectralPeak:
     Attributes
     ----------
     frequency : float
-        Angular frequency ``ω`` (rad/time) of the spectral peak.
+        Angular frequency ``omega`` (rad/time) of the spectral peak.
     power : float
-        ``|P̂(ω)|²`` — spectral power at this frequency.
+        ``|P_hat(omega)|**2`` — spectral power at this frequency.
     mixing_length : float
-        ``π/ω`` — half-period of energy exchange at this frequency.
+        ``pi/omega`` — half-period of energy exchange at this frequency.
     fwhm : float
         Full width at half maximum of the peak (rad/time).
     mixing_length_uncertainty : float
-        Propagated uncertainty: ``(pi/omega**2) * fwhm``.
+        Propagated from half-width: ``(pi/omega**2) * HWHM``
+        where ``HWHM = FWHM / 2``.
     """
 
     frequency: float
@@ -69,19 +72,20 @@ class MixingResult:
     even in multi-scale systems where rapid noise oscillations sit on
     top of a slower mixing envelope.
 
-    The uncertainty comes from the FWHM of the spectral peak:
-    ``dL = (pi/omega**2) * d_omega``, where ``d_omega`` is the FWHM.  A sharp spectral
-    peak (small FWHM) gives a precise mixing length; a broad peak
-    indicates the oscillation frequency is less well-defined.
+    The uncertainty comes from the half-width at half-maximum (HWHM)
+    of the spectral peak: ``dL = (pi/omega**2) * HWHM`` where
+    ``HWHM = FWHM / 2``.  A sharp spectral peak (small FWHM) gives a
+    precise mixing length; a broad peak indicates the oscillation
+    frequency is less well-defined.
 
     Attributes
     ----------
     mixing_length : float
-        ``π/ω_dom`` — half-period of the dominant oscillation frequency.
+        ``pi/omega_dom`` — half-period of the dominant oscillation frequency.
     mixing_length_uncertainty : float
-        Propagated from FWHM of the dominant spectral peak.
+        Propagated from HWHM of the dominant spectral peak.
     dominant_frequency : float
-        ``ω_dom`` — angular frequency of the strongest spectral peak.
+        ``omega_dom`` — angular frequency of the strongest spectral peak.
     frequency_fwhm : float
         FWHM of the dominant peak (rad/time).
     max_conversion : float
@@ -104,25 +108,32 @@ class MixingSpectrum:
     """Frequency decomposition of the conversion probability timeseries.
 
     Reports angular frequencies at which ``P(t)`` oscillates — no
-    theory-specific conversion.  For each frequency ``ω``, the half-period
-    ``π/ω`` gives the mixing timescale at that frequency.
+    theory-specific conversion.  For each frequency ``omega``, the half-period
+    ``pi/omega`` gives the mixing timescale at that frequency.
+
+    The frequency resolution is ``rayleigh_resolution = 2*pi/T`` where ``T``
+    is the observation window duration.
 
     Attributes
     ----------
     frequencies : ndarray
-        Angular frequencies ``ω`` (rad/time), excluding DC.
+        Angular frequencies ``omega`` (rad/time), excluding DC.
     power : ndarray
-        ``|P̂(ω)|²`` at each frequency.
+        ``|P_hat(omega)|**2`` at each frequency.
     dominant_frequency : float
-        ``ω`` of the strongest oscillation peak.
+        ``omega`` of the strongest oscillation peak.
     dominant_mixing_length : float
-        ``π / dominant_frequency`` — half-period at the dominant frequency.
+        ``pi / dominant_frequency`` — half-period at the dominant frequency.
+    rayleigh_resolution : float
+        ``2*pi/T`` — fundamental frequency resolution from the observation
+        window duration.  This is the minimum resolvable frequency difference.
     """
 
     frequencies: NDArray[np.float64]
     power: NDArray[np.float64]
     dominant_frequency: float
     dominant_mixing_length: float
+    rayleigh_resolution: float
 
 
 _MIN_POINTS = 3  # Minimum time points for peak detection / FFT
@@ -136,20 +147,28 @@ def _compute_fwhm(
     freqs: NDArray[np.float64],
     power: NDArray[np.float64],
     peak_idx: int,
+    rayleigh_resolution: float,
 ) -> float:
     """Full width at half maximum of a spectral peak.
 
     Uses linear interpolation between bins for sub-bin accuracy.
-    If the peak is at a spectrum boundary, uses the available one-sided
-    width doubled as an estimate.
+    If one side of the peak reaches the spectrum boundary without
+    crossing half-max, uses the available one-sided width doubled
+    as an estimate.
+
+    The FWHM is floored at the Rayleigh resolution (``2*pi/T``),
+    which is the minimum resolvable frequency width.
     """
     half_max = float(power[peak_idx]) / 2.0
     n = len(freqs)
+    peak_freq = float(freqs[peak_idx])
 
     # --- Scan left ---
     left_freq = float(freqs[0])  # default: left edge
+    left_found = False
     for j in range(peak_idx - 1, -1, -1):
         if power[j] < half_max:
+            left_found = True
             # Linear interpolation between j and j+1
             denom = float(power[j + 1] - power[j])
             if abs(denom) > 0.0:
@@ -163,8 +182,10 @@ def _compute_fwhm(
 
     # --- Scan right ---
     right_freq = float(freqs[-1])  # default: right edge
+    right_found = False
     for j in range(peak_idx + 1, n):
         if power[j] < half_max:
+            right_found = True
             # Linear interpolation between j-1 and j
             denom = float(power[j - 1] - power[j])
             if abs(denom) > 0.0:
@@ -176,27 +197,26 @@ def _compute_fwhm(
                 right_freq = float(freqs[j])
             break
 
-    fwhm = right_freq - left_freq
+    # Combine: use one-sided doubling when a scan reached the edge
+    if left_found and right_found:
+        fwhm = right_freq - left_freq
+    elif right_found and not left_found:
+        fwhm = 2.0 * (right_freq - peak_freq)
+    elif left_found and not right_found:
+        fwhm = 2.0 * (peak_freq - left_freq)
+    else:
+        # Both sides hit boundary — use full span (best effort)
+        fwhm = right_freq - left_freq
 
-    # If only one side was found (peak at boundary), double the half-width
-    if peak_idx == 0:
-        fwhm = 2.0 * (right_freq - float(freqs[peak_idx]))
-    elif peak_idx == n - 1:
-        fwhm = 2.0 * (float(freqs[peak_idx]) - left_freq)
-
-    # Floor: at least the frequency resolution
-    min_bins_for_resolution = 2
-    if n >= min_bins_for_resolution:
-        df = float(freqs[1] - freqs[0])
-        fwhm = max(fwhm, df)
-
-    return fwhm
+    # Floor: at least the Rayleigh resolution (2*pi/T)
+    return max(fwhm, rayleigh_resolution)
 
 
 def _find_spectral_peaks(
     freqs: NDArray[np.float64],
     power: NDArray[np.float64],
     min_prominence: float,
+    rayleigh_resolution: float,
 ) -> tuple[SpectralPeak, ...]:
     """Find peaks in the power spectrum above the prominence threshold.
 
@@ -225,9 +245,11 @@ def _find_spectral_peaks(
     for idx in peak_indices:
         omega = float(freqs[idx])
         p = float(power[idx])
-        fwhm = _compute_fwhm(freqs, power, idx)
+        fwhm = _compute_fwhm(freqs, power, idx, rayleigh_resolution)
         ml = np.pi / omega
-        ml_unc = (np.pi / (omega * omega)) * fwhm
+        # Uncertainty from HWHM (half-width at half-maximum = FWHM/2)
+        hwhm = fwhm / 2.0
+        ml_unc = (np.pi / (omega * omega)) * hwhm
         peaks.append(
             SpectralPeak(
                 frequency=omega,
@@ -261,9 +283,9 @@ def compute_mixing_length(
     oscillation timescale even in multi-scale systems where rapid
     oscillations sit on top of a slower mixing envelope.
 
-    The uncertainty comes from the full width at half maximum (FWHM) of
+    The uncertainty comes from the half-width at half-maximum (HWHM) of
     the spectral peak.  Error propagation: ``L = pi/omega``,
-    ``dL = (pi/omega**2) * d_omega``.
+    ``dL = (pi/omega**2) * HWHM`` where ``HWHM = FWHM/2``.
 
     Parameters
     ----------
@@ -294,7 +316,12 @@ def compute_mixing_length(
     spectrum = compute_mixing_spectrum(conversion)
 
     # Find spectral peaks
-    peaks = _find_spectral_peaks(spectrum.frequencies, spectrum.power, min_prominence)
+    peaks = _find_spectral_peaks(
+        spectrum.frequencies,
+        spectrum.power,
+        min_prominence,
+        spectrum.rayleigh_resolution,
+    )
 
     if not peaks:
         msg = (
@@ -329,7 +356,7 @@ def compute_mixing_spectrum(
     Angular frequencies are reported directly (consistent with
     :func:`compute_spectrum` which reports spatial wavenumbers as angular
     frequencies).  No theory-specific conversion is applied.  For each
-    frequency ``ω``, the half-period ``π/ω`` gives the corresponding
+    frequency ``omega``, the half-period ``pi/omega`` gives the corresponding
     mixing timescale.
 
     Parameters
@@ -364,10 +391,11 @@ def compute_mixing_spectrum(
         )
         raise ValueError(msg)
 
-    # Subtract mean to remove DC component
-    prob_centered = prob - np.mean(prob)
+    # Rayleigh resolution: fundamental frequency resolution from observation window
+    rayleigh_resolution = 2.0 * np.pi / float(times[-1] - times[0])
 
-    # FFT → power spectrum
+    # FFT (subtract mean to remove DC component)
+    prob_centered = prob - np.mean(prob)
     fft_vals = np.fft.rfft(prob_centered)
     raw_freqs = np.fft.rfftfreq(len(prob_centered), d=dt)
 
@@ -388,4 +416,5 @@ def compute_mixing_spectrum(
         power=power,
         dominant_frequency=omega_dom,
         dominant_mixing_length=np.pi / omega_dom,
+        rayleigh_resolution=rayleigh_resolution,
     )

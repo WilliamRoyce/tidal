@@ -551,7 +551,10 @@ def _generate_output(args: Namespace, ctx: PlotContext) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if fmt == "npz":
-        _save_npz(output_path, ctx.spec, ctx.storage, ctx.grid, ctx.params)
+        _save_npz(
+            output_path, ctx.spec, ctx.storage, ctx.grid, ctx.params,
+            spec_path=Path(args.json_path),
+        )
     else:
         from tidal.cli._plot import save_plot
 
@@ -606,18 +609,22 @@ def _print_summary(
             print(f"  {name}: peak {init_peak:.4f} → {final_peak:.4f}")
 
 
-def _save_npz(
+def _save_npz(  # noqa: PLR0913, PLR0917
     path: Path,
     spec: EquationSystem,
     storage: MemoryStorage,
     grid: CartesianGrid | None = None,
     parameters: dict[str, float] | None = None,
+    spec_path: Path | None = None,
 ) -> None:
     """Save simulation data as .npz file.
 
     Saves field and momentum arrays at every snapshot, plus grid metadata
     and resolved parameters so that the file can be loaded for post-hoc
     measurement via ``SimulationData.from_npz_auto``.
+
+    If *spec_path* is provided, stores the resolved path in the NPZ under
+    ``_spec_path`` so that ``tidal measure`` can auto-discover the JSON spec.
     """
     times = np.array(storage.times)
     data: dict[str, np.ndarray] = {"times": times}
@@ -653,6 +660,10 @@ def _save_npz(
     if parameters:
         data["_param_names"] = np.array(list(parameters.keys()))
         data["_param_values"] = np.array(list(parameters.values()), dtype=np.float64)
+
+    # JSON spec path (for tidal measure auto-discovery)
+    if spec_path is not None:
+        data["_spec_path"] = np.array(str(spec_path.resolve()))
 
     np.savez(str(path), **data)  # type: ignore[reportArgumentType]
     print(f"  Saved data to: {path}")
