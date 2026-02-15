@@ -232,8 +232,7 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
 ];
 
 (* === Unified Tensor Component Extraction === *)
-(* Single pipeline for any tensor rank. The old rank-specific functions
-   (ExtractVectorComponent, ExtractRank2Component) delegate here. *)
+(* Single pipeline for any tensor rank. *)
 
 ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   additionalFields_List:{}, computeChristoffels_:False, metricMatrix_:None] := Module[
