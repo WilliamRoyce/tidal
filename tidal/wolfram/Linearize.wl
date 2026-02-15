@@ -61,22 +61,6 @@ These are constraints on the solution space, not evolution equations. They reduc
 the 10 DOF of h_ab to 2 physical polarizations (+ and x) for gravitational waves. \
 TT gauge is imposed via initial conditions in the simulation, not at the Lagrangian level.";
 
-(* === Utility Functions === *)
-
-IsLinear::usage =
-  "IsLinear[expr, field] returns True if the expression is linear in the field. \
-Uses polynomial degree checking when possible; conservatively returns False for \
-non-polynomial expressions.";
-
-SelectLinearTerms::usage =
-  "SelectLinearTerms[expr, field] extracts terms that are linear (degree-1) in the field. \
-For polynomial expressions, returns Coefficient[expr, field, 1] * field. For complex \
-expressions, selects terms with exactly one field factor.";
-
-HasExactlyOneFieldFactor::usage =
-  "HasExactlyOneFieldFactor[term, field] returns True if term contains exactly one \
-occurrence of the field or its derivatives.";
-
 Begin["`Private`"];
 
 (* ================================================================ *)
