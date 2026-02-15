@@ -26,4 +26,10 @@ tidal simulate ../data/scalar_vector_coupling.json \
   --bc periodic,periodic \
   --ic gaussian \
   --t-end 5.0 \
-  --dt 0.005
+  --dt 0.005 \
+  --output ../data/scalar_vector_coupling_output.npz
+
+# Measure scalar-to-vector conversion and characteristic mixing length
+tidal measure ../data/scalar_vector_coupling_output.npz \
+  --what conversion,mixing \
+  --source phi_0 --target A_0,A_1,A_2
