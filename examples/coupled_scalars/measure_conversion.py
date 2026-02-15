@@ -47,7 +47,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 PARAMS: dict[str, float] = {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5}
-T_END = 30.0
+T_END = 100.0
 TRACKER_INTERVAL = 0.2
 OUTPUT_FILENAME = "coupled_scalars_measurement.png"
 
@@ -135,8 +135,12 @@ def _print_summary(
     # Mixing length
     if mixing is not None:
         print("  Mixing length (spectral):")
-        print(f"    L_mix      = {mixing.mixing_length:.4f} +/- {mixing.mixing_length_uncertainty:.4f}")
-        print(f"    omega_dom  = {mixing.dominant_frequency:.4f}  (FWHM = {mixing.frequency_fwhm:.4f})")
+        print(
+            f"    L_mix      = {mixing.mixing_length:.4f} +/- {mixing.mixing_length_uncertainty:.4f}"
+        )
+        print(
+            f"    omega_dom  = {mixing.dominant_frequency:.4f}  (FWHM = {mixing.frequency_fwhm:.4f})"
+        )
         print(f"    max P(t)   = {mixing.max_conversion:.6f}")
         if len(mixing.peaks) > 1:
             print(f"    ({len(mixing.peaks)} spectral peaks detected)")
@@ -272,7 +276,9 @@ def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
     # [1,1] Mixing spectrum (temporal FFT of P(t))
     ax = axes[1, 1]
     if spectrum is not None:
-        ax.semilogy(spectrum.frequencies, spectrum.power, "b-", linewidth=1.0)
+        ax.semilogy(
+            spectrum.frequencies, spectrum.power, "b-", linewidth=0.5, alpha=0.7
+        )
         ax.axvline(
             spectrum.dominant_frequency,
             color="red",
@@ -280,6 +286,9 @@ def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
             alpha=0.7,
             label=rf"$\omega_{{\mathrm{{dom}}}}$ = {spectrum.dominant_frequency:.2f}",
         )
+        # Focus on the interesting frequency range (up to 10x dominant)
+        x_max = min(10 * spectrum.dominant_frequency, spectrum.frequencies[-1])
+        ax.set_xlim(0, x_max)
         ax.set_xlabel(r"Angular frequency $\omega$ (rad/time)")
         ax.set_ylabel(r"Power $|\hat{P}(\omega)|^2$")
         ax.legend(fontsize=8)

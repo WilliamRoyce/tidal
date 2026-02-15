@@ -51,10 +51,10 @@ if TYPE_CHECKING:
 # Simulation parameters
 # ---------------------------------------------------------------------------
 
-PARAMS: dict[str, float] = {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5}
-T_END = 2.0
-TRACKER_INTERVAL = 0.1
-ENERGY_THRESHOLD = 0.05
+PARAMS: dict[str, float] = {"mA2": 1.0, "mB2": 5.0, "gcoup": 0.5}
+T_END = 100.0
+TRACKER_INTERVAL = 0.16
+ENERGY_THRESHOLD = 0.002  # Depends strongly on resolution and BCs; periodic BCs give machine-precision conservation, while Dirichlet can have O(1%) errors.
 OUTPUT_FILENAME = "coupled_proca_measurement.png"
 
 
@@ -71,7 +71,7 @@ def _run_simulation() -> SimulationData:
     pde = build_pde_from_json(json_path, parameters=PARAMS)
     grid = CartesianGrid(
         bounds=[(0, np.pi), (0, np.pi)],
-        shape=[20, 20],
+        shape=[96, 96],
         periodic=True,
     )
 
@@ -94,8 +94,11 @@ def _run_simulation() -> SimulationData:
     storage = MemoryStorage()
     tracker: TrackerBase = storage.tracker(interrupts=TRACKER_INTERVAL)
     result = pde.solve(
-        state, t_range=T_END, dt=0.02,
-        scheme="runge-kutta", tracker=tracker,
+        state,
+        t_range=T_END,
+        dt=0.01,
+        scheme="runge-kutta",
+        tracker=tracker,
     )
     normalize_solve_result(result)
 
@@ -120,8 +123,9 @@ def _print_summary(
     print("=" * 60)
     print()
 
-    print(f"  mA2 = {PARAMS['mA2']},  mB2 = {PARAMS['mB2']},  "
-          f"gcoup = {PARAMS['gcoup']}")
+    print(
+        f"  mA2 = {PARAMS['mA2']},  mB2 = {PARAMS['mB2']},  gcoup = {PARAMS['gcoup']}"
+    )
     print()
 
     # Group conversion
@@ -137,17 +141,27 @@ def _print_summary(
     peak_b1 = int(np.argmax(r_b1.probability))
     peak_b2 = int(np.argmax(r_b2.probability))
     print("  Per-component breakdown:")
-    print(f"    P(A_1->A_2): peak = {r_a2.probability[peak_a2]:.6f} at t = {r_a2.times[peak_a2]:.2f}")
-    print(f"    P(A_1->B_1): peak = {r_b1.probability[peak_b1]:.6f} at t = {r_b1.times[peak_b1]:.2f}")
-    print(f"    P(A_1->B_2): peak = {r_b2.probability[peak_b2]:.6f} at t = {r_b2.times[peak_b2]:.2f}")
+    print(
+        f"    P(A_1->A_2): peak = {r_a2.probability[peak_a2]:.6f} at t = {r_a2.times[peak_a2]:.2f}"
+    )
+    print(
+        f"    P(A_1->B_1): peak = {r_b1.probability[peak_b1]:.6f} at t = {r_b1.times[peak_b1]:.2f}"
+    )
+    print(
+        f"    P(A_1->B_2): peak = {r_b2.probability[peak_b2]:.6f} at t = {r_b2.times[peak_b2]:.2f}"
+    )
     print()
 
     # Mixing length
     try:
         mixing = compute_mixing_length(total)
         print("  Mixing length (spectral):")
-        print(f"    L_mix      = {mixing.mixing_length:.4f} +/- {mixing.mixing_length_uncertainty:.4f}")
-        print(f"    omega_dom  = {mixing.dominant_frequency:.4f}  (FWHM = {mixing.frequency_fwhm:.4f})")
+        print(
+            f"    L_mix      = {mixing.mixing_length:.4f} +/- {mixing.mixing_length_uncertainty:.4f}"
+        )
+        print(
+            f"    omega_dom  = {mixing.dominant_frequency:.4f}  (FWHM = {mixing.frequency_fwhm:.4f})"
+        )
         print(f"    max P(t)   = {mixing.max_conversion:.6f}")
         if len(mixing.peaks) > 1:
             print(f"    ({len(mixing.peaks)} spectral peaks detected)")
@@ -159,7 +173,9 @@ def _print_summary(
     try:
         spectrum = compute_mixing_spectrum(total)
         print("  Mixing spectrum (temporal FFT of P(t)):")
-        print(f"    dominant oscillation freq: omega = {spectrum.dominant_frequency:.4f}")
+        print(
+            f"    dominant oscillation freq: omega = {spectrum.dominant_frequency:.4f}"
+        )
         print(f"    dominant spectral L_mix:   {spectrum.dominant_mixing_length:.4f}")
         print(f"    frequency bins: {len(spectrum.frequencies)}")
     except ValueError as e:
@@ -202,13 +218,17 @@ def _plot_results(  # noqa: PLR0913, PLR0915, PLR0917
     ax = axes[0, 0]
     ax.plot(total.times, total.probability, "b-", linewidth=1.5)
     ax.plot(
-        total.times[peak_idx], total.probability[peak_idx],
-        "ro", markersize=6,
+        total.times[peak_idx],
+        total.probability[peak_idx],
+        "ro",
+        markersize=6,
     )
     ax.annotate(
         f"P = {total.probability[peak_idx]:.4f}\nt = {total.times[peak_idx]:.1f}",
         xy=(total.times[peak_idx], total.probability[peak_idx]),
-        xytext=(15, -10), textcoords="offset points", fontsize=9,
+        xytext=(15, -10),
+        textcoords="offset points",
+        fontsize=9,
         arrowprops={"arrowstyle": "->", "color": "gray"},
     )
     # Mixing length annotation
@@ -216,8 +236,12 @@ def _plot_results(  # noqa: PLR0913, PLR0915, PLR0917
         mixing = compute_mixing_length(total)
         ax.annotate(
             f"$L_{{mix}}$ = {mixing.mixing_length:.2f} $\\pm$ {mixing.mixing_length_uncertainty:.2f}",
-            xy=(0.95, 0.95), xycoords="axes fraction",
-            ha="right", va="top", fontsize=9, color="green",
+            xy=(0.95, 0.95),
+            xycoords="axes fraction",
+            ha="right",
+            va="top",
+            fontsize=9,
+            color="green",
             bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8},
         )
     except ValueError:
@@ -230,10 +254,18 @@ def _plot_results(  # noqa: PLR0913, PLR0915, PLR0917
 
     # [0,1] Per-component P(t)
     ax = axes[0, 1]
-    ax.plot(r_a2.times, r_a2.probability, "c-", label=r"$P(A_1 \to A_2)$", linewidth=1.2)
-    ax.plot(r_b1.times, r_b1.probability, "r-", label=r"$P(A_1 \to B_1)$", linewidth=1.2)
-    ax.plot(r_b2.times, r_b2.probability, "g-", label=r"$P(A_1 \to B_2)$", linewidth=1.2)
-    ax.plot(total.times, total.probability, "b--", label="Total", linewidth=1.0, alpha=0.5)
+    ax.plot(
+        r_a2.times, r_a2.probability, "c-", label=r"$P(A_1 \to A_2)$", linewidth=1.2
+    )
+    ax.plot(
+        r_b1.times, r_b1.probability, "r-", label=r"$P(A_1 \to B_1)$", linewidth=1.2
+    )
+    ax.plot(
+        r_b2.times, r_b2.probability, "g-", label=r"$P(A_1 \to B_2)$", linewidth=1.2
+    )
+    ax.plot(
+        total.times, total.probability, "b--", label="Total", linewidth=1.0, alpha=0.5
+    )
     ax.set_xlabel("Time")
     ax.set_ylabel(r"$P(t)$")
     ax.set_title("Per-Component Conversion")
@@ -245,18 +277,33 @@ def _plot_results(  # noqa: PLR0913, PLR0915, PLR0917
     ax = axes[0, 2]
     try:
         spectrum = compute_mixing_spectrum(total)
-        ax.semilogy(spectrum.frequencies, spectrum.power, "b-", linewidth=1.0)
-        ax.axvline(
-            spectrum.dominant_frequency, color="red", linestyle="--",
-            alpha=0.7, label=rf"$\omega_{{dom}}$ = {spectrum.dominant_frequency:.2f}",
+        ax.semilogy(
+            spectrum.frequencies, spectrum.power, "b-", linewidth=0.5, alpha=0.7
         )
+        ax.axvline(
+            spectrum.dominant_frequency,
+            color="red",
+            linestyle="--",
+            alpha=0.7,
+            label=rf"$\omega_{{dom}}$ = {spectrum.dominant_frequency:.2f}",
+        )
+        # Focus on the interesting frequency range (up to 10x dominant)
+        x_max = min(10 * spectrum.dominant_frequency, spectrum.frequencies[-1])
+        ax.set_xlim(0, x_max)
         ax.set_xlabel(r"Angular frequency $\omega$ (rad/time)")
         ax.set_ylabel(r"Power $|\hat{P}(\omega)|^2$")
         ax.set_title("Mixing Spectrum")
         ax.legend(fontsize=8)
     except ValueError as e:
-        ax.text(0.5, 0.5, f"Not computed:\n{e}", transform=ax.transAxes,
-                ha="center", va="center", fontsize=9)
+        ax.text(
+            0.5,
+            0.5,
+            f"Not computed:\n{e}",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=9,
+        )
         ax.set_title("Mixing Spectrum")
     ax.grid(visible=True, alpha=0.3)
 
@@ -265,8 +312,17 @@ def _plot_results(  # noqa: PLR0913, PLR0915, PLR0917
     times, per_field, interaction, energy_total = compute_energy_timeseries(data)
     for name, series in per_field.items():
         ax.plot(times, series, linewidth=1.2, label=rf"$E_{{{name}}}$")
-    ax.plot(times, interaction, "m--", label=r"$E_\mathrm{int}$", linewidth=1.0, alpha=0.7)
-    ax.plot(times, energy_total, "k-", label=r"$E_{\mathrm{total}}$", linewidth=1.0, alpha=0.5)
+    ax.plot(
+        times, interaction, "m--", label=r"$E_\mathrm{int}$", linewidth=1.0, alpha=0.7
+    )
+    ax.plot(
+        times,
+        energy_total,
+        "k-",
+        label=r"$E_{\mathrm{total}}$",
+        linewidth=1.0,
+        alpha=0.5,
+    )
     ax.set_xlabel("Time")
     ax.set_ylabel("Energy")
     ax.set_title("Energy Decomposition")
@@ -276,8 +332,13 @@ def _plot_results(  # noqa: PLR0913, PLR0915, PLR0917
     # [1,1] Energy conservation
     ax = axes[1, 1]
     ax.plot(diag.times, diag.relative_error, "k-", linewidth=1.0)
-    ax.axhline(ENERGY_THRESHOLD, color="r", linestyle="--", alpha=0.5,
-               label=f"threshold ({ENERGY_THRESHOLD})")
+    ax.axhline(
+        ENERGY_THRESHOLD,
+        color="r",
+        linestyle="--",
+        alpha=0.5,
+        label=f"threshold ({ENERGY_THRESHOLD})",
+    )
     ax.axhline(-ENERGY_THRESHOLD, color="r", linestyle="--", alpha=0.5)
     ax.set_xlabel("Time")
     ax.set_ylabel(r"$\Delta E\,/\,E_0$")
@@ -302,8 +363,15 @@ def _plot_results(  # noqa: PLR0913, PLR0915, PLR0917
         )
     except ValueError:
         summary_text = "No mixing detected"
-    ax.text(0.1, 0.9, summary_text, transform=ax.transAxes,
-            fontsize=10, family="monospace", verticalalignment="top")
+    ax.text(
+        0.1,
+        0.9,
+        summary_text,
+        transform=ax.transAxes,
+        fontsize=10,
+        family="monospace",
+        verticalalignment="top",
+    )
 
     plt.tight_layout()
     output_dir = Path(__file__).parent.parent.parent / "outputs"
@@ -323,7 +391,9 @@ def main() -> None:
     """Run simulation and perform full measurement analysis."""
     print("Running coupled Proca simulation (periodic BCs)...")
     data = _run_simulation()
-    print(f"  {data.n_snapshots} snapshots collected over t=[0, {float(data.times[-1]):.1f}]")
+    print(
+        f"  {data.n_snapshots} snapshots collected over t=[0, {float(data.times[-1]):.1f}]"
+    )
 
     print("Computing group conversion probability (A_1 -> {A_2, B_1, B_2})...")
     total = compute_group_conversion(data, "A_1")
