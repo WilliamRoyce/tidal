@@ -161,7 +161,7 @@ slower mixing envelope.
 | Field | Description |
 |-------|-------------|
 | `mixing_length` | `pi / omega_dom` — half-period of the dominant oscillation |
-| `mixing_length_uncertainty` | Propagated from FWHM: `(pi / omega^2) * fwhm` |
+| `mixing_length_uncertainty` | Propagated from HWHM: `(pi / omega^2) * (FWHM/2)` |
 | `dominant_frequency` | `omega_dom` — angular frequency of strongest spectral peak |
 | `frequency_fwhm` | FWHM of the dominant peak (rad/time) |
 | `max_conversion` | `max(P(t))` — peak conversion probability |
@@ -178,7 +178,7 @@ at which P(t) oscillates.
 | `power` | `|P_hat(omega)|^2` — spectral power |
 | `mixing_length` | `pi / omega` — half-period at this frequency |
 | `fwhm` | Full width at half maximum (rad/time) |
-| `mixing_length_uncertainty` | `(pi / omega^2) * fwhm` |
+| `mixing_length_uncertainty` | `(pi / omega^2) * (FWHM/2)` |
 
 ### MixingSpectrum
 
@@ -190,6 +190,7 @@ Temporal frequency decomposition of P(t).
 | `power` | `|P_hat(omega)|^2` at each frequency |
 | `dominant_frequency` | `omega` of strongest oscillation peak |
 | `dominant_mixing_length` | `pi / dominant_frequency` — half-period at dominant freq |
+| `rayleigh_resolution` | `2*pi/T` — fundamental frequency resolution from observation window |
 
 ### SpectralSnapshot
 
@@ -307,6 +308,32 @@ of the original source energy has converted to the target field.
 For two coupled oscillators with equal masses, this reduces to a Rabi
 oscillation with beat frequency `delta_omega = omega_+ - omega_-` where
 `omega_+/-` are the normal mode frequencies of the coupled system.
+
+### Mixing Spectrum and Mixing Length
+
+The mixing spectrum is the temporal FFT of the conversion probability
+`P(t)`, revealing which oscillation frequencies participate in energy
+exchange between coupled fields. For a two-field Rabi system, the
+dominant spectral peak sits at the beat frequency `delta_omega =
+omega_+ - omega_-`; multi-field or multi-scale systems show richer
+spectra with multiple peaks.
+
+The **mixing length** `L_mix = pi / omega_dom` is the half-period of
+the dominant oscillation — the characteristic distance (or time) over
+which energy transfers between fields.
+
+**Uncertainty estimation:** The uncertainty in `L_mix` is propagated
+from the half-width at half-maximum (HWHM = FWHM/2) of the dominant
+spectral peak via `dL = (pi / omega^2) * HWHM`. HWHM is the standard
+spectroscopic convention for peak position uncertainty — it represents
+the distance from the peak center to the half-power point. A sharp
+peak (narrow FWHM) gives a precise mixing length; a broad peak means
+the oscillation frequency is less well-defined.
+
+The FWHM is floored at the Rayleigh resolution (`2*pi/T`) since no
+measurement can resolve features narrower than the fundamental
+resolution limit.  To improve frequency resolution, increase the
+simulation duration `T` or decrease the snapshot interval `dt`.
 
 ### Spectral Decomposition
 
@@ -444,13 +471,13 @@ All functions follow the project's fail-fast convention:
 - **Dirichlet BCs + cross_derivative operators:** The continuous cross-derivative IS self-adjoint with Dirichlet BCs, but the discrete ghost-cell stencil breaks this symmetry at boundary cells, causing ~30% energy drift. With periodic BCs the discrete stencil is exactly antisymmetric and energy conserves to ~1e-10. All examples now use periodic BCs. For users who need Dirichlet BCs with `cross_derivative` operators, see [HAMILTONIAN.md](HAMILTONIAN.md) Section 7, item 5 for the full analysis and SBP as a future remedy.
 - **Position-dependent coefficients:** Energy computation requires constant `m^2` and coupling coefficients. Spatially varying coefficients raise `ValueError`. Extending this requires evaluating position-dependent coefficients at each grid point during virial integration.
 - **Quadratic Lagrangians only:** The virial formula is exact for degree-2 potentials. Higher-order (nonlinear) Lagrangians would need explicit potential density integration.
-- **CLI integration:** No `tidal measure` subcommand yet. The `PlotContext.to_simulation_data()` bridge is in place for Phase 2.
+- **CLI integration:** `tidal measure result.npz --what conversion,mixing --source phi_0 --target chi_0` extracts measurements from the command line. The JSON spec is auto-discovered from NPZ metadata or provided via `--spec`. See `docs/source/cli.md` for full reference.
 - **Per-mode spectral conversion:** `P(k, t)` — tracking which Fourier modes participate in conversion — is planned for Phase 3.
 - **Plotting utilities:** Dedicated conversion curve and spectral waterfall plots are planned for Phase 5.
 
 ## Tests
 
-31 tests in `tests/test_measurement.py` covering:
+75+ tests in `tests/test_measurement.py` and `tests/test_cli.py` covering:
 
 - `SimulationData` construction from `MemoryStorage` and NPZ (including `from_npz_auto`)
 - Per-field and system energy computation with analytical validation
