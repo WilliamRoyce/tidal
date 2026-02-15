@@ -228,3 +228,29 @@ def electrostatics_json() -> Path:
 def massive_3form_json() -> Path:
     """Path to massive_3form.json, skip if absent."""
     return _cli_json_fixture("massive_3form.json")
+
+
+# ==================== NPZ Fixtures for tidal measure ====================
+
+
+@pytest.fixture
+def coupled_scalars_npz(coupled_scalars_json: Path, tmp_path: Path) -> Path:
+    """Run a short coupled_scalars simulation and save NPZ for measurement tests.
+
+    Returns the path to the generated NPZ file.
+    """
+    from tidal.cli import main
+
+    output = tmp_path / "coupled_scalars.npz"
+    ret = main([
+        "simulate", str(coupled_scalars_json),
+        "--param", "mPhi2=1.0",
+        "--param", "mChi2=4.0",
+        "--param", "gCpl=0.5",
+        "--t-end", "5.0",
+        "--grid-shape", "32",
+        "--output", str(output),
+    ])
+    assert ret == 0, "coupled_scalars simulation failed"
+    assert output.exists(), "NPZ file was not created"
+    return output
