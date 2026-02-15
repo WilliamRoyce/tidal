@@ -451,6 +451,21 @@ DetectLHSTimeOrder[equation_] := Module[{terms, maxOrder},
 
 (* === Field-Aware LHS Detection (for multi-field cross-coupled equations) === *)
 
+(* Check if a function head string matches a specific field name *)
+(* Uses same StringEndsQ+digit logic as MatchFieldToHeads *)
+(* Example: FunctionMatchesField["gwH0", "h_0"] -> True *)
+(* Example: FunctionMatchesField["gwH4", "h_0"] -> False *)
+FunctionMatchesField[headStr_String, fieldName_String] := Module[
+  {fieldParts, fieldBase, fieldIndex, headDigits, headBase},
+  fieldParts = StringSplit[fieldName, "_"];
+  If[Length[fieldParts] < 2, Return[False]];
+  fieldBase = ToLowerCase[First[fieldParts]];
+  fieldIndex = Last[fieldParts];
+  headDigits = StringCases[headStr, RegularExpression["\\d+$"]];
+  headBase = ToLowerCase[StringReplace[headStr, RegularExpression["\\d+$"] -> ""]];
+  Length[headDigits] > 0 && headDigits[[-1]] === fieldIndex && StringEndsQ[headBase, fieldBase]
+];
+
 (* Field-aware overload: only considers time derivatives of the specified field *)
 (* This is critical for multi-field systems where cross-field time derivatives *)
 (* (e.g., d2_t(h_4) appearing in h_0's equation) must NOT be classified as LHS *)
