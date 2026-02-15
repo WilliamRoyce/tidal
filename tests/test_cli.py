@@ -1353,6 +1353,196 @@ class TestValidateCommand:
         assert ret == 1
 
 
+class TestMeasureCommand:
+    def test_measure_help(self) -> None:
+        with pytest.raises(SystemExit, match="0"):
+            main(["measure", "--help"])
+
+    def test_measure_nonexistent_npz(self) -> None:
+        ret = main(["measure", "/nonexistent/file.npz", "--spec", "/nonexistent/spec.json"])
+        assert ret == 1
+
+    def test_measure_summary_text(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Default mode should print full summary with energy + conservation."""
+        ret = main(["measure", str(coupled_scalars_npz), "--spec", str(coupled_scalars_json)])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Energy Conservation:" in out
+        assert "Per-Field Energy" in out
+
+    def test_measure_json_output(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--json should produce valid JSON with simulation metadata."""
+        import json as json_mod
+
+        capsys.readouterr()  # flush fixture output
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--json", "--quiet",
+        ])
+        assert ret == 0
+        raw = capsys.readouterr().out
+        data = json_mod.loads(raw)
+        assert "simulation" in data
+        assert "energy" in data or "conservation" in data
+
+    def test_measure_energy_only(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--what=energy should compute only energy (no conversion/mixing)."""
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "energy",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Per-Field Energy" in out
+        assert "Conversion" not in out
+
+    def test_measure_conversion_requires_source(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+    ) -> None:
+        """--what=conversion without --source should error."""
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "conversion",
+        ])
+        assert ret == 1
+
+    def test_measure_conversion_with_fields(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Explicit --source and --target should compute conversion."""
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "conversion",
+            "--source", "phi_0",
+            "--target", "chi_0",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Conversion" in out
+        assert "Peak P(t)" in out
+
+    def test_measure_png_output(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        tmp_path: Path,
+    ) -> None:
+        """--output with .png extension should create a plot file."""
+        output = tmp_path / "measurement.png"
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--output", str(output),
+        ])
+        assert ret == 0
+        assert output.exists()
+        assert output.stat().st_size > 0
+
+    def test_measure_spec_autodiscovery(
+        self,
+        coupled_scalars_npz: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """NPZ saved by tidal simulate should contain _spec_path for auto-discovery."""
+        ret = main(["measure", str(coupled_scalars_npz)])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Energy Conservation:" in out
+
+    def test_measure_quiet(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--quiet should suppress progress messages but keep results."""
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--quiet",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Loading:" not in out
+        assert "Energy Conservation:" in out
+
+    def test_measure_invalid_what(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+    ) -> None:
+        """Unknown --what value should return 1."""
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "nonexistent_measure",
+        ])
+        assert ret == 1
+
+    def test_measure_param_override(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--param should override parameter values from NPZ."""
+        capsys.readouterr()  # flush fixture output
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "energy",
+            "--param", "mPhi2=2.0",
+            "--json", "--quiet",
+        ])
+        assert ret == 0
+        import json as json_mod
+
+        data = json_mod.loads(capsys.readouterr().out)
+        assert data["simulation"]["parameters"]["mPhi2"] == 2.0
+
+    def test_measure_mixing_standalone(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--what=mixing (without explicit conversion) should auto-detect source/target."""
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "mixing",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Mixing Length:" in out or "Mixing Length: not extracted" in out
+        # Conversion should also have been computed (as a dependency)
+        assert "Conversion" in out
+
+
 class TestExceptionHandling:
     def test_value_error_shows_clean_message(self, capsys: pytest.CaptureFixture[str]) -> None:
         """ValueError should produce a clean 'Error:' message, not a traceback."""

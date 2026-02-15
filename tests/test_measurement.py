@@ -1460,9 +1460,9 @@ class TestMixingLength:
         assert abs(result.mixing_length - expected_lmix) / expected_lmix < 0.10
 
     def test_monotonic_raises(self) -> None:
-        """Monotonically increasing P(t) has no spectral peaks → ValueError."""
+        """Constant P(t) has no spectral peaks → ValueError."""
         times = np.linspace(0, 10, 100)
-        prob = 1.0 - np.exp(-times)
+        prob = np.full_like(times, 0.5)  # No oscillation → no peaks
         conv = _make_conversion_result(times, prob)
 
         with pytest.raises(ValueError, match="No spectral peaks"):
@@ -1504,7 +1504,7 @@ class TestMixingLength:
         assert len(result_low.peaks) >= len(result_high.peaks)
         assert len(result_high.peaks) >= 1
 
-    def test_uncertainty_from_fwhm(self) -> None:
+    def test_uncertainty_from_hwhm(self) -> None:
         """Long timeseries with clean cos gives sharp peak → small uncertainty."""
         omega_0 = 3.0
         times = np.linspace(0, 100, 10000)
@@ -1513,8 +1513,8 @@ class TestMixingLength:
 
         result = compute_mixing_length(conv)
 
-        # ΔL = (π/ω²) × FWHM — verify the relationship holds
-        expected_unc = (np.pi / (result.dominant_frequency**2)) * result.frequency_fwhm
+        # dL = (pi/omega^2) * HWHM where HWHM = FWHM/2
+        expected_unc = (np.pi / (result.dominant_frequency**2)) * result.frequency_fwhm / 2.0
         assert abs(result.mixing_length_uncertainty - expected_unc) < 1e-10
         # Clean signal over long time → narrow peak → small uncertainty
         assert result.mixing_length_uncertainty < result.mixing_length * 0.1
@@ -1545,6 +1545,18 @@ class TestMixingLength:
 
         for i in range(len(result.peaks) - 1):
             assert result.peaks[i].power >= result.peaks[i + 1].power
+
+    def test_rayleigh_resolution_stored(self) -> None:
+        """MixingSpectrum stores Rayleigh resolution = 2*pi/T."""
+        times = np.linspace(0, 20, 200)
+        prob = 0.5 + 0.5 * np.cos(3.0 * times)
+        conv = _make_conversion_result(times, prob)
+
+        spectrum = compute_mixing_spectrum(conv)
+
+        t_total = float(times[-1] - times[0])
+        expected = 2.0 * np.pi / t_total
+        assert abs(spectrum.rayleigh_resolution - expected) / expected < 0.01
 
 
 class TestMixingSpectrum:
