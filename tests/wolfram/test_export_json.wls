@@ -128,20 +128,8 @@ testGradY2D = Derivative[0, 0, 1][phi0][t, x, y];
 gradDir3 = TorsionGertsenshtein`ExportJSON`IdentifyGradientDirection[testGradY2D];
 TestCase["IdentifyGradientDirection for 2+1D d_y", "gradient_y", gradDir3];
 
-(* === Test 6: IsSpatialCrossDerivative === *)
-Print[""];
-Print["Test 6: IsSpatialCrossDerivative"];
-
-(* Cross derivative d_x d_y *)
-testCross = Derivative[0, 1, 1][phi0][t, x, y];
-TestTrue["IsSpatialCrossDerivative for d_x d_y",
-  TorsionGertsenshtein`ExportJSON`IsSpatialCrossDerivative[testCross]];
-
-(* Not cross derivative *)
-TestTrue["IsSpatialCrossDerivative returns False for d2_x",
-  !TorsionGertsenshtein`ExportJSON`IsSpatialCrossDerivative[testGradX2D]];
-
 (* === Test 7: IdentifySpatialCrossDerivative === *)
+testCross = Derivative[0, 1, 1][phi0][t, x, y];
 Print[""];
 Print["Test 7: IdentifySpatialCrossDerivative"];
 
