@@ -110,6 +110,11 @@ IdentifySpatialCrossDerivative::usage =
 the operator name: \"cross_derivative_xy\", \"cross_derivative_xz\", \"cross_derivative_yz\", \
 or False if not a cross-derivative. Requires time slot = 0.";
 
+CountDerivativeOrder::usage =
+  "CountDerivativeOrder[term] counts the total derivative order of a term. \
+Delegates to ExtractDerivativeProfile and returns Total of the profile, \
+or 0 if no Derivative pattern is found.";
+
 IdentifyDirectionalLaplacian::usage =
   "IdentifyDirectionalLaplacian[term] identifies pure second derivatives in a single \
 spatial direction. Returns \"laplacian_x\", \"laplacian_y\", \"laplacian_z\", or False. \
@@ -808,6 +813,14 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
   ];
 
   {coefficient, symbolicCoeff, isTimeDependent, coordDeps}
+];
+
+(* Count the total derivative order of a term *)
+(* Returns the total order of the Derivative expression found, or 0 if none *)
+(* Delegates to ExtractDerivativeProfile to avoid duplicating extraction logic *)
+CountDerivativeOrder[term_] := Module[{profile},
+  profile = ExtractDerivativeProfile[term];
+  If[Length[profile] == 0, 0, Total[profile]]
 ];
 
 (* === Generic Derivative Order Support === *)
