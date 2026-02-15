@@ -15,7 +15,6 @@
      - Epsilon tensor evaluation: EvaluateEpsilonComponents converts Levi-Civita
        tensors to numeric ±1 values (supports 2D, 3D, 4D)
      - Metric evaluation: EvaluateMinkowskiMetric handles (-,+,+,...) signature
-     - Coefficient extraction: ExtractCoefficientWithSymbolic preserves symbolic info
      - xAct introspection: IsChristoffelSymbol, IsCovDOperator, IsEpsilonTensor
 
    DIMENSION SUPPORT:
@@ -226,9 +225,8 @@ IsEpsilonTensor[expr_] := Quiet[
    proper numeric values. For flat space this is 0; for curved space it would be
    computed from the metric.
 
-   NOTE: The legacy RemoveChristoffelSymbols function is kept for backward compatibility
-   but now uses the improved IsChristoffelSymbol detection which catches xCoba-generated
-   symbols like ChristoffelCDPDcart.
+   For flat space all Christoffels = 0; for curved space they are computed
+   from the metric via the standard formula.
 *)
 
 (* Compute Christoffel symbols from xAct's metric definition.
