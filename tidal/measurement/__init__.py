@@ -10,6 +10,8 @@ Typical usage::
     from tidal.measurement import compute_mixing_length, compute_mixing_spectrum
 
     data = SimulationData.from_storage(storage, spec, grid, params)
+    # Or from a snapshot directory (memory-mapped, O(1) RAM):
+    # data = SimulationData.load("output_dir", spec)
     result = compute_conversion_probability(data, "phi_0", "chi_0")
     mixing = compute_mixing_length(result)
     print(f"L_mix = {mixing.mixing_length:.4f} +/- {mixing.mixing_length_uncertainty:.4f}")
@@ -97,6 +99,9 @@ from tidal.measurement._writer import (
 from tidal.measurement._writer import (
     compute_snapshot_count as compute_snapshot_count,
 )
+from tidal.measurement._writer import (
+    create_snapshot_callback as create_snapshot_callback,
+)
 
 __all__ = [
     "ConversionResult",
@@ -126,5 +131,6 @@ __all__ = [
     "compute_spectral_energy",
     "compute_spectrum",
     "compute_system_energy",
+    "create_snapshot_callback",
     "summarize",
 ]

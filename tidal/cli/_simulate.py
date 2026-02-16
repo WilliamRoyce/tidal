@@ -515,7 +515,13 @@ def _build_initial_state(
 
 
 def _infer_output_format(args: Namespace) -> str:
-    """Determine output format from --format or file extension."""
+    """Determine output format from --format or file extension.
+
+    Raises
+    ------
+    ValueError
+        If ``--output`` has a ``.npz`` extension (no longer supported).
+    """
     if args.no_plot:
         return "summary"
     if args.output_format is not None:
@@ -523,7 +529,11 @@ def _infer_output_format(args: Namespace) -> str:
     if args.output is not None:
         ext = Path(args.output).suffix.lower()
         if ext == ".npz":
-            return "npz"
+            msg = (
+                "NPZ format is no longer supported. "
+                "Use a directory path (no extension) for disk-backed output."
+            )
+            raise ValueError(msg)
         if ext in {".png", ".pdf", ".jpg", ".svg"}:
             return ext.lstrip(".")
         # No extension → directory format (disk-backed streaming)
@@ -564,15 +574,9 @@ def _generate_output(args: Namespace, ctx: PlotContext) -> None:
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    if fmt == "npz":
-        _save_npz(
-            output_path, ctx.spec, ctx.storage, ctx.grid, ctx.params,
-            spec_path=Path(args.json_path),
-        )
-    else:
-        from tidal.cli._plot import save_plot
+    from tidal.cli._plot import save_plot
 
-        save_plot(output_path, ctx)
+    save_plot(output_path, ctx)
 
 
 def _print_constraint_summary(
@@ -623,83 +627,32 @@ def _print_summary(
             print(f"  {name}: peak {init_peak:.4f} → {final_peak:.4f}")
 
 
-def _save_npz(  # noqa: PLR0913, PLR0917
-    path: Path,
-    spec: EquationSystem,
-    storage: MemoryStorage,
-    grid: CartesianGrid | None = None,
-    parameters: dict[str, float] | None = None,
-    spec_path: Path | None = None,
-) -> None:
-    """Save simulation data as .npz file.
-
-    Saves field and momentum arrays at every snapshot, plus grid metadata
-    and resolved parameters so that the file can be loaded for post-hoc
-    measurement via ``SimulationData.from_npz_auto``.
-
-    If *spec_path* is provided, stores the resolved path in the NPZ under
-    ``_spec_path`` so that ``tidal measure`` can auto-discover the JSON spec.
-    """
-    times = np.array(storage.times)
-    data: dict[str, np.ndarray] = {"times": times}
-
-    # Build slot maps
-    f_slots = field_slots(spec)
-    m_slots: dict[str, int] = {
-        name: idx
-        for idx, (name, slot_type) in enumerate(spec.state_layout)
-        if slot_type == "momentum"
-    }
-
-    for t_idx in range(len(storage)):
-        snapshot = cast("FieldCollection", storage[t_idx])
-        for name in spec.component_names:
-            data[f"{name}_t{t_idx}"] = snapshot[f_slots[name]].data
-        for name, slot_idx in m_slots.items():
-            data[f"pi_{name}_t{t_idx}"] = snapshot[slot_idx].data
-
-    # Grid metadata (for SimulationData.from_npz / from_npz_auto)
-    if grid is not None:
-        spacing = np.array(
-            [(b[1] - b[0]) / s for b, s in zip(grid.axes_bounds, grid.shape, strict=True)],
-            dtype=np.float64,
-        )
-        bounds = np.array(grid.axes_bounds, dtype=np.float64)
-        periodic_arr = np.array(grid.periodic, dtype=bool)
-        data["grid_spacing"] = spacing
-        data["grid_bounds"] = bounds
-        data["grid_periodic"] = periodic_arr
-
-    # Resolved parameters (for symbolic coefficient resolution)
-    if parameters:
-        data["_param_names"] = np.array(list(parameters.keys()))
-        data["_param_values"] = np.array(list(parameters.values()), dtype=np.float64)
-
-    # JSON spec path (for tidal measure auto-discovery)
-    if spec_path is not None:
-        data["_spec_path"] = np.array(str(spec_path.resolve()))
-
-    np.savez(str(path), **data)  # type: ignore[reportArgumentType]
-    print(f"  Saved data to: {path}")
-
-
 def _save_constraint_output(
     args: Namespace,
     spec: EquationSystem,
     state: FieldCollection,
 ) -> None:
-    """Save constraint-solve output to NPZ if requested."""
+    """Save constraint-solve output to a directory if requested.
+
+    Raises
+    ------
+    ValueError
+        If ``--output`` has a ``.npz`` extension (no longer supported).
+    """
     if args.no_plot or args.output is None:
         return
     output_path = Path(args.output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
     if output_path.suffix == ".npz":
-        slots = field_slots(spec)
-        field_data: dict[str, np.ndarray] = {}
-        for name in spec.component_names:
-            field_data[name] = state[slots[name]].data
-        np.savez(str(output_path), **field_data)  # type: ignore[reportArgumentType]
-        print(f"  Saved data to: {output_path}")
+        msg = (
+            "NPZ format is no longer supported. "
+            "Use a directory path (no extension) for output."
+        )
+        raise ValueError(msg)
+    output_path.mkdir(parents=True, exist_ok=True)
+    slots = field_slots(spec)
+    for name in spec.component_names:
+        np.save(str(output_path / f"{name}.npy"), state[slots[name]].data)
+    print(f"  Saved data to: {output_path}")
 
 
 # --- Command entry point ---
@@ -823,7 +776,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: PLR0914, PLR0915
             args, spec, grid, snapshot_interval, params,
         )
     else:
-        # Legacy in-memory path (for NPZ/plot output)
+        # In-memory path (for plot output)
         from pde import MemoryStorage
 
         storage = MemoryStorage()
@@ -889,66 +842,23 @@ def _setup_disk_backed(
     """
     from pde import CallbackTracker, MemoryStorage
 
-    from tidal.measurement._writer import (
-        SnapshotWriter as Writer,
-    )
-    from tidal.measurement._writer import (
-        _field_names_from_spec,  # pyright: ignore[reportPrivateUsage]
-        compute_snapshot_count,
-    )
+    from tidal.measurement._writer import create_snapshot_callback
 
     output_dir = Path(args.output) if args.output else Path("output")
-    n_snapshots = compute_snapshot_count(args.t_end, snapshot_interval)
 
-    field_names, momentum_names = _field_names_from_spec(spec)
-
-    spacing = tuple(
-        float((b[1] - b[0]) / s)
-        for b, s in zip(grid.axes_bounds, grid.shape, strict=True)
-    )
-    bounds = tuple((float(b[0]), float(b[1])) for b in grid.axes_bounds)
-    periodic_flags = tuple(bool(p) for p in grid.periodic)
-
-    writer = Writer(
+    writer, callback = create_snapshot_callback(
         output_dir=output_dir,
-        field_names=field_names,
-        momentum_names=momentum_names,
-        grid_shape=tuple(grid.shape),
-        n_snapshots=n_snapshots,
-        grid_spacing=spacing,
-        grid_bounds=bounds,
-        periodic=periodic_flags,
+        spec=spec,
+        grid=grid,
+        t_end=args.t_end,
+        snapshot_interval=snapshot_interval,
         parameters=params,
         spec_path=Path(args.json_path),
     )
 
-    f_slots = field_slots(spec)
-    m_slots: dict[str, int] = {
-        name: idx
-        for idx, (name, slot_type) in enumerate(spec.state_layout)
-        if slot_type == "momentum"
-    }
+    snapshot_tracker = CallbackTracker(callback, interrupts=snapshot_interval)
 
-    writer_field_names = set(field_names)
-    writer_momentum_names = set(momentum_names)
-
-    def _on_snapshot(state_view: object, time: float) -> None:
-        fc = cast("FieldCollection", state_view)
-        fields: dict[str, np.ndarray] = {
-            name: np.asarray(fc[slot].data, dtype=np.float64)
-            for name, slot in f_slots.items()
-            if name in writer_field_names
-        }
-        moms: dict[str, np.ndarray] = {
-            name: np.asarray(fc[slot].data, dtype=np.float64)
-            for name, slot in m_slots.items()
-            if name in writer_momentum_names
-        }
-        writer.append(time, fields, moms)
-
-    snapshot_tracker = CallbackTracker(_on_snapshot, interrupts=snapshot_interval)
-
-    # Minimal MemoryStorage for summary (only the final snapshot)
+    # Minimal MemoryStorage for PlotContext summary (only the final snapshot)
     storage = MemoryStorage()
     summary_tracker = storage.tracker(args.t_end)
 

@@ -4,7 +4,6 @@ Provides ``SimulationData``, a frozen dataclass that stores the full time
 history of field and momentum arrays.  Can be constructed from:
 
 - A live ``MemoryStorage`` object (straight from the solver)
-- An NPZ file previously saved by ``tidal simulate --output``
 - A snapshot directory written by :class:`~tidal.measurement.SnapshotWriter`
   (memory-mapped, O(1) RAM)
 """
@@ -191,158 +190,6 @@ class SimulationData:
         )
 
     @classmethod
-    def from_npz(  # noqa: C901, PLR0913, PLR0917
-        cls,
-        path: Path | str,
-        spec: EquationSystem,
-        grid_spacing: tuple[float, ...],
-        grid_bounds: tuple[tuple[float, float], ...],
-        periodic: tuple[bool, ...],
-        parameters: dict[str, float] | None = None,
-    ) -> SimulationData:
-        """Load from an NPZ file saved by ``tidal simulate --output``.
-
-        Parameters
-        ----------
-        path : Path or str
-            Path to the ``.npz`` file.
-        spec : EquationSystem
-            JSON-derived equation specification.
-        grid_spacing : tuple[float, ...]
-            Cell sizes per spatial axis.
-        grid_bounds : tuple[tuple[float, float], ...]
-            Domain bounds per spatial axis.
-        periodic : tuple[bool, ...]
-            Per-axis periodicity flags.
-        parameters : dict, optional
-            Resolved parameter values.
-
-        Raises
-        ------
-        FileNotFoundError
-            If *path* does not exist.
-        ValueError
-            If the NPZ is missing ``"times"`` or expected field keys.
-        """
-        p = Path(path)
-        if not p.exists():
-            msg = f"NPZ file not found: {p}"
-            raise FileNotFoundError(msg)
-
-        data = np.load(str(p))
-
-        if "times" not in data:
-            msg = f"NPZ file {p} missing required 'times' key"
-            raise ValueError(msg)
-        times = np.asarray(data["times"], dtype=np.float64)
-        n = len(times)
-
-        # Reconstruct field arrays
-        fields: dict[str, NDArray[np.float64]] = {}
-        for name in spec.component_names:
-            slices: list[NDArray[np.float64]] = []
-            for t_idx in range(n):
-                key = f"{name}_t{t_idx}"
-                if key not in data:
-                    msg = f"NPZ file {p} missing expected key '{key}'"
-                    raise ValueError(msg)
-                slices.append(np.asarray(data[key], dtype=np.float64))
-            fields[name] = np.stack(slices)
-
-        # Reconstruct momentum arrays (may not be present in older NPZs)
-        momenta: dict[str, NDArray[np.float64]] = {}
-        for eq in spec.equations:
-            if eq.time_derivative_order < 2:  # noqa: PLR2004
-                continue
-            name = eq.field_name
-            key0 = f"pi_{name}_t0"
-            if key0 not in data:
-                # Older NPZ format without momenta — skip gracefully
-                continue
-            slices_m: list[NDArray[np.float64]] = []
-            for t_idx in range(n):
-                key = f"pi_{name}_t{t_idx}"
-                if key not in data:
-                    msg = f"NPZ file {p} missing expected momentum key '{key}'"
-                    raise ValueError(msg)
-                slices_m.append(np.asarray(data[key], dtype=np.float64))
-            momenta[name] = np.stack(slices_m)
-
-        return cls(
-            times=times,
-            fields=fields,
-            momenta=momenta,
-            grid_spacing=grid_spacing,
-            grid_bounds=grid_bounds,
-            periodic=periodic,
-            spec=spec,
-            parameters=parameters or {},
-        )
-
-    @classmethod
-    def from_npz_auto(
-        cls,
-        path: Path | str,
-        spec: EquationSystem,
-    ) -> SimulationData:
-        """Load from an NPZ file, reading grid metadata and parameters from the file.
-
-        This is a convenience wrapper around :meth:`from_npz` that reads
-        ``grid_spacing``, ``grid_bounds``, ``grid_periodic``, and resolved
-        parameters directly from the NPZ — no manual specification needed.
-
-        Parameters
-        ----------
-        path : Path or str
-            Path to the ``.npz`` file (saved by ``tidal simulate --output``).
-        spec : EquationSystem
-            JSON-derived equation specification.
-
-        Raises
-        ------
-        FileNotFoundError
-            If *path* does not exist.
-        ValueError
-            If the NPZ is missing grid metadata keys.
-        """
-        p = Path(path)
-        if not p.exists():
-            msg = f"NPZ file not found: {p}"
-            raise FileNotFoundError(msg)
-
-        data = np.load(str(p))
-
-        for key in ("grid_spacing", "grid_bounds", "grid_periodic"):
-            if key not in data:
-                msg = (
-                    f"NPZ file {p} missing '{key}' metadata — "
-                    f"use from_npz() with explicit grid parameters instead"
-                )
-                raise ValueError(msg)
-
-        grid_spacing = tuple(float(v) for v in data["grid_spacing"])
-        grid_bounds = tuple(
-            (float(row[0]), float(row[1])) for row in data["grid_bounds"]
-        )
-        periodic = tuple(bool(v) for v in data["grid_periodic"])
-
-        # Reconstruct parameters if saved
-        parameters: dict[str, float] = {}
-        if "_param_names" in data and "_param_values" in data:
-            names = list(data["_param_names"])
-            values = list(data["_param_values"])
-            parameters = dict(zip(names, (float(v) for v in values), strict=True))
-
-        return cls.from_npz(
-            path=p,
-            spec=spec,
-            grid_spacing=grid_spacing,
-            grid_bounds=grid_bounds,
-            periodic=periodic,
-            parameters=parameters,
-        )
-
-    @classmethod
     def from_directory(  # noqa: C901, PLR0912, PLR0914, PLR0915
         cls,
         path: Path | str,
@@ -472,28 +319,79 @@ class SimulationData:
             parameters=parameters,
         )
 
+    def save(self, path: Path | str) -> Path:
+        """Save to a snapshot directory (metadata.json + .npy files).
+
+        This is the inverse of ``load()`` / ``from_directory()``.
+        Overwrites any existing files in the directory.
+
+        Parameters
+        ----------
+        path : Path or str
+            Directory to write into (created if it does not exist).
+
+        Returns
+        -------
+        Path
+            The directory that was written.
+        """
+        p = Path(path)
+        p.mkdir(parents=True, exist_ok=True)
+
+        np.save(str(p / "times.npy"), np.asarray(self.times))
+        for name, arr in self.fields.items():
+            np.save(str(p / f"{name}.npy"), np.asarray(arr))
+        for name, arr in self.momenta.items():
+            np.save(str(p / f"pi_{name}.npy"), np.asarray(arr))
+
+        # Infer grid shape from the first field array
+        first_field = next(iter(self.fields.values()))
+        grid_shape = list(first_field.shape[1:])  # strip snapshot dim
+
+        metadata = {
+            "format_version": 1,
+            "n_snapshots": self.n_snapshots,
+            "grid_shape": grid_shape,
+            "grid_spacing": list(self.grid_spacing),
+            "grid_bounds": [list(b) for b in self.grid_bounds],
+            "periodic": list(self.periodic),
+            "parameters": self.parameters,
+            "fields": list(self.fields.keys()),
+            "momenta": list(self.momenta.keys()),
+            "dtype": "float64",
+        }
+        (p / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
+        return p
+
     @classmethod
     def load(
         cls,
         path: Path | str,
         spec: EquationSystem,
     ) -> SimulationData:
-        """Auto-detect format (directory or NPZ) and load.
-
-        - If *path* is a directory → :meth:`from_directory` (memory-mapped)
-        - If *path* is a ``.npz`` file → :meth:`from_npz_auto` (eager load)
+        """Load from a snapshot directory (memory-mapped, O(1) RAM).
 
         Parameters
         ----------
         path : Path or str
-            Path to snapshot directory or NPZ file.
+            Path to snapshot directory.
         spec : EquationSystem
             JSON-derived equation specification.
+
+        Raises
+        ------
+        ValueError
+            If *path* is not a directory.
         """
         p = Path(path)
-        if p.is_dir():
-            return cls.from_directory(p, spec)
-        return cls.from_npz_auto(p, spec)
+        if not p.is_dir():
+            msg = (
+                f"Expected a snapshot directory, got file '{p}'. "
+                f"NPZ format is no longer supported — "
+                f"use 'tidal simulate --output <directory>'"
+            )
+            raise ValueError(msg)
+        return cls.from_directory(p, spec)
 
 
 def _infer_snapshot_count(times_arr: NDArray[np.float64]) -> int:

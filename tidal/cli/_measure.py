@@ -1,10 +1,11 @@
 """``tidal measure`` — Extract physics measurements from simulation output.
 
-Loads an NPZ file produced by ``tidal simulate --output`` and runs
-measurement analyses: energy decomposition, conversion probability,
-mixing length, spectral analysis, and energy conservation diagnostics.
+Loads simulation output from a snapshot directory produced by
+``tidal simulate --output`` and runs measurement analyses: energy
+decomposition, conversion probability, mixing length, spectral analysis,
+and energy conservation diagnostics.
 
-The JSON equation spec can be auto-discovered from the NPZ metadata
+The JSON equation spec can be auto-discovered from ``metadata.json``
 (stored by ``tidal simulate``) or provided explicitly via ``--spec``.
 
 Physics notes
@@ -54,14 +55,13 @@ _VALID_MEASUREMENTS = frozenset({
 # ------------------------------------------------------------------
 
 
-def _resolve_spec_path(data_path: Path, spec_arg: str | None) -> Path:  # noqa: C901
-    """Resolve the JSON spec path from CLI flag, directory metadata, or NPZ.
+def _resolve_spec_path(data_path: Path, spec_arg: str | None) -> Path:
+    """Resolve the JSON spec path from CLI flag or directory metadata.
 
     Resolution order:
     1. Explicit ``--spec`` flag (highest priority)
     2. ``spec_path`` from ``metadata.json`` (snapshot directory)
-    3. ``_spec_path`` stored in the NPZ by ``tidal simulate``
-    4. Error — no spec found
+    3. Error — no spec found
 
     Raises
     ------
@@ -92,24 +92,6 @@ def _resolve_spec_path(data_path: Path, spec_arg: str | None) -> Path:  # noqa: 
                 relative = data_path.parent / p.name
                 if relative.exists():
                     return relative
-
-        msg = (
-            f"Cannot determine JSON spec for {data_path.name} — "
-            f"use --spec to provide the path explicitly"
-        )
-        raise ValueError(msg)
-
-    # Try NPZ metadata
-    data = np.load(str(data_path), allow_pickle=False)
-    if "_spec_path" in data:
-        stored = str(data["_spec_path"])
-        p = Path(stored)
-        if p.exists():
-            return p
-        # Stored path doesn't exist — try relative to NPZ directory
-        relative = data_path.parent / p.name
-        if relative.exists():
-            return relative
 
     msg = (
         f"Cannot determine JSON spec for {data_path.name} — "
@@ -154,10 +136,7 @@ def _load_data(
     spec_path: Path,
     param_overrides: list[str],
 ) -> SimulationData:
-    """Load simulation data from NPZ or snapshot directory.
-
-    Auto-detects format: directories use memory-mapped lazy loading (O(1)
-    RAM), NPZ files are loaded eagerly.
+    """Load simulation data from a snapshot directory (memory-mapped, O(1) RAM).
 
     Merges ``--param`` overrides with parameters stored in the data.
     """
@@ -698,8 +677,8 @@ def measure_command(args: Namespace) -> int:
     """Run ``tidal measure`` subcommand.
 
     Flow:
-    1. Validate NPZ exists
-    2. Resolve JSON spec path (--spec or NPZ metadata)
+    1. Validate data path exists
+    2. Resolve JSON spec path (--spec or metadata.json)
     3. Parse --what measurement set
     4. Load SimulationData
     5. Run requested measurements (dependency-ordered)
@@ -707,7 +686,7 @@ def measure_command(args: Namespace) -> int:
 
     Returns 0 on success, 1 on error.
     """
-    data_path = Path(args.npz_path)
+    data_path = Path(args.data_path)
     if not data_path.exists():
         print(f"Error: data path not found: {data_path}", file=sys.stderr)
         return 1
@@ -717,8 +696,7 @@ def measure_command(args: Namespace) -> int:
     quiet: bool = getattr(args, "quiet", False)
 
     if not quiet:
-        fmt_label = "directory" if data_path.is_dir() else "NPZ"
-        print(f"Loading: {data_path.name} ({fmt_label})")
+        print(f"Loading: {data_path.name}")
         print(f"Spec:    {spec_path.name}")
 
     data = _load_data(data_path, spec_path, getattr(args, "param", None) or [])

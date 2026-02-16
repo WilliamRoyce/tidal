@@ -22,11 +22,13 @@ from __future__ import annotations
 import json
 import warnings
 from pathlib import Path
-from typing import TYPE_CHECKING, Self
+from typing import TYPE_CHECKING, Any, Self
 
 import numpy as np
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from numpy.typing import NDArray
 
     from tidal.symbolic.json_loader import EquationSystem
@@ -405,3 +407,94 @@ def _field_names_from_spec(  # pyright: ignore[reportUnusedFunction]
         if eq.time_derivative_order >= 2:  # noqa: PLR2004
             momentum_names.append(eq.field_name)
     return field_names, momentum_names
+
+
+def create_snapshot_callback(  # noqa: PLR0913, PLR0917
+    output_dir: Path | str,
+    spec: EquationSystem,
+    grid: Any,  # noqa: ANN401
+    t_end: float,
+    snapshot_interval: float,
+    parameters: dict[str, float] | None = None,
+    spec_path: Path | None = None,
+) -> tuple[SnapshotWriter, Callable[[Any, float], None]]:
+    """Create a SnapshotWriter + callback for streaming snapshots to disk.
+
+    The returned *callback* accepts ``(state, time)`` where *state* is a
+    ``pde.FieldCollection``.  Wrap it in ``CallbackTracker(callback, ...)``
+    and pass to ``pde.solve()``.  Call ``writer.close()`` after the solve.
+
+    Parameters
+    ----------
+    output_dir : Path or str
+        Directory to write snapshot files into.
+    spec : EquationSystem
+        Equation system (provides field/momentum names and state layout).
+    grid : CartesianGrid
+        py-pde grid (provides shape, spacing, bounds, periodicity).
+    t_end : float
+        Total simulation time.
+    snapshot_interval : float
+        Time between snapshots.
+    parameters : dict or None
+        Resolved parameter values to store in metadata.
+    spec_path : Path or None
+        Path to the JSON spec file (for auto-discovery by ``tidal measure``).
+
+    Returns
+    -------
+    writer : SnapshotWriter
+        Call ``writer.close()`` after the solve finishes.
+    callback : callable
+        Pass to ``CallbackTracker(callback, interrupts=snapshot_interval)``.
+    """
+    out = Path(output_dir)
+    field_names, momentum_names = _field_names_from_spec(spec)
+    n_snapshots = compute_snapshot_count(t_end, snapshot_interval)
+
+    spacing = tuple(
+        float((b[1] - b[0]) / s)
+        for b, s in zip(grid.axes_bounds, grid.shape, strict=True)
+    )
+    bounds = tuple((float(b[0]), float(b[1])) for b in grid.axes_bounds)
+    periodic_flags = tuple(bool(p) for p in grid.periodic)
+
+    writer = SnapshotWriter(
+        output_dir=out,
+        field_names=field_names,
+        momentum_names=momentum_names,
+        grid_shape=tuple(grid.shape),
+        n_snapshots=n_snapshots,
+        grid_spacing=spacing,
+        grid_bounds=bounds,
+        periodic=periodic_flags,
+        parameters=parameters,
+        spec_path=Path(spec_path) if spec_path else None,
+    )
+
+    # Build slot maps from spec.state_layout
+    field_slots: dict[str, int] = {}
+    momentum_slots: dict[str, int] = {}
+    for idx, (name, slot_type) in enumerate(spec.state_layout):
+        if slot_type == "field":
+            field_slots[name] = idx
+        elif slot_type == "momentum":
+            momentum_slots[name] = idx
+
+    field_set = set(field_names)
+    momentum_set = set(momentum_names)
+
+    def _on_snapshot(state_view: Any, time: float) -> None:  # noqa: ANN401
+        fields = {
+            name: np.asarray(state_view[slot].data, dtype=np.float64)
+            for name, slot in field_slots.items()
+            if name in field_set
+        }
+        moms = {
+            name: np.asarray(state_view[slot].data, dtype=np.float64)
+            for name, slot in momentum_slots.items()
+            if name in momentum_set
+        }
+        writer.append(time, fields, moms)
+
+    return writer, _on_snapshot
