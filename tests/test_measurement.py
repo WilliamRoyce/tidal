@@ -38,6 +38,7 @@ from tidal.measurement import (
     compute_spectral_energy,
     compute_spectrum,
     compute_system_energy,
+    summarize,
 )
 from tidal.measurement._energy import (
     _apply_spatial_operator,  # pyright: ignore[reportPrivateUsage]
@@ -483,6 +484,38 @@ class TestEnergyConservation:
         data = _make_sim_data_two_fields(n_snapshots=5)
         with pytest.raises(ValueError, match="positive"):
             check_energy_conservation(data, threshold=0.0)
+
+
+class TestSummarize:
+    """Test summarize() diagnostics function."""
+
+    def test_summarize_keys(self) -> None:
+        """Summary dict contains all expected keys."""
+        data = _make_sim_data_two_fields(n_snapshots=11)
+        result = summarize(data)
+
+        expected_keys = {
+            "times",
+            "per_field_energy",
+            "interaction_energy",
+            "total_energy",
+            "energy_conservation",
+            "field_peaks",
+        }
+        assert set(result.keys()) == expected_keys
+        assert isinstance(result["energy_conservation"], EnergyDiagnostics)
+        assert isinstance(result["per_field_energy"], dict)
+        assert set(result["per_field_energy"].keys()) == {"phi_0", "chi_0"}
+
+    def test_summarize_field_peaks(self) -> None:
+        """Field peaks match manual np.max(np.abs(...)) of first/last snapshots."""
+        data = _make_sim_data_two_fields(n_snapshots=11)
+        result = summarize(data)
+
+        for name in data.fields:
+            initial_peak = float(np.max(np.abs(data.fields[name][0])))
+            final_peak = float(np.max(np.abs(data.fields[name][-1])))
+            assert result["field_peaks"][name] == (initial_peak, final_peak)
 
 
 # ============================================================
