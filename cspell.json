@@ -197,6 +197,7 @@
     "jsons",
     "HWHM",
     "kvec",
+    "mmaps",
     "pcolormesh",
     "pytest",
     "pyright",

@@ -91,6 +91,12 @@ from tidal.measurement._spectral_conversion import (
 from tidal.measurement._spectral_conversion import (
     compute_spectral_conversion as compute_spectral_conversion,
 )
+from tidal.measurement._writer import (
+    SnapshotWriter as SnapshotWriter,
+)
+from tidal.measurement._writer import (
+    compute_snapshot_count as compute_snapshot_count,
+)
 
 __all__ = [
     "ConversionResult",
@@ -100,6 +106,7 @@ __all__ = [
     "MixingResult",
     "MixingSpectrum",
     "SimulationData",
+    "SnapshotWriter",
     "SpectralConversion",
     "SpectralPeak",
     "SpectralSnapshot",
@@ -114,6 +121,7 @@ __all__ = [
     "compute_mixing_length",
     "compute_mixing_spectrum",
     "compute_mode_amplitudes",
+    "compute_snapshot_count",
     "compute_spectral_conversion",
     "compute_spectral_energy",
     "compute_spectrum",

@@ -2054,3 +2054,472 @@ class TestDispersionRelation:
         data = _make_plane_wave_data()
         result = compute_dispersion(data, "phi_0")
         assert np.all(result.frequencies > 0.0)
+
+
+# ============================================================
+# Group 12 — SnapshotWriter and disk-backed storage
+# ============================================================
+
+from tidal.measurement._writer import (  # noqa: E402
+    SnapshotWriter,
+    compute_snapshot_count,
+)
+
+
+class TestSnapshotWriter:
+    """Tests for SnapshotWriter disk-backed streaming."""
+
+    def test_round_trip(self, tmp_path: Path) -> None:
+        """Write snapshots via SnapshotWriter, read via from_directory."""
+        spec = _build_coupled_scalars_spec()
+        n_grid = 16
+        n_snapshots = 5
+        grid_shape = (n_grid,)
+        grid_spacing = (0.5,)
+        grid_bounds = ((0.0, 8.0),)
+        periodic = (True,)
+        params = {"m_phi": 1.0, "m_chi": 2.0, "g": 0.1}
+
+        # Generate synthetic data
+        rng = np.random.default_rng(42)
+        expected_times = np.linspace(0.0, 4.0, n_snapshots)
+        expected_fields: dict[str, np.ndarray] = {
+            "phi_0": rng.standard_normal((n_snapshots, n_grid)),
+            "chi_0": rng.standard_normal((n_snapshots, n_grid)),
+        }
+        expected_momenta: dict[str, np.ndarray] = {
+            "phi_0": rng.standard_normal((n_snapshots, n_grid)),
+            "chi_0": rng.standard_normal((n_snapshots, n_grid)),
+        }
+
+        output_dir = tmp_path / "snap_out"
+        with SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=["phi_0", "chi_0"],
+            grid_shape=grid_shape,
+            n_snapshots=n_snapshots,
+            grid_spacing=grid_spacing,
+            grid_bounds=grid_bounds,
+            periodic=periodic,
+            parameters=params,
+        ) as writer:
+            for i in range(n_snapshots):
+                writer.append(
+                    float(expected_times[i]),
+                    {
+                        "phi_0": expected_fields["phi_0"][i],
+                        "chi_0": expected_fields["chi_0"][i],
+                    },
+                    {
+                        "phi_0": expected_momenta["phi_0"][i],
+                        "chi_0": expected_momenta["chi_0"][i],
+                    },
+                )
+
+        # Load via from_directory
+        data = SimulationData.from_directory(output_dir, spec)
+
+        np.testing.assert_allclose(data.times, expected_times)
+        for name in ("phi_0", "chi_0"):
+            np.testing.assert_allclose(data.fields[name], expected_fields[name])
+            np.testing.assert_allclose(data.momenta[name], expected_momenta[name])
+
+        assert data.grid_spacing == grid_spacing
+        assert data.grid_bounds == grid_bounds
+        assert data.periodic == periodic
+        assert data.parameters == params
+
+    def test_mmap_readonly(self, tmp_path: Path) -> None:
+        """from_directory returns memory-mapped arrays (read-only)."""
+        spec = _build_coupled_scalars_spec()
+        n_grid = 8
+        n_snapshots = 3
+
+        output_dir = tmp_path / "mmap_test"
+        with SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=["phi_0", "chi_0"],
+            grid_shape=(n_grid,),
+            n_snapshots=n_snapshots,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 8.0),),
+            periodic=(True,),
+        ) as writer:
+            for i in range(n_snapshots):
+                writer.append(
+                    float(i),
+                    {"phi_0": np.zeros(n_grid), "chi_0": np.ones(n_grid)},
+                    {"phi_0": np.zeros(n_grid), "chi_0": np.zeros(n_grid)},
+                )
+
+        data = SimulationData.from_directory(output_dir, spec)
+
+        # Memory-mapped arrays should be np.memmap instances
+        assert isinstance(data.fields["phi_0"], np.memmap)
+        assert isinstance(data.momenta["phi_0"], np.memmap)
+        assert isinstance(data.times, np.memmap)
+
+    def test_count_property(self, tmp_path: Path) -> None:
+        """Count tracks how many snapshots have been written."""
+        output_dir = tmp_path / "count_test"
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=3,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        )
+        assert writer.count == 0
+        writer.append(0.0, {"phi_0": np.zeros(4)}, {})
+        assert writer.count == 1
+        writer.append(1.0, {"phi_0": np.zeros(4)}, {})
+        assert writer.count == 2
+        writer.close()
+        assert writer.count == 2
+
+    def test_overflow_raises(self, tmp_path: Path) -> None:
+        """Writing more snapshots than pre-allocated raises ValueError."""
+        output_dir = tmp_path / "overflow_test"
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=1,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        )
+        writer.append(0.0, {"phi_0": np.zeros(4)}, {})
+        with pytest.raises(ValueError, match="Cannot write snapshot"):
+            writer.append(1.0, {"phi_0": np.zeros(4)}, {})
+        writer.close()
+
+    def test_missing_field_raises(self, tmp_path: Path) -> None:
+        """Append raises ValueError if a required field is missing."""
+        output_dir = tmp_path / "missing_field"
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=2,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        )
+        with pytest.raises(ValueError, match="Missing field 'chi_0'"):
+            writer.append(0.0, {"phi_0": np.zeros(4)}, {})
+        writer.close()
+
+    def test_write_after_close_raises(self, tmp_path: Path) -> None:
+        """Writing to a closed writer raises ValueError."""
+        output_dir = tmp_path / "closed_test"
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=2,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        )
+        writer.close()
+        with pytest.raises(ValueError, match="already closed"):
+            writer.append(0.0, {"phi_0": np.zeros(4)}, {})
+
+    def test_zero_snapshots_raises(self) -> None:
+        """n_snapshots < 1 raises ValueError."""
+        with pytest.raises(ValueError, match="n_snapshots must be >= 1"):
+            SnapshotWriter(
+                output_dir=Path("/tmp/unused"),
+                field_names=["phi_0"],
+                momentum_names=[],
+                grid_shape=(4,),
+                n_snapshots=0,
+                grid_spacing=(1.0,),
+                grid_bounds=((0.0, 4.0),),
+                periodic=(False,),
+            )
+
+    def test_empty_field_names_raises(self) -> None:
+        """Empty field_names raises ValueError."""
+        with pytest.raises(ValueError, match="field_names must be non-empty"):
+            SnapshotWriter(
+                output_dir=Path("/tmp/unused"),
+                field_names=[],
+                momentum_names=[],
+                grid_shape=(4,),
+                n_snapshots=1,
+                grid_spacing=(1.0,),
+                grid_bounds=((0.0, 4.0),),
+                periodic=(False,),
+            )
+
+    def test_single_snapshot(self, tmp_path: Path) -> None:
+        """Single-snapshot round-trip works correctly."""
+        spec = _build_coupled_scalars_spec()
+        output_dir = tmp_path / "single"
+        n_grid = 4
+        field_data = np.array([1.0, 2.0, 3.0, 4.0])
+
+        with SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=["phi_0", "chi_0"],
+            grid_shape=(n_grid,),
+            n_snapshots=1,
+            grid_spacing=(2.5,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+        ) as writer:
+            writer.append(
+                0.0,
+                {"phi_0": field_data, "chi_0": np.zeros(n_grid)},
+                {"phi_0": np.zeros(n_grid), "chi_0": np.zeros(n_grid)},
+            )
+
+        data = SimulationData.from_directory(output_dir, spec)
+        assert data.n_snapshots == 1
+        np.testing.assert_allclose(data.fields["phi_0"][0], field_data)
+
+    def test_partial_close_warns(self, tmp_path: Path) -> None:
+        """Closing with fewer snapshots than pre-allocated emits a warning."""
+        output_dir = tmp_path / "partial"
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=5,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        )
+        writer.append(0.0, {"phi_0": np.zeros(4)}, {})
+        writer.append(1.0, {"phi_0": np.ones(4)}, {})
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            writer.close()
+            assert len(w) == 1
+            assert "2/5" in str(w[0].message)
+
+    def test_2d_grid(self, tmp_path: Path) -> None:
+        """Round-trip with a 2D grid shape."""
+        spec = _build_coupled_scalars_spec()
+        output_dir = tmp_path / "grid2d"
+        grid_shape = (8, 6)
+        n_snapshots = 3
+
+        rng = np.random.default_rng(123)
+        expected = rng.standard_normal((n_snapshots, *grid_shape))
+
+        with SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=["phi_0", "chi_0"],
+            grid_shape=grid_shape,
+            n_snapshots=n_snapshots,
+            grid_spacing=(1.0, 1.0),
+            grid_bounds=((0.0, 8.0), (0.0, 6.0)),
+            periodic=(True, True),
+        ) as writer:
+            for i in range(n_snapshots):
+                writer.append(
+                    float(i),
+                    {"phi_0": expected[i], "chi_0": np.zeros(grid_shape)},
+                    {"phi_0": np.zeros(grid_shape), "chi_0": np.zeros(grid_shape)},
+                )
+
+        data = SimulationData.from_directory(output_dir, spec)
+        np.testing.assert_allclose(data.fields["phi_0"], expected)
+
+    def test_spec_path_recorded(self, tmp_path: Path) -> None:
+        """spec_path is recorded in metadata.json."""
+        import json
+
+        output_dir = tmp_path / "specpath"
+        spec_path = Path("examples/data/coupled_scalars.json")
+
+        with SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=1,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+            spec_path=spec_path,
+        ) as writer:
+            writer.append(0.0, {"phi_0": np.zeros(4)}, {})
+
+        metadata = json.loads((output_dir / "metadata.json").read_text())
+        assert metadata["spec_path"] == str(spec_path)
+        assert metadata["version"] == 1
+
+
+class TestCrashRecovery:
+    """Test recovery from incomplete writes (no metadata.json)."""
+
+    def test_recovery_without_metadata(self, tmp_path: Path) -> None:
+        """from_directory recovers when metadata.json is missing (crash)."""
+        spec = _build_coupled_scalars_spec()
+        output_dir = tmp_path / "crash"
+        n_grid = 4
+        n_snapshots = 5
+
+        # Write 3 of 5 snapshots, then DON'T close (simulates crash)
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=["phi_0", "chi_0"],
+            grid_shape=(n_grid,),
+            n_snapshots=n_snapshots,
+            grid_spacing=(2.5,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+        )
+        for i in range(3):
+            writer.append(
+                float(i) + 0.1,  # non-zero times
+                {"phi_0": np.full(n_grid, float(i)), "chi_0": np.zeros(n_grid)},
+                {"phi_0": np.zeros(n_grid), "chi_0": np.zeros(n_grid)},
+            )
+        # Flush without writing metadata.json
+        writer._flush_mmaps()  # pyright: ignore[reportPrivateUsage]
+        # Delete metadata.json if it exists (it shouldn't, but be safe)
+        meta_path = output_dir / "metadata.json"
+        if meta_path.exists():
+            meta_path.unlink()
+
+        # from_directory should infer 3 snapshots from times.npy
+        data = SimulationData.from_directory(output_dir, spec)
+        assert data.n_snapshots == 3
+        np.testing.assert_allclose(data.times[0], 0.1)
+        np.testing.assert_allclose(data.times[2], 2.1)
+        np.testing.assert_allclose(data.fields["phi_0"][1], np.full(n_grid, 1.0))
+
+    def test_recovery_all_zero_times(self, tmp_path: Path) -> None:
+        """Recovery with only t=0 written yields 1 snapshot."""
+        spec = _build_coupled_scalars_spec()
+        output_dir = tmp_path / "crash_t0"
+        n_grid = 4
+        n_snapshots = 10
+
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=["phi_0", "chi_0"],
+            grid_shape=(n_grid,),
+            n_snapshots=n_snapshots,
+            grid_spacing=(2.5,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+        )
+        # Write only the initial snapshot at t=0
+        writer.append(
+            0.0,
+            {"phi_0": np.ones(n_grid), "chi_0": np.zeros(n_grid)},
+            {"phi_0": np.zeros(n_grid), "chi_0": np.zeros(n_grid)},
+        )
+        writer._flush_mmaps()  # pyright: ignore[reportPrivateUsage]
+
+        # Remove metadata.json
+        meta_path = output_dir / "metadata.json"
+        if meta_path.exists():
+            meta_path.unlink()
+
+        data = SimulationData.from_directory(output_dir, spec)
+        assert data.n_snapshots == 1
+        np.testing.assert_allclose(data.fields["phi_0"][0], np.ones(n_grid))
+
+
+class TestSimulationDataLoad:
+    """Test SimulationData.load() universal entry point."""
+
+    def test_load_npz(self, tmp_path: Path) -> None:
+        """load() correctly dispatches to from_npz_auto for .npz files."""
+        data_orig = _make_single_field_data()
+
+        # Save as NPZ with grid metadata
+        npz_path = tmp_path / "test.npz"
+        save_data: dict[str, np.ndarray] = {"times": data_orig.times}
+        for name in data_orig.fields:
+            for t_idx in range(data_orig.n_snapshots):
+                save_data[f"{name}_t{t_idx}"] = data_orig.fields[name][t_idx]
+        for name in data_orig.momenta:
+            for t_idx in range(data_orig.n_snapshots):
+                save_data[f"pi_{name}_t{t_idx}"] = data_orig.momenta[name][t_idx]
+
+        # Grid metadata required by from_npz_auto
+        save_data["grid_spacing"] = np.array(data_orig.grid_spacing)
+        save_data["grid_bounds"] = np.array(data_orig.grid_bounds)
+        save_data["grid_periodic"] = np.array(data_orig.periodic)
+        np.savez(str(npz_path), **save_data)  # type: ignore[reportArgumentType]
+
+        data_loaded = SimulationData.load(npz_path, data_orig.spec)
+        np.testing.assert_allclose(data_loaded.times, data_orig.times)
+        np.testing.assert_allclose(
+            data_loaded.fields["phi_0"], data_orig.fields["phi_0"],
+        )
+
+    def test_load_directory(self, tmp_path: Path) -> None:
+        """load() correctly dispatches to from_directory for directories."""
+        spec = _build_coupled_scalars_spec()
+        output_dir = tmp_path / "loaddir"
+        n_grid = 4
+        n_snapshots = 2
+
+        with SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=["phi_0", "chi_0"],
+            grid_shape=(n_grid,),
+            n_snapshots=n_snapshots,
+            grid_spacing=(2.5,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+        ) as writer:
+            for i in range(n_snapshots):
+                writer.append(
+                    float(i),
+                    {"phi_0": np.full(n_grid, float(i)), "chi_0": np.zeros(n_grid)},
+                    {"phi_0": np.zeros(n_grid), "chi_0": np.zeros(n_grid)},
+                )
+
+        data = SimulationData.load(output_dir, spec)
+        assert data.n_snapshots == n_snapshots
+        np.testing.assert_allclose(data.fields["phi_0"][1], np.full(n_grid, 1.0))
+
+
+class TestComputeSnapshotCount:
+    """Tests for compute_snapshot_count utility."""
+
+    def test_exact_count(self) -> None:
+        """10.0 / 0.1 + 1 = 101 snapshots."""
+        assert compute_snapshot_count(10.0, 0.1) == 101
+
+    def test_non_divisible(self) -> None:
+        """Non-divisible interval truncates via int()."""
+        # 10.0 / 3.0 = 3.333... → int(3.333) + 1 = 4
+        assert compute_snapshot_count(10.0, 3.0) == 4
+
+    def test_single_snapshot_interval(self) -> None:
+        """Interval equal to t_end → 2 snapshots (t=0 and t=t_end)."""
+        assert compute_snapshot_count(5.0, 5.0) == 2
+
+    def test_zero_t_end_raises(self) -> None:
+        with pytest.raises(ValueError, match="t_end must be positive"):
+            compute_snapshot_count(0.0, 1.0)
+
+    def test_negative_interval_raises(self) -> None:
+        with pytest.raises(ValueError, match="snapshot_interval must be positive"):
+            compute_snapshot_count(10.0, -1.0)

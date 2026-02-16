@@ -54,13 +54,14 @@ _VALID_MEASUREMENTS = frozenset({
 # ------------------------------------------------------------------
 
 
-def _resolve_spec_path(npz_path: Path, spec_arg: str | None) -> Path:
-    """Resolve the JSON spec path from CLI flag or NPZ metadata.
+def _resolve_spec_path(data_path: Path, spec_arg: str | None) -> Path:  # noqa: C901
+    """Resolve the JSON spec path from CLI flag, directory metadata, or NPZ.
 
     Resolution order:
     1. Explicit ``--spec`` flag (highest priority)
-    2. ``_spec_path`` stored in the NPZ by ``tidal simulate``
-    3. Error — no spec found
+    2. ``spec_path`` from ``metadata.json`` (snapshot directory)
+    3. ``_spec_path`` stored in the NPZ by ``tidal simulate``
+    4. Error — no spec found
 
     Raises
     ------
@@ -76,20 +77,42 @@ def _resolve_spec_path(npz_path: Path, spec_arg: str | None) -> Path:
             raise FileNotFoundError(msg)
         return p
 
+    # Try snapshot directory metadata
+    if data_path.is_dir():
+        metadata_file = data_path / "metadata.json"
+        if metadata_file.exists():
+            import json
+
+            metadata = json.loads(metadata_file.read_text())
+            if "spec_path" in metadata:
+                p = Path(str(metadata["spec_path"]))
+                if p.exists():
+                    return p
+                # Try relative to directory
+                relative = data_path.parent / p.name
+                if relative.exists():
+                    return relative
+
+        msg = (
+            f"Cannot determine JSON spec for {data_path.name} — "
+            f"use --spec to provide the path explicitly"
+        )
+        raise ValueError(msg)
+
     # Try NPZ metadata
-    data = np.load(str(npz_path), allow_pickle=False)
+    data = np.load(str(data_path), allow_pickle=False)
     if "_spec_path" in data:
         stored = str(data["_spec_path"])
         p = Path(stored)
         if p.exists():
             return p
         # Stored path doesn't exist — try relative to NPZ directory
-        relative = npz_path.parent / p.name
+        relative = data_path.parent / p.name
         if relative.exists():
             return relative
 
     msg = (
-        f"Cannot determine JSON spec for {npz_path.name} — "
+        f"Cannot determine JSON spec for {data_path.name} — "
         f"use --spec to provide the path explicitly"
     )
     raise ValueError(msg)
@@ -127,20 +150,23 @@ def _parse_field_list(raw: str | None) -> tuple[str, ...] | None:
 
 
 def _load_data(
-    npz_path: Path,
+    data_path: Path,
     spec_path: Path,
     param_overrides: list[str],
 ) -> SimulationData:
-    """Load NPZ + JSON spec into a SimulationData ready for measurement.
+    """Load simulation data from NPZ or snapshot directory.
 
-    Merges ``--param`` overrides with parameters stored in the NPZ.
+    Auto-detects format: directories use memory-mapped lazy loading (O(1)
+    RAM), NPZ files are loaded eagerly.
+
+    Merges ``--param`` overrides with parameters stored in the data.
     """
     from tidal.cli._simulate import _parse_params  # pyright: ignore[reportPrivateUsage]
     from tidal.measurement import SimulationData
     from tidal.symbolic import load_equation_system
 
     spec = load_equation_system(spec_path)
-    data = SimulationData.from_npz_auto(npz_path, spec)
+    data = SimulationData.load(data_path, spec)
 
     # Merge CLI param overrides
     if param_overrides:
@@ -681,20 +707,21 @@ def measure_command(args: Namespace) -> int:
 
     Returns 0 on success, 1 on error.
     """
-    npz_path = Path(args.npz_path)
-    if not npz_path.exists():
-        print(f"Error: NPZ file not found: {npz_path}", file=sys.stderr)
+    data_path = Path(args.npz_path)
+    if not data_path.exists():
+        print(f"Error: data path not found: {data_path}", file=sys.stderr)
         return 1
 
-    spec_path = _resolve_spec_path(npz_path, getattr(args, "spec", None))
+    spec_path = _resolve_spec_path(data_path, getattr(args, "spec", None))
     measurements = _parse_measurements(getattr(args, "what", None))
     quiet: bool = getattr(args, "quiet", False)
 
     if not quiet:
-        print(f"Loading: {npz_path.name}")
+        fmt_label = "directory" if data_path.is_dir() else "NPZ"
+        print(f"Loading: {data_path.name} ({fmt_label})")
         print(f"Spec:    {spec_path.name}")
 
-    data = _load_data(npz_path, spec_path, getattr(args, "param", None) or [])
+    data = _load_data(data_path, spec_path, getattr(args, "param", None) or [])
 
     if not quiet:
         print(

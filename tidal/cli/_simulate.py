@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from pde import CartesianGrid, FieldCollection, MemoryStorage
 
     from tidal.measurement._io import SimulationData
+    from tidal.measurement._writer import SnapshotWriter
     from tidal.symbolic.json_loader import EquationSystem
 
 # Default grid shapes per spatial dimension
@@ -525,11 +526,18 @@ def _infer_output_format(args: Namespace) -> str:
             return "npz"
         if ext in {".png", ".pdf", ".jpg", ".svg"}:
             return ext.lstrip(".")
+        # No extension → directory format (disk-backed streaming)
+        if not ext:
+            return "directory"
     return "png"
 
 
 def _generate_output(args: Namespace, ctx: PlotContext) -> None:
-    """Generate output based on format selection."""
+    """Generate output based on format selection.
+
+    For ``"directory"`` format, this is a no-op — data was already streamed
+    to disk by ``SnapshotWriter`` before this function is called.
+    """
     fmt = _infer_output_format(args)
 
     final = cast("FieldCollection", ctx.storage[-1])
@@ -538,7 +546,7 @@ def _generate_output(args: Namespace, ctx: PlotContext) -> None:
     # Always print summary
     _print_summary(ctx.spec, ctx.initial_state, final, times, ctx.params)
 
-    if fmt == "summary":
+    if fmt in {"summary", "directory"}:
         return
 
     # Determine output path (default: next to JSON spec file)
@@ -716,7 +724,7 @@ def _validate_solver_params(args: Namespace) -> None:
         raise ValueError(msg)
 
 
-def simulate_command(args: Namespace) -> int:
+def simulate_command(args: Namespace) -> int:  # noqa: PLR0914, PLR0915
     """Execute the simulate command.
 
     Parameters
@@ -780,8 +788,6 @@ def simulate_command(args: Namespace) -> int:
     # Step 6: Validate solver parameters and determine dt
     _validate_solver_params(args)
 
-    from pde import MemoryStorage
-
     from tidal.utils import normalize_solve_result
 
     dt = args.dt
@@ -794,22 +800,38 @@ def simulate_command(args: Namespace) -> int:
     _check_cfl_stability(pde, dt, grid)
 
     # Step 7: Run simulation
+    snapshot_interval = (
+        args.snapshots if args.snapshots is not None else args.t_end / 100.0
+    )
     log(
         f"Running simulation (t=0 → {args.t_end}, dt={dt:.4f}, scheme={args.scheme})..."
     )
-    storage = MemoryStorage()
-    tracker = storage.tracker(
-        args.snapshots if args.snapshots is not None else args.t_end / 100.0
-    )
+
+    fmt = _infer_output_format(args)
+    use_directory = fmt == "directory"
+    writer: SnapshotWriter | None = None
+
+    if use_directory:
+        # Disk-backed streaming: O(1) memory regardless of snapshot count
+        storage, tracker, writer = _setup_disk_backed(
+            args, spec, grid, snapshot_interval, params,
+        )
+    else:
+        # Legacy in-memory path (for NPZ/plot output)
+        from pde import MemoryStorage
+
+        storage = MemoryStorage()
+        tracker = storage.tracker(snapshot_interval)
+
+    # Solve (tracker type varies: StorageTracker for legacy, list for disk-backed)
     if args.scheme == "scipy":
-        # py-pde's ScipySolver is a separate solver class, not a scheme of ExplicitSolver
         normalize_solve_result(
             pde.solve(  # type: ignore[attr-defined]
                 state,
                 t_range=args.t_end,
                 dt=dt,
                 solver="scipy",
-                tracker=tracker,
+                tracker=tracker,  # pyright: ignore[reportArgumentType]
             )
         )
     else:
@@ -819,10 +841,18 @@ def simulate_command(args: Namespace) -> int:
                 t_range=args.t_end,
                 dt=dt,
                 scheme=args.scheme,
-                tracker=tracker,
+                tracker=tracker,  # pyright: ignore[reportArgumentType]
             )
         )
-    log(f"  {len(storage)} snapshots stored")
+
+    if writer is not None:
+        writer.close()
+        log(
+            f"  {writer.count} snapshots streamed to: "
+            f"{writer.output_dir}"
+        )
+    else:
+        log(f"  {len(storage)} snapshots stored")
 
     # Step 8: Output
     ctx = PlotContext(
@@ -835,3 +865,85 @@ def simulate_command(args: Namespace) -> int:
     _generate_output(args, ctx)
 
     return 0
+
+
+def _setup_disk_backed(
+    args: Namespace,
+    spec: EquationSystem,
+    grid: CartesianGrid,
+    snapshot_interval: float,
+    params: dict[str, float],
+) -> tuple[MemoryStorage, list[object], SnapshotWriter]:
+    """Set up SnapshotWriter + CallbackTracker for disk-backed simulation.
+
+    Also creates a minimal MemoryStorage that only stores the final snapshot
+    (for PlotContext summary compatibility).
+
+    Returns (storage, tracker_list, writer).
+    """
+    from pde import CallbackTracker, MemoryStorage
+
+    from tidal.measurement._writer import (
+        SnapshotWriter as Writer,
+    )
+    from tidal.measurement._writer import (
+        _field_names_from_spec,  # pyright: ignore[reportPrivateUsage]
+        compute_snapshot_count,
+    )
+
+    output_dir = Path(args.output) if args.output else Path("output")
+    n_snapshots = compute_snapshot_count(args.t_end, snapshot_interval)
+
+    field_names, momentum_names = _field_names_from_spec(spec)
+
+    spacing = tuple(
+        float((b[1] - b[0]) / s)
+        for b, s in zip(grid.axes_bounds, grid.shape, strict=True)
+    )
+    bounds = tuple((float(b[0]), float(b[1])) for b in grid.axes_bounds)
+    periodic_flags = tuple(bool(p) for p in grid.periodic)
+
+    writer = Writer(
+        output_dir=output_dir,
+        field_names=field_names,
+        momentum_names=momentum_names,
+        grid_shape=tuple(grid.shape),
+        n_snapshots=n_snapshots,
+        grid_spacing=spacing,
+        grid_bounds=bounds,
+        periodic=periodic_flags,
+        parameters=params,
+        spec_path=Path(args.json_path),
+    )
+
+    f_slots = field_slots(spec)
+    m_slots: dict[str, int] = {
+        name: idx
+        for idx, (name, slot_type) in enumerate(spec.state_layout)
+        if slot_type == "momentum"
+    }
+
+    writer_field_names = set(field_names)
+    writer_momentum_names = set(momentum_names)
+
+    def _on_snapshot(state_view: object, time: float) -> None:
+        fc = cast("FieldCollection", state_view)
+        fields: dict[str, np.ndarray] = {
+            name: np.asarray(fc[slot].data, dtype=np.float64)
+            for name, slot in f_slots.items()
+            if name in writer_field_names
+        }
+        moms: dict[str, np.ndarray] = {
+            name: np.asarray(fc[slot].data, dtype=np.float64)
+            for name, slot in m_slots.items()
+            if name in writer_momentum_names
+        }
+        writer.append(time, fields, moms)
+
+    snapshot_tracker = CallbackTracker(_on_snapshot, interrupts=snapshot_interval)
+
+    # Minimal MemoryStorage for summary (only the final snapshot)
+    storage = MemoryStorage()
+    summary_tracker = storage.tracker(args.t_end)
+
+    return storage, [snapshot_tracker, summary_tracker], writer

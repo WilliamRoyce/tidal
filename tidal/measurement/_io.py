@@ -1,13 +1,17 @@
 """Uniform data abstraction for simulation output.
 
 Provides ``SimulationData``, a frozen dataclass that stores the full time
-history of field and momentum arrays.  Can be constructed from either a live
-``MemoryStorage`` object (straight from the solver) or from an NPZ file
-previously saved by ``tidal simulate --output``.
+history of field and momentum arrays.  Can be constructed from:
+
+- A live ``MemoryStorage`` object (straight from the solver)
+- An NPZ file previously saved by ``tidal simulate --output``
+- A snapshot directory written by :class:`~tidal.measurement.SnapshotWriter`
+  (memory-mapped, O(1) RAM)
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from math import prod
 from pathlib import Path
@@ -147,7 +151,10 @@ class SimulationData:
         for name, slot_idx in field_slot_map.items():
             fields[name] = np.stack(
                 [
-                    np.asarray(cast("FieldCollection", storage[t])[slot_idx].data, dtype=np.float64)
+                    np.asarray(
+                        cast("FieldCollection", storage[t])[slot_idx].data,
+                        dtype=np.float64,
+                    )
                     for t in range(n)
                 ]
             )
@@ -156,7 +163,10 @@ class SimulationData:
         for name, slot_idx in momentum_slot_map.items():
             momenta[name] = np.stack(
                 [
-                    np.asarray(cast("FieldCollection", storage[t])[slot_idx].data, dtype=np.float64)
+                    np.asarray(
+                        cast("FieldCollection", storage[t])[slot_idx].data,
+                        dtype=np.float64,
+                    )
                     for t in range(n)
                 ]
             )
@@ -331,3 +341,174 @@ class SimulationData:
             periodic=periodic,
             parameters=parameters,
         )
+
+    @classmethod
+    def from_directory(  # noqa: C901, PLR0912, PLR0914, PLR0915
+        cls,
+        path: Path | str,
+        spec: EquationSystem,
+    ) -> SimulationData:
+        """Load from a snapshot directory with memory-mapped arrays (O(1) RAM).
+
+        The directory must contain ``metadata.json`` and per-field ``.npy``
+        files written by :class:`~tidal.measurement.SnapshotWriter`.  Arrays
+        are opened as read-only memory maps — only the pages actually accessed
+        by measurement functions are loaded into RAM.
+
+        Parameters
+        ----------
+        path : Path or str
+            Path to the snapshot directory.
+        spec : EquationSystem
+            JSON-derived equation specification.
+
+        Raises
+        ------
+        FileNotFoundError
+            If *path* does not exist or is not a directory.
+        ValueError
+            If ``metadata.json`` is missing or corrupt.
+        """
+        p = Path(path)
+        if not p.is_dir():
+            msg = f"Snapshot directory not found: {p}"
+            raise FileNotFoundError(msg)
+
+        metadata_path = p / "metadata.json"
+        if not metadata_path.exists():
+            # Crash recovery: infer snapshot count from times.npy size
+            times_path = p / "times.npy"
+            if not times_path.exists():
+                msg = f"Snapshot directory {p} missing both metadata.json and times.npy"
+                raise ValueError(msg)
+            times_arr = np.load(str(times_path), mmap_mode="r")
+            # Find actual count: last non-zero time (or all if first is 0.0)
+            n = _infer_snapshot_count(times_arr)
+            metadata: dict[str, object] = {
+                "n_snapshots": n,
+                "fields": list(spec.component_names),
+                "momenta": [
+                    eq.field_name
+                    for eq in spec.equations
+                    if eq.time_derivative_order >= 2  # noqa: PLR2004
+                ],
+            }
+        else:
+            raw = metadata_path.read_text()
+            metadata = json.loads(raw)
+
+        n = int(metadata["n_snapshots"])  # type: ignore[arg-type]
+
+        # Load times
+        times_npy = p / "times.npy"
+        if not times_npy.exists():
+            msg = f"Snapshot directory {p} missing times.npy"
+            raise ValueError(msg)
+        times = np.load(str(times_npy), mmap_mode="r")[:n]
+
+        # Load fields (memory-mapped)
+        fields: dict[str, NDArray[np.float64]] = {}
+        for name in spec.component_names:
+            npy = p / f"{name}.npy"
+            if npy.exists():
+                fields[name] = np.load(str(npy), mmap_mode="r")[:n]
+
+        # Load momenta (memory-mapped)
+        momenta: dict[str, NDArray[np.float64]] = {}
+        momentum_names = cast("list[str]", metadata.get("momenta", []))
+        for name in momentum_names:
+            npy = p / f"pi_{name}.npy"
+            if npy.exists():
+                momenta[name] = np.load(str(npy), mmap_mode="r")[:n]
+
+        # Grid metadata — from metadata.json or spec defaults
+        grid_spacing: tuple[float, ...]
+        if "grid_spacing" in metadata:
+            raw_spacing = cast("list[float]", metadata["grid_spacing"])
+            grid_spacing = tuple(float(v) for v in raw_spacing)
+        else:
+            grid_spacing = (1.0,) * spec.spatial_dimension
+
+        grid_bounds: tuple[tuple[float, float], ...]
+        if "grid_bounds" in metadata:
+            raw_bounds = cast("list[list[float]]", metadata["grid_bounds"])
+            grid_bounds = tuple((float(b[0]), float(b[1])) for b in raw_bounds)
+        else:
+            raw_shape = cast(
+                "list[int]",
+                metadata.get("grid_shape", [1] * spec.spatial_dimension),
+            )
+            grid_bounds = tuple(
+                (0.0, float(s) * grid_spacing[i])
+                for i, s in enumerate(raw_shape)
+            )
+
+        periodic: tuple[bool, ...]
+        if "periodic" in metadata:
+            raw_periodic = cast("list[bool]", metadata["periodic"])
+            periodic = tuple(bool(v) for v in raw_periodic)
+        else:
+            periodic = (False,) * spec.spatial_dimension
+
+        # Parameters
+        raw_params = cast("dict[str, float]", metadata.get("parameters", {}))
+        parameters: dict[str, float] = {
+            str(k): float(v) for k, v in raw_params.items()
+        }
+
+        return cls(
+            times=times,
+            fields=fields,
+            momenta=momenta,
+            grid_spacing=grid_spacing,
+            grid_bounds=grid_bounds,
+            periodic=periodic,
+            spec=spec,
+            parameters=parameters,
+        )
+
+    @classmethod
+    def load(
+        cls,
+        path: Path | str,
+        spec: EquationSystem,
+    ) -> SimulationData:
+        """Auto-detect format (directory or NPZ) and load.
+
+        - If *path* is a directory → :meth:`from_directory` (memory-mapped)
+        - If *path* is a ``.npz`` file → :meth:`from_npz_auto` (eager load)
+
+        Parameters
+        ----------
+        path : Path or str
+            Path to snapshot directory or NPZ file.
+        spec : EquationSystem
+            JSON-derived equation specification.
+        """
+        p = Path(path)
+        if p.is_dir():
+            return cls.from_directory(p, spec)
+        return cls.from_npz_auto(p, spec)
+
+
+def _infer_snapshot_count(times_arr: NDArray[np.float64]) -> int:
+    """Infer actual snapshot count from a times array (crash recovery).
+
+    When ``metadata.json`` is missing (writer wasn't closed), we look at
+    the pre-allocated ``times.npy`` and find how many entries were actually
+    written.  Unwritten entries are zero (from memmap pre-allocation).
+
+    Strategy: Find the last index where ``times[i] > 0`` or ``i == 0``
+    (the initial time t=0 is legitimately zero).
+    """
+    n = len(times_arr)
+    if n == 0:
+        return 0
+    # The first entry (t=0) is always valid.  After that, unwritten
+    # entries are 0.0 from memmap pre-allocation.  Find the last
+    # non-zero entry.
+    for i in range(n - 1, 0, -1):
+        if float(times_arr[i]) != 0.0:
+            return i + 1
+    # Only t=0 was written
+    return 1
