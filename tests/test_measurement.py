@@ -1890,7 +1890,7 @@ def _make_plane_wave_data(
     x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
 
     k0 = 2.0 * np.pi * mode_index / domain_len
-    omega0 = np.sqrt(k0**2 + m2)
+    omega0 = float(np.sqrt(k0**2 + m2))
 
     # Time span: long enough for several oscillations
     t_end = 8.0 * np.pi / omega0  # ~4 full oscillations
@@ -1972,7 +1972,7 @@ class TestDispersionRelation:
         domain_len = float(data.grid_bounds[0][1] - data.grid_bounds[0][0])
 
         k0 = 2.0 * np.pi * mode_index / domain_len
-        omega0 = np.sqrt(k0**2 + m2)
+        omega0 = float(np.sqrt(k0**2 + m2))
 
         result = compute_dispersion(data, "phi_0")
 
