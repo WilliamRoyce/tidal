@@ -227,7 +227,7 @@ def _print_summary(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
 # ---------------------------------------------------------------------------
 
 
-def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
+def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     data: SimulationData,
     result: ConversionResult,
     diag: EnergyDiagnostics,
@@ -237,8 +237,8 @@ def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
     disp_phi: DispersionResult | None,
     params: dict[str, float],
 ) -> Path:
-    """Generate 2x3 measurement figure. Returns path to saved PNG."""
-    fig, axes = plt.subplots(2, 3, figsize=(16, 9))
+    """Generate 2x4 measurement figure. Returns path to saved PNG."""
+    fig, axes = plt.subplots(2, 4, figsize=(22, 9))
     fig.suptitle(
         "Coupled Klein-Gordon: Measurement Analysis\n"
         r"$\mathcal{L} = \frac{1}{2}(\partial\varphi)^2"
@@ -248,33 +248,24 @@ def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
         fontsize=13,
     )
 
+    peak_idx = int(np.argmax(result.probability))
+
     # [0,0] Conversion probability P(t) + mixing length annotation
     ax = axes[0, 0]
     ax.plot(result.times, result.probability, "b-", linewidth=1.5)
-    peak_idx = int(np.argmax(result.probability))
-    ax.plot(
-        result.times[peak_idx],
-        result.probability[peak_idx],
-        "ro",
-        markersize=6,
-    )
+    ax.plot(result.times[peak_idx], result.probability[peak_idx], "ro", markersize=6)
     ax.annotate(
         f"P = {result.probability[peak_idx]:.4f}\nt = {result.times[peak_idx]:.1f}",
         xy=(result.times[peak_idx], result.probability[peak_idx]),
-        xytext=(15, -10),
-        textcoords="offset points",
-        fontsize=9,
+        xytext=(15, -10), textcoords="offset points", fontsize=9,
         arrowprops={"arrowstyle": "->", "color": "gray"},
     )
     if mixing is not None:
         ax.annotate(
-            f"$L_{{mix}}$ = {mixing.mixing_length:.2f} $\\pm$ {mixing.mixing_length_uncertainty:.2f}",
-            xy=(0.95, 0.95),
-            xycoords="axes fraction",
-            ha="right",
-            va="top",
-            fontsize=9,
-            color="green",
+            f"$L_{{mix}}$ = {mixing.mixing_length:.2f}"
+            f" $\\pm$ {mixing.mixing_length_uncertainty:.2f}",
+            xy=(0.95, 0.95), xycoords="axes fraction", ha="right", va="top",
+            fontsize=9, color="green",
             bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8},
         )
     ax.set_xlabel("Time")
@@ -289,7 +280,7 @@ def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
     ax.plot(times, per_field["phi_0"], "b-", label=r"$E_\varphi$", linewidth=1.2)
     ax.plot(times, per_field["chi_0"], "r-", label=r"$E_\chi$", linewidth=1.2)
     ax.plot(
-        times, interaction, "g--", label=r"$E_\mathrm{int}$", linewidth=1.0, alpha=0.7
+        times, interaction, "g--", label=r"$E_\mathrm{int}$", linewidth=1.0, alpha=0.7,
     )
     ax.plot(times, total, "k-", label=r"$E_\mathrm{total}$", linewidth=1.0, alpha=0.5)
     ax.set_xlabel("Time")
@@ -309,14 +300,53 @@ def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
     ax.legend(fontsize=8)
     ax.grid(visible=True, alpha=0.3)
 
-    # [1,0] Spectral conversion P(k,t) heatmap or dispersion relation
+    # [0,3] Mixing spectrum (temporal FFT of P(t))
+    ax = axes[0, 3]
+    if spectrum is not None:
+        ax.semilogy(spectrum.frequencies, spectrum.power, "b-", linewidth=0.5, alpha=0.7)
+        ax.axvline(
+            spectrum.dominant_frequency, color="red", linestyle="--", alpha=0.7,
+            label=rf"$\omega_{{\mathrm{{dom}}}}$ = {spectrum.dominant_frequency:.2f}",
+        )
+        x_max = min(10 * spectrum.dominant_frequency, spectrum.frequencies[-1])
+        ax.set_xlim(0, x_max)
+        ax.set_xlabel(r"$\omega$ (rad/time)")
+        ax.set_ylabel(r"$|\hat{P}(\omega)|^2$")
+        ax.legend(fontsize=8)
+    else:
+        ax.text(0.5, 0.5, "Not computed", transform=ax.transAxes, ha="center")
+    ax.set_title("Mixing Spectrum")
+    ax.grid(visible=True, alpha=0.3)
+
+    # [1,0] Spectral conversion P(k,t) heatmap
     ax = axes[1, 0]
+    if spectral_conv is not None and np.any(spectral_conv.active_modes):
+        mesh = ax.pcolormesh(
+            spectral_conv.wavenumbers, spectral_conv.times,
+            spectral_conv.probability, shading="nearest", cmap="inferno",
+        )
+        fig.colorbar(mesh, ax=ax, label=r"$P(k,t)$", pad=0.02)
+        # Crop x-axis to active k-range
+        k_active_max = float(spectral_conv.wavenumbers[spectral_conv.active_modes].max())
+        ax.set_xlim(0, k_active_max * 1.15)
+        ax.set_xlabel(r"$|k|$")
+        ax.set_ylabel("Time")
+        ax.set_title(r"Spectral Conversion $P(k,t)$")
+    else:
+        ax.text(0.5, 0.5, "No spectral\nconversion data",
+                transform=ax.transAxes, ha="center", va="center", fontsize=9)
+        ax.set_title("Spectral Conversion")
+    ax.grid(visible=True, alpha=0.3)
+
+    # [1,1] Dispersion relation S(k, omega) heatmap
+    ax = axes[1, 1]
     if disp_phi is not None and np.any(disp_phi.peak_frequencies > 0.0):
-        # Dispersion relation S(k, omega) heatmap
         log_power = np.log10(np.maximum(disp_phi.power, 1e-30))
+        log_max = float(log_power.max())
         mesh = ax.pcolormesh(
             disp_phi.wavenumbers, disp_phi.frequencies, log_power.T,
             shading="nearest", cmap="viridis",
+            vmin=log_max - 20, vmax=log_max,
         )
         fig.colorbar(mesh, ax=ax, label=r"$\log_{10} S(k, \omega)$", pad=0.02)
         active = disp_phi.peak_frequencies > 0.0
@@ -324,73 +354,50 @@ def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
             disp_phi.wavenumbers[active], disp_phi.peak_frequencies[active],
             "w--", linewidth=1.5, alpha=0.9, label=r"$\omega(k)$ peak",
         )
+        # Data-driven axis cropping
+        # k-axis: match spectral conversion's active_modes range when available
+        if spectral_conv is not None and np.any(spectral_conv.active_modes):
+            ax.set_xlim(0, float(spectral_conv.wavenumbers[spectral_conv.active_modes].max()) * 1.15)
+        elif np.any(active):
+            max_peak = float(np.max(disp_phi.peak_powers))
+            if max_peak > 0:
+                strong = disp_phi.peak_powers >= max_peak * 1e-3
+                if np.any(strong):
+                    ax.set_xlim(0, float(disp_phi.wavenumbers[strong].max()) * 1.1)
+        # ω-axis: power threshold (limits to actual oscillation frequencies)
+        peak_pwr = float(np.maximum(np.max(disp_phi.power), 1e-30))
+        sig_f = np.max(disp_phi.power, axis=0) >= peak_pwr * 1e-6
+        if np.any(sig_f):
+            ax.set_ylim(0, float(disp_phi.frequencies[sig_f].max()) * 1.1)
         ax.set_xlabel(r"$|k|$")
         ax.set_ylabel(r"$\omega$ (rad/time)")
         ax.set_title(r"Dispersion $\omega(k)$ ($\varphi$)")
         ax.legend(fontsize=8, loc="upper left")
-    elif spectral_conv is not None and np.any(spectral_conv.active_modes):
-        # Spectral conversion P(k,t)
-        mesh = ax.pcolormesh(
-            spectral_conv.wavenumbers, spectral_conv.times,
-            spectral_conv.probability, shading="nearest", cmap="inferno",
-        )
-        fig.colorbar(mesh, ax=ax, label=r"$P(k,t)$", pad=0.02)
-        ax.set_xlabel(r"$|k|$")
-        ax.set_ylabel("Time")
-        ax.set_title(r"Spectral Conversion $P(k,t)$")
     else:
-        # Fallback: power spectrum
-        snap0 = compute_spectrum(
-            data.fields["phi_0"][0], data.grid_spacing, data.periodic,
-        )
-        snap_peak = compute_spectrum(
-            data.fields["chi_0"][peak_idx], data.grid_spacing, data.periodic,
-        )
-        ax.semilogy(snap0.wavenumbers, snap0.power_spectrum, "b-", label=r"$\varphi(t=0)$")
-        ax.semilogy(
-            snap_peak.wavenumbers, snap_peak.power_spectrum, "r-",
-            label=rf"$\chi(t={result.times[peak_idx]:.1f})$",
-        )
-        ax.set_xlabel(r"$|k|$")
-        ax.set_ylabel(r"$|\hat{\phi}(k)|^2$")
-        ax.set_title("Power Spectrum")
-        ax.legend(fontsize=8)
+        ax.text(0.5, 0.5, "No dispersion data",
+                transform=ax.transAxes, ha="center", va="center", fontsize=9)
+        ax.set_title("Dispersion")
     ax.grid(visible=True, alpha=0.3)
 
-    # [1,1] Mixing spectrum (temporal FFT of P(t))
-    ax = axes[1, 1]
-    if spectrum is not None:
-        ax.semilogy(
-            spectrum.frequencies, spectrum.power, "b-", linewidth=0.5, alpha=0.7
-        )
-        ax.axvline(
-            spectrum.dominant_frequency,
-            color="red",
-            linestyle="--",
-            alpha=0.7,
-            label=rf"$\omega_{{\mathrm{{dom}}}}$ = {spectrum.dominant_frequency:.2f}",
-        )
-        # Focus on the interesting frequency range (up to 10x dominant)
-        x_max = min(10 * spectrum.dominant_frequency, spectrum.frequencies[-1])
-        ax.set_xlim(0, x_max)
-        ax.set_xlabel(r"Angular frequency $\omega$ (rad/time)")
-        ax.set_ylabel(r"Power $|\hat{P}(\omega)|^2$")
-        ax.legend(fontsize=8)
-    else:
-        ax.text(
-            0.5,
-            0.5,
-            "Not computed\n(too few points)",
-            transform=ax.transAxes,
-            ha="center",
-            va="center",
-            fontsize=9,
-        )
-    ax.set_title("Mixing Spectrum")
-    ax.grid(visible=True, alpha=0.3)
-
-    # [1,2] Summary text
+    # [1,2] Power spectrum (phi at t=0, chi at t=peak)
     ax = axes[1, 2]
+    snap0 = compute_spectrum(data.fields["phi_0"][0], data.grid_spacing, data.periodic)
+    snap_peak = compute_spectrum(
+        data.fields["chi_0"][peak_idx], data.grid_spacing, data.periodic,
+    )
+    ax.semilogy(snap0.wavenumbers, snap0.power_spectrum, "b-", label=r"$\varphi(t=0)$")
+    ax.semilogy(
+        snap_peak.wavenumbers, snap_peak.power_spectrum, "r-",
+        label=rf"$\chi(t={result.times[peak_idx]:.1f})$",
+    )
+    ax.set_xlabel(r"$|k|$")
+    ax.set_ylabel(r"$|\hat{\phi}(k)|^2$")
+    ax.set_title("Power Spectrum")
+    ax.legend(fontsize=8)
+    ax.grid(visible=True, alpha=0.3)
+
+    # [1,3] Summary text
+    ax = axes[1, 3]
     m_phi2, m_chi2, g = params["mPhi2"], params["mChi2"], params["gCpl"]
     avg = (m_phi2 + m_chi2) / 2.0
     delta = np.sqrt(((m_phi2 - m_chi2) / 2.0) ** 2 + g**2)
@@ -404,21 +411,15 @@ def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
         f"  $\\omega_+ = {omega_plus:.4f}$,  $\\omega_- = {omega_minus:.4f}$",
         f"  $T_{{Rabi}} = {2 * np.pi / (omega_plus - omega_minus):.2f}$",
         "",
-        "Measurement Results:",
+        "Results:",
         f"  Peak $P(t) = {result.probability[peak_idx]:.6f}$",
         f"  at $t = {result.times[peak_idx]:.2f}$",
     ]
     if mixing is not None:
         lines += [
-            f"  $L_{{mix}} = {mixing.mixing_length:.4f} \\pm {mixing.mixing_length_uncertainty:.4f}$",
+            f"  $L_{{mix}} = {mixing.mixing_length:.4f}$",
             f"  $\\omega_{{dom}} = {mixing.dominant_frequency:.4f}$",
         ]
-    if spectral_conv is not None:
-        n_active = int(spectral_conv.active_modes.sum())
-        lines += ["", f"Spectral Conv: {n_active} active modes"]
-    if disp_phi is not None:
-        n_act = int(np.count_nonzero(disp_phi.peak_frequencies > 0.0))
-        lines += [f"Dispersion: {n_act} active modes"]
     lines += [
         "",
         f"  max $|\\Delta E / E_0| = {diag.max_relative_error:.2e}$",
@@ -428,13 +429,8 @@ def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
         "  Gaussian in $\\varphi$, $\\chi = 0$",
     ]
     ax.text(
-        0.05,
-        0.95,
-        "\n".join(lines),
-        transform=ax.transAxes,
-        fontsize=10,
-        verticalalignment="top",
-        fontfamily="monospace",
+        0.05, 0.95, "\n".join(lines), transform=ax.transAxes,
+        fontsize=9, verticalalignment="top", fontfamily="monospace",
     )
     ax.axis("off")
 

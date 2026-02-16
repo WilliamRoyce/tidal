@@ -152,6 +152,11 @@ def _plot_spectral_conversion(ax: Axes, results: dict[str, Any]) -> None:
     )
     ax.figure.colorbar(mesh, ax=ax, label=r"$P(k,t)$", pad=0.02)  # pyright: ignore[reportOptionalMemberAccess]
 
+    # Crop x-axis to active k-range (data-driven)
+    if np.any(active):
+        k_active_max = float(wn[active].max())
+        ax.set_xlim(0, k_active_max * 1.15)
+
     src = sc["source"]
     tgt = sc["target"]
     ax.set_xlabel(r"$|k|$")
@@ -162,7 +167,7 @@ def _plot_spectral_conversion(ax: Axes, results: dict[str, Any]) -> None:
     )
 
 
-def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:
+def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:  # noqa: C901
     """[1,0] Dispersion relation S(k, omega) heatmap with peak curve overlay."""
     import numpy as np
 
@@ -190,13 +195,15 @@ def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:
         ax.text(0.5, 0.5, "No frequency bins", transform=ax.transAxes, ha="center")
         return
 
-    # Log-scale power for better visibility
+    # Log-scale power with dynamic range clipping
     log_power = np.log10(np.maximum(power, 1e-30))
+    log_max = float(log_power.max())
 
     mesh = ax.pcolormesh(
         wn, freqs, log_power.T,
         shading="nearest",
         cmap="viridis",
+        vmin=log_max - 20, vmax=log_max,
     )
     ax.figure.colorbar(mesh, ax=ax, label=r"$\log_{10} S(k, \omega)$", pad=0.02)  # pyright: ignore[reportOptionalMemberAccess]
 
@@ -208,6 +215,25 @@ def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:
             "w--", linewidth=1.5, alpha=0.9, label=r"$\omega(k)$ peak",
         )
         ax.legend(fontsize=8, loc="upper left")
+
+    # Data-driven axis cropping
+    # k-axis: match spectral conversion's active_modes range when available
+    sc_obj = None
+    if "spectral_conversion" in results and "error" not in results.get("spectral_conversion", {}):
+        sc_obj = results["spectral_conversion"].get("_result_obj")
+    if sc_obj is not None and np.any(sc_obj.active_modes):
+        ax.set_xlim(0, float(sc_obj.wavenumbers[sc_obj.active_modes].max()) * 1.15)
+    elif np.any(active):
+        max_peak = float(np.max(result.peak_powers))
+        if max_peak > 0:
+            strong = result.peak_powers >= max_peak * 1e-3
+            if np.any(strong):
+                ax.set_xlim(0, float(wn[strong].max()) * 1.1)
+    # ω-axis: power threshold (limits to actual oscillation frequencies)
+    peak_pwr = float(np.maximum(np.max(power), 1e-30))
+    sig_f = np.max(power, axis=0) >= peak_pwr * 1e-6
+    if np.any(sig_f):
+        ax.set_ylim(0, float(freqs[sig_f].max()) * 1.1)
 
     ax.set_xlabel(r"$|k|$")
     ax.set_ylabel(r"$\omega$ (rad/time)")
