@@ -1,7 +1,7 @@
 {
 	"metadata":{
 		"source":"xAct",
-		"lagrangian_expr":"-1\/2 (d phi)^2 - phim2\/2 phi^2 - 1\/4 F_ab F^ab - Am2\/2 A^2 + kCS\/2 eps A dA + gSV phi div(A)",
+		"lagrangian_expr":"-1\/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - phim2\/2 phi[]^2 - 1\/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d] - Am2\/2 A[-a] eta[a, b] A[-b] + kCS\/2 * epsiloneta[a, b, c] * A[-a] * CD[-b][A[-c]] + gSV phi[] eta[a, b] CD[-a][A[-b]]",
 		"derived_from":"Euler-Lagrange",
 		"gauge":"none",
 		"linearized":false,

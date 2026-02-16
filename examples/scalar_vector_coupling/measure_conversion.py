@@ -12,8 +12,11 @@ A Gaussian pulse excites the scalar field phi.  The divergence coupling
 term (kCS) creates helical mixing between A components.
 
 This example uses ``compute_group_conversion`` to measure the total
-scalar-to-vector conversion P(t) = E_{A_1+A_2}(t) / E_phi(0), which is
-the natural group-to-group measurement for mixed-rank field systems.
+scalar-to-vector conversion P(t) = E_{A_1+A_2}(t) / E_phi(0), plus:
+
+- **Spectral conversion** P(k,t) via ``compute_group_spectral_conversion``
+- **Dispersion relation** omega(k) via ``compute_dispersion``
+- **Mixing length** and **mixing spectrum**
 
 Usage:
     uv run python examples/scalar_vector_coupling/measure_conversion.py
@@ -35,8 +38,10 @@ from tidal.measurement import (
     SimulationData,
     check_energy_conservation,
     compute_conversion_probability,
+    compute_dispersion,
     compute_energy_timeseries,
     compute_group_conversion,
+    compute_group_spectral_conversion,
     compute_mixing_length,
     compute_mixing_spectrum,
 )
@@ -48,7 +53,9 @@ if TYPE_CHECKING:
 
     from tidal.measurement._conversion import ConversionResult
     from tidal.measurement._diagnostics import EnergyDiagnostics
+    from tidal.measurement._dispersion import DispersionResult
     from tidal.measurement._mixing import MixingResult, MixingSpectrum
+    from tidal.measurement._spectral_conversion import SpectralConversion
 
 # ---------------------------------------------------------------------------
 # Simulation parameters
@@ -111,13 +118,15 @@ def _run_simulation() -> SimulationData:
 # ---------------------------------------------------------------------------
 
 
-def _print_summary(  # noqa: PLR0913, PLR0917
+def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
     total: ConversionResult,
     r_a1: ConversionResult,
     r_a2: ConversionResult,
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
     spectrum: MixingSpectrum | None,
+    spectral_conv: SpectralConversion | None,
+    disp_phi: DispersionResult | None,
 ) -> None:
     """Print quantitative summary to stdout."""
     print("=" * 60)
@@ -180,6 +189,37 @@ def _print_summary(  # noqa: PLR0913, PLR0917
         print("  Mixing spectrum: not computed")
     print()
 
+    # Spectral conversion
+    if spectral_conv is not None:
+        n_active = int(spectral_conv.active_modes.sum())
+        print("  Spectral conversion P(k,t):")
+        print(
+            f"    Active k-modes: {n_active} / {len(spectral_conv.wavenumbers)}"
+        )
+        if n_active > 0:
+            peak_k_idx = int(np.argmax(spectral_conv.probability[-1]))
+            print(
+                f"    Peak P(k, t_final) at |k| = {spectral_conv.wavenumbers[peak_k_idx]:.4f}:"
+                f"  P = {spectral_conv.probability[-1, peak_k_idx]:.6f}"
+            )
+    else:
+        print("  Spectral conversion: not computed")
+    print()
+
+    # Dispersion
+    if disp_phi is not None:
+        n_active = int(np.count_nonzero(disp_phi.peak_frequencies > 0.0))
+        print("  Dispersion (phi):")
+        print(
+            f"    Active k-modes: {n_active} / {len(disp_phi.wavenumbers)}"
+        )
+        print(
+            f"    Rayleigh resolution: {disp_phi.rayleigh_resolution:.4f} rad/time"
+        )
+    else:
+        print("  Dispersion (phi): not computed")
+    print()
+
     # Conservation
     print(f"  Energy conservation: {'PASS' if diag.is_conserved else 'FAIL'}")
     print(f"    max |dE/E| = {diag.max_relative_error:.2e}")
@@ -200,6 +240,8 @@ def _plot_results(  # noqa: PLR0913, PLR0915, PLR0917
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
     spectrum: MixingSpectrum | None,
+    spectral_conv: SpectralConversion | None,
+    disp_phi: DispersionResult | None,
 ) -> Path:
     """Generate 2x3 measurement figure. Returns path to saved PNG."""
     fig, axes = plt.subplots(2, 3, figsize=(16, 9))
@@ -354,6 +396,12 @@ def _plot_results(  # noqa: PLR0913, PLR0915, PLR0917
             f"  $L_{{mix}} = {mixing.mixing_length:.4f} \\pm {mixing.mixing_length_uncertainty:.4f}$",
             f"  $\\omega_{{dom}} = {mixing.dominant_frequency:.4f}$",
         ]
+    if spectral_conv is not None:
+        n_active = int(spectral_conv.active_modes.sum())
+        lines += ["", f"Spectral Conv: {n_active} active modes"]
+    if disp_phi is not None:
+        n_act = int(np.count_nonzero(disp_phi.peak_frequencies > 0.0))
+        lines += [f"Dispersion: {n_act} active modes"]
     lines += [
         "",
         f"  max $|\\Delta E / E_0| = {diag.max_relative_error:.2e}$",
@@ -414,14 +462,32 @@ def main() -> None:
     except ValueError as e:
         print(f"  Mixing spectrum: not computed ({e})")
 
+    print("Computing spectral conversion P(k,t)...")
+    spectral_conv: SpectralConversion | None = None
+    try:
+        spectral_conv = compute_group_spectral_conversion(
+            data, "phi_0", ["A_1", "A_2"],
+        )
+    except ValueError as e:
+        print(f"  Spectral conversion: not computed ({e})")
+
+    print("Computing dispersion relation...")
+    disp_phi: DispersionResult | None = None
+    try:
+        disp_phi = compute_dispersion(data, "phi_0")
+    except ValueError as e:
+        print(f"  Dispersion (phi): not computed ({e})")
+
     print("Checking energy conservation...")
     diag = check_energy_conservation(data, threshold=1e-3)
 
-    _print_summary(total, r_a1, r_a2, diag, mixing, spectrum)
+    _print_summary(total, r_a1, r_a2, diag, mixing, spectrum, spectral_conv, disp_phi)
 
     print()
     print("Generating measurement plots...")
-    output_path = _plot_results(data, total, r_a1, r_a2, diag, mixing, spectrum)
+    output_path = _plot_results(
+        data, total, r_a1, r_a2, diag, mixing, spectrum, spectral_conv, disp_phi,
+    )
     print(f"  Saved to: {output_path}")
 
 

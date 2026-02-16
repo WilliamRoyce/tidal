@@ -36,6 +36,14 @@
 #   # Step 4: Measure scalar-to-vector conversion and mixing length
 #   uv run tidal measure ../data/scalar_vector_coupling_output.npz \
 #     --what conversion,mixing --source phi_0 --target A_0,A_1,A_2
+#
+#   # Step 5: Spectral conversion P(k,t) — per-mode energy transfer
+#   uv run tidal measure ../data/scalar_vector_coupling_output.npz \
+#     --what spectral_conversion --source phi_0 --target A_1,A_2
+#
+#   # Step 6: Dispersion relation omega(k) for phi
+#   uv run tidal measure ../data/scalar_vector_coupling_output.npz \
+#     --what dispersion --source phi_0
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -64,3 +72,14 @@ tidal simulate ../data/scalar_vector_coupling.json \
 tidal measure ../data/scalar_vector_coupling_output.npz \
   --what conversion,mixing \
   --source phi_0 --target A_0,A_1,A_2
+
+# Step 5: Spectral conversion P(k,t)
+# Shows which Fourier modes participate in scalar-to-vector energy transfer
+tidal measure ../data/scalar_vector_coupling_output.npz \
+  --what spectral_conversion \
+  --source phi_0 --target A_1,A_2
+
+# Step 6: Dispersion relation omega(k) for the scalar field
+tidal measure ../data/scalar_vector_coupling_output.npz \
+  --what dispersion \
+  --source phi_0
