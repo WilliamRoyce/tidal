@@ -7,8 +7,13 @@ Demonstrates the measurement module applied to the coupled scalar system:
 
 A Gaussian pulse excites the lighter field (phi, m^2=1).  Coupling (g=0.5)
 transfers energy to the heavier field (chi, m^2=4).  The measurement module
-quantifies this conversion using canonical Hamiltonian energy, spectral
-decomposition, and energy conservation diagnostics.
+quantifies this conversion using:
+
+- **Conversion probability** P(t) = E_chi(t) / E_phi(0)
+- **Mixing length** L_mix = pi / omega_dom (half-period of dominant oscillation)
+- **Spectral conversion** P(k,t) — per-mode conversion probability
+- **Dispersion relation** omega(k) — extracted via spacetime FFT
+- **Energy conservation** diagnostics
 
 Usage:
     uv run python examples/coupled_scalars/measure_conversion.py
@@ -27,9 +32,11 @@ from tidal.measurement import (
     SimulationData,
     check_energy_conservation,
     compute_conversion_probability,
+    compute_dispersion,
     compute_energy_timeseries,
     compute_mixing_length,
     compute_mixing_spectrum,
+    compute_spectral_conversion,
     compute_spectrum,
 )
 from tidal.symbolic import build_pde_from_json, load_equation_system
@@ -40,7 +47,9 @@ if TYPE_CHECKING:
 
     from tidal.measurement._conversion import ConversionResult
     from tidal.measurement._diagnostics import EnergyDiagnostics
+    from tidal.measurement._dispersion import DispersionResult
     from tidal.measurement._mixing import MixingResult, MixingSpectrum
+    from tidal.measurement._spectral_conversion import SpectralConversion
 
 # ---------------------------------------------------------------------------
 # Simulation parameters
@@ -92,11 +101,14 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float]]:
 # ---------------------------------------------------------------------------
 
 
-def _print_summary(
+def _print_summary(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     result: ConversionResult,
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
     spectrum: MixingSpectrum | None,
+    spectral_conv: SpectralConversion | None,
+    disp_phi: DispersionResult | None,
+    disp_chi: DispersionResult | None,
     params: dict[str, float],
 ) -> None:
     """Print quantitative summary to stdout."""
@@ -160,6 +172,49 @@ def _print_summary(
         print("  Mixing spectrum: not computed")
     print()
 
+    # Spectral conversion
+    if spectral_conv is not None:
+        n_active = int(spectral_conv.active_modes.sum())
+        print("  Spectral conversion P(k,t):")
+        print(
+            f"    Active k-modes: {n_active} / {len(spectral_conv.wavenumbers)}"
+        )
+        if n_active > 0:
+            peak_k_idx = int(np.argmax(spectral_conv.probability[-1]))
+            print(
+                f"    Peak P(k, t_final) at |k| = {spectral_conv.wavenumbers[peak_k_idx]:.4f}:"
+                f"  P = {spectral_conv.probability[-1, peak_k_idx]:.6f}"
+            )
+    else:
+        print("  Spectral conversion: not computed")
+    print()
+
+    # Dispersion
+    if disp_phi is not None:
+        n_active = int(np.count_nonzero(disp_phi.peak_frequencies > 0.0))
+        print("  Dispersion (phi):")
+        print(
+            f"    Active k-modes: {n_active} / {len(disp_phi.wavenumbers)}"
+        )
+        print(
+            f"    Rayleigh resolution: {disp_phi.rayleigh_resolution:.4f} rad/time"
+        )
+        if n_active > 0:
+            # Compare measured omega(k=0) with predicted
+            omega_measured = disp_phi.peak_frequencies[0]
+            print(f"    omega(k~0) measured: {omega_measured:.4f}")
+    else:
+        print("  Dispersion (phi): not computed")
+    if disp_chi is not None:
+        n_active = int(np.count_nonzero(disp_chi.peak_frequencies > 0.0))
+        print("  Dispersion (chi):")
+        print(
+            f"    Active k-modes: {n_active} / {len(disp_chi.wavenumbers)}"
+        )
+    else:
+        print("  Dispersion (chi): not computed")
+    print()
+
     # Conservation
     print(f"  Energy conservation: {'PASS' if diag.is_conserved else 'FAIL'}")
     print(f"    max |dE/E| = {diag.max_relative_error:.2e}")
@@ -178,6 +233,8 @@ def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
     spectrum: MixingSpectrum | None,
+    spectral_conv: SpectralConversion | None,
+    disp_phi: DispersionResult | None,
     params: dict[str, float],
 ) -> Path:
     """Generate 2x3 measurement figure. Returns path to saved PNG."""
@@ -252,25 +309,52 @@ def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
     ax.legend(fontsize=8)
     ax.grid(visible=True, alpha=0.3)
 
-    # [1,0] Spectral power at t=0 and t=peak
+    # [1,0] Spectral conversion P(k,t) heatmap or dispersion relation
     ax = axes[1, 0]
-    snap0 = compute_spectrum(data.fields["phi_0"][0], data.grid_spacing, data.periodic)
-    snap_peak = compute_spectrum(
-        data.fields["chi_0"][peak_idx],
-        data.grid_spacing,
-        data.periodic,
-    )
-    ax.semilogy(snap0.wavenumbers, snap0.power_spectrum, "b-", label=r"$\varphi(t=0)$")
-    ax.semilogy(
-        snap_peak.wavenumbers,
-        snap_peak.power_spectrum,
-        "r-",
-        label=rf"$\chi(t={result.times[peak_idx]:.1f})$",
-    )
-    ax.set_xlabel(r"$|k|$")
-    ax.set_ylabel(r"$|\hat{\phi}(k)|^2$")
-    ax.set_title("Power Spectrum")
-    ax.legend(fontsize=8)
+    if disp_phi is not None and np.any(disp_phi.peak_frequencies > 0.0):
+        # Dispersion relation S(k, omega) heatmap
+        log_power = np.log10(np.maximum(disp_phi.power, 1e-30))
+        mesh = ax.pcolormesh(
+            disp_phi.wavenumbers, disp_phi.frequencies, log_power.T,
+            shading="nearest", cmap="viridis",
+        )
+        fig.colorbar(mesh, ax=ax, label=r"$\log_{10} S(k, \omega)$", pad=0.02)
+        active = disp_phi.peak_frequencies > 0.0
+        ax.plot(
+            disp_phi.wavenumbers[active], disp_phi.peak_frequencies[active],
+            "w--", linewidth=1.5, alpha=0.9, label=r"$\omega(k)$ peak",
+        )
+        ax.set_xlabel(r"$|k|$")
+        ax.set_ylabel(r"$\omega$ (rad/time)")
+        ax.set_title(r"Dispersion $\omega(k)$ ($\varphi$)")
+        ax.legend(fontsize=8, loc="upper left")
+    elif spectral_conv is not None and np.any(spectral_conv.active_modes):
+        # Spectral conversion P(k,t)
+        mesh = ax.pcolormesh(
+            spectral_conv.wavenumbers, spectral_conv.times,
+            spectral_conv.probability, shading="nearest", cmap="inferno",
+        )
+        fig.colorbar(mesh, ax=ax, label=r"$P(k,t)$", pad=0.02)
+        ax.set_xlabel(r"$|k|$")
+        ax.set_ylabel("Time")
+        ax.set_title(r"Spectral Conversion $P(k,t)$")
+    else:
+        # Fallback: power spectrum
+        snap0 = compute_spectrum(
+            data.fields["phi_0"][0], data.grid_spacing, data.periodic,
+        )
+        snap_peak = compute_spectrum(
+            data.fields["chi_0"][peak_idx], data.grid_spacing, data.periodic,
+        )
+        ax.semilogy(snap0.wavenumbers, snap0.power_spectrum, "b-", label=r"$\varphi(t=0)$")
+        ax.semilogy(
+            snap_peak.wavenumbers, snap_peak.power_spectrum, "r-",
+            label=rf"$\chi(t={result.times[peak_idx]:.1f})$",
+        )
+        ax.set_xlabel(r"$|k|$")
+        ax.set_ylabel(r"$|\hat{\phi}(k)|^2$")
+        ax.set_title("Power Spectrum")
+        ax.legend(fontsize=8)
     ax.grid(visible=True, alpha=0.3)
 
     # [1,1] Mixing spectrum (temporal FFT of P(t))
@@ -329,6 +413,12 @@ def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
             f"  $L_{{mix}} = {mixing.mixing_length:.4f} \\pm {mixing.mixing_length_uncertainty:.4f}$",
             f"  $\\omega_{{dom}} = {mixing.dominant_frequency:.4f}$",
         ]
+    if spectral_conv is not None:
+        n_active = int(spectral_conv.active_modes.sum())
+        lines += ["", f"Spectral Conv: {n_active} active modes"]
+    if disp_phi is not None:
+        n_act = int(np.count_nonzero(disp_phi.peak_frequencies > 0.0))
+        lines += [f"Dispersion: {n_act} active modes"]
     lines += [
         "",
         f"  max $|\\Delta E / E_0| = {diag.max_relative_error:.2e}$",
@@ -385,14 +475,37 @@ def main() -> None:
     except ValueError as e:
         print(f"  Mixing spectrum: not computed ({e})")
 
+    print("Computing spectral conversion P(k,t)...")
+    spectral_conv: SpectralConversion | None = None
+    try:
+        spectral_conv = compute_spectral_conversion(data, "phi_0", "chi_0")
+    except ValueError as e:
+        print(f"  Spectral conversion: not computed ({e})")
+
+    print("Computing dispersion relations...")
+    disp_phi: DispersionResult | None = None
+    disp_chi: DispersionResult | None = None
+    try:
+        disp_phi = compute_dispersion(data, "phi_0")
+    except ValueError as e:
+        print(f"  Dispersion (phi): not computed ({e})")
+    try:
+        disp_chi = compute_dispersion(data, "chi_0")
+    except ValueError as e:
+        print(f"  Dispersion (chi): not computed ({e})")
+
     print("Checking energy conservation...")
     diag = check_energy_conservation(data, threshold=1e-3)
 
-    _print_summary(result, diag, mixing, spectrum, params)
+    _print_summary(
+        result, diag, mixing, spectrum, spectral_conv, disp_phi, disp_chi, params,
+    )
 
     print()
     print("Generating measurement plots...")
-    output_path = _plot_results(data, result, diag, mixing, spectrum, params)
+    output_path = _plot_results(
+        data, result, diag, mixing, spectrum, spectral_conv, disp_phi, params,
+    )
     print(f"  Saved to: {output_path}")
 
 
