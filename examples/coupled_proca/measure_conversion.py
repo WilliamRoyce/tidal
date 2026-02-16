@@ -1,20 +1,22 @@
-"""Measurement example: A→B energy transfer in coupled Proca system.
+"""Measurement example: A->B energy transfer in coupled Proca system.
 
 Demonstrates the measurement module applied to the coupled Proca system:
 
     L = -1/4 F^A F^A - 1/4 F^B F^B
-        - mA2/2 A^2 - mB2/2 B^2 + gcoup A·B
+        - mA2/2 A^2 - mB2/2 B^2 + gcoup A.B
 
 A Gaussian pulse in A_1 transfers energy to the B sector via the gcoup
 coupling.  The A_0 and B_0 constraint fields are solved via coupled FFT
 (periodic boundary conditions).
 
-This example uses ``compute_group_conversion`` to measure the total
-A_1 → {A_2, B_1, B_2} energy transfer and per-component breakdown.
-Energy conservation improves as O(dx^2) with periodic BCs (~3% at 20x20).
+This example demonstrates:
+- **Group conversion** P(t) via ``compute_group_conversion``
+- **Spectral conversion** P(k,t) via ``compute_group_spectral_conversion``
+- **Dispersion relation** omega(k) via ``compute_dispersion``
+- Per-component conversion breakdown
 
 Usage:
-    uv run python examples/coupled_proca/measure_coupling.py
+    uv run python examples/coupled_proca/measure_conversion.py
 """
 
 from __future__ import annotations
@@ -33,8 +35,10 @@ from tidal.measurement import (
     SimulationData,
     check_energy_conservation,
     compute_conversion_probability,
+    compute_dispersion,
     compute_energy_timeseries,
     compute_group_conversion,
+    compute_group_spectral_conversion,
     compute_mixing_length,
     compute_mixing_spectrum,
 )
@@ -46,6 +50,8 @@ if TYPE_CHECKING:
 
     from tidal.measurement._conversion import ConversionResult
     from tidal.measurement._diagnostics import EnergyDiagnostics
+    from tidal.measurement._dispersion import DispersionResult
+    from tidal.measurement._spectral_conversion import SpectralConversion
 
 # ---------------------------------------------------------------------------
 # Simulation parameters
@@ -110,12 +116,14 @@ def _run_simulation() -> SimulationData:
 # ---------------------------------------------------------------------------
 
 
-def _print_summary(
+def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
     total: ConversionResult,
     r_a2: ConversionResult,
     r_b1: ConversionResult,
     r_b2: ConversionResult,
     diag: EnergyDiagnostics,
+    spectral_conv: SpectralConversion | None,
+    disp_a1: DispersionResult | None,
 ) -> None:
     """Print quantitative summary to stdout."""
     print("=" * 60)
@@ -182,6 +190,37 @@ def _print_summary(
         print(f"  Mixing spectrum: not computed ({e})")
     print()
 
+    # Spectral conversion
+    if spectral_conv is not None:
+        n_active = int(spectral_conv.active_modes.sum())
+        print("  Spectral conversion P(k,t):")
+        print(
+            f"    Active k-modes: {n_active} / {len(spectral_conv.wavenumbers)}"
+        )
+        if n_active > 0:
+            peak_k_idx = int(np.argmax(spectral_conv.probability[-1]))
+            print(
+                f"    Peak P(k, t_final) at |k| = {spectral_conv.wavenumbers[peak_k_idx]:.4f}:"
+                f"  P = {spectral_conv.probability[-1, peak_k_idx]:.6f}"
+            )
+    else:
+        print("  Spectral conversion: not computed")
+    print()
+
+    # Dispersion
+    if disp_a1 is not None:
+        n_active = int(np.count_nonzero(disp_a1.peak_frequencies > 0.0))
+        print("  Dispersion (A_1):")
+        print(
+            f"    Active k-modes: {n_active} / {len(disp_a1.wavenumbers)}"
+        )
+        print(
+            f"    Rayleigh resolution: {disp_a1.rayleigh_resolution:.4f} rad/time"
+        )
+    else:
+        print("  Dispersion (A_1): not computed")
+    print()
+
     # Conservation — periodic BCs give machine-precision conservation
     print(f"  Energy conservation: {'PASS' if diag.is_conserved else 'FAIL'}")
     print(f"    max |dE/E| = {diag.max_relative_error:.2e}")
@@ -194,13 +233,15 @@ def _print_summary(
 # ---------------------------------------------------------------------------
 
 
-def _plot_results(  # noqa: PLR0913, PLR0915, PLR0917
+def _plot_results(  # noqa: PLR0913, PLR0914, PLR0915, PLR0917
     data: SimulationData,
     total: ConversionResult,
     r_a2: ConversionResult,
     r_b1: ConversionResult,
     r_b2: ConversionResult,
     diag: EnergyDiagnostics,
+    spectral_conv: SpectralConversion | None,
+    disp_a1: DispersionResult | None,
 ) -> Path:
     """Generate 2x3 measurement figure. Returns path to saved PNG."""
     fig, axes = plt.subplots(2, 3, figsize=(18, 9))
@@ -362,7 +403,13 @@ def _plot_results(  # noqa: PLR0913, PLR0915, PLR0917
             f"peaks     = {len(mixing.peaks)}\n"
         )
     except ValueError:
-        summary_text = "No mixing detected"
+        summary_text = "No mixing detected\n"
+    if spectral_conv is not None:
+        n_active = int(spectral_conv.active_modes.sum())
+        summary_text += f"\nSpectral Conv: {n_active} active modes"
+    if disp_a1 is not None:
+        n_act = int(np.count_nonzero(disp_a1.peak_frequencies > 0.0))
+        summary_text += f"\nDispersion: {n_act} active modes"
     ax.text(
         0.1,
         0.9,
@@ -403,14 +450,32 @@ def main() -> None:
     r_b1 = compute_conversion_probability(data, "A_1", "B_1")
     r_b2 = compute_conversion_probability(data, "A_1", "B_2")
 
+    print("Computing spectral conversion P(k,t)...")
+    spectral_conv: SpectralConversion | None = None
+    try:
+        spectral_conv = compute_group_spectral_conversion(
+            data, ["A_1"], ["B_1", "B_2"],
+        )
+    except ValueError as e:
+        print(f"  Spectral conversion: not computed ({e})")
+
+    print("Computing dispersion relation...")
+    disp_a1: DispersionResult | None = None
+    try:
+        disp_a1 = compute_dispersion(data, "A_1")
+    except ValueError as e:
+        print(f"  Dispersion (A_1): not computed ({e})")
+
     print("Checking energy conservation...")
     diag = check_energy_conservation(data, threshold=ENERGY_THRESHOLD)
 
-    _print_summary(total, r_a2, r_b1, r_b2, diag)
+    _print_summary(total, r_a2, r_b1, r_b2, diag, spectral_conv, disp_a1)
 
     print()
     print("Generating measurement plots...")
-    output_path = _plot_results(data, total, r_a2, r_b1, r_b2, diag)
+    output_path = _plot_results(
+        data, total, r_a2, r_b1, r_b2, diag, spectral_conv, disp_a1,
+    )
     print(f"  Saved to: {output_path}")
 
 

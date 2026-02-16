@@ -23,7 +23,7 @@
 #   # Simulate (Gaussian IC, periodic BCs, 16x16 grid)
 #   uv run tidal simulate examples/data/coupled_proca_3d.json \
 #     --param mA2=1.0 --param mB2=2.0 --param gcoup=0.5 \
-#     --ic gaussian --grid-size 16 --t-end 2.0 --dt 0.05 \
+#     --ic gaussian --grid-shape 16 --t-end 2.0 --dt 0.05 \
 #     --bc periodic,periodic --scheme runge-kutta \
 #     --output outputs/coupled_proca_output.npz
 #
@@ -32,6 +32,16 @@
 #     --spec examples/data/coupled_proca_3d.json \
 #     --what conversion,mixing \
 #     --source A_0,A_1,A_2 --target B_0,B_1,B_2
+#
+#   # Spectral conversion P(k,t) — per-mode A->B transfer
+#   uv run tidal measure outputs/coupled_proca_output.npz \
+#     --spec examples/data/coupled_proca_3d.json \
+#     --what spectral_conversion --source A_1 --target B_1,B_2
+#
+#   # Dispersion relation omega(k) for A_1
+#   uv run tidal measure outputs/coupled_proca_output.npz \
+#     --spec examples/data/coupled_proca_3d.json \
+#     --what dispersion --source A_1
 
 set -euo pipefail
 
@@ -39,7 +49,7 @@ set -euo pipefail
 # Gaussian IC with periodic BCs; constraint solver auto-detects A_0, B_0
 tidal simulate examples/data/coupled_proca_3d.json \
   --param mA2=1.0 --param mB2=2.0 --param gcoup=0.5 \
-  --ic gaussian --grid-size 16 --t-end 2.0 --dt 0.05 \
+  --ic gaussian --grid-shape 16 --t-end 2.0 --dt 0.05 \
   --bc periodic,periodic --scheme runge-kutta \
   --output outputs/coupled_proca_output.npz
 
@@ -50,3 +60,15 @@ tidal measure outputs/coupled_proca_output.npz \
   --spec examples/data/coupled_proca_3d.json \
   --what conversion,mixing \
   --source A_0,A_1,A_2 --target B_0,B_1,B_2
+
+# Spectral conversion P(k,t) — per-mode A->B energy transfer
+tidal measure outputs/coupled_proca_output.npz \
+  --spec examples/data/coupled_proca_3d.json \
+  --what spectral_conversion \
+  --source A_1 --target B_1,B_2
+
+# Dispersion relation omega(k) for A_1
+tidal measure outputs/coupled_proca_output.npz \
+  --spec examples/data/coupled_proca_3d.json \
+  --what dispersion \
+  --source A_1
