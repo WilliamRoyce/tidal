@@ -16,19 +16,25 @@ from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
 
 from tidal.measurement import (
     ConversionResult,
+    DispersionResult,
     EnergyDiagnostics,
     MixingResult,
     MixingSpectrum,
     SimulationData,
+    SpectralConversion,
     SystemEnergy,
     check_energy_conservation,
     compute_conversion_probability,
+    compute_dispersion,
     compute_energy_timeseries,
     compute_field_energy,
     compute_group_conversion,
+    compute_group_spectral_conversion,
     compute_mixing_length,
     compute_mixing_spectrum,
     compute_mode_amplitudes,
+    compute_spectral_conversion,
+    compute_spectral_energy,
     compute_spectrum,
     compute_system_energy,
 )
@@ -38,6 +44,7 @@ from tidal.measurement._energy import (
     _compute_virial_potential,  # pyright: ignore[reportPrivateUsage]
     _gradient_energy_density,  # pyright: ignore[reportPrivateUsage]
     _is_momentum_field,  # pyright: ignore[reportPrivateUsage]
+    _resolve_term_target,  # pyright: ignore[reportPrivateUsage]
     _self_gradient_axes,  # pyright: ignore[reportPrivateUsage]
 )
 from tidal.symbolic.json_loader import (
@@ -127,6 +134,13 @@ def _make_sim_data_two_fields(
     fields_np = {k: np.stack(v) for k, v in fields_lists.items()}
     momenta_np = {k: np.stack(v) for k, v in momenta_lists.items()}
 
+    # Extract metadata parameters so symbolic coefficients resolve correctly
+    params = {
+        k: float(v)
+        for k, v in spec.metadata.get("parameters", {}).items()
+        if isinstance(v, (int, float))
+    }
+
     return SimulationData(
         times=times,
         fields=fields_np,
@@ -135,7 +149,7 @@ def _make_sim_data_two_fields(
         grid_bounds=grid_bounds,
         periodic=periodic,
         spec=spec,
-        parameters={},
+        parameters=params,
     )
 
 
@@ -1628,3 +1642,415 @@ class TestMixingSpectrum:
         # Both use the same FFT; mixing_length = π/ω_dom from the dominant peak
         assert abs(mixing_result.mixing_length - spectrum.dominant_mixing_length) < 0.01
         assert abs(mixing_result.dominant_frequency - spectrum.dominant_frequency) < 0.01
+
+
+# ============================================================
+# Spectral conversion tests
+# ============================================================
+
+
+class TestSpectralConversion:
+    """Test compute_spectral_conversion for per-mode P(k,t)."""
+
+    def test_shapes(self) -> None:
+        """Output arrays have correct shapes."""
+        data = _make_sim_data_two_fields(n_snapshots=11)
+        result = compute_spectral_conversion(data, "phi_0", "chi_0")
+
+        assert isinstance(result, SpectralConversion)
+        n_snap = data.n_snapshots
+        n_modes = len(result.wavenumbers)
+        assert result.probability.shape == (n_snap, n_modes)
+        assert result.source_spectral_energy.shape == (n_snap, n_modes)
+        assert result.target_spectral_energy.shape == (n_snap, n_modes)
+        assert result.active_modes.shape == (n_modes,)
+        assert len(result.times) == n_snap
+
+    def test_field_names(self) -> None:
+        """Source and target field names are stored correctly."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        result = compute_spectral_conversion(data, "phi_0", "chi_0")
+        assert result.source_field == "phi_0"
+        assert result.target_field == "chi_0"
+
+    def test_same_field_raises(self) -> None:
+        """Same source and target raises ValueError."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        with pytest.raises(ValueError, match="different"):
+            compute_spectral_conversion(data, "phi_0", "phi_0")
+
+    def test_invalid_field_raises(self) -> None:
+        """Invalid field name raises ValueError."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        with pytest.raises(ValueError, match="not in spec"):
+            compute_spectral_conversion(data, "phi_0", "nonexistent")
+
+    def test_zero_source_energy_raises(self) -> None:
+        """Zero source energy raises ValueError."""
+        data = _make_sim_data_two_fields(n_snapshots=5, amplitude=0.0)
+        with pytest.raises(ValueError, match="no modes above energy floor"):
+            compute_spectral_conversion(data, "phi_0", "chi_0")
+
+    def test_zero_target_gives_zero_probability(self) -> None:
+        """Target at zero → P(k,t=0) = 0 everywhere."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        result = compute_spectral_conversion(data, "phi_0", "chi_0")
+        # chi starts at zero, so P(k, t=0) should be ~0
+        np.testing.assert_allclose(result.probability[0], 0.0, atol=1e-10)
+
+    def test_energy_floor_masks_inactive(self) -> None:
+        """Inactive modes (below energy floor) have P=0 and active_modes=False."""
+        data = _make_sim_data_two_fields(n_snapshots=11)
+        # Very high floor raises (all modes below threshold)
+        with pytest.raises(ValueError, match="no modes above energy floor"):
+            compute_spectral_conversion(
+                data, "phi_0", "chi_0", energy_floor=1e10,
+            )
+        # Normal case: inactive modes have P=0
+        result = compute_spectral_conversion(data, "phi_0", "chi_0")
+        inactive = ~result.active_modes
+        if np.any(inactive):
+            assert np.all(result.probability[:, inactive] == 0.0)
+
+    def test_p_nonzero_at_later_times(self) -> None:
+        """P(k,t) should grow above zero as coupling transfers energy."""
+        data = _make_sim_data_two_fields(n_snapshots=51)
+        result = compute_spectral_conversion(data, "phi_0", "chi_0")
+        # At final time, there should be nonzero conversion in active modes
+        active_p_final = result.probability[-1, result.active_modes]
+        assert np.max(active_p_final) > 0.01
+
+
+class TestGroupSpectralConversion:
+    """Test compute_group_spectral_conversion."""
+
+    def test_single_field_matches_pairwise(self) -> None:
+        """Single-field groups should match pairwise spectral conversion."""
+        data = _make_sim_data_two_fields(n_snapshots=11)
+        pairwise = compute_spectral_conversion(data, "phi_0", "chi_0")
+        group = compute_group_spectral_conversion(data, "phi_0", "chi_0")
+        np.testing.assert_allclose(
+            group.probability, pairwise.probability, atol=1e-15,
+        )
+
+    def test_overlap_raises(self) -> None:
+        """Source and target groups must not overlap."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        with pytest.raises(ValueError, match="overlap"):
+            compute_group_spectral_conversion(
+                data, "phi_0", ["phi_0", "chi_0"],
+            )
+
+    def test_none_target_auto_selects(self) -> None:
+        """target_fields=None auto-selects remaining dynamical fields."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        result = compute_group_spectral_conversion(data, "phi_0")
+        assert result.target_field == "chi_0"
+
+
+# ============================================================
+# Review Pass 4 tests (A8)
+# ============================================================
+
+
+class TestResolveTermTarget:
+    """Tests for _resolve_term_target fail-fast behavior (A3)."""
+
+    def test_unknown_field_raises(self) -> None:
+        """Unresolvable field reference should raise ValueError."""
+        data = _make_sim_data_two_fields(n_snapshots=3)
+        with pytest.raises(ValueError, match="Unresolvable field reference"):
+            _resolve_term_target(data, "nonexistent_field", 0)
+
+    def test_constraint_returns_none(self) -> None:
+        """Constraint field momentum (time_derivative_order == 0) should return None."""
+        import dataclasses
+
+        # Build data with a constraint field (order 0)
+        spec = _build_coupled_scalars_spec()
+        # Modify first equation to be a constraint (order 0)
+        eq0 = spec.equations[0]
+        constraint_eq = dataclasses.replace(eq0, time_derivative_order=0)
+        constraint_spec = dataclasses.replace(
+            spec, equations=(constraint_eq, spec.equations[1]),
+        )
+
+        data = _make_sim_data_two_fields(n_snapshots=3)
+        # Replace spec with the constraint version
+        constraint_data = dataclasses.replace(data, spec=constraint_spec)
+        # pi_0 refers to the first field — which is now a constraint
+        result = _resolve_term_target(constraint_data, "pi_0", 0)
+        assert result is None
+
+    def test_momentum_out_of_range_raises(self) -> None:
+        """Momentum index beyond spec fields should raise ValueError."""
+        data = _make_sim_data_two_fields(n_snapshots=3)
+        # pi_99 is out of range for a 2-field spec
+        with pytest.raises(ValueError, match="resolves to index 99"):
+            _resolve_term_target(data, "pi_99", 0)
+
+
+class TestBincountRegression:
+    """Verify np.bincount radial binning matches expected behavior (A4)."""
+
+    def test_bincount_sums_correctly(self) -> None:
+        """Radial binning should sum values into correct bins."""
+        from tidal.measurement._spectral import (
+            _radial_bin,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        # Build a simple 2D k-magnitude grid and values
+        grid_spacing = (1.0, 1.0)
+        field_shape = (8, 8)
+        k_arrays = [
+            np.fft.fftfreq(8, d=1.0) * 2 * np.pi,
+            np.fft.rfftfreq(8, d=1.0) * 2 * np.pi,
+        ]
+        k_grid = np.meshgrid(*k_arrays, indexing="ij")
+        k_mag = np.sqrt(k_grid[0] ** 2 + k_grid[1] ** 2)
+
+        # Uniform values -- sum in each bin should equal count * value
+        values = np.ones_like(k_mag)
+        centers, binned = _radial_bin(k_mag, values, grid_spacing, field_shape)
+
+        # Total sum must be preserved
+        np.testing.assert_allclose(binned.sum(), values.sum(), rtol=1e-12)
+        # All bins non-negative
+        assert np.all(binned >= 0)
+        # Must have at least one bin
+        assert len(centers) >= 1
+        assert len(centers) == len(binned)
+
+
+class TestSpectralEnergyPhysics:
+    """Tests for spectral energy normalization (A6) and edge cases."""
+
+    def test_spectral_energy_matches_field_energy_uniform(self) -> None:
+        """Spectral energy should exactly match real-space energy for uniform field.
+
+        For a uniform field (all power in k=0), rfftn returns the DC bin fully
+        (no conjugate-symmetry issue), so the Parseval relationship holds exactly.
+        After the dV fix (A6), sum(spectral_bins) == field_energy.
+        """
+        n_grid = 32
+        dx = 10.0 / n_grid
+        amplitude = 2.0
+        field_arr = np.full(n_grid, amplitude)
+        mom_arr = np.zeros(n_grid)
+        m2 = 1.0  # arbitrary positive mass squared
+
+        # Real-space energy: purely mass term (gradient=0 for uniform, kinetic=0)
+        fe = compute_field_energy(field_arr, mom_arr, m2, (dx,), (True,))
+
+        # Spectral energy
+        _wn, se_bins = compute_spectral_energy(
+            field_arr, mom_arr, m2, (dx,), (True,),
+        )
+        spectral_total = float(se_bins.sum())
+
+        # Exact match for uniform field (k=0 only)
+        np.testing.assert_allclose(spectral_total, fe.total, rtol=1e-10)
+
+    def test_spectral_energy_negative_mass(self) -> None:
+        """Tachyonic m² < 0 should not crash; energy can be negative per mode."""
+        n_grid = 32
+        dx = 1.0
+        field = np.random.default_rng(42).standard_normal(n_grid)
+        momentum = np.random.default_rng(43).standard_normal(n_grid)
+        m2_tachyonic = -1.0
+
+        wavenumbers, se = compute_spectral_energy(
+            field, momentum, m2_tachyonic, (dx,), (True,),
+        )
+        # Should produce finite results (some bins may be negative)
+        assert np.all(np.isfinite(se))
+        assert len(wavenumbers) == len(se)
+
+
+# ============================================================
+# Dispersion relation tests (Part B)
+# ============================================================
+
+
+def _make_plane_wave_data(
+    n_grid: int = 64,
+    n_snapshots: int = 64,
+    mode_index: int = 3,
+) -> SimulationData:
+    """Build synthetic data: single-mode plane wave with exact KG evolution.
+
+    Creates phi(x, t) = A * cos(k0*x) * cos(omega0*t) where
+    omega0 = sqrt(k0^2 + m^2) from the KG dispersion relation.
+    """
+    spec = load_equation_system(DATA_DIR / "klein_gordon_1d.json")
+    m2 = float(spec.mass_matrix[0][0])
+
+    domain_len = 20.0
+    dx = domain_len / n_grid
+    x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
+
+    k0 = 2.0 * np.pi * mode_index / domain_len
+    omega0 = np.sqrt(k0**2 + m2)
+
+    # Time span: long enough for several oscillations
+    t_end = 8.0 * np.pi / omega0  # ~4 full oscillations
+    times = np.linspace(0.0, t_end, n_snapshots)
+
+    amplitude = 1.0
+    fields_list: list[np.ndarray] = []
+    momenta_list: list[np.ndarray] = []
+
+    for t in times:
+        phi = amplitude * np.cos(k0 * x) * np.cos(omega0 * t)
+        pi_field = -amplitude * omega0 * np.cos(k0 * x) * np.sin(omega0 * t)
+        fields_list.append(phi)
+        momenta_list.append(pi_field)
+
+    return SimulationData(
+        times=times,
+        fields={"phi_0": np.stack(fields_list)},
+        momenta={"phi_0": np.stack(momenta_list)},
+        grid_spacing=(dx,),
+        grid_bounds=((0.0, domain_len),),
+        periodic=(True,),
+        spec=spec,
+        parameters={},
+    )
+
+
+class TestDispersionRelation:
+    """Tests for compute_dispersion."""
+
+    def test_shapes(self) -> None:
+        """Output arrays should have consistent shapes."""
+        data = _make_plane_wave_data()
+        result = compute_dispersion(data, "phi_0")
+
+        assert isinstance(result, DispersionResult)
+        n_modes = len(result.wavenumbers)
+        n_freq = len(result.frequencies)
+        assert result.power.shape == (n_modes, n_freq)
+        assert result.peak_frequencies.shape == (n_modes,)
+        assert result.peak_powers.shape == (n_modes,)
+
+    def test_field_name_stored(self) -> None:
+        """field_name should round-trip."""
+        data = _make_plane_wave_data()
+        result = compute_dispersion(data, "phi_0")
+        assert result.field_name == "phi_0"
+
+    def test_invalid_field_raises(self) -> None:
+        """Unknown field should raise ValueError."""
+        data = _make_plane_wave_data()
+        with pytest.raises(ValueError, match="not in spec"):
+            compute_dispersion(data, "nonexistent")
+
+    def test_too_few_snapshots_raises(self) -> None:
+        """Fewer than 3 snapshots should raise ValueError."""
+        data = _make_plane_wave_data(n_snapshots=2)
+        with pytest.raises(ValueError, match="at least 3"):
+            compute_dispersion(data, "phi_0")
+
+    def test_non_uniform_timestep_raises(self) -> None:
+        """Non-uniform timestep should raise ValueError."""
+        import dataclasses
+
+        data = _make_plane_wave_data(n_snapshots=10)
+        # Make timestep non-uniform
+        bad_times = data.times.copy()
+        bad_times[-1] += 1.0
+        bad_data = dataclasses.replace(data, times=bad_times)
+        with pytest.raises(ValueError, match="Non-uniform"):
+            compute_dispersion(bad_data, "phi_0")
+
+    def test_peak_detection_plane_wave(self) -> None:
+        """Monochromatic plane wave should peak at the injected (k0, omega0)."""
+        mode_index = 3
+        data = _make_plane_wave_data(mode_index=mode_index)
+        spec = data.spec
+        m2 = float(spec.mass_matrix[0][0])
+        domain_len = float(data.grid_bounds[0][1] - data.grid_bounds[0][0])
+
+        k0 = 2.0 * np.pi * mode_index / domain_len
+        omega0 = np.sqrt(k0**2 + m2)
+
+        result = compute_dispersion(data, "phi_0")
+
+        # Find the k-bin closest to k0
+        k_idx = int(np.argmin(np.abs(result.wavenumbers - k0)))
+        detected_omega = result.peak_frequencies[k_idx]
+
+        # Should match within Rayleigh resolution
+        np.testing.assert_allclose(
+            detected_omega, omega0, atol=2 * result.rayleigh_resolution,
+        )
+
+    def test_kg_dispersion_curve(self) -> None:
+        """Free KG field: active modes should follow omega = sqrt(k^2 + m^2).
+
+        Uses parameter variables from the spec, not hardcoded numbers.
+        """
+        data = _make_plane_wave_data(n_grid=64, n_snapshots=128)
+        m2 = float(data.spec.mass_matrix[0][0])
+        result = compute_dispersion(data, "phi_0")
+
+        # For active modes, compare detected omega to analytical
+        active = result.peak_frequencies > 0.0
+        if np.any(active):
+            k_active = result.wavenumbers[active]
+            omega_detected = result.peak_frequencies[active]
+            omega_expected = np.sqrt(k_active**2 + m2)
+
+            # Within 2x Rayleigh resolution
+            np.testing.assert_allclose(
+                omega_detected, omega_expected,
+                atol=2 * result.rayleigh_resolution,
+            )
+
+    def test_rayleigh_resolution(self) -> None:
+        """Rayleigh resolution should be 2*pi / T."""
+        data = _make_plane_wave_data(n_snapshots=32)
+        result = compute_dispersion(data, "phi_0")
+
+        t_span = float(data.times[-1] - data.times[0])
+        expected = 2.0 * np.pi / t_span
+        np.testing.assert_allclose(result.rayleigh_resolution, expected, rtol=1e-10)
+
+    def test_inactive_modes_zeroed(self) -> None:
+        """Modes below min_amplitude should have peak_frequencies = 0."""
+        data = _make_plane_wave_data()
+        result = compute_dispersion(data, "phi_0", min_amplitude=1e-12)
+
+        # Plane wave only excites one mode — many modes should be inactive
+        n_active = np.count_nonzero(result.peak_frequencies > 0.0)
+        # At most a handful of modes should be active (the injected mode
+        # plus possibly its neighbors due to spectral leakage)
+        assert n_active < len(result.wavenumbers)
+        # Inactive modes should have zero peak frequency
+        inactive = result.peak_frequencies == 0.0
+        assert np.all(result.peak_powers[inactive] == 0.0)
+
+    def test_power_nonnegative(self) -> None:
+        """All S(k, omega) values should be >= 0."""
+        data = _make_plane_wave_data()
+        result = compute_dispersion(data, "phi_0")
+        assert np.all(result.power >= 0.0)
+
+    def test_single_frequency_dominates(self) -> None:
+        """Monochromatic wave should concentrate power at one frequency bin."""
+        data = _make_plane_wave_data(mode_index=3)
+        result = compute_dispersion(data, "phi_0")
+
+        # Find mode with most power
+        total_per_mode = result.power.sum(axis=1)
+        dominant_k = int(np.argmax(total_per_mode))
+
+        # The peak power should be > 50% of the total for that mode
+        mode_power = result.power[dominant_k]
+        assert float(np.max(mode_power)) > 0.5 * float(np.sum(mode_power))
+
+    def test_frequencies_positive(self) -> None:
+        """All frequency values should be > 0 (DC excluded)."""
+        data = _make_plane_wave_data()
+        result = compute_dispersion(data, "phi_0")
+        assert np.all(result.frequencies > 0.0)

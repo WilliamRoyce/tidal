@@ -329,15 +329,18 @@ class TestCoupledScalarsPipeline:
         phi_eq = next(eq for eq in spec.equations if eq.field_name == "phi_0")
         chi_terms = [t for t in phi_eq.rhs_terms if t.field == "chi_0"]
         assert len(chi_terms) == 1
-        assert chi_terms[0].coefficient == -0.5
         assert chi_terms[0].operator == "identity"
+        assert chi_terms[0].coefficient_symbolic == "-gCpl"
+        # Coupling matrix resolves symbolic: matrix[0][1] = -(coeff of identity(chi_0) in phi eq)
+        assert spec.coupling_matrix[0][1] == pytest.approx(0.5)
 
         # Check chi equation has term referencing phi
         chi_eq = next(eq for eq in spec.equations if eq.field_name == "chi_0")
         phi_terms = [t for t in chi_eq.rhs_terms if t.field == "phi_0"]
         assert len(phi_terms) == 1
-        assert phi_terms[0].coefficient == -0.5
         assert phi_terms[0].operator == "identity"
+        assert phi_terms[0].coefficient_symbolic == "-gCpl"
+        assert spec.coupling_matrix[1][0] == pytest.approx(0.5)
 
     def test_coupled_energy_transfer(
         self, coupled_json_path: Path, grid_1d: CartesianGrid
