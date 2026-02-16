@@ -29,7 +29,7 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
+from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
 from tidal.measurement import (
     SimulationData,
@@ -41,13 +41,12 @@ from tidal.measurement import (
     compute_group_spectral_conversion,
     compute_mixing_length,
     compute_mixing_spectrum,
+    create_snapshot_callback,
 )
 from tidal.symbolic import build_pde_from_json, load_equation_system
 from tidal.utils import normalize_solve_result
 
 if TYPE_CHECKING:
-    from pde.trackers.base import TrackerBase
-
     from tidal.measurement._conversion import ConversionResult
     from tidal.measurement._diagnostics import EnergyDiagnostics
     from tidal.measurement._dispersion import DispersionResult
@@ -59,8 +58,8 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 PARAMS: dict[str, float] = {"mA2": 1.0, "mB2": 5.0, "gcoup": 0.5}
-T_END = 100.0
-TRACKER_INTERVAL = 0.4
+T_END = 10.0
+TRACKER_INTERVAL = 0.2
 ENERGY_THRESHOLD = 0.002  # Depends strongly on resolution and BCs; periodic BCs give machine-precision conservation, while Dirichlet can have O(1%) errors.
 OUTPUT_FILENAME = "coupled_proca_measurement.png"
 
@@ -70,7 +69,7 @@ OUTPUT_FILENAME = "coupled_proca_measurement.png"
 # ---------------------------------------------------------------------------
 
 
-def _run_simulation() -> SimulationData:
+def _run_simulation() -> tuple[SimulationData, Path]:
     """Run the coupled Proca simulation and return measurement data."""
     json_path = Path(__file__).parent.parent / "data" / "coupled_proca_3d.json"
 
@@ -96,8 +95,17 @@ def _run_simulation() -> SimulationData:
 
     state = FieldCollection(fields)
 
-    storage = MemoryStorage()
-    tracker: TrackerBase = storage.tracker(interrupts=TRACKER_INTERVAL)
+    output_data_dir = Path(__file__).parent.parent / "data" / "coupled_proca_output"
+    writer, callback = create_snapshot_callback(
+        output_dir=output_data_dir,
+        spec=spec,
+        grid=grid,
+        t_end=T_END,
+        snapshot_interval=TRACKER_INTERVAL,
+        parameters=PARAMS,
+        spec_path=json_path,
+    )
+    tracker = CallbackTracker(callback, interrupts=TRACKER_INTERVAL)
     result = pde.solve(
         state,
         t_range=T_END,
@@ -106,8 +114,9 @@ def _run_simulation() -> SimulationData:
         tracker=tracker,
     )
     normalize_solve_result(result)
+    writer.close()
 
-    return SimulationData.from_storage(storage, spec, grid, PARAMS)
+    return SimulationData.from_directory(output_data_dir, spec), output_data_dir
 
 
 # ---------------------------------------------------------------------------
@@ -544,7 +553,8 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
 def main() -> None:
     """Run simulation and perform full measurement analysis."""
     print("Running coupled Proca simulation (periodic BCs)...")
-    data = _run_simulation()
+    data, data_dir = _run_simulation()
+    print(f"  Data saved to: {data_dir}")
     print(
         f"  {data.n_snapshots} snapshots collected over t=[0, {float(data.times[-1]):.1f}]"
     )

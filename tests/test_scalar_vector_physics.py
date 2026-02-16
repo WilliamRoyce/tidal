@@ -33,6 +33,11 @@ if TYPE_CHECKING:
 _JSON_PATH = Path("examples/data/scalar_vector_coupling.json")
 _DEFAULT_PARAMS = {"phim2": 1.0, "Am2": 0.5, "kCS": 0.3, "gSV": 0.2}
 
+pytestmark = pytest.mark.skipif(
+    not _JSON_PATH.exists(),
+    reason="scalar_vector_coupling.json not found (run tidal derive)",
+)
+
 
 @pytest.fixture
 def spec() -> EquationSystem:

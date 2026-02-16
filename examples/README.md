@@ -342,7 +342,6 @@ uv run python examples/sphere_kg/sphere_kg_simulation.py
 
 ```bash
 cd examples/electrostatics && bash run.sh
-uv run python examples/electrostatics/electrostatics_simulation.py
 ```
 
 **Key features**: Constraint solver (time_derivative_order=0), `--mode constraint` CLI flag.
@@ -355,7 +354,6 @@ uv run python examples/electrostatics/electrostatics_simulation.py
 
 ```bash
 cd examples/gravitational_waves && bash run.sh
-uv run python examples/gravitational_waves/gw_simulation.py
 ```
 
 **Key features**: xPert linearization, TT gauge, constraint equations, field-aware LHS detection, 6 independent metric perturbation components.
@@ -549,12 +547,11 @@ examples/
 │   ├── de_sitter_kg.json         # Curved spacetime KG
 │   ├── sphere_kg.json            # KG on 2-sphere
 │   ├── polar_kg.json             # KG in polar coordinates
-│   ├── electrostatics_2d.json    # Poisson equation
+│   ├── electrostatics_laplace.json # Electrostatics wave equation
 │   ├── scalar_vector_coupling.json # Scalar-vector stress test
 │   ├── spherical_kg.json         # KG in spherical coordinates
 │   ├── cylindrical_kg.json       # KG in cylindrical coordinates
 │   ├── linearized_gravity.json   # Gravitational waves
-│   ├── linearized_gravity_dedonder.json
 │   ├── massive_3form.json        # Rank-3 antisymmetric tensor
 │   ├── conformal_kg_static.json  # Conformal scalar field
 │   ├── massive_gravity_3d.json   # Linearized massive gravity (2+1D)

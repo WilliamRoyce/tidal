@@ -1,13 +1,16 @@
 """Uniform data abstraction for simulation output.
 
 Provides ``SimulationData``, a frozen dataclass that stores the full time
-history of field and momentum arrays.  Can be constructed from either a live
-``MemoryStorage`` object (straight from the solver) or from an NPZ file
-previously saved by ``tidal simulate --output``.
+history of field and momentum arrays.  Can be constructed from:
+
+- A live ``MemoryStorage`` object (straight from the solver)
+- A snapshot directory written by :class:`~tidal.measurement.SnapshotWriter`
+  (memory-mapped, O(1) RAM)
 """
 
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from math import prod
 from pathlib import Path
@@ -147,7 +150,10 @@ class SimulationData:
         for name, slot_idx in field_slot_map.items():
             fields[name] = np.stack(
                 [
-                    np.asarray(cast("FieldCollection", storage[t])[slot_idx].data, dtype=np.float64)
+                    np.asarray(
+                        cast("FieldCollection", storage[t])[slot_idx].data,
+                        dtype=np.float64,
+                    )
                     for t in range(n)
                 ]
             )
@@ -156,7 +162,10 @@ class SimulationData:
         for name, slot_idx in momentum_slot_map.items():
             momenta[name] = np.stack(
                 [
-                    np.asarray(cast("FieldCollection", storage[t])[slot_idx].data, dtype=np.float64)
+                    np.asarray(
+                        cast("FieldCollection", storage[t])[slot_idx].data,
+                        dtype=np.float64,
+                    )
                     for t in range(n)
                 ]
             )
@@ -181,82 +190,123 @@ class SimulationData:
         )
 
     @classmethod
-    def from_npz(  # noqa: C901, PLR0913, PLR0917
+    def from_directory(  # noqa: C901, PLR0912, PLR0914, PLR0915
         cls,
         path: Path | str,
         spec: EquationSystem,
-        grid_spacing: tuple[float, ...],
-        grid_bounds: tuple[tuple[float, float], ...],
-        periodic: tuple[bool, ...],
-        parameters: dict[str, float] | None = None,
     ) -> SimulationData:
-        """Load from an NPZ file saved by ``tidal simulate --output``.
+        """Load from a snapshot directory with memory-mapped arrays (O(1) RAM).
+
+        The directory must contain ``metadata.json`` and per-field ``.npy``
+        files written by :class:`~tidal.measurement.SnapshotWriter`.  Arrays
+        are opened as read-only memory maps — only the pages actually accessed
+        by measurement functions are loaded into RAM.
 
         Parameters
         ----------
         path : Path or str
-            Path to the ``.npz`` file.
+            Path to the snapshot directory.
         spec : EquationSystem
             JSON-derived equation specification.
-        grid_spacing : tuple[float, ...]
-            Cell sizes per spatial axis.
-        grid_bounds : tuple[tuple[float, float], ...]
-            Domain bounds per spatial axis.
-        periodic : tuple[bool, ...]
-            Per-axis periodicity flags.
-        parameters : dict, optional
-            Resolved parameter values.
 
         Raises
         ------
         FileNotFoundError
-            If *path* does not exist.
+            If *path* does not exist or is not a directory.
         ValueError
-            If the NPZ is missing ``"times"`` or expected field keys.
+            If ``metadata.json`` is missing or corrupt.
         """
         p = Path(path)
-        if not p.exists():
-            msg = f"NPZ file not found: {p}"
+        if not p.is_dir():
+            msg = f"Snapshot directory not found: {p}"
             raise FileNotFoundError(msg)
 
-        data = np.load(str(p))
+        metadata_path = p / "metadata.json"
+        metadata: dict[str, object] = {}
+        if metadata_path.exists():
+            try:
+                raw = metadata_path.read_text()
+                metadata = json.loads(raw)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                # Corrupt metadata (e.g. truncated write) — fall through
+                metadata = {}
+        if not metadata:
+            # Crash recovery: infer snapshot count from times.npy size
+            times_path = p / "times.npy"
+            if not times_path.exists():
+                msg = f"Snapshot directory {p} missing both metadata.json and times.npy"
+                raise ValueError(msg)
+            times_arr = np.load(str(times_path), mmap_mode="r")
+            # Find actual count: last non-zero time (or all if first is 0.0)
+            n_recovered = _infer_snapshot_count(times_arr)
+            metadata = {
+                "n_snapshots": n_recovered,
+                "fields": list(spec.component_names),
+                "momenta": [
+                    eq.field_name
+                    for eq in spec.equations
+                    if eq.time_derivative_order >= 2  # noqa: PLR2004
+                ],
+            }
 
-        if "times" not in data:
-            msg = f"NPZ file {p} missing required 'times' key"
+        n = int(metadata["n_snapshots"])  # type: ignore[arg-type]
+
+        # Load times
+        times_npy = p / "times.npy"
+        if not times_npy.exists():
+            msg = f"Snapshot directory {p} missing times.npy"
             raise ValueError(msg)
-        times = np.asarray(data["times"], dtype=np.float64)
-        n = len(times)
+        times = np.load(str(times_npy), mmap_mode="r")[:n]
 
-        # Reconstruct field arrays
+        # Load fields (memory-mapped)
         fields: dict[str, NDArray[np.float64]] = {}
         for name in spec.component_names:
-            slices: list[NDArray[np.float64]] = []
-            for t_idx in range(n):
-                key = f"{name}_t{t_idx}"
-                if key not in data:
-                    msg = f"NPZ file {p} missing expected key '{key}'"
-                    raise ValueError(msg)
-                slices.append(np.asarray(data[key], dtype=np.float64))
-            fields[name] = np.stack(slices)
+            npy = p / f"{name}.npy"
+            if npy.exists():
+                fields[name] = np.load(str(npy), mmap_mode="r")[:n]
 
-        # Reconstruct momentum arrays (may not be present in older NPZs)
+        # Load momenta (memory-mapped)
         momenta: dict[str, NDArray[np.float64]] = {}
-        for eq in spec.equations:
-            if eq.time_derivative_order < 2:  # noqa: PLR2004
-                continue
-            name = eq.field_name
-            key0 = f"pi_{name}_t0"
-            if key0 not in data:
-                # Older NPZ format without momenta — skip gracefully
-                continue
-            slices_m: list[NDArray[np.float64]] = []
-            for t_idx in range(n):
-                key = f"pi_{name}_t{t_idx}"
-                if key not in data:
-                    msg = f"NPZ file {p} missing expected momentum key '{key}'"
-                    raise ValueError(msg)
-                slices_m.append(np.asarray(data[key], dtype=np.float64))
-            momenta[name] = np.stack(slices_m)
+        momentum_names = cast("list[str]", metadata.get("momenta", []))
+        for name in momentum_names:
+            npy = p / f"pi_{name}.npy"
+            if npy.exists():
+                momenta[name] = np.load(str(npy), mmap_mode="r")[:n]
+
+        # Grid metadata — from metadata.json or spec defaults
+        grid_spacing: tuple[float, ...]
+        if "grid_spacing" in metadata:
+            raw_spacing = cast("list[float]", metadata["grid_spacing"])
+            grid_spacing = tuple(float(v) for v in raw_spacing)
+        else:
+            grid_spacing = (1.0,) * spec.spatial_dimension
+
+        grid_bounds: tuple[tuple[float, float], ...]
+        if "grid_bounds" in metadata:
+            raw_bounds = cast("list[list[float]]", metadata["grid_bounds"])
+            grid_bounds = tuple((float(b[0]), float(b[1])) for b in raw_bounds)
+        else:
+            raw_shape = cast(
+                "list[int]",
+                metadata.get("grid_shape", [1] * spec.spatial_dimension),
+            )
+            grid_bounds = tuple(
+                (0.0, float(s) * grid_spacing[i])
+                for i, s in enumerate(raw_shape)
+            )
+
+        periodic: tuple[bool, ...]
+        if "periodic" in metadata:
+            raw_periodic = cast("list[bool]", metadata["periodic"])
+            periodic = tuple(bool(v) for v in raw_periodic)
+        else:
+            periodic = (False,) * spec.spatial_dimension
+
+        # Parameters
+        raw_params = cast("dict[str, float]", metadata.get("parameters", {}))
+        parameters: dict[str, float] = {
+            str(k): float(v) for k, v in raw_params.items()
+        }
 
         return cls(
             times=times,
@@ -266,68 +316,103 @@ class SimulationData:
             grid_bounds=grid_bounds,
             periodic=periodic,
             spec=spec,
-            parameters=parameters or {},
+            parameters=parameters,
         )
 
-    @classmethod
-    def from_npz_auto(
-        cls,
-        path: Path | str,
-        spec: EquationSystem,
-    ) -> SimulationData:
-        """Load from an NPZ file, reading grid metadata and parameters from the file.
+    def save(self, path: Path | str) -> Path:
+        """Save to a snapshot directory (metadata.json + .npy files).
 
-        This is a convenience wrapper around :meth:`from_npz` that reads
-        ``grid_spacing``, ``grid_bounds``, ``grid_periodic``, and resolved
-        parameters directly from the NPZ — no manual specification needed.
+        This is the inverse of ``load()`` / ``from_directory()``.
+        Overwrites any existing files in the directory.
 
         Parameters
         ----------
         path : Path or str
-            Path to the ``.npz`` file (saved by ``tidal simulate --output``).
+            Directory to write into (created if it does not exist).
+
+        Returns
+        -------
+        Path
+            The directory that was written.
+        """
+        p = Path(path)
+        p.mkdir(parents=True, exist_ok=True)
+
+        np.save(str(p / "times.npy"), np.asarray(self.times))
+        for name, arr in self.fields.items():
+            np.save(str(p / f"{name}.npy"), np.asarray(arr))
+        for name, arr in self.momenta.items():
+            np.save(str(p / f"pi_{name}.npy"), np.asarray(arr))
+
+        # Infer grid shape from the first field array
+        first_field = next(iter(self.fields.values()))
+        grid_shape = list(first_field.shape[1:])  # strip snapshot dim
+
+        metadata = {
+            "version": 1,
+            "n_snapshots": self.n_snapshots,
+            "grid_shape": grid_shape,
+            "grid_spacing": list(self.grid_spacing),
+            "grid_bounds": [list(b) for b in self.grid_bounds],
+            "periodic": list(self.periodic),
+            "parameters": self.parameters,
+            "fields": list(self.fields.keys()),
+            "momenta": list(self.momenta.keys()),
+            "dtype": "float64",
+        }
+        (p / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
+        return p
+
+    @classmethod
+    def load(
+        cls,
+        path: Path | str,
+        spec: EquationSystem,
+    ) -> SimulationData:
+        """Load from a snapshot directory (memory-mapped, O(1) RAM).
+
+        Parameters
+        ----------
+        path : Path or str
+            Path to snapshot directory.
         spec : EquationSystem
             JSON-derived equation specification.
 
         Raises
         ------
-        FileNotFoundError
-            If *path* does not exist.
         ValueError
-            If the NPZ is missing grid metadata keys.
+            If *path* is not a directory.
         """
         p = Path(path)
-        if not p.exists():
-            msg = f"NPZ file not found: {p}"
-            raise FileNotFoundError(msg)
+        if not p.is_dir():
+            msg = (
+                f"Expected a snapshot directory, got file '{p}'. "
+                f"NPZ format is no longer supported — "
+                f"use 'tidal simulate --output <directory>'"
+            )
+            raise ValueError(msg)
+        return cls.from_directory(p, spec)
 
-        data = np.load(str(p))
 
-        for key in ("grid_spacing", "grid_bounds", "grid_periodic"):
-            if key not in data:
-                msg = (
-                    f"NPZ file {p} missing '{key}' metadata — "
-                    f"use from_npz() with explicit grid parameters instead"
-                )
-                raise ValueError(msg)
+def _infer_snapshot_count(times_arr: NDArray[np.float64]) -> int:
+    """Infer actual snapshot count from a times array (crash recovery).
 
-        grid_spacing = tuple(float(v) for v in data["grid_spacing"])
-        grid_bounds = tuple(
-            (float(row[0]), float(row[1])) for row in data["grid_bounds"]
-        )
-        periodic = tuple(bool(v) for v in data["grid_periodic"])
+    When ``metadata.json`` is missing (writer wasn't closed), we look at
+    the pre-allocated ``times.npy`` and find how many entries were actually
+    written.  Unwritten entries are zero (from memmap pre-allocation).
 
-        # Reconstruct parameters if saved
-        parameters: dict[str, float] = {}
-        if "_param_names" in data and "_param_values" in data:
-            names = list(data["_param_names"])
-            values = list(data["_param_values"])
-            parameters = dict(zip(names, (float(v) for v in values), strict=True))
-
-        return cls.from_npz(
-            path=p,
-            spec=spec,
-            grid_spacing=grid_spacing,
-            grid_bounds=grid_bounds,
-            periodic=periodic,
-            parameters=parameters,
-        )
+    Strategy: Find the last index where ``times[i] > 0`` or ``i == 0``
+    (the initial time t=0 is legitimately zero).
+    """
+    n = len(times_arr)
+    if n == 0:
+        return 0
+    # The first entry (t=0) is always valid.  After that, unwritten
+    # entries are 0.0 from memmap pre-allocation.  Find the last
+    # non-zero entry.
+    for i in range(n - 1, 0, -1):
+        t = float(times_arr[i])
+        if t != 0.0 and np.isfinite(t):
+            return i + 1
+    # Only t=0 was written
+    return 1

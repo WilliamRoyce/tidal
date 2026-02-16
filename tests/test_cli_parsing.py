@@ -236,10 +236,12 @@ class TestInferOutputFormat:
         assert _infer_output_format(_make_args(no_plot=True)) == "summary"
 
     def test_explicit_format_wins(self) -> None:
-        assert _infer_output_format(_make_args(output_format="npz")) == "npz"
+        assert _infer_output_format(_make_args(output_format="png")) == "png"
 
-    def test_npz_extension(self) -> None:
-        assert _infer_output_format(_make_args(output="foo.npz")) == "npz"
+    def test_npz_extension_raises(self) -> None:
+        """NPZ format is no longer supported — must raise ValueError."""
+        with pytest.raises(ValueError, match="no longer supported"):
+            _infer_output_format(_make_args(output="foo.npz"))
 
     def test_png_extension(self) -> None:
         assert _infer_output_format(_make_args(output="foo.png")) == "png"
@@ -258,7 +260,7 @@ class TestInferOutputFormat:
 
     def test_no_plot_takes_priority(self) -> None:
         """--no-plot should win even if --format or --output is given."""
-        assert _infer_output_format(_make_args(no_plot=True, output_format="npz")) == "summary"
+        assert _infer_output_format(_make_args(no_plot=True, output_format="png")) == "summary"
 
 
 class TestValidateFormulaAst:

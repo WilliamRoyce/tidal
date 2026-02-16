@@ -39,12 +39,22 @@ DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
 DEDONDER_JSON = DATA_DIR / "linearized_gravity_dedonder.json"
 UNFIXED_JSON = DATA_DIR / "linearized_gravity.json"
 
+_skip_dedonder = pytest.mark.skipif(
+    not DEDONDER_JSON.exists(),
+    reason="linearized_gravity_dedonder.json not found",
+)
+_skip_unfixed = pytest.mark.skipif(
+    not UNFIXED_JSON.exists(),
+    reason="linearized_gravity.json not found (run tidal derive)",
+)
+
 
 # ============================================================
 # De Donder gauge system tests
 # ============================================================
 
 
+@_skip_dedonder
 class TestDeDonderSpec:
     """Test that the de Donder gauge JSON loads correctly."""
 
@@ -113,6 +123,7 @@ class TestDeDonderSpec:
         assert spec.metadata.get("linearized") is True
 
 
+@_skip_dedonder
 class TestDeDonderPDE:
     """Test PDE construction and evolution for de Donder gauge."""
 
@@ -230,6 +241,7 @@ class TestDeDonderPDE:
 # ============================================================
 
 
+@_skip_unfixed
 class TestGaugeUnfixedSpec:
     """Structural tests for the gauge-unfixed linearized Einstein equations.
 
@@ -368,6 +380,7 @@ class TestGaugeUnfixedSpec:
 # ============================================================
 
 
+@_skip_dedonder
 class TestDeDonderPhysics:
     """Physics-level tests for gravitational wave propagation."""
 

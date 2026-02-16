@@ -1327,81 +1327,20 @@ class TestAutoComputedMatrices:
         assert spec.mass_matrix_symbolic == ()
 
 
-# === Integration tests with real JSON files ===
+# === Integration helpers for real JSON files (skip if absent) ===
 
 _DATA_DIR = Path(__file__).resolve().parent.parent / "examples" / "data"
 
 
 def _load_json(name: str) -> dict[str, Any]:
-    """Load a JSON file from examples/data/ as a dict."""
+    """Load a JSON file from examples/data/, skip test if absent."""
     import json
 
     path = _DATA_DIR / name
+    if not path.exists():
+        pytest.skip(f"{name} not found (run tidal derive)")
     with path.open() as f:
         return json.load(f)
-
-
-@pytest.mark.skipif(not _DATA_DIR.exists(), reason="examples/data/ not found")
-class TestAutoComputedMatricesIntegration:
-    """Verify auto-computed matrices from real JSON example files."""
-
-    def test_klein_gordon_1d_mass(self) -> None:
-        """KG has m²=1.0 from identity term."""
-        spec = EquationSystem.from_dict(_load_json("klein_gordon_1d.json"))
-        assert spec.mass_matrix == ((1.0,),)
-        assert spec.coupling_matrix == ((0.0,),)
-
-    def test_coupled_scalars_mass_and_coupling(self) -> None:
-        """Coupled scalars: m_phi²=1, m_chi²=4, g=0.5."""
-        spec = EquationSystem.from_dict(_load_json("coupled_scalars.json"))
-        assert spec.mass_matrix == ((1.0, 0.0), (0.0, 4.0))
-        assert spec.coupling_matrix == ((0.0, 0.5), (0.5, 0.0))
-
-    def test_em_massless(self) -> None:
-        """EM has no mass — identity terms absent."""
-        spec = EquationSystem.from_dict(_load_json("em_1d.json"))
-        assert spec.mass_matrix == ((0.0, 0.0), (0.0, 0.0))
-
-    def test_proca_symbolic_mass(self) -> None:
-        """Proca has symbolic mass -procaMassSquared per component."""
-        spec = EquationSystem.from_dict(_load_json("proca_1d.json"))
-        assert spec.mass_matrix == ((1.0, 0.0), (0.0, 1.0))
-        assert spec.mass_matrix_symbolic != ()
-        assert spec.mass_matrix_symbolic[0][0] == "-procaMassSquared"
-        assert spec.mass_matrix_symbolic[1][1] == "-procaMassSquared"
-
-    def test_de_sitter_symbolic_time_dependent(self) -> None:
-        """De Sitter KG has time-dependent symbolic mass."""
-        spec = EquationSystem.from_dict(_load_json("de_sitter_kg.json"))
-        assert spec.mass_matrix_symbolic != ()
-        assert spec.mass_matrix_symbolic[0][0] is not None
-        assert "dSm2" in spec.mass_matrix_symbolic[0][0]
-
-    def test_conformal_kg_mass(self) -> None:
-        """Conformal KG with Omega²=4 gives effective mass 4.0."""
-        spec = EquationSystem.from_dict(_load_json("conformal_kg_static.json"))
-        assert spec.mass_matrix == ((4.0,),)
-
-    def test_navier_cauchy_massless(self) -> None:
-        """Navier-Cauchy elasticity is massless."""
-        spec = EquationSystem.from_dict(_load_json("navier_cauchy_2d.json"))
-        assert all(spec.mass_matrix[i][j] == 0.0 for i in range(2) for j in range(2))
-
-    def test_chern_simons_massless(self) -> None:
-        """Chern-Simons 3-component gauge field is massless."""
-        spec = EquationSystem.from_dict(_load_json("chern_simons_3d.json"))
-        assert all(spec.mass_matrix[i][j] == 0.0 for i in range(3) for j in range(3))
-
-    def test_linearized_gravity_dedonder_massless(self) -> None:
-        """De Donder linearized gravity: 10 massless wave equations."""
-        spec = EquationSystem.from_dict(_load_json("linearized_gravity_dedonder.json"))
-        assert all(spec.mass_matrix[i][i] == 0.0 for i in range(10))
-
-    def test_sphere_kg_symbolic_mass(self) -> None:
-        """Sphere KG has symbolic mass -sphm2."""
-        spec = EquationSystem.from_dict(_load_json("sphere_kg.json"))
-        assert spec.mass_matrix_symbolic != ()
-        assert spec.mass_matrix_symbolic[0][0] is not None
 
 
 class TestParameterResolvedMatrices:

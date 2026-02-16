@@ -6,9 +6,6 @@
 # Produces 10 component equations (symmetric rank-2 tensor in 4D).
 # Constraint structure: h_00 has no d2_t (Hamiltonian constraint),
 # h_0i are first-order (momentum constraints), h_ij are second-order (evolution).
-#
-# For simulation with de Donder gauge (10 uncoupled wave equations):
-#   tidal derive linearized_gravity.wls  (produces both gauge variants)
 
 [theory]
 name = "Linearized Gravity"

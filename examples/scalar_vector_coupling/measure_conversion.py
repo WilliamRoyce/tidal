@@ -32,7 +32,7 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
+from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
 from tidal.measurement import (
     SimulationData,
@@ -44,13 +44,12 @@ from tidal.measurement import (
     compute_group_spectral_conversion,
     compute_mixing_length,
     compute_mixing_spectrum,
+    create_snapshot_callback,
 )
 from tidal.symbolic import build_pde_from_json, load_equation_system
 from tidal.utils import normalize_solve_result
 
 if TYPE_CHECKING:
-    from pde.trackers.base import TrackerBase
-
     from tidal.measurement._conversion import ConversionResult
     from tidal.measurement._diagnostics import EnergyDiagnostics
     from tidal.measurement._dispersion import DispersionResult
@@ -63,7 +62,7 @@ if TYPE_CHECKING:
 
 PARAMS: dict[str, float] = {"phim2": 1.0, "Am2": 0.5, "kCS": 0.3, "gSV": 0.2}
 T_END = 200.0
-TRACKER_INTERVAL = 0.16  # Save every 5th step (dt=0.01) for measurement analysis
+TRACKER_INTERVAL = 0.2
 OUTPUT_FILENAME = "scalar_vector_measurement.png"
 
 
@@ -72,7 +71,7 @@ OUTPUT_FILENAME = "scalar_vector_measurement.png"
 # ---------------------------------------------------------------------------
 
 
-def _run_simulation() -> SimulationData:
+def _run_simulation() -> tuple[SimulationData, Path]:
     """Run the scalar-vector simulation and return measurement-ready data."""
     json_path = Path(__file__).parent.parent / "data" / "scalar_vector_coupling.json"
 
@@ -97,8 +96,19 @@ def _run_simulation() -> SimulationData:
         ]
     )
 
-    storage = MemoryStorage()
-    tracker: TrackerBase = storage.tracker(interrupts=TRACKER_INTERVAL)
+    output_data_dir = (
+        Path(__file__).parent.parent / "data" / "scalar_vector_coupling_output"
+    )
+    writer, callback = create_snapshot_callback(
+        output_dir=output_data_dir,
+        spec=spec,
+        grid=grid,
+        t_end=T_END,
+        snapshot_interval=TRACKER_INTERVAL,
+        parameters=PARAMS,
+        spec_path=json_path,
+    )
+    tracker = CallbackTracker(callback, interrupts=TRACKER_INTERVAL)
     result = pde.solve(
         state,
         t_range=T_END,
@@ -107,8 +117,9 @@ def _run_simulation() -> SimulationData:
         tracker=tracker,
     )
     normalize_solve_result(result)
+    writer.close()
 
-    return SimulationData.from_storage(storage, spec, grid, PARAMS)
+    return SimulationData.from_directory(output_data_dir, spec), output_data_dir
 
 
 # ---------------------------------------------------------------------------
@@ -215,7 +226,7 @@ def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
     # Conservation
     print(f"  Energy conservation: {'PASS' if diag.is_conserved else 'FAIL'}")
     print(f"    max |dE/E| = {diag.max_relative_error:.2e}")
-    print("    threshold  = 1e-2")
+    print("    threshold  = 1e-3")
     print("=" * 60)
 
 
@@ -310,8 +321,8 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     # [0,2] Energy conservation
     ax = axes[0, 2]
     ax.plot(diag.times, diag.relative_error, "k-", linewidth=1.0)
-    ax.axhline(1e-2, color="r", linestyle="--", alpha=0.5, label="threshold (1e-2)")
-    ax.axhline(-1e-2, color="r", linestyle="--", alpha=0.5)
+    ax.axhline(1e-3, color="r", linestyle="--", alpha=0.5, label="threshold (1e-3)")
+    ax.axhline(-1e-3, color="r", linestyle="--", alpha=0.5)
     ax.set_xlabel("Time")
     ax.set_ylabel(r"$\Delta E\,/\,E_0$")
     ax.set_title("Energy Conservation")
@@ -430,7 +441,11 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         # Data-driven axis cropping
         # k-axis: match spectral conversion's active_modes range when available
         if spectral_conv is not None and np.any(spectral_conv.active_modes):
-            ax.set_xlim(0, float(spectral_conv.wavenumbers[spectral_conv.active_modes].max()) * 1.15)
+            ax.set_xlim(
+                0,
+                float(spectral_conv.wavenumbers[spectral_conv.active_modes].max())
+                * 1.15,
+            )
         elif np.any(active):
             max_peak = float(np.max(disp_phi.peak_powers))
             if max_peak > 0:
@@ -517,7 +532,8 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
 def main() -> None:
     """Run simulation and perform full measurement analysis."""
     print("Running scalar-vector coupling simulation...")
-    data = _run_simulation()
+    data, data_dir = _run_simulation()
+    print(f"  Data saved to: {data_dir}")
     print(
         f"  {data.n_snapshots} snapshots collected over t=[0, {float(data.times[-1]):.1f}]"
     )

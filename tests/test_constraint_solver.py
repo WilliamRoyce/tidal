@@ -1785,6 +1785,8 @@ class TestMassiveGravityConstraints:
             / "data"
             / "massive_gravity_3d.json"
         )
+        if not json_path.exists():
+            pytest.skip("massive_gravity_3d.json not found (run tidal derive)")
         params = {"m2": 1.0}
         spec = load_equation_system(json_path)
         pde = build_pde_from_json(json_path, parameters=params)
@@ -2729,6 +2731,8 @@ class TestCoupledProcaConstraints:
             / "data"
             / "coupled_proca_3d.json"
         )
+        if not json_path.exists():
+            pytest.skip("coupled_proca_3d.json not found (run tidal derive)")
         params = {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5}
         spec = load_equation_system(json_path)
         pde = build_pde_from_json(json_path, parameters=params)
@@ -2867,6 +2871,8 @@ class TestCoupledProcaConstraints:
             / "data"
             / "coupled_proca_3d.json"
         )
+        if not json_path.exists():
+            pytest.skip("coupled_proca_3d.json not found (run tidal derive)")
 
         # Build uncoupled version (gcoup=0)
         spec = load_equation_system(json_path)
@@ -3031,6 +3037,8 @@ class TestDirectionalLaplacianCoalescing:
         json_path = (
             Path(__file__).parent.parent / "examples" / "data" / "coupled_proca_3d.json"
         )
+        if not json_path.exists():
+            pytest.skip("coupled_proca_3d.json not found (run tidal derive)")
         params = {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5}
         spec = load_equation_system(json_path)
         pde = build_pde_from_json(json_path, parameters=params)

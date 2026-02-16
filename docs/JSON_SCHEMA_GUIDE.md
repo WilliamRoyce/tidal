@@ -647,7 +647,7 @@ A_0 is a constraint (time_order=0), A_1 and A_2 are second-order. Uses `pi_0`, `
 
 ### Electrostatics (Constraint Solver)
 
-Source: [`examples/data/electrostatics_2d.json`](../examples/data/electrostatics_2d.json)
+Example: constraint solver Poisson equation (inline test fixture in `tests/conftest.py`)
 
 Poisson equation solved as a constraint at each timestep:
 

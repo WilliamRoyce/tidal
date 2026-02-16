@@ -23,6 +23,11 @@ from tidal.symbolic import (
 
 DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
 
+pytestmark = pytest.mark.skipif(
+    not (DATA_DIR / "polar_kg.json").exists(),
+    reason="curvilinear JSONs not found (run tidal derive)",
+)
+
 
 # ---------------------------------------------------------------------------
 # Polar coordinate tests
