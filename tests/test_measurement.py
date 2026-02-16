@@ -1786,7 +1786,10 @@ def _make_plane_wave_data(
     Creates phi(x, t) = A * cos(k0*x) * cos(omega0*t) where
     omega0 = sqrt(k0^2 + m^2) from the KG dispersion relation.
     """
-    spec = load_equation_system(DATA_DIR / "klein_gordon_1d.json")
+    path = DATA_DIR / "klein_gordon_1d.json"
+    if not path.exists():
+        pytest.skip("klein_gordon_1d.json not found (run tidal derive)")
+    spec = load_equation_system(path)
     m2 = float(spec.mass_matrix[0][0])
 
     domain_len = 20.0

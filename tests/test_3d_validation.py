@@ -28,7 +28,10 @@ from tidal.utils import normalize_solve_result
 @pytest.fixture
 def kg_3d_json_path() -> Path:
     """Path to the 3+1D Klein-Gordon JSON file."""
-    return Path(__file__).parent.parent / "examples" / "data" / "klein_gordon_3d.json"
+    p = Path(__file__).parent.parent / "examples" / "data" / "klein_gordon_3d.json"
+    if not p.exists():
+        pytest.skip("klein_gordon_3d.json not found (run tidal derive)")
+    return p
 
 
 @pytest.fixture
