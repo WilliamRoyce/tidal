@@ -62,7 +62,7 @@ if TYPE_CHECKING:
 
 PARAMS: dict[str, float] = {"phim2": 1.0, "Am2": 0.5, "kCS": 0.3, "gSV": 0.2}
 T_END = 200.0
-TRACKER_INTERVAL = 0.16  # Save every 5th step (dt=0.01) for measurement analysis
+TRACKER_INTERVAL = 0.2
 OUTPUT_FILENAME = "scalar_vector_measurement.png"
 
 
@@ -96,7 +96,9 @@ def _run_simulation() -> tuple[SimulationData, Path]:
         ]
     )
 
-    output_data_dir = Path(__file__).parent.parent / "data" / "scalar_vector_coupling_output"
+    output_data_dir = (
+        Path(__file__).parent.parent / "data" / "scalar_vector_coupling_output"
+    )
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,
         spec=spec,
@@ -224,7 +226,7 @@ def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
     # Conservation
     print(f"  Energy conservation: {'PASS' if diag.is_conserved else 'FAIL'}")
     print(f"    max |dE/E| = {diag.max_relative_error:.2e}")
-    print("    threshold  = 1e-2")
+    print("    threshold  = 1e-3")
     print("=" * 60)
 
 
@@ -319,8 +321,8 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     # [0,2] Energy conservation
     ax = axes[0, 2]
     ax.plot(diag.times, diag.relative_error, "k-", linewidth=1.0)
-    ax.axhline(1e-2, color="r", linestyle="--", alpha=0.5, label="threshold (1e-2)")
-    ax.axhline(-1e-2, color="r", linestyle="--", alpha=0.5)
+    ax.axhline(1e-3, color="r", linestyle="--", alpha=0.5, label="threshold (1e-3)")
+    ax.axhline(-1e-3, color="r", linestyle="--", alpha=0.5)
     ax.set_xlabel("Time")
     ax.set_ylabel(r"$\Delta E\,/\,E_0$")
     ax.set_title("Energy Conservation")
@@ -439,7 +441,11 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         # Data-driven axis cropping
         # k-axis: match spectral conversion's active_modes range when available
         if spectral_conv is not None and np.any(spectral_conv.active_modes):
-            ax.set_xlim(0, float(spectral_conv.wavenumbers[spectral_conv.active_modes].max()) * 1.15)
+            ax.set_xlim(
+                0,
+                float(spectral_conv.wavenumbers[spectral_conv.active_modes].max())
+                * 1.15,
+            )
         elif np.any(active):
             max_peak = float(np.max(disp_phi.peak_powers))
             if max_peak > 0:
@@ -570,7 +576,7 @@ def main() -> None:
         print(f"  Dispersion (phi): not computed ({e})")
 
     print("Checking energy conservation...")
-    diag = check_energy_conservation(data, threshold=1e-2)
+    diag = check_energy_conservation(data, threshold=1e-3)
 
     _print_summary(total, r_a1, r_a2, diag, mixing, spectrum, spectral_conv, disp_phi)
 

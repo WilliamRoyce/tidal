@@ -58,8 +58,8 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 PARAMS: dict[str, float] = {"mA2": 1.0, "mB2": 5.0, "gcoup": 0.5}
-T_END = 100.0
-TRACKER_INTERVAL = 0.4
+T_END = 10.0
+TRACKER_INTERVAL = 0.2
 ENERGY_THRESHOLD = 0.002  # Depends strongly on resolution and BCs; periodic BCs give machine-precision conservation, while Dirichlet can have O(1%) errors.
 OUTPUT_FILENAME = "coupled_proca_measurement.png"
 

@@ -44,6 +44,12 @@
 #   # Step 6: Dispersion relation omega(k) for phi
 #   uv run tidal measure ../data/scalar_vector_coupling_output \
 #     --what dispersion --source phi_0
+#
+#   # Step 7: Combined plot with all measurements
+#   uv run tidal measure ../data/scalar_vector_coupling_output \
+#     --what conversion,mixing,spectral_conversion,dispersion \
+#     --source phi_0 --target A_0,A_1,A_2 \
+#     --output ../data/scalar_vector_coupling_measurement.png
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -83,3 +89,9 @@ tidal measure ../data/scalar_vector_coupling_output \
 tidal measure ../data/scalar_vector_coupling_output \
   --what dispersion \
   --source phi_0
+
+# Step 7: Combined measurement plot (all panels in one figure)
+tidal measure ../data/scalar_vector_coupling_output \
+  --what conversion,mixing,spectral_conversion,dispersion \
+  --source phi_0 --target A_0,A_1,A_2 \
+  --output ../data/scalar_vector_coupling_measurement.png

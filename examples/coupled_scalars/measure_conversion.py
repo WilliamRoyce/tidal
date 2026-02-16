@@ -55,7 +55,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 PARAMS: dict[str, float] = {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5}
-T_END = 50.0
+T_END = 200.0
 TRACKER_INTERVAL = 0.2
 OUTPUT_FILENAME = "coupled_scalars_measurement.png"
 
