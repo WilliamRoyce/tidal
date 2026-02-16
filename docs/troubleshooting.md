@@ -176,6 +176,128 @@ Print["Result: ", result];  (* Should be a number, not symbolic *)
 
 ## Common Python/py-pde Issues
 
+### py-pde Type Annotation Patterns
+
+**Symptoms:** pyright/mypy errors on py-pde method returns (`gradient()`, `laplace()`, arithmetic operators)
+
+**Cause:** py-pde's type stubs don't fully describe runtime return types. Field arithmetic and gradient operations return generic base types, not `ScalarField`.
+
+**Solutions:**
+
+1. Use `TYPE_CHECKING` imports for py-pde types to avoid runtime overhead:
+   ```python
+   from typing import TYPE_CHECKING, cast
+   if TYPE_CHECKING:
+       from pde import CartesianGrid, FieldCollection, ScalarField
+   ```
+
+2. Cast after arithmetic and gradient operations:
+   ```python
+   result = phi - psi
+   result = cast("ScalarField", result)  # py-pde returns DataFieldBase at type level
+
+   grad = phi.gradient(bc=cast("Any", bc))
+   grad = cast("FieldCollection", grad)  # gradient returns VectorField at runtime
+   ```
+
+3. Always add runtime `isinstance` checks before casts — fail-fast on type mismatches:
+   ```python
+   if not isinstance(dpi_dt, ScalarField):
+       msg = "dpi_dt computed non-ScalarField result"
+       raise TypeError(msg)
+   ```
+
+**Don't:** Suppress type errors with `# type: ignore` — use casts so the type checker still validates downstream usage.
+
+### Boundary Condition Gotcha: Gradient Chaining
+
+**Symptoms:** `gradient().gradient()` (for directional second derivatives) gives wrong results or silent numerical drift on periodic grids
+
+**Cause:** py-pde requires explicit `"auto_periodic_neumann"` boundary condition string for gradient chaining. Passing `None` for periodic grids silently breaks the computation.
+
+**Solutions:**
+
+1. For periodic grids, always use:
+   ```python
+   bc = "auto_periodic_neumann"
+   d2_phi_dx2 = phi.gradient(bc)[0].gradient(bc)[0]  # correct ∂²φ/∂x²
+   ```
+
+2. For non-periodic grids, use `"derivative"` (Neumann, zero flux):
+   ```python
+   bc = "derivative"
+   ```
+
+3. For mixed periodic/non-periodic (per-axis), check `grid.periodic`:
+   ```python
+   periodic = getattr(grid, "periodic", None)
+   if isinstance(periodic, Sequence):
+       bc = "auto_periodic_neumann" if any(periodic) else "derivative"
+   ```
+
+See `infer_bc_from_grid()` in `tidal/utils.py` which encapsulates this logic.
+
+### Grid Coordinate Version Compatibility
+
+**Symptoms:** `IndexError` or wrong-shaped arrays when accessing `grid.cell_coords`
+
+**Cause:** Different py-pde versions return cell coordinates in different formats:
+- Grid-shaped: `(*grid.shape, dim)` — newer versions
+- Flattened: `(N_cells, dim)` — older versions
+
+**Solution:** Always normalize before use:
+```python
+coords = cast("np.ndarray", grid.cell_coords)
+if coords.ndim == grid.dim + 1:  # grid-shaped
+    coords = coords.reshape(-1, grid.dim)  # flatten
+# Now coords is always (N_cells, dim)
+```
+
+### Numba Backend Fallback
+
+**Symptoms:** `NotImplementedError` when solving with `backend="numba"`
+
+**Cause:** Not all PDE classes implement `_make_pde_rhs_numba`. Custom PDEs using `evolution_rate()` override instead of expression-based definitions can't auto-compile to Numba.
+
+**Solutions:**
+1. Check before attempting: `hasattr(pde, "_make_pde_rhs_numba")`
+2. Fallback pattern:
+   ```python
+   try:
+       result = pde.solve(state, ..., backend="numba")
+   except NotImplementedError:
+       result = pde.solve(state, ..., backend="numpy")
+   ```
+
+### Spatial Coefficient Freezing for Numba JIT
+
+**Symptoms:** Numba JIT functions see stale or corrupted spatial coefficient data
+
+**Cause:** Numba closures capture references, not copies. If the original array is modified, the JIT function sees the new data.
+
+**Solution:** Copy spatial data before creating the JIT closure:
+```python
+m2_data = self.m2_field.data.copy()  # freeze before JIT
+laplace = state.grid.make_operator("laplace", bc)  # create operator outside JIT
+
+@jit
+def pde_rhs(state_data, t):
+    return laplace(state_data) - m2_data * state_data  # uses frozen copy
+```
+
+### Solver Return Type Polymorphism
+
+**Symptoms:** `TypeError` or `AttributeError` accessing solve result
+
+**Cause:** `pde.solve()` can return either `FieldCollection` directly or `tuple[FieldCollection | None, dict]`.
+
+**Solution:** Use `normalize_solve_result()` from `tidal/utils.py`:
+```python
+from tidal.utils import normalize_solve_result
+raw = pde.solve(state, t_range=t_end, ...)
+result = normalize_solve_result(raw)  # always FieldCollection, raises if None
+```
+
 ### "Unknown operator: X"
 
 **Symptoms:** `ValueError` when building PDE

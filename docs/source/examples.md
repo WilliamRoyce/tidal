@@ -81,18 +81,6 @@ uv run python examples/scalar_vector_coupling/simulation.py
 | gravitational_waves | Yes | Yes | — |
 | massive_3form | Yes | Yes | — |
 
-## Legacy Klein-Gordon Examples
-
-The `examples/klein_gordon/` directory contains standalone Klein-Gordon simulations that use the `kgsim` subpackage directly (without the symbolic pipeline):
-
-- `1d_gaussian_pulse.py` — Basic 1D Gaussian pulse propagation
-- `2d_2field_coupled.py` — 2D coupled multi-field dynamics
-- `anisotropic_2d_pulse.py` — Direction-dependent wave speeds
-- `higher_order_dispersion.py` — Fourth-order spatial derivatives
-- `radial_symmetry_optimized.py` — Radially symmetric initial conditions
-
-These are useful for quick prototyping and as educational references for py-pde usage.
-
 ## JSON Specification Files
 
 All generated JSON files live in `examples/data/`:

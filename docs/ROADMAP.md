@@ -3,7 +3,7 @@
 This document outlines the planned improvements and features for the TIDAL symbolic physics pipeline project.
 
 **Last Updated:** February 2026
-**Project Status:** Phase 13+ Complete, CLI done (850 Python tests + ~108 Wolfram tests)
+**Project Status:** Phase 13+ Complete, CLI + measurement module done (980+ Python tests + ~115 Wolfram tests)
 
 ## Overview
 
@@ -122,7 +122,8 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 | Feature | Status |
 |---------|--------|
-| CLI (`tidal` command) — 5 subcommands, 147 tests | ✅ Complete |
+| CLI (`tidal` command) — 6 subcommands (derive, inspect, simulate, measure, list, validate) | ✅ Complete |
+| Measurement module — energy, conversion P(t), mixing, spectral, dispersion, disk-backed I/O | ✅ Complete |
 | `theory.toml` configuration with `[[derived_fields]]` | ✅ Complete |
 | Scalar-vector coupling stress test (mixed-rank cross-field) | ✅ Complete |
 | Massive 3-form example (rank-3 antisymmetric tensor) | ✅ Complete |
@@ -181,9 +182,10 @@ Issues should be tagged with appropriate labels:
 
 **As of v0.3.1:**
 - ✅ Phase 13+ completed: All core pipeline features implemented
-- ✅ CLI (`tidal` command) implemented: 5 subcommands, 147 tests, zero new dependencies
+- ✅ CLI (`tidal` command) implemented: 6 subcommands, zero new dependencies
+- ✅ Measurement module: energy, conversion P(t), mixing, spectral, dispersion, disk-backed I/O
 - ✅ 18 working examples spanning 1+1D through 3+1D
-- ✅ 850 Python tests + ~108 Wolfram tests passing, 0 ruff violations, 0 pyright errors
+- ✅ 980+ Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
 - ✅ Project renamed to TIDAL with professional branding (logo, Makefile, community docs)
 - ✅ 17 of 25 original issues resolved (68%)
 - 🔄 **Primary remaining focus:** Phase 2 (Testing & CI) — animation tests, codecov, Wolfram CI

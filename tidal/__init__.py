@@ -4,9 +4,9 @@ A symbolic physics pipeline for deriving PDEs from Lagrangians using
 xAct/Mathematica and simulating them with py-pde.
 
 This package provides:
-- `kgsim`: Klein-Gordon equation simulations
 - `symbolic`: Lagrangian-to-PDE pipeline (symbolic computation layer)
-- `vectorfield`: Multi-component field simulations
+- `cli`: Command-line interface for derivation, simulation, and measurement
+- `measurement`: Post-hoc analysis (energy, conversion, dispersion, mixing)
 """
 
 from importlib.metadata import PackageNotFoundError

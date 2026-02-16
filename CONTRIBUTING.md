@@ -257,7 +257,7 @@ import numpy as np
 from pde import CartesianGrid
 
 # Local
-from tidal.kgsim.config import GridConfig
+from tidal.symbolic import load_equation_system
 
 # Type-only imports
 if TYPE_CHECKING:
@@ -295,10 +295,10 @@ from __future__ import annotations
 import pytest
 from pde import CartesianGrid
 
-from tidal.kgsim import make_grid
+from pde import CartesianGrid
 
 
-def test_my_feature(grid_1d: CartesianGrid) -> None:
+def test_my_feature() -> None:
     """Test that my feature works correctly."""
     # Arrange
     expected_value = 42
@@ -456,8 +456,7 @@ tidal/                   # TIDAL project root
 │   │   ├── ExportJSON.wl
 │   │   ├── CommonUtilities.wl
 │   │   └── ...
-│   ├── vectorfield/          # Multi-component field utilities
-│   ├── kgsim/                # Legacy Klein-Gordon simulation subpackage
+│   ├── measurement/          # Post-hoc analysis (energy, conversion, spectra)
 │   └── utils.py              # Shared utilities
 ├── tests/                    # Test suite (850 Python tests)
 │   ├── conftest.py          # Shared fixtures
