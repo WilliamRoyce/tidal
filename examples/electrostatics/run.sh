@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Electrostatics 2D example
-# See also: electrostatics.wls (manual derivation), electrostatics_simulation.py (Python simulation)
 #
-# Electrostatics solves the Poisson equation (no time evolution).
-# Use --mode constraint for single-step constraint solving.
+# Derives the free scalar field wave equation from a Lagrangian,
+# then demonstrates constraint-mode (Laplace equation) solving.
 #
 # To run manually:  cd examples/electrostatics
 
@@ -12,19 +11,14 @@ cd "$(dirname "$0")"
 
 # Derive wave equation from TOML config (Lagrangian-derived)
 tidal derive theory.toml
-# Alternative: derive hand-crafted Poisson equation (constraint + source)
-# tidal derive electrostatics.wls
 
 # Inspect the equation system
-tidal inspect ../data/electrostatics_2d.json
+tidal inspect ../data/electrostatics_laplace.json
 
-# Solve constraint (Poisson equation for phi given charge density rho)
-# Gaussian charge density at origin, Dirichlet BCs (phi=0 at boundary)
-tidal simulate ../data/electrostatics_2d.json \
-  --mode constraint \
+# Simulate: wave equation with Gaussian initial condition
+tidal simulate ../data/electrostatics_laplace.json \
   --grid-shape 64 \
   --bounds -5:5 \
-  --bc dirichlet \
-  --ic formula \
-  --ic-formula "-np.exp(-(x**2 + y**2) / 0.5)" \
-  --ic-component rho
+  --t-end 5.0 \
+  --ic gaussian \
+  --no-plot

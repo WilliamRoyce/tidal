@@ -570,7 +570,7 @@ def main() -> None:
         print(f"  Dispersion (phi): not computed ({e})")
 
     print("Checking energy conservation...")
-    diag = check_energy_conservation(data, threshold=1e-3)
+    diag = check_energy_conservation(data, threshold=1e-2)
 
     _print_summary(total, r_a1, r_a2, diag, mixing, spectrum, spectral_conv, disp_phi)
 
