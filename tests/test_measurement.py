@@ -504,8 +504,9 @@ class TestSummarize:
         }
         assert set(result.keys()) == expected_keys
         assert isinstance(result["energy_conservation"], EnergyDiagnostics)
-        assert isinstance(result["per_field_energy"], dict)
-        assert set(result["per_field_energy"].keys()) == {"phi_0", "chi_0"}
+        per_field: dict[str, object] = result["per_field_energy"]
+        assert isinstance(per_field, dict)
+        assert set(per_field.keys()) == {"phi_0", "chi_0"}
 
     def test_summarize_field_peaks(self) -> None:
         """Field peaks match manual np.max(np.abs(...)) of first/last snapshots."""
