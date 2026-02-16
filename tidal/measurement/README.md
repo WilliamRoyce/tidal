@@ -558,15 +558,11 @@ All functions follow the project's fail-fast convention:
 - `ValueError` for invalid field names, zero source energy, position-dependent coefficients, NaN/Inf data, out-of-range indices, non-positive thresholds
 - `FileNotFoundError` for missing snapshot directories
 
-## Limitations and Future Work
+## Limitations
 
-- **Dirichlet BCs + cross_derivative operators:** The continuous cross-derivative IS self-adjoint with Dirichlet BCs, but the discrete ghost-cell stencil breaks this symmetry at boundary cells, causing ~30% energy drift. With periodic BCs the discrete stencil is exactly antisymmetric and energy conserves to ~1e-10. All examples now use periodic BCs. For users who need Dirichlet BCs with `cross_derivative` operators, see [HAMILTONIAN.md](HAMILTONIAN.md) Section 7, item 5 for the full analysis and SBP as a future remedy.
-- **Position-dependent coefficients:** Energy computation requires constant `m^2` and coupling coefficients. Spatially varying coefficients raise `ValueError`. Extending this requires evaluating position-dependent coefficients at each grid point during virial integration.
-- **Quadratic Lagrangians only:** The virial formula is exact for degree-2 potentials. Higher-order (nonlinear) Lagrangians would need explicit potential density integration.
-- **CLI integration:** `tidal measure result_dir/ --what conversion,mixing --source phi_0 --target chi_0` extracts measurements from the command line. The JSON spec is auto-discovered from `metadata.json` or provided via `--spec`. See `docs/source/cli.md` for full reference.
-- **Per-mode spectral conversion:** `P(k, t)` decomposes conversion into individual Fourier modes via `compute_spectral_conversion()` and `compute_group_spectral_conversion()`. For derivative-coupled systems (gradient/cross_derivative cross-field terms), the mixing angle `θ(k)` is k-dependent — different modes have different oscillation amplitudes, not just frequencies. CLI: `tidal measure result_dir/ --what spectral_conversion --source phi_0 --target chi_0`.
-- **Dispersion relation:** `omega(k)` via spacetime FFT. CLI: `tidal measure result_dir/ --what dispersion --source phi_0`. Resolution improves with longer `T` and finer `dt`.
-- **Plotting utilities:** The CLI plot (`--output plot.png`) auto-selects panels: dispersion > spectral conversion > spectrum in the [1,0] panel position.
+- **Dirichlet BCs + cross_derivative operators:** The discrete ghost-cell stencil breaks self-adjointness at boundary cells, causing ~30% energy drift. Periodic BCs conserve to ~1e-10. See [HAMILTONIAN.md](HAMILTONIAN.md) Section 7, item 5 for the full analysis and SBP as a future remedy.
+- **Position-dependent coefficients:** Energy computation requires constant `m²` and coupling coefficients. Spatially varying coefficients raise `ValueError`. Future: evaluate at each grid point during virial integration.
+- **Quadratic Lagrangians only:** The virial formula is exact for degree-2 potentials. Higher-order Lagrangians would need explicit potential density integration.
 
 ## Tests
 
