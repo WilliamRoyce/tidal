@@ -42,7 +42,7 @@ tidal simulate examples/data/klein_gordon_1d.json
 tidal simulate examples/data/coupled_scalars.json \
     --param m_phi2=1.0 --param g=0.5 \
     --t-end 20.0 --dt 0.005 \
-    --grid-size 256 \
+    --grid-shape 256 \
     --ic gaussian --ic-width 5.0 \
     --bc periodic \
     --scheme scipy
