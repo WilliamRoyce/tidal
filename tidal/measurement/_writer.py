@@ -377,7 +377,7 @@ def compute_snapshot_count(t_end: float, snapshot_interval: float) -> int:
     return int(t_end / snapshot_interval) + 1
 
 
-def _field_names_from_spec(  # pyright: ignore[reportUnusedFunction]
+def _field_names_from_spec(
     spec: EquationSystem,
     *,
     exclude_constraints: bool = False,

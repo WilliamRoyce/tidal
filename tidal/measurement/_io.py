@@ -349,7 +349,7 @@ class SimulationData:
         grid_shape = list(first_field.shape[1:])  # strip snapshot dim
 
         metadata = {
-            "format_version": 1,
+            "version": 1,
             "n_snapshots": self.n_snapshots,
             "grid_shape": grid_shape,
             "grid_spacing": list(self.grid_spacing),
