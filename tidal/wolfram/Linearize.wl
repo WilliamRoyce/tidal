@@ -20,7 +20,7 @@
      - Gauge-unfixed output as PRIMARY result (preserves constraint structure)
      - TTGaugeConditions: informational tool describing TT gauge conditions
      - Works for any dimension (2+1D, 3+1D, etc.)
-     - Utility functions: IsLinear, SelectLinearTerms for general use
+     - Works with scalar, vector, and tensor fields
 
    USAGE PATTERN:
      (* 1. Set up perturbation *)
@@ -52,11 +52,6 @@ Examples: \
   LinearizeTensorExpression[Einstein[CD][-a,-b]]  (* linearized Einstein equations *) \
   LinearizeTensorExpression[RicciCD[-a,-b]]        (* linearized Ricci tensor *)";
 
-(* Backward-compatible alias *)
-LinearizedEinsteinEquation::usage =
-  "LinearizedEinsteinEquation[expr] is a backward-compatible alias for \
-LinearizeTensorExpression[expr]. Prefer using LinearizeTensorExpression directly.";
-
 (* === Informational Gauge Tools === *)
 
 TTGaugeConditions::usage =
@@ -65,22 +60,6 @@ as an informational Association: trace h = 0 (traceless) and h_{0mu} = 0 (transv
 These are constraints on the solution space, not evolution equations. They reduce \
 the 10 DOF of h_ab to 2 physical polarizations (+ and x) for gravitational waves. \
 TT gauge is imposed via initial conditions in the simulation, not at the Lagrangian level.";
-
-(* === Utility Functions === *)
-
-IsLinear::usage =
-  "IsLinear[expr, field] returns True if the expression is linear in the field. \
-Uses polynomial degree checking when possible; conservatively returns False for \
-non-polynomial expressions.";
-
-SelectLinearTerms::usage =
-  "SelectLinearTerms[expr, field] extracts terms that are linear (degree-1) in the field. \
-For polynomial expressions, returns Coefficient[expr, field, 1] * field. For complex \
-expressions, selects terms with exactly one field factor.";
-
-HasExactlyOneFieldFactor::usage =
-  "HasExactlyOneFieldFactor[term, field] returns True if term contains exactly one \
-occurrence of the field or its derivatives.";
 
 Begin["`Private`"];
 
@@ -154,9 +133,6 @@ LinearizeTensorExpression[tensorExpr_] := Module[
   result
 ];
 
-(* Backward-compatible alias *)
-LinearizedEinsteinEquation[expr_] := LinearizeTensorExpression[expr];
-
 (* ================================================================ *)
 (* === Gauge Conditions (Informational) === *)
 (* ================================================================ *)
@@ -181,47 +157,6 @@ TTGaugeConditions[hPert_, metric_] := Module[{},
     "physical_dof" -> 2,
     "polarizations" -> {"h_+", "h_x"}
   |>
-];
-
-(* ================================================================ *)
-(* === Utility Functions === *)
-(* ================================================================ *)
-
-(* Linearity check *)
-IsLinear[expr_, field_] := Module[
-  {testExpr, lambda},
-
-  (* Practical approach: check polynomial degree *)
-  If[PolynomialQ[expr, field],
-    Return[Exponent[expr, field] <= 1]
-  ];
-
-  (* Cannot determine linearity for non-polynomial expressions *)
-  (* Conservative: assume nonlinear to avoid silently skipping linearization *)
-  False
-];
-
-(* Extract linear terms *)
-SelectLinearTerms[expr_, field_] := Module[
-  {terms, linearTerms},
-
-  If[PolynomialQ[expr, field],
-    Return[Coefficient[expr, field, 1] * field]
-  ];
-
-  terms = If[Head[expr] === Plus, List @@ expr, {expr}];
-  linearTerms = Select[terms, HasExactlyOneFieldFactor[#, field] &];
-
-  If[Length[linearTerms] > 0,
-    Total[linearTerms],
-    0
-  ]
-];
-
-HasExactlyOneFieldFactor[term_, field_] := Module[
-  {count},
-  count = Count[term, field | Derivative[__][field] | field[__], {0, Infinity}];
-  count === 1
 ];
 
 End[];

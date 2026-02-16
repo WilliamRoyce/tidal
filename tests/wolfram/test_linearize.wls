@@ -1,7 +1,7 @@
 #!/usr/bin/env wolframscript
 (* Test suite for Linearize.wl module *)
 (* Tests xPert-based linearization: metric perturbation, tensor linearization, *)
-(* gauge conditions, and utility functions (IsLinear, SelectLinearTerms). *)
+(* gauge conditions, and TT gauge condition tools. *)
 
 Print["=== Linearize Module Test Suite ==="];
 Print[""];
@@ -113,104 +113,11 @@ TestTrue["Einstein and Ricci linearizations are different expressions",
 ];
 
 (* ================================================================ *)
-(* === Test Group 3: Backward-Compatible Alias === *)
+(* === Test Group 3: TTGaugeConditions === *)
 (* ================================================================ *)
 
 Print[""];
-Print["Test Group 3: LinearizedEinsteinEquation (backward-compatible alias)"];
-
-(* Test 3.1: Alias produces same result as LinearizeTensorExpression *)
-linEinsteinAlias = LinearizedEinsteinEquation[Einstein[linTestCD][-a, -b]];
-
-TestTrue["LinearizedEinsteinEquation gives same result as LinearizeTensorExpression",
-  linEinsteinAlias === linEinstein
-];
-
-(* Test 3.2: Alias produces a well-formed result (may be zero in 2D) *)
-TestTrue["Alias result is well-formed (not $Failed)",
-  linEinsteinAlias =!= $Failed
-];
-
-(* ================================================================ *)
-(* === Test Group 4: IsLinear and SelectLinearTerms === *)
-(* ================================================================ *)
-
-Print[""];
-Print["Test Group 4: IsLinear and SelectLinearTerms"];
-
-(* Use plain symbols for polynomial tests *)
-Block[{x, aa, bb, cc},
-
-  (* Test 4.1: Linear expression *)
-  TestTrue["IsLinear[aa*x + bb, x] is True",
-    IsLinear[aa*x + bb, x]
-  ];
-
-  (* Test 4.2: Quadratic expression is not linear *)
-  TestTrue["IsLinear[x^2, x] is False",
-    !IsLinear[x^2, x]
-  ];
-
-  (* Test 4.3: Pure constant is linear (degree 0 <= 1) *)
-  TestTrue["IsLinear[cc, x] is True (constant is degree 0)",
-    IsLinear[cc, x]
-  ];
-
-  (* Test 4.4: Mixed polynomial with linear and quadratic terms *)
-  TestTrue["IsLinear[aa*x + bb*x^2, x] is False",
-    !IsLinear[aa*x + bb*x^2, x]
-  ];
-
-  (* Test 4.5: SelectLinearTerms extracts linear part *)
-  selectedTerms = SelectLinearTerms[aa*x + bb*x^2 + cc, x];
-  Print["  SelectLinearTerms[aa*x + bb*x^2 + cc, x] = ", selectedTerms];
-  TestTrue["SelectLinearTerms extracts aa*x from aa*x + bb*x^2 + cc",
-    Simplify[selectedTerms - aa*x] === 0
-  ];
-
-  (* Test 4.6: SelectLinearTerms on purely linear expression *)
-  selectedTerms2 = SelectLinearTerms[3*x + 5, x];
-  TestTrue["SelectLinearTerms[3*x + 5, x] gives 3*x",
-    Simplify[selectedTerms2 - 3*x] === 0
-  ];
-
-  (* Test 4.7: SelectLinearTerms on purely quadratic expression *)
-  selectedTerms3 = SelectLinearTerms[x^2 + x^3, x];
-  TestTrue["SelectLinearTerms[x^2 + x^3, x] gives 0",
-    selectedTerms3 === 0
-  ];
-];
-
-(* ================================================================ *)
-(* === Test Group 5: HasExactlyOneFieldFactor === *)
-(* ================================================================ *)
-
-Print[""];
-Print["Test Group 5: HasExactlyOneFieldFactor"];
-
-Block[{x, aa},
-
-  TestTrue["HasExactlyOneFieldFactor[aa*x, x] is True",
-    HasExactlyOneFieldFactor[aa*x, x]
-  ];
-
-  (* HasExactlyOneFieldFactor is designed for product-form PDE terms
-     where fields appear as f[args]. Use two explicit field applications. *)
-  TestTrue["HasExactlyOneFieldFactor detects two field-related factors",
-    !HasExactlyOneFieldFactor[x[t] * x[s], x]
-  ];
-
-  TestTrue["HasExactlyOneFieldFactor[aa, x] is False (no field)",
-    !HasExactlyOneFieldFactor[aa, x]
-  ];
-];
-
-(* ================================================================ *)
-(* === Test Group 6: TTGaugeConditions === *)
-(* ================================================================ *)
-
-Print[""];
-Print["Test Group 6: TTGaugeConditions"];
+Print["Test Group 3: TTGaugeConditions"];
 
 ttResult = TTGaugeConditions[linTestHPert, linTestEta];
 

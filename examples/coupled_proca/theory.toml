@@ -1,6 +1,6 @@
 [theory]
 name = "Coupled Proca"
-description = "Two massive vector fields with cross-coupling in 2+1D cavity"
+description = "Two massive vector fields with cross-coupling in 2+1D (periodic)"
 
 [spacetime]
 dimension = 3
@@ -32,12 +32,10 @@ max_iterations = 30
 tolerance = 1e-10
 
 [constraint_solver.boundary_conditions.x]
-type = "dirichlet"
-value = 0.0
+type = "periodic"
 
 [constraint_solver.boundary_conditions.y]
-type = "dirichlet"
-value = 0.0
+type = "periodic"
 
 [output]
 path = "../data/coupled_proca_3d.json"

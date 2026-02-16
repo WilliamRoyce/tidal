@@ -16,8 +16,6 @@ from tidal.kgsim import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Sequence
-
     from pde import CartesianGrid
 
 
@@ -178,57 +176,6 @@ def simulation_config_explicit() -> SimulationConfig:
     )
 
 
-# ==================== Common Test Values ====================
-
-
-@pytest.fixture
-def gaussian_widths_valid() -> list[float]:
-    """Return valid Gaussian widths for testing.
-
-    Returns
-    -------
-    list[float]
-        List of positive width values.
-    """
-    return [1.0, 2.0, 5.0]
-
-
-@pytest.fixture
-def gaussian_widths_invalid() -> list[Sequence[float]]:
-    """Invalid Gaussian widths for testing validation.
-
-    Returns
-    -------
-    list[Sequence[float]]
-        List of invalid width values (zero, negative).
-    """
-    return [[0.0], [-1.0], [-5.0]]
-
-
-@pytest.fixture
-def masses_coupled() -> list[float]:
-    """Return standard masses for coupled field tests.
-
-    Returns
-    -------
-    list[float]
-        Two-field masses [0.25, 1.0].
-    """
-    return [0.25, 1.0]
-
-
-@pytest.fixture
-def coupling_matrix_symmetric() -> list[list[float]]:
-    """Symmetric coupling matrix for coupled field tests.
-
-    Returns
-    -------
-    list[list[float]]
-        2x2 symmetric coupling matrix with off-diagonal elements = 0.2.
-    """
-    return [[0.0, 0.2], [0.2, 0.0]]
-
-
 # ==================== CLI JSON Spec Fixtures ====================
 
 _EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "data"
@@ -281,3 +228,29 @@ def electrostatics_json() -> Path:
 def massive_3form_json() -> Path:
     """Path to massive_3form.json, skip if absent."""
     return _cli_json_fixture("massive_3form.json")
+
+
+# ==================== NPZ Fixtures for tidal measure ====================
+
+
+@pytest.fixture
+def coupled_scalars_npz(coupled_scalars_json: Path, tmp_path: Path) -> Path:
+    """Run a short coupled_scalars simulation and save NPZ for measurement tests.
+
+    Returns the path to the generated NPZ file.
+    """
+    from tidal.cli import main
+
+    output = tmp_path / "coupled_scalars.npz"
+    ret = main([
+        "simulate", str(coupled_scalars_json),
+        "--param", "mPhi2=1.0",
+        "--param", "mChi2=4.0",
+        "--param", "gCpl=0.5",
+        "--t-end", "5.0",
+        "--grid-shape", "32",
+        "--output", str(output),
+    ])
+    assert ret == 0, "coupled_scalars simulation failed"
+    assert output.exists(), "NPZ file was not created"
+    return output

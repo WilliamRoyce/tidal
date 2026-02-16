@@ -384,8 +384,9 @@ def _substitute_field_names(
         result = result.replace(f"{name}[", f"{prefixed}[")
         result = result.replace(f"{name} ", f"{prefixed} ")
 
-    # Also substitute eta and CD with prefixed versions
+    # Also substitute eta, CD, and bg (background/reference metric) with prefixed versions
     result = result.replace("eta[", f"{prefix}Eta[")
+    result = result.replace("bg[", f"{prefix}Bg[")
     result = result.replace("CD[", f"{prefix}CD[")
     result = result.replace("CD]", f"{prefix}CD]")
     result = result.replace("CD ]", f"{prefix}CD ]")
@@ -496,7 +497,23 @@ def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
     ]
 
 
-def _wls_fields(ctx: _WlsContext) -> list[str]:
+def _needs_bg_tensor(config: dict[str, Any]) -> bool:
+    """Check if any expression references the background metric ``bg[...]``.
+
+    The background metric is a non-dynamical reference tensor used in theories
+    like massive gravity (Fierz-Pauli) and bimetric gravity.  It is defined
+    via ``DefTensor`` so that xPert treats it as unperturbed.
+    """
+    exprs: list[str] = []
+    if "lagrangian" in config:
+        exprs.append(config["lagrangian"].get("expression", ""))
+    if "linearization" in config:
+        exprs.append(config["linearization"].get("expression", ""))
+    exprs.extend(df.get("rule", "") for df in config.get("derived_fields", []))
+    return any("bg[" in expr for expr in exprs)
+
+
+def _wls_fields(ctx: _WlsContext, *, include_bg: bool = False) -> list[str]:
     """Generate field definitions and constant symbol declarations."""
     lines: list[str] = ["(* Step 2: Define fields *)"]
     for field in ctx.fields:
@@ -508,6 +525,20 @@ def _wls_fields(ctx: _WlsContext) -> list[str]:
             f"If[!ConstantSymbolQ[{c}], DefConstantSymbol[{c}]];" for c in ctx.constants
         )
         lines.append("")
+
+    if include_bg:
+        bg_name = f"{ctx.prefix}Bg"
+        lines.extend([
+            "(* Background/reference metric — not perturbed by xPert *)",
+            f"If[!xTensorQ[{bg_name}],",
+            f'  DefTensor[{bg_name}[-a, -b], {ctx.manifold}, Symmetric[{{-a, -b}}], PrintAs -> "bg"]',
+            "];",
+            "(* Explicit zero perturbation: bg is non-dynamical *)",
+            "Unprotect[Perturbation];",
+            f"Perturbation[{bg_name}[__], ___] := 0;",
+            "Protect[Perturbation];",
+            "",
+        ])
 
     return lines
 
@@ -658,7 +689,9 @@ def _wls_euler_lagrange_single(ctx: _WlsContext) -> list[str]:
     ]
 
 
-def _wls_linearization(ctx: _WlsContext) -> list[str]:
+def _wls_linearization(
+    ctx: _WlsContext, *, include_bg: bool = False
+) -> list[str]:
     """Generate xPert linearization, decomposition, and export lines."""
     assert ctx.linearization is not None
     lin = ctx.linearization
@@ -678,6 +711,8 @@ def _wls_linearization(ctx: _WlsContext) -> list[str]:
         derived_fields=ctx.derived_fields,
     )
 
+    bg_name = f"{ctx.prefix}Bg"
+
     lines: list[str] = [
         "(* Step 3: xPert metric perturbation setup *)",
         f"{pert_sym}Tensor = SetupMetricPerturbation[{ctx.metric}, {pert_sym}, {eps_sym}];",
@@ -689,6 +724,16 @@ def _wls_linearization(ctx: _WlsContext) -> list[str]:
         "",
         "(* Convert xPert notation to plain tensor for pipeline *)",
         f"linExprPlain = linExpr /. {pert_sym}[LI[1], idx__] :> {ctx.prefix}{pert_field_name.capitalize()}[idx];",
+    ]
+
+    # Replace bg tensor with metric (bg = background metric by construction)
+    if include_bg:
+        lines.extend((
+            "(* Replace bg with metric — bg is the background by construction *)",
+            f"linExprPlain = linExprPlain /. {bg_name} -> {ctx.metric};",
+        ))
+
+    lines.extend([
         "linExprPlain = Simplify[linExprPlain];",
         'Print["Converted to plain tensor: ", Short[linExprPlain, 3]];',
         "",
@@ -701,7 +746,7 @@ def _wls_linearization(ctx: _WlsContext) -> list[str]:
         "  {k, Length[componentEqs]}",
         "];",
         "",
-    ]
+    ])
 
     return lines
 
@@ -800,6 +845,8 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
         # The last base metadata line needs a trailing comma
         lines[-1] += ","
         lines.extend(cs_lines)
+        # Strip trailing comma from last line to avoid Null in Association
+        lines[-1] = lines[-1].removesuffix(",")
 
     lines.extend(["|>;", ""])
 
@@ -907,11 +954,11 @@ def generate_wls(
     lines.extend(_wls_header(ctx))
     lines.extend(_wls_packages(ctx.pipeline_path, load_xpert=is_linearization))
     lines.extend(_wls_spacetime(config, ctx))
-    lines.extend(_wls_fields(ctx))
+    lines.extend(_wls_fields(ctx, include_bg=_needs_bg_tensor(config)))
     lines.extend(_wls_derived_fields(ctx))
 
     if is_linearization:
-        lines.extend(_wls_linearization(ctx))
+        lines.extend(_wls_linearization(ctx, include_bg=_needs_bg_tensor(config)))
     else:
         lines.extend(_wls_lagrangian(ctx))
         if ctx.is_multi:

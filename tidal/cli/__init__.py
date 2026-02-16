@@ -5,6 +5,7 @@ Entry point: ``tidal`` command with subcommands:
 - ``tidal derive``   — Derive equations from Lagrangian via Wolfram/xAct
 - ``tidal inspect``  — Display equation system information from JSON
 - ``tidal simulate`` — Run PDE simulation from JSON specification
+- ``tidal measure``  — Extract physics measurements from simulation output
 - ``tidal list``     — List available JSON specifications
 - ``tidal validate`` — Validate a JSON equation specification
 """
@@ -17,11 +18,11 @@ import sys
 __all__ = ["main"]
 
 
-def _build_parser() -> argparse.ArgumentParser:
+def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     """Build the top-level argument parser with subcommands."""
     parser = argparse.ArgumentParser(
         prog="tidal",
-        description="Lagrangian-to-PDE pipeline: derive, inspect, simulate, list.",
+        description="Lagrangian-to-PDE pipeline: derive, inspect, simulate, measure, list.",
     )
     parser.add_argument(
         "--version",
@@ -288,6 +289,89 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Path to the JSON equation specification to validate",
     )
 
+    # --- measure ---
+    measure_parser = sub.add_parser(
+        "measure",
+        help="Extract physics measurements from simulation output",
+        description=(
+            "Load an NPZ file from 'tidal simulate --output' and run "
+            "measurement analyses (energy, conversion, mixing length, etc.)."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  tidal measure result.npz --spec spec.json\n"
+            "  tidal measure result.npz --json\n"
+            "  tidal measure result.npz --what conversion --source phi_0 --target chi_0\n"
+            "  tidal measure result.npz --what energy,conservation\n"
+            "  tidal measure result.npz --output measurement.png"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    measure_parser.add_argument(
+        "npz_path",
+        help="Path to the .npz simulation output file",
+    )
+    measure_parser.add_argument(
+        "--spec",
+        default=None,
+        metavar="PATH",
+        help="Path to JSON equation spec (auto-discovered from NPZ if omitted)",
+    )
+    measure_parser.add_argument(
+        "--what",
+        default=None,
+        metavar="TYPE[,TYPE,...]",
+        help=(
+            "Measurements to run (comma-separated). "
+            "Options: summary, energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation. "
+            "Default: summary"
+        ),
+    )
+    measure_parser.add_argument(
+        "--source",
+        default=None,
+        metavar="FIELD[,FIELD,...]",
+        help="Source field(s) for conversion measurement (comma-separated)",
+    )
+    measure_parser.add_argument(
+        "--target",
+        default=None,
+        metavar="FIELD[,FIELD,...]",
+        help="Target field(s) for conversion measurement (comma-separated)",
+    )
+    measure_parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="KEY=VAL",
+        help="Override parameter value (repeatable, e.g. --param m2=1.0)",
+    )
+    measure_parser.add_argument(
+        "--energy-threshold",
+        type=float,
+        default=1e-3,
+        metavar="T",
+        help="Energy conservation threshold (default: 1e-3)",
+    )
+    measure_parser.add_argument(
+        "--output",
+        default=None,
+        metavar="PATH",
+        help="Save measurement plot (.png or .pdf)",
+    )
+    measure_parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_output",
+        help="Output measurements as JSON instead of text",
+    )
+    measure_parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress progress messages",
+    )
+
     return parser
 
 
@@ -339,6 +423,10 @@ def _dispatch(args: argparse.Namespace) -> int:
         from tidal.cli._validate import validate_command
 
         return validate_command(args)
+    if args.command == "measure":
+        from tidal.cli._measure import measure_command
+
+        return measure_command(args)
     msg = f"Unknown command: {args.command}"
     raise ValueError(msg)
 

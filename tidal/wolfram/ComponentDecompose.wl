@@ -194,14 +194,14 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
         componentEq = Expand[componentEq]
       ];
 
-      (* Replace ALL scalar fields with functions of coordinates *)
+      (* Replace ALL fields (any rank) with functions of coordinates *)
       (* This ensures cross-field terms are properly transformed *)
+      (* Uses ReplaceTensorFieldComponents which dispatches by rank: *)
+      (*   rank 0: fh[] -> fh0[t,x,y]  *)
+      (*   rank 1: fh[{i,-chart}] -> fhi[t,x,y]  *)
+      (*   rank 2+: full component replacement *)
       Do[
-        With[{fh = afh, cs = coordSyms},
-          componentEq = componentEq /. {
-            fh[] :> Symbol[ToString[fh] <> "0"][Sequence @@ cs]
-          }
-        ],
+        componentEq = ReplaceTensorFieldComponents[componentEq, afh, chart, coordSyms, dim],
         {afh, allFieldHeads}
       ];
 
@@ -232,8 +232,7 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
 ];
 
 (* === Unified Tensor Component Extraction === *)
-(* Single pipeline for any tensor rank. The old rank-specific functions
-   (ExtractVectorComponent, ExtractRank2Component) delegate here. *)
+(* Single pipeline for any tensor rank. *)
 
 ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   additionalFields_List:{}, computeChristoffels_:False, metricMatrix_:None] := Module[
@@ -333,19 +332,6 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
 
   Expand[componentEq]
 ];
-
-(* === Backward-Compatible Delegates === *)
-(* These call the unified ExtractTensorComponent so existing code still works *)
-
-ExtractVectorComponent[eom_, field_, chart_, componentIndex_,
-  additionalFields_List:{}, computeChristoffels_:False, metricMatrix_:None] :=
-  ExtractTensorComponent[eom, field, chart, {componentIndex},
-    additionalFields, computeChristoffels, metricMatrix];
-
-ExtractRank2Component[eom_, field_, chart_, idx1_, idx2_,
-  additionalFields_List:{}, computeChristoffels_:False, metricMatrix_:None] :=
-  ExtractTensorComponent[eom, field, chart, {idx1, idx2},
-    additionalFields, computeChristoffels, metricMatrix];
 
 (* === Symmetry Reduction Helpers === *)
 (* These are package-private helpers for EnumerateComponentTuples.
@@ -548,26 +534,6 @@ ReplaceHigherRankFieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module
   ];
 
   result
-];
-
-(* Helper: Find free (non-dummy) indices in an expression *)
-(* Renamed to avoid conflict with xPert's FindFreeIndices *)
-FindFreeIndicesLocal[expr_] := Module[
-  {allIndices, dummyPairs, freeIndices},
-
-  (* Get all indices from the expression *)
-  allIndices = Union[Cases[expr, _?AbstractIndexQ, {0, Infinity}]];
-
-  (* Identify dummy pairs (appearing twice with opposite character) *)
-  dummyPairs = Select[allIndices,
-    Count[expr, #, {0, Infinity}] > 1 &&
-    Count[expr, ChangeIndex[#], {0, Infinity}] > 0 &
-  ];
-
-  (* Free indices are those not in dummy pairs *)
-  freeIndices = Complement[allIndices, dummyPairs, ChangeIndex /@ dummyPairs];
-
-  freeIndices
 ];
 
 End[];

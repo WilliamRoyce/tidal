@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import pytest
 
 from tidal.symbolic.json_loader import (
-    KNOWN_OPERATORS,
+    _STATIC_OPERATORS,
     ComponentEquation,
     EquationSystem,
     OperatorTerm,
@@ -621,21 +621,21 @@ class TestFieldReferenceValidation:
 
 
 class TestOperatorRegistrySync:
-    """Validate KNOWN_OPERATORS and _OPERATOR_REGISTRY stay consistent."""
+    """Validate _STATIC_OPERATORS and _OPERATOR_REGISTRY stay consistent."""
 
     def test_all_registry_operators_are_known(self) -> None:
-        """Every operator in _OPERATOR_REGISTRY must be in KNOWN_OPERATORS."""
-        unknown = set(_OPERATOR_REGISTRY.keys()) - KNOWN_OPERATORS
+        """Every operator in _OPERATOR_REGISTRY must be in _STATIC_OPERATORS."""
+        unknown = set(_OPERATOR_REGISTRY.keys()) - _STATIC_OPERATORS
         assert unknown == set(), (
-            f"Operators in _OPERATOR_REGISTRY but not in KNOWN_OPERATORS: {sorted(unknown)}. "
-            "Add them to KNOWN_OPERATORS in json_loader.py."
+            f"Operators in _OPERATOR_REGISTRY but not in _STATIC_OPERATORS: {sorted(unknown)}. "
+            "Add them to _STATIC_OPERATORS in json_loader.py."
         )
 
     def test_all_known_operators_in_registry(self) -> None:
-        """Every KNOWN_OPERATOR has an entry in _OPERATOR_REGISTRY."""
-        special_cased = KNOWN_OPERATORS - set(_OPERATOR_REGISTRY.keys())
+        """Every _STATIC_OPERATORS entry has a handler in _OPERATOR_REGISTRY."""
+        special_cased = _STATIC_OPERATORS - set(_OPERATOR_REGISTRY.keys())
         assert special_cased == set(), (
-            f"KNOWN_OPERATORS not in _OPERATOR_REGISTRY: {sorted(special_cased)}. "
+            f"_STATIC_OPERATORS not in _OPERATOR_REGISTRY: {sorted(special_cased)}. "
             "Add them to _OPERATOR_REGISTRY (use None handler for special-cased operators)."
         )
 

@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from pde import CartesianGrid, FieldCollection, MemoryStorage
 
+    from tidal.measurement._io import SimulationData
     from tidal.symbolic.json_loader import EquationSystem
 
 # Default grid shapes per spatial dimension
@@ -68,6 +69,14 @@ class PlotContext:
     grid: CartesianGrid
     initial_state: FieldCollection
     params: dict[str, float]
+
+    def to_simulation_data(self) -> SimulationData:
+        """Convert to a :class:`~tidal.measurement.SimulationData` for measurement."""
+        from tidal.measurement import SimulationData
+
+        return SimulationData.from_storage(
+            self.storage, self.spec, self.grid, self.params,
+        )
 
 
 def field_slots(spec: EquationSystem) -> dict[str, int]:
@@ -542,7 +551,10 @@ def _generate_output(args: Namespace, ctx: PlotContext) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     if fmt == "npz":
-        _save_npz(output_path, ctx.spec, ctx.storage)
+        _save_npz(
+            output_path, ctx.spec, ctx.storage, ctx.grid, ctx.params,
+            spec_path=Path(args.json_path),
+        )
     else:
         from tidal.cli._plot import save_plot
 
@@ -597,23 +609,63 @@ def _print_summary(
             print(f"  {name}: peak {init_peak:.4f} → {final_peak:.4f}")
 
 
-def _save_npz(
+def _save_npz(  # noqa: PLR0913, PLR0917
     path: Path,
     spec: EquationSystem,
     storage: MemoryStorage,
+    grid: CartesianGrid | None = None,
+    parameters: dict[str, float] | None = None,
+    spec_path: Path | None = None,
 ) -> None:
-    """Save simulation data as .npz file."""
-    times = np.array(storage.times)
-    field_data: dict[str, np.ndarray] = {"times": times}
+    """Save simulation data as .npz file.
 
-    slots = field_slots(spec)
+    Saves field and momentum arrays at every snapshot, plus grid metadata
+    and resolved parameters so that the file can be loaded for post-hoc
+    measurement via ``SimulationData.from_npz_auto``.
+
+    If *spec_path* is provided, stores the resolved path in the NPZ under
+    ``_spec_path`` so that ``tidal measure`` can auto-discover the JSON spec.
+    """
+    times = np.array(storage.times)
+    data: dict[str, np.ndarray] = {"times": times}
+
+    # Build slot maps
+    f_slots = field_slots(spec)
+    m_slots: dict[str, int] = {
+        name: idx
+        for idx, (name, slot_type) in enumerate(spec.state_layout)
+        if slot_type == "momentum"
+    }
+
     for t_idx in range(len(storage)):
         snapshot = cast("FieldCollection", storage[t_idx])
         for name in spec.component_names:
-            key = f"{name}_t{t_idx}"
-            field_data[key] = snapshot[slots[name]].data
+            data[f"{name}_t{t_idx}"] = snapshot[f_slots[name]].data
+        for name, slot_idx in m_slots.items():
+            data[f"pi_{name}_t{t_idx}"] = snapshot[slot_idx].data
 
-    np.savez(str(path), **field_data)  # type: ignore[reportArgumentType]
+    # Grid metadata (for SimulationData.from_npz / from_npz_auto)
+    if grid is not None:
+        spacing = np.array(
+            [(b[1] - b[0]) / s for b, s in zip(grid.axes_bounds, grid.shape, strict=True)],
+            dtype=np.float64,
+        )
+        bounds = np.array(grid.axes_bounds, dtype=np.float64)
+        periodic_arr = np.array(grid.periodic, dtype=bool)
+        data["grid_spacing"] = spacing
+        data["grid_bounds"] = bounds
+        data["grid_periodic"] = periodic_arr
+
+    # Resolved parameters (for symbolic coefficient resolution)
+    if parameters:
+        data["_param_names"] = np.array(list(parameters.keys()))
+        data["_param_values"] = np.array(list(parameters.values()), dtype=np.float64)
+
+    # JSON spec path (for tidal measure auto-discovery)
+    if spec_path is not None:
+        data["_spec_path"] = np.array(str(spec_path.resolve()))
+
+    np.savez(str(path), **data)  # type: ignore[reportArgumentType]
     print(f"  Saved data to: {path}")
 
 

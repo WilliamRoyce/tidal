@@ -1,5 +1,32 @@
 # Changelog
 
+## `tidal measure` CLI Subcommand (February 2026)
+
+**Status:** COMPLETE
+
+**Summary:** New `tidal measure` subcommand for post-hoc measurement extraction from NPZ simulation output. Completes the derive-to-measure pipeline: `tidal derive` -> `tidal simulate --output` -> `tidal measure`.
+
+**New files:**
+
+- `tidal/cli/_measure.py` — core measurement command with 6 measurement types: summary, energy, conversion, mixing, spectrum, conservation
+- `tidal/cli/_measure_plot.py` — 2x3 measurement visualization (conversion P(t), energy decomposition, conservation, power spectrum, mixing spectrum, summary text)
+
+**Changes:**
+
+- `tidal simulate --output *.npz` now stores `_spec_path` in NPZ metadata for auto-discovery by `tidal measure`
+- `tidal measure result.npz` auto-discovers JSON spec from NPZ metadata or `--spec` flag
+- Output formats: human-readable text (default), JSON (`--json`), plot (`--output *.png`/`*.pdf`)
+- `--what` flag selects specific measurements; default is `summary` (all measurements with auto-detection)
+- `--source`/`--target` for explicit conversion field selection; supports multi-field groups (e.g., `--source A_0,A_1,A_2`)
+- `--param` overrides NPZ parameters at measurement time
+- Plot module uses cached mixing spectrum from `_run_mixing` instead of recomputing
+- 3 coupling example `run.sh` scripts updated with `tidal measure` steps
+- Documentation updated: README.md, docs/source/cli.md, tidal/measurement/README.md
+
+**Tests:** 942+ Python tests passing
+
+---
+
 ## Pre-Phase Hardening Pass (February 2026)
 
 **Status:** ✅ COMPLETE

@@ -1,32 +1,36 @@
-"""Linearized massive gravity in 2+1D simulation.
+"""Linearized massive gravity in 2+1D simulation (Fierz-Pauli mass term).
 
-This script demonstrates massive gravity in 2+1D:
-  G^(1)_ab[h] - m^2 h_ab = 0
+This script demonstrates massive gravity in 2+1D with the Fierz-Pauli
+mass term — the unique ghost-free linear mass term for spin-2:
 
-The mass term is obtained by linearizing G_ab - m^2 g_ab = 0 around flat
-Minkowski. The MINUS sign is essential: with "+", the identity terms have
-positive coefficient in the evolution equations (exponential growth); with
-"-", we get d2_t(h) = -m^2 h + spatial (stable Klein-Gordon-like).
+  G^(1)_ab[h] - m^2 (h_ab - eta_ab h) = 0
+
+where h = eta^cd h_cd is the trace.  The Fierz-Pauli combination
+(h_ab h^ab - h^2) propagates 5 DOF; wrong relative coefficient activates
+a Boulware-Deser ghost (6th DOF, negative energy).
+
+The trace term creates off-diagonal mass coupling between diagonal metric
+components (h_0, h_3, h_5) via h = -h_0 + h_3 + h_5.  Off-diagonal
+components (h_1, h_2, h_4) keep simple -m^2 self-coupling.
 
 In 2+1D, pure GR has no local degrees of freedom; the mass term creates
 a propagating massive mode with dispersion relation: omega^2 = k^2 + m^2.
 
 Component structure (symmetric rank-2 in 3D, gauge-unfixed):
-  h_0 (h_tt):         constraint (time_order=0, Helmholtz-type)
+  h_0 (h_tt):         constraint (time_order=0, trace-coupled to h_3, h_5)
   h_1 (h_tx):         constraint (time_order=0, partial Helmholtz)
   h_2 (h_ty):         constraint (time_order=0, partial Helmholtz)
-  h_3 (h_xx):         constraint (time_order=0, algebraic)
+  h_3 (h_xx):         constraint (time_order=0, trace-coupled to h_0, h_5)
   h_4 (h_xy):         EVOLUTION (time_order=2, the only propagating DOF)
-  h_5 (h_yy):         constraint (time_order=0, algebraic)
+  h_5 (h_yy):         constraint (time_order=0, trace-coupled to h_0, h_3)
 
 CONSTRAINT SOLVING (unified solver):
   All 5 constraint equations are solved at each timestep using the unified
   constraint solver with FFT block solve for coupled constraints:
 
-  - Cluster {h_0, h_3, h_5}: mutually coupled via Laplacian cross-terms.
-    Solved simultaneously in Fourier space as a 3x3 dense system at each
-    wavenumber. h_0 is Helmholtz-type (-m2*I - L), h_3 and h_5 are
-    algebraic (-m2*I), coupled through Laplacians.
+  - Cluster {h_0, h_3, h_5}: mutually coupled via Fierz-Pauli trace terms
+    AND Laplacian cross-terms. Solved simultaneously in Fourier space as a
+    3x3 dense system at each wavenumber.
 
   - Cluster {h_1, h_2}: mutually coupled. h_1 is partial Helmholtz
     (-m2*I - 0.5*L_y), h_2 is (-m2*I - 0.5*L_x), with cross_derivative
@@ -61,7 +65,7 @@ def main() -> None:  # noqa: PLR0915, PLR0914
     print("Linearized Massive Gravity 2+1D Simulation")
     print("=" * 60)
     print()
-    print("Equation: G^(1)_ab[h] - m^2 h_ab = 0")
+    print("Equation: G^(1)_ab[h] - m^2 (h_ab - eta_ab h) = 0  (Fierz-Pauli)")
     print()
 
     # Load the equation specification

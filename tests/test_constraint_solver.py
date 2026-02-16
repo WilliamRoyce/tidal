@@ -2708,11 +2708,10 @@ class TestCoupledSVDRegularization:
 
 
 class TestCoupledProcaConstraints:
-    """Integration tests: coupled Proca (two vector fields) with Dirichlet BCs.
+    """Integration tests: coupled Proca (two vector fields) with periodic BCs.
 
-    Exercises non-periodic constraint solver code paths:
-    - Sparse matrix solver (Dirichlet BCs, not FFT)
-    - Gauss-Seidel iteration for coupled A_0-B_0 constraints
+    Exercises coupled constraint solver code paths:
+    - Coupled FFT solve (periodic BCs)
     - Two different Helmholtz scales (mA2=1.0, mB2=2.0)
     - Cross-field identity coupling in constraint equations
     """
@@ -2737,7 +2736,7 @@ class TestCoupledProcaConstraints:
         grid = CartesianGrid(
             bounds=[(0, np.pi), (0, np.pi)],
             shape=[8, 8],
-            periodic=False,
+            periodic=True,
         )
         x = cast("np.ndarray", grid.cell_coords[..., 0])
         y = cast("np.ndarray", grid.cell_coords[..., 1])
@@ -2761,7 +2760,7 @@ class TestCoupledProcaConstraints:
         """A_0 and B_0 become non-zero after constraint solve with non-zero momenta.
 
         At t=0 all momenta are zero so constraint sources vanish. After one
-        forward Euler step, momenta become non-zero and the Gauss-Seidel
+        forward Euler step, momenta become non-zero and the FFT constraint
         solver should produce non-zero A_0 and B_0.
         """
         pde, state = coupled_proca_setup
@@ -2786,10 +2785,10 @@ class TestCoupledProcaConstraints:
         assert a0_max > 1e-6, f"A_0 should be nonzero, got max={a0_max}"
         assert b0_max > 1e-6, f"B_0 should be nonzero, got max={b0_max}"
 
-    def test_gauss_seidel_converges(
+    def test_constraint_solver_converges(
         self, coupled_proca_setup: tuple[PDEFromSpec, FieldCollection]
     ) -> None:
-        """Gauss-Seidel converges without warning on non-periodic coupled system."""
+        """Coupled FFT constraint solver runs without warning."""
         import warnings
 
         pde, state = coupled_proca_setup
@@ -2806,13 +2805,13 @@ class TestCoupledProcaConstraints:
             warnings.simplefilter("error")
             pde.evolution_rate(state, t=0.05)
 
-    def test_dirichlet_bc_respected(
+    def test_constraint_fields_finite(
         self, coupled_proca_setup: tuple[PDEFromSpec, FieldCollection]
     ) -> None:
-        """Constraint fields respect Dirichlet boundary conditions.
+        """Constraint fields are finite and non-zero after solve.
 
-        After constraint solve, boundary values of A_0 should be approximately
-        zero (Dirichlet condition enforced by the sparse matrix stencil).
+        After constraint solve with non-zero momenta, A_0 should be
+        finite everywhere and non-zero in at least some region.
         """
         pde, state = coupled_proca_setup
 
@@ -2827,16 +2826,15 @@ class TestCoupledProcaConstraints:
         a0_slot = pde._field_slot_map["A_0"]
         a0_data = np.asarray(state[a0_slot].data, dtype=float)
 
-        # py-pde with non-periodic grids uses ghost cells; the interior
-        # boundary-adjacent cells should have small values relative to center.
-        center_val = float(np.max(np.abs(a0_data[2:-2, 2:-2])))
-        assert center_val > 1e-6, "A_0 should have non-zero interior values"
         assert np.all(np.isfinite(a0_data)), "A_0 should be finite everywhere"
+        assert float(np.max(np.abs(a0_data))) > 1e-6, (
+            "A_0 should have non-zero values after constraint solve"
+        )
 
     def test_short_simulation_stable(
         self, coupled_proca_setup: tuple[PDEFromSpec, FieldCollection]
     ) -> None:
-        """Short simulation remains stable with active non-periodic constraints."""
+        """Short simulation remains stable with active periodic constraints."""
         from tidal.utils import normalize_solve_result
 
         pde, state = coupled_proca_setup
@@ -2879,7 +2877,7 @@ class TestCoupledProcaConstraints:
         grid = CartesianGrid(
             bounds=[(0, np.pi), (0, np.pi)],
             shape=[8, 8],
-            periodic=False,
+            periodic=True,
         )
         x = cast("np.ndarray", grid.cell_coords[..., 0])
         y = cast("np.ndarray", grid.cell_coords[..., 1])
@@ -3038,7 +3036,7 @@ class TestDirectionalLaplacianCoalescing:
         pde = build_pde_from_json(json_path, parameters=params)
 
         grid = CartesianGrid(
-            bounds=[(0, np.pi), (0, np.pi)], shape=[16, 16], periodic=False
+            bounds=[(0, np.pi), (0, np.pi)], shape=[16, 16], periodic=True
         )
 
         # Build initial state with non-zero momentum to activate constraints

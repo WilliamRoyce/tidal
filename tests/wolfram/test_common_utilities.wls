@@ -80,37 +80,10 @@ TestCase["LeviCivitaValue[{2,0,1}] = 1", 1, TorsionGertsenshtein`CommonUtilities
 TestCase["LeviCivitaValue[{0,1,2,3}] = 1", 1, TorsionGertsenshtein`CommonUtilities`LeviCivitaValue[{0, 1, 2, 3}]];
 TestCase["LeviCivitaValue[{1,0,2,3}] = -1", -1, TorsionGertsenshtein`CommonUtilities`LeviCivitaValue[{1, 0, 2, 3}]];
 
-(* === Test 4: ExtractNumericCoefficient === *)
-Print[""];
-Print["Test 4: ExtractNumericCoefficient"];
-
 (* Create test tensor *)
 DefTensor[cuTestPhi[], CUTestM2];
 
-(* Test scalar field coefficient extraction *)
-testTerm1 = 3.5 * cuTestPhi[];
-coeff1 = TorsionGertsenshtein`CommonUtilities`ExtractNumericCoefficient[testTerm1, "cuTestPhi"];
-TestApproxEqual["ExtractNumericCoefficient for 3.5*phi[]", 3.5, coeff1];
-
-testTerm2 = -2 * cuTestPhi[];
-coeff2 = TorsionGertsenshtein`CommonUtilities`ExtractNumericCoefficient[testTerm2, "cuTestPhi"];
-TestApproxEqual["ExtractNumericCoefficient for -2*phi[]", -2.0, coeff2];
-
-(* Test derivative term coefficient extraction *)
-testTerm3 = 4.5 * Derivative[1, 0][phi0][t[], x[]];
-coeff3 = TorsionGertsenshtein`CommonUtilities`ExtractNumericCoefficient[testTerm3, "phi0"];
-TestApproxEqual["ExtractNumericCoefficient for derivative term", 4.5, coeff3];
-
-(* === Test 5: ExtractCoefficientWithSymbolic === *)
-Print[""];
-Print["Test 5: ExtractCoefficientWithSymbolic"];
-
-testTerm4 = 5 * cuTestPhi[];
-coeffResult4 = TorsionGertsenshtein`CommonUtilities`ExtractCoefficientWithSymbolic[testTerm4, "cuTestPhi"];
-TestApproxEqual["ExtractCoefficientWithSymbolic numeric part", 5.0, coeffResult4["numeric"]];
-TestCase["ExtractCoefficientWithSymbolic symbolic part is None", None, coeffResult4["symbolic"]];
-
-(* === Test 6: xAct Introspection Helpers === *)
+(* === Test 4: xAct Introspection Helpers === *)
 Print[""];
 Print["Test 6: xAct Introspection Helpers"];
 
@@ -207,15 +180,6 @@ thrown2 = Catch[
 ];
 TestTrue["GetCoordinateSymbols throws on undefined chart",
   thrown2 =!= "no-throw-marker"];
-
-(* Test ExtractNumericCoefficient Throw on symbolic coefficient *)
-DefConstantSymbol[cuTestSymbolicM, PrintAs -> "m"];
-symbolicTerm = cuTestSymbolicM * cuTestPhi[];
-thrown3 = Catch[
-  TorsionGertsenshtein`CommonUtilities`ExtractNumericCoefficient[symbolicTerm, "cuTestPhi"]
-];
-TestTrue["ExtractNumericCoefficient throws on symbolic coefficient",
-  StringQ[thrown3] && StringContainsQ[thrown3, "ExtractNumericCoefficient"]];
 
 (* === Test 10: Memoization Consistency (Issue #89) === *)
 Print[""];

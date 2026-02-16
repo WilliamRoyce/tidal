@@ -15,7 +15,6 @@
      - Epsilon tensor evaluation: EvaluateEpsilonComponents converts Levi-Civita
        tensors to numeric ±1 values (supports 2D, 3D, 4D)
      - Metric evaluation: EvaluateMinkowskiMetric handles (-,+,+,...) signature
-     - Coefficient extraction: ExtractCoefficientWithSymbolic preserves symbolic info
      - xAct introspection: IsChristoffelSymbol, IsCovDOperator, IsEpsilonTensor
 
    DIMENSION SUPPORT:
@@ -60,10 +59,6 @@ IsNonConstantMetric::usage =
 depends on the given coordinate symbols (spatial or temporal). Used for automatic \
 detection of whether Christoffel symbol computation is required: constant metrics \
 have all Christoffels = 0, while non-constant metrics require explicit computation.";
-
-RemoveChristoffelSymbols::usage =
-  "RemoveChristoffelSymbols[expr] sets all Christoffel symbol terms to zero \
-(valid for flat Minkowski space). Legacy function; prefer EvaluateChristoffelComponents.";
 
 EvaluateMinkowskiMetric::usage =
   "EvaluateMinkowskiMetric[expr, chart] evaluates metric components for \
@@ -126,17 +121,6 @@ ConvertCDToDerivatives::incomplete =
 ExtractFieldHead::usage =
   "ExtractFieldHead[field] extracts the tensor head from an applied field \
 like phi[] or A[-a].";
-
-ExtractNumericCoefficient::usage =
-  "ExtractNumericCoefficient[term, fieldName] extracts the numeric coefficient \
-from a term containing the named field.";
-
-ExtractNumericCoefficient::symbolic =
-  "Symbolic coefficient `1` found for field `2`. Storing as metadata.";
-
-ExtractCoefficientWithSymbolic::usage =
-  "ExtractCoefficientWithSymbolic[term, fieldName] extracts coefficient preserving \
-both numeric value and symbolic expression. Returns <|\"numeric\" -> N, \"symbolic\" -> S|>.";
 
 EvaluateEpsilonComponents::usage =
   "EvaluateEpsilonComponents[expr, chart] evaluates Levi-Civita (epsilon) tensor \
@@ -241,9 +225,8 @@ IsEpsilonTensor[expr_] := Quiet[
    proper numeric values. For flat space this is 0; for curved space it would be
    computed from the metric.
 
-   NOTE: The legacy RemoveChristoffelSymbols function is kept for backward compatibility
-   but now uses the improved IsChristoffelSymbol detection which catches xCoba-generated
-   symbols like ChristoffelCDPDcart.
+   For flat space all Christoffels = 0; for curved space they are computed
+   from the metric via the standard formula.
 *)
 
 (* Compute Christoffel symbols from xAct's metric definition.
@@ -372,10 +355,6 @@ Pass the metric matrix as the 4th argument."]
 
   Simplify[result]
 ];
-
-(* Legacy function for backward compatibility - now properly detects xCoba symbols *)
-RemoveChristoffelSymbols[expr_] :=
-  expr /. f_[__] /; IsChristoffelSymbol[f] -> 0;
 
 (* === Minkowski Metric Evaluation === *)
 (* Evaluates metric components for signature (-1, +1, +1, ...) *)
@@ -619,80 +598,6 @@ ConvertCDToDerivatives[expr_, chart_] := Module[
 (* Extracts tensor head from applied form like phi[] or A[-a] *)
 
 ExtractFieldHead[field_] := If[Head[field] === Symbol, field, Head[field]];
-
-(* === Shared Field Replacement Rules === *)
-(* Used by both ExtractNumericCoefficient and ExtractCoefficientWithSymbolic *)
-(* Replaces all occurrences of the named field (and its derivatives) with 1, *)
-(* leaving just the coefficient. *)
-
-fieldReplacementRules[fieldName_] := {
-  (* Match Derivative[...][f][args] form (applied derivatives) *)
-  Derivative[__][f_][__] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
-  (* Match f[args] form (bare field with numeric suffix like A0, A1) *)
-  f_[__] /; StringMatchQ[ToString[f], ToString[fieldName] ~~ DigitCharacter ...] :> 1,
-  (* Match f[] form (scalar tensor with no arguments, like phi[]) *)
-  f_[] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
-  (* Match f[index] form (vector tensor with one index, like A[-a]) *)
-  f_[_] /; StringContainsQ[ToString[f], ToString[fieldName]] :> 1,
-  (* Direct field match *)
-  fieldName -> 1,
-  _Derivative[__][fieldName] -> 1
-};
-
-(* === Numeric Coefficient Extraction === *)
-(* Extracts numeric coefficient from a term containing the named field *)
-(* Unified version combining logic from ComponentDecompose and ExportJSON *)
-
-ExtractNumericCoefficient[term_, fieldName_] := Module[
-  {coeff},
-
-  coeff = Simplify[term /. fieldReplacementRules[fieldName]];
-
-  (* Handle various coefficient forms - fail explicitly for unresolved symbolic coefficients *)
-  Which[
-    NumericQ[coeff], coeff,
-    (* Try numeric evaluation *)
-    NumericQ[Quiet[N[coeff]]], Quiet[N[coeff]],
-    (* Symbolic coefficient that cannot be resolved numerically - FAIL *)
-    True,
-      Throw[StringJoin[
-        "ExtractNumericCoefficient: Cannot extract numeric coefficient from '",
-        ToString[coeff], "' for field '", ToString[fieldName], "'. ",
-        "Substitute symbolic coefficients before export, e.g.: expr /. {m2 -> 1.0}"
-      ]]
-  ]
-];
-
-(* === Symbolic Coefficient Extraction === *)
-(* Extracts coefficient preserving both numeric value and symbolic expression *)
-(* Returns an Association with "numeric" and "symbolic" keys *)
-
-ExtractCoefficientWithSymbolic[term_, fieldName_] := Module[
-  {coeff},
-
-  coeff = Simplify[term /. fieldReplacementRules[fieldName]];
-
-  (* Return Association with numeric value and symbolic expression *)
-  Which[
-    NumericQ[coeff],
-      <|"numeric" -> N[coeff], "symbolic" -> None|>,
-    (* Negative symbolic coefficient: -m2 *)
-    MatchQ[coeff, Times[-1, _Symbol]],
-      Message[ExtractNumericCoefficient::symbolic, coeff, fieldName];
-      <|"numeric" -> -1.0, "symbolic" -> ToString[coeff]|>,
-    (* Positive symbolic coefficient: m2 *)
-    MatchQ[coeff, _Symbol],
-      Message[ExtractNumericCoefficient::symbolic, coeff, fieldName];
-      <|"numeric" -> 1.0, "symbolic" -> ToString[coeff]|>,
-    (* Try numeric evaluation *)
-    NumericQ[Quiet[N[coeff]]],
-      <|"numeric" -> Quiet[N[coeff]], "symbolic" -> None|>,
-    (* Complex symbolic expression *)
-    True,
-      Message[ExtractNumericCoefficient::symbolic, coeff, fieldName];
-      <|"numeric" -> 1.0, "symbolic" -> ToString[coeff]|>
-  ]
-];
 
 (* === Levi-Civita (Epsilon) Tensor Evaluation === *)
 (* Evaluates epsilon tensor components to numeric ±1 values *)

@@ -144,7 +144,7 @@ class AnisotropicKGPDE(PDEBase):
         if len(self.speeds) == 0:
             msg = "speeds must be a non-empty sequence"
             raise ValueError(msg)
-        if np.any(self.speeds <= 0):
+        if (self.speeds <= 0).any():
             msg = "All wave speeds must be positive"
             raise ValueError(msg)
 
@@ -849,7 +849,7 @@ class AnisotropicHigherOrderKGPDE(PDEBase):
         if len(self.speeds) == 0:
             msg = "speeds must be non-empty"
             raise ValueError(msg)
-        if np.any(self.speeds <= 0):
+        if (self.speeds <= 0).any():
             msg = "All wave speeds must be positive"
             raise ValueError(msg)
 

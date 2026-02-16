@@ -354,8 +354,8 @@ def _build_identity_matrix(
     The identity operator I satisfies I(field) = field, so its matrix
     representation is simply the identity matrix with zero BC offset.
     """
-    n = int(np.prod(grid.shape))  # type: ignore[reportUnknownArgumentType]
-    return sparse.eye(n, format="dok"), sparse.dok_matrix((n, 1))  # type: ignore[reportUnknownArgumentType,reportReturnType]
+    n = math.prod(grid.shape)
+    return sparse.eye(n, format="dok"), sparse.dok_matrix((n, 1))  # type: ignore[reportReturnType]
 
 
 def _build_laplacian_matrix(
@@ -427,7 +427,7 @@ def _build_gradient_matrix(
     along the target axis. Boundary conditions modify boundary rows.
     """
     shape = grid.shape
-    n = int(np.prod(shape))  # type: ignore[reportUnknownArgumentType]
+    n = math.prod(shape)
     dx = grid.discretization[axis]
     scale = 1.0 / (2.0 * dx)
 
@@ -1390,13 +1390,13 @@ class PDEFromSpec(PDEBase):
 
         if isinstance(result, np.ndarray):
             arr = np.asarray(result, dtype=np.float64)
-            if np.any(np.isnan(arr)):
+            if np.isnan(arr).any():
                 msg = (
                     f"Coefficient '{sym}' produced NaN values "
                     f"(from '{py_expr}'). Check for 0/0 or invalid operations."
                 )
                 raise ValueError(msg)
-            if np.any(np.isinf(arr)):
+            if np.isinf(arr).any():
                 msg = (
                     f"Coefficient '{sym}' produced Inf values "
                     f"(from '{py_expr}'). Check for division by zero."
@@ -2124,7 +2124,7 @@ class PDEFromSpec(PDEBase):
             )
 
         # 4. Validate and update state
-        if not np.all(np.isfinite(solution_data)):
+        if not np.isfinite(solution_data).all():
             msg = (
                 f"Constraint solver for {eq.field_name} produced non-finite "
                 f"values (NaN or Inf). This typically indicates a singular or "
@@ -2212,7 +2212,7 @@ class PDEFromSpec(PDEBase):
         # (with floor of 1.0 to handle near-zero operators gracefully)
         mult_scale = max(float(np.max(np.abs(combined_multiplier))), 1.0)
         singular_mask = np.abs(combined_multiplier) < self._constraint_eps * mult_scale
-        n_singular = int(np.sum(singular_mask))
+        n_singular = int(singular_mask.sum())
 
         if n_singular > 0:
             # Check if source is compatible with the null space:
@@ -2272,7 +2272,7 @@ class PDEFromSpec(PDEBase):
             self_terms, self.spec.spatial_dimension
         )
 
-        n = int(np.prod(grid.shape))
+        n = math.prod(grid.shape)
         combined_matrix = sparse.dok_matrix((n, n))
         combined_vector = sparse.dok_matrix((n, 1))
 
@@ -2606,8 +2606,8 @@ class PDEFromSpec(PDEBase):
         alpha_sq = alpha * alpha
         s_reg_inv = s / (s * s + alpha_sq)
 
-        n_regularized = int(np.sum(s < alpha))
-        total_svs = int(np.prod(s.shape))
+        n_regularized = int((s < alpha).sum())
+        total_svs = math.prod(s.shape)
 
         if n_regularized > 0:
             field_names = [self.spec.equations[i].field_name for i in enabled_indices]
@@ -2647,7 +2647,7 @@ class PDEFromSpec(PDEBase):
             eq = self.spec.equations[comp_idx]
             field_slot = self._field_slot_map[eq.field_name]
             solution = np.fft.ifftn(f_hat[local_i]).real
-            if not np.all(np.isfinite(solution)):
+            if not np.isfinite(solution).all():
                 msg = (
                     f"Coupled FFT solver for {eq.field_name} produced "
                     f"non-finite values. The coupled system may be "
@@ -2970,18 +2970,6 @@ class PDEFromSpec(PDEBase):
                     )
 
         return warnings
-
-    def _cache_key(self) -> dict[str, Any]:
-        """Return a cache key for this PDE.
-
-        The key includes the specification metadata to ensure different
-        equation systems don't share cached operators.
-        """
-        return {
-            "n_components": self.n_components,
-            "component_names": self.spec.component_names,
-            "metadata_hash": hash(frozenset(self.spec.metadata.items())),
-        }
 
 
 def build_pde_from_json(

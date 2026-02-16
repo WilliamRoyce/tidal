@@ -41,10 +41,6 @@ BuildJSONStructure::usage =
   "BuildJSONStructure[componentEqs, metadata] builds the JSON Association \
 structure from component equations and metadata.";
 
-EquationToJSON::usage =
-  "EquationToJSON[componentEq, fieldName, fieldIndex] converts a single \
-component equation to JSON format.";
-
 BuildMultiFieldJSONStructure::usage =
   "BuildMultiFieldJSONStructure[fieldEquations, metadata] builds JSON for systems \
 with multiple independent fields. fieldEquations is a list of {fieldName, equation} pairs.";
@@ -109,15 +105,15 @@ classifies the spatial part using ClassifySpatialProfile. Returns canonical oper
 names like \"gradient_x\", \"laplacian_x\", \"cross_derivative_xy\", etc. \
 Throws if time order is not 1.";
 
-IsSpatialCrossDerivative::usage =
-  "IsSpatialCrossDerivative[term] returns True if term contains a spatial cross-derivative \
-(d_x d_y, d_x d_z, or d_y d_z with time slot = 0). Legacy boolean wrapper around \
-IdentifySpatialCrossDerivative.";
-
 IdentifySpatialCrossDerivative::usage =
   "IdentifySpatialCrossDerivative[term] identifies spatial cross-derivatives and returns \
 the operator name: \"cross_derivative_xy\", \"cross_derivative_xz\", \"cross_derivative_yz\", \
 or False if not a cross-derivative. Requires time slot = 0.";
+
+CountDerivativeOrder::usage =
+  "CountDerivativeOrder[term] counts the total derivative order of a term. \
+Delegates to ExtractDerivativeProfile and returns Total of the profile, \
+or 0 if no Derivative pattern is found.";
 
 IdentifyDirectionalLaplacian::usage =
   "IdentifyDirectionalLaplacian[term] identifies pure second derivatives in a single \
@@ -618,12 +614,20 @@ ParseFieldName[name_String] := Module[{match},
   ]]
 ];
 
-(* Map field name to momentum field name *)
-(* For py-pde state [field_0, pi_0, field_1, pi_1, ...], momentum is at odd indices *)
-(* Uses ParseFieldName for flexible format support *)
-FieldToMomentumName[fieldName_String] := Module[{parsed},
-  parsed = ParseFieldName[fieldName];
-  "pi_" <> ToString[parsed["index"]]
+(* Map field name to momentum field name using GLOBAL component index *)
+(* allFieldNames is the full ordered list of component names in the JSON. *)
+(* The numeric suffix in "pi_N" must be the 0-based global position, NOT *)
+(* the parse index from the field name, because multiple field bases can *)
+(* share the same parse index (e.g., phi_0 and A_0 both have index 0). *)
+FieldToMomentumName[fieldName_String, allFieldNames_List] := Module[{pos},
+  pos = FirstPosition[allFieldNames, fieldName];
+  If[MissingQ[pos],
+    Throw[StringJoin[
+      "FieldToMomentumName: field '", fieldName,
+      "' not found in field list: ", ToString[allFieldNames]
+    ]]
+  ];
+  "pi_" <> ToString[pos[[1]] - 1]  (* 0-indexed global position *)
 ];
 
 (* Classify spatial operator in a mixed time-space derivative *)
@@ -660,10 +664,7 @@ ExtractSpatialOperatorFromMixed[term_] := Module[
 (* Returns False if not a cross-derivative, or the operator name if it is *)
 (* Pattern: Derivative[0, ...] where exactly 2 spatial slots are > 0 *)
 
-(* Legacy boolean version for backward compatibility *)
-IsSpatialCrossDerivative[term_] := IdentifySpatialCrossDerivative[term] =!= False;
-
-(* New version that returns the specific operator name *)
+(* Returns the specific operator name *)
 (* Dimension-agnostic: delegates to ExtractDerivativeProfile + ClassifySpatialProfile *)
 IdentifySpatialCrossDerivative[term_] := Module[{profile, result},
   profile = ExtractDerivativeProfile[term];
@@ -837,7 +838,7 @@ CountDerivativeOrder[term_] := Module[{profile},
   If[Length[profile] == 0, 0, Total[profile]]
 ];
 
-(* === Phase 12: Generic Derivative Order Support === *)
+(* === Generic Derivative Order Support === *)
 
 (* Extract full derivative order profile from a term *)
 (* Returns {dt, dx, dy, ...} including the time slot *)
@@ -1041,7 +1042,7 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
 
   (* Convert to momentum field if mixed time-space derivative *)
   If[isMixedTimeSpace,
-    targetField = FieldToMomentumName[targetField]
+    targetField = FieldToMomentumName[targetField, allFieldNames]
   ];
 
   (* Step 5: Detect nonlinear (field-dependent) coefficients *)
@@ -1105,14 +1106,6 @@ ConstraintSolverHints[fieldName_String, timeOrder_Integer, metadata_Association]
     "boundary_conditions" -> bcAssoc
   |>
 ];
-
-(* === Equation Conversion === *)
-
-(* Phase 2, Issue 6: Now supports parabolic (d_t), elliptic (no time), and hyperbolic (d2_t) PDEs *)
-(* Single-field EquationToJSON delegates to multi-field version *)
-(* This avoids code duplication while maintaining backward compatibility *)
-EquationToJSON[componentEq_, fieldName_, fieldIndex_, metadata_] :=
-  EquationToJSONMultiField[componentEq, fieldName, fieldIndex, {fieldName}, metadata];
 
 End[];
 EndPackage[];

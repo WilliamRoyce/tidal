@@ -8,7 +8,6 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, cast
 
-import numpy as np
 from pde import ScalarField
 
 from tidal.kgsim.utils import infer_bc_from_grid
@@ -16,6 +15,7 @@ from tidal.kgsim.utils import infer_bc_from_grid
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    import numpy as np
     from pde import FieldCollection
 
 
@@ -78,7 +78,7 @@ def total_energy_observer(
         # cell_volume accounts for grid measure
         volume_element = cast("np.ndarray", phi.grid.cell_volumes)
 
-        total_energy = float(np.sum(density * volume_element.reshape(phi.data.shape)))
+        total_energy = float((density * volume_element.reshape(phi.data.shape)).sum())
         return {"time": t, "total_energy": total_energy}
 
     return _callback

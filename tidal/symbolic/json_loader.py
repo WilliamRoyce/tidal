@@ -57,8 +57,6 @@ _GENERIC_MULTI_AXIS_RE = re.compile(
     r"^derivative_(\d+" + _AXIS_RE_CLASS + r"(?:_\d+" + _AXIS_RE_CLASS + r")*)$"
 )
 
-# Backward-compatible alias
-KNOWN_OPERATORS: frozenset[str] = _STATIC_OPERATORS
 
 #: Mutable set of user-registered custom operators.
 #: Populated via ``register_operator()`` in pde_builder.py.
