@@ -236,7 +236,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sim_parser.add_argument(
         "--format",
-        choices=["png", "npz", "summary"],
+        choices=["png", "summary"],
         default=None,
         dest="output_format",
         help="Output format (default: inferred from --output extension)",
@@ -294,28 +294,28 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "measure",
         help="Extract physics measurements from simulation output",
         description=(
-            "Load an NPZ file from 'tidal simulate --output' and run "
+            "Load simulation output from 'tidal simulate --output' and run "
             "measurement analyses (energy, conversion, mixing length, etc.)."
         ),
         epilog=(
             "Examples:\n"
-            "  tidal measure result.npz --spec spec.json\n"
-            "  tidal measure result.npz --json\n"
-            "  tidal measure result.npz --what conversion --source phi_0 --target chi_0\n"
-            "  tidal measure result.npz --what energy,conservation\n"
-            "  tidal measure result.npz --output measurement.png"
+            "  tidal measure result_dir/ --spec spec.json\n"
+            "  tidal measure result_dir/ --json\n"
+            "  tidal measure result_dir/ --what conversion --source phi_0 --target chi_0\n"
+            "  tidal measure result_dir/ --what energy,conservation\n"
+            "  tidal measure result_dir/ --output measurement.png"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     measure_parser.add_argument(
-        "npz_path",
-        help="Path to the .npz simulation output file",
+        "data_path",
+        help="Path to the simulation output directory",
     )
     measure_parser.add_argument(
         "--spec",
         default=None,
         metavar="PATH",
-        help="Path to JSON equation spec (auto-discovered from NPZ if omitted)",
+        help="Path to JSON equation spec (auto-discovered from metadata.json if omitted)",
     )
     measure_parser.add_argument(
         "--what",
