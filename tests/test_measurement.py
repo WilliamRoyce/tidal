@@ -6,6 +6,7 @@ and diagnostics for coupled field systems.
 
 from __future__ import annotations
 
+import dataclasses
 import warnings
 from pathlib import Path
 from typing import cast
@@ -235,52 +236,6 @@ class TestSimulationDataFromStorage:
 
         with pytest.raises(ValueError, match="empty"):
             SimulationData.from_storage(storage, spec, grid)
-
-
-class TestSimulationDataFromNpz:
-    """Test SimulationData.from_npz."""
-
-    def test_round_trip(self, tmp_path: Path) -> None:
-        """Save to NPZ and reload, verifying field data matches."""
-        data_orig = _make_single_field_data()
-
-        # Save manually
-        npz_path = tmp_path / "test.npz"
-        save_data: dict[str, np.ndarray] = {"times": data_orig.times}
-        for name in data_orig.fields:
-            for t_idx in range(data_orig.n_snapshots):
-                save_data[f"{name}_t{t_idx}"] = data_orig.fields[name][t_idx]
-        for name in data_orig.momenta:
-            for t_idx in range(data_orig.n_snapshots):
-                save_data[f"pi_{name}_t{t_idx}"] = data_orig.momenta[name][t_idx]
-        np.savez(str(npz_path), **save_data)  # type: ignore[reportArgumentType]
-
-        # Reload
-        data_loaded = SimulationData.from_npz(
-            npz_path,
-            data_orig.spec,
-            data_orig.grid_spacing,
-            data_orig.grid_bounds,
-            data_orig.periodic,
-        )
-
-        np.testing.assert_allclose(data_loaded.times, data_orig.times)
-        np.testing.assert_allclose(
-            data_loaded.fields["phi_0"],
-            data_orig.fields["phi_0"],
-        )
-
-    def test_missing_file_raises(self) -> None:
-        """from_npz raises FileNotFoundError for missing file."""
-        spec = _build_coupled_scalars_spec()
-        with pytest.raises(FileNotFoundError):
-            SimulationData.from_npz(
-                "/nonexistent/path.npz",
-                spec,
-                (0.1,),
-                ((0.0, 10.0),),
-                (True,),
-            )
 
 
 # ============================================================
@@ -715,57 +670,6 @@ class TestPositionDependentValidation:
 
         with pytest.raises(ValueError, match="Position-dependent"):
             compute_system_energy(data, 0)
-
-
-class TestFromNpzAuto:
-    """Test SimulationData.from_npz_auto."""
-
-    def test_round_trip_with_parameters(self, tmp_path: Path) -> None:
-        """Save with grid metadata + parameters, reload via from_npz_auto."""
-        data_orig = _make_single_field_data()
-        params = {"m2": 1.0, "g": 0.5}
-
-        # Save with full metadata (mimicking _save_npz)
-        npz_path = tmp_path / "test_auto.npz"
-        save_data: dict[str, np.ndarray] = {"times": data_orig.times}
-        for name in data_orig.fields:
-            for t_idx in range(data_orig.n_snapshots):
-                save_data[f"{name}_t{t_idx}"] = data_orig.fields[name][t_idx]
-        for name in data_orig.momenta:
-            for t_idx in range(data_orig.n_snapshots):
-                save_data[f"pi_{name}_t{t_idx}"] = data_orig.momenta[name][t_idx]
-
-        # Grid metadata
-        save_data["grid_spacing"] = np.array(data_orig.grid_spacing)
-        save_data["grid_bounds"] = np.array(data_orig.grid_bounds)
-        save_data["grid_periodic"] = np.array(data_orig.periodic)
-
-        # Parameters
-        save_data["_param_names"] = np.array(list(params.keys()))
-        save_data["_param_values"] = np.array(list(params.values()))
-
-        np.savez(str(npz_path), **save_data)  # type: ignore[reportArgumentType]
-
-        # Reload via from_npz_auto
-        data_loaded = SimulationData.from_npz_auto(npz_path, data_orig.spec)
-
-        np.testing.assert_allclose(data_loaded.times, data_orig.times)
-        np.testing.assert_allclose(
-            data_loaded.fields["phi_0"],
-            data_orig.fields["phi_0"],
-        )
-        assert data_loaded.parameters == pytest.approx(params)
-        assert data_loaded.grid_spacing == pytest.approx(data_orig.grid_spacing)
-        assert data_loaded.periodic == data_orig.periodic
-
-    def test_missing_metadata_raises(self, tmp_path: Path) -> None:
-        """from_npz_auto raises ValueError when grid metadata is missing."""
-        spec = _build_coupled_scalars_spec()
-        npz_path = tmp_path / "no_meta.npz"
-        np.savez(str(npz_path), times=np.array([0.0, 1.0]))
-
-        with pytest.raises(ValueError, match=r"missing.*grid_spacing"):
-            SimulationData.from_npz_auto(npz_path, spec)
 
 
 # ============================================================
@@ -2063,6 +1967,7 @@ class TestDispersionRelation:
 from tidal.measurement._writer import (  # noqa: E402
     SnapshotWriter,
     compute_snapshot_count,
+    create_snapshot_callback,
 )
 
 
@@ -2445,31 +2350,14 @@ class TestCrashRecovery:
 class TestSimulationDataLoad:
     """Test SimulationData.load() universal entry point."""
 
-    def test_load_npz(self, tmp_path: Path) -> None:
-        """load() correctly dispatches to from_npz_auto for .npz files."""
-        data_orig = _make_single_field_data()
-
-        # Save as NPZ with grid metadata
+    def test_load_file_raises(self, tmp_path: Path) -> None:
+        """load() raises ValueError for non-directory paths."""
+        spec = _build_coupled_scalars_spec()
         npz_path = tmp_path / "test.npz"
-        save_data: dict[str, np.ndarray] = {"times": data_orig.times}
-        for name in data_orig.fields:
-            for t_idx in range(data_orig.n_snapshots):
-                save_data[f"{name}_t{t_idx}"] = data_orig.fields[name][t_idx]
-        for name in data_orig.momenta:
-            for t_idx in range(data_orig.n_snapshots):
-                save_data[f"pi_{name}_t{t_idx}"] = data_orig.momenta[name][t_idx]
+        npz_path.write_bytes(b"dummy")
 
-        # Grid metadata required by from_npz_auto
-        save_data["grid_spacing"] = np.array(data_orig.grid_spacing)
-        save_data["grid_bounds"] = np.array(data_orig.grid_bounds)
-        save_data["grid_periodic"] = np.array(data_orig.periodic)
-        np.savez(str(npz_path), **save_data)  # type: ignore[reportArgumentType]
-
-        data_loaded = SimulationData.load(npz_path, data_orig.spec)
-        np.testing.assert_allclose(data_loaded.times, data_orig.times)
-        np.testing.assert_allclose(
-            data_loaded.fields["phi_0"], data_orig.fields["phi_0"],
-        )
+        with pytest.raises(ValueError, match="no longer supported"):
+            SimulationData.load(npz_path, spec)
 
     def test_load_directory(self, tmp_path: Path) -> None:
         """load() correctly dispatches to from_directory for directories."""
@@ -2865,3 +2753,165 @@ class TestMemmapMeasurementIntegration:
         np.testing.assert_allclose(
             result_dir.probability, result_mem.probability, rtol=1e-12,
         )
+
+
+# ============================================================
+# Group 16 — create_snapshot_callback helper
+# ============================================================
+
+
+class TestCreateSnapshotCallback:
+    """Tests for the create_snapshot_callback() helper."""
+
+    def test_round_trip(self, tmp_path: Path) -> None:
+        """create_snapshot_callback → write snapshots → from_directory."""
+        spec = _build_coupled_scalars_spec()
+        grid = CartesianGrid([(0, 10)], 16, periodic=True)
+
+        t_end = 4.0
+        snapshot_interval = 1.0
+        params = {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5}
+
+        output_dir = tmp_path / "callback_test"
+        writer, callback = create_snapshot_callback(
+            output_dir=output_dir,
+            spec=spec,
+            grid=grid,
+            t_end=t_end,
+            snapshot_interval=snapshot_interval,
+            parameters=params,
+        )
+
+        # Simulate calling the callback manually
+        rng = np.random.default_rng(123)
+        n_snapshots = int(t_end / snapshot_interval) + 1  # 5
+        field_names = [eq.field_name for eq in spec.equations]
+        mom_names = [
+            eq.field_name
+            for eq in spec.equations
+            if eq.time_derivative_order >= 2
+        ]
+
+        for i in range(n_snapshots):
+            t = i * snapshot_interval
+            # Build a mock FieldCollection-like object with .data attribute
+            slots: list[_MockSlot] = []
+            for _name, _slot_type in spec.state_layout:
+                slots.append(_MockSlot(rng.standard_normal(16)))
+            mock_state = _MockFieldCollection(slots)
+            callback(mock_state, t)
+
+        writer.close()
+
+        # Verify directory was created with correct files
+        assert (output_dir / "metadata.json").exists()
+        assert (output_dir / "times.npy").exists()
+        for name in field_names:
+            assert (output_dir / f"{name}.npy").exists()
+        for name in mom_names:
+            assert (output_dir / f"pi_{name}.npy").exists()
+
+        # Verify we can load it back
+        data = SimulationData.from_directory(output_dir, spec)
+        assert data.n_snapshots == n_snapshots
+        assert len(data.fields) == len(field_names)
+        assert len(data.momenta) == len(mom_names)
+
+    def test_spec_path_stored(self, tmp_path: Path) -> None:
+        """spec_path is written to metadata.json."""
+        spec = _build_coupled_scalars_spec()
+        grid = CartesianGrid([(0, 10)], 16, periodic=True)
+
+        output_dir = tmp_path / "spec_path_test"
+        spec_path = Path("examples/data/coupled_scalars.json")
+        writer, callback = create_snapshot_callback(
+            output_dir=output_dir,
+            spec=spec,
+            grid=grid,
+            t_end=1.0,
+            snapshot_interval=1.0,
+            spec_path=spec_path,
+        )
+
+        # Write minimum snapshots
+        slots = [_MockSlot(np.zeros(16)) for _ in spec.state_layout]
+        mock_state = _MockFieldCollection(slots)
+        callback(mock_state, 0.0)
+        callback(mock_state, 1.0)
+        writer.close()
+
+        import json
+
+        meta = json.loads((output_dir / "metadata.json").read_text())
+        assert "spec_path" in meta
+        assert meta["spec_path"] == str(spec_path)
+
+
+@dataclasses.dataclass
+class _MockSlot:
+    """Minimal mock for a py-pde ScalarField (has .data attribute)."""
+
+    data: np.ndarray
+
+
+class _MockFieldCollection:
+    """Minimal mock for pde.FieldCollection (indexed by int)."""
+
+    def __init__(self, slots: list[_MockSlot]) -> None:
+        self._slots = slots
+
+    def __getitem__(self, idx: int) -> _MockSlot:
+        return self._slots[idx]
+
+
+# ============================================================
+# Group 17 — SimulationData.save() round-trip
+# ============================================================
+
+
+class TestSimulationDataSave:
+    """Tests for SimulationData.save() method."""
+
+    def test_save_round_trip(self, tmp_path: Path) -> None:
+        """save() then from_directory() produces identical data."""
+        data = _make_sim_data_two_fields(n_grid=16, n_snapshots=5)
+        save_dir = tmp_path / "saved"
+        data.save(save_dir)
+
+        loaded = SimulationData.from_directory(save_dir, data.spec)
+        np.testing.assert_array_almost_equal(loaded.times, data.times)
+        for name in data.fields:
+            np.testing.assert_array_almost_equal(
+                loaded.fields[name], data.fields[name],
+            )
+        for name in data.momenta:
+            np.testing.assert_array_almost_equal(
+                loaded.momenta[name], data.momenta[name],
+            )
+        assert loaded.grid_spacing == data.grid_spacing
+        assert loaded.grid_bounds == data.grid_bounds
+        assert loaded.periodic == data.periodic
+
+    def test_save_creates_directory(self, tmp_path: Path) -> None:
+        """save() creates the directory if it doesn't exist."""
+        data = _make_sim_data_two_fields(n_grid=16, n_snapshots=3)
+        save_dir = tmp_path / "nested" / "dir"
+        data.save(save_dir)
+        assert save_dir.is_dir()
+        assert (save_dir / "metadata.json").exists()
+        assert (save_dir / "times.npy").exists()
+
+    def test_save_metadata_fields(self, tmp_path: Path) -> None:
+        """save() writes correct metadata.json content."""
+        import json
+
+        data = _make_sim_data_two_fields(n_grid=16, n_snapshots=3)
+        save_dir = tmp_path / "meta_check"
+        data.save(save_dir)
+
+        meta = json.loads((save_dir / "metadata.json").read_text())
+        assert meta["n_snapshots"] == 3
+        assert meta["grid_spacing"] == list(data.grid_spacing)
+        assert meta["periodic"] == list(data.periodic)
+        assert set(meta["fields"]) == set(data.fields.keys())
+        assert set(meta["momenta"]) == set(data.momenta.keys())

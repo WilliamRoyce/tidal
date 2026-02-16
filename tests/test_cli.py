@@ -200,19 +200,6 @@ class TestSimulateCommand:
         assert output.exists()
         assert output.stat().st_size > 0
 
-    def test_simulate_npz_output(
-        self, klein_gordon_1d_json: Path, tmp_path: Path
-    ) -> None:
-        output = tmp_path / "test_output.npz"
-        ret = main([
-            "simulate", str(klein_gordon_1d_json),
-            "--param", "m2=1.0",
-            "--t-end", "0.5",
-            "--output", str(output),
-        ])
-        assert ret == 0
-        assert output.exists()
-
     # --- IC types (parametrized) ---
 
     @pytest.mark.parametrize("ic_type", ["gaussian", "plane-wave", "zero"])
@@ -1358,18 +1345,18 @@ class TestMeasureCommand:
         with pytest.raises(SystemExit, match="0"):
             main(["measure", "--help"])
 
-    def test_measure_nonexistent_npz(self) -> None:
-        ret = main(["measure", "/nonexistent/file.npz", "--spec", "/nonexistent/spec.json"])
+    def test_measure_nonexistent_path(self) -> None:
+        ret = main(["measure", "/nonexistent/data_dir", "--spec", "/nonexistent/spec.json"])
         assert ret == 1
 
     def test_measure_summary_text(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Default mode should print full summary with energy + conservation."""
-        ret = main(["measure", str(coupled_scalars_npz), "--spec", str(coupled_scalars_json)])
+        ret = main(["measure", str(coupled_scalars_dir), "--spec", str(coupled_scalars_json)])
         assert ret == 0
         out = capsys.readouterr().out
         assert "Energy Conservation:" in out
@@ -1377,7 +1364,7 @@ class TestMeasureCommand:
 
     def test_measure_json_output(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
@@ -1386,7 +1373,7 @@ class TestMeasureCommand:
 
         capsys.readouterr()  # flush fixture output
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--json", "--quiet",
         ])
@@ -1398,13 +1385,13 @@ class TestMeasureCommand:
 
     def test_measure_energy_only(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--what=energy should compute only energy (no conversion/mixing)."""
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "energy",
         ])
@@ -1415,12 +1402,12 @@ class TestMeasureCommand:
 
     def test_measure_conversion_requires_source(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
     ) -> None:
         """--what=conversion without --source should error."""
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "conversion",
         ])
@@ -1428,13 +1415,13 @@ class TestMeasureCommand:
 
     def test_measure_conversion_with_fields(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """Explicit --source and --target should compute conversion."""
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "conversion",
             "--source", "phi_0",
@@ -1447,14 +1434,14 @@ class TestMeasureCommand:
 
     def test_measure_png_output(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         tmp_path: Path,
     ) -> None:
         """--output with .png extension should create a plot file."""
         output = tmp_path / "measurement.png"
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--output", str(output),
         ])
@@ -1464,24 +1451,24 @@ class TestMeasureCommand:
 
     def test_measure_spec_autodiscovery(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """NPZ saved by tidal simulate should contain _spec_path for auto-discovery."""
-        ret = main(["measure", str(coupled_scalars_npz)])
+        """Snapshot directory should contain metadata.json with spec_path for auto-discovery."""
+        ret = main(["measure", str(coupled_scalars_dir)])
         assert ret == 0
         out = capsys.readouterr().out
         assert "Energy Conservation:" in out
 
     def test_measure_quiet(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--quiet should suppress progress messages but keep results."""
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--quiet",
         ])
@@ -1492,12 +1479,12 @@ class TestMeasureCommand:
 
     def test_measure_invalid_what(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
     ) -> None:
         """Unknown --what value should return 1."""
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "nonexistent_measure",
         ])
@@ -1505,14 +1492,14 @@ class TestMeasureCommand:
 
     def test_measure_param_override(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """--param should override parameter values from NPZ."""
+        """--param should override parameter values from snapshot data."""
         capsys.readouterr()  # flush fixture output
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "energy",
             "--param", "mPhi2=2.0",
@@ -1526,13 +1513,13 @@ class TestMeasureCommand:
 
     def test_measure_mixing_standalone(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--what=mixing (without explicit conversion) should auto-detect source/target."""
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "mixing",
         ])
@@ -1544,13 +1531,13 @@ class TestMeasureCommand:
 
     def test_measure_spectrum_individual(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--what=spectrum alone should compute power spectrum."""
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "spectrum",
         ])
@@ -1563,13 +1550,13 @@ class TestMeasureCommand:
 
     def test_measure_combined_energy_conversion(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--what=energy,conversion should compute both but not mixing."""
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "energy,conversion",
             "--source", "phi_0",
@@ -1583,13 +1570,13 @@ class TestMeasureCommand:
 
     def test_measure_spectral_conversion_auto_target(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--source without --target should auto-select remaining dynamical fields."""
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "spectral_conversion",
             "--source", "phi_0",
@@ -1600,13 +1587,13 @@ class TestMeasureCommand:
 
     def test_measure_spectral_conversion(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--what=spectral_conversion should compute P(k,t)."""
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "spectral_conversion",
             "--source", "phi_0",
@@ -1619,7 +1606,7 @@ class TestMeasureCommand:
 
     def test_measure_spectral_conversion_json(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
@@ -1628,7 +1615,7 @@ class TestMeasureCommand:
 
         capsys.readouterr()  # flush
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "spectral_conversion",
             "--source", "phi_0",
@@ -1642,12 +1629,12 @@ class TestMeasureCommand:
 
     def test_measure_spectral_conversion_requires_source(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
     ) -> None:
         """--what=spectral_conversion without --source should error."""
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "spectral_conversion",
         ])
@@ -1655,14 +1642,14 @@ class TestMeasureCommand:
 
     def test_measure_spectral_conversion_plot(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         tmp_path: Path,
     ) -> None:
         """--what=spectral_conversion --output .png should create plot."""
         output = tmp_path / "sc_plot.png"
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "spectral_conversion",
             "--source", "phi_0",
@@ -1675,13 +1662,13 @@ class TestMeasureCommand:
 
     def test_measure_dispersion_text(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--what=dispersion should compute dispersion relation."""
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "dispersion",
             "--source", "phi_0",
@@ -1692,7 +1679,7 @@ class TestMeasureCommand:
 
     def test_measure_dispersion_json(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         capsys: pytest.CaptureFixture[str],
     ) -> None:
@@ -1701,7 +1688,7 @@ class TestMeasureCommand:
 
         capsys.readouterr()
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "dispersion",
             "--source", "phi_0",
@@ -1713,14 +1700,14 @@ class TestMeasureCommand:
 
     def test_measure_dispersion_plot(
         self,
-        coupled_scalars_npz: Path,
+        coupled_scalars_dir: Path,
         coupled_scalars_json: Path,
         tmp_path: Path,
     ) -> None:
         """--what=dispersion --output .png should create plot."""
         output = tmp_path / "disp_plot.png"
         ret = main([
-            "measure", str(coupled_scalars_npz),
+            "measure", str(coupled_scalars_dir),
             "--spec", str(coupled_scalars_json),
             "--what", "dispersion",
             "--source", "phi_0",

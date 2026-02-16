@@ -230,18 +230,18 @@ def massive_3form_json() -> Path:
     return _cli_json_fixture("massive_3form.json")
 
 
-# ==================== NPZ Fixtures for tidal measure ====================
+# ==================== Directory Fixtures for tidal measure ====================
 
 
 @pytest.fixture
-def coupled_scalars_npz(coupled_scalars_json: Path, tmp_path: Path) -> Path:
-    """Run a short coupled_scalars simulation and save NPZ for measurement tests.
+def coupled_scalars_dir(coupled_scalars_json: Path, tmp_path: Path) -> Path:
+    """Run a short coupled_scalars simulation and save to directory for measurement tests.
 
-    Returns the path to the generated NPZ file.
+    Returns the path to the generated snapshot directory.
     """
     from tidal.cli import main
 
-    output = tmp_path / "coupled_scalars.npz"
+    output = tmp_path / "coupled_scalars_out"
     ret = main([
         "simulate", str(coupled_scalars_json),
         "--param", "mPhi2=1.0",
@@ -252,5 +252,5 @@ def coupled_scalars_npz(coupled_scalars_json: Path, tmp_path: Path) -> Path:
         "--output", str(output),
     ])
     assert ret == 0, "coupled_scalars simulation failed"
-    assert output.exists(), "NPZ file was not created"
+    assert output.is_dir(), "Snapshot directory was not created"
     return output
