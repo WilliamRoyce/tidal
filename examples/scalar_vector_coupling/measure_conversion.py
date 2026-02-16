@@ -32,7 +32,7 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
+from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
 from tidal.measurement import (
     SimulationData,
@@ -44,13 +44,12 @@ from tidal.measurement import (
     compute_group_spectral_conversion,
     compute_mixing_length,
     compute_mixing_spectrum,
+    create_snapshot_callback,
 )
 from tidal.symbolic import build_pde_from_json, load_equation_system
 from tidal.utils import normalize_solve_result
 
 if TYPE_CHECKING:
-    from pde.trackers.base import TrackerBase
-
     from tidal.measurement._conversion import ConversionResult
     from tidal.measurement._diagnostics import EnergyDiagnostics
     from tidal.measurement._dispersion import DispersionResult
@@ -72,7 +71,7 @@ OUTPUT_FILENAME = "scalar_vector_measurement.png"
 # ---------------------------------------------------------------------------
 
 
-def _run_simulation() -> SimulationData:
+def _run_simulation() -> tuple[SimulationData, Path]:
     """Run the scalar-vector simulation and return measurement-ready data."""
     json_path = Path(__file__).parent.parent / "data" / "scalar_vector_coupling.json"
 
@@ -97,8 +96,17 @@ def _run_simulation() -> SimulationData:
         ]
     )
 
-    storage = MemoryStorage()
-    tracker: TrackerBase = storage.tracker(interrupts=TRACKER_INTERVAL)
+    output_data_dir = Path(__file__).parent.parent / "data" / "scalar_vector_coupling_output"
+    writer, callback = create_snapshot_callback(
+        output_dir=output_data_dir,
+        spec=spec,
+        grid=grid,
+        t_end=T_END,
+        snapshot_interval=TRACKER_INTERVAL,
+        parameters=PARAMS,
+        spec_path=json_path,
+    )
+    tracker = CallbackTracker(callback, interrupts=TRACKER_INTERVAL)
     result = pde.solve(
         state,
         t_range=T_END,
@@ -107,8 +115,9 @@ def _run_simulation() -> SimulationData:
         tracker=tracker,
     )
     normalize_solve_result(result)
+    writer.close()
 
-    return SimulationData.from_storage(storage, spec, grid, PARAMS)
+    return SimulationData.from_directory(output_data_dir, spec), output_data_dir
 
 
 # ---------------------------------------------------------------------------
@@ -517,7 +526,8 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
 def main() -> None:
     """Run simulation and perform full measurement analysis."""
     print("Running scalar-vector coupling simulation...")
-    data = _run_simulation()
+    data, data_dir = _run_simulation()
+    print(f"  Data saved to: {data_dir}")
     print(
         f"  {data.n_snapshots} snapshots collected over t=[0, {float(data.times[-1]):.1f}]"
     )

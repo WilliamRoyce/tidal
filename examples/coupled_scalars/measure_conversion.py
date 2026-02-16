@@ -26,7 +26,7 @@ from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
 import numpy as np
-from pde import CartesianGrid, MemoryStorage
+from pde import CallbackTracker, CartesianGrid
 
 from tidal.measurement import (
     SimulationData,
@@ -38,13 +38,12 @@ from tidal.measurement import (
     compute_mixing_spectrum,
     compute_spectral_conversion,
     compute_spectrum,
+    create_snapshot_callback,
 )
 from tidal.symbolic import build_pde_from_json, load_equation_system
 from tidal.vectorfield import ComponentGaussianPulse
 
 if TYPE_CHECKING:
-    from pde.trackers.base import TrackerBase
-
     from tidal.measurement._conversion import ConversionResult
     from tidal.measurement._diagnostics import EnergyDiagnostics
     from tidal.measurement._dispersion import DispersionResult
@@ -56,7 +55,7 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 PARAMS: dict[str, float] = {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5}
-T_END = 100.0
+T_END = 50.0
 TRACKER_INTERVAL = 0.2
 OUTPUT_FILENAME = "coupled_scalars_measurement.png"
 
@@ -66,7 +65,7 @@ OUTPUT_FILENAME = "coupled_scalars_measurement.png"
 # ---------------------------------------------------------------------------
 
 
-def _run_simulation() -> tuple[SimulationData, dict[str, float]]:
+def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     """Run the coupled KG simulation and return measurement-ready data."""
     json_path = Path(__file__).parent.parent / "data" / "coupled_scalars.json"
 
@@ -82,8 +81,17 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float]]:
     )
     initial_state = pulse.create(grid, spec)
 
-    storage = MemoryStorage()
-    tracker: TrackerBase = storage.tracker(interrupts=TRACKER_INTERVAL)
+    output_data_dir = Path(__file__).parent.parent / "data" / "coupled_scalars_output"
+    writer, callback = create_snapshot_callback(
+        output_dir=output_data_dir,
+        spec=spec,
+        grid=grid,
+        t_end=T_END,
+        snapshot_interval=TRACKER_INTERVAL,
+        parameters=PARAMS,
+        spec_path=json_path,
+    )
+    tracker = CallbackTracker(callback, interrupts=TRACKER_INTERVAL)
     pde.solve(
         initial_state,
         t_range=T_END,
@@ -91,9 +99,10 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float]]:
         scheme="runge-kutta",
         tracker=tracker,
     )
+    writer.close()
 
-    data = SimulationData.from_storage(storage, spec, grid, PARAMS)
-    return data, PARAMS
+    data = SimulationData.from_directory(output_data_dir, spec)
+    return data, PARAMS, output_data_dir
 
 
 # ---------------------------------------------------------------------------
@@ -176,9 +185,7 @@ def _print_summary(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     if spectral_conv is not None:
         n_active = int(spectral_conv.active_modes.sum())
         print("  Spectral conversion P(k,t):")
-        print(
-            f"    Active k-modes: {n_active} / {len(spectral_conv.wavenumbers)}"
-        )
+        print(f"    Active k-modes: {n_active} / {len(spectral_conv.wavenumbers)}")
         if n_active > 0:
             peak_k_idx = int(np.argmax(spectral_conv.probability[-1]))
             print(
@@ -193,12 +200,8 @@ def _print_summary(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     if disp_phi is not None:
         n_active = int(np.count_nonzero(disp_phi.peak_frequencies > 0.0))
         print("  Dispersion (phi):")
-        print(
-            f"    Active k-modes: {n_active} / {len(disp_phi.wavenumbers)}"
-        )
-        print(
-            f"    Rayleigh resolution: {disp_phi.rayleigh_resolution:.4f} rad/time"
-        )
+        print(f"    Active k-modes: {n_active} / {len(disp_phi.wavenumbers)}")
+        print(f"    Rayleigh resolution: {disp_phi.rayleigh_resolution:.4f} rad/time")
         if n_active > 0:
             # Compare measured omega(k=0) with predicted
             omega_measured = disp_phi.peak_frequencies[0]
@@ -208,9 +211,7 @@ def _print_summary(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     if disp_chi is not None:
         n_active = int(np.count_nonzero(disp_chi.peak_frequencies > 0.0))
         print("  Dispersion (chi):")
-        print(
-            f"    Active k-modes: {n_active} / {len(disp_chi.wavenumbers)}"
-        )
+        print(f"    Active k-modes: {n_active} / {len(disp_chi.wavenumbers)}")
     else:
         print("  Dispersion (chi): not computed")
     print()
@@ -257,15 +258,21 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     ax.annotate(
         f"P = {result.probability[peak_idx]:.4f}\nt = {result.times[peak_idx]:.1f}",
         xy=(result.times[peak_idx], result.probability[peak_idx]),
-        xytext=(15, -10), textcoords="offset points", fontsize=9,
+        xytext=(15, -10),
+        textcoords="offset points",
+        fontsize=9,
         arrowprops={"arrowstyle": "->", "color": "gray"},
     )
     if mixing is not None:
         ax.annotate(
             f"$L_{{mix}}$ = {mixing.mixing_length:.2f}"
             f" $\\pm$ {mixing.mixing_length_uncertainty:.2f}",
-            xy=(0.95, 0.95), xycoords="axes fraction", ha="right", va="top",
-            fontsize=9, color="green",
+            xy=(0.95, 0.95),
+            xycoords="axes fraction",
+            ha="right",
+            va="top",
+            fontsize=9,
+            color="green",
             bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8},
         )
     ax.set_xlabel("Time")
@@ -280,7 +287,12 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     ax.plot(times, per_field["phi_0"], "b-", label=r"$E_\varphi$", linewidth=1.2)
     ax.plot(times, per_field["chi_0"], "r-", label=r"$E_\chi$", linewidth=1.2)
     ax.plot(
-        times, interaction, "g--", label=r"$E_\mathrm{int}$", linewidth=1.0, alpha=0.7,
+        times,
+        interaction,
+        "g--",
+        label=r"$E_\mathrm{int}$",
+        linewidth=1.0,
+        alpha=0.7,
     )
     ax.plot(times, total, "k-", label=r"$E_\mathrm{total}$", linewidth=1.0, alpha=0.5)
     ax.set_xlabel("Time")
@@ -303,9 +315,14 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     # [0,3] Mixing spectrum (temporal FFT of P(t))
     ax = axes[0, 3]
     if spectrum is not None:
-        ax.semilogy(spectrum.frequencies, spectrum.power, "b-", linewidth=0.5, alpha=0.7)
+        ax.semilogy(
+            spectrum.frequencies, spectrum.power, "b-", linewidth=0.5, alpha=0.7
+        )
         ax.axvline(
-            spectrum.dominant_frequency, color="red", linestyle="--", alpha=0.7,
+            spectrum.dominant_frequency,
+            color="red",
+            linestyle="--",
+            alpha=0.7,
             label=rf"$\omega_{{\mathrm{{dom}}}}$ = {spectrum.dominant_frequency:.2f}",
         )
         x_max = min(10 * spectrum.dominant_frequency, spectrum.frequencies[-1])
@@ -322,19 +339,31 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     ax = axes[1, 0]
     if spectral_conv is not None and np.any(spectral_conv.active_modes):
         mesh = ax.pcolormesh(
-            spectral_conv.wavenumbers, spectral_conv.times,
-            spectral_conv.probability, shading="nearest", cmap="inferno",
+            spectral_conv.wavenumbers,
+            spectral_conv.times,
+            spectral_conv.probability,
+            shading="nearest",
+            cmap="inferno",
         )
         fig.colorbar(mesh, ax=ax, label=r"$P(k,t)$", pad=0.02)
         # Crop x-axis to active k-range
-        k_active_max = float(spectral_conv.wavenumbers[spectral_conv.active_modes].max())
+        k_active_max = float(
+            spectral_conv.wavenumbers[spectral_conv.active_modes].max()
+        )
         ax.set_xlim(0, k_active_max * 1.15)
         ax.set_xlabel(r"$|k|$")
         ax.set_ylabel("Time")
         ax.set_title(r"Spectral Conversion $P(k,t)$")
     else:
-        ax.text(0.5, 0.5, "No spectral\nconversion data",
-                transform=ax.transAxes, ha="center", va="center", fontsize=9)
+        ax.text(
+            0.5,
+            0.5,
+            "No spectral\nconversion data",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=9,
+        )
         ax.set_title("Spectral Conversion")
     ax.grid(visible=True, alpha=0.3)
 
@@ -344,20 +373,32 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         log_power = np.log10(np.maximum(disp_phi.power, 1e-30))
         log_max = float(log_power.max())
         mesh = ax.pcolormesh(
-            disp_phi.wavenumbers, disp_phi.frequencies, log_power.T,
-            shading="nearest", cmap="viridis",
-            vmin=log_max - 20, vmax=log_max,
+            disp_phi.wavenumbers,
+            disp_phi.frequencies,
+            log_power.T,
+            shading="nearest",
+            cmap="viridis",
+            vmin=log_max - 20,
+            vmax=log_max,
         )
         fig.colorbar(mesh, ax=ax, label=r"$\log_{10} S(k, \omega)$", pad=0.02)
         active = disp_phi.peak_frequencies > 0.0
         ax.plot(
-            disp_phi.wavenumbers[active], disp_phi.peak_frequencies[active],
-            "w--", linewidth=1.5, alpha=0.9, label=r"$\omega(k)$ peak",
+            disp_phi.wavenumbers[active],
+            disp_phi.peak_frequencies[active],
+            "w--",
+            linewidth=1.5,
+            alpha=0.9,
+            label=r"$\omega(k)$ peak",
         )
         # Data-driven axis cropping
         # k-axis: match spectral conversion's active_modes range when available
         if spectral_conv is not None and np.any(spectral_conv.active_modes):
-            ax.set_xlim(0, float(spectral_conv.wavenumbers[spectral_conv.active_modes].max()) * 1.15)
+            ax.set_xlim(
+                0,
+                float(spectral_conv.wavenumbers[spectral_conv.active_modes].max())
+                * 1.15,
+            )
         elif np.any(active):
             max_peak = float(np.max(disp_phi.peak_powers))
             if max_peak > 0:
@@ -374,8 +415,15 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         ax.set_title(r"Dispersion $\omega(k)$ ($\varphi$)")
         ax.legend(fontsize=8, loc="upper left")
     else:
-        ax.text(0.5, 0.5, "No dispersion data",
-                transform=ax.transAxes, ha="center", va="center", fontsize=9)
+        ax.text(
+            0.5,
+            0.5,
+            "No dispersion data",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=9,
+        )
         ax.set_title("Dispersion")
     ax.grid(visible=True, alpha=0.3)
 
@@ -383,11 +431,15 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     ax = axes[1, 2]
     snap0 = compute_spectrum(data.fields["phi_0"][0], data.grid_spacing, data.periodic)
     snap_peak = compute_spectrum(
-        data.fields["chi_0"][peak_idx], data.grid_spacing, data.periodic,
+        data.fields["chi_0"][peak_idx],
+        data.grid_spacing,
+        data.periodic,
     )
     ax.semilogy(snap0.wavenumbers, snap0.power_spectrum, "b-", label=r"$\varphi(t=0)$")
     ax.semilogy(
-        snap_peak.wavenumbers, snap_peak.power_spectrum, "r-",
+        snap_peak.wavenumbers,
+        snap_peak.power_spectrum,
+        "r-",
         label=rf"$\chi(t={result.times[peak_idx]:.1f})$",
     )
     ax.set_xlabel(r"$|k|$")
@@ -429,8 +481,13 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         "  Gaussian in $\\varphi$, $\\chi = 0$",
     ]
     ax.text(
-        0.05, 0.95, "\n".join(lines), transform=ax.transAxes,
-        fontsize=9, verticalalignment="top", fontfamily="monospace",
+        0.05,
+        0.95,
+        "\n".join(lines),
+        transform=ax.transAxes,
+        fontsize=9,
+        verticalalignment="top",
+        fontfamily="monospace",
     )
     ax.axis("off")
 
@@ -451,7 +508,8 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
 def main() -> None:
     """Run simulation and perform full measurement analysis."""
     print("Running coupled Klein-Gordon simulation...")
-    data, params = _run_simulation()
+    data, params, data_dir = _run_simulation()
+    print(f"  Data saved to: {data_dir}")
     print(
         f"  {data.n_snapshots} snapshots collected over t=[0, {float(data.times[-1]):.1f}]"
     )
@@ -494,13 +552,27 @@ def main() -> None:
     diag = check_energy_conservation(data, threshold=1e-3)
 
     _print_summary(
-        result, diag, mixing, spectrum, spectral_conv, disp_phi, disp_chi, params,
+        result,
+        diag,
+        mixing,
+        spectrum,
+        spectral_conv,
+        disp_phi,
+        disp_chi,
+        params,
     )
 
     print()
     print("Generating measurement plots...")
     output_path = _plot_results(
-        data, result, diag, mixing, spectrum, spectral_conv, disp_phi, params,
+        data,
+        result,
+        diag,
+        mixing,
+        spectrum,
+        spectral_conv,
+        disp_phi,
+        params,
     )
     print(f"  Saved to: {output_path}")
 

@@ -27,22 +27,22 @@
 #     --param mPhi2=1.0 --param mChi2=4.0 --param gCpl=0.5 \
 #     --grid-shape 256 --bounds 0:100 --periodic \
 #     --ic gaussian --ic-component phi_0 --ic-center 30.0 --ic-width 5.0 \
-#     --t-end 20.0 --dt 0.01 --output ../data/coupled_scalars_output.npz
+#     --t-end 20.0 --dt 0.01 --output ../data/coupled_scalars_output
 #
 #   # Step 4: Measure conversion probability and characteristic mixing length
-#   uv run tidal measure ../data/coupled_scalars_output.npz \
+#   uv run tidal measure ../data/coupled_scalars_output \
 #     --what conversion,mixing --source phi_0 --target chi_0
 #
 #   # Step 5: Spectral conversion P(k,t) — which modes participate in mixing?
-#   uv run tidal measure ../data/coupled_scalars_output.npz \
+#   uv run tidal measure ../data/coupled_scalars_output \
 #     --what spectral_conversion --source phi_0 --target chi_0
 #
 #   # Step 6: Dispersion relation omega(k) — wave frequency vs wavenumber
-#   uv run tidal measure ../data/coupled_scalars_output.npz \
+#   uv run tidal measure ../data/coupled_scalars_output \
 #     --what dispersion --source phi_0
 #
 #   # Step 7: Combined plot with all measurements
-#   uv run tidal measure ../data/coupled_scalars_output.npz \
+#   uv run tidal measure ../data/coupled_scalars_output \
 #     --what conversion,mixing,spectral_conversion,dispersion \
 #     --source phi_0 --target chi_0 \
 #     --output ../data/coupled_scalars_measurement.png
@@ -69,29 +69,29 @@ tidal simulate ../data/coupled_scalars.json \
   --ic-width 5.0 \
   --t-end 20.0 \
   --dt 0.01 \
-  --output ../data/coupled_scalars_output.npz
+  --output ../data/coupled_scalars_output
 
 # Step 4: Measure conversion probability and characteristic mixing length
 # P(t) = E_chi(t) / E_phi(0) tracks what fraction of phi's energy went to chi
 # L_mix = pi / omega_dom is the half-period of the dominant oscillation in P(t)
-tidal measure ../data/coupled_scalars_output.npz \
+tidal measure ../data/coupled_scalars_output \
   --what conversion,mixing \
   --source phi_0 --target chi_0
 
 # Step 5: Spectral conversion P(k,t)
 # Shows which Fourier modes participate in the energy conversion over time
-tidal measure ../data/coupled_scalars_output.npz \
+tidal measure ../data/coupled_scalars_output \
   --what spectral_conversion \
   --source phi_0 --target chi_0
 
 # Step 6: Dispersion relation omega(k)
 # Extracts wave frequency vs wavenumber via spacetime FFT
-tidal measure ../data/coupled_scalars_output.npz \
+tidal measure ../data/coupled_scalars_output \
   --what dispersion \
   --source phi_0
 
 # Step 7: Combined measurement plot (all panels in one figure)
-tidal measure ../data/coupled_scalars_output.npz \
+tidal measure ../data/coupled_scalars_output \
   --what conversion,mixing,spectral_conversion,dispersion \
   --source phi_0 --target chi_0 \
   --output ../data/coupled_scalars_measurement.png

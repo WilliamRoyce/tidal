@@ -25,21 +25,21 @@
 #     --param mA2=1.0 --param mB2=2.0 --param gcoup=0.5 \
 #     --ic gaussian --grid-shape 16 --t-end 2.0 --dt 0.05 \
 #     --bc periodic,periodic --scheme runge-kutta \
-#     --output outputs/coupled_proca_output.npz
+#     --output outputs/coupled_proca_output
 #
 #   # Measure conversion from A-field group to B-field group
-#   uv run tidal measure outputs/coupled_proca_output.npz \
+#   uv run tidal measure outputs/coupled_proca_output \
 #     --spec examples/data/coupled_proca_3d.json \
 #     --what conversion,mixing \
 #     --source A_0,A_1,A_2 --target B_0,B_1,B_2
 #
 #   # Spectral conversion P(k,t) — per-mode A->B transfer
-#   uv run tidal measure outputs/coupled_proca_output.npz \
+#   uv run tidal measure outputs/coupled_proca_output \
 #     --spec examples/data/coupled_proca_3d.json \
 #     --what spectral_conversion --source A_1 --target B_1,B_2
 #
 #   # Dispersion relation omega(k) for A_1
-#   uv run tidal measure outputs/coupled_proca_output.npz \
+#   uv run tidal measure outputs/coupled_proca_output \
 #     --spec examples/data/coupled_proca_3d.json \
 #     --what dispersion --source A_1
 
@@ -51,24 +51,24 @@ tidal simulate examples/data/coupled_proca_3d.json \
   --param mA2=1.0 --param mB2=2.0 --param gcoup=0.5 \
   --ic gaussian --grid-shape 16 --t-end 2.0 --dt 0.05 \
   --bc periodic,periodic --scheme runge-kutta \
-  --output outputs/coupled_proca_output.npz
+  --output outputs/coupled_proca_output
 
 # Measure conversion between vector field groups and mixing length
 # Source = all A components, Target = all B components (group conversion)
 # P(t) = E_B(t) / E_A(0) tracks energy transfer from A to B
-tidal measure outputs/coupled_proca_output.npz \
+tidal measure outputs/coupled_proca_output \
   --spec examples/data/coupled_proca_3d.json \
   --what conversion,mixing \
   --source A_0,A_1,A_2 --target B_0,B_1,B_2
 
 # Spectral conversion P(k,t) — per-mode A->B energy transfer
-tidal measure outputs/coupled_proca_output.npz \
+tidal measure outputs/coupled_proca_output \
   --spec examples/data/coupled_proca_3d.json \
   --what spectral_conversion \
   --source A_1 --target B_1,B_2
 
 # Dispersion relation omega(k) for A_1
-tidal measure outputs/coupled_proca_output.npz \
+tidal measure outputs/coupled_proca_output \
   --spec examples/data/coupled_proca_3d.json \
   --what dispersion \
   --source A_1
