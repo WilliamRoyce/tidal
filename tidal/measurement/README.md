@@ -25,13 +25,16 @@ live `MemoryStorage` (straight from the solver) or from a saved `.npz` file.
 
 ```
 tidal/measurement/
-    __init__.py           Public API (21 exports)
-    _io.py                SimulationData: uniform data abstraction
-    _energy.py            Per-field canonical energy, interaction energy
-    _conversion.py        Conversion probability P(t) = E_target(t) / E_source(0)
-    _mixing.py            Mixing length extraction and mixing spectrum
-    _spectral.py          FFT spectral decomposition, mode tracking
-    _diagnostics.py       Energy conservation checks, summary statistics
+    __init__.py                Public API (25 exports)
+    _io.py                     SimulationData: uniform data abstraction
+    _energy.py                 Per-field canonical energy, interaction energy
+    _conversion.py             Conversion probability P(t) = E_target(t) / E_source(0)
+    _mixing.py                 Mixing length extraction and mixing spectrum
+    _spectral.py               FFT spectral decomposition, mode tracking
+    _spectral_conversion.py    Per-mode spectral conversion P(k,t)
+    _dispersion.py             Dispersion relation omega(k) extraction
+    _diagnostics.py            Energy conservation checks, summary statistics
+    _utils.py                  Shared utilities (_normalize_group)
 ```
 
 Data flows through the module as:
@@ -42,11 +45,11 @@ MemoryStorage / NPZ file
         v
   SimulationData          <-- _io.py: extracts full time history
         |
-   +------+----------+---------+-----------+
-   |      |          |         |           |
-   v      v          v         v           v
- Energy  Conversion  Mixing   Spectral   Diagnostics
- (_energy) (_conv)   (_mixing) (_spectral) (_diagnostics)
+   +------+-------+-------+---------+-------------+----------+-----------+
+   |      |       |       |         |             |          |           |
+   v      v       v       v         v             v          v           v
+ Energy  Conv   Mixing  Spectral  SpectralConv  Dispersion  Diagnostics
+ (_energy)      (_mix)  (_spec)   (_spec_conv)  (_disp)     (_diagnostics)
 ```
 
 ## Quick Start
@@ -201,6 +204,36 @@ Fourier decomposition of a field at one time.
 | `wavenumbers` | Radially binned `|k|` values |
 | `power_spectrum` | `|phi_hat(k)|^2` averaged over shells of constant `|k|` |
 
+### SpectralConversion
+
+Per-mode spectral conversion probability P(k,t).  Tracks which Fourier
+modes participate in energy conversion between source and target fields.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `times` | `ndarray (n,)` | Snapshot times |
+| `wavenumbers` | `ndarray (n_modes,)` | Radially binned `|k|` values |
+| `probability` | `ndarray (n, n_modes)` | `P(k,t) = E_target(k,t) / E_source(k,0)` |
+| `source_spectral_energy` | `ndarray (n, n_modes)` | Source spectral energy per mode over time |
+| `target_spectral_energy` | `ndarray (n, n_modes)` | Target spectral energy per mode over time |
+| `active_modes` | `ndarray (n_modes,)` bool | `True` for k-bins with nonzero initial source energy |
+| `source_field` | `str` | Source field name (or comma-joined group) |
+| `target_field` | `str` | Target field name (or comma-joined group) |
+
+### DispersionResult
+
+Dispersion relation extracted from simulation output via spacetime FFT.
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `wavenumbers` | `ndarray (n_modes,)` | Radially binned `|k|` values |
+| `frequencies` | `ndarray (n_freq,)` | Angular frequencies `omega` (rad/time), excluding DC |
+| `power` | `ndarray (n_modes, n_freq)` | `S(k, omega) = |A_hat(k, omega)|^2` |
+| `peak_frequencies` | `ndarray (n_modes,)` | Dominant `omega` at each k-bin (0 for inactive modes) |
+| `peak_powers` | `ndarray (n_modes,)` | Spectral power at dominant frequency per k-bin |
+| `field_name` | `str` | Which field this dispersion was computed for |
+| `rayleigh_resolution` | `float` | `2*pi/T` — minimum resolvable frequency difference |
+
 ### EnergyDiagnostics
 
 Energy conservation diagnostic result.
@@ -350,6 +383,44 @@ E(k) = 1/2 [ |pi_hat_k|^2 + (k^2 + m^2) |phi_hat_k|^2 ]
 For non-periodic axes, a Hann window is applied before the FFT (with a
 `UserWarning` noting that amplitudes are approximate).
 
+### Spectral Conversion P(k,t)
+
+The per-mode spectral conversion probability decomposes the scalar
+conversion `P(t)` into a 2D array `P(k,t) = E_target(k,t) / E_source(k, t=0)`,
+revealing which Fourier modes participate in energy conversion.
+
+For systems with derivative coupling (gradient/cross-derivative cross-field
+terms), the mixing angle `theta(k)` is k-dependent, so different modes have
+different oscillation amplitudes — not just different frequencies. The
+spectral conversion makes this k-dependence visible.
+
+CLI: `tidal measure result.npz --what spectral_conversion --source phi_0 --target chi_0`
+
+### Dispersion Relation
+
+The dispersion relation `omega(k)` maps wavenumber to oscillation frequency,
+encoding the dynamics of wave propagation. For a free Klein-Gordon field,
+`omega(k) = sqrt(k^2 + m^2)`.
+
+**Algorithm:**
+1. Compute spatial FFT (`rfftn`) at each snapshot, producing complex
+   coefficients `phi_hat(k, t)`
+2. Apply temporal FFT to `phi_hat(k, t)` along the time axis, yielding
+   the 2D power spectrum `S(k, omega) = |FFT_t[phi_hat(k,t)]|^2`
+3. Radially bin `S(k, omega)` by `|k|`
+4. Detect dominant frequency per k-bin via `argmax`
+
+**Key insight:** The temporal FFT operates on *complex* spatial Fourier
+coefficients, not on amplitudes `|phi_hat|`. Using amplitudes (always
+positive) would produce frequency doubling: the temporal FFT of
+`|cos(omega*t)|` has a peak at `2*omega`, not `omega`.
+
+**Resolution limit:** The minimum resolvable frequency difference is the
+Rayleigh resolution `2*pi/T` where `T` is the simulation duration. Longer
+simulations improve frequency resolution.
+
+CLI: `tidal measure result.npz --what dispersion --source phi_0`
+
 ## Design Decisions
 
 ### Energy Floor (`_ENERGY_FLOOR = 1e-12`)
@@ -455,7 +526,12 @@ The NPZ file contains:
 | `compute_mixing_spectrum(conversion)` | `MixingSpectrum` | Temporal FFT of P(t) — all mixing frequencies |
 | `compute_spectrum(field, spacing, periodic)` | `SpectralSnapshot` | Radially-averaged power spectrum |
 | `compute_spectral_energy(field, momentum, m2, spacing, periodic)` | `(wavenumbers, energy)` | Per-mode energy `E(k)` |
+| `compute_spectral_conversion(data, source, target)` | `SpectralConversion` | Per-mode conversion `P(k,t) = E_target(k,t) / E_source(k,0)` |
+| `compute_group_spectral_conversion(data, source_fields, target_fields)` | `SpectralConversion` | Multi-field group spectral conversion |
 | `compute_mode_amplitudes(data, field_name)` | `(times, k, amplitudes)` | Track `|phi_hat(k)|` over time |
+| `compute_spectral_conversion(data, source, target)` | `SpectralConversion` | Per-mode conversion `P(k,t) = E_target(k,t) / E_source(k,0)` |
+| `compute_group_spectral_conversion(data, source_fields, target_fields)` | `SpectralConversion` | Multi-field group spectral conversion |
+| `compute_dispersion(data, field_name, min_amplitude=1e-12)` | `DispersionResult` | Dispersion relation `omega(k)` via spacetime FFT |
 | `check_energy_conservation(data, threshold)` | `EnergyDiagnostics` | Conservation check with threshold |
 | `summarize(data)` | `dict` | Full measurement summary |
 
@@ -472,12 +548,13 @@ All functions follow the project's fail-fast convention:
 - **Position-dependent coefficients:** Energy computation requires constant `m^2` and coupling coefficients. Spatially varying coefficients raise `ValueError`. Extending this requires evaluating position-dependent coefficients at each grid point during virial integration.
 - **Quadratic Lagrangians only:** The virial formula is exact for degree-2 potentials. Higher-order (nonlinear) Lagrangians would need explicit potential density integration.
 - **CLI integration:** `tidal measure result.npz --what conversion,mixing --source phi_0 --target chi_0` extracts measurements from the command line. The JSON spec is auto-discovered from NPZ metadata or provided via `--spec`. See `docs/source/cli.md` for full reference.
-- **Per-mode spectral conversion:** `P(k, t)` — tracking which Fourier modes participate in conversion — is planned for Phase 3.
-- **Plotting utilities:** Dedicated conversion curve and spectral waterfall plots are planned for Phase 5.
+- **Per-mode spectral conversion:** `P(k, t)` decomposes conversion into individual Fourier modes via `compute_spectral_conversion()` and `compute_group_spectral_conversion()`. For derivative-coupled systems (gradient/cross_derivative cross-field terms), the mixing angle `θ(k)` is k-dependent — different modes have different oscillation amplitudes, not just frequencies. CLI: `tidal measure result.npz --what spectral_conversion --source phi_0 --target chi_0`.
+- **Dispersion relation:** `omega(k)` via spacetime FFT. CLI: `tidal measure result.npz --what dispersion --source phi_0`. Resolution improves with longer `T` and finer `dt`.
+- **Plotting utilities:** The CLI plot (`--output plot.png`) auto-selects panels: dispersion > spectral conversion > spectrum in the [1,0] panel position.
 
 ## Tests
 
-75+ tests in `tests/test_measurement.py` and `tests/test_cli.py` covering:
+150+ tests in `tests/test_measurement.py` and `tests/test_cli.py` covering:
 
 - `SimulationData` construction from `MemoryStorage` and NPZ (including `from_npz_auto`)
 - Per-field and system energy computation with analytical validation

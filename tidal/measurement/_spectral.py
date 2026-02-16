@@ -109,12 +109,9 @@ def _radial_bin(
     bin_edges = np.linspace(0.0, k_max + dk, n_bins + 1)
     bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
 
-    binned = np.zeros(n_bins, dtype=np.float64)
     bin_indices = np.clip(np.digitize(k_mag.ravel(), bin_edges) - 1, 0, n_bins - 1)
     v_flat = values.ravel()
-    for b_idx in range(n_bins):
-        mask = bin_indices == b_idx
-        binned[b_idx] = float(v_flat[mask].sum())
+    binned = np.bincount(bin_indices, weights=v_flat, minlength=n_bins).astype(np.float64)
     return bin_centers, binned
 
 
@@ -192,12 +189,13 @@ def compute_spectral_energy(
     k_sq = sum(ki**2 for ki in k_grid)
 
     n_total = float(np.array(field_data.shape).prod())
-    energy_field = 0.5 * (k_sq + mass_squared) * np.abs(phi_hat) ** 2 / n_total
+    dv = float(np.array(grid_spacing).prod())
+    energy_field = 0.5 * (k_sq + mass_squared) * np.abs(phi_hat) ** 2 * dv / n_total
 
     if momentum_data is not None:
         _validate_array(momentum_data, "momentum_data")
         pi_hat = np.fft.rfftn(momentum_data)
-        energy_total = energy_field + 0.5 * np.abs(pi_hat) ** 2 / n_total
+        energy_total = energy_field + 0.5 * np.abs(pi_hat) ** 2 * dv / n_total
     else:
         energy_total = energy_field
 

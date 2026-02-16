@@ -114,6 +114,106 @@ def _plot_spectrum(ax: Axes, results: dict[str, Any]) -> None:
     ax.legend(fontsize=7)
 
 
+def _plot_spectral_conversion(ax: Axes, results: dict[str, Any]) -> None:
+    """[1,0] Per-mode spectral conversion P(k,t) heatmap."""
+    import numpy as np
+
+    if "spectral_conversion" not in results or "error" in results["spectral_conversion"]:
+        ax.text(
+            0.5, 0.5, "No spectral conversion data",
+            transform=ax.transAxes, ha="center",
+        )
+        return
+
+    sc = results["spectral_conversion"]
+    result = sc.get("_result_obj")
+    if result is None:
+        ax.text(
+            0.5, 0.5, "Spectral conversion data\n(detail not available)",
+            transform=ax.transAxes, ha="center", va="center",
+        )
+        return
+
+    # Create meshgrid for pcolormesh
+    times = result.times
+    wn = result.wavenumbers
+    prob = result.probability
+
+    # Only show active modes
+    active = result.active_modes
+    if not np.any(active):
+        ax.text(0.5, 0.5, "No active modes", transform=ax.transAxes, ha="center")
+        return
+
+    mesh = ax.pcolormesh(
+        wn, times, prob,
+        shading="nearest",
+        cmap="inferno",
+    )
+    ax.figure.colorbar(mesh, ax=ax, label=r"$P(k,t)$", pad=0.02)  # pyright: ignore[reportOptionalMemberAccess]
+
+    src = sc["source"]
+    tgt = sc["target"]
+    ax.set_xlabel(r"$|k|$")
+    ax.set_ylabel("Time")
+    ax.set_title(
+        f"Spectral Conversion ({', '.join(src)} -> {', '.join(tgt)})",
+        fontsize=10,
+    )
+
+
+def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:
+    """[1,0] Dispersion relation S(k, omega) heatmap with peak curve overlay."""
+    import numpy as np
+
+    if "dispersion" not in results or "error" in results["dispersion"]:
+        ax.text(
+            0.5, 0.5, "No dispersion data",
+            transform=ax.transAxes, ha="center",
+        )
+        return
+
+    disp = results["dispersion"]
+    result = disp.get("_result_obj")
+    if result is None:
+        ax.text(
+            0.5, 0.5, "Dispersion data\n(detail not available)",
+            transform=ax.transAxes, ha="center", va="center",
+        )
+        return
+
+    wn = result.wavenumbers
+    freqs = result.frequencies
+    power = result.power
+
+    if power.size == 0 or len(freqs) == 0:
+        ax.text(0.5, 0.5, "No frequency bins", transform=ax.transAxes, ha="center")
+        return
+
+    # Log-scale power for better visibility
+    log_power = np.log10(np.maximum(power, 1e-30))
+
+    mesh = ax.pcolormesh(
+        wn, freqs, log_power.T,
+        shading="nearest",
+        cmap="viridis",
+    )
+    ax.figure.colorbar(mesh, ax=ax, label=r"$\log_{10} S(k, \omega)$", pad=0.02)  # pyright: ignore[reportOptionalMemberAccess]
+
+    # Overlay peak dispersion curve (only active modes)
+    active = result.peak_frequencies > 0.0
+    if np.any(active):
+        ax.plot(
+            wn[active], result.peak_frequencies[active],
+            "w--", linewidth=1.5, alpha=0.9, label=r"$\omega(k)$ peak",
+        )
+        ax.legend(fontsize=8, loc="upper left")
+
+    ax.set_xlabel(r"$|k|$")
+    ax.set_ylabel(r"$\omega$ (rad/time)")
+    ax.set_title(f"Dispersion ({disp['field']})", fontsize=10)
+
+
 def _plot_mixing_spectrum(ax: Axes, results: dict[str, Any]) -> None:
     """[1,1] Mixing spectrum (temporal FFT of P(t))."""
     # Prefer cached spectrum from _run_mixing; fall back to recomputation
@@ -221,11 +321,16 @@ def save_measurement_plot(
     axes[0, 2].set_title("Energy Conservation")
     axes[0, 2].grid(visible=True, alpha=0.3)
 
-    # Row 1
-    _plot_spectrum(axes[1, 0], results)
-    axes[1, 0].set_xlabel(r"$|k|$")
-    axes[1, 0].set_ylabel(r"$|\hat{\phi}(k)|^2$")
-    axes[1, 0].set_title("Power Spectrum")
+    # Row 1 — priority: dispersion > spectral_conversion > spectrum
+    if "dispersion" in results and "error" not in results.get("dispersion", {}):
+        _plot_dispersion(axes[1, 0], results)
+    elif "spectral_conversion" in results and "error" not in results.get("spectral_conversion", {}):
+        _plot_spectral_conversion(axes[1, 0], results)
+    else:
+        _plot_spectrum(axes[1, 0], results)
+        axes[1, 0].set_xlabel(r"$|k|$")
+        axes[1, 0].set_ylabel(r"$|\hat{\phi}(k)|^2$")
+        axes[1, 0].set_title("Power Spectrum")
     axes[1, 0].grid(visible=True, alpha=0.3)
 
     _plot_mixing_spectrum(axes[1, 1], results)

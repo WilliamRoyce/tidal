@@ -18,6 +18,9 @@ from tidal.measurement._energy import (
     _resolve_mass_squared,  # pyright: ignore[reportPrivateUsage]
     compute_field_energy,
 )
+from tidal.measurement._utils import (
+    _normalize_group,  # pyright: ignore[reportPrivateUsage]
+)
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -162,15 +165,6 @@ def _group_energy_series(
     for f in field_group:
         total += _field_energy_series(data, f, _resolve_mass_squared(data, names.index(f)))
     return total
-
-
-def _normalize_group(
-    fields: str | Sequence[str],
-) -> tuple[str, ...]:
-    """Normalize a string or sequence to a tuple of field names."""
-    if isinstance(fields, str):
-        return (fields,)
-    return tuple(fields)
 
 
 def compute_group_conversion(

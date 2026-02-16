@@ -327,8 +327,13 @@ def _resolve_term_target(
     Returns
     -------
     NDArray or None
-        The field/momentum snapshot, or None if the target is a zero-momentum
-        constraint field or unresolvable.
+        The field/momentum snapshot, or ``None`` if the target is a
+        zero-momentum constraint field (expected case).
+
+    Raises
+    ------
+    ValueError
+        If *field_name* cannot be resolved to any known field or momentum.
     """
     # Direct field reference
     if field_name in data.fields:
@@ -339,18 +344,32 @@ def _resolve_term_target(
     if m is not None:
         idx = int(m.group(1))
         names = data.spec.component_names
-        if idx < len(names):
-            target_name = names[idx]
-            # Constraint field → zero momentum
-            eq = data.spec.equations[idx]
-            if eq.time_derivative_order == 0:
-                return None
-            mom = data.momenta.get(target_name)
-            if mom is not None:
-                return mom[t_idx]
-        return None
+        if idx >= len(names):
+            msg = (
+                f"Momentum reference '{field_name}' resolves to index {idx}, "
+                f"but spec only has {len(names)} fields: {names}"
+            )
+            raise ValueError(msg)
+        target_name = names[idx]
+        # Constraint field → zero momentum (expected None)
+        eq = data.spec.equations[idx]
+        if eq.time_derivative_order == 0:
+            return None
+        mom = data.momenta.get(target_name)
+        if mom is not None:
+            return mom[t_idx]
+        msg = (
+            f"Momentum reference '{field_name}' resolves to field "
+            f"'{target_name}', but no momentum data found"
+        )
+        raise ValueError(msg)
 
-    return None
+    msg = (
+        f"Unresolvable field reference '{field_name}' — "
+        f"not a known field ({list(data.fields.keys())}) "
+        f"or momentum pattern (pi_N)"
+    )
+    raise ValueError(msg)
 
 
 # ------------------------------------------------------------------

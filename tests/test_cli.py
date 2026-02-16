@@ -1542,6 +1542,194 @@ class TestMeasureCommand:
         # Conversion should also have been computed (as a dependency)
         assert "Conversion" in out
 
+    def test_measure_spectrum_individual(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--what=spectrum alone should compute power spectrum."""
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "spectrum",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Spectrum" in out
+        # Should NOT include conversion or mixing sections
+        assert "Conversion" not in out
+        assert "Mixing" not in out
+
+    def test_measure_combined_energy_conversion(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--what=energy,conversion should compute both but not mixing."""
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "energy,conversion",
+            "--source", "phi_0",
+            "--target", "chi_0",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Per-Field Energy" in out
+        assert "Conversion" in out
+        assert "Mixing" not in out
+
+    def test_measure_spectral_conversion_auto_target(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--source without --target should auto-select remaining dynamical fields."""
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "spectral_conversion",
+            "--source", "phi_0",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Spectral Conversion" in out
+
+    def test_measure_spectral_conversion(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--what=spectral_conversion should compute P(k,t)."""
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "spectral_conversion",
+            "--source", "phi_0",
+            "--target", "chi_0",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Spectral Conversion" in out
+        assert "Active k-modes:" in out
+
+    def test_measure_spectral_conversion_json(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--what=spectral_conversion --json should include spectral_conversion key."""
+        import json as json_mod
+
+        capsys.readouterr()  # flush
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "spectral_conversion",
+            "--source", "phi_0",
+            "--target", "chi_0",
+            "--json", "--quiet",
+        ])
+        assert ret == 0
+        data = json_mod.loads(capsys.readouterr().out)
+        assert "spectral_conversion" in data
+        assert data["spectral_conversion"]["n_active_modes"] > 0
+
+    def test_measure_spectral_conversion_requires_source(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+    ) -> None:
+        """--what=spectral_conversion without --source should error."""
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "spectral_conversion",
+        ])
+        assert ret == 1
+
+    def test_measure_spectral_conversion_plot(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        tmp_path: Path,
+    ) -> None:
+        """--what=spectral_conversion --output .png should create plot."""
+        output = tmp_path / "sc_plot.png"
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "spectral_conversion",
+            "--source", "phi_0",
+            "--target", "chi_0",
+            "--output", str(output),
+        ])
+        assert ret == 0
+        assert output.exists()
+        assert output.stat().st_size > 0
+
+    def test_measure_dispersion_text(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--what=dispersion should compute dispersion relation."""
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "dispersion",
+            "--source", "phi_0",
+        ])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "Dispersion" in out
+
+    def test_measure_dispersion_json(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--what=dispersion --json should include 'dispersion' key."""
+        import json as json_mod
+
+        capsys.readouterr()
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "dispersion",
+            "--source", "phi_0",
+            "--json", "--quiet",
+        ])
+        assert ret == 0
+        data = json_mod.loads(capsys.readouterr().out)
+        assert "dispersion" in data
+
+    def test_measure_dispersion_plot(
+        self,
+        coupled_scalars_npz: Path,
+        coupled_scalars_json: Path,
+        tmp_path: Path,
+    ) -> None:
+        """--what=dispersion --output .png should create plot."""
+        output = tmp_path / "disp_plot.png"
+        ret = main([
+            "measure", str(coupled_scalars_npz),
+            "--spec", str(coupled_scalars_json),
+            "--what", "dispersion",
+            "--source", "phi_0",
+            "--output", str(output),
+        ])
+        assert ret == 0
+        assert output.exists()
+        assert output.stat().st_size > 0
+
 
 class TestExceptionHandling:
     def test_value_error_shows_clean_message(self, capsys: pytest.CaptureFixture[str]) -> None:

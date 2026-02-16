@@ -33,6 +33,12 @@ from tidal.measurement._diagnostics import (
 from tidal.measurement._diagnostics import (
     summarize as summarize,
 )
+from tidal.measurement._dispersion import (
+    DispersionResult as DispersionResult,
+)
+from tidal.measurement._dispersion import (
+    compute_dispersion as compute_dispersion,
+)
 from tidal.measurement._energy import (
     FieldEnergy as FieldEnergy,
 )
@@ -76,25 +82,39 @@ from tidal.measurement._spectral import (
 from tidal.measurement._spectral import (
     compute_spectrum as compute_spectrum,
 )
+from tidal.measurement._spectral_conversion import (
+    SpectralConversion as SpectralConversion,
+)
+from tidal.measurement._spectral_conversion import (
+    compute_group_spectral_conversion as compute_group_spectral_conversion,
+)
+from tidal.measurement._spectral_conversion import (
+    compute_spectral_conversion as compute_spectral_conversion,
+)
 
 __all__ = [
     "ConversionResult",
+    "DispersionResult",
     "EnergyDiagnostics",
     "FieldEnergy",
     "MixingResult",
     "MixingSpectrum",
     "SimulationData",
+    "SpectralConversion",
     "SpectralPeak",
     "SpectralSnapshot",
     "SystemEnergy",
     "check_energy_conservation",
     "compute_conversion_probability",
+    "compute_dispersion",
     "compute_energy_timeseries",
     "compute_field_energy",
     "compute_group_conversion",
+    "compute_group_spectral_conversion",
     "compute_mixing_length",
     "compute_mixing_spectrum",
     "compute_mode_amplitudes",
+    "compute_spectral_conversion",
     "compute_spectral_energy",
     "compute_spectrum",
     "compute_system_energy",
