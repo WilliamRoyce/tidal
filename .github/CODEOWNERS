@@ -10,7 +10,6 @@
 
 # Python PDE builders and symbolic processing
 /tidal/symbolic/  @WilliamRoyce
-/tidal/kgsim/     @WilliamRoyce
 
 # Examples (physics demonstrations)
 /examples/                        @WilliamRoyce

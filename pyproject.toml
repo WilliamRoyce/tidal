@@ -131,9 +131,6 @@ unfixable = ["T201"]
     "S603",
 ]
 "docs/**/*" = ["INP001", "I002"]
-"tidal/kgsim/animation_builder.py" = [
-    "EXE002",
-] # Container permission issue
 
 [tool.ruff.lint.pylint]
 allow-dunder-method-names = [

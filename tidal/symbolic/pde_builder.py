@@ -27,7 +27,6 @@ from scipy import (  # type: ignore[reportMissingTypeStubs]
 from scipy.sparse.linalg import spsolve  # type: ignore[reportUnknownVariableType]
 from typing_extensions import override
 
-from tidal.kgsim.utils import infer_bc_from_grid
 from tidal.symbolic.json_loader import (
     _CUSTOM_OPERATORS,  # type: ignore[reportPrivateUsage]
     AXIS_LETTERS,
@@ -38,6 +37,7 @@ from tidal.symbolic.json_loader import (
     OperatorTerm,
     load_equation_system,
 )
+from tidal.utils import infer_bc_from_grid
 
 if TYPE_CHECKING:
     from collections.abc import Callable
