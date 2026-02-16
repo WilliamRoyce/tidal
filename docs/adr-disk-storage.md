@@ -162,9 +162,8 @@ data = SimulationData.from_directory(output_dir, spec)
 ### CLI Integration
 
 - `tidal simulate spec.json --output /tmp/results/` creates a snapshot directory (disk-backed, O(1) memory).
-- `tidal simulate spec.json --output data.npz` uses legacy in-memory path (backward compatible).
-- `tidal measure /tmp/results/ --spec spec.json` auto-detects directory vs NPZ format.
-- `SimulationData.load(path, spec)` is the universal entry point: directory or NPZ.
+- `tidal measure /tmp/results/ --spec spec.json` loads from the snapshot directory.
+- `SimulationData.load(path, spec)` is the universal entry point (directory only; NPZ support was removed).
 
 ### Crash Recovery
 

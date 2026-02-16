@@ -19,7 +19,7 @@ gravitational waves (and vice versa) in coupled field systems.
 
 All measurements operate on `SimulationData`, a uniform abstraction over
 the full time history of field and momentum arrays. Data can come from a
-live `MemoryStorage` (straight from the solver) or from a saved `.npz` file.
+live `MemoryStorage` (straight from the solver) or from a saved snapshot directory.
 
 ## Architecture
 
@@ -40,7 +40,7 @@ tidal/measurement/
 Data flows through the module as:
 
 ```
-MemoryStorage / NPZ file
+MemoryStorage / Snapshot directory
         |
         v
   SimulationData          <-- _io.py: extracts full time history
@@ -65,8 +65,8 @@ from tidal.measurement import (
 # From a live simulation
 data = SimulationData.from_storage(storage, spec, grid, parameters)
 
-# Or from a saved NPZ file (reads grid metadata automatically)
-data = SimulationData.from_npz_auto("output.npz", spec)
+# Or from a saved snapshot directory (memory-mapped, O(1) RAM)
+data = SimulationData.from_directory("output_dir", spec)
 
 # Measure wave conversion (primary Gertsenshtein observable)
 result = compute_conversion_probability(data, "phi_0", "chi_0")
@@ -113,8 +113,12 @@ Rabi oscillations where peak conversion may occur mid-simulation.
 **Constructors:**
 
 - `from_storage(storage, spec, grid, parameters)` — from live `MemoryStorage`
-- `from_npz(path, spec, grid_spacing, grid_bounds, periodic, parameters)` — from `.npz` with explicit grid parameters
-- `from_npz_auto(path, spec)` — from `.npz` with grid metadata and parameters read from the file
+- `from_directory(path, spec)` — from snapshot directory (memory-mapped, O(1) RAM)
+- `load(path, spec)` — universal entry point (delegates to `from_directory`)
+
+**Methods:**
+
+- `save(path)` — save to snapshot directory (inverse of `load()`)
 
 **Properties:** `n_snapshots`, `volume_element`, `dynamical_fields`
 
@@ -394,7 +398,7 @@ terms), the mixing angle `theta(k)` is k-dependent, so different modes have
 different oscillation amplitudes — not just different frequencies. The
 spectral conversion makes this k-dependence visible.
 
-CLI: `tidal measure result.npz --what spectral_conversion --source phi_0 --target chi_0`
+CLI: `tidal measure result_dir/ --what spectral_conversion --source phi_0 --target chi_0`
 
 ### Dispersion Relation
 
@@ -419,7 +423,7 @@ positive) would produce frequency doubling: the temporal FFT of
 Rayleigh resolution `2*pi/T` where `T` is the simulation duration. Longer
 simulations improve frequency resolution.
 
-CLI: `tidal measure result.npz --what dispersion --source phi_0`
+CLI: `tidal measure result_dir/ --what dispersion --source phi_0`
 
 ## Design Decisions
 
@@ -472,6 +476,19 @@ convention. This gives `(f[i+1] - f[i-1]) / (2dx)` for first
 derivatives and `(f[i+1] - 2f[i] + f[i-1]) / dx^2` for second
 derivatives, including at boundary cells where the ghost cell is implied.
 
+## Where Simulation Data Is Saved
+
+| Command | Persisted to disk? | Location |
+|---------|-------------------|----------|
+| `tidal simulate spec.json` | PNG plot only | `{spec_dir}/{stem}_output.png` |
+| `tidal simulate spec.json --no-plot` | Nothing | Text summary to stdout |
+| `tidal simulate spec.json --output mydir` | Snapshot directory | `mydir/` |
+| `tidal simulate spec.json --output plot.png` | PNG plot only | `plot.png` |
+
+Data is only saved to a snapshot directory when `--output` is a path without
+an image extension. The example `measure_conversion.py` scripts save to
+`examples/data/{name}_output/` using `create_snapshot_callback`.
+
 ## Integration with the CLI
 
 ### From a Live Simulation
@@ -485,31 +502,30 @@ data = ctx.to_simulation_data()
 result = compute_conversion_probability(data, "phi_0", "chi_0")
 ```
 
-### From a Saved NPZ File
+### From a Snapshot Directory
 
-`tidal simulate --output result.npz` saves field snapshots, momentum
-snapshots, grid metadata, and resolved parameters. Load it back:
+`tidal simulate --output result_dir` streams field snapshots to disk
+via `SnapshotWriter` (O(1) memory). Load it back with memory-mapped
+arrays:
 
 ```python
 from tidal.measurement import SimulationData
 from tidal.symbolic.json_loader import load_equation_system
 
 spec = load_equation_system("examples/data/coupled_scalars.json")
-data = SimulationData.from_npz_auto("result.npz", spec)
+data = SimulationData.from_directory("result_dir", spec)
+# Or equivalently:
+data = SimulationData.load("result_dir", spec)
 ```
 
-The NPZ file contains:
+The directory contains:
 
-| Key Pattern | Content |
-|-------------|---------|
-| `times` | Snapshot time values |
-| `{name}_t{idx}` | Field snapshot (e.g., `phi_0_t0`) |
-| `pi_{name}_t{idx}` | Momentum snapshot (e.g., `pi_phi_0_t0`) |
-| `grid_spacing` | Cell sizes per axis |
-| `grid_bounds` | Domain bounds per axis |
-| `grid_periodic` | Per-axis periodicity flags |
-| `_param_names` | Parameter name array |
-| `_param_values` | Parameter value array |
+| File | Content |
+|------|---------|
+| `metadata.json` | Grid shape, spacing, bounds, parameters, field list |
+| `times.npy` | Snapshot time values, shape `(n_snapshots,)` |
+| `{name}.npy` | Field snapshots, shape `(n_snapshots, *grid_shape)` |
+| `pi_{name}.npy` | Momentum snapshots, shape `(n_snapshots, *grid_shape)` |
 
 ## API Reference
 
@@ -529,10 +545,10 @@ The NPZ file contains:
 | `compute_spectral_conversion(data, source, target)` | `SpectralConversion` | Per-mode conversion `P(k,t) = E_target(k,t) / E_source(k,0)` |
 | `compute_group_spectral_conversion(data, source_fields, target_fields)` | `SpectralConversion` | Multi-field group spectral conversion |
 | `compute_mode_amplitudes(data, field_name)` | `(times, k, amplitudes)` | Track `|phi_hat(k)|` over time |
-| `compute_spectral_conversion(data, source, target)` | `SpectralConversion` | Per-mode conversion `P(k,t) = E_target(k,t) / E_source(k,0)` |
-| `compute_group_spectral_conversion(data, source_fields, target_fields)` | `SpectralConversion` | Multi-field group spectral conversion |
 | `compute_dispersion(data, field_name, min_amplitude=1e-12)` | `DispersionResult` | Dispersion relation `omega(k)` via spacetime FFT |
 | `check_energy_conservation(data, threshold)` | `EnergyDiagnostics` | Conservation check with threshold |
+| `create_snapshot_callback(output_dir, spec, grid, ...)` | `(SnapshotWriter, callback)` | Create disk-backed snapshot callback for simulation |
+| `compute_snapshot_count(t_end, snapshot_interval)` | `int` | Exact snapshot count (includes t=0) |
 | `summarize(data)` | `dict` | Full measurement summary |
 
 ### Error Handling
@@ -540,23 +556,23 @@ The NPZ file contains:
 All functions follow the project's fail-fast convention:
 
 - `ValueError` for invalid field names, zero source energy, position-dependent coefficients, NaN/Inf data, out-of-range indices, non-positive thresholds
-- `FileNotFoundError` for missing NPZ files
+- `FileNotFoundError` for missing snapshot directories
 
 ## Limitations and Future Work
 
 - **Dirichlet BCs + cross_derivative operators:** The continuous cross-derivative IS self-adjoint with Dirichlet BCs, but the discrete ghost-cell stencil breaks this symmetry at boundary cells, causing ~30% energy drift. With periodic BCs the discrete stencil is exactly antisymmetric and energy conserves to ~1e-10. All examples now use periodic BCs. For users who need Dirichlet BCs with `cross_derivative` operators, see [HAMILTONIAN.md](HAMILTONIAN.md) Section 7, item 5 for the full analysis and SBP as a future remedy.
 - **Position-dependent coefficients:** Energy computation requires constant `m^2` and coupling coefficients. Spatially varying coefficients raise `ValueError`. Extending this requires evaluating position-dependent coefficients at each grid point during virial integration.
 - **Quadratic Lagrangians only:** The virial formula is exact for degree-2 potentials. Higher-order (nonlinear) Lagrangians would need explicit potential density integration.
-- **CLI integration:** `tidal measure result.npz --what conversion,mixing --source phi_0 --target chi_0` extracts measurements from the command line. The JSON spec is auto-discovered from NPZ metadata or provided via `--spec`. See `docs/source/cli.md` for full reference.
-- **Per-mode spectral conversion:** `P(k, t)` decomposes conversion into individual Fourier modes via `compute_spectral_conversion()` and `compute_group_spectral_conversion()`. For derivative-coupled systems (gradient/cross_derivative cross-field terms), the mixing angle `θ(k)` is k-dependent — different modes have different oscillation amplitudes, not just frequencies. CLI: `tidal measure result.npz --what spectral_conversion --source phi_0 --target chi_0`.
-- **Dispersion relation:** `omega(k)` via spacetime FFT. CLI: `tidal measure result.npz --what dispersion --source phi_0`. Resolution improves with longer `T` and finer `dt`.
+- **CLI integration:** `tidal measure result_dir/ --what conversion,mixing --source phi_0 --target chi_0` extracts measurements from the command line. The JSON spec is auto-discovered from `metadata.json` or provided via `--spec`. See `docs/source/cli.md` for full reference.
+- **Per-mode spectral conversion:** `P(k, t)` decomposes conversion into individual Fourier modes via `compute_spectral_conversion()` and `compute_group_spectral_conversion()`. For derivative-coupled systems (gradient/cross_derivative cross-field terms), the mixing angle `θ(k)` is k-dependent — different modes have different oscillation amplitudes, not just frequencies. CLI: `tidal measure result_dir/ --what spectral_conversion --source phi_0 --target chi_0`.
+- **Dispersion relation:** `omega(k)` via spacetime FFT. CLI: `tidal measure result_dir/ --what dispersion --source phi_0`. Resolution improves with longer `T` and finer `dt`.
 - **Plotting utilities:** The CLI plot (`--output plot.png`) auto-selects panels: dispersion > spectral conversion > spectrum in the [1,0] panel position.
 
 ## Tests
 
 150+ tests in `tests/test_measurement.py` and `tests/test_cli.py` covering:
 
-- `SimulationData` construction from `MemoryStorage` and NPZ (including `from_npz_auto`)
+- `SimulationData` construction from `MemoryStorage` and snapshot directories
 - Per-field and system energy computation with analytical validation
 - Rabi oscillation: pointwise comparison against exact analytical `P(t)` curve
 - Energy conservation for exact coupled-oscillator data

@@ -58,7 +58,7 @@ tidal simulate examples/data/chern_simons.json --mode constraint
 | `--param KEY=VALUE` | Override symbolic coefficient | (from JSON) |
 | `--t-end FLOAT` | Simulation end time | 10.0 |
 | `--dt FLOAT` | Time step | 0.01 |
-| `--grid-size INT` | Grid points per axis | 128 |
+| `--grid-shape INT` | Grid points per axis | 128 |
 | `--ic {gaussian,plane-wave,zero,formula}` | Initial condition preset | gaussian |
 | `--ic-width FLOAT` | Gaussian pulse width | 5.0 |
 | `--ic-formula EXPR` | Custom IC formula (Python expression) | — |
@@ -66,7 +66,7 @@ tidal simulate examples/data/chern_simons.json --mode constraint
 | `--scheme {scipy,runge-kutta}` | Solver scheme | runge-kutta |
 | `--mode {evolution,constraint}` | Simulation mode | evolution |
 | `--plot` / `--no-plot` | Enable/disable plotting | --plot |
-| `--output PATH` | Output file path | — |
+| `--output PATH` | Output path (directory for snapshot data; image extension for plot-only) | — |
 
 ### `tidal inspect` — Display equation system info
 
@@ -99,41 +99,41 @@ tidal validate examples/data/klein_gordon_1d.json --json
 
 ### `tidal measure` — Extract physics measurements
 
-Loads an NPZ file produced by `tidal simulate --output` and runs measurement analyses:
+Loads a snapshot directory produced by `tidal simulate --output <dir>` and runs measurement analyses:
 energy decomposition, conversion probability, mixing length, spectral analysis, and conservation diagnostics.
 
 ```bash
 # Full summary (energy + conservation + auto-detect conversion + mixing)
-tidal measure result.npz --spec spec.json
+tidal measure result_dir/ --spec spec.json
 
 # Specific measurements
-tidal measure result.npz --what conversion,mixing \
+tidal measure result_dir/ --what conversion,mixing \
     --source phi_0 --target chi_0
 
 # JSON output for scripting
-tidal measure result.npz --what energy,conservation --json
+tidal measure result_dir/ --what energy,conservation --json
 
 # Save 2x3 measurement plot
-tidal measure result.npz --output measurements.png
+tidal measure result_dir/ --output measurements.png
 ```
 
-The JSON spec can be auto-discovered from NPZ metadata (stored by `tidal simulate`) or provided explicitly via `--spec`.
+The JSON spec can be auto-discovered from `metadata.json` in the snapshot directory (stored by `tidal simulate`) or provided explicitly via `--spec`.
 
 **Options:**
 
 | Flag | Description | Default |
 |------|-------------|---------|
-| `--spec PATH` | JSON equation specification | (auto-discovered from NPZ) |
+| `--spec PATH` | JSON equation specification | (auto-discovered from metadata.json) |
 | `--what TYPES` | Measurement types (comma-separated) | summary |
 | `--source FIELDS` | Source field(s) for conversion (comma-separated) | (auto-detect) |
 | `--target FIELDS` | Target field(s) for conversion (comma-separated) | (auto-detect) |
-| `--param KEY=VALUE` | Override parameter from NPZ | (from NPZ) |
+| `--param KEY=VALUE` | Override parameter from metadata.json | (from metadata.json) |
 | `--energy-threshold T` | Conservation threshold | 1e-3 |
 | `--output PATH` | Save plot (.png/.pdf) | — |
 | `--json` | JSON output instead of text | — |
 | `--quiet` | Suppress progress messages | — |
 
-**Available measurement types:** `summary`, `energy`, `conversion`, `mixing`, `spectrum`, `conservation`.
+**Available measurement types:** `summary`, `energy`, `conversion`, `mixing`, `spectrum`, `spectral_conversion`, `dispersion`, `conservation`.
 
 ## TOML Configuration (`theory.toml`)
 
@@ -265,16 +265,16 @@ Available types: `periodic`, `neumann`, `dirichlet`.
 # 1. Derive equations from a Lagrangian
 tidal derive examples/coupled_scalars/theory.toml --run
 
-# 2. Simulate and save NPZ output
+# 2. Simulate and save to snapshot directory
 tidal simulate examples/data/coupled_scalars.json \
     --param mPhi2=1.0 --param mChi2=4.0 --param gCpl=0.5 \
-    --t-end 20.0 --output coupled_scalars.npz
+    --t-end 20.0 --output coupled_scalars_output
 
 # 3. Extract measurements: conversion probability and mixing length
-tidal measure coupled_scalars.npz \
+tidal measure coupled_scalars_output/ \
     --what conversion,mixing \
     --source phi_0 --target chi_0
 
 # 4. Save measurement plot
-tidal measure coupled_scalars.npz --output measurements.png
+tidal measure coupled_scalars_output/ --output measurements.png
 ```
