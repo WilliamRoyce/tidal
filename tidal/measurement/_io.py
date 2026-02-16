@@ -375,7 +375,15 @@ class SimulationData:
             raise FileNotFoundError(msg)
 
         metadata_path = p / "metadata.json"
-        if not metadata_path.exists():
+        metadata: dict[str, object] = {}
+        if metadata_path.exists():
+            try:
+                raw = metadata_path.read_text()
+                metadata = json.loads(raw)
+            except (json.JSONDecodeError, UnicodeDecodeError):
+                # Corrupt metadata (e.g. truncated write) — fall through
+                metadata = {}
+        if not metadata:
             # Crash recovery: infer snapshot count from times.npy size
             times_path = p / "times.npy"
             if not times_path.exists():
@@ -383,9 +391,9 @@ class SimulationData:
                 raise ValueError(msg)
             times_arr = np.load(str(times_path), mmap_mode="r")
             # Find actual count: last non-zero time (or all if first is 0.0)
-            n = _infer_snapshot_count(times_arr)
-            metadata: dict[str, object] = {
-                "n_snapshots": n,
+            n_recovered = _infer_snapshot_count(times_arr)
+            metadata = {
+                "n_snapshots": n_recovered,
                 "fields": list(spec.component_names),
                 "momenta": [
                     eq.field_name
@@ -393,9 +401,6 @@ class SimulationData:
                     if eq.time_derivative_order >= 2  # noqa: PLR2004
                 ],
             }
-        else:
-            raw = metadata_path.read_text()
-            metadata = json.loads(raw)
 
         n = int(metadata["n_snapshots"])  # type: ignore[arg-type]
 
@@ -508,7 +513,8 @@ def _infer_snapshot_count(times_arr: NDArray[np.float64]) -> int:
     # entries are 0.0 from memmap pre-allocation.  Find the last
     # non-zero entry.
     for i in range(n - 1, 0, -1):
-        if float(times_arr[i]) != 0.0:
+        t = float(times_arr[i])
+        if t != 0.0 and np.isfinite(t):
             return i + 1
     # Only t=0 was written
     return 1

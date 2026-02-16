@@ -540,14 +540,20 @@ def _generate_output(args: Namespace, ctx: PlotContext) -> None:
     """
     fmt = _infer_output_format(args)
 
+    if fmt in {"summary", "directory"}:
+        # Directory/summary: data already on disk; print summary if storage
+        # captured at least one snapshot (may be empty if solver overshot).
+        if len(ctx.storage) > 0:
+            final = cast("FieldCollection", ctx.storage[-1])
+            times = list(ctx.storage.times)
+            _print_summary(ctx.spec, ctx.initial_state, final, times, ctx.params)
+        return
+
     final = cast("FieldCollection", ctx.storage[-1])
     times = list(ctx.storage.times)
 
     # Always print summary
     _print_summary(ctx.spec, ctx.initial_state, final, times, ctx.params)
-
-    if fmt in {"summary", "directory"}:
-        return
 
     # Determine output path (default: next to JSON spec file)
     if args.output is not None:

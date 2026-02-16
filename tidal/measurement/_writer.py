@@ -36,6 +36,10 @@ _FORMAT_VERSION = 1
 
 _DEFAULT_DTYPE: np.dtype[np.float64] = np.dtype(np.float64)
 
+# Flush mmaps every N snapshots for crash resilience.
+# Higher values improve I/O performance; lower values reduce data loss on crash.
+_DEFAULT_FLUSH_INTERVAL = 10
+
 
 def _open_memmap(
     path: Path,
@@ -104,6 +108,7 @@ class SnapshotWriter:
         periodic: tuple[bool, ...],
         parameters: dict[str, float] | None = None,
         spec_path: Path | None = None,
+        flush_interval: int = _DEFAULT_FLUSH_INTERVAL,
     ) -> None:
         if n_snapshots < 1:
             msg = f"n_snapshots must be >= 1, got {n_snapshots}"
@@ -113,7 +118,19 @@ class SnapshotWriter:
             raise ValueError(msg)
 
         self._output_dir = Path(output_dir)
+        if self._output_dir.exists() and not self._output_dir.is_dir():
+            msg = f"Output path exists but is not a directory: {self._output_dir}"
+            raise ValueError(msg)
         self._output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Remove stale .npy / metadata files from a previous run
+        existing_npy = list(self._output_dir.glob("*.npy"))
+        stale_meta = self._output_dir / "metadata.json"
+        if existing_npy or stale_meta.exists():
+            for f in existing_npy:
+                f.unlink()
+            if stale_meta.exists():
+                stale_meta.unlink()
 
         self._n_snapshots = n_snapshots
         self._grid_shape = grid_shape
@@ -126,6 +143,7 @@ class SnapshotWriter:
         self._spec_path = spec_path
         self._count = 0
         self._closed = False
+        self._flush_interval = max(flush_interval, 1)
 
         # Pre-allocate times
         self._times_mmap = _open_memmap(
@@ -158,7 +176,7 @@ class SnapshotWriter:
     # Public API
     # ------------------------------------------------------------------
 
-    def append(
+    def append(  # noqa: C901
         self,
         t: float,
         fields: dict[str, NDArray[np.float64]],
@@ -178,7 +196,9 @@ class SnapshotWriter:
         Raises
         ------
         ValueError
-            If the writer is closed or the snapshot count is exceeded.
+            If the writer is closed, the snapshot count is exceeded,
+            the time is non-finite or non-monotonic, or a field/momentum
+            array has the wrong shape.
         """
         if self._closed:
             msg = "SnapshotWriter is already closed"
@@ -190,6 +210,20 @@ class SnapshotWriter:
             )
             raise ValueError(msg)
 
+        # Validate time
+        if not np.isfinite(t):
+            msg = f"Time must be finite, got {t}"
+            raise ValueError(msg)
+        if self._count > 0:
+            prev_t = float(self._times_mmap[self._count - 1])
+            if t < prev_t:
+                msg = (
+                    f"Times must be non-decreasing: "
+                    f"snapshot {self._count - 1} at t={prev_t}, "
+                    f"snapshot {self._count} at t={t}"
+                )
+                raise ValueError(msg)
+
         idx = self._count
         self._times_mmap[idx] = t
 
@@ -197,18 +231,33 @@ class SnapshotWriter:
             if name not in fields:
                 msg = f"Missing field '{name}' in snapshot {idx}"
                 raise ValueError(msg)
-            self._field_mmaps[name][idx] = fields[name]
+            arr = fields[name]
+            if arr.shape != self._grid_shape:
+                msg = (
+                    f"Field '{name}' has shape {arr.shape}, "
+                    f"expected {self._grid_shape}"
+                )
+                raise ValueError(msg)
+            self._field_mmaps[name][idx] = arr
 
         for name in self._momentum_names:
             if name not in momenta:
                 msg = f"Missing momentum '{name}' in snapshot {idx}"
                 raise ValueError(msg)
-            self._momentum_mmaps[name][idx] = momenta[name]
+            arr = momenta[name]
+            if arr.shape != self._grid_shape:
+                msg = (
+                    f"Momentum '{name}' has shape {arr.shape}, "
+                    f"expected {self._grid_shape}"
+                )
+                raise ValueError(msg)
+            self._momentum_mmaps[name][idx] = arr
 
         self._count += 1
 
-        # Flush mmaps periodically for crash resilience
-        self._flush_mmaps()
+        # Flush periodically for crash resilience (every _flush_interval snapshots)
+        if self._count % self._flush_interval == 0:
+            self._flush_mmaps()
 
     @property
     def count(self) -> int:
@@ -267,7 +316,10 @@ class SnapshotWriter:
             metadata["spec_path"] = str(self._spec_path)
 
         metadata_path = self._output_dir / "metadata.json"
-        metadata_path.write_text(json.dumps(metadata, indent=2) + "\n")
+        # Atomic write: temp file + rename to avoid corrupt JSON on crash
+        temp_path = self._output_dir / "metadata.json.tmp"
+        temp_path.write_text(json.dumps(metadata, indent=2) + "\n")
+        temp_path.replace(metadata_path)
 
         self._closed = True
 

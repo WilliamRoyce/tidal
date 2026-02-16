@@ -2523,3 +2523,345 @@ class TestComputeSnapshotCount:
     def test_negative_interval_raises(self) -> None:
         with pytest.raises(ValueError, match="snapshot_interval must be positive"):
             compute_snapshot_count(10.0, -1.0)
+
+
+# ============================================================
+# Group 12b — Review hardening: validation, recovery, integration
+# ============================================================
+
+
+class TestSnapshotWriterValidation:
+    """Tests for input validation added in critical review."""
+
+    def test_nan_time_raises(self, tmp_path: Path) -> None:
+        """NaN time raises ValueError."""
+        output_dir = tmp_path / "nan_t"
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=2,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        )
+        with pytest.raises(ValueError, match="Time must be finite"):
+            writer.append(float("nan"), {"phi_0": np.zeros(4)}, {})
+        writer.close()
+
+    def test_inf_time_raises(self, tmp_path: Path) -> None:
+        """Infinite time raises ValueError."""
+        output_dir = tmp_path / "inf_t"
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=2,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        )
+        with pytest.raises(ValueError, match="Time must be finite"):
+            writer.append(float("inf"), {"phi_0": np.zeros(4)}, {})
+        writer.close()
+
+    def test_out_of_order_time_raises(self, tmp_path: Path) -> None:
+        """Decreasing time raises ValueError."""
+        output_dir = tmp_path / "order_t"
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=3,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        )
+        writer.append(0.0, {"phi_0": np.zeros(4)}, {})
+        writer.append(1.0, {"phi_0": np.zeros(4)}, {})
+        with pytest.raises(ValueError, match="non-decreasing"):
+            writer.append(0.5, {"phi_0": np.zeros(4)}, {})
+        writer.close()
+
+    def test_equal_times_allowed(self, tmp_path: Path) -> None:
+        """Equal consecutive times are allowed (non-decreasing, not strictly increasing)."""
+        output_dir = tmp_path / "equal_t"
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=2,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        )
+        writer.append(0.0, {"phi_0": np.zeros(4)}, {})
+        writer.append(0.0, {"phi_0": np.zeros(4)}, {})  # Should not raise
+        writer.close()
+
+    def test_wrong_field_shape_raises(self, tmp_path: Path) -> None:
+        """Field with wrong shape raises ValueError."""
+        output_dir = tmp_path / "shape_f"
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=1,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        )
+        with pytest.raises(ValueError, match="Field 'phi_0' has shape"):
+            writer.append(0.0, {"phi_0": np.zeros(8)}, {})
+        writer.close()
+
+    def test_wrong_momentum_shape_raises(self, tmp_path: Path) -> None:
+        """Momentum with wrong shape raises ValueError."""
+        output_dir = tmp_path / "shape_m"
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0"],
+            momentum_names=["phi_0"],
+            grid_shape=(4,),
+            n_snapshots=1,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        )
+        with pytest.raises(ValueError, match="Momentum 'phi_0' has shape"):
+            writer.append(0.0, {"phi_0": np.zeros(4)}, {"phi_0": np.zeros(8)})
+        writer.close()
+
+    def test_output_path_is_file_raises(self, tmp_path: Path) -> None:
+        """SnapshotWriter raises if output path is an existing file."""
+        file_path = tmp_path / "not_a_dir"
+        file_path.write_text("oops")
+        with pytest.raises(ValueError, match="not a directory"):
+            SnapshotWriter(
+                output_dir=file_path,
+                field_names=["phi_0"],
+                momentum_names=[],
+                grid_shape=(4,),
+                n_snapshots=1,
+                grid_spacing=(1.0,),
+                grid_bounds=((0.0, 4.0),),
+                periodic=(False,),
+            )
+
+    def test_stale_files_cleaned(self, tmp_path: Path) -> None:
+        """Re-using an output directory removes stale .npy files."""
+        output_dir = tmp_path / "reuse"
+
+        # First run with phi_0 and chi_0
+        with SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=1,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        ) as w1:
+            w1.append(0.0, {"phi_0": np.zeros(4), "chi_0": np.ones(4)}, {})
+
+        assert (output_dir / "chi_0.npy").exists()
+
+        # Second run with only phi_0
+        with SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0"],
+            momentum_names=[],
+            grid_shape=(4,),
+            n_snapshots=1,
+            grid_spacing=(1.0,),
+            grid_bounds=((0.0, 4.0),),
+            periodic=(False,),
+        ) as w2:
+            w2.append(0.0, {"phi_0": np.zeros(4)}, {})
+
+        # Stale chi_0.npy should be gone
+        assert not (output_dir / "chi_0.npy").exists()
+        assert (output_dir / "phi_0.npy").exists()
+
+    def test_3d_grid_round_trip(self, tmp_path: Path) -> None:
+        """Round-trip with a 3D grid shape."""
+        spec = _build_coupled_scalars_spec()
+        output_dir = tmp_path / "grid3d"
+        grid_shape = (4, 4, 4)
+        n_snapshots = 2
+
+        rng = np.random.default_rng(321)
+        expected = rng.standard_normal((n_snapshots, *grid_shape))
+
+        with SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=["phi_0", "chi_0"],
+            grid_shape=grid_shape,
+            n_snapshots=n_snapshots,
+            grid_spacing=(1.0, 1.0, 1.0),
+            grid_bounds=((0.0, 4.0), (0.0, 4.0), (0.0, 4.0)),
+            periodic=(True, True, True),
+        ) as writer:
+            for i in range(n_snapshots):
+                writer.append(
+                    float(i),
+                    {"phi_0": expected[i], "chi_0": np.zeros(grid_shape)},
+                    {"phi_0": np.zeros(grid_shape), "chi_0": np.zeros(grid_shape)},
+                )
+
+        data = SimulationData.from_directory(output_dir, spec)
+        np.testing.assert_allclose(data.fields["phi_0"], expected)
+
+
+class TestCrashRecoveryHardened:
+    """Tests for crash recovery edge cases."""
+
+    def test_recovery_with_nan_times(self, tmp_path: Path) -> None:
+        """Recovery skips NaN entries in times array."""
+        spec = _build_coupled_scalars_spec()
+        output_dir = tmp_path / "nan_recovery"
+        n_grid = 4
+
+        writer = SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=["phi_0", "chi_0"],
+            grid_shape=(n_grid,),
+            n_snapshots=10,
+            grid_spacing=(2.5,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            flush_interval=1,
+        )
+        # Write 3 valid snapshots
+        for i in range(3):
+            writer.append(
+                float(i) + 0.1,
+                {"phi_0": np.full(n_grid, float(i)), "chi_0": np.zeros(n_grid)},
+                {"phi_0": np.zeros(n_grid), "chi_0": np.zeros(n_grid)},
+            )
+        writer._flush_mmaps()  # pyright: ignore[reportPrivateUsage]
+
+        # Corrupt entry 3 with NaN (simulating partial write)
+        times_mmap = np.load(
+            str(output_dir / "times.npy"), mmap_mode="r+",
+        )
+        times_mmap[3] = float("nan")
+        times_mmap.flush()
+
+        # Remove metadata.json to force recovery
+        meta_path = output_dir / "metadata.json"
+        if meta_path.exists():
+            meta_path.unlink()
+
+        data = SimulationData.from_directory(output_dir, spec)
+        # Should recover 3 valid snapshots, not 4 (NaN skipped)
+        assert data.n_snapshots == 3
+
+    def test_recovery_with_corrupt_json(self, tmp_path: Path) -> None:
+        """Recovery works when metadata.json is truncated/corrupt."""
+        spec = _build_coupled_scalars_spec()
+        output_dir = tmp_path / "corrupt_json"
+        n_grid = 4
+
+        with SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=["phi_0", "chi_0"],
+            grid_shape=(n_grid,),
+            n_snapshots=3,
+            grid_spacing=(2.5,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+        ) as writer:
+            for i in range(3):
+                writer.append(
+                    float(i) + 0.1,
+                    {"phi_0": np.full(n_grid, float(i)), "chi_0": np.zeros(n_grid)},
+                    {"phi_0": np.zeros(n_grid), "chi_0": np.zeros(n_grid)},
+                )
+
+        # Corrupt metadata.json
+        meta_path = output_dir / "metadata.json"
+        meta_path.write_text('{"n_snapshots": 3, "fields": [')  # Truncated JSON
+
+        data = SimulationData.from_directory(output_dir, spec)
+        assert data.n_snapshots == 3
+        np.testing.assert_allclose(data.fields["phi_0"][1], np.full(n_grid, 1.0))
+
+
+class TestMemmapMeasurementIntegration:
+    """Test that measurement functions work on memmap-backed SimulationData."""
+
+    def test_energy_from_directory(self, tmp_path: Path) -> None:
+        """compute_field_energy works on memmap data from from_directory."""
+        # Build reference data in memory
+        data_mem = _make_sim_data_two_fields(n_grid=16, n_snapshots=5)
+
+        # Write to directory
+        output_dir = tmp_path / "energy_int"
+        with SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=["phi_0", "chi_0"],
+            grid_shape=(16,),
+            n_snapshots=5,
+            grid_spacing=data_mem.grid_spacing,
+            grid_bounds=data_mem.grid_bounds,
+            periodic=data_mem.periodic,
+            parameters=data_mem.parameters,
+        ) as writer:
+            for t_idx in range(data_mem.n_snapshots):
+                writer.append(
+                    float(data_mem.times[t_idx]),
+                    {n: data_mem.fields[n][t_idx] for n in data_mem.fields},
+                    {n: data_mem.momenta[n][t_idx] for n in data_mem.momenta},
+                )
+
+        # Load from directory (memmap)
+        data_dir = SimulationData.from_directory(output_dir, data_mem.spec)
+
+        # Compute system energy on both
+        energy_mem = compute_system_energy(data_mem, 0)
+        energy_dir = compute_system_energy(data_dir, 0)
+
+        np.testing.assert_allclose(energy_dir.total, energy_mem.total, rtol=1e-12)
+
+    def test_conversion_from_directory(self, tmp_path: Path) -> None:
+        """compute_conversion_probability works on memmap data."""
+        data_mem = _make_sim_data_two_fields(n_grid=16, n_snapshots=11)
+
+        output_dir = tmp_path / "conv_int"
+        with SnapshotWriter(
+            output_dir=output_dir,
+            field_names=["phi_0", "chi_0"],
+            momentum_names=["phi_0", "chi_0"],
+            grid_shape=(16,),
+            n_snapshots=11,
+            grid_spacing=data_mem.grid_spacing,
+            grid_bounds=data_mem.grid_bounds,
+            periodic=data_mem.periodic,
+            parameters=data_mem.parameters,
+        ) as writer:
+            for t_idx in range(data_mem.n_snapshots):
+                writer.append(
+                    float(data_mem.times[t_idx]),
+                    {n: data_mem.fields[n][t_idx] for n in data_mem.fields},
+                    {n: data_mem.momenta[n][t_idx] for n in data_mem.momenta},
+                )
+
+        data_dir = SimulationData.from_directory(output_dir, data_mem.spec)
+
+        result_mem = compute_conversion_probability(data_mem, "phi_0", "chi_0")
+        result_dir = compute_conversion_probability(data_dir, "phi_0", "chi_0")
+
+        np.testing.assert_allclose(
+            result_dir.probability, result_mem.probability, rtol=1e-12,
+        )
