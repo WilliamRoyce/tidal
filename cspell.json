@@ -198,6 +198,7 @@
     "HWHM",
     "kvec",
     "mmaps",
+    "mydir",
     "pcolormesh",
     "pytest",
     "pyright",
