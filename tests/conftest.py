@@ -256,15 +256,18 @@ def inline_constraint_json(tmp_path_factory: pytest.TempPathFactory) -> Path:
 # ==================== Directory Fixtures for tidal measure ====================
 
 
-@pytest.fixture
-def coupled_scalars_dir(inline_coupled_scalars_json: Path, tmp_path: Path) -> Path:
+@pytest.fixture(scope="session")
+def coupled_scalars_dir(
+    inline_coupled_scalars_json: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Path:
     """Run a short coupled_scalars simulation and save to directory for measurement tests.
 
     Returns the path to the generated snapshot directory.
     """
     from tidal.cli import main
 
-    output = tmp_path / "coupled_scalars_out"
+    output = tmp_path_factory.mktemp("measure") / "coupled_scalars_out"
     ret = main([
         "simulate", str(inline_coupled_scalars_json),
         "--param", "mPhi2=1.0",
