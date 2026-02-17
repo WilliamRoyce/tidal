@@ -187,6 +187,93 @@ def _validate_derived_fields(config: dict[str, Any]) -> None:
             raise ValueError(msg)
 
 
+def _expected_component_count(field: dict[str, Any], dim: int) -> int:
+    """Return the expected number of components for a field given spacetime dimension."""
+    ftype = field["type"]
+    if ftype == "scalar":
+        return 1
+    if ftype == "vector":
+        return dim
+    # Tensor: dim^rank (full, no symmetry reduction for component values)
+    rank = field.get("rank", 2)
+    return dim**rank
+
+
+def _validate_background_fields(config: dict[str, Any]) -> None:
+    """Validate optional ``[[background_fields]]`` entries.
+
+    Background fields are non-dynamical tensors that appear in the Lagrangian
+    but are NOT varied in the Euler-Lagrange derivation.  They survive as
+    (possibly position-dependent) coefficients in the equations of motion.
+
+    Each entry must have a ``components`` key specifying component values:
+    - scalar: ``components = ["B0val"]`` (1 element)
+    - vector: ``components = [0, 0, "B0val"]`` (dim elements)
+
+    Component values can be numbers (0, 1.0) or symbolic Wolfram expressions
+    (``"B0val"``, ``"B0val * Sin[2*Pi*x[]/L]"``).  Constants used in
+    expressions must be declared in ``[constants]``.
+
+    Raises
+    ------
+    ValueError
+        If a background field has invalid type/rank/symmetry, missing
+        components, wrong component count, or name collision.
+    TypeError
+        If ``components`` is not a list or contains non-numeric/non-string values.
+    """
+    bg_fields = config.get("background_fields", [])
+    if not bg_fields:
+        return
+
+    dim = config["spacetime"]["dimension"]
+    dynamical_names = {f["name"] for f in config.get("fields", [])}
+    derived_names = {f["name"] for f in config.get("derived_fields", [])}
+
+    for i, field in enumerate(bg_fields):
+        _validate_single_field(field, i, dim)
+
+        fname = field["name"]
+
+        # Name collision check
+        if fname in dynamical_names:
+            msg = f"Background field '{fname}' conflicts with a dynamical [[fields]] entry"
+            raise ValueError(msg)
+        if fname in derived_names:
+            msg = f"Background field '{fname}' conflicts with a [[derived_fields]] entry"
+            raise ValueError(msg)
+
+        # Require components
+        comps: list[int | float | str] | None = field.get("components")
+        if comps is None:
+            msg = (
+                f"[[background_fields]] entry {i} ('{fname}') must have "
+                f"'components' specifying component values"
+            )
+            raise ValueError(msg)
+        if not isinstance(comps, list):  # pyright: ignore[reportUnnecessaryIsInstance]
+            msg = f"[[background_fields]] entry {i} ('{fname}'): 'components' must be a list"
+            raise TypeError(msg)
+
+        expected = _expected_component_count(field, dim)
+        if len(comps) != expected:
+            msg = (
+                f"[[background_fields]] entry {i} ('{fname}'): expected "
+                f"{expected} components for {field['type']} in {dim}D, got {len(comps)}"
+            )
+            raise ValueError(msg)
+
+        # Validate component types (numbers or strings)
+        for j, comp in enumerate(comps):
+            if not isinstance(comp, (int, float, str)):  # pyright: ignore[reportUnnecessaryIsInstance]
+                msg = (
+                    f"[[background_fields]] entry {i} ('{fname}'): "
+                    f"component {j} must be a number or string expression, "
+                    f"got {type(comp).__name__}"
+                )
+                raise TypeError(msg)
+
+
 def _validate_linearization(config: dict[str, Any]) -> None:
     """Validate optional ``[linearization]`` section.
 
@@ -244,6 +331,7 @@ def _validate_config(config: dict[str, Any]) -> None:
     _validate_spacetime(config)
     _validate_fields(config)
     _validate_derived_fields(config)
+    _validate_background_fields(config)
     if has_lagrangian:
         _validate_lagrangian(config)
     else:
@@ -362,14 +450,17 @@ def _substitute_field_names(
     prefix: str,
     *,
     derived_fields: list[dict[str, Any]] | None = None,
+    background_fields: list[dict[str, Any]] | None = None,
 ) -> str:
     """Replace user field names with prefixed xAct names in the Lagrangian."""
     result = expression
 
-    # Merge fundamental and derived fields for substitution
+    # Merge fundamental, derived, and background fields for substitution
     all_fields = list(fields)
     if derived_fields:
         all_fields.extend(derived_fields)
+    if background_fields:
+        all_fields.extend(background_fields)
 
     # Sort by name length descending to avoid partial replacements
     sorted_fields = sorted(all_fields, key=lambda f: len(f["name"]), reverse=True)
@@ -418,6 +509,7 @@ class _WlsContext:
     pipeline_path: str
     parameters: dict[str, float]
     derived_fields: list[dict[str, Any]]
+    background_fields: list[dict[str, Any]]
     linearization: dict[str, Any] | None
     constraint_solver: dict[str, Any] | None
 
@@ -513,6 +605,66 @@ def _needs_bg_tensor(config: dict[str, Any]) -> bool:
     return any("bg[" in expr for expr in exprs)
 
 
+def _wls_background_component_values(
+    field: dict[str, Any], prefix: str, chart: str, dim: int,
+) -> list[str]:
+    """Generate ``ComponentValue`` lines for a single background field."""
+    comps: list[int | float | str] = field.get("components", [])
+    prefixed = f"{prefix}{field['name'].capitalize()}"
+    ftype = field["type"]
+    lines: list[str] = []
+
+    if ftype == "scalar":
+        lines.append(f"ComponentValue[{prefixed}[], {comps[0]}];")
+    elif ftype == "vector":
+        for idx, val in enumerate(comps):
+            lines.append(
+                f"ComponentValue[{prefixed}[{{{idx}, -{chart}}}], {val}];"
+            )
+    else:
+        # Tensor rank 2+: iterate over all index tuples
+        rank = field.get("rank", 2)
+        for flat_idx, val in enumerate(comps):
+            multi_idx: list[int] = []
+            remaining = flat_idx
+            for _ in range(rank):
+                multi_idx.append(remaining % dim)
+                remaining //= dim
+            multi_idx.reverse()
+            idx_str = ", ".join(f"{{{k}, -{chart}}}" for k in multi_idx)
+            lines.append(f"ComponentValue[{prefixed}[{idx_str}], {val}];")
+
+    return lines
+
+
+def _wls_scalar_background_substitution(
+    ctx: _WlsContext, eom_var: str,
+) -> list[str]:
+    """Generate explicit ``ReplaceAll`` for scalar background fields.
+
+    Scalar backgrounds (rank 0) have no indices, so ``ToBasis`` inside
+    ``DecomposeToComponents`` does **not** trigger ``ComponentValue``
+    substitution.  We must substitute explicitly before decomposition.
+
+    Vector/tensor backgrounds are handled correctly by ``ToBasis``, so
+    this only targets ``type == "scalar"``.
+    """
+    lines: list[str] = []
+    for field in ctx.background_fields:
+        if field["type"] != "scalar":
+            continue
+        prefixed = f"{ctx.prefix}{field['name'].capitalize()}"
+        comps = field.get("components", [])
+        if not comps:
+            continue
+        value = comps[0]
+        lines.extend((
+            f"(* Substitute scalar background {field['name']} -> {value} *)",
+            f"{eom_var} = {eom_var} /. {{{prefixed}[] -> {value}}};",
+        ))
+    return lines
+
+
 def _wls_fields(ctx: _WlsContext, *, include_bg: bool = False) -> list[str]:
     """Generate field definitions and constant symbol declarations."""
     lines: list[str] = ["(* Step 2: Define fields *)"]
@@ -524,6 +676,20 @@ def _wls_fields(ctx: _WlsContext, *, include_bg: bool = False) -> list[str]:
         lines.extend(
             f"If[!ConstantSymbolQ[{c}], DefConstantSymbol[{c}]];" for c in ctx.constants
         )
+        lines.append("")
+
+    # Background fields — non-dynamical tensors (not varied by VarD)
+    if ctx.background_fields:
+        lines.append("(* Background fields — non-dynamical (not varied in Euler-Lagrange) *)")
+        for field in ctx.background_fields:
+            lines.extend((_generate_field_def(field, ctx.prefix, ctx.manifold), ""))
+            # Set component values via xCoba's ComponentValue mechanism.
+            # After ToBasis in ComponentDecompose, xCoba replaces the tensor
+            # with these values — no pipeline changes needed.
+            lines.extend(
+                _wls_background_component_values(field, ctx.prefix, ctx.chart, ctx.dim)
+            )
+            lines.append("")
         lines.append("")
 
     if include_bg:
@@ -561,6 +727,7 @@ def _wls_derived_fields(ctx: _WlsContext) -> list[str]:
             ctx.fields,
             ctx.prefix,
             derived_fields=ctx.derived_fields,
+            background_fields=ctx.background_fields,
         )
         rule_var = f"{ctx.prefix}{field['name'].capitalize()}Rules"
         lines.extend(
@@ -576,7 +743,11 @@ def _wls_derived_fields(ctx: _WlsContext) -> list[str]:
 def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
     """Generate Lagrangian definition lines."""
     prefixed = _substitute_field_names(
-        ctx.lagrangian_expr, ctx.fields, ctx.prefix, derived_fields=ctx.derived_fields
+        ctx.lagrangian_expr,
+        ctx.fields,
+        ctx.prefix,
+        derived_fields=ctx.derived_fields,
+        background_fields=ctx.background_fields,
     )
     lines = [
         "(* Step 3: Lagrangian *)",
@@ -626,6 +797,12 @@ def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
                 f"{eom_var} = VarD[{fexpr}, {ctx.cd}][{ctx.prefix}Lagrangian];",
                 f"{eom_var} = ToCanonical[{eom_var}];",
                 f"{eom_var} = ContractMetric[{eom_var}, {ctx.metric}];",
+            )
+        )
+        # Scalar background fields need explicit substitution (ToBasis won't touch them)
+        lines.extend(_wls_scalar_background_substitution(ctx, eom_var))
+        lines.extend(
+            (
                 f'Print["EOM {fname}: ", {eom_var}];',
                 "",
             )
@@ -672,11 +849,17 @@ def _wls_euler_lagrange_single(ctx: _WlsContext) -> list[str]:
     fname = field["name"]
     fexpr = _field_expression(field, ctx.prefix)
 
-    return [
+    lines = [
         "(* Step 4: Euler-Lagrange equations *)",
         f"eom = EulerLagrangeEquation[{ctx.prefix}Lagrangian, {fexpr}, {ctx.cd}];",
         'Print["EOM: ", eom];',
         "",
+    ]
+
+    # Scalar background fields need explicit substitution (ToBasis won't touch them)
+    lines.extend(_wls_scalar_background_substitution(ctx, "eom"))
+
+    lines.extend([
         "(* Step 5: Decompose to components *)",
         f'componentEqs = DecomposeToComponents[eom, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
         'Print["Components: ", Length[componentEqs]];',
@@ -686,7 +869,9 @@ def _wls_euler_lagrange_single(ctx: _WlsContext) -> list[str]:
         "  {k, Length[componentEqs]}",
         "];",
         "",
-    ]
+    ])
+
+    return lines
 
 
 def _wls_linearization(
@@ -709,6 +894,7 @@ def _wls_linearization(
         ctx.fields,
         ctx.prefix,
         derived_fields=ctx.derived_fields,
+        background_fields=ctx.background_fields,
     )
 
     bg_name = f"{ctx.prefix}Bg"
@@ -733,8 +919,12 @@ def _wls_linearization(
             f"linExprPlain = linExprPlain /. {bg_name} -> {ctx.metric};",
         ))
 
+    lines.append("linExprPlain = Simplify[linExprPlain];")
+
+    # Scalar background fields need explicit substitution (ToBasis won't touch them)
+    lines.extend(_wls_scalar_background_substitution(ctx, "linExprPlain"))
+
     lines.extend([
-        "linExprPlain = Simplify[linExprPlain];",
         'Print["Converted to plain tensor: ", Short[linExprPlain, 3]];',
         "",
         "(* Step 5: Decompose to components *)",
@@ -944,6 +1134,7 @@ def generate_wls(
         pipeline_path=str(wolfram_dir),
         parameters={k: float(v) for k, v in config.get("parameters", {}).items()},
         derived_fields=config.get("derived_fields", []),
+        background_fields=config.get("background_fields", []),
         linearization=config.get("linearization"),
         constraint_solver=config.get("constraint_solver"),
     )
