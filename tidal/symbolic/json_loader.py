@@ -118,10 +118,21 @@ class LHSStructure:
         -------
         LHSStructure
             Parsed LHS structure.
+
+        Raises
+        ------
+        ValueError
+            If ``order`` dict does not contain a ``'time'`` key.
         """
         expression = str(data.get("expression", ""))
         order = data.get("order", {})
-        time_order = int(order.get("time", 2))  # Default to 2 for hyperbolic
+        if "time" not in order:
+            msg = (
+                "lhs.order must specify 'time' "
+                "(0 for constraint, 1 for parabolic, >=2 for hyperbolic)"
+            )
+            raise ValueError(msg)
+        time_order = int(order["time"])
         space_order = int(order.get("space", 0))
         return cls(
             expression=expression, time_order=time_order, space_order=space_order
@@ -817,6 +828,8 @@ class EquationSystem:
         ------
         ValueError
             If the JSON data is invalid or component references are inconsistent.
+        TypeError
+            If a metadata parameter has an unsupported type.
         """
         # Extract spacetime info
         spacetime = data["spacetime"]
@@ -855,11 +868,19 @@ class EquationSystem:
         # numeric matrices reflect actual parameter values, not just ±1.0
         # shape factors from the Wolfram pipeline.
         raw_params = metadata.get("parameters", {})
-        default_params: dict[str, float] = {
-            k: float(v)
-            for k, v in raw_params.items()
-            if isinstance(v, (int, float))
-        }
+        default_params: dict[str, float] = {}
+        for k, v in raw_params.items():
+            if isinstance(v, (int, float)):
+                default_params[k] = float(v)
+            elif isinstance(v, str):
+                try:
+                    default_params[k] = float(v)
+                except ValueError:
+                    msg = f"Parameter '{k}': cannot convert '{v}' to float"
+                    raise ValueError(msg) from None
+            else:
+                msg = f"Parameter '{k}': unsupported type {type(v).__name__}, expected number or numeric string"
+                raise TypeError(msg)
 
         # Auto-compute mass/coupling matrices from identity operator terms.
         # This is the authoritative source — JSON values are ignored in favour
