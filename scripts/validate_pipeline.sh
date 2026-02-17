@@ -43,7 +43,7 @@ echo "  JSON is valid"
 # Step 3: Run Python pipeline tests that use this JSON
 echo ""
 echo "Step 3: Running Python pipeline tests..."
-uv run pytest tests/test_em_pipeline.py -v
+uv run pytest tests/test_pde_builder.py -v -k em
 
 echo ""
 echo "=== Pipeline validation passed ==="
