@@ -18,7 +18,7 @@ View the `tidal` package documentation [here](https://williamroyce.github.io/tor
 
 A research codebase for exploring **electromagnetic ↔ gravitational wave conversion** (Gertsenshtein effect) and potential **amplification mechanisms** in gravity theories with **torsion** (Poincaré gauge theory; parity-even quadratic invariants). The repository includes:
 
-- **A lightweight PDE sandbox** (built on [`py-pde`]) for rapid prototyping and numerics with **850 passing Python tests + ~108 Wolfram tests**.
+- **A lightweight PDE sandbox** (built on [`py-pde`]) for rapid prototyping and numerics with **900+ Python tests + ~115 Wolfram tests**.
 - A symbolic pipeline (Mathematica + xAct) for **deriving linearized field equations** and exporting them to Python-friendly forms.
 - Documentation and experiments for **mixing mechanisms** and **hyperbolicity/causality checks** relevant to the effect.
 
@@ -39,11 +39,11 @@ For more, visit the [Documentation](https://williamroyce.github.io/torsion-gerts
 
 ## Current Status (usable today)
 
-- **Lagrangian-to-PDE pipeline (`tidal.symbolic`, `tidal.wolfram`)**: complete symbolic-to-numerical pipeline for deriving field equations from Lagrangian densities. Uses Mathematica/xAct for symbolic derivation (Euler-Lagrange equations, linearization, component decomposition) → JSON export → Python/py-pde for dynamic PDE construction and simulation. **Zero hardcoded physics** in numerical layer - all equations derived symbolically. Includes **18 working examples** spanning 1+1D through 3+1D: scalars, vectors, tensors (rank 3+), coupled multi-field systems, curvilinear coordinates, and curved spacetimes. See [examples/README.md](examples/README.md) for complete documentation.
+- **Lagrangian-to-PDE pipeline (`tidal.symbolic`, `tidal.wolfram`)**: complete symbolic-to-numerical pipeline for deriving field equations from Lagrangian densities. Uses Mathematica/xAct for symbolic derivation (Euler-Lagrange equations, linearization, component decomposition) → JSON export → Python/py-pde for dynamic PDE construction and simulation. **Zero hardcoded physics** in numerical layer - all equations derived symbolically. Includes **20 working examples** spanning 1+1D through 3+1D: scalars, vectors, tensors (rank 3+), coupled multi-field systems, curvilinear coordinates, and curved spacetimes. See [examples/README.md](examples/README.md) for complete documentation.
 - **CLI (`tidal` command)**: unified command-line interface with 6 subcommands — `tidal derive` (Lagrangian → JSON via TOML config), `tidal simulate` (JSON → PDE simulation with plotting), `tidal measure` (post-hoc measurement extraction from snapshot directories: energy, conversion, mixing length, spectra), `tidal inspect` (equation system info), `tidal list` (discover available specs), `tidal validate` (JSON spec validation). Supports `theory.toml` configs with `[[derived_fields]]` for intermediate tensor definitions (e.g., field strength F_ab). Zero new dependencies (stdlib argparse + tomllib).
 - **Measurement module (`tidal.measurement`)**: post-hoc analysis of simulation output — Hamiltonian energy density, field conversion probability P(t), spectral conversion P(k,t), dispersion relation omega(k), mixing length, and diagnostics. Disk-backed snapshot storage for long simulations via `SnapshotWriter`.
 - **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), Wolfram Engine 14.3 with xAct tensor framework, optional ffmpeg; Sphinx docs skeleton; type-checked codebase with pytest test suite.
-- **Professional development infrastructure**: 942+ Python tests + ~115 Wolfram tests, 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution. 0 ruff violations, 0 pyright errors (strict mode).
+- **Professional development infrastructure**: 900+ Python tests + ~115 Wolfram tests, 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution. 0 ruff violations, 0 pyright errors (strict mode).
 
 This README describes the current capabilities, how to run the examples, and planned improvements.
 
@@ -51,7 +51,7 @@ This README describes the current capabilities, how to run the examples, and pla
 
 # Project Scope and Milestones
 
-This section clarifies where we’re going beyond KG demos.
+This section clarifies the project scope and milestones.
 
 ## Symbolic Computing Infrastructure
 
@@ -79,7 +79,7 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 
 **Development Tools:**
 
-- Comprehensive test suite with ~108 Wolfram unit tests covering all pipeline modules
+- Comprehensive test suite with ~115 Wolfram unit tests covering all pipeline modules
 - 5 utility scripts for workflow automation (test execution, example derivations, pipeline validation)
 - Robust kernel caching support ensuring reliable test execution across multiple runs
 
@@ -93,12 +93,10 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 
 ## Recent Improvements
 
-- **Phase 4-13+ Pipeline Evolution (February 2026)**: ✅ **ALL CRITICAL IMPLEMENTATION COMPLETE**. Fixed Wolfram test symbol conflicts, created 5 development utility scripts, completed module header documentation. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **CLI**: Full `tidal` command with 5 subcommands (derive, inspect, simulate, list, validate) and `theory.toml` support including `[[derived_fields]]`. **Stress tests**: Scalar-vector coupling (mixed-rank cross-field, 4 constants, 4x4 matrices), massive 3-form (rank-3 antisymmetric tensor). **850 Python tests + ~108 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
+- **Phase 4-13+ Pipeline Evolution (February 2026)**: ✅ **ALL CRITICAL IMPLEMENTATION COMPLETE**. Fixed Wolfram test symbol conflicts, created 5 development utility scripts, completed module header documentation. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **CLI**: Full `tidal` command with 6 subcommands (derive, inspect, simulate, measure, list, validate) and `theory.toml` support including `[[derived_fields]]`. **Stress tests**: Scalar-vector coupling (mixed-rank cross-field, 4 constants, 4x4 matrices), massive 3-form (rank-3 antisymmetric tensor). **900+ Python tests + ~115 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
 - **Lagrangian-to-PDE pipeline (February 2026)**: Complete symbolic derivation pipeline implemented with Mathematica/xAct → JSON → Python/py-pde. Fixed component extraction (free index detection with `IndicesOf[]`), operator identification (laplacian vs identity/mass terms), and RHS extraction. Created EM and Klein-Gordon examples demonstrating massless vs massive field dynamics. Added comprehensive documentation proving zero hardcoded physics in numerical layer. See [CHANGELOG.md](CHANGELOG.md) for detailed Phase 11 implementation notes.
 - **2D coupled-field support**: `multi_gaussian_2d` initializer for N-field systems on 2D grids; dimension-agnostic coordinate handling for both 1D and 2D; comprehensive test suite for 2D coupled dynamics (symmetry preservation, energy transfer, decoupled limits).
 - **Enhanced coordinate handling**: automatic detection of coordinate array format (flattened vs grid-shaped) in `gaussian_pulse` and `multi_gaussian_2d`; works seamlessly with different py-pde grid configurations.
-- **Coupled multi-field PDEs**: `make_coupled_kg_pde` builder for N-field systems with mass/coupling matrices; validation for matrix dimensions, finite masses, and non-negativity.
-- **Enhanced plotting**: `choose_writer_and_out` accepts custom output paths and FPS; side-by-side evolution plots with shared colorbars; clean plots with optional axis/tick removal.
 - **Profiling and logging**: timer utilities with detailed profiling summaries; logging-based output (no print statements in library code); configurable verbosity.
 - **Type safety**: explicit type annotations for observers, trackers, and callbacks; keyword-only boolean arguments to avoid positional ambiguity.
 - **Test coverage**: edge-case tests for initial conditions (non-1D/2D grids, non-positive widths, empty amplitudes, mismatched parameter lengths); symmetry tests for coupled-field evolution in both 1D and 2D.
@@ -147,41 +145,9 @@ Common CLI tools pre-installed in the container: `git`, `node`, `npm`, `eslint`,
 
 ## Running the Examples
 
-This repository includes a development container configured for Debian. When you open the workspace in a devcontainer (VS Code Remote - Containers / Codespaces) common tools (git, node/npm, eslint, apt, etc.) are already available on PATH which simplifies setup.
-
-All commands from the repo root:
-
-```bash
-# 1D KG example: Gaussian pulse spacetime evolution (heatmap)
-uv run python examples/klein_gordon/1d_gaussian_pulse.py
-
-# 1D KG animation: time-evolving line plot of φ(x) (MP4 or GIF)
-uv run python examples/klein_gordon/1d_gaussian_pulse_anim.py
-
-# 1D KG with potential step (mass variation)
-uv run python examples/klein_gordon/1d_step_mass.py
-
-# 1D potential barrier example
-uv run python examples/klein_gordon/1d_barrier.py
-
-# 2D KG example: radial ring pulse (writes snapshots and a video/gif)
-uv run python examples/klein_gordon/2d_ring_pulse.py
-
-# Coupled two-field symmetric KG system in 1D (side-by-side spacetime plots)
-uv run python examples/klein_gordon/2field_coupled.py
-
-# **NEW** Coupled two-field KG system in 2D (animated dual-panel evolution)
-uv run python examples/klein_gordon/2d_2field_coupled.py
-
-# **NEW** 3+1D Klein-Gordon example (full 4D spacetime)
-uv run python examples/scalar_field_3d/kg_3d_simulation.py
-```
-
-Outputs are written to `outputs/` (created automatically if missing).
-
 ### Lagrangian-to-PDE Pipeline Examples
 
-The repository includes a complete symbolic-to-numerical pipeline for deriving field equations from Lagrangians and simulating them numerically. **18 examples** cover scalars, vectors, rank-3 tensors, coupled multi-field systems, curvilinear coordinates, and curved spacetimes.
+The repository includes a complete symbolic-to-numerical pipeline for deriving field equations from Lagrangians and simulating them numerically. **20 examples** cover scalars, vectors, rank-3 tensors, coupled multi-field systems, curvilinear coordinates, and curved spacetimes.
 
 ```bash
 # Each example has a run.sh showing the full derive → inspect → simulate workflow:
@@ -233,22 +199,11 @@ tidal validate examples/data/klein_gordon_1d.json      # validate JSON spec stru
 | `gravitational_waves/` | 3+1D | xPert linearization, TT gauge, constraints |
 | `massive_3form/` | 3+1D | Rank-3 antisymmetric tensor, symmetry reduction |
 | `massive_gravity/` | 2+1D | Linearized massive gravity, Fierz-Pauli mass, xPert, coupled constraints |
-| `coupled_proca/` | 2+1D | Two massive vectors, coupled Helmholtz constraints, Dirichlet BCs |
+| `coupled_proca/` | 2+1D | Two massive vectors, coupled Helmholtz constraints, periodic BCs |
+| `coupled_scattering/` | 2+1D | Position-dependent Gaussian coupling, background fields, wave scattering |
+| `scalar_potential_well/` | 1+1D | Background potential well, `[[background_fields]]`, bound states |
 
 See [examples/README.md](examples/README.md) for complete documentation and verification that the Python layer contains zero hardcoded physics.
-
-### Animation Features
-
-- **1D animations** (`1d_gaussian_pulse_anim.py`): show φ(x) vs x at each time step; configurable FPS and snapshot interval; supports both MP4 (ffmpeg) and GIF (Pillow).
-- **2D single-field animations** (`2d_ring_pulse.py`): radial collapse/expansion of a ring pulse; imshow-based heatmaps written frame-by-frame with tqdm progress bars.
-- **2D coupled-field animations** (`2d_2field_coupled.py`): dual-panel visualization showing both fields evolving simultaneously with shared color scale; demonstrates energy transfer between coupled fields with different masses; spatially separated initial Gaussians show propagation and interaction.
-- **1D coupled-field plots** (`2field_coupled.py`): two side-by-side spacetime heatmaps (one per field) with a shared colorbar; clean axis formatting; test for symmetry preservation.
-
-### Customization
-
-- **FPS control**: pass `fps=<int>` to `choose_writer_and_out` (default: auto-calculated from snapshot count and t_end).
-- **Snapshot resolution**: set `snapshot_interval` in the `run` call to match your desired temporal resolution (e.g., `dt` for every integrator step).
-- **Output format**: MP4 if ffmpeg is available; GIF fallback otherwise. Specify output path (without extension) to `choose_writer_and_out`.
 
 ## (Optional) Video Support
 
@@ -263,9 +218,9 @@ If `ffmpeg` is unavailable, the example falls back to a GIF via Pillow.
 
 ## Tests
 
-The project includes a comprehensive test suite with **850 Python tests + ~108 Wolfram tests**.
+The project includes a comprehensive test suite with **900+ Python tests + ~115 Wolfram tests**.
 
-### Python Tests (850 tests)
+### Python Tests (900+ tests)
 
 ```bash
 # Run all Python tests with pytest
@@ -285,7 +240,7 @@ uv run pytest --cov=tidal --cov-report=term-missing
 uv run pytest --cov=tidal --cov-report=xml
 ```
 
-### Wolfram Tests (~108 tests)
+### Wolfram Tests (~115 tests)
 
 ```bash
 # Run all Wolfram unit tests
@@ -414,7 +369,7 @@ See [`scripts/README.md`](scripts/README.md) for detailed setup instructions.
 ## Contributing
 
 - Open an issue or submit a PR.
-- **Test requirements**: All changes must maintain 100% test pass rate (850 Python + ~108 Wolfram tests). New features require corresponding unit tests in both Python and Wolfram layers where applicable.
+- **Test requirements**: All changes must maintain 100% test pass rate (900+ Python + ~115 Wolfram tests). New features require corresponding unit tests in both Python and Wolfram layers where applicable.
 - Run `./scripts/full_test.sh` before submitting PRs to verify all tests pass.
 - Follow the project's type-checking and linting conventions (keyword-only booleans, explicit type annotations, no print in library code).
 
