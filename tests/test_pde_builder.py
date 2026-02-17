@@ -1818,7 +1818,9 @@ class TestMathematicaFunctionConversion:
 
     def test_inequality_simple(self) -> None:
         """Test Inequality[a, LessEqual, x, LessEqual, b] → chained <=."""
-        result = PDEFromSpec._convert_inequality(
+        from tidal.symbolic._eval_utils import _convert_inequality
+
+        result = _convert_inequality(
             "Inequality[30, LessEqual, x[], LessEqual, 70]"
         )
         assert "<=" in result
@@ -1828,7 +1830,9 @@ class TestMathematicaFunctionConversion:
 
     def test_inequality_less(self) -> None:
         """Test Inequality with Less (strict) operator."""
-        result = PDEFromSpec._convert_inequality(
+        from tidal.symbolic._eval_utils import _convert_inequality
+
+        result = _convert_inequality(
             "Inequality[0, Less, x[], Less, 10]"
         )
         assert "<" in result
@@ -1838,10 +1842,12 @@ class TestMathematicaFunctionConversion:
 
     def test_piecewise_single_condition(self) -> None:
         """Test full Piecewise expression from scalar_potential_well JSON."""
+        from tidal.symbolic._eval_utils import _convert_inequality, _convert_piecewise
+
         expr = "Piecewise[{{-V0, Inequality[30, LessEqual, x[], LessEqual, 70]}}, 0]"
         # First convert Inequality, then Piecewise (matching pipeline order)
-        result = PDEFromSpec._convert_inequality(expr)
-        result = PDEFromSpec._convert_piecewise(result)
+        result = _convert_inequality(expr)
+        result = _convert_piecewise(result)
         assert "piecewise(" in result
         assert "Piecewise" not in result
         assert "Inequality" not in result
@@ -1850,8 +1856,10 @@ class TestMathematicaFunctionConversion:
 
     def test_piecewise_multi_condition(self) -> None:
         """Test Piecewise with two conditions → nested piecewise() calls."""
+        from tidal.symbolic._eval_utils import _convert_piecewise
+
         expr = "Piecewise[{{v1, c1}, {v2, c2}}, d]"
-        result = PDEFromSpec._convert_piecewise(expr)
+        result = _convert_piecewise(expr)
         assert result.count("piecewise(") == 2
         assert "Piecewise" not in result
 
