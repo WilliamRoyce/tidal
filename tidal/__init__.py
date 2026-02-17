@@ -9,6 +9,8 @@ This package provides:
 - `measurement`: Post-hoc analysis (energy, conversion, dispersion, mixing)
 """
 
+from __future__ import annotations
+
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as _pkg_version
 
