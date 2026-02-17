@@ -24,14 +24,13 @@ from typing import TYPE_CHECKING, cast
 
 import matplotlib as mpl
 
-from tidal.utils import normalize_solve_result
-
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
 
 from tidal.symbolic import build_pde_from_json, load_equation_system
+from tidal.utils import normalize_solve_result
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -41,9 +40,29 @@ if TYPE_CHECKING:
 
     NumericArray = NDArray[np.float64]
 
+# ── Configuration ─────────────────────────────────────────────
 
-OUTPUT_FILENAME = "coupled_proca_output.png"
+# Physics
 PARAMETERS = {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5}
+
+# Grid
+GRID_BOUNDS = [(0, np.pi), (0, np.pi)]
+GRID_SHAPE = [20, 20]
+GRID_PERIODIC = True
+
+# Time integration
+T_END = 2.0
+DT = 0.05
+SNAPSHOT_INTERVAL = 0.2
+
+# Initial conditions
+PULSE_CENTER_X = np.pi / 2
+PULSE_CENTER_Y = np.pi / 2
+PULSE_WIDTH = 0.5
+PULSE_AMPLITUDE = 0.5
+
+# Output
+OUTPUT_FILENAME = "coupled_proca_output.png"
 
 # State layout (from spec):
 #   A_0 (constraint, t_order=0) -> idx 0 (field only)
@@ -57,13 +76,25 @@ IDX_A1 = 1
 IDX_B0 = 5
 IDX_B1 = 6
 
+# ── Helpers ───────────────────────────────────────────────────
+
 
 def _get_field(snap: FieldCollection, idx: int) -> NumericArray:
     return np.asarray(snap[idx].data, dtype=float)
 
 
+def _print_header() -> None:
+    print("=" * 60)
+    print("Coupled Proca 2+1D Simulation (Periodic BCs)")
+    print("=" * 60)
+    print()
+    print("Lagrangian:")
+    print("  L = -1/4 F^A F^A - 1/4 F^B F^B")
+    print("      - mA2/2 A^2 - mB2/2 B^2 + gcoup A.B")
+    print()
+
+
 def _load_spec(json_path: Path) -> EquationSystem:
-    """Load the equation specification and print system summary."""
     print("Step 1: Loading equation specification...")
     spec = load_equation_system(json_path)
     print(f"  Components: {spec.n_components} ({', '.join(spec.component_names)})")
@@ -82,7 +113,6 @@ def _load_spec(json_path: Path) -> EquationSystem:
 
 
 def _build_pde(json_path: Path) -> PDEBase:
-    """Build the PDE from JSON specification."""
     print("Step 2: Building PDE from specification...")
     pde = build_pde_from_json(json_path, parameters=PARAMETERS)
     print(f"  PDE class: {type(pde).__name__}")
@@ -92,14 +122,13 @@ def _build_pde(json_path: Path) -> PDEBase:
 
 
 def _create_grid() -> CartesianGrid:
-    """Set up a 2D periodic spatial grid."""
     print("Step 3: Setting up 2D periodic grid...")
     grid = CartesianGrid(
-        bounds=[(0, np.pi), (0, np.pi)],
-        shape=[20, 20],
-        periodic=True,
+        bounds=GRID_BOUNDS,
+        shape=GRID_SHAPE,
+        periodic=GRID_PERIODIC,
     )
-    print("  Domain: [0, pi] x [0, pi]")
+    print(f"  Domain: {GRID_BOUNDS}")
     print(f"  Resolution: {grid.shape}")
     print("  Boundary conditions: periodic")
     print()
@@ -107,16 +136,16 @@ def _create_grid() -> CartesianGrid:
 
 
 def _create_initial_state(grid: CartesianGrid, spec: EquationSystem) -> FieldCollection:
-    """Create initial conditions: Gaussian in A_1, all else zero."""
     print("Step 4: Creating initial conditions...")
     x_coords = cast("np.ndarray", grid.cell_coords[..., 0])
     y_coords = cast("np.ndarray", grid.cell_coords[..., 1])
 
-    center_x, center_y = np.pi / 2, np.pi / 2
-    width = 0.5
-    amplitude = 0.5
-    gaussian = amplitude * np.exp(
-        -((x_coords - center_x) ** 2 + (y_coords - center_y) ** 2) / (2 * width**2)
+    gaussian = PULSE_AMPLITUDE * np.exp(
+        -(
+            (x_coords - PULSE_CENTER_X) ** 2
+            + (y_coords - PULSE_CENTER_Y) ** 2
+        )
+        / (2 * PULSE_WIDTH**2)
     )
 
     fields: list[ScalarField] = []
@@ -128,31 +157,30 @@ def _create_initial_state(grid: CartesianGrid, spec: EquationSystem) -> FieldCol
 
     state = FieldCollection(fields)
     assert len(state) == spec.state_size
-    print(f"  Gaussian pulse in A_1 at ({center_x:.2f}, {center_y:.2f})")
-    print(f"  Width: {width}, Amplitude: {amplitude}")
+    print(f"  Gaussian pulse in A_1 at ({PULSE_CENTER_X:.2f}, {PULSE_CENTER_Y:.2f})")
+    print(f"  Width: {PULSE_WIDTH}, Amplitude: {PULSE_AMPLITUDE}")
     print()
     return state
 
 
 def _run_simulation(pde: PDEBase, state: FieldCollection) -> MemoryStorage:
-    """Run time evolution and return storage with snapshots."""
     print("Step 5: Running simulation...")
     storage = MemoryStorage()
     result = pde.solve(
         state,
-        t_range=2.0,
-        dt=0.05,
+        t_range=T_END,
+        dt=DT,
         scheme="runge-kutta",
-        tracker=storage.tracker(0.2),
+        tracker=storage.tracker(SNAPSHOT_INTERVAL),
     )
     normalize_solve_result(result)
+    print(f"  Duration: {T_END} time units")
     print(f"  Stored {len(storage)} snapshots")
     print()
     return storage
 
 
 def _analyze_results(pde: PDEBase, storage: MemoryStorage) -> None:
-    """Check for coupling and stability."""
     print("Step 6: Analyzing results...")
 
     final = cast("FieldCollection", storage[-1])
@@ -189,23 +217,21 @@ def _analyze_results(pde: PDEBase, storage: MemoryStorage) -> None:
     print()
 
 
-def _plot_results(  # noqa: PLR0914
+def _plot_results(
     pde: PDEBase, storage: MemoryStorage
 ) -> None:
-    """Generate a 2x3 visualization."""
     print("Step 7: Generating visualization...")
 
     final = cast("FieldCollection", storage[-1])
     # Re-solve constraints for plotting
     pde.evolution_rate(final)
 
-    t_end = 2.0
-    lx, ly = np.pi, np.pi
+    lx, ly = GRID_BOUNDS[0][1], GRID_BOUNDS[1][1]
     fig, axes = plt.subplots(2, 3, figsize=(16, 10))
 
     # Row 0: A_1 snapshots
     snap_indices = [0, len(storage) // 2, len(storage) - 1]
-    snap_labels = ["t = 0", f"t = {t_end / 2:.1f}", f"t = {t_end:.1f}"]
+    snap_labels = ["t = 0", f"t = {T_END / 2:.1f}", f"t = {T_END:.1f}"]
 
     for col, (snap_idx, snap_label) in enumerate(
         zip(snap_indices, snap_labels, strict=True)
@@ -235,7 +261,7 @@ def _plot_results(  # noqa: PLR0914
     )
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.set_title(f"A_0 (constraint) at t={t_end:.1f}")
+    ax.set_title(f"A_0 (constraint) at t={T_END:.1f}")
     plt.colorbar(im, ax=ax, shrink=0.8)
 
     # Row 1, Center: B_0 constraint
@@ -248,13 +274,12 @@ def _plot_results(  # noqa: PLR0914
     )
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.set_title(f"B_0 (constraint) at t={t_end:.1f}")
+    ax.set_title(f"B_0 (constraint) at t={T_END:.1f}")
     plt.colorbar(im, ax=ax, shrink=0.8)
 
     # Row 1, Right: Amplitude evolution
     ax = axes[1, 2]
-    snapshot_interval = 0.2
-    times = [float(i) * snapshot_interval for i in range(len(storage))]
+    times = list(storage.times)
     a1_max = [
         float(np.max(np.abs(_get_field(cast("FieldCollection", storage[i]), IDX_A1))))
         for i in range(len(storage))
@@ -286,29 +311,11 @@ def _plot_results(  # noqa: PLR0914
     output_path = output_dir / OUTPUT_FILENAME
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
     print(f"  Saved plot to: {output_path}")
+    plt.close()
     print()
 
 
-def main() -> None:
-    """Run the coupled Proca simulation."""
-    print("=" * 60)
-    print("Coupled Proca 2+1D Simulation (Periodic BCs)")
-    print("=" * 60)
-    print()
-    print("Lagrangian:")
-    print("  L = -1/4 F^A F^A - 1/4 F^B F^B")
-    print("      - mA2/2 A^2 - mB2/2 B^2 + gcoup A.B")
-    print()
-
-    json_path = Path(__file__).parent.parent / "data" / "coupled_proca_3d.json"
-    spec = _load_spec(json_path)
-    pde = _build_pde(json_path)
-    grid = _create_grid()
-    state = _create_initial_state(grid, spec)
-    storage = _run_simulation(pde, state)
-    _analyze_results(pde, storage)
-    _plot_results(pde, storage)
-
+def _print_footer() -> None:
     print("=" * 60)
     print("Simulation complete!")
     print()
@@ -319,6 +326,23 @@ def main() -> None:
     print("  4. Cross-coupling gcoup transfers energy between A and B sectors")
     print("  5. Energy drift O(dx^2) convergent with periodic BCs")
     print("=" * 60)
+
+
+# ── Entry point ───────────────────────────────────────────────
+
+
+def main() -> None:
+    """Run the coupled Proca simulation."""
+    json_path = Path(__file__).parent.parent / "data" / "coupled_proca_3d.json"
+    _print_header()
+    spec = _load_spec(json_path)
+    pde = _build_pde(json_path)
+    grid = _create_grid()
+    state = _create_initial_state(grid, spec)
+    storage = _run_simulation(pde, state)
+    _analyze_results(pde, storage)
+    _plot_results(pde, storage)
+    _print_footer()
 
 
 if __name__ == "__main__":

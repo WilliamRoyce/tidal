@@ -25,14 +25,13 @@ Performance note:
     expensive. This example uses 16^3 cells for a practical demo.
 """
 
-from pathlib import Path
-from typing import cast
+from __future__ import annotations
 
-OUTPUT_FILENAME = "massive_3form_output.png"
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import matplotlib as mpl
-
-from tidal.utils import normalize_solve_result
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt
@@ -44,16 +43,55 @@ from tidal.symbolic import (
     create_initial_state,
     load_equation_system,
 )
+from tidal.utils import normalize_solve_result
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+    from tidal.symbolic.equation_system import EquationSystem
+
+    from tidal.symbolic.pde_builder import PDEFromSpec
+
+    NumericArray = NDArray[np.float64]
+
+# ── Configuration ─────────────────────────────────────────────
+
+# Physics
+MASS_SQUARED = 1.0
+
+# Grid
+GRID_POINTS_PER_AXIS = 16  # 16^3 = 4,096 cells; 8 fields = 32K floats
+DOMAIN_SIZE = 10.0
+
+# Time integration
+T_END = 5.0
+DT = 0.05
+SNAPSHOT_INTERVAL = 0.5
+
+# Initial conditions
+PULSE_WIDTH = 1.5
+PULSE_AMPLITUDE = 1.0
+
+# Output
+OUTPUT_FILENAME = "massive_3form_output.png"
+
+# State indices (interleaved: [C_0, pi_0, C_1, pi_1, C_2, pi_2, C_3, pi_3])
+C0_FIELD_SLOT = 0
+
+# ── Helpers ───────────────────────────────────────────────────
 
 
-def main() -> None:  # noqa: PLR0914, PLR0915
-    """Run the massive 3-form field simulation.
+@dataclass(frozen=True)
+class SimulationResult:
+    """Container for massive 3-form simulation results."""
 
-    Raises
-    ------
-    FileNotFoundError
-        If the JSON specification file is not found.
-    """
+    grid: CartesianGrid
+    storage: MemoryStorage
+    spec: EquationSystem
+    initial_state: FieldCollection
+    initial_peak: float
+
+
+def _print_header() -> None:
     print("=" * 60)
     print("Massive 3-Form Field in 3+1D Minkowski Spacetime")
     print("=" * 60)
@@ -63,11 +101,9 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     print("Reduction: 64 raw components -> 4 independent (antisymmetry)")
     print()
 
-    # ----------------------------------------------------------------
-    # Step 1: Load the equation specification
-    # ----------------------------------------------------------------
+
+def _load_spec(json_path: Path) -> EquationSystem:
     print("Step 1: Loading equation specification...")
-    json_path = Path(__file__).parent.parent / "data" / "massive_3form.json"
 
     if not json_path.exists():
         msg = (
@@ -96,113 +132,111 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     print("  State layout:")
     for i, (name, slot_type) in enumerate(spec.state_layout):
         print(f"    slot {i}: {name} ({slot_type})")
-
-    # ----------------------------------------------------------------
-    # Step 2: Build the PDE
-    # ----------------------------------------------------------------
     print()
+    return spec
+
+
+def _build_pde(json_path: Path) -> PDEFromSpec:
     print("Step 2: Building PDE from specification...")
-
-    m2_value = 1.0
-    pde = build_pde_from_json(json_path, parameters={"m2": m2_value})
+    pde = build_pde_from_json(json_path, parameters={"m2": MASS_SQUARED})
     print(f"  PDE class: {type(pde).__name__}")
-    print(f"  Mass parameter: m^2 = {m2_value}")
-    print(
-        f"  State size: {spec.state_size} fields (4 components x 2 = field + momentum)"
-    )
-
-    # ----------------------------------------------------------------
-    # Step 3: Create the 3D spatial grid
-    # ----------------------------------------------------------------
+    print(f"  Mass parameter: m^2 = {MASS_SQUARED}")
     print()
+    return pde
+
+
+def _create_grid() -> CartesianGrid:
     print("Step 3: Setting up 3D simulation grid...")
-
-    n = 16  # Grid points per axis (16^3 = 4,096 cells; 8 fields = 32K floats)
-    domain_size = 10.0
-
+    n = GRID_POINTS_PER_AXIS
     grid = CartesianGrid(
-        bounds=[(0, domain_size), (0, domain_size), (0, domain_size)],
+        bounds=[(0, DOMAIN_SIZE), (0, DOMAIN_SIZE), (0, DOMAIN_SIZE)],
         shape=[n, n, n],
         periodic=True,
     )
-    print(f"  Domain: [0, {domain_size}]^3")
+    print(f"  Domain: [0, {DOMAIN_SIZE}]^3")
     print(f"  Resolution: {n} x {n} x {n} = {n**3:,} cells")
-    print(f"  Grid spacing: dx = dy = dz = {domain_size / n:.3f}")
+    print(f"  Grid spacing: dx = dy = dz = {DOMAIN_SIZE / n:.3f}")
     print("  Periodic boundary conditions")
-
-    # ----------------------------------------------------------------
-    # Step 4: Set up initial conditions
-    # ----------------------------------------------------------------
     print()
+    return grid
+
+
+def _create_initial_state(
+    grid: CartesianGrid, spec: EquationSystem
+) -> tuple[FieldCollection, float]:
     print("Step 4: Creating initial conditions...")
 
     x = cast("np.ndarray", grid.cell_coords[..., 0])
     y = cast("np.ndarray", grid.cell_coords[..., 1])
     z = cast("np.ndarray", grid.cell_coords[..., 2])
 
-    center = domain_size / 2.0
-    width = 1.5
-    amplitude = 1.0
+    center = DOMAIN_SIZE / 2.0
 
     # 3D Gaussian pulse in C_0 only (other components = 0)
-    c0_data = amplitude * np.exp(
-        -((x - center) ** 2 + (y - center) ** 2 + (z - center) ** 2) / (2 * width**2)
+    c0_data = PULSE_AMPLITUDE * np.exp(
+        -((x - center) ** 2 + (y - center) ** 2 + (z - center) ** 2)
+        / (2 * PULSE_WIDTH**2)
     )
 
     # Only C_0 is excited; C_1, C_2, C_3 remain zero (component independence)
     state = create_initial_state(grid, spec, field_data={"C_0": c0_data})
-
-    initial_state = state.copy()
     initial_peak = float(np.max(np.abs(c0_data)))
 
     print(
-        f"  Gaussian pulse in C_0: center=({center}, {center}, {center}), width={width}"
+        f"  Gaussian pulse in C_0: center=({center}, {center}, {center}), "
+        f"width={PULSE_WIDTH}"
     )
-    print(f"  Amplitude: {amplitude}, initial peak = {initial_peak:.4f}")
+    print(f"  Amplitude: {PULSE_AMPLITUDE}, initial peak = {initial_peak:.4f}")
     print("  C_1, C_2, C_3: zero (testing component independence)")
     print("  All momenta: zero (pulse starts at rest)")
-
-    # ----------------------------------------------------------------
-    # Step 5: Run simulation
-    # ----------------------------------------------------------------
     print()
+    return state, initial_peak
+
+
+def _run_simulation(
+    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection, spec: EquationSystem,
+    initial_peak: float,
+) -> SimulationResult:
     print("Step 5: Running simulation...")
 
-    t_end = 5.0
-    dt = 0.05
-    snapshot_interval = 0.5
+    initial_state = state.copy()
 
     storage = MemoryStorage()
     result = pde.solve(
         state,
-        t_range=t_end,
-        dt=dt,
+        t_range=T_END,
+        dt=DT,
         scheme="runge-kutta",
-        tracker=storage.tracker(snapshot_interval),
+        tracker=storage.tracker(SNAPSHOT_INTERVAL),
     )
     result = normalize_solve_result(result)
 
-    print(f"  Duration: {t_end} time units")
-    print(f"  Time step: dt = {dt}")
+    print(f"  Duration: {T_END} time units")
+    print(f"  Time step: dt = {DT}")
     print("  Scheme: Runge-Kutta (RK4)")
     print(f"  Stored {len(storage)} snapshots")
-
-    # ----------------------------------------------------------------
-    # Step 6: Analyze results
-    # ----------------------------------------------------------------
     print()
+
+    return SimulationResult(
+        grid=grid,
+        storage=storage,
+        spec=spec,
+        initial_state=initial_state,
+        initial_peak=initial_peak,
+    )
+
+
+def _analyze_results(result: SimulationResult) -> None:
     print("Step 6: Analyzing results...")
 
-    final = cast("FieldCollection", storage[-1])
-
-    # State layout is interleaved: [C_0, pi_0, C_1, pi_1, C_2, pi_2, C_3, pi_3]
-    component_names = spec.component_names
+    final = cast("FieldCollection", result.storage[-1])
+    component_names = result.spec.component_names
     n_components = len(component_names)
 
-    final_peak_c0 = float(np.max(np.abs(final[0].data)))
-    print(f"  C_0 initial peak: {initial_peak:.4f}")
+    final_peak_c0 = float(np.max(np.abs(final[C0_FIELD_SLOT].data)))
+    print(f"  C_0 initial peak: {result.initial_peak:.4f}")
     print(f"  C_0 final peak:   {final_peak_c0:.4f}")
-    print(f"  C_0 decay ratio:  {final_peak_c0 / initial_peak:.4f}")
+    print(f"  C_0 decay ratio:  {final_peak_c0 / result.initial_peak:.4f}")
     print("  (Expected: amplitude decreases as pulse spreads in 3D)")
 
     print()
@@ -211,13 +245,23 @@ def main() -> None:  # noqa: PLR0914, PLR0915
         field_slot = 2 * i  # C_i is at slot 2*i
         max_val = float(np.max(np.abs(final[field_slot].data)))
         print(f"    max|{component_names[i]}| = {max_val:.2e} (should be ~0)")
-
-    # ----------------------------------------------------------------
-    # Step 7: Collect evolution data for plotting
-    # ----------------------------------------------------------------
     print()
+
+
+def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     print("Step 7: Generating visualization...")
 
+    storage = result.storage
+    grid = result.grid
+    spec = result.spec
+    initial_state = result.initial_state
+    initial_peak = result.initial_peak
+
+    final = cast("FieldCollection", storage[-1])
+    component_names = spec.component_names
+    n_components = len(component_names)
+
+    n = GRID_POINTS_PER_AXIS
     ix_center = n // 2
     iy_center = n // 2
     iz_center = n // 2
@@ -225,30 +269,27 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     z_1d = cast("np.ndarray", grid.cell_coords[ix_center, iy_center, :, 2])
 
     # Collect max|C_i| over time for all components
-    times = [0.0, *list(storage.times)]
-    max_c0_over_time = [initial_peak]
+    times: list[float] = [0.0, *list(storage.times)]
+    max_c0_over_time: list[float] = [initial_peak]
     max_others_over_time: dict[str, list[float]] = {
         name: [0.0] for name in component_names[1:]
     }
 
     for t_idx in range(len(storage)):
         snapshot = cast("FieldCollection", storage[t_idx])
-        max_c0_over_time.append(float(np.max(np.abs(snapshot[0].data))))
+        max_c0_over_time.append(float(np.max(np.abs(snapshot[C0_FIELD_SLOT].data))))
         for i in range(1, n_components):
             field_slot = 2 * i
             max_others_over_time[component_names[i]].append(
                 float(np.max(np.abs(snapshot[field_slot].data)))
             )
 
-    # ----------------------------------------------------------------
-    # Step 8: Create plots
-    # ----------------------------------------------------------------
     fig, axes = plt.subplots(2, 2, figsize=(14, 12))
 
     # --- Panel 1: C_0 z-profile (initial vs final + intermediates) ---
     ax = axes[0, 0]
-    initial_profile = initial_state[0].data[ix_center, iy_center, :]
-    final_profile = final[0].data[ix_center, iy_center, :]
+    initial_profile = initial_state[C0_FIELD_SLOT].data[ix_center, iy_center, :]
+    final_profile = final[C0_FIELD_SLOT].data[ix_center, iy_center, :]
 
     ax.plot(z_1d, initial_profile, "b-", linewidth=2, label="t = 0.0 (initial)")
     ax.plot(
@@ -261,7 +302,7 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     for frac, color, alpha in [(0.25, "green", 0.5), (0.5, "orange", 0.5)]:
         idx = int(frac * (n_snapshots - 1))
         snap = cast("FieldCollection", storage[idx])
-        profile = snap[0].data[ix_center, iy_center, :]
+        profile = snap[C0_FIELD_SLOT].data[ix_center, iy_center, :]
         ax.plot(
             z_1d,
             profile,
@@ -279,14 +320,14 @@ def main() -> None:  # noqa: PLR0914, PLR0915
 
     # --- Panel 2: C_0 x-y slice (initial) ---
     ax = axes[0, 1]
-    initial_xy_slice = initial_state[0].data[:, :, iz_center]
+    initial_xy_slice = initial_state[C0_FIELD_SLOT].data[:, :, iz_center]
     im = ax.imshow(
         initial_xy_slice.T,
         origin="lower",
-        extent=[0, domain_size, 0, domain_size],
+        extent=[0, DOMAIN_SIZE, 0, DOMAIN_SIZE],
         cmap="RdBu_r",
-        vmin=-amplitude,
-        vmax=amplitude,
+        vmin=-PULSE_AMPLITUDE,
+        vmax=PULSE_AMPLITUDE,
     )
     ax.set_xlabel("x")
     ax.set_ylabel("y")
@@ -315,8 +356,8 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     ax.ticklabel_format(style="scientific", axis="y", scilimits=(0, 0))
 
     fig.suptitle(
-        f"Massive 3-Form (antisymmetric rank-3): m$^2$={m2_value}, "
-        f"grid={n}$^3$, dt={dt}",
+        f"Massive 3-Form (antisymmetric rank-3): m$^2$={MASS_SQUARED}, "
+        f"grid={n}$^3$, dt={DT}",
         fontsize=14,
     )
     plt.tight_layout()
@@ -328,17 +369,51 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     plt.close(fig)
 
     print(f"  Saved plot to: {output_path}")
-
     print()
+
+
+def _print_footer(result: SimulationResult) -> None:
+    final = cast("FieldCollection", result.storage[-1])
+    component_names = result.spec.component_names
+    n_components = len(component_names)
+
+    final_peak_c0 = float(np.max(np.abs(final[C0_FIELD_SLOT].data)))
+
+    # Collect final max for non-C_0 components
+    max_others_final: dict[str, float] = {}
+    for i in range(1, n_components):
+        field_slot = 2 * i
+        max_others_final[component_names[i]] = float(
+            np.max(np.abs(final[field_slot].data))
+        )
+
     print("*** Massive 3-form simulation complete! ***")
     print()
     print("Key results:")
     print(f"  - Symmetry reduction: 64 raw components -> {n_components} independent")
-    print(f"  - C_0 peak decayed from {initial_peak:.4f} to {final_peak_c0:.4f}")
-    for name in component_names[1:]:
-        final_max = max_others_over_time[name][-1]
+    print(
+        f"  - C_0 peak decayed from {result.initial_peak:.4f} to {final_peak_c0:.4f}"
+    )
+    for name, final_max in max_others_final.items():
         print(f"  - {name} remained ~0 (max = {final_max:.2e})")
     print("  - Component independence verified: no spurious coupling")
+
+
+# ── Entry point ───────────────────────────────────────────────
+
+
+def main() -> None:
+    """Run the massive 3-form field simulation."""
+    json_path = Path(__file__).parent.parent / "data" / "massive_3form.json"
+    _print_header()
+    spec = _load_spec(json_path)
+    pde = _build_pde(json_path)
+    grid = _create_grid()
+    state, initial_peak = _create_initial_state(grid, spec)
+    sim_result = _run_simulation(pde, grid, state, spec, initial_peak)
+    _analyze_results(sim_result)
+    _plot_results(sim_result)
+    _print_footer(sim_result)
 
 
 if __name__ == "__main__":

@@ -53,20 +53,33 @@ if TYPE_CHECKING:
     from tidal.measurement._mixing import MixingResult, MixingSpectrum
     from tidal.measurement._spectral_conversion import SpectralConversion
 
-# ---------------------------------------------------------------------------
-# Simulation parameters
-# ---------------------------------------------------------------------------
+# ── Configuration ─────────────────────────────────────────────
 
+# Physics
 PARAMS: dict[str, float] = {"mA2": 1.0, "mB2": 5.0, "gcoup": 0.5}
+
+# Grid
+GRID_BOUNDS = [(0, 50), (0, 50)]
+GRID_SHAPE = [64, 64]
+GRID_PERIODIC = True
+
+# Time integration
 T_END = 10.0
+DT = 0.01
 TRACKER_INTERVAL = 0.2
-ENERGY_THRESHOLD = 0.002  # Depends strongly on resolution and BCs; periodic BCs give machine-precision conservation, while Dirichlet can have O(1%) errors.
+
+# Initial conditions
+PULSE_CENTER_X = 25.0
+PULSE_CENTER_Y = 25.0
+PULSE_WIDTH = 5.0
+
+# Analysis
+ENERGY_THRESHOLD = 0.002  # periodic BCs give machine-precision conservation
+
+# Output
 OUTPUT_FILENAME = "coupled_proca_measurement.png"
 
-
-# ---------------------------------------------------------------------------
-# Simulation
-# ---------------------------------------------------------------------------
+# ── Simulation ────────────────────────────────────────────────
 
 
 def _run_simulation() -> tuple[SimulationData, Path]:
@@ -76,15 +89,18 @@ def _run_simulation() -> tuple[SimulationData, Path]:
     spec = load_equation_system(json_path)
     pde = build_pde_from_json(json_path, parameters=PARAMS)
     grid = CartesianGrid(
-        bounds=[(0, 50), (0, 50)],
-        shape=[64, 64],
-        periodic=True,
+        bounds=GRID_BOUNDS,
+        shape=GRID_SHAPE,
+        periodic=GRID_PERIODIC,
     )
 
     # Build initial state from spec layout — Gaussian pulse in A_1
     x = cast("np.ndarray", grid.cell_coords[..., 0])
     y = cast("np.ndarray", grid.cell_coords[..., 1])
-    gaussian = np.exp(-((x - 25.0) ** 2 + (y - 25.0) ** 2) / (2 * 5.0**2))
+    gaussian = np.exp(
+        -((x - PULSE_CENTER_X) ** 2 + (y - PULSE_CENTER_Y) ** 2)
+        / (2 * PULSE_WIDTH**2)
+    )
 
     fields: list[ScalarField] = []
     for name, slot_type in spec.state_layout:
@@ -109,7 +125,7 @@ def _run_simulation() -> tuple[SimulationData, Path]:
     result = pde.solve(
         state,
         t_range=T_END,
-        dt=0.01,
+        dt=DT,
         scheme="runge-kutta",
         tracker=tracker,
     )
@@ -119,9 +135,7 @@ def _run_simulation() -> tuple[SimulationData, Path]:
     return SimulationData.from_directory(output_data_dir, spec), output_data_dir
 
 
-# ---------------------------------------------------------------------------
-# Measurement + printing
-# ---------------------------------------------------------------------------
+# ── Measurement + printing ────────────────────────────────────
 
 
 def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
@@ -230,9 +244,7 @@ def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
     print("=" * 60)
 
 
-# ---------------------------------------------------------------------------
-# Plotting
-# ---------------------------------------------------------------------------
+# ── Plotting ──────────────────────────────────────────────────
 
 
 def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
@@ -545,9 +557,7 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     return output_path
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
+# ── Entry point ───────────────────────────────────────────────
 
 
 def main() -> None:

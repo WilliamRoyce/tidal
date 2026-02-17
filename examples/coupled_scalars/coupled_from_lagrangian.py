@@ -26,6 +26,9 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+import matplotlib as mpl
+
+mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from pde import CartesianGrid, FieldCollection, MemoryStorage, PDEBase, ScalarField
@@ -41,9 +44,30 @@ if TYPE_CHECKING:
 
     NumericArray = NDArray[np.float64]
 
+# ── Configuration ─────────────────────────────────────────────
 
-DEFAULT_T_END = 20.0
+# Grid
+GRID_BOUNDS = [(0, 100)]
+GRID_SHAPE = [256]
+GRID_PERIODIC = True
+
+# Time integration
+T_END = 20.0
+DT = 0.01
+SNAPSHOT_INTERVAL = 0.5
+
+# Initial conditions
+PULSE_CENTER = 30.0
+PULSE_WIDTH = 5.0
+PULSE_AMPLITUDE = 1.0
+
+# Analysis
+COUPLING_THRESHOLD = 0.01
+
+# Output
 OUTPUT_FILENAME = "coupled_scalars_output.png"
+
+# ── Helpers ───────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
@@ -53,21 +77,6 @@ class SimulationData:
     x: NumericArray
     times: list[float]
     snapshots: list[FieldCollection]
-
-
-def main() -> None:
-    """Run the coupled scalar fields simulation from Lagrangian-derived equations."""
-    json_path = Path(__file__).parent.parent / "data" / "coupled_scalars.json"
-    _print_header()
-    spec = _load_spec(json_path)
-    pde = _build_pde(json_path)
-    grid = _create_grid()
-    initial_state = _create_initial_state(grid, spec)
-    storage = _run_simulation(pde, initial_state, DEFAULT_T_END)
-    simulation = _collect_simulation_data(storage, grid)
-    _analyze_results(simulation, spec)
-    _plot_results(simulation, spec)
-    _print_footer()
 
 
 def _print_header() -> None:
@@ -117,9 +126,9 @@ def _build_pde(json_path: Path) -> PDEBase:
 
 def _create_grid() -> CartesianGrid:
     print("Step 3: Setting up simulation grid...")
-    grid = CartesianGrid([(0, 100)], 256, periodic=True)
-    print("  Domain: [0, 100]")
-    print("  Resolution: 256 points")
+    grid = CartesianGrid(GRID_BOUNDS, GRID_SHAPE, periodic=GRID_PERIODIC)
+    print(f"  Domain: {GRID_BOUNDS}")
+    print(f"  Resolution: {GRID_SHAPE[0]} points")
     print("  Periodic boundary conditions")
     print()
     return grid
@@ -127,14 +136,14 @@ def _create_grid() -> CartesianGrid:
 
 def _create_initial_state(grid: CartesianGrid, spec: EquationSystem) -> FieldCollection:
     print("Step 4: Creating initial conditions...")
-    print("  Gaussian pulse in φ at x=30")
+    print(f"  Gaussian pulse in φ at x={PULSE_CENTER}")
     print("  χ initially zero (energy will transfer via coupling)")
 
     # Initialize phi with a Gaussian pulse, chi starts at zero
     pulse = ComponentGaussianPulse(
-        center=(30.0,),
-        width=5.0,
-        amplitude=1.0,
+        center=(PULSE_CENTER,),
+        width=PULSE_WIDTH,
+        amplitude=PULSE_AMPLITUDE,
         active_components={"phi_0": 1.0},  # Only phi has initial pulse
     )
     initial_state = pulse.create(grid, spec)
@@ -143,15 +152,15 @@ def _create_initial_state(grid: CartesianGrid, spec: EquationSystem) -> FieldCol
     return initial_state
 
 
-def _run_simulation(
-    pde: PDEBase, initial_state: FieldCollection, t_end: float
-) -> MemoryStorage:
+def _run_simulation(pde: PDEBase, initial_state: FieldCollection) -> MemoryStorage:
     print("Step 5: Running simulation...")
-    print(f"  Duration: {t_end} time units")
+    print(f"  Duration: {T_END} time units")
     print("  (Coupled evolution with mode-mixing)")
     storage = MemoryStorage()
-    tracker: TrackerBase = storage.tracker(interrupts=0.5)
-    pde.solve(initial_state, t_range=t_end, dt=0.01, scheme="runge-kutta", tracker=tracker)
+    tracker: TrackerBase = storage.tracker(interrupts=SNAPSHOT_INTERVAL)
+    pde.solve(
+        initial_state, t_range=T_END, dt=DT, scheme="runge-kutta", tracker=tracker
+    )
     print(f"  Stored {len(storage)} snapshots")
     print()
     return storage
@@ -197,7 +206,7 @@ def _analyze_results(simulation: SimulationData, _spec: EquationSystem) -> None:
         float(np.max(np.abs(_get_component(snapshot, 2))))
         for snapshot in simulation.snapshots
     ]
-    if max(chi_max_over_time) > 0.01:  # noqa: PLR2004 - threshold
+    if max(chi_max_over_time) > COUPLING_THRESHOLD:
         print("  Energy transfer: φ → χ observed ✓ (coupling working)")
     else:
         print("  No energy transfer to χ (check coupling)")
@@ -371,7 +380,8 @@ def _plot_results(simulation: SimulationData, _spec: EquationSystem) -> None:  #
     output_dir.mkdir(exist_ok=True, parents=True)
     output_path = output_dir / OUTPUT_FILENAME
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"Saved plot to: {output_path}")
+    print(f"  Saved plot to: {output_path}")
+    plt.close()
     print()
 
 
@@ -385,6 +395,24 @@ def _print_footer() -> None:
     print("  3. Energy oscillates between φ and χ (mode mixing)")
     print("  4. Demonstrates inter-field coupling without hardcoding physics")
     print("=" * 60)
+
+
+# ── Entry point ───────────────────────────────────────────────
+
+
+def main() -> None:
+    """Run the coupled scalar fields simulation from Lagrangian-derived equations."""
+    json_path = Path(__file__).parent.parent / "data" / "coupled_scalars.json"
+    _print_header()
+    spec = _load_spec(json_path)
+    pde = _build_pde(json_path)
+    grid = _create_grid()
+    initial_state = _create_initial_state(grid, spec)
+    storage = _run_simulation(pde, initial_state)
+    simulation = _collect_simulation_data(storage, grid)
+    _analyze_results(simulation, spec)
+    _plot_results(simulation, spec)
+    _print_footer()
 
 
 if __name__ == "__main__":
