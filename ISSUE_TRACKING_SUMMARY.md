@@ -11,7 +11,7 @@
 
 Three parallel exploration agents analyzed:
 - **Wolfram Pipeline** (6 modules: CommonUtilities.wl, ComponentDecompose.wl, EulerLagrange.wl, ExportJSON.wl, Linearize.wl, Christoffel handling)
-- **Python Simulation** (symbolic/, kgsim/ modules, pde_builder.py, json_loader.py, operators)
+- **Python Simulation** (symbolic/ modules, pde_builder.py, json_loader.py, operators)
 - **Testing & Infrastructure** (tests/, examples/, docs/, CI/CD workflows)
 
 **Key Findings (at time of analysis):**
@@ -239,10 +239,10 @@ ISSUE_TRACKING_SUMMARY.md   ✅ This summary
 
 **Current State (v0.3.1):**
 - ✅ Phase 13+ completed (rank-3+ tensor support, mixed derivatives, curvilinear)
-- ✅ CLI (`tidal` command) implemented — 5 subcommands, 147 tests, zero new deps
-- ✅ 850 Python tests + ~108 Wolfram tests passing
+- ✅ CLI (`tidal` command) implemented — 6 subcommands, 200+ tests, zero new deps
+- ✅ 900+ Python tests + ~115 Wolfram tests passing
 - ✅ 0 ruff violations, 0 pyright errors (strict mode)
-- ✅ 18 working examples spanning 1+1D through 3+1D
+- ✅ 20 working examples spanning 1+1D through 3+1D
 - ✅ Project renamed to TIDAL with professional branding (logo, Makefile, COMMUNITY.md)
 - ✅ Sphinx docs with autodoc, napoleon, viewcode, intersphinx, autosummary, doctest
 
