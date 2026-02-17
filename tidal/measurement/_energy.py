@@ -333,7 +333,7 @@ def _build_coord_arrays(
         n = round((hi - lo) / dx)
         # Cell-centered: offset by dx/2
         axes.append(np.linspace(lo + dx / 2, hi - dx / 2, n))
-        _ = name  # used below
+        del name  # used only in the dict comprehension below
 
     grids = np.meshgrid(*axes, indexing="ij")
     return {
@@ -366,7 +366,7 @@ def _resolve_coefficient_on_grid(
     return evaluate_coefficient(
         sym,
         data.parameters,
-        data.spec.coordinates,
+        data.spec.effective_coordinates,
         coord_arrays=coord_arrays,
         t=0.0,
     )
@@ -532,7 +532,7 @@ def _resolve_mass_squared(
             from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
 
             coeff = evaluate_coefficient(
-                sym, data.parameters, data.spec.coordinates,
+                sym, data.parameters, data.spec.effective_coordinates,
                 coord_arrays=coord_arrays,
             )
             # Convention: mass_matrix[i][i] = -(coefficient of identity(field_i))
