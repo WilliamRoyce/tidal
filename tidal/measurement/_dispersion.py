@@ -23,6 +23,9 @@ from tidal.measurement._spectral import (
     _build_k_grid,  # pyright: ignore[reportPrivateUsage]
     _radial_bin,  # pyright: ignore[reportPrivateUsage]
 )
+from tidal.measurement._utils import (
+    _check_no_position_dependent_terms,  # pyright: ignore[reportPrivateUsage]
+)
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -206,9 +209,12 @@ def compute_dispersion(
     Raises
     ------
     ValueError
-        If *field_name* is unknown, fewer than 3 snapshots, or
-        the timestep is non-uniform.
+        If *field_name* is unknown, fewer than 3 snapshots, the
+        timestep is non-uniform, or any equation term is
+        position-dependent (uniform medium required).
     """
+    _check_no_position_dependent_terms(data, "Dispersion relation omega(k)")
+
     if field_name not in data.spec.component_names:
         msg = f"Field '{field_name}' not in spec fields: {data.spec.component_names}"
         raise ValueError(msg)

@@ -181,8 +181,23 @@ def compute_spectral_energy(
         Radially binned ``|k|`` values.
     spectral_energy : ndarray
         Energy per wavenumber bin.
+
+    Raises
+    ------
+    TypeError
+        If *mass_squared* is an ndarray (position-dependent mass breaks
+        the Fourier-diagonal structure).
     """
     _validate_array(field_data, "field_data")
+
+    if isinstance(mass_squared, np.ndarray):
+        msg = (
+            "compute_spectral_energy requires spatially uniform mass_squared "
+            "(got ndarray). Spectral energy E(k) = 0.5*(k²+m²)|φ̂_k|² is only "
+            "defined for constant m² — position-dependent mass breaks the "
+            "Fourier-diagonal structure."
+        )
+        raise TypeError(msg)
 
     phi_hat = np.fft.rfftn(field_data)
     k_grid, k_mag = _build_k_grid(field_data.shape, grid_spacing)
