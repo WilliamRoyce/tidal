@@ -26,8 +26,8 @@ Generates a Wolfram Language script (`.wls`) from a TOML configuration file and 
 # Generate .wls only
 tidal derive examples/scalar_field/theory.toml
 
-# Generate and run wolframscript
-tidal derive examples/scalar_field/theory.toml --run
+# Generate .wls and run wolframscript via the generated run.sh
+bash examples/scalar_field/run.sh
 ```
 
 ### `tidal simulate` — Run a PDE simulation
@@ -64,7 +64,7 @@ tidal simulate examples/data/chern_simons.json --mode constraint
 | `--ic-formula EXPR` | Custom IC formula (Python expression) | — |
 | `--bc TYPES` | Boundary conditions (comma-separated per axis) | periodic |
 | `--scheme {scipy,runge-kutta}` | Solver scheme | runge-kutta |
-| `--mode {evolution,constraint}` | Simulation mode | evolution |
+| `--mode {evolve,constraint}` | Simulation mode | evolve |
 | `--plot` / `--no-plot` | Enable/disable plotting | --plot |
 | `--output PATH` | Output path (directory for snapshot data; image extension for plot-only) | — |
 
@@ -224,7 +224,7 @@ This generates `DefTensor` + `MakeRule` in the `.wls` output, with automatic sub
 # 1. Write theory.toml (see examples/scalar_field/theory.toml)
 
 # 2. Derive equations
-tidal derive examples/scalar_field/theory.toml --run
+tidal derive examples/scalar_field/theory.toml
 
 # 3. Inspect the result
 tidal inspect examples/data/klein_gordon_1d.json
@@ -263,7 +263,7 @@ Available types: `periodic`, `neumann`, `dirichlet`.
 
 ```bash
 # 1. Derive equations from a Lagrangian
-tidal derive examples/coupled_scalars/theory.toml --run
+tidal derive examples/coupled_scalars/theory.toml
 
 # 2. Simulate and save to snapshot directory
 tidal simulate examples/data/coupled_scalars.json \
