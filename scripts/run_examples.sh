@@ -58,6 +58,38 @@ for example in "${EXAMPLES[@]}"; do
     echo ""
 done
 
+# --- TOML-only examples (no standalone .wls) ---
+echo ""
+echo "=== Running TOML-only Derivations ==="
+echo ""
+
+TOML_EXAMPLES=(
+    "examples/electrostatics/theory.toml"
+    "examples/gravitational_waves/theory.toml"
+    "examples/coupled_scattering/theory.toml"
+    "examples/scalar_potential_well/theory.toml"
+)
+
+for toml in "${TOML_EXAMPLES[@]}"; do
+    TOML_PATH="$PROJECT_ROOT/$toml"
+
+    if [ ! -f "$TOML_PATH" ]; then
+        echo "SKIP: $toml (file not found)"
+        continue
+    fi
+
+    echo "Running: tidal derive $toml"
+    if (cd "$PROJECT_ROOT" && tidal derive "$toml"); then
+        PASSED=$((PASSED + 1))
+        echo "  OK"
+    else
+        FAILED=$((FAILED + 1))
+        FAILED_EXAMPLES+=("$toml")
+        echo "  FAILED"
+    fi
+    echo ""
+done
+
 echo "=== Example Derivation Summary ==="
 echo "Passed: $PASSED"
 echo "Failed: $FAILED"
