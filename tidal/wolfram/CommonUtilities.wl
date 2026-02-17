@@ -738,5 +738,43 @@ EvaluateCurvatureComponents[expr_, chart_, metricMatrix_:None] := Module[
   result
 ];
 
+
+(* ========================================================= *)
+(* ValidateNoUnresolvedBackgrounds                           *)
+(* ========================================================= *)
+
+(*
+  After ToBasis + TraceBasisDummy, all background tensor symbols should be
+  fully resolved to their component expressions.  If any unresolved tensor
+  heads remain, the ComponentValue substitution failed silently — this is
+  a pipeline error that must be caught.
+
+  Usage (from generated .wls):
+    ValidateNoUnresolvedBackgrounds[decomposedExpr, {bgTensor1, bgTensor2, ...}]
+
+  Throws a clear error message naming the unresolved tensor.
+*)
+
+ValidateNoUnresolvedBackgrounds[expr_, bgTensorHeads_List] := Module[
+  {head, pattern, found},
+  Do[
+    head = bgTensorHeads[[i]];
+    (* Check if any expression of the form head[...] remains *)
+    pattern = head[___];
+    found = !FreeQ[expr, pattern];
+    If[found,
+      Throw[StringJoin[
+        "PIPELINE ERROR: Background tensor '", ToString[head],
+        "' was not fully resolved after ToBasis. ",
+        "ComponentValue substitution failed silently. ",
+        "Check that DefTensor and ComponentValue were called correctly ",
+        "for this background field."
+      ]]
+    ],
+    {i, Length[bgTensorHeads]}
+  ];
+];
+
+
 End[];
 EndPackage[];
