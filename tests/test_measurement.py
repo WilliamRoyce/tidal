@@ -637,54 +637,69 @@ class TestNearZeroEnergyThreshold:
         assert result.probability is not None
 
 
-class TestPositionDependentValidation:
-    """Test that position-dependent mass/coupling is rejected."""
+class TestPositionDependentMass:
+    """Test that position-dependent mass is correctly resolved in energy."""
 
-    def _make_spec_with_position_dependent_mass(self) -> EquationSystem:
-        """Build a synthetic spec with position-dependent identity term."""
-        base_spec = _build_coupled_scalars_spec()
+    @staticmethod
+    def _make_standalone_spec_with_position_dependent_mass() -> EquationSystem:
+        """Build a self-contained spec with position-dependent identity term.
 
-        # Replace first equation's identity term with position-dependent one
-        new_terms: list[OperatorTerm] = []
-        for term in base_spec.equations[0].rhs_terms:
-            if term.operator == "identity" and term.field == "phi_0":
-                new_terms.append(
-                    OperatorTerm(
-                        coefficient=term.coefficient,
-                        operator="identity",
-                        field="phi_0",
-                        coefficient_symbolic=term.coefficient_symbolic,
-                        coordinate_dependent=("x",),
-                    )
-                )
-            else:
-                new_terms.append(term)
-
-        new_eq = ComponentEquation(
-            field_name=base_spec.equations[0].field_name,
-            field_index=base_spec.equations[0].field_index,
-            time_derivative_order=base_spec.equations[0].time_derivative_order,
-            rhs_terms=tuple(new_terms),
+        Two 1+1D scalar fields: phi_0 with position-dependent mass
+        ``-m2 * x`` (symbolic), chi_0 with constant mass.
+        """
+        phi_terms = (
+            OperatorTerm(
+                coefficient=1.0,
+                operator="laplacian",
+                field="phi_0",
+            ),
+            OperatorTerm(
+                coefficient=-1.0,
+                operator="identity",
+                field="phi_0",
+                coefficient_symbolic="-m2",
+                coordinate_dependent=("x",),
+            ),
         )
-        new_equations = (new_eq, base_spec.equations[1])
-
+        chi_terms = (
+            OperatorTerm(
+                coefficient=1.0,
+                operator="laplacian",
+                field="chi_0",
+            ),
+            OperatorTerm(
+                coefficient=-4.0,
+                operator="identity",
+                field="chi_0",
+            ),
+        )
+        eq_phi = ComponentEquation(
+            field_name="phi_0",
+            field_index=0,
+            time_derivative_order=2,
+            rhs_terms=phi_terms,
+        )
+        eq_chi = ComponentEquation(
+            field_name="chi_0",
+            field_index=1,
+            time_derivative_order=2,
+            rhs_terms=chi_terms,
+        )
         return EquationSystem(
-            n_components=base_spec.n_components,
-            dimension=base_spec.dimension,
-            spatial_dimension=base_spec.spatial_dimension,
-            equations=new_equations,
-            component_names=base_spec.component_names,
-            mass_matrix=base_spec.mass_matrix,
-            coupling_matrix=base_spec.coupling_matrix,
-            metadata=base_spec.metadata,
-            coordinates=base_spec.coordinates,
-            mass_matrix_symbolic=base_spec.mass_matrix_symbolic,
-            coupling_matrix_symbolic=base_spec.coupling_matrix_symbolic,
+            n_components=2,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi_0", "chi_0"),
+            equations=(eq_phi, eq_chi),
+            mass_matrix=((1.0, 0.0), (0.0, 4.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={},
+            coordinates=("t", "x"),
         )
 
-    def test_position_dependent_mass_raises(self) -> None:
-        """Position-dependent mass term raises ValueError in system energy."""
-        spec = self._make_spec_with_position_dependent_mass()
+    def test_position_dependent_mass_works(self) -> None:
+        """Position-dependent mass term is resolved without error."""
+        spec = self._make_standalone_spec_with_position_dependent_mass()
         data = SimulationData(
             times=np.array([0.0, 1.0]),
             fields={
@@ -699,11 +714,14 @@ class TestPositionDependentValidation:
             grid_bounds=((0.0, 10.0),),
             periodic=(True,),
             spec=spec,
-            parameters={},
+            parameters={"m2": 1.0},
         )
 
-        with pytest.raises(ValueError, match="Position-dependent"):
-            compute_system_energy(data, 0)
+        result = compute_system_energy(data, 0)
+        # Should succeed — position-dependent mass is evaluated on grid
+        assert result.total >= 0.0
+        assert "phi_0" in result.per_field
+        assert "chi_0" in result.per_field
 
 
 # ============================================================

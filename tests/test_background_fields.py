@@ -8,7 +8,7 @@ position-dependent expressions like UnitStep, Sign, Max, Min.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 import pytest
@@ -317,8 +317,8 @@ class TestBackgroundEnergy:
         # then _resolve_mass_squared negates: -(-4.0) = 4.0
         assert m2 == pytest.approx(4.0)
 
-    def test_position_dependent_mass_in_virial_raises(self) -> None:
-        """Position-dependent identity term raises ValueError in virial energy."""
+    def test_position_dependent_mass_in_virial_works(self) -> None:
+        """Position-dependent identity term evaluates on grid in virial energy."""
         from tidal.measurement._energy import _compute_virial_potential
         from tidal.measurement._io import SimulationData
 
@@ -361,8 +361,67 @@ class TestBackgroundEnergy:
             parameters={"V0": 4.0},
         )
 
-        with pytest.raises(ValueError, match=r"position-dependent|Position-dependent"):
-            _compute_virial_potential(data, t_idx=0)
+        # Should now work (no longer raises) — position-dependent coefficients
+        # are evaluated on the grid for the virial integral.
+        result = _compute_virial_potential(data, t_idx=0)
+        assert np.isfinite(result)
+        # With constant phi=1 field, virial is non-trivial
+        assert result != 0.0
+
+    def test_position_dependent_mass_resolved_on_grid(self) -> None:
+        """_resolve_mass_squared returns ndarray for position-dependent mass."""
+        from tidal.measurement._energy import _resolve_mass_squared
+        from tidal.measurement._io import SimulationData
+
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(1.0, "laplacian", "phi"),
+                        OperatorTerm(
+                            -1.0,
+                            "identity",
+                            "phi",
+                            coefficient_symbolic="-V0*exp(-(x()^2 + y()^2))",
+                            coordinate_dependent=("x", "y"),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((1.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=("t", "x", "y"),
+        )
+
+        data = SimulationData(
+            spec=spec,
+            fields={"phi": np.ones((2, 16, 16))},
+            momenta={"pi_phi": np.zeros((2, 16, 16))},
+            times=np.array([0.0, 1.0]),
+            grid_spacing=(10.0 / 16, 10.0 / 16),
+            grid_bounds=((-5.0, 5.0), (-5.0, 5.0)),
+            periodic=(True, True),
+            parameters={"V0": 3.0},
+        )
+
+        m2 = _resolve_mass_squared(data, 0)
+        # Position-dependent → returns ndarray
+        assert isinstance(m2, np.ndarray)
+        assert m2.shape == (16, 16)
+        # Center cell at (0.3125, 0.3125) — not exactly (0,0) so exp != 1
+        # coefficient_symbolic = -V0*exp(-(x^2+y^2)), _resolve_mass_squared negates
+        # Verify center has highest value and edges are smaller
+        assert m2[8, 8] > m2[0, 0], "Center should be > corner"
+        assert m2[8, 8] == pytest.approx(3.0, abs=0.6)  # close to V0=3.0
+        assert m2[0, 0] < 0.01  # far from center, exp decays
 
 
 # ===========================================================================
@@ -372,6 +431,53 @@ class TestBackgroundEnergy:
 
 class TestBackgroundFieldValidation:
     """TOML validation edge cases for [[background_fields]]."""
+
+    def test_background_gradient_in_lagrangian_raises(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """CD[-a][G[]] in Lagrangian should raise with clear error message."""
+        from tidal.cli._derive import _validate_config
+
+        config: dict[str, Any] = {
+            "theory": {"name": "Bad Gradient"},
+            "spacetime": {"dimension": 3, "metric": "minkowski"},
+            "fields": [{"name": "phi", "type": "scalar"}],
+            "constants": {"names": ["g0"]},
+            "background_fields": [
+                {"name": "G", "type": "scalar", "components": ["g0"]},
+            ],
+            "lagrangian": {
+                "expression": (
+                    "-1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]] "
+                    "- CD[-a][G[]] eta[a,b] CD[-b][phi[]]"
+                ),
+            },
+            "output": {"path": "out.json"},
+        }
+        with pytest.raises(ValueError, match=r"covariant derivative.*background.*G"):
+            _validate_config(config)
+
+    def test_background_no_gradient_passes(
+        self, tmp_path: pathlib.Path,
+    ) -> None:
+        """G[] * phi[] (no gradient) should pass validation."""
+        from tidal.cli._derive import _validate_config
+
+        config: dict[str, Any] = {
+            "theory": {"name": "OK Coupling"},
+            "spacetime": {"dimension": 3, "metric": "minkowski"},
+            "fields": [{"name": "phi", "type": "scalar"}],
+            "constants": {"names": ["g0"]},
+            "background_fields": [
+                {"name": "G", "type": "scalar", "components": ["g0"]},
+            ],
+            "lagrangian": {
+                "expression": "-1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]] - G[] * phi[]^2",
+            },
+            "output": {"path": "out.json"},
+        }
+        # Should not raise
+        _validate_config(config)
 
     def test_multiple_background_fields(
         self, tmp_path: pathlib.Path,
@@ -610,3 +716,229 @@ class TestGaussianCoupling2DGrid:
 
         # Symmetric: arr[i,j] ≈ arr[j,i] (rotational symmetry)
         assert_allclose(arr[20, 32], arr[32, 20], atol=1e-10)
+
+
+# ===========================================================================
+# Group 6: Spatial coefficient caching (B6)
+# ===========================================================================
+
+
+class TestSpatialCoefficientCache:
+    """Verify that spatial-only coefficients are cached after first use."""
+
+    def test_spatial_cache_populated_on_first_rhs(self) -> None:
+        """Spatial-only coefficient should be cached after _ensure_spatial_cache."""
+        spec = _make_spec(
+            coefficient_symbolic="g0 * exp(-(x()^2 + y()^2) / (2 * R^2))",
+            coordinate_dependent=("x", "y"),
+            operator="identity",
+            coefficient=1.0,
+        )
+        pde = PDEFromSpec(spec, parameters={"g0": 2.0, "R": 8.0})
+        grid = CartesianGrid([(-30, 30), (-30, 30)], 32, periodic=True)
+
+        # Before first use, spatial cache should be empty
+        assert not pde._spatial_cache_ready
+        assert len(pde._spatial_cache) == 0
+
+        # Trigger cache population
+        pde._ensure_spatial_cache(grid)
+
+        assert pde._spatial_cache_ready
+        assert len(pde._spatial_cache) == 1
+        cached_key = "g0 * exp(-(x()^2 + y()^2) / (2 * R^2))"
+        assert cached_key in pde._spatial_cache
+        arr = pde._spatial_cache[cached_key]
+        assert arr.shape == (32, 32)
+        # Peak at center
+        assert arr[16, 16] == pytest.approx(2.0, rel=0.1)
+
+    def test_spatial_cache_skips_time_dependent(self) -> None:
+        """Time-dependent terms should NOT be cached in spatial cache."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0, "identity", "phi",
+                            coefficient_symbolic="g0 * exp(-t()) * exp(-x()^2)",
+                            coordinate_dependent=("x",),
+                            time_dependent=True,
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=("t", "x", "y"),
+        )
+        pde = PDEFromSpec(spec, parameters={"g0": 1.0})
+        grid = CartesianGrid([(-10, 10), (-10, 10)], 16, periodic=True)
+
+        pde._ensure_spatial_cache(grid)
+
+        # Time-dependent term should NOT be in spatial cache; no spatial-only
+        # terms exist so cache stays in initial state
+        assert not pde._spatial_cache_ready
+        assert len(pde._spatial_cache) == 0
+
+    def test_time_dependent_background_evaluates_correctly(self) -> None:
+        """Time-dependent background coefficient should vary with t."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0, "identity", "phi",
+                            coefficient_symbolic="g0 * cos(t())",
+                            time_dependent=True,
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=("t", "x", "y"),
+        )
+        pde = PDEFromSpec(spec, parameters={"g0": 2.0})
+        term = spec.equations[0].rhs_terms[0]
+
+        # t=0: cos(0) = 1, so coefficient = 2.0
+        assert pde._resolve_coefficient_at_point(term, t=0.0, grid=None) == pytest.approx(2.0)
+        # t=pi/2: cos(pi/2) = 0, so coefficient = 0.0
+        assert pde._resolve_coefficient_at_point(term, t=np.pi / 2, grid=None) == pytest.approx(0.0, abs=1e-14)
+        # t=pi: cos(pi) = -1, so coefficient = -2.0
+        assert pde._resolve_coefficient_at_point(term, t=np.pi, grid=None) == pytest.approx(-2.0)
+
+    def test_time_and_position_dependent_background(self) -> None:
+        """Background with both time and position dependence evaluates correctly."""
+        spec = _make_spec(
+            coefficient_symbolic="g0 * exp(-x()^2) * cos(t())",
+            coordinate_dependent=("x",),
+        )
+        # Need to mark as time-dependent too — rebuild the term
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0, "laplacian", "phi",
+                            coefficient_symbolic="g0 * exp(-x()^2) * cos(t())",
+                            coordinate_dependent=("x",),
+                            time_dependent=True,
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+            coordinates=("t", "x", "y"),
+        )
+        pde = PDEFromSpec(spec, parameters={"g0": 3.0})
+        grid = CartesianGrid([(-5, 5), (-5, 5)], 16, periodic=True)
+        term = spec.equations[0].rhs_terms[0]
+
+        # t=0: cos(0)=1, so result = 3*exp(-x^2)
+        result_t0 = np.asarray(
+            pde._resolve_coefficient_at_point(term, t=0.0, grid=grid),
+        )
+        assert result_t0[8, 8] == pytest.approx(3.0, rel=0.1)  # center: x≈0
+
+        # t=pi: cos(pi)=-1, so result = -3*exp(-x^2)
+        result_tpi = np.asarray(
+            pde._resolve_coefficient_at_point(term, t=np.pi, grid=grid),
+        )
+        assert_allclose(result_tpi, -result_t0, atol=1e-12)
+
+    def test_sign_change_warning_for_position_dependent_mass(self) -> None:
+        """Position-dependent mass that changes sign emits UserWarning."""
+        import warnings
+
+        # Build spec with a mass coefficient that changes sign: sin(x)
+        spec = _make_spec(
+            coefficient_symbolic="sin(x())",
+            coordinate_dependent=("x",),
+            operator="identity",
+            field="phi",
+            coefficient=1.0,
+        )
+        pde = PDEFromSpec(spec, parameters={})
+        grid = CartesianGrid([(-10, 10), (-10, 10)], 32, periodic=True)
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            pde._ensure_spatial_cache(grid)
+
+        tachyonic_warnings = [
+            x for x in w
+            if "tachyonic" in str(x.message).lower()
+        ]
+        assert len(tachyonic_warnings) == 1
+        assert "changes sign" in str(tachyonic_warnings[0].message)
+
+    def test_no_warning_for_positive_definite_mass(self) -> None:
+        """Position-dependent mass that stays positive should not warn."""
+        import warnings
+
+        # exp(-x^2) is always positive
+        spec = _make_spec(
+            coefficient_symbolic="exp(-x()^2)",
+            coordinate_dependent=("x",),
+            operator="identity",
+            field="phi",
+            coefficient=1.0,
+        )
+        pde = PDEFromSpec(spec, parameters={})
+        grid = CartesianGrid([(-10, 10), (-10, 10)], 32, periodic=True)
+
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            pde._ensure_spatial_cache(grid)
+
+        tachyonic_warnings = [
+            x for x in w
+            if "tachyonic" in str(x.message).lower()
+        ]
+        assert len(tachyonic_warnings) == 0
+
+    def test_spatial_cache_reused_across_calls(self) -> None:
+        """Ensure cached value is the same object across multiple cache checks."""
+        spec = _make_spec(
+            coefficient_symbolic="g0 * exp(-x()^2)",
+            coordinate_dependent=("x",),
+            operator="identity",
+            coefficient=1.0,
+        )
+        pde = PDEFromSpec(spec, parameters={"g0": 3.0})
+        grid = CartesianGrid([(-10, 10), (-10, 10)], 16, periodic=True)
+
+        pde._ensure_spatial_cache(grid)
+        cached_arr = pde._spatial_cache["g0 * exp(-x()^2)"]
+
+        # Second call should be a no-op
+        pde._ensure_spatial_cache(grid)
+        assert pde._spatial_cache["g0 * exp(-x()^2)"] is cached_arr
