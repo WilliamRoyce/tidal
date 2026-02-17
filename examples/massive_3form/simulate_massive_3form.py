@@ -47,8 +47,8 @@ from tidal.utils import normalize_solve_result
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
-    from tidal.symbolic.equation_system import EquationSystem
 
+    from tidal.symbolic.json_loader import EquationSystem
     from tidal.symbolic.pde_builder import PDEFromSpec
 
     NumericArray = NDArray[np.float64]
