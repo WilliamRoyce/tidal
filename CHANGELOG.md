@@ -1,5 +1,40 @@
 # Changelog
 
+## Background Fields & Repository Cleanup (February 2026)
+
+**Status:** COMPLETE
+
+**Summary:** Added `[[background_fields]]` support for non-dynamical fields in the TOML-to-Wolfram pipeline, two new examples demonstrating the feature, and a comprehensive documentation/git hygiene cleanup pass.
+
+**New features:**
+
+- **Background fields (`[[background_fields]]` TOML):** Declare non-dynamical tensors that survive as position-dependent coefficients in the EOM. Supports scalar backgrounds with explicit `ReplaceAll` before component decomposition. Validation rejects derivatives of background fields (`CD[-a][G[]]`) at TOML parse time.
+- **`_eval_utils.py` module:** Extracted standalone `evaluate_coefficient()` for Mathematica-to-Python expression conversion and grid evaluation, used by `pde_builder.py`.
+
+**New examples:**
+
+- `coupled_scattering/` — Two coupled scalars with position-dependent Gaussian coupling via `[[background_fields]]`, wave packet scattering simulation
+- `scalar_potential_well/` — Scalar field in a background potential well, bound state dynamics
+
+**Bug fixes:**
+
+- `_derive.py:623`: Fixed wrong dict key `rule` → `definition` for derived field background detection
+- `curved_spacetime/*.toml`: Fixed output paths (were relative to project root, should be relative to TOML directory)
+- `scripts/validate_pipeline.sh`: Fixed dead test file reference
+
+**Documentation & cleanup:**
+
+- Removed 95 tracked Sphinx build artifacts from git (`docs/build/`)
+- Removed legacy `validate_implementation.py` and 3 stale Sphinx docs
+- Removed all dead `kgsim/` references from README, architecture docs, PIPELINE_README
+- Updated test counts, CLI subcommand counts, example counts across 10+ docs
+- Added `coupled_scattering` and `scalar_potential_well` to all documentation tables
+- Fixed `docs/source/cli.md` derived_fields example (`rule` → `definition`, case fix)
+- Added `tidal.measurement` to Sphinx API docs
+- Updated `docs/NEXT_PHASES.md` Phase A status to complete
+
+---
+
 ## `tidal measure` CLI Subcommand (February 2026)
 
 **Status:** COMPLETE
