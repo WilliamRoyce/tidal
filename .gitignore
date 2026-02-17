@@ -12,6 +12,11 @@ wolfram_test_output.txt
 /examples/data/**/*.npy
 /examples/data/**/*.json
 
+# Build artifacts
+docs/build/
+coverage.xml
+htmlcov/
+
 # Wolfram installers / license artifacts (never commit)
 Wolfram*.sh
 Wolfram*.run
