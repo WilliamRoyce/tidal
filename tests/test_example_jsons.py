@@ -41,6 +41,7 @@ _DEFAULT_PARAMS: dict[str, dict[str, float]] = {
     "coupled_proca_3d.json": {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5},
     "scalar_potential_well.json": {"V0": 4.0},
     "coupled_scattering.json": {"mPhi2": 1.0, "mChi2": 4.0, "g0": 1.0, "R": 8.0},
+    "proca_background.json": {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5, "g0": 1.0, "R": 8.0},
 }
 
 # Grid sizes per spatial dimension (small for speed).
