@@ -48,7 +48,12 @@ if TYPE_CHECKING:
 
     NumericArray = NDArray[np.float64]
 
-OUTPUT_FILENAME = "spherical_kg_output.png"
+# ── Configuration ─────────────────────────────────────────────
+
+# Physics
+MASS_SQUARED = 0.5
+
+# Grid
 R_MIN = 0.5
 R_MAX = 8.0
 THETA_MIN = 0.05  # Avoid theta=0 singularity (sin(0)=0)
@@ -58,12 +63,21 @@ PHI_MAX = 2 * np.pi
 GRID_NR = 64
 GRID_NTHETA = 64
 GRID_NPHI = 64
-MASS_SQUARED = 0.5  # Mass parameter squared
+
+# Time integration
+T_END = 5.0
+DT = 0.01
+SNAPSHOT_INTERVAL = 0.5
+
+# Initial conditions
 PULSE_RADIUS = 3.0
 PULSE_WIDTH = 0.6
 PULSE_AMPLITUDE = 1.0
-T_END = 5.0
-DT = 0.01
+
+# Output
+OUTPUT_FILENAME = "spherical_kg_output.png"
+
+# ── Helpers ───────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
@@ -75,20 +89,6 @@ class SimulationResult:
     r_coords: NumericArray
     theta_coords: NumericArray
     phi_coords: NumericArray
-
-
-def main() -> None:
-    """Run the spherical coordinate Klein-Gordon simulation."""
-    _print_header()
-    json_path = Path(__file__).parent.parent / "data" / "spherical_kg.json"
-    _load_spec(json_path)
-    pde = _build_pde(json_path)
-    grid = _create_grid()
-    state = _create_initial_state(grid)
-    result = _run_simulation(pde, grid, state)
-    _analyze_results(result)
-    _plot_results(result)
-    _print_footer()
 
 
 def _print_header() -> None:
@@ -181,7 +181,7 @@ def _run_simulation(
         dt=DT,  # Let the solver choose adaptive time steps
         solver="scipy",
         method="RK45",
-        tracker=storage.tracker(0.5),
+        tracker=storage.tracker(SNAPSHOT_INTERVAL),
     )
     result = normalize_solve_result(result)
 
@@ -350,6 +350,23 @@ def _print_footer() -> None:
     print("  4. 3+1D: 3 spatial dimensions (r, theta, phi)")
     print("  5. All coefficients derived from metric by xAct pipeline")
     print("=" * 60)
+
+
+# ── Entry point ───────────────────────────────────────────────
+
+
+def main() -> None:
+    """Run the spherical coordinate Klein-Gordon simulation."""
+    json_path = Path(__file__).parent.parent / "data" / "spherical_kg.json"
+    _print_header()
+    _load_spec(json_path)
+    pde = _build_pde(json_path)
+    grid = _create_grid()
+    state = _create_initial_state(grid)
+    result = _run_simulation(pde, grid, state)
+    _analyze_results(result)
+    _plot_results(result)
+    _print_footer()
 
 
 if __name__ == "__main__":

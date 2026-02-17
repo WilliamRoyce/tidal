@@ -1799,20 +1799,102 @@ class TestMathematicaFunctionConversion:
         assert result == "(3)/(4)*np.pi"
 
     def test_sign_conversion(self) -> None:
-        """Test Sign[x] → np.sign(x)."""
+        """Test Sign[x] → sign(x) (no np. prefix — available in eval namespace)."""
         spec = self.make_spec()
         pde = PDEFromSpec(spec)
         result = pde._mathematica_to_python("Sign[x()]")
-        assert result == "np.sign(x)"
+        assert result == "sign(x)"
 
     def test_max_min_conversion(self) -> None:
-        """Test Max/Min → np.maximum/np.minimum."""
+        """Test Max/Min → maximum/minimum (no np. prefix — available in eval namespace)."""
         spec = self.make_spec()
         pde = PDEFromSpec(spec)
         result_max = pde._mathematica_to_python("Max[x[], 0]")
-        assert result_max == "np.maximum(x, 0)"
+        assert result_max == "maximum(x, 0)"
         result_min = pde._mathematica_to_python("Min[x[], 1]")
-        assert result_min == "np.minimum(x, 1)"
+        assert result_min == "minimum(x, 1)"
+
+    # ===== Piecewise / Inequality =====
+
+    def test_inequality_simple(self) -> None:
+        """Test Inequality[a, LessEqual, x, LessEqual, b] → chained <=."""
+        from tidal.symbolic._eval_utils import _convert_inequality
+
+        result = _convert_inequality(
+            "Inequality[30, LessEqual, x[], LessEqual, 70]"
+        )
+        assert "<=" in result
+        assert "&" in result
+        assert "Inequality" not in result
+        assert "LessEqual" not in result
+
+    def test_inequality_less(self) -> None:
+        """Test Inequality with Less (strict) operator."""
+        from tidal.symbolic._eval_utils import _convert_inequality
+
+        result = _convert_inequality(
+            "Inequality[0, Less, x[], Less, 10]"
+        )
+        assert "<" in result
+        assert "Less" not in result
+        # Should NOT contain <= (strict inequality)
+        assert "<=" not in result
+
+    def test_piecewise_single_condition(self) -> None:
+        """Test full Piecewise expression from scalar_potential_well JSON."""
+        from tidal.symbolic._eval_utils import _convert_inequality, _convert_piecewise
+
+        expr = "Piecewise[{{-V0, Inequality[30, LessEqual, x[], LessEqual, 70]}}, 0]"
+        # First convert Inequality, then Piecewise (matching pipeline order)
+        result = _convert_inequality(expr)
+        result = _convert_piecewise(result)
+        assert "piecewise(" in result
+        assert "Piecewise" not in result
+        assert "Inequality" not in result
+        assert "LessEqual" not in result
+        assert "-V0" in result
+
+    def test_piecewise_multi_condition(self) -> None:
+        """Test Piecewise with two conditions → nested piecewise() calls."""
+        from tidal.symbolic._eval_utils import _convert_piecewise
+
+        expr = "Piecewise[{{v1, c1}, {v2, c2}}, d]"
+        result = _convert_piecewise(expr)
+        assert result.count("piecewise(") == 2
+        assert "Piecewise" not in result
+
+    def test_piecewise_after_full_conversion(self) -> None:
+        """Test full _mathematica_to_python pipeline with Piecewise expression."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        expr = "Piecewise[{{-V0, Inequality[30, LessEqual, x[], LessEqual, 70]}}, 0]"
+        result = pde._mathematica_to_python(expr)
+        # After full conversion: brackets → parens, x[] → x() → x
+        assert "piecewise(" in result
+        assert "Piecewise" not in result
+        assert "Inequality" not in result
+        assert "x[]" not in result
+        assert "x()" not in result
+
+    def test_exp_function_conversion(self) -> None:
+        """Both E^(...) and Exp[...] should convert to exp(...)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        # E^(x) → exp(x) — Mathematica's standard notation (Step 1)
+        result_e = pde._mathematica_to_python("E^(x[])")
+        assert "exp(" in result_e
+        assert "E^" not in result_e
+        # Exp[x] → exp(x) — Mathematica's function form (Step 4)
+        result_exp = pde._mathematica_to_python("Exp[x[]]")
+        assert "exp(" in result_exp
+        assert "Exp" not in result_exp
+        # Full Gaussian expression with Exp
+        gaussian = "g0 * Exp[-(x[]^2 + y[]^2) / (2 * R^2)]"
+        result_gauss = pde._mathematica_to_python(gaussian)
+        assert "exp(" in result_gauss
+        assert "Exp" not in result_gauss
+        assert "x[]" not in result_gauss
+        assert "y[]" not in result_gauss
 
 
 class TestCachingOptimizations:

@@ -5,6 +5,8 @@ derived from Lagrangians. It builds on the symbolic package to provide
 convenient initial condition creation and configuration.
 """
 
+from __future__ import annotations
+
 from tidal.vectorfield.config import (
     ComponentFieldParams,
 )

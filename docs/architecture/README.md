@@ -73,12 +73,15 @@ flowchart TD
             pb["pde_builder.py<br/><i>PDEFromSpec, build_pde_from_json,<br/>create_initial_state</i>"]
         end
 
-        subgraph kg["kgsim/"]
-            kinit["__init__.py"]
-            keq["equations.py<br/><i>KleinGordonPDE</i>"]
-            kutil["utils.py<br/><i>infer_bc_from_grid</i>"]
-            krun["runners.py<br/><i>run, run_with_snapshots</i>"]
-            kgrid["grids.py<br/><i>make_grid</i>"]
+        subgraph cli["cli/"]
+            cmain["__main__.py<br/><i>Entry point</i>"]
+            cderiv["_derive.py<br/><i>TOML → .wls → JSON</i>"]
+            csim["_simulate.py<br/><i>JSON → PDE → solve</i>"]
+        end
+
+        subgraph meas["measurement/"]
+            menergy["_energy.py<br/><i>Hamiltonian energy</i>"]
+            mconv["_conversion.py<br/><i>Field conversion P(t)</i>"]
         end
 
         vf["vectorfield/<br/><i>ComponentGaussianPulse,<br/>ComponentPlaneWave</i>"]
@@ -86,14 +89,13 @@ flowchart TD
     end
 
     init --> sinit
-    init --> kinit
     init --> vf
     sinit --> jl
     sinit --> pb
     pb -- "imports dataclasses" --> jl
-    pb -- "imports infer_bc_from_grid" --> kutil
-    kinit --> keq
-    kinit --> krun
+    cmain --> cderiv
+    cmain --> csim
+    csim --> pb
 
     subgraph ext["External Libraries"]
         pypde["py-pde<br/><i>PDEBase, ScalarField,<br/>FieldCollection, CartesianGrid</i>"]
@@ -102,12 +104,11 @@ flowchart TD
 
     pb --> pypde
     pb --> numpy
-    keq --> pypde
-    kgrid --> pypde
 ```
 
 The `symbolic/` subpackage is the core pipeline — it loads JSON specs and builds PDE solvers.
-The `kgsim/` subpackage provides standalone Klein-Gordon utilities (grids, runners, observers) used by simpler examples.
+The `cli/` subpackage provides the `tidal` command-line interface (derive, simulate, inspect, measure, list, validate).
+The `measurement/` subpackage provides post-hoc analysis tools (energy, conversion, spectra, mixing).
 
 ---
 

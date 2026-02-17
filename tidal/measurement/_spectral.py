@@ -154,7 +154,7 @@ def compute_spectrum(
 def compute_spectral_energy(
     field_data: NDArray[np.float64],
     momentum_data: NDArray[np.float64] | None,
-    mass_squared: float,
+    mass_squared: float | NDArray[np.float64],
     grid_spacing: tuple[float, ...],
     _periodic: tuple[bool, ...],
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
@@ -168,8 +168,8 @@ def compute_spectral_energy(
         Field snapshot.
     momentum_data : ndarray or None
         Momentum snapshot (None for constraint fields).
-    mass_squared : float
-        Mass-squared term.
+    mass_squared : float or ndarray
+        Mass-squared term (scalar or position-dependent array).
     grid_spacing : tuple[float, ...]
         Cell sizes per axis.
     _periodic : tuple[bool, ...]

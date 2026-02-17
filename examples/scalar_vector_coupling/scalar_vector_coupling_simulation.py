@@ -34,17 +34,13 @@ from typing import TYPE_CHECKING, cast
 
 import matplotlib as mpl
 
-from tidal.utils import normalize_solve_result
-
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
 
-from tidal.symbolic import (
-    build_pde_from_json,
-    load_equation_system,
-)
+from tidal.symbolic import build_pde_from_json, load_equation_system
+from tidal.utils import normalize_solve_result
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -55,14 +51,29 @@ if TYPE_CHECKING:
 
     NumericArray = NDArray[np.float64]
 
+# ── Configuration ─────────────────────────────────────────────
 
-# --- Constants ---
-
-DEFAULT_T_END = 10.0
-OUTPUT_FILENAME = "scalar_vector_coupling_output.png"
-
-# Physical parameters for the simulation
+# Physics
 PARAMETERS = {"phim2": 1.0, "Am2": 0.5, "kCS": 0.3, "gSV": 0.2}
+
+# Grid
+GRID_BOUNDS = [(0, 50), (0, 50)]
+GRID_SHAPE = [64, 64]
+GRID_PERIODIC = True
+
+# Time integration
+T_END = 10.0
+DT = 0.01
+SNAPSHOT_INTERVAL = 0.5
+
+# Initial conditions
+PULSE_CENTER_X = 25.0
+PULSE_CENTER_Y = 25.0
+PULSE_WIDTH = 5.0
+PULSE_AMPLITUDE = 1.0
+
+# Output
+OUTPUT_FILENAME = "scalar_vector_coupling_output.png"
 
 # State vector indices (from JSON spec time-derivative orders):
 #   phi_0 (2nd order) -> field=0, momentum=1
@@ -77,6 +88,8 @@ IDX_PI_A1 = 4
 IDX_A2 = 5
 IDX_PI_A2 = 6
 
+# ── Helpers ───────────────────────────────────────────────────
+
 
 @dataclass(frozen=True)
 class SimulationData:
@@ -86,28 +99,6 @@ class SimulationData:
     y: NumericArray
     times: list[float]
     snapshots: list[FieldCollection]
-
-
-# --- Orchestrator ---
-
-
-def main() -> None:
-    """Run the scalar-vector coupling simulation."""
-    json_path = Path(__file__).parent.parent / "data" / "scalar_vector_coupling.json"
-
-    _print_header()
-    spec = _load_spec(json_path)
-    pde = _build_pde(json_path)
-    grid = _create_grid()
-    initial_state = _create_initial_state(grid, spec)
-    storage = _run_simulation(pde, initial_state, DEFAULT_T_END)
-    simulation = _collect_simulation_data(storage, grid)
-    _analyze_results(simulation)
-    _plot_results(simulation)
-    _print_footer()
-
-
-# --- Pipeline steps ---
 
 
 def _print_header() -> None:
@@ -124,7 +115,6 @@ def _print_header() -> None:
 
 
 def _load_spec(json_path: Path) -> EquationSystem:
-    """Load the equation specification and print system summary."""
     print("Step 1: Loading equation specification...")
     spec = load_equation_system(json_path)
 
@@ -146,7 +136,6 @@ def _load_spec(json_path: Path) -> EquationSystem:
 
 
 def _build_pde(json_path: Path) -> PDEBase:
-    """Build the PDE from JSON specification with symbolic parameters."""
     print("Step 2: Building PDE from specification...")
     pde = build_pde_from_json(json_path, parameters=PARAMETERS)
     print(f"  PDE class: {type(pde).__name__}")
@@ -156,14 +145,13 @@ def _build_pde(json_path: Path) -> PDEBase:
 
 
 def _create_grid() -> CartesianGrid:
-    """Set up a 2D periodic spatial grid."""
     print("Step 3: Setting up 2D simulation grid...")
     grid = CartesianGrid(
-        bounds=[(0, 50), (0, 50)],
-        shape=[64, 64],
-        periodic=True,
+        bounds=GRID_BOUNDS,
+        shape=GRID_SHAPE,
+        periodic=GRID_PERIODIC,
     )
-    print(f"  Domain: [{grid.axes_bounds[0]}, {grid.axes_bounds[1]}]")
+    print(f"  Domain: {GRID_BOUNDS}")
     print(f"  Resolution: {grid.shape}")
     print("  Periodic boundary conditions")
     print()
@@ -184,13 +172,10 @@ def _create_initial_state(
     x = cast("np.ndarray", grid.cell_coords[..., 0])
     y = cast("np.ndarray", grid.cell_coords[..., 1])
 
-    center_x, center_y = 25.0, 25.0
-    width = 5.0
-    amplitude = 1.0
-
     # Gaussian pulse in the scalar field phi
-    gaussian = amplitude * np.exp(
-        -((x - center_x) ** 2 + (y - center_y) ** 2) / (2 * width**2)
+    gaussian = PULSE_AMPLITUDE * np.exp(
+        -((x - PULSE_CENTER_X) ** 2 + (y - PULSE_CENTER_Y) ** 2)
+        / (2 * PULSE_WIDTH**2)
     )
 
     # Build the 7-field state vector
@@ -208,28 +193,25 @@ def _create_initial_state(
         f"State size mismatch: {len(state)} != {spec.state_size}"
     )
 
-    print(f"  Gaussian pulse in phi at ({center_x}, {center_y})")
-    print(f"  Width: {width}, Amplitude: {amplitude}")
+    print(f"  Gaussian pulse in phi at ({PULSE_CENTER_X}, {PULSE_CENTER_Y})")
+    print(f"  Width: {PULSE_WIDTH}, Amplitude: {PULSE_AMPLITUDE}")
     print("  All A components initialized to zero")
     print(f"  State vector: {len(state)} fields")
     print()
     return state
 
 
-def _run_simulation(
-    pde: PDEBase, initial_state: FieldCollection, t_end: float
-) -> MemoryStorage:
-    """Run the time evolution and store snapshots."""
+def _run_simulation(pde: PDEBase, initial_state: FieldCollection) -> MemoryStorage:
     print("Step 5: Running simulation...")
-    print(f"  Duration: {t_end} time units")
+    print(f"  Duration: {T_END} time units")
 
     storage = MemoryStorage()
-    tracker: TrackerBase = storage.tracker(interrupts=0.5)
+    tracker: TrackerBase = storage.tracker(interrupts=SNAPSHOT_INTERVAL)
 
     result = pde.solve(
         initial_state,
-        t_range=t_end,
-        dt=0.01,
+        t_range=T_END,
+        dt=DT,
         scheme="runge-kutta",
         tracker=tracker,
     )
@@ -243,7 +225,6 @@ def _run_simulation(
 def _collect_simulation_data(
     storage: MemoryStorage, grid: CartesianGrid
 ) -> SimulationData:
-    """Extract coordinate arrays and snapshots from storage."""
     x = np.asarray(grid.cell_coords[..., 0], dtype=float)
     y = np.asarray(grid.cell_coords[..., 1], dtype=float)
     times = list(storage.times)
@@ -252,13 +233,6 @@ def _collect_simulation_data(
 
 
 def _get_component(snapshot: FieldCollection, index: int) -> NumericArray:
-    """Safely extract a single field component from a snapshot.
-
-    Raises
-    ------
-    TypeError
-        If the field at the given index is not a ScalarField.
-    """
     field = snapshot[index]
     if not isinstance(field, ScalarField):
         msg = f"Expected ScalarField at index {index}, got {type(field).__name__}"
@@ -267,7 +241,6 @@ def _get_component(snapshot: FieldCollection, index: int) -> NumericArray:
 
 
 def _analyze_results(simulation: SimulationData) -> None:
-    """Check for scalar-to-vector energy transfer via the coupling."""
     print("Step 6: Analyzing results...")
 
     # Initial amplitudes
@@ -327,6 +300,8 @@ def _plot_results(simulation: SimulationData) -> None:  # noqa: PLR0915, PLR0914
 
     initial = simulation.snapshots[0]
     final = simulation.snapshots[-1]
+    x_max = GRID_BOUNDS[0][1]
+    y_max = GRID_BOUNDS[1][1]
 
     # --- Row 0: phi_0 initial and final ---
 
@@ -340,7 +315,7 @@ def _plot_results(simulation: SimulationData) -> None:  # noqa: PLR0915, PLR0914
         cmap="bwr",
         vmin=-vmax_phi,
         vmax=vmax_phi,
-        extent=[0, 50, 0, 50],
+        extent=[0, x_max, 0, y_max],
     )
     axes[0, 0].set_title("Initial phi_0")
     axes[0, 0].set_xlabel("x")
@@ -353,7 +328,7 @@ def _plot_results(simulation: SimulationData) -> None:  # noqa: PLR0915, PLR0914
         cmap="bwr",
         vmin=-vmax_phi,
         vmax=vmax_phi,
-        extent=[0, 50, 0, 50],
+        extent=[0, x_max, 0, y_max],
     )
     axes[0, 1].set_title(f"Final phi_0 (t={simulation.times[-1]:.1f})")
     axes[0, 1].set_xlabel("x")
@@ -372,7 +347,7 @@ def _plot_results(simulation: SimulationData) -> None:  # noqa: PLR0915, PLR0914
         cmap="bwr",
         vmin=-vmax_a,
         vmax=vmax_a,
-        extent=[0, 50, 0, 50],
+        extent=[0, x_max, 0, y_max],
     )
     axes[1, 0].set_title(f"Final A_1 (t={simulation.times[-1]:.1f})")
     axes[1, 0].set_xlabel("x")
@@ -385,7 +360,7 @@ def _plot_results(simulation: SimulationData) -> None:  # noqa: PLR0915, PLR0914
         cmap="bwr",
         vmin=-vmax_a,
         vmax=vmax_a,
-        extent=[0, 50, 0, 50],
+        extent=[0, x_max, 0, y_max],
     )
     axes[1, 1].set_title(f"Final A_2 (t={simulation.times[-1]:.1f})")
     axes[1, 1].set_xlabel("x")
@@ -461,6 +436,7 @@ def _plot_results(simulation: SimulationData) -> None:  # noqa: PLR0915, PLR0914
     output_path = output_dir / OUTPUT_FILENAME
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
     print(f"  Saved plot to: {output_path}")
+    plt.close()
     print()
 
 
@@ -475,6 +451,24 @@ def _print_footer() -> None:
     print("  4. CS term creates helical mixing between A components")
     print("  5. A_0 constraint solved at each step (not time-evolved)")
     print("=" * 60)
+
+
+# ── Entry point ───────────────────────────────────────────────
+
+
+def main() -> None:
+    """Run the scalar-vector coupling simulation."""
+    json_path = Path(__file__).parent.parent / "data" / "scalar_vector_coupling.json"
+    _print_header()
+    spec = _load_spec(json_path)
+    pde = _build_pde(json_path)
+    grid = _create_grid()
+    initial_state = _create_initial_state(grid, spec)
+    storage = _run_simulation(pde, initial_state)
+    simulation = _collect_simulation_data(storage, grid)
+    _analyze_results(simulation)
+    _plot_results(simulation)
+    _print_footer()
 
 
 if __name__ == "__main__":

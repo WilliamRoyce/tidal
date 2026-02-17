@@ -7,20 +7,25 @@ from typing import Literal
 import matplotlib as mpl
 from matplotlib import rcParams
 
-# Try to use PGF backend, but fall back to default if unavailable
-pgf_available = True
+# Try to use PGF backend, but fall back to default if unavailable.
+# Check for TeX availability FIRST — mpl.use("pgf") can succeed even when
+# no LaTeX executable is installed, causing deferred crashes on render.
+pgf_available = False
 _pgf_backend_error = None
 
-try:
-    mpl.use("pgf")
-except RuntimeError as e:
-    pgf_available = False
-    _pgf_backend_error = str(e)
-    warnings.warn(
-        f"PGF backend not available: {e}. Using default backend instead.",
-        UserWarning,
-        stacklevel=2,
-    )
+if any(shutil.which(cmd) is not None for cmd in ["pdflatex", "xelatex", "lualatex"]):
+    try:
+        mpl.use("pgf")
+        pgf_available = True
+    except RuntimeError as e:
+        _pgf_backend_error = str(e)
+        warnings.warn(
+            f"PGF backend not available: {e}. Using default backend instead.",
+            UserWarning,
+            stacklevel=2,
+        )
+else:
+    _pgf_backend_error = "No LaTeX executable found (pdflatex, xelatex, lualatex)"
 
 
 def check_tex_available() -> bool:

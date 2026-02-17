@@ -210,8 +210,8 @@ For theories that need intermediate tensor definitions (e.g., the electromagneti
 [[derived_fields]]
 name = "F"
 rank = 2
-symmetry = "Antisymmetric"
-rule = "F[-a, -b] -> CD[-a][A[-b]] - CD[-b][A[-a]]"
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
 ```
 
 This generates `DefTensor` + `MakeRule` in the `.wls` output, with automatic substitution before decomposition.

@@ -10,12 +10,12 @@ Key Features
 ------------
 
 * **Symbolic Pipeline**: Lagrangian → Euler-Lagrange → Component Decomposition → JSON → PDE Simulation
-* **CLI Tool**: ``tidal`` command with derive, simulate, inspect, list, and validate subcommands
-* **18 Working Examples**: Spanning 1+1D through 3+1D spacetimes
+* **CLI Tool**: ``tidal`` command with derive, simulate, measure, inspect, list, and validate subcommands
+* **20 Working Examples**: Spanning 1+1D through 3+1D spacetimes
 * **Multi-Field Support**: Scalars, vectors, and rank-3+ tensors with cross-field coupling
 * **Curvilinear Coordinates**: Automatic Christoffel symbol computation for non-Cartesian grids
 * **Parameter Sweeps**: Override symbolic coefficients at runtime without re-deriving
-* **743 Python Tests + ~108 Wolfram Tests**: Comprehensive validation of both pipeline stages
+* **900+ Python Tests + ~115 Wolfram Tests**: Comprehensive validation of both pipeline stages
 
 Quick Start
 -----------
@@ -50,14 +50,6 @@ Install and run:
    cli
    examples
    TEX_SUPPORT
-
-.. toctree::
-   :maxdepth: 2
-   :caption: Legacy Implementation Notes
-
-   2D_COUPLED_IMPLEMENTATION
-   ADVANCED_KLEIN_GORDON_IMPLEMENTATION
-   RESTRUCTURING_PHASE2
 
 .. toctree::
    :maxdepth: 2

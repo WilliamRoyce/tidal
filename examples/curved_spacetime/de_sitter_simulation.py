@@ -24,15 +24,13 @@ Verification:
   2. Energy loss to cosmic expansion
 """
 
-from pathlib import Path
-from typing import cast
+from __future__ import annotations
 
-OUTPUT_FILENAME = "de_sitter_kg_output.png"
-AMPLITUDE_DECAY_THRESHOLD = 0.9  # Threshold to detect Hubble friction effect
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import matplotlib as mpl
-
-from tidal.utils import normalize_solve_result
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt
@@ -40,10 +38,60 @@ import numpy as np
 from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
 
 from tidal.symbolic import build_pde_from_json, load_equation_system
+from tidal.utils import normalize_solve_result
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    from tidal.symbolic.pde_builder import PDEFromSpec
+
+    NumericArray = NDArray[np.float64]
+
+# ── Configuration ─────────────────────────────────────────────
+
+# Physics
+HUBBLE_PARAM = 0.1  # Hubble constant (expansion rate)
+MASS_SQUARED = 1.0  # Mass parameter
+
+# Grid
+X_MIN = 0.0
+X_MAX = 50.0
+Y_MIN = 0.0
+Y_MAX = 50.0
+GRID_SHAPE = [64, 64]
+GRID_PERIODIC: list[bool] = [True, True]
+
+# Time integration
+T_END = 20.0
+DT = 0.01
+SNAPSHOT_INTERVAL = 0.2
+
+# Initial conditions
+CENTER_X = 25.0
+CENTER_Y = 25.0
+PULSE_WIDTH = 3.0
+PULSE_AMPLITUDE = 1.0
+
+# Analysis
+AMPLITUDE_DECAY_THRESHOLD = 0.9  # Threshold to detect Hubble friction effect
+
+# Output
+OUTPUT_FILENAME = "de_sitter_kg_output.png"
+
+# ── Helpers ───────────────────────────────────────────────────
 
 
-def main() -> None:  # noqa: PLR0914, PLR0915
-    """Run the 2+1D de Sitter Klein-Gordon simulation."""
+@dataclass(frozen=True)
+class SimulationResult:
+    """Container for de Sitter KG simulation results."""
+
+    grid: CartesianGrid
+    storage: MemoryStorage
+    x_coords: NumericArray
+    y_coords: NumericArray
+
+
+def _print_header() -> None:
     print("=" * 60)
     print("De Sitter Klein-Gordon 2+1D Simulation (Hubble Friction)")
     print("=" * 60)
@@ -55,15 +103,14 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     print("                                               ^^^ (n-1)H = H for n=2")
     print()
 
-    # Load the equation specification
+
+def _load_spec(json_path: Path) -> None:
     print("Step 1: Loading equation specification...")
-    json_path = Path(__file__).parent.parent / "data" / "de_sitter_kg.json"
     spec = load_equation_system(json_path)
 
     print(f"  Spacetime dimension: {spec.dimension} (2+1D)")
     print(f"  Components: {spec.n_components} ({', '.join(spec.component_names)})")
 
-    # Show equation structure
     print()
     print("  Equation structure:")
     for eq in spec.equations:
@@ -72,96 +119,105 @@ def main() -> None:  # noqa: PLR0914, PLR0915
             for term in eq.rhs_terms
         )
         print(f"    d2_t({eq.field_name}) = {terms_str}")
-
-    # Build the PDE with runtime parameters
     print()
-    print("Step 2: Building PDE from specification...")
-    hubble_param = 0.1  # Hubble constant (expansion rate)
-    mass_squared = 1.0  # Mass parameter
 
+
+def _build_pde(json_path: Path) -> PDEFromSpec:
+    print("Step 2: Building PDE from specification...")
     pde = build_pde_from_json(
-        json_path, parameters={"dSH": hubble_param, "dSm2": mass_squared}
+        json_path, parameters={"dSH": HUBBLE_PARAM, "dSm2": MASS_SQUARED}
     )
     print(f"  PDE class: {type(pde).__name__}")
     print(f"  Components: {pde.n_components}")
-    print(f"  Hubble parameter: H = {hubble_param}")
-    print(f"  Mass parameter: m^2 = {mass_squared}")
-
-    # Set up 2D spatial grid
+    print(f"  Hubble parameter: H = {HUBBLE_PARAM}")
+    print(f"  Mass parameter: m^2 = {MASS_SQUARED}")
     print()
+    return pde
+
+
+def _create_grid() -> CartesianGrid:
     print("Step 3: Setting up 2D simulation grid...")
     grid = CartesianGrid(
-        bounds=[(0, 50), (0, 50)],  # x, y domain
-        shape=[64, 64],  # 64x64 grid points
-        periodic=True,
+        bounds=[(X_MIN, X_MAX), (Y_MIN, Y_MAX)],
+        shape=GRID_SHAPE,
+        periodic=GRID_PERIODIC,
     )
-    print("  Domain: [0, 50] x [0, 50]")
+    print(f"  Domain: [{X_MIN:.0f}, {X_MAX:.0f}] x [{Y_MIN:.0f}, {Y_MAX:.0f}]")
     print(f"  Resolution: {grid.shape[0]}x{grid.shape[1]} points")
     print("  Periodic boundary conditions")
-
-    # Create initial conditions
     print()
+    return grid
+
+
+def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
     print("Step 4: Creating initial conditions...")
 
-    # Initial state: 2 fields = 1 component * (field + momentum)
-    phi = ScalarField(grid, data=0.0, label="dSphi_0")
-    pi = ScalarField(grid, data=0.0, label="pi_0")
-
-    # Initialize a 2D Gaussian pulse at center
     x = cast("np.ndarray", grid.cell_coords[..., 0])
     y = cast("np.ndarray", grid.cell_coords[..., 1])
-    center_x, center_y = 25.0, 25.0
-    width = 3.0
-    amplitude = 1.0
 
-    gaussian = amplitude * np.exp(
-        -((x - center_x) ** 2 + (y - center_y) ** 2) / (2 * width**2)
+    # Initialize a 2D Gaussian pulse at center
+    gaussian = PULSE_AMPLITUDE * np.exp(
+        -((x - CENTER_X) ** 2 + (y - CENTER_Y) ** 2) / (2 * PULSE_WIDTH**2)
     )
-    phi.data[:] = gaussian
 
+    phi = ScalarField(grid, data=gaussian, label="dSphi_0")
+    pi = ScalarField(grid, data=0.0, label="pi_0")
     state = FieldCollection([phi, pi])
-    print(f"  2D Gaussian pulse at center ({center_x}, {center_y})")
-    print(f"  Width: {width}, Amplitude: {amplitude}")
-    print("  Initial momentum: zero")
 
-    # Run simulation
+    print(f"  2D Gaussian pulse at center ({CENTER_X}, {CENTER_Y})")
+    print(f"  Width: {PULSE_WIDTH}, Amplitude: {PULSE_AMPLITUDE}")
+    print("  Initial momentum: zero")
     print()
+    return state
+
+
+def _run_simulation(
+    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection
+) -> SimulationResult:
     print("Step 5: Running simulation...")
-    t_end = 20.0
-    dt = 0.01
 
     storage = MemoryStorage()
     result = pde.solve(
         state,
-        t_range=t_end,
-        dt=dt,
+        t_range=T_END,
+        dt=DT,
         scheme="runge-kutta",  # RK4 for better numerical stability
-        tracker=storage.tracker(0.2),  # Store every 0.2 time units
+        tracker=storage.tracker(SNAPSHOT_INTERVAL),
     )
     result = normalize_solve_result(result)
 
-    print(f"  Duration: {t_end} time units")
-    print(f"  Stored {len(storage)} snapshots")
+    x = cast("np.ndarray", grid.cell_coords[..., 0])
+    y = cast("np.ndarray", grid.cell_coords[..., 1])
 
-    # Analyze results
+    print(f"  Duration: {T_END} time units")
+    print(f"  Stored {len(storage)} snapshots")
     print()
+
+    return SimulationResult(
+        grid=grid,
+        storage=storage,
+        x_coords=x,
+        y_coords=y,
+    )
+
+
+def _analyze_results(result: SimulationResult) -> dict[str, float]:
     print("Step 6: Analyzing results...")
 
-    # Get initial and final states
-    initial = cast("FieldCollection", storage[0])
-    final = cast("FieldCollection", storage[-1])
+    initial = cast("FieldCollection", result.storage[0])
+    final = cast("FieldCollection", result.storage[-1])
 
     # Extract field amplitudes
-    initial_max = np.max(np.abs(initial[0].data))
-    final_max = np.max(np.abs(final[0].data))
+    initial_max = float(np.max(np.abs(initial[0].data)))
+    final_max = float(np.max(np.abs(final[0].data)))
 
     print(f"  Initial: max|phi| = {initial_max:.4f}")
     print(f"  Final:   max|phi| = {final_max:.4f}")
 
     # Calculate amplitude decay ratio
-    decay_ratio = final_max / initial_max if initial_max > 0 else 0
+    decay_ratio = final_max / initial_max if initial_max > 0 else 0.0
     # For 2+1D (n=2), amplitude decay depends on H and the specific solution
-    expected_decay = np.exp(-0.5 * hubble_param * t_end)
+    expected_decay = float(np.exp(-0.5 * HUBBLE_PARAM * T_END))
 
     print(f"  Amplitude ratio (final/initial): {decay_ratio:.4f}")
     print(f"  Reference decay exp(-H*t/2): {expected_decay:.4f}")
@@ -171,15 +227,15 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     else:
         print("  Note: For small H or short time, damping may be subtle")
 
-    # Energy proxy: bare-mass Hamiltonian E = ½∫(π² + m²φ²) dx
-    # Note: With time-dependent mass m²·exp(2Ht), no simple energy functional
-    # decays monotonically — the growing cross-term m²(e^{2Ht}-1)∫φπ causes
+    # Energy proxy: bare-mass Hamiltonian E = 1/2 * integral(pi^2 + m^2 phi^2) dx
+    # Note: With time-dependent mass m^2*exp(2Ht), no simple energy functional
+    # decays monotonically -- the growing cross-term m^2(e^{2Ht}-1)*integral(phi*pi) causes
     # oscillations. We use this proxy only for text output; the plot uses
     # amplitude decay which IS monotonic and clearly shows Hubble friction.
     def compute_energy(snapshot: FieldCollection) -> float:
         phi_data = snapshot[0].data
         pi_data = snapshot[1].data
-        return float(np.sum(pi_data**2 + mass_squared * phi_data**2))
+        return float(np.sum(pi_data**2 + MASS_SQUARED * phi_data**2))
 
     initial_energy = compute_energy(initial)
     final_energy = compute_energy(final)
@@ -188,23 +244,31 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     print(f"  Final 'energy': {final_energy:.2f}")
     if initial_energy > 0:
         print(f"  Energy loss: {100 * (1 - final_energy / initial_energy):.1f}%")
-
-    # Generate visualization
     print()
+
+    return {"decay_ratio": decay_ratio}
+
+
+def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     print("Step 7: Generating visualization...")
+
+    storage = result.storage
+    grid = result.grid
+
+    initial = cast("FieldCollection", storage[0])
+    final = cast("FieldCollection", storage[-1])
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
     # Initial field (2D)
     ax = axes[0, 0]
-    vmax = amplitude
     im = ax.imshow(
         initial[0].data.T,
         origin="lower",
         cmap="bwr_r",
-        vmin=-vmax,
-        vmax=vmax,
-        extent=[0, 50, 0, 50],
+        vmin=-PULSE_AMPLITUDE,
+        vmax=PULSE_AMPLITUDE,
+        extent=[X_MIN, X_MAX, Y_MIN, Y_MAX],
     )
     ax.set_xlabel("x")
     ax.set_ylabel("y")
@@ -217,19 +281,19 @@ def main() -> None:  # noqa: PLR0914, PLR0915
         final[0].data.T,
         origin="lower",
         cmap="bwr_r",
-        vmin=-vmax,
-        vmax=vmax,
-        extent=[0, 50, 0, 50],
+        vmin=-PULSE_AMPLITUDE,
+        vmax=PULSE_AMPLITUDE,
+        extent=[X_MIN, X_MAX, Y_MIN, Y_MAX],
     )
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.set_title(rf"Final $\phi$ (t={t_end:.0f})")
+    ax.set_title(rf"Final $\phi$ (t={T_END:.0f})")
     plt.colorbar(im, ax=ax, label=r"$\phi$")
 
     # Amplitude and field-norm decay (monotonic indicators of Hubble damping)
     # Note: No simple energy proxy decays as exp(-Ht) for this equation because
-    # the time-dependent mass m²·exp(2Ht) introduces a growing cross-term in
-    # dE/dt. Amplitude and ∫φ² are unambiguous decay indicators.
+    # the time-dependent mass m^2*exp(2Ht) introduces a growing cross-term in
+    # dE/dt. Amplitude and integral(phi^2) are unambiguous decay indicators.
     ax = axes[1, 0]
     time_values = list(storage.times)
     amplitudes = [
@@ -260,7 +324,7 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     # Reference: amplitude decay exp(-Ht/2) for weakly damped oscillator
     ax.plot(
         time_values,
-        np.exp(-0.5 * hubble_param * t_array),
+        np.exp(-0.5 * HUBBLE_PARAM * t_array),
         "r--",
         linewidth=1.5,
         label=r"$e^{-Ht/2}$",
@@ -268,7 +332,7 @@ def main() -> None:  # noqa: PLR0914, PLR0915
 
     ax.set_xlabel("Time")
     ax.set_ylabel("Normalized quantity")
-    ax.set_title(f"Hubble damping (H={hubble_param})")
+    ax.set_title(f"Hubble damping (H={HUBBLE_PARAM})")
     ax.legend()
     ax.grid(visible=True, alpha=0.3)
 
@@ -303,7 +367,7 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     ax.grid(visible=True, alpha=0.3)
 
     fig.suptitle(
-        rf"De Sitter KG 2+1D: $g_{{\mu\nu}} = e^{{2Ht}} \eta_{{\mu\nu}}$, H={hubble_param}, m$^2$={mass_squared}"
+        rf"De Sitter KG 2+1D: $g_{{\mu\nu}} = e^{{2Ht}} \eta_{{\mu\nu}}$, H={HUBBLE_PARAM}, m$^2$={MASS_SQUARED}"
         "\nHubble friction causes energy loss to expansion",
         fontsize=12,
     )
@@ -313,27 +377,46 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     output_dir.mkdir(exist_ok=True, parents=True)
     output_path = output_dir / OUTPUT_FILENAME
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"Saved plot to: {output_path}")
-
-    # Summary
+    print(f"  Saved plot to: {output_path}")
+    plt.close()
     print()
+
+
+def _print_footer(decay_ratio: float) -> None:
     print("=" * 60)
     print("Simulation complete!")
     print()
     print("Key observations:")
-    print(f"  1. De Sitter metric: g_ab = exp(2Ht) * eta_ab with H={hubble_param}")
+    print(f"  1. De Sitter metric: g_ab = exp(2Ht) * eta_ab with H={HUBBLE_PARAM}")
     print("  2. Hubble friction term: -(n-1)*H * d_t phi where n = spatial dimensions")
     print("     For this 2+1D simulation (n=2): -H * d_t phi")
     print("     Note: In 1+1D, friction = 0 (conformal invariance)")
     print("  3. Christoffel symbols computed from metric definition (not hardcoded)")
     print("  4. Energy is NOT conserved - lost to cosmic expansion")
-    print(f"  5. Amplitude decayed by factor ~{decay_ratio:.3f} over t={t_end}")
+    print(f"  5. Amplitude decayed by factor ~{decay_ratio:.3f} over t={T_END}")
     print()
     print("  Physical interpretation:")
     print("    Waves in expanding spacetime lose energy to expansion.")
     print("    The Hubble friction term acts like a velocity-dependent damping.")
     print("    This is why the CMB photons have redshifted since the Big Bang.")
     print("=" * 60)
+
+
+# ── Entry point ───────────────────────────────────────────────
+
+
+def main() -> None:
+    """Run the 2+1D de Sitter Klein-Gordon simulation."""
+    json_path = Path(__file__).parent.parent / "data" / "de_sitter_kg.json"
+    _print_header()
+    _load_spec(json_path)
+    pde = _build_pde(json_path)
+    grid = _create_grid()
+    state = _create_initial_state(grid)
+    result = _run_simulation(pde, grid, state)
+    analysis = _analyze_results(result)
+    _plot_results(result)
+    _print_footer(decay_ratio=analysis["decay_ratio"])
 
 
 if __name__ == "__main__":

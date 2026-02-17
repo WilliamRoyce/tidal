@@ -28,6 +28,10 @@ EXAMPLES=(
     "examples/spherical_kg/spherical_kg.wls"
     "examples/cylindrical_kg/cylindrical_kg.wls"
     "examples/scalar_field_3d/klein_gordon_3d.wls"
+    "examples/scalar_vector_coupling/scalar_vector_coupling.wls"
+    "examples/massive_3form/massive_3form.wls"
+    "examples/massive_gravity/massive_gravity.wls"
+    "examples/coupled_proca/coupled_proca.wls"
 )
 
 PASSED=0

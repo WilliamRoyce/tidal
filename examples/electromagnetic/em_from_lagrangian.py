@@ -18,14 +18,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
+import matplotlib as mpl
+
+mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from pde import CartesianGrid, FieldCollection, MemoryStorage, PDEBase, ScalarField
 
 from tidal.symbolic import build_pde_from_json, load_equation_system
-from tidal.vectorfield import (
-    ComponentGaussianPulse,
-)
+from tidal.vectorfield import ComponentGaussianPulse
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -35,10 +36,30 @@ if TYPE_CHECKING:
 
     NumericArray = NDArray[np.float64]
 
+# ── Configuration ─────────────────────────────────────────────
 
+# Grid
+GRID_BOUNDS = [(0, 100)]
+GRID_SHAPE = [256]
+GRID_PERIODIC = True
+
+# Time integration
+T_END = 25.0
+DT = 0.01
+SNAPSHOT_INTERVAL = 1.0
+
+# Initial conditions
+PULSE_CENTER = 50.0
+PULSE_WIDTH = 5.0
+PULSE_AMPLITUDE = 1.0
+
+# Analysis
 A0_TOL = 1e-10
-DEFAULT_T_END = 25.0
+
+# Output
 OUTPUT_FILENAME = "em_from_lagrangian_output.png"
+
+# ── Helpers ───────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
@@ -48,21 +69,6 @@ class SimulationData:
     x: NumericArray
     times: list[float]
     snapshots: list[FieldCollection]
-
-
-def main() -> None:
-    """Run the EM field simulation from Lagrangian-derived equations."""
-    json_path = Path(__file__).parent.parent / "data" / "em_1d.json"
-    _print_header()
-    spec = _load_spec(json_path)
-    pde = _build_pde(json_path)
-    grid = _create_grid()
-    initial_state = _create_initial_state(grid, spec)
-    storage = _run_simulation(pde, initial_state, DEFAULT_T_END)
-    simulation = _collect_simulation_data(storage, grid)
-    _analyze_results(simulation)
-    _plot_results(simulation)
-    _print_footer()
 
 
 def _print_header() -> None:
@@ -94,9 +100,9 @@ def _build_pde(json_path: Path) -> PDEBase:
 
 def _create_grid() -> CartesianGrid:
     print("Step 3: Setting up simulation grid...")
-    grid = CartesianGrid([(0, 100)], 256, periodic=True)
-    print("  Domain: [0, 100]")
-    print("  Resolution: 256 points")
+    grid = CartesianGrid(GRID_BOUNDS, GRID_SHAPE, periodic=GRID_PERIODIC)
+    print(f"  Domain: {GRID_BOUNDS}")
+    print(f"  Resolution: {GRID_SHAPE[0]} points")
     print("  Periodic boundary conditions")
     print()
     return grid
@@ -106,29 +112,27 @@ def _create_initial_state(grid: CartesianGrid, spec: EquationSystem) -> FieldCol
     print("Step 4: Creating initial conditions...")
     print("  Gaussian pulse in A_1 (spatial component of vector potential)")
     pulse = ComponentGaussianPulse(
-        center=(50.0,),
-        width=5.0,
-        amplitude=1.0,
+        center=(PULSE_CENTER,),
+        width=PULSE_WIDTH,
+        amplitude=PULSE_AMPLITUDE,
         active_components={"A_1": 1.0},
     )
     initial_state = pulse.create(grid, spec)
-    print("  Pulse center: x = 50")
-    print("  Pulse width: 5")
+    print(f"  Pulse center: x = {PULSE_CENTER}")
+    print(f"  Pulse width: {PULSE_WIDTH}")
     print("  Initial A_0: 0 (temporal component)")
     print("  Initial A_1: Gaussian (spatial component)")
     print()
     return initial_state
 
 
-def _run_simulation(
-    pde: PDEBase, initial_state: FieldCollection, t_end: float
-) -> MemoryStorage:
+def _run_simulation(pde: PDEBase, initial_state: FieldCollection) -> MemoryStorage:
     print("Step 5: Running simulation...")
-    print(f"  Duration: {t_end} time units")
+    print(f"  Duration: {T_END} time units")
     print("  (Massless waves propagate at c = 1 in natural units)")
     storage = MemoryStorage()
-    tracker: TrackerBase = storage.tracker(interrupts=1.0)
-    pde.solve(initial_state, t_range=t_end, dt=0.01, tracker=tracker)
+    tracker: TrackerBase = storage.tracker(interrupts=SNAPSHOT_INTERVAL)
+    pde.solve(initial_state, t_range=T_END, dt=DT, tracker=tracker)
     print(f"  Stored {len(storage)} snapshots")
     print()
     return storage
@@ -237,7 +241,8 @@ def _plot_results(simulation: SimulationData) -> None:
     output_dir.mkdir(exist_ok=True, parents=True)
     output_path = output_dir / OUTPUT_FILENAME
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"Saved plot to: {output_path}")
+    print(f"  Saved plot to: {output_path}")
+    plt.close()
     print()
 
 
@@ -251,6 +256,24 @@ def _print_footer() -> None:
     print("  3. Gaussian pulse splits into left/right moving waves")
     print("  4. A_0 and A_1 evolve independently (no coupling)")
     print("=" * 60)
+
+
+# ── Entry point ───────────────────────────────────────────────
+
+
+def main() -> None:
+    """Run the EM field simulation from Lagrangian-derived equations."""
+    json_path = Path(__file__).parent.parent / "data" / "em_1d.json"
+    _print_header()
+    spec = _load_spec(json_path)
+    pde = _build_pde(json_path)
+    grid = _create_grid()
+    initial_state = _create_initial_state(grid, spec)
+    storage = _run_simulation(pde, initial_state)
+    simulation = _collect_simulation_data(storage, grid)
+    _analyze_results(simulation)
+    _plot_results(simulation)
+    _print_footer()
 
 
 if __name__ == "__main__":

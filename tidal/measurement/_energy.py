@@ -317,6 +317,61 @@ def _resolve_term_coefficient(
     return float(term.coefficient)
 
 
+def _build_coord_arrays(
+    data: SimulationData,
+) -> dict[str, NDArray[np.float64]]:
+    """Build spatial coordinate arrays from ``SimulationData`` grid info.
+
+    Constructs cell-centered coordinate meshgrids matching the field
+    data shape (``*grid_shape``).
+    """
+    spatial_coords = data.spec.spatial_coordinates
+    axes: list[NDArray[np.float64]] = []
+    for i, name in enumerate(spatial_coords):
+        lo, hi = data.grid_bounds[i]
+        dx = data.grid_spacing[i]
+        n = round((hi - lo) / dx)
+        # Cell-centered: offset by dx/2
+        axes.append(np.linspace(lo + dx / 2, hi - dx / 2, n))
+        _ = name  # used below
+
+    grids = np.meshgrid(*axes, indexing="ij")
+    return {
+        name: np.asarray(g, dtype=np.float64)
+        for name, g in zip(spatial_coords, grids, strict=True)
+    }
+
+
+def _resolve_coefficient_on_grid(
+    term: OperatorTerm,
+    data: SimulationData,
+    coord_arrays: dict[str, NDArray[np.float64]],
+) -> float | NDArray[np.float64]:
+    """Resolve a term's coefficient, returning a grid array if position-dependent.
+
+    For constant coefficients, returns a scalar float (same as
+    ``_resolve_term_coefficient``).  For position-dependent coefficients,
+    evaluates the symbolic expression on the grid using
+    :func:`~tidal.symbolic._eval_utils.evaluate_coefficient`.
+    """
+    if not term.position_dependent:
+        return _resolve_term_coefficient(term, data.parameters)
+
+    sym = term.coefficient_symbolic
+    if sym is None:
+        return float(term.coefficient)
+
+    from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+    return evaluate_coefficient(
+        sym,
+        data.parameters,
+        data.spec.coordinates,
+        coord_arrays=coord_arrays,
+        t=0.0,
+    )
+
+
 def _resolve_term_target(
     data: SimulationData,
     field_name: str,
@@ -380,7 +435,7 @@ def _resolve_term_target(
 def compute_field_energy(  # noqa: PLR0913
     field_data: NDArray[np.float64],
     momentum_data: NDArray[np.float64] | None,
-    mass_squared: float,
+    mass_squared: float | NDArray[np.float64],
     grid_spacing: tuple[float, ...],
     periodic: tuple[bool, ...],
     *,
@@ -394,8 +449,9 @@ def compute_field_energy(  # noqa: PLR0913
         Field values on the spatial grid.
     momentum_data : ndarray or None
         Conjugate momentum ``π``.  ``None`` for constraint fields.
-    mass_squared : float
-        Diagonal mass matrix entry ``m²``.
+    mass_squared : float | ndarray
+        Diagonal mass matrix entry ``m²``.  May be a scalar (constant mass)
+        or a grid-shaped ndarray (position-dependent mass).
     grid_spacing : tuple[float, ...]
         Cell size per spatial axis.
     periodic : tuple[bool, ...]
@@ -425,8 +481,8 @@ def compute_field_energy(  # noqa: PLR0913
     grad_sq = _gradient_energy_density(field_data, grid_spacing, periodic, axes=gradient_axes)
     gradient = 0.5 * float(grad_sq.sum()) * dv
 
-    # Mass energy: 0.5 * m² * ∫ φ² dV
-    mass_energy = 0.5 * mass_squared * float((field_data**2).sum()) * dv
+    # Mass energy: 0.5 * m² * ∫ φ² dV (m² may be scalar or ndarray)
+    mass_energy = 0.5 * float((mass_squared * field_data**2).sum()) * dv
 
     total = kinetic + gradient + mass_energy
     return FieldEnergy(kinetic=kinetic, gradient=gradient, mass=mass_energy, total=total)
@@ -438,33 +494,51 @@ def compute_field_energy(  # noqa: PLR0913
 
 
 def _resolve_mass_squared(
-    data: SimulationData, field_idx: int,
-) -> float:
+    data: SimulationData,
+    field_idx: int,
+    coord_arrays: dict[str, NDArray[np.float64]] | None = None,
+) -> float | NDArray[np.float64]:
     """Get the diagonal mass matrix entry for a field.
 
     Tries symbolic resolution first (using ``data.parameters``), then
-    falls back to the pre-computed numeric matrix.
+    falls back to the pre-computed numeric matrix.  For position-dependent
+    mass terms, evaluates the symbolic expression on the grid and returns
+    an ndarray (negated, per mass matrix convention).
 
-    Raises
-    ------
-    ValueError
-        If the mass term is position-dependent.
+    Parameters
+    ----------
+    data : SimulationData
+        Simulation data.
+    field_idx : int
+        Field equation index.
+    coord_arrays : dict[str, NDArray] | None
+        Pre-built coordinate arrays (from ``_build_coord_arrays``).
+        Required if the mass term is position-dependent.
     """
     from tidal.symbolic.json_loader import (  # noqa: PLC0415
         _resolve_symbolic_coeff,  # pyright: ignore[reportPrivateUsage]
     )
 
-    # Check for position-dependent mass term
+    # Check for position-dependent mass term → evaluate on grid
     eq = data.spec.equations[field_idx]
     field_name = eq.field_name
     for term in eq.rhs_terms:
         if term.operator == "identity" and term.field == field_name and term.position_dependent:
-            msg = (
-                f"Position-dependent mass term in equation '{field_name}' "
-                f"— energy computation requires constant coefficients "
-                f"(coordinate_dependent={term.coordinate_dependent})"
+            sym = term.coefficient_symbolic
+            if sym is None:
+                return float(term.coefficient)
+            if coord_arrays is None:
+                coord_arrays = _build_coord_arrays(data)
+            from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+            coeff = evaluate_coefficient(
+                sym, data.parameters, data.spec.coordinates,
+                coord_arrays=coord_arrays,
             )
-            raise ValueError(msg)
+            # Convention: mass_matrix[i][i] = -(coefficient of identity(field_i))
+            if isinstance(coeff, np.ndarray):
+                return -coeff
+            return -float(coeff)
 
     sym_row = data.spec.mass_matrix_symbolic[field_idx] if data.spec.mass_matrix_symbolic else ()
     if field_idx < len(sym_row):
@@ -490,13 +564,21 @@ def _compute_virial_potential(
     Excludes ``first_derivative_t`` (gyroscopic, do no work) and
     ``pi_N`` momentum references (velocity-dependent forces).
 
-    Raises
-    ------
-    ValueError
-        If any term has a position-dependent coefficient.
+    Supports position-dependent coefficients by evaluating them on the
+    grid and performing elementwise integration.
     """
     dv = data.volume_element
     potential = 0.0
+
+    # Build coordinate arrays once (lazy, only if needed)
+    coord_arrays: dict[str, NDArray[np.float64]] | None = None
+    has_posdep = any(
+        term.position_dependent
+        for eq in data.spec.equations
+        for term in eq.rhs_terms
+    )
+    if has_posdep:
+        coord_arrays = _build_coord_arrays(data)
 
     for eq in data.spec.equations:
         if eq.time_derivative_order < 2:  # noqa: PLR2004
@@ -513,26 +595,16 @@ def _compute_virial_potential(
             if _is_momentum_field(term.field):
                 continue
 
-            # Position-dependent coefficients not yet supported
-            if term.position_dependent:
-                msg = (
-                    f"Position-dependent coefficient in equation "
-                    f"'{eq.field_name}' term '{term.operator}({term.field})' "
-                    f"— virial energy computation requires constant "
-                    f"coefficients (coordinate_dependent="
-                    f"{term.coordinate_dependent})"
-                )
-                raise ValueError(msg)
-
             target = _resolve_term_target(data, term.field, t_idx)
             if target is None:
                 continue
 
-            coeff = _resolve_term_coefficient(term, data.parameters)
+            coeff = _resolve_coefficient_on_grid(term, data, coord_arrays or {})
             operated = _apply_spatial_operator(
                 term.operator, target, data.grid_spacing, data.periodic,
             )
-            potential += coeff * float((phi_i * operated).sum()) * dv
+            # coeff may be scalar or ndarray — numpy handles both
+            potential += float((coeff * phi_i * operated).sum()) * dv
 
     return -0.5 * potential
 
@@ -564,14 +636,14 @@ def _compute_constraint_self_energy(
         grad_sq = _gradient_energy_density(c_field, data.grid_spacing, data.periodic)
         energy -= 0.5 * float(grad_sq.sum()) * dv
 
-        # Mass: -½ m² ∫ C² dV  (NEGATIVE)
+        # Mass: -½ m² ∫ C² dV  (NEGATIVE, m² may be scalar or ndarray)
         m2 = _resolve_mass_squared(data, field_idx)
-        energy -= 0.5 * m2 * float((c_field**2).sum()) * dv
+        energy -= 0.5 * float((m2 * c_field**2).sum()) * dv
 
     return energy
 
 
-def compute_system_energy(
+def compute_system_energy(  # noqa: PLR0914
     data: SimulationData,
     t_idx: int,
 ) -> SystemEnergy:
@@ -606,6 +678,19 @@ def compute_system_energy(
     # fields with a full ``laplacian``, this is all axes (unchanged).
     # For vector components with directional laplacians (e.g. laplacian_y),
     # only the corresponding axes contribute to per-field gradient energy.
+
+    # Pre-build coordinate arrays once if any field has position-dependent mass
+    coord_arrays: dict[str, NDArray[np.float64]] | None = None
+    has_posdep_mass = any(
+        term.operator == "identity"
+        and term.field == eq.field_name
+        and term.position_dependent
+        for eq in data.spec.equations
+        for term in eq.rhs_terms
+    )
+    if has_posdep_mass:
+        coord_arrays = _build_coord_arrays(data)
+
     per_field: dict[str, FieldEnergy] = {}
     for field_idx, eq in enumerate(data.spec.equations):
         name = eq.field_name
@@ -616,7 +701,7 @@ def compute_system_energy(
         mom_snapshot = data.momenta.get(name)
         mom_arr = mom_snapshot[t_idx] if mom_snapshot is not None else None
 
-        m2 = _resolve_mass_squared(data, field_idx)
+        m2 = _resolve_mass_squared(data, field_idx, coord_arrays=coord_arrays)
         axes = _self_gradient_axes(eq)
         per_field[name] = compute_field_energy(
             field_snapshot, mom_arr, m2, data.grid_spacing, data.periodic,

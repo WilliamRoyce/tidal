@@ -17,6 +17,8 @@ Typical usage::
     print(f"L_mix = {mixing.mixing_length:.4f} +/- {mixing.mixing_length_uncertainty:.4f}")
 """
 
+from __future__ import annotations
+
 from tidal.measurement._conversion import (
     ConversionResult as ConversionResult,
 )

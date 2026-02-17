@@ -1,0 +1,58 @@
+# Coupled Scalar Scattering — Localized Interaction Region
+#
+# Physics: Two scalar fields phi and chi coupled through a spatially
+# localized background field G(x,y) = g0 * exp(-r^2 / (2*R^2)).
+#
+#   L = -1/2 (d phi)^2 - 1/2 (d chi)^2 - mPhi2/2 phi^2
+#       - mChi2/2 chi^2 - G(x,y) phi chi
+#
+# The coupling G is localized near the origin.  An incident phi wave
+# packet scatters off the coupling region, partially converting to chi
+# radiation.  The chi field starts as a localized blob at the origin.
+#
+# Analogy to Gertsenshtein effect:
+#   phi  <-> photon           (light, fast)
+#   chi  <-> graviton         (heavy, slow)
+#   G(x,y) <-> background B_0(x,y)  (localized coupling region)
+#
+# Demonstrates:
+#   - Position-dependent cross-field coupling via [[background_fields]]
+#   - Multi-field 2+1D scattering with energy transfer
+#   - Exp[...] coefficient evaluation in the Python pipeline
+
+[theory]
+name = "Coupled Scalar Scattering"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[fields]]
+name = "chi"
+type = "scalar"
+
+[constants]
+names = ["mPhi2", "mChi2", "g0", "R"]
+
+[[background_fields]]
+name = "G"
+type = "scalar"
+components = ["g0 * Exp[-(x[]^2 + y[]^2) / (2 * R^2)]"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - 1/2 CD[-a][chi[]] eta[a, b] CD[-b][chi[]] - mPhi2/2 * phi[]^2 - mChi2/2 * chi[]^2 - G[] * phi[] * chi[]"
+
+# Stability requirement: mPhi2 * mChi2 > g0^2 (positive-definite mass matrix).
+# With these values: det = 1*4 - 1 = 3 > 0.
+[parameters]
+mPhi2 = 1.0
+mChi2 = 4.0
+g0 = 1.0
+R = 8.0
+
+[output]
+path = "../data/coupled_scattering.json"

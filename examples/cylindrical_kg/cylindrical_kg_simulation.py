@@ -46,7 +46,12 @@ if TYPE_CHECKING:
 
     NumericArray = NDArray[np.float64]
 
-OUTPUT_FILENAME = "cylindrical_kg_output.png"
+# ── Configuration ─────────────────────────────────────────────
+
+# Physics
+MASS_SQUARED = 0.0
+
+# Grid
 R_MIN = 0.5
 R_MAX = 8.0
 THETA_MIN = 0.0
@@ -56,14 +61,23 @@ Z_MAX = 5.0
 GRID_NR = 48
 GRID_NTHETA = 48
 GRID_NZ = 48
-MASS_SQUARED = 0.0
+
+# Time integration
+T_END = 4.0
+DT = 0.01
+SNAPSHOT_INTERVAL = 0.5
+
+# Initial conditions
 PULSE_RADIUS = 3.0
 PULSE_Z_CENTER = 0.0
 PULSE_WIDTH_R = 0.6
 PULSE_WIDTH_Z = 0.8
 PULSE_AMPLITUDE = 1.0
-T_END = 4.0
-DT = 0.01
+
+# Output
+OUTPUT_FILENAME = "cylindrical_kg_output.png"
+
+# ── Helpers ───────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
@@ -75,20 +89,6 @@ class SimulationResult:
     r_coords: NumericArray
     theta_coords: NumericArray
     z_coords: NumericArray
-
-
-def main() -> None:
-    """Run the cylindrical coordinate Klein-Gordon simulation."""
-    _print_header()
-    json_path = Path(__file__).parent.parent / "data" / "cylindrical_kg.json"
-    _load_spec(json_path)
-    pde = _build_pde(json_path)
-    grid = _create_grid()
-    state = _create_initial_state(grid)
-    result = _run_simulation(pde, grid, state)
-    _analyze_results(result)
-    _plot_results(result)
-    _print_footer()
 
 
 def _print_header() -> None:
@@ -184,7 +184,7 @@ def _run_simulation(
         dt=DT,
         solver="scipy",
         method="RK45",
-        tracker=storage.tracker(0.5),
+        tracker=storage.tracker(SNAPSHOT_INTERVAL),
     )
     result = normalize_solve_result(result)
 
@@ -354,6 +354,23 @@ def _print_footer() -> None:
     print("  4. 3+1D: mixed curved (r, theta) and flat (z) spatial directions")
     print("  5. All coefficients derived from metric by xAct pipeline")
     print("=" * 60)
+
+
+# ── Entry point ───────────────────────────────────────────────
+
+
+def main() -> None:
+    """Run the cylindrical coordinate Klein-Gordon simulation."""
+    json_path = Path(__file__).parent.parent / "data" / "cylindrical_kg.json"
+    _print_header()
+    _load_spec(json_path)
+    pde = _build_pde(json_path)
+    grid = _create_grid()
+    state = _create_initial_state(grid)
+    result = _run_simulation(pde, grid, state)
+    _analyze_results(result)
+    _plot_results(result)
+    _print_footer()
 
 
 if __name__ == "__main__":

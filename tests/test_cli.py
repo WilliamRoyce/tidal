@@ -1717,6 +1717,649 @@ class TestMeasureCommand:
         assert output.stat().st_size > 0
 
 
+class TestBackgroundFields:
+    """Tests for [[background_fields]] TOML feature — WLS generation dry-runs."""
+
+    def test_background_scalar_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Scalar background field should generate DefTensor + ComponentValue."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Scalar in External Potential"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["V0"]
+
+[[background_fields]]
+name = "V"
+type = "scalar"
+components = ["V0"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]] - V[] * phi[]^2"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "Background fields" in out
+        assert "ComponentValue" in out
+        assert "V0" in out
+        assert "EulerLagrangeEquation" in out
+
+    def test_background_vector_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Vector background field should generate ComponentValue for each component."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "EM in External B Field"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[constants]
+names = ["B0val"]
+
+[[background_fields]]
+name = "B"
+type = "vector"
+components = [0, 0, "B0val"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert out.count("ComponentValue") == 3
+        assert "B0val" in out
+        assert "{0," in out
+        assert "{1," in out
+        assert "{2," in out
+
+    def test_background_tensor_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Rank-2 tensor background field should generate dim^2 ComponentValues."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Tensor Background"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[background_fields]]
+name = "G"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+components = [-1, 0, 0, 1]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert out.count("ComponentValue") == 4
+
+    def test_background_field_in_lagrangian_substitution(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Background field name should be substituted in Lagrangian expression."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Substitution Test"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[background_fields]]
+name = "V"
+type = "scalar"
+components = [1.0]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]] - V[] * phi[]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Theory name "Substitution Test" -> prefix "st"
+        assert "stV[]" in out
+
+    def test_background_missing_components(self, tmp_path: Path) -> None:
+        """Background field without components should fail validation."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[background_fields]]
+name = "V"
+type = "scalar"
+
+[lagrangian]
+expression = "phi[]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_background_wrong_component_count(self, tmp_path: Path) -> None:
+        """Background field with wrong number of components should fail."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad Count"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[background_fields]]
+name = "B"
+type = "vector"
+components = [0, 1]
+
+[lagrangian]
+expression = "phi[]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_background_name_collision_dynamical(self, tmp_path: Path) -> None:
+        """Background field with same name as dynamical field should fail."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Collision"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[background_fields]]
+name = "phi"
+type = "scalar"
+components = [1.0]
+
+[lagrangian]
+expression = "phi[]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_background_name_collision_derived(self, tmp_path: Path) -> None:
+        """Background field with same name as derived field should fail."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Collision"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[[background_fields]]
+name = "F"
+type = "scalar"
+components = [1.0]
+
+[lagrangian]
+expression = "-1/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_no_background_fields_backward_compat(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Existing TOMLs without [[background_fields]] should still work."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "No Background"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "Background fields" not in out
+        assert "ComponentValue" not in out
+        assert "EulerLagrangeEquation" in out
+
+    def test_background_numeric_components(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Background field with numeric (int/float) components should work."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Numeric Background"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[background_fields]]
+name = "G"
+type = "vector"
+components = [0, 1.5]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "1.5" in out
+
+    def test_background_multi_field_coupling_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Two dynamical fields coupled through a background field."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Background Coupling"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "psi"
+type = "scalar"
+
+[[fields]]
+name = "chi"
+type = "scalar"
+
+[constants]
+names = ["gCpl", "Bval"]
+
+[[background_fields]]
+name = "B"
+type = "scalar"
+components = ["Bval"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][psi[]] eta[a, b] CD[-b][psi[]] - 1/2 CD[-a][chi[]] eta[a, b] CD[-b][chi[]] + gCpl * B[] * psi[] * chi[]"
+
+[parameters]
+gCpl = 0.3
+Bval = 1.0
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "Background fields" in out
+        assert "ComponentValue" in out
+        assert "Bval" in out
+        assert "DecomposeToComponents" in out
+        assert "bcPsi[]" in out
+        assert "bcChi[]" in out
+        assert '"Bval" -> 1.0' in out
+
+    def test_background_localized_unitstep_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Spatially-varying background with UnitStep should parse."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Localized Background"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["V0"]
+
+[[background_fields]]
+name = "V"
+type = "scalar"
+components = ["V0 * UnitStep[x[] - 30] * UnitStep[70 - x[]]"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - V[]/2 * phi[]^2"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "UnitStep" in out
+        assert "ComponentValue" in out
+
+    def test_scalar_background_explicit_substitution(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Scalar background should generate ReplaceAll before DecomposeToComponents."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Scalar Potential Well"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["V0"]
+
+[[background_fields]]
+name = "V"
+type = "scalar"
+components = ["V0"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - V[]/2 * phi[]^2"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "spwV[] -> V0" in out
+        decompose_pos = out.index("DecomposeToComponents")
+        replace_pos = out.index("spwV[] -> V0")
+        assert replace_pos < decompose_pos
+
+    def test_scalar_background_multi_field_substitution(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Multi-field with scalar background should substitute in all EOMs."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Background Coupling"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "psi"
+type = "scalar"
+
+[[fields]]
+name = "chi"
+type = "scalar"
+
+[constants]
+names = ["Bval"]
+
+[[background_fields]]
+name = "B"
+type = "scalar"
+components = ["Bval"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][psi[]] eta[a, b] CD[-b][psi[]] - 1/2 CD[-a][chi[]] eta[a, b] CD[-b][chi[]] + B[] * psi[] * chi[]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Both EOM variables should have the substitution
+        assert out.count("bcB[] -> Bval") >= 2
+
+    def test_scalar_background_localized_substitution(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Localized scalar background should substitute the full expression."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Localized Background"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["V0"]
+
+[[background_fields]]
+name = "V"
+type = "scalar"
+components = ["V0 * UnitStep[x[] - 30] * UnitStep[70 - x[]]"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - V[]/2 * phi[]^2"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "lbV[] -> V0 * UnitStep[x[] - 30] * UnitStep[70 - x[]]" in out
+
+    def test_vector_background_no_explicit_substitution(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Vector background should NOT generate ReplaceAll (ToBasis handles it)."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Vector No Sub"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[background_fields]]
+name = "B"
+type = "vector"
+components = [0, 0, 1.0]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "Substitute scalar background" not in out
+
+    def test_coupled_scattering_multifield_background(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Multi-field + scalar background with Exp should produce correct WLS."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Coupled Scalar Scattering"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[fields]]
+name = "chi"
+type = "scalar"
+
+[constants]
+names = ["mPhi2", "mChi2", "g0", "R"]
+
+[[background_fields]]
+name = "G"
+type = "scalar"
+components = ["g0 * Exp[-(x[]^2 + y[]^2) / (2 * R^2)]"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - 1/2 CD[-a][chi[]] eta[a, b] CD[-b][chi[]] - mPhi2/2 * phi[]^2 - mChi2/2 * chi[]^2 - G[] * phi[] * chi[]"
+
+[parameters]
+mPhi2 = 0.0
+mChi2 = 1.0
+g0 = 2.0
+R = 8.0
+
+[output]
+path = "coupled_scattering.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Prefix from "Coupled Scalar Scattering" → "css"
+        # Background G should be defined
+        assert "cssG" in out
+        # Scalar background should get ReplaceAll substitution
+        assert "Substitute scalar background" in out
+        # Both fields should appear in Euler-Lagrange
+        assert "cssPhi" in out
+        assert "cssChi" in out
+        # Constants should be declared
+        assert "DefConstantSymbol" in out
+        assert "g0" in out
+        assert "mChi2" in out
+
+
 class TestExceptionHandling:
     def test_value_error_shows_clean_message(self, capsys: pytest.CaptureFixture[str]) -> None:
         """ValueError should produce a clean 'Error:' message, not a traceback."""

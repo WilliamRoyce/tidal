@@ -47,34 +47,41 @@ tidal/
     ├── EulerLagrange.wl     # Euler-Lagrange derivation
     ├── CommonUtilities.wl   # Shared utilities, epsilon evaluation
     ├── ComponentDecompose.wl # Decompose to components
-    ├── ExportJSON.wl        # JSON export, mass/coupling extraction
-    └── LagrangianPipeline.wl # Main entry point
+    └── ExportJSON.wl        # JSON export, mass/coupling extraction
 ```
 
 ## Usage
 
 ### 1. Mathematica Side: Derive Equations from Lagrangian
 
+The recommended workflow uses `tidal derive` with a TOML configuration file:
+
+```bash
+# Derive equations from a theory TOML file (generates .wls, runs wolframscript)
+tidal derive examples/electromagnetic/theory.toml
+```
+
+Or use the Wolfram pipeline directly:
+
 ```mathematica
-<< TorsionGertsenshtein`LagrangianPipeline`;
+Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]];
+Get[FileNameJoin[{pipelinePath, "EulerLagrange.wl"}]];
+Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]];
+Get[FileNameJoin[{pipelinePath, "ExportJSON.wl"}]];
 
 (* Setup 1+1D Minkowski spacetime *)
-{M, eta, CD, cart} = SetupMinkowski1D[];
+DefManifold[M2, 2, IndexRange[a, h]];
+DefChart[cart, M2, {0, 1}, {t[], x[]}];
+DefMetric[-1, eta[-a, -b], CD, PrintAs -> "η"];
 
-(* Define EM vector potential *)
-DefTensor[A[-a], M];
-DefTensor[F[-a, -b], M, Antisymmetric[{-a, -b}]];
-FieldStrengthRule = F[-a, -b] -> CD[-a][A[-b]] - CD[-b][A[-a]];
+(* Define EM vector potential and derive Euler-Lagrange equations *)
+DefTensor[A[-a], M2];
+L = -1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]];
+eomA = EulerLagrangeEquation[L, A[a], CD];
 
-(* EM Lagrangian: L = -1/4 F_ab F^ab *)
-EMLagrangian = -1/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d];
-EMLagrangianExpanded = EMLagrangian /. FieldStrengthRule;
-
-(* Process and export *)
-json = ProcessLagrangian[
-    EMLagrangianExpanded, A[-a], CD, cart,
-    "OutputPath" -> "examples/data/em_1d.json"
-];
+(* Decompose to components and export *)
+comps = DecomposeToComponents[eomA, A[-a], cart, {}];
+jsonStructure = BuildMultiFieldJSONStructure[comps, metadata];
 ```
 
 ### 2. Python Side: Load and Simulate
@@ -226,13 +233,13 @@ for g_value in [0.1, 0.5, 1.0, 2.0]:
 
 ### Klein-Gordon (Validation)
 
-The Klein-Gordon field provides cross-validation:
+The Klein-Gordon field validates the full pipeline:
 
 1. Mathematica derives: `Box[phi] - m^2 phi = 0`
 2. Export to JSON
 3. Python builds `PDEFromSpec`
-4. Compare to existing `KleinGordonPDE`
-5. Results must match ✓
+4. Simulate and verify dispersion relation matches theory
+5. Energy conservation holds ✓
 
 ### Electromagnetic Field (1+1D)
 
@@ -294,14 +301,19 @@ state = pulse.create(grid, spec)
 ### Unit Tests
 
 - `tests/test_json_loader.py` - JSON parsing and validation
-- `tests/test_pde_builder.py` - PDE construction from spec
+- `tests/test_pde_builder.py` - PDE construction from spec (includes EM pipeline tests)
 - `tests/test_vectorfield.py` - Multi-component utilities
-- `tests/test_em_pipeline.py` - End-to-end integration
+- `tests/test_measurement.py` - Energy, conversion, spectral analysis
+- `tests/test_cli.py` - CLI subcommands and TOML-to-WLS generation
 
 ### Validation
 
 ```bash
-python validate_implementation.py
+# Run full test suite (Python + Wolfram)
+./scripts/full_test.sh
+
+# Validate end-to-end pipeline
+./scripts/validate_pipeline.sh
 ```
 
 Checks:
@@ -323,11 +335,13 @@ Checks:
 ## Completed Extensions
 
 - ✅ **Coupled systems**: Multi-field Lagrangians (coupled_scalars, scalar_vector_coupling)
-- ✅ **Higher dimensions**: 2+1D and 3+1D spacetimes (18 examples)
+- ✅ **Higher dimensions**: 2+1D and 3+1D spacetimes (20 examples)
 - ✅ **Gauge constraints**: Constraint equations with `time_derivative_order=0`
 - ✅ **Rank 3+ tensors**: Antisymmetric rank-3 with symmetry reduction (massive_3form)
 - ✅ **Curvilinear coordinates**: Polar, spherical, cylindrical with Christoffel auto-detection
-- ✅ **CLI**: `tidal` command with derive/simulate/inspect/list/validate subcommands
+- ✅ **CLI**: `tidal` command with derive/simulate/measure/inspect/list/validate subcommands
+- ✅ **Background fields**: Non-dynamical `[[background_fields]]` for position-dependent coupling
+- ✅ **Measurement module**: Energy, conversion P(t), spectral P(k,t), dispersion, mixing length
 - ✅ **Auto-computed matrices**: Mass/coupling matrices from identity terms (Phase 12)
 
 ## Future Extensions

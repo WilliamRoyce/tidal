@@ -18,14 +18,13 @@ Verification:
   We compare both and verify they match.
 """
 
-from pathlib import Path
-from typing import cast
+from __future__ import annotations
 
-OUTPUT_FILENAME = "conformal_kg_static_output.png"
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import matplotlib as mpl
-
-from tidal.utils import normalize_solve_result
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt
@@ -33,27 +32,71 @@ import numpy as np
 from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
 
 from tidal.symbolic import build_pde_from_json, load_equation_system
+from tidal.utils import normalize_solve_result
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    from tidal.symbolic.pde_builder import PDEFromSpec
+
+    NumericArray = NDArray[np.float64]
+
+# ── Configuration ─────────────────────────────────────────────
+
+# Physics
+M_EFF_SQUARED = 4.0  # From conformal factor Omega=2: m_eff^2 = m^2 * Omega^2 = 1 * 4
+
+# Grid
+X_MIN = 0.0
+X_MAX = 100.0
+GRID_SHAPE = [256]
+GRID_PERIODIC: list[bool] = [True]
+
+# Time integration
+T_END = 20.0
+DT = 0.002  # Small timestep needed for m_eff^2=4 (higher frequency requires smaller dt)
+SNAPSHOT_INTERVAL = 1.0
+
+# Initial conditions
+CENTER_X = 50.0
+PULSE_WIDTH = 5.0
+PULSE_AMPLITUDE = 1.0
+
+# Analysis
+DISPERSION_THRESHOLD = 1.1  # Factor above which dispersion is "observed"
+
+# Output
+OUTPUT_FILENAME = "conformal_kg_static_output.png"
+
+# ── Helpers ───────────────────────────────────────────────────
 
 
-def main() -> None:  # noqa: PLR0914, PLR0915
-    """Run the static conformal Klein-Gordon simulation."""
+@dataclass(frozen=True)
+class SimulationResult:
+    """Container for conformal KG simulation results."""
+
+    grid: CartesianGrid
+    storage: MemoryStorage
+    x_coords: NumericArray
+
+
+def _print_header() -> None:
     print("=" * 60)
     print("Static Conformal Klein-Gordon 1+1D Simulation")
     print("=" * 60)
     print()
     print("Metric: ds^2 = Omega^2 * (-dt^2 + dx^2)  where Omega = 2")
-    print("Effective mass: m_eff^2 = m^2 * Omega^2 = 1 * 4 = 4")
+    print(f"Effective mass: m_eff^2 = m^2 * Omega^2 = 1 * 4 = {M_EFF_SQUARED:.0f}")
     print()
 
-    # Load the equation specification
+
+def _load_spec(json_path: Path) -> None:
     print("Step 1: Loading equation specification...")
-    json_path = Path(__file__).parent.parent / "data" / "conformal_kg_static.json"
     spec = load_equation_system(json_path)
 
     print(f"  Spacetime dimension: {spec.dimension} (1+1D)")
     print(f"  Components: {spec.n_components} ({', '.join(spec.component_names)})")
 
-    # Show equation structure
     print()
     print("  Equation structure:")
     for eq in spec.equations:
@@ -62,107 +105,124 @@ def main() -> None:  # noqa: PLR0914, PLR0915
             for term in eq.rhs_terms
         )
         print(f"    d2_t({eq.field_name}) = {terms_str}")
-
-    # Build the PDE
     print()
+
+
+def _build_pde(json_path: Path) -> PDEFromSpec:
     print("Step 2: Building PDE from specification...")
     pde = build_pde_from_json(json_path)
     print(f"  PDE class: {type(pde).__name__}")
     print(f"  Components: {pde.n_components}")
-
-    # Set up 1D spatial grid
     print()
+    return pde
+
+
+def _create_grid() -> CartesianGrid:
     print("Step 3: Setting up 1D simulation grid...")
     grid = CartesianGrid(
-        bounds=[(0, 100)],  # x domain
-        shape=[256],  # 256 grid points
-        periodic=True,
+        bounds=[(X_MIN, X_MAX)],
+        shape=GRID_SHAPE,
+        periodic=GRID_PERIODIC,
     )
-    print("  Domain: [0, 100]")
+    print(f"  Domain: [{X_MIN:.0f}, {X_MAX:.0f}]")
     print(f"  Resolution: {grid.shape[0]} points")
     print("  Periodic boundary conditions")
-
-    # Create initial conditions
     print()
+    return grid
+
+
+def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
     print("Step 4: Creating initial conditions...")
+
+    x = cast("np.ndarray", grid.cell_coords[..., 0])
 
     # Initial state: 2 fields = 1 component * (field + momentum)
     # State layout: confPhi_0, pi_0
-    phi = ScalarField(grid, data=0.0, label="confPhi_0")
+    gaussian = PULSE_AMPLITUDE * np.exp(
+        -((x - CENTER_X) ** 2) / (2 * PULSE_WIDTH**2)
+    )
+
+    phi = ScalarField(grid, data=gaussian, label="confPhi_0")
     pi = ScalarField(grid, data=0.0, label="pi_0")
-
-    # Initialize a Gaussian pulse
-    x = cast("np.ndarray", grid.cell_coords[..., 0])
-    center_x = 50.0
-    width = 5.0
-    amplitude = 1.0
-
-    gaussian = amplitude * np.exp(-((x - center_x) ** 2) / (2 * width**2))
-    phi.data[:] = gaussian
-
     state = FieldCollection([phi, pi])
-    print(f"  Gaussian pulse at center x={center_x}")
-    print(f"  Width: {width}, Amplitude: {amplitude}")
-    print("  Initial momentum: zero")
 
-    # Run simulation
-    # Note: Using smaller dt for better energy conservation.
-    # The explicit Euler integrator does not exactly conserve the Hamiltonian.
+    print(f"  Gaussian pulse at center x={CENTER_X}")
+    print(f"  Width: {PULSE_WIDTH}, Amplitude: {PULSE_AMPLITUDE}")
+    print("  Initial momentum: zero")
     print()
+    return state
+
+
+def _run_simulation(
+    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection
+) -> SimulationResult:
     print("Step 5: Running simulation...")
-    t_end = 20.0
-    dt = 0.002  # Small timestep needed for m_eff²=4 (higher frequency requires smaller dt)
 
     storage = MemoryStorage()
     result = pde.solve(
         state,
-        t_range=t_end,
-        dt=dt,
+        t_range=T_END,
+        dt=DT,
         scheme="runge-kutta",  # RK4 for better energy conservation
-        tracker=storage.tracker(1.0),  # Store every 1.0 time units
+        tracker=storage.tracker(SNAPSHOT_INTERVAL),
     )
     result = normalize_solve_result(result)
 
-    print(f"  Duration: {t_end} time units")
-    print(f"  Stored {len(storage)} snapshots")
+    x = cast("np.ndarray", grid.cell_coords[..., 0])
 
-    # Analyze results
+    print(f"  Duration: {T_END} time units")
+    print(f"  Stored {len(storage)} snapshots")
     print()
+
+    return SimulationResult(
+        grid=grid,
+        storage=storage,
+        x_coords=x,
+    )
+
+
+def _analyze_results(result: SimulationResult) -> None:
     print("Step 6: Analyzing results...")
 
-    # Get initial and final states
-    initial = cast("FieldCollection", storage[0])
-    final = cast("FieldCollection", storage[-1])
+    initial = cast("FieldCollection", result.storage[0])
+    final = cast("FieldCollection", result.storage[-1])
+    x = result.x_coords
 
     # Extract field amplitudes
-    initial_max = np.max(np.abs(initial[0].data))
-    final_max = np.max(np.abs(final[0].data))
+    initial_max = float(np.max(np.abs(initial[0].data)))
+    final_max = float(np.max(np.abs(final[0].data)))
 
     print(f"  Initial: max|phi| = {initial_max:.4f}")
     print(f"  Final:   max|phi| = {final_max:.4f}")
 
     # Check dispersion (massive field should spread)
-    initial_width = np.sqrt(
-        np.sum((x - center_x) ** 2 * initial[0].data ** 2)
+    initial_width = float(np.sqrt(
+        np.sum((x - CENTER_X) ** 2 * initial[0].data ** 2)
         / (np.sum(initial[0].data ** 2) + 1e-10)
+    ))
+    final_com = float(
+        np.sum(x * final[0].data ** 2) / (np.sum(final[0].data ** 2) + 1e-10)
     )
-    final_com = np.sum(x * final[0].data ** 2) / (np.sum(final[0].data ** 2) + 1e-10)
-    final_width = np.sqrt(
+    final_width = float(np.sqrt(
         np.sum((x - final_com) ** 2 * final[0].data ** 2)
         / (np.sum(final[0].data ** 2) + 1e-10)
-    )
+    ))
 
     print(f"  Initial pulse width: {initial_width:.2f}")
     print(f"  Final pulse width: {final_width:.2f}")
 
-    if final_width > initial_width * 1.1:
+    if final_width > initial_width * DISPERSION_THRESHOLD:
         print("  Dispersion observed (as expected for massive field)")
     else:
         print("  Note: Dispersion may be subtle at this mass/time scale")
-
-    # Generate visualization
     print()
+
+
+def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     print("Step 7: Generating visualization...")
+
+    storage = result.storage
+    x = result.x_coords
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
@@ -211,10 +271,9 @@ def main() -> None:  # noqa: PLR0914, PLR0915
         # Compute spatial gradient
         grad_phi = np.gradient(phi_data, dx)
 
-        # Proper Hamiltonian: H = ½∫[π² + (∂_x φ)² + m_eff²φ²] dx
-        m_eff_sq = 4.0  # From conformal factor Ω=2: m_eff² = m² * Ω² = 1 * 4
+        # Proper Hamiltonian: H = 1/2 * integral[pi^2 + (d_x phi)^2 + m_eff^2 phi^2] dx
         energy = np.sum(
-            0.5 * pi_data**2 + 0.5 * grad_phi**2 + 0.5 * m_eff_sq * phi_data**2
+            0.5 * pi_data**2 + 0.5 * grad_phi**2 + 0.5 * M_EFF_SQUARED * phi_data**2
         )
         energies.append(energy)
         time_values.append(t_idx)
@@ -229,7 +288,6 @@ def main() -> None:  # noqa: PLR0914, PLR0915
 
     # Space-time diagram
     ax = axes[1, 1]
-    # Build 2D array of field values over time
     n_snapshots = len(storage)
     spacetime = np.zeros((n_snapshots, len(x)))
     for t_idx in range(n_snapshots):
@@ -240,10 +298,10 @@ def main() -> None:  # noqa: PLR0914, PLR0915
         spacetime,
         aspect="auto",
         origin="lower",
-        extent=[0, 100, 0, n_snapshots],
+        extent=[X_MIN, X_MAX, 0, n_snapshots],
         cmap="bwr_r",
-        vmin=-amplitude,
-        vmax=amplitude,
+        vmin=-PULSE_AMPLITUDE,
+        vmax=PULSE_AMPLITUDE,
     )
     ax.set_xlabel("x")
     ax.set_ylabel("Time (snapshot)")
@@ -261,20 +319,39 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     output_dir.mkdir(exist_ok=True, parents=True)
     output_path = output_dir / OUTPUT_FILENAME
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"Saved plot to: {output_path}")
-
-    # Summary
+    print(f"  Saved plot to: {output_path}")
+    plt.close()
     print()
+
+
+def _print_footer() -> None:
     print("=" * 60)
     print("Simulation complete!")
     print()
     print("Key observations:")
     print("  1. Conformal metric g_ab = Omega^2 eta_ab with Omega=2")
     print("  2. Constant Omega => Christoffel symbols = 0")
-    print("  3. Effective mass m_eff^2 = m^2 * Omega^2 = 4")
+    print(f"  3. Effective mass m_eff^2 = m^2 * Omega^2 = {M_EFF_SQUARED:.0f}")
     print("  4. Dynamics identical to flat KG with m^2=4")
     print("  5. This validates metric handling for curved spacetime Phase 1")
     print("=" * 60)
+
+
+# ── Entry point ───────────────────────────────────────────────
+
+
+def main() -> None:
+    """Run the static conformal Klein-Gordon simulation."""
+    json_path = Path(__file__).parent.parent / "data" / "conformal_kg_static.json"
+    _print_header()
+    _load_spec(json_path)
+    pde = _build_pde(json_path)
+    grid = _create_grid()
+    state = _create_initial_state(grid)
+    result = _run_simulation(pde, grid, state)
+    _analyze_results(result)
+    _plot_results(result)
+    _print_footer()
 
 
 if __name__ == "__main__":

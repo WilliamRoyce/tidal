@@ -23,4 +23,4 @@ dSH = 0.1
 dSm2 = 1.0
 
 [output]
-path = "examples/data/de_sitter_kg.json"
+path = "../data/de_sitter_kg.json"

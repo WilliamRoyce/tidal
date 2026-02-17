@@ -40,20 +40,36 @@ if TYPE_CHECKING:
 
     NumericArray = NDArray[np.float64]
 
-OUTPUT_FILENAME = "polar_kg_output.png"
+# ── Configuration ─────────────────────────────────────────────
+
+# Physics
+MASS_SQUARED = 0.5
+
+# Grid
 R_MIN = 0.5
 R_MAX = 10.0
 THETA_MIN = 0.0
 THETA_MAX = 2 * np.pi
-GRID_NR = 128
-GRID_NTHETA = 128
-MASS_SQUARED = 0.5
+GRID_SHAPE = [128, 128]
+GRID_PERIODIC: list[bool] = [False, True]
+
+# Time integration
+T_END = 8.0
+DT = 0.005
+SNAPSHOT_INTERVAL = 0.2
+
+# Initial conditions
 PULSE_RADIUS = 3.0
 PULSE_WIDTH = 0.5
 PULSE_AMPLITUDE = 1.0
-T_END = 8.0
-DT = 0.005
+
+# Analysis
 ENERGY_THRESHOLD = 0.15
+
+# Output
+OUTPUT_FILENAME = "polar_kg_output.png"
+
+# ── Helpers ───────────────────────────────────────────────────
 
 
 @dataclass(frozen=True)
@@ -64,20 +80,6 @@ class SimulationResult:
     storage: MemoryStorage
     r_coords: NumericArray
     theta_coords: NumericArray
-
-
-def main() -> None:
-    """Run the polar coordinate Klein-Gordon simulation."""
-    _print_header()
-    json_path = Path(__file__).parent.parent / "data" / "polar_kg.json"
-    _load_spec(json_path)
-    pde = _build_pde(json_path)
-    grid = _create_grid()
-    state = _create_initial_state(grid)
-    result = _run_simulation(pde, grid, state)
-    _analyze_results(result)
-    _plot_results(result)
-    _print_footer()
 
 
 def _print_header() -> None:
@@ -124,12 +126,12 @@ def _create_grid() -> CartesianGrid:
     print("Step 3: Setting up polar coordinate grid...")
     grid = CartesianGrid(
         bounds=[(R_MIN, R_MAX), (THETA_MIN, THETA_MAX)],
-        shape=[GRID_NR, GRID_NTHETA],
-        periodic=[False, True],  # r: bounded, theta: periodic
+        shape=GRID_SHAPE,
+        periodic=GRID_PERIODIC,
     )
     print(f"  r range: [{R_MIN}, {R_MAX}]")
     print("  theta range: [0, 2*pi]")
-    print(f"  Resolution: {GRID_NR} x {GRID_NTHETA}")
+    print(f"  Resolution: {GRID_SHAPE[0]} x {GRID_SHAPE[1]}")
     print("  Boundary: r=Neumann, theta=periodic")
     print()
     return grid
@@ -139,7 +141,6 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
     print("Step 4: Creating initial conditions...")
 
     r = cast("np.ndarray", grid.cell_coords[..., 0])
-    cast("np.ndarray", grid.cell_coords[..., 1])
 
     # Gaussian ring at r = PULSE_RADIUS, uniform in theta
     gaussian_ring = PULSE_AMPLITUDE * np.exp(
@@ -169,7 +170,7 @@ def _run_simulation(
         dt=DT,
         solver="scipy",
         method="RK45",
-        tracker=storage.tracker(0.2),
+        tracker=storage.tracker(SNAPSHOT_INTERVAL),
     )
     result = normalize_solve_result(result)
 
@@ -299,7 +300,7 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
 
     # Angular cross-section at fixed r over time
     ax = axes[1, 1]
-    r_idx = GRID_NR // 3  # Pick a representative radius
+    r_idx = GRID_SHAPE[0] // 3  # Pick a representative radius
     r_value = r_1d[r_idx]
     theta_1d = cast("np.ndarray", grid.cell_coords[0, :, 1])
     for i, t_idx in enumerate(times_to_plot):
@@ -345,6 +346,23 @@ def _print_footer() -> None:
     print("  4. All coefficients derived from metric by xAct pipeline")
     print("  5. Mixed BCs: Neumann (r) + periodic (theta)")
     print("=" * 60)
+
+
+# ── Entry point ───────────────────────────────────────────────
+
+
+def main() -> None:
+    """Run the polar coordinate Klein-Gordon simulation."""
+    json_path = Path(__file__).parent.parent / "data" / "polar_kg.json"
+    _print_header()
+    _load_spec(json_path)
+    pde = _build_pde(json_path)
+    grid = _create_grid()
+    state = _create_initial_state(grid)
+    result = _run_simulation(pde, grid, state)
+    _analyze_results(result)
+    _plot_results(result)
+    _print_footer()
 
 
 if __name__ == "__main__":

@@ -24,6 +24,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+import matplotlib as mpl
+
+mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 from pde import CallbackTracker, CartesianGrid
@@ -50,19 +53,30 @@ if TYPE_CHECKING:
     from tidal.measurement._mixing import MixingResult, MixingSpectrum
     from tidal.measurement._spectral_conversion import SpectralConversion
 
-# ---------------------------------------------------------------------------
-# Simulation parameters
-# ---------------------------------------------------------------------------
+# ── Configuration ─────────────────────────────────────────────
 
+# Physics
 PARAMS: dict[str, float] = {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5}
+
+# Grid
+GRID_BOUNDS = [(0, 100)]
+GRID_SHAPE = 256
+GRID_PERIODIC = True
+
+# Time integration
 T_END = 200.0
+DT = 0.01
 TRACKER_INTERVAL = 0.2
+
+# Initial conditions
+PULSE_CENTER = (30.0,)
+PULSE_WIDTH = 5.0
+PULSE_AMPLITUDE = 1.0
+
+# Output
 OUTPUT_FILENAME = "coupled_scalars_measurement.png"
 
-
-# ---------------------------------------------------------------------------
-# Simulation
-# ---------------------------------------------------------------------------
+# ── Simulation ────────────────────────────────────────────────
 
 
 def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
@@ -71,12 +85,12 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
 
     spec = load_equation_system(json_path)
     pde = build_pde_from_json(json_path, parameters=PARAMS)
-    grid = CartesianGrid([(0, 100)], 256, periodic=True)
+    grid = CartesianGrid(GRID_BOUNDS, GRID_SHAPE, periodic=GRID_PERIODIC)
 
     pulse = ComponentGaussianPulse(
-        center=(30.0,),
-        width=5.0,
-        amplitude=1.0,
+        center=PULSE_CENTER,
+        width=PULSE_WIDTH,
+        amplitude=PULSE_AMPLITUDE,
         active_components={"phi_0": 1.0},
     )
     initial_state = pulse.create(grid, spec)
@@ -95,7 +109,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     pde.solve(
         initial_state,
         t_range=T_END,
-        dt=0.01,
+        dt=DT,
         scheme="runge-kutta",
         tracker=tracker,
     )
@@ -105,9 +119,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     return data, PARAMS, output_data_dir
 
 
-# ---------------------------------------------------------------------------
-# Measurement + printing
-# ---------------------------------------------------------------------------
+# ── Measurement + printing ────────────────────────────────────
 
 
 def _print_summary(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
@@ -223,9 +235,7 @@ def _print_summary(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
     print("=" * 60)
 
 
-# ---------------------------------------------------------------------------
-# Plotting
-# ---------------------------------------------------------------------------
+# ── Plotting ──────────────────────────────────────────────────
 
 
 def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
@@ -500,9 +510,7 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     return output_path
 
 
-# ---------------------------------------------------------------------------
-# Entry point
-# ---------------------------------------------------------------------------
+# ── Entry point ───────────────────────────────────────────────
 
 
 def main() -> None:

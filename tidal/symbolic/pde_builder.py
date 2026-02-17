@@ -20,10 +20,7 @@ from typing import TYPE_CHECKING, Any, SupportsFloat, cast
 
 import numpy as np
 from pde import FieldCollection, PDEBase, ScalarField
-from scipy import (  # type: ignore[reportMissingTypeStubs]
-    sparse,
-    special,
-)
+from scipy import sparse  # type: ignore[reportMissingTypeStubs]
 from scipy.sparse.linalg import spsolve  # type: ignore[reportUnknownVariableType]
 from typing_extensions import override
 
@@ -920,6 +917,19 @@ class PDEFromSpec(PDEBase):
         self._cached_bc: BCDescriptor | None = None
         self._cached_grid_id: int | None = None
 
+        # B6: Persistent cache for spatial-only coefficients (position_dependent=True,
+        # time_dependent=False).  These are constant in time, so we evaluate once on
+        # the grid at first use and reuse across all substeps.  Keyed by the symbolic
+        # expression string (same key as coeff_cache).  Populated lazily by
+        # _ensure_spatial_cache() on first _compute_rhs_for_component() call.
+        self._spatial_cache: dict[str, NumericArray] = {}
+        self._spatial_cache_ready: bool = False
+        self._has_spatial_only_terms: bool = any(
+            term.position_dependent and not term.time_dependent
+            for eq in spec.equations
+            for term in eq.rhs_terms
+        )
+
         # Validate operator dimension requirements against spec at construction time
         self._validate_operator_dimensions()
 
@@ -1072,121 +1082,19 @@ class PDEFromSpec(PDEBase):
         Contains numpy/scipy math functions and user-provided parameters.
         The time variable ``t`` and spatial grid coordinates are injected
         per-call in ``_resolve_coefficient_at_point``.
+
+        Delegates to ``_eval_utils.build_eval_namespace`` for the canonical
+        implementation (single source of truth).
         """
-        ns: dict[str, Any] = dict(self._parameters)
-        ns["exp"] = np.exp
-        # Basic trig
-        ns["sin"] = np.sin
-        ns["cos"] = np.cos
-        ns["tan"] = np.tan
-        # Reciprocal trig (no direct numpy equivalents)
-        ns["cot"] = lambda x: np.cos(x) / np.sin(x)  # type: ignore[reportUnknownLambdaType]
-        ns["sec"] = lambda x: 1.0 / np.cos(x)  # type: ignore[reportUnknownLambdaType]
-        ns["csc"] = lambda x: 1.0 / np.sin(x)  # type: ignore[reportUnknownLambdaType]
-        # Inverse trig
-        ns["arcsin"] = np.arcsin
-        ns["arccos"] = np.arccos
-        ns["arctan"] = np.arctan
-        ns["arctan2"] = np.arctan2
-        # Hyperbolic
-        ns["sinh"] = np.sinh
-        ns["cosh"] = np.cosh
-        ns["tanh"] = np.tanh
-        # Inverse hyperbolic
-        ns["arcsinh"] = np.arcsinh
-        ns["arccosh"] = np.arccosh
-        ns["arctanh"] = np.arctanh
-        # Other
-        ns["log"] = np.log
-        ns["sqrt"] = np.sqrt
-        ns["abs"] = np.abs
-        # Special functions (scipy.special)
-        ns["erf"] = special.erf
-        ns["jv"] = special.jv  # BesselJ
-        ns["yv"] = special.yv  # BesselY
-        return ns
+        from tidal.symbolic._eval_utils import build_eval_namespace  # noqa: PLC0415
 
-    @staticmethod
-    def _convert_power_function(expr: str) -> str:
-        """Convert Power[base, exponent] to (base)**(exponent).
-
-        Handles nested expressions in both arguments. Must run before bracket
-        conversion ([] → ()).
-
-        Parameters
-        ----------
-        expr : str
-            Expression potentially containing Power[...] syntax.
-
-        Returns
-        -------
-        str
-            Expression with Power[...] converted to (...)**(...).
-        """
-        # Pattern: Power[<arg1>, <arg2>] where args may contain nested brackets
-        # (?:[^[\]]|\[[^\]]*\]) matches either non-bracket chars or [...] pairs
-        pattern = r"Power\[((?:[^[\]]|\[[^\]]*\])*),\s*((?:[^[\]]|\[[^\]]*\])*)\]"
-
-        def replacer(match: re.Match[str]) -> str:
-            base = match.group(1).strip()
-            exp = match.group(2).strip()
-            return f"({base})**({exp})"
-
-        # Multiple passes for nested Power calls
-        prev = None
-        result = expr
-        while prev != result:
-            prev = result
-            result = re.sub(pattern, replacer, result)
-        return result
-
-    @staticmethod
-    def _convert_arctan2(expr: str) -> str:
-        """Convert ArcTan[x, y] to arctan2(y, x) with argument swap.
-
-        Mathematica's ArcTan[x, y] computes atan2(y, x), so arguments must
-        be swapped during conversion to match NumPy's arctan2(y, x) signature.
-
-        Parameters
-        ----------
-        expr : str
-            Expression potentially containing ArcTan[x, y] syntax.
-
-        Returns
-        -------
-        str
-            Expression with ArcTan[x, y] converted to arctan2(y, x).
-        """
-        # Pattern: ArcTan[<arg1>, <arg2>] - must handle before generic function conversion
-        pattern = r"ArcTan\[((?:[^[\],]|\[[^\]]*\])*),\s*((?:[^[\]]|\[[^\]]*\])*)\]"
-
-        def replacer(match: re.Match[str]) -> str:
-            x = match.group(1).strip()
-            y = match.group(2).strip()
-            return f"arctan2({y}, {x})"  # Swap x and y!
-
-        return re.sub(pattern, replacer, expr)
+        return dict(build_eval_namespace(self._parameters))
 
     def _mathematica_to_python(self, expr: str) -> str:
         """Convert Mathematica InputForm expression to evaluable Python.
 
-        Handles common Mathematica syntax:
-        - ``E^(...)`` to ``exp(...)`` (Euler's number)
-        - ``Power[x,y]`` to ``(x)**(y)`` (function form of exponentiation)
-        - ``Sin[x]`` to ``sin(x)``, ``Cos[x]`` to ``cos(x)``, ``Tan[x]`` to ``tan(x)``
-        - ``Cot[x]`` to ``cot(x)``, ``Sec[x]`` to ``sec(x)``, ``Csc[x]`` to ``csc(x)``
-        - ``ArcSin[x]`` to ``arcsin(x)``, ``ArcCos[x]`` to ``arccos(x)``, etc.
-        - ``ArcTan[x, y]`` to ``arctan2(y, x)`` (note argument order swap!)
-        - ``Sinh[x]`` to ``sinh(x)``, ``Cosh[x]`` to ``cosh(x)``, etc.
-        - ``ArcSinh[x]`` to ``arcsinh(x)``, ``ArcCosh[x]`` to ``arccosh(x)``, etc.
-        - ``Erf[x]`` to ``erf(x)`` (scipy.special)
-        - ``BesselJ[n, x]`` to ``jv(n, x)``, ``BesselY[n, x]`` to ``yv(n, x)``
-        - ``Rational[p, q]`` to ``(p)/(q)`` (exact fractions from xAct InputForm)
-        - ``Pi`` to ``np.pi`` (mathematical constant)
-        - ``Sign[x]`` to ``np.sign(x)``, ``Max[a,b]`` to ``np.maximum(a,b)``
-        - ``t[]`` to ``t`` (xCoba coordinate symbols, using actual coordinate names)
-        - Mathematica brackets ``[``, ``]`` to Python parens ``(``, ``)``
-        - Mathematica ``^`` to Python ``**``
+        Delegates to ``_eval_utils.mathematica_to_python`` for the canonical
+        implementation (single source of truth).
 
         Parameters
         ----------
@@ -1198,75 +1106,9 @@ class PDEFromSpec(PDEBase):
         str
             Python-evaluable expression string.
         """
-        result = expr
+        from tidal.symbolic._eval_utils import mathematica_to_python  # noqa: PLC0415
 
-        # Step 1: E^(...) → exp(...) — Mathematica's Euler number
-        result = re.sub(r"\bE\^", "exp", result)
-
-        # Step 2: Power[x, y] → (x)**(y) — must handle before bracket conversion
-        result = self._convert_power_function(result)
-
-        # Step 3: ArcTan[x, y] → arctan2(y, x) — special 2-arg case with swap
-        # Must handle before generic function conversion
-        result = self._convert_arctan2(result)
-
-        # Step 3.5: Rational[p, q] → (p)/(q) — Mathematica exact fractions
-        # xAct outputs Rational[1,2] for 1/2 in InputForm. Must handle before
-        # bracket conversion since Rational uses Mathematica brackets.
-        result = re.sub(r"Rational\[([^,\]]+),\s*([^,\]]+)\]", r"(\1)/(\2)", result)
-
-        # Step 4: Function name conversions (batch)
-        function_map = [
-            # Basic trig
-            ("Sin", "sin"),
-            ("Cos", "cos"),
-            ("Tan", "tan"),
-            # Reciprocal trig
-            ("Cot", "cot"),
-            ("Sec", "sec"),
-            ("Csc", "csc"),
-            # Inverse trig (1-arg)
-            ("ArcSin", "arcsin"),
-            ("ArcCos", "arccos"),
-            ("ArcTan", "arctan"),  # 1-arg version only (2-arg handled above)
-            # Hyperbolic
-            ("Sinh", "sinh"),
-            ("Cosh", "cosh"),
-            ("Tanh", "tanh"),
-            # Inverse hyperbolic
-            ("ArcSinh", "arcsinh"),
-            ("ArcCosh", "arccosh"),
-            ("ArcTanh", "arctanh"),
-            # Other
-            ("Log", "log"),
-            ("Sqrt", "sqrt"),
-            ("Abs", "abs"),
-            ("Sign", "np.sign"),
-            ("Max", "np.maximum"),
-            ("Min", "np.minimum"),
-            # Special functions (scipy.special)
-            ("Erf", "erf"),
-            ("BesselJ", "jv"),
-            ("BesselY", "yv"),
-        ]
-        for mma_func, py_func in function_map:
-            result = re.sub(rf"\b{mma_func}\b", py_func, result)
-
-        # Step 4.5: Pi → np.pi — Mathematica constant (before bracket conversion)
-        result = re.sub(r"\bPi\b", "np.pi", result)
-
-        # Step 5: Mathematica brackets to Python parens (after function renaming)
-        result = result.replace("[", "(").replace("]", ")")
-
-        # Step 6: Mathematica ^ to Python ** (AFTER E^ → exp to avoid double-conversion)
-        result = result.replace("^", "**")
-
-        # Step 7: xCoba coordinate symbols: t() → t, x() → x, etc.
-        # Uses actual coordinate names from equation system (not hardcoded x/y/z).
-        for coord in self.spec.effective_coordinates:
-            result = result.replace(f"{coord}()", coord)
-
-        return result
+        return mathematica_to_python(expr, self.spec.effective_coordinates)
 
     def _resolve_coefficient_at_point(
         self,
@@ -1364,6 +1206,79 @@ class PDEFromSpec(PDEBase):
             )
             raise ValueError(msg) from e
         return self._validate_eval_result(result, sym, py_expr)
+
+    def _ensure_spatial_cache(self, grid: GridBase) -> None:
+        """Lazily pre-evaluate spatial-only coefficients on the grid.
+
+        Called on first ``_compute_rhs_for_component()`` invocation.  For each
+        term that is ``position_dependent=True`` and ``time_dependent=False``,
+        evaluates the coefficient once and stores the resulting ndarray in
+        ``_spatial_cache``.  Subsequent calls are a no-op.
+        """
+        if self._spatial_cache_ready or not self._has_spatial_only_terms:
+            return
+
+        spatial_coords = self.spec.spatial_coordinates
+        raw_coords = grid.cell_coords  # pyright: ignore[reportUnknownVariableType]
+        coord_arrays: dict[str, NumericArray] = {
+            name: np.asarray(raw_coords[..., i], dtype=np.float64)  # pyright: ignore[reportUnknownArgumentType]
+            for i, name in enumerate(spatial_coords[: grid.num_axes])
+        }
+
+        for eq in self.spec.equations:
+            for term in eq.rhs_terms:
+                if not (term.position_dependent and not term.time_dependent):
+                    continue
+                sym = term.coefficient_symbolic
+                if sym and sym not in self._spatial_cache:
+                    result = self._resolve_coefficient_at_point(
+                        term, 0.0, grid, coord_arrays=coord_arrays,
+                    )
+                    if isinstance(result, np.ndarray):
+                        self._spatial_cache[sym] = result
+        self._spatial_cache_ready = True
+
+        # Diagnostic: warn if position-dependent self-identity coefficients
+        # (mass-like terms) have sign changes across the grid, which may
+        # indicate tachyonic instability at certain spatial locations.
+        self._check_position_dependent_mass_sign()
+
+    def _check_position_dependent_mass_sign(self) -> None:
+        """Warn if position-dependent mass-like terms change sign on the grid.
+
+        Checks each spatial-only ``identity`` self-term (mass term) for sign
+        changes.  A sign change means the effective mass² is negative at some
+        grid locations, which may cause tachyonic instability.
+
+        Emits ``UserWarning`` — not an error, since some physics genuinely
+        requires position-dependent sign changes (e.g. potential wells).
+        """
+        for eq in self.spec.equations:
+            for term in eq.rhs_terms:
+                if (
+                    term.operator != "identity"
+                    or term.field != eq.field_name
+                    or not term.position_dependent
+                    or term.time_dependent
+                ):
+                    continue
+                sym = term.coefficient_symbolic
+                if sym is None or sym not in self._spatial_cache:
+                    continue
+                arr = self._spatial_cache[sym]
+                has_positive = bool(np.any(arr > 0))
+                has_negative = bool(np.any(arr < 0))
+                if has_positive and has_negative:
+                    warnings.warn(
+                        f"Position-dependent mass term in equation "
+                        f"'{eq.field_name}' ('{sym}') changes sign across "
+                        f"the grid (min={float(arr.min()):.4g}, "
+                        f"max={float(arr.max()):.4g}). This may cause "
+                        f"tachyonic instability at locations where the "
+                        f"effective mass² is negative.",
+                        UserWarning,
+                        stacklevel=3,
+                    )
 
     @staticmethod
     def _validate_eval_result(
@@ -1595,7 +1510,7 @@ class PDEFromSpec(PDEBase):
         msg = f"Unknown field name: {field_name}"
         raise ValueError(msg)
 
-    def _compute_rhs_for_component(  # noqa: C901, PLR0912, PLR0914
+    def _compute_rhs_for_component(  # noqa: C901, PLR0912, PLR0914, PLR0915
         self,
         component_idx: int,
         state: FieldCollection,
@@ -1637,6 +1552,9 @@ class PDEFromSpec(PDEBase):
         """
         eq = self.spec.equations[component_idx]
         grid = state.grid
+
+        # B6: Lazily pre-evaluate spatial-only coefficients on first call
+        self._ensure_spatial_cache(grid)
 
         # C2: Pre-extract spatial coordinate arrays once for all position-dependent terms
         coord_arrays: dict[str, NumericArray] | None = None
@@ -1694,13 +1612,15 @@ class PDEFromSpec(PDEBase):
                 )
                 operated = self._get_operator(term.operator, target_field, bc)
 
-            # Resolve coefficient: B4 preresolved → C1 timestep cache → full eval
+            # Resolve coefficient: B4 preresolved → B6 spatial cache → C1 timestep cache → full eval
             preresolved = self._preresolved.get((component_idx, term_idx))
             if preresolved is not None:
                 coefficient: float | NumericArray = preresolved
             else:
                 cache_key = term.coefficient_symbolic
-                if cache_key is not None and cache_key in coeff_cache:
+                if cache_key is not None and cache_key in self._spatial_cache:
+                    coefficient = self._spatial_cache[cache_key]
+                elif cache_key is not None and cache_key in coeff_cache:
                     coefficient = coeff_cache[cache_key]
                 else:
                     coefficient = self._resolve_coefficient_at_point(
