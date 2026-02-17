@@ -24,15 +24,13 @@ Verification:
   3. Compare wave speed at different positions
 """
 
-from pathlib import Path
-from typing import cast
+from __future__ import annotations
 
-OUTPUT_FILENAME = "sphere_kg_output.png"
-ENERGY_CONSERVATION_THRESHOLD = 0.1  # Relative energy change threshold for conservation check
+from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING, cast
 
 import matplotlib as mpl
-
-from tidal.utils import normalize_solve_result
 
 mpl.use("Agg")
 import matplotlib.pyplot as plt
@@ -40,10 +38,58 @@ import numpy as np
 from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
 
 from tidal.symbolic import build_pde_from_json, load_equation_system
+from tidal.utils import normalize_solve_result
+
+if TYPE_CHECKING:
+    from numpy.typing import NDArray
+
+    from tidal.symbolic.pde_builder import PDEFromSpec
+
+    NumericArray = NDArray[np.float64]
+
+# ── Configuration ─────────────────────────────────────────────
+
+# Physics
+SPHERE_RADIUS = 2.0
+MASS_SQUARED = 0.0  # Massless for clean wave speed test
+
+# Grid
+DOMAIN_SIZE_FACTOR = 4  # Domain extends DOMAIN_SIZE_FACTOR * SPHERE_RADIUS
+GRID_SHAPE = [128, 128]
+GRID_PERIODIC = True
+
+# Time integration
+T_END = 10.0
+DT = 0.005
+SNAPSHOT_INTERVAL = 0.2
+
+# Initial conditions
+PULSE_WIDTH = 0.8
+PULSE_AMPLITUDE = 1.0
+
+# Analysis
+ENERGY_CONSERVATION_THRESHOLD = 0.1
+
+# Output
+OUTPUT_FILENAME = "sphere_kg_output.png"
+
+# State indices
+PHI_INDEX = 0
+PI_INDEX = 1
+
+# ── Helpers ───────────────────────────────────────────────────
 
 
-def main() -> None:  # noqa: PLR0914, PLR0915
-    """Run the 2-sphere Klein-Gordon simulation."""
+@dataclass(frozen=True)
+class SimulationResult:
+    """Container for sphere KG simulation results."""
+
+    grid: CartesianGrid
+    storage: MemoryStorage
+    domain_size: float
+
+
+def _print_header() -> None:
     print("=" * 60)
     print("Klein-Gordon on 2-Sphere (Stereographic Projection)")
     print("=" * 60)
@@ -52,15 +98,14 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     print("  Omega(x,y) = 2R^2 / (R^2 + x^2 + y^2)")
     print()
 
-    # Load the equation specification
+
+def _load_spec(json_path: Path) -> None:
     print("Step 1: Loading equation specification...")
-    json_path = Path(__file__).parent.parent / "data" / "sphere_kg.json"
     spec = load_equation_system(json_path)
 
     print(f"  Spacetime dimension: {spec.dimension} (2+1D)")
     print(f"  Components: {spec.n_components} ({', '.join(spec.component_names)})")
 
-    # Show equation structure
     print()
     print("  Equation structure:")
     for eq in spec.equations:
@@ -69,104 +114,112 @@ def main() -> None:  # noqa: PLR0914, PLR0915
         print(
             f"    d2_t({eq.field_name}): {n_terms} terms, {n_pos_dep} position-dependent"
         )
-
-    # Build the PDE with runtime parameters
     print()
-    print("Step 2: Building PDE from specification...")
-    sphere_radius = 2.0
-    mass_squared = 0.0  # Massless for clean wave speed test
 
+
+def _build_pde(json_path: Path) -> PDEFromSpec:
+    print("Step 2: Building PDE from specification...")
     pde = build_pde_from_json(
-        json_path, parameters={"sphR": sphere_radius, "sphm2": mass_squared}
+        json_path, parameters={"sphR": SPHERE_RADIUS, "sphm2": MASS_SQUARED}
     )
     print(f"  PDE class: {type(pde).__name__}")
     print(f"  Components: {pde.n_components}")
-    print(f"  Sphere radius: R = {sphere_radius}")
-    print(f"  Mass parameter: m^2 = {mass_squared}")
-
-    # Set up 2D spatial grid centered at south pole
-    # Domain: [-L, L] x [-L, L] where L covers up to past the equator
+    print(f"  Sphere radius: R = {SPHERE_RADIUS}")
+    print(f"  Mass parameter: m^2 = {MASS_SQUARED}")
     print()
+    return pde
+
+
+def _create_grid() -> tuple[CartesianGrid, float]:
     print("Step 3: Setting up 2D simulation grid...")
-    domain_size = 4 * sphere_radius  # Cover past the equator
+    domain_size = DOMAIN_SIZE_FACTOR * SPHERE_RADIUS
     grid = CartesianGrid(
         bounds=[(-domain_size, domain_size), (-domain_size, domain_size)],
-        shape=[128, 128],
-        periodic=True,
+        shape=GRID_SHAPE,
+        periodic=GRID_PERIODIC,
     )
     print(f"  Domain: [-{domain_size}, {domain_size}]^2")
     print(f"  Resolution: {grid.shape[0]}x{grid.shape[1]} points")
-
-    # Create initial conditions
     print()
+    return grid, domain_size
+
+
+def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
     print("Step 4: Creating initial conditions...")
 
-    # Initial state: 1 field + momentum
-    phi = ScalarField(grid, data=0.0, label="sphphi_0")
-    pi = ScalarField(grid, data=0.0, label="pi_0")
-
-    # Initialize a 2D Gaussian pulse near the south pole
     x = cast("np.ndarray", grid.cell_coords[..., 0])
     y = cast("np.ndarray", grid.cell_coords[..., 1])
-    width = 0.8
-    amplitude = 1.0
 
     # Gaussian pulse at south pole (x=y=0)
-    gaussian = amplitude * np.exp(-(x**2 + y**2) / (2 * width**2))
-    phi.data[:] = gaussian
+    gaussian = PULSE_AMPLITUDE * np.exp(
+        -(x**2 + y**2) / (2 * PULSE_WIDTH**2)
+    )
 
+    phi = ScalarField(grid, data=gaussian, label="sphphi_0")
+    pi = ScalarField(grid, data=0.0, label="pi_0")
     state = FieldCollection([phi, pi])
+
     print("  Gaussian pulse at south pole (x=0, y=0)")
-    print(f"  Width: {width}, Amplitude: {amplitude}")
+    print(f"  Width: {PULSE_WIDTH}, Amplitude: {PULSE_AMPLITUDE}")
 
     # Show wave speed at key locations
     print()
     print("  Wave speed profile (1/Omega^2):")
     for r_val, label in [
         (0.0, "south pole"),
-        (sphere_radius, "equator"),
-        (2 * sphere_radius, "past equator"),
+        (SPHERE_RADIUS, "equator"),
+        (2 * SPHERE_RADIUS, "past equator"),
     ]:
-        omega = 2 * sphere_radius**2 / (sphere_radius**2 + r_val**2)
+        omega = 2 * SPHERE_RADIUS**2 / (SPHERE_RADIUS**2 + r_val**2)
         speed = 1 / omega**2
         print(f"    r={r_val:.1f} ({label}): Omega={omega:.3f}, speed={speed:.3f}")
-
-    # Run simulation
     print()
+    return state
+
+
+def _run_simulation(
+    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection
+) -> SimulationResult:
     print("Step 5: Running simulation...")
-    t_end = 10.0
-    dt = 0.005
+    domain_size = DOMAIN_SIZE_FACTOR * SPHERE_RADIUS
 
     storage = MemoryStorage()
     result = pde.solve(
         state,
-        t_range=t_end,
-        dt=dt,
+        t_range=T_END,
+        dt=DT,
         scheme="runge-kutta",
-        tracker=storage.tracker(0.2),
+        tracker=storage.tracker(SNAPSHOT_INTERVAL),
     )
     result = normalize_solve_result(result)
 
-    print(f"  Duration: {t_end} time units")
+    print(f"  Duration: {T_END} time units")
     print(f"  Stored {len(storage)} snapshots")
-
-    # Analyze results
     print()
+
+    return SimulationResult(
+        grid=grid,
+        storage=storage,
+        domain_size=domain_size,
+    )
+
+
+def _analyze_results(result: SimulationResult) -> None:
     print("Step 6: Analyzing results...")
 
-    initial = cast("FieldCollection", storage[0])
-    final = cast("FieldCollection", storage[-1])
+    initial = cast("FieldCollection", result.storage[0])
+    final = cast("FieldCollection", result.storage[-1])
 
-    initial_max = np.max(np.abs(initial[0].data))
-    final_max = np.max(np.abs(final[0].data))
+    initial_max = np.max(np.abs(initial[PHI_INDEX].data))
+    final_max = np.max(np.abs(final[PHI_INDEX].data))
 
     print(f"  Initial: max|phi| = {initial_max:.4f}")
     print(f"  Final:   max|phi| = {final_max:.4f}")
 
     # Energy should be approximately conserved (no friction)
     def compute_energy(snapshot: FieldCollection) -> float:
-        phi_data = snapshot[0].data
-        pi_data = snapshot[1].data
+        phi_data = snapshot[PHI_INDEX].data
+        pi_data = snapshot[PI_INDEX].data
         return float(np.sum(pi_data**2 + phi_data**2))
 
     initial_energy = compute_energy(initial)
@@ -180,18 +233,26 @@ def main() -> None:  # noqa: PLR0914, PLR0915
         print("  Energy approximately conserved (no Hubble friction)")
     else:
         print("  Note: Energy change may be due to boundary effects")
-
-    # Generate visualization
     print()
+
+
+def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     print("Step 7: Generating visualization...")
+
+    storage = result.storage
+    grid = result.grid
+    domain_size = result.domain_size
+
+    initial = cast("FieldCollection", storage[0])
+    final = cast("FieldCollection", storage[-1])
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
     # Initial field
     ax = axes[0, 0]
-    vmax = amplitude
+    vmax = PULSE_AMPLITUDE
     im = ax.imshow(
-        initial[0].data.T,
+        initial[PHI_INDEX].data.T,
         origin="lower",
         cmap="bwr_r",
         vmin=-vmax,
@@ -206,8 +267,8 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     # Draw equator circle
     theta = np.linspace(0, 2 * np.pi, 100)
     ax.plot(
-        sphere_radius * np.cos(theta),
-        sphere_radius * np.sin(theta),
+        SPHERE_RADIUS * np.cos(theta),
+        SPHERE_RADIUS * np.sin(theta),
         "k--",
         alpha=0.5,
         label="equator",
@@ -216,10 +277,9 @@ def main() -> None:  # noqa: PLR0914, PLR0915
 
     # Final field
     ax = axes[0, 1]
-    # Use adaptive vmax for final state
-    final_vmax = max(np.max(np.abs(final[0].data)), 0.01)
+    final_vmax = max(np.max(np.abs(final[PHI_INDEX].data)), 0.01)
     im = ax.imshow(
-        final[0].data.T,
+        final[PHI_INDEX].data.T,
         origin="lower",
         cmap="bwr_r",
         vmin=-final_vmax,
@@ -228,10 +288,13 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     )
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.set_title(rf"Final $\phi$ (t={t_end:.0f})")
+    ax.set_title(rf"Final $\phi$ (t={T_END:.0f})")
     plt.colorbar(im, ax=ax, label=r"$\phi$")
     ax.plot(
-        sphere_radius * np.cos(theta), sphere_radius * np.sin(theta), "k--", alpha=0.5
+        SPHERE_RADIUS * np.cos(theta),
+        SPHERE_RADIUS * np.sin(theta),
+        "k--",
+        alpha=0.5,
     )
 
     # Cross-sections at different times
@@ -245,8 +308,8 @@ def main() -> None:  # noqa: PLR0914, PLR0915
         3 * n_snapshots // 4,
         n_snapshots - 1,
     ]
-    cmap = plt.get_cmap("viridis")
-    colors = cmap(np.linspace(0.2, 0.8, len(times_to_plot)))
+    cmap_colors = plt.get_cmap("viridis")
+    colors = cmap_colors(np.linspace(0.2, 0.8, len(times_to_plot)))
 
     center_idx = grid.shape[1] // 2
     x_1d = cast("np.ndarray", grid.cell_coords[:, 0, 0])
@@ -254,15 +317,15 @@ def main() -> None:  # noqa: PLR0914, PLR0915
         snapshot = cast("FieldCollection", storage[t_idx])
         ax.plot(
             x_1d,
-            snapshot[0].data[:, center_idx],
+            snapshot[PHI_INDEX].data[:, center_idx],
             color=colors[i],
             label=f"t={time_values[t_idx]:.1f}",
             alpha=0.8,
         )
     ax.axvline(
-        x=-sphere_radius, color="gray", linestyle="--", alpha=0.3, label="equator"
+        x=-SPHERE_RADIUS, color="gray", linestyle="--", alpha=0.3, label="equator"
     )
-    ax.axvline(x=sphere_radius, color="gray", linestyle="--", alpha=0.3)
+    ax.axvline(x=SPHERE_RADIUS, color="gray", linestyle="--", alpha=0.3)
     ax.set_xlabel("x")
     ax.set_ylabel(r"$\phi$")
     ax.set_title(r"$\phi$ cross-section at y=0 (wave spreading)")
@@ -272,24 +335,24 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     # Wave speed profile overlay
     ax = axes[1, 1]
     r_values = np.sqrt(x_1d**2)
-    omega_profile = 2 * sphere_radius**2 / (sphere_radius**2 + r_values**2)
+    omega_profile = 2 * SPHERE_RADIUS**2 / (SPHERE_RADIUS**2 + r_values**2)
     speed_profile = 1.0 / omega_profile**2
 
     ax.plot(x_1d, speed_profile, "b-", linewidth=2, label=r"$1/\Omega^2$ (wave speed)")
     ax.plot(
         x_1d, omega_profile, "r-", linewidth=2, label=r"$\Omega$ (conformal factor)"
     )
-    ax.axvline(x=-sphere_radius, color="gray", linestyle="--", alpha=0.3)
-    ax.axvline(x=sphere_radius, color="gray", linestyle="--", alpha=0.3)
+    ax.axvline(x=-SPHERE_RADIUS, color="gray", linestyle="--", alpha=0.3)
+    ax.axvline(x=SPHERE_RADIUS, color="gray", linestyle="--", alpha=0.3)
     ax.set_xlabel("x")
     ax.set_ylabel("Value")
-    ax.set_title(f"Wave speed profile (R={sphere_radius})")
+    ax.set_title(f"Wave speed profile (R={SPHERE_RADIUS})")
     ax.legend()
     ax.grid(visible=True, alpha=0.3)
     ax.set_ylim(0, max(speed_profile) * 1.1)
 
     fig.suptitle(
-        rf"KG on $S^2$ (stereographic): $\Omega = 2R^2/(R^2+x^2+y^2)$, R={sphere_radius}"
+        rf"KG on $S^2$ (stereographic): $\Omega = 2R^2/(R^2+x^2+y^2)$, R={SPHERE_RADIUS}"
         "\nPosition-dependent wave speed from spatial curvature",
         fontsize=12,
     )
@@ -299,15 +362,17 @@ def main() -> None:  # noqa: PLR0914, PLR0915
     output_dir.mkdir(exist_ok=True, parents=True)
     output_path = output_dir / OUTPUT_FILENAME
     plt.savefig(output_path, dpi=150, bbox_inches="tight")
-    print(f"Saved plot to: {output_path}")
-
-    # Summary
+    print(f"  Saved plot to: {output_path}")
+    plt.close()
     print()
+
+
+def _print_footer() -> None:
     print("=" * 60)
     print("Simulation complete!")
     print()
     print("Key observations:")
-    print(f"  1. 2-sphere metric with R={sphere_radius}: Omega = 2R^2/(R^2+r^2)")
+    print(f"  1. 2-sphere metric with R={SPHERE_RADIUS}: Omega = 2R^2/(R^2+r^2)")
     print("  2. NO Hubble friction (time component is flat)")
     print("  3. Position-dependent wave speed: 1/Omega^2")
     print("     - Slow near south pole (Omega=2, speed=0.25)")
@@ -323,6 +388,23 @@ def main() -> None:  # noqa: PLR0914, PLR0915
         "    Near the equator, the conformal factor is 1 and speed matches flat space."
     )
     print("=" * 60)
+
+
+# ── Entry point ───────────────────────────────────────────────
+
+
+def main() -> None:
+    """Run the 2-sphere Klein-Gordon simulation."""
+    json_path = Path(__file__).parent.parent / "data" / "sphere_kg.json"
+    _print_header()
+    _load_spec(json_path)
+    pde = _build_pde(json_path)
+    grid, _domain_size = _create_grid()
+    state = _create_initial_state(grid)
+    sim_result = _run_simulation(pde, grid, state)
+    _analyze_results(sim_result)
+    _plot_results(sim_result)
+    _print_footer()
 
 
 if __name__ == "__main__":
