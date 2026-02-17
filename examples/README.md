@@ -407,7 +407,33 @@ tidal derive examples/coupled_proca/theory.toml
 uv run python examples/coupled_proca/simulation.py
 ```
 
-**Key features**: Two massive vector fields with cross-coupling, coupled Helmholtz constraints (A_0, B_0), Dirichlet boundary conditions, Gauss-Seidel iteration for non-periodic grid, 6×6 mass/coupling matrices.
+**Key features**: Two massive vector fields with cross-coupling, coupled Helmholtz constraints (A_0, B_0), periodic boundary conditions, FFT constraint solver, 6×6 mass/coupling matrices.
+
+---
+
+### 17. Coupled Scattering (Background Fields, 2+1D)
+
+**Lagrangian**: `L = KG(φ) + KG(χ) + G(x,y) φ χ` where G is a Gaussian background coupling
+
+```bash
+tidal derive examples/coupled_scattering/theory.toml
+uv run python examples/coupled_scattering/coupled_scattering_simulation.py
+```
+
+**Key features**: Position-dependent Gaussian coupling via `[[background_fields]]`, wave packet scattering, conversion probability measurement, `_eval_utils.py` coefficient evaluation.
+
+---
+
+### 18. Scalar Potential Well (Background Fields, 1+1D)
+
+**Lagrangian**: `L = -1/2 (∂φ)² - 1/2 V(x) φ²` where V(x) is a background potential
+
+```bash
+tidal derive examples/scalar_potential_well/theory.toml
+uv run python examples/scalar_potential_well/potential_well_simulation.py
+```
+
+**Key features**: Non-dynamical background scalar field via `[[background_fields]]`, position-dependent mass term, Gaussian potential well profile, bound state dynamics.
 
 ---
 
@@ -420,22 +446,23 @@ uv run python examples/coupled_proca/simulation.py
 | proca | Y | Y | Y |
 | coupled_scalars | Y | Y | Y |
 | chern_simons | Y | Y | Y |
-| elasticity | N | Y | Y |
-| curved_spacetime | N | Y | Y |
+| elasticity | Y | Y | Y |
+| curved_spacetime | * | Y | Y |
 | sphere_kg | Y | Y | Y |
 | polar_kg | Y | Y | Y |
-| electrostatics | N | Y | Y |
+| electrostatics | Y | Y | Y |
 | scalar_vector_coupling | Y | Y | Y |
 | scalar_field_3d | Y | Y | Y |
 | spherical_kg | Y | Y | Y |
 | cylindrical_kg | Y | Y | Y |
-| gravitational_waves | N | Y | Y |
-| massive_3form | Y | Y | N |
+| gravitational_waves | Y | Y | Y |
+| massive_3form | Y | Y | Y |
 | massive_gravity | Y | Y | Y |
 | coupled_proca | Y | Y | Y |
-| klein_gordon (legacy) | N | N | N |
+| coupled_scattering | Y | Y | Y |
+| scalar_potential_well | Y | Y | Y |
 
-*Note: `elasticity`, `curved_spacetime`, `electrostatics`, and `gravitational_waves` cannot have `theory.toml` because they require manual Wolfram script construction. `klein_gordon` is a legacy example directory with standalone scripts.*
+*Note: `curved_spacetime` uses two separate TOML files (`de_sitter.toml`, `conformal_static.toml`) instead of a single `theory.toml`.*
 
 ---
 
@@ -448,8 +475,6 @@ cd /workspaces/torsion-gertsenshtein
 # Validate all JSON specs with the CLI
 tidal validate examples/data/klein_gordon_1d.json
 
-# Or use the legacy validation script
-python validate_implementation.py
 ```
 
 This verifies:
