@@ -43,6 +43,9 @@ dependencies = [
     "scipy>=1.10,<2.0",
 ]
 
+[project.optional-dependencies]
+wolfram = ["wolframclient>=1.4.0,<2.0"]
+
 [project.scripts]
 tidal = "tidal.cli:main"
 
