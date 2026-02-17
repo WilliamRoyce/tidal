@@ -122,12 +122,31 @@ def _validate_lagrangian(config: dict[str, Any]) -> None:
     Raises
     ------
     ValueError
-        If expression is missing or empty.
+        If expression is missing, empty, or contains covariant derivatives
+        of background fields (which are not supported).
     """
     expr = config["lagrangian"].get("expression")
     if not expr or not expr.strip():
         msg = "[lagrangian].expression must be a non-empty string"
         raise ValueError(msg)
+
+    # Check for covariant derivatives of background fields.
+    # CD[-a][G[]] or CD[a][G[-b]] etc. would silently produce wrong results
+    # because the scalar ReplaceAll substitution doesn't handle derivatives.
+    bg_names = [f["name"] for f in config.get("background_fields", [])]
+    for bg_name in bg_names:
+        # Match CD[...][<bg_name>[...]] — any index pattern around the BG field
+        pattern = rf"CD\[[^\]]*\]\s*\[\s*{re.escape(bg_name)}\b"
+        if re.search(pattern, expr):
+            msg = (
+                f"Lagrangian contains a covariant derivative of background "
+                f"field '{bg_name}' (e.g., CD[-a][{bg_name}[...]]). "
+                f"Derivatives of background fields are not yet supported — "
+                f"they would produce incorrect equations of motion. "
+                f"Use the background field directly (without derivatives) "
+                f"in the coupling term."
+            )
+            raise ValueError(msg)
 
 
 def _validate_parameters(config: dict[str, Any]) -> None:
