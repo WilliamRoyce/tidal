@@ -620,7 +620,7 @@ def _needs_bg_tensor(config: dict[str, Any]) -> bool:
         exprs.append(config["lagrangian"].get("expression", ""))
     if "linearization" in config:
         exprs.append(config["linearization"].get("expression", ""))
-    exprs.extend(df.get("rule", "") for df in config.get("derived_fields", []))
+    exprs.extend(df.get("definition", "") for df in config.get("derived_fields", []))
     return any("bg[" in expr for expr in exprs)
 
 
