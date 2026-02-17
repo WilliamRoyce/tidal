@@ -63,7 +63,7 @@ uv run pre-commit install
 ### 3. Verify Setup
 
 ```bash
-# Run tests (850 Python tests)
+# Run tests (900+ Python tests)
 uv run pytest
 
 # Run linter
@@ -458,13 +458,13 @@ tidal/                   # TIDAL project root
 │   │   └── ...
 │   ├── measurement/          # Post-hoc analysis (energy, conversion, spectra)
 │   └── utils.py              # Shared utilities
-├── tests/                    # Test suite (850 Python tests)
+├── tests/                    # Test suite (900+ Python tests)
 │   ├── conftest.py          # Shared fixtures
 │   ├── test_cli.py          # CLI integration tests
 │   ├── test_cli_parsing.py  # CLI argument parsing tests
 │   ├── test_scalar_vector_physics.py  # Physics stress tests
 │   └── test_*.py            # Other test modules
-├── examples/                 # 18 pipeline examples + legacy KG
+├── examples/                 # 20 pipeline examples
 │   ├── data/                # Generated JSON specifications (20 files)
 │   └── {example}/           # Each has .wls, run.sh; most have theory.toml, simulation.py
 ├── docs/                     # Documentation
