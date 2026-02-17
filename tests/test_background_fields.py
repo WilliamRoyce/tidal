@@ -526,3 +526,87 @@ class TestPiecewiseCoefficientResolution:
         assert_allclose(arr_pw[interior], arr_us[interior])
         exterior = (coords < 29) | (coords > 71)
         assert_allclose(arr_pw[exterior], arr_us[exterior])
+
+
+# ---------------------------------------------------------------------------
+# Gaussian Exp-based coupling coefficient on 2D grid
+# ---------------------------------------------------------------------------
+
+
+class TestGaussianCoupling2DGrid:
+    """Test Gaussian Exp-based coupling coefficient evaluates correctly on a 2D grid."""
+
+    def test_gaussian_coupling_peak_and_decay(self) -> None:
+        """Gaussian coupling g0*E^(-r^2/(2R^2)) has peak at center, decays at edges."""
+        # Build a 2-field spec with a Gaussian cross-field coupling term
+        spec = EquationSystem(
+            n_components=2,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi_0", "chi_0"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi_0",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0, "laplacian_x", "phi_0",
+                        ),
+                        OperatorTerm(
+                            1.0, "laplacian_y", "phi_0",
+                        ),
+                        OperatorTerm(
+                            -1.0, "identity", "chi_0",
+                            coefficient_symbolic="g0 * E^(-(x[]^2 + y[]^2) / (2 * R^2))",
+                            coordinate_dependent=("x", "y"),
+                        ),
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="chi_0",
+                    field_index=1,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            1.0, "laplacian_x", "chi_0",
+                        ),
+                        OperatorTerm(
+                            1.0, "laplacian_y", "chi_0",
+                        ),
+                        OperatorTerm(
+                            -1.0, "identity", "phi_0",
+                            coefficient_symbolic="g0 * E^(-(x[]^2 + y[]^2) / (2 * R^2))",
+                            coordinate_dependent=("x", "y"),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={},
+            coordinates=("t", "x", "y"),
+        )
+        params = {"g0": 2.0, "R": 8.0}
+        pde = PDEFromSpec(spec, parameters=params)
+        grid = CartesianGrid([(-30, 30), (-30, 30)], 64, periodic=True)
+
+        # Resolve the cross-field coupling term (index 2 in phi_0 equation)
+        term = spec.equations[0].rhs_terms[2]
+        result = pde._resolve_coefficient_at_point(term, t=0.0, grid=grid)
+        arr = np.asarray(result)
+
+        # No NaN or Inf
+        assert np.all(np.isfinite(arr)), "Gaussian coupling has NaN/Inf"
+
+        # Peak at center: _resolve_coefficient_at_point evaluates the symbolic
+        # expression directly (g0 * exp(0) = 2.0); numeric coefficient is NOT applied.
+        center = arr[32, 32]
+        assert center == pytest.approx(2.0, rel=0.1)
+
+        # Edge should be near zero (large r^2)
+        edge = arr[0, 0]
+        assert abs(edge) < 0.1, f"Edge value should decay to ~0, got {edge}"
+
+        # Symmetric: arr[i,j] ≈ arr[j,i] (rotational symmetry)
+        assert_allclose(arr[20, 32], arr[32, 20], atol=1e-10)

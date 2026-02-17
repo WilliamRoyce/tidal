@@ -2301,6 +2301,64 @@ path = "output.json"
         out = capsys.readouterr().out
         assert "Substitute scalar background" not in out
 
+    def test_coupled_scattering_multifield_background(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Multi-field + scalar background with Exp should produce correct WLS."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Coupled Scalar Scattering"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[fields]]
+name = "chi"
+type = "scalar"
+
+[constants]
+names = ["mPhi2", "mChi2", "g0", "R"]
+
+[[background_fields]]
+name = "G"
+type = "scalar"
+components = ["g0 * Exp[-(x[]^2 + y[]^2) / (2 * R^2)]"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - 1/2 CD[-a][chi[]] eta[a, b] CD[-b][chi[]] - mPhi2/2 * phi[]^2 - mChi2/2 * chi[]^2 - G[] * phi[] * chi[]"
+
+[parameters]
+mPhi2 = 0.0
+mChi2 = 1.0
+g0 = 2.0
+R = 8.0
+
+[output]
+path = "coupled_scattering.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Prefix from "Coupled Scalar Scattering" → "css"
+        # Background G should be defined
+        assert "cssG" in out
+        # Scalar background should get ReplaceAll substitution
+        assert "Substitute scalar background" in out
+        # Both fields should appear in Euler-Lagrange
+        assert "cssPhi" in out
+        assert "cssChi" in out
+        # Constants should be declared
+        assert "DefConstantSymbol" in out
+        assert "g0" in out
+        assert "mChi2" in out
+
 
 class TestExceptionHandling:
     def test_value_error_shows_clean_message(self, capsys: pytest.CaptureFixture[str]) -> None:
