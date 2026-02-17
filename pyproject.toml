@@ -39,12 +39,8 @@ classifiers = [
 dependencies = [
     "py-pde>=0.38,<1.0",
     "matplotlib>=3.1,<4.0",
-    "numba>=0.59,<1.0",
     "numpy>=1.22,<3.0",
     "scipy>=1.10,<2.0",
-    "sympy>=1.9,<2.0",
-    "tqdm>=4.66,<5.0",
-    "wolframclient>=1.4.0,<2.0",
 ]
 
 [project.scripts]
@@ -168,12 +164,6 @@ exclude_lines = [
 ]
 show_missing = true
 precision = 2
-
-[tool.pyright]
-typeCheckingMode = "strict"
-include = ["tests", "tidal", "examples"]
-reportImplicitOverride = true
-reportUnknownMemberType = false
 
 [build-system]
 requires = ["setuptools"]
