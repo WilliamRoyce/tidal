@@ -82,7 +82,7 @@ class SpectralConversion:
 def _field_spectral_energy_series(
     data: SimulationData,
     field_name: str,
-    mass_squared: float,
+    mass_squared: float | NDArray[np.float64],
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
     """Compute per-mode spectral energy E(k,t) for one field at all snapshots.
 

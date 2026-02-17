@@ -21,7 +21,7 @@ import re
 from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy import special
+from scipy import special  # type: ignore[import-untyped]
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray

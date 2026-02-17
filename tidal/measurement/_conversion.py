@@ -67,7 +67,7 @@ class ConversionResult:
 def _field_energy_series(
     data: SimulationData,
     field_name: str,
-    mass_squared: float,
+    mass_squared: float | NDArray[np.float64],
 ) -> NDArray[np.float64]:
     """Compute total energy of *field_name* at every snapshot."""
     energies: list[float] = []
