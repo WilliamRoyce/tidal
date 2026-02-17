@@ -26,7 +26,7 @@ EXPECTED_SPATIAL_DIM = 2  # Stereographic coordinates on S²
 def sphere_spec() -> EquationSystem:
     """Load the sphere KG equation specification."""
     if not SPHERE_JSON.exists():
-        pytest.skip("sphere_kg.json not found (run sphere_kg.wls first)")
+        pytest.skip("sphere_kg.json not found (run `tidal derive theory.toml` first)")
     return load_equation_system(SPHERE_JSON)
 
 
