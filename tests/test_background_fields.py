@@ -19,6 +19,7 @@ from pde import CartesianGrid
 from tidal.measurement._io import SimulationData
 from tidal.symbolic.json_loader import (
     ComponentEquation,
+    ConstraintSolverConfig,
     EquationSystem,
     OperatorTerm,
 )
@@ -1535,3 +1536,206 @@ class TestVectorBackground:
         # Should succeed — position-dependent coupling evaluated on grid
         assert result.total >= 0.0
         assert "phi_0" in result.per_field
+
+
+class TestConstraintAutoDetectionPositionDependent:
+    """Tests that method='auto' correctly routes to matrix/Gauss-Seidel
+    when constraint terms have position-dependent coefficients.
+    """
+
+    def test_coupled_constraints_auto_routes_to_gauss_seidel(self) -> None:
+        """Coupled constraints with position-dependent cross-terms use Gauss-Seidel.
+
+        Simulates the proca_background scenario: A_0 and B_0 are coupled
+        constraints with position-dependent identity terms from a Lorentzian
+        background. method='auto' on a periodic grid should route to
+        Gauss-Seidel instead of FFT.
+        """
+        from pde import FieldCollection, ScalarField
+
+        lorentzian_expr = "(1 + (x()**2 + y()**2) / 64)**(-1)"
+        a0_terms = (
+            OperatorTerm(coefficient=-1.0, operator="laplacian", field="A_0"),
+            OperatorTerm(coefficient=-1.0, operator="identity", field="A_0"),
+            OperatorTerm(
+                coefficient=-0.5, operator="identity", field="B_0",
+                coefficient_symbolic=f"-0.5 * {lorentzian_expr}",
+                coordinate_dependent=("x", "y"),
+            ),
+            # Source from dynamical field rho
+            OperatorTerm(coefficient=1.0, operator="identity", field="rho"),
+        )
+        b0_terms = (
+            OperatorTerm(coefficient=-1.0, operator="laplacian", field="B_0"),
+            OperatorTerm(coefficient=-2.0, operator="identity", field="B_0"),
+            OperatorTerm(
+                coefficient=-0.5, operator="identity", field="A_0",
+                coefficient_symbolic=f"-0.5 * {lorentzian_expr}",
+                coordinate_dependent=("x", "y"),
+            ),
+        )
+        # Source field to drive constraints
+        rho_terms = (
+            OperatorTerm(coefficient=1.0, operator="laplacian", field="rho"),
+            OperatorTerm(coefficient=-1.0, operator="identity", field="rho"),
+        )
+        spec = EquationSystem(
+            n_components=3, dimension=3, spatial_dimension=2,
+            component_names=("A_0", "B_0", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="A_0", field_index=0, time_derivative_order=0,
+                    rhs_terms=a0_terms,
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, method="auto", max_iterations=30,
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="B_0", field_index=1, time_derivative_order=0,
+                    rhs_terms=b0_terms,
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, method="auto", max_iterations=30,
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="rho", field_index=2, time_derivative_order=2,
+                    rhs_terms=rho_terms,
+                ),
+            ),
+            mass_matrix=((1.0, 0.0, 0.0), (0.0, 2.0, 0.0), (0.0, 0.0, 1.0)),
+            coupling_matrix=((0.0, 0.0, -1.0), (0.0, 0.0, 0.0), (0.0, 0.0, 0.0)),
+            metadata={}, coordinates=("t", "x", "y"),
+        )
+        pde = PDEFromSpec(spec, parameters={})
+        grid = CartesianGrid([(-10, 10), (-10, 10)], 16, periodic=True)
+
+        # Gaussian source in rho
+        x, y = grid.cell_coords[..., 0], grid.cell_coords[..., 1]
+        gaussian = np.exp(-(x**2 + y**2) / 8)
+        state = FieldCollection([
+            ScalarField(grid, data=0.0),  # A_0
+            ScalarField(grid, data=0.0),  # B_0
+            ScalarField(grid, data=gaussian),  # rho
+            ScalarField(grid, data=0.0),  # pi_rho
+        ])
+
+        # Should NOT raise ValueError about FFT incompatibility
+        pde.evolution_rate(state, t=0.0)
+
+        # A_0 should be non-zero (driven by rho source)
+        a0_data = np.asarray(state[0].data)
+        assert np.any(np.abs(a0_data) > 1e-12)
+
+    def test_single_constraint_auto_routes_to_matrix(self) -> None:
+        """Single constraint with position-dependent self-term uses matrix solver.
+
+        A single constraint with a spatially-varying identity coefficient
+        should auto-detect and use the matrix path, not FFT.
+        """
+        from pde import FieldCollection, ScalarField
+
+        phi_terms = (
+            OperatorTerm(coefficient=-1.0, operator="laplacian", field="phi"),
+            OperatorTerm(
+                coefficient=-1.0, operator="identity", field="phi",
+                coefficient_symbolic="-(1 + (x()**2 + y()**2) / 64)**(-1)",
+                coordinate_dependent=("x", "y"),
+            ),
+            # Source from dynamical field rho
+            OperatorTerm(coefficient=1.0, operator="identity", field="rho"),
+        )
+        rho_terms = (
+            OperatorTerm(coefficient=1.0, operator="laplacian", field="rho"),
+            OperatorTerm(coefficient=-1.0, operator="identity", field="rho"),
+        )
+        spec = EquationSystem(
+            n_components=2, dimension=3, spatial_dimension=2,
+            component_names=("phi", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi", field_index=0, time_derivative_order=0,
+                    rhs_terms=phi_terms,
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, method="auto",
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="rho", field_index=1, time_derivative_order=2,
+                    rhs_terms=rho_terms,
+                ),
+            ),
+            mass_matrix=((0.0, 0.0), (0.0, 1.0)),
+            coupling_matrix=((0.0, -1.0), (0.0, 0.0)),
+            metadata={}, coordinates=("t", "x", "y"),
+        )
+        pde = PDEFromSpec(spec, parameters={})
+        grid = CartesianGrid([(-10, 10), (-10, 10)], 16, periodic=True)
+
+        x, y = grid.cell_coords[..., 0], grid.cell_coords[..., 1]
+        gaussian = np.exp(-(x**2 + y**2) / 8)
+        state = FieldCollection([
+            ScalarField(grid, data=0.0),  # phi (constraint)
+            ScalarField(grid, data=gaussian),  # rho
+            ScalarField(grid, data=0.0),  # pi_rho
+        ])
+
+        # Should NOT raise ValueError about FFT incompatibility
+        pde.evolution_rate(state, t=0.0)
+
+        # Constraint should be solved
+        phi_data = np.asarray(state[0].data)
+        assert np.any(np.abs(phi_data) > 1e-12)
+
+    def test_explicit_fft_with_position_dependent_still_raises(self) -> None:
+        """Explicit method='fft' with position-dependent self-term still fails.
+
+        The auto-detection gracefully routes to matrix, but if the user
+        explicitly requests FFT, they should get a clear error message.
+        """
+        from pde import FieldCollection, ScalarField
+
+        phi_terms = (
+            OperatorTerm(coefficient=-1.0, operator="laplacian", field="phi"),
+            OperatorTerm(
+                coefficient=-1.0, operator="identity", field="phi",
+                coefficient_symbolic="-(1 + (x()**2 + y()**2) / 64)**(-1)",
+                coordinate_dependent=("x", "y"),
+            ),
+        )
+        rho_terms = (
+            OperatorTerm(coefficient=1.0, operator="laplacian", field="rho"),
+            OperatorTerm(coefficient=-1.0, operator="identity", field="rho"),
+        )
+        spec = EquationSystem(
+            n_components=2, dimension=3, spatial_dimension=2,
+            component_names=("phi", "rho"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi", field_index=0, time_derivative_order=0,
+                    rhs_terms=phi_terms,
+                    constraint_solver=ConstraintSolverConfig(
+                        enabled=True, method="fft",
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="rho", field_index=1, time_derivative_order=2,
+                    rhs_terms=rho_terms,
+                ),
+            ),
+            mass_matrix=((0.0, 0.0), (0.0, 1.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={}, coordinates=("t", "x", "y"),
+        )
+        pde = PDEFromSpec(spec, parameters={})
+        grid = CartesianGrid([(-10, 10), (-10, 10)], 16, periodic=True)
+
+        x, y = grid.cell_coords[..., 0], grid.cell_coords[..., 1]
+        gaussian = np.exp(-(x**2 + y**2) / 8)
+        state = FieldCollection([
+            ScalarField(grid, data=0.0),
+            ScalarField(grid, data=gaussian),
+            ScalarField(grid, data=0.0),
+        ])
+
+        with pytest.raises(ValueError, match="FFT"):
+            pde.evolution_rate(state, t=0.0)

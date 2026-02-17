@@ -2970,3 +2970,39 @@ class TestSimulationDataSave:
         assert meta["periodic"] == list(data.periodic)
         assert set(meta["fields"]) == set(data.fields.keys())
         assert set(meta["momenta"]) == set(data.momenta.keys())
+
+
+class TestSnapshotCountValidation:
+    """Fail-fast: metadata n_snapshots must not exceed actual array size."""
+
+    def test_inflated_n_snapshots_raises(self, tmp_path: Path) -> None:
+        """Metadata claiming more snapshots than times.npy has → ValueError."""
+        import json
+
+        spec = _build_coupled_scalars_spec()
+
+        out = tmp_path / "inflated"
+        out.mkdir()
+        times = np.array([0.0, 1.0, 2.0])
+        np.save(str(out / "times.npy"), times)
+        for eq in spec.equations:
+            np.save(str(out / f"{eq.field_name}.npy"), np.zeros((3, 8)))
+            if eq.time_derivative_order >= 2:
+                np.save(str(out / f"pi_{eq.field_name}.npy"), np.zeros((3, 8)))
+
+        meta = {
+            "n_snapshots": 100,
+            "fields": [eq.field_name for eq in spec.equations],
+            "momenta": [
+                eq.field_name
+                for eq in spec.equations
+                if eq.time_derivative_order >= 2
+            ],
+            "grid_spacing": [1.0],
+            "grid_bounds": [[0.0, 8.0]],
+            "periodic": [True],
+        }
+        (out / "metadata.json").write_text(json.dumps(meta))
+
+        with pytest.raises(ValueError, match="Metadata claims 100 snapshots"):
+            SimulationData.from_directory(out, spec)
