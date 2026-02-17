@@ -109,7 +109,7 @@ def _load_spec(json_path: Path) -> EquationSystem:
         msg = (
             f"JSON specification not found: {json_path}\n"
             "Run the Wolfram derivation first: "
-            "wolframscript -file examples/massive_3form/massive_3form.wls"
+            "tidal derive examples/massive_3form/theory.toml"
         )
         raise FileNotFoundError(msg)
 
