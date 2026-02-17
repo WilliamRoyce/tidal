@@ -656,6 +656,33 @@ def _wls_background_component_values(
     return lines
 
 
+def _wls_validate_backgrounds_after_decompose(
+    ctx: _WlsContext, comp_var: str,
+) -> list[str]:
+    """Generate validation that vector/tensor backgrounds resolved after ToBasis.
+
+    After DecomposeToComponents, all background tensor symbols should be
+    fully resolved to coordinate expressions via ComponentValue + ToBasis.
+    This emits a check that catches silent substitution failures.
+
+    Only emitted when there are non-scalar background fields (scalars use
+    explicit ReplaceAll, so they're always resolved).
+    """
+    non_scalar_bgs = [
+        f for f in ctx.background_fields if f["type"] != "scalar"
+    ]
+    if not non_scalar_bgs:
+        return []
+
+    bg_heads = ", ".join(
+        f"{ctx.prefix}{f['name'].capitalize()}" for f in non_scalar_bgs
+    )
+    return [
+        "(* Validate background field substitution succeeded *)",
+        f"ValidateNoUnresolvedBackgrounds[{comp_var}, {{{bg_heads}}}];",
+    ]
+
+
 def _wls_scalar_background_substitution(
     ctx: _WlsContext, eom_var: str,
 ) -> list[str]:
@@ -844,9 +871,11 @@ def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
             (
                 f'{comp_var} = DecomposeToComponents[{eom_var}, {fexpr}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
                 f'Print["{fname} components: ", Length[{comp_var}]];',
-                "",
             )
         )
+        # Validate vector/tensor backgrounds resolved after ToBasis
+        lines.extend(_wls_validate_backgrounds_after_decompose(ctx, comp_var))
+        lines.append("")
 
     # Step 6: Export
     lines.extend(("(* Step 6: Build and export JSON *)", "fieldEquations = Flatten[{"))
@@ -882,6 +911,9 @@ def _wls_euler_lagrange_single(ctx: _WlsContext) -> list[str]:
         "(* Step 5: Decompose to components *)",
         f'componentEqs = DecomposeToComponents[eom, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
         'Print["Components: ", Length[componentEqs]];',
+    ])
+    lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
+    lines.extend([
         "",
         "fieldEquations = Table[",
         f'  {{"{fname}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
@@ -896,8 +928,16 @@ def _wls_euler_lagrange_single(ctx: _WlsContext) -> list[str]:
 def _wls_linearization(
     ctx: _WlsContext, *, include_bg: bool = False
 ) -> list[str]:
-    """Generate xPert linearization, decomposition, and export lines."""
-    assert ctx.linearization is not None
+    """Generate xPert linearization, decomposition, and export lines.
+
+    Raises
+    ------
+    ValueError
+        If ``ctx.linearization`` is ``None``.
+    """
+    if ctx.linearization is None:
+        msg = "_wls_linearization called without linearization config"
+        raise ValueError(msg)
     lin = ctx.linearization
     pert_field_name = lin["perturbation_field"]
     pert_field = next(f for f in ctx.fields if f["name"] == pert_field_name)
@@ -949,6 +989,9 @@ def _wls_linearization(
         "(* Step 5: Decompose to components *)",
         f'componentEqs = DecomposeToComponents[linExprPlain, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
         'Print["Components: ", Length[componentEqs]];',
+    ])
+    lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
+    lines.extend([
         "",
         "fieldEquations = Table[",
         f'  {{"{pert_field_name}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
