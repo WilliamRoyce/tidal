@@ -1,12 +1,17 @@
 """Tests for version bumping script."""
 
+from __future__ import annotations
+
 # Import the module - adjust path if needed
 import sys
 import tempfile
-from collections.abc import Generator
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 sys.path.insert(0, str(Path(__file__).parent.parent / "scripts"))
 
