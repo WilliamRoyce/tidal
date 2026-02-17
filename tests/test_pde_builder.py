@@ -1868,6 +1868,26 @@ class TestMathematicaFunctionConversion:
         assert "x[]" not in result
         assert "x()" not in result
 
+    def test_exp_function_conversion(self) -> None:
+        """Both E^(...) and Exp[...] should convert to exp(...)."""
+        spec = self.make_spec()
+        pde = PDEFromSpec(spec)
+        # E^(x) → exp(x) — Mathematica's standard notation (Step 1)
+        result_e = pde._mathematica_to_python("E^(x[])")
+        assert "exp(" in result_e
+        assert "E^" not in result_e
+        # Exp[x] → exp(x) — Mathematica's function form (Step 4)
+        result_exp = pde._mathematica_to_python("Exp[x[]]")
+        assert "exp(" in result_exp
+        assert "Exp" not in result_exp
+        # Full Gaussian expression with Exp
+        gaussian = "g0 * Exp[-(x[]^2 + y[]^2) / (2 * R^2)]"
+        result_gauss = pde._mathematica_to_python(gaussian)
+        assert "exp(" in result_gauss
+        assert "Exp" not in result_gauss
+        assert "x[]" not in result_gauss
+        assert "y[]" not in result_gauss
+
 
 class TestCachingOptimizations:
     """Tests for Issue #89 caching and memoization optimizations."""
