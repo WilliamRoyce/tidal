@@ -16,8 +16,8 @@ The measurement module quantifies this conversion using:
 - **Mixing length** L_mix = pi / omega_dom  (half-period of dominant oscillation)
 - **Spectral conversion** P(k,t) — per-mode conversion probability
 - **Dispersion relation** omega(k) — extracted via spacetime FFT
-- **Hamiltonian energy** decomposition (manual, since virial fails for
-  position-dependent coupling)
+- **Hamiltonian energy** decomposition (manual, cross-validated against
+  virial energy from the measurement module)
 
 Analogy to Gertsenshtein effect:
   phi <-> photon,  chi <-> graviton,  G(x,y) <-> background B_0(x,y)
@@ -46,6 +46,7 @@ from tidal.measurement import (
     compute_mixing_length,
     compute_mixing_spectrum,
     compute_spectral_conversion,
+    compute_system_energy,
     create_snapshot_callback,
 )
 from tidal.symbolic import build_pde_from_json, load_equation_system
@@ -60,9 +61,11 @@ if TYPE_CHECKING:
     from tidal.measurement._mixing import MixingResult, MixingSpectrum
     from tidal.measurement._spectral_conversion import SpectralConversion
 
-# NOTE: compute_energy_timeseries and check_energy_conservation are NOT
-# imported — they raise ValueError for position-dependent coupling G(x,y).
-# Hamiltonian energy is computed manually instead.
+# NOTE: The measurement module's virial energy (compute_system_energy) now
+# supports position-dependent coupling G(x,y).  We keep the manual
+# Hamiltonian decomposition as a cross-validation — it gives a physics-
+# specific breakdown (phi energy, chi energy, coupling energy) that the
+# generic virial formula does not.
 
 # ── Configuration ─────────────────────────────────────────────
 
@@ -154,8 +157,9 @@ def _compute_hamiltonian_energies(
 ) -> HamiltonianDecomposition:
     """Compute full Hamiltonian decomposition over all snapshots.
 
-    The measurement module's virial energy raises ValueError for
-    position-dependent coupling, so we compute directly from the fields.
+    Provides a physics-specific breakdown (phi energy, chi energy,
+    coupling energy) as a cross-validation against the measurement
+    module's virial energy.
     """
     dx, dy = data.grid_spacing
     dv = dx * dy
@@ -346,7 +350,7 @@ def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
     )
     print(f"  Hamiltonian H(0) = {h0:.4f},  H(T) = {h_final:.4f}")
     print(f"  max |dH/H| = {max_drift:.2e}")
-    print("  (Virial energy N/A for position-dependent coupling — computed manually)")
+    print("  (Manual decomposition cross-validated against virial energy)")
     print("=" * 65)
 
 
@@ -755,8 +759,18 @@ def main() -> None:
     except ValueError as e:
         print(f"  Dispersion (phi): not computed ({e})")
 
-    print("Computing Hamiltonian energy (manual — virial N/A for G(x,y))...")
+    print("Computing Hamiltonian energy (manual decomposition)...")
     hamiltonian = _compute_hamiltonian_energies(data, coupling_field)
+
+    # Cross-validate with measurement module's virial energy
+    print("Cross-validating with virial energy (measurement module)...")
+    virial = compute_system_energy(data, 0)
+    h_manual = hamiltonian.total_energy[0]
+    h_virial = virial.total
+    rel_diff = abs(h_manual - h_virial) / max(abs(h_manual), 1e-30)
+    print(f"  Manual H(0) = {h_manual:.6f}")
+    print(f"  Virial H(0) = {h_virial:.6f}")
+    print(f"  Relative difference: {rel_diff:.2e}")
 
     _print_summary(
         result,
