@@ -200,6 +200,8 @@
     "HWHM",
     "kvec",
     "mmaps",
+    "MPHI",
+    "MCHI",
     "mydir",
     "pcolormesh",
     "pytest",
