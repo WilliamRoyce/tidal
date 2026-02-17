@@ -186,7 +186,8 @@ def compute_spectral_conversion(
 
     # P(k,t) = E_target(k,t) / E_source(k, t=0) for active modes
     probability = np.zeros_like(tgt_energy)
-    probability[:, active] = tgt_energy[:, active] / src_energy[0, active]
+    denom = np.maximum(src_energy[0, active], energy_floor)
+    probability[:, active] = tgt_energy[:, active] / denom
 
     return SpectralConversion(
         times=data.times.copy(),
