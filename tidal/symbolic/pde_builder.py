@@ -1478,6 +1478,7 @@ class PDEFromSpec(PDEBase):
             ("ArcCosh", "arccosh"),
             ("ArcTanh", "arctanh"),
             # Other
+            ("Exp", "exp"),
             ("Log", "log"),
             ("Sqrt", "sqrt"),
             ("Abs", "abs"),
