@@ -256,7 +256,14 @@ class SimulationData:
         if not times_npy.exists():
             msg = f"Snapshot directory {p} missing times.npy"
             raise ValueError(msg)
-        times = np.load(str(times_npy), mmap_mode="r")[:n]
+        times_full = np.load(str(times_npy), mmap_mode="r")
+        if n > len(times_full):
+            msg = (
+                f"Metadata claims {n} snapshots but times.npy "
+                f"has only {len(times_full)} entries"
+            )
+            raise ValueError(msg)
+        times = times_full[:n]
 
         # Load fields (memory-mapped)
         fields: dict[str, NDArray[np.float64]] = {}
