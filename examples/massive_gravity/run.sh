@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Massive Gravity 2+1D example (Fierz-Pauli)
-# See also: massive_gravity.wls (manual derivation), simulation.py (Python simulation)
+# See also: simulation.py (Python simulation)
 #
 # Fierz-Pauli mass term: G^(1)_ab - m^2 (h_ab - eta_ab h) = 0
 # The trace h = eta^cd h_cd couples diagonal metric components (h_0, h_3, h_5).
@@ -13,8 +13,6 @@ cd "$(dirname "$0")"
 
 # Derive equations from TOML config (xPert linearization with FP mass term)
 tidal derive theory.toml
-# Alternative: derive from handwritten Wolfram script
-# tidal derive massive_gravity.wls
 
 # Inspect the equation system (6 components: h_0..h_5)
 tidal inspect ../data/massive_gravity_3d.json

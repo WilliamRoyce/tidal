@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Chern-Simons 2+1D example
-# See also: chern_simons.wls (manual derivation), chern_simons_simulation.py (Python simulation)
+# See also: chern_simons_simulation.py (Python simulation)
 #
 # To run manually:  cd examples/chern_simons && tidal derive theory.toml
 

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Cylindrical Klein-Gordon 3+1D example
-# See also: cylindrical_kg.wls (manual derivation), cylindrical_kg_simulation.py (Python simulation)
+# See also: cylindrical_kg_simulation.py (Python simulation)
 #
 # NOTE: The derive step uses cylindrical coordinates (r, theta, z) with a
-# coordinate-dependent metric. Both TOML and manual .wls derivation are supported.
+# coordinate-dependent metric.
 # The simulation works via CLI with --bc and --ic formula flags.
 #
 # To run manually:  cd examples/cylindrical_kg

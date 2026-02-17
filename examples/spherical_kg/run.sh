@@ -1,10 +1,9 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Spherical Klein-Gordon 3+1D example
-# See also: spherical_kg.wls (manual derivation), spherical_kg_simulation.py (Python simulation)
+# See also: spherical_kg_simulation.py (Python simulation)
 #
 # NOTE: The derive step uses spherical coordinates (r, theta, phi) with a
 # coordinate-dependent metric and trigonometric coefficient functions.
-# Both TOML and manual .wls derivation are supported.
 # The simulation works via CLI with --bc and --ic formula flags.
 #
 # To run manually:  cd examples/spherical_kg

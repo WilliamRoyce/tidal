@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Klein-Gordon 1+1D example
-# See also: klein_gordon.wls (manual derivation), kg_from_lagrangian.py (Python simulation)
+# See also: kg_from_lagrangian.py (Python simulation)
 #
 # To run manually:  cd examples/scalar_field && tidal derive theory.toml
 

@@ -1,9 +1,9 @@
 #!/bin/bash
-# Run all Wolfram example derivations to regenerate JSON files
+# Run all example derivations via `tidal derive` to regenerate JSON files
 #
 # Usage: ./scripts/run_examples.sh
 #
-# Runs each example script in examples/ to regenerate equations JSON.
+# Derives equations from every example TOML config.
 # Useful after modifying Wolfram pipeline modules.
 
 set -e
@@ -15,62 +15,36 @@ echo "=== Running Example Derivations ==="
 echo ""
 
 EXAMPLES=(
-    "examples/scalar_field/klein_gordon.wls"
-    "examples/electromagnetic/em_lagrangian_1d.wls"
-    "examples/coupled_scalars/coupled_scalars.wls"
-    "examples/chern_simons/chern_simons.wls"
-    "examples/elasticity/navier_cauchy.wls"
-    "examples/proca/proca.wls"
-    "examples/curved_spacetime/de_sitter_kg.wls"
-    "examples/curved_spacetime/conformal_kg_static.wls"
-    "examples/sphere_kg/sphere_kg.wls"
-    "examples/polar_kg/polar_kg.wls"
-    "examples/spherical_kg/spherical_kg.wls"
-    "examples/cylindrical_kg/cylindrical_kg.wls"
-    "examples/scalar_field_3d/klein_gordon_3d.wls"
-    "examples/scalar_vector_coupling/scalar_vector_coupling.wls"
-    "examples/massive_3form/massive_3form.wls"
-    "examples/massive_gravity/massive_gravity.wls"
-    "examples/coupled_proca/coupled_proca.wls"
+    "examples/scalar_field/theory.toml"
+    "examples/electromagnetic/theory.toml"
+    "examples/coupled_scalars/theory.toml"
+    "examples/chern_simons/theory.toml"
+    "examples/elasticity/theory.toml"
+    "examples/proca/theory.toml"
+    "examples/curved_spacetime/de_sitter.toml"
+    "examples/curved_spacetime/conformal_static.toml"
+    "examples/sphere_kg/theory.toml"
+    "examples/polar_kg/theory.toml"
+    "examples/spherical_kg/theory.toml"
+    "examples/cylindrical_kg/theory.toml"
+    "examples/scalar_field_3d/theory.toml"
+    "examples/scalar_vector_coupling/theory.toml"
+    "examples/massive_3form/theory.toml"
+    "examples/massive_gravity/theory.toml"
+    "examples/coupled_proca/theory.toml"
+    "examples/electrostatics/theory.toml"
+    "examples/gravitational_waves/theory.toml"
+    "examples/coupled_scattering/theory.toml"
+    "examples/scalar_potential_well/theory.toml"
+    "examples/vector_background/theory.toml"
+    "examples/proca_background/theory.toml"
 )
 
 PASSED=0
 FAILED=0
 FAILED_EXAMPLES=()
 
-for example in "${EXAMPLES[@]}"; do
-    EXAMPLE_PATH="$PROJECT_ROOT/$example"
-
-    if [ ! -f "$EXAMPLE_PATH" ]; then
-        echo "SKIP: $example (file not found)"
-        continue
-    fi
-
-    echo "Running: $example"
-    if wolframscript -file "$EXAMPLE_PATH"; then
-        PASSED=$((PASSED + 1))
-        echo "  OK"
-    else
-        FAILED=$((FAILED + 1))
-        FAILED_EXAMPLES+=("$example")
-        echo "  FAILED"
-    fi
-    echo ""
-done
-
-# --- TOML-only examples (no standalone .wls) ---
-echo ""
-echo "=== Running TOML-only Derivations ==="
-echo ""
-
-TOML_EXAMPLES=(
-    "examples/electrostatics/theory.toml"
-    "examples/gravitational_waves/theory.toml"
-    "examples/coupled_scattering/theory.toml"
-    "examples/scalar_potential_well/theory.toml"
-)
-
-for toml in "${TOML_EXAMPLES[@]}"; do
+for toml in "${EXAMPLES[@]}"; do
     TOML_PATH="$PROJECT_ROOT/$toml"
 
     if [ ! -f "$TOML_PATH" ]; then

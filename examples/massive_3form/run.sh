@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Massive 3-Form 3+1D example
-# See also: massive_3form.wls (manual derivation), simulate_massive_3form.py (Python simulation)
+# See also: simulate_massive_3form.py (Python simulation)
 #
 # To run manually:  cd examples/massive_3form && tidal derive theory.toml
 

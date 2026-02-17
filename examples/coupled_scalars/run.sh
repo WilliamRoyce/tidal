@@ -7,7 +7,6 @@
 # The mixing length L_mix = pi/omega_dom characterizes the oscillation period.
 #
 # See also:
-#   coupled_scalars.wls          — manual Wolfram derivation
 #   coupled_from_lagrangian.py   — Python simulation script
 #   measure_conversion.py        — detailed measurement analysis
 #
