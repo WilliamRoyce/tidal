@@ -16,7 +16,7 @@ import re
 import warnings
 from dataclasses import dataclass
 from functools import partial
-from typing import TYPE_CHECKING, Any, SupportsFloat, cast
+from typing import TYPE_CHECKING, Any, ClassVar, SupportsFloat, cast
 
 import numpy as np
 from pde import FieldCollection, PDEBase, ScalarField
@@ -1100,10 +1100,22 @@ class PDEFromSpec(PDEBase):
         ns["log"] = np.log
         ns["sqrt"] = np.sqrt
         ns["abs"] = np.abs
+        ns["sign"] = np.sign
+        ns["maximum"] = np.maximum
+        ns["minimum"] = np.minimum
+        # Step functions (UnitStep/HeavisideTheta)
+        ns["heaviside"] = lambda x: np.heaviside(x, 0.5)  # type: ignore[reportUnknownLambdaType]
+        # Piecewise (from Mathematica Simplify converting UnitStep products)
+        ns["piecewise"] = np.where
         # Special functions (scipy.special)
         ns["erf"] = special.erf
         ns["jv"] = special.jv  # BesselJ
         ns["yv"] = special.yv  # BesselY
+        # numpy module — needed for np.pi in position-dependent expressions
+        ns["np"] = np
+        # Mathematica booleans — eval uses __builtins__={} which strips Python builtins
+        ns["True"] = True
+        ns["False"] = False
         return ns
 
     @staticmethod
@@ -1167,6 +1179,223 @@ class PDEFromSpec(PDEBase):
 
         return re.sub(pattern, replacer, expr)
 
+    # Comparison operator names used inside Inequality[...]
+    _COMPARISON_OPS: ClassVar[dict[str, str]] = {
+        "LessEqual": "<=",
+        "Less": "<",
+        "GreaterEqual": ">=",
+        "Greater": ">",
+        "Equal": "==",
+    }
+
+    @staticmethod
+    def _split_bracket_aware(s: str) -> list[str]:
+        """Split string on commas, respecting ``[...]`` bracket nesting.
+
+        Parameters
+        ----------
+        s : str
+            Content string (typically inside a Mathematica function call).
+
+        Returns
+        -------
+        list[str]
+            Comma-separated parts, preserving nested bracket structure.
+        """
+        parts: list[str] = []
+        depth = 0
+        current: list[str] = []
+        for ch in s:
+            if ch == "[":
+                depth += 1
+                current.append(ch)
+            elif ch == "]":
+                depth -= 1
+                current.append(ch)
+            elif ch == "," and depth == 0:
+                parts.append("".join(current))
+                current = []
+            else:
+                current.append(ch)
+        if current:
+            parts.append("".join(current))
+        return parts
+
+    @staticmethod
+    def _convert_inequality(expr: str) -> str:
+        """Convert ``Inequality[a, op, b, op, c, ...]`` to chained comparisons.
+
+        Mathematica's ``Inequality`` represents compound comparisons like
+        ``30 <= x <= 70``.  The function form is::
+
+            Inequality[30, LessEqual, x[], LessEqual, 70]
+
+        This is converted to::
+
+            ((30) <= (x[])) & ((x[]) <= (70))
+
+        Must run before bracket conversion (Step 5) and before Piecewise
+        conversion (Inequality appears inside Piecewise conditions).
+
+        Parameters
+        ----------
+        expr : str
+            Expression potentially containing ``Inequality[...]`` syntax.
+
+        Returns
+        -------
+        str
+            Expression with ``Inequality`` converted to Python comparisons.
+        """
+        pattern = r"Inequality\[((?:[^[\]]|\[[^\]]*\])*)\]"
+
+        def replacer(match: re.Match[str]) -> str:
+            inner = match.group(1)
+            args = PDEFromSpec._split_bracket_aware(inner)
+            min_args = 3  # Inequality[a, op, b] minimum
+            if len(args) < min_args or len(args) % 2 == 0:
+                return match.group(0)  # Malformed, leave unchanged
+            parts: list[str] = []
+            for i in range(0, len(args) - 2, 2):
+                left = args[i].strip()
+                op_name = args[i + 1].strip()
+                right = args[i + 2].strip()
+                op_sym = PDEFromSpec._COMPARISON_OPS.get(op_name, op_name)
+                parts.append(f"(({left}) {op_sym} ({right}))")
+            return " & ".join(parts)
+
+        prev = None
+        result = expr
+        while prev != result:
+            prev = result
+            result = re.sub(pattern, replacer, result)
+        return result
+
+    @staticmethod
+    def _find_top_level_comma(s: str) -> int:
+        """Find index of first comma not inside ``()[]{}``."""
+        depth = 0
+        for i, ch in enumerate(s):
+            if ch in "([{":
+                depth += 1
+            elif ch in ")]}":
+                depth -= 1
+            elif ch == "," and depth == 0:
+                return i
+        return -1
+
+    @staticmethod
+    def _find_matching_brace(s: str) -> int:
+        """Find index of the closing ``}`` that matches the opening ``{`` at s[0]."""
+        depth = 0
+        for i, ch in enumerate(s):
+            if ch == "{":
+                depth += 1
+            elif ch == "}":
+                depth -= 1
+                if depth == 0:
+                    return i
+        return -1
+
+    @staticmethod
+    def _extract_brace_pairs(cases_str: str) -> list[tuple[str, str]]:
+        """Extract ``{value, condition}`` pairs from the inner list string."""
+        cases: list[tuple[str, str]] = []
+        i = 0
+        while i < len(cases_str):
+            if cases_str[i] == "{":
+                end = PDEFromSpec._find_matching_brace(cases_str[i:])
+                if end < 0:
+                    break
+                case_content = cases_str[i + 1 : i + end]
+                comma_idx = PDEFromSpec._find_top_level_comma(case_content)
+                if comma_idx >= 0:
+                    val = case_content[:comma_idx].strip()
+                    cond = case_content[comma_idx + 1 :].strip()
+                    cases.append((val, cond))
+                i += end + 1
+            else:
+                i += 1
+        return cases
+
+    @staticmethod
+    def _parse_piecewise_content(
+        content: str,
+    ) -> tuple[list[tuple[str, str]], str]:
+        """Parse the inner content of a ``Piecewise[...]`` expression.
+
+        Parameters
+        ----------
+        content : str
+            Everything between ``Piecewise[`` and the closing ``]``.
+            Expected form: ``{{val1, cond1}, {val2, cond2}, ...}, default``
+
+        Returns
+        -------
+        tuple[list[tuple[str, str]], str]
+            List of ``(value, condition)`` pairs and the default value string.
+        """
+        content = content.strip()
+        if not content.startswith("{{"):
+            return [], content
+
+        end_idx = PDEFromSpec._find_matching_brace(content)
+        if end_idx < 0:
+            return [], content  # Malformed
+
+        cases_str = content[1:end_idx]  # Strip outer { ... }
+        default_str = content[end_idx + 1 :].strip()
+        if default_str.startswith(","):
+            default_str = default_str[1:].strip()
+        if not default_str:
+            default_str = "0"
+
+        return PDEFromSpec._extract_brace_pairs(cases_str), default_str
+
+    @staticmethod
+    def _convert_piecewise(expr: str) -> str:
+        """Convert ``Piecewise[{{val, cond}, ...}, default]`` to ``piecewise()`` calls.
+
+        Mathematica's ``Simplify`` often converts products of ``UnitStep``
+        functions into ``Piecewise`` form.  This converts back into calls to
+        ``piecewise(cond, val_true, val_false)`` (a thin ``numpy.where``
+        wrapper provided in the eval namespace).
+
+        Must run AFTER ``_convert_inequality`` (conditions are then
+        bracket-free comparison chains) and BEFORE bracket conversion.
+
+        Parameters
+        ----------
+        expr : str
+            Expression potentially containing ``Piecewise[...]`` syntax.
+
+        Returns
+        -------
+        str
+            Expression with ``Piecewise`` converted to ``piecewise()`` calls.
+        """
+        # After _convert_inequality, conditions contain comparisons with &
+        # and coordinate symbols like x[].  Square-bracket nesting inside
+        # Piecewise[...] is at most one level deep (e.g. x[]).
+        pattern = r"Piecewise\[((?:[^[\]]|\[[^\]]*\])*)\]"
+
+        def replacer(match: re.Match[str]) -> str:
+            content = match.group(1)
+            cases, default = PDEFromSpec._parse_piecewise_content(content)
+            if not cases:
+                return default
+            result = default
+            for val, cond in reversed(cases):
+                result = f"piecewise({cond}, {val}, {result})"
+            return result
+
+        prev = None
+        result = expr
+        while prev != result:
+            prev = result
+            result = re.sub(pattern, replacer, result)
+        return result
+
     def _mathematica_to_python(self, expr: str) -> str:
         """Convert Mathematica InputForm expression to evaluable Python.
 
@@ -1183,7 +1412,10 @@ class PDEFromSpec(PDEBase):
         - ``BesselJ[n, x]`` to ``jv(n, x)``, ``BesselY[n, x]`` to ``yv(n, x)``
         - ``Rational[p, q]`` to ``(p)/(q)`` (exact fractions from xAct InputForm)
         - ``Pi`` to ``np.pi`` (mathematical constant)
-        - ``Sign[x]`` to ``np.sign(x)``, ``Max[a,b]`` to ``np.maximum(a,b)``
+        - ``Sign[x]`` to ``sign(x)``, ``Max[a,b]`` to ``maximum(a,b)``
+        - ``UnitStep[x]`` to ``heaviside(x)``, ``HeavisideTheta[x]`` to ``heaviside(x)``
+        - ``Inequality[a, LessEqual, b, LessEqual, c]`` to ``((a) <= (b)) & ((b) <= (c))``
+        - ``Piecewise[{{val, cond}}, default]`` to ``piecewise(cond, val, default)``
         - ``t[]`` to ``t`` (xCoba coordinate symbols, using actual coordinate names)
         - Mathematica brackets ``[``, ``]`` to Python parens ``(``, ``)``
         - Mathematica ``^`` to Python ``**``
@@ -1215,6 +1447,14 @@ class PDEFromSpec(PDEBase):
         # bracket conversion since Rational uses Mathematica brackets.
         result = re.sub(r"Rational\[([^,\]]+),\s*([^,\]]+)\]", r"(\1)/(\2)", result)
 
+        # Step 3.7: Inequality[a, op, b, op, c] → chained comparisons
+        # Must run before Piecewise (Inequality appears inside Piecewise conditions)
+        result = self._convert_inequality(result)
+
+        # Step 3.8: Piecewise[{{val, cond}, ...}, default] → piecewise() calls
+        # Must run after Inequality (conditions are now comparison chains)
+        result = self._convert_piecewise(result)
+
         # Step 4: Function name conversions (batch)
         function_map = [
             # Basic trig
@@ -1241,9 +1481,12 @@ class PDEFromSpec(PDEBase):
             ("Log", "log"),
             ("Sqrt", "sqrt"),
             ("Abs", "abs"),
-            ("Sign", "np.sign"),
-            ("Max", "np.maximum"),
-            ("Min", "np.minimum"),
+            ("Sign", "sign"),
+            ("Max", "maximum"),
+            ("Min", "minimum"),
+            # Step functions
+            ("UnitStep", "heaviside"),
+            ("HeavisideTheta", "heaviside"),
             # Special functions (scipy.special)
             ("Erf", "erf"),
             ("BesselJ", "jv"),
