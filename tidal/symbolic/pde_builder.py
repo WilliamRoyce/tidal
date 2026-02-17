@@ -1175,6 +1175,9 @@ class PDEFromSpec(PDEBase):
                 namespace.update(coord_arrays)
             else:
                 spatial_coords = self.spec.spatial_coordinates
+                # Inject as many coordinates as the grid supports; if the
+                # expression references an axis beyond grid.num_axes, the
+                # downstream symbol validation will catch it with a clear error.
                 coords = grid.cell_coords  # type: ignore[union-attr]
                 for i, name in enumerate(spatial_coords[: grid.num_axes]):  # type: ignore[union-attr]
                     namespace[name] = np.asarray(coords[..., i], dtype=np.float64)  # pyright: ignore[reportUnknownArgumentType]
@@ -2027,7 +2030,10 @@ class PDEFromSpec(PDEBase):
 
         # 3. Choose solver path
         all_periodic = hasattr(grid, "periodic") and all(grid.periodic)
-        use_fft = (method == "fft") or (method == "auto" and all_periodic)
+        has_pos_dep_self = any(term.position_dependent for term in self_terms)
+        use_fft = (method == "fft") or (
+            method == "auto" and all_periodic and not has_pos_dep_self
+        )
 
         if method == "fft" and not all_periodic:
             msg = (
@@ -2373,8 +2379,25 @@ class PDEFromSpec(PDEBase):
         """
         grid = state.grid
         all_periodic = hasattr(grid, "periodic") and all(grid.periodic)
+        enabled_names = {self.spec.equations[i].field_name for i in enabled_indices}
 
-        if all_periodic:
+        # Determine if FFT block solver is viable: requires periodic grid,
+        # no explicit method="matrix", and no position-dependent intra-cluster terms.
+        use_fft = all_periodic
+        if use_fft:
+            for i in enabled_indices:
+                eq = self.spec.equations[i]
+                if eq.constraint_solver.method == "matrix":
+                    use_fft = False
+                    break
+                for term in eq.rhs_terms:
+                    if term.field in enabled_names and term.position_dependent:
+                        use_fft = False
+                        break
+                if not use_fft:
+                    break
+
+        if use_fft:
             return self._solve_coupled_constraints_fft(
                 enabled_indices, state, bc, t, virtual_momenta
             )
