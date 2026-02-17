@@ -21,4 +21,4 @@ expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - m2/2 phi[]^2"
 m2 = 1.0
 
 [output]
-path = "examples/data/conformal_kg_static.json"
+path = "../data/conformal_kg_static.json"
