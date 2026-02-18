@@ -16,7 +16,7 @@
 
 View the `tidal` package documentation [here](https://williamroyce.github.io/torsion-gertsenshtein/).
 
-A research codebase for exploring **electromagnetic ↔ gravitational wave conversion** (Gertsenshtein effect) and potential **amplification mechanisms** in gravity theories with **torsion** (Poincaré gauge theory; parity-even quadratic invariants). The repository includes:
+A research codebase for exploring **electromagnetic ↔ gravitational wave conversion** ([Gertsenshtein effect](https://arxiv.org/abs/2301.02072); Gertsenshtein 1962, Domcke & Garcia-Cely 2023) and potential **amplification mechanisms** in gravity theories with **torsion** (Poincaré gauge theory; parity-even quadratic invariants). The repository includes:
 
 - **A lightweight PDE sandbox** (built on [`py-pde`]) for rapid prototyping and numerics with **950+ Python tests + ~115 Wolfram tests**.
 - A symbolic pipeline (Mathematica + xAct) for **deriving linearized field equations** and exporting them to Python-friendly forms.
@@ -385,9 +385,12 @@ This project is licensed under the MIT License. See [LICENSE](LICENSE) for detai
 
 This project builds on:
 
-- [`py-pde`](https://py-pde.readthedocs.io/) for the PDE solver framework.
-- [`uv`](https://github.com/astral-sh/uv) for fast Python environment management.
-- The [xAct/xTensor ecosystem](http://www.xact.es/) for symbolic tensor algebra (xCore, xPerm, xTensor, xCoba) powering the complete Lagrangian-to-PDE derivation pipeline.
+- [`py-pde`](https://py-pde.readthedocs.io/) — PDE solver framework (Zwicker, JOSS 2020).
+- [`uv`](https://github.com/astral-sh/uv) — fast Python environment management.
+- The [xAct/xTensor ecosystem](http://www.xact.es/) — symbolic tensor algebra (Martín-García et al.) powering the Lagrangian-to-PDE derivation pipeline.
+- [xPert](https://www.researchgate.net/publication/1740524) — metric perturbation theory (Brizuela et al. 2009) for linearisation.
+
+Design decisions are informed by [Dedalus](https://arxiv.org/abs/1905.10388) (Burns et al. 2020), [MEEP](https://meep.readthedocs.io/) (Oskooi et al. 2010), and [FEniCS](https://fenicsproject.org/) (Baratta et al. 2023). The core physics targets the Gertsenshtein effect (Gertsenshtein 1962; [Domcke & Garcia-Cely 2023](https://arxiv.org/abs/2301.02072)). See [`docs/references.md`](docs/references.md) for the full citation list.
 
 [`py-pde`]: https://py-pde.readthedocs.io/
 [`uv`]: https://github.com/astral-sh/uv
