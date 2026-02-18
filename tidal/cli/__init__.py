@@ -221,6 +221,50 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Solver scheme (default: runge-kutta)",
     )
     sim_parser.add_argument(
+        "--adaptive",
+        action="store_true",
+        help="Enable adaptive step-size control (tolerances drive step selection)",
+    )
+    sim_parser.add_argument(
+        "--method",
+        choices=["RK45", "RK23", "DOP853", "Radau", "BDF", "LSODA"],
+        default=None,
+        help="scipy solve_ivp method (default: DOP853). Requires --scheme scipy",
+    )
+    sim_parser.add_argument(
+        "--rtol",
+        type=float,
+        default=None,
+        help="Relative error tolerance for scipy adaptive solver",
+    )
+    sim_parser.add_argument(
+        "--atol",
+        type=float,
+        default=None,
+        help="Absolute error tolerance for scipy adaptive solver",
+    )
+    sim_parser.add_argument(
+        "--tolerance",
+        type=float,
+        default=None,
+        help="Error tolerance for adaptive explicit solver (py-pde). Requires --scheme runge-kutta --adaptive",
+    )
+    sim_parser.add_argument(
+        "--max-step",
+        type=float,
+        default=None,
+        dest="max_step",
+        help="Maximum step size (default: auto from CFL)",
+    )
+    sim_parser.add_argument(
+        "--energy-monitor",
+        type=float,
+        default=None,
+        dest="energy_monitor",
+        metavar="THRESHOLD",
+        help="Halt if relative energy drift |dE/E0| exceeds THRESHOLD",
+    )
+    sim_parser.add_argument(
         "--snapshots",
         type=float,
         default=None,
