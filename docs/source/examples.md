@@ -1,10 +1,10 @@
 # Examples
 
-TIDAL includes 20 pipeline examples spanning 1+1D through 3+1D spacetimes with scalar, vector, and tensor fields.
+TIDAL includes 22 pipeline examples spanning 1+1D through 3+1D spacetimes with scalar, vector, and tensor fields.
 
 ## Pipeline Examples
 
-All pipeline examples follow the same pattern: a Wolfram script (`.wls`) derives equations from a Lagrangian, exports to JSON, and a Python script or CLI command runs the simulation.
+All pipeline examples follow the same pattern: `tidal derive theory.toml` derives equations from a Lagrangian (via wolframscript), exports to JSON, and a Python script or CLI command runs the simulation.
 
 | Example | Dim | Fields | Key Features |
 |---------|-----|--------|--------------|
@@ -28,6 +28,8 @@ All pipeline examples follow the same pattern: a Wolfram script (`.wls`) derives
 | `coupled_proca/` | 2+1D | A_i, B_i | Two massive vectors, coupled Helmholtz constraints, periodic BCs |
 | `coupled_scattering/` | 2+1D | phi_0, chi_0 | Position-dependent Gaussian coupling, background fields, wave scattering |
 | `scalar_potential_well/` | 1+1D | phi_0 | Background potential well, `[[background_fields]]`, bound states |
+| `proca_background/` | 2+1D | A_i, B_i | Lorentzian scalar background, two Proca vectors, constraint+BG integration |
+| `vector_background/` | 2+1D | phi_0, A_i | Tanh domain wall vector background, ComponentValue mechanism, sign-changing coupling |
 
 ## Running Examples
 
@@ -86,6 +88,8 @@ uv run python examples/scalar_vector_coupling/simulation.py
 | coupled_proca | Yes | Yes | Yes |
 | coupled_scattering | Yes | Yes | Yes |
 | scalar_potential_well | Yes | Yes | Yes |
+| proca_background | Yes | Yes | Yes |
+| vector_background | Yes | Yes | Yes |
 
 ## JSON Specification Files
 
