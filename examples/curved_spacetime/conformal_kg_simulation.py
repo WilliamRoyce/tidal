@@ -164,7 +164,7 @@ def _run_simulation(
     print("Step 5: Running simulation...")
 
     spec = load_equation_system(json_path)
-    output_data_dir = Path(__file__).parent.parent / "data" / "conformal_kg_output"
+    output_data_dir = Path(__file__).parent.parent.parent / "outputs" / "conformal_kg"
 
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,

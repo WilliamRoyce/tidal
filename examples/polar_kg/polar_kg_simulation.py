@@ -170,7 +170,7 @@ def _run_simulation(
 
     spec = load_equation_system(json_path)
     params = {"polm2": MASS_SQUARED}
-    output_data_dir = Path(__file__).parent.parent / "data" / "polar_kg_output"
+    output_data_dir = Path(__file__).parent.parent.parent / "outputs" / "polar_kg"
 
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,

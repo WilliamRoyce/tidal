@@ -182,7 +182,7 @@ def _run_simulation(
 
     spec = load_equation_system(json_path)
     params = {"dSH": HUBBLE_PARAM, "dSm2": MASS_SQUARED}
-    output_data_dir = Path(__file__).parent.parent / "data" / "de_sitter_output"
+    output_data_dir = Path(__file__).parent.parent.parent / "outputs" / "de_sitter"
 
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,

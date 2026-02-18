@@ -109,7 +109,7 @@ def _run_simulation() -> tuple[SimulationData, Path]:
 
     state = FieldCollection(fields)
 
-    output_data_dir = Path(__file__).parent.parent / "data" / "coupled_proca_output"
+    output_data_dir = Path(__file__).parent.parent.parent / "outputs" / "coupled_proca"
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,
         spec=spec,

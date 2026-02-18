@@ -95,7 +95,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     )
     initial_state = pulse.create(grid, spec)
 
-    output_data_dir = Path(__file__).parent.parent / "data" / "coupled_scalars_output"
+    output_data_dir = Path(__file__).parent.parent.parent / "outputs" / "coupled_scalars"
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,
         spec=spec,
