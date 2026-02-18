@@ -1,4 +1,4 @@
-"""Measurement example: scalar-vector conversion with tanh domain wall (2+1D).
+"""Measurement example: scalar-vector conversion with localized tanh background (2+1D).
 
 Demonstrates the measurement module applied to a vector background field:
 
@@ -6,12 +6,10 @@ Demonstrates the measurement module applied to a vector background field:
         -1/2 (d_a A_b)(d^a A^b) + 1/2 (d_a A_b)(d^b A^a)
         - mA2/2 A_a A^a + gBV * B^a A_a phi
 
-where B_a(x,y) = (0, 0, B0 * tanh(x/W) * exp(-y^2/(2R^2))) is an external
-vector background with a tanh domain wall in x, localized in y by a Gaussian
-envelope.  This is qualitatively different from both:
-  - Gaussian (coupled_scattering): symmetric, exponential tails
-  - Lorentzian (proca_background): symmetric, algebraic tails
-  - Tanh wall: antisymmetric, transitions from -B0 to +B0 across x=0
+where B_a(x,y) = (0, 0, B0 * tanh(x/W) * exp(-(x^2+y^2)/(2R^2))) is an
+external vector background with a localized tanh profile: antisymmetric and
+sign-changing across x=0, with a Gaussian envelope in both x and y that
+decays to ~0 at the periodic boundaries.
 
 Only the B_2 component is nonzero, so after VarD:
   - phi eq: ... + gBV * B_2(x,y) * A_2  (position-dependent identity)
@@ -23,7 +21,7 @@ region) and crosses the domain wall at x=0.  The sign-changing background
 creates asymmetric conversion behavior.
 
 The measurement module quantifies conversion using:
-- **Conversion probability** P(t) = E_A2(t) / E_phi(0)
+- **Conversion probability** P(t) = E_A(t) / E_phi(0) via group conversion
 - **Mixing length** and **mixing spectrum** (temporal FFT of P(t))
 - **Energy conservation** via ``check_energy_conservation``
 - **Hamiltonian energy** decomposition via the generic virial formula
@@ -49,8 +47,8 @@ from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 from tidal.measurement import (
     SimulationData,
     check_energy_conservation,
-    compute_conversion_probability,
     compute_energy_timeseries,
+    compute_group_conversion,
     compute_mixing_length,
     compute_mixing_spectrum,
     create_snapshot_callback,
@@ -127,7 +125,7 @@ class EnergyDecomposition:
 
 
 def _compute_coupling_field(data: SimulationData) -> NDArray[np.float64]:
-    """Compute B_2(x,y) = B0 * tanh(x/W) * exp(-y^2/(2R^2)) on the grid."""
+    """Compute B_2(x,y) = B0 * tanh(x/W) * exp(-(x^2+y^2)/(2R^2)) on the grid."""
     shape = data.fields["phi_0"].shape[1:]  # spatial (nx, ny)
     dx, dy = data.grid_spacing
     x_1d = np.linspace(
@@ -144,7 +142,7 @@ def _compute_coupling_field(data: SimulationData) -> NDArray[np.float64]:
     b0 = data.parameters.get("B0", B0)
     w = data.parameters.get("W", WALL_WIDTH)
     r_param = data.parameters.get("R", COUPLING_RADIUS)
-    return b0 * np.tanh(x / w) * np.exp(-(y**2) / (2 * r_param**2))
+    return b0 * np.tanh(x / w) * np.exp(-(x**2 + y**2) / (2 * r_param**2))
 
 
 def _compute_energy_decomposition(data: SimulationData) -> EnergyDecomposition:
@@ -203,7 +201,7 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
 
 
 def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
-    """Run the scalar-vector + tanh domain wall simulation.
+    """Run the scalar-vector + localized tanh background simulation.
 
     Raises
     ------
@@ -223,7 +221,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     grid = CartesianGrid([DOMAIN, DOMAIN], N_CELLS, periodic=True)
     initial_state = _create_initial_state(grid)
 
-    output_data_dir = Path(__file__).parent.parent / "data" / "vector_background_output"
+    output_data_dir = Path(__file__).parent.parent.parent / "outputs" / "vector_background"
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,
         spec=spec,
@@ -258,7 +256,7 @@ def _print_summary(
 ) -> None:
     """Print quantitative measurement summary to stdout."""
     print("=" * 65)
-    print("Vector Background Domain Wall: Measurement Summary")
+    print("Vector Background (Localized Tanh): Measurement Summary")
     print("=" * 65)
     print()
 
@@ -285,7 +283,7 @@ def _print_summary(
     print(f"  Peak conversion P(t) = {result.probability[peak_idx]:.6f}")
     print(f"    at t = {result.times[peak_idx]:.2f}")
     print(f"  Initial source energy E_phi(0) = {result.source_energy[0]:.4f}")
-    print(f"  Final  target energy E_A2(T) = {result.target_energy[-1]:.4f}")
+    print(f"  Final  target energy E_A(T) = {result.target_energy[-1]:.4f}")
     print()
 
     if mixing is not None:
@@ -319,7 +317,7 @@ def _plot_results(
     """Generate 2x4 measurement figure. Returns path to saved PNG."""
     fig, axes = plt.subplots(2, 4, figsize=(22, 9))
     fig.suptitle(
-        "Scalar-Vector + Tanh Domain Wall Background (2+1D)\n"
+        "Scalar-Vector + Localized Tanh Background (2+1D)\n"
         r"$\mathcal{L} = -\frac{1}{2}(\partial\phi)^2"
         r" - \frac{m_\phi^2}{2}\phi^2"
         r" - \frac{1}{2}(\partial_a A_b)(\partial^a A^b)"
@@ -327,6 +325,8 @@ def _plot_results(
         r" + g_{BV}\,B^a A_a\,\phi$",
         fontsize=13,
     )
+
+    peak_idx = int(np.argmax(result.probability))
 
     # [0,0] Conversion probability P(t) + mixing length annotation
     _plot_conversion(axes[0, 0], result, mixing)
@@ -340,14 +340,20 @@ def _plot_results(
     # [0,3] Mixing spectrum (temporal FFT of P(t))
     _plot_mixing_spectrum(axes[0, 3], spectrum)
 
-    # [1,0] B_2(x,y) domain wall coupling field
+    # [1,0] B_2(x,y) coupling field
     _plot_coupling_field(axes[1, 0], fig, data, coupling_field)
 
-    # [1,1] |A_2| at final time (coupled component)
-    _plot_field_heatmap(axes[1, 1], data, "A_2", coupling_field, "A_2 (coupled)")
+    # [1,1] |A_2| at peak conversion time (coupled component)
+    _plot_field_heatmap(
+        axes[1, 1], data, "A_2", coupling_field, "A_2 (coupled)",
+        snapshot_idx=peak_idx,
+    )
 
-    # [1,2] |A_1| at final time (uncoupled -- should stay ~0)
-    _plot_field_heatmap(axes[1, 2], data, "A_1", coupling_field, "A_1 (uncoupled)")
+    # [1,2] |A_1| at peak conversion time (uncoupled -- should stay ~0)
+    _plot_field_heatmap(
+        axes[1, 2], data, "A_1", coupling_field, "A_1 (uncoupled)",
+        snapshot_idx=peak_idx,
+    )
 
     # [1,3] Summary text
     _plot_summary_text(axes[1, 3], result, diag, mixing, params)
@@ -388,8 +394,8 @@ def _plot_conversion(
             bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8},
         )
     ax.set_xlabel("Time")
-    ax.set_ylabel(r"$P(t) = E_{A_2}(t)\,/\,E_\phi(0)$")
-    ax.set_title(r"Conversion Probability ($\phi \to A_2$)")
+    ax.set_ylabel(r"$P(t) = E_A(t)\,/\,E_\phi(0)$")
+    ax.set_title(r"Conversion Probability ($\phi \to A$)")
     ax.set_ylim(bottom=0)
     ax.grid(visible=True, alpha=0.3)
 
@@ -401,7 +407,7 @@ def _plot_hamiltonian(ax: Axes, h: EnergyDecomposition) -> None:
         h.times,
         h.coupling_energy,
         "g--",
-        label=r"$-g\!\int\! B_2\,A_2\,\phi\,dA$",
+        label=r"$E_\mathrm{int}$",
         linewidth=1.0,
         alpha=0.7,
     )
@@ -491,7 +497,7 @@ def _plot_coupling_field(
     ax.axvline(0, color="k", linestyle="--", linewidth=0.8, alpha=0.5)
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    ax.set_title(r"Domain wall $B_2 = B_0\tanh(x/W)\,e^{-y^2/(2R^2)}$")
+    ax.set_title(r"$B_2 = B_0\tanh(x/W)\,e^{-(x^2+y^2)/(2R^2)}$")
 
 
 def _plot_field_heatmap(
@@ -500,9 +506,10 @@ def _plot_field_heatmap(
     field_name: str,
     coupling_field: NDArray[np.float64],
     title_label: str,
+    snapshot_idx: int = -1,
 ) -> None:
-    """Plot |field| at final time with coupling B_2(x,y) contours."""
-    final = data.fields[field_name][-1]
+    """Plot |field| at given snapshot with coupling B_2(x,y) contours."""
+    final = data.fields[field_name][snapshot_idx]
     bounds = data.grid_bounds
     extent = (bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1])
     vmax = max(float(np.max(np.abs(final))), 1e-10)
@@ -534,8 +541,8 @@ def _plot_field_heatmap(
         )
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    t_final = float(data.times[-1])
-    ax.set_title(rf"$|{title_label}|$ at $t={t_final:.0f}$")
+    t_snap = float(data.times[snapshot_idx])
+    ax.set_title(rf"$|{title_label}|$ at $t={t_snap:.0f}$ (peak)")
     plt.colorbar(im, ax=ax)
 
 
@@ -579,7 +586,7 @@ def _plot_summary_text(
         f"  max $|\\Delta E / E_0| = {diag.max_relative_error:.2e}$",
         f"  Conservation: {'PASS' if diag.is_conserved else 'FAIL'}",
         "",
-        "Domain wall: tanh(x/W)",
+        "Localized tanh: $\\tanh(x/W) e^{-r^2/2R^2}$",
         "  coupling changes sign at x=0",
         "  A_1 should stay $\\approx 0$ (B_1=0)",
     ]
@@ -600,7 +607,7 @@ def _plot_summary_text(
 
 def main() -> None:
     """Run simulation and perform measurement analysis."""
-    print("Running scalar-vector + tanh domain wall simulation (2+1D)...")
+    print("Running scalar-vector + localized tanh background simulation (2+1D)...")
     data, params, data_dir = _run_simulation()
     print(f"  Data saved to: {data_dir}")
     print(f"  {data.n_snapshots} snapshots over t=[0, {float(data.times[-1]):.1f}]")
@@ -608,9 +615,9 @@ def main() -> None:
     print("Computing coupling field B_2(x,y)...")
     coupling_field = _compute_coupling_field(data)
 
-    print("Computing conversion probability (phi -> A_2)...")
-    result = compute_conversion_probability(
-        data, source_field="phi_0", target_field="A_2"
+    print("Computing group conversion probability (phi -> A)...")
+    result = compute_group_conversion(
+        data, source_fields=["phi_0"], target_fields=["A_1", "A_2"]
     )
 
     # Check that A_1 stays at zero (B_1=0, uncoupled)

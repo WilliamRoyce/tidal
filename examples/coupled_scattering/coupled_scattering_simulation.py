@@ -77,7 +77,7 @@ PARAMS: dict[str, float] = {
 
 # Grid (2D, periodic)
 DOMAIN = (-50.0, 50.0)
-N_CELLS = 96
+N_CELLS = 64
 
 # Time integration
 T_END = 20.0
@@ -202,7 +202,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     initial_state = _create_initial_state(grid)
 
     output_data_dir = (
-        Path(__file__).parent.parent / "data" / "coupled_scattering_output"
+        Path(__file__).parent.parent.parent / "outputs" / "coupled_scattering"
     )
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,
@@ -332,8 +332,8 @@ def _plot_results(
     # [1,0] Mixing spectrum
     _plot_mixing_spectrum(axes[1, 0], spectrum)
 
-    # [1,1] |chi| at final time + coupling contours
-    _plot_chi_heatmap(axes[1, 1], data, coupling_field)
+    # [1,1] |chi| at peak conversion time + coupling contours
+    _plot_chi_heatmap(axes[1, 1], data, coupling_field, snapshot_idx=peak_idx)
 
     # [1,2] Summary text
     _plot_summary_text(axes[1, 2], result, energy, diag, mixing, params, peak_idx)
@@ -450,9 +450,10 @@ def _plot_chi_heatmap(
     ax: Axes,
     data: SimulationData,
     coupling_field: NDArray[np.float64],
+    snapshot_idx: int = -1,
 ) -> None:
-    """Plot |chi| at final time with coupling G(x,y) contours."""
-    final_chi = data.fields["chi_0"][-1]
+    """Plot |chi| at given snapshot with coupling G(x,y) contours."""
+    final_chi = data.fields["chi_0"][snapshot_idx]
     bounds = data.grid_bounds
     extent = (bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1])
     im = ax.imshow(
@@ -479,8 +480,8 @@ def _plot_chi_heatmap(
     )
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    t_final = float(data.times[-1])
-    ax.set_title(rf"$|\chi|$ at $t={t_final:.0f}$ + coupling $G$ contours")
+    t_snap = float(data.times[snapshot_idx])
+    ax.set_title(rf"$|\chi|$ at $t={t_snap:.0f}$ (peak) + coupling $G$ contours")
     plt.colorbar(im, ax=ax)
 
 

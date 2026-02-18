@@ -62,13 +62,13 @@ PARAMS: dict[str, float] = {"phim2": 1.0, "Am2": 0.5, "kCS": 0.3, "gSV": 0.2}
 
 # Grid
 GRID_BOUNDS = [(0, 50), (0, 50)]
-GRID_SHAPE = [96, 96]
+GRID_SHAPE = [64, 64]
 GRID_PERIODIC = True
 
 # Time integration
-T_END = 200.0
+T_END = 100.0
 DT = 0.01
-TRACKER_INTERVAL = 0.2
+TRACKER_INTERVAL = 1.0
 
 # Initial conditions
 PULSE_CENTER_X = 25.0
@@ -93,8 +93,7 @@ def _run_simulation() -> tuple[SimulationData, Path]:
     x = cast("np.ndarray", grid.cell_coords[..., 0])
     y = cast("np.ndarray", grid.cell_coords[..., 1])
     gaussian = np.exp(
-        -((x - PULSE_CENTER_X) ** 2 + (y - PULSE_CENTER_Y) ** 2)
-        / (2 * PULSE_WIDTH**2)
+        -((x - PULSE_CENTER_X) ** 2 + (y - PULSE_CENTER_Y) ** 2) / (2 * PULSE_WIDTH**2)
     )
 
     state = FieldCollection(
@@ -110,7 +109,7 @@ def _run_simulation() -> tuple[SimulationData, Path]:
     )
 
     output_data_dir = (
-        Path(__file__).parent.parent / "data" / "scalar_vector_coupling_output"
+        Path(__file__).parent.parent.parent / "outputs" / "scalar_vector_coupling"
     )
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,

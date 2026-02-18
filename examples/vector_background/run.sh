@@ -2,8 +2,8 @@
 # Vector Background Domain Wall — Full derive → inspect → simulate → measure
 #
 # Physics: Scalar phi + vector A coupled via an external vector field B_a(x,y)
-# where B = (0, 0, B0*tanh(x/W)*exp(-y^2/(2R^2))).  The coupling creates a
-# "domain wall" that changes sign across x=0.
+# where B = (0, 0, B0*tanh(x/W)*exp(-(x^2+y^2)/(2R^2))).  The coupling is a
+# localized tanh: antisymmetric across x=0, decaying to ~0 at periodic edges.
 #
 # This is the first test of the vector background ComponentValue mechanism.
 # The generated WLS includes ValidateNoUnresolvedBackgrounds to catch any

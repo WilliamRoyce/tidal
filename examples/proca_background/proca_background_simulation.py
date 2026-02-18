@@ -208,7 +208,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     grid = CartesianGrid([DOMAIN, DOMAIN], N_CELLS, periodic=True)
     initial_state = _create_initial_state(grid)
 
-    output_data_dir = Path(__file__).parent.parent / "data" / "proca_background_output"
+    output_data_dir = Path(__file__).parent.parent.parent / "outputs" / "proca_background"
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,
         spec=spec,
@@ -303,6 +303,8 @@ def _plot_results(
         fontsize=13,
     )
 
+    peak_idx = int(np.argmax(result.probability))
+
     # [0,0] Total P(t) + mixing length annotation
     _plot_conversion(axes[0, 0], result, mixing)
 
@@ -318,8 +320,8 @@ def _plot_results(
     # [1,0] Coupling G(x,y) heatmap
     _plot_coupling_field(axes[1, 0], fig, data, coupling_field)
 
-    # [1,1] |B_1| at final time
-    _plot_field_heatmap(axes[1, 1], data, "B_1", coupling_field)
+    # [1,1] |B_1| at peak conversion time
+    _plot_field_heatmap(axes[1, 1], data, "B_1", coupling_field, snapshot_idx=peak_idx)
 
     # [1,2] Summary text
     _plot_summary_text(axes[1, 2], result, diag, mixing, params)
@@ -469,9 +471,10 @@ def _plot_field_heatmap(
     data: SimulationData,
     field_name: str,
     coupling_field: NDArray[np.float64],
+    snapshot_idx: int = -1,
 ) -> None:
-    """Plot |field| at final time with coupling G(x,y) contours."""
-    final = data.fields[field_name][-1]
+    """Plot |field| at given snapshot with coupling G(x,y) contours."""
+    final = data.fields[field_name][snapshot_idx]
     bounds = data.grid_bounds
     extent = (bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1])
     im = ax.imshow(
@@ -498,8 +501,8 @@ def _plot_field_heatmap(
     )
     ax.set_xlabel("x")
     ax.set_ylabel("y")
-    t_final = float(data.times[-1])
-    ax.set_title(rf"$|{field_name}|$ at $t={t_final:.0f}$ + coupling contours")
+    t_snap = float(data.times[snapshot_idx])
+    ax.set_title(rf"$|{field_name}|$ at $t={t_snap:.0f}$ (peak) + coupling contours")
     plt.colorbar(im, ax=ax)
 
 
