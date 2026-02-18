@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Electromagnetic 1+1D example
-# See also: em_from_lagrangian.py (Python simulation)
+# Electromagnetic 1+1D — Full derive → inspect → simulate → plot pipeline
 #
 # To run manually:  cd examples/electromagnetic && tidal derive theory.toml
 
@@ -23,4 +22,10 @@ tidal simulate ../data/em_1d.json \
   --ic-component A_1 \
   --ic-width 5.0 \
   --t-end 25.0 \
-  --scheme scipy
+  --scheme scipy \
+  --output ../data/em_output
+
+# Visualize results
+tidal plot ../data/em_output --type heatmap --field A_1 --output ../data/em_heatmap.png --quiet
+tidal plot ../data/em_output --type amplitude --output ../data/em_amplitude.png --quiet
+tidal plot ../data/em_output --type snapshot --time-index -1 --output ../data/em_final.png --quiet

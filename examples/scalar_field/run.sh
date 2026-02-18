@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Klein-Gordon 1+1D example
-# See also: kg_from_lagrangian.py (Python simulation)
+# Klein-Gordon 1+1D — Full derive → inspect → simulate → plot pipeline
 #
 # To run manually:  cd examples/scalar_field && tidal derive theory.toml
 
@@ -16,7 +15,7 @@ tidal derive theory.toml
 # Inspect the equation system
 tidal inspect ../data/klein_gordon_1d.json
 
-# Run simulation (Gaussian pulse, matches kg_from_lagrangian.py defaults)
+# Run simulation (Gaussian pulse, disk-backed output)
 tidal simulate ../data/klein_gordon_1d.json \
   --param m2=1.0 \
   --grid-shape 256 \
@@ -26,4 +25,12 @@ tidal simulate ../data/klein_gordon_1d.json \
   --ic-width 5.0 \
   --t-end 30.0 \
   --scheme scipy \
-  --snapshots 0.1
+  --snapshots 0.1 \
+  --output ../data/scalar_field_output
+
+# Visualize results
+tidal plot ../data/scalar_field_output --type heatmap --output ../data/scalar_field_heatmap.png --quiet
+tidal plot ../data/scalar_field_output --type amplitude --output ../data/scalar_field_amplitude.png --quiet
+tidal plot ../data/scalar_field_output --type snapshot --time-index 0 --output ../data/scalar_field_t0.png --quiet
+tidal plot ../data/scalar_field_output --type snapshot --time-index -1 --output ../data/scalar_field_final.png --quiet
+tidal plot ../data/scalar_field_output --type profile --output ../data/scalar_field_profile.png --quiet

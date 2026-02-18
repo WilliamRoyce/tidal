@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Proca (massive vector) 1+1D example
-# See also: proca_simulation.py (Python simulation)
+# Proca (massive vector) 1+1D — Full derive → inspect → simulate → plot pipeline
 #
 # To run manually:  cd examples/proca && tidal derive theory.toml
 
@@ -23,4 +22,11 @@ tidal simulate ../data/proca_1d.json \
   --ic-component A_1 \
   --ic-width 5.0 \
   --t-end 30.0 \
-  --scheme scipy
+  --scheme scipy \
+  --output ../data/proca_output
+
+# Visualize results
+tidal plot ../data/proca_output --type heatmap --field A_1 --output ../data/proca_heatmap.png --quiet
+tidal plot ../data/proca_output --type amplitude --output ../data/proca_amplitude.png --quiet
+tidal plot ../data/proca_output --type energy --output ../data/proca_energy.png --quiet
+tidal plot ../data/proca_output --type profile --field A_1 --output ../data/proca_profile.png --quiet

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Gravitational Waves 3+1D example
+# Gravitational Waves 3+1D — Full derive → inspect → simulate pipeline
 #
 # This example uses xPert linearization of the Einstein equations.
 # The TOML config produces gauge-unfixed linearized Einstein equations (10 components).

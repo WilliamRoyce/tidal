@@ -36,3 +36,7 @@ tidal simulate ../data/proca_background.json \
 tidal measure ../data/proca_background_output \
   --what conversion \
   --source A_0,A_1,A_2 --target B_0,B_1,B_2
+
+# Step 5: Individual plots
+tidal plot ../data/proca_background_output --type amplitude --output ../data/pbg_amplitude.png --quiet
+tidal plot ../data/proca_background_output --type snapshot --time-index -1 --output ../data/pbg_final.png --quiet

@@ -37,3 +37,7 @@ tidal simulate ../data/vector_background.json \
 tidal measure ../data/vector_background_output \
   --what conversion \
   --source phi_0 --target A_0,A_1,A_2
+
+# Step 5: Individual plots
+tidal plot ../data/vector_background_output --type amplitude --output ../data/vbg_amplitude.png --quiet
+tidal plot ../data/vector_background_output --type snapshot --time-index -1 --output ../data/vbg_final.png --quiet

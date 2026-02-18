@@ -6,10 +6,6 @@
 # producing Rabi-like oscillations in the conversion probability P(t).
 # The mixing length L_mix = pi/omega_dom characterizes the oscillation period.
 #
-# See also:
-#   coupled_from_lagrangian.py   — Python simulation script
-#   measure_conversion.py        — detailed measurement analysis
-#
 # Running this script:
 #   cd examples/coupled_scalars && uv run bash run.sh
 #
@@ -94,3 +90,10 @@ tidal measure ../data/coupled_scalars_output \
   --what conversion,mixing,spectral_conversion,dispersion \
   --source phi_0 --target chi_0 \
   --output ../data/coupled_scalars_measurement.png
+
+# Step 8: Individual plots for quick feedback
+tidal plot ../data/coupled_scalars_output --type heatmap --field phi_0 --output ../data/cs_phi_heatmap.png --quiet
+tidal plot ../data/coupled_scalars_output --type heatmap --field chi_0 --output ../data/cs_chi_heatmap.png --quiet
+tidal plot ../data/coupled_scalars_output --type amplitude --output ../data/cs_amplitude.png --quiet
+tidal plot ../data/coupled_scalars_output --type energy --output ../data/cs_energy.png --quiet
+tidal plot ../data/coupled_scalars_output --type compare --output ../data/cs_compare.png --quiet

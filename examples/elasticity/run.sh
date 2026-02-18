@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Elasticity (Navier-Cauchy) 2+1D example
-# See also: elasticity_from_lagrangian.py (Python simulation)
+# Elasticity (Navier-Cauchy) 2+1D — Full derive → inspect → simulate → plot pipeline
 #
 # The elasticity Lagrangian uses component-derivative notation (CD[{idx, -chart}])
 # because the Lame parameters produce anisotropic spatial coefficients.
@@ -26,4 +25,10 @@ tidal simulate ../data/navier_cauchy_2d.json \
   --ic-component ux_0 \
   --ic-width 1.0 \
   --t-end 3.0 \
-  --scheme scipy
+  --scheme scipy \
+  --output ../data/elasticity_output
+
+# Visualize results — snapshots of each displacement component
+tidal plot ../data/elasticity_output --type snapshot --field ux_0 --time-index -1 --output ../data/elasticity_ux.png --quiet
+tidal plot ../data/elasticity_output --type snapshot --field uy_0 --time-index -1 --output ../data/elasticity_uy.png --quiet
+tidal plot ../data/elasticity_output --type amplitude --output ../data/elasticity_amplitude.png --quiet

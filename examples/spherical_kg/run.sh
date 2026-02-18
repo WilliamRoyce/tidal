@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Spherical Klein-Gordon 3+1D example
-# See also: spherical_kg_simulation.py (Python simulation)
+# Spherical Klein-Gordon 3+1D — Full derive → inspect → simulate pipeline
 #
 # NOTE: The derive step uses spherical coordinates (r, theta, phi) with a
 # coordinate-dependent metric and trigonometric coefficient functions.

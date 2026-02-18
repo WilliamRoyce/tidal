@@ -10,8 +10,6 @@
 # This demonstrates parametric mode conversion — directly analogous to the
 # Gertsenshtein effect (phi=photon, chi=graviton, G=background B-field).
 #
-# See also:
-#   coupled_scattering_simulation.py  — Python simulation with custom ICs + plots
 #
 # Running this script:
 #   cd examples/coupled_scattering && uv run bash run.sh
@@ -98,7 +96,11 @@ tidal measure ../data/coupled_scattering_output \
   --source phi_0 --target chi_0 \
   --output ../data/coupled_scattering_measurement.png
 
+# Step 8: Individual plots
+tidal plot ../data/coupled_scattering_output --type amplitude --output ../data/csc_amplitude.png --quiet
+tidal plot ../data/coupled_scattering_output --type snapshot --field chi_0 --time-index -1 --output ../data/csc_chi_final.png --quiet
+
 # NOTE: Energy diagnostics (virial) will raise ValueError for this example
 # because the coupling G(x,y) is position-dependent. The simulation and
 # conversion measurements work correctly — only virial energy is unsupported.
-echo "Pipeline complete. See coupled_scattering_simulation.py for custom IC + plots."
+echo "Pipeline complete."

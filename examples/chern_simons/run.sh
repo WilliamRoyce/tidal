@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Chern-Simons 2+1D example
-# See also: chern_simons_simulation.py (Python simulation)
+# Chern-Simons 2+1D — Full derive → inspect → simulate → plot pipeline
 #
 # To run manually:  cd examples/chern_simons && tidal derive theory.toml
 
@@ -24,4 +23,14 @@ tidal simulate ../data/chern_simons_3d.json \
   --ic-component A_1 \
   --ic-width 5.0 \
   --t-end 10.0 \
-  --scheme scipy
+  --scheme scipy \
+  --output ../data/chern_simons_output
+
+# Visualize results — initial and final snapshots for each field
+tidal plot ../data/chern_simons_output --type snapshot --field A_0 --time-index 0 --output ../data/cs_A0_t0.png --quiet
+tidal plot ../data/chern_simons_output --type snapshot --field A_1 --time-index 0 --output ../data/cs_A1_t0.png --quiet
+tidal plot ../data/chern_simons_output --type snapshot --field A_2 --time-index 0 --output ../data/cs_A2_t0.png --quiet
+tidal plot ../data/chern_simons_output --type snapshot --field A_0 --time-index -1 --output ../data/cs_A0_final.png --quiet
+tidal plot ../data/chern_simons_output --type snapshot --field A_1 --time-index -1 --output ../data/cs_A1_final.png --quiet
+tidal plot ../data/chern_simons_output --type snapshot --field A_2 --time-index -1 --output ../data/cs_A2_final.png --quiet
+tidal plot ../data/chern_simons_output --type amplitude --output ../data/cs_amplitude.png --quiet

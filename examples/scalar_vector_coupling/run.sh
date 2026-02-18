@@ -11,9 +11,6 @@
 #
 # A_0 is a constraint; phi_0, A_1, A_2 are dynamical.
 #
-# See also:
-#   measure_conversion.py        — detailed measurement analysis
-#
 # Running this script:
 #   cd examples/scalar_vector_coupling && uv run bash run.sh
 #
@@ -94,3 +91,9 @@ tidal measure ../data/scalar_vector_coupling_output \
   --what conversion,mixing,spectral_conversion,dispersion \
   --source phi_0 --target A_0,A_1,A_2 \
   --output ../data/scalar_vector_coupling_measurement.png
+
+# Step 8: Individual plots
+tidal plot ../data/scalar_vector_coupling_output --type snapshot --field phi_0 --time-index 0 --output ../data/sv_phi_t0.png --quiet
+tidal plot ../data/scalar_vector_coupling_output --type snapshot --field phi_0 --time-index -1 --output ../data/sv_phi_final.png --quiet
+tidal plot ../data/scalar_vector_coupling_output --type amplitude --output ../data/sv_amplitude.png --quiet
+tidal plot ../data/scalar_vector_coupling_output --type energy --output ../data/sv_energy.png --quiet

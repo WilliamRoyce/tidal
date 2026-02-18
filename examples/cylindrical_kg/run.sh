@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Cylindrical Klein-Gordon 3+1D example
-# See also: cylindrical_kg_simulation.py (Python simulation)
+# Cylindrical Klein-Gordon 3+1D — Full derive → inspect → simulate pipeline
 #
 # NOTE: The derive step uses cylindrical coordinates (r, theta, z) with a
 # coordinate-dependent metric.

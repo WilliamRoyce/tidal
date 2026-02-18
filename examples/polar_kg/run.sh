@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Polar Klein-Gordon 2+1D example
-# See also: polar_kg_simulation.py (Python simulation)
+# Polar Klein-Gordon 2+1D — Full derive → inspect → simulate → plot pipeline
 #
 # NOTE: The derive step uses polar coordinates (r, theta) with a coordinate-dependent
 # metric.
@@ -27,4 +26,10 @@ tidal simulate ../data/polar_kg.json \
   --ic formula \
   --ic-formula "np.exp(-(x - 3.0)**2 / 0.5)" \
   --t-end 8.0 \
-  --scheme scipy
+  --scheme scipy \
+  --output ../data/polar_kg_output
+
+# Visualize results
+tidal plot ../data/polar_kg_output --type snapshot --time-index 0 --output ../data/pk_initial.png --quiet
+tidal plot ../data/polar_kg_output --type snapshot --time-index -1 --output ../data/pk_final.png --quiet
+tidal plot ../data/polar_kg_output --type amplitude --output ../data/pk_amplitude.png --quiet

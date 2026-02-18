@@ -11,9 +11,6 @@
 #   - Two Helmholtz scales (mA2 vs mB2)
 #   - Cross-field identity coupling in constraints (gcoup)
 #
-# See also:
-#   measure_conversion.py      — detailed measurement analysis
-#
 # Running this script:
 #   cd examples/coupled_proca && uv run bash run.sh
 #
@@ -90,3 +87,7 @@ tidal measure ../data/coupled_proca_output \
   --what conversion,mixing,spectral_conversion,dispersion \
   --source A_0,A_1,A_2 --target B_0,B_1,B_2 \
   --output ../data/coupled_proca_measurement.png
+
+# Step 8: Individual plots
+tidal plot ../data/coupled_proca_output --type snapshot --time-index -1 --output ../data/cp_final.png --quiet
+tidal plot ../data/coupled_proca_output --type amplitude --output ../data/cp_amplitude.png --quiet
