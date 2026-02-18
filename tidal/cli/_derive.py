@@ -692,8 +692,8 @@ def _wls_scalar_background_substitution(
     ``DecomposeToComponents`` does **not** trigger ``ComponentValue``
     substitution.  We must substitute explicitly before decomposition.
 
-    Vector/tensor backgrounds are handled correctly by ``ToBasis``, so
-    this only targets ``type == "scalar"``.
+    Vector/tensor backgrounds need explicit substitution AFTER
+    decomposition — see ``_wls_vector_background_substitution``.
     """
     lines: list[str] = []
     for field in ctx.background_fields:
@@ -708,6 +708,67 @@ def _wls_scalar_background_substitution(
             f"(* Substitute scalar background {field['name']} -> {value} *)",
             f"{eom_var} = {eom_var} /. {{{prefixed}[] -> {value}}};",
         ))
+    return lines
+
+
+def _wls_vector_background_substitution(
+    ctx: _WlsContext, comp_var: str,
+) -> list[str]:
+    """Generate explicit ``ReplaceAll`` for vector/tensor background fields.
+
+    ``ToBasis`` inside ``DecomposeToComponents`` does NOT reliably resolve
+    ``ComponentValue`` definitions for vector/tensor backgrounds.  The
+    unresolved Mathematica tensor notation (e.g. ``vbdB[{2, -vbdCart}]``)
+    survives into the exported JSON coefficients, which Python cannot
+    evaluate.
+
+    This function generates explicit substitution rules AFTER
+    decomposition, covering both covariant (``{i, -chart}``) and
+    contravariant (``{i, chart}``) index orientations.
+    """
+    non_scalar_bgs = [
+        f for f in ctx.background_fields if f["type"] != "scalar"
+    ]
+    if not non_scalar_bgs:
+        return []
+
+    lines: list[str] = []
+    for field in non_scalar_bgs:
+        prefixed = f"{ctx.prefix}{field['name'].capitalize()}"
+        comps: list[int | float | str] = field.get("components", [])
+        if not comps:
+            continue
+
+        rules: list[str] = []
+        if field["type"] == "vector":
+            for idx, val in enumerate(comps):
+                rules.extend((
+                    f"{prefixed}[{{{idx}, -{ctx.chart}}}] -> {val}",
+                    f"{prefixed}[{{{idx}, {ctx.chart}}}] -> {val}",
+                ))
+        else:
+            # Tensor rank 2+: iterate over all index tuples
+            rank = field.get("rank", 2)
+            for flat_idx, val in enumerate(comps):
+                multi_idx: list[int] = []
+                remaining = flat_idx
+                for _ in range(rank):
+                    multi_idx.append(remaining % ctx.dim)
+                    remaining //= ctx.dim
+                multi_idx.reverse()
+                idx_down = ", ".join(f"{{{k}, -{ctx.chart}}}" for k in multi_idx)
+                idx_up = ", ".join(f"{{{k}, {ctx.chart}}}" for k in multi_idx)
+                rules.extend((
+                    f"{prefixed}[{idx_down}] -> {val}",
+                    f"{prefixed}[{idx_up}] -> {val}",
+                ))
+
+        rules_str = ", ".join(rules)
+        lines.extend([
+            f"(* Substitute vector/tensor background {field['name']} *)",
+            f"{comp_var} = {comp_var} /. {{{rules_str}}};",
+        ])
+
     return lines
 
 
@@ -873,7 +934,9 @@ def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
                 f'Print["{fname} components: ", Length[{comp_var}]];',
             )
         )
-        # Validate vector/tensor backgrounds resolved after ToBasis
+        # Substitute vector/tensor backgrounds explicitly (ToBasis unreliable)
+        lines.extend(_wls_vector_background_substitution(ctx, comp_var))
+        # Validate all backgrounds resolved
         lines.extend(_wls_validate_backgrounds_after_decompose(ctx, comp_var))
         lines.append("")
 
@@ -912,6 +975,7 @@ def _wls_euler_lagrange_single(ctx: _WlsContext) -> list[str]:
         f'componentEqs = DecomposeToComponents[eom, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
         'Print["Components: ", Length[componentEqs]];',
     ])
+    lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
     lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
     lines.extend([
         "",
@@ -990,6 +1054,7 @@ def _wls_linearization(
         f'componentEqs = DecomposeToComponents[linExprPlain, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
         'Print["Components: ", Length[componentEqs]];',
     ])
+    lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
     lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
     lines.extend([
         "",

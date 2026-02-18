@@ -113,19 +113,16 @@ def _first_derivative(
     *,
     is_periodic: bool,
 ) -> NDArray[np.float64]:
-    """Single-axis first derivative.
+    """Single-axis first derivative via central differences.
 
-    Uses FFT for periodic axes, central differences with Dirichlet
-    ghost cells for non-periodic axes.
+    Uses ``np.roll`` for periodic wrapping, Dirichlet ghost cells for
+    non-periodic axes.  Both paths use the same 2-point central stencil
+    ``(f[i+1] - f[i-1]) / (2 dx)``, matching py-pde's finite-difference
+    operators so the virial energy tracks the PDE solver's conserved
+    Hamiltonian exactly.
     """
     if is_periodic:
-        n = field.shape[axis]
-        freq = np.fft.fftfreq(n, d=dx) * (2.0 * np.pi)
-        shape = [1] * field.ndim
-        shape[axis] = n
-        ik = 1j * freq.reshape(shape)
-        fhat = np.fft.fft(field, axis=axis)
-        return np.real(np.fft.ifft(ik * fhat, axis=axis))
+        return (np.roll(field, -1, axis=axis) - np.roll(field, 1, axis=axis)) / (2.0 * dx)
 
     # Central difference with Dirichlet ghost cells: (f[i+1] - f[i-1]) / (2dx)
     padded = _pad_dirichlet(field, axis)
@@ -143,19 +140,19 @@ def _second_derivative(
     *,
     is_periodic: bool,
 ) -> NDArray[np.float64]:
-    """Single-axis second derivative.
+    """Single-axis second derivative via 3-point central stencil.
 
-    Uses ``-k²`` in FFT for periodic axes, central differences with
-    Dirichlet ghost cells for non-periodic axes.
+    Uses ``np.roll`` for periodic wrapping, Dirichlet ghost cells for
+    non-periodic axes.  Both paths use ``(f[i+1] - 2f[i] + f[i-1]) / dx²``,
+    matching py-pde's finite-difference operators so the virial energy
+    tracks the PDE solver's conserved Hamiltonian exactly.
     """
     if is_periodic:
-        n = field.shape[axis]
-        freq = np.fft.fftfreq(n, d=dx) * (2.0 * np.pi)
-        shape = [1] * field.ndim
-        shape[axis] = n
-        neg_k2 = -(freq**2).reshape(shape)
-        fhat = np.fft.fft(field, axis=axis)
-        return np.real(np.fft.ifft(neg_k2 * fhat, axis=axis))
+        return (
+            np.roll(field, -1, axis=axis)
+            - 2.0 * field
+            + np.roll(field, 1, axis=axis)
+        ) / (dx * dx)
 
     # Standard 3-point stencil with Dirichlet ghost cells:
     # (f[i+1] - 2f[i] + f[i-1]) / dx²
@@ -216,7 +213,16 @@ def _gradient_energy_density(
     periodic: tuple[bool, ...],
     axes: list[int] | None = None,
 ) -> NDArray[np.float64]:
-    """Compute ``|∇φ|²`` on the grid.
+    """Gradient energy density consistent with the virial potential formula.
+
+    For **periodic** axes, uses the Laplacian-based identity
+    ``-φ · ∂²φ/∂x²`` so that ``0.5 * Σ * dV`` exactly matches the
+    virial potential's self-laplacian contribution (discrete integration
+    by parts is exact for periodic wrapping).
+
+    For **non-periodic** axes, uses ``(∂φ/∂x)²`` (central-difference
+    gradient squared), because the discrete IBP has nonzero boundary
+    terms that would make the Laplacian form inconsistent.
 
     Parameters
     ----------
@@ -224,12 +230,18 @@ def _gradient_energy_density(
         If ``None``, sum over all spatial axes (isotropic gradient).
         Otherwise, sum only over the specified axis indices.
     """
-    grad_sq: NDArray[np.float64] = np.zeros_like(field)
+    result: NDArray[np.float64] = np.zeros_like(field)
     iter_axes = range(len(grid_spacing)) if axes is None else axes
     for axis in iter_axes:
-        grad_axis = _first_derivative(field, axis, grid_spacing[axis], is_periodic=periodic[axis])
-        grad_sq += grad_axis**2
-    return grad_sq
+        dx = grid_spacing[axis]
+        if periodic[axis]:
+            # Virial-consistent: -φ · ∂²φ/∂x² (exact discrete IBP)
+            result -= field * _second_derivative(field, axis, dx, is_periodic=True)
+        else:
+            # Gradient squared: (∂φ/∂x)² (correct for non-periodic BCs)
+            grad = _first_derivative(field, axis, dx, is_periodic=False)
+            result += grad**2
+    return result
 
 
 # ------------------------------------------------------------------
