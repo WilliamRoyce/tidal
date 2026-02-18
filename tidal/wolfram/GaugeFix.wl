@@ -43,6 +43,13 @@ term -(1/(2*xi))*(metric^{ab} covd_a field_b)^2 for a vector field. \
 With xi=1 (Feynman gauge), this reduces Maxwell equations to uncoupled \
 wave equations.  Example: BuildLorenzGaugeTerm[A, eta, CD, 1]";
 
+BuildDeDonderGaugeTerm::usage =
+  "BuildDeDonderGaugeTerm[field, metric, covd, xi] returns the de Donder \
+gauge-fixing term -(1/(2*xi))*metric^{be}*(D_b)(D_e) where \
+D_b = metric^{ac} covd_a field_{cb} - (1/2) covd_b (metric^{cd} field_{cd}). \
+For linearised gravity with xi=1, this reduces Einstein equations to \
+uncoupled wave equations.  Example: BuildDeDonderGaugeTerm[h, eta, CD, 1]";
+
 Begin["`Private`"];
 
 (* ================================================================ *)
@@ -68,6 +75,35 @@ BuildLorenzGaugeTerm[field_, metric_, covd_, xi_:1] := Module[
 
   (* Gauge-fixing term: -(1/2xi)(div A)^2 *)
   gaugeTerm = -(1/(2 xi)) divA^2;
+
+  gaugeTerm
+];
+
+(* ================================================================ *)
+(* === de Donder Gauge: -(1/2xi)(D_b)(D^b)                      === *)
+(* === D_b = nabla_a h^a{}_b - (1/2) nabla_b h                  === *)
+(* ================================================================ *)
+
+BuildDeDonderGaugeTerm[field_, metric_, covd_, xi_:1] := Module[
+  {traceH, d1, d2, gaugeTerm},
+
+  (* Validate xi > 0 *)
+  If[!NumericQ[xi] || xi <= 0,
+    Throw["BuildDeDonderGaugeTerm: xi must be a positive number, got " <> ToString[xi]]
+  ];
+
+  (* Trace: h = g^{cd} h_{cd} *)
+  traceH = metric[c, d] field[-c, -d];
+
+  (* De Donder vector D_b = g^{ac} nabla_a h_{cb} - (1/2) nabla_b h *)
+  (* First copy with free index -b, dummy indices a, c *)
+  d1 = metric[a, c] covd[-a][field[-c, -b]] - (1/2) covd[-b][traceH];
+
+  (* Second copy with free index -e, fresh dummy indices f, g *)
+  d2 = metric[f, g] covd[-f][field[-g, -e]] - (1/2) covd[-e][traceH];
+
+  (* Square: -(1/2xi) g^{be} D_b D_e — contract the two free indices *)
+  gaugeTerm = -(1/(2 xi)) metric[b, e] d1 d2;
 
   gaugeTerm
 ];

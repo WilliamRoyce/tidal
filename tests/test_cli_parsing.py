@@ -439,12 +439,14 @@ class TestGaugeToml:
         assert "GaugeFix.wl" in wls
 
     def test_lorenz_xi_parameter(self) -> None:
-        """Parameter xi=2.0 appears in WLS output."""
+        """Parameter xi=2.0 appears as fourth argument to BuildLorenzGaugeTerm."""
+        import re
+
         wls = self._generate(
             {"gauge": [{"field": "A", "type": "lorenz", "xi": 2.0}]}
         )
-        # xi=2.0 should appear as the fourth argument
-        assert "2.0" in wls or "2" in wls
+        # xi=2.0 should appear as the fourth argument to the builder call
+        assert re.search(r"BuildLorenzGaugeTerm\[.*,\s*2(\.0)?\s*\]", wls)
 
     def test_custom_expression_in_wls(self) -> None:
         """Custom gauge expression → GaugeTerm + AddGaugeFixingTerm in WLS."""
@@ -453,7 +455,7 @@ class TestGaugeToml:
                 "field": "A",
                 "type": "custom",
                 "mechanism": "lagrangian_term",
-                "expression": "-(1/2) * eta[a,b] CD[-a][A[-c]] eta[c,d] CD[-b][A[-d]]",
+                "expression": "-(1/2) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]",
             }]
         })
         assert "GaugeTerm" in wls
@@ -469,3 +471,227 @@ class TestGaugeToml:
         """Lorenz gauge → metadata string 'lorenz(A)'."""
         wls = self._generate({"gauge": [{"field": "A", "type": "lorenz"}]})
         assert '"gauge" -> "lorenz(A)"' in wls
+
+    def test_gauge_canonicalization_in_wls(self) -> None:
+        """Lorenz gauge → ToCanonical + ContractMetric after AddGaugeFixingTerm."""
+        wls = self._generate({"gauge": [{"field": "A", "type": "lorenz"}]})
+        add_idx = wls.index("AddGaugeFixingTerm")
+        canon_idx = wls.index("ToCanonical", add_idx)
+        contract_idx = wls.index("ContractMetric", canon_idx)
+        assert add_idx < canon_idx < contract_idx
+
+    def test_temporal_substitution_in_wls(self) -> None:
+        """Temporal gauge → fieldEquations /. {comp :> 0} in WLS output."""
+        wls = self._generate({"gauge": [{"field": "A", "type": "temporal"}]})
+        assert "fieldEquations /." in wls or "fieldEquations/." in wls
+        assert ":> 0" in wls
+        # GaugeFix.wl should NOT be loaded for Type B constraints
+        assert "GaugeFix.wl" not in wls
+
+    def test_coulomb_constraint_in_wls(self) -> None:
+        """Coulomb gauge → AppendTo[fieldEquations, ...] with Derivative terms."""
+        wls = self._generate({"gauge": [{"field": "A", "type": "coulomb"}]})
+        assert "AppendTo[fieldEquations" in wls
+        assert "Derivative" in wls
+        assert "coulomb" in wls.lower()
+        # GaugeFix.wl should NOT be loaded for Type B constraints
+        assert "GaugeFix.wl" not in wls
+
+    def test_axial_substitution_in_wls(self) -> None:
+        """Axial gauge → fieldEquations /. {last-spatial-comp :> 0} in WLS output."""
+        wls = self._generate({"gauge": [{"field": "A", "type": "axial"}]})
+        assert "fieldEquations /." in wls or "fieldEquations/." in wls
+        assert ":> 0" in wls
+
+    def test_de_donder_in_wls(self) -> None:
+        """De Donder gauge on tensor → BuildDeDonderGaugeTerm in WLS output."""
+        wls = self._generate({
+            "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}],
+            "derived_fields": [],
+            "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
+            "gauge": [{"field": "h", "type": "de_donder"}],
+        })
+        assert "BuildDeDonderGaugeTerm" in wls
+        assert "GaugeFix.wl" in wls
+        assert "ToCanonical" in wls
+
+    def test_mixed_type_a_and_b_in_wls(self) -> None:
+        """Mixed Type A + Type B: loads GaugeFix.wl for Type A, has substitution for Type B."""
+        wls = self._generate({
+            "fields": [
+                {"name": "A", "type": "vector"},
+                {"name": "B", "type": "vector"},
+            ],
+            "derived_fields": [],
+            "lagrangian": {
+                "expression": (
+                    "-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] "
+                    "- 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-c][B[-d]]"
+                )
+            },
+            "gauge": [
+                {"field": "A", "type": "lorenz"},
+                {"field": "B", "type": "temporal"},
+            ],
+        })
+        assert "BuildLorenzGaugeTerm" in wls
+        assert "GaugeFix.wl" in wls
+        assert ":> 0" in wls
+
+
+# ==================== Adaptive solver argument validation ====================
+
+
+class TestValidateSolverParamsAdaptive:
+    """Tests for adaptive-solver flag validation in _validate_solver_params."""
+
+    @staticmethod
+    def _make_args(**overrides: object) -> Namespace:
+        defaults: dict[str, object] = {
+            "t_end": 10.0,
+            "dt": None,
+            "snapshots": None,
+            "scheme": "runge-kutta",
+            "adaptive": False,
+            "method": None,
+            "rtol": None,
+            "atol": None,
+            "tolerance": None,
+            "max_step": None,
+            "energy_monitor": None,
+        }
+        defaults.update(overrides)
+        return Namespace(**defaults)
+
+    def test_method_requires_scipy(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        with pytest.raises(ValueError, match="--method requires --scheme scipy"):
+            _validate_solver_params(self._make_args(method="DOP853"))
+
+    def test_rtol_requires_scipy(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        with pytest.raises(ValueError, match="--rtol requires --scheme scipy"):
+            _validate_solver_params(self._make_args(rtol=1e-8))
+
+    def test_atol_requires_scipy(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        with pytest.raises(ValueError, match="--atol requires --scheme scipy"):
+            _validate_solver_params(self._make_args(atol=1e-10))
+
+    def test_tolerance_requires_adaptive_rk(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        with pytest.raises(ValueError, match="--tolerance requires"):
+            _validate_solver_params(self._make_args(tolerance=1e-4))
+
+    def test_tolerance_with_scipy_rejected(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        with pytest.raises(ValueError, match="--tolerance requires"):
+            _validate_solver_params(
+                self._make_args(scheme="scipy", tolerance=1e-4, adaptive=True)
+            )
+
+    def test_negative_rtol_rejected(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        with pytest.raises(ValueError, match="--rtol must be positive"):
+            _validate_solver_params(self._make_args(scheme="scipy", rtol=-1.0))
+
+    def test_negative_atol_rejected(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        with pytest.raises(ValueError, match="--atol must be positive"):
+            _validate_solver_params(self._make_args(scheme="scipy", atol=-1e-10))
+
+    def test_negative_tolerance_rejected(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        with pytest.raises(ValueError, match="--tolerance must be positive"):
+            _validate_solver_params(
+                self._make_args(adaptive=True, tolerance=-1e-4)
+            )
+
+    def test_negative_max_step_rejected(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        with pytest.raises(ValueError, match="--max-step must be positive"):
+            _validate_solver_params(self._make_args(max_step=-1.0))
+
+    def test_negative_energy_monitor_rejected(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        with pytest.raises(ValueError, match="--energy-monitor must be positive"):
+            _validate_solver_params(self._make_args(energy_monitor=-0.01))
+
+    def test_valid_scipy_args(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        _validate_solver_params(
+            self._make_args(scheme="scipy", method="DOP853", rtol=1e-8, atol=1e-10)
+        )
+
+    def test_valid_adaptive_rk_args(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        _validate_solver_params(
+            self._make_args(adaptive=True, tolerance=1e-5)
+        )
+
+    def test_valid_max_step_any_scheme(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        _validate_solver_params(self._make_args(max_step=0.1))
+
+    def test_valid_energy_monitor(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        _validate_solver_params(self._make_args(energy_monitor=0.01))
+
+
+class TestFormatSolverLog:
+    """Tests for _format_solver_log."""
+
+    @staticmethod
+    def _make_args(**overrides: object) -> Namespace:
+        defaults: dict[str, object] = {
+            "t_end": 10.0,
+            "scheme": "runge-kutta",
+            "adaptive": False,
+            "method": None,
+            "rtol": None,
+            "atol": None,
+            "tolerance": None,
+        }
+        defaults.update(overrides)
+        return Namespace(**defaults)
+
+    def test_fixed_step_format(self) -> None:
+        from tidal.cli._simulate import _format_solver_log
+
+        msg = _format_solver_log(self._make_args(), 0.01, None)
+        assert "dt=0.0100" in msg
+        assert "runge-kutta" in msg
+
+    def test_scipy_format(self) -> None:
+        from tidal.cli._simulate import _format_solver_log
+
+        msg = _format_solver_log(
+            self._make_args(scheme="scipy", rtol=1e-8), 0.01, 0.05
+        )
+        assert "DOP853" in msg
+        assert "rtol=1e-08" in msg
+        assert "max_step=0.0500" in msg
+        assert "first_step" in msg
+
+    def test_adaptive_rk_format(self) -> None:
+        from tidal.cli._simulate import _format_solver_log
+
+        msg = _format_solver_log(
+            self._make_args(adaptive=True, tolerance=1e-5), 0.01, None
+        )
+        assert "adaptive RK" in msg
+        assert "tolerance=1e-05" in msg

@@ -35,7 +35,7 @@ See `docs/background_fields.md` for the full architecture documentation.
 ## Phase B: Optional Gauge Fixing Toolkit
 
 **Priority: MEDIUM — useful convenience for simplifying vector/tensor equations, not required**
-**Status:** Planned
+**Status:** Complete
 
 ### What and Why
 
@@ -68,7 +68,7 @@ xi = 1.0              # optional gauge parameter (default 1.0 = Feynman gauge)
 field = "A"
 type = "custom"
 mechanism = "lagrangian_term"
-expression = "-(1/(2*xi)) * eta[a,b] CD[-a][A[-c]] eta[c,d] CD[-b][A[-d]]"
+expression = "-(1/(2*xi)) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]"
 
 # Custom constraint
 [[gauge]]
@@ -368,7 +368,7 @@ Dedalus (Burns et al. 2020) provides a native eigenvalue problem (EVP) capabilit
 ```
 Phase A (Background Fields)      ─── COMPLETE
 Phase D (Gertsenshtein Example)  ─── Requires A; B optional for cleaner equations
-Phase B (Gauge Fixing, optional) ─── Independent, useful for D
+Phase B (Gauge Fixing, optional) ─── COMPLETE
 Phase C (Sweep & Convergence)    ─── Independent, high priority
 Phase F (Adaptive Time-Stepping) ─── Independent, quick win
 Phase G (Absorbing Boundaries)   ─── Independent, uses Phase A infrastructure
@@ -377,12 +377,11 @@ Phase I (Eigenvalue/Dispersion)  ─── Independent, analysis capability
 Phase E (Spectral Methods)       ─── Independent, large scope
 ```
 
-**Critical path to Gertsenshtein:** A (done) → D (~3–5 days; B optional for cleaner equations)
+**Critical path to Gertsenshtein:** A (done), B (done) → D (~3–5 days)
 
 **Recommended order for maximum impact:**
-1. **D** (Gertsenshtein Example) — the project's raison d'être, unblocked by A
+1. **D** (Gertsenshtein Example) — the project's raison d'être, unblocked by A+B
 2. **C** (Sweep & Convergence) — required for publication-quality validation of D
-3. **B** (Gauge Fixing, optional) — convenience toolkit for simplifying equations
 4. **G** (Absorbing Boundaries) — extends D to realistic finite-magnet geometries
 5. **F** (Adaptive Time-Stepping) — quick win for production runs
 6. **I** (Eigenvalue/Dispersion) — analysis tool for parameter exploration

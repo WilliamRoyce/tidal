@@ -33,7 +33,7 @@ Quiet[
 Print["Setting up test manifold GFTestM2 (2D Minkowski)..."];
 Print[""];
 
-DefManifold[GFTestM2, 2, {a, b, c, d}];
+DefManifold[GFTestM2, 2, {a, b, c, d, e, f, g, h, i}];
 DefMetric[-1, gfTestEta[-a, -b], gfTestCD, SymbolOfCovD -> {";", "D"}, PrintAs -> "eta"];
 DefTensor[gfTestA[-a], GFTestM2];
 
@@ -124,6 +124,64 @@ TestTrue["Gauge-fixed Lagrangian differs from original",
 
 TestTrue["Gauge-fixed Lagrangian contains original L",
   !FreeQ[fixedLagrangian, L]
+];
+
+(* ================================================================ *)
+(* === Test Group 4: BuildDeDonderGaugeTerm                       === *)
+(* ================================================================ *)
+
+Print[""];
+Print["Test Group 4: BuildDeDonderGaugeTerm"];
+
+(* Setup: Need a symmetric rank-2 tensor for de Donder gauge *)
+Quiet[
+  DefTensor[gfTestH[-a, -b], GFTestM2, Symmetric[{-a, -b}]],
+  {DefTensor::ntensoraliases}
+];
+
+(* Test 4.1: Result is non-zero *)
+deDonderTerm = BuildDeDonderGaugeTerm[gfTestH, gfTestEta, gfTestCD, 1];
+TestTrue["De Donder gauge term is non-zero",
+  deDonderTerm =!= 0
+];
+
+(* Test 4.2: Result contains the field *)
+TestTrue["De Donder gauge term contains field h",
+  !FreeQ[deDonderTerm, gfTestH]
+];
+
+(* Test 4.3: Result contains the covariant derivative *)
+TestTrue["De Donder gauge term contains covariant derivative",
+  !FreeQ[deDonderTerm, gfTestCD]
+];
+
+(* Test 4.4: xi=1 is the default (both forms agree) *)
+deDonderDefault = BuildDeDonderGaugeTerm[gfTestH, gfTestEta, gfTestCD];
+TestCase["De Donder default xi=1 matches explicit xi=1",
+  deDonderDefault,
+  deDonderTerm
+];
+
+(* Test 4.5: Different xi values produce different terms *)
+deDonderTerm2 = BuildDeDonderGaugeTerm[gfTestH, gfTestEta, gfTestCD, 2];
+TestTrue["De Donder xi=2 differs from xi=1",
+  deDonderTerm =!= deDonderTerm2
+];
+
+(* Test 4.6: Invalid xi throws *)
+TestTrue["BuildDeDonderGaugeTerm throws for xi=0",
+  StringQ[Catch[BuildDeDonderGaugeTerm[gfTestH, gfTestEta, gfTestCD, 0]]]
+];
+
+TestTrue["BuildDeDonderGaugeTerm throws for xi=-1",
+  StringQ[Catch[BuildDeDonderGaugeTerm[gfTestH, gfTestEta, gfTestCD, -1]]]
+];
+
+(* Test 4.7: Integration — AddGaugeFixingTerm with de Donder *)
+dDGaugeTerm = BuildDeDonderGaugeTerm[gfTestH, gfTestEta, gfTestCD, 1];
+dDFixedLag = AddGaugeFixingTerm[L, dDGaugeTerm];
+TestTrue["De Donder gauge-fixed Lagrangian differs from original",
+  dDFixedLag =!= L
 ];
 
 (* === Print summary === *)

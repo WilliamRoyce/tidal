@@ -29,41 +29,45 @@ examples continue to work unchanged.
 
 ## Named Presets
 
-| Preset | Mechanism | Fields | Expression | Effect |
-|--------|-----------|--------|------------|--------|
-| `lorenz` | lagrangian_term | vector | `-(1/2xi)(d_mu A^mu)^2` | Maxwell -> uncoupled wave equations |
-| `de_donder` | lagrangian_term | sym. rank-2 | `-(1/2xi)(d_a h^a_b - 1/2 d_b h)^2` | Lin. Einstein -> uncoupled waves |
-| `temporal` | constraint | vector | `A_0 = 0` | Eliminates temporal component |
-| `coulomb` | constraint | vector | `div A = 0` | Transversality constraint |
-| `axial` | constraint | vector | `A_n = 0` | Eliminates one spatial component |
+### Type A — Lagrangian term (added to L before EL derivation)
 
-Presets are syntactic sugar over the expression-based mechanism described
-below. Each maps to a builder function in `GaugeFix.wl`.
+| Preset | Fields | Expression | Effect |
+|--------|--------|------------|--------|
+| `lorenz` | vector | `-(1/2xi)(d_mu A^mu)^2` | Maxwell -> uncoupled wave equations |
+| `de_donder` | sym. rank-2 | `-(1/2xi)(d_a h^a_b - 1/2 d_b h)^2` | Lin. Einstein -> uncoupled waves |
+
+### Type B — Constraint (applied after EOM derivation)
+
+| Preset | Fields | Constraint | Effect |
+|--------|--------|------------|--------|
+| `temporal` | vector | `A_0 = 0` | Zeroes temporal component in all equations |
+| `coulomb` | vector | `div A_spatial = 0` | Adds transversality constraint equation |
+| `axial` | vector | `A_n = 0` | Zeroes last spatial component in all equations |
+
+Type A presets use Wolfram builder functions in `GaugeFix.wl`.
+Type B presets operate at the component level after `DecomposeToComponents`,
+modifying or augmenting the equation system directly.
 
 ## Custom Gauge Terms
 
 For full flexibility, use `type = "custom"` with an arbitrary Wolfram
-expression:
+expression and `mechanism = "lagrangian_term"`:
 
 ```toml
-# Type A: add a term to the Lagrangian (before EL derivation)
 [[gauge]]
 field = "A"
 type = "custom"
 mechanism = "lagrangian_term"
-expression = "-(1/(2*xi)) * eta[a,b] CD[-a][A[-c]] eta[c,d] CD[-b][A[-d]]"
-
-# Type B: impose a constraint (after EOM derivation)
-[[gauge]]
-field = "A"
-type = "custom"
-mechanism = "constraint"
-expression = "eta[a,b] CD[-a][A[-b]]"   # set to zero
+expression = "-(1/(2*xi)) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]"
 ```
 
 The `expression` field uses the same syntax as `[lagrangian].expression` and
 `[[derived_fields]].definition` — field names, `eta`, `CD`, and chart
 placeholders are all substituted automatically.
+
+> **Note:** Custom constraint gauges (`mechanism = "constraint"`) are not yet
+> supported. Use a named preset (`temporal`, `coulomb`, `axial`) for
+> constraint-based gauge fixing.
 
 ### Worked Example: Lorenz Gauge Two Ways
 
@@ -81,7 +85,7 @@ xi = 1.0
 field = "A"
 type = "custom"
 mechanism = "lagrangian_term"
-expression = "-(1/2) * eta[a,b] CD[-a][A[-c]] eta[c,d] CD[-b][A[-d]]"
+expression = "-(1/2) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]"
 ```
 
 Both produce the same gauge-fixed Lagrangian. The preset is more readable;
@@ -93,12 +97,19 @@ non-standard gauge choices.
 **Type A — Lagrangian term** (`mechanism = "lagrangian_term"`):
 - An expression is added to L *before* Euler-Lagrange derivation
 - Changes the structure of the equations of motion
+- The gauge-fixed Lagrangian is canonicalized (`ToCanonical` + `ContractMetric`)
+  before EL derivation
 - Example: Lorenz gauge adds `-(1/2xi)(div A)^2`, turning Maxwell into wave equations
+- Presets: `lorenz`, `de_donder`
 
 **Type B — Constraint** (`mechanism = "constraint"`):
-- A constraint is imposed on the EOM *after* derivation
-- Eliminates degrees of freedom without modifying the Lagrangian
-- Example: temporal gauge sets `A_0 = 0`, eliminating the temporal component
+- Applied *after* EOM derivation and component decomposition
+- For `temporal` and `axial`: substitutes the constrained component (and all its
+  derivatives) with zero via `ReplaceAll` on the component equations
+- For `coulomb`: appends a spatial divergence constraint equation
+  (`div A_spatial = 0`) to the equation system as a `time_order=0` equation
+- The original EOM structure is preserved; constraints modify or augment it
+- Presets: `temporal`, `coulomb`, `axial`
 
 For named presets, the mechanism is inferred automatically (e.g., `lorenz`
 is always `lagrangian_term`, `temporal` is always `constraint`).
@@ -126,9 +137,11 @@ type = "lorenz"
 
 ## Adding New Presets (Developer Guide)
 
-Adding a new named gauge preset is a 3-step process:
+The process depends on the gauge mechanism.
 
-### Step 1: Write a builder function in `tidal/wolfram/GaugeFix.wl`
+### Type A (Lagrangian term) — 3 steps
+
+**Step 1:** Write a builder function in `tidal/wolfram/GaugeFix.wl`:
 
 ```mathematica
 BuildMyGaugeTerm[field_, metric_, covd_, xi_:1] := Module[
@@ -149,24 +162,35 @@ The function must return an *expression* (a Wolfram symbolic expression),
 not perform an action. The pipeline calls `AddGaugeFixingTerm[L, yourTerm]`
 to inject it into the Lagrangian.
 
-### Step 2: Add a registry entry in `tidal/cli/_derive.py`
-
-Add to the `_GAUGE_PRESETS` dict:
+**Step 2:** Add a registry entry in `tidal/cli/_derive.py`:
 
 ```python
 _GAUGE_PRESETS["my_gauge"] = {
-    "mechanism": "lagrangian_term",   # or "constraint"
+    "mechanism": "lagrangian_term",
     "builder": "BuildMyGaugeTerm",    # Wolfram function name
-    "requires": "vector",             # or "tensor", "scalar"
+    "requires": "vector",             # or "tensor"
 }
 ```
 
-### Step 3: (Optional) Add validation rules
+**Step 3:** (Optional) Add validation rules in `_validate_gauge()`.
 
-If your gauge has specific requirements beyond field type (e.g., requires
-a specific symmetry, extra parameters), add checks in `_validate_gauge()`.
+### Type B (Constraint) — 2 steps
 
-That's it. Users can now write `type = "my_gauge"` in their TOML.
+Type B presets operate at the component level in Python — no Wolfram builder
+function needed.
+
+**Step 1:** Add a registry entry (no `builder` key):
+
+```python
+_GAUGE_PRESETS["my_constraint"] = {
+    "mechanism": "constraint",
+    "requires": "vector",
+}
+```
+
+**Step 2:** Add a handler in `_wls_gauge_fixing_type_b()` in `_derive.py`.
+Use `_type_b_zero_component()` for substitution-type constraints or
+`_type_b_coulomb_constraint()` as a template for differential constraints.
 
 ## FAQ
 
@@ -184,6 +208,11 @@ quantities are all gauge-invariant physical observables.
 **Can I mix presets and custom gauges?**
 Yes. Each `[[gauge]]` entry is independent. You can use `type = "lorenz"`
 on one field and `type = "custom"` on another.
+
+**Can I mix Type A and Type B gauges?**
+Yes. For example, `lorenz` on field A (Type A) and `temporal` on field B
+(Type B) is valid. Type A modifies the Lagrangian before EL; Type B
+modifies the component equations after decomposition.
 
 **What happens if I gauge-fix a field that has no gauge symmetry?**
 For massive fields (Proca), the mass term already breaks gauge symmetry.

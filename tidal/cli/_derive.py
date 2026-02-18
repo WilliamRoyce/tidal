@@ -42,9 +42,10 @@ _MINKOWSKI_SIGNATURES: dict[int, list[int]] = {
 
 
 # Gauge-fixing preset registry.  Each entry maps a preset name to its
-# mechanism ("lagrangian_term" or "constraint"), the Wolfram builder
-# function in GaugeFix.wl, and the required field type.
-# Adding a new named gauge = one entry here + one function in GaugeFix.wl.
+# mechanism ("lagrangian_term" or "constraint"), and the required field type.
+# Type A (lagrangian_term) presets also have a "builder" key naming the
+# Wolfram function in GaugeFix.wl.  Type B (constraint) presets are
+# implemented at the component level in Python (_wls_gauge_fixing_type_b).
 _GAUGE_PRESETS: dict[str, dict[str, str]] = {
     "lorenz": {
         "mechanism": "lagrangian_term",
@@ -58,17 +59,14 @@ _GAUGE_PRESETS: dict[str, dict[str, str]] = {
     },
     "temporal": {
         "mechanism": "constraint",
-        "builder": "BuildTemporalGaugeConstraint",
         "requires": "vector",
     },
     "coulomb": {
         "mechanism": "constraint",
-        "builder": "BuildCoulombGaugeConstraint",
         "requires": "vector",
     },
     "axial": {
         "mechanism": "constraint",
-        "builder": "BuildAxialGaugeConstraint",
         "requires": "vector",
     },
 }
@@ -397,6 +395,12 @@ def _validate_gauge_entry_custom(i: int, entry: dict[str, Any]) -> None:
             f"'mechanism' = 'lagrangian_term' or 'constraint'"
         )
         raise ValueError(msg)
+    if mechanism == "constraint":
+        msg = (
+            f"[[gauge]] entry {i}: custom constraint gauges not yet supported; "
+            f"use a named preset (temporal, coulomb, axial) or mechanism='lagrangian_term'"
+        )
+        raise ValueError(msg)
     expr = entry.get("expression")
     if not expr or not isinstance(expr, str) or not expr.strip():
         msg = f"[[gauge]] entry {i}: custom gauge requires non-empty 'expression'"
@@ -507,6 +511,12 @@ def _validate_config(config: dict[str, Any]) -> None:
         raise ValueError(msg)
     if has_lagrangian and has_linearization:
         msg = "[lagrangian] and [linearization] are mutually exclusive"
+        raise ValueError(msg)
+    if has_linearization and config.get("gauge"):
+        msg = (
+            "[[gauge]] is not supported with [linearization] "
+            "(gauge fixing requires [lagrangian])"
+        )
         raise ValueError(msg)
 
     _validate_spacetime(config)
@@ -1104,10 +1114,84 @@ def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
         lines.extend((
             f"{ctx.prefix}Lagrangian = AddGaugeFixingTerm["
             f"{ctx.prefix}Lagrangian, {ctx.prefix}GaugeTerm];",
+            f"{ctx.prefix}Lagrangian = ToCanonical[{ctx.prefix}Lagrangian];",
+            f"{ctx.prefix}Lagrangian = ContractMetric[{ctx.prefix}Lagrangian, {ctx.metric}];",
             f'Print["Gauge-fixed Lagrangian '
             f'({entry["type"]} on {field_name}): ", {ctx.prefix}Lagrangian];',
             "",
         ))
+    return lines
+
+
+def _type_b_zero_component(comp_name: str, field_name: str, gauge_type: str) -> list[str]:
+    """Generate WLS to substitute a component and its derivatives with zero.
+
+    Used by temporal gauge (``A_0 = 0``) and axial gauge (``A_n = 0``).
+    Applied to the ``fieldEquations`` variable after component decomposition.
+    """
+    return [
+        f"(* {gauge_type.capitalize()} gauge: {field_name} component {comp_name} = 0 *)",
+        f"fieldEquations = fieldEquations /. {{{comp_name}[args___] :> 0, Derivative[ders__][{comp_name}][args___] :> 0}};",
+        f'Print["Applied {gauge_type} gauge: {comp_name} = 0"];',
+        "",
+    ]
+
+
+def _type_b_coulomb_constraint(
+    ctx: _WlsContext, field_name: str, comp_pfx: str,
+) -> list[str]:
+    """Generate WLS to add a Coulomb gauge constraint (spatial divergence = 0).
+
+    Appends an additional constraint equation ``div A_spatial = 0`` to
+    ``fieldEquations`` after component decomposition.
+    """
+    coords = _COORDS[ctx.dim]
+    coord_args = ", ".join(f"{c}[]" for c in coords)
+
+    # Build sum of spatial first derivatives: d_1 A_1 + d_2 A_2 + ...
+    deriv_terms: list[str] = []
+    for i in range(1, ctx.dim):
+        deriv_indices = ", ".join("1" if j == i else "0" for j in range(ctx.dim))
+        comp = f"{comp_pfx}{i}"
+        deriv_terms.append(f"Derivative[{deriv_indices}][{comp}][{coord_args}]")
+
+    constraint_expr = " + ".join(deriv_terms)
+    constraint_name = f"{field_name}_coulomb"
+
+    return [
+        f"(* Coulomb gauge: spatial divergence of {field_name} = 0 *)",
+        f'AppendTo[fieldEquations, {{"{constraint_name}", {constraint_expr}}}];',
+        f'Print["Added Coulomb constraint: div {field_name} = 0"];',
+        "",
+    ]
+
+
+def _wls_gauge_fixing_type_b(ctx: _WlsContext) -> list[str]:
+    """Generate Type B gauge-fixing code (constraints applied after decomposition).
+
+    Type B constraints modify ``fieldEquations`` after component decomposition:
+
+    - **temporal**: substitute ``A_0 → 0`` (and all derivatives) everywhere
+    - **axial**: substitute last spatial component → 0
+    - **coulomb**: append ``div A_spatial = 0`` constraint equation
+    """
+    lines: list[str] = ["(* Gauge fixing: post-decomposition constraints *)"]
+    for entry in ctx.gauge:
+        if _resolve_gauge_mechanism(entry) != "constraint":
+            continue
+        gauge_type: str = entry["type"]
+        field_name: str = entry["field"]
+        comp_pfx = f"{ctx.prefix}{field_name.capitalize()}"
+
+        if gauge_type == "temporal":
+            lines.extend(_type_b_zero_component(f"{comp_pfx}0", field_name, "temporal"))
+        elif gauge_type == "axial":
+            last_spatial = ctx.dim - 1
+            lines.extend(
+                _type_b_zero_component(f"{comp_pfx}{last_spatial}", field_name, "axial"),
+            )
+        elif gauge_type == "coulomb":
+            lines.extend(_type_b_coulomb_constraint(ctx, field_name, comp_pfx))
     return lines
 
 
@@ -1504,6 +1588,9 @@ def generate_wls(
     has_type_a = has_gauge and any(
         _resolve_gauge_mechanism(g) == "lagrangian_term" for g in ctx.gauge
     )
+    has_type_b = has_gauge and any(
+        _resolve_gauge_mechanism(g) == "constraint" for g in ctx.gauge
+    )
 
     lines: list[str] = []
     lines.extend(_wls_header(ctx))
@@ -1511,7 +1598,7 @@ def generate_wls(
         _wls_packages(
             ctx.pipeline_path,
             load_xpert=is_linearization,
-            load_gauge=has_gauge,
+            load_gauge=has_type_a,  # Only load GaugeFix.wl for Type A
         )
     )
     lines.extend(_wls_spacetime(config, ctx))
@@ -1529,6 +1616,9 @@ def generate_wls(
             lines.extend(_wls_euler_lagrange_multi(ctx))
         else:
             lines.extend(_wls_euler_lagrange_single(ctx))
+        # Type B gauge fixing: constraints applied after decomposition
+        if has_type_b:
+            lines.extend(_wls_gauge_fixing_type_b(ctx))
 
     lines.extend(_wls_metadata_and_export(config, ctx))
 
