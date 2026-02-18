@@ -16,7 +16,6 @@ B starts at zero -- any B that appears is purely from conversion.
 The measurement module quantifies this conversion using:
 
 - **Conversion probability** P(t) = E_B(t) / E_A(0) via group conversion
-- **Per-component conversion** A_1->B_1, A_2->B_2
 - **Mixing length** and **mixing spectrum** (temporal FFT of P(t))
 - **Energy conservation** via ``check_energy_conservation``
 - **Hamiltonian energy** decomposition via the generic virial formula
@@ -42,7 +41,6 @@ from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 from tidal.measurement import (
     SimulationData,
     check_energy_conservation,
-    compute_conversion_probability,
     compute_energy_timeseries,
     compute_group_conversion,
     compute_mixing_length,
@@ -239,8 +237,6 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
 
 def _print_summary(
     result: ConversionResult,
-    r_a1_b1: ConversionResult,
-    r_a1_b2: ConversionResult,
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
     params: dict[str, float],
@@ -269,11 +265,6 @@ def _print_summary(
     print(f"  Final  target energy E_B(T) = {result.target_energy[-1]:.4f}")
     print()
 
-    print("  Per-component peaks:")
-    print(f"    P(A_1 -> B_1) = {r_a1_b1.probability.max():.6f}")
-    print(f"    P(A_1 -> B_2) = {r_a1_b2.probability.max():.6f}")
-    print()
-
     if mixing is not None:
         print("  Mixing length:")
         print(f"    L_mix = {mixing.mixing_length:.4f}")
@@ -295,8 +286,6 @@ def _print_summary(
 def _plot_results(
     data: SimulationData,
     result: ConversionResult,
-    r_a1_b1: ConversionResult,
-    r_a1_b2: ConversionResult,
     hamiltonian: EnergyDecomposition,
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
@@ -317,26 +306,26 @@ def _plot_results(
     # [0,0] Total P(t) + mixing length annotation
     _plot_conversion(axes[0, 0], result, mixing)
 
-    # [0,1] Per-component P(t): A_1->B_1, A_2->B_2
-    _plot_per_component(axes[0, 1], result, r_a1_b1, r_a1_b2)
+    # [0,1] Energy conservation via check_energy_conservation
+    _plot_energy_conservation(axes[0, 1], diag)
 
-    # [0,2] Energy conservation via check_energy_conservation
-    _plot_energy_conservation(axes[0, 2], diag)
+    # [0,2] Mixing spectrum (temporal FFT of P(t))
+    _plot_mixing_spectrum(axes[0, 2], spectrum)
 
-    # [0,3] Mixing spectrum (temporal FFT of P(t))
-    _plot_mixing_spectrum(axes[0, 3], spectrum)
+    # [0,3] Energy decomposition (E_A, E_B, coupling, total)
+    _plot_hamiltonian(axes[0, 3], hamiltonian)
 
-    # [1,0] Energy decomposition (E_A, E_B, coupling, total)
-    _plot_hamiltonian(axes[1, 0], hamiltonian)
+    # [1,0] Coupling G(x,y) heatmap
+    _plot_coupling_field(axes[1, 0], fig, data, coupling_field)
 
-    # [1,1] Coupling G(x,y) heatmap
-    _plot_coupling_field(axes[1, 1], fig, data, coupling_field)
+    # [1,1] |B_1| at final time
+    _plot_field_heatmap(axes[1, 1], data, "B_1", coupling_field)
 
-    # [1,2] |B_1| at final time
-    _plot_field_heatmap(axes[1, 2], data, "B_1", coupling_field)
+    # [1,2] Summary text
+    _plot_summary_text(axes[1, 2], result, diag, mixing, params)
 
-    # [1,3] Summary text
-    _plot_summary_text(axes[1, 3], result, diag, mixing, params)
+    # [1,3] blank
+    axes[1, 3].axis("off")
 
     plt.tight_layout()
     output_dir = Path(__file__).parent.parent.parent / "outputs"
@@ -376,42 +365,6 @@ def _plot_conversion(
     ax.set_xlabel("Time")
     ax.set_ylabel(r"$P(t) = E_B(t)\,/\,E_A(0)$")
     ax.set_title("Conversion Probability (A -> B)")
-    ax.set_ylim(bottom=0)
-    ax.grid(visible=True, alpha=0.3)
-
-
-def _plot_per_component(
-    ax: Axes,
-    total: ConversionResult,
-    r_a1_b1: ConversionResult,
-    r_a1_b2: ConversionResult,
-) -> None:
-    ax.plot(
-        r_a1_b1.times,
-        r_a1_b1.probability,
-        "c-",
-        label=r"$P(A_1 \to B_1)$",
-        linewidth=1.2,
-    )
-    ax.plot(
-        r_a1_b2.times,
-        r_a1_b2.probability,
-        "r-",
-        label=r"$P(A_1 \to B_2)$",
-        linewidth=1.2,
-    )
-    ax.plot(
-        total.times,
-        total.probability,
-        "b--",
-        label="Total",
-        linewidth=1.0,
-        alpha=0.5,
-    )
-    ax.set_xlabel("Time")
-    ax.set_ylabel(r"$P(t)$")
-    ax.set_title("Per-Component Conversion")
-    ax.legend(fontsize=8)
     ax.set_ylim(bottom=0)
     ax.grid(visible=True, alpha=0.3)
 
@@ -471,7 +424,7 @@ def _plot_hamiltonian(ax: Axes, h: EnergyDecomposition) -> None:
         h.times,
         h.coupling_energy,
         "g--",
-        label=r"$-g\!\int\! G\,A\!\cdot\!B\,dA$",
+        label=r"$E_\mathrm{int}$",
         linewidth=1.0,
         alpha=0.7,
     )
@@ -622,10 +575,6 @@ def main() -> None:
         target_fields=["B_1", "B_2"],
     )
 
-    print("Computing per-component conversion...")
-    r_a1_b1 = compute_conversion_probability(data, "A_1", "B_1")
-    r_a1_b2 = compute_conversion_probability(data, "A_1", "B_2")
-
     print("Computing mixing length and spectrum...")
     mixing: MixingResult | None = None
     spectrum: MixingSpectrum | None = None
@@ -644,15 +593,13 @@ def main() -> None:
     print("Checking energy conservation...")
     diag = check_energy_conservation(data, threshold=ENERGY_THRESHOLD)
 
-    _print_summary(result, r_a1_b1, r_a1_b2, diag, mixing, params)
+    _print_summary(result, diag, mixing, params)
 
     print()
     print("Generating measurement plots...")
     output_path = _plot_results(
         data,
         result,
-        r_a1_b1,
-        r_a1_b2,
         hamiltonian,
         diag,
         mixing,

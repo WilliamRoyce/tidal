@@ -80,9 +80,9 @@ DOMAIN = (-50.0, 50.0)
 N_CELLS = 96
 
 # Time integration
-T_END = 500.0
+T_END = 20.0
 DT = 0.02
-TRACKER_INTERVAL = 5.0
+TRACKER_INTERVAL = 0.2
 
 # Initial conditions — rightward-propagating phi wave packet
 X0 = -25.0  # center of wave packet (left of coupling region)

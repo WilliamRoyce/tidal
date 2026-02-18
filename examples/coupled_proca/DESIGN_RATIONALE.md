@@ -68,7 +68,7 @@ tidal derive examples/coupled_proca/theory.toml
 
 `measure_coupling.py` uses the measurement module to compute:
 - **Group conversion**: `A_1 -> {A_2, B_1, B_2}` energy transfer via `compute_group_conversion`
-- **Per-component breakdown**: individual `A_1 -> A_2`, `A_1 -> B_1`, `A_1 -> B_2` probabilities
+- **Spectral conversion** P(k,t) and **dispersion** omega(k)
 - **Energy conservation diagnostics**: O(dx^2) convergent with periodic BCs
 
 ## Validation
