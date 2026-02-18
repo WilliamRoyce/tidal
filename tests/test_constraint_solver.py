@@ -844,30 +844,28 @@ class TestOperatorMatrixBuilders:
         grid = CartesianGrid([(0, 1)] * 2, [16, 16], periodic=False)
         self._compare_matrix_vs_function(grid, "laplacian_y", "dirichlet")
 
-    def test_directional_laplacians_use_wide_stencil(self) -> None:
-        """Directional laplacians use gradient-of-gradient (wide stencil).
+    def test_directional_laplacians_sum_to_full_laplacian(self) -> None:
+        """Directional laplacians use compact 3-point stencil (periodic).
 
-        This differs from the compact Laplacian stencil. Verify that the
-        directional laplacian matrix is exactly G_axis @ G_axis.
+        Verify that laplacian_x + laplacian_y == laplacian, consistent
+        with ``field.laplace()``'s per-axis 3-point stencil.
         """
         grid = CartesianGrid([(0, 2 * np.pi)] * 2, [16, 16], periodic=True)
         bcs = _get_bcs(grid)
 
-        gx_mat, gx_vec = _build_gradient_matrix(grid, bcs, axis=0)
         lx_mat, lx_vec = _build_directional_laplacian_matrix(grid, bcs, axis=0)
+        ly_mat, ly_vec = _build_directional_laplacian_matrix(grid, bcs, axis=1)
+        full_mat, full_vec = _build_laplacian_matrix(grid, bcs)
 
-        # Should be G_x @ G_x
-        expected_mat = _sp_matmul(gx_mat, gx_mat)
-        expected_vec = _sp_add(_sp_matmul(gx_mat, gx_vec), gx_vec)
+        sum_mat = _sp_add(lx_mat, ly_mat)
+        sum_vec = _sp_add(lx_vec, ly_vec)
 
         rng = np.random.default_rng(42)
         field = rng.standard_normal(int(np.prod(grid.shape)))
 
-        lx_result = _sp_matvec(lx_mat, field) + _sp_to_dense(lx_vec).ravel()
-        expected_result = (
-            _sp_matvec(expected_mat, field) + _sp_to_dense(expected_vec).ravel()
-        )
-        assert_allclose(lx_result, expected_result, rtol=1e-14, atol=1e-14)
+        sum_result = _sp_matvec(sum_mat, field) + _sp_to_dense(sum_vec).ravel()
+        full_result = _sp_matvec(full_mat, field) + _sp_to_dense(full_vec).ravel()
+        assert_allclose(sum_result, full_result, rtol=1e-14, atol=1e-14)
 
     # --- Gradient ---
 

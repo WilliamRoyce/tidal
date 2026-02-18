@@ -9,7 +9,7 @@ position-dependent expressions like UnitStep, Sign, Max, Min.
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 import pytest
@@ -1405,8 +1405,8 @@ class TestVectorBackground:
         # Specifically validates the vector background B (not scalar backgrounds)
         assert "vbdB" in wls
 
-    def test_vector_background_no_replace_all_for_vector(self) -> None:
-        """Vector BG does NOT get scalar-style ReplaceAll substitution."""
+    def test_vector_background_explicit_substitution(self) -> None:
+        """Vector BG gets explicit ReplaceAll after decomposition."""
         import tomllib
 
         from tidal.cli._derive import generate_wls
@@ -1415,14 +1415,18 @@ class TestVectorBackground:
             config = tomllib.load(f)
         wls = generate_wls(config, config_dir=self.TOML_PATH.parent)
 
-        # Scalar BGs use /. (ReplaceAll) — vector BGs should NOT
+        # Vector BGs use /. (ReplaceAll) after DecomposeToComponents
         replace_all_lines = [
             line for line in wls.splitlines()
             if "/." in line and "vbdB" in line
         ]
-        assert len(replace_all_lines) == 0, (
-            f"Vector background B should NOT use ReplaceAll, but found: {replace_all_lines}"
+        assert len(replace_all_lines) > 0, (
+            "Vector background B should use ReplaceAll after decomposition"
         )
+        # Should cover all 3 components (indices 0, 1, 2) in both orientations
+        for idx in range(3):
+            assert f"vbdB[{{{idx}, -vbdCart}}]" in wls
+            assert f"vbdB[{{{idx}, vbdCart}}]" in wls
 
     def test_vector_background_tanh_coefficient_evaluates(self) -> None:
         """Tanh * Exp profile evaluates correctly on a grid."""
@@ -1610,7 +1614,8 @@ class TestConstraintAutoDetectionPositionDependent:
         grid = CartesianGrid([(-10, 10), (-10, 10)], 16, periodic=True)
 
         # Gaussian source in rho
-        x, y = grid.cell_coords[..., 0], grid.cell_coords[..., 1]
+        coords = cast("np.ndarray", grid.cell_coords)
+        x, y = coords[..., 0], coords[..., 1]
         gaussian = np.exp(-(x**2 + y**2) / 8)
         state = FieldCollection([
             ScalarField(grid, data=0.0),  # A_0
@@ -1671,7 +1676,8 @@ class TestConstraintAutoDetectionPositionDependent:
         pde = PDEFromSpec(spec, parameters={})
         grid = CartesianGrid([(-10, 10), (-10, 10)], 16, periodic=True)
 
-        x, y = grid.cell_coords[..., 0], grid.cell_coords[..., 1]
+        coords = cast("np.ndarray", grid.cell_coords)
+        x, y = coords[..., 0], coords[..., 1]
         gaussian = np.exp(-(x**2 + y**2) / 8)
         state = FieldCollection([
             ScalarField(grid, data=0.0),  # phi (constraint)
@@ -1729,7 +1735,8 @@ class TestConstraintAutoDetectionPositionDependent:
         pde = PDEFromSpec(spec, parameters={})
         grid = CartesianGrid([(-10, 10), (-10, 10)], 16, periodic=True)
 
-        x, y = grid.cell_coords[..., 0], grid.cell_coords[..., 1]
+        coords = cast("np.ndarray", grid.cell_coords)
+        x, y = coords[..., 0], coords[..., 1]
         gaussian = np.exp(-(x**2 + y**2) / 8)
         state = FieldCollection([
             ScalarField(grid, data=0.0),

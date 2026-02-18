@@ -800,7 +800,7 @@ class TestApplySpatialOperator:
         np.testing.assert_allclose(result, 2.0, atol=1e-10)
 
     def test_laplacian_x_cosine_periodic(self) -> None:
-        """Laplacian of cos(kx) = -k^2 cos(kx) for periodic FFT."""
+        """Laplacian of cos(kx) matches 3-point FD stencil for periodic grid."""
         n = 128
         domain = 2.0 * np.pi
         dx = domain / n
@@ -809,7 +809,9 @@ class TestApplySpatialOperator:
         field = np.cos(k * x)
 
         result = _apply_spatial_operator("laplacian_x", field, (dx,), (True,))
-        expected = -(k**2) * np.cos(k * x)
+        # FD effective wavenumber: k²_eff = 2(1 - cos(k·dx)) / dx²
+        k2_eff = 2.0 * (1.0 - np.cos(k * dx)) / (dx * dx)
+        expected = -k2_eff * np.cos(k * x)
         np.testing.assert_allclose(result, expected, atol=1e-10)
 
     def test_laplacian_sum_of_axes(self) -> None:
@@ -832,7 +834,7 @@ class TestApplySpatialOperator:
         np.testing.assert_allclose(lap_iso, lap_x + lap_y, atol=1e-10)
 
     def test_cross_derivative_xy(self) -> None:
-        """Cross derivative of sin(x)*sin(y) = cos(x)*cos(y)."""
+        """Cross derivative of sin(x)*sin(y) via successive FD stencils."""
         n = 64
         domain = 2.0 * np.pi
         dx = domain / n
@@ -847,8 +849,12 @@ class TestApplySpatialOperator:
         result = _apply_spatial_operator(
             "cross_derivative_xy", field, spacing, periodic
         )
-        expected = np.cos(xx) * np.cos(yy)
-        np.testing.assert_allclose(result, expected, atol=1e-8)
+        # FD central difference of sin(kx): D_x[sin(kx)] = cos(kx) * sin(k·dx)/dx
+        # Cross derivative = product of two central-difference factors
+        k = 1.0
+        fd_factor = np.sin(k * dx) / dx  # sin(k·dx)/dx vs exact k
+        expected = fd_factor**2 * np.cos(xx) * np.cos(yy)
+        np.testing.assert_allclose(result, expected, atol=1e-10)
 
     def test_unknown_operator_raises(self) -> None:
         """Unknown operator name raises ValueError."""
