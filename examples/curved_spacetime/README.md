@@ -4,7 +4,7 @@ This directory contains examples of field equations on curved (non-flat) spaceti
 
 ## Phase 1: Static Conformal Factor
 
-**Files**: `conformal_kg_static.wls`, `conformal_kg_simulation.py`
+**Files**: `conformal_static.toml`, `conformal_kg_simulation.py`
 
 A Klein-Gordon scalar field on conformally flat spacetime with **constant** conformal factor.
 
@@ -25,7 +25,7 @@ Static conformal with `Omega=2, m=1` should produce identical dynamics to flat K
 
 ```bash
 # Derive equations
-wolframscript -file examples/curved_spacetime/conformal_kg_static.wls
+tidal derive examples/curved_spacetime/conformal_static.toml
 
 # Run simulation
 uv run python examples/curved_spacetime/conformal_kg_simulation.py
@@ -35,7 +35,7 @@ uv run python examples/curved_spacetime/conformal_kg_simulation.py
 
 ## Phase 2: de Sitter Expansion (Time-Dependent)
 
-**Files**: `de_sitter_kg.wls`, `de_sitter_simulation.py`
+**Files**: `de_sitter.toml`, `de_sitter_simulation.py`
 
 A Klein-Gordon scalar field on de Sitter spacetime with **time-dependent** conformal factor.
 
@@ -65,7 +65,7 @@ The Hubble friction term causes wave damping during expansion:
 
 ```bash
 # Derive equations
-wolframscript -file examples/curved_spacetime/de_sitter_kg.wls
+tidal derive examples/curved_spacetime/de_sitter.toml
 
 # Run simulation
 uv run python examples/curved_spacetime/de_sitter_simulation.py

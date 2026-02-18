@@ -47,8 +47,7 @@ Each example also has a `run.sh` script demonstrating the equivalent CLI workflo
 
 **Stage 1 - Derivation**:
 ```bash
-cd examples/electromagnetic
-wolframscript -file em_lagrangian_1d.wls
+tidal derive examples/electromagnetic/theory.toml
 ```
 - Derives Maxwell equations from Lagrangian
 - Applies Lorenz gauge: `∂_μ A^μ = 0`
@@ -74,8 +73,7 @@ python examples/electromagnetic/em_from_lagrangian.py
 
 **Stage 1 - Derivation**:
 ```bash
-cd examples/scalar_field
-wolframscript -file klein_gordon.wls
+tidal derive examples/scalar_field/theory.toml
 ```
 - Derives Klein-Gordon equation from Lagrangian
 - Decomposes to: `∂²φ/∂t² = ∂²φ/∂x² - m²φ` (with m² = 1)
@@ -133,33 +131,31 @@ The Python code doesn't "know" about mass terms - it reads them from JSON and ap
 ### EM Example
 ```bash
 # Stage 1: Derive from Lagrangian
-cd /workspaces/torsion-gertsenshtein/examples/electromagnetic
-wolframscript -file em_lagrangian_1d.wls
+tidal derive examples/electromagnetic/theory.toml
 
 # Verify JSON was created
-cat ../data/em_1d.json | jq '.equations[0].rhs.terms'
+cat examples/data/em_1d.json | jq '.equations[0].rhs.terms'
 
 # Stage 2: Simulate
-python em_from_lagrangian.py
+python examples/electromagnetic/em_from_lagrangian.py
 
 # Check output
-ls -lh ../../outputs/em_from_lagrangian_output.png
+ls -lh outputs/em_from_lagrangian_output.png
 ```
 
 ### Klein-Gordon Example
 ```bash
 # Stage 1: Derive from Lagrangian
-cd /workspaces/torsion-gertsenshtein/examples/scalar_field
-wolframscript -file klein_gordon.wls
+tidal derive examples/scalar_field/theory.toml
 
 # Verify JSON was created
-cat ../data/klein_gordon_1d.json | jq '.equations[0].rhs.terms'
+cat examples/data/klein_gordon_1d.json | jq '.equations[0].rhs.terms'
 
 # Stage 2: Simulate
-python kg_from_lagrangian.py
+python examples/scalar_field/kg_from_lagrangian.py
 
 # Check output
-ls -lh ../../outputs/kg_from_lagrangian_output.png
+ls -lh outputs/kg_from_lagrangian_output.png
 ```
 
 ---
@@ -189,7 +185,7 @@ These examples demonstrate that the pipeline handles non-Cartesian coordinate sy
 
 ```bash
 # Stage 1: Derive from Lagrangian
-wolframscript -file examples/polar_kg/polar_kg.wls
+tidal derive examples/polar_kg/theory.toml
 
 # Stage 2: Simulate
 python examples/polar_kg/polar_kg_simulation.py
@@ -202,7 +198,7 @@ python examples/polar_kg/polar_kg_simulation.py
 **Metric**: `ds² = -dt² + dx² + x² dy² + x² sin²(y) dz²` (x=r, y=θ, z=φ)
 
 ```bash
-wolframscript -file examples/spherical_kg/spherical_kg.wls
+tidal derive examples/spherical_kg/theory.toml
 python examples/spherical_kg/spherical_kg_simulation.py
 ```
 
@@ -213,7 +209,7 @@ python examples/spherical_kg/spherical_kg_simulation.py
 **Metric**: `ds² = -dt² + dx² + x² dy² + dz²` (x=r, y=θ, z=z)
 
 ```bash
-wolframscript -file examples/cylindrical_kg/cylindrical_kg.wls
+tidal derive examples/cylindrical_kg/theory.toml
 python examples/cylindrical_kg/cylindrical_kg_simulation.py
 ```
 
@@ -229,8 +225,7 @@ python examples/cylindrical_kg/cylindrical_kg_simulation.py
 
 **Stage 1 - Derivation**:
 ```bash
-cd examples/scalar_field_3d
-wolframscript -file klein_gordon_3d.wls
+tidal derive examples/scalar_field_3d/theory.toml
 ```
 - Derives Klein-Gordon equation in full 4D spacetime
 - Decomposes to: `∂²φ/∂t² = ∂²φ/∂x² + ∂²φ/∂y² + ∂²φ/∂z² - m²φ`
@@ -543,7 +538,7 @@ For cases requiring custom Wolfram logic (gauge fixing, xPert linearization):
    - Construct Lagrangian using xAct
    - Call `EulerLagrangeEquation`
    - Call `DecomposeToComponents`
-   - Call `BuildJSONStructure` and export
+   - Call `BuildMultiFieldJSONStructure` and export
 
 2. **Create Python simulation** (e.g., `examples/new_field/simulate.py`):
    - Load JSON: `spec = load_equation_system("../data/new_field.json")`
@@ -599,7 +594,10 @@ examples/
 ├── massive_3form/                 # Rank-3 antisymmetric tensor (3+1D)
 ├── massive_gravity/               # Linearized massive gravity (2+1D)
 ├── coupled_proca/                 # Two coupled massive vectors (2+1D)
-└── klein_gordon/                  # Legacy KG demo scripts (standalone)
+├── coupled_scattering/            # Position-dependent coupling, background fields (2+1D)
+├── proca_background/              # Scalar background, two Proca vectors (2+1D)
+├── scalar_potential_well/         # Background potential well, bound states (1+1D)
+└── vector_background/             # Vector domain wall background (2+1D)
 ```
 
 ---
