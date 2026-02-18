@@ -413,7 +413,7 @@ tracker=storage.tracker(0.5)
 ## Verification Checklist
 
 ### After Wolfram Changes
-- [ ] Run all examples: `wolframscript -file examples/*/*.wls`
+- [ ] Run all examples: `./scripts/run_examples.sh` (or `tidal derive examples/*/theory.toml`)
 - [ ] Check JSON dimension matches spacetime (2 for 1+1D, 3 for 2+1D)
 - [ ] Verify component count matches field rank × dimensions
 - [ ] Spot-check coefficients in JSON (shouldn't all be 1.0)
