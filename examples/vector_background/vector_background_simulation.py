@@ -414,7 +414,7 @@ def _plot_hamiltonian(ax: Axes, h: EnergyDecomposition) -> None:
         alpha=0.5,
     )
     ax.set_xlabel("Time")
-    ax.set_ylabel("Energy")
+    ax.set_ylabel("Energy density")
     ax.set_title("Energy Decomposition")
     ax.legend(fontsize=8, ncol=2)
     ax.grid(visible=True, alpha=0.3)

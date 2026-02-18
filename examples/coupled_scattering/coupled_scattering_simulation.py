@@ -80,9 +80,9 @@ DOMAIN = (-50.0, 50.0)
 N_CELLS = 96
 
 # Time integration
-T_END = 50.0
+T_END = 500.0
 DT = 0.02
-TRACKER_INTERVAL = 0.5
+TRACKER_INTERVAL = 5.0
 
 # Initial conditions — rightward-propagating phi wave packet
 X0 = -25.0  # center of wave packet (left of coupling region)
@@ -287,7 +287,7 @@ def _print_summary(
 
     h0 = energy.total_energy[0]
     h_final = energy.total_energy[-1]
-    print(f"  Energy E(0) = {h0:.4f},  E(T) = {h_final:.4f}")
+    print(f"  Energy density ⟨ε⟩(0) = {h0:.6f},  ⟨ε⟩(T) = {h_final:.6f}")
     print(f"  max |dE/E0| = {diag.max_relative_error:.2e}")
     print(f"  Conserved: {diag.is_conserved}")
     print("=" * 65)
@@ -402,7 +402,7 @@ def _plot_hamiltonian(ax: Axes, h: EnergyDecomposition) -> None:
         alpha=0.5,
     )
     ax.set_xlabel("Time")
-    ax.set_ylabel("Energy")
+    ax.set_ylabel("Energy density")
     ax.set_title("Energy Decomposition")
     ax.legend(fontsize=8, ncol=2)
     ax.grid(visible=True, alpha=0.3)

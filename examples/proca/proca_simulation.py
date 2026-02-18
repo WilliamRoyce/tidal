@@ -315,8 +315,8 @@ def _plot_results(
     ax = axes[1, 1]
     ax.plot(diag.times, diag.total_energy, "b-", linewidth=2)
     ax.set_xlabel("Time")
-    ax.set_ylabel("Total Energy")
-    ax.set_title(f"Energy (virial) — max |dE/E$_0$| = {diag.max_relative_error:.2e}")
+    ax.set_ylabel("Energy density")
+    ax.set_title(f"Energy density (virial) — max |d⟨ε⟩/⟨ε⟩$_0$| = {diag.max_relative_error:.2e}")
     ax.grid(visible=True, alpha=0.3)
 
     fig.suptitle(

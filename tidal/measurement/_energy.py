@@ -1,18 +1,23 @@
-"""Hamiltonian energy computation from Lagrangian-derived equations.
+"""Hamiltonian energy density computation from Lagrangian-derived equations.
 
-Computes the complete Hamiltonian H = T + V for any quadratic Lagrangian
-by reconstructing it from the Euler-Lagrange equations in the JSON spec:
+Computes the spatially-averaged Hamiltonian energy density ⟨ε⟩ = H / V_domain
+for any quadratic Lagrangian by reconstructing it from the Euler-Lagrange
+equations in the JSON spec:
 
-    H = ½ Σ_{dyn} ∫ π_sim² dV     (kinetic, using simulation momenta)
-      + V_virial                    (from dynamical fields' spatial RHS terms)
-      + V_constraint_self           (constraint field gradient + mass, sign-flipped)
-      + V_constraint_cross          (cross-constraint identity coupling)
+    ⟨ε⟩ = ½ Σ_{dyn} ⟨π_sim²⟩        (kinetic, using simulation momenta)
+         + ⟨v_virial⟩                 (from dynamical fields' spatial RHS terms)
+         + ⟨v_constraint_self⟩        (constraint field gradient + mass, sign-flipped)
+         + ⟨v_constraint_cross⟩       (cross-constraint identity coupling)
 
-The virial potential uses Euler's homogeneous function theorem for degree-2
-functionals: V = -½ Σ ∫ φ_i · RHS_i^{spatial} dV.
+The virial potential density uses Euler's homogeneous function theorem for
+degree-2 functionals: ⟨v⟩ = -½ Σ ⟨φ_i · RHS_i^{spatial}⟩.
 
 Constraint fields (temporal gauge components) have NEGATIVE self-energy
 due to the Minkowski metric g^{00} = -1.  This sign flip is automatic.
+
+All energy values are **average energy densities** (intensive quantities),
+independent of the domain size.  Ratios (conservation, conversion probability)
+are invariant under this normalization.
 """
 
 from __future__ import annotations
@@ -42,19 +47,21 @@ _MOMENTUM_RE = re.compile(r"^pi_?(\d+)$")
 
 @dataclass(frozen=True)
 class FieldEnergy:
-    """Energy decomposition for a single field at one snapshot.
+    """Energy density decomposition for a single field at one snapshot.
+
+    All values are spatially-averaged energy densities ⟨ε⟩ = E / V_domain.
 
     Attributes
     ----------
     kinetic : float
-        ``0.5 * ∫ π² dV``
+        ``0.5 * ⟨π²⟩``
     gradient : float
-        ``0.5 * ∫ |∇_self φ|² dV`` — gradient energy over self-laplacian
-        axes only.  For scalar fields (full ``laplacian``), this equals
-        ``0.5 * ∫ |∇φ|² dV``.  For vector components with directional
-        laplacians (e.g. ``laplacian_y``), only the relevant axes.
+        ``0.5 * ⟨|∇_self φ|²⟩`` — gradient energy density over
+        self-laplacian axes only.  For scalar fields (full ``laplacian``),
+        this equals ``0.5 * ⟨|∇φ|²⟩``.  For vector components with
+        directional laplacians (e.g. ``laplacian_y``), only the relevant axes.
     mass : float
-        ``0.5 * m² * ∫ φ² dV``
+        ``0.5 * m² * ⟨φ²⟩``
     total : float
         Sum of kinetic + gradient + mass.
     """
@@ -67,18 +74,21 @@ class FieldEnergy:
 
 @dataclass(frozen=True)
 class SystemEnergy:
-    """Energy for the full coupled system at one snapshot.
+    """Energy density for the full coupled system at one snapshot.
+
+    All values are spatially-averaged energy densities ⟨ε⟩ = E / V_domain.
 
     Attributes
     ----------
     per_field : dict[str, FieldEnergy]
-        Energy breakdown per field (operator-aware gradient).
+        Energy density breakdown per field (operator-aware gradient).
     interaction : float
-        Cross-field coupling energy: total potential minus per-field
-        self-potentials.  Uses operator-aware gradient axes, so this is
-        zero when fields are uncoupled and only one field is excited.
+        Cross-field coupling energy density: total potential density minus
+        per-field self-potential densities.  Uses operator-aware gradient
+        axes, so this is zero when fields are uncoupled and only one field
+        is excited.
     total : float
-        Complete Hamiltonian: kinetic + virial potential + constraint self-energy.
+        Complete Hamiltonian density: kinetic + virial + constraint self-energy.
     """
 
     per_field: dict[str, FieldEnergy]
@@ -454,7 +464,9 @@ def compute_field_energy(  # noqa: PLR0913
     *,
     gradient_axes: list[int] | None = None,
 ) -> FieldEnergy:
-    """Compute canonical energy for a single field at one snapshot.
+    """Compute canonical energy density for a single field at one snapshot.
+
+    Returns spatially-averaged energy density ⟨ε⟩ = E / V_domain.
 
     Parameters
     ----------
@@ -482,20 +494,18 @@ def compute_field_energy(  # noqa: PLR0913
     if momentum_data is not None:
         _validate_array(momentum_data, "momentum_data")
 
-    dv = float(np.array(grid_spacing).prod())
-
-    # Kinetic energy: 0.5 * ∫ π² dV
+    # Kinetic energy density: 0.5 * ⟨π²⟩
     if momentum_data is not None:
-        kinetic = 0.5 * float((momentum_data**2).sum()) * dv
+        kinetic = 0.5 * float((momentum_data**2).mean())
     else:
         kinetic = 0.0
 
-    # Gradient energy: 0.5 * ∫ |∇φ|² dV (over specified axes)
+    # Gradient energy density: 0.5 * ⟨|∇φ|²⟩ (over specified axes)
     grad_sq = _gradient_energy_density(field_data, grid_spacing, periodic, axes=gradient_axes)
-    gradient = 0.5 * float(grad_sq.sum()) * dv
+    gradient = 0.5 * float(grad_sq.mean())
 
-    # Mass energy: 0.5 * m² * ∫ φ² dV (m² may be scalar or ndarray)
-    mass_energy = 0.5 * float((mass_squared * field_data**2).sum()) * dv
+    # Mass energy density: 0.5 * ⟨m² φ²⟩ (m² may be scalar or ndarray)
+    mass_energy = 0.5 * float((mass_squared * field_data**2).mean())
 
     total = kinetic + gradient + mass_energy
     return FieldEnergy(kinetic=kinetic, gradient=gradient, mass=mass_energy, total=total)
@@ -570,17 +580,16 @@ def _compute_virial_potential(
     data: SimulationData,
     t_idx: int,
 ) -> float:
-    """Virial potential from dynamical fields' spatial RHS terms.
+    """Virial potential density from dynamical fields' spatial RHS terms.
 
-    ``V_virial = -½ Σ_{i: dynamical} ∫ φ_i · RHS_i^{spatial} dV``
+    ``⟨v_virial⟩ = -½ Σ_{i: dynamical} ⟨φ_i · RHS_i^{spatial}⟩``
 
     Excludes ``first_derivative_t`` (gyroscopic, do no work) and
     ``pi_N`` momentum references (velocity-dependent forces).
 
     Supports position-dependent coefficients by evaluating them on the
-    grid and performing elementwise integration.
+    grid and performing elementwise averaging.
     """
-    dv = data.volume_element
     potential = 0.0
 
     # Build coordinate arrays once (lazy, only if needed)
@@ -617,7 +626,7 @@ def _compute_virial_potential(
                 term.operator, target, data.grid_spacing, data.periodic,
             )
             # coeff may be scalar or ndarray — numpy handles both
-            potential += float((coeff * phi_i * operated).sum()) * dv
+            potential += float((coeff * phi_i * operated).mean())
 
     return -0.5 * potential
 
@@ -626,9 +635,9 @@ def _compute_constraint_self_energy(
     data: SimulationData,
     t_idx: int,
 ) -> float:
-    """Constraint field self-energy with sign flip (g^{00} = -1).
+    """Constraint field self-energy density with sign flip (g^{00} = -1).
 
-    ``V_constraint = Σ_{j: constraint} [ -½ |∇C_j|² - ½ m_j² C_j² ] dV``
+    ``⟨v_constraint⟩ = Σ_{j: constraint} [ -½ ⟨|∇C_j|²⟩ - ½ m_j² ⟨C_j²⟩ ]``
 
     Temporal gauge components have NEGATIVE gradient and mass self-energy
     relative to spatial/scalar fields, due to the Minkowski metric.
@@ -643,15 +652,14 @@ def _compute_constraint_self_energy(
             continue  # constraint field not stored in data
 
         c_field = data.fields[name][t_idx]
-        dv = data.volume_element
 
-        # Gradient: -½ ∫ |∇C|² dV  (NEGATIVE)
+        # Gradient: -½ ⟨|∇C|²⟩  (NEGATIVE)
         grad_sq = _gradient_energy_density(c_field, data.grid_spacing, data.periodic)
-        energy -= 0.5 * float(grad_sq.sum()) * dv
+        energy -= 0.5 * float(grad_sq.mean())
 
-        # Mass: -½ m² ∫ C² dV  (NEGATIVE, m² may be scalar or ndarray)
+        # Mass: -½ ⟨m² C²⟩  (NEGATIVE, m² may be scalar or ndarray)
         m2 = _resolve_mass_squared(data, field_idx)
-        energy -= 0.5 * float((m2 * c_field**2).sum()) * dv
+        energy -= 0.5 * float((m2 * c_field**2).mean())
 
     return energy
 
@@ -660,12 +668,12 @@ def _compute_constraint_coupling_energy(
     data: SimulationData,
     t_idx: int,
 ) -> float:
-    """Cross-constraint coupling energy from RHS terms between constraints.
+    """Cross-constraint coupling energy density from RHS terms between constraints.
 
     For each constraint equation i with a term ``c * op(C_j)`` referencing
     another constraint field C_j, accumulates:
 
-        ``V_cross += +½ * c * ∫ C_i * op(C_j) dV``
+        ``⟨v_cross⟩ += +½ * c * ⟨C_i * op(C_j)⟩``
 
     The ``+½`` sign (opposite of the dynamical virial ``-½``) arises because
     constraint fields have ``π = 0``, so their Hamiltonian contribution is
@@ -710,9 +718,8 @@ def _accumulate_cross_constraint_terms(
     constraint_names: set[str],
     coord_arrays: dict[str, NDArray[np.float64]] | None,
 ) -> float:
-    """Sum cross-constraint term contributions: +½ c_ij ∫ C_i·op(C_j) dV."""
+    """Sum cross-constraint term densities: +½ c_ij ⟨C_i·op(C_j)⟩."""
     energy = 0.0
-    dv = data.volume_element
 
     for eq in data.spec.equations:
         if eq.time_derivative_order != 0 or eq.field_name not in data.fields:
@@ -733,7 +740,7 @@ def _accumulate_cross_constraint_terms(
             operated = _apply_spatial_operator(
                 term.operator, target, data.grid_spacing, data.periodic,
             )
-            energy += 0.5 * float((coeff * c_i * operated).sum()) * dv
+            energy += 0.5 * float((coeff * c_i * operated).mean())
 
     return energy
 
@@ -742,15 +749,15 @@ def compute_system_energy(  # noqa: PLR0914
     data: SimulationData,
     t_idx: int,
 ) -> SystemEnergy:
-    """Compute total Hamiltonian energy at snapshot *t_idx*.
+    """Compute Hamiltonian energy density at snapshot *t_idx*.
 
-    Uses the complete formula derived from the Lagrangian:
+    Returns spatially-averaged energy density ⟨ε⟩ = H / V_domain, using:
 
-        H = ½ Σ π_sim² + V_virial + V_constraint_self + V_constraint_cross
+        ⟨ε⟩ = ½ Σ ⟨π_sim²⟩ + ⟨v_virial⟩ + ⟨v_constraint_self⟩ + ⟨v_cross⟩
 
-    where V_virial is computed from dynamical equations' spatial RHS terms
-    (Euler's theorem for quadratic functionals), V_constraint_self accounts
-    for temporal gauge components' negative self-energy, and V_constraint_cross
+    where ⟨v_virial⟩ is from dynamical equations' spatial RHS terms
+    (Euler's theorem for quadratic functionals), ⟨v_constraint_self⟩ accounts
+    for temporal gauge components' negative self-energy, and ⟨v_cross⟩
     captures identity coupling between constraint fields (e.g. gcoup*G*A_0*B_0).
 
     Parameters
@@ -835,13 +842,13 @@ def compute_energy_timeseries(
     NDArray[np.float64],
     NDArray[np.float64],
 ]:
-    """Compute energy for every snapshot in the simulation.
+    """Compute energy density for every snapshot in the simulation.
 
     Returns
     -------
     times : ndarray, shape ``(n_snapshots,)``
     per_field : dict[str, ndarray]
-        Each value is shape ``(n_snapshots,)`` — total energy of that field.
+        Each value is shape ``(n_snapshots,)`` — energy density of that field.
     interaction : ndarray, shape ``(n_snapshots,)``
     total : ndarray, shape ``(n_snapshots,)``
     """

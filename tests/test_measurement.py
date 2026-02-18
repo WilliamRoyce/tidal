@@ -1455,11 +1455,10 @@ class TestConstraintCouplingEnergy:
 
         energy = _compute_constraint_coupling_energy(data, 0)
 
-        # Expected: +½ * 0.5 * ∫ A_0*B_0 dV (from A_0 eq)
-        #         + ½ * 0.5 * ∫ B_0*A_0 dV (from B_0 eq)
-        #         = 0.5 * ∫ A_0*B_0 dV
-        dv = dx
-        expected = 0.5 * float(np.sum(a0 * b0)) * dv
+        # Expected: +½ * 0.5 * ⟨A_0*B_0⟩ (from A_0 eq)
+        #         + ½ * 0.5 * ⟨B_0*A_0⟩ (from B_0 eq)
+        #         = 0.5 * ⟨A_0*B_0⟩
+        expected = 0.5 * float(np.mean(a0 * b0))
         np.testing.assert_allclose(energy, expected, rtol=1e-10)
 
     def test_single_constraint_returns_zero(self) -> None:

@@ -26,10 +26,11 @@ class EnergyDiagnostics:
     ----------
     times : ndarray, shape ``(n_snapshots,)``
     total_energy : ndarray, shape ``(n_snapshots,)``
+        Spatially-averaged energy density ⟨ε⟩ at each snapshot.
     relative_error : ndarray, shape ``(n_snapshots,)``
-        ``(E(t) - E(0)) / E(0)``.
+        ``(⟨ε⟩(t) - ⟨ε⟩(0)) / ⟨ε⟩(0)``.
     max_relative_error : float
-        Peak relative energy drift.
+        Peak relative energy density drift.
     is_conserved : bool
         Whether ``max_relative_error < threshold``.
     """
@@ -45,7 +46,7 @@ def check_energy_conservation(
     data: SimulationData,
     threshold: float = 1e-3,
 ) -> EnergyDiagnostics:
-    """Check whether total energy is conserved over the simulation.
+    """Check whether energy density is conserved over the simulation.
 
     Parameters
     ----------

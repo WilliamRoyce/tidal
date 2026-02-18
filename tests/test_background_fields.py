@@ -1337,9 +1337,9 @@ class TestProcaScalarBackground:
             parameters={},
         )
         result = compute_system_energy(data, 0)
-        # Expected: m²=2, B_1=1 everywhere, V = 10.0 per grid cell
-        # E_potential = 0.5 * m² * integral(B_1²) dV = 0.5 * 2 * 1² * 20² = 400
-        expected_potential = 0.5 * 2.0 * (20.0 ** 2)
+        # Expected: m²=2, B_1=1 everywhere
+        # Energy density = 0.5 * m² * ⟨B_1²⟩ = 0.5 * 2 * 1² = 1.0
+        expected_potential = 0.5 * 2.0 * 1.0**2
         assert_allclose(result.total, expected_potential, rtol=0.1)
 
 

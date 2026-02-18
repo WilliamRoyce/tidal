@@ -124,24 +124,26 @@ Rabi oscillations where peak conversion may occur mid-simulation.
 
 ### FieldEnergy
 
-Energy decomposition for a single field at one snapshot.
+Energy density decomposition for a single field at one snapshot.
+All values are spatially-averaged energy densities (intensive quantities).
 
 | Field | Description |
 |-------|-------------|
-| `kinetic` | `0.5 * integral(pi^2) dV` |
-| `gradient` | `0.5 * integral(|grad(phi)|^2) dV` |
-| `mass` | `0.5 * m^2 * integral(phi^2) dV` |
+| `kinetic` | `0.5 * mean(pi^2)` |
+| `gradient` | `0.5 * mean(|grad(phi)|^2)` |
+| `mass` | `0.5 * mean(m^2 * phi^2)` |
 | `total` | Sum of kinetic + gradient + mass |
 
 ### SystemEnergy
 
-Energy for the full coupled system at one snapshot.
+Energy density for the full coupled system at one snapshot.
+All values are spatially-averaged energy densities.
 
 | Field | Description |
 |-------|-------------|
 | `per_field` | `dict[str, FieldEnergy]` per dynamical field |
-| `interaction` | `V_total - sum(per_field self-potentials)` — captures all coupling types |
-| `total` | Complete Hamiltonian: `kinetic + V_virial + V_constraint_self` |
+| `interaction` | `v_total - sum(per_field self-potentials)` — captures all coupling types |
+| `total` | Complete Hamiltonian density: `kinetic + v_virial + v_constraint_self` |
 
 ### ConversionResult
 
@@ -254,54 +256,57 @@ Energy conservation diagnostic result.
 
 > For the full mathematical derivation, see [HAMILTONIAN.md](HAMILTONIAN.md).
 
-### Hamiltonian Energy
+### Hamiltonian Energy Density
 
-The system Hamiltonian is reconstructed automatically from the
+The system Hamiltonian density is reconstructed automatically from the
 Euler-Lagrange equations in the JSON spec — no manual per-system
-formulas.  The complete formula is:
+formulas.  All values are **spatially-averaged energy densities**
+(intensive quantities, independent of domain size).  The complete
+formula is:
 
 ```
-H = 1/2 sum_{dynamical} integral pi_sim^2 dV    (kinetic)
-  + V_virial                                      (potential from EOM)
-  + V_constraint_self                              (temporal components)
+<epsilon> = 1/2 sum_{dynamical} <pi_sim^2>       (kinetic density)
+          + <v_virial>                             (potential from EOM)
+          + <v_constraint_self>                    (temporal components)
 ```
 
-**Per-field energy** uses the standard scalar decomposition:
+**Per-field energy density** uses the standard scalar decomposition:
 
 ```
-E_i = integral dV [ 1/2 pi_i^2 + 1/2 |grad(phi_i)|^2 + 1/2 m_ii^2 phi_i^2 ]
+<epsilon_i> = 1/2 <pi_i^2> + 1/2 <|grad(phi_i)|^2> + 1/2 m_ii^2 <phi_i^2>
 ```
 
 where `pi_i` is the simulation momentum (time derivative of `phi_i`),
-and `m_ii` is the diagonal mass matrix entry. Constraint fields
+`m_ii` is the diagonal mass matrix entry, and `<...>` denotes the
+spatial average (mean over grid points). Constraint fields
 (`time_derivative_order == 0`) are excluded from per-field energy.
 
 **Gradient computation:** For periodic axes, the gradient uses spectral
 (FFT) differentiation (`ik * FFT(phi)`) for exact accuracy. For
 non-periodic axes, 2nd-order central finite differences are used instead.
 
-### Virial Potential
+### Virial Potential Density
 
-The virial potential captures ALL cross-field coupling (identity,
+The virial potential density captures ALL cross-field coupling (identity,
 derivative, constraint-mediated) using Euler's homogeneous function
 theorem for degree-2 functionals:
 
 ```
-V_virial = -1/2 sum_{i: dynamical} integral phi_i * RHS_i^{spatial} dV
+<v_virial> = -1/2 sum_{i: dynamical} <phi_i * RHS_i^{spatial}>
 ```
 
 where `RHS_i^{spatial}` is the right-hand side of the i-th dynamical
 equation with `first_derivative_t` (gyroscopic) and `pi_N`
 (velocity-dependent) terms excluded.
 
-### Constraint Field Self-Energy
+### Constraint Field Self-Energy Density
 
 Temporal gauge components (A_0 in electrodynamics) have **negative**
 self-energy due to the Minkowski metric g^{00} = -1:
 
 ```
-V_constraint = sum_{j: constraint} [-1/2 integral |grad(C_j)|^2 dV
-                                    -1/2 m_j^2 integral C_j^2 dV]
+<v_constraint> = sum_{j: constraint} [-1/2 <|grad(C_j)|^2>
+                                      -1/2 m_j^2 <C_j^2>]
 ```
 
 ### Interaction Energy

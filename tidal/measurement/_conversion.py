@@ -69,7 +69,7 @@ def _field_energy_series(
     field_name: str,
     mass_squared: float | NDArray[np.float64],
 ) -> NDArray[np.float64]:
-    """Compute total energy of *field_name* at every snapshot."""
+    """Compute energy density of *field_name* at every snapshot."""
     energies: list[float] = []
     for t_idx in range(data.n_snapshots):
         field_arr = data.fields[field_name][t_idx]

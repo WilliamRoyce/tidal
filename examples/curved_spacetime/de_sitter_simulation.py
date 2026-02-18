@@ -249,8 +249,8 @@ def _analyze_results(result: SimulationResult) -> dict[str, float]:
     _times, _per_field, _interaction, total = compute_energy_timeseries(data)
     e0 = total[0]
     e_final = total[-1]
-    print(f"  Initial energy (virial): {e0:.2f}")
-    print(f"  Final energy (virial):   {e_final:.2f}")
+    print(f"  Initial energy density (virial): {e0:.6f}")
+    print(f"  Final energy density (virial):   {e_final:.6f}")
     if e0 > 0:
         print(f"  Energy loss: {100 * (1 - e_final / e0):.1f}%")
     print()
