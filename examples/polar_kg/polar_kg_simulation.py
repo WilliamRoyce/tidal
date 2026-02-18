@@ -28,10 +28,15 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
+from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
+from tidal.measurement import (
+    EnergyDiagnostics,
+    SimulationData,
+    check_energy_conservation,
+    create_snapshot_callback,
+)
 from tidal.symbolic import build_pde_from_json, load_equation_system
-from tidal.utils import normalize_solve_result
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -77,7 +82,7 @@ class SimulationResult:
     """Container for polar KG simulation results."""
 
     grid: CartesianGrid
-    storage: MemoryStorage
+    data: SimulationData
     r_coords: NumericArray
     theta_coords: NumericArray
 
@@ -159,31 +164,45 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
 
 
 def _run_simulation(
-    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection
+    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection, json_path: Path
 ) -> SimulationResult:
     print("Step 5: Running simulation...")
 
-    storage = MemoryStorage()
-    result = pde.solve(  # type: ignore[union-attr]
+    spec = load_equation_system(json_path)
+    params = {"polm2": MASS_SQUARED}
+    output_data_dir = Path(__file__).parent.parent / "data" / "polar_kg_output"
+
+    writer, callback = create_snapshot_callback(
+        output_dir=output_data_dir,
+        spec=spec,
+        grid=grid,
+        t_end=T_END,
+        snapshot_interval=SNAPSHOT_INTERVAL,
+        parameters=params,
+        spec_path=json_path,
+    )
+    tracker = CallbackTracker(callback, interrupts=SNAPSHOT_INTERVAL)
+    pde.solve(  # type: ignore[union-attr]
         state,
         t_range=T_END,
         dt=DT,
         solver="scipy",
         method="RK45",
-        tracker=storage.tracker(SNAPSHOT_INTERVAL),
+        tracker=tracker,
     )
-    result = normalize_solve_result(result)
+    writer.close()
 
+    data = SimulationData.from_directory(output_data_dir, spec)
     r = cast("np.ndarray", grid.cell_coords[..., 0])
     theta = cast("np.ndarray", grid.cell_coords[..., 1])
 
     print(f"  Duration: {T_END} time units, solver=scipy/RK45")
-    print(f"  Stored {len(storage)} snapshots")
+    print(f"  {data.n_snapshots} snapshots saved to {output_data_dir}")
     print()
 
     return SimulationResult(
         grid=grid,
-        storage=storage,
+        data=data,
         r_coords=r,
         theta_coords=theta,
     )
@@ -192,43 +211,27 @@ def _run_simulation(
 def _analyze_results(result: SimulationResult) -> None:
     print("Step 6: Analyzing results...")
 
-    initial = cast("FieldCollection", result.storage[0])
-    final = cast("FieldCollection", result.storage[-1])
+    data = result.data
+    field_name = data.field_names[0]
 
-    initial_max = float(np.max(np.abs(initial[0].data)))
-    final_max = float(np.max(np.abs(final[0].data)))
+    initial_max = float(np.max(np.abs(data.fields[field_name][0])))
+    final_max = float(np.max(np.abs(data.fields[field_name][-1])))
 
     print(f"  Initial max|phi| = {initial_max:.4f}")
     print(f"  Final   max|phi| = {final_max:.4f}")
-
-    # Energy proxy (should be roughly conserved for flat space, static metric)
-    def compute_energy(snapshot: FieldCollection) -> float:
-        phi_data = snapshot[0].data
-        pi_data = snapshot[1].data
-        return float(np.sum(pi_data**2 + phi_data**2))
-
-    initial_energy = compute_energy(initial)
-    final_energy = compute_energy(final)
-    energy_change = abs(final_energy - initial_energy) / max(initial_energy, 1e-10)
-
-    print(f"  Initial energy proxy: {initial_energy:.2f}")
-    print(f"  Final energy proxy:   {final_energy:.2f}")
-    print(f"  Relative change:      {energy_change:.4f}")
-    if energy_change < ENERGY_THRESHOLD:
-        print("  Energy approximately conserved (flat space, static metric)")
-    else:
-        print("  Note: Energy change may be due to boundary effects")
     print()
 
 
-def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
+def _plot_results(result: SimulationResult, diag: EnergyDiagnostics) -> None:  # noqa: PLR0914, PLR0915
     print("Step 7: Generating visualization...")
 
-    storage = result.storage
+    data = result.data
     grid = result.grid
+    field_name = data.field_names[0]
+    n_snapshots = data.n_snapshots
 
-    initial = cast("FieldCollection", storage[0])
-    final = cast("FieldCollection", storage[-1])
+    initial_phi = data.fields[field_name][0]
+    final_phi = data.fields[field_name][-1]
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
@@ -236,7 +239,7 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     ax = axes[0, 0]
     vmax = PULSE_AMPLITUDE
     im = ax.imshow(
-        initial[0].data.T,
+        initial_phi.T,
         origin="lower",
         cmap="bwr_r",
         vmin=-vmax,
@@ -252,9 +255,9 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
 
     # Final field in native (r, theta) coordinates
     ax = axes[0, 1]
-    final_vmax = max(float(np.max(np.abs(final[0].data))), 0.01)
+    final_vmax = max(float(np.max(np.abs(final_phi))), 0.01)
     im = ax.imshow(
-        final[0].data.T,
+        final_phi.T,
         origin="lower",
         cmap="bwr_r",
         vmin=-final_vmax,
@@ -270,8 +273,7 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
 
     # Radial cross-section at theta=0 over time
     ax = axes[1, 0]
-    time_values = list(storage.times)
-    n_snapshots = len(storage)
+    time_values = list(data.times)
     times_to_plot = [
         0,
         n_snapshots // 4,
@@ -284,10 +286,9 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
 
     r_1d = cast("np.ndarray", grid.cell_coords[:, 0, 0])
     for i, t_idx in enumerate(times_to_plot):
-        snapshot = cast("FieldCollection", storage[t_idx])
         ax.plot(
             r_1d,
-            snapshot[0].data[:, 0],  # theta=0 slice
+            data.fields[field_name][t_idx][:, 0],  # theta=0 slice
             color=colors[i],
             label=f"t={time_values[t_idx]:.1f}",
             alpha=0.8,
@@ -304,14 +305,14 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     r_value = r_1d[r_idx]
     theta_1d = cast("np.ndarray", grid.cell_coords[0, :, 1])
     for i, t_idx in enumerate(times_to_plot):
-        snapshot = cast("FieldCollection", storage[t_idx])
         ax.plot(
             theta_1d / np.pi,
-            snapshot[0].data[r_idx, :],
+            data.fields[field_name][t_idx][r_idx, :],
             color=colors[i],
             label=f"t={time_values[t_idx]:.1f}",
             alpha=0.8,
         )
+    _ = diag  # energy diagnostics available for future use
     ax.set_xlabel("theta / pi")
     ax.set_ylabel("phi")
     ax.set_title(f"Angular cross-section (r={r_value:.1f})")
@@ -352,16 +353,35 @@ def _print_footer() -> None:
 
 
 def main() -> None:
-    """Run the polar coordinate Klein-Gordon simulation."""
+    """Run the polar coordinate Klein-Gordon simulation.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the JSON spec has not been generated yet.
+    """
     json_path = Path(__file__).parent.parent / "data" / "polar_kg.json"
+    if not json_path.exists():
+        msg = (
+            f"{json_path} not found. "
+            "Run 'tidal derive theory.toml' first (requires wolframscript)."
+        )
+        raise FileNotFoundError(msg)
     _print_header()
     _load_spec(json_path)
     pde = _build_pde(json_path)
     grid = _create_grid()
     state = _create_initial_state(grid)
-    result = _run_simulation(pde, grid, state)
+    result = _run_simulation(pde, grid, state, json_path)
     _analyze_results(result)
-    _plot_results(result)
+
+    print("Checking energy conservation...")
+    diag = check_energy_conservation(result.data, threshold=ENERGY_THRESHOLD)
+    print(f"  max |dE/E0| = {diag.max_relative_error:.2e}")
+    print(f"  Conserved: {diag.is_conserved}")
+    print()
+
+    _plot_results(result, diag)
     _print_footer()
 
 

@@ -139,7 +139,7 @@ def _run_simulation() -> tuple[SimulationData, Path]:
 # ── Measurement + printing ────────────────────────────────────
 
 
-def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
+def _print_summary(  # noqa: PLR0915
     total: ConversionResult,
     r_a1: ConversionResult,
     r_a2: ConversionResult,
@@ -245,7 +245,7 @@ def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
 # ── Plotting ──────────────────────────────────────────────────
 
 
-def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
+def _plot_results(  # noqa: C901, PLR0912, PLR0914, PLR0915
     data: SimulationData,
     total: ConversionResult,
     r_a1: ConversionResult,

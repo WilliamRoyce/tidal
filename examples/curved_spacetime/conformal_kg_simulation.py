@@ -29,10 +29,15 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
+from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
+from tidal.measurement import (
+    EnergyDiagnostics,
+    SimulationData,
+    check_energy_conservation,
+    create_snapshot_callback,
+)
 from tidal.symbolic import build_pde_from_json, load_equation_system
-from tidal.utils import normalize_solve_result
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -76,7 +81,7 @@ class SimulationResult:
     """Container for conformal KG simulation results."""
 
     grid: CartesianGrid
-    storage: MemoryStorage
+    data: SimulationData
     x_coords: NumericArray
 
 
@@ -154,29 +159,42 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
 
 
 def _run_simulation(
-    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection
+    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection, json_path: Path
 ) -> SimulationResult:
     print("Step 5: Running simulation...")
 
-    storage = MemoryStorage()
-    result = pde.solve(
+    spec = load_equation_system(json_path)
+    output_data_dir = Path(__file__).parent.parent / "data" / "conformal_kg_output"
+
+    writer, callback = create_snapshot_callback(
+        output_dir=output_data_dir,
+        spec=spec,
+        grid=grid,
+        t_end=T_END,
+        snapshot_interval=SNAPSHOT_INTERVAL,
+        parameters={},
+        spec_path=json_path,
+    )
+    tracker = CallbackTracker(callback, interrupts=SNAPSHOT_INTERVAL)
+    pde.solve(
         state,
         t_range=T_END,
         dt=DT,
-        scheme="runge-kutta",  # RK4 for better energy conservation
-        tracker=storage.tracker(SNAPSHOT_INTERVAL),
+        scheme="runge-kutta",
+        tracker=tracker,
     )
-    result = normalize_solve_result(result)
+    writer.close()
 
+    data = SimulationData.from_directory(output_data_dir, spec)
     x = cast("np.ndarray", grid.cell_coords[..., 0])
 
     print(f"  Duration: {T_END} time units")
-    print(f"  Stored {len(storage)} snapshots")
+    print(f"  {data.n_snapshots} snapshots saved to {output_data_dir}")
     print()
 
     return SimulationResult(
         grid=grid,
-        storage=storage,
+        data=data,
         x_coords=x,
     )
 
@@ -184,28 +202,31 @@ def _run_simulation(
 def _analyze_results(result: SimulationResult) -> None:
     print("Step 6: Analyzing results...")
 
-    initial = cast("FieldCollection", result.storage[0])
-    final = cast("FieldCollection", result.storage[-1])
+    data = result.data
     x = result.x_coords
+    field_name = data.field_names[0]  # e.g. "confPhi_0"
 
     # Extract field amplitudes
-    initial_max = float(np.max(np.abs(initial[0].data)))
-    final_max = float(np.max(np.abs(final[0].data)))
+    initial_max = float(np.max(np.abs(data.fields[field_name][0])))
+    final_max = float(np.max(np.abs(data.fields[field_name][-1])))
 
     print(f"  Initial: max|phi| = {initial_max:.4f}")
     print(f"  Final:   max|phi| = {final_max:.4f}")
 
     # Check dispersion (massive field should spread)
+    initial_phi = data.fields[field_name][0]
+    final_phi = data.fields[field_name][-1]
+
     initial_width = float(np.sqrt(
-        np.sum((x - CENTER_X) ** 2 * initial[0].data ** 2)
-        / (np.sum(initial[0].data ** 2) + 1e-10)
+        np.sum((x - CENTER_X) ** 2 * initial_phi**2)
+        / (np.sum(initial_phi**2) + 1e-10)
     ))
     final_com = float(
-        np.sum(x * final[0].data ** 2) / (np.sum(final[0].data ** 2) + 1e-10)
+        np.sum(x * final_phi**2) / (np.sum(final_phi**2) + 1e-10)
     )
     final_width = float(np.sqrt(
-        np.sum((x - final_com) ** 2 * final[0].data ** 2)
-        / (np.sum(final[0].data ** 2) + 1e-10)
+        np.sum((x - final_com) ** 2 * final_phi**2)
+        / (np.sum(final_phi**2) + 1e-10)
     ))
 
     print(f"  Initial pulse width: {initial_width:.2f}")
@@ -218,23 +239,27 @@ def _analyze_results(result: SimulationResult) -> None:
     print()
 
 
-def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
+def _plot_results(result: SimulationResult, diag: EnergyDiagnostics) -> None:
     print("Step 7: Generating visualization...")
 
-    storage = result.storage
+    data = result.data
     x = result.x_coords
+    field_name = data.field_names[0]
+    n_snapshots = data.n_snapshots
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
     # Field evolution
-    times = [0, len(storage) // 3, 2 * len(storage) // 3, len(storage) - 1]
+    times = [0, n_snapshots // 3, 2 * n_snapshots // 3, n_snapshots - 1]
     cmap = plt.get_cmap("viridis")
     colors = cmap(np.linspace(0.2, 0.8, len(times)))
 
     ax = axes[0, 0]
     for i, t_idx in enumerate(times):
-        snapshot = cast("FieldCollection", storage[t_idx])
-        ax.plot(x, snapshot[0].data, color=colors[i], label=f"t={t_idx:.0f}", alpha=0.8)
+        ax.plot(
+            x, data.fields[field_name][t_idx],
+            color=colors[i], label=f"t={t_idx:.0f}", alpha=0.8,
+        )
     ax.set_xlabel("x")
     ax.set_ylabel(r"$\phi$")
     ax.set_title(r"Field $\phi$ evolution")
@@ -244,55 +269,27 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     # Momentum evolution
     ax = axes[0, 1]
     for i, t_idx in enumerate(times):
-        snapshot = cast("FieldCollection", storage[t_idx])
-        ax.plot(x, snapshot[1].data, color=colors[i], label=f"t={t_idx:.0f}", alpha=0.8)
+        ax.plot(
+            x, data.momenta[field_name][t_idx],
+            color=colors[i], label=f"t={t_idx:.0f}", alpha=0.8,
+        )
     ax.set_xlabel("x")
     ax.set_ylabel(r"$\pi$")
     ax.set_title(r"Momentum $\pi = \partial_t \phi$ evolution")
     ax.legend()
     ax.grid(visible=True, alpha=0.3)
 
-    # Energy (proper Hamiltonian for static conformal)
-    # Note: Static conformal spacetime is conservative, so Hamiltonian should be conserved.
-    # Using RK4 scheme (scheme='runge-kutta') provides much better energy conservation
-    # than the default explicit Euler, which is non-symplectic and causes linear drift.
+    # Energy conservation (via measurement module)
     ax = axes[1, 0]
-    energies = []
-    time_values = []
-
-    # Grid spacing for gradient calculation
-    dx = float(x[1] - x[0])
-
-    for t_idx in range(len(storage)):
-        snapshot = cast("FieldCollection", storage[t_idx])
-        phi_data = snapshot[0].data
-        pi_data = snapshot[1].data
-
-        # Compute spatial gradient
-        grad_phi = np.gradient(phi_data, dx)
-
-        # Proper Hamiltonian: H = 1/2 * integral[pi^2 + (d_x phi)^2 + m_eff^2 phi^2] dx
-        energy = np.sum(
-            0.5 * pi_data**2 + 0.5 * grad_phi**2 + 0.5 * M_EFF_SQUARED * phi_data**2
-        )
-        energies.append(energy)
-        time_values.append(t_idx)
-
-    ax.plot(time_values, energies, "b-", linewidth=2)
-    ax.set_xlabel("Snapshot index")
+    ax.plot(diag.times, diag.total_energy, "b-", linewidth=2)
+    ax.set_xlabel("Time")
     ax.set_ylabel("Total Energy")
-    ax.set_title(
-        r"Hamiltonian $H = \frac{1}{2}\int[\pi^2 + (\nabla\phi)^2 + m_{eff}^2\phi^2]dx$"
-    )
+    ax.set_title(f"Energy (virial) — max |dE/E$_0$| = {diag.max_relative_error:.2e}")
     ax.grid(visible=True, alpha=0.3)
 
     # Space-time diagram
     ax = axes[1, 1]
-    n_snapshots = len(storage)
-    spacetime = np.zeros((n_snapshots, len(x)))
-    for t_idx in range(n_snapshots):
-        snapshot = cast("FieldCollection", storage[t_idx])
-        spacetime[t_idx, :] = snapshot[0].data
+    spacetime = data.fields[field_name]  # shape (n_snapshots, nx)
 
     im = ax.imshow(
         spacetime,
@@ -341,16 +338,35 @@ def _print_footer() -> None:
 
 
 def main() -> None:
-    """Run the static conformal Klein-Gordon simulation."""
+    """Run the static conformal Klein-Gordon simulation.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the JSON spec has not been generated yet.
+    """
     json_path = Path(__file__).parent.parent / "data" / "conformal_kg_static.json"
+    if not json_path.exists():
+        msg = (
+            f"{json_path} not found. "
+            "Run 'tidal derive theory.toml' first (requires wolframscript)."
+        )
+        raise FileNotFoundError(msg)
     _print_header()
     _load_spec(json_path)
     pde = _build_pde(json_path)
     grid = _create_grid()
     state = _create_initial_state(grid)
-    result = _run_simulation(pde, grid, state)
+    result = _run_simulation(pde, grid, state, json_path)
     _analyze_results(result)
-    _plot_results(result)
+
+    print("Checking energy conservation...")
+    diag = check_energy_conservation(result.data)
+    print(f"  max |dE/E0| = {diag.max_relative_error:.2e}")
+    print(f"  Conserved: {diag.is_conserved}")
+    print()
+
+    _plot_results(result, diag)
     _print_footer()
 
 

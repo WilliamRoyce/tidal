@@ -35,10 +35,14 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
+from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
+from tidal.measurement import (
+    SimulationData,
+    compute_energy_timeseries,
+    create_snapshot_callback,
+)
 from tidal.symbolic import build_pde_from_json, load_equation_system
-from tidal.utils import normalize_solve_result
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -86,7 +90,7 @@ class SimulationResult:
     """Container for de Sitter KG simulation results."""
 
     grid: CartesianGrid
-    storage: MemoryStorage
+    data: SimulationData
     x_coords: NumericArray
     y_coords: NumericArray
 
@@ -172,30 +176,44 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
 
 
 def _run_simulation(
-    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection
+    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection, json_path: Path
 ) -> SimulationResult:
     print("Step 5: Running simulation...")
 
-    storage = MemoryStorage()
-    result = pde.solve(
+    spec = load_equation_system(json_path)
+    params = {"dSH": HUBBLE_PARAM, "dSm2": MASS_SQUARED}
+    output_data_dir = Path(__file__).parent.parent / "data" / "de_sitter_output"
+
+    writer, callback = create_snapshot_callback(
+        output_dir=output_data_dir,
+        spec=spec,
+        grid=grid,
+        t_end=T_END,
+        snapshot_interval=SNAPSHOT_INTERVAL,
+        parameters=params,
+        spec_path=json_path,
+    )
+    tracker = CallbackTracker(callback, interrupts=SNAPSHOT_INTERVAL)
+    pde.solve(
         state,
         t_range=T_END,
         dt=DT,
-        scheme="runge-kutta",  # RK4 for better numerical stability
-        tracker=storage.tracker(SNAPSHOT_INTERVAL),
+        scheme="runge-kutta",
+        tracker=tracker,
     )
-    result = normalize_solve_result(result)
+    writer.close()
 
+    data = SimulationData.from_directory(output_data_dir, spec)
     x = cast("np.ndarray", grid.cell_coords[..., 0])
     y = cast("np.ndarray", grid.cell_coords[..., 1])
 
     print(f"  Duration: {T_END} time units")
-    print(f"  Stored {len(storage)} snapshots")
+    print(f"  {data.n_snapshots} snapshots saved to {output_data_dir}")
     print()
 
     return SimulationResult(
         grid=grid,
-        storage=storage,
+        data=data,
         x_coords=x,
         y_coords=y,
     )
@@ -204,19 +222,18 @@ def _run_simulation(
 def _analyze_results(result: SimulationResult) -> dict[str, float]:
     print("Step 6: Analyzing results...")
 
-    initial = cast("FieldCollection", result.storage[0])
-    final = cast("FieldCollection", result.storage[-1])
+    data = result.data
+    field_name = data.field_names[0]
 
     # Extract field amplitudes
-    initial_max = float(np.max(np.abs(initial[0].data)))
-    final_max = float(np.max(np.abs(final[0].data)))
+    initial_max = float(np.max(np.abs(data.fields[field_name][0])))
+    final_max = float(np.max(np.abs(data.fields[field_name][-1])))
 
     print(f"  Initial: max|phi| = {initial_max:.4f}")
     print(f"  Final:   max|phi| = {final_max:.4f}")
 
     # Calculate amplitude decay ratio
     decay_ratio = final_max / initial_max if initial_max > 0 else 0.0
-    # For 2+1D (n=2), amplitude decay depends on H and the specific solution
     expected_decay = float(np.exp(-0.5 * HUBBLE_PARAM * T_END))
 
     print(f"  Amplitude ratio (final/initial): {decay_ratio:.4f}")
@@ -227,23 +244,15 @@ def _analyze_results(result: SimulationResult) -> dict[str, float]:
     else:
         print("  Note: For small H or short time, damping may be subtle")
 
-    # Energy proxy: bare-mass Hamiltonian E = 1/2 * integral(pi^2 + m^2 phi^2) dx
-    # Note: With time-dependent mass m^2*exp(2Ht), no simple energy functional
-    # decays monotonically -- the growing cross-term m^2(e^{2Ht}-1)*integral(phi*pi) causes
-    # oscillations. We use this proxy only for text output; the plot uses
-    # amplitude decay which IS monotonic and clearly shows Hubble friction.
-    def compute_energy(snapshot: FieldCollection) -> float:
-        phi_data = snapshot[0].data
-        pi_data = snapshot[1].data
-        return float(np.sum(pi_data**2 + MASS_SQUARED * phi_data**2))
-
-    initial_energy = compute_energy(initial)
-    final_energy = compute_energy(final)
-
-    print(f"  Initial 'energy': {initial_energy:.2f}")
-    print(f"  Final 'energy': {final_energy:.2f}")
-    if initial_energy > 0:
-        print(f"  Energy loss: {100 * (1 - final_energy / initial_energy):.1f}%")
+    # Energy evolution via measurement module (NOT conserved for de Sitter)
+    print("Computing energy evolution (virial formula)...")
+    _times, _per_field, _interaction, total = compute_energy_timeseries(data)
+    e0 = total[0]
+    e_final = total[-1]
+    print(f"  Initial energy (virial): {e0:.2f}")
+    print(f"  Final energy (virial):   {e_final:.2f}")
+    if e0 > 0:
+        print(f"  Energy loss: {100 * (1 - e_final / e0):.1f}%")
     print()
 
     return {"decay_ratio": decay_ratio}
@@ -252,18 +261,20 @@ def _analyze_results(result: SimulationResult) -> dict[str, float]:
 def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     print("Step 7: Generating visualization...")
 
-    storage = result.storage
+    data = result.data
     grid = result.grid
+    field_name = data.field_names[0]
+    n_snapshots = data.n_snapshots
 
-    initial = cast("FieldCollection", storage[0])
-    final = cast("FieldCollection", storage[-1])
+    initial_phi = data.fields[field_name][0]
+    final_phi = data.fields[field_name][-1]
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
     # Initial field (2D)
     ax = axes[0, 0]
     im = ax.imshow(
-        initial[0].data.T,
+        initial_phi.T,
         origin="lower",
         cmap="bwr_r",
         vmin=-PULSE_AMPLITUDE,
@@ -278,7 +289,7 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     # Final field (2D)
     ax = axes[0, 1]
     im = ax.imshow(
-        final[0].data.T,
+        final_phi.T,
         origin="lower",
         cmap="bwr_r",
         vmin=-PULSE_AMPLITUDE,
@@ -291,18 +302,15 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     plt.colorbar(im, ax=ax, label=r"$\phi$")
 
     # Amplitude and field-norm decay (monotonic indicators of Hubble damping)
-    # Note: No simple energy proxy decays as exp(-Ht) for this equation because
-    # the time-dependent mass m^2*exp(2Ht) introduces a growing cross-term in
-    # dE/dt. Amplitude and integral(phi^2) are unambiguous decay indicators.
     ax = axes[1, 0]
-    time_values = list(storage.times)
+    time_values = list(data.times)
     amplitudes = [
-        float(np.max(np.abs(cast("FieldCollection", storage[i])[0].data)))
-        for i in range(len(storage))
+        float(np.max(np.abs(data.fields[field_name][i])))
+        for i in range(n_snapshots)
     ]
     field_norms = [
-        float(np.sum(cast("FieldCollection", storage[i])[0].data ** 2))
-        for i in range(len(storage))
+        float(np.sum(data.fields[field_name][i] ** 2))
+        for i in range(n_snapshots)
     ]
 
     t_array = np.array(time_values)
@@ -339,7 +347,6 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     # Cross-section through center (y = center_y)
     ax = axes[1, 1]
     center_idx = grid.shape[1] // 2
-    n_snapshots = len(storage)
     times_to_plot = [
         0,
         n_snapshots // 4,
@@ -352,10 +359,9 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
 
     x_1d = cast("np.ndarray", grid.cell_coords[:, 0, 0])
     for i, t_idx in enumerate(times_to_plot):
-        snapshot = cast("FieldCollection", storage[t_idx])
         ax.plot(
             x_1d,
-            snapshot[0].data[:, center_idx],
+            data.fields[field_name][t_idx][:, center_idx],
             color=colors[i],
             label=f"t={time_values[t_idx]:.0f}",
             alpha=0.8,
@@ -406,14 +412,26 @@ def _print_footer(decay_ratio: float) -> None:
 
 
 def main() -> None:
-    """Run the 2+1D de Sitter Klein-Gordon simulation."""
+    """Run the 2+1D de Sitter Klein-Gordon simulation.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the JSON spec has not been generated yet.
+    """
     json_path = Path(__file__).parent.parent / "data" / "de_sitter_kg.json"
+    if not json_path.exists():
+        msg = (
+            f"{json_path} not found. "
+            "Run 'tidal derive theory.toml' first (requires wolframscript)."
+        )
+        raise FileNotFoundError(msg)
     _print_header()
     _load_spec(json_path)
     pde = _build_pde(json_path)
     grid = _create_grid()
     state = _create_initial_state(grid)
-    result = _run_simulation(pde, grid, state)
+    result = _run_simulation(pde, grid, state, json_path)
     analysis = _analyze_results(result)
     _plot_results(result)
     _print_footer(decay_ratio=analysis["decay_ratio"])

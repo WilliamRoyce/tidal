@@ -24,11 +24,10 @@ creates asymmetric conversion behavior.
 
 The measurement module quantifies conversion using:
 - **Conversion probability** P(t) = E_A2(t) / E_phi(0)
+- **Mixing length** and **mixing spectrum** (temporal FFT of P(t))
+- **Energy conservation** via ``check_energy_conservation``
 - **Hamiltonian energy** decomposition via the generic virial formula
   (from the measurement module's ``compute_energy_timeseries``)
-
-Spectral measurements (P(k,t), omega(k), mixing length) are NOT available
-because the position-dependent background breaks translation invariance.
 
 Usage:
     uv run python examples/vector_background/vector_background_simulation.py
@@ -49,8 +48,11 @@ from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
 from tidal.measurement import (
     SimulationData,
+    check_energy_conservation,
     compute_conversion_probability,
     compute_energy_timeseries,
+    compute_mixing_length,
+    compute_mixing_spectrum,
     create_snapshot_callback,
 )
 from tidal.symbolic import build_pde_from_json, load_equation_system
@@ -61,6 +63,8 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from tidal.measurement._conversion import ConversionResult
+    from tidal.measurement._diagnostics import EnergyDiagnostics
+    from tidal.measurement._mixing import MixingResult, MixingSpectrum
 
 # -- Configuration --------------------------------------------------------
 
@@ -88,13 +92,16 @@ N_CELLS = 64
 # Time integration
 T_END = 20.0
 DT = 0.02
-TRACKER_INTERVAL = 1.0
+TRACKER_INTERVAL = 0.2
 
 # Initial conditions -- rightward-propagating phi wave packet
 X0 = -15.0  # left of domain wall
 SIGMA = 3.0
 K0 = 2.0  # wavevector (k0 > sqrt(mPhi2) for propagation)
 PULSE_AMPLITUDE = 1.0
+
+# Analysis
+ENERGY_THRESHOLD = 0.001
 
 # Output
 OUTPUT_FILENAME = "vector_background_measurement.png"
@@ -153,8 +160,8 @@ def _compute_energy_decomposition(data: SimulationData) -> EnergyDecomposition:
     phi_fields = [n for n in per_field if n.startswith("phi_")]
     a_fields = [n for n in per_field if n.startswith("A_")]
 
-    phi_energy = sum(per_field[n] for n in phi_fields)
-    a_energy = sum(per_field[n] for n in a_fields)
+    phi_energy = cast("NDArray[np.float64]", sum(per_field[n] for n in phi_fields))
+    a_energy = cast("NDArray[np.float64]", sum(per_field[n] for n in a_fields))
 
     return EnergyDecomposition(
         times=times,
@@ -245,7 +252,8 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
 
 def _print_summary(
     result: ConversionResult,
-    hamiltonian: EnergyDecomposition,
+    diag: EnergyDiagnostics,
+    mixing: MixingResult | None,
     params: dict[str, float],
 ) -> None:
     """Print quantitative measurement summary to stdout."""
@@ -280,17 +288,17 @@ def _print_summary(
     print(f"  Final  target energy E_A2(T) = {result.target_energy[-1]:.4f}")
     print()
 
-    print("  Spectral measurements: NOT AVAILABLE")
-    print("    (tanh domain wall breaks translation invariance)")
+    if mixing is not None:
+        print("  Mixing length:")
+        print(f"    L_mix = {mixing.mixing_length:.4f}")
+        print(f"    omega_dom = {mixing.dominant_frequency:.4f}")
+        print(f"    uncertainty = {mixing.mixing_length_uncertainty:.4f}")
+    else:
+        print("  Mixing length: NOT EXTRACTED")
     print()
 
-    h0 = hamiltonian.total_energy[0]
-    h_final = hamiltonian.total_energy[-1]
-    max_drift = float(
-        np.max(np.abs((hamiltonian.total_energy - h0) / max(abs(h0), 1e-30)))
-    )
-    print(f"  Hamiltonian H(0) = {h0:.4f},  H(T) = {h_final:.4f}")
-    print(f"  max |dH/H| = {max_drift:.2e}")
+    print(f"  Energy conservation: max |dE/E0| = {diag.max_relative_error:.2e}")
+    print(f"  Conservation: {'PASS' if diag.is_conserved else 'FAIL'}")
     print("  (virial formula from measurement module)")
     print("=" * 65)
 
@@ -302,11 +310,14 @@ def _plot_results(
     data: SimulationData,
     result: ConversionResult,
     hamiltonian: EnergyDecomposition,
+    diag: EnergyDiagnostics,
+    mixing: MixingResult | None,
+    spectrum: MixingSpectrum | None,
     coupling_field: NDArray[np.float64],
     params: dict[str, float],
 ) -> Path:
-    """Generate 2x3 measurement figure. Returns path to saved PNG."""
-    fig, axes = plt.subplots(2, 3, figsize=(16, 10))
+    """Generate 2x4 measurement figure. Returns path to saved PNG."""
+    fig, axes = plt.subplots(2, 4, figsize=(22, 9))
     fig.suptitle(
         "Scalar-Vector + Tanh Domain Wall Background (2+1D)\n"
         r"$\mathcal{L} = -\frac{1}{2}(\partial\phi)^2"
@@ -317,23 +328,29 @@ def _plot_results(
         fontsize=13,
     )
 
-    # [0,0] Conversion probability P(t)
-    _plot_conversion(axes[0, 0], result)
+    # [0,0] Conversion probability P(t) + mixing length annotation
+    _plot_conversion(axes[0, 0], result, mixing)
 
-    # [0,1] Hamiltonian energy decomposition
+    # [0,1] Energy decomposition (E_phi, E_A, coupling, total)
     _plot_hamiltonian(axes[0, 1], hamiltonian)
 
-    # [0,2] B_2(x,y) domain wall coupling field
-    _plot_coupling_field(axes[0, 2], fig, data, coupling_field)
+    # [0,2] Energy conservation via check_energy_conservation
+    _plot_energy_conservation(axes[0, 2], diag)
 
-    # [1,0] A_2 at final time (coupled component)
-    _plot_field_heatmap(axes[1, 0], data, "A_2", coupling_field, "A_2 (coupled)")
+    # [0,3] Mixing spectrum (temporal FFT of P(t))
+    _plot_mixing_spectrum(axes[0, 3], spectrum)
 
-    # [1,1] A_1 at final time (uncoupled -- should stay ~0)
-    _plot_field_heatmap(axes[1, 1], data, "A_1", coupling_field, "A_1 (uncoupled)")
+    # [1,0] B_2(x,y) domain wall coupling field
+    _plot_coupling_field(axes[1, 0], fig, data, coupling_field)
 
-    # [1,2] Summary text
-    _plot_summary_text(axes[1, 2], result, hamiltonian, params)
+    # [1,1] |A_2| at final time (coupled component)
+    _plot_field_heatmap(axes[1, 1], data, "A_2", coupling_field, "A_2 (coupled)")
+
+    # [1,2] |A_1| at final time (uncoupled -- should stay ~0)
+    _plot_field_heatmap(axes[1, 2], data, "A_1", coupling_field, "A_1 (uncoupled)")
+
+    # [1,3] Summary text
+    _plot_summary_text(axes[1, 3], result, diag, mixing, params)
 
     plt.tight_layout()
     output_dir = Path(__file__).parent.parent.parent / "outputs"
@@ -344,7 +361,9 @@ def _plot_results(
     return output_path
 
 
-def _plot_conversion(ax: Axes, result: ConversionResult) -> None:
+def _plot_conversion(
+    ax: Axes, result: ConversionResult, mixing: MixingResult | None
+) -> None:
     peak_idx = int(np.argmax(result.probability))
     ax.plot(result.times, result.probability, "b-", linewidth=1.5)
     ax.plot(result.times[peak_idx], result.probability[peak_idx], "ro", markersize=6)
@@ -356,6 +375,18 @@ def _plot_conversion(ax: Axes, result: ConversionResult) -> None:
         fontsize=9,
         arrowprops={"arrowstyle": "->", "color": "gray"},
     )
+    if mixing is not None:
+        ax.annotate(
+            f"$L_{{mix}}$ = {mixing.mixing_length:.2f}"
+            f" $\\pm$ {mixing.mixing_length_uncertainty:.2f}",
+            xy=(0.95, 0.95),
+            xycoords="axes fraction",
+            ha="right",
+            va="top",
+            fontsize=9,
+            color="green",
+            bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8},
+        )
     ax.set_xlabel("Time")
     ax.set_ylabel(r"$P(t) = E_{A_2}(t)\,/\,E_\phi(0)$")
     ax.set_title(r"Conversion Probability ($\phi \to A_2$)")
@@ -384,8 +415,56 @@ def _plot_hamiltonian(ax: Axes, h: EnergyDecomposition) -> None:
     )
     ax.set_xlabel("Time")
     ax.set_ylabel("Energy")
-    ax.set_title("Hamiltonian Energy")
+    ax.set_title("Energy Decomposition")
     ax.legend(fontsize=8, ncol=2)
+    ax.grid(visible=True, alpha=0.3)
+
+
+def _plot_energy_conservation(ax: Axes, diag: EnergyDiagnostics) -> None:
+    ax.plot(diag.times, diag.relative_error, "k-", linewidth=1.0)
+    ax.axhline(
+        ENERGY_THRESHOLD,
+        color="r",
+        linestyle="--",
+        alpha=0.5,
+        label=f"threshold ({ENERGY_THRESHOLD})",
+    )
+    ax.axhline(-ENERGY_THRESHOLD, color="r", linestyle="--", alpha=0.5)
+    ax.set_xlabel("Time")
+    ax.set_ylabel(r"$\Delta E\,/\,E_0$")
+    ax.set_title("Energy Conservation")
+    ax.legend(fontsize=8)
+    ax.grid(visible=True, alpha=0.3)
+
+
+def _plot_mixing_spectrum(ax: Axes, spectrum: MixingSpectrum | None) -> None:
+    if spectrum is not None:
+        ax.semilogy(
+            spectrum.frequencies, spectrum.power, "b-", linewidth=0.5, alpha=0.7
+        )
+        ax.axvline(
+            spectrum.dominant_frequency,
+            color="red",
+            linestyle="--",
+            alpha=0.7,
+            label=rf"$\omega_{{dom}}$ = {spectrum.dominant_frequency:.2f}",
+        )
+        x_max = min(10 * spectrum.dominant_frequency, spectrum.frequencies[-1])
+        ax.set_xlim(0, x_max)
+        ax.set_xlabel(r"$\omega$ (rad/time)")
+        ax.set_ylabel(r"$|\hat{P}(\omega)|^2$")
+        ax.legend(fontsize=8)
+    else:
+        ax.text(
+            0.5,
+            0.5,
+            "Not computed",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=9,
+        )
+    ax.set_title("Mixing Spectrum")
     ax.grid(visible=True, alpha=0.3)
 
 
@@ -463,7 +542,8 @@ def _plot_field_heatmap(
 def _plot_summary_text(
     ax: Axes,
     result: ConversionResult,
-    hamiltonian: EnergyDecomposition,
+    diag: EnergyDiagnostics,
+    mixing: MixingResult | None,
     params: dict[str, float],
 ) -> None:
     m_phi2 = params["mPhi2"]
@@ -474,10 +554,6 @@ def _plot_summary_text(
     r_param = params["R"]
     omega_k = np.sqrt(K0**2 + m_phi2)
     peak_idx = int(np.argmax(result.probability))
-    h0 = hamiltonian.total_energy[0]
-    max_drift = float(
-        np.max(np.abs((hamiltonian.total_energy - h0) / max(abs(h0), 1e-30)))
-    )
     lines = [
         "Parameters:",
         f"  $m_\\phi^2 = {m_phi2}$,  $m_A^2 = {m_a2}$",
@@ -490,13 +566,22 @@ def _plot_summary_text(
         "Results:",
         f"  Peak $P(t) = {result.probability[peak_idx]:.6f}$",
         f"  at $t = {result.times[peak_idx]:.2f}$",
-        f"  max $|\\Delta H / H_0| = {max_drift:.2e}$",
+    ]
+    if mixing is not None:
+        lines += [
+            "",
+            "Mixing Length:",
+            f"  $L_{{mix}} = {mixing.mixing_length:.4f}$",
+            f"  $\\omega_{{dom}} = {mixing.dominant_frequency:.4f}$",
+        ]
+    lines += [
+        "",
+        f"  max $|\\Delta E / E_0| = {diag.max_relative_error:.2e}$",
+        f"  Conservation: {'PASS' if diag.is_conserved else 'FAIL'}",
         "",
         "Domain wall: tanh(x/W)",
         "  coupling changes sign at x=0",
         "  A_1 should stay $\\approx 0$ (B_1=0)",
-        "",
-        "Spectral methods: N/A",
     ]
     ax.text(
         0.05,
@@ -528,20 +613,44 @@ def main() -> None:
         data, source_field="phi_0", target_field="A_2"
     )
 
-    print("Computing energy decomposition (virial formula)...")
-    hamiltonian = _compute_energy_decomposition(data)
-
     # Check that A_1 stays at zero (B_1=0, uncoupled)
     a1_max = float(np.max(np.abs(data.fields["A_1"])))
     a2_max = float(np.max(np.abs(data.fields["A_2"])))
     print(f"  A_1 max (uncoupled, should be ~0): {a1_max:.2e}")
     print(f"  A_2 max (coupled): {a2_max:.4f}")
 
-    _print_summary(result, hamiltonian, params)
+    print("Computing mixing length and spectrum...")
+    mixing: MixingResult | None = None
+    spectrum: MixingSpectrum | None = None
+    try:
+        mixing = compute_mixing_length(result)
+    except ValueError as e:
+        print(f"  Mixing length: not extracted ({e})")
+    try:
+        spectrum = compute_mixing_spectrum(result)
+    except ValueError as e:
+        print(f"  Mixing spectrum: not computed ({e})")
+
+    print("Computing energy decomposition (virial formula)...")
+    hamiltonian = _compute_energy_decomposition(data)
+
+    print("Checking energy conservation...")
+    diag = check_energy_conservation(data, threshold=ENERGY_THRESHOLD)
+
+    _print_summary(result, diag, mixing, params)
 
     print()
     print("Generating measurement plots...")
-    output_path = _plot_results(data, result, hamiltonian, coupling_field, params)
+    output_path = _plot_results(
+        data,
+        result,
+        hamiltonian,
+        diag,
+        mixing,
+        spectrum,
+        coupling_field,
+        params,
+    )
     print(f"  Saved to: {output_path}")
 
 

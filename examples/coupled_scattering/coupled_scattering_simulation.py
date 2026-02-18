@@ -14,10 +14,12 @@ The measurement module quantifies this conversion using:
 
 - **Conversion probability** P(t) = E_chi(t) / E_phi(0)
 - **Mixing length** L_mix = pi / omega_dom  (half-period of dominant oscillation)
-- **Spectral conversion** P(k,t) — per-mode conversion probability
-- **Dispersion relation** omega(k) — extracted via spacetime FFT
-- **Hamiltonian energy** decomposition (manual, cross-validated against
-  virial energy from the measurement module)
+- **Energy decomposition** via ``compute_energy_timeseries`` (measurement module)
+- **Energy conservation** via ``check_energy_conservation``
+
+Note: Spectral conversion P(k,t) and dispersion omega(k) are NOT available for
+this system because the position-dependent Gaussian coupling G(x,y) breaks
+spatial translation invariance required by FFT-based analysis.
 
 Analogy to Gertsenshtein effect:
   phi <-> photon,  chi <-> graviton,  G(x,y) <-> background B_0(x,y)
@@ -40,32 +42,23 @@ import numpy as np
 from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
 from tidal.measurement import (
+    EnergyDiagnostics,
     SimulationData,
+    check_energy_conservation,
     compute_conversion_probability,
-    compute_dispersion,
+    compute_energy_timeseries,
     compute_mixing_length,
     compute_mixing_spectrum,
-    compute_spectral_conversion,
-    compute_system_energy,
     create_snapshot_callback,
 )
 from tidal.symbolic import build_pde_from_json, load_equation_system
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
-    from matplotlib.figure import Figure
     from numpy.typing import NDArray
 
     from tidal.measurement._conversion import ConversionResult
-    from tidal.measurement._dispersion import DispersionResult
     from tidal.measurement._mixing import MixingResult, MixingSpectrum
-    from tidal.measurement._spectral_conversion import SpectralConversion
-
-# NOTE: The measurement module's virial energy (compute_system_energy) now
-# supports position-dependent coupling G(x,y).  We keep the manual
-# Hamiltonian decomposition as a cross-validation — it gives a physics-
-# specific breakdown (phi energy, chi energy, coupling energy) that the
-# generic virial formula does not.
 
 # ── Configuration ─────────────────────────────────────────────
 
@@ -84,12 +77,12 @@ PARAMS: dict[str, float] = {
 
 # Grid (2D, periodic)
 DOMAIN = (-50.0, 50.0)
-N_CELLS = 128
+N_CELLS = 96
 
 # Time integration
-T_END = 1000.0
+T_END = 50.0
 DT = 0.02
-TRACKER_INTERVAL = 10.0
+TRACKER_INTERVAL = 0.5
 
 # Initial conditions — rightward-propagating phi wave packet
 X0 = -25.0  # center of wave packet (left of coupling region)
@@ -101,15 +94,16 @@ PULSE_AMPLITUDE = 1.0
 OUTPUT_FILENAME = "coupled_scattering_measurement.png"
 
 
-# ── Hamiltonian energy (manual) ───────────────────────────────
+# ── Energy decomposition (via measurement module) ────────────
 
 
 @dataclass(frozen=True)
-class HamiltonianDecomposition:
-    """Hamiltonian energy decomposition over time.
+class EnergyDecomposition:
+    """Energy decomposition by field group via the generic virial formula.
 
-    H = sum_i [1/2 pi_i^2 + 1/2 |grad phi_i|^2 + m_i^2/2 phi_i^2]
-        + integral G(x,y) phi chi dA
+    Computed by ``compute_energy_timeseries``, which reads operators directly
+    from the JSON spec.  Automatically handles position-dependent coefficients
+    like the Gaussian coupling G(x,y).
     """
 
     times: NDArray[np.float64]
@@ -117,18 +111,6 @@ class HamiltonianDecomposition:
     chi_energy: NDArray[np.float64]
     coupling_energy: NDArray[np.float64]
     total_energy: NDArray[np.float64]
-
-
-def _gradient_energy_2d(
-    field: NDArray[np.float64],
-    dx: float,
-    dy: float,
-) -> float:
-    """Compute 1/2 integral |grad phi|^2 dA using periodic central differences."""
-    dv = dx * dy
-    gx = (np.roll(field, -1, axis=0) - np.roll(field, 1, axis=0)) / (2 * dx)
-    gy = (np.roll(field, -1, axis=1) - np.roll(field, 1, axis=1)) / (2 * dy)
-    return 0.5 * float(np.sum(gx**2 + gy**2)) * dv
 
 
 def _compute_coupling_field(data: SimulationData) -> NDArray[np.float64]:
@@ -151,50 +133,24 @@ def _compute_coupling_field(data: SimulationData) -> NDArray[np.float64]:
     return g0 * np.exp(-(x**2 + y**2) / (2 * r_param**2))
 
 
-def _compute_hamiltonian_energies(
-    data: SimulationData,
-    coupling_field: NDArray[np.float64],
-) -> HamiltonianDecomposition:
-    """Compute full Hamiltonian decomposition over all snapshots.
+def _compute_energy_decomposition(data: SimulationData) -> EnergyDecomposition:
+    """Compute energy decomposition grouped by field sector.
 
-    Provides a physics-specific breakdown (phi energy, chi energy,
-    coupling energy) as a cross-validation against the measurement
-    module's virial energy.
+    Uses the generic virial formula via ``compute_energy_timeseries``,
+    which reads operators from the JSON spec.  This correctly handles
+    position-dependent coefficients and all spatial operators.
     """
-    dx, dy = data.grid_spacing
-    dv = dx * dy
-    n = data.n_snapshots
-    phi_e = np.empty(n)
-    chi_e = np.empty(n)
-    cpl_e = np.empty(n)
+    times, per_field, interaction, total = compute_energy_timeseries(data)
 
-    m_phi2 = data.parameters.get("mPhi2", MPHI2)
-    m_chi2 = data.parameters.get("mChi2", MCHI2)
+    phi_energy = per_field["phi_0"]
+    chi_energy = per_field["chi_0"]
 
-    for i in range(n):
-        phi = data.fields["phi_0"][i]
-        pi_phi = data.momenta["phi_0"][i]
-        chi = data.fields["chi_0"][i]
-        pi_chi = data.momenta["chi_0"][i]
-
-        phi_e[i] = (
-            0.5 * float(np.sum(pi_phi**2)) * dv
-            + _gradient_energy_2d(phi, dx, dy)
-            + 0.5 * m_phi2 * float(np.sum(phi**2)) * dv
-        )
-        chi_e[i] = (
-            0.5 * float(np.sum(pi_chi**2)) * dv
-            + _gradient_energy_2d(chi, dx, dy)
-            + 0.5 * m_chi2 * float(np.sum(chi**2)) * dv
-        )
-        cpl_e[i] = float(np.sum(coupling_field * phi * chi)) * dv
-
-    return HamiltonianDecomposition(
-        times=data.times,
-        phi_energy=phi_e,
-        chi_energy=chi_e,
-        coupling_energy=cpl_e,
-        total_energy=phi_e + chi_e + cpl_e,
+    return EnergyDecomposition(
+        times=times,
+        phi_energy=phi_energy,
+        chi_energy=chi_energy,
+        coupling_energy=interaction,
+        total_energy=total,
     )
 
 
@@ -274,13 +230,12 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
 # ── Summary ───────────────────────────────────────────────────
 
 
-def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
+def _print_summary(
     result: ConversionResult,
-    hamiltonian: HamiltonianDecomposition,
+    energy: EnergyDecomposition,
+    diag: EnergyDiagnostics,
     mixing: MixingResult | None,
     spectrum: MixingSpectrum | None,
-    spectral_conv: SpectralConversion | None,
-    disp_phi: DispersionResult | None,
     params: dict[str, float],
 ) -> None:
     """Print quantitative measurement summary to stdout."""
@@ -330,46 +285,29 @@ def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
         print("  Mixing spectrum: not computed")
     print()
 
-    if spectral_conv is not None:
-        n_active = int(spectral_conv.active_modes.sum())
-        print(f"  Spectral conversion: {n_active} active k-modes")
-    else:
-        print("  Spectral conversion: not computed")
-
-    if disp_phi is not None:
-        n_active = int(np.count_nonzero(disp_phi.peak_frequencies > 0.0))
-        print(f"  Dispersion (phi): {n_active} active k-modes")
-    else:
-        print("  Dispersion: not computed")
-    print()
-
-    h0 = hamiltonian.total_energy[0]
-    h_final = hamiltonian.total_energy[-1]
-    max_drift = float(
-        np.max(np.abs((hamiltonian.total_energy - h0) / max(abs(h0), 1e-30)))
-    )
-    print(f"  Hamiltonian H(0) = {h0:.4f},  H(T) = {h_final:.4f}")
-    print(f"  max |dH/H| = {max_drift:.2e}")
-    print("  (Manual decomposition cross-validated against virial energy)")
+    h0 = energy.total_energy[0]
+    h_final = energy.total_energy[-1]
+    print(f"  Energy E(0) = {h0:.4f},  E(T) = {h_final:.4f}")
+    print(f"  max |dE/E0| = {diag.max_relative_error:.2e}")
+    print(f"  Conserved: {diag.is_conserved}")
     print("=" * 65)
 
 
 # ── Plotting ──────────────────────────────────────────────────
 
 
-def _plot_results(  # noqa: PLR0913, PLR0917
+def _plot_results(
     data: SimulationData,
     result: ConversionResult,
-    hamiltonian: HamiltonianDecomposition,
+    energy: EnergyDecomposition,
+    diag: EnergyDiagnostics,
     mixing: MixingResult | None,
     spectrum: MixingSpectrum | None,
-    spectral_conv: SpectralConversion | None,
-    disp_phi: DispersionResult | None,
     coupling_field: NDArray[np.float64],
     params: dict[str, float],
 ) -> Path:
-    """Generate 2x4 measurement figure. Returns path to saved PNG."""
-    fig, axes = plt.subplots(2, 4, figsize=(22, 9))
+    """Generate 2x3 measurement figure. Returns path to saved PNG."""
+    fig, axes = plt.subplots(2, 3, figsize=(17, 9))
     fig.suptitle(
         "Coupled Scalar Scattering (2+1D): Measurement Analysis\n"
         r"$\mathcal{L} = -\frac{1}{2}(\partial\phi)^2"
@@ -385,26 +323,20 @@ def _plot_results(  # noqa: PLR0913, PLR0917
     # [0,0] Conversion probability P(t)
     _plot_conversion(axes[0, 0], result, peak_idx, mixing)
 
-    # [0,1] Hamiltonian energy decomposition
-    _plot_hamiltonian(axes[0, 1], hamiltonian)
+    # [0,1] Energy decomposition
+    _plot_hamiltonian(axes[0, 1], energy)
 
-    # [0,2] Energy conservation |dH/H0|
-    _plot_energy_conservation(axes[0, 2], hamiltonian)
+    # [0,2] Energy conservation via check_energy_conservation
+    _plot_energy_conservation(axes[0, 2], diag)
 
-    # [0,3] Mixing spectrum
-    _plot_mixing_spectrum(axes[0, 3], spectrum)
+    # [1,0] Mixing spectrum
+    _plot_mixing_spectrum(axes[1, 0], spectrum)
 
-    # [1,0] Spectral conversion P(k,t)
-    _plot_spectral_conversion(axes[1, 0], fig, spectral_conv)
+    # [1,1] |chi| at final time + coupling contours
+    _plot_chi_heatmap(axes[1, 1], data, coupling_field)
 
-    # [1,1] Dispersion omega(k)
-    _plot_dispersion(axes[1, 1], fig, disp_phi, spectral_conv)
-
-    # [1,2] |chi| at final time + coupling contours
-    _plot_chi_heatmap(axes[1, 2], data, coupling_field)
-
-    # [1,3] Summary text
-    _plot_summary_text(axes[1, 3], result, hamiltonian, mixing, params, peak_idx)
+    # [1,2] Summary text
+    _plot_summary_text(axes[1, 2], result, energy, diag, mixing, params, peak_idx)
 
     plt.tight_layout()
     output_dir = Path(__file__).parent.parent.parent / "outputs"
@@ -450,7 +382,7 @@ def _plot_conversion(
     ax.grid(visible=True, alpha=0.3)
 
 
-def _plot_hamiltonian(ax: Axes, h: HamiltonianDecomposition) -> None:
+def _plot_hamiltonian(ax: Axes, h: EnergyDecomposition) -> None:
     ax.plot(h.times, h.phi_energy, "b-", label=r"$E_\phi$", linewidth=1.2)
     ax.plot(h.times, h.chi_energy, "r-", label=r"$E_\chi$", linewidth=1.2)
     ax.plot(
@@ -471,19 +403,17 @@ def _plot_hamiltonian(ax: Axes, h: HamiltonianDecomposition) -> None:
     )
     ax.set_xlabel("Time")
     ax.set_ylabel("Energy")
-    ax.set_title("Hamiltonian Energy")
+    ax.set_title("Energy Decomposition")
     ax.legend(fontsize=8, ncol=2)
     ax.grid(visible=True, alpha=0.3)
 
 
-def _plot_energy_conservation(ax: Axes, h: HamiltonianDecomposition) -> None:
-    h0 = h.total_energy[0]
-    relative = (h.total_energy - h0) / max(abs(h0), 1e-30)
-    ax.plot(h.times, relative, "k-", linewidth=1.0)
+def _plot_energy_conservation(ax: Axes, diag: EnergyDiagnostics) -> None:
+    ax.plot(diag.times, diag.relative_error, "k-", linewidth=1.0)
     ax.axhline(1e-3, color="r", linestyle="--", alpha=0.5, label="threshold (1e-3)")
     ax.axhline(-1e-3, color="r", linestyle="--", alpha=0.5)
     ax.set_xlabel("Time")
-    ax.set_ylabel(r"$\Delta H\,/\,H_0$")
+    ax.set_ylabel(r"$\Delta E\,/\,E_0$")
     ax.set_title("Energy Conservation")
     ax.legend(fontsize=8)
     ax.grid(visible=True, alpha=0.3)
@@ -513,107 +443,6 @@ def _plot_mixing_spectrum(ax: Axes, spectrum: MixingSpectrum | None) -> None:
     else:
         ax.text(0.5, 0.5, "Not computed", transform=ax.transAxes, ha="center")
     ax.set_title("Mixing Spectrum")
-    ax.grid(visible=True, alpha=0.3)
-
-
-def _plot_spectral_conversion(
-    ax: Axes,
-    fig: Figure,
-    spectral_conv: SpectralConversion | None,
-) -> None:
-    if spectral_conv is not None and np.any(spectral_conv.active_modes):
-        prob = spectral_conv.probability
-        p_active = prob[:, spectral_conv.active_modes]
-        vmax = float(np.percentile(p_active, 99)) if p_active.size > 0 else 1.0
-        mesh = ax.pcolormesh(
-            spectral_conv.wavenumbers,
-            spectral_conv.times,
-            prob,
-            shading="nearest",
-            cmap="inferno",
-            vmax=max(vmax, 1e-6),
-        )
-        fig.colorbar(mesh, ax=ax, label=r"$P(k,t)$", pad=0.02)
-        k_active_max = float(
-            spectral_conv.wavenumbers[spectral_conv.active_modes].max()
-        )
-        ax.set_xlim(0, k_active_max * 1.15)
-        ax.set_xlabel(r"$|k|$")
-        ax.set_ylabel("Time")
-        ax.set_title(r"Spectral Conversion $P(k,t)$")
-    else:
-        ax.text(
-            0.5,
-            0.5,
-            "No spectral\nconversion data",
-            transform=ax.transAxes,
-            ha="center",
-            va="center",
-            fontsize=9,
-        )
-        ax.set_title("Spectral Conversion")
-    ax.grid(visible=True, alpha=0.3)
-
-
-def _plot_dispersion(
-    ax: Axes,
-    fig: Figure,
-    disp_phi: DispersionResult | None,
-    spectral_conv: SpectralConversion | None,
-) -> None:
-    if disp_phi is not None and np.any(disp_phi.peak_frequencies > 0.0):
-        log_power = np.log10(np.maximum(disp_phi.power, 1e-30))
-        log_max = float(log_power.max())
-        mesh = ax.pcolormesh(
-            disp_phi.wavenumbers,
-            disp_phi.frequencies,
-            log_power.T,
-            shading="nearest",
-            cmap="viridis",
-            vmin=log_max - 20,
-            vmax=log_max,
-        )
-        fig.colorbar(mesh, ax=ax, label=r"$\log_{10} S(k,\omega)$", pad=0.02)
-        active = disp_phi.peak_frequencies > 0.0
-        ax.plot(
-            disp_phi.wavenumbers[active],
-            disp_phi.peak_frequencies[active],
-            "w--",
-            linewidth=1.5,
-            alpha=0.9,
-            label=r"$\omega(k)$ peak",
-        )
-        if spectral_conv is not None and np.any(spectral_conv.active_modes):
-            ax.set_xlim(
-                0,
-                float(spectral_conv.wavenumbers[spectral_conv.active_modes].max())
-                * 1.15,
-            )
-        elif np.any(active):
-            max_peak = float(np.max(disp_phi.peak_powers))
-            if max_peak > 0:
-                strong = disp_phi.peak_powers >= max_peak * 1e-3
-                if np.any(strong):
-                    ax.set_xlim(0, float(disp_phi.wavenumbers[strong].max()) * 1.1)
-        peak_pwr = float(np.maximum(np.max(disp_phi.power), 1e-30))
-        sig_f = np.max(disp_phi.power, axis=0) >= peak_pwr * 1e-6
-        if np.any(sig_f):
-            ax.set_ylim(0, float(disp_phi.frequencies[sig_f].max()) * 1.1)
-        ax.set_xlabel(r"$|k|$")
-        ax.set_ylabel(r"$\omega$ (rad/time)")
-        ax.set_title(r"Dispersion $\omega(k)$ ($\phi$)")
-        ax.legend(fontsize=8, loc="upper left")
-    else:
-        ax.text(
-            0.5,
-            0.5,
-            "No dispersion data",
-            transform=ax.transAxes,
-            ha="center",
-            va="center",
-            fontsize=9,
-        )
-        ax.set_title("Dispersion")
     ax.grid(visible=True, alpha=0.3)
 
 
@@ -655,10 +484,11 @@ def _plot_chi_heatmap(
     plt.colorbar(im, ax=ax)
 
 
-def _plot_summary_text(  # noqa: PLR0913, PLR0917
+def _plot_summary_text(
     ax: Axes,
     result: ConversionResult,
-    hamiltonian: HamiltonianDecomposition,
+    energy: EnergyDecomposition,
+    diag: EnergyDiagnostics,
     mixing: MixingResult | None,
     params: dict[str, float],
     peak_idx: int,
@@ -668,10 +498,7 @@ def _plot_summary_text(  # noqa: PLR0913, PLR0917
     g0 = params["g0"]
     r_param = params["R"]
     omega_k = np.sqrt(K0**2 + m_phi2)
-    h0 = hamiltonian.total_energy[0]
-    max_drift = float(
-        np.max(np.abs((hamiltonian.total_energy - h0) / max(abs(h0), 1e-30)))
-    )
+    _ = energy  # used for type consistency; total energy printed via diag
     lines = [
         "Parameters:",
         f"  $m_\\phi^2 = {m_phi2}$,  $m_\\chi^2 = {m_chi2}$",
@@ -691,7 +518,7 @@ def _plot_summary_text(  # noqa: PLR0913, PLR0917
         ]
     lines += [
         "",
-        f"  max $|\\Delta H / H_0| = {max_drift:.2e}$",
+        f"  max $|\\Delta E / E_0| = {diag.max_relative_error:.2e}$",
         "",
         "Initial condition:",
         "  Gaussian $\\phi$ wave packet, $\\chi = 0$",
@@ -737,48 +564,18 @@ def main() -> None:
     except ValueError as e:
         print(f"  Mixing spectrum: not computed ({e})")
 
-    print("Computing spectral conversion P(k,t)...")
-    spectral_conv: SpectralConversion | None = None
-    try:
-        # Higher floor than default 1e-12: in 2D, radial binning spreads
-        # a directional wave packet across circular shells, leaving most bins
-        # with near-zero initial energy.  1e-4 keeps only meaningful modes.
-        spectral_conv = compute_spectral_conversion(
-            data,
-            "phi_0",
-            "chi_0",
-            energy_floor=1e-4,
-        )
-    except ValueError as e:
-        print(f"  Spectral conversion: not computed ({e})")
+    print("Computing energy decomposition (virial formula)...")
+    energy = _compute_energy_decomposition(data)
 
-    print("Computing dispersion relation...")
-    disp_phi: DispersionResult | None = None
-    try:
-        disp_phi = compute_dispersion(data, "phi_0")
-    except ValueError as e:
-        print(f"  Dispersion (phi): not computed ({e})")
-
-    print("Computing Hamiltonian energy (manual decomposition)...")
-    hamiltonian = _compute_hamiltonian_energies(data, coupling_field)
-
-    # Cross-validate with measurement module's virial energy
-    print("Cross-validating with virial energy (measurement module)...")
-    virial = compute_system_energy(data, 0)
-    h_manual = hamiltonian.total_energy[0]
-    h_virial = virial.total
-    rel_diff = abs(h_manual - h_virial) / max(abs(h_manual), 1e-30)
-    print(f"  Manual H(0) = {h_manual:.6f}")
-    print(f"  Virial H(0) = {h_virial:.6f}")
-    print(f"  Relative difference: {rel_diff:.2e}")
+    print("Checking energy conservation...")
+    diag = check_energy_conservation(data)
 
     _print_summary(
         result,
-        hamiltonian,
+        energy,
+        diag,
         mixing,
         spectrum,
-        spectral_conv,
-        disp_phi,
         params,
     )
 
@@ -787,11 +584,10 @@ def main() -> None:
     output_path = _plot_results(
         data,
         result,
-        hamiltonian,
+        energy,
+        diag,
         mixing,
         spectrum,
-        spectral_conv,
-        disp_phi,
         coupling_field,
         params,
     )

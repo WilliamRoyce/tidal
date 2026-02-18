@@ -16,12 +16,11 @@ B starts at zero -- any B that appears is purely from conversion.
 The measurement module quantifies this conversion using:
 
 - **Conversion probability** P(t) = E_B(t) / E_A(0) via group conversion
+- **Per-component conversion** A_1->B_1, A_2->B_2
+- **Mixing length** and **mixing spectrum** (temporal FFT of P(t))
+- **Energy conservation** via ``check_energy_conservation``
 - **Hamiltonian energy** decomposition via the generic virial formula
   (from the measurement module's ``compute_energy_timeseries``)
-
-Spectral measurements (P(k,t), omega(k), mixing length) are NOT available
-for this system because the position-dependent Lorentzian background breaks
-translation invariance.  Only real-space measurements are physical.
 
 Usage:
     uv run python examples/proca_background/proca_background_simulation.py
@@ -42,8 +41,12 @@ from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
 from tidal.measurement import (
     SimulationData,
+    check_energy_conservation,
+    compute_conversion_probability,
     compute_energy_timeseries,
     compute_group_conversion,
+    compute_mixing_length,
+    compute_mixing_spectrum,
     create_snapshot_callback,
 )
 from tidal.symbolic import build_pde_from_json, load_equation_system
@@ -54,6 +57,8 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from tidal.measurement._conversion import ConversionResult
+    from tidal.measurement._diagnostics import EnergyDiagnostics
+    from tidal.measurement._mixing import MixingResult, MixingSpectrum
 
 # -- Configuration --------------------------------------------------------
 
@@ -74,7 +79,7 @@ PARAMS: dict[str, float] = {
 
 # Grid (2D, periodic, centered at origin for the Lorentzian)
 DOMAIN = (-30.0, 30.0)
-N_CELLS = 128
+N_CELLS = 64
 
 # Time integration
 T_END = 20.0
@@ -84,6 +89,9 @@ TRACKER_INTERVAL = 0.2
 # Initial conditions -- Gaussian pulse in A_1 at center
 PULSE_AMPLITUDE = 0.5
 PULSE_WIDTH = 3.0
+
+# Analysis
+ENERGY_THRESHOLD = 0.001
 
 # Output
 OUTPUT_FILENAME = "proca_background_measurement.png"
@@ -141,8 +149,8 @@ def _compute_energy_decomposition(data: SimulationData) -> EnergyDecomposition:
     a_fields = [n for n in per_field if n.startswith("A_")]
     b_fields = [n for n in per_field if n.startswith("B_")]
 
-    a_energy = sum(per_field[n] for n in a_fields)
-    b_energy = sum(per_field[n] for n in b_fields)
+    a_energy = cast("NDArray[np.float64]", sum(per_field[n] for n in a_fields))
+    b_energy = cast("NDArray[np.float64]", sum(per_field[n] for n in b_fields))
 
     return EnergyDecomposition(
         times=times,
@@ -231,7 +239,10 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
 
 def _print_summary(
     result: ConversionResult,
-    hamiltonian: EnergyDecomposition,
+    r_a1_b1: ConversionResult,
+    r_a1_b2: ConversionResult,
+    diag: EnergyDiagnostics,
+    mixing: MixingResult | None,
     params: dict[str, float],
 ) -> None:
     """Print quantitative measurement summary to stdout."""
@@ -258,18 +269,22 @@ def _print_summary(
     print(f"  Final  target energy E_B(T) = {result.target_energy[-1]:.4f}")
     print()
 
-    # NOTE: Spectral measurements are not available for this system.
-    print("  Spectral measurements: NOT AVAILABLE")
-    print("    (Lorentzian background breaks translation invariance)")
+    print("  Per-component peaks:")
+    print(f"    P(A_1 -> B_1) = {r_a1_b1.probability.max():.6f}")
+    print(f"    P(A_1 -> B_2) = {r_a1_b2.probability.max():.6f}")
     print()
 
-    h0 = hamiltonian.total_energy[0]
-    h_final = hamiltonian.total_energy[-1]
-    max_drift = float(
-        np.max(np.abs((hamiltonian.total_energy - h0) / max(abs(h0), 1e-30)))
-    )
-    print(f"  Hamiltonian H(0) = {h0:.4f},  H(T) = {h_final:.4f}")
-    print(f"  max |dH/H| = {max_drift:.2e}")
+    if mixing is not None:
+        print("  Mixing length:")
+        print(f"    L_mix = {mixing.mixing_length:.4f}")
+        print(f"    omega_dom = {mixing.dominant_frequency:.4f}")
+        print(f"    uncertainty = {mixing.mixing_length_uncertainty:.4f}")
+    else:
+        print("  Mixing length: NOT EXTRACTED")
+    print()
+
+    print(f"  Energy conservation: max |dE/E0| = {diag.max_relative_error:.2e}")
+    print(f"  Conservation: {'PASS' if diag.is_conserved else 'FAIL'}")
     print("  (virial formula from measurement module)")
     print("=" * 65)
 
@@ -280,12 +295,17 @@ def _print_summary(
 def _plot_results(
     data: SimulationData,
     result: ConversionResult,
+    r_a1_b1: ConversionResult,
+    r_a1_b2: ConversionResult,
     hamiltonian: EnergyDecomposition,
+    diag: EnergyDiagnostics,
+    mixing: MixingResult | None,
+    spectrum: MixingSpectrum | None,
     coupling_field: NDArray[np.float64],
     params: dict[str, float],
 ) -> Path:
-    """Generate 2x3 measurement figure. Returns path to saved PNG."""
-    fig, axes = plt.subplots(2, 3, figsize=(16, 10))
+    """Generate 2x4 measurement figure. Returns path to saved PNG."""
+    fig, axes = plt.subplots(2, 4, figsize=(22, 9))
     fig.suptitle(
         "Proca + Lorentzian Background (2+1D): Measurement Analysis\n"
         r"$\mathcal{L} = -\frac{1}{4}F_A^2 - \frac{1}{4}F_B^2"
@@ -294,23 +314,29 @@ def _plot_results(
         fontsize=13,
     )
 
-    # [0,0] Conversion probability P(t)
-    _plot_conversion(axes[0, 0], result)
+    # [0,0] Total P(t) + mixing length annotation
+    _plot_conversion(axes[0, 0], result, mixing)
 
-    # [0,1] Hamiltonian energy decomposition
-    _plot_hamiltonian(axes[0, 1], hamiltonian)
+    # [0,1] Per-component P(t): A_1->B_1, A_2->B_2
+    _plot_per_component(axes[0, 1], result, r_a1_b1, r_a1_b2)
 
-    # [0,2] Energy conservation |dH/H0|
-    _plot_energy_conservation(axes[0, 2], hamiltonian)
+    # [0,2] Energy conservation via check_energy_conservation
+    _plot_energy_conservation(axes[0, 2], diag)
 
-    # [1,0] Lorentzian coupling G(x,y)
-    _plot_coupling_field(axes[1, 0], fig, data, coupling_field)
+    # [0,3] Mixing spectrum (temporal FFT of P(t))
+    _plot_mixing_spectrum(axes[0, 3], spectrum)
 
-    # [1,1] |B_1| at final time
-    _plot_field_heatmap(axes[1, 1], data, "B_1", coupling_field)
+    # [1,0] Energy decomposition (E_A, E_B, coupling, total)
+    _plot_hamiltonian(axes[1, 0], hamiltonian)
 
-    # [1,2] Summary text
-    _plot_summary_text(axes[1, 2], result, hamiltonian, params)
+    # [1,1] Coupling G(x,y) heatmap
+    _plot_coupling_field(axes[1, 1], fig, data, coupling_field)
+
+    # [1,2] |B_1| at final time
+    _plot_field_heatmap(axes[1, 2], data, "B_1", coupling_field)
+
+    # [1,3] Summary text
+    _plot_summary_text(axes[1, 3], result, diag, mixing, params)
 
     plt.tight_layout()
     output_dir = Path(__file__).parent.parent.parent / "outputs"
@@ -321,7 +347,9 @@ def _plot_results(
     return output_path
 
 
-def _plot_conversion(ax: Axes, result: ConversionResult) -> None:
+def _plot_conversion(
+    ax: Axes, result: ConversionResult, mixing: MixingResult | None
+) -> None:
     peak_idx = int(np.argmax(result.probability))
     ax.plot(result.times, result.probability, "b-", linewidth=1.5)
     ax.plot(result.times[peak_idx], result.probability[peak_idx], "ro", markersize=6)
@@ -333,10 +361,106 @@ def _plot_conversion(ax: Axes, result: ConversionResult) -> None:
         fontsize=9,
         arrowprops={"arrowstyle": "->", "color": "gray"},
     )
+    if mixing is not None:
+        ax.annotate(
+            f"$L_{{mix}}$ = {mixing.mixing_length:.2f}"
+            f" $\\pm$ {mixing.mixing_length_uncertainty:.2f}",
+            xy=(0.95, 0.95),
+            xycoords="axes fraction",
+            ha="right",
+            va="top",
+            fontsize=9,
+            color="green",
+            bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8},
+        )
     ax.set_xlabel("Time")
     ax.set_ylabel(r"$P(t) = E_B(t)\,/\,E_A(0)$")
     ax.set_title("Conversion Probability (A -> B)")
     ax.set_ylim(bottom=0)
+    ax.grid(visible=True, alpha=0.3)
+
+
+def _plot_per_component(
+    ax: Axes,
+    total: ConversionResult,
+    r_a1_b1: ConversionResult,
+    r_a1_b2: ConversionResult,
+) -> None:
+    ax.plot(
+        r_a1_b1.times,
+        r_a1_b1.probability,
+        "c-",
+        label=r"$P(A_1 \to B_1)$",
+        linewidth=1.2,
+    )
+    ax.plot(
+        r_a1_b2.times,
+        r_a1_b2.probability,
+        "r-",
+        label=r"$P(A_1 \to B_2)$",
+        linewidth=1.2,
+    )
+    ax.plot(
+        total.times,
+        total.probability,
+        "b--",
+        label="Total",
+        linewidth=1.0,
+        alpha=0.5,
+    )
+    ax.set_xlabel("Time")
+    ax.set_ylabel(r"$P(t)$")
+    ax.set_title("Per-Component Conversion")
+    ax.legend(fontsize=8)
+    ax.set_ylim(bottom=0)
+    ax.grid(visible=True, alpha=0.3)
+
+
+def _plot_energy_conservation(ax: Axes, diag: EnergyDiagnostics) -> None:
+    ax.plot(diag.times, diag.relative_error, "k-", linewidth=1.0)
+    ax.axhline(
+        ENERGY_THRESHOLD,
+        color="r",
+        linestyle="--",
+        alpha=0.5,
+        label=f"threshold ({ENERGY_THRESHOLD})",
+    )
+    ax.axhline(-ENERGY_THRESHOLD, color="r", linestyle="--", alpha=0.5)
+    ax.set_xlabel("Time")
+    ax.set_ylabel(r"$\Delta E\,/\,E_0$")
+    ax.set_title("Energy Conservation")
+    ax.legend(fontsize=8)
+    ax.grid(visible=True, alpha=0.3)
+
+
+def _plot_mixing_spectrum(ax: Axes, spectrum: MixingSpectrum | None) -> None:
+    if spectrum is not None:
+        ax.semilogy(
+            spectrum.frequencies, spectrum.power, "b-", linewidth=0.5, alpha=0.7
+        )
+        ax.axvline(
+            spectrum.dominant_frequency,
+            color="red",
+            linestyle="--",
+            alpha=0.7,
+            label=rf"$\omega_{{dom}}$ = {spectrum.dominant_frequency:.2f}",
+        )
+        x_max = min(10 * spectrum.dominant_frequency, spectrum.frequencies[-1])
+        ax.set_xlim(0, x_max)
+        ax.set_xlabel(r"$\omega$ (rad/time)")
+        ax.set_ylabel(r"$|\hat{P}(\omega)|^2$")
+        ax.legend(fontsize=8)
+    else:
+        ax.text(
+            0.5,
+            0.5,
+            "Not computed",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=9,
+        )
+    ax.set_title("Mixing Spectrum")
     ax.grid(visible=True, alpha=0.3)
 
 
@@ -361,21 +485,8 @@ def _plot_hamiltonian(ax: Axes, h: EnergyDecomposition) -> None:
     )
     ax.set_xlabel("Time")
     ax.set_ylabel("Energy")
-    ax.set_title("Hamiltonian Energy")
+    ax.set_title("Energy Decomposition")
     ax.legend(fontsize=8, ncol=2)
-    ax.grid(visible=True, alpha=0.3)
-
-
-def _plot_energy_conservation(ax: Axes, h: EnergyDecomposition) -> None:
-    h0 = h.total_energy[0]
-    relative = (h.total_energy - h0) / max(abs(h0), 1e-30)
-    ax.plot(h.times, relative, "k-", linewidth=1.0)
-    ax.axhline(1e-3, color="r", linestyle="--", alpha=0.5, label="threshold (1e-3)")
-    ax.axhline(-1e-3, color="r", linestyle="--", alpha=0.5)
-    ax.set_xlabel("Time")
-    ax.set_ylabel(r"$\Delta H\,/\,H_0$")
-    ax.set_title("Energy Conservation")
-    ax.legend(fontsize=8)
     ax.grid(visible=True, alpha=0.3)
 
 
@@ -442,7 +553,8 @@ def _plot_field_heatmap(
 def _plot_summary_text(
     ax: Axes,
     result: ConversionResult,
-    hamiltonian: EnergyDecomposition,
+    diag: EnergyDiagnostics,
+    mixing: MixingResult | None,
     params: dict[str, float],
 ) -> None:
     m_a2 = params["mA2"]
@@ -451,10 +563,6 @@ def _plot_summary_text(
     g0 = params["g0"]
     r_param = params["R"]
     peak_idx = int(np.argmax(result.probability))
-    h0 = hamiltonian.total_energy[0]
-    max_drift = float(
-        np.max(np.abs((hamiltonian.total_energy - h0) / max(abs(h0), 1e-30)))
-    )
     lines = [
         "Parameters:",
         f"  $m_A^2 = {m_a2}$,  $m_B^2 = {m_b2}$",
@@ -466,13 +574,21 @@ def _plot_summary_text(
         "Results:",
         f"  Peak $P(t) = {result.probability[peak_idx]:.6f}$",
         f"  at $t = {result.times[peak_idx]:.2f}$",
-        f"  max $|\\Delta H / H_0| = {max_drift:.2e}$",
+    ]
+    if mixing is not None:
+        lines += [
+            "",
+            "Mixing Length:",
+            f"  $L_{{mix}} = {mixing.mixing_length:.4f}$",
+            f"  $\\omega_{{dom}} = {mixing.dominant_frequency:.4f}$",
+        ]
+    lines += [
+        "",
+        f"  max $|\\Delta E / E_0| = {diag.max_relative_error:.2e}$",
+        f"  Conservation: {'PASS' if diag.is_conserved else 'FAIL'}",
         "",
         "Background: Lorentzian $1/(1+r^2/R^2)$",
         "  (algebraic tails, non-compact)",
-        "",
-        "Spectral methods: N/A",
-        "  (breaks translation invariance)",
     ]
     ax.text(
         0.05,
@@ -506,14 +622,44 @@ def main() -> None:
         target_fields=["B_1", "B_2"],
     )
 
+    print("Computing per-component conversion...")
+    r_a1_b1 = compute_conversion_probability(data, "A_1", "B_1")
+    r_a1_b2 = compute_conversion_probability(data, "A_1", "B_2")
+
+    print("Computing mixing length and spectrum...")
+    mixing: MixingResult | None = None
+    spectrum: MixingSpectrum | None = None
+    try:
+        mixing = compute_mixing_length(result)
+    except ValueError as e:
+        print(f"  Mixing length: not extracted ({e})")
+    try:
+        spectrum = compute_mixing_spectrum(result)
+    except ValueError as e:
+        print(f"  Mixing spectrum: not computed ({e})")
+
     print("Computing energy decomposition (virial formula)...")
     hamiltonian = _compute_energy_decomposition(data)
 
-    _print_summary(result, hamiltonian, params)
+    print("Checking energy conservation...")
+    diag = check_energy_conservation(data, threshold=ENERGY_THRESHOLD)
+
+    _print_summary(result, r_a1_b1, r_a1_b2, diag, mixing, params)
 
     print()
     print("Generating measurement plots...")
-    output_path = _plot_results(data, result, hamiltonian, coupling_field, params)
+    output_path = _plot_results(
+        data,
+        result,
+        r_a1_b1,
+        r_a1_b2,
+        hamiltonian,
+        diag,
+        mixing,
+        spectrum,
+        coupling_field,
+        params,
+    )
     print(f"  Saved to: {output_path}")
 
 

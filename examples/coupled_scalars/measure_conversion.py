@@ -122,7 +122,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
 # ── Measurement + printing ────────────────────────────────────
 
 
-def _print_summary(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
+def _print_summary(  # noqa: PLR0912, PLR0915
     result: ConversionResult,
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
@@ -238,7 +238,7 @@ def _print_summary(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
 # ── Plotting ──────────────────────────────────────────────────
 
 
-def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
+def _plot_results(  # noqa: C901, PLR0912, PLR0914, PLR0915
     data: SimulationData,
     result: ConversionResult,
     diag: EnergyDiagnostics,

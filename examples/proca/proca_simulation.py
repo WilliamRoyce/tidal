@@ -27,10 +27,15 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
+from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
+from tidal.measurement import (
+    EnergyDiagnostics,
+    SimulationData,
+    check_energy_conservation,
+    create_snapshot_callback,
+)
 from tidal.symbolic import build_pde_from_json, load_equation_system
-from tidal.utils import normalize_solve_result
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -65,12 +70,6 @@ DISPERSION_THRESHOLD = 1.2
 # Output
 OUTPUT_FILENAME = "proca_output.png"
 
-# State indices (2 components, each with field + momentum)
-IDX_A0 = 0
-IDX_PI0 = 1
-IDX_A1 = 2
-IDX_PI1 = 3
-
 # ── Helpers ───────────────────────────────────────────────────
 
 
@@ -79,7 +78,7 @@ class SimulationResult:
     """Container for Proca simulation results."""
 
     grid: CartesianGrid
-    storage: MemoryStorage
+    data: SimulationData
     x_coords: NumericArray
 
 
@@ -165,33 +164,43 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
 
 
 def _run_simulation(
-    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection
+    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection, json_path: Path
 ) -> SimulationResult:
     print("Step 5: Running simulation...")
-    # Note: Using smaller dt for better energy conservation.
-    # The explicit Euler integrator does not exactly conserve the Hamiltonian;
-    # energy drift decreases with smaller dt (dt=0.01 gives ~36% drift,
-    # dt=0.005 gives ~16%).
 
-    storage = MemoryStorage()
-    result = pde.solve(  # type: ignore[union-attr]
+    spec = load_equation_system(json_path)
+    params = {"procaMassSquared": MASS_SQUARED}
+    output_data_dir = Path(__file__).parent.parent / "data" / "proca_output"
+
+    writer, callback = create_snapshot_callback(
+        output_dir=output_data_dir,
+        spec=spec,
+        grid=grid,
+        t_end=T_END,
+        snapshot_interval=SNAPSHOT_INTERVAL,
+        parameters=params,
+        spec_path=json_path,
+    )
+    tracker = CallbackTracker(callback, interrupts=SNAPSHOT_INTERVAL)
+    pde.solve(  # type: ignore[union-attr]
         state,
         t_range=T_END,
         dt=DT,
-        scheme="runge-kutta",  # RK4 for better energy conservation
-        tracker=storage.tracker(SNAPSHOT_INTERVAL),
+        scheme="runge-kutta",
+        tracker=tracker,
     )
-    result = normalize_solve_result(result)
+    writer.close()
 
+    data = SimulationData.from_directory(output_data_dir, spec)
     x = cast("np.ndarray", grid.cell_coords[..., 0])
 
     print(f"  Duration: {T_END} time units")
-    print(f"  Stored {len(storage)} snapshots")
+    print(f"  {data.n_snapshots} snapshots saved to {output_data_dir}")
     print()
 
     return SimulationResult(
         grid=grid,
-        storage=storage,
+        data=data,
         x_coords=x,
     )
 
@@ -199,32 +208,33 @@ def _run_simulation(
 def _analyze_results(result: SimulationResult) -> None:
     print("Step 6: Analyzing results...")
 
-    initial = cast("FieldCollection", result.storage[0])
-    final = cast("FieldCollection", result.storage[-1])
+    data = result.data
     x = result.x_coords
 
     # Extract field amplitudes
-    initial_a0 = np.max(np.abs(initial[IDX_A0].data))
-    initial_a1 = np.max(np.abs(initial[IDX_A1].data))
+    initial_a0 = float(np.max(np.abs(data.fields["procaA_0"][0])))
+    initial_a1 = float(np.max(np.abs(data.fields["procaA_1"][0])))
 
-    final_a0 = np.max(np.abs(final[IDX_A0].data))
-    final_a1 = np.max(np.abs(final[IDX_A1].data))
+    final_a0 = float(np.max(np.abs(data.fields["procaA_0"][-1])))
+    final_a1 = float(np.max(np.abs(data.fields["procaA_1"][-1])))
 
     print(f"  Initial: max|A_0| = {initial_a0:.4f}, max|A_1| = {initial_a1:.4f}")
     print(f"  Final:   max|A_0| = {final_a0:.4f}, max|A_1| = {final_a1:.4f}")
 
     # Check for dispersion (pulse spreading)
+    initial_a1_data = data.fields["procaA_1"][0]
+    final_a1_data = data.fields["procaA_1"][-1]
+
     initial_width = np.sqrt(
-        np.sum((x - PULSE_CENTER_X) ** 2 * initial[IDX_A1].data ** 2)
-        / np.sum(initial[IDX_A1].data ** 2)
+        np.sum((x - PULSE_CENTER_X) ** 2 * initial_a1_data**2)
+        / np.sum(initial_a1_data**2)
     )
-    # Find center of mass of final A_1
-    final_com = np.sum(x * final[IDX_A1].data ** 2) / (
-        np.sum(final[IDX_A1].data ** 2) + 1e-10
+    final_com = np.sum(x * final_a1_data**2) / (
+        np.sum(final_a1_data**2) + 1e-10
     )
     final_width = np.sqrt(
-        np.sum((x - final_com) ** 2 * final[IDX_A1].data ** 2)
-        / (np.sum(final[IDX_A1].data ** 2) + 1e-10)
+        np.sum((x - final_com) ** 2 * final_a1_data**2)
+        / (np.sum(final_a1_data**2) + 1e-10)
     )
 
     print(f"  Initial pulse width: {initial_width:.2f}")
@@ -237,26 +247,28 @@ def _analyze_results(result: SimulationResult) -> None:
     print()
 
 
-def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
+def _plot_results(
+    result: SimulationResult, diag: EnergyDiagnostics
+) -> None:
     print("Step 7: Generating visualization...")
 
-    storage = result.storage
+    data = result.data
     x = result.x_coords
+    n_snapshots = data.n_snapshots
 
     fig, axes = plt.subplots(2, 2, figsize=(14, 10))
 
-    # Get time snapshots
-    times = [0, len(storage) // 3, 2 * len(storage) // 3, len(storage) - 1]
+    # Get time snapshot indices
+    times = [0, n_snapshots // 3, 2 * n_snapshots // 3, n_snapshots - 1]
     cmap = plt.get_cmap("viridis")
     colors = cmap(np.linspace(0.2, 0.8, len(times)))
 
     # A_0 evolution
     ax = axes[0, 0]
     for i, t_idx in enumerate(times):
-        snapshot = cast("FieldCollection", storage[t_idx])
         ax.plot(
             x,
-            snapshot[IDX_A0].data,
+            data.fields["procaA_0"][t_idx],
             color=colors[i],
             label=f"t={t_idx:.0f}",
             alpha=0.8,
@@ -270,10 +282,9 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     # A_1 evolution
     ax = axes[0, 1]
     for i, t_idx in enumerate(times):
-        snapshot = cast("FieldCollection", storage[t_idx])
         ax.plot(
             x,
-            snapshot[IDX_A1].data,
+            data.fields["procaA_1"][t_idx],
             color=colors[i],
             label=f"t={t_idx:.0f}",
             alpha=0.8,
@@ -287,10 +298,9 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     # Momentum pi_1 evolution
     ax = axes[1, 0]
     for i, t_idx in enumerate(times):
-        snapshot = cast("FieldCollection", storage[t_idx])
         ax.plot(
             x,
-            snapshot[IDX_PI1].data,
+            data.momenta["procaA_1"][t_idx],
             color=colors[i],
             label=f"t={t_idx:.0f}",
             alpha=0.8,
@@ -301,47 +311,12 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     ax.legend()
     ax.grid(visible=True, alpha=0.3)
 
-    # Energy (Hamiltonian) over time
-    # Note: The Hamiltonian should be conserved for the continuous Klein-Gordon
-    # equation. Using RK4 scheme (scheme='runge-kutta') provides much better
-    # energy conservation than the default explicit Euler, which is
-    # non-symplectic and causes linear drift.
+    # Energy conservation (via measurement module)
     ax = axes[1, 1]
-    energies = []
-    time_values = []
-
-    dx = float(x[1] - x[0])
-
-    for t_idx in range(len(storage)):
-        snapshot = cast("FieldCollection", storage[t_idx])
-
-        # Extract fields and momenta
-        a0_data = snapshot[IDX_A0].data
-        pi0_data = snapshot[IDX_PI0].data
-        a1_data = snapshot[IDX_A1].data
-        pi1_data = snapshot[IDX_PI1].data
-
-        # Compute spatial gradients
-        grad_a0 = np.gradient(a0_data, dx)
-        grad_a1 = np.gradient(a1_data, dx)
-
-        # Klein-Gordon Hamiltonian: H = 1/2 int [pi^2 + (d_x phi)^2 + m^2 phi^2] dx
-        energy_a0 = np.sum(
-            0.5 * pi0_data**2 + 0.5 * grad_a0**2 + 0.5 * MASS_SQUARED * a0_data**2
-        )
-        energy_a1 = np.sum(
-            0.5 * pi1_data**2 + 0.5 * grad_a1**2 + 0.5 * MASS_SQUARED * a1_data**2
-        )
-
-        energies.append(energy_a0 + energy_a1)
-        time_values.append(t_idx)
-
-    ax.plot(time_values, energies, "b-", linewidth=2)
-    ax.set_xlabel("Snapshot index")
+    ax.plot(diag.times, diag.total_energy, "b-", linewidth=2)
+    ax.set_xlabel("Time")
     ax.set_ylabel("Total Energy")
-    ax.set_title(
-        r"Hamiltonian $H = \frac{1}{2}\int[\pi^2 + (\nabla\phi)^2 + m^2\phi^2]dx$"
-    )
+    ax.set_title(f"Energy (virial) — max |dE/E$_0$| = {diag.max_relative_error:.2e}")
     ax.grid(visible=True, alpha=0.3)
 
     fig.suptitle(
@@ -380,16 +355,35 @@ def _print_footer() -> None:
 
 
 def main() -> None:
-    """Run the Proca field simulation."""
+    """Run the Proca field simulation.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the JSON spec has not been generated yet.
+    """
     json_path = Path(__file__).parent.parent / "data" / "proca_1d.json"
+    if not json_path.exists():
+        msg = (
+            f"{json_path} not found. "
+            "Run 'tidal derive theory.toml' first (requires wolframscript)."
+        )
+        raise FileNotFoundError(msg)
     _print_header()
     _load_spec(json_path)
     pde = _build_pde(json_path)
     grid = _create_grid()
     state = _create_initial_state(grid)
-    result = _run_simulation(pde, grid, state)
+    result = _run_simulation(pde, grid, state, json_path)
     _analyze_results(result)
-    _plot_results(result)
+
+    print("Checking energy conservation...")
+    diag = check_energy_conservation(result.data)
+    print(f"  max |dE/E0| = {diag.max_relative_error:.2e}")
+    print(f"  Conserved: {diag.is_conserved}")
+    print()
+
+    _plot_results(result, diag)
     _print_footer()
 
 
