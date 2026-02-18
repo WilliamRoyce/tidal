@@ -4,6 +4,11 @@ Background fields are non-dynamical tensors that appear in the Lagrangian
 but are NOT varied in the Euler-Lagrange derivation. They survive as
 (possibly position-dependent) coefficients in the equations of motion.
 
+This feature is essential for simulating the Gertsenshtein effect
+(Gertsenshtein 1962; Domcke & Garcia-Cely 2023), where a static external
+magnetic field B₀(x) catalyses photon-graviton conversion. It also enables
+general probe-field approximations and theories with fixed external sources.
+
 ## Pipeline Trace
 
 ### 1. TOML Declaration
@@ -104,3 +109,12 @@ To support a new Mathematica function (e.g., `Gamma[x]`), update
 
 `PDEFromSpec._mathematica_to_python()` and `PDEFromSpec._build_base_namespace()`
 both delegate to `_eval_utils.py`, so no changes are needed in `pde_builder.py`.
+
+## References
+
+- Gertsenshtein (1962), "Wave resonance of light and gravitational waves", JETP 14, 84 — original prediction requiring external B-field as background
+- Domcke & Garcia-Cely (2023), "A simple derivation of the Gertsenshtein effect", [arXiv:2301.02072](https://arxiv.org/abs/2301.02072) — modern derivation with inhomogeneous background profiles
+- Martín-García et al., "xAct: Efficient tensor computer algebra for Mathematica", [xact.es](http://www.xact.es/) — symbolic tensor algebra (`VarD`, `ComponentValue`, `ToBasis`)
+- Zwicker (2020), "py-pde: A Python package for solving partial differential equations", JOSS 5(48), 2158 — PDE solver backend
+
+See [`docs/references.md`](references.md) for the full citation list.

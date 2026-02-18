@@ -222,7 +222,17 @@ To fully automate CS term derivation:
 
 ## References
 
+### Project Files
+
 - TOML: `examples/chern_simons/theory.toml` (derive via `tidal derive`)
 - JSON: `examples/data/chern_simons_3d.json`
 - Python: `examples/chern_simons/chern_simons_simulation.py`
-- Plan: `/home/vscode/.claude/plans/valiant-orbiting-codd.md`
+
+### Physics & Software
+
+- Deser, Jackiw & Templeton (1982), "Topologically massive gauge theories", Annals of Physics 140, 372–411 — original formulation of topologically massive gauge theory in 2+1D
+- Dunne (1999), "Aspects of Chern-Simons Theory", [arXiv:hep-th/9902115](https://arxiv.org/abs/hep-th/9902115) — pedagogical review of Chern-Simons field theory
+- Martín-García et al., "xAct: Efficient tensor computer algebra for Mathematica", [xact.es](http://www.xact.es/) — symbolic tensor algebra used for the derivation pipeline
+- Zwicker (2020), "py-pde: A Python package for solving partial differential equations", JOSS 5(48), 2158 — PDE solver backend
+
+See [`docs/references.md`](references.md) for the full citation list.
