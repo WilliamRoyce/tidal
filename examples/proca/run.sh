@@ -23,4 +23,4 @@ tidal simulate ../data/proca_1d.json \
   --ic-component A_1 \
   --ic-width 5.0 \
   --t-end 30.0 \
-  --dt 0.005
+  --scheme scipy

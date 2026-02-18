@@ -29,7 +29,7 @@
 #   uv run tidal simulate ../data/scalar_vector_coupling.json \
 #     --param phim2=1.0 --param Am2=0.5 --param kCS=0.3 --param gSV=0.2 \
 #     --grid-shape 48 --bounds 0:10,0:10 --bc periodic,periodic \
-#     --ic gaussian --t-end 5.0 --dt 0.005 \
+#     --ic gaussian --t-end 5.0 --scheme scipy \
 #     --output ../data/scalar_vector_coupling_output
 #
 #   # Step 4: Measure scalar-to-vector conversion and mixing length
@@ -68,7 +68,7 @@ tidal simulate ../data/scalar_vector_coupling.json \
   --bc periodic,periodic \
   --ic gaussian \
   --t-end 5.0 \
-  --dt 0.005 \
+  --scheme scipy \
   --output ../data/scalar_vector_coupling_output
 
 # Step 4: Measure scalar-to-vector conversion and characteristic mixing length

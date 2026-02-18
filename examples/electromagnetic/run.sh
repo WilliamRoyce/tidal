@@ -23,4 +23,4 @@ tidal simulate ../data/em_1d.json \
   --ic-component A_1 \
   --ic-width 5.0 \
   --t-end 25.0 \
-  --dt 0.01
+  --scheme scipy

@@ -25,8 +25,8 @@ tidal inspect ../data/proca_background.json
 # Gaussian IC with periodic BCs; constraint solver auto-detects A_0, B_0
 tidal simulate ../data/proca_background.json \
   --param mA2=1.0 --param mB2=2.0 --param gcoup=0.5 --param g0=1.0 --param R=8.0 \
-  --ic gaussian --grid-shape 16 --t-end 2.0 --dt 0.05 \
-  --bc periodic,periodic --scheme runge-kutta \
+  --ic gaussian --grid-shape 16 --t-end 2.0 \
+  --bc periodic,periodic --scheme scipy \
   --output ../data/proca_background_output
 
 # Step 4: Measure conversion between vector field groups

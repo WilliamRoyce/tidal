@@ -27,4 +27,4 @@ tidal simulate ../data/cylindrical_kg.json \
   --ic formula \
   --ic-formula "np.exp(-((x - 3.0)**2 / 0.72) - (z**2 / 1.28))" \
   --t-end 4.0 \
-  --dt 0.01
+  --scheme scipy

@@ -26,4 +26,4 @@ tidal simulate ../data/navier_cauchy_2d.json \
   --ic-component ux_0 \
   --ic-width 1.0 \
   --t-end 3.0 \
-  --dt 0.005
+  --scheme scipy

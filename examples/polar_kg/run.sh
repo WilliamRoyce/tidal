@@ -27,5 +27,4 @@ tidal simulate ../data/polar_kg.json \
   --ic formula \
   --ic-formula "np.exp(-(x - 3.0)**2 / 0.5)" \
   --t-end 8.0 \
-  --dt 0.005 \
   --scheme scipy

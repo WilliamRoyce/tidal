@@ -24,4 +24,4 @@ tidal simulate ../data/massive_3form.json \
   --ic-component C_0 \
   --ic-width 1.5 \
   --t-end 5.0 \
-  --dt 0.05
+  --scheme scipy

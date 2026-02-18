@@ -26,7 +26,7 @@
 #     --param mPhi2=1.0 --param mChi2=4.0 --param gCpl=0.5 \
 #     --grid-shape 256 --bounds 0:100 --periodic \
 #     --ic gaussian --ic-component phi_0 --ic-center 30.0 --ic-width 5.0 \
-#     --t-end 20.0 --dt 0.01 --output ../data/coupled_scalars_output
+#     --t-end 20.0 --scheme scipy --output ../data/coupled_scalars_output
 #
 #   # Step 4: Measure conversion probability and characteristic mixing length
 #   uv run tidal measure ../data/coupled_scalars_output \
@@ -67,7 +67,7 @@ tidal simulate ../data/coupled_scalars.json \
   --ic-center 30.0 \
   --ic-width 5.0 \
   --t-end 20.0 \
-  --dt 0.01 \
+  --scheme scipy \
   --output ../data/coupled_scalars_output
 
 # Step 4: Measure conversion probability and characteristic mixing length

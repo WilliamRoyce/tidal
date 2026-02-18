@@ -25,5 +25,5 @@ tidal simulate ../data/klein_gordon_1d.json \
   --ic gaussian \
   --ic-width 5.0 \
   --t-end 30.0 \
-  --dt 0.01 \
+  --scheme scipy \
   --snapshots 0.1

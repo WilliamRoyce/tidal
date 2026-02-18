@@ -26,4 +26,4 @@ tidal simulate ../data/linearized_gravity.json \
   --ic-formula "np.exp(-(z - 20.0)**2 / 18.0) * np.cos(0.6283 * (z - 20.0))" \
   --ic-component h_4 \
   --t-end 15.0 \
-  --dt 0.01
+  --scheme scipy

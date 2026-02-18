@@ -28,8 +28,8 @@
 #   # Step 3: Simulate (Gaussian IC, periodic BCs, 16x16 grid)
 #   uv run tidal simulate ../data/coupled_proca_3d.json \
 #     --param mA2=1.0 --param mB2=2.0 --param gcoup=0.5 \
-#     --ic gaussian --grid-shape 16 --t-end 2.0 --dt 0.05 \
-#     --bc periodic,periodic --scheme runge-kutta \
+#     --ic gaussian --grid-shape 16 --t-end 2.0 \
+#     --bc periodic,periodic --scheme scipy \
 #     --output ../data/coupled_proca_output
 #
 #   # Step 4: Measure conversion from A-field group to B-field group
@@ -64,8 +64,8 @@ tidal inspect ../data/coupled_proca_3d.json
 # Gaussian IC with periodic BCs; constraint solver auto-detects A_0, B_0
 tidal simulate ../data/coupled_proca_3d.json \
   --param mA2=1.0 --param mB2=2.0 --param gcoup=0.5 \
-  --ic gaussian --grid-shape 16 --t-end 2.0 --dt 0.05 \
-  --bc periodic,periodic --scheme runge-kutta \
+  --ic gaussian --grid-shape 16 --t-end 2.0 \
+  --bc periodic,periodic --scheme scipy \
   --output ../data/coupled_proca_output
 
 # Step 4: Measure conversion between vector field groups and mixing length

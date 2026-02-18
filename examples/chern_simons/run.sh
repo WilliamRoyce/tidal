@@ -24,4 +24,4 @@ tidal simulate ../data/chern_simons_3d.json \
   --ic-component A_1 \
   --ic-width 5.0 \
   --t-end 10.0 \
-  --dt 0.01
+  --scheme scipy

@@ -27,4 +27,4 @@ tidal simulate ../data/sphere_kg.json \
   --ic gaussian \
   --ic-width 0.8 \
   --t-end 10.0 \
-  --dt 0.005
+  --scheme scipy

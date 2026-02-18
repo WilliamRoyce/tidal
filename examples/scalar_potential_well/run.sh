@@ -28,7 +28,7 @@ tidal simulate ../data/scalar_potential_well.json \
   --ic-center 15.0 \
   --ic-width 5.0 \
   --t-end 20.0 \
-  --dt 0.01 \
+  --scheme scipy \
   --output ../data/scalar_potential_well_output
 
 # NOTE: Energy measurement will raise ValueError for the localized variant

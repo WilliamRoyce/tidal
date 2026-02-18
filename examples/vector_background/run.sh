@@ -29,8 +29,8 @@ tidal inspect ../data/vector_background.json
 tidal simulate ../data/vector_background.json \
   --param mPhi2=1.0 --param mA2=2.0 --param gBV=0.5 \
   --param B0=1.0 --param W=3.0 --param R=8.0 \
-  --ic gaussian --grid-shape 16 --t-end 2.0 --dt 0.05 \
-  --bc periodic,periodic --scheme runge-kutta \
+  --ic gaussian --grid-shape 16 --t-end 2.0 \
+  --bc periodic,periodic --scheme scipy \
   --output ../data/vector_background_output
 
 # Step 4: Measure conversion (real-space only — no spectral)

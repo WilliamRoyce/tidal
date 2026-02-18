@@ -27,7 +27,7 @@ tidal simulate ../data/massive_gravity_3d.json \
   --ic gaussian \
   --ic-component h_3 \
   --t-end 5.0 \
-  --dt 0.005
+  --scheme scipy
 
 # For parameter sweep (vary mass):
 # for m2 in 0.5 1.0 2.0; do

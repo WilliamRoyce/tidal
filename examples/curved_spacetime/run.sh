@@ -24,7 +24,7 @@ tidal simulate ../data/de_sitter_kg.json \
   --ic gaussian \
   --ic-width 3.0 \
   --t-end 20.0 \
-  --dt 0.01
+  --scheme scipy
 
 ### Conformal Static Klein-Gordon (1+1D, constant conformal factor) ###
 
@@ -43,4 +43,4 @@ tidal simulate ../data/conformal_kg_static.json \
   --ic gaussian \
   --ic-width 5.0 \
   --t-end 20.0 \
-  --dt 0.002
+  --scheme scipy
