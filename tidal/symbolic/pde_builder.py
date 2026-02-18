@@ -93,9 +93,27 @@ def _op_gradient(axis: int) -> Callable[[ScalarField, BCDescriptor], ScalarField
 def _op_directional_laplacian(
     axis: int,
 ) -> Callable[[ScalarField, BCDescriptor], ScalarField]:
-    """Create a directional Laplacian handler (∂²/∂x_i²)."""
+    """Create a directional Laplacian handler (∂²/∂x_i²).
+
+    Uses the standard 3-point central-difference stencil for periodic grids
+    (consistent with ``field.laplace()``).  For non-periodic grids, falls
+    back to applying the gradient operator twice.
+    """
 
     def _handler(field: ScalarField, bc: BCDescriptor) -> ScalarField:
+        grid = field.grid
+        # Use 3-point stencil for periodic axes (matches field.laplace())
+        if hasattr(grid, "periodic") and grid.periodic[axis]:
+            data = np.asarray(field.data, dtype=np.float64)
+            dx = float(grid.discretization[axis])
+            result_data = (
+                np.roll(data, -1, axis=axis)
+                - 2.0 * data
+                + np.roll(data, 1, axis=axis)
+            ) / (dx * dx)
+            return ScalarField(grid, data=result_data)
+
+        # Non-periodic: gradient-squared fallback
         grad = field.gradient(bc=bc)[axis]
         if not isinstance(grad, ScalarField):  # pyright: ignore[reportUnnecessaryIsInstance]
             msg = f"Expected ScalarField from gradient, got {type(grad).__name__}"
@@ -390,26 +408,56 @@ def _build_directional_laplacian_matrix(
 ) -> _MatrixAndVector:
     """Build sparse matrix for directional Laplacian ∂²/∂x_i².
 
-    Computed as G_i @ G_i (composition of two gradient matrices along the
-    same axis). This matches the function-based operator
-    ``_op_directional_laplacian`` which applies ``field.gradient(bc)[axis]``
-    twice, using py-pde's central-difference gradient stencil.
+    Uses the standard 3-point stencil ``[1/dx², -2/dx², 1/dx²]`` for
+    periodic grids, consistent with ``field.laplace()`` per axis and
+    ``_op_directional_laplacian``.
 
-    .. note::
-
-       The resulting wide stencil [1/(4dx²), 0, -2/(4dx²), 0, 1/(4dx²)]
-       differs from the compact 3-point Laplacian stencil [1/dx², -2/dx²,
-       1/dx²] used by py-pde's ``field.laplace(bc)``.  Consequently,
-       ``laplacian_x_matrix + laplacian_y_matrix != laplacian_matrix``.
-       This is intentional — each matrix matches its corresponding
-       function-based operator exactly.
+    For non-periodic grids, falls back to gradient-squared (G_i @ G_i)
+    to preserve py-pde's boundary condition handling.
     """
+    is_periodic = hasattr(grid, "periodic") and grid.periodic[axis]
+    if is_periodic:
+        return _build_directional_laplacian_3pt(grid, axis=axis)
+    # Non-periodic: gradient-squared fallback
     g_mat, g_vec = _build_gradient_matrix(grid, bcs, axis=axis)
-    # dir_lap = G @ G: apply gradient twice along the same axis
-    # G @ (G @ field + vec) + vec = G² @ field + G @ vec + vec
     dir_lap_matrix = g_mat @ g_mat  # type: ignore[reportOperatorIssue]
     dir_lap_vector = g_mat @ g_vec + g_vec  # type: ignore[reportOperatorIssue]
     return dir_lap_matrix, dir_lap_vector  # type: ignore[reportUnknownVariableType]
+
+
+def _build_directional_laplacian_3pt(
+    grid: Any,  # noqa: ANN401
+    *,
+    axis: int,
+) -> _MatrixAndVector:
+    """Build 3-point stencil matrix for ∂²/∂x_i² on a periodic grid."""
+    shape = grid.shape
+    n = math.prod(shape)
+    dx = float(grid.discretization[axis])
+    inv_dx2 = 1.0 / (dx * dx)
+
+    mat = sparse.dok_matrix((n, n))  # type: ignore[reportUnknownArgumentType]
+    vec = sparse.dok_matrix((n, 1))  # type: ignore[reportUnknownArgumentType]
+
+    for flat_idx in range(n):
+        multi_idx = list(np.unravel_index(flat_idx, shape))
+
+        # Center: -2/dx²
+        mat[flat_idx, flat_idx] = -2.0 * inv_dx2
+
+        # Left neighbor: +1/dx² (periodic wrap)
+        left = list(multi_idx)
+        left[axis] = (left[axis] - 1) % shape[axis]
+        left_flat = int(np.ravel_multi_index(left, shape))
+        mat[flat_idx, left_flat] += inv_dx2
+
+        # Right neighbor: +1/dx² (periodic wrap)
+        right = list(multi_idx)
+        right[axis] = (right[axis] + 1) % shape[axis]
+        right_flat = int(np.ravel_multi_index(right, shape))
+        mat[flat_idx, right_flat] += inv_dx2
+
+    return mat.tocsr(), vec.tocsr()  # type: ignore[reportReturnType]
 
 
 def _build_gradient_matrix(
@@ -654,14 +702,15 @@ def _fft_laplacian(k_grids: list[np.ndarray], dx_array: np.ndarray) -> np.ndarra
 def _fft_directional_laplacian(
     k_grids: list[np.ndarray], dx_array: np.ndarray, *, axis: int
 ) -> np.ndarray:
-    """Discrete directional laplacian = (gradient)² along one axis.
+    """Discrete directional laplacian along one axis.
 
-    Uses the wide stencil matching _build_directional_laplacian_matrix:
-    G² eigenvalue = (i·sin(k·dx)/dx)² = -sin²(k·dx)/dx².
+    Uses the standard 3-point stencil eigenvalue ``(2cos(k·dx) - 2) / dx²``,
+    consistent with ``field.laplace()`` per-axis and
+    ``_op_directional_laplacian``.
     """
     k = k_grids[axis]
     dx = dx_array[axis]
-    return -(np.sin(k * dx) ** 2) / dx**2
+    return (2.0 * np.cos(k * dx) - 2.0) / dx**2
 
 
 def _fft_gradient(
