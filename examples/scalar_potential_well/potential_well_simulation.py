@@ -60,7 +60,6 @@ GRID_PERIODIC = True
 
 # Time integration
 T_END = 100.0
-DT = 0.005
 SNAPSHOT_INTERVAL = 0.5
 
 # Initial conditions
@@ -167,11 +166,11 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
 def _run_simulation(pde: PDEBase, initial_state: FieldCollection) -> MemoryStorage:
     print("Step 5: Running simulation...")
     print(f"  Duration: {T_END} time units")
-    print(f"  Scheme: runge-kutta, dt={DT}")
+    print("  Solver: scipy/DOP853 (adaptive)")
     storage = MemoryStorage()
     tracker: TrackerBase = storage.tracker(interrupts=SNAPSHOT_INTERVAL)
     pde.solve(
-        initial_state, t_range=T_END, dt=DT, scheme="runge-kutta", tracker=tracker
+        initial_state, t_range=T_END, solver="scipy", method="DOP853", tracker=tracker
     )
     print(f"  Stored {len(storage)} snapshots")
     print()

@@ -56,7 +56,6 @@ GRID_POINTS = 512
 
 # Time integration
 T_END = 30.0
-DT = 0.005  # Smaller timestep for better energy conservation
 SNAPSHOT_INTERVAL = 1.0
 
 # Initial conditions
@@ -185,8 +184,8 @@ def _run_simulation(
     pde.solve(  # type: ignore[union-attr]
         state,
         t_range=T_END,
-        dt=DT,
-        scheme="runge-kutta",
+        solver="scipy",
+        method="DOP853",
         tracker=tracker,
     )
     writer.close()

@@ -64,7 +64,6 @@ GRID_NZ = 48
 
 # Time integration
 T_END = 4.0
-DT = 0.01
 SNAPSHOT_INTERVAL = 0.5
 
 # Initial conditions
@@ -181,9 +180,8 @@ def _run_simulation(
     result = pde.solve(  # type: ignore[union-attr]
         state,
         t_range=T_END,
-        dt=DT,
         solver="scipy",
-        method="RK45",
+        method="DOP853",
         tracker=storage.tracker(SNAPSHOT_INTERVAL),
     )
     result = normalize_solve_result(result)

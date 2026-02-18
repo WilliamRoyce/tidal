@@ -81,7 +81,6 @@ N_CELLS = 64
 
 # Time integration
 T_END = 20.0
-DT = 0.02
 TRACKER_INTERVAL = 0.2
 
 # Initial conditions — rightward-propagating phi wave packet
@@ -217,8 +216,8 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     pde.solve(
         initial_state,
         t_range=T_END,
-        dt=DT,
-        scheme="runge-kutta",
+        solver="scipy",
+        method="DOP853",
         tracker=tracker,
     )
     writer.close()

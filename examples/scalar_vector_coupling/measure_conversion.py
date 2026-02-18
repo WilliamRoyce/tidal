@@ -67,7 +67,6 @@ GRID_PERIODIC = True
 
 # Time integration
 T_END = 100.0
-DT = 0.01
 TRACKER_INTERVAL = 1.0
 
 # Initial conditions
@@ -124,8 +123,8 @@ def _run_simulation() -> tuple[SimulationData, Path]:
     result = pde.solve(
         state,
         t_range=T_END,
-        dt=DT,
-        scheme="runge-kutta",
+        solver="scipy",
+        method="DOP853",
         tracker=tracker,
     )
     normalize_solve_result(result)

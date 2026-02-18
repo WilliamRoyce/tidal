@@ -45,7 +45,6 @@ GRID_PERIODIC = True
 
 # Time integration
 T_END = 25.0
-DT = 0.01
 SNAPSHOT_INTERVAL = 1.0
 
 # Initial conditions
@@ -132,7 +131,7 @@ def _run_simulation(pde: PDEBase, initial_state: FieldCollection) -> MemoryStora
     print("  (Massless waves propagate at c = 1 in natural units)")
     storage = MemoryStorage()
     tracker: TrackerBase = storage.tracker(interrupts=SNAPSHOT_INTERVAL)
-    pde.solve(initial_state, t_range=T_END, dt=DT, tracker=tracker)
+    pde.solve(initial_state, t_range=T_END, solver="scipy", method="DOP853", tracker=tracker)
     print(f"  Stored {len(storage)} snapshots")
     print()
     return storage

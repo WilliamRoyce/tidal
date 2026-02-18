@@ -59,7 +59,6 @@ GRID_PERIODIC: list[bool] = [True]
 
 # Time integration
 T_END = 20.0
-DT = 0.002  # Small timestep needed for m_eff^2=4 (higher frequency requires smaller dt)
 SNAPSHOT_INTERVAL = 1.0
 
 # Initial conditions
@@ -179,8 +178,8 @@ def _run_simulation(
     pde.solve(
         state,
         t_range=T_END,
-        dt=DT,
-        scheme="runge-kutta",
+        solver="scipy",
+        method="DOP853",
         tracker=tracker,
     )
     writer.close()

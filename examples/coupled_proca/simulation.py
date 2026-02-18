@@ -52,7 +52,6 @@ GRID_PERIODIC = True
 
 # Time integration
 T_END = 2.0
-DT = 0.05
 SNAPSHOT_INTERVAL = 0.2
 
 # Initial conditions
@@ -169,8 +168,8 @@ def _run_simulation(pde: PDEBase, state: FieldCollection) -> MemoryStorage:
     result = pde.solve(
         state,
         t_range=T_END,
-        dt=DT,
-        scheme="runge-kutta",
+        solver="scipy",
+        method="DOP853",
         tracker=storage.tracker(SNAPSHOT_INTERVAL),
     )
     normalize_solve_result(result)

@@ -67,7 +67,6 @@ GRID_PERIODIC: list[bool] = [True, True]
 
 # Time integration
 T_END = 20.0
-DT = 0.01
 SNAPSHOT_INTERVAL = 0.2
 
 # Initial conditions
@@ -197,8 +196,8 @@ def _run_simulation(
     pde.solve(
         state,
         t_range=T_END,
-        dt=DT,
-        scheme="runge-kutta",
+        solver="scipy",
+        method="DOP853",
         tracker=tracker,
     )
     writer.close()

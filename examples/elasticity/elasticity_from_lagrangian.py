@@ -45,7 +45,6 @@ DOMAIN_SIZE = (10.0, 10.0)
 
 # Time integration
 T_FINAL = 3.0
-DT = 0.005
 
 # Initial conditions
 GAUSSIAN_SIGMA = 1.0
@@ -152,10 +151,10 @@ def _run_simulation(
 ) -> SimulationResult:
     print("Step 5: Running simulation...")
 
-    result = pde.solve(state, t_range=T_FINAL, dt=DT)
+    result = pde.solve(state, t_range=T_FINAL, solver="scipy", method="DOP853")
     assert isinstance(result, FieldCollection)
 
-    print(f"  Duration: {T_FINAL} time units, dt={DT}")
+    print(f"  Duration: {T_FINAL} time units, solver=scipy/DOP853 (adaptive)")
     print()
 
     return SimulationResult(grid=grid, final_state=result)

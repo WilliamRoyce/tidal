@@ -64,7 +64,6 @@ DOMAIN_SIZE = 10.0
 
 # Time integration
 T_END = 5.0
-DT = 0.05
 SNAPSHOT_INTERVAL = 0.5
 
 # Initial conditions
@@ -205,15 +204,14 @@ def _run_simulation(
     result = pde.solve(
         state,
         t_range=T_END,
-        dt=DT,
-        scheme="runge-kutta",
+        solver="scipy",
+        method="DOP853",
         tracker=storage.tracker(SNAPSHOT_INTERVAL),
     )
     result = normalize_solve_result(result)
 
     print(f"  Duration: {T_END} time units")
-    print(f"  Time step: dt = {DT}")
-    print("  Scheme: Runge-Kutta (RK4)")
+    print("  Solver: scipy/DOP853 (adaptive)")
     print(f"  Stored {len(storage)} snapshots")
     print()
 
@@ -357,7 +355,7 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
 
     fig.suptitle(
         f"Massive 3-Form (antisymmetric rank-3): m$^2$={MASS_SQUARED}, "
-        f"grid={n}$^3$, dt={DT}",
+        f"grid={n}$^3$, solver=scipy/DOP853 (adaptive)",
         fontsize=14,
     )
     plt.tight_layout()

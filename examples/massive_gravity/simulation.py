@@ -80,7 +80,6 @@ NY = 64
 OMEGA = np.sqrt(2 * MASS_SQUARED)
 PERIOD = 2 * np.pi / OMEGA
 T_END = 3.5 * PERIOD
-DT = 0.01
 N_SNAPSHOTS = 200
 SNAPSHOT_INTERVAL = T_END / N_SNAPSHOTS
 
@@ -211,8 +210,8 @@ def _run_simulation(
     result = pde.solve(
         state,
         t_range=T_END,
-        dt=DT,
-        scheme="runge-kutta",
+        solver="scipy",
+        method="DOP853",
         tracker=storage.tracker(SNAPSHOT_INTERVAL),
     )
     result = normalize_solve_result(result)
