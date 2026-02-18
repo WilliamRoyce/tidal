@@ -2381,15 +2381,16 @@ class PDEFromSpec(PDEBase):
         all_periodic = hasattr(grid, "periodic") and all(grid.periodic)
         enabled_names = {self.spec.equations[i].field_name for i in enabled_indices}
 
-        # Determine if FFT block solver is viable: requires periodic grid,
-        # no explicit method="matrix", and no position-dependent intra-cluster terms.
+        # Determine if FFT block solver is viable: requires periodic grid
+        # and no position-dependent intra-cluster coefficients.
+        # NOTE: per-equation method="matrix" does NOT force Gauss-Seidel here —
+        # the FFT block solve is always correct for periodic grids with constant
+        # coefficients. The method setting only affects the per-field solver when
+        # Gauss-Seidel iteration is used as the fallback.
         use_fft = all_periodic
         if use_fft:
             for i in enabled_indices:
                 eq = self.spec.equations[i]
-                if eq.constraint_solver.method == "matrix":
-                    use_fft = False
-                    break
                 for term in eq.rhs_terms:
                     if term.field in enabled_names and term.position_dependent:
                         use_fft = False

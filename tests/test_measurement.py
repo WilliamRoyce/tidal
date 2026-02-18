@@ -42,6 +42,7 @@ from tidal.measurement import (
 )
 from tidal.measurement._energy import (
     _apply_spatial_operator,  # pyright: ignore[reportPrivateUsage]
+    _compute_constraint_coupling_energy,  # pyright: ignore[reportPrivateUsage]
     _compute_constraint_self_energy,  # pyright: ignore[reportPrivateUsage]
     _compute_virial_potential,  # pyright: ignore[reportPrivateUsage]
     _gradient_energy_density,  # pyright: ignore[reportPrivateUsage]
@@ -1282,10 +1283,246 @@ class TestVirialWithConstraints:
         constraint_e = _compute_constraint_self_energy(data, 0)
         assert constraint_e < 0.0
 
-        # Verify total = kinetic + virial + constraint_self
+        # Verify total = kinetic + virial + constraint_self + constraint_cross
         virial = _compute_virial_potential(data, 0)
-        expected_total = se.per_field["A_1"].kinetic + virial + constraint_e
+        cross_e = _compute_constraint_coupling_energy(data, 0)
+        expected_total = se.per_field["A_1"].kinetic + virial + constraint_e + cross_e
         np.testing.assert_allclose(se.total, expected_total, rtol=1e-10)
+
+        # Single-constraint system → cross coupling is zero
+        assert cross_e == 0.0
+
+
+def _make_two_constraint_spec() -> EquationSystem:
+    """Build a synthetic spec with two constraints and two dynamical fields.
+
+    Mimics a simplified coupled Proca system: A_0 (constraint) + A_1 (dynamical)
+    + B_0 (constraint) + B_1 (dynamical), with cross-constraint coupling.
+    """
+    # A_0: constraint (time_order=0) with coupling to B_0
+    a0_terms = (
+        OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_0"),
+        OperatorTerm(
+            coefficient=-1.0,
+            operator="identity",
+            field="A_0",
+            coefficient_symbolic="-mA2",
+        ),
+        OperatorTerm(
+            coefficient=0.5,
+            operator="identity",
+            field="B_0",
+            coefficient_symbolic="gcoup",
+        ),
+    )
+    eq_a0 = ComponentEquation(
+        field_name="A_0",
+        field_index=0,
+        time_derivative_order=0,
+        rhs_terms=a0_terms,
+    )
+
+    # A_1 dynamical field
+    a1_terms = (
+        OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_1"),
+        OperatorTerm(
+            coefficient=-1.0,
+            operator="identity",
+            field="A_1",
+            coefficient_symbolic="-mA2",
+        ),
+        OperatorTerm(
+            coefficient=0.5,
+            operator="identity",
+            field="B_1",
+            coefficient_symbolic="gcoup",
+        ),
+    )
+    eq_a1 = ComponentEquation(
+        field_name="A_1",
+        field_index=1,
+        time_derivative_order=2,
+        rhs_terms=a1_terms,
+    )
+
+    # B_0 constraint with coupling to A_0
+    b0_terms = (
+        OperatorTerm(coefficient=1.0, operator="laplacian_x", field="B_0"),
+        OperatorTerm(
+            coefficient=-2.0,
+            operator="identity",
+            field="B_0",
+            coefficient_symbolic="-mB2",
+        ),
+        OperatorTerm(
+            coefficient=0.5,
+            operator="identity",
+            field="A_0",
+            coefficient_symbolic="gcoup",
+        ),
+    )
+    eq_b0 = ComponentEquation(
+        field_name="B_0",
+        field_index=2,
+        time_derivative_order=0,
+        rhs_terms=b0_terms,
+    )
+
+    # B_1 dynamical field
+    b1_terms = (
+        OperatorTerm(coefficient=1.0, operator="laplacian_x", field="B_1"),
+        OperatorTerm(
+            coefficient=-2.0,
+            operator="identity",
+            field="B_1",
+            coefficient_symbolic="-mB2",
+        ),
+        OperatorTerm(
+            coefficient=0.5,
+            operator="identity",
+            field="A_1",
+            coefficient_symbolic="gcoup",
+        ),
+    )
+    eq_b1 = ComponentEquation(
+        field_name="B_1",
+        field_index=3,
+        time_derivative_order=2,
+        rhs_terms=b1_terms,
+    )
+
+    return EquationSystem(
+        n_components=4,
+        dimension=2,
+        spatial_dimension=1,
+        equations=(eq_a0, eq_a1, eq_b0, eq_b1),
+        component_names=("A_0", "A_1", "B_0", "B_1"),
+        mass_matrix=((1.0, 0.0, 0.0, 0.0), (0.0, 1.0, 0.0, 0.0),
+                      (0.0, 0.0, 2.0, 0.0), (0.0, 0.0, 0.0, 2.0)),
+        coupling_matrix=((0.0, 0.0, -0.5, 0.0), (0.0, 0.0, 0.0, -0.5),
+                          (-0.5, 0.0, 0.0, 0.0), (0.0, -0.5, 0.0, 0.0)),
+        metadata={"parameters": {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5}},
+        coordinates=("t", "x"),
+        mass_matrix_symbolic=(("-mA2", None, None, None),
+                               (None, "-mA2", None, None),
+                               (None, None, "-mB2", None),
+                               (None, None, None, "-mB2")),
+        coupling_matrix_symbolic=((None, None, "gcoup", None),
+                                   (None, None, None, "gcoup"),
+                                   ("gcoup", None, None, None),
+                                   (None, "gcoup", None, None)),
+    )
+
+
+class TestConstraintCouplingEnergy:
+    """Test _compute_constraint_coupling_energy."""
+
+    def test_cross_constraint_coupling_nonzero(self) -> None:
+        """Two constraints with cross identity terms give nonzero coupling."""
+        spec = _make_two_constraint_spec()
+        n = 64
+        dx = 10.0 / n
+        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
+
+        k = 2.0 * np.pi / 10.0
+        a0 = np.cos(k * x)
+        b0 = 0.5 * np.sin(k * x)
+
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={
+                "A_0": a0[np.newaxis, :],
+                "A_1": np.zeros((1, n)),
+                "B_0": b0[np.newaxis, :],
+                "B_1": np.zeros((1, n)),
+            },
+            momenta={
+                "A_1": np.zeros((1, n)),
+                "B_1": np.zeros((1, n)),
+            },
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5},
+        )
+
+        energy = _compute_constraint_coupling_energy(data, 0)
+
+        # Expected: +½ * 0.5 * ∫ A_0*B_0 dV (from A_0 eq)
+        #         + ½ * 0.5 * ∫ B_0*A_0 dV (from B_0 eq)
+        #         = 0.5 * ∫ A_0*B_0 dV
+        dv = dx
+        expected = 0.5 * float(np.sum(a0 * b0)) * dv
+        np.testing.assert_allclose(energy, expected, rtol=1e-10)
+
+    def test_single_constraint_returns_zero(self) -> None:
+        """Single constraint system → no cross terms → zero."""
+        spec = _make_constraint_spec()
+        n = 32
+        dx = 10.0 / n
+
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={
+                "A_0": np.ones((1, n)),
+                "A_1": np.zeros((1, n)),
+            },
+            momenta={"A_1": np.zeros((1, n))},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={"Am2": 0.5},
+        )
+
+        energy = _compute_constraint_coupling_energy(data, 0)
+        assert energy == 0.0
+
+    def test_system_energy_includes_cross_constraint(self) -> None:
+        """compute_system_energy includes cross-constraint coupling."""
+        spec = _make_two_constraint_spec()
+        n = 64
+        dx = 10.0 / n
+        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
+
+        k = 2.0 * np.pi / 10.0
+        a0 = 0.3 * np.cos(k * x)
+        a1 = np.cos(k * x)
+        b0 = 0.2 * np.sin(k * x)
+        b1 = 0.5 * np.sin(k * x)
+
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={
+                "A_0": a0[np.newaxis, :],
+                "A_1": a1[np.newaxis, :],
+                "B_0": b0[np.newaxis, :],
+                "B_1": b1[np.newaxis, :],
+            },
+            momenta={
+                "A_1": np.zeros((1, n)),
+                "B_1": np.zeros((1, n)),
+            },
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5},
+        )
+
+        se = compute_system_energy(data, 0)
+        virial = _compute_virial_potential(data, 0)
+        constraint_self = _compute_constraint_self_energy(data, 0)
+        constraint_cross = _compute_constraint_coupling_energy(data, 0)
+
+        # Verify all energy components sum to the total
+        total_kinetic = sum(fe.kinetic for fe in se.per_field.values())
+        expected = total_kinetic + virial + constraint_self + constraint_cross
+        np.testing.assert_allclose(se.total, expected, rtol=1e-10)
+
+        # Cross coupling should be nonzero for this configuration
+        assert constraint_cross != 0.0
 
 
 class TestScalarVectorEnergyConservation:

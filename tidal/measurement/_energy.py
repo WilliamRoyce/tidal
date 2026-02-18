@@ -6,6 +6,7 @@ by reconstructing it from the Euler-Lagrange equations in the JSON spec:
     H = ½ Σ_{dyn} ∫ π_sim² dV     (kinetic, using simulation momenta)
       + V_virial                    (from dynamical fields' spatial RHS terms)
       + V_constraint_self           (constraint field gradient + mass, sign-flipped)
+      + V_constraint_cross          (cross-constraint identity coupling)
 
 The virial potential uses Euler's homogeneous function theorem for degree-2
 functionals: V = -½ Σ ∫ φ_i · RHS_i^{spatial} dV.
@@ -643,6 +644,88 @@ def _compute_constraint_self_energy(
     return energy
 
 
+def _compute_constraint_coupling_energy(
+    data: SimulationData,
+    t_idx: int,
+) -> float:
+    """Cross-constraint coupling energy from RHS terms between constraints.
+
+    For each constraint equation i with a term ``c * op(C_j)`` referencing
+    another constraint field C_j, accumulates:
+
+        ``V_cross += +½ * c * ∫ C_i * op(C_j) dV``
+
+    The ``+½`` sign (opposite of the dynamical virial ``-½``) arises because
+    constraint fields have ``π = 0``, so their Hamiltonian contribution is
+    ``H = -L``.  The RHS coefficients in the JSON already embed the Minkowski
+    sign, so the formula reproduces the correct Hamiltonian coupling.
+
+    For symmetric coupling (c_ij in eq_i AND c_ji in eq_j), the two halves
+    sum to the full coupling energy.
+
+    This handles any spatial operator (identity, gradient, laplacian, etc.)
+    between constraint fields, not just identity coupling.
+    """
+    # Identify constraint field names for fast lookup
+    constraint_names: set[str] = set()
+    for eq in data.spec.equations:
+        if eq.time_derivative_order == 0:
+            constraint_names.add(eq.field_name)
+
+    if len(constraint_names) < 2:  # noqa: PLR2004
+        return 0.0  # need at least 2 constraints for cross terms
+
+    # Build coordinate arrays lazily (only if position-dependent)
+    coord_arrays: dict[str, NDArray[np.float64]] | None = None
+    has_posdep = any(
+        term.position_dependent
+        for eq in data.spec.equations
+        if eq.time_derivative_order == 0
+        for term in eq.rhs_terms
+        if term.field in constraint_names and term.field != eq.field_name
+    )
+    if has_posdep:
+        coord_arrays = _build_coord_arrays(data)
+
+    return _accumulate_cross_constraint_terms(
+        data, t_idx, constraint_names, coord_arrays,
+    )
+
+
+def _accumulate_cross_constraint_terms(
+    data: SimulationData,
+    t_idx: int,
+    constraint_names: set[str],
+    coord_arrays: dict[str, NDArray[np.float64]] | None,
+) -> float:
+    """Sum cross-constraint term contributions: +½ c_ij ∫ C_i·op(C_j) dV."""
+    energy = 0.0
+    dv = data.volume_element
+
+    for eq in data.spec.equations:
+        if eq.time_derivative_order != 0 or eq.field_name not in data.fields:
+            continue
+        c_i = data.fields[eq.field_name][t_idx]
+
+        for term in eq.rhs_terms:
+            if term.field == eq.field_name or term.field not in constraint_names:
+                continue
+            if _is_momentum_field(term.field):
+                continue
+
+            target = _resolve_term_target(data, term.field, t_idx)
+            if target is None:
+                continue
+
+            coeff = _resolve_coefficient_on_grid(term, data, coord_arrays or {})
+            operated = _apply_spatial_operator(
+                term.operator, target, data.grid_spacing, data.periodic,
+            )
+            energy += 0.5 * float((coeff * c_i * operated).sum()) * dv
+
+    return energy
+
+
 def compute_system_energy(  # noqa: PLR0914
     data: SimulationData,
     t_idx: int,
@@ -651,11 +734,12 @@ def compute_system_energy(  # noqa: PLR0914
 
     Uses the complete formula derived from the Lagrangian:
 
-        H = ½ Σ π_sim² + V_virial + V_constraint_self
+        H = ½ Σ π_sim² + V_virial + V_constraint_self + V_constraint_cross
 
     where V_virial is computed from dynamical equations' spatial RHS terms
-    (Euler's theorem for quadratic functionals), and V_constraint_self
-    accounts for temporal gauge components' negative self-energy.
+    (Euler's theorem for quadratic functionals), V_constraint_self accounts
+    for temporal gauge components' negative self-energy, and V_constraint_cross
+    captures identity coupling between constraint fields (e.g. gcoup*G*A_0*B_0).
 
     Parameters
     ----------
@@ -714,8 +798,11 @@ def compute_system_energy(  # noqa: PLR0914
     # Constraint field self-energy (negative, from g^{00} = -1)
     v_constraint = _compute_constraint_self_energy(data, t_idx)
 
-    # Total potential = virial + constraint
-    v_total = v_virial + v_constraint
+    # Cross-constraint coupling (e.g. gcoup*G*A_0*B_0 between two constraints)
+    v_constraint_cross = _compute_constraint_coupling_energy(data, t_idx)
+
+    # Total potential = virial + constraint self + constraint cross
+    v_total = v_virial + v_constraint + v_constraint_cross
 
     # Interaction = total potential minus per-field self-potentials
     self_potential = sum(fe.gradient + fe.mass for fe in per_field.values())

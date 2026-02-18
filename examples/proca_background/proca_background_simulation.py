@@ -16,8 +16,8 @@ B starts at zero -- any B that appears is purely from conversion.
 The measurement module quantifies this conversion using:
 
 - **Conversion probability** P(t) = E_B(t) / E_A(0) via group conversion
-- **Hamiltonian energy** decomposition (manual, cross-validated against
-  virial energy from the measurement module)
+- **Hamiltonian energy** decomposition via the generic virial formula
+  (from the measurement module's ``compute_energy_timeseries``)
 
 Spectral measurements (P(k,t), omega(k), mixing length) are NOT available
 for this system because the position-dependent Lorentzian background breaks
@@ -42,23 +42,18 @@ from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
 from tidal.measurement import (
     SimulationData,
+    compute_energy_timeseries,
     compute_group_conversion,
-    compute_system_energy,
     create_snapshot_callback,
 )
 from tidal.symbolic import build_pde_from_json, load_equation_system
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
     from numpy.typing import NDArray
 
     from tidal.measurement._conversion import ConversionResult
-
-# NOTE: The measurement module's virial energy (compute_system_energy) now
-# supports position-dependent coupling G(x,y).  We keep the manual
-# Hamiltonian decomposition as a cross-validation -- it gives a physics-
-# specific breakdown (A energy, B energy, coupling energy) that the
-# generic virial formula does not.
 
 # -- Configuration --------------------------------------------------------
 
@@ -79,12 +74,12 @@ PARAMS: dict[str, float] = {
 
 # Grid (2D, periodic, centered at origin for the Lorentzian)
 DOMAIN = (-30.0, 30.0)
-N_CELLS = 64
+N_CELLS = 128
 
 # Time integration
 T_END = 20.0
 DT = 0.02
-TRACKER_INTERVAL = 1.0
+TRACKER_INTERVAL = 0.2
 
 # Initial conditions -- Gaussian pulse in A_1 at center
 PULSE_AMPLITUDE = 0.5
@@ -94,19 +89,16 @@ PULSE_WIDTH = 3.0
 OUTPUT_FILENAME = "proca_background_measurement.png"
 
 
-# -- Hamiltonian energy (manual) ------------------------------------------
+# -- Energy decomposition (via measurement module) ------------------------
 
 
 @dataclass(frozen=True)
-class HamiltonianDecomposition:
-    """Hamiltonian energy decomposition over time.
+class EnergyDecomposition:
+    """Energy decomposition by field group via the generic virial formula.
 
-    H = sum_i [1/2 pi_Ai^2 + 1/2 |grad A_i|^2 + mA2/2 A_i^2]
-      + sum_i [1/2 pi_Bi^2 + 1/2 |grad B_i|^2 + mB2/2 B_i^2]
-      - gcoup * integral G(x,y) (A_1*B_1 + A_2*B_2) dA
-
-    Note: A_0 and B_0 are constraints (t_order=0) and have no kinetic
-    energy.  Only spatial components (A_1, A_2, B_1, B_2) contribute.
+    Computed by ``compute_energy_timeseries``, which reads operators directly
+    from the JSON spec.  Automatically handles directional laplacians (curl
+    energy for Proca vectors) and position-dependent coefficients.
     """
 
     times: NDArray[np.float64]
@@ -114,18 +106,6 @@ class HamiltonianDecomposition:
     b_energy: NDArray[np.float64]
     coupling_energy: NDArray[np.float64]
     total_energy: NDArray[np.float64]
-
-
-def _gradient_energy_2d(
-    field: NDArray[np.float64],
-    dx: float,
-    dy: float,
-) -> float:
-    """Compute 1/2 integral |grad phi|^2 dA using periodic central differences."""
-    dv = dx * dy
-    gx = (np.roll(field, -1, axis=0) - np.roll(field, 1, axis=0)) / (2 * dx)
-    gy = (np.roll(field, -1, axis=1) - np.roll(field, 1, axis=1)) / (2 * dy)
-    return 0.5 * float(np.sum(gx**2 + gy**2)) * dv
 
 
 def _compute_coupling_field(data: SimulationData) -> NDArray[np.float64]:
@@ -148,67 +128,28 @@ def _compute_coupling_field(data: SimulationData) -> NDArray[np.float64]:
     return g0 / (1.0 + (x**2 + y**2) / r_param**2)
 
 
-def _compute_hamiltonian_energies(  # noqa: PLR0914
-    data: SimulationData,
-    coupling_field: NDArray[np.float64],
-) -> HamiltonianDecomposition:
-    """Compute full Hamiltonian decomposition over all snapshots.
+def _compute_energy_decomposition(data: SimulationData) -> EnergyDecomposition:
+    """Compute energy decomposition grouped by field sector.
 
-    Only spatial components (A_1, A_2, B_1, B_2) contribute to kinetic
-    and mass energy.  Constraints A_0, B_0 have no conjugate momenta.
+    Uses the generic virial formula via ``compute_energy_timeseries``,
+    which reads operators from the JSON spec.  This correctly handles
+    directional laplacians (Proca curl energy), cross-derivatives,
+    constraint self-energy, and position-dependent coefficients.
     """
-    dx, dy = data.grid_spacing
-    dv = dx * dy
-    n = data.n_snapshots
-    a_e = np.empty(n)
-    b_e = np.empty(n)
-    cpl_e = np.empty(n)
+    times, per_field, interaction, total = compute_energy_timeseries(data)
 
-    m_a2 = data.parameters.get("mA2", MA2)
-    m_b2 = data.parameters.get("mB2", MB2)
-    gcoup = data.parameters.get("gcoup", GCOUP)
+    a_fields = [n for n in per_field if n.startswith("A_")]
+    b_fields = [n for n in per_field if n.startswith("B_")]
 
-    for i in range(n):
-        # A sector: A_1 and A_2 (spatial evolution components)
-        a1 = data.fields["A_1"][i]
-        a2 = data.fields["A_2"][i]
-        pi_a1 = data.momenta["A_1"][i]
-        pi_a2 = data.momenta["A_2"][i]
+    a_energy = sum(per_field[n] for n in a_fields)
+    b_energy = sum(per_field[n] for n in b_fields)
 
-        a_e[i] = (
-            0.5 * float(np.sum(pi_a1**2 + pi_a2**2)) * dv
-            + _gradient_energy_2d(a1, dx, dy)
-            + _gradient_energy_2d(a2, dx, dy)
-            + 0.5 * m_a2 * float(np.sum(a1**2 + a2**2)) * dv
-        )
-
-        # B sector: B_1 and B_2
-        b1 = data.fields["B_1"][i]
-        b2 = data.fields["B_2"][i]
-        pi_b1 = data.momenta["B_1"][i]
-        pi_b2 = data.momenta["B_2"][i]
-
-        b_e[i] = (
-            0.5 * float(np.sum(pi_b1**2 + pi_b2**2)) * dv
-            + _gradient_energy_2d(b1, dx, dy)
-            + _gradient_energy_2d(b2, dx, dy)
-            + 0.5 * m_b2 * float(np.sum(b1**2 + b2**2)) * dv
-        )
-
-        # Coupling: -gcoup * integral G(x,y) * (A_1*B_1 + A_2*B_2) dA
-        # Sign: Lagrangian has +gcoup*G*A.B, Hamiltonian has -gcoup*G*A.B
-        # But in Minkowski with (-,+,+): A.B = -A_0*B_0 + A_1*B_1 + A_2*B_2
-        # For the potential energy term, the spatial dot product contributes.
-        cpl_e[i] = -gcoup * float(
-            np.sum(coupling_field * (a1 * b1 + a2 * b2))
-        ) * dv
-
-    return HamiltonianDecomposition(
-        times=data.times,
-        a_energy=a_e,
-        b_energy=b_e,
-        coupling_energy=cpl_e,
-        total_energy=a_e + b_e + cpl_e,
+    return EnergyDecomposition(
+        times=times,
+        a_energy=a_energy,
+        b_energy=b_energy,
+        coupling_energy=interaction,
+        total_energy=total,
     )
 
 
@@ -221,23 +162,21 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
     x = np.asarray(coords[..., 0], dtype=float)
     y = np.asarray(coords[..., 1], dtype=float)
 
-    gaussian = PULSE_AMPLITUDE * np.exp(
-        -(x**2 + y**2) / (2 * PULSE_WIDTH**2)
-    )
+    gaussian = PULSE_AMPLITUDE * np.exp(-(x**2 + y**2) / (2 * PULSE_WIDTH**2))
 
     # State layout: A_0, A_1, pi_A1, A_2, pi_A2, B_0, B_1, pi_B1, B_2, pi_B2
     return FieldCollection(
         [
-            ScalarField(grid, data=0.0, label="A_0_field"),       # A_0 constraint
-            ScalarField(grid, data=gaussian, label="A_1_field"),   # A_1 pulse
-            ScalarField(grid, data=0.0, label="A_1_momentum"),     # pi_A1
-            ScalarField(grid, data=0.0, label="A_2_field"),        # A_2
-            ScalarField(grid, data=0.0, label="A_2_momentum"),     # pi_A2
-            ScalarField(grid, data=0.0, label="B_0_field"),        # B_0 constraint
-            ScalarField(grid, data=0.0, label="B_1_field"),        # B_1
-            ScalarField(grid, data=0.0, label="B_1_momentum"),     # pi_B1
-            ScalarField(grid, data=0.0, label="B_2_field"),        # B_2
-            ScalarField(grid, data=0.0, label="B_2_momentum"),     # pi_B2
+            ScalarField(grid, data=0.0, label="A_0_field"),  # A_0 constraint
+            ScalarField(grid, data=gaussian, label="A_1_field"),  # A_1 pulse
+            ScalarField(grid, data=0.0, label="A_1_momentum"),  # pi_A1
+            ScalarField(grid, data=0.0, label="A_2_field"),  # A_2
+            ScalarField(grid, data=0.0, label="A_2_momentum"),  # pi_A2
+            ScalarField(grid, data=0.0, label="B_0_field"),  # B_0 constraint
+            ScalarField(grid, data=0.0, label="B_1_field"),  # B_1
+            ScalarField(grid, data=0.0, label="B_1_momentum"),  # pi_B1
+            ScalarField(grid, data=0.0, label="B_2_field"),  # B_2
+            ScalarField(grid, data=0.0, label="B_2_momentum"),  # pi_B2
         ]
     )
 
@@ -263,9 +202,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     grid = CartesianGrid([DOMAIN, DOMAIN], N_CELLS, periodic=True)
     initial_state = _create_initial_state(grid)
 
-    output_data_dir = (
-        Path(__file__).parent.parent / "data" / "proca_background_output"
-    )
+    output_data_dir = Path(__file__).parent.parent / "data" / "proca_background_output"
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,
         spec=spec,
@@ -294,7 +231,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
 
 def _print_summary(
     result: ConversionResult,
-    hamiltonian: HamiltonianDecomposition,
+    hamiltonian: EnergyDecomposition,
     params: dict[str, float],
 ) -> None:
     """Print quantitative measurement summary to stdout."""
@@ -309,7 +246,9 @@ def _print_summary(
     g0 = params["g0"]
     r_param = params["R"]
     print(f"  mA2={m_a2}, mB2={m_b2}, gcoup={gcoup}, g0={g0}, R={r_param}")
-    print(f"  Stability: mA2*mB2 = {m_a2 * m_b2:.1f} > (g0*gcoup)^2 = {(g0 * gcoup)**2:.2f}")
+    print(
+        f"  Stability: mA2*mB2 = {m_a2 * m_b2:.1f} > (g0*gcoup)^2 = {(g0 * gcoup) ** 2:.2f}"
+    )
     print()
 
     peak_idx = int(np.argmax(result.probability))
@@ -331,7 +270,7 @@ def _print_summary(
     )
     print(f"  Hamiltonian H(0) = {h0:.4f},  H(T) = {h_final:.4f}")
     print(f"  max |dH/H| = {max_drift:.2e}")
-    print("  (Manual decomposition cross-validated against virial energy)")
+    print("  (virial formula from measurement module)")
     print("=" * 65)
 
 
@@ -341,7 +280,7 @@ def _print_summary(
 def _plot_results(
     data: SimulationData,
     result: ConversionResult,
-    hamiltonian: HamiltonianDecomposition,
+    hamiltonian: EnergyDecomposition,
     coupling_field: NDArray[np.float64],
     params: dict[str, float],
 ) -> Path:
@@ -401,7 +340,7 @@ def _plot_conversion(ax: Axes, result: ConversionResult) -> None:
     ax.grid(visible=True, alpha=0.3)
 
 
-def _plot_hamiltonian(ax: Axes, h: HamiltonianDecomposition) -> None:
+def _plot_hamiltonian(ax: Axes, h: EnergyDecomposition) -> None:
     ax.plot(h.times, h.a_energy, "b-", label=r"$E_A$", linewidth=1.2)
     ax.plot(h.times, h.b_energy, "r-", label=r"$E_B$", linewidth=1.2)
     ax.plot(
@@ -427,7 +366,7 @@ def _plot_hamiltonian(ax: Axes, h: HamiltonianDecomposition) -> None:
     ax.grid(visible=True, alpha=0.3)
 
 
-def _plot_energy_conservation(ax: Axes, h: HamiltonianDecomposition) -> None:
+def _plot_energy_conservation(ax: Axes, h: EnergyDecomposition) -> None:
     h0 = h.total_energy[0]
     relative = (h.total_energy - h0) / max(abs(h0), 1e-30)
     ax.plot(h.times, relative, "k-", linewidth=1.0)
@@ -442,7 +381,7 @@ def _plot_energy_conservation(ax: Axes, h: HamiltonianDecomposition) -> None:
 
 def _plot_coupling_field(
     ax: Axes,
-    fig: plt.Figure,
+    fig: Figure,
     data: SimulationData,
     coupling_field: NDArray[np.float64],
 ) -> None:
@@ -503,7 +442,7 @@ def _plot_field_heatmap(
 def _plot_summary_text(
     ax: Axes,
     result: ConversionResult,
-    hamiltonian: HamiltonianDecomposition,
+    hamiltonian: EnergyDecomposition,
     params: dict[str, float],
 ) -> None:
     m_a2 = params["mA2"]
@@ -522,7 +461,7 @@ def _plot_summary_text(
         f"  $g_{{coup}} = {gcoup}$,  $g_0 = {g0}$,  $R = {r_param}$",
         "",
         f"Stability: $m_A^2 m_B^2 = {m_a2 * m_b2:.1f}$",
-        f"  $> (g_0 g_{{coup}})^2 = {(g0 * gcoup)**2:.2f}$",
+        f"  $> (g_0 g_{{coup}})^2 = {(g0 * gcoup) ** 2:.2f}$",
         "",
         "Results:",
         f"  Peak $P(t) = {result.probability[peak_idx]:.6f}$",
@@ -563,22 +502,12 @@ def main() -> None:
     print("Computing group conversion probability (A -> B)...")
     result = compute_group_conversion(
         data,
-        source=["A_1", "A_2"],
-        target=["B_1", "B_2"],
+        source_fields=["A_1", "A_2"],
+        target_fields=["B_1", "B_2"],
     )
 
-    print("Computing Hamiltonian energy (manual decomposition)...")
-    hamiltonian = _compute_hamiltonian_energies(data, coupling_field)
-
-    # Cross-validate with measurement module's virial energy
-    print("Cross-validating with virial energy (measurement module)...")
-    virial = compute_system_energy(data, 0)
-    h_manual = hamiltonian.total_energy[0]
-    h_virial = virial.total
-    rel_diff = abs(h_manual - h_virial) / max(abs(h_manual), 1e-30)
-    print(f"  Manual H(0) = {h_manual:.6f}")
-    print(f"  Virial H(0) = {h_virial:.6f}")
-    print(f"  Relative difference: {rel_diff:.2e}")
+    print("Computing energy decomposition (virial formula)...")
+    hamiltonian = _compute_energy_decomposition(data)
 
     _print_summary(result, hamiltonian, params)
 

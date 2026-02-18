@@ -24,7 +24,8 @@ creates asymmetric conversion behavior.
 
 The measurement module quantifies conversion using:
 - **Conversion probability** P(t) = E_A2(t) / E_phi(0)
-- **Hamiltonian energy** decomposition (manual, cross-validated against virial)
+- **Hamiltonian energy** decomposition via the generic virial formula
+  (from the measurement module's ``compute_energy_timeseries``)
 
 Spectral measurements (P(k,t), omega(k), mixing length) are NOT available
 because the position-dependent background breaks translation invariance.
@@ -49,19 +50,17 @@ from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 from tidal.measurement import (
     SimulationData,
     compute_conversion_probability,
-    compute_system_energy,
+    compute_energy_timeseries,
     create_snapshot_callback,
 )
 from tidal.symbolic import build_pde_from_json, load_equation_system
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
     from numpy.typing import NDArray
 
     from tidal.measurement._conversion import ConversionResult
-
-# NOTE: Only A_2 couples to phi (B_0=B_1=0).  A_1 should remain at zero
-# throughout the simulation.  This is a key validation check.
 
 # -- Configuration --------------------------------------------------------
 
@@ -101,19 +100,16 @@ PULSE_AMPLITUDE = 1.0
 OUTPUT_FILENAME = "vector_background_measurement.png"
 
 
-# -- Hamiltonian energy (manual) ------------------------------------------
+# -- Energy decomposition (via measurement module) ------------------------
 
 
 @dataclass(frozen=True)
-class HamiltonianDecomposition:
-    """Hamiltonian energy decomposition over time.
+class EnergyDecomposition:
+    """Energy decomposition by field group via the generic virial formula.
 
-    H = 1/2 pi_phi^2 + 1/2 |grad phi|^2 + mPhi2/2 phi^2
-      + sum_{i=1,2} [1/2 pi_Ai^2 + 1/2 |grad A_i|^2 + mA2/2 A_i^2]
-      - gBV * integral B_2(x,y) * A_2 * phi dA
-
-    Note: A_0 is a constraint and has no kinetic energy.
-    Only B_2 is nonzero so coupling reduces to a single integral.
+    Computed by ``compute_energy_timeseries``, which reads operators directly
+    from the JSON spec.  Automatically handles directional laplacians (curl
+    energy for Proca vectors) and position-dependent coefficients.
     """
 
     times: NDArray[np.float64]
@@ -121,18 +117,6 @@ class HamiltonianDecomposition:
     a_energy: NDArray[np.float64]
     coupling_energy: NDArray[np.float64]
     total_energy: NDArray[np.float64]
-
-
-def _gradient_energy_2d(
-    field: NDArray[np.float64],
-    dx: float,
-    dy: float,
-) -> float:
-    """Compute 1/2 integral |grad phi|^2 dA using periodic central differences."""
-    dv = dx * dy
-    gx = (np.roll(field, -1, axis=0) - np.roll(field, 1, axis=0)) / (2 * dx)
-    gy = (np.roll(field, -1, axis=1) - np.roll(field, 1, axis=1)) / (2 * dy)
-    return 0.5 * float(np.sum(gx**2 + gy**2)) * dv
 
 
 def _compute_coupling_field(data: SimulationData) -> NDArray[np.float64]:
@@ -156,61 +140,28 @@ def _compute_coupling_field(data: SimulationData) -> NDArray[np.float64]:
     return b0 * np.tanh(x / w) * np.exp(-(y**2) / (2 * r_param**2))
 
 
-def _compute_hamiltonian_energies(  # noqa: PLR0914
-    data: SimulationData,
-    coupling_field: NDArray[np.float64],
-) -> HamiltonianDecomposition:
-    """Compute full Hamiltonian decomposition over all snapshots.
+def _compute_energy_decomposition(data: SimulationData) -> EnergyDecomposition:
+    """Compute energy decomposition grouped by field sector.
 
-    A_0 is a constraint (no kinetic energy).  A_1 has no background
-    coupling (B_1=0), but we still include its free energy.
+    Uses the generic virial formula via ``compute_energy_timeseries``,
+    which reads operators from the JSON spec.  This correctly handles
+    directional laplacians (Proca curl energy), cross-derivatives,
+    constraint self-energy, and position-dependent coefficients.
     """
-    dx, dy = data.grid_spacing
-    dv = dx * dy
-    n = data.n_snapshots
-    phi_e = np.empty(n)
-    a_e = np.empty(n)
-    cpl_e = np.empty(n)
+    times, per_field, interaction, total = compute_energy_timeseries(data)
 
-    m_phi2 = data.parameters.get("mPhi2", MPHI2)
-    m_a2 = data.parameters.get("mA2", MA2)
-    gbv = data.parameters.get("gBV", GBV)
+    phi_fields = [n for n in per_field if n.startswith("phi_")]
+    a_fields = [n for n in per_field if n.startswith("A_")]
 
-    for i in range(n):
-        # Phi sector
-        phi = data.fields["phi_0"][i]
-        pi_phi = data.momenta["phi_0"][i]
+    phi_energy = sum(per_field[n] for n in phi_fields)
+    a_energy = sum(per_field[n] for n in a_fields)
 
-        phi_e[i] = (
-            0.5 * float(np.sum(pi_phi**2)) * dv
-            + _gradient_energy_2d(phi, dx, dy)
-            + 0.5 * m_phi2 * float(np.sum(phi**2)) * dv
-        )
-
-        # A sector: A_1 and A_2 (spatial evolution components)
-        a1 = data.fields["A_1"][i]
-        a2 = data.fields["A_2"][i]
-        pi_a1 = data.momenta["A_1"][i]
-        pi_a2 = data.momenta["A_2"][i]
-
-        a_e[i] = (
-            0.5 * float(np.sum(pi_a1**2 + pi_a2**2)) * dv
-            + _gradient_energy_2d(a1, dx, dy)
-            + _gradient_energy_2d(a2, dx, dy)
-            + 0.5 * m_a2 * float(np.sum(a1**2 + a2**2)) * dv
-        )
-
-        # Coupling: -gBV * integral B_2(x,y) * A_2 * phi dA
-        # Sign: Lagrangian has +gBV*B^a*A_a*phi, with B^2 = B_2 (upper index
-        # in Minkowski flat spatial).  Hamiltonian flips sign of potential.
-        cpl_e[i] = -gbv * float(np.sum(coupling_field * a2 * phi)) * dv
-
-    return HamiltonianDecomposition(
-        times=data.times,
-        phi_energy=phi_e,
-        a_energy=a_e,
-        coupling_energy=cpl_e,
-        total_energy=phi_e + a_e + cpl_e,
+    return EnergyDecomposition(
+        times=times,
+        phi_energy=phi_energy,
+        a_energy=a_energy,
+        coupling_energy=interaction,
+        total_energy=total,
     )
 
 
@@ -265,9 +216,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     grid = CartesianGrid([DOMAIN, DOMAIN], N_CELLS, periodic=True)
     initial_state = _create_initial_state(grid)
 
-    output_data_dir = (
-        Path(__file__).parent.parent / "data" / "vector_background_output"
-    )
+    output_data_dir = Path(__file__).parent.parent / "data" / "vector_background_output"
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,
         spec=spec,
@@ -296,7 +245,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
 
 def _print_summary(
     result: ConversionResult,
-    hamiltonian: HamiltonianDecomposition,
+    hamiltonian: EnergyDecomposition,
     params: dict[str, float],
 ) -> None:
     """Print quantitative measurement summary to stdout."""
@@ -314,7 +263,9 @@ def _print_summary(
     print(f"  mPhi2={m_phi2}, mA2={m_a2}, gBV={gbv}, B0={b0}, W={w}, R={r_param}")
     max_coupling = gbv * b0
     print(f"  Max coupling (x>>W): gBV*B0 = {max_coupling:.2f}")
-    print(f"  Stability: mPhi2*mA2 = {m_phi2 * m_a2:.1f} > (gBV*B0)^2 = {max_coupling**2:.2f}")
+    print(
+        f"  Stability: mPhi2*mA2 = {m_phi2 * m_a2:.1f} > (gBV*B0)^2 = {max_coupling**2:.2f}"
+    )
     print()
 
     omega_k = np.sqrt(K0**2 + m_phi2)
@@ -340,7 +291,7 @@ def _print_summary(
     )
     print(f"  Hamiltonian H(0) = {h0:.4f},  H(T) = {h_final:.4f}")
     print(f"  max |dH/H| = {max_drift:.2e}")
-    print("  (Manual decomposition cross-validated against virial energy)")
+    print("  (virial formula from measurement module)")
     print("=" * 65)
 
 
@@ -350,7 +301,7 @@ def _print_summary(
 def _plot_results(
     data: SimulationData,
     result: ConversionResult,
-    hamiltonian: HamiltonianDecomposition,
+    hamiltonian: EnergyDecomposition,
     coupling_field: NDArray[np.float64],
     params: dict[str, float],
 ) -> Path:
@@ -412,7 +363,7 @@ def _plot_conversion(ax: Axes, result: ConversionResult) -> None:
     ax.grid(visible=True, alpha=0.3)
 
 
-def _plot_hamiltonian(ax: Axes, h: HamiltonianDecomposition) -> None:
+def _plot_hamiltonian(ax: Axes, h: EnergyDecomposition) -> None:
     ax.plot(h.times, h.phi_energy, "b-", label=r"$E_\phi$", linewidth=1.2)
     ax.plot(h.times, h.a_energy, "r-", label=r"$E_A$", linewidth=1.2)
     ax.plot(
@@ -440,7 +391,7 @@ def _plot_hamiltonian(ax: Axes, h: HamiltonianDecomposition) -> None:
 
 def _plot_coupling_field(
     ax: Axes,
-    fig: plt.Figure,
+    fig: Figure,
     data: SimulationData,
     coupling_field: NDArray[np.float64],
 ) -> None:
@@ -512,7 +463,7 @@ def _plot_field_heatmap(
 def _plot_summary_text(
     ax: Axes,
     result: ConversionResult,
-    hamiltonian: HamiltonianDecomposition,
+    hamiltonian: EnergyDecomposition,
     params: dict[str, float],
 ) -> None:
     m_phi2 = params["mPhi2"]
@@ -573,20 +524,12 @@ def main() -> None:
     coupling_field = _compute_coupling_field(data)
 
     print("Computing conversion probability (phi -> A_2)...")
-    result = compute_conversion_probability(data, source="phi_0", target="A_2")
+    result = compute_conversion_probability(
+        data, source_field="phi_0", target_field="A_2"
+    )
 
-    print("Computing Hamiltonian energy (manual decomposition)...")
-    hamiltonian = _compute_hamiltonian_energies(data, coupling_field)
-
-    # Cross-validate with measurement module's virial energy
-    print("Cross-validating with virial energy (measurement module)...")
-    virial = compute_system_energy(data, 0)
-    h_manual = hamiltonian.total_energy[0]
-    h_virial = virial.total
-    rel_diff = abs(h_manual - h_virial) / max(abs(h_manual), 1e-30)
-    print(f"  Manual H(0) = {h_manual:.6f}")
-    print(f"  Virial H(0) = {h_virial:.6f}")
-    print(f"  Relative difference: {rel_diff:.2e}")
+    print("Computing energy decomposition (virial formula)...")
+    hamiltonian = _compute_energy_decomposition(data)
 
     # Check that A_1 stays at zero (B_1=0, uncoupled)
     a1_max = float(np.max(np.abs(data.fields["A_1"])))
