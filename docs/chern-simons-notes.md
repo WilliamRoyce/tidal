@@ -226,7 +226,7 @@ To fully automate CS term derivation:
 
 - TOML: `examples/chern_simons/theory.toml` (derive via `tidal derive`)
 - JSON: `examples/data/chern_simons_3d.json`
-- Python: `examples/chern_simons/chern_simons_simulation.py`
+- Run: `cd examples/chern_simons && bash run.sh`
 
 ### Physics & Software
 

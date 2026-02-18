@@ -77,7 +77,7 @@ tidal list
 tidal validate examples/data/klein_gordon_1d.json
 
 # Run a pipeline example
-uv run python examples/scalar_field/kg_from_lagrangian.py
+cd examples/scalar_field && bash run.sh
 ```
 
 ### Dev Container (Alternative)
