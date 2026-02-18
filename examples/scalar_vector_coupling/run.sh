@@ -12,7 +12,6 @@
 # A_0 is a constraint; phi_0, A_1, A_2 are dynamical.
 #
 # See also:
-#   scalar_vector_coupling.wls   — manual Wolfram derivation
 #   measure_conversion.py        — detailed measurement analysis
 #
 # Running this script:

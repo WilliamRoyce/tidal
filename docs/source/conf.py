@@ -1,9 +1,11 @@
 """Sphinx configuration for TIDAL documentation."""
 
+from importlib.metadata import version as _get_version
+
 project = "TIDAL"
 author = "William Royce"
-version = "0.3.3"
-release = "0.3.3"
+version = _get_version("tidal")
+release = version
 
 extensions = [
     "sphinx.ext.autodoc",

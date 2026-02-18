@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Elasticity (Navier-Cauchy) 2+1D example
-# See also: navier_cauchy.wls (manual derivation), elasticity_from_lagrangian.py (Python simulation)
+# See also: elasticity_from_lagrangian.py (Python simulation)
 #
 # The elasticity Lagrangian uses component-derivative notation (CD[{idx, -chart}])
 # because the Lame parameters produce anisotropic spatial coefficients.
@@ -12,8 +12,6 @@ cd "$(dirname "$0")"
 
 # Derive equations from TOML config (uses component-derivative -chart placeholder)
 tidal derive theory.toml
-# Alternative: derive from handwritten .wls (identical physics, numeric coefficients)
-# tidal derive navier_cauchy.wls
 
 # Inspect the equation system
 tidal inspect ../data/navier_cauchy_2d.json

@@ -466,7 +466,7 @@ tidal/                   # TIDAL project root
 │   └── test_*.py            # Other test modules
 ├── examples/                 # 20 pipeline examples
 │   ├── data/                # Generated JSON specifications (20 files)
-│   └── {example}/           # Each has .wls, run.sh; most have theory.toml, simulation.py
+│   └── {example}/           # Each has theory.toml, run.sh; most have simulation.py
 ├── docs/                     # Documentation
 │   └── source/              # Sphinx source files
 └── pyproject.toml           # Project configuration

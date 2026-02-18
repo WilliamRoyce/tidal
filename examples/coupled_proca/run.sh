@@ -12,7 +12,6 @@
 #   - Cross-field identity coupling in constraints (gcoup)
 #
 # See also:
-#   coupled_proca.wls          — manual Wolfram derivation
 #   measure_conversion.py      — detailed measurement analysis
 #
 # Running this script:

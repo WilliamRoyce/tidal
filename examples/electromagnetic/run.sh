@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Electromagnetic 1+1D example
-# See also: em_lagrangian_1d.wls (manual derivation), em_from_lagrangian.py (Python simulation)
+# See also: em_from_lagrangian.py (Python simulation)
 #
 # To run manually:  cd examples/electromagnetic && tidal derive theory.toml
 

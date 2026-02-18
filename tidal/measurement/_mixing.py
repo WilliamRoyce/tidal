@@ -244,6 +244,8 @@ def _find_spectral_peaks(
     peaks: list[SpectralPeak] = []
     for idx in peak_indices:
         omega = float(freqs[idx])
+        if omega <= 0.0:
+            continue  # skip non-positive frequencies (avoid division by zero)
         p = float(power[idx])
         fwhm = _compute_fwhm(freqs, power, idx, rayleigh_resolution)
         ml = np.pi / omega
@@ -410,6 +412,9 @@ def compute_mixing_spectrum(
     # Dominant peak
     peak_idx = int(np.argmax(power))
     omega_dom = float(angular_freqs[peak_idx])
+    if omega_dom <= 0.0:
+        msg = "Dominant frequency is zero — cannot compute mixing length"
+        raise ValueError(msg)
 
     return MixingSpectrum(
         frequencies=angular_freqs,

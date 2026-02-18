@@ -49,17 +49,16 @@ Component values can be:
 
 ## Caching Architecture
 
-Three levels of caching prevent redundant evaluation:
+Four levels of caching prevent redundant evaluation:
 
 | Level | Cache | What | Lifetime |
 |-------|-------|------|----------|
+| L0 | `_preresolved` | Fully constant coefficients (no `eval()` needed) | Instance (construction) |
 | L1 | `_expr_cache` | Mathematica→Python string conversion | Instance (singleton) |
 | L2 | `_spatial_cache` | Grid arrays for spatial-only coefficients | Instance (populated on first RHS call) |
 | L3 | `coeff_cache` | Per-RHS-call results | Single `_compute_rhs_for_component()` call |
 
-**Key behavior**: Spatial-only coefficients (`position_dependent=True`, `time_dependent=False`) are evaluated once on the grid and cached persistently across all timesteps. Time-dependent coefficients are re-evaluated each substep.
-
-The `_preresolved` dict (L0) caches fully constant coefficients (neither position- nor time-dependent) at construction time — no eval() needed at runtime.
+**Key behavior**: Spatial-only coefficients (`position_dependent=True`, `time_dependent=False`) are evaluated once on the grid and cached persistently across all timesteps. Time-dependent coefficients are re-evaluated each substep. Fully constant coefficients (neither position- nor time-dependent) are resolved once at construction time (L0) with no `eval()` at runtime.
 
 ## Supported Patterns
 
@@ -88,21 +87,20 @@ The `_preresolved` dict (L0) caches fully constant coefficients (neither positio
 
 ## Adding New Mathematica Functions
 
-To support a new Mathematica function (e.g., `Gamma[x]`):
+To support a new Mathematica function (e.g., `Gamma[x]`), update
+`_eval_utils.py` only — `pde_builder.py` delegates to it automatically:
 
-1. **String conversion**: Add to `_FUNCTION_MAP` in `_eval_utils.py` and the
-   `function_map` list in `PDEFromSpec._mathematica_to_python()`:
+1. **String conversion**: Add to `_FUNCTION_MAP` in `_eval_utils.py`:
    ```python
    ("Gamma", "gamma"),
    ```
 
-2. **Evaluation namespace**: Add to `build_eval_namespace()` in `_eval_utils.py`
-   and `PDEFromSpec._build_base_namespace()`:
+2. **Evaluation namespace**: Add to `build_eval_namespace()` in `_eval_utils.py`:
    ```python
    ns["gamma"] = special.gamma
    ```
 
 3. **Test**: Add a conversion test in `test_background_fields.py`.
 
-Both locations must be updated to keep `PDEFromSpec` and the standalone
-`evaluate_coefficient` in sync.
+`PDEFromSpec._mathematica_to_python()` and `PDEFromSpec._build_base_namespace()`
+both delegate to `_eval_utils.py`, so no changes are needed in `pde_builder.py`.

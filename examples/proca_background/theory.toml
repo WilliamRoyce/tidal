@@ -1,0 +1,70 @@
+# Coupled Proca with Lorentzian Scalar Background
+#
+# Physics: Two massive vector fields A, B with coupling modulated by a
+# spatially localized scalar background G(x,y) = g0 / (1 + (x^2+y^2)/R^2).
+#
+# The Lorentzian profile has heavier (algebraic) tails compared to the
+# Gaussian used in coupled_scattering, testing a different regime of
+# position-dependent coefficients.
+#
+#   L = -1/2 (dA)^2 + 1/2 (d_a A_b)(d^b A^a) - mA2/2 A^2
+#       -1/2 (dB)^2 + 1/2 (d_a B_b)(d^b B^a) - mB2/2 B^2
+#       + G(x,y) * gcoup * A_a B^a
+#
+# Key features tested:
+#   - Constraint fields (A_0, B_0) with position-dependent source terms
+#   - Lorentzian background profile (Power function in Mathematica)
+#   - Scalar background in a vector-field context
+#   - Constraint solver with non-uniform coupling
+
+[theory]
+name = "Proca with Lorentzian Background"
+description = "Two massive vectors coupled via a Lorentzian scalar background in 2+1D"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "B"
+type = "vector"
+
+[constants]
+names = ["mA2", "mB2", "gcoup", "g0", "R"]
+
+[[background_fields]]
+name = "G"
+type = "scalar"
+components = ["g0 * Power[1 + (x[]^2 + y[]^2) / R^2, -1]"]
+
+[lagrangian]
+expression = "(-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] + 1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-d][A[-c]] - mA2/2 A[-a] eta[a,b] A[-b] - 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-c][B[-d]] + 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-d][B[-c]] - mB2/2 B[-a] eta[a,b] B[-b] + G[] * gcoup * A[-a] eta[a,b] B[-b])"
+
+# Stability: mA2 * mB2 > (g0 * gcoup)^2 at the origin.
+# At origin G(0,0) = g0, so effective coupling = g0*gcoup = 0.5.
+# det = 1*2 - 0.25 = 1.75 > 0.
+[parameters]
+mA2 = 1.0
+mB2 = 2.0
+gcoup = 0.5
+g0 = 1.0
+R = 8.0
+
+[constraint_solver]
+enabled = true
+method = "auto"
+max_iterations = 30
+tolerance = 1e-10
+
+[constraint_solver.boundary_conditions.x]
+type = "periodic"
+
+[constraint_solver.boundary_conditions.y]
+type = "periodic"
+
+[output]
+path = "../data/proca_background.json"

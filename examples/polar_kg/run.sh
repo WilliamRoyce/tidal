@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Polar Klein-Gordon 2+1D example
-# See also: polar_kg.wls (manual derivation), polar_kg_simulation.py (Python simulation)
+# See also: polar_kg_simulation.py (Python simulation)
 #
 # NOTE: The derive step uses polar coordinates (r, theta) with a coordinate-dependent
-# metric. Both TOML and manual .wls derivation are supported.
+# metric.
 # The simulation works via CLI with --bc and --ic formula flags.
 #
 # To run manually:  cd examples/polar_kg

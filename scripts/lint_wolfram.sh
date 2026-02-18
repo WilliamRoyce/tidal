@@ -20,7 +20,6 @@ MODULES=(
     "tidal/wolfram/ComponentDecompose.wl"
     "tidal/wolfram/EulerLagrange.wl"
     "tidal/wolfram/Linearize.wl"
-    "tidal/wolfram/LagrangianPipeline.wl"
 )
 
 PASSED=0

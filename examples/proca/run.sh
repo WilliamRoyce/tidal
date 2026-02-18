@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Proca (massive vector) 1+1D example
-# See also: proca.wls (manual derivation), proca_simulation.py (Python simulation)
+# See also: proca_simulation.py (Python simulation)
 #
 # To run manually:  cd examples/proca && tidal derive theory.toml
 

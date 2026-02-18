@@ -11,6 +11,7 @@ from tidal.symbolic.json_loader import (
     _STATIC_OPERATORS,
     ComponentEquation,
     EquationSystem,
+    LHSStructure,
     OperatorTerm,
     _resolve_symbolic_coeff,
     load_equation_system,
@@ -1507,3 +1508,59 @@ class TestResolveSymbolicCoeff:
     def test_inf_result_returns_none(self) -> None:
         # math.isfinite rejects Inf
         assert _resolve_symbolic_coeff("1e309", {}) is None
+
+
+class TestLHSStructureMissingTimeOrder:
+    """Fail-fast: LHS order must include 'time' key."""
+
+    def test_missing_time_raises(self) -> None:
+        with pytest.raises(ValueError, match=r"lhs\.order must specify 'time'"):
+            LHSStructure.from_dict({"expression": "phi", "order": {"space": 0}})
+
+    def test_empty_order_raises(self) -> None:
+        with pytest.raises(ValueError, match=r"lhs\.order must specify 'time'"):
+            LHSStructure.from_dict({"expression": "phi", "order": {}})
+
+    def test_valid_order_passes(self) -> None:
+        lhs = LHSStructure.from_dict(
+            {"expression": "phi", "order": {"time": 2, "space": 0}}
+        )
+        assert lhs.time_order == 2
+
+
+class TestMetadataParameterParsing:
+    """Fail-fast: metadata parameters must be numeric."""
+
+    def _make_spec_dict(self, params: dict[str, object]) -> dict[str, object]:
+        return {
+            "metadata": {"parameters": params},
+            "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {
+                        "expression": "d2_t(phi_0)",
+                        "order": {"time": 2, "space": 0},
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            }
+                        ],
+                    },
+                }
+            ],
+        }
+
+    def test_string_numeric_param_accepted(self) -> None:
+        spec = EquationSystem.from_dict(self._make_spec_dict({"m2": "1.5"}))
+        assert spec is not None
+
+    def test_string_non_numeric_param_raises(self) -> None:
+        with pytest.raises(ValueError, match="cannot convert"):
+            EquationSystem.from_dict(self._make_spec_dict({"m2": "abc"}))

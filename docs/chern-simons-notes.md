@@ -222,7 +222,7 @@ To fully automate CS term derivation:
 
 ## References
 
-- Script: `examples/chern_simons/chern_simons.wls`
+- TOML: `examples/chern_simons/theory.toml` (derive via `tidal derive`)
 - JSON: `examples/data/chern_simons_3d.json`
 - Python: `examples/chern_simons/chern_simons_simulation.py`
 - Plan: `/home/vscode/.claude/plans/valiant-orbiting-codd.md`

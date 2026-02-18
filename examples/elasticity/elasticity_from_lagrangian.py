@@ -242,7 +242,7 @@ def main() -> None:
 
     if not json_path.exists():
         print(f"JSON file not found: {json_path}")
-        print("Run the Wolfram script first: wolframscript -file navier_cauchy.wls")
+        print("Run: tidal derive theory.toml (in examples/elasticity/)")
         return
 
     _print_header()

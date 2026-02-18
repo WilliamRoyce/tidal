@@ -1,0 +1,72 @@
+# Scalar-Vector Coupling with Tanh Domain Wall Vector Background
+#
+# Physics: Scalar phi + vector A coupled via an external vector field B_a(x,y):
+#
+#   L = -1/2 (d phi)^2 - mPhi2/2 phi^2
+#       -1/2 (d_a A_b)(d^a A^b) + 1/2 (d_a A_b)(d^b A^a) - mA2/2 A^2
+#       + gBV * B^a A_a phi
+#
+# The background vector field B has components:
+#   B_0 = 0  (no temporal component)
+#   B_1 = 0  (no x-component)
+#   B_2 = B0 * Tanh[x[] / W] * Exp[-(x[]^2 + y[]^2) / (2 * R^2)]
+#
+# This is a "localized tanh" — antisymmetric and sign-changing across x=0,
+# with a Gaussian envelope in both x and y that decays to ~0 at the periodic
+# boundaries.  Qualitatively different from:
+#   - Gaussian (coupled_scattering): symmetric, exponential tails
+#   - Lorentzian (proca_background): symmetric, algebraic tails
+#   - Localized tanh: antisymmetric, sign-changing, localized by Gaussian
+#
+# After VarD:
+#   phi eq: ... + gBV * B_2(x,y) * A_2    (position-dependent identity(A_2))
+#   A_2 eq: ... + gBV * B_2(x,y) * phi    (position-dependent identity(phi))
+#   A_0, A_1 eqs: coupling vanishes (B_0 = B_1 = 0)
+#
+# Key features tested:
+#   - First test of vector background ComponentValue mechanism
+#   - Sign-changing background (tachyonic diagnostic should warn)
+#   - Tanh * Exp(x²+y²) product function conversion
+#   - Zero-valued background components (B_0=0, B_1=0)
+#   - Mixed-rank (scalar + vector) coupling with position-dependent coefficients
+#   - ValidateNoUnresolvedBackgrounds check in generated WLS
+
+[theory]
+name = "Vector Background Domain Wall"
+description = "Scalar-vector coupling via tanh domain wall vector background in 2+1D"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[constants]
+names = ["mPhi2", "mA2", "gBV", "B0", "W", "R"]
+
+[[background_fields]]
+name = "B"
+type = "vector"
+components = ["0", "0", "B0 * Tanh[x[] / W] * Exp[-(x[]^2 + y[]^2) / (2 * R^2)]"]
+
+[lagrangian]
+expression = "(-1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]] - mPhi2/2 * phi[]^2 - 1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] + 1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-d][A[-c]] - mA2/2 A[-a] eta[a,b] A[-b] + gBV * B[-a] eta[a,b] A[-b] * phi[])"
+
+# Stability: effective coupling at origin is gBV*B0*tanh(0)=0 (zero crossing).
+# Max coupling at x>>W: gBV*B0 = 0.5.  mPhi2*mA2 > (gBV*B0)^2 => 1*2 > 0.25.
+[parameters]
+mPhi2 = 1.0
+mA2 = 2.0
+gBV = 0.5
+B0 = 1.0
+W = 3.0
+R = 8.0
+
+[output]
+path = "../data/vector_background.json"

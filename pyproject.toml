@@ -1,6 +1,6 @@
 [project]
 name = "tidal"
-version = "0.3.3"
+version = "0.4.0"
 description = "TIDAL: Tensor Integration and Derivation for Any Lagrangian"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -39,13 +39,12 @@ classifiers = [
 dependencies = [
     "py-pde>=0.38,<1.0",
     "matplotlib>=3.1,<4.0",
-    "numba>=0.59,<1.0",
     "numpy>=1.22,<3.0",
     "scipy>=1.10,<2.0",
-    "sympy>=1.9,<2.0",
-    "tqdm>=4.66,<5.0",
-    "wolframclient>=1.4.0,<2.0",
 ]
+
+[project.optional-dependencies]
+wolfram = ["wolframclient>=1.4.0,<2.0"]
 
 [project.scripts]
 tidal = "tidal.cli:main"
@@ -117,7 +116,7 @@ unfixable = ["T201"]
     "S603",
     "ARG002",
 ]
-"examples/**/*" = ["INP001", "T201", "E402"]
+"examples/**/*" = ["INP001", "T201", "E402", "PLR0913", "PLR0917"]
 "tidal/cli/**/*" = ["T201", "PLC0415"]
 "tidal/cli/_derive.py" = ["T201", "PLC0415", "S404", "S603", "S607"]
 "scripts/**/*" = [
@@ -168,12 +167,6 @@ exclude_lines = [
 ]
 show_missing = true
 precision = 2
-
-[tool.pyright]
-typeCheckingMode = "strict"
-include = ["tests", "tidal", "examples"]
-reportImplicitOverride = true
-reportUnknownMemberType = false
 
 [build-system]
 requires = ["setuptools"]

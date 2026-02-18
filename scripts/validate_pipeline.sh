@@ -4,7 +4,7 @@
 # Usage: ./scripts/validate_pipeline.sh
 #
 # Runs a complete pipeline validation:
-# 1. Derives equations from Lagrangian (Wolfram)
+# 1. Derives equations from TOML config (Wolfram)
 # 2. Validates JSON was created
 # 3. Runs Python pipeline tests
 
@@ -21,7 +21,7 @@ echo ""
 # Step 1: Run a simple derivation
 echo "Step 1: Deriving Klein-Gordon equations..."
 echo ""
-wolframscript -file "$PROJECT_ROOT/examples/scalar_field/klein_gordon.wls"
+tidal derive examples/scalar_field/theory.toml
 
 # Step 2: Validate JSON was created
 JSON_FILE="$PROJECT_ROOT/examples/data/klein_gordon_1d.json"

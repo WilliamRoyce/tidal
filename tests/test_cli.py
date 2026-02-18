@@ -2267,10 +2267,10 @@ path = "output.json"
         out = capsys.readouterr().out
         assert "lbV[] -> V0 * UnitStep[x[] - 30] * UnitStep[70 - x[]]" in out
 
-    def test_vector_background_no_explicit_substitution(
+    def test_vector_background_explicit_substitution(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
     ) -> None:
-        """Vector background should NOT generate ReplaceAll (ToBasis handles it)."""
+        """Vector background generates ReplaceAll after decomposition."""
         config = tmp_path / "theory.toml"
         config.write_text("""
 [theory]
@@ -2299,7 +2299,10 @@ path = "output.json"
         assert ret == 0
 
         out = capsys.readouterr().out
+        # Vector backgrounds should NOT use scalar-style substitution
         assert "Substitute scalar background" not in out
+        # But SHOULD use vector/tensor-style substitution after decomposition
+        assert "Substitute vector/tensor background" in out
 
     def test_coupled_scattering_multifield_background(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str],

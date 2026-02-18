@@ -158,9 +158,10 @@ def compute_spectral_energy(
     grid_spacing: tuple[float, ...],
     _periodic: tuple[bool, ...],
 ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
-    """Compute per-mode energy ``E(k) = 0.5 * [|π̂_k|² + (k² + m²)|φ̂_k|²]``.
+    """Compute per-mode energy density ``ε(k) = 0.5 * [|π̂_k|² + (k²+m²)|φ̂_k|²] / N²``.
 
-    Returns the radially-averaged spectral energy density.
+    Returns radially-averaged spectral energy density consistent with the
+    spatial-average convention: ``Σ_k ε(k) = ⟨ε⟩`` (Parseval).
 
     Parameters
     ----------
@@ -181,21 +182,38 @@ def compute_spectral_energy(
         Radially binned ``|k|`` values.
     spectral_energy : ndarray
         Energy per wavenumber bin.
+
+    Raises
+    ------
+    TypeError
+        If *mass_squared* is an ndarray (position-dependent mass breaks
+        the Fourier-diagonal structure).
     """
     _validate_array(field_data, "field_data")
+
+    if isinstance(mass_squared, np.ndarray):
+        msg = (
+            "compute_spectral_energy requires spatially uniform mass_squared "
+            "(got ndarray). Spectral energy E(k) = 0.5*(k²+m²)|φ̂_k|² is only "
+            "defined for constant m² — position-dependent mass breaks the "
+            "Fourier-diagonal structure."
+        )
+        raise TypeError(msg)
 
     phi_hat = np.fft.rfftn(field_data)
     k_grid, k_mag = _build_k_grid(field_data.shape, grid_spacing)
     k_sq = sum(ki**2 for ki in k_grid)
 
     n_total = float(np.array(field_data.shape).prod())
-    dv = float(np.array(grid_spacing).prod())
-    energy_field = 0.5 * (k_sq + mass_squared) * np.abs(phi_hat) ** 2 * dv / n_total
+    # Factor 1/N² gives energy density consistent with ⟨ε⟩ = mean(ε_grid).
+    # Parseval: Σ |φ̂|² = N · Σ |φ|², so mean(|φ|²) = Σ |φ̂|² / N².
+    norm = 1.0 / (n_total * n_total)
+    energy_field = 0.5 * (k_sq + mass_squared) * np.abs(phi_hat) ** 2 * norm
 
     if momentum_data is not None:
         _validate_array(momentum_data, "momentum_data")
         pi_hat = np.fft.rfftn(momentum_data)
-        energy_total = energy_field + 0.5 * np.abs(pi_hat) ** 2 * dv / n_total
+        energy_total = energy_field + 0.5 * np.abs(pi_hat) ** 2 * norm
     else:
         energy_total = energy_field
 

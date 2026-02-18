@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Curved Spacetime examples
-# See also: de_sitter_kg.wls, conformal_kg_static.wls (manual derivations)
-#           de_sitter_simulation.py, conformal_kg_simulation.py (Python simulations)
+# See also: de_sitter_simulation.py, conformal_kg_simulation.py (Python simulations)
 #
 # To run manually:  cd examples/curved_spacetime && tidal derive de_sitter.toml
 

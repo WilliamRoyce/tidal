@@ -13,7 +13,6 @@ This example demonstrates:
 - **Group conversion** P(t) via ``compute_group_conversion``
 - **Spectral conversion** P(k,t) via ``compute_group_spectral_conversion``
 - **Dispersion relation** omega(k) via ``compute_dispersion``
-- Per-component conversion breakdown
 
 Usage:
     uv run python examples/coupled_proca/measure_conversion.py
@@ -34,7 +33,6 @@ from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 from tidal.measurement import (
     SimulationData,
     check_energy_conservation,
-    compute_conversion_probability,
     compute_dispersion,
     compute_energy_timeseries,
     compute_group_conversion,
@@ -111,7 +109,7 @@ def _run_simulation() -> tuple[SimulationData, Path]:
 
     state = FieldCollection(fields)
 
-    output_data_dir = Path(__file__).parent.parent / "data" / "coupled_proca_output"
+    output_data_dir = Path(__file__).parent.parent.parent / "outputs" / "coupled_proca"
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,
         spec=spec,
@@ -138,11 +136,8 @@ def _run_simulation() -> tuple[SimulationData, Path]:
 # ── Measurement + printing ────────────────────────────────────
 
 
-def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
+def _print_summary(  # noqa: PLR0915
     total: ConversionResult,
-    r_a2: ConversionResult,
-    r_b1: ConversionResult,
-    r_b2: ConversionResult,
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
     spectrum: MixingSpectrum | None,
@@ -166,22 +161,6 @@ def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
     print(f"    Peak P = {total.probability[peak_idx]:.6f}")
     print(f"    at t = {total.times[peak_idx]:.2f}")
     print(f"    Initial source energy E_A1(0) = {total.source_energy[0]:.4f}")
-    print()
-
-    # Per-component
-    peak_a2 = int(np.argmax(r_a2.probability))
-    peak_b1 = int(np.argmax(r_b1.probability))
-    peak_b2 = int(np.argmax(r_b2.probability))
-    print("  Per-component breakdown:")
-    print(
-        f"    P(A_1->A_2): peak = {r_a2.probability[peak_a2]:.6f} at t = {r_a2.times[peak_a2]:.2f}"
-    )
-    print(
-        f"    P(A_1->B_1): peak = {r_b1.probability[peak_b1]:.6f} at t = {r_b1.times[peak_b1]:.2f}"
-    )
-    print(
-        f"    P(A_1->B_2): peak = {r_b2.probability[peak_b2]:.6f} at t = {r_b2.times[peak_b2]:.2f}"
-    )
     print()
 
     # Mixing length
@@ -247,12 +226,9 @@ def _print_summary(  # noqa: PLR0913, PLR0915, PLR0917
 # ── Plotting ──────────────────────────────────────────────────
 
 
-def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
+def _plot_results(  # noqa: C901, PLR0912, PLR0914, PLR0915
     data: SimulationData,
     total: ConversionResult,
-    r_a2: ConversionResult,
-    r_b1: ConversionResult,
-    r_b2: ConversionResult,
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
     spectrum: MixingSpectrum | None,
@@ -301,46 +277,8 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     ax.set_ylim(bottom=0)
     ax.grid(visible=True, alpha=0.3)
 
-    # [0,1] Per-component P(t)
+    # [0,1] Energy conservation
     ax = axes[0, 1]
-    ax.plot(
-        r_a2.times,
-        r_a2.probability,
-        "c-",
-        label=r"$P(A_1 \to A_2)$",
-        linewidth=1.2,
-    )
-    ax.plot(
-        r_b1.times,
-        r_b1.probability,
-        "r-",
-        label=r"$P(A_1 \to B_1)$",
-        linewidth=1.2,
-    )
-    ax.plot(
-        r_b2.times,
-        r_b2.probability,
-        "g-",
-        label=r"$P(A_1 \to B_2)$",
-        linewidth=1.2,
-    )
-    ax.plot(
-        total.times,
-        total.probability,
-        "b--",
-        label="Total",
-        linewidth=1.0,
-        alpha=0.5,
-    )
-    ax.set_xlabel("Time")
-    ax.set_ylabel(r"$P(t)$")
-    ax.set_title("Per-Component Conversion")
-    ax.legend(fontsize=8)
-    ax.set_ylim(bottom=0)
-    ax.grid(visible=True, alpha=0.3)
-
-    # [0,2] Energy conservation
-    ax = axes[0, 2]
     ax.plot(diag.times, diag.relative_error, "k-", linewidth=1.0)
     ax.axhline(
         ENERGY_THRESHOLD,
@@ -356,8 +294,8 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     ax.legend(fontsize=8)
     ax.grid(visible=True, alpha=0.3)
 
-    # [0,3] Mixing spectrum (temporal FFT of P(t))
-    ax = axes[0, 3]
+    # [0,2] Mixing spectrum (temporal FFT of P(t))
+    ax = axes[0, 2]
     if spectrum is not None:
         ax.semilogy(
             spectrum.frequencies, spectrum.power, "b-", linewidth=0.5, alpha=0.7
@@ -387,8 +325,8 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     ax.set_title("Mixing Spectrum")
     ax.grid(visible=True, alpha=0.3)
 
-    # [1,0] Energy decomposition
-    ax = axes[1, 0]
+    # [0,3] Energy decomposition
+    ax = axes[0, 3]
     times, per_field, interaction, energy_total = compute_energy_timeseries(data)
     for name, series in per_field.items():
         ax.plot(times, series, linewidth=1.2, label=rf"$E_{{{name}}}$")
@@ -409,13 +347,13 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         alpha=0.5,
     )
     ax.set_xlabel("Time")
-    ax.set_ylabel("Energy")
+    ax.set_ylabel("Energy density")
     ax.set_title("Energy Decomposition")
     ax.legend(fontsize=7, ncol=2)
     ax.grid(visible=True, alpha=0.3)
 
-    # [1,1] Spectral conversion P(k,t) heatmap
-    ax = axes[1, 1]
+    # [1,0] Spectral conversion P(k,t) heatmap
+    ax = axes[1, 0]
     if spectral_conv is not None and np.any(spectral_conv.active_modes):
         mesh = ax.pcolormesh(
             spectral_conv.wavenumbers,
@@ -446,8 +384,8 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         ax.set_title("Spectral Conversion")
     ax.grid(visible=True, alpha=0.3)
 
-    # [1,2] Dispersion relation S(k, omega) heatmap
-    ax = axes[1, 2]
+    # [1,1] Dispersion relation S(k, omega) heatmap
+    ax = axes[1, 1]
     if disp_a1 is not None and np.any(disp_a1.peak_frequencies > 0.0):
         log_power = np.log10(np.maximum(disp_a1.power, 1e-30))
         log_max = float(log_power.max())
@@ -484,7 +422,7 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
                 strong = disp_a1.peak_powers >= max_peak * 1e-3
                 if np.any(strong):
                     ax.set_xlim(0, float(disp_a1.wavenumbers[strong].max()) * 1.1)
-        # ω-axis: power threshold (limits to actual oscillation frequencies)
+        # omega-axis: power threshold (limits to actual oscillation frequencies)
         peak_pwr = float(np.maximum(np.max(disp_a1.power), 1e-30))
         sig_f = np.max(disp_a1.power, axis=0) >= peak_pwr * 1e-6
         if np.any(sig_f):
@@ -506,8 +444,8 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         ax.set_title("Dispersion")
     ax.grid(visible=True, alpha=0.3)
 
-    # [1,3] Summary text panel
-    ax = axes[1, 3]
+    # [1,2] Summary text panel
+    ax = axes[1, 2]
     ax.axis("off")
     lines = [
         "Parameters:",
@@ -517,11 +455,6 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         "Results:",
         f"  Peak $P(t) = {total.probability[peak_idx]:.6f}$",
         f"  at $t = {total.times[peak_idx]:.2f}$",
-        "",
-        "Per-Component Peaks:",
-        f"  $P(A_1 \\to A_2) = {r_a2.probability.max():.6f}$",
-        f"  $P(A_1 \\to B_1) = {r_b1.probability.max():.6f}$",
-        f"  $P(A_1 \\to B_2) = {r_b2.probability.max():.6f}$",
     ]
     if mixing is not None:
         lines += [
@@ -548,6 +481,9 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         verticalalignment="top",
     )
 
+    # [1,3] blank
+    axes[1, 3].axis("off")
+
     plt.tight_layout()
     output_dir = Path(__file__).parent.parent.parent / "outputs"
     output_dir.mkdir(exist_ok=True, parents=True)
@@ -571,11 +507,6 @@ def main() -> None:
 
     print("Computing group conversion probability (A_1 -> {A_2, B_1, B_2})...")
     total = compute_group_conversion(data, "A_1")
-
-    print("Computing per-component conversion...")
-    r_a2 = compute_conversion_probability(data, "A_1", "A_2")
-    r_b1 = compute_conversion_probability(data, "A_1", "B_1")
-    r_b2 = compute_conversion_probability(data, "A_1", "B_2")
 
     print("Computing mixing length and spectrum...")
     mixing: MixingResult | None = None
@@ -612,9 +543,6 @@ def main() -> None:
 
     _print_summary(
         total,
-        r_a2,
-        r_b1,
-        r_b2,
         diag,
         mixing,
         spectrum,
@@ -627,9 +555,6 @@ def main() -> None:
     output_path = _plot_results(
         data,
         total,
-        r_a2,
-        r_b1,
-        r_b2,
         diag,
         mixing,
         spectrum,

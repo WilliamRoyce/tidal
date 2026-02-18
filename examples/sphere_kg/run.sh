@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # CLI equivalents for the Sphere Klein-Gordon 2+1D example (stereographic projection)
-# See also: sphere_kg.wls (manual derivation), sphere_kg_simulation.py (Python simulation)
+# See also: sphere_kg_simulation.py (Python simulation)
 #
 # NOTE: The derive step uses stereographic projection coordinates with
-# position-dependent metric. Both TOML and manual .wls derivation are supported.
+# position-dependent metric.
 # The simulate step works fully via CLI (all periodic BCs, 2D Cartesian grid).
 #
 # To run manually:  cd examples/sphere_kg

@@ -35,10 +35,15 @@ import matplotlib as mpl
 mpl.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
-from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
+from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
+from tidal.measurement import (
+    EnergyDiagnostics,
+    SimulationData,
+    check_energy_conservation,
+    create_snapshot_callback,
+)
 from tidal.symbolic import build_pde_from_json, load_equation_system
-from tidal.utils import normalize_solve_result
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -73,10 +78,6 @@ ENERGY_CONSERVATION_THRESHOLD = 0.1
 # Output
 OUTPUT_FILENAME = "sphere_kg_output.png"
 
-# State indices
-PHI_INDEX = 0
-PI_INDEX = 1
-
 # ── Helpers ───────────────────────────────────────────────────
 
 
@@ -85,7 +86,7 @@ class SimulationResult:
     """Container for sphere KG simulation results."""
 
     grid: CartesianGrid
-    storage: MemoryStorage
+    data: SimulationData
     domain_size: float
 
 
@@ -178,28 +179,43 @@ def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
 
 
 def _run_simulation(
-    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection
+    pde: PDEFromSpec, grid: CartesianGrid, state: FieldCollection, json_path: Path
 ) -> SimulationResult:
     print("Step 5: Running simulation...")
     domain_size = DOMAIN_SIZE_FACTOR * SPHERE_RADIUS
 
-    storage = MemoryStorage()
-    result = pde.solve(
+    spec = load_equation_system(json_path)
+    params = {"sphR": SPHERE_RADIUS, "sphm2": MASS_SQUARED}
+    output_data_dir = Path(__file__).parent.parent.parent / "outputs" / "sphere_kg"
+
+    writer, callback = create_snapshot_callback(
+        output_dir=output_data_dir,
+        spec=spec,
+        grid=grid,
+        t_end=T_END,
+        snapshot_interval=SNAPSHOT_INTERVAL,
+        parameters=params,
+        spec_path=json_path,
+    )
+    tracker = CallbackTracker(callback, interrupts=SNAPSHOT_INTERVAL)
+    pde.solve(
         state,
         t_range=T_END,
         dt=DT,
         scheme="runge-kutta",
-        tracker=storage.tracker(SNAPSHOT_INTERVAL),
+        tracker=tracker,
     )
-    result = normalize_solve_result(result)
+    writer.close()
+
+    data = SimulationData.from_directory(output_data_dir, spec)
 
     print(f"  Duration: {T_END} time units")
-    print(f"  Stored {len(storage)} snapshots")
+    print(f"  {data.n_snapshots} snapshots saved to {output_data_dir}")
     print()
 
     return SimulationResult(
         grid=grid,
-        storage=storage,
+        data=data,
         domain_size=domain_size,
     )
 
@@ -207,44 +223,28 @@ def _run_simulation(
 def _analyze_results(result: SimulationResult) -> None:
     print("Step 6: Analyzing results...")
 
-    initial = cast("FieldCollection", result.storage[0])
-    final = cast("FieldCollection", result.storage[-1])
+    data = result.data
+    field_name = next(iter(data.fields))
 
-    initial_max = np.max(np.abs(initial[PHI_INDEX].data))
-    final_max = np.max(np.abs(final[PHI_INDEX].data))
+    initial_max = float(np.max(np.abs(data.fields[field_name][0])))
+    final_max = float(np.max(np.abs(data.fields[field_name][-1])))
 
     print(f"  Initial: max|phi| = {initial_max:.4f}")
     print(f"  Final:   max|phi| = {final_max:.4f}")
-
-    # Energy should be approximately conserved (no friction)
-    def compute_energy(snapshot: FieldCollection) -> float:
-        phi_data = snapshot[PHI_INDEX].data
-        pi_data = snapshot[PI_INDEX].data
-        return float(np.sum(pi_data**2 + phi_data**2))
-
-    initial_energy = compute_energy(initial)
-    final_energy = compute_energy(final)
-    energy_change = abs(final_energy - initial_energy) / max(initial_energy, 1e-10)
-
-    print(f"  Initial energy proxy: {initial_energy:.2f}")
-    print(f"  Final energy proxy: {final_energy:.2f}")
-    print(f"  Relative energy change: {energy_change:.4f}")
-    if energy_change < ENERGY_CONSERVATION_THRESHOLD:
-        print("  Energy approximately conserved (no Hubble friction)")
-    else:
-        print("  Note: Energy change may be due to boundary effects")
     print()
 
 
-def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
+def _plot_results(result: SimulationResult, diag: EnergyDiagnostics) -> None:  # noqa: PLR0914, PLR0915
     print("Step 7: Generating visualization...")
 
-    storage = result.storage
+    data = result.data
     grid = result.grid
     domain_size = result.domain_size
+    field_name = next(iter(data.fields))
+    n_snapshots = data.n_snapshots
 
-    initial = cast("FieldCollection", storage[0])
-    final = cast("FieldCollection", storage[-1])
+    initial_phi = data.fields[field_name][0]
+    final_phi = data.fields[field_name][-1]
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
 
@@ -252,7 +252,7 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     ax = axes[0, 0]
     vmax = PULSE_AMPLITUDE
     im = ax.imshow(
-        initial[PHI_INDEX].data.T,
+        initial_phi.T,
         origin="lower",
         cmap="bwr_r",
         vmin=-vmax,
@@ -277,9 +277,9 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
 
     # Final field
     ax = axes[0, 1]
-    final_vmax = max(np.max(np.abs(final[PHI_INDEX].data)), 0.01)
+    final_vmax = max(float(np.max(np.abs(final_phi))), 0.01)
     im = ax.imshow(
-        final[PHI_INDEX].data.T,
+        final_phi.T,
         origin="lower",
         cmap="bwr_r",
         vmin=-final_vmax,
@@ -299,8 +299,7 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
 
     # Cross-sections at different times
     ax = axes[1, 0]
-    time_values = list(storage.times)
-    n_snapshots = len(storage)
+    time_values = list(data.times)
     times_to_plot = [
         0,
         n_snapshots // 4,
@@ -314,14 +313,14 @@ def _plot_results(result: SimulationResult) -> None:  # noqa: PLR0914, PLR0915
     center_idx = grid.shape[1] // 2
     x_1d = cast("np.ndarray", grid.cell_coords[:, 0, 0])
     for i, t_idx in enumerate(times_to_plot):
-        snapshot = cast("FieldCollection", storage[t_idx])
         ax.plot(
             x_1d,
-            snapshot[PHI_INDEX].data[:, center_idx],
+            data.fields[field_name][t_idx][:, center_idx],
             color=colors[i],
             label=f"t={time_values[t_idx]:.1f}",
             alpha=0.8,
         )
+    _ = diag  # energy diagnostics available for future use
     ax.axvline(
         x=-SPHERE_RADIUS, color="gray", linestyle="--", alpha=0.3, label="equator"
     )
@@ -394,16 +393,37 @@ def _print_footer() -> None:
 
 
 def main() -> None:
-    """Run the 2-sphere Klein-Gordon simulation."""
+    """Run the 2-sphere Klein-Gordon simulation.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the JSON spec has not been generated yet.
+    """
     json_path = Path(__file__).parent.parent / "data" / "sphere_kg.json"
+    if not json_path.exists():
+        msg = (
+            f"{json_path} not found. "
+            "Run 'tidal derive theory.toml' first (requires wolframscript)."
+        )
+        raise FileNotFoundError(msg)
     _print_header()
     _load_spec(json_path)
     pde = _build_pde(json_path)
     grid, _domain_size = _create_grid()
     state = _create_initial_state(grid)
-    sim_result = _run_simulation(pde, grid, state)
+    sim_result = _run_simulation(pde, grid, state, json_path)
     _analyze_results(sim_result)
-    _plot_results(sim_result)
+
+    print("Checking energy conservation...")
+    diag = check_energy_conservation(
+        sim_result.data, threshold=ENERGY_CONSERVATION_THRESHOLD
+    )
+    print(f"  max |dE/E0| = {diag.max_relative_error:.2e}")
+    print(f"  Conserved: {diag.is_conserved}")
+    print()
+
+    _plot_results(sim_result, diag)
     _print_footer()
 
 

@@ -7,6 +7,8 @@ including:
 - Hubble friction in de Sitter expansion
 """
 
+from __future__ import annotations
+
 from pathlib import Path
 from typing import cast
 
@@ -33,7 +35,7 @@ class TestFirstDerivativeTimeOperator:
         """Load de Sitter KG specification."""
         json_path = DATA_DIR / "de_sitter_kg.json"
         if not json_path.exists():
-            pytest.skip("de_sitter_kg.json not found - run de_sitter_kg.wls first")
+            pytest.skip("de_sitter_kg.json not found - run `tidal derive de_sitter.toml` first")
         return load_equation_system(json_path)
 
     @pytest.fixture
@@ -98,7 +100,7 @@ class TestTimeDependentCoefficients:
         """Load de Sitter KG specification."""
         json_path = DATA_DIR / "de_sitter_kg.json"
         if not json_path.exists():
-            pytest.skip("de_sitter_kg.json not found - run de_sitter_kg.wls first")
+            pytest.skip("de_sitter_kg.json not found - run `tidal derive de_sitter.toml` first")
         return load_equation_system(json_path)
 
     def test_time_dependent_flag_parsing(self) -> None:
@@ -150,7 +152,7 @@ class TestDeSitterSimulation:
         """Load de Sitter KG specification."""
         json_path = DATA_DIR / "de_sitter_kg.json"
         if not json_path.exists():
-            pytest.skip("de_sitter_kg.json not found - run de_sitter_kg.wls first")
+            pytest.skip("de_sitter_kg.json not found - run `tidal derive de_sitter.toml` first")
         return load_equation_system(json_path)
 
     @pytest.fixture
@@ -230,7 +232,7 @@ class TestStaticConformalEquivalence:
         json_path = DATA_DIR / "conformal_kg_static.json"
         if not json_path.exists():
             pytest.skip(
-                "conformal_kg_static.json not found - run conformal_kg_static.wls first"
+                "conformal_kg_static.json not found - run `tidal derive conformal_static.toml` first"
             )
         return load_equation_system(json_path)
 

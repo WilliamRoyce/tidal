@@ -2024,16 +2024,17 @@ wheels = [
 
 [[package]]
 name = "tidal"
-version = "0.3.3"
+version = "0.4.0"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
-    { name = "numba" },
     { name = "numpy" },
     { name = "py-pde" },
     { name = "scipy" },
-    { name = "sympy" },
-    { name = "tqdm" },
+]
+
+[package.optional-dependencies]
+wolfram = [
     { name = "wolframclient" },
 ]
 
@@ -2052,14 +2053,12 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.1,<4.0" },
-    { name = "numba", specifier = ">=0.59,<1.0" },
     { name = "numpy", specifier = ">=1.22,<3.0" },
     { name = "py-pde", specifier = ">=0.38,<1.0" },
     { name = "scipy", specifier = ">=1.10,<2.0" },
-    { name = "sympy", specifier = ">=1.9,<2.0" },
-    { name = "tqdm", specifier = ">=4.66,<5.0" },
-    { name = "wolframclient", specifier = ">=1.4.0,<2.0" },
+    { name = "wolframclient", marker = "extra == 'wolfram'", specifier = ">=1.4.0,<2.0" },
 ]
+provides-extras = ["wolfram"]
 
 [package.metadata.requires-dev]
 dev = [

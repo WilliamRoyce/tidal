@@ -95,7 +95,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     )
     initial_state = pulse.create(grid, spec)
 
-    output_data_dir = Path(__file__).parent.parent / "data" / "coupled_scalars_output"
+    output_data_dir = Path(__file__).parent.parent.parent / "outputs" / "coupled_scalars"
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,
         spec=spec,
@@ -122,7 +122,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
 # ── Measurement + printing ────────────────────────────────────
 
 
-def _print_summary(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
+def _print_summary(  # noqa: PLR0912, PLR0915
     result: ConversionResult,
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
@@ -238,7 +238,7 @@ def _print_summary(  # noqa: PLR0912, PLR0913, PLR0915, PLR0917
 # ── Plotting ──────────────────────────────────────────────────
 
 
-def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
+def _plot_results(  # noqa: C901, PLR0912, PLR0914, PLR0915
     data: SimulationData,
     result: ConversionResult,
     diag: EnergyDiagnostics,
@@ -306,7 +306,7 @@ def _plot_results(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     )
     ax.plot(times, total, "k-", label=r"$E_\mathrm{total}$", linewidth=1.0, alpha=0.5)
     ax.set_xlabel("Time")
-    ax.set_ylabel("Energy")
+    ax.set_ylabel("Energy density")
     ax.set_title("Energy Decomposition")
     ax.legend(fontsize=8, ncol=2)
     ax.grid(visible=True, alpha=0.3)

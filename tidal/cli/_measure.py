@@ -81,8 +81,6 @@ def _resolve_spec_path(data_path: Path, spec_arg: str | None) -> Path:
     if data_path.is_dir():
         metadata_file = data_path / "metadata.json"
         if metadata_file.exists():
-            import json
-
             metadata = json.loads(metadata_file.read_text())
             if "spec_path" in metadata:
                 p = Path(str(metadata["spec_path"]))

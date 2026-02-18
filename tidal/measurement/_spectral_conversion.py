@@ -24,6 +24,7 @@ from tidal.measurement._energy import (
 )
 from tidal.measurement._spectral import compute_spectral_energy
 from tidal.measurement._utils import (
+    _check_no_position_dependent_terms,  # pyright: ignore[reportPrivateUsage]
     _normalize_group,  # pyright: ignore[reportPrivateUsage]
 )
 
@@ -151,9 +152,12 @@ def compute_spectral_conversion(
     Raises
     ------
     ValueError
-        If field names are invalid, the same, or no modes are above
-        the energy floor.
+        If field names are invalid, the same, no modes are above the
+        energy floor, or any equation term is position-dependent
+        (translation invariance required for Fourier decomposition).
     """
+    _check_no_position_dependent_terms(data, "Spectral conversion P(k,t)")
+
     names = data.spec.component_names
     if source_field not in names:
         msg = f"Source field '{source_field}' not in spec fields: {names}"
@@ -182,7 +186,8 @@ def compute_spectral_conversion(
 
     # P(k,t) = E_target(k,t) / E_source(k, t=0) for active modes
     probability = np.zeros_like(tgt_energy)
-    probability[:, active] = tgt_energy[:, active] / src_energy[0, active]
+    denom = np.maximum(src_energy[0, active], energy_floor)
+    probability[:, active] = tgt_energy[:, active] / denom
 
     return SpectralConversion(
         times=data.times.copy(),
@@ -228,8 +233,11 @@ def compute_group_spectral_conversion(
     ------
     ValueError
         If any field name is invalid, groups overlap, target is empty,
-        or no modes are above the energy floor.
+        no modes are above the energy floor, or any equation term is
+        position-dependent (translation invariance required).
     """
+    _check_no_position_dependent_terms(data, "Spectral conversion P(k,t)")
+
     names = data.spec.component_names
 
     src = _normalize_group(source_fields)

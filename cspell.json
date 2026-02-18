@@ -232,6 +232,7 @@
     "spsolve",
     "testf",
     "toarray",
+    "tocsr",
     "tocsc",
     "tomllib",
     "trange",

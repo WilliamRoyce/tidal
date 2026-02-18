@@ -113,7 +113,7 @@ def _load_spec(json_path: Path) -> None:
         msg = (
             f"JSON specification not found: {json_path}\n"
             "Run the Wolfram derivation first: "
-            "wolframscript -file examples/scalar_field_3d/klein_gordon_3d.wls"
+            "tidal derive examples/scalar_field_3d/theory.toml"
         )
         raise FileNotFoundError(msg)
 

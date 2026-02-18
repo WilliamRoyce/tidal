@@ -1,31 +1,28 @@
-"""Measurement example: wave conversion in coupled scalar scattering (2+1D).
+"""Measurement example: vector conversion with Lorentzian background (2+1D).
 
-Demonstrates the measurement module applied to a position-dependent coupling:
+Demonstrates the measurement module applied to a position-dependent coupling
+between two massive Proca vector fields:
 
-    L = -1/2 (d phi)^2 - 1/2 (d chi)^2
-        - mPhi2/2 phi^2 - mChi2/2 chi^2 - G(x,y) phi chi
+    L = -1/4 F^A_{ab} F^{A,ab} - 1/4 F^B_{ab} F^{B,ab}
+        - mA2/2 A_a A^a - mB2/2 B_a B^a
+        + gcoup * G(x,y) * A_a B^a
 
-where G(x,y) = g0 * exp(-(x^2+y^2) / (2*R^2)) is a localized Gaussian
-background field centered at the origin.
+where G(x,y) = g0 / (1 + (x^2+y^2)/R^2) is a Lorentzian profile centered
+at the origin.  Unlike the Gaussian in coupled_scattering, the Lorentzian
+has algebraic (1/r^2) tails rather than exponential decay.
 
-A rightward-propagating phi wave packet is incident on the coupling region.
-Chi starts at zero — any chi that appears is purely from conversion.
+A Gaussian pulse in A_1 is placed at the center of the coupling region.
+B starts at zero -- any B that appears is purely from conversion.
 The measurement module quantifies this conversion using:
 
-- **Conversion probability** P(t) = E_chi(t) / E_phi(0)
-- **Mixing length** L_mix = pi / omega_dom  (half-period of dominant oscillation)
-- **Energy decomposition** via ``compute_energy_timeseries`` (measurement module)
+- **Conversion probability** P(t) = E_B(t) / E_A(0) via group conversion
+- **Mixing length** and **mixing spectrum** (temporal FFT of P(t))
 - **Energy conservation** via ``check_energy_conservation``
-
-Note: Spectral conversion P(k,t) and dispersion omega(k) are NOT available for
-this system because the position-dependent Gaussian coupling G(x,y) breaks
-spatial translation invariance required by FFT-based analysis.
-
-Analogy to Gertsenshtein effect:
-  phi <-> photon,  chi <-> graviton,  G(x,y) <-> background B_0(x,y)
+- **Hamiltonian energy** decomposition via the generic virial formula
+  (from the measurement module's ``compute_energy_timeseries``)
 
 Usage:
-    uv run python examples/coupled_scattering/coupled_scattering_simulation.py
+    uv run python examples/proca_background/proca_background_simulation.py
 """
 
 from __future__ import annotations
@@ -42,11 +39,10 @@ import numpy as np
 from pde import CallbackTracker, CartesianGrid, FieldCollection, ScalarField
 
 from tidal.measurement import (
-    EnergyDiagnostics,
     SimulationData,
     check_energy_conservation,
-    compute_conversion_probability,
     compute_energy_timeseries,
+    compute_group_conversion,
     compute_mixing_length,
     compute_mixing_spectrum,
     create_snapshot_callback,
@@ -55,28 +51,32 @@ from tidal.symbolic import build_pde_from_json, load_equation_system
 
 if TYPE_CHECKING:
     from matplotlib.axes import Axes
+    from matplotlib.figure import Figure
     from numpy.typing import NDArray
 
     from tidal.measurement._conversion import ConversionResult
+    from tidal.measurement._diagnostics import EnergyDiagnostics
     from tidal.measurement._mixing import MixingResult, MixingSpectrum
 
-# ── Configuration ─────────────────────────────────────────────
+# -- Configuration --------------------------------------------------------
 
 # Physics
-MPHI2 = 1.0
-MCHI2 = 4.0
+MA2 = 1.0
+MB2 = 2.0
+GCOUP = 0.5
 G0 = 1.0
 COUPLING_RADIUS = 8.0
 
 PARAMS: dict[str, float] = {
-    "mPhi2": MPHI2,
-    "mChi2": MCHI2,
+    "mA2": MA2,
+    "mB2": MB2,
+    "gcoup": GCOUP,
     "g0": G0,
     "R": COUPLING_RADIUS,
 }
 
-# Grid (2D, periodic)
-DOMAIN = (-50.0, 50.0)
+# Grid (2D, periodic, centered at origin for the Lorentzian)
+DOMAIN = (-30.0, 30.0)
 N_CELLS = 64
 
 # Time integration
@@ -84,17 +84,18 @@ T_END = 20.0
 DT = 0.02
 TRACKER_INTERVAL = 0.2
 
-# Initial conditions — rightward-propagating phi wave packet
-X0 = -25.0  # center of wave packet (left of coupling region)
-SIGMA = 4.0  # Gaussian envelope width
-K0 = 3.0  # wavevector (k0 > sqrt(mPhi2) for propagation)
-PULSE_AMPLITUDE = 1.0
+# Initial conditions -- Gaussian pulse in A_1 at center
+PULSE_AMPLITUDE = 0.5
+PULSE_WIDTH = 3.0
+
+# Analysis
+ENERGY_THRESHOLD = 0.001
 
 # Output
-OUTPUT_FILENAME = "coupled_scattering_measurement.png"
+OUTPUT_FILENAME = "proca_background_measurement.png"
 
 
-# ── Energy decomposition (via measurement module) ────────────
+# -- Energy decomposition (via measurement module) ------------------------
 
 
 @dataclass(frozen=True)
@@ -102,20 +103,20 @@ class EnergyDecomposition:
     """Energy decomposition by field group via the generic virial formula.
 
     Computed by ``compute_energy_timeseries``, which reads operators directly
-    from the JSON spec.  Automatically handles position-dependent coefficients
-    like the Gaussian coupling G(x,y).
+    from the JSON spec.  Automatically handles directional laplacians (curl
+    energy for Proca vectors) and position-dependent coefficients.
     """
 
     times: NDArray[np.float64]
-    phi_energy: NDArray[np.float64]
-    chi_energy: NDArray[np.float64]
+    a_energy: NDArray[np.float64]
+    b_energy: NDArray[np.float64]
     coupling_energy: NDArray[np.float64]
     total_energy: NDArray[np.float64]
 
 
 def _compute_coupling_field(data: SimulationData) -> NDArray[np.float64]:
-    """Compute G(x,y) = g0 * exp(-r^2 / (2*R^2)) on the simulation grid."""
-    shape = data.fields["phi_0"].shape[1:]  # spatial (nx, ny)
+    """Compute G(x,y) = g0 / (1 + (x^2+y^2)/R^2) on the simulation grid."""
+    shape = data.fields["A_1"].shape[1:]  # spatial (nx, ny)
     dx, dy = data.grid_spacing
     x_1d = np.linspace(
         data.grid_bounds[0][0] + dx / 2,
@@ -130,7 +131,7 @@ def _compute_coupling_field(data: SimulationData) -> NDArray[np.float64]:
     x, y = np.meshgrid(x_1d, y_1d, indexing="ij")
     g0 = data.parameters.get("g0", G0)
     r_param = data.parameters.get("R", COUPLING_RADIUS)
-    return g0 * np.exp(-(x**2 + y**2) / (2 * r_param**2))
+    return g0 / (1.0 + (x**2 + y**2) / r_param**2)
 
 
 def _compute_energy_decomposition(data: SimulationData) -> EnergyDecomposition:
@@ -138,57 +139,63 @@ def _compute_energy_decomposition(data: SimulationData) -> EnergyDecomposition:
 
     Uses the generic virial formula via ``compute_energy_timeseries``,
     which reads operators from the JSON spec.  This correctly handles
-    position-dependent coefficients and all spatial operators.
+    directional laplacians (Proca curl energy), cross-derivatives,
+    constraint self-energy, and position-dependent coefficients.
     """
     times, per_field, interaction, total = compute_energy_timeseries(data)
 
-    phi_energy = per_field["phi_0"]
-    chi_energy = per_field["chi_0"]
+    a_fields = [n for n in per_field if n.startswith("A_")]
+    b_fields = [n for n in per_field if n.startswith("B_")]
+
+    a_energy = cast("NDArray[np.float64]", sum(per_field[n] for n in a_fields))
+    b_energy = cast("NDArray[np.float64]", sum(per_field[n] for n in b_fields))
 
     return EnergyDecomposition(
         times=times,
-        phi_energy=phi_energy,
-        chi_energy=chi_energy,
+        a_energy=a_energy,
+        b_energy=b_energy,
         coupling_energy=interaction,
         total_energy=total,
     )
 
 
-# ── Simulation ────────────────────────────────────────────────
+# -- Simulation -----------------------------------------------------------
 
 
 def _create_initial_state(grid: CartesianGrid) -> FieldCollection:
-    """Create ICs: traveling phi wave packet, chi = 0 (pure conversion)."""
+    """Create ICs: Gaussian A_1 pulse at center, all B = 0."""
     coords = cast("np.ndarray", grid.cell_coords)
     x = np.asarray(coords[..., 0], dtype=float)
     y = np.asarray(coords[..., 1], dtype=float)
 
-    envelope = PULSE_AMPLITUDE * np.exp(
-        -((x - X0) ** 2) / (2 * SIGMA**2) - y**2 / (2 * SIGMA**2)
-    )
-    phi_data = envelope * np.cos(K0 * (x - X0))
-    omega = np.sqrt(K0**2 + MPHI2)
-    pi_phi_data = omega * envelope * np.sin(K0 * (x - X0))
+    gaussian = PULSE_AMPLITUDE * np.exp(-(x**2 + y**2) / (2 * PULSE_WIDTH**2))
 
+    # State layout: A_0, A_1, pi_A1, A_2, pi_A2, B_0, B_1, pi_B1, B_2, pi_B2
     return FieldCollection(
         [
-            ScalarField(grid, data=phi_data, label="phi_0"),
-            ScalarField(grid, data=pi_phi_data, label="pi_phi_0"),
-            ScalarField(grid, data=np.zeros_like(x), label="chi_0"),
-            ScalarField(grid, data=np.zeros_like(x), label="pi_chi_0"),
+            ScalarField(grid, data=0.0, label="A_0_field"),  # A_0 constraint
+            ScalarField(grid, data=gaussian, label="A_1_field"),  # A_1 pulse
+            ScalarField(grid, data=0.0, label="A_1_momentum"),  # pi_A1
+            ScalarField(grid, data=0.0, label="A_2_field"),  # A_2
+            ScalarField(grid, data=0.0, label="A_2_momentum"),  # pi_A2
+            ScalarField(grid, data=0.0, label="B_0_field"),  # B_0 constraint
+            ScalarField(grid, data=0.0, label="B_1_field"),  # B_1
+            ScalarField(grid, data=0.0, label="B_1_momentum"),  # pi_B1
+            ScalarField(grid, data=0.0, label="B_2_field"),  # B_2
+            ScalarField(grid, data=0.0, label="B_2_momentum"),  # pi_B2
         ]
     )
 
 
 def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
-    """Run the coupled scattering simulation and return measurement-ready data.
+    """Run the coupled Proca + Lorentzian background simulation.
 
     Raises
     ------
     FileNotFoundError
         If the JSON spec has not been generated yet.
     """
-    json_path = Path(__file__).parent.parent / "data" / "coupled_scattering.json"
+    json_path = Path(__file__).parent.parent / "data" / "proca_background.json"
     if not json_path.exists():
         msg = (
             f"{json_path} not found. "
@@ -201,9 +208,7 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     grid = CartesianGrid([DOMAIN, DOMAIN], N_CELLS, periodic=True)
     initial_state = _create_initial_state(grid)
 
-    output_data_dir = (
-        Path(__file__).parent.parent.parent / "outputs" / "coupled_scattering"
-    )
+    output_data_dir = Path(__file__).parent.parent.parent / "outputs" / "proca_background"
     writer, callback = create_snapshot_callback(
         output_dir=output_data_dir,
         spec=spec,
@@ -227,116 +232,102 @@ def _run_simulation() -> tuple[SimulationData, dict[str, float], Path]:
     return data, PARAMS, output_data_dir
 
 
-# ── Summary ───────────────────────────────────────────────────
+# -- Summary --------------------------------------------------------------
 
 
 def _print_summary(
     result: ConversionResult,
-    energy: EnergyDecomposition,
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
-    spectrum: MixingSpectrum | None,
     params: dict[str, float],
 ) -> None:
     """Print quantitative measurement summary to stdout."""
     print("=" * 65)
-    print("Coupled Scalar Scattering: Measurement Summary")
+    print("Proca + Lorentzian Background: Measurement Summary")
     print("=" * 65)
     print()
 
-    m_phi2 = params["mPhi2"]
-    m_chi2 = params["mChi2"]
+    m_a2 = params["mA2"]
+    m_b2 = params["mB2"]
+    gcoup = params["gcoup"]
     g0 = params["g0"]
     r_param = params["R"]
-    print(f"  m_phi^2 = {m_phi2},  m_chi^2 = {m_chi2},  g0 = {g0},  R = {r_param}")
-
-    omega_k = np.sqrt(K0**2 + m_phi2)
-    v_group = K0 / omega_k
-    print(f"  Wave packet: k0 = {K0},  omega = {omega_k:.4f},  v_group = {v_group:.4f}")
-    print(f"  Stability: det(M) = {m_phi2 * m_chi2 - g0**2:.2f} > 0")
+    print(f"  mA2={m_a2}, mB2={m_b2}, gcoup={gcoup}, g0={g0}, R={r_param}")
+    print(
+        f"  Stability: mA2*mB2 = {m_a2 * m_b2:.1f} > (g0*gcoup)^2 = {(g0 * gcoup) ** 2:.2f}"
+    )
     print()
 
     peak_idx = int(np.argmax(result.probability))
     print(f"  Peak conversion P(t) = {result.probability[peak_idx]:.6f}")
     print(f"    at t = {result.times[peak_idx]:.2f}")
-    print(f"  Initial source energy E_phi(0) = {result.source_energy[0]:.4f}")
-    print(f"  Final  target energy E_chi(T) = {result.target_energy[-1]:.4f}")
+    print(f"  Initial source energy E_A(0) = {result.source_energy[0]:.4f}")
+    print(f"  Final  target energy E_B(T) = {result.target_energy[-1]:.4f}")
     print()
 
     if mixing is not None:
-        print("  Mixing length (spectral):")
-        print(
-            f"    L_mix      = {mixing.mixing_length:.4f}"
-            f" +/- {mixing.mixing_length_uncertainty:.4f}"
-        )
-        print(
-            f"    omega_dom  = {mixing.dominant_frequency:.4f}"
-            f"  (FWHM = {mixing.frequency_fwhm:.4f})"
-        )
+        print("  Mixing length:")
+        print(f"    L_mix = {mixing.mixing_length:.4f}")
+        print(f"    omega_dom = {mixing.dominant_frequency:.4f}")
+        print(f"    uncertainty = {mixing.mixing_length_uncertainty:.4f}")
     else:
-        print("  Mixing length: not extracted (no spectral peaks)")
+        print("  Mixing length: NOT EXTRACTED")
     print()
 
-    if spectrum is not None:
-        print("  Mixing spectrum (temporal FFT of P(t)):")
-        print(f"    dominant frequency: {spectrum.dominant_frequency:.4f}")
-        print(f"    dominant L_mix:     {spectrum.dominant_mixing_length:.4f}")
-    else:
-        print("  Mixing spectrum: not computed")
-    print()
-
-    h0 = energy.total_energy[0]
-    h_final = energy.total_energy[-1]
-    print(f"  Energy density ⟨ε⟩(0) = {h0:.6f},  ⟨ε⟩(T) = {h_final:.6f}")
-    print(f"  max |dE/E0| = {diag.max_relative_error:.2e}")
-    print(f"  Conserved: {diag.is_conserved}")
+    print(f"  Energy conservation: max |dE/E0| = {diag.max_relative_error:.2e}")
+    print(f"  Conservation: {'PASS' if diag.is_conserved else 'FAIL'}")
+    print("  (virial formula from measurement module)")
     print("=" * 65)
 
 
-# ── Plotting ──────────────────────────────────────────────────
+# -- Plotting -------------------------------------------------------------
 
 
 def _plot_results(
     data: SimulationData,
     result: ConversionResult,
-    energy: EnergyDecomposition,
+    hamiltonian: EnergyDecomposition,
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
     spectrum: MixingSpectrum | None,
     coupling_field: NDArray[np.float64],
     params: dict[str, float],
 ) -> Path:
-    """Generate 2x3 measurement figure. Returns path to saved PNG."""
-    fig, axes = plt.subplots(2, 3, figsize=(17, 9))
+    """Generate 2x4 measurement figure. Returns path to saved PNG."""
+    fig, axes = plt.subplots(2, 4, figsize=(22, 9))
     fig.suptitle(
-        "Coupled Scalar Scattering (2+1D): Measurement Analysis\n"
-        r"$\mathcal{L} = -\frac{1}{2}(\partial\phi)^2"
-        r" - \frac{1}{2}(\partial\chi)^2"
-        r" - \frac{m_\phi^2}{2}\phi^2"
-        r" - \frac{m_\chi^2}{2}\chi^2"
-        r" - G(x,y)\,\phi\,\chi$",
+        "Proca + Lorentzian Background (2+1D): Measurement Analysis\n"
+        r"$\mathcal{L} = -\frac{1}{4}F_A^2 - \frac{1}{4}F_B^2"
+        r" - \frac{m_A^2}{2}A^2 - \frac{m_B^2}{2}B^2"
+        r" + g\,G(x,y)\,A\!\cdot\!B$",
         fontsize=13,
     )
 
     peak_idx = int(np.argmax(result.probability))
 
-    # [0,0] Conversion probability P(t)
-    _plot_conversion(axes[0, 0], result, peak_idx, mixing)
+    # [0,0] Total P(t) + mixing length annotation
+    _plot_conversion(axes[0, 0], result, mixing)
 
-    # [0,1] Energy decomposition
-    _plot_hamiltonian(axes[0, 1], energy)
+    # [0,1] Energy conservation via check_energy_conservation
+    _plot_energy_conservation(axes[0, 1], diag)
 
-    # [0,2] Energy conservation via check_energy_conservation
-    _plot_energy_conservation(axes[0, 2], diag)
+    # [0,2] Mixing spectrum (temporal FFT of P(t))
+    _plot_mixing_spectrum(axes[0, 2], spectrum)
 
-    # [1,0] Mixing spectrum
-    _plot_mixing_spectrum(axes[1, 0], spectrum)
+    # [0,3] Energy decomposition (E_A, E_B, coupling, total)
+    _plot_hamiltonian(axes[0, 3], hamiltonian)
 
-    # [1,1] |chi| at peak conversion time + coupling contours
-    _plot_chi_heatmap(axes[1, 1], data, coupling_field, snapshot_idx=peak_idx)
+    # [1,0] Coupling G(x,y) heatmap
+    _plot_coupling_field(axes[1, 0], fig, data, coupling_field)
+
+    # [1,1] |B_1| at peak conversion time
+    _plot_field_heatmap(axes[1, 1], data, "B_1", coupling_field, snapshot_idx=peak_idx)
 
     # [1,2] Summary text
-    _plot_summary_text(axes[1, 2], result, energy, diag, mixing, params, peak_idx)
+    _plot_summary_text(axes[1, 2], result, diag, mixing, params)
+
+    # [1,3] blank
+    axes[1, 3].axis("off")
 
     plt.tight_layout()
     output_dir = Path(__file__).parent.parent.parent / "outputs"
@@ -348,11 +339,9 @@ def _plot_results(
 
 
 def _plot_conversion(
-    ax: Axes,
-    result: ConversionResult,
-    peak_idx: int,
-    mixing: MixingResult | None,
+    ax: Axes, result: ConversionResult, mixing: MixingResult | None
 ) -> None:
+    peak_idx = int(np.argmax(result.probability))
     ax.plot(result.times, result.probability, "b-", linewidth=1.5)
     ax.plot(result.times[peak_idx], result.probability[peak_idx], "ro", markersize=6)
     ax.annotate(
@@ -376,20 +365,68 @@ def _plot_conversion(
             bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8},
         )
     ax.set_xlabel("Time")
-    ax.set_ylabel(r"$P(t) = E_\chi(t)\,/\,E_\phi(0)$")
-    ax.set_title("Conversion Probability")
+    ax.set_ylabel(r"$P(t) = E_B(t)\,/\,E_A(0)$")
+    ax.set_title("Conversion Probability (A -> B)")
     ax.set_ylim(bottom=0)
     ax.grid(visible=True, alpha=0.3)
 
 
+def _plot_energy_conservation(ax: Axes, diag: EnergyDiagnostics) -> None:
+    ax.plot(diag.times, diag.relative_error, "k-", linewidth=1.0)
+    ax.axhline(
+        ENERGY_THRESHOLD,
+        color="r",
+        linestyle="--",
+        alpha=0.5,
+        label=f"threshold ({ENERGY_THRESHOLD})",
+    )
+    ax.axhline(-ENERGY_THRESHOLD, color="r", linestyle="--", alpha=0.5)
+    ax.set_xlabel("Time")
+    ax.set_ylabel(r"$\Delta E\,/\,E_0$")
+    ax.set_title("Energy Conservation")
+    ax.legend(fontsize=8)
+    ax.grid(visible=True, alpha=0.3)
+
+
+def _plot_mixing_spectrum(ax: Axes, spectrum: MixingSpectrum | None) -> None:
+    if spectrum is not None:
+        ax.semilogy(
+            spectrum.frequencies, spectrum.power, "b-", linewidth=0.5, alpha=0.7
+        )
+        ax.axvline(
+            spectrum.dominant_frequency,
+            color="red",
+            linestyle="--",
+            alpha=0.7,
+            label=rf"$\omega_{{dom}}$ = {spectrum.dominant_frequency:.2f}",
+        )
+        x_max = min(10 * spectrum.dominant_frequency, spectrum.frequencies[-1])
+        ax.set_xlim(0, x_max)
+        ax.set_xlabel(r"$\omega$ (rad/time)")
+        ax.set_ylabel(r"$|\hat{P}(\omega)|^2$")
+        ax.legend(fontsize=8)
+    else:
+        ax.text(
+            0.5,
+            0.5,
+            "Not computed",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
+            fontsize=9,
+        )
+    ax.set_title("Mixing Spectrum")
+    ax.grid(visible=True, alpha=0.3)
+
+
 def _plot_hamiltonian(ax: Axes, h: EnergyDecomposition) -> None:
-    ax.plot(h.times, h.phi_energy, "b-", label=r"$E_\phi$", linewidth=1.2)
-    ax.plot(h.times, h.chi_energy, "r-", label=r"$E_\chi$", linewidth=1.2)
+    ax.plot(h.times, h.a_energy, "b-", label=r"$E_A$", linewidth=1.2)
+    ax.plot(h.times, h.b_energy, "r-", label=r"$E_B$", linewidth=1.2)
     ax.plot(
         h.times,
         h.coupling_energy,
         "g--",
-        label=r"$\int G\phi\chi\,dA$",
+        label=r"$E_\mathrm{int}$",
         linewidth=1.0,
         alpha=0.7,
     )
@@ -408,63 +445,47 @@ def _plot_hamiltonian(ax: Axes, h: EnergyDecomposition) -> None:
     ax.grid(visible=True, alpha=0.3)
 
 
-def _plot_energy_conservation(ax: Axes, diag: EnergyDiagnostics) -> None:
-    ax.plot(diag.times, diag.relative_error, "k-", linewidth=1.0)
-    ax.axhline(1e-3, color="r", linestyle="--", alpha=0.5, label="threshold (1e-3)")
-    ax.axhline(-1e-3, color="r", linestyle="--", alpha=0.5)
-    ax.set_xlabel("Time")
-    ax.set_ylabel(r"$\Delta E\,/\,E_0$")
-    ax.set_title("Energy Conservation")
-    ax.legend(fontsize=8)
-    ax.grid(visible=True, alpha=0.3)
-
-
-def _plot_mixing_spectrum(ax: Axes, spectrum: MixingSpectrum | None) -> None:
-    if spectrum is not None:
-        ax.semilogy(
-            spectrum.frequencies,
-            spectrum.power,
-            "b-",
-            linewidth=0.5,
-            alpha=0.7,
-        )
-        ax.axvline(
-            spectrum.dominant_frequency,
-            color="red",
-            linestyle="--",
-            alpha=0.7,
-            label=rf"$\omega_{{\mathrm{{dom}}}}$ = {spectrum.dominant_frequency:.2f}",
-        )
-        x_max = min(10 * spectrum.dominant_frequency, spectrum.frequencies[-1])
-        ax.set_xlim(0, x_max)
-        ax.set_xlabel(r"$\omega$ (rad/time)")
-        ax.set_ylabel(r"$|\hat{P}(\omega)|^2$")
-        ax.legend(fontsize=8)
-    else:
-        ax.text(0.5, 0.5, "Not computed", transform=ax.transAxes, ha="center")
-    ax.set_title("Mixing Spectrum")
-    ax.grid(visible=True, alpha=0.3)
-
-
-def _plot_chi_heatmap(
+def _plot_coupling_field(
     ax: Axes,
+    fig: Figure,
     data: SimulationData,
     coupling_field: NDArray[np.float64],
-    snapshot_idx: int = -1,
 ) -> None:
-    """Plot |chi| at given snapshot with coupling G(x,y) contours."""
-    final_chi = data.fields["chi_0"][snapshot_idx]
     bounds = data.grid_bounds
     extent = (bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1])
     im = ax.imshow(
-        np.abs(final_chi).T,
+        coupling_field.T,
+        aspect="equal",
+        origin="lower",
+        extent=extent,
+        cmap="YlOrRd",
+    )
+    fig.colorbar(im, ax=ax, label=r"$G(x,y)$")
+    ax.set_xlabel("x")
+    ax.set_ylabel("y")
+    ax.set_title(r"Coupling $G(x,y) = g_0 / (1 + r^2/R^2)$")
+
+
+def _plot_field_heatmap(
+    ax: Axes,
+    data: SimulationData,
+    field_name: str,
+    coupling_field: NDArray[np.float64],
+    snapshot_idx: int = -1,
+) -> None:
+    """Plot |field| at given snapshot with coupling G(x,y) contours."""
+    final = data.fields[field_name][snapshot_idx]
+    bounds = data.grid_bounds
+    extent = (bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1])
+    im = ax.imshow(
+        np.abs(final).T,
         aspect="equal",
         origin="lower",
         extent=extent,
         cmap="inferno",
     )
     # Coupling contours
-    shape = final_chi.shape
+    shape = final.shape
     dx, dy = data.grid_spacing
     x_1d = np.linspace(bounds[0][0] + dx / 2, bounds[0][1] - dx / 2, shape[0])
     y_1d = np.linspace(bounds[1][0] + dy / 2, bounds[1][1] - dy / 2, shape[1])
@@ -481,32 +502,30 @@ def _plot_chi_heatmap(
     ax.set_xlabel("x")
     ax.set_ylabel("y")
     t_snap = float(data.times[snapshot_idx])
-    ax.set_title(rf"$|\chi|$ at $t={t_snap:.0f}$ (peak) + coupling $G$ contours")
+    ax.set_title(rf"$|{field_name}|$ at $t={t_snap:.0f}$ (peak) + coupling contours")
     plt.colorbar(im, ax=ax)
 
 
 def _plot_summary_text(
     ax: Axes,
     result: ConversionResult,
-    energy: EnergyDecomposition,
     diag: EnergyDiagnostics,
     mixing: MixingResult | None,
     params: dict[str, float],
-    peak_idx: int,
 ) -> None:
-    m_phi2 = params["mPhi2"]
-    m_chi2 = params["mChi2"]
+    m_a2 = params["mA2"]
+    m_b2 = params["mB2"]
+    gcoup = params["gcoup"]
     g0 = params["g0"]
     r_param = params["R"]
-    omega_k = np.sqrt(K0**2 + m_phi2)
-    _ = energy  # used for type consistency; total energy printed via diag
+    peak_idx = int(np.argmax(result.probability))
     lines = [
         "Parameters:",
-        f"  $m_\\phi^2 = {m_phi2}$,  $m_\\chi^2 = {m_chi2}$",
-        f"  $g_0 = {g0}$,  $R = {r_param}$",
+        f"  $m_A^2 = {m_a2}$,  $m_B^2 = {m_b2}$",
+        f"  $g_{{coup}} = {gcoup}$,  $g_0 = {g0}$,  $R = {r_param}$",
         "",
-        f"Wave packet: $k_0 = {K0}$",
-        f"  $\\omega = {omega_k:.4f}$,  $v_g = {K0 / omega_k:.4f}$",
+        f"Stability: $m_A^2 m_B^2 = {m_a2 * m_b2:.1f}$",
+        f"  $> (g_0 g_{{coup}})^2 = {(g0 * gcoup) ** 2:.2f}$",
         "",
         "Results:",
         f"  Peak $P(t) = {result.probability[peak_idx]:.6f}$",
@@ -514,16 +533,18 @@ def _plot_summary_text(
     ]
     if mixing is not None:
         lines += [
+            "",
+            "Mixing Length:",
             f"  $L_{{mix}} = {mixing.mixing_length:.4f}$",
             f"  $\\omega_{{dom}} = {mixing.dominant_frequency:.4f}$",
         ]
     lines += [
         "",
         f"  max $|\\Delta E / E_0| = {diag.max_relative_error:.2e}$",
+        f"  Conservation: {'PASS' if diag.is_conserved else 'FAIL'}",
         "",
-        "Initial condition:",
-        "  Gaussian $\\phi$ wave packet, $\\chi = 0$",
-        "  (pure conversion scenario)",
+        "Background: Lorentzian $1/(1+r^2/R^2)$",
+        "  (algebraic tails, non-compact)",
     ]
     ax.text(
         0.05,
@@ -537,12 +558,12 @@ def _plot_summary_text(
     ax.axis("off")
 
 
-# ── Entry point ───────────────────────────────────────────────
+# -- Entry point ----------------------------------------------------------
 
 
 def main() -> None:
-    """Run simulation and perform full measurement analysis."""
-    print("Running coupled scattering simulation (2+1D)...")
+    """Run simulation and perform measurement analysis."""
+    print("Running Proca + Lorentzian background simulation (2+1D)...")
     data, params, data_dir = _run_simulation()
     print(f"  Data saved to: {data_dir}")
     print(f"  {data.n_snapshots} snapshots over t=[0, {float(data.times[-1]):.1f}]")
@@ -550,8 +571,12 @@ def main() -> None:
     print("Computing coupling field G(x,y)...")
     coupling_field = _compute_coupling_field(data)
 
-    print("Computing conversion probability...")
-    result = compute_conversion_probability(data, "phi_0", "chi_0")
+    print("Computing group conversion probability (A -> B)...")
+    result = compute_group_conversion(
+        data,
+        source_fields=["A_1", "A_2"],
+        target_fields=["B_1", "B_2"],
+    )
 
     print("Computing mixing length and spectrum...")
     mixing: MixingResult | None = None
@@ -566,26 +591,19 @@ def main() -> None:
         print(f"  Mixing spectrum: not computed ({e})")
 
     print("Computing energy decomposition (virial formula)...")
-    energy = _compute_energy_decomposition(data)
+    hamiltonian = _compute_energy_decomposition(data)
 
     print("Checking energy conservation...")
-    diag = check_energy_conservation(data)
+    diag = check_energy_conservation(data, threshold=ENERGY_THRESHOLD)
 
-    _print_summary(
-        result,
-        energy,
-        diag,
-        mixing,
-        spectrum,
-        params,
-    )
+    _print_summary(result, diag, mixing, params)
 
     print()
     print("Generating measurement plots...")
     output_path = _plot_results(
         data,
         result,
-        energy,
+        hamiltonian,
         diag,
         mixing,
         spectrum,
