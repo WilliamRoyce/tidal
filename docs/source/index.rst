@@ -39,8 +39,8 @@ Install and run:
    # Inspect an equation system
    tidal inspect examples/data/chern_simons.json
 
-   # Run a pipeline example directly
-   uv run python examples/scalar_field/kg_from_lagrangian.py
+   # Run a pipeline example
+   cd examples/scalar_field && bash run.sh
 
 .. toctree::
    :maxdepth: 2
