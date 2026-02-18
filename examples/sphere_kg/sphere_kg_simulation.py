@@ -224,7 +224,7 @@ def _analyze_results(result: SimulationResult) -> None:
     print("Step 6: Analyzing results...")
 
     data = result.data
-    field_name = data.field_names[0]
+    field_name = next(iter(data.fields))
 
     initial_max = float(np.max(np.abs(data.fields[field_name][0])))
     final_max = float(np.max(np.abs(data.fields[field_name][-1])))
@@ -240,7 +240,7 @@ def _plot_results(result: SimulationResult, diag: EnergyDiagnostics) -> None:  #
     data = result.data
     grid = result.grid
     domain_size = result.domain_size
-    field_name = data.field_names[0]
+    field_name = next(iter(data.fields))
     n_snapshots = data.n_snapshots
 
     initial_phi = data.fields[field_name][0]

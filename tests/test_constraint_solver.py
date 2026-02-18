@@ -42,11 +42,6 @@ from tidal.symbolic.pde_builder import (
 # === Sparse matrix helpers (explicit typing for scipy stubs) ===
 
 
-def _sp_matmul(a: sparse.spmatrix, b: sparse.spmatrix) -> sparse.spmatrix:
-    """Multiply two sparse matrices with explicit return type."""
-    return cast("sparse.spmatrix", a @ b)  # type: ignore[reportOperatorIssue]
-
-
 def _sp_matvec(mat: sparse.spmatrix, vec: np.ndarray) -> np.ndarray:
     """Multiply a sparse matrix by a dense vector."""
     result: np.ndarray = mat @ vec  # type: ignore[reportOperatorIssue]

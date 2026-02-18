@@ -204,7 +204,7 @@ def _analyze_results(result: SimulationResult) -> None:
 
     data = result.data
     x = result.x_coords
-    field_name = data.field_names[0]  # e.g. "confPhi_0"
+    field_name = next(iter(data.fields))  # e.g. "confPhi_0"
 
     # Extract field amplitudes
     initial_max = float(np.max(np.abs(data.fields[field_name][0])))
@@ -244,7 +244,7 @@ def _plot_results(result: SimulationResult, diag: EnergyDiagnostics) -> None:
 
     data = result.data
     x = result.x_coords
-    field_name = data.field_names[0]
+    field_name = next(iter(data.fields))
     n_snapshots = data.n_snapshots
 
     fig, axes = plt.subplots(2, 2, figsize=(12, 10))
