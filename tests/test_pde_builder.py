@@ -2440,3 +2440,320 @@ class TestOperatorDimensionValidation:
         """_operator_min_dim raises for unrecognized operators."""
         with pytest.raises(ValueError, match="Unknown operator"):
             PDEFromSpec._operator_min_dim("nonexistent_op")
+
+
+# === CFL Limit Tests ===
+
+
+class TestCFLLimit:
+    """Tests for PDEFromSpec.cfl_limit()."""
+
+    def test_wave_equation_cfl(
+        self, simple_wave_spec: EquationSystem, grid_1d_small: CartesianGrid
+    ) -> None:
+        """CFL limit for wave eq with c=1: dx/c = dx."""
+        pde = PDEFromSpec(simple_wave_spec)
+        limit = pde.cfl_limit(grid_1d_small)
+        # grid: (0,10), 32 points → dx = 10/32 = 0.3125; c=sqrt(1)=1 → limit=0.3125
+        dx = 10.0 / 32
+        assert limit is not None
+        assert abs(limit - dx) < 1e-10
+
+    def test_massive_wave_cfl(
+        self, grid_1d_small: CartesianGrid
+    ) -> None:
+        """CFL limit only considers laplacian, not identity (mass) term."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=4.0, operator="laplacian", field="phi"),
+                        OperatorTerm(coefficient=-1.0, operator="identity", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((1.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        limit = pde.cfl_limit(grid_1d_small)
+        # c = sqrt(4) = 2, dx = 10/32 → limit = dx/c = 0.15625
+        dx = 10.0 / 32
+        assert limit is not None
+        assert abs(limit - dx / 2.0) < 1e-10
+
+    def test_no_wave_returns_none(
+        self, grid_1d_small: CartesianGrid
+    ) -> None:
+        """First-order equation (no wave) → cfl_limit returns None."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=1,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        assert pde.cfl_limit(grid_1d_small) is None
+
+    def test_two_field_picks_smallest(self, grid_1d_small: CartesianGrid) -> None:
+        """Two-field system: picks the more restrictive CFL limit."""
+        spec = EquationSystem(
+            n_components=2,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "chi"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="chi",
+                    field_index=1,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=9.0, operator="laplacian", field="chi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        limit = pde.cfl_limit(grid_1d_small)
+        # c_chi = sqrt(9) = 3 → dx/3 is more restrictive than dx/1
+        dx = 10.0 / 32
+        assert limit is not None
+        assert abs(limit - dx / 3.0) < 1e-10
+
+    def test_directional_laplacian_cfl(self, grid_1d_small: CartesianGrid) -> None:
+        """Directional laplacian_x contributes to CFL limit."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=4.0, operator="laplacian_x", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        limit = pde.cfl_limit(grid_1d_small)
+        # c = sqrt(4) = 2, dx = 10/32 → limit = dx/c = 0.15625
+        dx = 10.0 / 32
+        assert limit is not None
+        assert abs(limit - dx / 2.0) < 1e-10
+
+    def test_cross_field_laplacian_cfl(self, grid_1d_small: CartesianGrid) -> None:
+        """Cross-field laplacian(chi) in phi equation contributes to CFL."""
+        spec = EquationSystem(
+            n_components=2,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "chi"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),
+                        OperatorTerm(coefficient=9.0, operator="laplacian", field="chi"),
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="chi",
+                    field_index=1,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian", field="chi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        limit = pde.cfl_limit(grid_1d_small)
+        # phi eq: max laplacian coeff = max(1, 9) = 9 so c=3, giving dx/3
+        # chi eq: max laplacian coeff = 1 so c=1, giving dx/1
+        # Overall picks the most restrictive: dx/3
+        dx = 10.0 / 32
+        assert limit is not None
+        assert abs(limit - dx / 3.0) < 1e-10
+
+
+# === Jacobian Sparsity Tests ===
+
+
+class TestJacobianSparsity:
+    """Tests for PDEFromSpec.jacobian_sparsity()."""
+
+    def test_single_wave_field(
+        self, simple_wave_spec: EquationSystem, grid_1d_small: CartesianGrid
+    ) -> None:
+        """Single wave field: 2 slots (phi, pi), tridiag laplacian in pi row."""
+        pde = PDEFromSpec(simple_wave_spec)
+        mat = pde.jacobian_sparsity(grid_1d_small)
+        assert mat is not None
+        n = grid_1d_small.num_cells  # 32
+        # Total state size: phi(32) + pi(32) = 64
+        assert mat.shape == (2 * n, 2 * n)
+        # phi row: d/dt phi = pi → diagonal block [0:32, 32:64]
+        # Should have diagonal entries
+        for i in range(n):
+            assert mat[i, n + i] == 1
+        # pi row: d/dt pi = laplacian(phi) → tridiagonal block [32:64, 0:32]
+        for i in range(n):
+            assert mat[n + i, i] == 1  # diagonal
+        # Neighbors (interior points)
+        for i in range(1, n - 1):
+            assert mat[n + i, i - 1] == 1
+            assert mat[n + i, i + 1] == 1
+        # Periodic corners
+        assert mat[n, n - 1] == 1      # first row wraps to last col
+        assert mat[2 * n - 1, 0] == 1  # last row wraps to first col
+
+    def test_two_uncoupled_fields(
+        self, em_spec: EquationSystem, grid_1d_small: CartesianGrid
+    ) -> None:
+        """Two uncoupled fields: block-diagonal structure."""
+        pde = PDEFromSpec(em_spec)
+        mat = pde.jacobian_sparsity(grid_1d_small)
+        assert mat is not None
+        n = grid_1d_small.num_cells
+        # A_0(n) + pi_A_0(n) + A_1(n) + pi_A_1(n) = 4n
+        assert mat.shape == (4 * n, 4 * n)
+        # No coupling between A_0 block and A_1 block
+        # A_0 is at [0:n], pi_A_0 at [n:2n], A_1 at [2n:3n], pi_A_1 at [3n:4n]
+        # Check no entries in off-diagonal blocks
+        from scipy import sparse
+
+        csr = sparse.csr_matrix(mat)
+        # pi_A_0 rows should have no entries in A_1 or pi_A_1 columns
+        for i in range(n, 2 * n):
+            row = csr.getrow(i)
+            cols = row.indices
+            assert all(c < 2 * n for c in cols), f"Row {i} has unexpected cross-block entry"
+
+    def test_coupled_cross_field_identity(
+        self, grid_1d_small: CartesianGrid
+    ) -> None:
+        """Cross-field identity coupling creates diagonal off-block entries."""
+        spec = EquationSystem(
+            n_components=2,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "chi"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),
+                        OperatorTerm(coefficient=-0.5, operator="identity", field="chi"),
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="chi",
+                    field_index=1,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian", field="chi"),
+                        OperatorTerm(coefficient=-0.5, operator="identity", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0, 0.5), (0.5, 0.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        mat = pde.jacobian_sparsity(grid_1d_small)
+        assert mat is not None
+        n = grid_1d_small.num_cells
+        # phi(n), pi_phi(n), chi(n), pi_chi(n) = 4n
+        assert mat.shape == (4 * n, 4 * n)
+        # pi_phi depends on chi via identity → diagonal block [n:2n, 2n:3n]
+        for i in range(n):
+            assert mat[n + i, 2 * n + i] == 1
+        # pi_chi depends on phi via identity → diagonal block [3n:4n, 0:n]
+        for i in range(n):
+            assert mat[3 * n + i, i] == 1
+
+    def test_non_periodic_no_wrapping(
+        self, simple_wave_spec: EquationSystem
+    ) -> None:
+        """Non-periodic grid: no corner wrapping entries in sparsity pattern."""
+        grid = CartesianGrid([(0, 10)], 32, periodic=False)
+        pde = PDEFromSpec(simple_wave_spec)
+        mat = pde.jacobian_sparsity(grid)
+        assert mat is not None
+        n = 32
+        # pi row laplacian block starts at row n, col 0
+        # No periodic corner entries
+        assert mat[n, n - 1] == 0  # first pi row → last phi col
+        assert mat[2 * n - 1, 0] == 0  # last pi row → first phi col
+
+    def test_multi_d_returns_none(self) -> None:
+        """Multi-D grid: returns None (tridiagonal pattern insufficient)."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        grid = CartesianGrid([(0, 10), (0, 10)], [16, 16], periodic=True)
+        pde = PDEFromSpec(spec)
+        assert pde.jacobian_sparsity(grid) is None

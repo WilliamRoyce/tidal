@@ -487,6 +487,85 @@ class TestSimulateCommand:
         ])
         assert ret == 0
 
+    def test_simulate_scipy_adaptive_dop853(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Verify scipy adaptive solver with DOP853 and custom tolerances."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--scheme", "scipy",
+            "--adaptive",
+            "--method", "DOP853",
+            "--rtol", "1e-6",
+            "--atol", "1e-8",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+        captured = capsys.readouterr()
+        assert "DOP853" in captured.out
+
+    def test_simulate_adaptive_rk(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Verify adaptive explicit RK with tolerance."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--scheme", "runge-kutta",
+            "--adaptive",
+            "--tolerance", "1e-4",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+        captured = capsys.readouterr()
+        assert "adaptive RK" in captured.out
+
+    def test_simulate_scipy_with_max_step(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Verify --max-step is accepted by scipy solver."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--scheme", "scipy",
+            "--max-step", "0.1",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+    def test_energy_monitor_fires(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Energy monitor with impossibly tight threshold should trigger halt."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--energy-monitor", "1e-15",
+            "--t-end", "1.0",
+            "--no-plot",
+        ])
+        assert ret == 1
+        captured = capsys.readouterr()
+        assert "Energy conservation violated" in captured.err
+
+    def test_blowup_detection_fires(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Tachyonic instability (m2<0) causes blow-up, detected by threshold."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=-100.0",
+            "--t-end", "10.0",
+            "--no-plot",
+        ])
+        assert ret == 1
+        captured = capsys.readouterr()
+        assert "Blow-up detected" in captured.err or "blow-up" in captured.err.lower()
+
     def test_simulate_custom_snapshots(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
@@ -1144,7 +1223,7 @@ xi = 1.0
 field = "A"
 type = "custom"
 mechanism = "lagrangian_term"
-expression = "-(1/2) * eta[a,b] CD[-a][A[-c]] eta[c,d] CD[-b][A[-d]]"
+expression = "-(1/2) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]"
 """)
         ret = main(["derive", str(config), "--dry-run"])
         assert ret == 0
@@ -1267,6 +1346,190 @@ expression = "eta[a,b] CD[-a][A[-b]]"
 """)
         ret = main(["derive", str(config), "--dry-run"])
         assert ret == 1
+
+    def test_gauge_xi_zero_rejected(self, tmp_path: Path) -> None:
+        """Reject xi=0 (would cause division by zero)."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "lorenz"
+xi = 0
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_xi_negative_rejected(self, tmp_path: Path) -> None:
+        """Reject xi=-1 (must be positive)."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "lorenz"
+xi = -1
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_custom_invalid_mechanism(self, tmp_path: Path) -> None:
+        """Custom gauge with invalid mechanism value is rejected."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "custom"
+mechanism = "invalid"
+expression = "eta[a,b] CD[-a][A[-b]]"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_custom_empty_expression(self, tmp_path: Path) -> None:
+        """Custom gauge with empty expression is rejected."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "custom"
+mechanism = "lagrangian_term"
+expression = ""
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_custom_constraint_rejected(self, tmp_path: Path) -> None:
+        """Custom constraint gauges are not yet supported."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "custom"
+mechanism = "constraint"
+expression = "eta[a,b] CD[-a][A[-b]]"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_with_linearization_rejected(self, tmp_path: Path) -> None:
+        """Both [linearization] and [[gauge]] should fail validation."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "LinGauge"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[linearization]
+background_metric = "minkowski"
+perturbation = "h"
+order = 1
+
+[output]
+path = "output.json"
+
+[[gauge]]
+field = "h"
+type = "lorenz"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_temporal_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Temporal gauge on vector field produces ReplaceAll in WLS."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "temporal"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert ":> 0" in out
+        assert "temporal" in out.lower()
+
+    def test_gauge_coulomb_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Coulomb gauge on vector field produces constraint equation in WLS."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "coulomb"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "AppendTo[fieldEquations" in out
+        assert "coulomb" in out.lower()
+
+    def test_gauge_axial_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Axial gauge on vector field produces ReplaceAll for last spatial component."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "axial"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert ":> 0" in out
+        assert "axial" in out.lower()
+
+    def test_gauge_de_donder_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """De Donder gauge on tensor field produces builder call in WLS."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "LinGrav"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[lagrangian]
+expression = "CD[-a][h[-b,-c]] eta[a,d] eta[b,e] eta[c,f] CD[-d][h[-e,-f]]"
+
+[output]
+path = "output.json"
+
+[[gauge]]
+field = "h"
+type = "de_donder"
+xi = 1.0
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "BuildDeDonderGaugeTerm" in out
+        assert "AddGaugeFixingTerm" in out
+        assert "GaugeFix.wl" in out
 
 
 class TestDeriveAbsolutePaths:
