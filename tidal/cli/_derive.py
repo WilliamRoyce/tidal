@@ -716,15 +716,16 @@ def _wls_vector_background_substitution(
 ) -> list[str]:
     """Generate explicit ``ReplaceAll`` for vector/tensor background fields.
 
-    ``ToBasis`` inside ``DecomposeToComponents`` does NOT reliably resolve
-    ``ComponentValue`` definitions for vector/tensor backgrounds.  The
-    unresolved Mathematica tensor notation (e.g. ``vbdB[{2, -vbdCart}]``)
-    survives into the exported JSON coefficients, which Python cannot
-    evaluate.
+    Unlike scalar backgrounds (substituted BEFORE decomposition because
+    ``ToBasis`` doesn't trigger ``ComponentValue`` for rank-0 tensors),
+    vector/tensor backgrounds are substituted AFTER decomposition so that
+    xAct handles the index algebra (contractions, metric raising/lowering)
+    before we inject numeric component values.
 
-    This function generates explicit substitution rules AFTER
-    decomposition, covering both covariant (``{i, -chart}``) and
-    contravariant (``{i, chart}``) index orientations.
+    Both covariant (``{i, -chart}``) and contravariant (``{i, chart}``)
+    index orientations get the same component value.  This is correct for
+    diagonal metrics (Minkowski); non-diagonal metrics would need metric
+    factors for index raising/lowering.
     """
     non_scalar_bgs = [
         f for f in ctx.background_fields if f["type"] != "scalar"

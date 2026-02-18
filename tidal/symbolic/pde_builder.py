@@ -1173,8 +1173,9 @@ class PDEFromSpec(PDEBase):
         the same evaluation works for both scalar (time-only) and array
         (position-dependent) results.
 
-        Returns a scalar ``float`` for constant or time-only coefficients, or a
-        ``numpy.ndarray`` (same shape as the grid) for position-dependent ones.
+        Returns a scalar ``float`` when the coefficient has no spatial
+        coordinate dependence (even if time-dependent), or a
+        ``numpy.ndarray`` (grid-shaped) when position-dependent.
 
         Parameters
         ----------

@@ -8,11 +8,14 @@ resolve position-dependent coefficients.
 The conversion pipeline:
     Mathematica InputForm → Python string → eval() with numpy namespace
 
-The three main entry points are:
+Primary public entry point:
+
+- ``evaluate_coefficient(expr, parameters, coordinates, ...)`` — full eval
+
+Building blocks (also used directly by ``pde_builder.PDEFromSpec``):
 
 - ``mathematica_to_python(expr, coordinates)`` — string-level conversion
 - ``build_eval_namespace(parameters)`` — static evaluation namespace
-- ``evaluate_coefficient(expr, parameters, coordinates, ...)`` — full eval
 """
 
 from __future__ import annotations

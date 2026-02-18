@@ -1432,7 +1432,7 @@ class TestVectorBackground:
         """Tanh * Exp profile evaluates correctly on a grid."""
         from tidal.symbolic._eval_utils import evaluate_coefficient
 
-        expr = "B0 * tanh(x / W) * exp(-(y**2) / (2 * R**2))"
+        expr = "B0 * tanh(x / W) * exp(-(x**2 + y**2) / (2 * R**2))"
         params: dict[str, float] = {"B0": 1.0, "W": 3.0, "R": 8.0}
         # Use 33 points so x=0.0 falls exactly on index 16
         n = 33
@@ -1454,11 +1454,11 @@ class TestVectorBackground:
         # At origin: tanh(0) = 0, exp(0) = 1 → B = 0
         assert_allclose(result[mid, mid], 0.0, atol=1e-10)
 
-        # At x=+10, y=0: tanh(10/3) ~ 0.9997, exp(0) = 1
-        assert result[-1, mid] > 0.9
+        # At x=+10, y=0: tanh(10/3)~1 * exp(-100/128)~0.46
+        assert result[-1, mid] > 0.3
 
-        # At x=-10, y=0: tanh(-10/3) ~ -0.9997
-        assert result[0, mid] < -0.9
+        # At x=-10, y=0: tanh(-10/3)~-1 * exp(-100/128)~-0.46
+        assert result[0, mid] < -0.3
 
     def test_vector_background_zero_component_constant(self) -> None:
         """B_0=0, B_1=0 components give constant zero, not position-dependent."""
@@ -1494,7 +1494,7 @@ class TestVectorBackground:
             OperatorTerm(coefficient=-1.0, operator="identity", field="phi_0"),
             OperatorTerm(
                 coefficient=-0.5, operator="identity", field="A_2",
-                coefficient_symbolic="-gBV * B0 * tanh(x / W) * exp(-(y**2) / (2 * R**2))",
+                coefficient_symbolic="-gBV * B0 * tanh(x / W) * exp(-(x**2 + y**2) / (2 * R**2))",
                 coordinate_dependent=("x", "y"),
             ),
         )
@@ -1503,7 +1503,7 @@ class TestVectorBackground:
             OperatorTerm(coefficient=-2.0, operator="identity", field="A_2"),
             OperatorTerm(
                 coefficient=-0.5, operator="identity", field="phi_0",
-                coefficient_symbolic="-gBV * B0 * tanh(x / W) * exp(-(y**2) / (2 * R**2))",
+                coefficient_symbolic="-gBV * B0 * tanh(x / W) * exp(-(x**2 + y**2) / (2 * R**2))",
                 coordinate_dependent=("x", "y"),
             ),
         )
