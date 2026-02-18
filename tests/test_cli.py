@@ -1086,6 +1086,189 @@ path = "output.json"
         assert '"m2" -> 1.0' in out
 
 
+class TestGaugeFixing:
+    """Tests for ``[[gauge]]`` TOML → validation and WLS generation."""
+
+    _BASE_TOML = """\
+[theory]
+name = "EM"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[lagrangian]
+expression = "-1/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d]"
+
+[output]
+path = "output.json"
+"""
+
+    def test_gauge_lorenz_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Lorenz gauge on vector field → GaugeFix.wl loaded + builder in WLS."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "lorenz"
+xi = 1.0
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "GaugeFix.wl" in out
+        assert "BuildLorenzGaugeTerm" in out
+        assert "AddGaugeFixingTerm" in out
+
+    def test_gauge_custom_lagrangian_term_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Custom gauge expression → appears in WLS output."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "custom"
+mechanism = "lagrangian_term"
+expression = "-(1/2) * eta[a,b] CD[-a][A[-c]] eta[c,d] CD[-b][A[-d]]"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "GaugeTerm" in out
+        assert "AddGaugeFixingTerm" in out
+
+    def test_gauge_metadata_lorenz(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Lorenz gauge metadata string in WLS."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "lorenz"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert '"gauge" -> "lorenz(A)"' in out
+
+    def test_gauge_metadata_none_default(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """No [[gauge]] → 'gauge -> none' in metadata."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML)
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert '"gauge" -> "none"' in out
+
+    def test_gauge_bad_field_ref(self, tmp_path: Path) -> None:
+        """Reject field='Z' not declared in [[fields]]."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "Z"
+type = "lorenz"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_bad_type(self, tmp_path: Path) -> None:
+        """Reject unknown gauge type."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "unknown"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_scalar_not_allowed(self, tmp_path: Path) -> None:
+        """Lorenz gauge on scalar field → exit code 1."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[lagrangian]
+expression = "phi[]^2"
+
+[output]
+path = "output.json"
+
+[[gauge]]
+field = "phi"
+type = "lorenz"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_duplicate_field(self, tmp_path: Path) -> None:
+        """Two gauge entries for same field → exit code 1."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "lorenz"
+
+[[gauge]]
+field = "A"
+type = "lorenz"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_custom_missing_expression(self, tmp_path: Path) -> None:
+        """Custom gauge without expression key is rejected."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "custom"
+mechanism = "lagrangian_term"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_custom_missing_mechanism(self, tmp_path: Path) -> None:
+        """Custom gauge without mechanism key is rejected."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "custom"
+expression = "eta[a,b] CD[-a][A[-b]]"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+
 class TestDeriveAbsolutePaths:
     """Verify generated WLS scripts use absolute paths (not $InputFileName-relative)."""
 

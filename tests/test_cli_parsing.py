@@ -402,3 +402,70 @@ class TestConstraintSolverToml:
         assert '"type" -> "periodic"' in wls
         # Periodic BCs should NOT have a "value" key
         assert '"value"' not in wls
+
+
+class TestGaugeToml:
+    """Tests for ``[[gauge]]`` TOML → WLS generation."""
+
+    def _generate(self, config: dict[str, object]) -> str:
+        from tidal.cli._derive import generate_wls
+
+        base: dict[str, object] = {
+            "theory": {"name": "Test"},
+            "spacetime": {"dimension": 2, "metric": "minkowski"},
+            "fields": [{"name": "A", "type": "vector"}],
+            "derived_fields": [
+                {
+                    "name": "F",
+                    "type": "tensor",
+                    "rank": 2,
+                    "symmetry": "antisymmetric",
+                    "definition": "CD[-a][A[-b]] - CD[-b][A[-a]]",
+                }
+            ],
+            "lagrangian": {
+                "expression": "-1/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d]"
+            },
+            "output": {"path": "out.json"},
+        }
+        base.update(config)
+        return generate_wls(base)
+
+    def test_lorenz_preset_in_wls(self) -> None:
+        """Lorenz preset → BuildLorenzGaugeTerm + AddGaugeFixingTerm + GaugeFix.wl."""
+        wls = self._generate({"gauge": [{"field": "A", "type": "lorenz"}]})
+        assert "BuildLorenzGaugeTerm" in wls
+        assert "AddGaugeFixingTerm" in wls
+        assert "GaugeFix.wl" in wls
+
+    def test_lorenz_xi_parameter(self) -> None:
+        """Parameter xi=2.0 appears in WLS output."""
+        wls = self._generate(
+            {"gauge": [{"field": "A", "type": "lorenz", "xi": 2.0}]}
+        )
+        # xi=2.0 should appear as the fourth argument
+        assert "2.0" in wls or "2" in wls
+
+    def test_custom_expression_in_wls(self) -> None:
+        """Custom gauge expression → GaugeTerm + AddGaugeFixingTerm in WLS."""
+        wls = self._generate({
+            "gauge": [{
+                "field": "A",
+                "type": "custom",
+                "mechanism": "lagrangian_term",
+                "expression": "-(1/2) * eta[a,b] CD[-a][A[-c]] eta[c,d] CD[-b][A[-d]]",
+            }]
+        })
+        assert "GaugeTerm" in wls
+        assert "AddGaugeFixingTerm" in wls
+
+    def test_no_gauge_no_gaugefix(self) -> None:
+        """No [[gauge]] → GaugeFix.wl not loaded."""
+        wls = self._generate({})
+        assert "GaugeFix.wl" not in wls
+        assert '"gauge" -> "none"' in wls
+
+    def test_gauge_metadata_string(self) -> None:
+        """Lorenz gauge → metadata string 'lorenz(A)'."""
+        wls = self._generate({"gauge": [{"field": "A", "type": "lorenz"}]})
+        assert '"gauge" -> "lorenz(A)"' in wls

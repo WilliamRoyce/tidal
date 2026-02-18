@@ -41,6 +41,39 @@ _MINKOWSKI_SIGNATURES: dict[int, list[int]] = {
 }
 
 
+# Gauge-fixing preset registry.  Each entry maps a preset name to its
+# mechanism ("lagrangian_term" or "constraint"), the Wolfram builder
+# function in GaugeFix.wl, and the required field type.
+# Adding a new named gauge = one entry here + one function in GaugeFix.wl.
+_GAUGE_PRESETS: dict[str, dict[str, str]] = {
+    "lorenz": {
+        "mechanism": "lagrangian_term",
+        "builder": "BuildLorenzGaugeTerm",
+        "requires": "vector",
+    },
+    "de_donder": {
+        "mechanism": "lagrangian_term",
+        "builder": "BuildDeDonderGaugeTerm",
+        "requires": "tensor",
+    },
+    "temporal": {
+        "mechanism": "constraint",
+        "builder": "BuildTemporalGaugeConstraint",
+        "requires": "vector",
+    },
+    "coulomb": {
+        "mechanism": "constraint",
+        "builder": "BuildCoulombGaugeConstraint",
+        "requires": "vector",
+    },
+    "axial": {
+        "mechanism": "constraint",
+        "builder": "BuildAxialGaugeConstraint",
+        "requires": "vector",
+    },
+}
+
+
 # --- Validation ---
 
 
@@ -325,6 +358,135 @@ def _validate_linearization(config: dict[str, Any]) -> None:
         raise ValueError(msg)
 
 
+def _validate_gauge_entry_preset(
+    i: int, entry: dict[str, Any], field_info: dict[str, Any],
+) -> None:
+    """Validate a named gauge preset against the target field type.
+
+    Raises
+    ------
+    ValueError
+        If the field type is incompatible with the preset.
+    """
+    gauge_type = entry["type"]
+    preset = _GAUGE_PRESETS[gauge_type]
+    required_type = preset["requires"]
+    if field_info["type"] == "scalar":
+        msg = f"[[gauge]] entry {i}: scalars have no gauge freedom"
+        raise ValueError(msg)
+    if required_type == "vector" and field_info["type"] != "vector":
+        msg = f"[[gauge]] entry {i}: '{gauge_type}' requires a vector field, got '{field_info['type']}'"
+        raise ValueError(msg)
+    if required_type == "tensor" and field_info["type"] != "tensor":
+        msg = f"[[gauge]] entry {i}: '{gauge_type}' requires a tensor field, got '{field_info['type']}'"
+        raise ValueError(msg)
+
+
+def _validate_gauge_entry_custom(i: int, entry: dict[str, Any]) -> None:
+    """Validate a custom gauge entry has ``mechanism`` and ``expression``.
+
+    Raises
+    ------
+    ValueError
+        If ``mechanism`` or ``expression`` is missing or invalid.
+    """
+    mechanism = entry.get("mechanism")
+    if mechanism not in {"lagrangian_term", "constraint"}:
+        msg = (
+            f"[[gauge]] entry {i}: custom gauge requires "
+            f"'mechanism' = 'lagrangian_term' or 'constraint'"
+        )
+        raise ValueError(msg)
+    expr = entry.get("expression")
+    if not expr or not isinstance(expr, str) or not expr.strip():
+        msg = f"[[gauge]] entry {i}: custom gauge requires non-empty 'expression'"
+        raise ValueError(msg)
+
+
+def _validate_gauge_entry_common(
+    i: int,
+    entry: dict[str, Any],
+    field_map: dict[str, dict[str, Any]],
+    seen_fields: set[str],
+) -> tuple[str, str]:
+    """Validate keys common to all ``[[gauge]]`` entries.
+
+    Returns the ``(field_name, gauge_type)`` pair on success.
+
+    Raises
+    ------
+    ValueError
+        If required keys are missing, field is undeclared or duplicated,
+        or ``xi`` is not a positive number.
+    """
+    if "field" not in entry or not isinstance(entry.get("field"), str):
+        msg = f"[[gauge]] entry {i}: missing or invalid 'field'"
+        raise ValueError(msg)
+    if "type" not in entry or not isinstance(entry.get("type"), str):
+        msg = f"[[gauge]] entry {i}: missing or invalid 'type'"
+        raise ValueError(msg)
+
+    field_name: str = entry["field"]
+    gauge_type: str = entry["type"]
+
+    if field_name not in field_map:
+        msg = f"[[gauge]] entry {i}: field '{field_name}' not in [[fields]]"
+        raise ValueError(msg)
+    if field_name in seen_fields:
+        msg = f"[[gauge]] entry {i}: duplicate gauge for field '{field_name}'"
+        raise ValueError(msg)
+    seen_fields.add(field_name)
+
+    if "xi" in entry:
+        xi = entry["xi"]
+        if not isinstance(xi, (int, float)) or xi <= 0:
+            msg = f"[[gauge]] entry {i}: 'xi' must be a positive number"
+            raise ValueError(msg)
+
+    return field_name, gauge_type
+
+
+def _validate_gauge(config: dict[str, Any]) -> None:
+    """Validate optional ``[[gauge]]`` entries.
+
+    Each entry specifies a per-field gauge-fixing choice.  Named presets
+    (``lorenz``, ``de_donder``, etc.) are validated against field type;
+    ``type = "custom"`` requires ``mechanism`` and ``expression``.
+
+    Raises
+    ------
+    TypeError
+        If ``[[gauge]]`` is not a list.
+    ValueError
+        If a gauge entry references a non-existent field, uses an unknown
+        type, targets a scalar (no gauge freedom), duplicates a field, or
+        is missing required keys for custom gauges.
+    """
+    gauge_list = config.get("gauge", [])
+    if not gauge_list:
+        return
+    if not isinstance(gauge_list, list):  # pyright: ignore[reportUnnecessaryIsInstance]
+        msg = "[[gauge]] must be an array of tables"
+        raise TypeError(msg)
+
+    field_map = {f["name"]: f for f in config.get("fields", [])}
+    seen_fields: set[str] = set()
+
+    for i, entry in enumerate(gauge_list):
+        field_name, gauge_type = _validate_gauge_entry_common(
+            i, entry, field_map, seen_fields,
+        )
+
+        if gauge_type in _GAUGE_PRESETS:
+            _validate_gauge_entry_preset(i, entry, field_map[field_name])
+        elif gauge_type == "custom":
+            _validate_gauge_entry_custom(i, entry)
+        else:
+            known = ", ".join([*_GAUGE_PRESETS, "custom"])
+            msg = f"[[gauge]] entry {i}: unknown gauge type '{gauge_type}' (known: {known})"
+            raise ValueError(msg)
+
+
 def _validate_config(config: dict[str, Any]) -> None:
     """Validate TOML config structure.
 
@@ -355,6 +517,7 @@ def _validate_config(config: dict[str, Any]) -> None:
         _validate_lagrangian(config)
     else:
         _validate_linearization(config)
+    _validate_gauge(config)
     _validate_parameters(config)
 
 
@@ -531,6 +694,7 @@ class _WlsContext:
     background_fields: list[dict[str, Any]]
     linearization: dict[str, Any] | None
     constraint_solver: dict[str, Any] | None
+    gauge: list[dict[str, Any]]
 
 
 def _wls_header(ctx: _WlsContext) -> list[str]:
@@ -545,7 +709,12 @@ def _wls_header(ctx: _WlsContext) -> list[str]:
     ]
 
 
-def _wls_packages(pipeline_path: str, *, load_xpert: bool = False) -> list[str]:
+def _wls_packages(
+    pipeline_path: str,
+    *,
+    load_xpert: bool = False,
+    load_gauge: bool = False,
+) -> list[str]:
     """Generate xAct package loading and pipeline import lines.
 
     Parameters
@@ -554,6 +723,8 @@ def _wls_packages(pipeline_path: str, *, load_xpert: bool = False) -> list[str]:
         Absolute path to the ``tidal/wolfram/`` directory.
     load_xpert : bool
         If *True*, also load ``xAct`xPert`` and ``Linearize.wl``.
+    load_gauge : bool
+        If *True*, also load ``GaugeFix.wl``.
     """
     escaped = pipeline_path.replace("\\", "\\\\").replace('"', '\\"')
     lines = [
@@ -576,6 +747,8 @@ def _wls_packages(pipeline_path: str, *, load_xpert: bool = False) -> list[str]:
     )
     if load_xpert:
         lines.append('Get[FileNameJoin[{pipelinePath, "Linearize.wl"}]];')
+    if load_gauge:
+        lines.append('Get[FileNameJoin[{pipelinePath, "GaugeFix.wl"}]];')
     lines.extend(("", "$DefInfoQ = False;", ""))
     return lines
 
@@ -892,6 +1065,52 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
     return lines
 
 
+def _resolve_gauge_mechanism(entry: dict[str, Any]) -> str:
+    """Return ``'lagrangian_term'`` or ``'constraint'`` for a gauge entry."""
+    if entry["type"] == "custom":
+        return str(entry["mechanism"])
+    return _GAUGE_PRESETS[entry["type"]]["mechanism"]
+
+
+def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
+    """Generate Type A gauge-fixing terms (added to Lagrangian before EL).
+
+    For named presets, emits a call to the corresponding ``Build*GaugeTerm``
+    function in ``GaugeFix.wl``.  For custom expressions, emits the user's
+    Wolfram expression directly (after field-name substitution).
+    """
+    lines: list[str] = ["(* Gauge fixing: Lagrangian terms *)"]
+    for entry in ctx.gauge:
+        if _resolve_gauge_mechanism(entry) != "lagrangian_term":
+            continue
+        field_name: str = entry["field"]
+        xi = entry.get("xi", 1)
+        pfx_field = f"{ctx.prefix}{field_name.capitalize()}"
+
+        if entry["type"] == "custom":
+            expr = _substitute_field_names(
+                entry["expression"],
+                ctx.fields,
+                ctx.prefix,
+                derived_fields=ctx.derived_fields,
+                background_fields=ctx.background_fields,
+            )
+            lines.append(f"{ctx.prefix}GaugeTerm = ({expr});")
+        else:
+            builder = _GAUGE_PRESETS[entry["type"]]["builder"]
+            lines.append(
+                f"{ctx.prefix}GaugeTerm = {builder}[{pfx_field}, {ctx.metric}, {ctx.cd}, {xi}];"
+            )
+        lines.extend((
+            f"{ctx.prefix}Lagrangian = AddGaugeFixingTerm["
+            f"{ctx.prefix}Lagrangian, {ctx.prefix}GaugeTerm];",
+            f'Print["Gauge-fixed Lagrangian '
+            f'({entry["type"]} on {field_name}): ", {ctx.prefix}Lagrangian];',
+            "",
+        ))
+    return lines
+
+
 def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
     """Generate Euler-Lagrange, decomposition, and export lines for multi-field."""
     lines: list[str] = ["(* Step 4: Euler-Lagrange equations *)"]
@@ -1143,12 +1362,24 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
         raw_expr.replace("\\", "\\\\").replace('"', '\\"').replace("\n", " ").strip()
     )
 
+    # Build gauge metadata string
+    if ctx.gauge:
+        gauge_parts: list[str] = []
+        for g in ctx.gauge:
+            if g["type"] == "custom":
+                gauge_parts.append(f'custom({g["field"]})')
+            else:
+                gauge_parts.append(f'{g["type"]}({g["field"]})')
+        gauge_val = "+".join(gauge_parts)
+    else:
+        gauge_val = "none"
+
     lines: list[str] = [
         "metadata = <|",
         '  "source" -> "xAct",',
         f'  "lagrangian_expr" -> "{escaped_expr}",',
         '  "derived_from" -> "Euler-Lagrange",',
-        '  "gauge" -> "none",',
+        f'  "gauge" -> "{gauge_val}",',
         f'  "linearized" -> {linearized_str},',
         f'  "dimension" -> {ctx.dim},',
         f'  "signature" -> {{{sig_str}}},',
@@ -1265,13 +1496,24 @@ def generate_wls(
         background_fields=config.get("background_fields", []),
         linearization=config.get("linearization"),
         constraint_solver=config.get("constraint_solver"),
+        gauge=config.get("gauge", []),
     )
 
     is_linearization = ctx.linearization is not None
+    has_gauge = bool(ctx.gauge)
+    has_type_a = has_gauge and any(
+        _resolve_gauge_mechanism(g) == "lagrangian_term" for g in ctx.gauge
+    )
 
     lines: list[str] = []
     lines.extend(_wls_header(ctx))
-    lines.extend(_wls_packages(ctx.pipeline_path, load_xpert=is_linearization))
+    lines.extend(
+        _wls_packages(
+            ctx.pipeline_path,
+            load_xpert=is_linearization,
+            load_gauge=has_gauge,
+        )
+    )
     lines.extend(_wls_spacetime(config, ctx))
     lines.extend(_wls_fields(ctx, include_bg=_needs_bg_tensor(config)))
     lines.extend(_wls_derived_fields(ctx))
@@ -1280,6 +1522,9 @@ def generate_wls(
         lines.extend(_wls_linearization(ctx, include_bg=_needs_bg_tensor(config)))
     else:
         lines.extend(_wls_lagrangian(ctx))
+        # Type A gauge fixing: modify Lagrangian before EL derivation
+        if has_type_a:
+            lines.extend(_wls_gauge_fixing_type_a(ctx))
         if ctx.is_multi:
             lines.extend(_wls_euler_lagrange_multi(ctx))
         else:

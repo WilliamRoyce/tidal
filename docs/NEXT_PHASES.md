@@ -101,8 +101,7 @@ New presets are trivially added: write a `Build*GaugeTerm` function in `GaugeFix
 - Custom expression path reuses `_substitute_field_names()` (existing infrastructure)
 - Dynamic gauge metadata in `_wls_metadata_and_export()`
 - Tests: validation, WLS generation, custom expression handling, Wolfram unit tests
-- Example: `examples/em_lorenz/theory.toml` (Lorenz preset) + inline test of custom expression
-- Tutorial: `docs/gauge_fixing.md` — quick start, preset reference, custom expression walkthrough, "adding new presets" developer guide
+- Tutorial: `docs/gauge_fixing.md` — quick start, preset reference, custom expression walkthrough, "adding new presets" developer guide (includes inline TOML examples for Lorenz preset and custom expressions)
 
 **B2: Additional presets + constraint mechanism** (~3–5 days)
 - `GaugeFix.wl`: `BuildDeDonderGaugeTerm`, `BuildTemporalGaugeConstraint`, `BuildCoulombGaugeConstraint`, `BuildAxialGaugeConstraint`
