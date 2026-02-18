@@ -2936,9 +2936,9 @@ class PDEFromSpec(PDEBase):
             max_diffusive_coeff = 0.0
             for term in eq.rhs_terms:
                 coeff_abs = abs(term.coefficient)
-                if (
-                    term.operator == "laplacian" and term.field == eq.field_name
-                ) or term.operator.startswith("laplacian_"):
+                if term.operator == "laplacian" or term.operator.startswith(
+                    "laplacian_"
+                ):
                     max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
                 elif term.operator == "biharmonic":
                     max_diffusive_coeff = max(max_diffusive_coeff, coeff_abs)
@@ -2964,6 +2964,161 @@ class PDEFromSpec(PDEBase):
                     )
 
         return warnings
+
+    def cfl_limit(self, grid: GridBase) -> float | None:
+        """Return the CFL time-step limit for explicit wave equations.
+
+        Computes ``dx_min / c_max`` where ``c_max`` is the maximum wave speed
+        estimated from Laplacian coefficients, and the biharmonic stability
+        limit ``dx^4 / (2D)``.  Returns the most restrictive bound, or
+        ``None`` if no wave/biharmonic terms are present.
+
+        Parameters
+        ----------
+        grid : GridBase
+            The spatial grid (used for cell spacing).
+
+        Returns
+        -------
+        float | None
+            The CFL time-step limit, or None if no stability-constraining
+            terms exist.
+        """
+        dx_min = min(grid.discretization)
+        limits: list[float] = []
+
+        for eq in self.spec.equations:
+            if eq.time_derivative_order < 2:  # noqa: PLR2004
+                continue
+
+            max_laplacian_coeff = 0.0
+            max_diffusive_coeff = 0.0
+            for term in eq.rhs_terms:
+                coeff_abs = abs(term.coefficient)
+                if term.operator == "laplacian" or term.operator.startswith(
+                    "laplacian_"
+                ):
+                    max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
+                elif term.operator == "biharmonic":
+                    max_diffusive_coeff = max(max_diffusive_coeff, coeff_abs)
+
+            if max_laplacian_coeff > 0:
+                c_max = math.sqrt(max_laplacian_coeff)
+                limits.append(dx_min / c_max)
+            if max_diffusive_coeff > 0:
+                limits.append(dx_min**4 / (2 * max_diffusive_coeff))
+
+        return min(limits) if limits else None
+
+    def jacobian_sparsity(  # noqa: C901, PLR0912
+        self, grid: GridBase,
+    ) -> object | None:
+        """Compute Jacobian sparsity pattern for implicit solvers.
+
+        For stiff solvers (Radau, BDF), providing the sparsity pattern avoids
+        costly O(N) finite-difference Jacobian evaluations per step.
+
+        The pattern is determined by:
+        - State vector layout: each field/momentum is a contiguous block of
+          ``grid.num_cells`` elements.
+        - Spatial stencil: 3-point Laplacian → tridiagonal per self-coupling.
+        - Cross-field coupling: ``identity`` terms → diagonal block.
+        - Gradient cross-terms → tridiagonal block.
+        - Periodic BCs → corner entries wrapping first↔last grid points.
+
+        Parameters
+        ----------
+        grid : GridBase
+            The spatial grid.
+
+        Returns
+        -------
+        scipy.sparse.lil_matrix | None
+            The sparsity pattern in LIL format (converted to CSC by caller),
+            or None if the system is too complex for automatic inference.
+        """
+        try:
+            from scipy import (  # type: ignore[reportMissingTypeStubs]  # noqa: PLC0415
+                sparse,
+            )
+        except ImportError:
+            return None
+
+        # Multi-D grids need multi-diagonal bands (offsets ±1, ±N_x, ±N_x*N_y,
+        # etc.) for spatial stencils.  The 1D tridiagonal pattern below is
+        # insufficient for higher dimensions.  Return None so solve_ivp falls
+        # back to dense Jacobian estimation.
+        if grid.dim > 1:
+            return None
+
+        # Build the field→slot mapping for the flattened state vector
+        n = grid.num_cells  # points per scalar field
+        slots: dict[str, int] = {}  # field_name → starting index in flat vector
+        idx = 0
+        for eq in self.spec.equations:
+            slots[eq.field_name] = idx
+            idx += n
+            if eq.time_derivative_order >= 2:  # noqa: PLR2004
+                # momentum slot follows field slot
+                slots[f"pi_{eq.field_name}"] = idx
+                idx += n
+        total = idx
+
+        mat = sparse.lil_matrix((total, total), dtype=np.int8)
+        spatial_ops = {"laplacian", "biharmonic"}
+        spatial_prefixes = ("laplacian_", "gradient_", "first_derivative_", "cross_derivative_")
+
+        # Helper: mark tridiagonal pattern for a block
+        def _mark_tridiag(row_start: int, col_start: int) -> None:
+            for i in range(n):
+                mat[row_start + i, col_start + i] = 1  # diagonal
+                if i > 0:
+                    mat[row_start + i, col_start + i - 1] = 1
+                if i < n - 1:
+                    mat[row_start + i, col_start + i + 1] = 1
+            # Periodic wrapping
+            if hasattr(grid, "periodic") and np.any(grid.periodic):
+                mat[row_start, col_start + n - 1] = 1
+                mat[row_start + n - 1, col_start] = 1
+
+        # Helper: mark diagonal pattern for a block
+        def _mark_diag(row_start: int, col_start: int) -> None:
+            for i in range(n):
+                mat[row_start + i, col_start + i] = 1
+
+        def _is_spatial(op: str) -> bool:
+            return op in spatial_ops or op.startswith(spatial_prefixes)
+
+        for eq in self.spec.equations:
+            eq_slot = slots[eq.field_name]
+
+            if eq.time_derivative_order >= 2:  # noqa: PLR2004
+                # d/dt field = momentum → diagonal coupling field↔momentum
+                mom_slot = slots[f"pi_{eq.field_name}"]
+                _mark_diag(eq_slot, mom_slot)
+
+                # d/dt momentum = RHS terms
+                for term in eq.rhs_terms:
+                    if term.field not in slots:
+                        continue
+                    src_slot = slots[term.field]
+                    if _is_spatial(term.operator):
+                        _mark_tridiag(mom_slot, src_slot)
+                    else:
+                        _mark_diag(mom_slot, src_slot)
+
+            elif eq.time_derivative_order == 1:
+                # d/dt field = RHS terms
+                for term in eq.rhs_terms:
+                    if term.field not in slots:
+                        continue
+                    src_slot = slots[term.field]
+                    if _is_spatial(term.operator):
+                        _mark_tridiag(eq_slot, src_slot)
+                    else:
+                        _mark_diag(eq_slot, src_slot)
+
+        return mat
 
 
 def build_pde_from_json(
