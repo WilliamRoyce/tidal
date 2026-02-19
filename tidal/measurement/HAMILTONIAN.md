@@ -259,9 +259,22 @@ This term contributes zero to the virial at each instant.
 ### Momentum references (`pi_N`)
 
 Terms like `gradient_x(pi_0)` in the A_1 equation reference the
-momentum of another field.  These are velocity-dependent forces, not
-potential energy contributions.  For constraint fields, `pi_N = 0`
-(zero momentum by construction).
+momentum of another field.  For **dynamical** fields, these are
+velocity-dependent forces (not potential energy contributions) and are
+excluded from the virial.
+
+For **constraint** fields, `pi_N` is estimated via backward finite
+difference from consecutive snapshots:
+
+```
+  pi_N(t_i) ~ (field_N(t_i) - field_N(t_{i-1})) / (t_i - t_{i-1})
+```
+
+This IS included in the virial potential, because the constraint
+field's time variation (driven by evolving dynamical sources)
+represents real position-dependent energy flow.  At the first snapshot
+(`t_idx=0`), no previous data is available, so constraint momenta are
+treated as zero.
 
 ## 6. Complete Formula
 
@@ -279,7 +292,8 @@ where:
   V_virial = -1/2 * sum_{i: dynamical} integral phi_i * RHS_i^{spatial} dV
 ```
 
-with RHS_i^{spatial} excluding `first_derivative_t` and `pi_N` terms, and:
+with RHS_i^{spatial} excluding `first_derivative_t` and dynamical
+`pi_N` terms (constraint `pi_N` included via FD estimate), and:
 
 ```
   V_constraint_self = sum_{j: constraint} [-1/2 integral |grad(C_j)|^2 dV

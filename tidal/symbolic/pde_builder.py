@@ -107,9 +107,7 @@ def _op_directional_laplacian(
             data = np.asarray(field.data, dtype=np.float64)
             dx = float(grid.discretization[axis])
             result_data = (
-                np.roll(data, -1, axis=axis)
-                - 2.0 * data
-                + np.roll(data, 1, axis=axis)
+                np.roll(data, -1, axis=axis) - 2.0 * data + np.roll(data, 1, axis=axis)
             ) / (dx * dx)
             return ScalarField(grid, data=result_data)
 
@@ -979,6 +977,18 @@ class PDEFromSpec(PDEBase):
             for term in eq.rhs_terms
         )
 
+        # B7: Constraint momentum estimation via finite differences.
+        # Constraint fields (time_derivative_order=0) are solved elliptically at each
+        # evolution_rate() call.  Their value changes because the source terms (momenta
+        # of dynamical fields) evolve.  We estimate ∂_t(constraint_field) by comparing
+        # consecutive solutions:  pi_0 ~ (A_0(t) - A_0(t_prev)) / (t - t_prev).
+        # This provides nonzero virtual momenta for dynamical equations that reference
+        # gradient(pi_N) of a constraint field -- without requiring gauge choices or
+        # Wolfram pipeline changes.  First call returns pi_0 = 0 (no previous data).
+        # See docs/constraint_fields.md for the physics background.
+        self._prev_constraint_fields: dict[str, NumericArray] = {}
+        self._prev_constraint_t: float | None = None
+
         # Validate operator dimension requirements against spec at construction time
         self._validate_operator_dimensions()
 
@@ -1285,7 +1295,10 @@ class PDEFromSpec(PDEBase):
                 sym = term.coefficient_symbolic
                 if sym and sym not in self._spatial_cache:
                     result = self._resolve_coefficient_at_point(
-                        term, 0.0, grid, coord_arrays=coord_arrays,
+                        term,
+                        0.0,
+                        grid,
+                        coord_arrays=coord_arrays,
                     )
                     if isinstance(result, np.ndarray):
                         self._spatial_cache[sym] = result
@@ -2366,15 +2379,25 @@ class PDEFromSpec(PDEBase):
         grid = state.grid
         virtual_momenta: dict[str, ScalarField] = {}
 
-        # Collect enabled constraint indices
+        # Collect enabled constraint indices and initialise virtual momenta to zero.
+        # The actual momentum estimation (finite-difference) happens AFTER the
+        # constraint solve below, once we have updated field values to compare
+        # against the previous call.
+        constraint_fields: list[str] = []
         enabled_indices: list[int] = []
         for i, eq in enumerate(self.spec.equations):
             if eq.time_derivative_order == 0:
+                constraint_fields.append(eq.field_name)
                 if eq.constraint_solver.enabled:
                     enabled_indices.append(i)
                 virtual_momenta[eq.field_name] = ScalarField(grid, data=0.0)
 
         if not enabled_indices:
+            # Still estimate momenta for disabled constraints (field may change
+            # due to other mechanisms).
+            self._estimate_constraint_momenta(
+                constraint_fields, state, grid, t, virtual_momenta
+            )
             return state, virtual_momenta
 
         # Check for coupled constraints
@@ -2389,7 +2412,76 @@ class PDEFromSpec(PDEBase):
                     i, state, bc, t, virtual_momenta
                 )
 
+        # Estimate ∂_t(constraint_field) via backward finite difference.
+        # See docs/constraint_fields.md for the physical reasoning.
+        self._estimate_constraint_momenta(
+            constraint_fields, state, grid, t, virtual_momenta
+        )
+
         return state, virtual_momenta
+
+    def _estimate_constraint_momenta(
+        self,
+        constraint_fields: list[str],
+        state: FieldCollection,
+        grid: GridBase,
+        t: float,
+        virtual_momenta: dict[str, ScalarField],
+    ) -> None:
+        """Estimate ∂_t of constraint fields via backward finite difference.
+
+        Constraint fields (``time_derivative_order=0``) have no evolution
+        equation of their own — they are determined by an elliptic equation
+        at each instant.  However, their *value* changes in time because
+        the source terms (dynamical field momenta) evolve.  Any dynamical
+        equation that references ``gradient(pi_N)`` of a constraint field
+        therefore needs a nonzero virtual momentum.
+
+        We estimate this as::
+
+            pi_N(t) ~ [field_N(t) - field_N(t_prev)] / (t - t_prev)
+
+        This is a backward (causal) finite-difference approximation,
+        first-order accurate in Δt.  On the first call (no previous data),
+        we leave the zero initialization in place.
+
+        The approach is theory-agnostic: it works for any Lagrangian that
+        produces constraint equations, without requiring gauge choices or
+        Wolfram pipeline changes.  See ``docs/constraint_fields.md`` for
+        the physics background and references.
+
+        Parameters
+        ----------
+        constraint_fields : list[str]
+            Names of all constraint fields (time_derivative_order=0).
+        state : FieldCollection
+            The current state (constraint fields already updated in-place).
+        grid : GridBase
+            The spatial grid.
+        t : float
+            Current time.
+        virtual_momenta : dict[str, ScalarField]
+            Dict to update with estimated momenta (modified in-place).
+        """
+        for field_name in constraint_fields:
+            slot = self._field_slot_map[field_name]
+            new_data = np.asarray(state[slot].data)
+
+            if (
+                field_name in self._prev_constraint_fields
+                and self._prev_constraint_t is not None
+                and t > self._prev_constraint_t
+            ):
+                dt_fd = t - self._prev_constraint_t
+                pi_data = (new_data - self._prev_constraint_fields[field_name]) / dt_fd
+                virtual_momenta[field_name] = ScalarField(grid, data=pi_data)
+            # else: keep the zero ScalarField already in virtual_momenta
+
+            self._prev_constraint_fields[field_name] = np.array(
+                new_data, dtype=np.float64
+            )
+
+        self._prev_constraint_t = t
 
     def _solve_coupled_constraints(
         self,
@@ -2906,7 +2998,7 @@ class PDEFromSpec(PDEBase):
 
         return FieldCollection(rates)  # type: ignore[arg-type]
 
-    def check_stability(self, dt: float, grid: GridBase) -> list[str]:  # noqa: C901
+    def check_stability(self, dt: float, grid: GridBase) -> list[str]:  # noqa: C901, PLR0912
         """Check CFL / stability conditions for explicit time-stepping.
 
         Estimates maximum wave speeds and diffusivities from the equation
@@ -2950,6 +3042,16 @@ class PDEFromSpec(PDEBase):
                     max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
                 elif term.operator == "biharmonic":
                     max_diffusive_coeff = max(max_diffusive_coeff, coeff_abs)
+                elif term.operator.startswith("cross_derivative_"):
+                    # AM-GM: |beta*k_x*k_y| <= |beta|*(k_x^2+k_y^2)/2,
+                    # so cross-derivative CFL is Laplacian-equivalent.
+                    if raw_coeff < 0:
+                        warnings.append(
+                            f"Negative cross-derivative coefficient {raw_coeff} "
+                            f"for {eq.field_name} (field {term.field}): "
+                            f"check metric signature."
+                        )
+                    max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
 
             # CFL for wave equation: dt < dx / c where c = sqrt(laplacian_coeff)
             if max_laplacian_coeff > 0:
@@ -2968,9 +3070,7 @@ class PDEFromSpec(PDEBase):
             # so CFL ~ dx^2 / sqrt(D).  Factor 1/4 is conservative for
             # explicit RK methods.
             if max_diffusive_coeff > 0:
-                biharm_limit = dx_min**2 / (
-                    4 * math.sqrt(max_diffusive_coeff)
-                )
+                biharm_limit = dx_min**2 / (4 * math.sqrt(max_diffusive_coeff))
                 if dt > biharm_limit:
                     warnings.append(
                         f"Biharmonic stability violated for {eq.field_name}: "
@@ -2986,6 +3086,7 @@ class PDEFromSpec(PDEBase):
             if term.operator == "laplacian"
             or term.operator.startswith("laplacian_")
             or term.operator == "biharmonic"
+            or term.operator.startswith("cross_derivative_")
         )
         if has_pos_dep:
             warnings.append(
@@ -2998,9 +3099,12 @@ class PDEFromSpec(PDEBase):
         """Return the CFL time-step limit for explicit wave equations.
 
         Computes ``dx_min / c_max`` where ``c_max`` is the maximum wave speed
-        estimated from Laplacian coefficients, and the wave-biharmonic CFL
-        ``dx^2 / (4 sqrt(D))``.  Returns the most restrictive bound, or
-        ``None`` if no wave/biharmonic terms are present.
+        estimated from Laplacian and cross-derivative coefficients, and the
+        wave-biharmonic CFL ``dx^2 / (4 sqrt(D))``.  Cross-derivative terms
+        (e.g. ``cross_derivative_xy``) are treated as Laplacian-equivalent
+        via AM-GM: ``|beta * k_x * k_y| <= |beta| * (k_x^2 + k_y^2) / 2``.
+        Returns the most restrictive bound, or ``None`` if no
+        stability-constraining terms exist.
 
         Parameters
         ----------
@@ -3030,19 +3134,20 @@ class PDEFromSpec(PDEBase):
                     max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
                 elif term.operator == "biharmonic":
                     max_diffusive_coeff = max(max_diffusive_coeff, coeff_abs)
+                elif term.operator.startswith("cross_derivative_"):
+                    max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
 
             if max_laplacian_coeff > 0:
                 c_max = math.sqrt(max_laplacian_coeff)
                 limits.append(dx_min / c_max)
             if max_diffusive_coeff > 0:
-                limits.append(
-                    dx_min**2 / (4 * math.sqrt(max_diffusive_coeff))
-                )
+                limits.append(dx_min**2 / (4 * math.sqrt(max_diffusive_coeff)))
 
         return min(limits) if limits else None
 
     def jacobian_sparsity(  # noqa: C901, PLR0912, PLR0915
-        self, grid: GridBase,
+        self,
+        grid: GridBase,
     ) -> Any | None:  # noqa: ANN401 — scipy lacks type stubs
         """Compute Jacobian sparsity pattern for implicit solvers.
 
@@ -3097,7 +3202,12 @@ class PDEFromSpec(PDEBase):
 
         mat = sparse.lil_matrix((total, total), dtype=np.int8)
         spatial_ops = {"laplacian", "biharmonic"}
-        spatial_prefixes = ("laplacian_", "gradient_", "first_derivative_", "cross_derivative_")
+        spatial_prefixes = (
+            "laplacian_",
+            "gradient_",
+            "first_derivative_",
+            "cross_derivative_",
+        )
 
         is_periodic = hasattr(grid, "periodic") and np.any(grid.periodic)
 

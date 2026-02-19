@@ -48,9 +48,7 @@ _STATIC_OPERATORS: frozenset[str] = frozenset(
 )
 
 #: Pattern for generic single-axis Nth-order derivatives: derivative_3_x, derivative_5_y, etc.
-_GENERIC_SINGLE_AXIS_RE = re.compile(
-    r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$"
-)
+_GENERIC_SINGLE_AXIS_RE = re.compile(r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$")
 
 #: Pattern for generic multi-axis derivatives: derivative_2x_1y, derivative_3x_2z, etc.
 _GENERIC_MULTI_AXIS_RE = re.compile(
@@ -262,7 +260,9 @@ class BoundaryCondition:
         """
         bc_type = str(data["type"])
         if bc_type not in _VALID_BC_TYPES:
-            msg = f"Unknown BC type: {bc_type!r}. Valid types: {sorted(_VALID_BC_TYPES)}"
+            msg = (
+                f"Unknown BC type: {bc_type!r}. Valid types: {sorted(_VALID_BC_TYPES)}"
+            )
             raise ValueError(msg)
         return cls(
             type=bc_type,
@@ -486,9 +486,7 @@ class ComponentEquation:
         )
 
 
-def _resolve_symbolic_coeff(
-    sym: str, parameters: Mapping[str, float]
-) -> float | None:
+def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float | None:
     """Resolve a symbolic coefficient string with parameter values.
 
     Handles simple names (``"m2"``), negated names (``"-m2"``), and
@@ -592,14 +590,15 @@ class EquationSystem:
         # matrices that don't match the convention: matrix[i][j] = -(identity coeff).
         raw_params = self.metadata.get("parameters", {})
         check_params: dict[str, float] = {
-            k: float(v)
-            for k, v in raw_params.items()
-            if isinstance(v, (int, float))
+            k: float(v) for k, v in raw_params.items() if isinstance(v, (int, float))
         }
         expected_mass, expected_coupling, _, _ = self._compute_matrices_from_terms(
             self.equations, self.component_names, parameters=check_params or None
         )
-        if self.mass_matrix != expected_mass or self.coupling_matrix != expected_coupling:
+        if (
+            self.mass_matrix != expected_mass
+            or self.coupling_matrix != expected_coupling
+        ):
             import warnings  # noqa: PLC0415
 
             warnings.warn(
@@ -746,10 +745,7 @@ class EquationSystem:
                     # Prefer symbolic + params for numeric value; fall back
                     # to the raw numeric coefficient (shape factor).
                     effective_coeff = term.coefficient
-                    if (
-                        term.coefficient_symbolic is not None
-                        and parameters
-                    ):
+                    if term.coefficient_symbolic is not None and parameters:
                         resolved = _resolve_symbolic_coeff(
                             term.coefficient_symbolic, parameters
                         )
