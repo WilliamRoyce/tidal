@@ -32,7 +32,11 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from tidal.measurement._io import SimulationData
-    from tidal.symbolic.json_loader import ComponentEquation, OperatorTerm
+    from tidal.symbolic.json_loader import (
+        ComponentEquation,
+        EquationSystem,
+        OperatorTerm,
+    )
 
 # Threshold below which energy is treated as zero.  Prevents division by
 # near-zero values from floating-point integration noise.
@@ -319,6 +323,53 @@ def _is_momentum_field(field_name: str) -> bool:
     return _MOMENTUM_RE.match(field_name) is not None
 
 
+def _is_constraint_momentum(
+    field_name: str, spec: EquationSystem,
+) -> bool:
+    """Check if *field_name* is ``pi_N`` for a constraint equation *N*."""
+    m = _MOMENTUM_RE.match(field_name)
+    if m is None:
+        return False
+    idx = int(m.group(1))
+    if idx >= len(spec.equations):
+        return False
+    return spec.equations[idx].time_derivative_order == 0
+
+
+def _estimate_constraint_momentum(
+    data: SimulationData,
+    field_name: str,
+    t_idx: int,
+) -> NDArray[np.float64] | None:
+    """Estimate constraint field momentum via backward finite difference.
+
+    Returns ``None`` for the first snapshot (``t_idx=0``) or when consecutive
+    times are equal, since no finite-difference estimate is possible.
+    """
+    if t_idx == 0:
+        return None
+    dt = float(data.times[t_idx] - data.times[t_idx - 1])
+    if dt <= 0:
+        return None
+    current = np.asarray(data.fields[field_name][t_idx], dtype=np.float64)
+    previous = np.asarray(data.fields[field_name][t_idx - 1], dtype=np.float64)
+    return (current - previous) / dt
+
+
+def _build_constraint_momenta(
+    data: SimulationData,
+    t_idx: int,
+) -> dict[str, NDArray[np.float64]]:
+    """Compute FD-estimated momenta for all constraint fields at *t_idx*."""
+    result: dict[str, NDArray[np.float64]] = {}
+    for eq in data.spec.equations:
+        if eq.time_derivative_order == 0 and eq.field_name in data.fields:
+            cm = _estimate_constraint_momentum(data, eq.field_name, t_idx)
+            if cm is not None:
+                result[eq.field_name] = cm
+    return result
+
+
 def _resolve_term_coefficient(
     term: OperatorTerm,
     parameters: dict[str, float],
@@ -399,14 +450,22 @@ def _resolve_term_target(
     data: SimulationData,
     field_name: str,
     t_idx: int,
+    constraint_momenta: dict[str, NDArray[np.float64]] | None = None,
 ) -> NDArray[np.float64] | None:
     """Resolve the field data a term acts on.
+
+    Parameters
+    ----------
+    constraint_momenta : dict, optional
+        Pre-computed FD-estimated momenta for constraint fields.  When
+        provided, ``pi_N`` references to constraint fields return the
+        FD estimate instead of ``None``.
 
     Returns
     -------
     NDArray or None
         The field/momentum snapshot, or ``None`` if the target is a
-        zero-momentum constraint field (expected case).
+        zero-momentum constraint field with no FD estimate available.
 
     Raises
     ------
@@ -429,9 +488,11 @@ def _resolve_term_target(
             )
             raise ValueError(msg)
         target_name = names[idx]
-        # Constraint field → zero momentum (expected None)
         eq = data.spec.equations[idx]
         if eq.time_derivative_order == 0:
+            # Constraint field: return FD estimate if available
+            if constraint_momenta is not None and target_name in constraint_momenta:
+                return constraint_momenta[target_name]
             return None
         mom = data.momenta.get(target_name)
         if mom is not None:
@@ -443,7 +504,7 @@ def _resolve_term_target(
         raise ValueError(msg)
 
     msg = (
-        f"Unresolvable field reference '{field_name}' — "
+        f"Unresolvable field reference '{field_name}' -- "
         f"not a known field ({list(data.fields.keys())}) "
         f"or momentum pattern (pi_N)"
     )
@@ -582,10 +643,14 @@ def _compute_virial_potential(
 ) -> float:
     """Virial potential density from dynamical fields' spatial RHS terms.
 
-    ``⟨v_virial⟩ = -½ Σ_{i: dynamical} ⟨φ_i · RHS_i^{spatial}⟩``
+    ``v_virial = -1/2 * sum_{i: dynamical} <phi_i . RHS_i^{spatial}>``
 
     Excludes ``first_derivative_t`` (gyroscopic, do no work) and
-    ``pi_N`` momentum references (velocity-dependent forces).
+    **dynamical** ``pi_N`` momentum references (velocity-dependent forces).
+    Constraint field momenta (``pi_N`` where field *N* has
+    ``time_derivative_order == 0``) are **included** via backward
+    finite-difference estimation from consecutive snapshots, because
+    the constraint field's time variation represents real energy flow.
 
     Supports position-dependent coefficients by evaluating them on the
     grid and performing elementwise averaging.
@@ -602,6 +667,9 @@ def _compute_virial_potential(
     if has_posdep:
         coord_arrays = _build_coord_arrays(data)
 
+    # Estimate constraint momenta via backward FD from consecutive snapshots
+    constraint_momenta = _build_constraint_momenta(data, t_idx)
+
     for eq in data.spec.equations:
         if eq.time_derivative_order < 2:  # noqa: PLR2004
             continue  # skip constraints and first-order
@@ -613,11 +681,16 @@ def _compute_virial_potential(
             if term.operator == "first_derivative_t":
                 continue
 
-            # Skip momentum-field references (velocity-dependent)
-            if _is_momentum_field(term.field):
+            # Skip dynamical momentum references (velocity-dependent forces).
+            # Constraint momenta are included -- they represent real coupling.
+            if _is_momentum_field(term.field) and not _is_constraint_momentum(
+                term.field, data.spec
+            ):
                 continue
 
-            target = _resolve_term_target(data, term.field, t_idx)
+            target = _resolve_term_target(
+                data, term.field, t_idx, constraint_momenta,
+            )
             if target is None:
                 continue
 
@@ -625,7 +698,7 @@ def _compute_virial_potential(
             operated = _apply_spatial_operator(
                 term.operator, target, data.grid_spacing, data.periodic,
             )
-            # coeff may be scalar or ndarray — numpy handles both
+            # coeff may be scalar or ndarray -- numpy handles both
             potential += float((coeff * phi_i * operated).mean())
 
     return -0.5 * potential
@@ -718,7 +791,7 @@ def _accumulate_cross_constraint_terms(
     constraint_names: set[str],
     coord_arrays: dict[str, NDArray[np.float64]] | None,
 ) -> float:
-    """Sum cross-constraint term densities: +½ c_ij ⟨C_i·op(C_j)⟩."""
+    """Sum cross-constraint term densities: +1/2 c_ij <C_i . op(C_j)>."""
     energy = 0.0
 
     for eq in data.spec.equations:
@@ -729,7 +802,10 @@ def _accumulate_cross_constraint_terms(
         for term in eq.rhs_terms:
             if term.field == eq.field_name or term.field not in constraint_names:
                 continue
-            if _is_momentum_field(term.field):
+            # Skip dynamical momentum references; constraint momenta pass through
+            if _is_momentum_field(term.field) and not _is_constraint_momentum(
+                term.field, data.spec
+            ):
                 continue
 
             target = _resolve_term_target(data, term.field, t_idx)

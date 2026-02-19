@@ -586,7 +586,9 @@ def _infer_output_format(args: Namespace) -> str:
         # No extension → directory format (disk-backed streaming)
         if not ext:
             return "directory"
-    return "png"
+    # Default: disk-backed directory output so simulation data always persists.
+    # Users can override with --output foo.png for in-memory image output.
+    return "directory"
 
 
 def _generate_output(args: Namespace, ctx: PlotContext) -> None:
@@ -879,9 +881,7 @@ def _stiffness_advisory(  # noqa: C901, PLR0912
     if mass:
         try:
             max_mass_sq = max(
-                abs(mass[i][j])
-                for i in range(len(mass))
-                for j in range(len(mass[0]))
+                abs(mass[i][j]) for i in range(len(mass)) for j in range(len(mass[0]))
             )
         except (TypeError, IndexError):
             max_mass_sq = 0.0
@@ -1042,6 +1042,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
             snapshot_interval,
             params,
         )
+        log(f"  Output directory: {writer.output_dir}")
     else:
         # In-memory path (for plot output)
         from pde import MemoryStorage
@@ -1170,7 +1171,12 @@ def _setup_disk_backed(
 
     from tidal.measurement._writer import create_snapshot_callback
 
-    output_dir = Path(args.output) if args.output else Path("output")
+    if args.output:
+        output_dir = Path(args.output)
+    else:
+        # Auto-generate from spec name: examples/data/foo.json → examples/data/foo_output/
+        json_file = Path(args.json_path).resolve()
+        output_dir = json_file.parent / f"{json_file.stem}_output"
 
     writer, callback = create_snapshot_callback(
         output_dir=output_dir,

@@ -277,7 +277,11 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--output",
         default=None,
         metavar="PATH",
-        help="Output file path (default: {spec_dir}/{stem}_output.png)",
+        help=(
+            "Output path: directory for disk-backed snapshots "
+            "(default: {spec_dir}/{stem}_output/), "
+            "or image file (.png/.pdf/.svg) for in-memory plot"
+        ),
     )
     sim_parser.add_argument(
         "--format",
