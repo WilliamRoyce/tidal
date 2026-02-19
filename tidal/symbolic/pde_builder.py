@@ -2906,7 +2906,7 @@ class PDEFromSpec(PDEBase):
 
         return FieldCollection(rates)  # type: ignore[arg-type]
 
-    def check_stability(self, dt: float, grid: GridBase) -> list[str]:
+    def check_stability(self, dt: float, grid: GridBase) -> list[str]:  # noqa: C901
         """Check CFL / stability conditions for explicit time-stepping.
 
         Estimates maximum wave speeds and diffusivities from the equation
@@ -2935,10 +2935,18 @@ class PDEFromSpec(PDEBase):
             max_laplacian_coeff = 0.0
             max_diffusive_coeff = 0.0
             for term in eq.rhs_terms:
-                coeff_abs = abs(term.coefficient)
+                raw_coeff = term.coefficient
+                coeff_abs = abs(raw_coeff)
                 if term.operator == "laplacian" or term.operator.startswith(
                     "laplacian_"
                 ):
+                    if raw_coeff < 0:
+                        warnings.append(
+                            f"Negative Laplacian coefficient {raw_coeff} "
+                            f"for {eq.field_name} (field {term.field}): "
+                            f"anti-diffusive / tachyonic spatial mode. "
+                            f"Check metric signature."
+                        )
                     max_laplacian_coeff = max(max_laplacian_coeff, coeff_abs)
                 elif term.operator == "biharmonic":
                     max_diffusive_coeff = max(max_diffusive_coeff, coeff_abs)
@@ -2954,23 +2962,44 @@ class PDEFromSpec(PDEBase):
                         f"(c={c_max:.3e}, dx={dx_min:.3e})"
                     )
 
-            # Stability for biharmonic: dt < dx^4 / (2 * coeff)
+            # Wave-biharmonic CFL: dt < dx^2 / (4 * sqrt(D))
+            # Von Neumann analysis of d^2 phi/dt^2 = -D nabla^4 phi:
+            # max group velocity v_g = 2*sqrt(D)*k_max, k_max = pi/dx,
+            # so CFL ~ dx^2 / sqrt(D).  Factor 1/4 is conservative for
+            # explicit RK methods.
             if max_diffusive_coeff > 0:
-                biharm_limit = dx_min**4 / (2 * max_diffusive_coeff)
+                biharm_limit = dx_min**2 / (
+                    4 * math.sqrt(max_diffusive_coeff)
+                )
                 if dt > biharm_limit:
                     warnings.append(
                         f"Biharmonic stability violated for {eq.field_name}: "
-                        f"dt={dt:.3e} > dx^4/(2D)={biharm_limit:.3e}"
+                        f"dt={dt:.3e} > dx²/(4√D)={biharm_limit:.3e}"
                     )
 
+        # Warn if any wave-relevant term has position-dependent coefficient
+        has_pos_dep = any(
+            term.position_dependent
+            for eq in self.spec.equations
+            if eq.time_derivative_order >= 2  # noqa: PLR2004
+            for term in eq.rhs_terms
+            if term.operator == "laplacian"
+            or term.operator.startswith("laplacian_")
+            or term.operator == "biharmonic"
+        )
+        if has_pos_dep:
+            warnings.append(
+                "CFL estimate uses constant coefficient only; "
+                "position-dependent terms may require smaller dt."
+            )
         return warnings
 
     def cfl_limit(self, grid: GridBase) -> float | None:
         """Return the CFL time-step limit for explicit wave equations.
 
         Computes ``dx_min / c_max`` where ``c_max`` is the maximum wave speed
-        estimated from Laplacian coefficients, and the biharmonic stability
-        limit ``dx^4 / (2D)``.  Returns the most restrictive bound, or
+        estimated from Laplacian coefficients, and the wave-biharmonic CFL
+        ``dx^2 / (4 sqrt(D))``.  Returns the most restrictive bound, or
         ``None`` if no wave/biharmonic terms are present.
 
         Parameters
@@ -3006,11 +3035,13 @@ class PDEFromSpec(PDEBase):
                 c_max = math.sqrt(max_laplacian_coeff)
                 limits.append(dx_min / c_max)
             if max_diffusive_coeff > 0:
-                limits.append(dx_min**4 / (2 * max_diffusive_coeff))
+                limits.append(
+                    dx_min**2 / (4 * math.sqrt(max_diffusive_coeff))
+                )
 
         return min(limits) if limits else None
 
-    def jacobian_sparsity(  # noqa: C901, PLR0912
+    def jacobian_sparsity(  # noqa: C901, PLR0912, PLR0915
         self, grid: GridBase,
     ) -> Any | None:  # noqa: ANN401 — scipy lacks type stubs
         """Compute Jacobian sparsity pattern for implicit solvers.
@@ -3068,18 +3099,22 @@ class PDEFromSpec(PDEBase):
         spatial_ops = {"laplacian", "biharmonic"}
         spatial_prefixes = ("laplacian_", "gradient_", "first_derivative_", "cross_derivative_")
 
-        # Helper: mark tridiagonal pattern for a block
-        def _mark_tridiag(row_start: int, col_start: int) -> None:
+        is_periodic = hasattr(grid, "periodic") and np.any(grid.periodic)
+
+        # Helper: mark banded stencil pattern for a block
+        def _mark_band(row_start: int, col_start: int, width: int) -> None:
+            """Mark entries within ``width`` of the diagonal."""
             for i in range(n):
-                mat[row_start + i, col_start + i] = 1  # diagonal
-                if i > 0:
-                    mat[row_start + i, col_start + i - 1] = 1
-                if i < n - 1:
-                    mat[row_start + i, col_start + i + 1] = 1
-            # Periodic wrapping
-            if hasattr(grid, "periodic") and np.any(grid.periodic):
-                mat[row_start, col_start + n - 1] = 1
-                mat[row_start + n - 1, col_start] = 1
+                for offset in range(-width, width + 1):
+                    j = i + offset
+                    if 0 <= j < n:
+                        mat[row_start + i, col_start + j] = 1
+            if is_periodic:
+                for offset in range(1, width + 1):
+                    mat[row_start, col_start + n - offset] = 1
+                    mat[row_start + offset - 1, col_start + n - 1] = 1
+                    mat[row_start + n - 1, col_start + offset - 1] = 1
+                    mat[row_start + n - offset, col_start] = 1
 
         # Helper: mark diagonal pattern for a block
         def _mark_diag(row_start: int, col_start: int) -> None:
@@ -3088,6 +3123,14 @@ class PDEFromSpec(PDEBase):
 
         def _is_spatial(op: str) -> bool:
             return op in spatial_ops or op.startswith(spatial_prefixes)
+
+        def _stencil_width(op: str) -> int:
+            """Return half-width of the finite-difference stencil."""
+            # Biharmonic (nabla^4) uses 5-point stencil: i-2..i+2
+            if op == "biharmonic":
+                return 2
+            # Laplacian/gradient/first_derivative use 3-point: i-1..i+1
+            return 1
 
         for eq in self.spec.equations:
             eq_slot = slots[eq.field_name]
@@ -3103,7 +3146,7 @@ class PDEFromSpec(PDEBase):
                         continue
                     src_slot = slots[term.field]
                     if _is_spatial(term.operator):
-                        _mark_tridiag(mom_slot, src_slot)
+                        _mark_band(mom_slot, src_slot, _stencil_width(term.operator))
                     else:
                         _mark_diag(mom_slot, src_slot)
 
@@ -3114,7 +3157,7 @@ class PDEFromSpec(PDEBase):
                         continue
                     src_slot = slots[term.field]
                     if _is_spatial(term.operator):
-                        _mark_tridiag(eq_slot, src_slot)
+                        _mark_band(eq_slot, src_slot, _stencil_width(term.operator))
                     else:
                         _mark_diag(eq_slot, src_slot)
 
