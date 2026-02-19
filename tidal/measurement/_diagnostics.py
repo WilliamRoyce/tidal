@@ -45,6 +45,9 @@ class EnergyDiagnostics:
 def check_energy_conservation(
     data: SimulationData,
     threshold: float = 1e-3,
+    *,
+    total_energy: NDArray[np.float64] | None = None,
+    times: NDArray[np.float64] | None = None,
 ) -> EnergyDiagnostics:
     """Check whether energy density is conserved over the simulation.
 
@@ -53,6 +56,12 @@ def check_energy_conservation(
     data : SimulationData
     threshold : float
         Maximum allowed ``|ΔE/E₀|``.  Default ``1e-3`` (0.1%).
+    total_energy : ndarray, optional
+        Pre-computed total energy timeseries.  When provided together with
+        *times*, skips the (expensive) call to
+        :func:`compute_energy_timeseries`.
+    times : ndarray, optional
+        Snapshot times corresponding to *total_energy*.
 
     Returns
     -------
@@ -61,13 +70,22 @@ def check_energy_conservation(
     Raises
     ------
     ValueError
-        If *threshold* is not positive.
+        If *threshold* is not positive, or if only one of *total_energy*
+        and *times* is provided.
     """
     if threshold <= 0:
         msg = f"threshold must be positive, got {threshold}"
         raise ValueError(msg)
 
-    times, _per_field, _interaction, total = compute_energy_timeseries(data)
+    if (total_energy is None) != (times is None):
+        msg = "total_energy and times must both be provided or both omitted"
+        raise ValueError(msg)
+
+    if total_energy is not None:
+        t = times
+        total = total_energy
+    else:
+        t, _per_field, _interaction, total = compute_energy_timeseries(data)
 
     e0 = total[0]
     relative_error = (total - e0) / e0 if e0 >= ENERGY_FLOOR else np.zeros_like(total)
@@ -75,7 +93,7 @@ def check_energy_conservation(
     max_err = float(np.max(np.abs(relative_error)))
 
     return EnergyDiagnostics(
-        times=times,
+        times=t,  # type: ignore[arg-type]
         total_energy=total,
         relative_error=relative_error,
         max_relative_error=max_err,
@@ -109,6 +127,8 @@ def summarize(data: SimulationData) -> dict[str, Any]:
         "per_field_energy": {k: v.tolist() for k, v in per_field.items()},
         "interaction_energy": interaction.tolist(),
         "total_energy": total.tolist(),
-        "energy_conservation": check_energy_conservation(data),
+        "energy_conservation": check_energy_conservation(
+            data, total_energy=total, times=times,
+        ),
         "field_peaks": field_peaks,
     }
