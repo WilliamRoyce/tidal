@@ -1,8 +1,8 @@
 # Phase F: Adaptive Time-Stepping
 
-**Status:** Implemented
-**Date:** 2026-02-18
-**Implementation:** ~300 new lines across 4 files, 27 new tests
+**Status:** Implemented + Critical Review Pass
+**Date:** 2026-02-18 (initial), 2026-02-19 (critical review)
+**Implementation:** ~300 new lines across 4 files, 44 tests (27 original + 17 review fixes)
 
 Adaptive time-stepping replaces hardcoded fixed time steps with
 error-controlled solvers that automatically select step sizes. This gives
@@ -133,7 +133,7 @@ All new flags are on the `tidal simulate` subcommand. Defined in
 | `--rtol` | float | scipy default (1e-3) | `--scheme scipy` | Relative error tolerance |
 | `--atol` | float | scipy default (1e-6) | `--scheme scipy` | Absolute error tolerance |
 | `--tolerance` | float | py-pde default (1e-4) | `--adaptive` | Error tolerance for adaptive explicit RK |
-| `--max-step` | float | auto (CFL) | any | Maximum allowed step size |
+| `--max-step` | float | auto (CFL) | `--scheme scipy` | Maximum allowed step size |
 | `--energy-monitor` | float | disabled | any | Halt if `\|dE/E0\|` exceeds threshold |
 
 ### Validation Rules
@@ -141,6 +141,7 @@ All new flags are on the `tidal simulate` subcommand. Defined in
 Validated in `_validate_solver_params()` at `tidal/cli/_simulate.py:756-804`:
 
 - `--method`, `--rtol`, `--atol` require `--scheme scipy`
+- `--max-step` requires `--scheme scipy` (py-pde's `ExplicitSolver` has no `max_step` parameter)
 - `--tolerance` requires `--scheme runge-kutta --adaptive`
 - All tolerance/step values must be positive
 - `--energy-monitor` threshold must be positive
@@ -156,7 +157,13 @@ operators. Computes:
 
 - **Wave CFL:** `dt_max = dx_min / sqrt(max_laplacian_coeff)` — the
   classical Courant condition where `sqrt(coeff)` is the wave speed.
-- **Biharmonic stability:** `dt_max = dx_min^4 / (2 * max_biharmonic_coeff)`
+- **Wave-biharmonic CFL:** `dt_max = dx_min^2 / (4 * sqrt(D))` where D is
+  the biharmonic coefficient. Derived from Von Neumann analysis of
+  `d²φ/dt² = -D∇⁴φ`: the maximum group velocity is `v_g = 2√D · k_max`
+  where `k_max = π/dx`. The factor 1/4 is conservative for explicit RK
+  methods. *(Note: the initial implementation used the diffusion-type
+  formula `dx⁴/(2D)`, which was over-conservative — corrected in the
+  critical review.)*
 
 Returns the most restrictive limit, or `None` if no wave/biharmonic terms
 exist (e.g., constraint-only or first-order systems).
@@ -177,11 +184,23 @@ internal first-order representation.
 
 ### Stability Checking
 
-**Location:** `PDEFromSpec.check_stability(dt, grid)` at `tidal/symbolic/pde_builder.py:2909-2966`
+**Location:** `PDEFromSpec.check_stability(dt, grid)` at `tidal/symbolic/pde_builder.py:2909-2995`
 
 Same algorithm as `cfl_limit()`, but compares a proposed `dt` against
 each limit and returns a list of human-readable warning strings. Used by
 Path A (fixed-step) to print warnings at simulation startup.
+
+Additional diagnostic warnings:
+
+- **Negative Laplacian coefficient:** Warns when a Laplacian term has a
+  negative coefficient, indicating anti-diffusive / tachyonic spatial modes
+  that are unconditionally unstable for explicit methods. Analogous to the
+  existing tachyonic mass warning from the pipeline.
+- **Position-dependent coefficients:** Warns when any wave-relevant term
+  (Laplacian or biharmonic) has position-dependent coefficients (from
+  background fields). The CFL estimate uses only the constant part of the
+  coefficient; the actual stability limit may be more restrictive where
+  the coefficient is larger.
 
 ### Jacobian Sparsity Pattern
 
@@ -205,10 +224,12 @@ influence which rates. TIDAL computes it from the equation structure:
 
 **Sparsity rules:**
 - `d/dt field = momentum` — diagonal block (field ← momentum)
-- `d/dt momentum = laplacian(field)` — tridiagonal block (3-point stencil)
+- `d/dt momentum = laplacian(field)` — tridiagonal block (3-point stencil, width=1)
+- `d/dt momentum = biharmonic(field)` — pentadiagonal block (5-point stencil, width=2)
 - `d/dt momentum = identity(other_field)` — diagonal block (cross-field)
 - `d/dt momentum = gradient(other_field)` — tridiagonal block (cross-field)
-- Periodic BCs add corner entries (first ↔ last grid point wrapping)
+- Periodic BCs add corner entries (first ↔ last grid point wrapping,
+  extended to width=2 for biharmonic)
 
 **Limitations:** Only 1D grids are supported. For multi-dimensional grids
 (2D, 3D), the Laplacian stencil involves neighbours at offsets +/-1,
@@ -218,10 +239,12 @@ that the current implementation does not construct. Multi-D grids return
 
 ### Stiffness Advisory
 
-**Location:** `_stiffness_advisory()` at `tidal/cli/_simulate.py:807-853`
+**Location:** `_stiffness_advisory()` at `tidal/cli/_simulate.py:819-888`
 
 Automatically warns when the system appears stiff and an explicit method
-is selected. Computes a dimensionless stiffness ratio:
+is selected. Two independent checks are performed:
+
+**1. Mass-based stiffness.** Computes a dimensionless stiffness ratio:
 
 ```
 stiffness_ratio = max(|m^2|) * dx_min^2 / max(|c^2|)
@@ -232,9 +255,17 @@ Laplacian coefficient (wave speed squared). This ratio measures how many
 mass oscillation periods fit within one spatial CFL step. When it
 exceeds 100, explicit methods waste many steps resolving mass oscillations.
 
+**2. Anisotropic Laplacian stiffness.** When directional Laplacians
+(`laplacian_x`, `laplacian_y`, etc.) have very different coefficients,
+the fastest axis dominates the CFL limit while the slowest axis wastes
+steps — a form of directional stiffness. If `max(coeff) / min(coeff) > 100`,
+an advisory is emitted. This check runs independently of the mass-based
+check, so it fires even for massless systems.
+
 The advisory prints:
 ```
 Note: system may be stiff (m^2*dx^2/c^2=450). Consider --scheme scipy --method Radau.
+Note: anisotropic Laplacian stiffness (max/min=1000000). Consider --scheme scipy --method Radau.
 ```
 
 The system does NOT automatically switch methods — the user retains full
@@ -259,18 +290,29 @@ systems with symplectic-like time stepping. It is NOT the true physical
 Hamiltonian energy — but for detecting numerical instability (the primary
 use case), any conserved-ish quantity suffices.
 
+**Implicit method interaction:** When using `--energy-monitor` with an
+implicit method (Radau, BDF), the code emits an advisory note. Implicit
+methods introduce numerical dissipation by design — the L2 norm will
+drift even for stable systems. Recommended threshold: `>= 0.1` for
+implicit methods. For precise energy tracking, use the measurement
+module's `compute_system_energy()` post-hoc.
+
 ### Blow-Up Detection
 
 **Location:** `simulate_command()` at `tidal/cli/_simulate.py:974-993`
 
 Always-on callback that checks `max(|state|)` at each snapshot. If any
-field component exceeds `max(initial_max * 1e6, 1e6)`, the simulation
-halts. This catches tachyonic instabilities (m^2 < 0) and numerical
-explosions early, before they produce multi-GB output files full of `inf`.
+field component exceeds `min(max(initial_max * 1e6, 1e6), 1e15)`, the
+simulation halts. This catches tachyonic instabilities (m^2 < 0) and
+numerical explosions early, before they produce multi-GB output files
+full of `inf`.
 
 The threshold is 6 orders of magnitude above the initial state or 10^6,
-whichever is larger. The absolute floor of 10^6 handles the case where
-the initial state is zero (e.g., chi in a phi-only IC).
+whichever is larger, **capped at 10^15**. The absolute floor of 10^6
+handles zero-initialized fields. The cap at 10^15 prevents the threshold
+from approaching float64 limits for large initial conditions (e.g.,
+`initial_max = 1e10` would give an uncapped threshold of 10^16, too
+close to float64 `max ≈ 1.8e308` to reliably detect divergence).
 
 ## py-pde ScipySolver Architecture
 
@@ -354,20 +396,22 @@ and 24 Python scripts (removed `DT` constant, replaced solver call).
 
 ## Test Coverage
 
-27 new tests across three categories.
+44 tests total: 27 original + 17 from critical review.
 
-### Argument Parsing & Validation (17 tests)
+### Argument Parsing & Validation (17 + 3 tests)
 
-Located in `tests/test_cli.py`. Cover all flag combinations, type
+Located in `tests/test_cli_parsing.py`. Cover all flag combinations, type
 checking, and mutual-exclusion rules:
 
 - `--method` without `--scheme scipy` → `ValueError`
 - `--rtol` without `--scheme scipy` → `ValueError`
+- `--max-step` without `--scheme scipy` → `ValueError` *(added in review)*
 - `--tolerance` without `--adaptive` → `ValueError`
 - Negative tolerance values → `ValueError`
 - Valid combinations parse correctly
+- `--max-step` accepted with `--scheme scipy` *(added in review)*
 
-### PDE Builder Methods (7 tests)
+### PDE Builder Methods (7 + 9 tests)
 
 Located in `tests/test_pde_builder.py`:
 
@@ -380,6 +424,15 @@ Located in `tests/test_pde_builder.py`:
 | `test_directional_laplacian_cfl` | `laplacian_x` contributes to CFL |
 | `test_cross_field_laplacian_cfl` | Cross-field Laplacian included |
 | `test_multi_d_returns_none` | Jacobian sparsity returns `None` for 2D+ |
+| `test_negative_laplacian_warns` | Negative Laplacian → anti-diffusive warning *(review)* |
+| `test_positive_laplacian_no_warning` | Positive Laplacian → no false warning *(review)* |
+| `test_biharmonic_cfl_formula` | Biharmonic CFL = dx²/(4√D) *(review)* |
+| `test_biharmonic_stability_warning` | Biharmonic CFL violation warning *(review)* |
+| `test_position_dependent_laplacian_warns` | Position-dependent CFL caveat *(review)* |
+| `test_constant_coefficient_no_position_warning` | No false position-dep warning *(review)* |
+| `test_biharmonic_pentadiag_periodic` | Biharmonic → 5-point sparsity *(review)* |
+| `test_biharmonic_non_periodic_no_corner_wrap` | Non-periodic biharmonic corners *(review)* |
+| `test_mixed_order_sparsity` | Mixed 1st/2nd order slot layout *(review)* |
 
 ### Integration Tests (3 tests)
 
@@ -397,6 +450,18 @@ Located in `tests/test_cli.py`. Run actual simulations:
 |------|-----------------|
 | `test_energy_monitor_fires` | Energy monitor triggers on impossible threshold |
 | `test_blowup_detection_fires` | Blow-up detection catches tachyonic instability |
+
+### Critical Review Tests (5 tests)
+
+Located in `tests/test_cli.py`:
+
+| Test | What it verifies |
+|------|-----------------|
+| `test_implicit_multi_d_warns` | Implicit method + multi-D → sparsity warning *(review)* |
+| `test_energy_monitor_implicit_note` | Energy monitor + implicit → L2 drift note *(review)* |
+| `test_blowup_threshold_capped` | Threshold formula capped at 1e15 *(review)* |
+| `test_anisotropic_laplacian_stiffness` | Anisotropic directional Laplacians → advisory *(review)* |
+| `test_stiffness_advisory_zero_mass` | Anisotropic advisory fires even with zero mass *(review)* |
 
 ## Design Decisions & Rationale
 
@@ -452,17 +517,21 @@ For true energy conservation checks, the measurement module's
 `compute_system_energy()` provides the physical Hamiltonian — but it
 operates post-hoc on saved data, not during simulation.
 
-### Why blow-up threshold = max(initial * 1e6, 1e6)?
+### Why blow-up threshold = min(max(initial * 1e6, 1e6), 1e15)?
 
 The threshold needs to be:
 - **High enough** to not trigger on legitimate physics (large but finite amplification)
 - **Low enough** to catch actual divergence before it produces inf/nan
 - **Nonzero** even when the initial state is zero (e.g., chi starts at 0)
+- **Bounded above** to avoid approaching float64 limits for large ICs
 
 Six orders of magnitude covers the range between "largest physically
 plausible amplification" (resonant amplification rarely exceeds 10^3)
 and "definitely diverging" (10^6 growth in finite time is not physical).
-The absolute floor of 10^6 handles zero-initialized fields.
+The absolute floor of 10^6 handles zero-initialized fields. The cap at
+10^15 prevents the threshold from reaching float64 overflow territory
+when the initial state is already large (e.g., `initial_max = 1e12`
+would give an uncapped threshold of `1e18`).
 
 ### Why stiffness threshold = 100?
 
@@ -486,17 +555,21 @@ Giving the user an advisory + control is safer than silent auto-switching.
 
 1. **Jacobian sparsity: 1D only.** Multi-dimensional grids fall back to
    dense Jacobian estimation, which is O(N) per Newton step. For large 2D/3D
-   grids with implicit methods, this can be prohibitively slow.
+   grids with implicit methods, this can be prohibitively slow. A warning is
+   emitted when an implicit method is used on a multi-D grid without
+   sparsity information.
 
 2. **BDF restart penalty.** py-pde's "many calls" architecture restarts
    BDF at order 1 each snapshot interval. For stiff systems that benefit
    from high-order BDF, this negates much of the advantage. Use Radau
    (implicit one-step) instead until the single-call bypass is implemented.
 
-3. **Energy monitor is approximate.** The L2 norm proxy does not equal the
-   true physical Hamiltonian. It can drift for non-symplectic integration
-   even when the system is stable (e.g., BDF introduces numerical
-   dissipation). Use the measurement module for post-hoc energy analysis.
+3. **Energy monitor + implicit methods.** The L2 norm proxy drifts under
+   implicit methods (BDF, Radau) due to numerical dissipation. When
+   `--energy-monitor` is combined with an implicit method, the code prints
+   an advisory. Recommended: use threshold `>= 0.1` with implicit methods,
+   or skip the monitor and use post-hoc energy analysis via the measurement
+   module's `compute_system_energy()`.
 
 4. **No adaptive mesh refinement.** Time-step adaptation only. Spatial
    resolution is fixed throughout the simulation. AMR would require
@@ -505,8 +578,15 @@ Giving the user an advisory + control is safer than silent auto-switching.
 5. **Position-dependent coefficients.** The CFL and stiffness estimates
    use the constant coefficient from the JSON spec. For position-dependent
    coefficients (background fields), the actual wave speed varies across
-   the grid. The estimates use the symbolic constant, which may over- or
+   the grid. A warning is emitted when position-dependent terms are
+   detected in wave-relevant equations. The estimates may over- or
    under-estimate the true stability limit.
+
+6. **Negative Laplacian coefficients.** A negative Laplacian coefficient
+   indicates anti-diffusive / tachyonic spatial modes that are unconditionally
+   unstable for explicit methods. The stability checker now warns about this,
+   but does not prevent simulation — the user may have physical reasons for
+   the sign (e.g., conformal metric factors).
 
 ## Future Extensions
 
@@ -527,6 +607,44 @@ Giving the user an advisory + control is safer than silent auto-switching.
 4. **Adaptive mesh refinement.** Refine spatial resolution near wavefronts
    or coupling regions. Would require migrating from py-pde's uniform
    Cartesian grids to an AMR-capable backend (e.g., PETSc, AMReX).
+
+## Critical Review (2026-02-19)
+
+A systematic critical review of Phase F was conducted with three
+independent review passes (correctness, robustness, test coverage).
+
+### Findings Summary
+
+| Tier | Issue | Severity | Fix |
+|------|-------|----------|-----|
+| **1: Correctness** | `--max-step` silently ignored for non-scipy paths | Bug | Raise `ValueError` in validation |
+| **1: Correctness** | Biharmonic Jacobian sparsity uses 3-point (should be 5-point) | Latent bug | `_mark_band()` with `_stencil_width()` |
+| **1: Correctness** | Biharmonic CFL uses diffusion formula (should be wave) | Over-conservative | `dx²/(4√D)` from Von Neumann analysis |
+| **2: Design** | Position-dependent coefficients not flagged in CFL | Gap | Warning in `check_stability()` |
+| **2: Design** | Implicit + multi-D silently falls back to dense Jacobian | Gap | Warning in `_build_scipy_kwargs()` |
+| **2: Design** | Stiffness advisory misses anisotropic Laplacians | Gap | Secondary check in `_stiffness_advisory()` |
+| **2: Design** | Energy monitor + BDF interaction undocumented | Gap | Info note + doc update |
+| **3: Edge case** | Blow-up threshold scales to float64 limits for large IC | Edge | Cap at 1e15 |
+| **3: Edge case** | Negative Laplacian coefficient silently abs()'d | Edge | Warning before abs() |
+| **3: Edge case** | Dead `max_step` assignment in fixed-step path | Cleanup | Absorbed by Fix 1 |
+
+### Dismissed Issues
+
+These were reviewed and determined to not require changes:
+
+- **`_CFL_FACTOR = 0.5`** — conservative but standard for wave equations + explicit RK
+- **`int8` dtype for sparsity matrix** — acceptable per scipy docs (any nonzero = coupling)
+- **`cross_derivative` in `spatial_prefixes`** — harmless, unreachable in 1D
+- **Energy monitor `.data` access** — consistent with all other callbacks in the file
+
+### Verdict
+
+The core architecture (three solver paths, CFL auto-computation, py-pde
+integration) is sound and well-suited to TIDAL's goals. The review found
+no fundamental design flaws — all issues were either latent bugs in
+unused code paths (biharmonic), missing diagnostics (warnings for edge
+cases), or documentation gaps. All 10 issues were fixed, and 17 new
+tests were added to prevent regression.
 
 ## References
 
