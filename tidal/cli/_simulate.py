@@ -422,6 +422,48 @@ def _apply_formula_ic(
     return create_initial_state(grid, spec, field_data={component: field_arr})
 
 
+def _validate_ic_args(
+    ic_type: str,
+    component: str,
+    spec: EquationSystem,
+    args: Namespace,
+) -> None:
+    """Emit warnings for problematic IC argument combinations.
+
+    Warns when IC targets a constraint field or when arguments are
+    silently ignored for a given IC type.
+    """
+    import warnings
+
+    # Warn if IC targets a constraint field (time_derivative_order == 0)
+    if ic_type != "zero":
+        eq = next((e for e in spec.equations if e.field_name == component), None)
+        if eq is not None and eq.time_derivative_order == 0:
+            dynamical = [
+                e.field_name
+                for e in spec.equations
+                if e.time_derivative_order >= 2  # noqa: PLR2004
+            ]
+            suggestion = dynamical[0] if dynamical else "a dynamical field"
+            warnings.warn(
+                f"IC applied to constraint field '{component}' "
+                f"(time_derivative_order=0). "
+                f"Constraint solver will overwrite this IC. "
+                f"Consider --ic-component {suggestion} instead.",
+                UserWarning,
+                stacklevel=3,
+            )
+
+    # Warn about silently ignored --ic-wavevector with gaussian IC
+    if ic_type == "gaussian" and args.ic_wavevector is not None:
+        warnings.warn(
+            "--ic-wavevector is ignored for --ic=gaussian "
+            "(only applies to --ic=plane-wave)",
+            UserWarning,
+            stacklevel=3,
+        )
+
+
 def _build_initial_state(
     args: Namespace,
     grid: CartesianGrid,
@@ -453,6 +495,8 @@ def _build_initial_state(
             f"Available: {', '.join(spec.component_names)}"
         )
         raise ValueError(msg)
+
+    _validate_ic_args(ic_type, component, spec, args)
 
     if ic_type == "zero":
         if args.ic_component is not None:
@@ -704,6 +748,15 @@ def _build_scipy_kwargs(
         jac_sp = pde.jacobian_sparsity(grid)  # type: ignore[attr-defined]
         if jac_sp is not None:
             kwargs["jac_sparsity"] = jac_sp
+        elif grid.dim > 1:
+            import warnings as _warnings
+
+            _warnings.warn(
+                f"Implicit method {method} on {grid.dim}D grid: "
+                f"Jacobian sparsity not available, falling back to dense "
+                f"estimation. This may be very slow for large grids.",
+                stacklevel=2,
+            )
     return kwargs
 
 
@@ -753,7 +806,7 @@ def _check_cfl_stability(pde: object, dt: float, grid: CartesianGrid) -> None:
     sys.stderr.writelines(f"  Warning: {w}\n" for w in warnings_list)
 
 
-def _validate_solver_params(args: Namespace) -> None:  # noqa: C901
+def _validate_solver_params(args: Namespace) -> None:  # noqa: C901, PLR0912
     """Validate solver-related CLI arguments.
 
     Raises
@@ -799,12 +852,15 @@ def _validate_solver_params(args: Namespace) -> None:  # noqa: C901
     if args.max_step is not None and args.max_step <= 0:
         msg = f"--max-step must be positive, got {args.max_step}"
         raise ValueError(msg)
+    if args.max_step is not None and args.scheme != "scipy":
+        msg = "--max-step requires --scheme scipy (py-pde's ExplicitSolver does not support max_step)"
+        raise ValueError(msg)
     if args.energy_monitor is not None and args.energy_monitor <= 0:
         msg = f"--energy-monitor must be positive, got {args.energy_monitor}"
         raise ValueError(msg)
 
 
-def _stiffness_advisory(  # noqa: C901
+def _stiffness_advisory(  # noqa: C901, PLR0912
     spec: EquationSystem,
     grid: CartesianGrid,
     args: Namespace,
@@ -815,42 +871,64 @@ def _stiffness_advisory(  # noqa: C901
     if method in _IMPLICIT_METHODS:
         return  # already using an implicit method
 
-    mass = spec.mass_matrix
-    if not mass:
-        return  # empty mass matrix
-
-    # Estimate stiffness ratio: max(|m²|) * dx_min² / max(|c²|)
-    # This measures mass oscillation frequency relative to the fastest
-    # spatial mode frequency.  When >> 1, explicit methods waste steps.
+    stiffness_threshold = 100
     dx_min = min(grid.discretization)
-    try:
-        max_mass_sq = max(
-            abs(mass[i][j]) for i in range(len(mass)) for j in range(len(mass[0]))
-        )
-    except (TypeError, IndexError):
-        return  # can't extract mass entries
-    if max_mass_sq == 0:
-        return
 
-    # Extract max wave speed squared from Laplacian coefficients
-    max_c_sq = 0.0
+    # --- Mass-based stiffness check ---
+    mass = spec.mass_matrix
+    if mass:
+        try:
+            max_mass_sq = max(
+                abs(mass[i][j])
+                for i in range(len(mass))
+                for j in range(len(mass[0]))
+            )
+        except (TypeError, IndexError):
+            max_mass_sq = 0.0
+        if max_mass_sq > 0:
+            max_c_sq = 0.0
+            for eq in spec.equations:
+                if eq.time_derivative_order < 2:  # noqa: PLR2004
+                    continue
+                for term in eq.rhs_terms:
+                    if term.operator == "laplacian" or term.operator.startswith(
+                        "laplacian_"
+                    ):
+                        max_c_sq = max(max_c_sq, abs(term.coefficient))
+            if max_c_sq > 0:
+                stiffness_ratio = max_mass_sq * dx_min**2 / max_c_sq
+                if stiffness_ratio > stiffness_threshold:
+                    msg = (
+                        f"  Note: system may be stiff "
+                        f"(m²·dx²/c²={stiffness_ratio:.0f}). "
+                        f"Consider --scheme scipy --method Radau "
+                        f"for better performance."
+                    )
+                    cast("object", log)(msg)  # type: ignore[operator]
+
+    # --- Anisotropic Laplacian coefficient spread ---
+    # If directional Laplacians (laplacian_x, laplacian_y, ...) have
+    # very different coefficients, the fastest axis dominates CFL while
+    # the slowest axis wastes steps — a form of stiffness.
+    dir_coeffs: list[float] = []
     for eq in spec.equations:
         if eq.time_derivative_order < 2:  # noqa: PLR2004
             continue
-        for term in eq.rhs_terms:
-            if term.operator == "laplacian" or term.operator.startswith("laplacian_"):
-                max_c_sq = max(max_c_sq, abs(term.coefficient))
-    if max_c_sq <= 0:
-        return  # no wave terms → can't estimate stiffness
-
-    stiffness_ratio = max_mass_sq * dx_min**2 / max_c_sq
-    stiffness_threshold = 100
-    if stiffness_ratio > stiffness_threshold:
-        msg = (
-            f"  Note: system may be stiff (m²·dx²/c²={stiffness_ratio:.0f}). "
-            f"Consider --scheme scipy --method Radau for better performance."
+        dir_coeffs.extend(
+            abs(term.coefficient)
+            for term in eq.rhs_terms
+            if term.operator.startswith("laplacian_")
         )
-        cast("object", log)(msg)  # type: ignore[operator]
+    if len(dir_coeffs) >= 2:  # noqa: PLR2004
+        min_c = min(dir_coeffs)
+        max_c = max(dir_coeffs)
+        if min_c > 0 and max_c / min_c > stiffness_threshold:
+            msg = (
+                f"  Note: anisotropic Laplacian stiffness "
+                f"(max/min={max_c / min_c:.0f}). "
+                f"Consider --scheme scipy --method Radau."
+            )
+            cast("object", log)(msg)  # type: ignore[operator]
 
 
 def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, PLR0915
@@ -938,11 +1016,11 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
     elif args.adaptive:
         # Adaptive explicit RK: dt is initial guess, adapted by tolerance
         dt = args.dt if args.dt is not None else cfl_dt
-        max_step = args.max_step
+        max_step = None  # py-pde ExplicitSolver has no max_step support
     else:
         # Fixed-step explicit RK (original behavior)
         dt = args.dt if args.dt is not None else cfl_dt
-        max_step = args.max_step
+        max_step = None
         _check_cfl_stability(pde, dt, grid)
 
     # Step 7: Run simulation
@@ -973,7 +1051,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
 
     # Add blow-up detection callback
     initial_max = float(np.max(np.abs(initial_state.data)))
-    blowup_threshold = max(initial_max * 1e6, 1e6)
+    blowup_threshold = min(max(initial_max * 1e6, 1e6), 1e15)
 
     def _check_blowup(state_now: object, t: float) -> None:
         current_max = float(np.max(np.abs(state_now.data)))  # type: ignore[union-attr]
@@ -999,6 +1077,16 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
             snapshot_interval,
         )
         tracker.append(energy_tracker)  # pyright: ignore[reportArgumentType]
+        # Implicit methods (BDF, Radau) introduce numerical dissipation,
+        # which causes the L2 norm to drift even for stable systems.
+        # Warn the user to use a generous threshold.
+        method = args.method or ("DOP853" if args.scheme == "scipy" else "")
+        if method in _IMPLICIT_METHODS:
+            log(
+                f"  Note: --energy-monitor with implicit method {method}: "
+                f"expect L2 norm drift from numerical dissipation. "
+                f"Use threshold >= 0.1 to avoid false alarms."
+            )
 
     import time as _time
 
