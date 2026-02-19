@@ -13,6 +13,7 @@ import pytest
 from tidal.cli import main
 
 if TYPE_CHECKING:
+    from argparse import Namespace
     from pathlib import Path
 
 
@@ -22,11 +23,11 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(scope="session")
-def _inline_2d_spec(tmp_path_factory: pytest.TempPathFactory) -> Path:
+def inline_2d_spec(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Write an inline 2+1D Klein-Gordon JSON spec."""
     import json
 
-    spec = {
+    spec: dict[str, object] = {
         "metadata": {
             "source": "inline-test-2d",
             "lagrangian_expr": "-1/2 (d phi)^2",
@@ -67,14 +68,14 @@ def _inline_2d_spec(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture(scope="session")
 def two_d_sim_dir(
-    _inline_2d_spec: Path,
+    inline_2d_spec: Path,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Path:
     """Run a short 2D simulation for 2D plot tests."""
     output = tmp_path_factory.mktemp("plot2d") / "sim_out"
     ret = main([
         "simulate",
-        str(_inline_2d_spec),
+        str(inline_2d_spec),
         "--t-end", "2.0",
         "--grid-shape", "16,16",
         "--bounds", "0:10,0:10",
@@ -526,6 +527,55 @@ class TestOutputOptions:
         # Clean up
         expected.unlink()
 
+    def test_default_output_path_with_field(
+        self,
+        coupled_scalars_dir: Path,
+    ) -> None:
+        """With --field, default filename includes field name."""
+        ret = main([
+            "plot", str(coupled_scalars_dir),
+            "--type", "heatmap",
+            "--field", "phi_0",
+            "--quiet",
+        ])
+        assert ret == 0
+        expected = coupled_scalars_dir / "heatmap_phi_0.png"
+        assert expected.exists()
+        expected.unlink()
+
+    def test_default_output_path_snapshot_t0(
+        self,
+        coupled_scalars_dir: Path,
+    ) -> None:
+        """Snapshot default filename includes field and time index."""
+        ret = main([
+            "plot", str(coupled_scalars_dir),
+            "--type", "snapshot",
+            "--field", "phi_0",
+            "--time-index", "0",
+            "--quiet",
+        ])
+        assert ret == 0
+        expected = coupled_scalars_dir / "snapshot_phi_0_t0.png"
+        assert expected.exists()
+        expected.unlink()
+
+    def test_default_output_path_snapshot_final(
+        self,
+        coupled_scalars_dir: Path,
+    ) -> None:
+        """Snapshot with time-index -1 uses 'final' in filename."""
+        ret = main([
+            "plot", str(coupled_scalars_dir),
+            "--type", "snapshot",
+            "--time-index", "-1",
+            "--quiet",
+        ])
+        assert ret == 0
+        expected = coupled_scalars_dir / "snapshot_final.png"
+        assert expected.exists()
+        expected.unlink()
+
     def test_verbose_output(
         self,
         coupled_scalars_dir: Path,
@@ -719,31 +769,98 @@ class TestPanelHelpers:
             _parse_figsize("8")
 
     def test_resolve_time_indices_default(self) -> None:
-        from tidal.cli._panels import _resolve_time_indices
+        from tidal.cli._panels import resolve_time_indices
 
         # Create a minimal mock
         class _MockData:
             n_snapshots = 10
 
-        result = _resolve_time_indices(_MockData(), None)  # type: ignore[arg-type]
+        result = resolve_time_indices(_MockData(), None)  # type: ignore[arg-type]
         assert len(result) == 5
         assert result[0] == 0
         assert result[-1] == 9
 
     def test_resolve_time_indices_explicit(self) -> None:
-        from tidal.cli._panels import _resolve_time_indices
+        from tidal.cli._panels import resolve_time_indices
 
         class _MockData:
             n_snapshots = 10
 
-        result = _resolve_time_indices(_MockData(), [0, -1])  # type: ignore[arg-type]
+        result = resolve_time_indices(_MockData(), [0, -1])  # type: ignore[arg-type]
         assert result == [0, 9]
 
     def test_resolve_time_indices_out_of_range(self) -> None:
-        from tidal.cli._panels import _resolve_time_indices
+        from tidal.cli._panels import resolve_time_indices
 
         class _MockData:
             n_snapshots = 5
 
         with pytest.raises(ValueError, match="out of range"):
-            _resolve_time_indices(_MockData(), [10])  # type: ignore[arg-type]
+            resolve_time_indices(_MockData(), [10])  # type: ignore[arg-type]
+
+
+# ============================================================
+# Unit tests for _default_filename
+# ============================================================
+
+
+class TestDefaultFilename:
+    def _ns(
+        self,
+        *,
+        field: str | None = None,
+        time_index: int | None = None,
+    ) -> Namespace:
+        from argparse import Namespace
+
+        return Namespace(field=field, time_index=time_index)
+
+    def test_amplitude(self) -> None:
+        from tidal.cli._plot_command import _default_filename
+
+        assert _default_filename("amplitude", self._ns()) == "amplitude.png"
+
+    def test_energy(self) -> None:
+        from tidal.cli._plot_command import _default_filename
+
+        assert _default_filename("energy", self._ns()) == "energy.png"
+
+    def test_compare(self) -> None:
+        from tidal.cli._plot_command import _default_filename
+
+        assert _default_filename("compare", self._ns()) == "compare.png"
+
+    def test_heatmap_no_field(self) -> None:
+        from tidal.cli._plot_command import _default_filename
+
+        assert _default_filename("heatmap", self._ns()) == "heatmap.png"
+
+    def test_heatmap_with_field(self) -> None:
+        from tidal.cli._plot_command import _default_filename
+
+        assert _default_filename("heatmap", self._ns(field="phi_0")) == "heatmap_phi_0.png"
+
+    def test_profile_with_field(self) -> None:
+        from tidal.cli._plot_command import _default_filename
+
+        assert _default_filename("profile", self._ns(field="h_3")) == "profile_h_3.png"
+
+    def test_snapshot_field_and_t0(self) -> None:
+        from tidal.cli._plot_command import _default_filename
+
+        assert _default_filename("snapshot", self._ns(field="A_0", time_index=0)) == "snapshot_A_0_t0.png"
+
+    def test_snapshot_field_and_final(self) -> None:
+        from tidal.cli._plot_command import _default_filename
+
+        assert _default_filename("snapshot", self._ns(field="A_1", time_index=-1)) == "snapshot_A_1_final.png"
+
+    def test_snapshot_no_field_no_index(self) -> None:
+        from tidal.cli._plot_command import _default_filename
+
+        assert _default_filename("snapshot", self._ns()) == "snapshot_final.png"
+
+    def test_snapshot_no_field_with_index(self) -> None:
+        from tidal.cli._plot_command import _default_filename
+
+        assert _default_filename("snapshot", self._ns(time_index=5)) == "snapshot_t5.png"
