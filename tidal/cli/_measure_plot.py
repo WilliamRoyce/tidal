@@ -1,21 +1,20 @@
 """Measurement visualization for ``tidal measure --output``.
 
-Generates a 2x3 measurement figure:
+Generates a dynamic measurement figure with only the panels corresponding
+to measurements present in the ``results`` dict.  A summary text panel is
+always appended as the last panel.
 
-.. code-block::
-
-    [0,0] Conversion P(t)     [0,1] Per-field energy     [0,2] Energy conservation
-    [1,0] Power spectrum       [1,1] Mixing spectrum      [1,2] Summary text
-
-Each panel is guarded by ``if key in results`` — gracefully skips
-missing measurements.
+Each panel's plot function is guarded by ``if key in results`` — gracefully
+showing "No … data" when the measurement errored.
 """
 
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from pathlib import Path
 
     from matplotlib.axes import Axes
@@ -26,7 +25,7 @@ _ENERGY_FLOOR = 1e-30
 
 
 def _plot_conversion(ax: Axes, results: dict[str, Any]) -> None:
-    """[0,0] Conversion probability P(t)."""
+    """Conversion probability P(t)."""
     import numpy as np
 
     if "conversion" not in results or "error" in results["conversion"]:
@@ -57,7 +56,7 @@ def _plot_conversion(ax: Axes, results: dict[str, Any]) -> None:
 
 
 def _plot_energy(ax: Axes, results: dict[str, Any]) -> None:
-    """[0,1] Per-field energy timeseries."""
+    """Per-field energy timeseries."""
     if "energy" not in results or "error" in results["energy"]:
         ax.text(0.5, 0.5, "No energy data", transform=ax.transAxes, ha="center")
         return
@@ -72,7 +71,7 @@ def _plot_energy(ax: Axes, results: dict[str, Any]) -> None:
 
 
 def _plot_conservation(ax: Axes, results: dict[str, Any]) -> None:
-    """[0,2] Energy conservation (relative error)."""
+    """Energy conservation (relative error)."""
     import numpy as np
 
     if "energy" not in results or "error" in results["energy"]:
@@ -97,7 +96,7 @@ def _plot_conservation(ax: Axes, results: dict[str, Any]) -> None:
 
 
 def _plot_spectrum(ax: Axes, results: dict[str, Any]) -> None:
-    """[1,0] Spatial power spectrum (initial + final)."""
+    """Spatial power spectrum (initial + final)."""
     if "spectrum" not in results or "error" in results["spectrum"]:
         ax.text(0.5, 0.5, "No spectrum data", transform=ax.transAxes, ha="center")
         return
@@ -115,7 +114,7 @@ def _plot_spectrum(ax: Axes, results: dict[str, Any]) -> None:
 
 
 def _plot_spectral_conversion(ax: Axes, results: dict[str, Any]) -> None:
-    """[1,0] Per-mode spectral conversion P(k,t) heatmap."""
+    """Per-mode spectral conversion P(k,t) heatmap."""
     import numpy as np
 
     if "spectral_conversion" not in results or "error" in results["spectral_conversion"]:
@@ -168,7 +167,7 @@ def _plot_spectral_conversion(ax: Axes, results: dict[str, Any]) -> None:
 
 
 def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:  # noqa: C901
-    """[1,0] Dispersion relation S(k, omega) heatmap with peak curve overlay."""
+    """Dispersion relation S(k, omega) heatmap with peak curve overlay."""
     import numpy as np
 
     if "dispersion" not in results or "error" in results["dispersion"]:
@@ -241,7 +240,7 @@ def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:  # noqa: C901
 
 
 def _plot_mixing_spectrum(ax: Axes, results: dict[str, Any]) -> None:
-    """[1,1] Mixing spectrum (temporal FFT of P(t))."""
+    """Mixing spectrum (temporal FFT of P(t))."""
     # Prefer cached spectrum from _run_mixing; fall back to recomputation
     spectrum = None
     if "mixing" in results and "error" not in results["mixing"]:
@@ -276,7 +275,7 @@ def _plot_mixing_spectrum(ax: Axes, results: dict[str, Any]) -> None:
 
 
 def _plot_summary_text(ax: Axes, data: SimulationData, results: dict[str, Any]) -> None:
-    """[1,2] Summary text panel."""
+    """Summary text panel."""
     lines: list[str] = []
 
     if data.parameters:
@@ -318,54 +317,80 @@ def _plot_summary_text(ax: Axes, data: SimulationData, results: dict[str, Any]) 
     ax.axis("off")
 
 
+# ------------------------------------------------------------------
+# Panel registry: (result_key, plot_fn, title, xlabel, ylabel)
+#
+# Entries whose title/xlabel/ylabel are None set their own labels
+# inside the plot function (e.g. dispersion, spectral_conversion).
+# ------------------------------------------------------------------
+
+_PanelEntry = tuple[
+    str,
+    "Callable[[Axes, dict[str, Any]], None]",
+    str | None,
+    str | None,
+    str | None,
+]
+
+_PANEL_REGISTRY: list[_PanelEntry] = [
+    ("conversion", _plot_conversion, "Conversion Probability", "Time", None),
+    ("energy", _plot_energy, "Energy Decomposition", "Time", "Energy"),
+    ("conservation", _plot_conservation, "Energy Conservation", "Time", r"$\Delta E / E_0$"),
+    ("dispersion", _plot_dispersion, None, None, None),
+    ("spectral_conversion", _plot_spectral_conversion, None, None, None),
+    ("spectrum", _plot_spectrum, "Power Spectrum", r"$|k|$", r"$|\hat{\phi}(k)|^2$"),
+    ("mixing", _plot_mixing_spectrum, "Mixing Spectrum", r"$\omega$ (rad/time)", r"$|\hat{P}(\omega)|^2$"),
+]
+
+
 def save_measurement_plot(
     path: Path,
     data: SimulationData,
     results: dict[str, Any],
 ) -> None:
-    """Generate and save a 2x3 measurement figure."""
+    """Generate and save a measurement figure with only the requested panels.
+
+    The layout is dynamic: only panels whose result key is present in
+    *results* are included, plus a summary text panel at the end.
+    """
     import matplotlib.pyplot as plt
 
-    fig, axes = plt.subplots(2, 3, figsize=(16, 9))
+    # Build list of panels to render
+    panels: list[_PanelEntry] = [
+        entry for entry in _PANEL_REGISTRY if entry[0] in results
+    ]
+
+    n_data_panels = len(panels)
+    # +1 for summary text panel
+    n_panels = n_data_panels + 1
+
+    ncols = min(n_panels, 3)
+    nrows = math.ceil(n_panels / ncols)
+    figsize = (min(ncols * 5.5, 16), max(nrows * 4.5, 4.5))
+
+    fig, axes = plt.subplots(nrows, ncols, figsize=figsize, squeeze=False)
     fig.suptitle("TIDAL Measurement Analysis", fontsize=13)
 
-    # Row 0
-    _plot_conversion(axes[0, 0], results)
-    axes[0, 0].set_xlabel("Time")
-    axes[0, 0].set_title("Conversion Probability")
-    axes[0, 0].grid(visible=True, alpha=0.3)
+    flat_axes = axes.flatten()
 
-    _plot_energy(axes[0, 1], results)
-    axes[0, 1].set_xlabel("Time")
-    axes[0, 1].set_ylabel("Energy")
-    axes[0, 1].set_title("Energy Decomposition")
-    axes[0, 1].grid(visible=True, alpha=0.3)
+    # Render data panels
+    for i, (_, plot_fn, title, xlabel, ylabel) in enumerate(panels):
+        ax = flat_axes[i]
+        plot_fn(ax, results)
+        if title is not None:
+            ax.set_title(title)
+        if xlabel is not None:
+            ax.set_xlabel(xlabel)
+        if ylabel is not None:
+            ax.set_ylabel(ylabel)
+        ax.grid(visible=True, alpha=0.3)
 
-    _plot_conservation(axes[0, 2], results)
-    axes[0, 2].set_xlabel("Time")
-    axes[0, 2].set_ylabel(r"$\Delta E / E_0$")
-    axes[0, 2].set_title("Energy Conservation")
-    axes[0, 2].grid(visible=True, alpha=0.3)
+    # Summary text panel (always last)
+    _plot_summary_text(flat_axes[n_data_panels], data, results)
 
-    # Row 1 — priority: dispersion > spectral_conversion > spectrum
-    if "dispersion" in results and "error" not in results.get("dispersion", {}):
-        _plot_dispersion(axes[1, 0], results)
-    elif "spectral_conversion" in results and "error" not in results.get("spectral_conversion", {}):
-        _plot_spectral_conversion(axes[1, 0], results)
-    else:
-        _plot_spectrum(axes[1, 0], results)
-        axes[1, 0].set_xlabel(r"$|k|$")
-        axes[1, 0].set_ylabel(r"$|\hat{\phi}(k)|^2$")
-        axes[1, 0].set_title("Power Spectrum")
-    axes[1, 0].grid(visible=True, alpha=0.3)
-
-    _plot_mixing_spectrum(axes[1, 1], results)
-    axes[1, 1].set_xlabel(r"$\omega$ (rad/time)")
-    axes[1, 1].set_ylabel(r"$|\hat{P}(\omega)|^2$")
-    axes[1, 1].set_title("Mixing Spectrum")
-    axes[1, 1].grid(visible=True, alpha=0.3)
-
-    _plot_summary_text(axes[1, 2], data, results)
+    # Hide any unused axes
+    for j in range(n_data_panels + 1, len(flat_axes)):
+        flat_axes[j].set_visible(False)
 
     plt.tight_layout()
     fig.savefig(str(path), dpi=150, bbox_inches="tight")
