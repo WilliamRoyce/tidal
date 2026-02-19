@@ -22,10 +22,11 @@ tidal derive theory.toml
 tidal inspect ../data/proca_background.json
 
 # Step 3: Run simulation
-# Gaussian IC with periodic BCs; constraint solver auto-detects A_0, B_0
+# Gaussian IC in A_1 with periodic BCs; constraint solver auto-detects A_0, B_0
 tidal simulate ../data/proca_background.json \
   --param mA2=1.0 --param mB2=2.0 --param gcoup=0.5 --param g0=1.0 --param R=8.0 \
-  --ic gaussian --grid-shape 16 --t-end 2.0 \
+  --ic gaussian --ic-component A_1 --ic-amplitude 0.5 --ic-width 3.0 \
+  --grid-shape 64 --bounds -30:30,-30:30 --t-end 20.0 \
   --bc periodic,periodic --scheme scipy \
   --output ../data/proca_background_output
 
@@ -39,4 +40,4 @@ tidal measure ../data/proca_background_output \
 
 # Step 5: Individual plots (saved into the simulation output directory)
 tidal plot ../data/proca_background_output --type amplitude --quiet
-tidal plot ../data/proca_background_output --type snapshot --time-index -1 --quiet
+tidal plot ../data/proca_background_output --type snapshot --field A_1 --time-index -1 --quiet

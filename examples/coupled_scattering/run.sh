@@ -25,9 +25,10 @@
 #   # Step 3: Simulate — phi wave packet hits coupling region, converts to chi
 #   uv run tidal simulate ../data/coupled_scattering.json \
 #     --param mPhi2=1.0 --param mChi2=4.0 --param g0=1.0 --param R=8.0 \
-#     --grid-shape 128 --bounds=-50:50,-50:50 --periodic \
+#     --grid-shape 64 --bounds=-50:50,-50:50 --periodic \
 #     --ic gaussian --ic-component phi_0 --ic-center=-25.0,0.0 --ic-width 4.0 \
-#     --t-end 40.0 --scheme scipy --output ../data/coupled_scattering_output
+#     --ic-amplitude 1.0 \
+#     --t-end 20.0 --scheme scipy --output ../data/coupled_scattering_output
 #
 #   # Step 4: Measure conversion probability and mixing length
 #   uv run tidal measure ../data/coupled_scattering_output \
@@ -43,7 +44,7 @@
 #
 #   # Step 7: Combined measurement plot
 #   uv run tidal measure ../data/coupled_scattering_output \
-#     --what conversion,mixing,spectral_conversion,dispersion \
+#     --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
 #     --source phi_0 --target chi_0 \
 #     --output ../data/coupled_scattering_output/measurement.png
 
@@ -57,18 +58,19 @@ tidal derive theory.toml
 tidal inspect ../data/coupled_scattering.json
 
 # Step 3: Run simulation
-# Gaussian wave packet in phi at x=-25, propagating rightward (k0=3).
-# Chi starts as a blob at origin. Coupling G(x,y) is Gaussian, radius R=8.
+# Gaussian pulse in phi at x=-25; disperses into coupling region at origin.
+# Chi starts at zero. Coupling G(x,y) is Gaussian, radius R=8.
 tidal simulate ../data/coupled_scattering.json \
   --param mPhi2=1.0 --param mChi2=4.0 --param g0=1.0 --param R=8.0 \
-  --grid-shape 128 \
+  --grid-shape 64 \
   --bounds=-50:50,-50:50 \
   --periodic \
   --ic gaussian \
   --ic-component phi_0 \
   --ic-center=-25.0,0.0 \
   --ic-width 4.0 \
-  --t-end 40.0 \
+  --ic-amplitude 1.0 \
+  --t-end 20.0 \
   --scheme scipy \
   --output ../data/coupled_scattering_output
 
@@ -92,7 +94,7 @@ tidal measure ../data/coupled_scattering_output \
 
 # Step 7: Combined measurement plot (all panels in one figure)
 tidal measure ../data/coupled_scattering_output \
-  --what conversion,mixing,spectral_conversion,dispersion \
+  --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
   --source phi_0 --target chi_0 \
   --output ../data/coupled_scattering_output/measurement.png
 

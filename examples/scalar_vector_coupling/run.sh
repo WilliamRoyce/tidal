@@ -22,11 +22,13 @@
 #   # Step 2: Inspect the generated equation system (4 fields, 4x4 matrices)
 #   uv run tidal inspect ../data/scalar_vector_coupling.json
 #
-#   # Step 3: Simulate with Gaussian IC for phi (periodic BCs, 48x48 grid)
+#   # Step 3: Simulate with Gaussian IC for phi (periodic BCs, 64x64 grid on [0,50]²)
 #   uv run tidal simulate ../data/scalar_vector_coupling.json \
 #     --param phim2=1.0 --param Am2=0.5 --param kCS=0.3 --param gSV=0.2 \
-#     --grid-shape 48 --bounds 0:10,0:10 --bc periodic,periodic \
-#     --ic gaussian --t-end 5.0 --scheme scipy \
+#     --grid-shape 64 --bounds 0:50,0:50 --bc periodic,periodic \
+#     --ic gaussian --ic-component phi_0 --ic-amplitude 1.0 --ic-width 5.0 \
+#     --ic-center 25.0,25.0 \
+#     --t-end 10.0 --scheme scipy \
 #     --output ../data/scalar_vector_coupling_output
 #
 #   # Step 4: Measure scalar-to-vector conversion and mixing length
@@ -43,7 +45,7 @@
 #
 #   # Step 7: Combined plot with all measurements
 #   uv run tidal measure ../data/scalar_vector_coupling_output \
-#     --what conversion,mixing,spectral_conversion,dispersion \
+#     --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
 #     --source phi_0 --target A_0,A_1,A_2 \
 #     --output ../data/scalar_vector_coupling_output/measurement.png
 
@@ -60,11 +62,12 @@ tidal inspect ../data/scalar_vector_coupling.json
 # Gaussian IC for phi; periodic BCs ensure energy conservation
 tidal simulate ../data/scalar_vector_coupling.json \
   --param phim2=1.0 --param Am2=0.5 --param kCS=0.3 --param gSV=0.2 \
-  --grid-shape 48 \
-  --bounds 0:10,0:10 \
+  --grid-shape 64 \
+  --bounds 0:50,0:50 \
   --bc periodic,periodic \
-  --ic gaussian \
-  --t-end 5.0 \
+  --ic gaussian --ic-component phi_0 --ic-amplitude 1.0 --ic-width 5.0 \
+  --ic-center 25.0,25.0 \
+  --t-end 10.0 \
   --scheme scipy \
   --output ../data/scalar_vector_coupling_output
 
@@ -88,7 +91,7 @@ tidal measure ../data/scalar_vector_coupling_output \
 
 # Step 7: Combined measurement plot (all panels in one figure)
 tidal measure ../data/scalar_vector_coupling_output \
-  --what conversion,mixing,spectral_conversion,dispersion \
+  --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
   --source phi_0 --target A_0,A_1,A_2 \
   --output ../data/scalar_vector_coupling_output/measurement.png
 

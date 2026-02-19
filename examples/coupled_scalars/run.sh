@@ -22,6 +22,7 @@
 #     --param mPhi2=1.0 --param mChi2=4.0 --param gCpl=0.5 \
 #     --grid-shape 256 --bounds 0:100 --periodic \
 #     --ic gaussian --ic-component phi_0 --ic-center 30.0 --ic-width 5.0 \
+#     --ic-amplitude 1.0 \
 #     --t-end 20.0 --scheme scipy --output ../data/coupled_scalars_output
 #
 #   # Step 4: Measure conversion probability and characteristic mixing length
@@ -38,7 +39,7 @@
 #
 #   # Step 7: Combined plot with all measurements
 #   uv run tidal measure ../data/coupled_scalars_output \
-#     --what conversion,mixing,spectral_conversion,dispersion \
+#     --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
 #     --source phi_0 --target chi_0 \
 #     --output ../data/coupled_scalars_output/measurement.png
 
@@ -62,6 +63,7 @@ tidal simulate ../data/coupled_scalars.json \
   --ic-component phi_0 \
   --ic-center 30.0 \
   --ic-width 5.0 \
+  --ic-amplitude 1.0 \
   --t-end 20.0 \
   --scheme scipy \
   --output ../data/coupled_scalars_output
@@ -87,7 +89,7 @@ tidal measure ../data/coupled_scalars_output \
 
 # Step 7: Combined measurement plot (all panels in one figure)
 tidal measure ../data/coupled_scalars_output \
-  --what conversion,mixing,spectral_conversion,dispersion \
+  --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
   --source phi_0 --target chi_0 \
   --output ../data/coupled_scalars_output/measurement.png
 
