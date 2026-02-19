@@ -58,7 +58,12 @@ def field_names(data: SimulationData, requested: list[str] | None) -> list[str]:
 
 
 def single_field(data: SimulationData, requested: str | None) -> str:
-    """Resolve a single field name, defaulting to first field.
+    """Resolve a single field name, defaulting to first dynamical field.
+
+    When *requested* is ``None``, returns the first field that has
+    momentum data (i.e. a dynamical, time-evolved field) rather than a
+    constraint field.  Falls back to the absolute first field if every
+    field is a constraint.
 
     Raises
     ------
@@ -67,6 +72,10 @@ def single_field(data: SimulationData, requested: str | None) -> str:
     """
     all_names = list(data.fields.keys())
     if requested is None:
+        # Prefer first dynamical field (has momentum) over constraint fields
+        for name in all_names:
+            if name in data.momenta:
+                return name
         return all_names[0]
     if requested not in data.fields:
         msg = f"Unknown field '{requested}'. Available: {', '.join(all_names)}"
