@@ -6,7 +6,7 @@ and interaction with the SimulationData / disk-backed output pipeline.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
 import pytest
 
@@ -73,15 +73,21 @@ def two_d_sim_dir(
 ) -> Path:
     """Run a short 2D simulation for 2D plot tests."""
     output = tmp_path_factory.mktemp("plot2d") / "sim_out"
-    ret = main([
-        "simulate",
-        str(inline_2d_spec),
-        "--t-end", "2.0",
-        "--grid-shape", "16,16",
-        "--bounds", "0:10,0:10",
-        "--output", str(output),
-        "--quiet",
-    ])
+    ret = main(
+        [
+            "simulate",
+            str(inline_2d_spec),
+            "--t-end",
+            "2.0",
+            "--grid-shape",
+            "16,16",
+            "--bounds",
+            "0:10,0:10",
+            "--output",
+            str(output),
+            "--quiet",
+        ]
+    )
     assert ret == 0, "2D simulation failed"
     assert output.is_dir()
     return output
@@ -124,12 +130,17 @@ class TestHeatmap:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "heatmap.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "heatmap",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "heatmap",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
         assert output.stat().st_size > 0
@@ -140,13 +151,19 @@ class TestHeatmap:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "heatmap_chi.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "heatmap",
-            "--field", "chi_0",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "heatmap",
+                "--field",
+                "chi_0",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -156,13 +173,19 @@ class TestHeatmap:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "heatmap_viridis.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "heatmap",
-            "--cmap", "viridis",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "heatmap",
+                "--cmap",
+                "viridis",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -171,13 +194,19 @@ class TestHeatmap:
         coupled_scalars_dir: Path,
         tmp_path: Path,
     ) -> None:
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "heatmap",
-            "--field", "nonexistent",
-            "--output", str(tmp_path / "bad.png"),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "heatmap",
+                "--field",
+                "nonexistent",
+                "--output",
+                str(tmp_path / "bad.png"),
+                "--quiet",
+            ]
+        )
         assert ret == 1
 
 
@@ -188,13 +217,19 @@ class TestSnapshot1D:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "snap.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "snapshot",
-            "--time-index", "-1",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "snapshot",
+                "--time-index",
+                "-1",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -204,13 +239,19 @@ class TestSnapshot1D:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "snap0.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "snapshot",
-            "--time-index", "0",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "snapshot",
+                "--time-index",
+                "0",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -222,12 +263,17 @@ class TestAmplitude:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "amp.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "amplitude",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "amplitude",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -237,13 +283,19 @@ class TestAmplitude:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "amp_phi.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "amplitude",
-            "--fields", "phi_0",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "amplitude",
+                "--fields",
+                "phi_0",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -253,13 +305,19 @@ class TestAmplitude:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "amp_overlay.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "amplitude",
-            "--overlay", "exp(-0.1*t)",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "amplitude",
+                "--overlay",
+                "exp(-0.1*t)",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -268,13 +326,19 @@ class TestAmplitude:
         coupled_scalars_dir: Path,
         tmp_path: Path,
     ) -> None:
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "amplitude",
-            "--overlay", "__import__('os').system('echo bad')",
-            "--output", str(tmp_path / "bad.png"),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "amplitude",
+                "--overlay",
+                "__import__('os').system('echo bad')",
+                "--output",
+                str(tmp_path / "bad.png"),
+                "--quiet",
+            ]
+        )
         assert ret == 1
 
 
@@ -285,12 +349,17 @@ class TestEnergy:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "energy.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "energy",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "energy",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -300,13 +369,19 @@ class TestEnergy:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "energy_phi.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "energy",
-            "--fields", "phi_0",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "energy",
+                "--fields",
+                "phi_0",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -318,12 +393,17 @@ class TestProfile:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "profile.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "profile",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "profile",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -333,13 +413,19 @@ class TestProfile:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "profile_times.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "profile",
-            "--time-indices", "0,5,-1",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "profile",
+                "--time-indices",
+                "0,5,-1",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -351,12 +437,17 @@ class TestCompare:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "compare.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "compare",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "compare",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -373,12 +464,17 @@ class TestSnapshot2D:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "snap2d.png"
-        ret = main([
-            "plot", str(two_d_sim_dir),
-            "--type", "snapshot",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(two_d_sim_dir),
+                "--type",
+                "snapshot",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -388,12 +484,17 @@ class TestSnapshot2D:
         tmp_path: Path,
     ) -> None:
         """Heatmap requires 1D spatial data — should error for 2D."""
-        ret = main([
-            "plot", str(two_d_sim_dir),
-            "--type", "heatmap",
-            "--output", str(tmp_path / "bad.png"),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(two_d_sim_dir),
+                "--type",
+                "heatmap",
+                "--output",
+                str(tmp_path / "bad.png"),
+                "--quiet",
+            ]
+        )
         assert ret == 1
 
     def test_profile_2d_requires_cross_section(
@@ -402,12 +503,17 @@ class TestSnapshot2D:
         tmp_path: Path,
     ) -> None:
         """Profile on 2D data without --cross-section should error."""
-        ret = main([
-            "plot", str(two_d_sim_dir),
-            "--type", "profile",
-            "--output", str(tmp_path / "bad.png"),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(two_d_sim_dir),
+                "--type",
+                "profile",
+                "--output",
+                str(tmp_path / "bad.png"),
+                "--quiet",
+            ]
+        )
         assert ret == 1
 
     def test_profile_2d_with_cross_section(
@@ -416,13 +522,19 @@ class TestSnapshot2D:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "profile_cs.png"
-        ret = main([
-            "plot", str(two_d_sim_dir),
-            "--type", "profile",
-            "--cross-section", "y=5.0",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(two_d_sim_dir),
+                "--type",
+                "profile",
+                "--cross-section",
+                "y=5.0",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -432,12 +544,17 @@ class TestSnapshot2D:
         tmp_path: Path,
     ) -> None:
         """Compare on 2D data without --cross-section should error."""
-        ret = main([
-            "plot", str(two_d_sim_dir),
-            "--type", "compare",
-            "--output", str(tmp_path / "bad.png"),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(two_d_sim_dir),
+                "--type",
+                "compare",
+                "--output",
+                str(tmp_path / "bad.png"),
+                "--quiet",
+            ]
+        )
         assert ret == 1
 
     def test_compare_2d_with_cross_section(
@@ -446,13 +563,19 @@ class TestSnapshot2D:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "compare_cs.png"
-        ret = main([
-            "plot", str(two_d_sim_dir),
-            "--type", "compare",
-            "--cross-section", "x=5.0",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(two_d_sim_dir),
+                "--type",
+                "compare",
+                "--cross-section",
+                "x=5.0",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -469,13 +592,19 @@ class TestOutputOptions:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "titled.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "amplitude",
-            "--title", "My Custom Title",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "amplitude",
+                "--title",
+                "My Custom Title",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -485,13 +614,19 @@ class TestOutputOptions:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "hidpi.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "amplitude",
-            "--dpi", "72",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "amplitude",
+                "--dpi",
+                "72",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -501,13 +636,19 @@ class TestOutputOptions:
         tmp_path: Path,
     ) -> None:
         output = tmp_path / "sized.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "amplitude",
-            "--figsize", "10,4",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "amplitude",
+                "--figsize",
+                "10,4",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -516,11 +657,15 @@ class TestOutputOptions:
         coupled_scalars_dir: Path,
     ) -> None:
         """Without --output, file goes to DATA_DIR/{type}.png."""
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "amplitude",
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "amplitude",
+                "--quiet",
+            ]
+        )
         assert ret == 0
         expected = coupled_scalars_dir / "amplitude.png"
         assert expected.exists()
@@ -532,12 +677,17 @@ class TestOutputOptions:
         coupled_scalars_dir: Path,
     ) -> None:
         """With --field, default filename includes field name."""
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "heatmap",
-            "--field", "phi_0",
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "heatmap",
+                "--field",
+                "phi_0",
+                "--quiet",
+            ]
+        )
         assert ret == 0
         expected = coupled_scalars_dir / "heatmap_phi_0.png"
         assert expected.exists()
@@ -548,13 +698,19 @@ class TestOutputOptions:
         coupled_scalars_dir: Path,
     ) -> None:
         """Snapshot default filename includes field and time index."""
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "snapshot",
-            "--field", "phi_0",
-            "--time-index", "0",
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "snapshot",
+                "--field",
+                "phi_0",
+                "--time-index",
+                "0",
+                "--quiet",
+            ]
+        )
         assert ret == 0
         expected = coupled_scalars_dir / "snapshot_phi_0_t0.png"
         assert expected.exists()
@@ -565,12 +721,17 @@ class TestOutputOptions:
         coupled_scalars_dir: Path,
     ) -> None:
         """Snapshot with time-index -1 uses 'final' in filename."""
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "snapshot",
-            "--time-index", "-1",
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "snapshot",
+                "--time-index",
+                "-1",
+                "--quiet",
+            ]
+        )
         assert ret == 0
         expected = coupled_scalars_dir / "snapshot_final.png"
         assert expected.exists()
@@ -584,11 +745,16 @@ class TestOutputOptions:
     ) -> None:
         """Without --quiet, progress messages should print."""
         output = tmp_path / "verbose.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "amplitude",
-            "--output", str(output),
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "amplitude",
+                "--output",
+                str(output),
+            ]
+        )
         assert ret == 0
         captured = capsys.readouterr()
         assert "Loaded" in captured.out
@@ -606,13 +772,19 @@ class TestArgParsing:
         coupled_scalars_dir: Path,
         tmp_path: Path,
     ) -> None:
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "profile",
-            "--time-indices", "abc",
-            "--output", str(tmp_path / "bad.png"),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "profile",
+                "--time-indices",
+                "abc",
+                "--output",
+                str(tmp_path / "bad.png"),
+                "--quiet",
+            ]
+        )
         assert ret == 1
 
     def test_bad_cross_section_format(
@@ -620,13 +792,19 @@ class TestArgParsing:
         coupled_scalars_dir: Path,
         tmp_path: Path,
     ) -> None:
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "profile",
-            "--cross-section", "badformat",
-            "--output", str(tmp_path / "bad.png"),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "profile",
+                "--cross-section",
+                "badformat",
+                "--output",
+                str(tmp_path / "bad.png"),
+                "--quiet",
+            ]
+        )
         assert ret == 1
 
     def test_bad_cross_section_axis(
@@ -634,13 +812,19 @@ class TestArgParsing:
         coupled_scalars_dir: Path,
         tmp_path: Path,
     ) -> None:
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "profile",
-            "--cross-section", "w=5.0",
-            "--output", str(tmp_path / "bad.png"),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "profile",
+                "--cross-section",
+                "w=5.0",
+                "--output",
+                str(tmp_path / "bad.png"),
+                "--quiet",
+            ]
+        )
         assert ret == 1
 
     def test_bad_figsize(
@@ -648,13 +832,19 @@ class TestArgParsing:
         coupled_scalars_dir: Path,
         tmp_path: Path,
     ) -> None:
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "amplitude",
-            "--figsize", "10,abc",
-            "--output", str(tmp_path / "bad.png"),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "amplitude",
+                "--figsize",
+                "10,abc",
+                "--output",
+                str(tmp_path / "bad.png"),
+                "--quiet",
+            ]
+        )
         assert ret == 1
 
     def test_bad_figsize_not_two(
@@ -662,13 +852,19 @@ class TestArgParsing:
         coupled_scalars_dir: Path,
         tmp_path: Path,
     ) -> None:
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "amplitude",
-            "--figsize", "10",
-            "--output", str(tmp_path / "bad.png"),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "amplitude",
+                "--figsize",
+                "10",
+                "--output",
+                str(tmp_path / "bad.png"),
+                "--quiet",
+            ]
+        )
         assert ret == 1
 
     def test_unknown_fields(
@@ -676,13 +872,19 @@ class TestArgParsing:
         coupled_scalars_dir: Path,
         tmp_path: Path,
     ) -> None:
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "amplitude",
-            "--fields", "phi_0,nonexistent",
-            "--output", str(tmp_path / "bad.png"),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "amplitude",
+                "--fields",
+                "phi_0,nonexistent",
+                "--output",
+                str(tmp_path / "bad.png"),
+                "--quiet",
+            ]
+        )
         assert ret == 1
 
     def test_param_override(
@@ -692,13 +894,19 @@ class TestArgParsing:
     ) -> None:
         """--param should be accepted without error."""
         output = tmp_path / "param.png"
-        ret = main([
-            "plot", str(coupled_scalars_dir),
-            "--type", "energy",
-            "--param", "mPhi2=2.0",
-            "--output", str(output),
-            "--quiet",
-        ])
+        ret = main(
+            [
+                "plot",
+                str(coupled_scalars_dir),
+                "--type",
+                "energy",
+                "--param",
+                "mPhi2=2.0",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
         assert ret == 0
         assert output.exists()
 
@@ -773,8 +981,11 @@ class TestPanelHelpers:
         from tidal.cli._panels import single_field
 
         class _MockData:
-            fields = {"A_0": ..., "A_1": ..., "A_2": ...}
-            momenta = {"A_1": ..., "A_2": ...}  # A_0 is constraint (no momentum)
+            fields: ClassVar[dict[str, object]] = {"A_0": ..., "A_1": ..., "A_2": ...}
+            momenta: ClassVar[dict[str, object]] = {
+                "A_1": ...,
+                "A_2": ...,
+            }  # A_0 is constraint
 
         result = single_field(_MockData(), None)  # type: ignore[arg-type]
         assert result == "A_1"
@@ -784,8 +995,8 @@ class TestPanelHelpers:
         from tidal.cli._panels import single_field
 
         class _MockData:
-            fields = {"phi": ..., "rho": ...}
-            momenta: dict[str, object] = {}
+            fields: ClassVar[dict[str, object]] = {"phi": ..., "rho": ...}
+            momenta: ClassVar[dict[str, object]] = {}
 
         result = single_field(_MockData(), None)  # type: ignore[arg-type]
         assert result == "phi"
@@ -860,7 +1071,9 @@ class TestDefaultFilename:
     def test_heatmap_with_field(self) -> None:
         from tidal.cli._plot_command import _default_filename
 
-        assert _default_filename("heatmap", self._ns(field="phi_0")) == "heatmap_phi_0.png"
+        assert (
+            _default_filename("heatmap", self._ns(field="phi_0")) == "heatmap_phi_0.png"
+        )
 
     def test_profile_with_field(self) -> None:
         from tidal.cli._plot_command import _default_filename
@@ -870,12 +1083,18 @@ class TestDefaultFilename:
     def test_snapshot_field_and_t0(self) -> None:
         from tidal.cli._plot_command import _default_filename
 
-        assert _default_filename("snapshot", self._ns(field="A_0", time_index=0)) == "snapshot_A_0_t0.png"
+        assert (
+            _default_filename("snapshot", self._ns(field="A_0", time_index=0))
+            == "snapshot_A_0_t0.png"
+        )
 
     def test_snapshot_field_and_final(self) -> None:
         from tidal.cli._plot_command import _default_filename
 
-        assert _default_filename("snapshot", self._ns(field="A_1", time_index=-1)) == "snapshot_A_1_final.png"
+        assert (
+            _default_filename("snapshot", self._ns(field="A_1", time_index=-1))
+            == "snapshot_A_1_final.png"
+        )
 
     def test_snapshot_no_field_no_index(self) -> None:
         from tidal.cli._plot_command import _default_filename
@@ -885,4 +1104,6 @@ class TestDefaultFilename:
     def test_snapshot_no_field_with_index(self) -> None:
         from tidal.cli._plot_command import _default_filename
 
-        assert _default_filename("snapshot", self._ns(time_index=5)) == "snapshot_t5.png"
+        assert (
+            _default_filename("snapshot", self._ns(time_index=5)) == "snapshot_t5.png"
+        )

@@ -2619,6 +2619,75 @@ class TestCFLLimit:
         assert limit is not None
         assert abs(limit - dx / 3.0) < 1e-10
 
+    def test_cross_derivative_cfl(self, grid_2d: CartesianGrid) -> None:
+        """Cross-derivative contributes to CFL limit like a Laplacian."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            coefficient=4.0,
+                            operator="cross_derivative_xy",
+                            field="phi",
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        limit = pde.cfl_limit(grid_2d)
+        # dx = 10/32 = 0.3125; c = sqrt(4) = 2 -> limit = dx/c = 0.15625
+        dx = 10.0 / 32
+        assert limit is not None
+        assert abs(limit - dx / 2.0) < 1e-10
+
+    def test_cross_derivative_combined_with_laplacian_cfl(
+        self, grid_2d: CartesianGrid
+    ) -> None:
+        """Cross-derivative + laplacian: CFL uses max of both coefficients."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            coefficient=1.0, operator="laplacian", field="phi"
+                        ),
+                        OperatorTerm(
+                            coefficient=9.0,
+                            operator="cross_derivative_xy",
+                            field="phi",
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        limit = pde.cfl_limit(grid_2d)
+        # max(1, 9) = 9, c = sqrt(9) = 3 -> limit = dx/3
+        dx = 10.0 / 32
+        assert limit is not None
+        assert abs(limit - dx / 3.0) < 1e-10
+
 
 # === Jacobian Sparsity Tests ===
 
@@ -2879,6 +2948,70 @@ class TestBiharmonicWaveCFL:
         warnings = pde.check_stability(1.0, grid_1d_small)
         assert any("Biharmonic stability" in w for w in warnings)
         assert any("dx²/(4√D)" in w for w in warnings)
+
+
+class TestCrossDerivativeCFLWarning:
+    """Cross-derivative terms trigger CFL warning when dt exceeds limit."""
+
+    def test_cross_derivative_cfl_violated(self, grid_2d: CartesianGrid) -> None:
+        """Exceeding cross-derivative CFL triggers 'CFL violated' warning."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            coefficient=100.0,
+                            operator="cross_derivative_xy",
+                            field="phi",
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        # c = sqrt(100) = 10, dx = 10/32 = 0.3125, limit = 0.03125
+        warnings = pde.check_stability(1.0, grid_2d)
+        assert any("CFL violated" in w for w in warnings)
+
+    def test_negative_cross_derivative_warns(self, grid_2d: CartesianGrid) -> None:
+        """Negative cross-derivative coefficient emits metric-signature warning."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            coefficient=-2.0,
+                            operator="cross_derivative_xy",
+                            field="phi",
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        warnings = pde.check_stability(0.001, grid_2d)
+        assert any("Negative cross-derivative" in w for w in warnings)
+        assert any("metric signature" in w for w in warnings)
 
 
 class TestPositionDependentCFLWarning:

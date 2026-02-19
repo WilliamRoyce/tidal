@@ -43,9 +43,9 @@ class TestParseGridShape:
     @pytest.mark.parametrize(
         ("raw", "dim"),
         [
-            ("32,64", 1),     # 2 values for 1D
-            ("32,64", 3),     # 2 values for 3D
-            ("8,16,32", 2),   # 3 values for 2D
+            ("32,64", 1),  # 2 values for 1D
+            ("32,64", 3),  # 2 values for 3D
+            ("8,16,32", 2),  # 3 values for 2D
         ],
     )
     def test_dimension_mismatch(self, raw: str, dim: int) -> None:
@@ -79,8 +79,8 @@ class TestParseBounds:
     @pytest.mark.parametrize(
         ("raw", "dim"),
         [
-            ("0:20,0:10", 1),   # 2 values for 1D
-            ("0:20,0:10", 3),   # 2 values for 3D
+            ("0:20,0:10", 1),  # 2 values for 1D
+            ("0:20,0:10", 3),  # 2 values for 3D
         ],
     )
     def test_dimension_mismatch(self, raw: str, dim: int) -> None:
@@ -196,7 +196,9 @@ class TestParseParams:
         with pytest.raises(ValueError, match="Must be a number"):
             parse_params(["m2=abc"], spec)  # type: ignore[arg-type]
 
-    def test_non_numeric_metadata_skipped(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_non_numeric_metadata_skipped(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         spec = _make_spec_stub({"parameters": {"note": "not a number", "m2": 1.0}})
         result = parse_params([], spec)  # type: ignore[arg-type]
         assert result == {"m2": 1.0}
@@ -214,7 +216,9 @@ class TestParseParams:
         assert "bogus" in err
         assert "not found" in err
 
-    def test_no_warning_for_known_param(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_no_warning_for_known_param(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         spec = _make_spec_stub({"parameters": {"m2": 1.0}})
         parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
         err = capsys.readouterr().err
@@ -226,7 +230,11 @@ class TestParseParams:
 
 def _make_args(**kwargs: object) -> Namespace:
     """Create a Namespace with defaults for _infer_output_format."""
-    defaults: dict[str, object] = {"no_plot": False, "output_format": None, "output": None}
+    defaults: dict[str, object] = {
+        "no_plot": False,
+        "output_format": None,
+        "output": None,
+    }
     defaults.update(kwargs)
     return Namespace(**defaults)
 
@@ -255,12 +263,16 @@ class TestInferOutputFormat:
     def test_jpg_extension(self) -> None:
         assert _infer_output_format(_make_args(output="foo.jpg")) == "jpg"
 
-    def test_no_output_defaults_png(self) -> None:
-        assert _infer_output_format(_make_args()) == "png"
+    def test_no_output_defaults_directory(self) -> None:
+        """Without --output, default format is disk-backed directory."""
+        assert _infer_output_format(_make_args()) == "directory"
 
     def test_no_plot_takes_priority(self) -> None:
         """--no-plot should win even if --format or --output is given."""
-        assert _infer_output_format(_make_args(no_plot=True, output_format="png")) == "summary"
+        assert (
+            _infer_output_format(_make_args(no_plot=True, output_format="png"))
+            == "summary"
+        )
 
 
 class TestValidateFormulaAst:
@@ -356,9 +368,7 @@ class TestConstraintSolverToml:
             "theory": {"name": "Test"},
             "spacetime": {"dimension": 3, "metric": "minkowski"},
             "fields": [{"name": "phi", "type": "scalar"}],
-            "lagrangian": {
-                "expression": "CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"
-            },
+            "lagrangian": {"expression": "CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"},
             "output": {"path": "out.json"},
         }
         base.update(config)
@@ -376,29 +386,33 @@ class TestConstraintSolverToml:
 
     def test_constraint_solver_dirichlet_bcs(self) -> None:
         """Dirichlet BC config → correct Wolfram Association syntax."""
-        wls = self._generate({
-            "constraint_solver": {
-                "enabled": True,
-                "boundary_conditions": {
-                    "x": {"type": "dirichlet", "value": 0.0},
-                    "y": {"type": "dirichlet", "value": 0.0},
-                },
+        wls = self._generate(
+            {
+                "constraint_solver": {
+                    "enabled": True,
+                    "boundary_conditions": {
+                        "x": {"type": "dirichlet", "value": 0.0},
+                        "y": {"type": "dirichlet", "value": 0.0},
+                    },
+                }
             }
-        })
+        )
         assert '"type" -> "dirichlet"' in wls
         assert '"value" -> 0.0' in wls
 
     def test_constraint_solver_periodic_bcs(self) -> None:
         """Periodic BC config → Wolfram Association without value key."""
-        wls = self._generate({
-            "constraint_solver": {
-                "enabled": True,
-                "boundary_conditions": {
-                    "x": {"type": "periodic"},
-                    "y": {"type": "periodic"},
-                },
+        wls = self._generate(
+            {
+                "constraint_solver": {
+                    "enabled": True,
+                    "boundary_conditions": {
+                        "x": {"type": "periodic"},
+                        "y": {"type": "periodic"},
+                    },
+                }
             }
-        })
+        )
         assert '"type" -> "periodic"' in wls
         # Periodic BCs should NOT have a "value" key
         assert '"value"' not in wls
@@ -442,22 +456,24 @@ class TestGaugeToml:
         """Parameter xi=2.0 appears as fourth argument to BuildLorenzGaugeTerm."""
         import re
 
-        wls = self._generate(
-            {"gauge": [{"field": "A", "type": "lorenz", "xi": 2.0}]}
-        )
+        wls = self._generate({"gauge": [{"field": "A", "type": "lorenz", "xi": 2.0}]})
         # xi=2.0 should appear as the fourth argument to the builder call
         assert re.search(r"BuildLorenzGaugeTerm\[.*,\s*2(\.0)?\s*\]", wls)
 
     def test_custom_expression_in_wls(self) -> None:
         """Custom gauge expression → GaugeTerm + AddGaugeFixingTerm in WLS."""
-        wls = self._generate({
-            "gauge": [{
-                "field": "A",
-                "type": "custom",
-                "mechanism": "lagrangian_term",
-                "expression": "-(1/2) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]",
-            }]
-        })
+        wls = self._generate(
+            {
+                "gauge": [
+                    {
+                        "field": "A",
+                        "type": "custom",
+                        "mechanism": "lagrangian_term",
+                        "expression": "-(1/2) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]",
+                    }
+                ]
+            }
+        )
         assert "GaugeTerm" in wls
         assert "AddGaugeFixingTerm" in wls
 
@@ -505,35 +521,41 @@ class TestGaugeToml:
 
     def test_de_donder_in_wls(self) -> None:
         """De Donder gauge on tensor → BuildDeDonderGaugeTerm in WLS output."""
-        wls = self._generate({
-            "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}],
-            "derived_fields": [],
-            "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
-            "gauge": [{"field": "h", "type": "de_donder"}],
-        })
+        wls = self._generate(
+            {
+                "fields": [
+                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}
+                ],
+                "derived_fields": [],
+                "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
+                "gauge": [{"field": "h", "type": "de_donder"}],
+            }
+        )
         assert "BuildDeDonderGaugeTerm" in wls
         assert "GaugeFix.wl" in wls
         assert "ToCanonical" in wls
 
     def test_mixed_type_a_and_b_in_wls(self) -> None:
         """Mixed Type A + Type B: loads GaugeFix.wl for Type A, has substitution for Type B."""
-        wls = self._generate({
-            "fields": [
-                {"name": "A", "type": "vector"},
-                {"name": "B", "type": "vector"},
-            ],
-            "derived_fields": [],
-            "lagrangian": {
-                "expression": (
-                    "-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] "
-                    "- 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-c][B[-d]]"
-                )
-            },
-            "gauge": [
-                {"field": "A", "type": "lorenz"},
-                {"field": "B", "type": "temporal"},
-            ],
-        })
+        wls = self._generate(
+            {
+                "fields": [
+                    {"name": "A", "type": "vector"},
+                    {"name": "B", "type": "vector"},
+                ],
+                "derived_fields": [],
+                "lagrangian": {
+                    "expression": (
+                        "-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] "
+                        "- 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-c][B[-d]]"
+                    )
+                },
+                "gauge": [
+                    {"field": "A", "type": "lorenz"},
+                    {"field": "B", "type": "temporal"},
+                ],
+            }
+        )
         assert "BuildLorenzGaugeTerm" in wls
         assert "GaugeFix.wl" in wls
         assert ":> 0" in wls
@@ -611,9 +633,7 @@ class TestValidateSolverParamsAdaptive:
         from tidal.cli._simulate import _validate_solver_params
 
         with pytest.raises(ValueError, match="--tolerance must be positive"):
-            _validate_solver_params(
-                self._make_args(adaptive=True, tolerance=-1e-4)
-            )
+            _validate_solver_params(self._make_args(adaptive=True, tolerance=-1e-4))
 
     def test_negative_max_step_rejected(self) -> None:
         from tidal.cli._simulate import _validate_solver_params
@@ -637,9 +657,7 @@ class TestValidateSolverParamsAdaptive:
     def test_valid_adaptive_rk_args(self) -> None:
         from tidal.cli._simulate import _validate_solver_params
 
-        _validate_solver_params(
-            self._make_args(adaptive=True, tolerance=1e-5)
-        )
+        _validate_solver_params(self._make_args(adaptive=True, tolerance=1e-5))
 
     def test_max_step_rejected_without_scipy(self) -> None:
         """T6: --max-step raises ValueError when scheme is not scipy."""
@@ -653,9 +671,7 @@ class TestValidateSolverParamsAdaptive:
         from tidal.cli._simulate import _validate_solver_params
 
         with pytest.raises(ValueError, match="--max-step requires --scheme scipy"):
-            _validate_solver_params(
-                self._make_args(scheme="runge-kutta", max_step=0.5)
-            )
+            _validate_solver_params(self._make_args(scheme="runge-kutta", max_step=0.5))
 
     def test_max_step_accepted_with_scipy(self) -> None:
         from tidal.cli._simulate import _validate_solver_params
@@ -695,9 +711,7 @@ class TestFormatSolverLog:
     def test_scipy_format(self) -> None:
         from tidal.cli._simulate import _format_solver_log
 
-        msg = _format_solver_log(
-            self._make_args(scheme="scipy", rtol=1e-8), 0.01, 0.05
-        )
+        msg = _format_solver_log(self._make_args(scheme="scipy", rtol=1e-8), 0.01, 0.05)
         assert "DOP853" in msg
         assert "rtol=1e-08" in msg
         assert "max_step=0.0500" in msg

@@ -42,10 +42,13 @@ from tidal.measurement import (
 )
 from tidal.measurement._energy import (
     _apply_spatial_operator,
+    _build_constraint_momenta,
     _compute_constraint_coupling_energy,
     _compute_constraint_self_energy,
     _compute_virial_potential,
+    _estimate_constraint_momentum,
     _gradient_energy_density,
+    _is_constraint_momentum,
     _is_momentum_field,
     _resolve_term_target,
     _self_gradient_axes,
@@ -3279,3 +3282,242 @@ class TestSnapshotCountValidation:
 
         with pytest.raises(ValueError, match="Metadata claims 100 snapshots"):
             SimulationData.from_directory(out, spec)
+
+
+# ============================================================
+# Constraint momentum estimation tests
+# ============================================================
+
+
+def _make_proca_spec_with_gradient_pi0() -> EquationSystem:
+    """Build a spec where A_1's equation has gradient_x(pi_0).
+
+    A_0: constraint (time_order=0), Helmholtz: laplacian_x(A_0) + source
+    A_1: dynamical (time_order=2), wave: laplacian_x(A_1) + gradient_x(pi_0)
+    """
+    eq_a0 = ComponentEquation(
+        field_name="A_0",
+        field_index=0,
+        time_derivative_order=0,
+        rhs_terms=(
+            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_0"),
+            OperatorTerm(coefficient=-1.0, operator="identity", field="A_0"),
+        ),
+    )
+    eq_a1 = ComponentEquation(
+        field_name="A_1",
+        field_index=1,
+        time_derivative_order=2,
+        rhs_terms=(
+            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_1"),
+            OperatorTerm(coefficient=1.0, operator="gradient_x", field="pi_0"),
+        ),
+    )
+    return EquationSystem(
+        n_components=2,
+        dimension=2,
+        spatial_dimension=1,
+        equations=(eq_a0, eq_a1),
+        component_names=("A_0", "A_1"),
+        mass_matrix=((1.0, 0.0), (0.0, 0.0)),
+        coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+        metadata={},
+        coordinates=("t", "x"),
+    )
+
+
+class TestConstraintMomentumEstimation:
+    """Test _estimate_constraint_momentum and _build_constraint_momenta."""
+
+    def test_first_snapshot_returns_none(self) -> None:
+        """t_idx=0 returns None (no previous data)."""
+        spec = _make_proca_spec_with_gradient_pi0()
+        n = 32
+        dx = 10.0 / n
+        data = SimulationData(
+            times=np.array([0.0, 0.1]),
+            fields={
+                "A_0": np.zeros((2, n)),
+                "A_1": np.zeros((2, n)),
+            },
+            momenta={"A_1": np.zeros((2, n))},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+        result = _estimate_constraint_momentum(data, "A_0", 0)
+        assert result is None
+
+    def test_backward_fd_accuracy(self) -> None:
+        """FD estimate matches analytic derivative for linear-in-time field."""
+        spec = _make_proca_spec_with_gradient_pi0()
+        n = 32
+        dx = 10.0 / n
+        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
+        rate = 3.0  # d_t(A_0) = 3.0 everywhere
+
+        data = SimulationData(
+            times=np.array([0.0, 0.1, 0.2]),
+            fields={
+                "A_0": np.stack([
+                    np.sin(x),
+                    np.sin(x) + rate * 0.1,
+                    np.sin(x) + rate * 0.2,
+                ]),
+                "A_1": np.zeros((3, n)),
+            },
+            momenta={"A_1": np.zeros((3, n))},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+        result = _estimate_constraint_momentum(data, "A_0", 2)
+        assert result is not None
+        np.testing.assert_allclose(result, rate, atol=1e-12)
+
+    def test_zero_dt_returns_none(self) -> None:
+        """Equal consecutive times returns None."""
+        spec = _make_proca_spec_with_gradient_pi0()
+        n = 32
+        dx = 10.0 / n
+        data = SimulationData(
+            times=np.array([0.0, 0.0]),  # same time
+            fields={
+                "A_0": np.ones((2, n)),
+                "A_1": np.zeros((2, n)),
+            },
+            momenta={"A_1": np.zeros((2, n))},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+        result = _estimate_constraint_momentum(data, "A_0", 1)
+        assert result is None
+
+    def test_build_constraint_momenta_collects_all(self) -> None:
+        """_build_constraint_momenta returns dict for all constraint fields."""
+        spec = _make_proca_spec_with_gradient_pi0()
+        n = 32
+        dx = 10.0 / n
+        data = SimulationData(
+            times=np.array([0.0, 0.1]),
+            fields={
+                "A_0": np.stack([np.zeros(n), np.ones(n)]),
+                "A_1": np.zeros((2, n)),
+            },
+            momenta={"A_1": np.zeros((2, n))},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+        cm = _build_constraint_momenta(data, 1)
+        assert "A_0" in cm
+        # A_0 went from 0 to 1 in dt=0.1 -> rate = 10.0
+        np.testing.assert_allclose(cm["A_0"], 10.0, atol=1e-12)
+
+    def test_is_constraint_momentum(self) -> None:
+        """_is_constraint_momentum correctly identifies constraint vs dynamical."""
+        spec = _make_proca_spec_with_gradient_pi0()
+        assert _is_constraint_momentum("pi_0", spec) is True
+        assert _is_constraint_momentum("pi_1", spec) is False
+        assert _is_constraint_momentum("A_0", spec) is False
+
+
+class TestVirialWithConstraintMomenta:
+    """Test virial potential includes constraint momentum coupling."""
+
+    def test_gradient_pi0_contributes_to_virial(self) -> None:
+        """gradient_x(pi_0) in A_1 equation contributes when A_0 changes."""
+        spec = _make_proca_spec_with_gradient_pi0()
+        n = 64
+        dx = 10.0 / n
+        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
+        k = 2.0 * np.pi / 10.0
+
+        # A_0 changes between snapshots -> pi_0 is nonzero
+        # pi_0 ~ d_t(A_0) = 5*sin(kx), gradient_x(pi_0) ~ 5*k*cos(kx)
+        a0_t0 = np.cos(k * x)
+        a0_t1 = np.cos(k * x) + 0.5 * np.sin(k * x)  # shifted
+
+        # Use cos(kx) for A_1 so A_1 * gradient_x(pi_0) ~ cos^2(kx) > 0
+        # (sin*cos averages to zero by orthogonality, cos*cos does not)
+        a1_data = 0.3 * np.cos(k * x)
+
+        data = SimulationData(
+            times=np.array([0.0, 0.1]),
+            fields={
+                "A_0": np.stack([a0_t0, a0_t1]),
+                "A_1": np.stack([a1_data, a1_data]),
+            },
+            momenta={"A_1": np.zeros((2, n))},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+
+        # At t_idx=1, constraint momentum is nonzero -> virial should differ
+        virial_t1 = _compute_virial_potential(data, 1)
+        # Virial at t_idx=0 has no constraint momentum contribution
+        virial_t0 = _compute_virial_potential(data, 0)
+
+        # Both should be nonzero (laplacian_x(A_1) term always present)
+        # but t1 should differ from t0 due to gradient_x(pi_0)
+        assert virial_t1 != pytest.approx(virial_t0, abs=1e-10), (
+            f"Virial should differ: t0={virial_t0}, t1={virial_t1}"
+        )
+
+    def test_virial_at_t0_excludes_constraint_momenta(self) -> None:
+        """At t_idx=0, constraint momenta are zero (no previous snapshot)."""
+        spec = _make_proca_spec_with_gradient_pi0()
+        n = 64
+        dx = 10.0 / n
+        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
+        k = 2.0 * np.pi / 10.0
+
+        # Make A_0 nonzero so gradient_x(pi_0) WOULD contribute if pi_0 != 0
+        a0_data = np.cos(k * x)
+        a1_data = 0.3 * np.sin(k * x)
+
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={
+                "A_0": a0_data[np.newaxis, :],
+                "A_1": a1_data[np.newaxis, :],
+            },
+            momenta={"A_1": np.zeros((1, n))},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+
+        # Build a version WITHOUT gradient_x(pi_0) for comparison
+        eq_a1_no_pi = ComponentEquation(
+            field_name="A_1",
+            field_index=1,
+            time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_1"),
+            ),
+        )
+        spec_no_pi = dataclasses.replace(
+            spec, equations=(spec.equations[0], eq_a1_no_pi)
+        )
+        data_no_pi = dataclasses.replace(data, spec=spec_no_pi)
+
+        virial_with_pi = _compute_virial_potential(data, 0)
+        virial_no_pi = _compute_virial_potential(data_no_pi, 0)
+
+        # At t_idx=0, constraint momentum is zero -> both should match
+        assert virial_with_pi == pytest.approx(virial_no_pi, abs=1e-14)
