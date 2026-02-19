@@ -492,7 +492,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--output",
         default=None,
         metavar="PATH",
-        help="Output file path (default: DATA_DIR/{type}.png)",
+        help="Output file path (default: DATA_DIR/{type}[_{field}][_tN].png)",
     )
     plot_parser.add_argument(
         "--dpi",
