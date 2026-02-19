@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from tidal.measurement._energy import (
-    _validate_array,  # pyright: ignore[reportPrivateUsage]
+    validate_array,
 )
 
 if TYPE_CHECKING:
@@ -68,7 +68,7 @@ def _apply_hann_window(
     return data
 
 
-def _build_k_grid(
+def build_k_grid(
     field_shape: tuple[int, ...],
     grid_spacing: tuple[float, ...],
 ) -> tuple[list[NDArray[np.float64]], NDArray[np.float64]]:
@@ -90,7 +90,7 @@ def _build_k_grid(
     return k_grid, k_mag
 
 
-def _radial_bin(
+def radial_bin(
     k_mag: NDArray[np.float64],
     values: NDArray[np.float64],
     grid_spacing: tuple[float, ...],
@@ -140,14 +140,14 @@ def compute_spectrum(
     -------
     SpectralSnapshot
     """
-    _validate_array(field_data, "field_data")
+    validate_array(field_data, "field_data")
 
     data_for_fft = _apply_hann_window(field_data, periodic)
     fhat = np.fft.rfftn(data_for_fft)
     power_full = np.abs(fhat) ** 2
 
-    _k_grid, k_mag = _build_k_grid(field_data.shape, grid_spacing)
-    wavenumbers, binned = _radial_bin(k_mag, power_full, grid_spacing, field_data.shape)
+    _k_grid, k_mag = build_k_grid(field_data.shape, grid_spacing)
+    wavenumbers, binned = radial_bin(k_mag, power_full, grid_spacing, field_data.shape)
     return SpectralSnapshot(wavenumbers=wavenumbers, power_spectrum=binned)
 
 
@@ -189,7 +189,7 @@ def compute_spectral_energy(
         If *mass_squared* is an ndarray (position-dependent mass breaks
         the Fourier-diagonal structure).
     """
-    _validate_array(field_data, "field_data")
+    validate_array(field_data, "field_data")
 
     if isinstance(mass_squared, np.ndarray):
         msg = (
@@ -201,7 +201,7 @@ def compute_spectral_energy(
         raise TypeError(msg)
 
     phi_hat = np.fft.rfftn(field_data)
-    k_grid, k_mag = _build_k_grid(field_data.shape, grid_spacing)
+    k_grid, k_mag = build_k_grid(field_data.shape, grid_spacing)
     k_sq = sum(ki**2 for ki in k_grid)
 
     n_total = float(np.array(field_data.shape).prod())
@@ -211,13 +211,13 @@ def compute_spectral_energy(
     energy_field = 0.5 * (k_sq + mass_squared) * np.abs(phi_hat) ** 2 * norm
 
     if momentum_data is not None:
-        _validate_array(momentum_data, "momentum_data")
+        validate_array(momentum_data, "momentum_data")
         pi_hat = np.fft.rfftn(momentum_data)
         energy_total = energy_field + 0.5 * np.abs(pi_hat) ** 2 * norm
     else:
         energy_total = energy_field
 
-    return _radial_bin(k_mag, energy_total, grid_spacing, field_data.shape)
+    return radial_bin(k_mag, energy_total, grid_spacing, field_data.shape)
 
 
 def compute_mode_amplitudes(

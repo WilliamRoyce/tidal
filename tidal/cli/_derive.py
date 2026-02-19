@@ -466,14 +466,16 @@ def _validate_gauge(config: dict[str, Any]) -> None:
         type, targets a scalar (no gauge freedom), duplicates a field, or
         is missing required keys for custom gauges.
     """
-    gauge_list = config.get("gauge", [])
+    gauge_list: list[dict[str, Any]] = config.get("gauge", [])
     if not gauge_list:
         return
     if not isinstance(gauge_list, list):  # pyright: ignore[reportUnnecessaryIsInstance]
         msg = "[[gauge]] must be an array of tables"
         raise TypeError(msg)
 
-    field_map = {f["name"]: f for f in config.get("fields", [])}
+    field_map: dict[str, dict[str, Any]] = {
+        f["name"]: f for f in config.get("fields", [])
+    }
     seen_fields: set[str] = set()
 
     for i, entry in enumerate(gauge_list):

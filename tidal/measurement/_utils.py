@@ -14,7 +14,7 @@ if TYPE_CHECKING:
     from tidal.measurement._io import SimulationData
 
 
-def _normalize_group(  # pyright: ignore[reportUnusedFunction]  # used by sibling modules
+def normalize_group(
     fields: str | Sequence[str],
 ) -> tuple[str, ...]:
     """Normalize a string or sequence to a tuple of field names."""
@@ -23,7 +23,7 @@ def _normalize_group(  # pyright: ignore[reportUnusedFunction]  # used by siblin
     return tuple(fields)
 
 
-def _check_no_position_dependent_terms(  # pyright: ignore[reportUnusedFunction]  # used by sibling modules
+def check_no_position_dependent_terms(
     data: SimulationData,
     context: str,
 ) -> None:

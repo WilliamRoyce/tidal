@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from tidal.measurement._energy import (
-    _ENERGY_FLOOR,  # pyright: ignore[reportPrivateUsage]
+    ENERGY_FLOOR,
     compute_energy_timeseries,
 )
 
@@ -70,7 +70,7 @@ def check_energy_conservation(
     times, _per_field, _interaction, total = compute_energy_timeseries(data)
 
     e0 = total[0]
-    relative_error = (total - e0) / e0 if e0 >= _ENERGY_FLOOR else np.zeros_like(total)
+    relative_error = (total - e0) / e0 if e0 >= ENERGY_FLOOR else np.zeros_like(total)
 
     max_err = float(np.max(np.abs(relative_error)))
 

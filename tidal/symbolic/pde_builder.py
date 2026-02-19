@@ -3012,7 +3012,7 @@ class PDEFromSpec(PDEBase):
 
     def jacobian_sparsity(  # noqa: C901, PLR0912
         self, grid: GridBase,
-    ) -> object | None:
+    ) -> Any | None:  # noqa: ANN401 — scipy lacks type stubs
         """Compute Jacobian sparsity pattern for implicit solvers.
 
         For stiff solvers (Radau, BDF), providing the sparsity pattern avoids

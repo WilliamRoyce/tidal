@@ -271,7 +271,7 @@ class TestBackgroundEnergy:
 
     def test_constant_background_mass_resolves(self) -> None:
         """Constant symbolic mass from background field resolves for energy."""
-        from tidal.measurement._energy import _resolve_mass_squared
+        from tidal.measurement._energy import resolve_mass_squared
         from tidal.measurement._io import SimulationData
 
         spec = EquationSystem(
@@ -314,10 +314,10 @@ class TestBackgroundEnergy:
             parameters={"V0": 4.0},
         )
 
-        m2 = _resolve_mass_squared(data, 0)
+        m2 = resolve_mass_squared(data, 0)
         # Convention: matrix[i][j] = -(coefficient of identity(field_j))
         # mass_matrix_symbolic stores raw "-V0", resolution gives -V0 = -4.0
-        # then _resolve_mass_squared negates: -(-4.0) = 4.0
+        # then resolve_mass_squared negates: -(-4.0) = 4.0
         assert m2 == pytest.approx(4.0)
 
     def test_position_dependent_mass_in_virial_works(self) -> None:
@@ -372,8 +372,8 @@ class TestBackgroundEnergy:
         assert result != 0.0
 
     def test_position_dependent_mass_resolved_on_grid(self) -> None:
-        """_resolve_mass_squared returns ndarray for position-dependent mass."""
-        from tidal.measurement._energy import _resolve_mass_squared
+        """resolve_mass_squared returns ndarray for position-dependent mass."""
+        from tidal.measurement._energy import resolve_mass_squared
         from tidal.measurement._io import SimulationData
 
         spec = EquationSystem(
@@ -415,12 +415,12 @@ class TestBackgroundEnergy:
             parameters={"V0": 3.0},
         )
 
-        m2 = _resolve_mass_squared(data, 0)
+        m2 = resolve_mass_squared(data, 0)
         # Position-dependent → returns ndarray
         assert isinstance(m2, np.ndarray)
         assert m2.shape == (16, 16)
         # Center cell at (0.3125, 0.3125) — not exactly (0,0) so exp != 1
-        # coefficient_symbolic = -V0*exp(-(x^2+y^2)), _resolve_mass_squared negates
+        # coefficient_symbolic = -V0*exp(-(x^2+y^2)), resolve_mass_squared negates
         # Verify center has highest value and edges are smaller
         assert m2[8, 8] > m2[0, 0], "Center should be > corner"
         assert m2[8, 8] == pytest.approx(3.0, abs=0.6)  # close to V0=3.0

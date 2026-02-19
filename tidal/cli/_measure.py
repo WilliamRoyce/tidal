@@ -55,7 +55,7 @@ _VALID_MEASUREMENTS = frozenset({
 # ------------------------------------------------------------------
 
 
-def _resolve_spec_path(data_path: Path, spec_arg: str | None) -> Path:
+def resolve_spec_path(data_path: Path, spec_arg: str | None) -> Path:
     """Resolve the JSON spec path from CLI flag or directory metadata.
 
     Resolution order:
@@ -129,7 +129,7 @@ def _parse_field_list(raw: str | None) -> tuple[str, ...] | None:
     return tuple(s.strip() for s in raw.split(",") if s.strip())
 
 
-def _load_data(
+def load_data(
     data_path: Path,
     spec_path: Path,
     param_overrides: list[str],
@@ -138,7 +138,7 @@ def _load_data(
 
     Merges ``--param`` overrides with parameters stored in the data.
     """
-    from tidal.cli._simulate import _parse_params  # pyright: ignore[reportPrivateUsage]
+    from tidal.cli._simulate import parse_params
     from tidal.measurement import SimulationData
     from tidal.symbolic import load_equation_system
 
@@ -148,7 +148,7 @@ def _load_data(
     # Merge CLI param overrides
     if param_overrides:
         merged = dict(data.parameters)
-        cli_params = _parse_params(param_overrides, spec)
+        cli_params = parse_params(param_overrides, spec)
         merged.update(cli_params)
         from dataclasses import replace
 
@@ -689,7 +689,7 @@ def measure_command(args: Namespace) -> int:
         print(f"Error: data path not found: {data_path}", file=sys.stderr)
         return 1
 
-    spec_path = _resolve_spec_path(data_path, getattr(args, "spec", None))
+    spec_path = resolve_spec_path(data_path, getattr(args, "spec", None))
     measurements = _parse_measurements(getattr(args, "what", None))
     quiet: bool = getattr(args, "quiet", False)
 
@@ -697,7 +697,7 @@ def measure_command(args: Namespace) -> int:
         print(f"Loading: {data_path.name}")
         print(f"Spec:    {spec_path.name}")
 
-    data = _load_data(data_path, spec_path, getattr(args, "param", None) or [])
+    data = load_data(data_path, spec_path, getattr(args, "param", None) or [])
 
     if not quiet:
         print(

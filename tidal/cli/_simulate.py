@@ -39,7 +39,7 @@ VMAX_FLOOR = 0.01
 # Curated namespace for --ic-formula eval().
 # Includes np for backward compatibility (e.g. np.exp(...) in formulas)
 # plus named math functions for convenience.
-_FORMULA_NAMESPACE: dict[str, object] = {
+FORMULA_NAMESPACE: dict[str, object] = {
     "np": np,
     "pi": np.pi,
     "e": np.e,
@@ -97,7 +97,7 @@ def field_slots(spec: EquationSystem) -> dict[str, int]:
     }
 
 
-def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:  # noqa: C901
+def parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:  # noqa: C901
     """Parse --param KEY=VAL arguments into a dict.
 
     Also merges default parameters from metadata when not overridden.
@@ -302,7 +302,7 @@ def _build_grid(
     )
 
 
-def _validate_formula_ast(expr: str, allowed_names: set[str]) -> None:
+def validate_formula_ast(expr: str, allowed_names: set[str]) -> None:
     """Validate a formula expression using AST analysis.
 
     Only allows safe math constructs: literals, names from the allowed set,
@@ -405,12 +405,12 @@ def _apply_formula_ic(
         raise ValueError(msg)
 
     coords = spec.spatial_coordinates
-    namespace = dict(_FORMULA_NAMESPACE)
+    namespace = dict(FORMULA_NAMESPACE)
     for i, name in enumerate(coords):
         namespace[name] = grid.cell_coords[..., i]
 
     allowed_names = set(namespace.keys())
-    _validate_formula_ast(args.ic_formula, allowed_names)
+    validate_formula_ast(args.ic_formula, allowed_names)
 
     field_arr = eval(args.ic_formula, {"__builtins__": {}}, namespace)  # noqa: S307
     field_arr = np.asarray(field_arr, dtype=float)
@@ -887,7 +887,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
     )
 
     # Step 2: Parse parameters
-    params = _parse_params(args.param, spec)
+    params = parse_params(args.param, spec)
     if params:
         log(f"  Parameters: {params}")
 

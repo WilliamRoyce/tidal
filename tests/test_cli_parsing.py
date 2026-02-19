@@ -16,8 +16,8 @@ from tidal.cli._simulate import (
     _parse_bc,
     _parse_bounds,
     _parse_grid_shape,
-    _parse_params,
     _parse_single_bound,
+    parse_params,
 )
 
 # ==================== _parse_grid_shape ====================
@@ -174,41 +174,41 @@ def _make_spec_stub(metadata: dict[str, object] | None = None) -> object:
 class TestParseParams:
     def test_empty_list_no_metadata(self) -> None:
         spec = _make_spec_stub()
-        assert _parse_params([], spec) == {}  # type: ignore[arg-type]
+        assert parse_params([], spec) == {}  # type: ignore[arg-type]
 
     def test_metadata_defaults_loaded(self) -> None:
         spec = _make_spec_stub({"parameters": {"m2": 1.0, "g": 0.5}})
-        result = _parse_params([], spec)  # type: ignore[arg-type]
+        result = parse_params([], spec)  # type: ignore[arg-type]
         assert result == {"m2": 1.0, "g": 0.5}
 
     def test_cli_overrides_metadata(self) -> None:
         spec = _make_spec_stub({"parameters": {"m2": 1.0}})
-        result = _parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
+        result = parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
         assert result == {"m2": 2.0}
 
     def test_missing_equals_raises(self) -> None:
         spec = _make_spec_stub()
         with pytest.raises(ValueError, match="KEY=VALUE"):
-            _parse_params(["bad_no_equals"], spec)  # type: ignore[arg-type]
+            parse_params(["bad_no_equals"], spec)  # type: ignore[arg-type]
 
     def test_non_numeric_value_raises(self) -> None:
         spec = _make_spec_stub()
         with pytest.raises(ValueError, match="Must be a number"):
-            _parse_params(["m2=abc"], spec)  # type: ignore[arg-type]
+            parse_params(["m2=abc"], spec)  # type: ignore[arg-type]
 
     def test_non_numeric_metadata_skipped(self, capsys: pytest.CaptureFixture[str]) -> None:
         spec = _make_spec_stub({"parameters": {"note": "not a number", "m2": 1.0}})
-        result = _parse_params([], spec)  # type: ignore[arg-type]
+        result = parse_params([], spec)  # type: ignore[arg-type]
         assert result == {"m2": 1.0}
         assert "Warning" in capsys.readouterr().err
 
     def test_no_parameters_key_in_metadata(self) -> None:
         spec = _make_spec_stub({"source": "xAct"})
-        assert _parse_params([], spec) == {}  # type: ignore[arg-type]
+        assert parse_params([], spec) == {}  # type: ignore[arg-type]
 
     def test_warns_unknown_param(self, capsys: pytest.CaptureFixture[str]) -> None:
         spec = _make_spec_stub({"parameters": {"m2": 1.0}})
-        result = _parse_params(["m2=2.0", "bogus=3.0"], spec)  # type: ignore[arg-type]
+        result = parse_params(["m2=2.0", "bogus=3.0"], spec)  # type: ignore[arg-type]
         assert result == {"m2": 2.0, "bogus": 3.0}
         err = capsys.readouterr().err
         assert "bogus" in err
@@ -216,7 +216,7 @@ class TestParseParams:
 
     def test_no_warning_for_known_param(self, capsys: pytest.CaptureFixture[str]) -> None:
         spec = _make_spec_stub({"parameters": {"m2": 1.0}})
-        _parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
+        parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
         err = capsys.readouterr().err
         assert "not found" not in err
 
@@ -267,79 +267,79 @@ class TestValidateFormulaAst:
     """Tests for _validate_formula_ast AST-based formula validation."""
 
     def test_valid_simple_expression(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
-        _validate_formula_ast("x + 1", {"x"})
+        validate_formula_ast("x + 1", {"x"})
 
     def test_valid_function_calls(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
-        _validate_formula_ast("sin(x) + cos(y)", {"sin", "cos", "x", "y"})
+        validate_formula_ast("sin(x) + cos(y)", {"sin", "cos", "x", "y"})
 
     def test_valid_numpy_attribute(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
-        _validate_formula_ast("np.exp(-x**2)", {"np", "x"})
+        validate_formula_ast("np.exp(-x**2)", {"np", "x"})
 
     def test_rejects_unknown_name(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
         with pytest.raises(ValueError, match="Disallowed name 'badvar'"):
-            _validate_formula_ast("badvar * 2", {"x"})
+            validate_formula_ast("badvar * 2", {"x"})
 
     def test_rejects_attribute_access(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
         with pytest.raises(ValueError, match="Attribute access not allowed"):
-            _validate_formula_ast("x.__class__", {"x"})
+            validate_formula_ast("x.__class__", {"x"})
 
     def test_rejects_import_name(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
         with pytest.raises(ValueError, match="Disallowed name '__import__'"):
-            _validate_formula_ast("__import__('os')", {"x"})
+            validate_formula_ast("__import__('os')", {"x"})
 
     def test_rejects_lambda(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
         with pytest.raises(TypeError, match=r"Disallowed construct.*Lambda"):
-            _validate_formula_ast("(lambda: 1)()", {"x"})
+            validate_formula_ast("(lambda: 1)()", {"x"})
 
     def test_valid_ternary(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
-        _validate_formula_ast("x if x > 0 else -x", {"x"})
+        validate_formula_ast("x if x > 0 else -x", {"x"})
 
     def test_valid_complex_math(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
-        _validate_formula_ast(
+        validate_formula_ast(
             "exp(-((x - 5)**2 + (y - pi)**2) / 0.5**2)",
             {"exp", "x", "y", "pi"},
         )
 
     def test_rejects_list_comprehension(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
         with pytest.raises(TypeError, match=r"Disallowed construct.*ListComp"):
-            _validate_formula_ast("[i for i in x]", {"x", "i"})
+            validate_formula_ast("[i for i in x]", {"x", "i"})
 
     def test_rejects_walrus_operator(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
         with pytest.raises(TypeError, match=r"Disallowed construct.*NamedExpr"):
-            _validate_formula_ast("(y := x + 1)", {"x", "y"})
+            validate_formula_ast("(y := x + 1)", {"x", "y"})
 
     def test_rejects_nested_attribute(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
         with pytest.raises(ValueError, match="Attribute access not allowed"):
-            _validate_formula_ast("x.a.b", {"x"})
+            validate_formula_ast("x.a.b", {"x"})
 
     def test_allows_subscript_slicing(self) -> None:
-        from tidal.cli._simulate import _validate_formula_ast
+        from tidal.cli._simulate import validate_formula_ast
 
-        _validate_formula_ast("x[0:5]", {"x"})
+        validate_formula_ast("x[0:5]", {"x"})
 
 
 # ==================== generate_wls constraint_solver ====================

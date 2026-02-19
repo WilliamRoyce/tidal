@@ -36,7 +36,7 @@ if TYPE_CHECKING:
 
 # Threshold below which energy is treated as zero.  Prevents division by
 # near-zero values from floating-point integration noise.
-_ENERGY_FLOOR: float = 1e-12
+ENERGY_FLOOR: float = 1e-12
 
 # Axis letter → numpy axis index (spatial axes only).
 _AXIS_MAP: dict[str, int] = {"x": 0, "y": 1, "z": 2}
@@ -490,9 +490,9 @@ def compute_field_energy(  # noqa: PLR0913
     -------
     FieldEnergy
     """
-    _validate_array(field_data, "field_data")
+    validate_array(field_data, "field_data")
     if momentum_data is not None:
-        _validate_array(momentum_data, "momentum_data")
+        validate_array(momentum_data, "momentum_data")
 
     # Kinetic energy density: 0.5 * ⟨π²⟩
     if momentum_data is not None:
@@ -516,7 +516,7 @@ def compute_field_energy(  # noqa: PLR0913
 # ------------------------------------------------------------------
 
 
-def _resolve_mass_squared(
+def resolve_mass_squared(
     data: SimulationData,
     field_idx: int,
     coord_arrays: dict[str, NDArray[np.float64]] | None = None,
@@ -658,7 +658,7 @@ def _compute_constraint_self_energy(
         energy -= 0.5 * float(grad_sq.mean())
 
         # Mass: -½ ⟨m² C²⟩  (NEGATIVE, m² may be scalar or ndarray)
-        m2 = _resolve_mass_squared(data, field_idx)
+        m2 = resolve_mass_squared(data, field_idx)
         energy -= 0.5 * float((m2 * c_field**2).mean())
 
     return energy
@@ -804,7 +804,7 @@ def compute_system_energy(  # noqa: PLR0914
         mom_snapshot = data.momenta.get(name)
         mom_arr = mom_snapshot[t_idx] if mom_snapshot is not None else None
 
-        m2 = _resolve_mass_squared(data, field_idx, coord_arrays=coord_arrays)
+        m2 = resolve_mass_squared(data, field_idx, coord_arrays=coord_arrays)
         axes = _self_gradient_axes(eq)
         per_field[name] = compute_field_energy(
             field_snapshot, mom_arr, m2, data.grid_spacing, data.periodic,
@@ -882,7 +882,7 @@ def compute_energy_timeseries(
 # ------------------------------------------------------------------
 
 
-def _validate_array(arr: NDArray[np.float64], label: str) -> None:
+def validate_array(arr: NDArray[np.float64], label: str) -> None:
     """Check array for non-finite values.
 
     Raises

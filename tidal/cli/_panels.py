@@ -37,7 +37,7 @@ _LINE_COLORS = (
 # -- Helpers ----------------------------------------------------------------
 
 
-def _field_names(data: SimulationData, requested: list[str] | None) -> list[str]:
+def field_names(data: SimulationData, requested: list[str] | None) -> list[str]:
     """Resolve field names, defaulting to all fields in spec order.
 
     Raises
@@ -57,7 +57,7 @@ def _field_names(data: SimulationData, requested: list[str] | None) -> list[str]
     return requested
 
 
-def _single_field(data: SimulationData, requested: str | None) -> str:
+def single_field(data: SimulationData, requested: str | None) -> str:
     """Resolve a single field name, defaulting to first field.
 
     Raises
@@ -80,7 +80,7 @@ def _spatial_dim(data: SimulationData) -> int:
     return first.ndim - 1  # (n_snapshots, *spatial_shape)
 
 
-def _resolve_time_indices(
+def resolve_time_indices(
     data: SimulationData,
     raw: list[int] | None,
     *,
@@ -209,7 +209,7 @@ def render_heatmap(
         cmap=cmap,
         vmin=-vmax,
         vmax=vmax,
-        extent=[x_min, x_max, t_min, t_max],
+        extent=(x_min, x_max, t_min, t_max),
     )
     ax.set_xlabel("x")
     ax.set_ylabel("t")
@@ -259,7 +259,7 @@ def render_snapshot(
             cmap=cmap,
             vmin=-vmax,
             vmax=vmax,
-            extent=[x_min, x_max, y_min, y_max],
+            extent=(x_min, x_max, y_min, y_max),
         )
         ax.set_xlabel("x")
         ax.set_ylabel("y")
@@ -307,10 +307,10 @@ def _plot_overlay(ax: Axes, data: SimulationData, formula: str) -> None:
     ValueError
         If the formula evaluation fails.
     """
-    from tidal.cli._simulate import _FORMULA_NAMESPACE
+    from tidal.cli._simulate import FORMULA_NAMESPACE
 
     t = data.times
-    ns = {**_FORMULA_NAMESPACE, "t": t}
+    ns = {**FORMULA_NAMESPACE, "t": t}
     try:
         values = eval(formula, {"__builtins__": {}}, ns)  # noqa: S307
     except Exception as exc:

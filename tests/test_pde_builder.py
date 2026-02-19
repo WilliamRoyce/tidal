@@ -2664,13 +2664,13 @@ class TestJacobianSparsity:
         # No coupling between A_0 block and A_1 block
         # A_0 is at [0:n], pi_A_0 at [n:2n], A_1 at [2n:3n], pi_A_1 at [3n:4n]
         # Check no entries in off-diagonal blocks
-        from scipy import sparse
+        from scipy import sparse  # pyright: ignore[reportMissingTypeStubs]
 
-        csr = sparse.csr_matrix(mat)
+        csr: Any = sparse.csr_matrix(mat)
         # pi_A_0 rows should have no entries in A_1 or pi_A_1 columns
         for i in range(n, 2 * n):
-            row = csr.getrow(i)
-            cols = row.indices
+            row: Any = csr.getrow(i)
+            cols: list[int] = list(row.indices)
             assert all(c < 2 * n for c in cols), f"Row {i} has unexpected cross-block entry"
 
     def test_coupled_cross_field_identity(

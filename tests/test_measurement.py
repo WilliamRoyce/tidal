@@ -41,14 +41,14 @@ from tidal.measurement import (
     summarize,
 )
 from tidal.measurement._energy import (
-    _apply_spatial_operator,  # pyright: ignore[reportPrivateUsage]
-    _compute_constraint_coupling_energy,  # pyright: ignore[reportPrivateUsage]
-    _compute_constraint_self_energy,  # pyright: ignore[reportPrivateUsage]
-    _compute_virial_potential,  # pyright: ignore[reportPrivateUsage]
-    _gradient_energy_density,  # pyright: ignore[reportPrivateUsage]
-    _is_momentum_field,  # pyright: ignore[reportPrivateUsage]
-    _resolve_term_target,  # pyright: ignore[reportPrivateUsage]
-    _self_gradient_axes,  # pyright: ignore[reportPrivateUsage]
+    _apply_spatial_operator,
+    _compute_constraint_coupling_energy,
+    _compute_constraint_self_energy,
+    _compute_virial_potential,
+    _gradient_energy_density,
+    _is_momentum_field,
+    _resolve_term_target,
+    _self_gradient_axes,
 )
 from tidal.symbolic.json_loader import (
     ComponentEquation,
@@ -1994,7 +1994,7 @@ class TestBincountRegression:
     def test_bincount_sums_correctly(self) -> None:
         """Radial binning should sum values into correct bins."""
         from tidal.measurement._spectral import (
-            _radial_bin,  # pyright: ignore[reportPrivateUsage]
+            radial_bin,
         )
 
         # Build a simple 2D k-magnitude grid and values
@@ -2009,7 +2009,7 @@ class TestBincountRegression:
 
         # Uniform values -- sum in each bin should equal count * value
         values = np.ones_like(k_mag)
-        centers, binned = _radial_bin(k_mag, values, grid_spacing, field_shape)
+        centers, binned = radial_bin(k_mag, values, grid_spacing, field_shape)
 
         # Total sum must be preserved
         np.testing.assert_allclose(binned.sum(), values.sum(), rtol=1e-12)
@@ -2596,7 +2596,7 @@ class TestCrashRecovery:
                 {"phi_0": np.zeros(n_grid), "chi_0": np.zeros(n_grid)},
             )
         # Flush without writing metadata.json
-        writer._flush_mmaps()  # pyright: ignore[reportPrivateUsage]
+        writer._flush_mmaps()
         # Delete metadata.json if it exists (it shouldn't, but be safe)
         meta_path = output_dir / "metadata.json"
         if meta_path.exists():
@@ -2632,7 +2632,7 @@ class TestCrashRecovery:
             {"phi_0": np.ones(n_grid), "chi_0": np.zeros(n_grid)},
             {"phi_0": np.zeros(n_grid), "chi_0": np.zeros(n_grid)},
         )
-        writer._flush_mmaps()  # pyright: ignore[reportPrivateUsage]
+        writer._flush_mmaps()
 
         # Remove metadata.json
         meta_path = output_dir / "metadata.json"
@@ -2932,7 +2932,7 @@ class TestCrashRecoveryHardened:
                 {"phi_0": np.full(n_grid, float(i)), "chi_0": np.zeros(n_grid)},
                 {"phi_0": np.zeros(n_grid), "chi_0": np.zeros(n_grid)},
             )
-        writer._flush_mmaps()  # pyright: ignore[reportPrivateUsage]
+        writer._flush_mmaps()
 
         # Corrupt entry 3 with NaN (simulating partial write)
         times_mmap = np.load(
