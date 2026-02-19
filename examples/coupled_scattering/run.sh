@@ -45,7 +45,7 @@
 #   uv run tidal measure ../data/coupled_scattering_output \
 #     --what conversion,mixing,spectral_conversion,dispersion \
 #     --source phi_0 --target chi_0 \
-#     --output ../data/coupled_scattering_measurement.png
+#     --output ../data/coupled_scattering_output/measurement.png
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -94,11 +94,11 @@ tidal measure ../data/coupled_scattering_output \
 tidal measure ../data/coupled_scattering_output \
   --what conversion,mixing,spectral_conversion,dispersion \
   --source phi_0 --target chi_0 \
-  --output ../data/coupled_scattering_measurement.png
+  --output ../data/coupled_scattering_output/measurement.png
 
-# Step 8: Individual plots
-tidal plot ../data/coupled_scattering_output --type amplitude --output ../data/csc_amplitude.png --quiet
-tidal plot ../data/coupled_scattering_output --type snapshot --field chi_0 --time-index -1 --output ../data/csc_chi_final.png --quiet
+# Step 8: Individual plots (saved into the simulation output directory)
+tidal plot ../data/coupled_scattering_output --type amplitude --quiet
+tidal plot ../data/coupled_scattering_output --type snapshot --field chi_0 --time-index -1 --quiet
 
 # NOTE: Energy diagnostics (virial) will raise ValueError for this example
 # because the coupling G(x,y) is position-dependent. The simulation and

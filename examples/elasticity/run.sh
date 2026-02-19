@@ -29,6 +29,6 @@ tidal simulate ../data/navier_cauchy_2d.json \
   --output ../data/elasticity_output
 
 # Visualize results — snapshots of each displacement component
-tidal plot ../data/elasticity_output --type snapshot --field ux_0 --time-index -1 --output ../data/elasticity_ux.png --quiet
-tidal plot ../data/elasticity_output --type snapshot --field uy_0 --time-index -1 --output ../data/elasticity_uy.png --quiet
-tidal plot ../data/elasticity_output --type amplitude --output ../data/elasticity_amplitude.png --quiet
+tidal plot ../data/elasticity_output --type snapshot --field ux_0 --time-index -1 --quiet
+tidal plot ../data/elasticity_output --type snapshot --field uy_0 --time-index -1 --quiet
+tidal plot ../data/elasticity_output --type amplitude --quiet

@@ -25,7 +25,7 @@ tidal simulate ../data/em_1d.json \
   --scheme scipy \
   --output ../data/em_output
 
-# Visualize results
-tidal plot ../data/em_output --type heatmap --field A_1 --output ../data/em_heatmap.png --quiet
-tidal plot ../data/em_output --type amplitude --output ../data/em_amplitude.png --quiet
-tidal plot ../data/em_output --type snapshot --time-index -1 --output ../data/em_final.png --quiet
+# Visualize results (plots saved into the simulation output directory)
+tidal plot ../data/em_output --type heatmap --field A_1 --quiet
+tidal plot ../data/em_output --type amplitude --quiet
+tidal plot ../data/em_output --type snapshot --time-index -1 --quiet

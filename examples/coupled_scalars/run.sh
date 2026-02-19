@@ -40,7 +40,7 @@
 #   uv run tidal measure ../data/coupled_scalars_output \
 #     --what conversion,mixing,spectral_conversion,dispersion \
 #     --source phi_0 --target chi_0 \
-#     --output ../data/coupled_scalars_measurement.png
+#     --output ../data/coupled_scalars_output/measurement.png
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -89,11 +89,11 @@ tidal measure ../data/coupled_scalars_output \
 tidal measure ../data/coupled_scalars_output \
   --what conversion,mixing,spectral_conversion,dispersion \
   --source phi_0 --target chi_0 \
-  --output ../data/coupled_scalars_measurement.png
+  --output ../data/coupled_scalars_output/measurement.png
 
-# Step 8: Individual plots for quick feedback
-tidal plot ../data/coupled_scalars_output --type heatmap --field phi_0 --output ../data/cs_phi_heatmap.png --quiet
-tidal plot ../data/coupled_scalars_output --type heatmap --field chi_0 --output ../data/cs_chi_heatmap.png --quiet
-tidal plot ../data/coupled_scalars_output --type amplitude --output ../data/cs_amplitude.png --quiet
-tidal plot ../data/coupled_scalars_output --type energy --output ../data/cs_energy.png --quiet
-tidal plot ../data/coupled_scalars_output --type compare --output ../data/cs_compare.png --quiet
+# Step 8: Individual plots (saved into the simulation output directory)
+tidal plot ../data/coupled_scalars_output --type heatmap --field phi_0 --quiet
+tidal plot ../data/coupled_scalars_output --type heatmap --field chi_0 --quiet
+tidal plot ../data/coupled_scalars_output --type amplitude --quiet
+tidal plot ../data/coupled_scalars_output --type energy --quiet
+tidal plot ../data/coupled_scalars_output --type compare --quiet

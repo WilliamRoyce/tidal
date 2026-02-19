@@ -99,10 +99,47 @@ def _parse_figsize(raw: str | None) -> tuple[float, float] | None:
 
 def _validate_overlay(formula: str) -> None:
     """Validate an overlay formula using AST analysis."""
-    from tidal.cli._simulate import _FORMULA_NAMESPACE, _validate_formula_ast
+    from tidal.cli._simulate import FORMULA_NAMESPACE, validate_formula_ast
 
-    allowed = set(_FORMULA_NAMESPACE.keys()) | {"t"}
-    _validate_formula_ast(formula, allowed)
+    allowed = set(FORMULA_NAMESPACE.keys()) | {"t"}
+    validate_formula_ast(formula, allowed)
+
+
+# ------------------------------------------------------------------
+# Default output filename
+# ------------------------------------------------------------------
+
+_SINGLE_FIELD_TYPES = frozenset({"heatmap", "snapshot", "profile"})
+
+
+def _default_filename(plot_type: str, args: Namespace) -> str:
+    """Build a collision-resistant default filename from plot args.
+
+    Encodes the field name and time index into the filename so that
+    multiple ``tidal plot`` invocations with different parameters do
+    not overwrite each other.
+
+    Examples: ``heatmap_phi_0.png``, ``snapshot_A_0_t0.png``,
+    ``snapshot_A_1_final.png``, ``amplitude.png``.
+    """
+    parts: list[str] = [plot_type]
+
+    # Include field name for single-field plot types
+    field: str | None = getattr(args, "field", None)
+    if field is not None and plot_type in _SINGLE_FIELD_TYPES:
+        parts.append(field)
+
+    # Include time index for snapshot
+    if plot_type == "snapshot":
+        time_index: int | None = getattr(args, "time_index", None)
+        if time_index is not None and time_index == -1:
+            parts.append("final")
+        elif time_index is not None:
+            parts.append(f"t{time_index}")
+        else:
+            parts.append("final")
+
+    return "_".join(parts) + ".png"
 
 
 # ------------------------------------------------------------------
@@ -117,17 +154,17 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
     mpl.use("Agg")
     import matplotlib.pyplot as plt
 
-    from tidal.cli._measure import _load_data, _resolve_spec_path
+    from tidal.cli._measure import load_data, resolve_spec_path
     from tidal.cli._panels import (
-        _field_names,
-        _resolve_time_indices,
-        _single_field,
+        field_names,
         render_amplitude,
         render_compare,
         render_energy,
         render_heatmap,
         render_profile,
         render_snapshot,
+        resolve_time_indices,
+        single_field,
     )
 
     data_path = Path(args.data_dir)
@@ -165,9 +202,9 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
 
     # Load data
     try:
-        spec_path = _resolve_spec_path(data_path, args.spec)
+        spec_path = resolve_spec_path(data_path, args.spec)
         param_overrides: list[str] = args.param or []
-        data = _load_data(data_path, spec_path, param_overrides)
+        data = load_data(data_path, spec_path, param_overrides)
     except (FileNotFoundError, ValueError, OSError) as exc:
         print(f"Error loading data: {exc}", file=sys.stderr)
         return 1
@@ -177,7 +214,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
               f"fields: {', '.join(data.fields.keys())}")
 
     # Output path
-    output_path = Path(args.output) if args.output else data_path / f"{plot_type}.png"
+    output_path = Path(args.output) if args.output else data_path / _default_filename(plot_type, args)
 
     # Create figure
     dpi = args.dpi or DPI_DEFAULT
@@ -191,29 +228,29 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
     # Dispatch to render function
     try:
         if plot_type == "heatmap":
-            field = _single_field(data, args.field)
+            field = single_field(data, args.field)
             render_heatmap(ax, data, field, cmap=cmap)
 
         elif plot_type == "snapshot":
-            field = _single_field(data, args.field)
+            field = single_field(data, args.field)
             t_idx = args.time_index if args.time_index is not None else -1
             render_snapshot(ax, data, field, t_idx, cmap=cmap)
 
         elif plot_type == "amplitude":
-            fields = _field_names(data, fields_list)
+            fields = field_names(data, fields_list)
             render_amplitude(ax, data, fields, overlay=overlay)
 
         elif plot_type == "energy":
-            fields = _field_names(data, fields_list)
+            fields = field_names(data, fields_list)
             render_energy(ax, data, fields)
 
         elif plot_type == "profile":
-            field = _single_field(data, args.field)
-            indices = _resolve_time_indices(data, time_indices)
+            field = single_field(data, args.field)
+            indices = resolve_time_indices(data, time_indices)
             render_profile(ax, data, field, indices, cross_section=cross_section)
 
         elif plot_type == "compare":
-            fields = _field_names(data, fields_list)
+            fields = field_names(data, fields_list)
             render_compare(ax, data, fields, cross_section=cross_section)
 
     except ValueError as exc:

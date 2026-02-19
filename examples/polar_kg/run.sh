@@ -29,7 +29,7 @@ tidal simulate ../data/polar_kg.json \
   --scheme scipy \
   --output ../data/polar_kg_output
 
-# Visualize results
-tidal plot ../data/polar_kg_output --type snapshot --time-index 0 --output ../data/pk_initial.png --quiet
-tidal plot ../data/polar_kg_output --type snapshot --time-index -1 --output ../data/pk_final.png --quiet
-tidal plot ../data/polar_kg_output --type amplitude --output ../data/pk_amplitude.png --quiet
+# Visualize results (plots saved into the simulation output directory)
+tidal plot ../data/polar_kg_output --type snapshot --time-index 0 --quiet
+tidal plot ../data/polar_kg_output --type snapshot --time-index -1 --quiet
+tidal plot ../data/polar_kg_output --type amplitude --quiet

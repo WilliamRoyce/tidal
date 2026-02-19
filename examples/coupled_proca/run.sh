@@ -46,7 +46,7 @@
 #   uv run tidal measure ../data/coupled_proca_output \
 #     --what conversion,mixing,spectral_conversion,dispersion \
 #     --source A_0,A_1,A_2 --target B_0,B_1,B_2 \
-#     --output ../data/coupled_proca_measurement.png
+#     --output ../data/coupled_proca_output/measurement.png
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -86,8 +86,8 @@ tidal measure ../data/coupled_proca_output \
 tidal measure ../data/coupled_proca_output \
   --what conversion,mixing,spectral_conversion,dispersion \
   --source A_0,A_1,A_2 --target B_0,B_1,B_2 \
-  --output ../data/coupled_proca_measurement.png
+  --output ../data/coupled_proca_output/measurement.png
 
-# Step 8: Individual plots
-tidal plot ../data/coupled_proca_output --type snapshot --time-index -1 --output ../data/cp_final.png --quiet
-tidal plot ../data/coupled_proca_output --type amplitude --output ../data/cp_amplitude.png --quiet
+# Step 8: Individual plots (saved into the simulation output directory)
+tidal plot ../data/coupled_proca_output --type snapshot --time-index -1 --quiet
+tidal plot ../data/coupled_proca_output --type amplitude --quiet

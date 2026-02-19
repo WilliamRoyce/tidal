@@ -29,11 +29,11 @@ tidal simulate ../data/massive_gravity_3d.json \
   --scheme scipy \
   --output ../data/massive_gravity_output
 
-# Visualize results
-tidal plot ../data/massive_gravity_output --type snapshot --field h_3 --time-index 0 --output ../data/mg_t0.png --quiet
-tidal plot ../data/massive_gravity_output --type snapshot --field h_3 --time-index -1 --output ../data/mg_final.png --quiet
-tidal plot ../data/massive_gravity_output --type amplitude --overlay 'cos(sqrt(2)*t)*0.5' --output ../data/mg_amplitude.png --quiet
-tidal plot ../data/massive_gravity_output --type profile --field h_3 --cross-section y=25.0 --output ../data/mg_profile.png --quiet
+# Visualize results (plots saved into the simulation output directory)
+tidal plot ../data/massive_gravity_output --type snapshot --field h_3 --time-index 0 --quiet
+tidal plot ../data/massive_gravity_output --type snapshot --field h_3 --time-index -1 --quiet
+tidal plot ../data/massive_gravity_output --type amplitude --overlay 'cos(sqrt(2)*t)*0.5' --quiet
+tidal plot ../data/massive_gravity_output --type profile --field h_3 --cross-section y=25.0 --quiet
 
 # For parameter sweep (vary mass):
 # for m2 in 0.5 1.0 2.0; do

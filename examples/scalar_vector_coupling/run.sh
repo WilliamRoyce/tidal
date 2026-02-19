@@ -45,7 +45,7 @@
 #   uv run tidal measure ../data/scalar_vector_coupling_output \
 #     --what conversion,mixing,spectral_conversion,dispersion \
 #     --source phi_0 --target A_0,A_1,A_2 \
-#     --output ../data/scalar_vector_coupling_measurement.png
+#     --output ../data/scalar_vector_coupling_output/measurement.png
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -90,10 +90,10 @@ tidal measure ../data/scalar_vector_coupling_output \
 tidal measure ../data/scalar_vector_coupling_output \
   --what conversion,mixing,spectral_conversion,dispersion \
   --source phi_0 --target A_0,A_1,A_2 \
-  --output ../data/scalar_vector_coupling_measurement.png
+  --output ../data/scalar_vector_coupling_output/measurement.png
 
-# Step 8: Individual plots
-tidal plot ../data/scalar_vector_coupling_output --type snapshot --field phi_0 --time-index 0 --output ../data/sv_phi_t0.png --quiet
-tidal plot ../data/scalar_vector_coupling_output --type snapshot --field phi_0 --time-index -1 --output ../data/sv_phi_final.png --quiet
-tidal plot ../data/scalar_vector_coupling_output --type amplitude --output ../data/sv_amplitude.png --quiet
-tidal plot ../data/scalar_vector_coupling_output --type energy --output ../data/sv_energy.png --quiet
+# Step 8: Individual plots (saved into the simulation output directory)
+tidal plot ../data/scalar_vector_coupling_output --type snapshot --field phi_0 --time-index 0 --quiet
+tidal plot ../data/scalar_vector_coupling_output --type snapshot --field phi_0 --time-index -1 --quiet
+tidal plot ../data/scalar_vector_coupling_output --type amplitude --quiet
+tidal plot ../data/scalar_vector_coupling_output --type energy --quiet

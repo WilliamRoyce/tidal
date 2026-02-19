@@ -27,10 +27,10 @@ tidal simulate ../data/chern_simons_3d.json \
   --output ../data/chern_simons_output
 
 # Visualize results — initial and final snapshots for each field
-tidal plot ../data/chern_simons_output --type snapshot --field A_0 --time-index 0 --output ../data/cs_A0_t0.png --quiet
-tidal plot ../data/chern_simons_output --type snapshot --field A_1 --time-index 0 --output ../data/cs_A1_t0.png --quiet
-tidal plot ../data/chern_simons_output --type snapshot --field A_2 --time-index 0 --output ../data/cs_A2_t0.png --quiet
-tidal plot ../data/chern_simons_output --type snapshot --field A_0 --time-index -1 --output ../data/cs_A0_final.png --quiet
-tidal plot ../data/chern_simons_output --type snapshot --field A_1 --time-index -1 --output ../data/cs_A1_final.png --quiet
-tidal plot ../data/chern_simons_output --type snapshot --field A_2 --time-index -1 --output ../data/cs_A2_final.png --quiet
-tidal plot ../data/chern_simons_output --type amplitude --output ../data/cs_amplitude.png --quiet
+tidal plot ../data/chern_simons_output --type snapshot --field A_0 --time-index 0 --quiet
+tidal plot ../data/chern_simons_output --type snapshot --field A_1 --time-index 0 --quiet
+tidal plot ../data/chern_simons_output --type snapshot --field A_2 --time-index 0 --quiet
+tidal plot ../data/chern_simons_output --type snapshot --field A_0 --time-index -1 --quiet
+tidal plot ../data/chern_simons_output --type snapshot --field A_1 --time-index -1 --quiet
+tidal plot ../data/chern_simons_output --type snapshot --field A_2 --time-index -1 --quiet
+tidal plot ../data/chern_simons_output --type amplitude --quiet

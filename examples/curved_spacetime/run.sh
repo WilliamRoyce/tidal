@@ -26,11 +26,11 @@ tidal simulate ../data/de_sitter_kg.json \
   --scheme scipy \
   --output ../data/de_sitter_output
 
-# Visualize de Sitter results
-tidal plot ../data/de_sitter_output --type snapshot --time-index 0 --output ../data/ds_initial.png --quiet
-tidal plot ../data/de_sitter_output --type snapshot --time-index -1 --output ../data/ds_final.png --quiet
-tidal plot ../data/de_sitter_output --type amplitude --overlay 'exp(-0.1*t)' --output ../data/ds_amplitude.png --quiet
-tidal plot ../data/de_sitter_output --type profile --cross-section y=25.0 --output ../data/ds_profile.png --quiet
+# Visualize de Sitter results (plots saved into the simulation output directory)
+tidal plot ../data/de_sitter_output --type snapshot --time-index 0 --quiet
+tidal plot ../data/de_sitter_output --type snapshot --time-index -1 --quiet
+tidal plot ../data/de_sitter_output --type amplitude --overlay 'exp(-0.1*t)' --quiet
+tidal plot ../data/de_sitter_output --type profile --cross-section y=25.0 --quiet
 
 ### Conformal Static Klein-Gordon (1+1D, constant conformal factor) ###
 
@@ -52,7 +52,7 @@ tidal simulate ../data/conformal_kg_static.json \
   --scheme scipy \
   --output ../data/conformal_kg_output
 
-# Visualize conformal KG results
-tidal plot ../data/conformal_kg_output --type heatmap --output ../data/ck_heatmap.png --quiet
-tidal plot ../data/conformal_kg_output --type profile --output ../data/ck_profile.png --quiet
-tidal plot ../data/conformal_kg_output --type amplitude --output ../data/ck_amplitude.png --quiet
+# Visualize conformal KG results (plots saved into the simulation output directory)
+tidal plot ../data/conformal_kg_output --type heatmap --quiet
+tidal plot ../data/conformal_kg_output --type profile --quiet
+tidal plot ../data/conformal_kg_output --type amplitude --quiet

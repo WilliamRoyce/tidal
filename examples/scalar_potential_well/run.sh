@@ -31,11 +31,11 @@ tidal simulate ../data/scalar_potential_well.json \
   --scheme scipy \
   --output ../data/scalar_potential_well_output
 
-# Step 4: Visualize
-tidal plot ../data/scalar_potential_well_output --type heatmap --output ../data/pw_heatmap.png --quiet
-tidal plot ../data/scalar_potential_well_output --type profile --output ../data/pw_profile.png --quiet
-tidal plot ../data/scalar_potential_well_output --type compare --output ../data/pw_compare.png --quiet
-tidal plot ../data/scalar_potential_well_output --type amplitude --output ../data/pw_amplitude.png --quiet
+# Step 4: Visualize (plots saved into the simulation output directory)
+tidal plot ../data/scalar_potential_well_output --type heatmap --quiet
+tidal plot ../data/scalar_potential_well_output --type profile --quiet
+tidal plot ../data/scalar_potential_well_output --type compare --quiet
+tidal plot ../data/scalar_potential_well_output --type amplitude --quiet
 
 # NOTE: Energy measurement will raise ValueError for the localized variant
 # because virial formula doesn't support position-dependent mass terms.

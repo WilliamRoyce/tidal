@@ -25,8 +25,8 @@ tidal simulate ../data/proca_1d.json \
   --scheme scipy \
   --output ../data/proca_output
 
-# Visualize results
-tidal plot ../data/proca_output --type heatmap --field A_1 --output ../data/proca_heatmap.png --quiet
-tidal plot ../data/proca_output --type amplitude --output ../data/proca_amplitude.png --quiet
-tidal plot ../data/proca_output --type energy --output ../data/proca_energy.png --quiet
-tidal plot ../data/proca_output --type profile --field A_1 --output ../data/proca_profile.png --quiet
+# Visualize results (plots saved into the simulation output directory)
+tidal plot ../data/proca_output --type heatmap --field A_1 --quiet
+tidal plot ../data/proca_output --type amplitude --quiet
+tidal plot ../data/proca_output --type energy --quiet
+tidal plot ../data/proca_output --type profile --field A_1 --quiet

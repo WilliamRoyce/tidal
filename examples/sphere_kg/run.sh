@@ -29,8 +29,8 @@ tidal simulate ../data/sphere_kg.json \
   --scheme scipy \
   --output ../data/sphere_kg_output
 
-# Visualize results
-tidal plot ../data/sphere_kg_output --type snapshot --time-index 0 --output ../data/sk_initial.png --quiet
-tidal plot ../data/sphere_kg_output --type snapshot --time-index -1 --output ../data/sk_final.png --quiet
-tidal plot ../data/sphere_kg_output --type profile --cross-section y=0.0 --output ../data/sk_profile.png --quiet
-tidal plot ../data/sphere_kg_output --type amplitude --output ../data/sk_amplitude.png --quiet
+# Visualize results (plots saved into the simulation output directory)
+tidal plot ../data/sphere_kg_output --type snapshot --time-index 0 --quiet
+tidal plot ../data/sphere_kg_output --type snapshot --time-index -1 --quiet
+tidal plot ../data/sphere_kg_output --type profile --cross-section y=0.0 --quiet
+tidal plot ../data/sphere_kg_output --type amplitude --quiet

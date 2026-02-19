@@ -28,9 +28,9 @@ tidal simulate ../data/klein_gordon_1d.json \
   --snapshots 0.1 \
   --output ../data/scalar_field_output
 
-# Visualize results
-tidal plot ../data/scalar_field_output --type heatmap --output ../data/scalar_field_heatmap.png --quiet
-tidal plot ../data/scalar_field_output --type amplitude --output ../data/scalar_field_amplitude.png --quiet
-tidal plot ../data/scalar_field_output --type snapshot --time-index 0 --output ../data/scalar_field_t0.png --quiet
-tidal plot ../data/scalar_field_output --type snapshot --time-index -1 --output ../data/scalar_field_final.png --quiet
-tidal plot ../data/scalar_field_output --type profile --output ../data/scalar_field_profile.png --quiet
+# Visualize results (plots saved into the simulation output directory)
+tidal plot ../data/scalar_field_output --type heatmap --quiet
+tidal plot ../data/scalar_field_output --type amplitude --quiet
+tidal plot ../data/scalar_field_output --type snapshot --time-index 0 --quiet
+tidal plot ../data/scalar_field_output --type snapshot --time-index -1 --quiet
+tidal plot ../data/scalar_field_output --type profile --quiet
