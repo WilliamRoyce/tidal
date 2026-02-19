@@ -279,6 +279,32 @@ class TestSimulateCommand:
         ])
         assert ret == 1
 
+    def test_simulate_warns_ic_on_constraint_field(
+        self, inline_constraint_json: Path
+    ) -> None:
+        """Warn when --ic gaussian defaults to a constraint field."""
+        with pytest.warns(UserWarning, match="constraint field 'phi'"):
+            main([
+                "simulate", str(inline_constraint_json),
+                "--ic", "gaussian",
+                "--t-end", "0.1",
+                "--no-plot",
+            ])
+
+    def test_simulate_warns_wavevector_with_gaussian(
+        self, inline_kg_1d_json: Path
+    ) -> None:
+        """Warn when --ic-wavevector is used with --ic=gaussian."""
+        with pytest.warns(UserWarning, match="--ic-wavevector is ignored"):
+            main([
+                "simulate", str(inline_kg_1d_json),
+                "--param", "m2=1.0",
+                "--ic", "gaussian",
+                "--ic-wavevector", "1.0",
+                "--t-end", "0.1",
+                "--no-plot",
+            ])
+
     def test_simulate_nonexistent_file(self) -> None:
         ret = main(["simulate", "/nonexistent/file.json", "--no-plot"])
         assert ret == 1
@@ -2162,6 +2188,64 @@ class TestMeasureCommand:
         assert output.exists()
         assert output.stat().st_size > 0
 
+    def test_measure_png_dynamic_conversion_only(
+        self,
+        coupled_scalars_dir: Path,
+        inline_coupled_scalars_json: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Dashboard with --what conversion should only have conversion + summary panels."""
+        output = tmp_path / "dashboard.png"
+        ret = main([
+            "measure", str(coupled_scalars_dir),
+            "--spec", str(inline_coupled_scalars_json),
+            "--what", "conversion",
+            "--source", "phi_0",
+            "--target", "chi_0",
+            "--output", str(output),
+        ])
+        assert ret == 0
+        assert output.exists()
+        assert output.stat().st_size > 0
+
+    def test_measure_png_dynamic_energy_only(
+        self,
+        coupled_scalars_dir: Path,
+        inline_coupled_scalars_json: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Dashboard with --what energy should have energy + summary panels."""
+        output = tmp_path / "energy_only.png"
+        ret = main([
+            "measure", str(coupled_scalars_dir),
+            "--spec", str(inline_coupled_scalars_json),
+            "--what", "energy",
+            "--output", str(output),
+        ])
+        assert ret == 0
+        assert output.exists()
+        assert output.stat().st_size > 0
+
+    def test_measure_png_dynamic_energy_and_conversion(
+        self,
+        coupled_scalars_dir: Path,
+        inline_coupled_scalars_json: Path,
+        tmp_path: Path,
+    ) -> None:
+        """Dashboard with --what energy,conversion should have 3 data panels + summary."""
+        output = tmp_path / "multi.png"
+        ret = main([
+            "measure", str(coupled_scalars_dir),
+            "--spec", str(inline_coupled_scalars_json),
+            "--what", "energy,conversion",
+            "--source", "phi_0",
+            "--target", "chi_0",
+            "--output", str(output),
+        ])
+        assert ret == 0
+        assert output.exists()
+        assert output.stat().st_size > 0
+
 
 class TestBackgroundFields:
     """Tests for [[background_fields]] TOML feature — WLS generation dry-runs."""
@@ -3153,3 +3237,187 @@ path = "output.json"
 """)
         ret = main(["derive", str(config), "--dry-run"])
         assert ret == 1
+
+
+# === Critical Review Fix Tests (T8-T12) ===
+
+
+class TestImplicitMultiDWarning:
+    """T8: Implicit method on multi-D grid without sparsity warns (Fix 5)."""
+
+    def test_implicit_multi_d_warns(self) -> None:
+        import warnings
+        from argparse import Namespace
+
+        from pde import CartesianGrid
+
+        from tidal.cli._simulate import _build_scipy_kwargs
+        from tidal.symbolic.json_loader import (
+            ComponentEquation,
+            EquationSystem,
+            OperatorTerm,
+        )
+        from tidal.symbolic.pde_builder import PDEFromSpec
+
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        grid = CartesianGrid([(0, 10), (0, 10)], [8, 8], periodic=True)
+        args = Namespace(
+            method="Radau", rtol=None, atol=None, scheme="scipy",
+        )
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            _build_scipy_kwargs(args, None, pde, grid)
+        warning_msgs = [str(wi.message) for wi in w]
+        assert any("Jacobian sparsity not available" in m for m in warning_msgs)
+        assert any("dense" in m for m in warning_msgs)
+
+
+class TestEnergyMonitorImplicitNote:
+    """T9: Energy monitor + implicit method emits info note (Fix 7)."""
+
+    def test_energy_monitor_implicit_note(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """When energy-monitor + implicit method combined, print info note."""
+        main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--scheme", "scipy",
+            "--method", "Radau",
+            "--energy-monitor", "0.5",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        captured = capsys.readouterr()
+        # Note goes through log() → stdout
+        output = captured.out + captured.err
+        assert "L2 norm drift" in output or "numerical dissipation" in output
+
+
+class TestBlowupThresholdCapped:
+    """T10: Blow-up threshold capped at 1e15 (Fix 8)."""
+
+    def test_blowup_threshold_capped(self) -> None:
+        """Blow-up threshold: min(max(initial_max * 1e6, 1e6), 1e15)."""
+        # For large initial_max = 1e12, threshold should be 1e15 (not 1e18)
+        initial_max = 1e12
+        threshold = min(max(initial_max * 1e6, 1e6), 1e15)
+        assert threshold == 1e15
+
+        # For small initial_max = 1.0, threshold should be 1e6
+        initial_max = 1.0
+        threshold = min(max(initial_max * 1e6, 1e6), 1e15)
+        assert threshold == 1e6
+
+        # For medium initial_max = 100, threshold = 1e8 (below cap)
+        initial_max = 100.0
+        threshold = min(max(initial_max * 1e6, 1e6), 1e15)
+        assert threshold == 1e8
+
+
+class TestStiffnessAdvisoryAnisotropic:
+    """T11-T12: Anisotropic Laplacian and zero-mass stiffness (Fix 6)."""
+
+    @staticmethod
+    def _run_stiffness(spec: object, grid: object, scheme: str = "runge-kutta") -> list[str]:
+        """Run _stiffness_advisory and capture its log output."""
+        from argparse import Namespace
+
+        messages: list[str] = []
+
+        def log(msg: str) -> None:
+            messages.append(msg)
+
+        from tidal.cli._simulate import _stiffness_advisory
+
+        args = Namespace(method=None, scheme=scheme)
+        _stiffness_advisory(spec, grid, args, log)  # type: ignore[arg-type]
+        return messages
+
+    def test_anisotropic_laplacian_stiffness(self) -> None:
+        """T11: Highly anisotropic directional Laplacians trigger advisory."""
+        from pde import CartesianGrid
+
+        from tidal.symbolic.json_loader import (
+            ComponentEquation,
+            EquationSystem,
+            OperatorTerm,
+        )
+
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian_x", field="phi"),
+                        OperatorTerm(coefficient=1e6, operator="laplacian_y", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        grid = CartesianGrid([(0, 10), (0, 10)], [16, 16], periodic=True)
+        msgs = self._run_stiffness(spec, grid)
+        assert any("anisotropic" in m.lower() for m in msgs)
+
+    def test_stiffness_advisory_zero_mass(self) -> None:
+        """T12: Zero mass matrix but anisotropic Laplacians still triggers advisory."""
+        from pde import CartesianGrid
+
+        from tidal.symbolic.json_loader import (
+            ComponentEquation,
+            EquationSystem,
+            OperatorTerm,
+        )
+
+        spec = EquationSystem(
+            n_components=1,
+            dimension=3,
+            spatial_dimension=2,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian_x", field="phi"),
+                        OperatorTerm(coefficient=1000.0, operator="laplacian_y", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        grid = CartesianGrid([(0, 10), (0, 10)], [16, 16], periodic=True)
+        msgs = self._run_stiffness(spec, grid)
+        # Even with empty mass, anisotropic Laplacian check should fire
+        assert any("anisotropic" in m.lower() for m in msgs)

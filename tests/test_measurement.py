@@ -486,6 +486,37 @@ class TestEnergyConservation:
         with pytest.raises(ValueError, match="positive"):
             check_energy_conservation(data, threshold=0.0)
 
+    def test_precomputed_energy_matches(self) -> None:
+        """Pre-computed total_energy/times gives same result as from-scratch."""
+        from tidal.measurement._energy import compute_energy_timeseries
+
+        data = _make_sim_data_two_fields(n_snapshots=51)
+        times, _pf, _inter, total = compute_energy_timeseries(data)
+
+        diag_scratch = check_energy_conservation(data, threshold=1e-6)
+        diag_precomp = check_energy_conservation(
+            data, threshold=1e-6, total_energy=total, times=times,
+        )
+
+        assert diag_precomp.is_conserved == diag_scratch.is_conserved
+        assert diag_precomp.max_relative_error == diag_scratch.max_relative_error
+        np.testing.assert_array_equal(diag_precomp.total_energy, diag_scratch.total_energy)
+        np.testing.assert_array_equal(diag_precomp.relative_error, diag_scratch.relative_error)
+
+    def test_precomputed_energy_missing_times_raises(self) -> None:
+        """Providing total_energy without times raises ValueError."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        fake_total = np.ones(5)
+        with pytest.raises(ValueError, match="both be provided"):
+            check_energy_conservation(data, total_energy=fake_total)
+
+    def test_precomputed_times_missing_energy_raises(self) -> None:
+        """Providing times without total_energy raises ValueError."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        fake_times = np.linspace(0, 1, 5)
+        with pytest.raises(ValueError, match="both be provided"):
+            check_energy_conservation(data, times=fake_times)
+
 
 class TestSummarize:
     """Test summarize() diagnostics function."""

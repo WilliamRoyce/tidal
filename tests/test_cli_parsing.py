@@ -641,10 +641,26 @@ class TestValidateSolverParamsAdaptive:
             self._make_args(adaptive=True, tolerance=1e-5)
         )
 
-    def test_valid_max_step_any_scheme(self) -> None:
+    def test_max_step_rejected_without_scipy(self) -> None:
+        """T6: --max-step raises ValueError when scheme is not scipy."""
         from tidal.cli._simulate import _validate_solver_params
 
-        _validate_solver_params(self._make_args(max_step=0.1))
+        with pytest.raises(ValueError, match="--max-step requires --scheme scipy"):
+            _validate_solver_params(self._make_args(max_step=0.1))
+
+    def test_max_step_rejected_fixed_step(self) -> None:
+        """T7: --max-step raises ValueError for fixed-step explicit RK."""
+        from tidal.cli._simulate import _validate_solver_params
+
+        with pytest.raises(ValueError, match="--max-step requires --scheme scipy"):
+            _validate_solver_params(
+                self._make_args(scheme="runge-kutta", max_step=0.5)
+            )
+
+    def test_max_step_accepted_with_scipy(self) -> None:
+        from tidal.cli._simulate import _validate_solver_params
+
+        _validate_solver_params(self._make_args(scheme="scipy", max_step=0.1))
 
     def test_valid_energy_monitor(self) -> None:
         from tidal.cli._simulate import _validate_solver_params

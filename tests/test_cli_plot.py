@@ -768,6 +768,28 @@ class TestPanelHelpers:
         with pytest.raises(ValueError, match="expected W,H"):
             _parse_figsize("8")
 
+    def test_single_field_prefers_dynamical(self) -> None:
+        """single_field() should skip constraint fields and return first dynamical."""
+        from tidal.cli._panels import single_field
+
+        class _MockData:
+            fields = {"A_0": ..., "A_1": ..., "A_2": ...}
+            momenta = {"A_1": ..., "A_2": ...}  # A_0 is constraint (no momentum)
+
+        result = single_field(_MockData(), None)  # type: ignore[arg-type]
+        assert result == "A_1"
+
+    def test_single_field_fallback_all_constraints(self) -> None:
+        """single_field() falls back to first field if all are constraints."""
+        from tidal.cli._panels import single_field
+
+        class _MockData:
+            fields = {"phi": ..., "rho": ...}
+            momenta: dict[str, object] = {}
+
+        result = single_field(_MockData(), None)  # type: ignore[arg-type]
+        assert result == "phi"
+
     def test_resolve_time_indices_default(self) -> None:
         from tidal.cli._panels import resolve_time_indices
 

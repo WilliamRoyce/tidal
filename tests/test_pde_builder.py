@@ -2757,3 +2757,314 @@ class TestJacobianSparsity:
         grid = CartesianGrid([(0, 10), (0, 10)], [16, 16], periodic=True)
         pde = PDEFromSpec(spec)
         assert pde.jacobian_sparsity(grid) is None
+
+
+# === Critical Review Fix Tests (T1-T5) ===
+
+
+class TestCheckStabilityNegativeLaplacian:
+    """T1: Negative Laplacian coefficient warning (Fix 9)."""
+
+    def test_negative_laplacian_warns(self, grid_1d_small: CartesianGrid) -> None:
+        """Negative Laplacian coefficient emits anti-diffusive warning."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=-1.0, operator="laplacian", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        warnings = pde.check_stability(0.001, grid_1d_small)
+        assert any("Negative Laplacian" in w for w in warnings)
+        assert any("anti-diffusive" in w for w in warnings)
+
+    def test_positive_laplacian_no_warning(self, grid_1d_small: CartesianGrid) -> None:
+        """Positive Laplacian coefficient does not emit anti-diffusive warning."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        warnings = pde.check_stability(0.001, grid_1d_small)
+        assert not any("Negative Laplacian" in w for w in warnings)
+
+
+class TestBiharmonicWaveCFL:
+    """T2: Biharmonic CFL uses wave-type formula dx²/(4√D) (Fix 3)."""
+
+    def test_biharmonic_cfl_formula(self, grid_1d_small: CartesianGrid) -> None:
+        """Biharmonic CFL: dx²/(4√D), NOT dx⁴/(2D)."""
+        d_coeff = 16.0
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=d_coeff, operator="biharmonic", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        limit = pde.cfl_limit(grid_1d_small)
+        # dx = 10/32 = 0.3125, D=16, sqrt(D)=4
+        # Expected: dx² / (4*sqrt(D)) = 0.3125² / (4*4) = 0.09765625/16 ≈ 0.006104
+        dx = 10.0 / 32
+        import math
+
+        expected = dx**2 / (4 * math.sqrt(d_coeff))
+        assert limit is not None
+        assert abs(limit - expected) < 1e-10
+
+    def test_biharmonic_stability_warning(self, grid_1d_small: CartesianGrid) -> None:
+        """Exceeding biharmonic CFL triggers warning with correct formula reference."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="biharmonic", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        # Use a dt that exceeds the biharmonic limit
+        warnings = pde.check_stability(1.0, grid_1d_small)
+        assert any("Biharmonic stability" in w for w in warnings)
+        assert any("dx²/(4√D)" in w for w in warnings)
+
+
+class TestPositionDependentCFLWarning:
+    """T3: Position-dependent coefficients trigger CFL caveat (Fix 4)."""
+
+    def test_position_dependent_laplacian_warns(
+        self, grid_1d_small: CartesianGrid
+    ) -> None:
+        """Position-dependent Laplacian coefficient triggers CFL caveat."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(
+                            coefficient=1.0,
+                            operator="laplacian",
+                            field="phi",
+                            coordinate_dependent=("x",),
+                        ),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        warnings = pde.check_stability(0.001, grid_1d_small)
+        assert any("position-dependent" in w for w in warnings)
+
+    def test_constant_coefficient_no_position_warning(
+        self, grid_1d_small: CartesianGrid
+    ) -> None:
+        """Constant Laplacian coefficient does NOT trigger position-dependent warning."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        pde = PDEFromSpec(spec)
+        warnings = pde.check_stability(0.001, grid_1d_small)
+        assert not any("position-dependent" in w for w in warnings)
+
+
+class TestBiharmonicPentadiagSparsity:
+    """T4: Biharmonic uses 5-point pentadiagonal sparsity (Fix 2)."""
+
+    def test_biharmonic_pentadiag_periodic(self) -> None:
+        """Biharmonic stencil: i-2, i-1, i, i+1, i+2 with periodic wrapping."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="biharmonic", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        grid = CartesianGrid([(0, 10)], 16, periodic=True)
+        pde = PDEFromSpec(spec)
+        mat = pde.jacobian_sparsity(grid)
+        assert mat is not None
+        n = 16
+        # pi row (slot 1 → rows n:2n) depends on phi (slot 0 → cols 0:n)
+        # via biharmonic: should have pentadiagonal pattern
+        # Check an interior point: row n+5 should have entries at cols 3,4,5,6,7
+        for offset in range(-2, 3):
+            assert mat[n + 5, 5 + offset] == 1
+        # Check there's no entry at distance 3
+        assert mat[n + 5, 5 + 3] == 0
+        assert mat[n + 5, 5 - 3] == 0
+        # Periodic corner wrapping: row n+0 should wrap to cols n-2 and n-1
+        assert mat[n, n - 1] == 1  # offset -1 wraps
+        assert mat[n, n - 2] == 1  # offset -2 wraps
+        # Last row wraps: row 2n-1 should wrap to cols 0 and 1
+        assert mat[2 * n - 1, 0] == 1  # offset +1 wraps
+        assert mat[2 * n - 1, 1] == 1  # offset +2 wraps
+
+    def test_biharmonic_non_periodic_no_corner_wrap(self) -> None:
+        """Biharmonic on non-periodic grid: no corner wrapping."""
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi",),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="biharmonic", field="phi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={},
+        )
+        grid = CartesianGrid([(0, 10)], 16, periodic=False)
+        pde = PDEFromSpec(spec)
+        mat = pde.jacobian_sparsity(grid)
+        assert mat is not None
+        n = 16
+        # No periodic wrapping for biharmonic corners
+        assert mat[n, n - 1] == 0
+        assert mat[n, n - 2] == 0
+        assert mat[2 * n - 1, 0] == 0
+        assert mat[2 * n - 1, 1] == 0
+
+
+class TestMixedFirstSecondOrderSparsity:
+    """T5: Mixed time-derivative orders handled correctly in sparsity."""
+
+    def test_mixed_order_sparsity(self) -> None:
+        """First-order + second-order fields: correct slot layout."""
+        spec = EquationSystem(
+            n_components=2,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi", "psi"),
+            equations=(
+                ComponentEquation(
+                    field_name="phi",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),
+                    ),
+                ),
+                ComponentEquation(
+                    field_name="psi",
+                    field_index=1,
+                    time_derivative_order=1,
+                    rhs_terms=(
+                        OperatorTerm(coefficient=1.0, operator="laplacian", field="psi"),
+                    ),
+                ),
+            ),
+            mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={},
+        )
+        grid = CartesianGrid([(0, 10)], 16, periodic=True)
+        pde = PDEFromSpec(spec)
+        mat = pde.jacobian_sparsity(grid)
+        assert mat is not None
+        n = 16
+        # phi is second-order → 2 slots (phi, pi_phi): 0:n, n:2n
+        # psi is first-order → 1 slot: 2n:3n
+        # Total: 3n = 48
+        assert mat.shape == (3 * n, 3 * n)
+        # phi slot (0:n) → d/dt phi = pi_phi → should have entries in pi_phi block (n:2n)
+        for i in range(n):
+            assert mat[i, n + i] == 1
+        # psi slot (2n:3n) → d/dt psi = laplacian(psi) → tridiag in self-block
+        for i in range(n):
+            assert mat[2 * n + i, 2 * n + i] == 1  # diagonal
