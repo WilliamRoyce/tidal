@@ -111,30 +111,30 @@ case where accuracy matters more than speed.
 
 ### Choosing a Path
 
-| Scenario | Recommended Path |
-|----------|-----------------|
-| Quick test, debugging | Path A (fixed) |
-| Standard wave equation, moderate accuracy | Path C (`--scheme scipy`) |
-| High-precision convergence study | Path C with `--rtol 1e-10 --atol 1e-12` |
-| Stiff system (m^2 dx^2 >> 1) | Path C with `--method Radau` |
-| Multi-step implicit (stiff + history) | Path C with `--method BDF` |
-| Backward compatibility with old scripts | Path A with explicit `--dt` |
+| Scenario                                  | Recommended Path                        |
+| ----------------------------------------- | --------------------------------------- |
+| Quick test, debugging                     | Path A (fixed)                          |
+| Standard wave equation, moderate accuracy | Path C (`--scheme scipy`)               |
+| High-precision convergence study          | Path C with `--rtol 1e-10 --atol 1e-12` |
+| Stiff system (m^2 dx^2 >> 1)              | Path C with `--method Radau`            |
+| Multi-step implicit (stiff + history)     | Path C with `--method BDF`              |
+| Backward compatibility with old scripts   | Path A with explicit `--dt`             |
 
 ## CLI Reference
 
 All new flags are on the `tidal simulate` subcommand. Defined in
 `tidal/cli/__init__.py:206-267`.
 
-| Flag | Type | Default | Requires | Purpose |
-|------|------|---------|----------|---------|
-| `--scheme` | `{runge-kutta, scipy}` | `runge-kutta` | — | Solver backend selection |
-| `--adaptive` | bool flag | `False` | `--scheme runge-kutta` | Enable adaptive step-size control |
-| `--method` | `{RK45, RK23, DOP853, Radau, BDF, LSODA}` | `DOP853` | `--scheme scipy` | scipy `solve_ivp` integration method |
-| `--rtol` | float | scipy default (1e-3) | `--scheme scipy` | Relative error tolerance |
-| `--atol` | float | scipy default (1e-6) | `--scheme scipy` | Absolute error tolerance |
-| `--tolerance` | float | py-pde default (1e-4) | `--adaptive` | Error tolerance for adaptive explicit RK |
-| `--max-step` | float | auto (CFL) | `--scheme scipy` | Maximum allowed step size |
-| `--energy-monitor` | float | disabled | any | Halt if `\|dE/E0\|` exceeds threshold |
+| Flag               | Type                                      | Default               | Requires               | Purpose                                  |
+| ------------------ | ----------------------------------------- | --------------------- | ---------------------- | ---------------------------------------- |
+| `--scheme`         | `{runge-kutta, scipy}`                    | `runge-kutta`         | —                      | Solver backend selection                 |
+| `--adaptive`       | bool flag                                 | `False`               | `--scheme runge-kutta` | Enable adaptive step-size control        |
+| `--method`         | `{RK45, RK23, DOP853, Radau, BDF, LSODA}` | `DOP853`              | `--scheme scipy`       | scipy `solve_ivp` integration method     |
+| `--rtol`           | float                                     | scipy default (1e-3)  | `--scheme scipy`       | Relative error tolerance                 |
+| `--atol`           | float                                     | scipy default (1e-6)  | `--scheme scipy`       | Absolute error tolerance                 |
+| `--tolerance`      | float                                     | py-pde default (1e-4) | `--adaptive`           | Error tolerance for adaptive explicit RK |
+| `--max-step`       | float                                     | auto (CFL)            | `--scheme scipy`       | Maximum allowed step size                |
+| `--energy-monitor` | float                                     | disabled              | any                    | Halt if `\|dE/E0\|` exceeds threshold    |
 
 ### Validation Rules
 
@@ -161,9 +161,9 @@ operators. Computes:
   the biharmonic coefficient. Derived from Von Neumann analysis of
   `d²φ/dt² = -D∇⁴φ`: the maximum group velocity is `v_g = 2√D · k_max`
   where `k_max = π/dx`. The factor 1/4 is conservative for explicit RK
-  methods. *(Note: the initial implementation used the diffusion-type
+  methods. _(Note: the initial implementation used the diffusion-type
   formula `dx⁴/(2D)`, which was over-conservative — corrected in the
-  critical review.)*
+  critical review.)_
 
 Returns the most restrictive limit, or `None` if no wave/biharmonic terms
 exist (e.g., constraint-only or first-order systems).
@@ -215,6 +215,7 @@ The sparsity pattern is a binary matrix indicating which state variables
 influence which rates. TIDAL computes it from the equation structure:
 
 **State vector layout** (for a system with fields phi, chi, each second-order):
+
 ```
 [ phi_0, phi_1, ..., phi_{N-1},    # field values
   pi_phi_0, ..., pi_phi_{N-1},     # momenta (d/dt phi)
@@ -223,6 +224,7 @@ influence which rates. TIDAL computes it from the equation structure:
 ```
 
 **Sparsity rules:**
+
 - `d/dt field = momentum` — diagonal block (field ← momentum)
 - `d/dt momentum = laplacian(field)` — tridiagonal block (3-point stencil, width=1)
 - `d/dt momentum = biharmonic(field)` — pentadiagonal block (5-point stencil, width=2)
@@ -233,7 +235,7 @@ influence which rates. TIDAL computes it from the equation structure:
 
 **Limitations:** Only 1D grids are supported. For multi-dimensional grids
 (2D, 3D), the Laplacian stencil involves neighbours at offsets +/-1,
-+/-N_x, +/-N_x*N_y, etc. — requiring a multi-diagonal band structure
++/-N_x, +/-N_x\*N_y, etc. — requiring a multi-diagonal band structure
 that the current implementation does not construct. Multi-D grids return
 `None`, causing `solve_ivp` to fall back to dense Jacobian estimation.
 
@@ -263,6 +265,7 @@ an advisory is emitted. This check runs independently of the mass-based
 check, so it fires even for massless systems.
 
 The advisory prints:
+
 ```
 Note: system may be stiff (m^2*dx^2/c^2=450). Consider --scheme scipy --method Radau.
 Note: anisotropic Laplacian stiffness (max/min=1000000). Consider --scheme scipy --method Radau.
@@ -332,14 +335,14 @@ for t_start, t_end in snapshot_intervals:
 
 ### Impact on Method Choice
 
-| Method | Type | Restart Penalty | Recommendation |
-|--------|------|----------------|----------------|
-| DOP853 | Explicit, one-step, order 8 | None | Default choice |
-| RK45 | Explicit, one-step, order 5 | None | Faster per step, lower order |
-| RK23 | Explicit, one-step, order 3 | None | Rough estimates only |
-| Radau | Implicit, one-step, order 5 | Minimal | Best for stiff systems |
-| BDF | Implicit, multi-step, order 1-5 | **Significant** — restarts at order 1, loses history | Penalized by many-calls architecture |
-| LSODA | Auto-switch Adams/BDF | **Significant** — loses stiff/non-stiff detection | Penalized by many-calls architecture |
+| Method | Type                            | Restart Penalty                                      | Recommendation                       |
+| ------ | ------------------------------- | ---------------------------------------------------- | ------------------------------------ |
+| DOP853 | Explicit, one-step, order 8     | None                                                 | Default choice                       |
+| RK45   | Explicit, one-step, order 5     | None                                                 | Faster per step, lower order         |
+| RK23   | Explicit, one-step, order 3     | None                                                 | Rough estimates only                 |
+| Radau  | Implicit, one-step, order 5     | Minimal                                              | Best for stiff systems               |
+| BDF    | Implicit, multi-step, order 1-5 | **Significant** — restarts at order 1, loses history | Penalized by many-calls architecture |
+| LSODA  | Auto-switch Adams/BDF           | **Significant** — loses stiff/non-stiff detection    | Penalized by many-calls architecture |
 
 **Why DOP853 is the default:** It is an 8th-order one-step method with
 excellent accuracy per function evaluation. Being one-step, it suffers
@@ -363,6 +366,7 @@ as the recommended default.
 ### Before (fixed-step)
 
 **run.sh:**
+
 ```bash
 tidal simulate ../data/coupled_scalars.json \
   --dt 0.01 \
@@ -371,6 +375,7 @@ tidal simulate ../data/coupled_scalars.json \
 ```
 
 **Python:**
+
 ```python
 DT = 0.01
 pde.solve(initial_state, t_range=T_END, dt=DT, scheme="runge-kutta", tracker=tracker)
@@ -379,6 +384,7 @@ pde.solve(initial_state, t_range=T_END, dt=DT, scheme="runge-kutta", tracker=tra
 ### After (adaptive scipy)
 
 **run.sh:**
+
 ```bash
 tidal simulate ../data/coupled_scalars.json \
   --scheme scipy \
@@ -387,6 +393,7 @@ tidal simulate ../data/coupled_scalars.json \
 ```
 
 **Python:**
+
 ```python
 pde.solve(initial_state, t_range=T_END, solver="scipy", method="DOP853", tracker=tracker)
 ```
@@ -405,63 +412,63 @@ checking, and mutual-exclusion rules:
 
 - `--method` without `--scheme scipy` → `ValueError`
 - `--rtol` without `--scheme scipy` → `ValueError`
-- `--max-step` without `--scheme scipy` → `ValueError` *(added in review)*
+- `--max-step` without `--scheme scipy` → `ValueError` _(added in review)_
 - `--tolerance` without `--adaptive` → `ValueError`
 - Negative tolerance values → `ValueError`
 - Valid combinations parse correctly
-- `--max-step` accepted with `--scheme scipy` *(added in review)*
+- `--max-step` accepted with `--scheme scipy` _(added in review)_
 
 ### PDE Builder Methods (7 + 9 tests)
 
 Located in `tests/test_pde_builder.py`:
 
-| Test | What it verifies |
-|------|-----------------|
-| `test_wave_equation_cfl` | CFL = dx/c for unit wave speed |
-| `test_massive_wave_cfl` | CFL ignores mass term (identity operator) |
-| `test_no_wave_returns_none` | First-order equations → `None` |
-| `test_two_field_picks_smallest` | Most restrictive limit across fields |
-| `test_directional_laplacian_cfl` | `laplacian_x` contributes to CFL |
-| `test_cross_field_laplacian_cfl` | Cross-field Laplacian included |
-| `test_multi_d_returns_none` | Jacobian sparsity returns `None` for 2D+ |
-| `test_negative_laplacian_warns` | Negative Laplacian → anti-diffusive warning *(review)* |
-| `test_positive_laplacian_no_warning` | Positive Laplacian → no false warning *(review)* |
-| `test_biharmonic_cfl_formula` | Biharmonic CFL = dx²/(4√D) *(review)* |
-| `test_biharmonic_stability_warning` | Biharmonic CFL violation warning *(review)* |
-| `test_position_dependent_laplacian_warns` | Position-dependent CFL caveat *(review)* |
-| `test_constant_coefficient_no_position_warning` | No false position-dep warning *(review)* |
-| `test_biharmonic_pentadiag_periodic` | Biharmonic → 5-point sparsity *(review)* |
-| `test_biharmonic_non_periodic_no_corner_wrap` | Non-periodic biharmonic corners *(review)* |
-| `test_mixed_order_sparsity` | Mixed 1st/2nd order slot layout *(review)* |
+| Test                                            | What it verifies                                       |
+| ----------------------------------------------- | ------------------------------------------------------ |
+| `test_wave_equation_cfl`                        | CFL = dx/c for unit wave speed                         |
+| `test_massive_wave_cfl`                         | CFL ignores mass term (identity operator)              |
+| `test_no_wave_returns_none`                     | First-order equations → `None`                         |
+| `test_two_field_picks_smallest`                 | Most restrictive limit across fields                   |
+| `test_directional_laplacian_cfl`                | `laplacian_x` contributes to CFL                       |
+| `test_cross_field_laplacian_cfl`                | Cross-field Laplacian included                         |
+| `test_multi_d_returns_none`                     | Jacobian sparsity returns `None` for 2D+               |
+| `test_negative_laplacian_warns`                 | Negative Laplacian → anti-diffusive warning _(review)_ |
+| `test_positive_laplacian_no_warning`            | Positive Laplacian → no false warning _(review)_       |
+| `test_biharmonic_cfl_formula`                   | Biharmonic CFL = dx²/(4√D) _(review)_                  |
+| `test_biharmonic_stability_warning`             | Biharmonic CFL violation warning _(review)_            |
+| `test_position_dependent_laplacian_warns`       | Position-dependent CFL caveat _(review)_               |
+| `test_constant_coefficient_no_position_warning` | No false position-dep warning _(review)_               |
+| `test_biharmonic_pentadiag_periodic`            | Biharmonic → 5-point sparsity _(review)_               |
+| `test_biharmonic_non_periodic_no_corner_wrap`   | Non-periodic biharmonic corners _(review)_             |
+| `test_mixed_order_sparsity`                     | Mixed 1st/2nd order slot layout _(review)_             |
 
 ### Integration Tests (3 tests)
 
 Located in `tests/test_cli.py`. Run actual simulations:
 
-| Test | What it verifies |
-|------|-----------------|
+| Test                                  | What it verifies                   |
+| ------------------------------------- | ---------------------------------- |
 | `test_simulate_scipy_adaptive_dop853` | Scipy DOP853 with custom rtol/atol |
-| `test_simulate_adaptive_rk` | py-pde adaptive explicit RK |
-| `test_simulate_scipy_with_max_step` | Scipy with max-step limit |
+| `test_simulate_adaptive_rk`           | py-pde adaptive explicit RK        |
+| `test_simulate_scipy_with_max_step`   | Scipy with max-step limit          |
 
 ### Monitoring Tests (2 tests)
 
-| Test | What it verifies |
-|------|-----------------|
-| `test_energy_monitor_fires` | Energy monitor triggers on impossible threshold |
+| Test                          | What it verifies                                |
+| ----------------------------- | ----------------------------------------------- |
+| `test_energy_monitor_fires`   | Energy monitor triggers on impossible threshold |
 | `test_blowup_detection_fires` | Blow-up detection catches tachyonic instability |
 
 ### Critical Review Tests (5 tests)
 
 Located in `tests/test_cli.py`:
 
-| Test | What it verifies |
-|------|-----------------|
-| `test_implicit_multi_d_warns` | Implicit method + multi-D → sparsity warning *(review)* |
-| `test_energy_monitor_implicit_note` | Energy monitor + implicit → L2 drift note *(review)* |
-| `test_blowup_threshold_capped` | Threshold formula capped at 1e15 *(review)* |
-| `test_anisotropic_laplacian_stiffness` | Anisotropic directional Laplacians → advisory *(review)* |
-| `test_stiffness_advisory_zero_mass` | Anisotropic advisory fires even with zero mass *(review)* |
+| Test                                   | What it verifies                                          |
+| -------------------------------------- | --------------------------------------------------------- |
+| `test_implicit_multi_d_warns`          | Implicit method + multi-D → sparsity warning _(review)_   |
+| `test_energy_monitor_implicit_note`    | Energy monitor + implicit → L2 drift note _(review)_      |
+| `test_blowup_threshold_capped`         | Threshold formula capped at 1e15 _(review)_               |
+| `test_anisotropic_laplacian_stiffness` | Anisotropic directional Laplacians → advisory _(review)_  |
+| `test_stiffness_advisory_zero_mass`    | Anisotropic advisory fires even with zero mass _(review)_ |
 
 ## Design Decisions & Rationale
 
@@ -517,9 +524,10 @@ For true energy conservation checks, the measurement module's
 `compute_system_energy()` provides the physical Hamiltonian — but it
 operates post-hoc on saved data, not during simulation.
 
-### Why blow-up threshold = min(max(initial * 1e6, 1e6), 1e15)?
+### Why blow-up threshold = min(max(initial \* 1e6, 1e6), 1e15)?
 
 The threshold needs to be:
+
 - **High enough** to not trigger on legitimate physics (large but finite amplification)
 - **Low enough** to catch actual divergence before it produces inf/nan
 - **Nonzero** even when the initial state is zero (e.g., chi starts at 0)
@@ -615,18 +623,18 @@ independent review passes (correctness, robustness, test coverage).
 
 ### Findings Summary
 
-| Tier | Issue | Severity | Fix |
-|------|-------|----------|-----|
-| **1: Correctness** | `--max-step` silently ignored for non-scipy paths | Bug | Raise `ValueError` in validation |
-| **1: Correctness** | Biharmonic Jacobian sparsity uses 3-point (should be 5-point) | Latent bug | `_mark_band()` with `_stencil_width()` |
-| **1: Correctness** | Biharmonic CFL uses diffusion formula (should be wave) | Over-conservative | `dx²/(4√D)` from Von Neumann analysis |
-| **2: Design** | Position-dependent coefficients not flagged in CFL | Gap | Warning in `check_stability()` |
-| **2: Design** | Implicit + multi-D silently falls back to dense Jacobian | Gap | Warning in `_build_scipy_kwargs()` |
-| **2: Design** | Stiffness advisory misses anisotropic Laplacians | Gap | Secondary check in `_stiffness_advisory()` |
-| **2: Design** | Energy monitor + BDF interaction undocumented | Gap | Info note + doc update |
-| **3: Edge case** | Blow-up threshold scales to float64 limits for large IC | Edge | Cap at 1e15 |
-| **3: Edge case** | Negative Laplacian coefficient silently abs()'d | Edge | Warning before abs() |
-| **3: Edge case** | Dead `max_step` assignment in fixed-step path | Cleanup | Absorbed by Fix 1 |
+| Tier               | Issue                                                         | Severity          | Fix                                        |
+| ------------------ | ------------------------------------------------------------- | ----------------- | ------------------------------------------ |
+| **1: Correctness** | `--max-step` silently ignored for non-scipy paths             | Bug               | Raise `ValueError` in validation           |
+| **1: Correctness** | Biharmonic Jacobian sparsity uses 3-point (should be 5-point) | Latent bug        | `_mark_band()` with `_stencil_width()`     |
+| **1: Correctness** | Biharmonic CFL uses diffusion formula (should be wave)        | Over-conservative | `dx²/(4√D)` from Von Neumann analysis      |
+| **2: Design**      | Position-dependent coefficients not flagged in CFL            | Gap               | Warning in `check_stability()`             |
+| **2: Design**      | Implicit + multi-D silently falls back to dense Jacobian      | Gap               | Warning in `_build_scipy_kwargs()`         |
+| **2: Design**      | Stiffness advisory misses anisotropic Laplacians              | Gap               | Secondary check in `_stiffness_advisory()` |
+| **2: Design**      | Energy monitor + BDF interaction undocumented                 | Gap               | Info note + doc update                     |
+| **3: Edge case**   | Blow-up threshold scales to float64 limits for large IC       | Edge              | Cap at 1e15                                |
+| **3: Edge case**   | Negative Laplacian coefficient silently abs()'d               | Edge              | Warning before abs()                       |
+| **3: Edge case**   | Dead `max_step` assignment in fixed-step path                 | Cleanup           | Absorbed by Fix 1                          |
 
 ### Dismissed Issues
 
@@ -648,12 +656,12 @@ tests were added to prevent regression.
 
 ## References
 
-- **Hairer, Norsett & Wanner (1993)**, *Solving Ordinary Differential
-  Equations I: Nonstiff Problems*, Springer. — DOP853 method, embedded
+- **Hairer, Norsett & Wanner (1993)**, _Solving Ordinary Differential
+  Equations I: Nonstiff Problems_, Springer. — DOP853 method, embedded
   Runge-Kutta theory, error estimation.
 
-- **Hairer & Wanner (1996)**, *Solving Ordinary Differential Equations II:
-  Stiff and Differential-Algebraic Problems*, Springer. — BDF, Radau,
+- **Hairer & Wanner (1996)**, _Solving Ordinary Differential Equations II:
+  Stiff and Differential-Algebraic Problems_, Springer. — BDF, Radau,
   stiffness theory, Jacobian sparsity exploitation.
 
 - **Dormand & Prince (1980)**, "A family of embedded Runge-Kutta formulae",

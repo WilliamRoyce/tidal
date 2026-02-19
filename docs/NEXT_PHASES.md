@@ -23,6 +23,7 @@ Design decisions and feature choices below are informed by established scientifi
 Background fields allow non-dynamical tensors (e.g., an external magnetic field B₀(x)) to appear in the Lagrangian without being varied in the Euler–Lagrange derivation. They survive as spatially-varying coefficients in the equations of motion.
 
 **Key deliverables (all complete):**
+
 - `[[background_fields]]` TOML section with scalar, vector, and tensor support
 - Wolfram: `DefTensor` + `ReplaceAll` (scalar) / `ComponentValue` + `ToBasis` (vector/tensor)
 - Python: 3-level caching (L0 preresolved → L1 expression → L2 spatial grid → L3 per-call)
@@ -40,6 +41,7 @@ See `docs/background_fields.md` for the full architecture documentation.
 ### What and Why
 
 Gauge fixing simplifies equation structure for theories with gauge symmetry (massless vectors, linearized gravity). It is never required — TIDAL's existing pipeline handles gauge-invariant theories correctly, and all measurement quantities (energy, conversion, mixing) are gauge-invariant. However, explicit gauge fixing can be desirable to:
+
 - Reduce coupled Maxwell equations to uncoupled wave equations (Lorenz gauge)
 - Reduce 10-component linearized Einstein equations to clean wave equations (de Donder gauge)
 - Eliminate unphysical degrees of freedom for cleaner simulations
@@ -51,6 +53,7 @@ Gauge fixing is **always opt-in and per-field**: a multi-field theory (A, B, h) 
 The gauge system follows the same pattern as `[[derived_fields]]`: users can write **arbitrary Wolfram expressions** as gauge-fixing terms. Named gauges (Lorenz, de Donder, etc.) are built-in presets — convenience sugar over the same expression mechanism. Adding a new gauge preset requires only one new function in `GaugeFix.wl` and one registry entry in `_derive.py`.
 
 **Two mechanisms:**
+
 - **Type A (Lagrangian term):** An expression added to L before Euler-Lagrange derivation — changes EOM structure
 - **Type B (Constraint):** A constraint imposed on the EOM after derivation — eliminates degrees of freedom
 
@@ -80,19 +83,20 @@ expression = "eta[a,b] CD[-a][A[-b]]"   # set to zero
 
 ### Built-In Presets
 
-| Preset | Mechanism | Fields | Expression | Effect |
-|--------|-----------|--------|------------|--------|
-| `lorenz` | lagrangian_term | vector | `-(1/2ξ)(∂_μ A^μ)²` | Maxwell → uncoupled wave equations |
-| `de_donder` | lagrangian_term | sym. rank-2 | `-(1/2ξ)(∂_a h^a_b - ½∂_b h)²` | Lin. Einstein → uncoupled waves |
-| `temporal` | constraint | vector | `A_0 = 0` | Eliminates temporal component |
-| `coulomb` | constraint | vector | `∇·A = 0` | Transversality constraint |
-| `axial` | constraint | vector | `A_n = 0` | Eliminates one spatial component |
+| Preset      | Mechanism       | Fields      | Expression                     | Effect                             |
+| ----------- | --------------- | ----------- | ------------------------------ | ---------------------------------- |
+| `lorenz`    | lagrangian_term | vector      | `-(1/2ξ)(∂_μ A^μ)²`            | Maxwell → uncoupled wave equations |
+| `de_donder` | lagrangian_term | sym. rank-2 | `-(1/2ξ)(∂_a h^a_b - ½∂_b h)²` | Lin. Einstein → uncoupled waves    |
+| `temporal`  | constraint      | vector      | `A_0 = 0`                      | Eliminates temporal component      |
+| `coulomb`   | constraint      | vector      | `∇·A = 0`                      | Transversality constraint          |
+| `axial`     | constraint      | vector      | `A_n = 0`                      | Eliminates one spatial component   |
 
 New presets are trivially added: write a `Build*GaugeTerm` function in `GaugeFix.wl` + add one entry to `_GAUGE_PRESETS` in `_derive.py`. See `docs/gauge_fixing.md` for a full tutorial and developer guide.
 
 ### Implementation Sub-Phases
 
 **B1: Core framework + Lorenz proof-of-concept** (~4–5 days)
+
 - Expression-based `[[gauge]]` TOML parsing + `_validate_gauge()` in `_derive.py`
 - `_GAUGE_PRESETS` registry (extensible dict mapping names → builder functions)
 - `_WlsContext.gauge` field
@@ -104,6 +108,7 @@ New presets are trivially added: write a `Build*GaugeTerm` function in `GaugeFix
 - Tutorial: `docs/gauge_fixing.md` — quick start, preset reference, custom expression walkthrough, "adding new presets" developer guide (includes inline TOML examples for Lorenz preset and custom expressions)
 
 **B2: Additional presets + constraint mechanism** (~3–5 days)
+
 - `GaugeFix.wl`: `BuildDeDonderGaugeTerm`, `BuildTemporalGaugeConstraint`, `BuildCoulombGaugeConstraint`, `BuildAxialGaugeConstraint`
 - Type B WLS generation: `_wls_gauge_fixing_type_b()` (post-EOM constraint application)
 - Constraint mechanism reuses existing `constraint_solver` infrastructure
@@ -111,12 +116,14 @@ New presets are trivially added: write a `Build*GaugeTerm` function in `GaugeFix
 - Additional examples as appropriate
 
 ### Key Files
+
 - **NEW** `tidal/wolfram/GaugeFix.wl` — Core primitive + preset builder functions
 - **NEW** `docs/gauge_fixing.md` — Tutorial, preset reference, custom expression guide, developer recipe
 - `tidal/cli/_derive.py` — `_GAUGE_PRESETS` registry, TOML validation, WLS generation
 - `tidal/wolfram/ExportJSON.wl` — gauge metadata passthrough (already works)
 
 ### Scope: Medium (~7–10 days total across B1–B2)
+
 ### Dependencies: None
 
 ---
@@ -146,17 +153,18 @@ Standard V&V methodology (Roache 1998; NASA GRC grid convergence tutorial; AIAA 
 1. **CLI**: `tidal sweep spec.json --param "g=0.1:1.0:10"` and `tidal converge spec.json --grids "32,64,128,256"`
 2. **New module** `tidal/cli/_sweep.py`: Orchestrates multiple simulation runs
 3. **Post-processing**: Automatically calls measurement module on each run, collects scalar results into summary JSON
-4. **Convergence**: Computes ‖u_h − u_{h/2}‖ norms, estimates convergence order p, computes GCI
+4. **Convergence**: Computes ‖u*h − u*{h/2}‖ norms, estimates convergence order p, computes GCI
 5. **MMS module**: `tidal/verification/mms.py` — generates source terms from a prescribed analytic solution
 6. **Output**: JSON summary + optional multi-panel plots (P vs. parameter, error vs. resolution)
 
 ### References
 
-- Roache (1998), *Verification and Validation in Computational Science and Engineering*
+- Roache (1998), _Verification and Validation in Computational Science and Engineering_
 - NASA GRC, "Examining Spatial (Grid) Convergence"
-- AIAA G-077-1998, *Guide for V&V of CFD Simulations*
+- AIAA G-077-1998, _Guide for V&V of CFD Simulations_
 
 ### Scope: Medium (~5–7 days)
+
 ### Dependencies: None (can be developed in parallel with other phases)
 
 ---
@@ -193,6 +201,7 @@ This is the integration example that combines Phase A (and optionally Phase B) i
 - Berlin et al. (2024), "Numerical analysis of resonant axion-photon mixing", [arXiv:2405.08865](https://arxiv.org/abs/2405.08865) — numerical methods for resonant mixing
 
 ### Scope: Medium (~3–5 days)
+
 ### Dependencies: Phase A (complete) required; Phase B optional (simplifies EM and gravity equations)
 
 ---
@@ -225,6 +234,7 @@ TIDAL currently uses py-pde's 2nd-order finite-difference spatial discretisation
 - Burns et al. (2020), "Dedalus: A Flexible Framework for Numerical Simulations with Spectral Methods", Phys. Rev. Research 2, 023068
 
 ### Scope: Large (~7–10 days)
+
 ### Dependencies: None
 
 ---
@@ -253,6 +263,7 @@ The Gertsenshtein conversion timescale can be vastly different from the wave osc
 4. **Implicit methods**: BDF/Radau for stiff systems
 
 ### Scope: Small-Medium (~2–4 days)
+
 ### Dependencies: None
 
 ---
@@ -290,6 +301,7 @@ The Perfectly Matched Layer (PML) technique (Bérenger 1994) is the gold standar
 - Oskooi et al. (2010), "MEEP: A flexible free-software package for electromagnetic simulations by the FDTD method"
 
 ### Scope: Medium (~4–6 days for sponge layer; +5–8 days for full PML)
+
 ### Dependencies: Phase A (complete) provides the `coordinate_dependent` coefficient infrastructure
 
 ---
@@ -324,6 +336,7 @@ TIDAL currently uses raw numpy memory-mapped arrays for disk-backed storage. Whi
 - Burns et al. (2020), Dedalus HDF5 analysis output framework
 
 ### Scope: Medium (~4–6 days)
+
 ### Dependencies: None
 
 ---
@@ -359,6 +372,7 @@ Dedalus (Burns et al. 2020) provides a native eigenvalue problem (EVP) capabilit
 - Burns et al. (2020), "Dedalus: A Flexible Framework for Numerical Simulations with Spectral Methods" — native EVP capability
 
 ### Scope: Medium (~4–6 days)
+
 ### Dependencies: None (uses existing mass/coupling matrix infrastructure from Phase 12)
 
 ---
@@ -380,19 +394,21 @@ Phase E (Spectral Methods)       ─── Independent, large scope
 **Critical path to Gertsenshtein:** A (done), B (done) → D (~3–5 days)
 
 **Recommended order for maximum impact:**
+
 1. **D** (Gertsenshtein Example) — the project's raison d'être, unblocked by A+B
 2. **C** (Sweep & Convergence) — required for publication-quality validation of D
-4. **G** (Absorbing Boundaries) — extends D to realistic finite-magnet geometries
-5. **F** (Adaptive Time-Stepping) — quick win for production runs
-6. **I** (Eigenvalue/Dispersion) — analysis tool for parameter exploration
-7. **H** (HDF5/XDMF Output) — interoperability with standard tools
-8. **E** (Spectral Methods) — large scope, significant accuracy payoff
+3. **G** (Absorbing Boundaries) — extends D to realistic finite-magnet geometries
+4. **F** (Adaptive Time-Stepping) — quick win for production runs
+5. **I** (Eigenvalue/Dispersion) — analysis tool for parameter exploration
+6. **H** (HDF5/XDMF Output) — interoperability with standard tools
+7. **E** (Spectral Methods) — large scope, significant accuracy payoff
 
 ---
 
 ## Verification Plan
 
 After each phase:
+
 1. **Unit tests**: 15–30 new tests per phase, maintaining 0 ruff/pyright errors
 2. **Integration tests**: End-to-end TOML → JSON → simulation → measurement
 3. **Physics validation**: Compare against analytical solutions where available

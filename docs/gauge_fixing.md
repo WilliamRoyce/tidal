@@ -31,18 +31,18 @@ examples continue to work unchanged.
 
 ### Type A — Lagrangian term (added to L before EL derivation)
 
-| Preset | Fields | Expression | Effect |
-|--------|--------|------------|--------|
-| `lorenz` | vector | `-(1/2xi)(d_mu A^mu)^2` | Maxwell -> uncoupled wave equations |
-| `de_donder` | sym. rank-2 | `-(1/2xi)(d_a h^a_b - 1/2 d_b h)^2` | Lin. Einstein -> uncoupled waves |
+| Preset      | Fields      | Expression                          | Effect                              |
+| ----------- | ----------- | ----------------------------------- | ----------------------------------- |
+| `lorenz`    | vector      | `-(1/2xi)(d_mu A^mu)^2`             | Maxwell -> uncoupled wave equations |
+| `de_donder` | sym. rank-2 | `-(1/2xi)(d_a h^a_b - 1/2 d_b h)^2` | Lin. Einstein -> uncoupled waves    |
 
 ### Type B — Constraint (applied after EOM derivation)
 
-| Preset | Fields | Constraint | Effect |
-|--------|--------|------------|--------|
-| `temporal` | vector | `A_0 = 0` | Zeroes temporal component in all equations |
-| `coulomb` | vector | `div A_spatial = 0` | Adds transversality constraint equation |
-| `axial` | vector | `A_n = 0` | Zeroes last spatial component in all equations |
+| Preset     | Fields | Constraint          | Effect                                         |
+| ---------- | ------ | ------------------- | ---------------------------------------------- |
+| `temporal` | vector | `A_0 = 0`           | Zeroes temporal component in all equations     |
+| `coulomb`  | vector | `div A_spatial = 0` | Adds transversality constraint equation        |
+| `axial`    | vector | `A_n = 0`           | Zeroes last spatial component in all equations |
 
 Type A presets use Wolfram builder functions in `GaugeFix.wl`.
 Type B presets operate at the component level after `DecomposeToComponents`,
@@ -72,6 +72,7 @@ placeholders are all substituted automatically.
 ### Worked Example: Lorenz Gauge Two Ways
 
 **Using the preset:**
+
 ```toml
 [[gauge]]
 field = "A"
@@ -80,6 +81,7 @@ xi = 1.0
 ```
 
 **Equivalent custom expression:**
+
 ```toml
 [[gauge]]
 field = "A"
@@ -95,7 +97,8 @@ non-standard gauge choices.
 ## Two Mechanisms
 
 **Type A — Lagrangian term** (`mechanism = "lagrangian_term"`):
-- An expression is added to L *before* Euler-Lagrange derivation
+
+- An expression is added to L _before_ Euler-Lagrange derivation
 - Changes the structure of the equations of motion
 - The gauge-fixed Lagrangian is canonicalized (`ToCanonical` + `ContractMetric`)
   before EL derivation
@@ -103,7 +106,8 @@ non-standard gauge choices.
 - Presets: `lorenz`, `de_donder`
 
 **Type B — Constraint** (`mechanism = "constraint"`):
-- Applied *after* EOM derivation and component decomposition
+
+- Applied _after_ EOM derivation and component decomposition
 - For `temporal` and `axial`: substitutes the constrained component (and all its
   derivatives) with zero via `ReplaceAll` on the component equations
 - For `coulomb`: appends a spatial divergence constraint equation
@@ -158,7 +162,7 @@ BuildMyGaugeTerm[field_, metric_, covd_, xi_:1] := Module[
 ];
 ```
 
-The function must return an *expression* (a Wolfram symbolic expression),
+The function must return an _expression_ (a Wolfram symbolic expression),
 not perform an action. The pipeline calls `AddGaugeFixingTerm[L, yourTerm]`
 to inject it into the Lagrangian.
 

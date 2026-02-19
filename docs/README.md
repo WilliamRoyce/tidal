@@ -5,9 +5,11 @@ This directory contains living documentation that captures the project's evoluti
 ## 📚 Documentation Files
 
 ### [MEMORY.md](MEMORY.md)
+
 **The main reference guide** - Start here for architecture, patterns, and critical decisions.
 
 **Contents:**
+
 - Critical architecture decisions (multi-field coupling, dimension handling)
 - xAct/Wolfram patterns and best practices
 - Pipeline module integration patterns
@@ -20,9 +22,11 @@ This directory contains living documentation that captures the project's evoluti
 ---
 
 ### [troubleshooting.md](troubleshooting.md)
+
 **Error encyclopedia** - Look here when something breaks.
 
 **Contents:**
+
 - Common Wolfram/xAct errors and fixes
 - Python/py-pde issues (operators, grids, state)
 - Debugging techniques for both sides
@@ -33,9 +37,11 @@ This directory contains living documentation that captures the project's evoluti
 ---
 
 ### [chern-simons-notes.md](chern-simons-notes.md)
+
 **Example-specific deep dive** - Reference for complex implementation patterns.
 
 **Contents:**
+
 - Physics background for Chern-Simons theory
 - Implementation status (symbolic vs manual approaches)
 - Wolfram hybrid approach details
@@ -76,6 +82,7 @@ MEMORY.md (Architecture & Patterns)
 ### When to create a new example-notes file:
 
 Create `docs/{example-name}-notes.md` when:
+
 - The example requires hybrid symbolic/manual approaches
 - Special tensor structures need careful handling (epsilon, field strength, etc.)
 - The implementation has interesting physics or mathematical subtleties
@@ -85,32 +92,35 @@ Use `chern-simons-notes.md` as a template.
 
 ### What belongs where:
 
-| Content Type | Destination |
-|--------------|-------------|
+| Content Type          | Destination                                 |
+| --------------------- | ------------------------------------------- |
 | Architecture decision | MEMORY.md → Critical Architecture Decisions |
-| General xAct pattern | MEMORY.md → xAct/Wolfram Patterns |
-| Error you solved | troubleshooting.md → Appropriate section |
-| Example physics | {example}-notes.md → Physics Background |
+| General xAct pattern  | MEMORY.md → xAct/Wolfram Patterns           |
+| Error you solved      | troubleshooting.md → Appropriate section    |
+| Example physics       | {example}-notes.md → Physics Background     |
 | Example-specific code | {example}-notes.md → Implementation Pattern |
-| New file location | MEMORY.md → Quick Reference |
-| New function purpose | MEMORY.md → Quick Reference |
+| New file location     | MEMORY.md → Quick Reference                 |
+| New function purpose  | MEMORY.md → Quick Reference                 |
 
 ---
 
 ## 🚀 Quick Start
 
 **New to the project?** Read in this order:
+
 1. Project README.md (root)
 2. MEMORY.md (architecture overview)
 3. Run an example: `examples/scalar_field/` or `examples/coupled_scalars/`
 4. Skim troubleshooting.md to know what to watch for
 
 **Implementing something new?**
+
 1. Check MEMORY.md for existing patterns
 2. Look at similar examples (scalar → coupled scalars → electromagnetic → chern-simons)
 3. Add your findings back to these docs when done
 
 **Hit an error?**
+
 1. Search troubleshooting.md for symptoms
 2. If not found, debug and **add your solution** to troubleshooting.md
 3. If it reveals an architectural insight, update MEMORY.md too
