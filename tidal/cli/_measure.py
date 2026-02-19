@@ -175,11 +175,26 @@ def _run_energy(data: SimulationData) -> dict[str, Any]:
     }
 
 
-def _run_conservation(data: SimulationData, threshold: float) -> dict[str, Any]:
-    """Check energy conservation."""
+def _run_conservation(
+    data: SimulationData,
+    threshold: float,
+    *,
+    energy_result: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Check energy conservation.
+
+    When *energy_result* is provided (from a prior ``_run_energy()`` call),
+    the pre-computed total energy timeseries is reused, avoiding a redundant
+    call to ``compute_energy_timeseries()``.
+    """
     from tidal.measurement import check_energy_conservation
 
-    diag = check_energy_conservation(data, threshold=threshold)
+    kwargs: dict[str, Any] = {}
+    if energy_result is not None and "error" not in energy_result:
+        kwargs["total_energy"] = np.array(energy_result["total"], dtype=np.float64)
+        kwargs["times"] = np.array(energy_result["times"], dtype=np.float64)
+
+    diag = check_energy_conservation(data, threshold=threshold, **kwargs)
     return {
         "max_relative_error": diag.max_relative_error,
         "is_conserved": diag.is_conserved,
@@ -372,7 +387,9 @@ def _run_summary(
     results: dict[str, Any] = {}
 
     results["energy"] = _run_energy(data)
-    results["conservation"] = _run_conservation(data, threshold)
+    results["conservation"] = _run_conservation(
+        data, threshold, energy_result=results["energy"],
+    )
 
     # Auto-detect conversion (needs >= 2 dynamical fields)
     dyn = data.dynamical_fields
@@ -595,7 +612,9 @@ def _run_individual_measurements(  # noqa: C901, PLR0912, PLR0915
 
     if "conservation" in measurements:
         try:
-            results["conservation"] = _run_conservation(data, threshold)
+            results["conservation"] = _run_conservation(
+                data, threshold, energy_result=results.get("energy"),
+            )
         except ValueError as e:
             results["conservation"] = {"error": str(e)}
 
