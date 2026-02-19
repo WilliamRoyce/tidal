@@ -191,12 +191,24 @@ updating `virtual_momenta` in-place.
   previous state may come from a rejected stage. The finite-difference
   estimate remains valid because the state and time are self-consistent.
 
-### Future Enhancement
+### Future Enhancement: Elliptic Solve for Constraint Momenta
 
 For higher accuracy, the constraint equation could be differentiated in time
 analytically, yielding another elliptic equation for `π_N` with exact source
-terms. This would eliminate the `O(Δt)` error but requires additional
-elliptic solves. See Phase B (gauge fixing) for related work.
+terms. This would eliminate the `O(Δt)` error but requires:
+
+1. Parsing constraint RHS for `pi_N` references and mapping them to
+   dynamical equations' RHS expressions.
+2. Evaluating multiple dynamical RHS expressions as source terms.
+3. Solving an additional elliptic equation per constraint per
+   `evolution_rate()` call (doubling constraint solve cost).
+4. Handling position-dependent coefficients in the substitution.
+
+**Deferred** until energy conservation measurements on real simulations
+demonstrate `O(Δt)` drift attributable to the FD approximation. For
+DOP853 with 13 stages per step, `Δt_stage` is typically `O(10^-4)`,
+making the FD error negligible compared to spatial discretisation error.
+See Phase B (gauge fixing) for related work.
 
 ---
 

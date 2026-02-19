@@ -1019,18 +1019,18 @@ With `set -e`, the first form causes premature exit.
 
 ### 🛠️ Files Modified
 
-| File                                               | Changes                                               |
-| -------------------------------------------------- | ----------------------------------------------------- |
-| `tidal/wolfram/CommonUtilities.wl` | Enhanced coefficient extraction, fixed IsCovDOperator |
-| `tidal/wolfram/Linearize.wl`       | Added 3 private helper usage strings                  |
-| `tests/wolfram/test_euler_lagrange.wls`            | Fixed DefMetric syntax                                |
-| `tests/wolfram/test_common_utilities.wls`          | Verified with fixed utilities                         |
-| `tests/wolfram/test_export_json.wls`               | Verified with fixed patterns                          |
-| `scripts/run_wolfram_tests.sh`                     | Fixed bash arithmetic, enhanced output                |
-| `scripts/run_examples.sh`                          | NEW: Regenerate all JSON files                        |
-| `scripts/full_test.sh`                             | NEW: Complete test suite                              |
-| `scripts/validate_pipeline.sh`                     | NEW: End-to-end validation                            |
-| `scripts/lint_wolfram.sh`                          | NEW: Wolfram syntax checking                          |
+| File                                      | Changes                                               |
+| ----------------------------------------- | ----------------------------------------------------- |
+| `tidal/wolfram/CommonUtilities.wl`        | Enhanced coefficient extraction, fixed IsCovDOperator |
+| `tidal/wolfram/Linearize.wl`              | Added 3 private helper usage strings                  |
+| `tests/wolfram/test_euler_lagrange.wls`   | Fixed DefMetric syntax                                |
+| `tests/wolfram/test_common_utilities.wls` | Verified with fixed utilities                         |
+| `tests/wolfram/test_export_json.wls`      | Verified with fixed patterns                          |
+| `scripts/run_wolfram_tests.sh`            | Fixed bash arithmetic, enhanced output                |
+| `scripts/run_examples.sh`                 | NEW: Regenerate all JSON files                        |
+| `scripts/full_test.sh`                    | NEW: Complete test suite                              |
+| `scripts/validate_pipeline.sh`            | NEW: End-to-end validation                            |
+| `scripts/lint_wolfram.sh`                 | NEW: Wolfram syntax checking                          |
 
 ---
 

@@ -34,6 +34,7 @@
     "Deser",
     "diffusivities",
     "DJSON",
+    "Domcke",
     "dphi",
     "dpkg",
     "dtheta",
@@ -88,6 +89,7 @@
     "numba",
     "Nyquist",
     "pdes",
+    "pentadiagonal",
     "polg",
     "polm",
     "Proca",
@@ -130,6 +132,7 @@
     "tachyonic",
     "Tikhonov",
     "Transversality",
+    "tridiagonal",
     "uncontracted",
     "undefines",
     "unvalidated",
@@ -155,6 +158,7 @@
     "ytick",
     "yticklabels",
     "yticks",
+    "Zwicker",
     "δfield"
   ],
   "ignoreWords": [
@@ -188,6 +192,7 @@
     "funcs",
     "gcoup",
     "Grav",
+    "hidpi",
     "ifft",
     "ifftn",
     "imag",
@@ -223,6 +228,7 @@
     "ndarray",
     "xlabel",
     "ylabel",
+    "pentadiag",
     "phim",
     "pyproject",
     "rcond",
@@ -246,7 +252,11 @@
     "xycoords",
     "xytext"
   ],
-  "flagWords": ["hte", "teh", "wolfrom"],
+  "flagWords": [
+    "hte",
+    "teh",
+    "wolfrom"
+  ],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [

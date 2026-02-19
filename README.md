@@ -164,44 +164,45 @@ tidal validate examples/data/klein_gordon_1d.json      # validate JSON spec stru
 
 **CLI Subcommands:**
 
-| Command | Description |
-|---------|-------------|
-| `tidal derive theory.toml` | Generate .wls from TOML, run wolframscript to produce JSON |
-| `tidal simulate spec.json` | Full simulation with plotting (supports `--param`, `--ic`, `--bc`, `--scheme`) |
-| `tidal measure result_dir/` | Extract physics measurements (energy, conversion, mixing length, spectra) |
-| `tidal inspect spec.json` | Display equation system info (fields, operators, parameters) |
-| `tidal list` | Discover all available JSON specs in `examples/data/` |
-| `tidal validate spec.json` | Validate JSON equation specification structure |
+| Command                     | Description                                                                    |
+| --------------------------- | ------------------------------------------------------------------------------ |
+| `tidal derive theory.toml`  | Generate .wls from TOML, run wolframscript to produce JSON                     |
+| `tidal simulate spec.json`  | Full simulation with plotting (supports `--param`, `--ic`, `--bc`, `--scheme`) |
+| `tidal measure result_dir/` | Extract physics measurements (energy, conversion, mixing length, spectra)      |
+| `tidal inspect spec.json`   | Display equation system info (fields, operators, parameters)                   |
+| `tidal list`                | Discover all available JSON specs in `examples/data/`                          |
+| `tidal validate spec.json`  | Validate JSON equation specification structure                                 |
 
 **TOML Configuration** (`theory.toml`):
+
 - Define spacetime dimension, metric, fields, constants, and Lagrangian expression
 - `[[derived_fields]]` section for intermediate tensors (e.g., field strength `F_ab = CD[-a][A[-b]] - CD[-b][A[-a]]`)
 - Runtime parameters with default values in `[parameters]` section
 
 **Pipeline Examples:**
 
-| Example | Dim | Key Features |
-|---------|-----|--------------|
-| `scalar_field/` | 1+1D | Klein-Gordon, mass term, dispersion |
-| `electromagnetic/` | 1+1D | Maxwell, Lorenz gauge, massless waves |
-| `proca/` | 1+1D | Massive vector field (Proca mass) |
-| `coupled_scalars/` | 1+1D | Cross-field coupling, mass matrix, energy transfer |
-| `chern_simons/` | 2+1D | Epsilon tensor, topological mass, A_0 constraint |
-| `elasticity/` | 2+1D | Anisotropic laplacian, cross_derivative_xy |
-| `curved_spacetime/` | 2+1D | De Sitter, Hubble friction, time-dependent coefficients |
-| `sphere_kg/` | 2+1D | KG on S², position-dependent coefficients |
-| `polar_kg/` | 2+1D | Polar coordinates, Christoffel auto-detection |
-| `electrostatics/` | 2+1D | Poisson equation, constraint solver |
-| `scalar_vector_coupling/` | 2+1D | Mixed-rank cross-field (scalar+vector), 4 constants, CS+coupling |
-| `scalar_field_3d/` | 3+1D | Full 4D KG, 32^3 grid |
-| `spherical_kg/` | 3+1D | Spherical coordinates, trig coefficients |
-| `cylindrical_kg/` | 3+1D | Cylindrical coordinates, mixed curved/flat |
-| `gravitational_waves/` | 3+1D | xPert linearization, TT gauge, constraints |
-| `massive_3form/` | 3+1D | Rank-3 antisymmetric tensor, symmetry reduction |
-| `massive_gravity/` | 2+1D | Linearized massive gravity, Fierz-Pauli mass, xPert, coupled constraints |
-| `coupled_proca/` | 2+1D | Two massive vectors, coupled Helmholtz constraints, periodic BCs |
-| `coupled_scattering/` | 2+1D | Position-dependent Gaussian coupling, background fields, wave scattering |
-| `scalar_potential_well/` | 1+1D | Background potential well, `[[background_fields]]`, bound states |
+| Example                   | Dim  | Key Features                                                             |
+| ------------------------- | ---- | ------------------------------------------------------------------------ |
+| `scalar_field/`           | 1+1D | Klein-Gordon, mass term, dispersion                                      |
+| `electromagnetic/`        | 1+1D | Maxwell, Lorenz gauge, massless waves                                    |
+| `proca/`                  | 1+1D | Massive vector field (Proca mass)                                        |
+| `coupled_scalars/`        | 1+1D | Cross-field coupling, mass matrix, energy transfer                       |
+| `chern_simons/`           | 2+1D | Epsilon tensor, topological mass, A_0 constraint                         |
+| `elasticity/`             | 2+1D | Anisotropic laplacian, cross_derivative_xy                               |
+| `curved_spacetime/`       | 2+1D | De Sitter, Hubble friction, time-dependent coefficients                  |
+| `sphere_kg/`              | 2+1D | KG on S², position-dependent coefficients                                |
+| `polar_kg/`               | 2+1D | Polar coordinates, Christoffel auto-detection                            |
+| `electrostatics/`         | 2+1D | Poisson equation, constraint solver                                      |
+| `scalar_vector_coupling/` | 2+1D | Mixed-rank cross-field (scalar+vector), 4 constants, CS+coupling         |
+| `scalar_field_3d/`        | 3+1D | Full 4D KG, 32^3 grid                                                    |
+| `spherical_kg/`           | 3+1D | Spherical coordinates, trig coefficients                                 |
+| `cylindrical_kg/`         | 3+1D | Cylindrical coordinates, mixed curved/flat                               |
+| `gravitational_waves/`    | 3+1D | xPert linearization, TT gauge, constraints                               |
+| `massive_3form/`          | 3+1D | Rank-3 antisymmetric tensor, symmetry reduction                          |
+| `massive_gravity/`        | 2+1D | Linearized massive gravity, Fierz-Pauli mass, xPert, coupled constraints |
+| `coupled_proca/`          | 2+1D | Two massive vectors, coupled Helmholtz constraints, periodic BCs         |
+| `coupled_scattering/`     | 2+1D | Position-dependent Gaussian coupling, background fields, wave scattering |
+| `scalar_potential_well/`  | 1+1D | Background potential well, `[[background_fields]]`, bound states         |
 
 See [examples/README.md](examples/README.md) for complete documentation and verification that the Python layer contains zero hardcoded physics.
 
@@ -388,7 +389,7 @@ This project builds on:
 - [`py-pde`](https://py-pde.readthedocs.io/) — PDE solver framework (Zwicker, JOSS 2020).
 - [`uv`](https://github.com/astral-sh/uv) — fast Python environment management.
 - The [xAct/xTensor ecosystem](http://www.xact.es/) — symbolic tensor algebra (Martín-García et al.) powering the Lagrangian-to-PDE derivation pipeline.
-- [xPert](https://www.researchgate.net/publication/1740524) — metric perturbation theory (Brizuela et al. 2009) for linearisation.
+- [xPert](https://www.researchgate.net/publication/1740524) — metric perturbation theory (Brizuela et al. 2009) for linearization.
 
 Design decisions are informed by [Dedalus](https://arxiv.org/abs/1905.10388) (Burns et al. 2020), [MEEP](https://meep.readthedocs.io/) (Oskooi et al. 2010), and [FEniCS](https://fenicsproject.org/) (Baratta et al. 2023). The core physics targets the Gertsenshtein effect (Gertsenshtein 1962; [Domcke & Garcia-Cely 2023](https://arxiv.org/abs/2301.02072)). See [`docs/references.md`](docs/references.md) for the full citation list.
 
