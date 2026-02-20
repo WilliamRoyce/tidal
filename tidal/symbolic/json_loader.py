@@ -48,7 +48,9 @@ _STATIC_OPERATORS: frozenset[str] = frozenset(
 )
 
 #: Pattern for generic single-axis Nth-order derivatives: derivative_3_x, derivative_5_y, etc.
-_GENERIC_SINGLE_AXIS_RE = re.compile(r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$")
+_GENERIC_SINGLE_AXIS_RE = re.compile(
+    r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$"
+)
 
 #: Pattern for generic multi-axis derivatives: derivative_2x_1y, derivative_3x_2z, etc.
 _GENERIC_MULTI_AXIS_RE = re.compile(
@@ -260,9 +262,7 @@ class BoundaryCondition:
         """
         bc_type = str(data["type"])
         if bc_type not in _VALID_BC_TYPES:
-            msg = (
-                f"Unknown BC type: {bc_type!r}. Valid types: {sorted(_VALID_BC_TYPES)}"
-            )
+            msg = f"Unknown BC type: {bc_type!r}. Valid types: {sorted(_VALID_BC_TYPES)}"
             raise ValueError(msg)
         return cls(
             type=bc_type,
@@ -387,6 +387,158 @@ class ConstraintSolverConfig:
         )
 
 
+# === Phase K: Canonical Momentum Structures ===
+
+
+@dataclass(frozen=True)
+class HamiltonianFactor:
+    """One factor in a quadratic Hamiltonian term.
+
+    Represents a field (or its time/spatial derivative) that appears as a
+    multiplicative factor in a term of the component-form Hamiltonian density.
+
+    Attributes
+    ----------
+    field : str
+        Component field name (e.g., "A_1", "phi_0").
+    operator : str
+        Differential operator: "identity" (bare field), "time_derivative"
+        (∂_t field, maps to canonical momentum at evaluation), or a spatial
+        operator ("gradient_x", "laplacian", etc.).
+    """
+
+    field: str
+    operator: str
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> HamiltonianFactor:
+        """Parse from JSON dict."""
+        return cls(field=str(data["field"]), operator=str(data["operator"]))
+
+
+@dataclass(frozen=True)
+class HamiltonianTerm:
+    """A single quadratic term in the Hamiltonian density.
+
+    H = Σ coefficient * factor_a * factor_b
+
+    Attributes
+    ----------
+    coefficient : float
+        Numeric coefficient.
+    factor_a : HamiltonianFactor
+        First field factor.
+    factor_b : HamiltonianFactor
+        Second field factor (may equal factor_a for squared terms).
+    coefficient_symbolic : str | None
+        Symbolic coefficient expression (for parameter override).
+    """
+
+    coefficient: float
+    factor_a: HamiltonianFactor
+    factor_b: HamiltonianFactor
+    coefficient_symbolic: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> HamiltonianTerm:
+        """Parse from JSON dict."""
+        return cls(
+            coefficient=float(data["coefficient"]),
+            factor_a=HamiltonianFactor.from_dict(data["factor_a"]),
+            factor_b=HamiltonianFactor.from_dict(data["factor_b"]),
+            coefficient_symbolic=data.get("coefficient_symbolic"),
+        )
+
+
+@dataclass(frozen=True)
+class CanonicalCorrection:
+    """A single correction term: π_i = p_i + Σ correction_terms.
+
+    Each correction is: coefficient * operator(constraint_field).
+    For example, for Proca: π_1 = p_1 - gradient_x(A_0)
+    gives coefficient=-1.0, operator="gradient_x", field="A_0".
+
+    Attributes
+    ----------
+    coefficient : float
+        Numeric coefficient.
+    operator : str
+        Differential operator applied to the constraint field.
+    field : str
+        The constraint field name this correction involves.
+    coefficient_symbolic : str | None
+        Symbolic coefficient expression.
+    """
+
+    coefficient: float
+    operator: str
+    field: str
+    coefficient_symbolic: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> CanonicalCorrection:
+        """Parse from JSON dict (same format as OperatorTerm)."""
+        return cls(
+            coefficient=float(data["coefficient"]),
+            operator=str(data["operator"]),
+            field=str(data["field"]),
+            coefficient_symbolic=data.get("coefficient_symbolic"),
+        )
+
+
+@dataclass(frozen=True)
+class CanonicalStructure:
+    """Canonical momentum and Hamiltonian structure derived from Lagrangian.
+
+    Computed symbolically via Legendre transform in Wolfram and exported
+    as part of the JSON spec. Used by the PDE builder for canonical
+    evolution and by the energy measurement for Hamiltonian evaluation.
+
+    Attributes
+    ----------
+    hamiltonian_terms : tuple[HamiltonianTerm, ...]
+        Quadratic terms in the component-form Hamiltonian density.
+    corrections : dict[str, tuple[CanonicalCorrection, ...]]
+        Per-component canonical corrections: π_i = p_i + corrections[field_name].
+        Empty tuple for fields where π = p (scalars without gauge coupling).
+    hamiltonian_symbolic : str
+        Full symbolic Hamiltonian expression (Mathematica InputForm).
+    """
+
+    hamiltonian_terms: tuple[HamiltonianTerm, ...]
+    corrections: dict[str, tuple[CanonicalCorrection, ...]]
+    hamiltonian_symbolic: str
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> CanonicalStructure:
+        """Parse from JSON ``canonical`` section.
+
+        Raises
+        ------
+        ValueError
+            If ``hamiltonian_terms`` is empty.
+        """
+        h_terms = tuple(
+            HamiltonianTerm.from_dict(t) for t in data["hamiltonian_terms"]
+        )
+        if not h_terms:
+            msg = "canonical.hamiltonian_terms must be non-empty"
+            raise ValueError(msg)
+
+        raw_corrections = data.get("canonical_corrections", {})
+        corrections: dict[str, tuple[CanonicalCorrection, ...]] = {}
+        for field_name, corr_list in raw_corrections.items():
+            corrections[str(field_name)] = tuple(
+                CanonicalCorrection.from_dict(c) for c in corr_list
+            )
+
+        return cls(
+            hamiltonian_terms=h_terms,
+            corrections=corrections,
+            hamiltonian_symbolic=str(data.get("hamiltonian_symbolic", "")),
+        )
+
+
 @dataclass(frozen=True)
 class ComponentEquation:
     """Equation of motion for a single field component.
@@ -486,7 +638,9 @@ class ComponentEquation:
         )
 
 
-def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float | None:
+def _resolve_symbolic_coeff(
+    sym: str, parameters: Mapping[str, float]
+) -> float | None:
     """Resolve a symbolic coefficient string with parameter values.
 
     Handles simple names (``"m2"``), negated names (``"-m2"``), and
@@ -545,6 +699,11 @@ class EquationSystem:
         Coordinate names from JSON spacetime.coordinates (e.g., ("t", "x", "y")).
         Defaults to empty tuple; use ``effective_coordinates`` for a guaranteed
         non-empty result that infers names from dimension when not set.
+    canonical : CanonicalStructure | None
+        Canonical momentum and Hamiltonian structure from Legendre transform.
+        Present when the JSON spec includes a ``"canonical"`` section (generated
+        by ``tidal derive`` for non-linearization theories). None for legacy
+        specs or linearization theories.
     """
 
     n_components: int
@@ -558,6 +717,7 @@ class EquationSystem:
     coordinates: tuple[str, ...] = ()
     mass_matrix_symbolic: tuple[tuple[str | None, ...], ...] = ()
     coupling_matrix_symbolic: tuple[tuple[str | None, ...], ...] = ()
+    canonical: CanonicalStructure | None = None
 
     def __post_init__(self) -> None:
         """Validate the equation system.
@@ -590,15 +750,14 @@ class EquationSystem:
         # matrices that don't match the convention: matrix[i][j] = -(identity coeff).
         raw_params = self.metadata.get("parameters", {})
         check_params: dict[str, float] = {
-            k: float(v) for k, v in raw_params.items() if isinstance(v, (int, float))
+            k: float(v)
+            for k, v in raw_params.items()
+            if isinstance(v, (int, float))
         }
         expected_mass, expected_coupling, _, _ = self._compute_matrices_from_terms(
             self.equations, self.component_names, parameters=check_params or None
         )
-        if (
-            self.mass_matrix != expected_mass
-            or self.coupling_matrix != expected_coupling
-        ):
+        if self.mass_matrix != expected_mass or self.coupling_matrix != expected_coupling:
             import warnings  # noqa: PLC0415
 
             warnings.warn(
@@ -745,7 +904,10 @@ class EquationSystem:
                     # Prefer symbolic + params for numeric value; fall back
                     # to the raw numeric coefficient (shape factor).
                     effective_coeff = term.coefficient
-                    if term.coefficient_symbolic is not None and parameters:
+                    if (
+                        term.coefficient_symbolic is not None
+                        and parameters
+                    ):
                         resolved = _resolve_symbolic_coeff(
                             term.coefficient_symbolic, parameters
                         )
@@ -893,6 +1055,12 @@ class EquationSystem:
         # Extract coordinate names
         coordinates = tuple(str(c) for c in spacetime.get("coordinates", []))
 
+        # Parse canonical structure (Phase K) — optional for backward compat
+        canonical_data = data.get("canonical")
+        canonical: CanonicalStructure | None = None
+        if canonical_data is not None:
+            canonical = CanonicalStructure.from_dict(canonical_data)
+
         return cls(
             n_components=n_components,
             dimension=dimension,
@@ -905,6 +1073,7 @@ class EquationSystem:
             coordinates=coordinates,
             mass_matrix_symbolic=mass_matrix_symbolic,
             coupling_matrix_symbolic=coupling_matrix_symbolic,
+            canonical=canonical,
         )
 
 

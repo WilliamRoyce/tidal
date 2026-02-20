@@ -14,12 +14,12 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from tidal.measurement._energy import (
-    ENERGY_FLOOR,
+    _ENERGY_FLOOR,  # pyright: ignore[reportPrivateUsage]
+    _resolve_mass_squared,  # pyright: ignore[reportPrivateUsage]
     compute_field_energy,
-    resolve_mass_squared,
 )
 from tidal.measurement._utils import (
-    normalize_group,
+    _normalize_group,  # pyright: ignore[reportPrivateUsage]
 )
 
 if TYPE_CHECKING:
@@ -124,15 +124,15 @@ def compute_conversion_probability(
         raise ValueError(msg)
 
     source_arr = _field_energy_series(
-        data, source_field, resolve_mass_squared(data, names.index(source_field)),
+        data, source_field, _resolve_mass_squared(data, names.index(source_field)),
     )
     target_arr = _field_energy_series(
-        data, target_field, resolve_mass_squared(data, names.index(target_field)),
+        data, target_field, _resolve_mass_squared(data, names.index(target_field)),
     )
     total_arr = source_arr + target_arr
 
     e_source_0 = source_arr[0]
-    if e_source_0 < ENERGY_FLOOR:
+    if e_source_0 < _ENERGY_FLOOR:
         msg = (
             f"Source field '{source_field}' has zero initial energy — "
             f"cannot compute conversion probability"
@@ -141,7 +141,7 @@ def compute_conversion_probability(
 
     probability = target_arr / e_source_0
     e_total_0 = total_arr[0]
-    relative_error = (total_arr - e_total_0) / e_total_0 if e_total_0 >= ENERGY_FLOOR else np.zeros_like(total_arr)
+    relative_error = (total_arr - e_total_0) / e_total_0 if e_total_0 >= _ENERGY_FLOOR else np.zeros_like(total_arr)
 
     return ConversionResult(
         times=data.times.copy(),
@@ -163,7 +163,7 @@ def _group_energy_series(
     names = data.spec.component_names
     total: NDArray[np.float64] = np.zeros(data.n_snapshots, dtype=np.float64)
     for f in field_group:
-        total += _field_energy_series(data, f, resolve_mass_squared(data, names.index(f)))
+        total += _field_energy_series(data, f, _resolve_mass_squared(data, names.index(f)))
     return total
 
 
@@ -205,12 +205,12 @@ def compute_group_conversion(
     names = data.spec.component_names
 
     # Normalize to tuples
-    src = normalize_group(source_fields)
+    src = _normalize_group(source_fields)
     if target_fields is None:
         src_set = set(src)
         tgt = tuple(f for f in data.dynamical_fields if f not in src_set)
     else:
-        tgt = normalize_group(target_fields)
+        tgt = _normalize_group(target_fields)
 
     # Validate field names
     for name in (*src, *tgt):
@@ -233,7 +233,7 @@ def compute_group_conversion(
     total_arr = source_arr + target_arr
 
     e_source_0 = float(source_arr[0])
-    if e_source_0 < ENERGY_FLOOR:
+    if e_source_0 < _ENERGY_FLOOR:
         msg = (
             f"Source group {src} has zero initial energy — "
             f"cannot compute conversion probability"
@@ -244,7 +244,7 @@ def compute_group_conversion(
     e_total_0 = float(total_arr[0])
     relative_error: NDArray[np.float64] = (
         (total_arr - e_total_0) / e_total_0
-        if e_total_0 >= ENERGY_FLOOR
+        if e_total_0 >= _ENERGY_FLOOR
         else np.zeros_like(total_arr)
     )
 

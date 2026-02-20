@@ -19,13 +19,13 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from tidal.measurement._energy import (
-    ENERGY_FLOOR,
-    resolve_mass_squared,
+    _ENERGY_FLOOR,  # pyright: ignore[reportPrivateUsage]
+    _resolve_mass_squared,  # pyright: ignore[reportPrivateUsage]
 )
 from tidal.measurement._spectral import compute_spectral_energy
 from tidal.measurement._utils import (
-    check_no_position_dependent_terms,
-    normalize_group,
+    _check_no_position_dependent_terms,  # pyright: ignore[reportPrivateUsage]
+    _normalize_group,  # pyright: ignore[reportPrivateUsage]
 )
 
 if TYPE_CHECKING:
@@ -126,7 +126,7 @@ def compute_spectral_conversion(
     source_field: str,
     target_field: str,
     *,
-    energy_floor: float = ENERGY_FLOOR,
+    energy_floor: float = _ENERGY_FLOOR,
 ) -> SpectralConversion:
     """Compute per-mode spectral conversion ``P(k,t)``.
 
@@ -156,7 +156,7 @@ def compute_spectral_conversion(
         energy floor, or any equation term is position-dependent
         (translation invariance required for Fourier decomposition).
     """
-    check_no_position_dependent_terms(data, "Spectral conversion P(k,t)")
+    _check_no_position_dependent_terms(data, "Spectral conversion P(k,t)")
 
     names = data.spec.component_names
     if source_field not in names:
@@ -169,8 +169,8 @@ def compute_spectral_conversion(
         msg = f"Source and target must be different fields, got '{source_field}'"
         raise ValueError(msg)
 
-    src_m2 = resolve_mass_squared(data, names.index(source_field))
-    tgt_m2 = resolve_mass_squared(data, names.index(target_field))
+    src_m2 = _resolve_mass_squared(data, names.index(source_field))
+    tgt_m2 = _resolve_mass_squared(data, names.index(target_field))
 
     wavenumbers, src_energy = _field_spectral_energy_series(data, source_field, src_m2)
     _wn_tgt, tgt_energy = _field_spectral_energy_series(data, target_field, tgt_m2)
@@ -206,7 +206,7 @@ def compute_group_spectral_conversion(
     source_fields: str | Sequence[str],
     target_fields: str | Sequence[str] | None = None,
     *,
-    energy_floor: float = ENERGY_FLOOR,
+    energy_floor: float = _ENERGY_FLOOR,
 ) -> SpectralConversion:
     """Compute per-mode spectral conversion for field groups.
 
@@ -236,16 +236,16 @@ def compute_group_spectral_conversion(
         no modes are above the energy floor, or any equation term is
         position-dependent (translation invariance required).
     """
-    check_no_position_dependent_terms(data, "Spectral conversion P(k,t)")
+    _check_no_position_dependent_terms(data, "Spectral conversion P(k,t)")
 
     names = data.spec.component_names
 
-    src = normalize_group(source_fields)
+    src = _normalize_group(source_fields)
     if target_fields is None:
         src_set = set(src)
         tgt = tuple(f for f in data.dynamical_fields if f not in src_set)
     else:
-        tgt = normalize_group(target_fields)
+        tgt = _normalize_group(target_fields)
 
     # Validate field names
     for name in (*src, *tgt):
@@ -266,11 +266,11 @@ def compute_group_spectral_conversion(
         group: tuple[str, ...],
     ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         wn, total = _field_spectral_energy_series(
-            data, group[0], resolve_mass_squared(data, names.index(group[0])),
+            data, group[0], _resolve_mass_squared(data, names.index(group[0])),
         )
         for f in group[1:]:
             _wn, e = _field_spectral_energy_series(
-                data, f, resolve_mass_squared(data, names.index(f)),
+                data, f, _resolve_mass_squared(data, names.index(f)),
             )
             total += e
         return wn, total

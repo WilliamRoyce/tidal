@@ -494,8 +494,8 @@ derivatives, including at boundary cells where the ghost cell is implied.
 | `tidal simulate spec.json --output plot.png` | PNG plot only | `plot.png` |
 
 Data is only saved to a snapshot directory when `--output` is a path without
-an image extension. The `run.sh` scripts save to
-`examples/data/{name}_output/` via `tidal simulate --output`.
+an image extension. The example `measure_conversion.py` scripts save to
+`examples/data/{name}_output/` using `create_snapshot_callback`.
 
 ## Integration with the CLI
 

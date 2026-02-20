@@ -105,7 +105,7 @@ At each `evolution_rate(state, t)` call (`pde_builder.py`):
 
 1. **Pass 1a — Constraint solve:** `_evolve_constraints()` solves the elliptic
    equations for all constraint fields, updating their values in-place.
-   It then estimates `∂_t(constraint_field)` via finite difference (see below).
+   It then computes `∂_t(constraint_field)` analytically (see below).
 2. **Pass 1b — First-order momenta:** `_evolve_first_order()` computes virtual
    momenta for `time_derivative_order = 1` fields.
 3. **Pass 2 — Rates:** `_evolve_second_order()` builds the full rate vector.
@@ -143,72 +143,118 @@ this term should be nonzero.
 Prior to this fix, the code set `virtual_momenta["A_0"] = 0` unconditionally,
 dropping the `∂_x(∂_t A_0)` coupling from the dynamical equations.
 
-### The Fix: Backward Finite Difference
+### The Fix: Analytical Constraint Momentum via Time Differentiation
 
-After solving the constraint at time `t`, we compare the new field value with
-the stored value from the previous `evolution_rate()` call:
+Rather than estimating `π_N` via finite differences (which introduces a time
+lag that causes k-dependent instability through the constraint-dynamical
+feedback loop), we compute `π_N` **exactly** by differentiating the constraint
+equation in time.
+
+#### Mathematical Derivation
+
+Given a constraint equation of the form:
 
 ```
-π_N(t) ≈ [field_N(t) − field_N(t_prev)] / (t − t_prev)
+L[A_0] = -S(π_1, π_2, ..., B_0, ...)
 ```
 
-This is a **backward (causal) finite difference**, first-order accurate in
-`Δt`. On the first call (`t = 0` or no previous data), we return `π_N = 0`.
+where `L` is the self-operator (e.g., `∇² − m²`) and `S` is the source
+(terms referencing other fields and their momenta), differentiating both sides
+with respect to time yields:
 
-### Why This Works Generally
+```
+L[∂_t A_0] = L[π_0] = -∂_t S
+```
 
-The finite-difference approach is **theory-agnostic**:
+This is another elliptic equation for `π_0`, with the **same self-operator**
+`L` as the original constraint, and a new source `-∂_t S` computed from the
+time derivatives of the dynamical fields.
 
-- No knowledge of the constraint equation form is needed
-- No Wolfram pipeline changes required
-- No gauge choices — it is purely kinematic (observe the field changed,
-  estimate the rate)
-- Works for scalar, vector, or tensor constraint fields
-- Works for coupled constraints (e.g., `A_0 ↔ B_0` in coupled Proca)
-- Works with any adaptive ODE solver (DOP853, Radau, BDF)
+#### Computing ∂_t S
+
+The time derivative of each source term is obtained by replacing fields with
+their time derivatives:
+
+| Source term type | Replacement | Source of replacement |
+| --- | --- | --- |
+| `c · op(π_j)` where j is 2nd-order | `c · op(∂_t π_j) = c · op(RHS_j)` | Dynamical equation j |
+| `c · op(h_j)` where h_j is 2nd-order field | `c · op(π_j)` | Momentum from state |
+| `c · op(constraint_field_j)` | `c · op(π_j)` | Off-diagonal coupling |
+
+#### Handling Back-Coupling
+
+The dynamical equation `RHS_j` may itself contain `gradient(π_0)` terms
+(the very momentum we are solving for). These terms are moved to the LHS,
+creating an **augmented operator**:
+
+```
+L_aug[π_0] = L[π_0] + back_coupling[π_0] = -∂_t S_base
+```
+
+where `∂_t S_base` is computed with all constraint momenta set to zero.
+
+The back-coupling contribution is a product of Fourier multipliers. For
+example, in coupled Proca:
+
+- Source term: `-1 · gradient_x(π_1)` in A_0 constraint
+- A_1 dynamical eq contains: `-1 · gradient_x(π_0)`
+- Back-coupling multiplier: `(-1) · ik_x · (-1) · ik_x = -k_x²`
+- Similarly for y: `(-1) · ik_y · (-1) · ik_y = -k_y²`
+- Total: augmented diagonal = `(-k² - m²) + (-k²) = -2k² - m²`
+
+#### Block FFT Solve for Coupled Constraints
+
+When multiple constraint fields are coupled (e.g., `A_0 ↔ B_0` in coupled
+Proca), the system is solved simultaneously via batched SVD:
+
+```
+M_aug(k) · [π_A0, π_B0, ...]^T = -[∂_t S_A0, ∂_t S_B0, ...]^T
+```
+
+where `M_aug(k)` has:
+- **Diagonal entries:** self-operator multiplier + back-coupling
+- **Off-diagonal entries:** from cross-constraint coupling (e.g., `gcoup`)
+
+This uses the same SVD infrastructure and Tikhonov regularization as the
+existing block FFT constraint solver (`_solve_coupled_constraints_fft`).
+
+### Why This Is Better Than Finite Differences
+
+The previous approach estimated `π_N` via backward FD:
+`π_N ≈ (field(t) - field(t_prev)) / Δt`. This introduced a **time lag** that
+turned the constraint-dynamical feedback loop into a delay differential
+equation (DDE). Perturbative analysis of the DDE characteristic equation
+showed a growth rate `σ ∝ k⁴ Δt / m²` — exponential blow-up of high-k modes
+that no time step reduction could cure.
+
+The analytical approach eliminates the time lag entirely:
+
+- **No persistent state:** The method is a pure function of `(state, t)`,
+  inherently compatible with adaptive ODE solvers (no anchor/caching needed).
+- **Exact at every instant:** No `O(Δt)` error — the momentum is the exact
+  solution of the differentiated constraint equation.
+- **k-independent stability:** The augmented operator `L_aug` has strictly
+  negative eigenvalues for all k, preventing instability at any wavelength.
 
 ### Implementation
 
-Persistent state on `PDEFromSpec`:
+Method `_compute_analytical_constraint_momenta()` runs after the constraint
+solve, computing virtual momenta via `_solve_constraint_momenta_fft()`.
 
-```python
-self._prev_constraint_fields: dict[str, NumericArray] = {}
-self._prev_constraint_t: float | None = None
-```
+The method is theory-agnostic: it reads the equation structure from the JSON
+spec and automatically identifies source terms, back-coupling chains, and
+cross-constraint coupling without any theory-specific knowledge.
 
-Method `_estimate_constraint_momenta()` runs after the constraint solve,
-updating `virtual_momenta` in-place.
+### Limitations
 
-### Accuracy and Limitations
-
-- **First-order in Δt:** The error in `π_N` is `O(Δt)`, where `Δt` is the
-  time between consecutive `evolution_rate()` calls. For DOP853 (13 stages
-  per step), these calls are closely spaced within each step, so the
-  approximation is generally accurate.
-- **First call:** At `t = 0`, `π_N = 0`. This is correct when initial
-  conditions have zero momenta (constraint sources are zero).
-- **Adaptive step rejection:** If the solver retries a step, the stored
-  previous state may come from a rejected stage. The finite-difference
-  estimate remains valid because the state and time are self-consistent.
-
-### Future Enhancement: Elliptic Solve for Constraint Momenta
-
-For higher accuracy, the constraint equation could be differentiated in time
-analytically, yielding another elliptic equation for `π_N` with exact source
-terms. This would eliminate the `O(Δt)` error but requires:
-
-1. Parsing constraint RHS for `pi_N` references and mapping them to
-   dynamical equations' RHS expressions.
-2. Evaluating multiple dynamical RHS expressions as source terms.
-3. Solving an additional elliptic equation per constraint per
-   `evolution_rate()` call (doubling constraint solve cost).
-4. Handling position-dependent coefficients in the substitution.
-
-**Deferred** until energy conservation measurements on real simulations
-demonstrate `O(Δt)` drift attributable to the FD approximation. For
-DOP853 with 13 stages per step, `Δt_stage` is typically `O(10^-4)`,
-making the FD error negligible compared to spatial discretisation error.
-See Phase B (gauge fixing) for related work.
+- **Periodic BCs only:** Requires FFT. For non-periodic grids, a future
+  matrix-based analytical solve extension is needed.
+- **Position-dependent self-term coefficients:** Same limitation as the FFT
+  constraint solver — raises `ValueError` suggesting `method='matrix'`.
+  Falls back to `π = 0` with a debug-level log message.
+- **Time-dependent source coefficients:** `∂_t(c(t) · op(field))` requires
+  `∂_t c`, which is not yet implemented. Raises `ValueError` if detected.
+  (No current example has this case.)
 
 ---
 

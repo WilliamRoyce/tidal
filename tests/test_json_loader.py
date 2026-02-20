@@ -1564,3 +1564,144 @@ class TestMetadataParameterParsing:
     def test_string_non_numeric_param_raises(self) -> None:
         with pytest.raises(ValueError, match="cannot convert"):
             EquationSystem.from_dict(self._make_spec_dict({"m2": "abc"}))
+
+
+# === Phase K: Canonical Structure Tests ===
+
+
+class TestCanonicalStructure:
+    """Tests for parsing canonical momentum and Hamiltonian structures."""
+
+    def _make_canonical_data(
+        self,
+        *,
+        h_terms: list[dict[str, Any]] | None = None,
+        corrections: dict[str, list[dict[str, Any]]] | None = None,
+        symbolic: str = "H_test",
+    ) -> dict[str, Any]:
+        if h_terms is None:
+            h_terms = [
+                {
+                    "coefficient": 0.5,
+                    "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                    "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+                },
+            ]
+        if corrections is None:
+            corrections = {"phi_0": []}
+        return {
+            "hamiltonian_terms": h_terms,
+            "canonical_corrections": corrections,
+            "hamiltonian_symbolic": symbolic,
+        }
+
+    def test_parse_kg_canonical(self) -> None:
+        """Klein-Gordon: π = p, no corrections."""
+        from tidal.symbolic.json_loader import CanonicalStructure
+
+        data = self._make_canonical_data(
+            h_terms=[
+                {
+                    "coefficient": 0.5,
+                    "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                    "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+                },
+                {
+                    "coefficient": 0.5,
+                    "factor_a": {"field": "phi_0", "operator": "gradient_x"},
+                    "factor_b": {"field": "phi_0", "operator": "gradient_x"},
+                },
+                {
+                    "coefficient": 0.5,
+                    "factor_a": {"field": "phi_0", "operator": "identity"},
+                    "factor_b": {"field": "phi_0", "operator": "identity"},
+                    "coefficient_symbolic": "m2",
+                },
+            ],
+        )
+        cs = CanonicalStructure.from_dict(data)
+        assert len(cs.hamiltonian_terms) == 3
+        assert cs.corrections["phi_0"] == ()
+        assert cs.hamiltonian_terms[0].factor_a.operator == "time_derivative"
+        assert cs.hamiltonian_terms[2].coefficient_symbolic == "m2"
+
+    def test_parse_proca_corrections(self) -> None:
+        """Proca: π_1 = p_1 - gradient_x(A_0)."""
+        from tidal.symbolic.json_loader import CanonicalStructure
+
+        data = self._make_canonical_data(
+            corrections={
+                "A_0": [],
+                "A_1": [
+                    {"coefficient": -1.0, "operator": "gradient_x", "field": "A_0"},
+                ],
+            },
+        )
+        cs = CanonicalStructure.from_dict(data)
+        assert len(cs.corrections["A_1"]) == 1
+        corr = cs.corrections["A_1"][0]
+        assert corr.coefficient == -1.0
+        assert corr.operator == "gradient_x"
+        assert corr.field == "A_0"
+        assert cs.corrections["A_0"] == ()
+
+    def test_empty_terms_raises(self) -> None:
+        from tidal.symbolic.json_loader import CanonicalStructure
+
+        with pytest.raises(ValueError, match="non-empty"):
+            CanonicalStructure.from_dict(self._make_canonical_data(h_terms=[]))
+
+    def test_equation_system_with_canonical(self) -> None:
+        """EquationSystem.from_dict parses canonical section."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                        ],
+                    },
+                }
+            ],
+            "canonical": {
+                "hamiltonian_terms": [
+                    {
+                        "coefficient": 0.5,
+                        "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                        "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+                    },
+                ],
+                "canonical_corrections": {"phi_0": []},
+                "hamiltonian_symbolic": "test",
+            },
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.canonical is not None
+        assert len(spec.canonical.hamiltonian_terms) == 1
+        assert spec.canonical.corrections["phi_0"] == ()
+
+    def test_equation_system_without_canonical(self) -> None:
+        """Legacy specs without canonical section → canonical is None."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                        ],
+                    },
+                }
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.canonical is None

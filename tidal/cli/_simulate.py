@@ -6,7 +6,7 @@ import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -39,7 +39,7 @@ VMAX_FLOOR = 0.01
 # Curated namespace for --ic-formula eval().
 # Includes np for backward compatibility (e.g. np.exp(...) in formulas)
 # plus named math functions for convenience.
-FORMULA_NAMESPACE: dict[str, object] = {
+_FORMULA_NAMESPACE: dict[str, object] = {
     "np": np,
     "pi": np.pi,
     "e": np.e,
@@ -76,10 +76,7 @@ class PlotContext:
         from tidal.measurement import SimulationData
 
         return SimulationData.from_storage(
-            self.storage,
-            self.spec,
-            self.grid,
-            self.params,
+            self.storage, self.spec, self.grid, self.params,
         )
 
 
@@ -97,7 +94,7 @@ def field_slots(spec: EquationSystem) -> dict[str, int]:
     }
 
 
-def parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:  # noqa: C901
+def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:  # noqa: C901
     """Parse --param KEY=VAL arguments into a dict.
 
     Also merges default parameters from metadata when not overridden.
@@ -302,7 +299,7 @@ def _build_grid(
     )
 
 
-def validate_formula_ast(expr: str, allowed_names: set[str]) -> None:
+def _validate_formula_ast(expr: str, allowed_names: set[str]) -> None:
     """Validate a formula expression using AST analysis.
 
     Only allows safe math constructs: literals, names from the allowed set,
@@ -405,12 +402,12 @@ def _apply_formula_ic(
         raise ValueError(msg)
 
     coords = spec.spatial_coordinates
-    namespace = dict(FORMULA_NAMESPACE)
+    namespace = dict(_FORMULA_NAMESPACE)
     for i, name in enumerate(coords):
         namespace[name] = grid.cell_coords[..., i]
 
     allowed_names = set(namespace.keys())
-    validate_formula_ast(args.ic_formula, allowed_names)
+    _validate_formula_ast(args.ic_formula, allowed_names)
 
     field_arr = eval(args.ic_formula, {"__builtins__": {}}, namespace)  # noqa: S307
     field_arr = np.asarray(field_arr, dtype=float)
@@ -420,48 +417,6 @@ def _apply_formula_ic(
         field_arr = np.full(grid.shape, float(field_arr))
 
     return create_initial_state(grid, spec, field_data={component: field_arr})
-
-
-def _validate_ic_args(
-    ic_type: str,
-    component: str,
-    spec: EquationSystem,
-    args: Namespace,
-) -> None:
-    """Emit warnings for problematic IC argument combinations.
-
-    Warns when IC targets a constraint field or when arguments are
-    silently ignored for a given IC type.
-    """
-    import warnings
-
-    # Warn if IC targets a constraint field (time_derivative_order == 0)
-    if ic_type != "zero":
-        eq = next((e for e in spec.equations if e.field_name == component), None)
-        if eq is not None and eq.time_derivative_order == 0:
-            dynamical = [
-                e.field_name
-                for e in spec.equations
-                if e.time_derivative_order >= 2  # noqa: PLR2004
-            ]
-            suggestion = dynamical[0] if dynamical else "a dynamical field"
-            warnings.warn(
-                f"IC applied to constraint field '{component}' "
-                f"(time_derivative_order=0). "
-                f"Constraint solver will overwrite this IC. "
-                f"Consider --ic-component {suggestion} instead.",
-                UserWarning,
-                stacklevel=3,
-            )
-
-    # Warn about silently ignored --ic-wavevector with gaussian IC
-    if ic_type == "gaussian" and args.ic_wavevector is not None:
-        warnings.warn(
-            "--ic-wavevector is ignored for --ic=gaussian "
-            "(only applies to --ic=plane-wave)",
-            UserWarning,
-            stacklevel=3,
-        )
 
 
 def _build_initial_state(
@@ -495,8 +450,6 @@ def _build_initial_state(
             f"Available: {', '.join(spec.component_names)}"
         )
         raise ValueError(msg)
-
-    _validate_ic_args(ic_type, component, spec, args)
 
     if ic_type == "zero":
         if args.ic_component is not None:
@@ -586,9 +539,7 @@ def _infer_output_format(args: Namespace) -> str:
         # No extension → directory format (disk-backed streaming)
         if not ext:
             return "directory"
-    # Default: disk-backed directory output so simulation data always persists.
-    # Users can override with --output foo.png for in-memory image output.
-    return "directory"
+    return "png"
 
 
 def _generate_output(args: Namespace, ctx: PlotContext) -> None:
@@ -704,101 +655,6 @@ def _save_constraint_output(
     print(f"  Saved data to: {output_path}")
 
 
-# --- Adaptive solver helpers ---
-
-_IMPLICIT_METHODS = frozenset({"Radau", "BDF"})
-
-
-def _format_solver_log(args: Namespace, dt: float, max_step: float | None) -> str:
-    """Format the solver startup log message."""
-    parts = [f"Running simulation (t=0 → {args.t_end}"]
-    if args.scheme == "scipy":
-        method = args.method or "DOP853"
-        parts.append(f"method={method}")
-        if args.rtol is not None:
-            parts.append(f"rtol={args.rtol:.0e}")
-        if args.atol is not None:
-            parts.append(f"atol={args.atol:.0e}")
-        parts.append(f"first_step={dt:.4f}")
-    elif args.adaptive:
-        tol = args.tolerance if args.tolerance is not None else 1e-4
-        parts.extend((f"adaptive RK, tolerance={tol:.0e}", f"initial dt={dt:.4f}"))
-    else:
-        parts.append(f"dt={dt:.4f}, scheme={args.scheme}")
-    if max_step is not None:
-        parts.append(f"max_step={max_step:.4f}")
-    return ", ".join(parts) + ")..."
-
-
-def _build_scipy_kwargs(
-    args: Namespace,
-    max_step: float | None,
-    pde: object,
-    grid: CartesianGrid,
-) -> dict[str, Any]:
-    """Build kwargs to forward to ``solve_ivp`` via py-pde's ScipySolver."""
-    kwargs: dict[str, Any] = {"method": args.method or "DOP853"}
-    if args.rtol is not None:
-        kwargs["rtol"] = args.rtol
-    if args.atol is not None:
-        kwargs["atol"] = args.atol
-    if max_step is not None:
-        kwargs["max_step"] = max_step
-    # For implicit methods, compute Jacobian sparsity for performance
-    method = args.method or "DOP853"
-    if method in _IMPLICIT_METHODS:
-        jac_sp = pde.jacobian_sparsity(grid)  # type: ignore[attr-defined]
-        if jac_sp is not None:
-            kwargs["jac_sparsity"] = jac_sp
-        elif grid.dim > 1:
-            import warnings as _warnings
-
-            _warnings.warn(
-                f"Implicit method {method} on {grid.dim}D grid: "
-                f"Jacobian sparsity not available, falling back to dense "
-                f"estimation. This may be very slow for large grids.",
-                stacklevel=2,
-            )
-    return kwargs
-
-
-def _build_energy_monitor(
-    threshold: float,
-    snapshot_interval: float,
-) -> object:
-    """Build a CallbackTracker that monitors energy conservation.
-
-    Uses the L2 norm of the full state vector as an energy proxy.
-    This is conserved for Hamiltonian systems (up to discretization error)
-    and does not require knowledge of the equation structure.
-
-    Raises RuntimeError during simulation if ``|dE/E0|`` exceeds *threshold*.
-    """
-    from pde import CallbackTracker
-
-    energy_epsilon = 1e-30
-    e0_holder: list[float | None] = [None]  # mutable container for closure
-
-    def _energy_callback(state_now: object, t: float) -> None:
-        data = state_now.data  # type: ignore[union-attr]
-        e_total = float(np.sum(data * data))  # pyright: ignore[reportUnknownArgumentType]
-        if e0_holder[0] is None:
-            e0_holder[0] = e_total
-            return
-        e0 = e0_holder[0]
-        if abs(e0) < energy_epsilon:
-            return  # can't compute relative drift from ~zero energy
-        drift = abs((e_total - e0) / e0)
-        if drift > threshold:
-            msg = (
-                f"Energy conservation violated at t={t:.4f}: "
-                f"|dE/E0|={drift:.3e} > threshold={threshold:.3e}"
-            )
-            raise RuntimeError(msg)
-
-    return CallbackTracker(_energy_callback, interrupts=snapshot_interval)
-
-
 # --- Command entry point ---
 
 
@@ -808,14 +664,13 @@ def _check_cfl_stability(pde: object, dt: float, grid: CartesianGrid) -> None:
     sys.stderr.writelines(f"  Warning: {w}\n" for w in warnings_list)
 
 
-def _validate_solver_params(args: Namespace) -> None:  # noqa: C901, PLR0912
+def _validate_solver_params(args: Namespace) -> None:
     """Validate solver-related CLI arguments.
 
     Raises
     ------
     ValueError
-        If ``--t-end``, ``--dt``, or ``--snapshots`` are non-positive,
-        or if adaptive-solver flags are combined incorrectly.
+        If ``--t-end``, ``--dt``, or ``--snapshots`` are non-positive.
     """
     if args.t_end <= 0:
         msg = f"--t-end must be positive, got {args.t_end}"
@@ -827,111 +682,8 @@ def _validate_solver_params(args: Namespace) -> None:  # noqa: C901, PLR0912
         msg = f"--snapshots must be positive, got {args.snapshots}"
         raise ValueError(msg)
 
-    # Adaptive-solver flag validation
-    if args.method is not None and args.scheme != "scipy":
-        msg = "--method requires --scheme scipy"
-        raise ValueError(msg)
-    if args.rtol is not None and args.scheme != "scipy":
-        msg = "--rtol requires --scheme scipy"
-        raise ValueError(msg)
-    if args.atol is not None and args.scheme != "scipy":
-        msg = "--atol requires --scheme scipy"
-        raise ValueError(msg)
-    if args.tolerance is not None and (
-        args.scheme != "runge-kutta" or not args.adaptive
-    ):
-        msg = "--tolerance requires --scheme runge-kutta --adaptive"
-        raise ValueError(msg)
-    if args.rtol is not None and args.rtol <= 0:
-        msg = f"--rtol must be positive, got {args.rtol}"
-        raise ValueError(msg)
-    if args.atol is not None and args.atol <= 0:
-        msg = f"--atol must be positive, got {args.atol}"
-        raise ValueError(msg)
-    if args.tolerance is not None and args.tolerance <= 0:
-        msg = f"--tolerance must be positive, got {args.tolerance}"
-        raise ValueError(msg)
-    if args.max_step is not None and args.max_step <= 0:
-        msg = f"--max-step must be positive, got {args.max_step}"
-        raise ValueError(msg)
-    if args.max_step is not None and args.scheme != "scipy":
-        msg = "--max-step requires --scheme scipy (py-pde's ExplicitSolver does not support max_step)"
-        raise ValueError(msg)
-    if args.energy_monitor is not None and args.energy_monitor <= 0:
-        msg = f"--energy-monitor must be positive, got {args.energy_monitor}"
-        raise ValueError(msg)
 
-
-def _stiffness_advisory(  # noqa: C901, PLR0912
-    spec: EquationSystem,
-    grid: CartesianGrid,
-    args: Namespace,
-    log: object,
-) -> None:
-    """Log an advisory if the system appears stiff and an explicit method is chosen."""
-    method = args.method or ("DOP853" if args.scheme == "scipy" else "runge-kutta")
-    if method in _IMPLICIT_METHODS:
-        return  # already using an implicit method
-
-    stiffness_threshold = 100
-    dx_min = min(grid.discretization)
-
-    # --- Mass-based stiffness check ---
-    mass = spec.mass_matrix
-    if mass:
-        try:
-            max_mass_sq = max(
-                abs(mass[i][j]) for i in range(len(mass)) for j in range(len(mass[0]))
-            )
-        except (TypeError, IndexError):
-            max_mass_sq = 0.0
-        if max_mass_sq > 0:
-            max_c_sq = 0.0
-            for eq in spec.equations:
-                if eq.time_derivative_order < 2:  # noqa: PLR2004
-                    continue
-                for term in eq.rhs_terms:
-                    if term.operator == "laplacian" or term.operator.startswith(
-                        "laplacian_"
-                    ):
-                        max_c_sq = max(max_c_sq, abs(term.coefficient))
-            if max_c_sq > 0:
-                stiffness_ratio = max_mass_sq * dx_min**2 / max_c_sq
-                if stiffness_ratio > stiffness_threshold:
-                    msg = (
-                        f"  Note: system may be stiff "
-                        f"(m²·dx²/c²={stiffness_ratio:.0f}). "
-                        f"Consider --scheme scipy --method Radau "
-                        f"for better performance."
-                    )
-                    cast("object", log)(msg)  # type: ignore[operator]
-
-    # --- Anisotropic Laplacian coefficient spread ---
-    # If directional Laplacians (laplacian_x, laplacian_y, ...) have
-    # very different coefficients, the fastest axis dominates CFL while
-    # the slowest axis wastes steps — a form of stiffness.
-    dir_coeffs: list[float] = []
-    for eq in spec.equations:
-        if eq.time_derivative_order < 2:  # noqa: PLR2004
-            continue
-        dir_coeffs.extend(
-            abs(term.coefficient)
-            for term in eq.rhs_terms
-            if term.operator.startswith("laplacian_")
-        )
-    if len(dir_coeffs) >= 2:  # noqa: PLR2004
-        min_c = min(dir_coeffs)
-        max_c = max(dir_coeffs)
-        if min_c > 0 and max_c / min_c > stiffness_threshold:
-            msg = (
-                f"  Note: anisotropic Laplacian stiffness "
-                f"(max/min={max_c / min_c:.0f}). "
-                f"Consider --scheme scipy --method Radau."
-            )
-            cast("object", log)(msg)  # type: ignore[operator]
-
-
-def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, PLR0915
+def simulate_command(args: Namespace) -> int:  # noqa: PLR0914, PLR0915
     """Execute the simulate command.
 
     Parameters
@@ -965,7 +717,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
     )
 
     # Step 2: Parse parameters
-    params = parse_params(args.param, spec)
+    params = _parse_params(args.param, spec)
     if params:
         log(f"  Parameters: {params}")
 
@@ -977,9 +729,6 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
     bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
     grid = _build_grid(args, spec, bounds)
     log(f"  Grid: {'x'.join(str(s) for s in grid.shape)}, bounds: {grid.axes_bounds}")
-
-    # Stiffness advisory: warn if system appears stiff and explicit method is chosen
-    _stiffness_advisory(spec, grid, args, log)
 
     # Step 5: Initial conditions
     state = _build_initial_state(args, grid, spec, bounds)
@@ -1000,34 +749,22 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
 
     from tidal.utils import normalize_solve_result
 
-    # Compute CFL-based dt hint and max_step guard
-    cfl_dt = _CFL_FACTOR * min(
-        (b[1] - b[0]) / s for b, s in zip(grid.axes_bounds, grid.shape, strict=True)
-    )
-    cfl_max_step = pde.cfl_limit(grid)  # type: ignore[attr-defined]
-
-    # Determine dt and max_step based on solver path
-    if args.scheme == "scipy":
-        # Scipy: dt is just a first_step hint; tolerances drive step selection
-        dt: float = args.dt if args.dt is not None else cfl_dt
-        max_step: float | None = (
-            args.max_step if args.max_step is not None else cfl_max_step
+    dt = args.dt
+    if dt is None:
+        # Auto dt from grid spacing
+        dt = _CFL_FACTOR * min(
+            (b[1] - b[0]) / s for b, s in zip(grid.axes_bounds, grid.shape, strict=True)
         )
-    elif args.adaptive:
-        # Adaptive explicit RK: dt is initial guess, adapted by tolerance
-        dt = args.dt if args.dt is not None else cfl_dt
-        max_step = None  # py-pde ExplicitSolver has no max_step support
-    else:
-        # Fixed-step explicit RK (original behavior)
-        dt = args.dt if args.dt is not None else cfl_dt
-        max_step = None
-        _check_cfl_stability(pde, dt, grid)
+
+    _check_cfl_stability(pde, dt, grid)
 
     # Step 7: Run simulation
     snapshot_interval = (
         args.snapshots if args.snapshots is not None else args.t_end / 100.0
     )
-    log(_format_solver_log(args, dt, max_step))
+    log(
+        f"Running simulation (t=0 → {args.t_end}, dt={dt:.4f}, scheme={args.scheme})..."
+    )
 
     fmt = _infer_output_format(args)
     use_directory = fmt == "directory"
@@ -1036,13 +773,8 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
     if use_directory:
         # Disk-backed streaming: O(1) memory regardless of snapshot count
         storage, tracker, writer = _setup_disk_backed(
-            args,
-            spec,
-            grid,
-            snapshot_interval,
-            params,
+            args, spec, grid, snapshot_interval, params,
         )
-        log(f"  Output directory: {writer.output_dir}")
     else:
         # In-memory path (for plot output)
         from pde import MemoryStorage
@@ -1050,74 +782,15 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
         storage = MemoryStorage()
         tracker = storage.tracker(snapshot_interval)
 
-    # Add blow-up detection callback
-    initial_max = float(np.max(np.abs(initial_state.data)))
-    blowup_threshold = min(max(initial_max * 1e6, 1e6), 1e15)
-
-    def _check_blowup(state_now: object, t: float) -> None:
-        current_max = float(np.max(np.abs(state_now.data)))  # type: ignore[union-attr]
-        if current_max > blowup_threshold:
-            msg = (
-                f"Blow-up detected at t={t:.4f}: max|state|={current_max:.3e} "
-                f"exceeds threshold {blowup_threshold:.3e}"
-            )
-            raise RuntimeError(msg)
-
-    from pde import CallbackTracker
-
-    blowup_tracker = CallbackTracker(_check_blowup, interrupts=snapshot_interval)
-    if isinstance(tracker, list):
-        tracker.append(blowup_tracker)
-    else:
-        tracker = [tracker, blowup_tracker]
-
-    # Add energy monitor callback if requested
-    if args.energy_monitor is not None:
-        energy_tracker = _build_energy_monitor(
-            args.energy_monitor,
-            snapshot_interval,
-        )
-        tracker.append(energy_tracker)  # pyright: ignore[reportArgumentType]
-        # Implicit methods (BDF, Radau) introduce numerical dissipation,
-        # which causes the L2 norm to drift even for stable systems.
-        # Warn the user to use a generous threshold.
-        method = args.method or ("DOP853" if args.scheme == "scipy" else "")
-        if method in _IMPLICIT_METHODS:
-            log(
-                f"  Note: --energy-monitor with implicit method {method}: "
-                f"expect L2 norm drift from numerical dissipation. "
-                f"Use threshold >= 0.1 to avoid false alarms."
-            )
-
-    import time as _time
-
-    t_wall_start = _time.perf_counter()
-
-    # Solve — three paths: fixed explicit, adaptive explicit, scipy adaptive
+    # Solve (tracker type varies: StorageTracker for legacy, list for disk-backed)
     if args.scheme == "scipy":
-        solver_kwargs = _build_scipy_kwargs(args, max_step, pde, grid)
         normalize_solve_result(
-            pde.solve(  # type: ignore[attr-defined]  # pyright: ignore[reportCallIssue]
+            pde.solve(  # type: ignore[attr-defined]
                 state,
                 t_range=args.t_end,
                 dt=dt,
                 solver="scipy",
                 tracker=tracker,  # pyright: ignore[reportArgumentType]
-                **solver_kwargs,
-            )
-        )
-    elif args.adaptive:
-        adaptive_kwargs: dict[str, Any] = {"adaptive": True}
-        if args.tolerance is not None:
-            adaptive_kwargs["tolerance"] = args.tolerance
-        normalize_solve_result(
-            pde.solve(  # type: ignore[attr-defined]  # pyright: ignore[reportCallIssue]
-                state,
-                t_range=args.t_end,
-                dt=dt,
-                scheme=args.scheme,
-                tracker=tracker,  # pyright: ignore[reportArgumentType]
-                **adaptive_kwargs,
             )
         )
     else:
@@ -1131,12 +804,12 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
             )
         )
 
-    t_wall_elapsed = _time.perf_counter() - t_wall_start
-    log(f"  Completed in {t_wall_elapsed:.2f}s")
-
     if writer is not None:
         writer.close()
-        log(f"  {writer.count} snapshots streamed to: {writer.output_dir}")
+        log(
+            f"  {writer.count} snapshots streamed to: "
+            f"{writer.output_dir}"
+        )
     else:
         log(f"  {len(storage)} snapshots stored")
 
@@ -1171,12 +844,7 @@ def _setup_disk_backed(
 
     from tidal.measurement._writer import create_snapshot_callback
 
-    if args.output:
-        output_dir = Path(args.output)
-    else:
-        # Auto-generate from spec name: examples/data/foo.json → examples/data/foo_output/
-        json_file = Path(args.json_path).resolve()
-        output_dir = json_file.parent / f"{json_file.stem}_output"
+    output_dir = Path(args.output) if args.output else Path("output")
 
     writer, callback = create_snapshot_callback(
         output_dir=output_dir,

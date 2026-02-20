@@ -16,8 +16,8 @@ from tidal.cli._simulate import (
     _parse_bc,
     _parse_bounds,
     _parse_grid_shape,
+    _parse_params,
     _parse_single_bound,
-    parse_params,
 )
 
 # ==================== _parse_grid_shape ====================
@@ -43,9 +43,9 @@ class TestParseGridShape:
     @pytest.mark.parametrize(
         ("raw", "dim"),
         [
-            ("32,64", 1),  # 2 values for 1D
-            ("32,64", 3),  # 2 values for 3D
-            ("8,16,32", 2),  # 3 values for 2D
+            ("32,64", 1),     # 2 values for 1D
+            ("32,64", 3),     # 2 values for 3D
+            ("8,16,32", 2),   # 3 values for 2D
         ],
     )
     def test_dimension_mismatch(self, raw: str, dim: int) -> None:
@@ -79,8 +79,8 @@ class TestParseBounds:
     @pytest.mark.parametrize(
         ("raw", "dim"),
         [
-            ("0:20,0:10", 1),  # 2 values for 1D
-            ("0:20,0:10", 3),  # 2 values for 3D
+            ("0:20,0:10", 1),   # 2 values for 1D
+            ("0:20,0:10", 3),   # 2 values for 3D
         ],
     )
     def test_dimension_mismatch(self, raw: str, dim: int) -> None:
@@ -174,53 +174,49 @@ def _make_spec_stub(metadata: dict[str, object] | None = None) -> object:
 class TestParseParams:
     def test_empty_list_no_metadata(self) -> None:
         spec = _make_spec_stub()
-        assert parse_params([], spec) == {}  # type: ignore[arg-type]
+        assert _parse_params([], spec) == {}  # type: ignore[arg-type]
 
     def test_metadata_defaults_loaded(self) -> None:
         spec = _make_spec_stub({"parameters": {"m2": 1.0, "g": 0.5}})
-        result = parse_params([], spec)  # type: ignore[arg-type]
+        result = _parse_params([], spec)  # type: ignore[arg-type]
         assert result == {"m2": 1.0, "g": 0.5}
 
     def test_cli_overrides_metadata(self) -> None:
         spec = _make_spec_stub({"parameters": {"m2": 1.0}})
-        result = parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
+        result = _parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
         assert result == {"m2": 2.0}
 
     def test_missing_equals_raises(self) -> None:
         spec = _make_spec_stub()
         with pytest.raises(ValueError, match="KEY=VALUE"):
-            parse_params(["bad_no_equals"], spec)  # type: ignore[arg-type]
+            _parse_params(["bad_no_equals"], spec)  # type: ignore[arg-type]
 
     def test_non_numeric_value_raises(self) -> None:
         spec = _make_spec_stub()
         with pytest.raises(ValueError, match="Must be a number"):
-            parse_params(["m2=abc"], spec)  # type: ignore[arg-type]
+            _parse_params(["m2=abc"], spec)  # type: ignore[arg-type]
 
-    def test_non_numeric_metadata_skipped(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_non_numeric_metadata_skipped(self, capsys: pytest.CaptureFixture[str]) -> None:
         spec = _make_spec_stub({"parameters": {"note": "not a number", "m2": 1.0}})
-        result = parse_params([], spec)  # type: ignore[arg-type]
+        result = _parse_params([], spec)  # type: ignore[arg-type]
         assert result == {"m2": 1.0}
         assert "Warning" in capsys.readouterr().err
 
     def test_no_parameters_key_in_metadata(self) -> None:
         spec = _make_spec_stub({"source": "xAct"})
-        assert parse_params([], spec) == {}  # type: ignore[arg-type]
+        assert _parse_params([], spec) == {}  # type: ignore[arg-type]
 
     def test_warns_unknown_param(self, capsys: pytest.CaptureFixture[str]) -> None:
         spec = _make_spec_stub({"parameters": {"m2": 1.0}})
-        result = parse_params(["m2=2.0", "bogus=3.0"], spec)  # type: ignore[arg-type]
+        result = _parse_params(["m2=2.0", "bogus=3.0"], spec)  # type: ignore[arg-type]
         assert result == {"m2": 2.0, "bogus": 3.0}
         err = capsys.readouterr().err
         assert "bogus" in err
         assert "not found" in err
 
-    def test_no_warning_for_known_param(
-        self, capsys: pytest.CaptureFixture[str]
-    ) -> None:
+    def test_no_warning_for_known_param(self, capsys: pytest.CaptureFixture[str]) -> None:
         spec = _make_spec_stub({"parameters": {"m2": 1.0}})
-        parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
+        _parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
         err = capsys.readouterr().err
         assert "not found" not in err
 
@@ -230,11 +226,7 @@ class TestParseParams:
 
 def _make_args(**kwargs: object) -> Namespace:
     """Create a Namespace with defaults for _infer_output_format."""
-    defaults: dict[str, object] = {
-        "no_plot": False,
-        "output_format": None,
-        "output": None,
-    }
+    defaults: dict[str, object] = {"no_plot": False, "output_format": None, "output": None}
     defaults.update(kwargs)
     return Namespace(**defaults)
 
@@ -263,95 +255,91 @@ class TestInferOutputFormat:
     def test_jpg_extension(self) -> None:
         assert _infer_output_format(_make_args(output="foo.jpg")) == "jpg"
 
-    def test_no_output_defaults_directory(self) -> None:
-        """Without --output, default format is disk-backed directory."""
-        assert _infer_output_format(_make_args()) == "directory"
+    def test_no_output_defaults_png(self) -> None:
+        assert _infer_output_format(_make_args()) == "png"
 
     def test_no_plot_takes_priority(self) -> None:
         """--no-plot should win even if --format or --output is given."""
-        assert (
-            _infer_output_format(_make_args(no_plot=True, output_format="png"))
-            == "summary"
-        )
+        assert _infer_output_format(_make_args(no_plot=True, output_format="png")) == "summary"
 
 
 class TestValidateFormulaAst:
     """Tests for _validate_formula_ast AST-based formula validation."""
 
     def test_valid_simple_expression(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
-        validate_formula_ast("x + 1", {"x"})
+        _validate_formula_ast("x + 1", {"x"})
 
     def test_valid_function_calls(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
-        validate_formula_ast("sin(x) + cos(y)", {"sin", "cos", "x", "y"})
+        _validate_formula_ast("sin(x) + cos(y)", {"sin", "cos", "x", "y"})
 
     def test_valid_numpy_attribute(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
-        validate_formula_ast("np.exp(-x**2)", {"np", "x"})
+        _validate_formula_ast("np.exp(-x**2)", {"np", "x"})
 
     def test_rejects_unknown_name(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(ValueError, match="Disallowed name 'badvar'"):
-            validate_formula_ast("badvar * 2", {"x"})
+            _validate_formula_ast("badvar * 2", {"x"})
 
     def test_rejects_attribute_access(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(ValueError, match="Attribute access not allowed"):
-            validate_formula_ast("x.__class__", {"x"})
+            _validate_formula_ast("x.__class__", {"x"})
 
     def test_rejects_import_name(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(ValueError, match="Disallowed name '__import__'"):
-            validate_formula_ast("__import__('os')", {"x"})
+            _validate_formula_ast("__import__('os')", {"x"})
 
     def test_rejects_lambda(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(TypeError, match=r"Disallowed construct.*Lambda"):
-            validate_formula_ast("(lambda: 1)()", {"x"})
+            _validate_formula_ast("(lambda: 1)()", {"x"})
 
     def test_valid_ternary(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
-        validate_formula_ast("x if x > 0 else -x", {"x"})
+        _validate_formula_ast("x if x > 0 else -x", {"x"})
 
     def test_valid_complex_math(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
-        validate_formula_ast(
+        _validate_formula_ast(
             "exp(-((x - 5)**2 + (y - pi)**2) / 0.5**2)",
             {"exp", "x", "y", "pi"},
         )
 
     def test_rejects_list_comprehension(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(TypeError, match=r"Disallowed construct.*ListComp"):
-            validate_formula_ast("[i for i in x]", {"x", "i"})
+            _validate_formula_ast("[i for i in x]", {"x", "i"})
 
     def test_rejects_walrus_operator(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(TypeError, match=r"Disallowed construct.*NamedExpr"):
-            validate_formula_ast("(y := x + 1)", {"x", "y"})
+            _validate_formula_ast("(y := x + 1)", {"x", "y"})
 
     def test_rejects_nested_attribute(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
         with pytest.raises(ValueError, match="Attribute access not allowed"):
-            validate_formula_ast("x.a.b", {"x"})
+            _validate_formula_ast("x.a.b", {"x"})
 
     def test_allows_subscript_slicing(self) -> None:
-        from tidal.cli._simulate import validate_formula_ast
+        from tidal.cli._simulate import _validate_formula_ast
 
-        validate_formula_ast("x[0:5]", {"x"})
+        _validate_formula_ast("x[0:5]", {"x"})
 
 
 # ==================== generate_wls constraint_solver ====================
@@ -368,7 +356,9 @@ class TestConstraintSolverToml:
             "theory": {"name": "Test"},
             "spacetime": {"dimension": 3, "metric": "minkowski"},
             "fields": [{"name": "phi", "type": "scalar"}],
-            "lagrangian": {"expression": "CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"},
+            "lagrangian": {
+                "expression": "CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"
+            },
             "output": {"path": "out.json"},
         }
         base.update(config)
@@ -386,33 +376,29 @@ class TestConstraintSolverToml:
 
     def test_constraint_solver_dirichlet_bcs(self) -> None:
         """Dirichlet BC config → correct Wolfram Association syntax."""
-        wls = self._generate(
-            {
-                "constraint_solver": {
-                    "enabled": True,
-                    "boundary_conditions": {
-                        "x": {"type": "dirichlet", "value": 0.0},
-                        "y": {"type": "dirichlet", "value": 0.0},
-                    },
-                }
+        wls = self._generate({
+            "constraint_solver": {
+                "enabled": True,
+                "boundary_conditions": {
+                    "x": {"type": "dirichlet", "value": 0.0},
+                    "y": {"type": "dirichlet", "value": 0.0},
+                },
             }
-        )
+        })
         assert '"type" -> "dirichlet"' in wls
         assert '"value" -> 0.0' in wls
 
     def test_constraint_solver_periodic_bcs(self) -> None:
         """Periodic BC config → Wolfram Association without value key."""
-        wls = self._generate(
-            {
-                "constraint_solver": {
-                    "enabled": True,
-                    "boundary_conditions": {
-                        "x": {"type": "periodic"},
-                        "y": {"type": "periodic"},
-                    },
-                }
+        wls = self._generate({
+            "constraint_solver": {
+                "enabled": True,
+                "boundary_conditions": {
+                    "x": {"type": "periodic"},
+                    "y": {"type": "periodic"},
+                },
             }
-        )
+        })
         assert '"type" -> "periodic"' in wls
         # Periodic BCs should NOT have a "value" key
         assert '"value"' not in wls
@@ -456,24 +442,22 @@ class TestGaugeToml:
         """Parameter xi=2.0 appears as fourth argument to BuildLorenzGaugeTerm."""
         import re
 
-        wls = self._generate({"gauge": [{"field": "A", "type": "lorenz", "xi": 2.0}]})
+        wls = self._generate(
+            {"gauge": [{"field": "A", "type": "lorenz", "xi": 2.0}]}
+        )
         # xi=2.0 should appear as the fourth argument to the builder call
         assert re.search(r"BuildLorenzGaugeTerm\[.*,\s*2(\.0)?\s*\]", wls)
 
     def test_custom_expression_in_wls(self) -> None:
         """Custom gauge expression → GaugeTerm + AddGaugeFixingTerm in WLS."""
-        wls = self._generate(
-            {
-                "gauge": [
-                    {
-                        "field": "A",
-                        "type": "custom",
-                        "mechanism": "lagrangian_term",
-                        "expression": "-(1/2) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]",
-                    }
-                ]
-            }
-        )
+        wls = self._generate({
+            "gauge": [{
+                "field": "A",
+                "type": "custom",
+                "mechanism": "lagrangian_term",
+                "expression": "-(1/2) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]",
+            }]
+        })
         assert "GaugeTerm" in wls
         assert "AddGaugeFixingTerm" in wls
 
@@ -521,41 +505,35 @@ class TestGaugeToml:
 
     def test_de_donder_in_wls(self) -> None:
         """De Donder gauge on tensor → BuildDeDonderGaugeTerm in WLS output."""
-        wls = self._generate(
-            {
-                "fields": [
-                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}
-                ],
-                "derived_fields": [],
-                "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
-                "gauge": [{"field": "h", "type": "de_donder"}],
-            }
-        )
+        wls = self._generate({
+            "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}],
+            "derived_fields": [],
+            "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
+            "gauge": [{"field": "h", "type": "de_donder"}],
+        })
         assert "BuildDeDonderGaugeTerm" in wls
         assert "GaugeFix.wl" in wls
         assert "ToCanonical" in wls
 
     def test_mixed_type_a_and_b_in_wls(self) -> None:
         """Mixed Type A + Type B: loads GaugeFix.wl for Type A, has substitution for Type B."""
-        wls = self._generate(
-            {
-                "fields": [
-                    {"name": "A", "type": "vector"},
-                    {"name": "B", "type": "vector"},
-                ],
-                "derived_fields": [],
-                "lagrangian": {
-                    "expression": (
-                        "-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] "
-                        "- 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-c][B[-d]]"
-                    )
-                },
-                "gauge": [
-                    {"field": "A", "type": "lorenz"},
-                    {"field": "B", "type": "temporal"},
-                ],
-            }
-        )
+        wls = self._generate({
+            "fields": [
+                {"name": "A", "type": "vector"},
+                {"name": "B", "type": "vector"},
+            ],
+            "derived_fields": [],
+            "lagrangian": {
+                "expression": (
+                    "-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] "
+                    "- 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-c][B[-d]]"
+                )
+            },
+            "gauge": [
+                {"field": "A", "type": "lorenz"},
+                {"field": "B", "type": "temporal"},
+            ],
+        })
         assert "BuildLorenzGaugeTerm" in wls
         assert "GaugeFix.wl" in wls
         assert ":> 0" in wls
@@ -633,7 +611,9 @@ class TestValidateSolverParamsAdaptive:
         from tidal.cli._simulate import _validate_solver_params
 
         with pytest.raises(ValueError, match="--tolerance must be positive"):
-            _validate_solver_params(self._make_args(adaptive=True, tolerance=-1e-4))
+            _validate_solver_params(
+                self._make_args(adaptive=True, tolerance=-1e-4)
+            )
 
     def test_negative_max_step_rejected(self) -> None:
         from tidal.cli._simulate import _validate_solver_params
@@ -657,26 +637,14 @@ class TestValidateSolverParamsAdaptive:
     def test_valid_adaptive_rk_args(self) -> None:
         from tidal.cli._simulate import _validate_solver_params
 
-        _validate_solver_params(self._make_args(adaptive=True, tolerance=1e-5))
+        _validate_solver_params(
+            self._make_args(adaptive=True, tolerance=1e-5)
+        )
 
-    def test_max_step_rejected_without_scipy(self) -> None:
-        """T6: --max-step raises ValueError when scheme is not scipy."""
+    def test_valid_max_step_any_scheme(self) -> None:
         from tidal.cli._simulate import _validate_solver_params
 
-        with pytest.raises(ValueError, match="--max-step requires --scheme scipy"):
-            _validate_solver_params(self._make_args(max_step=0.1))
-
-    def test_max_step_rejected_fixed_step(self) -> None:
-        """T7: --max-step raises ValueError for fixed-step explicit RK."""
-        from tidal.cli._simulate import _validate_solver_params
-
-        with pytest.raises(ValueError, match="--max-step requires --scheme scipy"):
-            _validate_solver_params(self._make_args(scheme="runge-kutta", max_step=0.5))
-
-    def test_max_step_accepted_with_scipy(self) -> None:
-        from tidal.cli._simulate import _validate_solver_params
-
-        _validate_solver_params(self._make_args(scheme="scipy", max_step=0.1))
+        _validate_solver_params(self._make_args(max_step=0.1))
 
     def test_valid_energy_monitor(self) -> None:
         from tidal.cli._simulate import _validate_solver_params
@@ -711,7 +679,9 @@ class TestFormatSolverLog:
     def test_scipy_format(self) -> None:
         from tidal.cli._simulate import _format_solver_log
 
-        msg = _format_solver_log(self._make_args(scheme="scipy", rtol=1e-8), 0.01, 0.05)
+        msg = _format_solver_log(
+            self._make_args(scheme="scipy", rtol=1e-8), 0.01, 0.05
+        )
         assert "DOP853" in msg
         assert "rtol=1e-08" in msg
         assert "max_step=0.0500" in msg

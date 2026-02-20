@@ -42,20 +42,22 @@ from tidal.measurement import (
 )
 from tidal.measurement._energy import (
     _apply_spatial_operator,
-    _build_constraint_momenta,
     _compute_constraint_coupling_energy,
     _compute_constraint_self_energy,
+    _compute_hamiltonian_from_canonical,
     _compute_virial_potential,
-    _estimate_constraint_momentum,
+    _evaluate_hamiltonian_factor,
     _gradient_energy_density,
-    _is_constraint_momentum,
     _is_momentum_field,
     _resolve_term_target,
     _self_gradient_axes,
 )
 from tidal.symbolic.json_loader import (
+    CanonicalStructure,
     ComponentEquation,
     EquationSystem,
+    HamiltonianFactor,
+    HamiltonianTerm,
     OperatorTerm,
     load_equation_system,
 )
@@ -330,6 +332,251 @@ class TestEnergyTimeseries:
 
 
 # ============================================================
+# Canonical Hamiltonian energy tests
+# ============================================================
+
+
+def _make_kg_canonical_structure(m2: float = 1.0) -> CanonicalStructure:
+    """Build canonical structure for Klein-Gordon: H = ½π² + ½(∇φ)² + ½m²φ².
+
+    Decomposed as quadratic terms:
+      ½ * time_derivative(phi_0) * time_derivative(phi_0)  → kinetic
+      -½ * phi_0 * laplacian(phi_0)                        → gradient (IBP)
+      ½m² * phi_0 * phi_0                                  → mass
+    """
+    return CanonicalStructure(
+        hamiltonian_terms=(
+            HamiltonianTerm(
+                coefficient=0.5,
+                factor_a=HamiltonianFactor(field="phi_0", operator="time_derivative"),
+                factor_b=HamiltonianFactor(field="phi_0", operator="time_derivative"),
+            ),
+            HamiltonianTerm(
+                coefficient=-0.5,
+                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="phi_0", operator="laplacian"),
+            ),
+            HamiltonianTerm(
+                coefficient=0.5 * m2,
+                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+            ),
+        ),
+        corrections={},
+        hamiltonian_symbolic=f"1/2 pi^2 + 1/2 (grad phi)^2 + 1/2 * {m2} * phi^2",
+    )
+
+
+def _make_coupled_canonical_structure(
+    m2_phi: float, m2_chi: float, g: float,
+) -> CanonicalStructure:
+    """Build canonical structure for two coupled scalars.
+
+    H = ½π_φ² + ½(∇φ)² + ½m²_φ φ² + ½π_χ² + ½(∇χ)² + ½m²_χ χ² + g φ χ
+    """
+    return CanonicalStructure(
+        hamiltonian_terms=(
+            # phi kinetic
+            HamiltonianTerm(
+                coefficient=0.5,
+                factor_a=HamiltonianFactor(field="phi_0", operator="time_derivative"),
+                factor_b=HamiltonianFactor(field="phi_0", operator="time_derivative"),
+            ),
+            # phi gradient (IBP form)
+            HamiltonianTerm(
+                coefficient=-0.5,
+                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="phi_0", operator="laplacian"),
+            ),
+            # phi mass
+            HamiltonianTerm(
+                coefficient=0.5 * m2_phi,
+                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+            ),
+            # chi kinetic
+            HamiltonianTerm(
+                coefficient=0.5,
+                factor_a=HamiltonianFactor(field="chi_0", operator="time_derivative"),
+                factor_b=HamiltonianFactor(field="chi_0", operator="time_derivative"),
+            ),
+            # chi gradient (IBP form)
+            HamiltonianTerm(
+                coefficient=-0.5,
+                factor_a=HamiltonianFactor(field="chi_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="chi_0", operator="laplacian"),
+            ),
+            # chi mass
+            HamiltonianTerm(
+                coefficient=0.5 * m2_chi,
+                factor_a=HamiltonianFactor(field="chi_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
+            ),
+            # coupling: g * phi * chi (split as ½g φχ + ½g χφ in symmetric form,
+            # but a single term g*φ*χ works since it's symmetric)
+            HamiltonianTerm(
+                coefficient=g,
+                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
+            ),
+        ),
+        corrections={},
+        hamiltonian_symbolic="coupled scalar H",
+    )
+
+
+class TestCanonicalHamiltonianEnergy:
+    """Test canonical Hamiltonian energy evaluation from structured terms."""
+
+    def test_evaluate_factor_identity(self) -> None:
+        """Identity factor returns field data directly."""
+        data = _make_sim_data_two_fields(n_snapshots=3)
+        result = _evaluate_hamiltonian_factor("phi_0", "identity", data, 0)
+        assert result is not None
+        np.testing.assert_array_equal(result, data.fields["phi_0"][0])
+
+    def test_evaluate_factor_time_derivative(self) -> None:
+        """time_derivative factor returns stored momentum."""
+        data = _make_sim_data_two_fields(n_snapshots=3)
+        result = _evaluate_hamiltonian_factor("phi_0", "time_derivative", data, 0)
+        assert result is not None
+        np.testing.assert_array_equal(result, data.momenta["phi_0"][0])
+
+    def test_evaluate_factor_gradient(self) -> None:
+        """gradient_x factor applies first derivative."""
+        data = _make_sim_data_two_fields(n_snapshots=3)
+        result = _evaluate_hamiltonian_factor("phi_0", "gradient_x", data, 0)
+        assert result is not None
+        assert result.shape == data.fields["phi_0"][0].shape
+
+    def test_kg_hamiltonian_matches_field_energy(self) -> None:
+        """Canonical H for single field matches compute_field_energy.
+
+        Uses the coupled_scalars spec with only phi excited (chi=0).
+        The KG canonical structure matches ½π² + ½(∇φ)² + ½m²φ².
+        """
+        data = _make_sim_data_two_fields(n_snapshots=3)
+        m2_phi = float(data.spec.mass_matrix[0][0])
+        canonical = _make_kg_canonical_structure(m2_phi)
+        spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
+        data_with_canonical = SimulationData(
+            times=data.times,
+            fields=data.fields,
+            momenta=data.momenta,
+            grid_spacing=data.grid_spacing,
+            grid_bounds=data.grid_bounds,
+            periodic=data.periodic,
+            spec=spec_with_canonical,
+            parameters=data.parameters,
+        )
+
+        h_canonical = _compute_hamiltonian_from_canonical(data_with_canonical, 0)
+
+        # Compare with standard field energy (should match for scalars)
+        fe = compute_field_energy(
+            data.fields["phi_0"][0],
+            data.momenta["phi_0"][0],
+            m2_phi,
+            data.grid_spacing,
+            data.periodic,
+        )
+        # The canonical H uses -½φ·∇²φ (IBP form) which differs from
+        # ½|∇φ|² by boundary terms. For periodic BCs, these are identical.
+        np.testing.assert_allclose(h_canonical, fe.total, rtol=1e-10)
+
+    def test_coupled_canonical_energy_conservation(self) -> None:
+        """Canonical H is conserved for exact coupled oscillator evolution."""
+        data = _make_sim_data_two_fields(n_snapshots=51)
+        m2_phi = float(data.spec.mass_matrix[0][0])
+        m2_chi = float(data.spec.mass_matrix[1][1])
+        g_val = float(data.spec.coupling_matrix[0][1])
+
+        canonical = _make_coupled_canonical_structure(m2_phi, m2_chi, g_val)
+        spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
+        data_c = SimulationData(
+            times=data.times,
+            fields=data.fields,
+            momenta=data.momenta,
+            grid_spacing=data.grid_spacing,
+            grid_bounds=data.grid_bounds,
+            periodic=data.periodic,
+            spec=spec_with_canonical,
+            parameters=data.parameters,
+        )
+
+        energies = [
+            _compute_hamiltonian_from_canonical(data_c, t_idx)
+            for t_idx in range(data_c.n_snapshots)
+        ]
+        energies_arr = np.array(energies)
+        # Exact solution → conserved to machine precision
+        relative_drift = np.abs(energies_arr - energies_arr[0]) / energies_arr[0]
+        assert np.max(relative_drift) < 1e-10
+
+    def test_system_energy_uses_canonical_when_available(self) -> None:
+        """compute_system_energy uses canonical H when spec has canonical structure."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        m2_phi = float(data.spec.mass_matrix[0][0])
+        m2_chi = float(data.spec.mass_matrix[1][1])
+        g_val = float(data.spec.coupling_matrix[0][1])
+
+        canonical = _make_coupled_canonical_structure(m2_phi, m2_chi, g_val)
+        spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
+        data_c = SimulationData(
+            times=data.times,
+            fields=data.fields,
+            momenta=data.momenta,
+            grid_spacing=data.grid_spacing,
+            grid_bounds=data.grid_bounds,
+            periodic=data.periodic,
+            spec=spec_with_canonical,
+            parameters=data.parameters,
+        )
+
+        se = compute_system_energy(data_c, 0)
+        assert se.total > 0
+        # Verify total matches direct canonical H evaluation
+        h_direct = _compute_hamiltonian_from_canonical(data_c, 0)
+        np.testing.assert_allclose(se.total, h_direct, rtol=1e-12)
+
+    def test_canonical_matches_virial_for_scalars(self) -> None:
+        """For coupled scalars, canonical H and virial formula give same total."""
+        data = _make_sim_data_two_fields(n_snapshots=5)
+        m2_phi = float(data.spec.mass_matrix[0][0])
+        m2_chi = float(data.spec.mass_matrix[1][1])
+        g_val = float(data.spec.coupling_matrix[0][1])
+
+        # Virial energy (no canonical)
+        se_virial = compute_system_energy(data, 0)
+
+        # Canonical energy
+        canonical = _make_coupled_canonical_structure(m2_phi, m2_chi, g_val)
+        spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
+        data_c = SimulationData(
+            times=data.times,
+            fields=data.fields,
+            momenta=data.momenta,
+            grid_spacing=data.grid_spacing,
+            grid_bounds=data.grid_bounds,
+            periodic=data.periodic,
+            spec=spec_with_canonical,
+            parameters=data.parameters,
+        )
+        se_canonical = compute_system_energy(data_c, 0)
+
+        # For scalar fields with periodic BCs, both paths should agree
+        np.testing.assert_allclose(
+            se_canonical.total, se_virial.total, rtol=1e-10,
+        )
+
+    def test_no_canonical_raises(self) -> None:
+        """_compute_hamiltonian_from_canonical raises without canonical structure."""
+        data = _make_sim_data_two_fields(n_snapshots=3)
+        with pytest.raises(ValueError, match="without canonical"):
+            _compute_hamiltonian_from_canonical(data, 0)
+
+
+# ============================================================
 # Conversion probability tests
 # ============================================================
 
@@ -488,37 +735,6 @@ class TestEnergyConservation:
         data = _make_sim_data_two_fields(n_snapshots=5)
         with pytest.raises(ValueError, match="positive"):
             check_energy_conservation(data, threshold=0.0)
-
-    def test_precomputed_energy_matches(self) -> None:
-        """Pre-computed total_energy/times gives same result as from-scratch."""
-        from tidal.measurement._energy import compute_energy_timeseries
-
-        data = _make_sim_data_two_fields(n_snapshots=51)
-        times, _pf, _inter, total = compute_energy_timeseries(data)
-
-        diag_scratch = check_energy_conservation(data, threshold=1e-6)
-        diag_precomp = check_energy_conservation(
-            data, threshold=1e-6, total_energy=total, times=times,
-        )
-
-        assert diag_precomp.is_conserved == diag_scratch.is_conserved
-        assert diag_precomp.max_relative_error == diag_scratch.max_relative_error
-        np.testing.assert_array_equal(diag_precomp.total_energy, diag_scratch.total_energy)
-        np.testing.assert_array_equal(diag_precomp.relative_error, diag_scratch.relative_error)
-
-    def test_precomputed_energy_missing_times_raises(self) -> None:
-        """Providing total_energy without times raises ValueError."""
-        data = _make_sim_data_two_fields(n_snapshots=5)
-        fake_total = np.ones(5)
-        with pytest.raises(ValueError, match="both be provided"):
-            check_energy_conservation(data, total_energy=fake_total)
-
-    def test_precomputed_times_missing_energy_raises(self) -> None:
-        """Providing times without total_energy raises ValueError."""
-        data = _make_sim_data_two_fields(n_snapshots=5)
-        fake_times = np.linspace(0, 1, 5)
-        with pytest.raises(ValueError, match="both be provided"):
-            check_energy_conservation(data, times=fake_times)
 
 
 class TestSummarize:
@@ -2028,7 +2244,7 @@ class TestBincountRegression:
     def test_bincount_sums_correctly(self) -> None:
         """Radial binning should sum values into correct bins."""
         from tidal.measurement._spectral import (
-            radial_bin,
+            _radial_bin,
         )
 
         # Build a simple 2D k-magnitude grid and values
@@ -2043,7 +2259,7 @@ class TestBincountRegression:
 
         # Uniform values -- sum in each bin should equal count * value
         values = np.ones_like(k_mag)
-        centers, binned = radial_bin(k_mag, values, grid_spacing, field_shape)
+        centers, binned = _radial_bin(k_mag, values, grid_spacing, field_shape)
 
         # Total sum must be preserved
         np.testing.assert_allclose(binned.sum(), values.sum(), rtol=1e-12)
@@ -3282,242 +3498,3 @@ class TestSnapshotCountValidation:
 
         with pytest.raises(ValueError, match="Metadata claims 100 snapshots"):
             SimulationData.from_directory(out, spec)
-
-
-# ============================================================
-# Constraint momentum estimation tests
-# ============================================================
-
-
-def _make_proca_spec_with_gradient_pi0() -> EquationSystem:
-    """Build a spec where A_1's equation has gradient_x(pi_0).
-
-    A_0: constraint (time_order=0), Helmholtz: laplacian_x(A_0) + source
-    A_1: dynamical (time_order=2), wave: laplacian_x(A_1) + gradient_x(pi_0)
-    """
-    eq_a0 = ComponentEquation(
-        field_name="A_0",
-        field_index=0,
-        time_derivative_order=0,
-        rhs_terms=(
-            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_0"),
-            OperatorTerm(coefficient=-1.0, operator="identity", field="A_0"),
-        ),
-    )
-    eq_a1 = ComponentEquation(
-        field_name="A_1",
-        field_index=1,
-        time_derivative_order=2,
-        rhs_terms=(
-            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_1"),
-            OperatorTerm(coefficient=1.0, operator="gradient_x", field="pi_0"),
-        ),
-    )
-    return EquationSystem(
-        n_components=2,
-        dimension=2,
-        spatial_dimension=1,
-        equations=(eq_a0, eq_a1),
-        component_names=("A_0", "A_1"),
-        mass_matrix=((1.0, 0.0), (0.0, 0.0)),
-        coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
-        metadata={},
-        coordinates=("t", "x"),
-    )
-
-
-class TestConstraintMomentumEstimation:
-    """Test _estimate_constraint_momentum and _build_constraint_momenta."""
-
-    def test_first_snapshot_returns_none(self) -> None:
-        """t_idx=0 returns None (no previous data)."""
-        spec = _make_proca_spec_with_gradient_pi0()
-        n = 32
-        dx = 10.0 / n
-        data = SimulationData(
-            times=np.array([0.0, 0.1]),
-            fields={
-                "A_0": np.zeros((2, n)),
-                "A_1": np.zeros((2, n)),
-            },
-            momenta={"A_1": np.zeros((2, n))},
-            grid_spacing=(dx,),
-            grid_bounds=((0.0, 10.0),),
-            periodic=(True,),
-            spec=spec,
-            parameters={},
-        )
-        result = _estimate_constraint_momentum(data, "A_0", 0)
-        assert result is None
-
-    def test_backward_fd_accuracy(self) -> None:
-        """FD estimate matches analytic derivative for linear-in-time field."""
-        spec = _make_proca_spec_with_gradient_pi0()
-        n = 32
-        dx = 10.0 / n
-        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
-        rate = 3.0  # d_t(A_0) = 3.0 everywhere
-
-        data = SimulationData(
-            times=np.array([0.0, 0.1, 0.2]),
-            fields={
-                "A_0": np.stack([
-                    np.sin(x),
-                    np.sin(x) + rate * 0.1,
-                    np.sin(x) + rate * 0.2,
-                ]),
-                "A_1": np.zeros((3, n)),
-            },
-            momenta={"A_1": np.zeros((3, n))},
-            grid_spacing=(dx,),
-            grid_bounds=((0.0, 10.0),),
-            periodic=(True,),
-            spec=spec,
-            parameters={},
-        )
-        result = _estimate_constraint_momentum(data, "A_0", 2)
-        assert result is not None
-        np.testing.assert_allclose(result, rate, atol=1e-12)
-
-    def test_zero_dt_returns_none(self) -> None:
-        """Equal consecutive times returns None."""
-        spec = _make_proca_spec_with_gradient_pi0()
-        n = 32
-        dx = 10.0 / n
-        data = SimulationData(
-            times=np.array([0.0, 0.0]),  # same time
-            fields={
-                "A_0": np.ones((2, n)),
-                "A_1": np.zeros((2, n)),
-            },
-            momenta={"A_1": np.zeros((2, n))},
-            grid_spacing=(dx,),
-            grid_bounds=((0.0, 10.0),),
-            periodic=(True,),
-            spec=spec,
-            parameters={},
-        )
-        result = _estimate_constraint_momentum(data, "A_0", 1)
-        assert result is None
-
-    def test_build_constraint_momenta_collects_all(self) -> None:
-        """_build_constraint_momenta returns dict for all constraint fields."""
-        spec = _make_proca_spec_with_gradient_pi0()
-        n = 32
-        dx = 10.0 / n
-        data = SimulationData(
-            times=np.array([0.0, 0.1]),
-            fields={
-                "A_0": np.stack([np.zeros(n), np.ones(n)]),
-                "A_1": np.zeros((2, n)),
-            },
-            momenta={"A_1": np.zeros((2, n))},
-            grid_spacing=(dx,),
-            grid_bounds=((0.0, 10.0),),
-            periodic=(True,),
-            spec=spec,
-            parameters={},
-        )
-        cm = _build_constraint_momenta(data, 1)
-        assert "A_0" in cm
-        # A_0 went from 0 to 1 in dt=0.1 -> rate = 10.0
-        np.testing.assert_allclose(cm["A_0"], 10.0, atol=1e-12)
-
-    def test_is_constraint_momentum(self) -> None:
-        """_is_constraint_momentum correctly identifies constraint vs dynamical."""
-        spec = _make_proca_spec_with_gradient_pi0()
-        assert _is_constraint_momentum("pi_0", spec) is True
-        assert _is_constraint_momentum("pi_1", spec) is False
-        assert _is_constraint_momentum("A_0", spec) is False
-
-
-class TestVirialWithConstraintMomenta:
-    """Test virial potential includes constraint momentum coupling."""
-
-    def test_gradient_pi0_contributes_to_virial(self) -> None:
-        """gradient_x(pi_0) in A_1 equation contributes when A_0 changes."""
-        spec = _make_proca_spec_with_gradient_pi0()
-        n = 64
-        dx = 10.0 / n
-        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
-        k = 2.0 * np.pi / 10.0
-
-        # A_0 changes between snapshots -> pi_0 is nonzero
-        # pi_0 ~ d_t(A_0) = 5*sin(kx), gradient_x(pi_0) ~ 5*k*cos(kx)
-        a0_t0 = np.cos(k * x)
-        a0_t1 = np.cos(k * x) + 0.5 * np.sin(k * x)  # shifted
-
-        # Use cos(kx) for A_1 so A_1 * gradient_x(pi_0) ~ cos^2(kx) > 0
-        # (sin*cos averages to zero by orthogonality, cos*cos does not)
-        a1_data = 0.3 * np.cos(k * x)
-
-        data = SimulationData(
-            times=np.array([0.0, 0.1]),
-            fields={
-                "A_0": np.stack([a0_t0, a0_t1]),
-                "A_1": np.stack([a1_data, a1_data]),
-            },
-            momenta={"A_1": np.zeros((2, n))},
-            grid_spacing=(dx,),
-            grid_bounds=((0.0, 10.0),),
-            periodic=(True,),
-            spec=spec,
-            parameters={},
-        )
-
-        # At t_idx=1, constraint momentum is nonzero -> virial should differ
-        virial_t1 = _compute_virial_potential(data, 1)
-        # Virial at t_idx=0 has no constraint momentum contribution
-        virial_t0 = _compute_virial_potential(data, 0)
-
-        # Both should be nonzero (laplacian_x(A_1) term always present)
-        # but t1 should differ from t0 due to gradient_x(pi_0)
-        assert virial_t1 != pytest.approx(virial_t0, abs=1e-10), (
-            f"Virial should differ: t0={virial_t0}, t1={virial_t1}"
-        )
-
-    def test_virial_at_t0_excludes_constraint_momenta(self) -> None:
-        """At t_idx=0, constraint momenta are zero (no previous snapshot)."""
-        spec = _make_proca_spec_with_gradient_pi0()
-        n = 64
-        dx = 10.0 / n
-        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
-        k = 2.0 * np.pi / 10.0
-
-        # Make A_0 nonzero so gradient_x(pi_0) WOULD contribute if pi_0 != 0
-        a0_data = np.cos(k * x)
-        a1_data = 0.3 * np.sin(k * x)
-
-        data = SimulationData(
-            times=np.array([0.0]),
-            fields={
-                "A_0": a0_data[np.newaxis, :],
-                "A_1": a1_data[np.newaxis, :],
-            },
-            momenta={"A_1": np.zeros((1, n))},
-            grid_spacing=(dx,),
-            grid_bounds=((0.0, 10.0),),
-            periodic=(True,),
-            spec=spec,
-            parameters={},
-        )
-
-        # Build a version WITHOUT gradient_x(pi_0) for comparison
-        eq_a1_no_pi = ComponentEquation(
-            field_name="A_1",
-            field_index=1,
-            time_derivative_order=2,
-            rhs_terms=(
-                OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_1"),
-            ),
-        )
-        spec_no_pi = dataclasses.replace(
-            spec, equations=(spec.equations[0], eq_a1_no_pi)
-        )
-        data_no_pi = dataclasses.replace(data, spec=spec_no_pi)
-
-        virial_with_pi = _compute_virial_potential(data, 0)
-        virial_no_pi = _compute_virial_potential(data_no_pi, 0)
-
-        # At t_idx=0, constraint momentum is zero -> both should match
-        assert virial_with_pi == pytest.approx(virial_no_pi, abs=1e-14)

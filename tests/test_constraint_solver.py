@@ -997,9 +997,7 @@ class TestFFTMultipliers:
         kx = cast("np.ndarray", np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi)
         ky = cast("np.ndarray", np.fft.fftfreq(ny, d=dx_array[1]) * 2 * np.pi)
         kx_grid, ky_grid = np.meshgrid(kx, ky, indexing="ij")
-        multiplier = _OPERATOR_FFT_MULTIPLIERS["gradient_x"](
-            [kx_grid, ky_grid], dx_array
-        )
+        multiplier = _OPERATOR_FFT_MULTIPLIERS["gradient_x"]([kx_grid, ky_grid], dx_array)
         fft_result = np.fft.ifft2(multiplier * np.fft.fft2(field_data)).real
 
         assert_allclose(mat_result, fft_result, rtol=1e-10, atol=1e-10)
@@ -1023,9 +1021,7 @@ class TestFFTMultipliers:
         kx = cast("np.ndarray", np.fft.fftfreq(nx, d=dx_array[0]) * 2 * np.pi)
         ky = cast("np.ndarray", np.fft.fftfreq(ny, d=dx_array[1]) * 2 * np.pi)
         kx_grid, ky_grid = np.meshgrid(kx, ky, indexing="ij")
-        multiplier = _OPERATOR_FFT_MULTIPLIERS["laplacian_x"](
-            [kx_grid, ky_grid], dx_array
-        )
+        multiplier = _OPERATOR_FFT_MULTIPLIERS["laplacian_x"]([kx_grid, ky_grid], dx_array)
         fft_result = np.fft.ifft2(multiplier * np.fft.fft2(field_data)).real
 
         assert_allclose(mat_result, fft_result, rtol=1e-10, atol=1e-10)
@@ -2723,7 +2719,10 @@ class TestCoupledProcaConstraints:
         from tidal.symbolic import build_pde_from_json, load_equation_system
 
         json_path = (
-            Path(__file__).parent.parent / "examples" / "data" / "coupled_proca_3d.json"
+            Path(__file__).parent.parent
+            / "examples"
+            / "data"
+            / "coupled_proca_3d.json"
         )
         if not json_path.exists():
             pytest.skip("coupled_proca_3d.json not found (run tidal derive)")
@@ -2860,7 +2859,10 @@ class TestCoupledProcaConstraints:
         from tidal.utils import normalize_solve_result
 
         json_path = (
-            Path(__file__).parent.parent / "examples" / "data" / "coupled_proca_3d.json"
+            Path(__file__).parent.parent
+            / "examples"
+            / "data"
+            / "coupled_proca_3d.json"
         )
         if not json_path.exists():
             pytest.skip("coupled_proca_3d.json not found (run tidal derive)")
@@ -2914,184 +2916,6 @@ class TestCoupledProcaConstraints:
         )
         assert b1_coupled_max > 1e-6, (
             f"Coupled B_1 should be non-zero, got {b1_coupled_max}"
-        )
-
-
-# =====================================================================
-# Constraint Momentum Finite-Difference Tests
-# =====================================================================
-
-
-class TestConstraintMomentumEstimation:
-    """Tests for finite-difference estimation of constraint field momenta.
-
-    Constraint fields (time_derivative_order=0) are solved elliptically at each
-    evolution_rate() call.  Their value changes because the source terms evolve.
-    The solver estimates ∂_t(constraint_field) via backward finite difference
-    and provides nonzero virtual momenta to dynamical equations.
-
-    See docs/constraint_fields.md for the physics background.
-    """
-
-    @pytest.fixture
-    def coupled_proca_setup(
-        self,
-    ) -> tuple[PDEFromSpec, FieldCollection]:
-        """Build PDE + state for coupled Proca on small periodic grid."""
-        from pathlib import Path
-
-        from tidal.symbolic import build_pde_from_json, load_equation_system
-
-        json_path = (
-            Path(__file__).parent.parent / "examples" / "data" / "coupled_proca_3d.json"
-        )
-        if not json_path.exists():
-            pytest.skip("coupled_proca_3d.json not found (run tidal derive)")
-        params = {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5}
-        pde = build_pde_from_json(json_path, parameters=params)
-
-        spec = load_equation_system(json_path)
-        grid = CartesianGrid(
-            bounds=[(0, np.pi), (0, np.pi)],
-            shape=[8, 8],
-            periodic=True,
-        )
-        x = cast("np.ndarray", grid.cell_coords[..., 0])
-        y = cast("np.ndarray", grid.cell_coords[..., 1])
-        gaussian = 0.5 * np.exp(
-            -((x - np.pi / 2) ** 2 + (y - np.pi / 2) ** 2) / (2 * 0.5**2)
-        )
-
-        fields: list[ScalarField] = []
-        for name, slot_type in spec.state_layout:
-            sf = ScalarField(grid, data=0.0, label=f"{name}_{slot_type}")
-            if name == "A_1" and slot_type == "field":
-                sf.data[:] = gaussian
-            fields.append(sf)
-
-        state = FieldCollection(fields)
-        return pde, state
-
-    def test_constraint_momentum_zero_first_call(
-        self, coupled_proca_setup: tuple[PDEFromSpec, FieldCollection]
-    ) -> None:
-        """On the first evolution_rate() call, constraint momenta should be zero.
-
-        No previous data exists, so the finite-difference estimate returns zero.
-        """
-        pde, state = coupled_proca_setup
-        assert pde._prev_constraint_t is None
-
-        pde.evolution_rate(state, t=0.0)
-
-        # After first call, prev_constraint_t should be set
-        assert pde._prev_constraint_t == 0.0
-        assert "A_0" in pde._prev_constraint_fields
-        assert "B_0" in pde._prev_constraint_fields
-
-    def test_constraint_momentum_finite_diff(
-        self, coupled_proca_setup: tuple[PDEFromSpec, FieldCollection]
-    ) -> None:
-        """After two calls, constraint momenta should be nonzero (FD estimate).
-
-        The first call has zero momenta; after one Euler step, momenta become
-        nonzero and the constraint fields change.  The second call should produce
-        nonzero ∂_t(A_0) and ∂_t(B_0) via finite difference.
-        """
-        pde, state = coupled_proca_setup
-
-        # First call: zero momenta → constraint sources vanish → A_0 ≈ 0
-        rate = pde.evolution_rate(state, t=0.0)
-
-        # Advance one Euler step to create non-zero momenta
-        for i in range(len(state)):
-            state[i].data[:] = np.asarray(state[i].data) + 0.05 * np.asarray(
-                rate[i].data
-            )
-
-        # Second call at t=0.05: constraint field changes -> FD estimate nonzero
-        # Access _evolve_constraints directly to check virtual_momenta
-        from pde import FieldCollection
-
-        state_copy = FieldCollection([sf.copy() for sf in state])
-        assert pde._cached_bc is not None  # populated by evolution_rate()
-        _, virtual_momenta = pde._evolve_constraints(state_copy, pde._cached_bc, t=0.05)
-
-        # π₀ = ∂_t(A_0) should be nonzero
-        pi_a0 = np.asarray(virtual_momenta["A_0"].data)
-        pi_b0 = np.asarray(virtual_momenta["B_0"].data)
-
-        assert float(np.max(np.abs(pi_a0))) > 1e-8, (
-            f"π(A_0) should be nonzero via FD, got max={float(np.max(np.abs(pi_a0)))}"
-        )
-        assert float(np.max(np.abs(pi_b0))) > 1e-8, (
-            f"π(B_0) should be nonzero via FD, got max={float(np.max(np.abs(pi_b0)))}"
-        )
-
-    def test_constraint_momentum_used_in_wave_eq(
-        self, coupled_proca_setup: tuple[PDEFromSpec, FieldCollection]
-    ) -> None:
-        """The gradient_x(pi_0) term in the A_1 wave equation should be nonzero.
-
-        After two evolution_rate() calls, the finite-difference π₀ is nonzero.
-        The wave equation for A_1 includes -gradient_x(pi_0), which should
-        now contribute to the RHS (unlike the old code where it was always zero).
-        """
-        pde, state = coupled_proca_setup
-
-        # First call
-        rate1 = pde.evolution_rate(state, t=0.0)
-
-        # Advance state
-        for i in range(len(state)):
-            state[i].data[:] = np.asarray(state[i].data) + 0.05 * np.asarray(
-                rate1[i].data
-            )
-
-        # Second call — now pi_0 is nonzero
-        rate2 = pde.evolution_rate(state, t=0.05)
-
-        # The rate for A_1's momentum (which is the RHS of the A_1 wave eq)
-        # should differ from a version without the pi_0 contribution.
-        # We can't easily isolate the pi_0 term, but we CAN check that the
-        # overall rates are nonzero and finite.
-        a1_mom_slot = pde._momentum_slot_map["A_1"]
-        a1_rhs = np.asarray(rate2[a1_mom_slot].data)
-        assert np.all(np.isfinite(a1_rhs)), "A_1 RHS should be finite"
-        assert float(np.max(np.abs(a1_rhs))) > 1e-6, (
-            f"A_1 RHS should be nonzero, got max={float(np.max(np.abs(a1_rhs)))}"
-        )
-
-    def test_constraint_momentum_coupled(
-        self, coupled_proca_setup: tuple[PDEFromSpec, FieldCollection]
-    ) -> None:
-        """Both A_0 and B_0 constraint momenta are computed independently.
-
-        In coupled Proca, A_0 and B_0 are coupled constraints.  Each should
-        get its own finite-difference momentum estimate, and the estimates
-        should generally differ because A_0 and B_0 respond differently
-        (different mass parameters mA2 vs mB2).
-        """
-        pde, state = coupled_proca_setup
-
-        # Two calls to build up FD data
-        rate = pde.evolution_rate(state, t=0.0)
-        for i in range(len(state)):
-            state[i].data[:] = np.asarray(state[i].data) + 0.05 * np.asarray(
-                rate[i].data
-            )
-        pde.evolution_rate(state, t=0.05)
-
-        # Both should have stored previous values
-        assert "A_0" in pde._prev_constraint_fields
-        assert "B_0" in pde._prev_constraint_fields
-        assert pde._prev_constraint_t == 0.05
-
-        # Values should differ (mA2 ≠ mB2 → different Helmholtz response)
-        a0_prev = pde._prev_constraint_fields["A_0"]
-        b0_prev = pde._prev_constraint_fields["B_0"]
-        assert not np.allclose(a0_prev, b0_prev), (
-            "A_0 and B_0 constraint fields should differ (different mass parameters)"
         )
 
 

@@ -466,16 +466,14 @@ def _validate_gauge(config: dict[str, Any]) -> None:
         type, targets a scalar (no gauge freedom), duplicates a field, or
         is missing required keys for custom gauges.
     """
-    gauge_list: list[dict[str, Any]] = config.get("gauge", [])
+    gauge_list = config.get("gauge", [])
     if not gauge_list:
         return
     if not isinstance(gauge_list, list):  # pyright: ignore[reportUnnecessaryIsInstance]
         msg = "[[gauge]] must be an array of tables"
         raise TypeError(msg)
 
-    field_map: dict[str, dict[str, Any]] = {
-        f["name"]: f for f in config.get("fields", [])
-    }
+    field_map = {f["name"]: f for f in config.get("fields", [])}
     seen_fields: set[str] = set()
 
     for i, entry in enumerate(gauge_list):
@@ -1418,6 +1416,202 @@ def _wls_constraint_metadata(
     return lines
 
 
+def _canonical_field_heads(ctx: _WlsContext) -> tuple[str, str]:
+    """Return (heads_str, all_heads_str) for canonical pipeline WLS generation."""
+    p = ctx.prefix
+    field_heads = [f"{p}{f['name'].capitalize()}" for f in ctx.fields]
+    all_heads = list(field_heads)
+    all_heads.extend(f"{p}{bg['name'].capitalize()}" for bg in ctx.background_fields)
+    return ", ".join(field_heads), ", ".join(all_heads)
+
+
+def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str]:
+    """Generate WLS code to compute and parse the Hamiltonian.
+
+    Calls ``LegendreTransformH``, applies scalar BG substitutions, decomposes
+    to components, and parses into structured quadratic terms.
+    """
+    p = ctx.prefix
+    heads_str, _ = _canonical_field_heads(ctx)
+
+    lines: list[str] = [
+        "",
+        "(* === Phase K: Canonical Momentum & Hamiltonian === *)",
+        'Print[""];',
+        'Print["Computing canonical momenta and Hamiltonian..."];',
+        "",
+        "(* Compute Hamiltonian via Legendre transform *)",
+        f"{{canonicalH, piList}} = LegendreTransformH[{p}Lagrangian, {{{heads_str}}}, {ctx.chart}, {ctx.cd}];",
+        'Print["H (abstract): ", Short[canonicalH, 3]];',
+        "",
+    ]
+
+    # Apply scalar background substitutions to H
+    lines.extend(_wls_scalar_background_substitution(ctx, "canonicalH"))
+
+    lines.extend((
+        "",
+        "(* Decompose H to component form *)",
+        f"canonicalHComp = DecomposeScalarExpression[canonicalH, {ctx.chart}, {{{all_heads_str}}}, "
+        f'"MetricMatrix" -> {p}MetricMatrix];',
+        'Print["H (components): ", Short[canonicalHComp, 5]];',
+        "",
+        "(* Parse H into structured quadratic terms *)",
+        "allCompNames = fieldEquations[[All, 1]];",
+        "hamiltonianTerms = ParseHamiltonianExpression[canonicalHComp, allCompNames];",
+        'Print["Hamiltonian terms: ", Length[hamiltonianTerms]];',
+        "",
+    ))
+    return lines
+
+
+def _wls_canonical_scalar_correction(
+    ctx: _WlsContext, fname: str, corr_var: str, all_heads_str: str,
+) -> list[str]:
+    """Generate WLS code for canonical correction of a scalar field."""
+    p = ctx.prefix
+    return [
+        f"(* Decompose scalar correction for {fname} *)",
+        f"{corr_var}Comp = DecomposeScalarExpression[{corr_var}, {ctx.chart}, {{{all_heads_str}}}, "
+        f'"MetricMatrix" -> {p}MetricMatrix];',
+        f'Print["Correction {fname} (comp): ", {corr_var}Comp];',
+        "",
+        "Module[{corrTerms},",
+        f"  If[{corr_var}Comp === 0,",
+        f'    canonicalCorrections["{fname}_0"] = {{}},',
+        f"    corrTerms = ParseMultiFieldRHS[{corr_var}Comp, allCompNames];",
+        f'    canonicalCorrections["{fname}_0"] = corrTerms',
+        "  ]",
+        "];",
+        "",
+    ]
+
+
+def _wls_canonical_vector_correction(
+    ctx: _WlsContext,
+    field: dict[str, Any],
+    field_idx: int,
+    corr_var: str,
+) -> list[str]:
+    """Generate WLS code for canonical correction of a vector/tensor field."""
+    fname = field["name"]
+    fexpr = _field_expression(field, ctx.prefix)
+    rank = 1 if field["type"] == "vector" else field.get("rank", 2)
+
+    # Other fields for DecomposeToComponents
+    other_exprs = [
+        _field_expression(f, ctx.prefix)
+        for j, f in enumerate(ctx.fields) if j != field_idx
+    ]
+    others_str = ", ".join(other_exprs) if other_exprs else ""
+    p = ctx.prefix
+
+    lines: list[str] = [
+        f"(* Decompose correction for {fname} (rank {rank}) *)",
+        f"{corr_var}Comps = DecomposeToComponents[{corr_var}, {fexpr}, {ctx.chart}, {{{others_str}}}, "
+        f'"MetricMatrix" -> {p}MetricMatrix];',
+    ]
+
+    # Substitute vector/tensor BGs (reuse existing helper pattern)
+    lines.extend(_wls_vector_background_substitution(ctx, f"{corr_var}Comps"))
+
+    lines.extend((
+        f'Print["Correction {fname} components: ", Length[{corr_var}Comps]];',
+        "",
+        "Do[",
+        "  Module[{compIdx, compEq, compName, corrTerms},",
+        f"    compIdx = {corr_var}Comps[[k, 1]];",
+        f'    compName = "{fname}_" <> ToString[compIdx];',
+        f"    compEq = {corr_var}Comps[[k, 2]];",
+        "    If[compEq === 0,",
+        "      canonicalCorrections[compName] = {},",
+        "      corrTerms = ParseMultiFieldRHS[compEq, allCompNames];",
+        "      canonicalCorrections[compName] = corrTerms",
+        "    ]",
+        "  ],",
+        f"  {{k, Length[{corr_var}Comps]}}",
+        "];",
+        "",
+    ))
+    return lines
+
+
+def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
+    """Generate canonical momentum + Hamiltonian computation and JSON injection.
+
+    Emits WLS code that:
+    1. Computes H, π via ``LegendreTransformH`` on the Lagrangian
+    2. Decomposes H to components and parses into structured terms
+    3. For each dynamical field, computes canonical corrections π_i - p_i
+    4. Injects the canonical structure into ``jsonStructure`` before export
+
+    The Lagrangian variable ``{prefix}Lagrangian`` and ``fieldEquations`` must
+    already exist in the WLS script context (set by EL/linearization steps).
+    """
+    _, all_heads_str = _canonical_field_heads(ctx)
+
+    lines: list[str] = _wls_canonical_hamiltonian(ctx, all_heads_str)
+
+    # Compute canonical corrections per dynamical field
+    lines.extend((
+        "(* Compute canonical corrections: π_i - ∂_t(field_i) per component *)",
+        "canonicalCorrections = <||>;",
+        "",
+    ))
+
+    for i, field in enumerate(ctx.fields):
+        fname = field["name"]
+        fexpr = _field_expression(field, ctx.prefix)
+        pi_var = f"piExpr{fname.capitalize()}"
+        idx = i + 1  # Wolfram is 1-indexed
+
+        lines.extend((
+            f"(* Canonical momentum for {fname} *)",
+            f"{pi_var} = piList[[{idx}, 2]];",
+            f'Print["pi({fname}): ", {pi_var}];',
+            "",
+        ))
+
+        # Apply scalar BG substitutions to pi
+        lines.extend(_wls_scalar_background_substitution(ctx, pi_var))
+
+        # Compute canonical correction: pi minus time derivative of field
+        time_coord = ctx.coords[0]  # always "t"
+        vel_var = f"velExpr{fname.capitalize()}"
+        corr_var = f"corrExpr{fname.capitalize()}"
+        lines.extend((
+            f"{vel_var} = {ctx.cd}[-{time_coord}][{fexpr}];",
+            f"{corr_var} = Expand[ToCanonical[ContractMetric[{pi_var} - {vel_var}]]];",
+            f'Print["Correction {fname}: ", {corr_var}];',
+            "",
+        ))
+
+        if field["type"] == "scalar":
+            lines.extend(
+                _wls_canonical_scalar_correction(ctx, fname, corr_var, all_heads_str)
+            )
+        else:
+            lines.extend(
+                _wls_canonical_vector_correction(ctx, field, i, corr_var)
+            )
+
+    # Inject canonical structure into jsonStructure
+    lines.extend((
+        "(* Inject canonical structure into JSON *)",
+        'jsonStructure["canonical"] = <|',
+        '  "hamiltonian_terms" -> hamiltonianTerms,',
+        '  "canonical_corrections" -> canonicalCorrections,',
+        '  "hamiltonian_symbolic" -> ToString[canonicalHComp, InputForm]',
+        "|>;",
+        "",
+        'Print["Canonical structure injected into JSON."];',
+        'Print[""];',
+        "",
+    ))
+
+    return lines
+
+
 def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
     """Generate metadata and JSON export lines.
 
@@ -1500,6 +1694,12 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
                 "",
             )
         )
+
+    # Canonical momentum + Hamiltonian pipeline (Phase K)
+    # Must run after jsonStructure is built (needs allCompNames from fieldEquations)
+    # and before JSON export. Only for non-linearization paths that have a Lagrangian.
+    if ctx.linearization is None:
+        lines.extend(_wls_canonical_pipeline(ctx))
 
     # Export
     escaped_output = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')

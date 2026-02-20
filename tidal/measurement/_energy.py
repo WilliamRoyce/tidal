@@ -32,15 +32,11 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from tidal.measurement._io import SimulationData
-    from tidal.symbolic.json_loader import (
-        ComponentEquation,
-        EquationSystem,
-        OperatorTerm,
-    )
+    from tidal.symbolic.json_loader import ComponentEquation, OperatorTerm
 
 # Threshold below which energy is treated as zero.  Prevents division by
 # near-zero values from floating-point integration noise.
-ENERGY_FLOOR: float = 1e-12
+_ENERGY_FLOOR: float = 1e-12
 
 # Axis letter → numpy axis index (spatial axes only).
 _AXIS_MAP: dict[str, int] = {"x": 0, "y": 1, "z": 2}
@@ -323,53 +319,6 @@ def _is_momentum_field(field_name: str) -> bool:
     return _MOMENTUM_RE.match(field_name) is not None
 
 
-def _is_constraint_momentum(
-    field_name: str, spec: EquationSystem,
-) -> bool:
-    """Check if *field_name* is ``pi_N`` for a constraint equation *N*."""
-    m = _MOMENTUM_RE.match(field_name)
-    if m is None:
-        return False
-    idx = int(m.group(1))
-    if idx >= len(spec.equations):
-        return False
-    return spec.equations[idx].time_derivative_order == 0
-
-
-def _estimate_constraint_momentum(
-    data: SimulationData,
-    field_name: str,
-    t_idx: int,
-) -> NDArray[np.float64] | None:
-    """Estimate constraint field momentum via backward finite difference.
-
-    Returns ``None`` for the first snapshot (``t_idx=0``) or when consecutive
-    times are equal, since no finite-difference estimate is possible.
-    """
-    if t_idx == 0:
-        return None
-    dt = float(data.times[t_idx] - data.times[t_idx - 1])
-    if dt <= 0:
-        return None
-    current = np.asarray(data.fields[field_name][t_idx], dtype=np.float64)
-    previous = np.asarray(data.fields[field_name][t_idx - 1], dtype=np.float64)
-    return (current - previous) / dt
-
-
-def _build_constraint_momenta(
-    data: SimulationData,
-    t_idx: int,
-) -> dict[str, NDArray[np.float64]]:
-    """Compute FD-estimated momenta for all constraint fields at *t_idx*."""
-    result: dict[str, NDArray[np.float64]] = {}
-    for eq in data.spec.equations:
-        if eq.time_derivative_order == 0 and eq.field_name in data.fields:
-            cm = _estimate_constraint_momentum(data, eq.field_name, t_idx)
-            if cm is not None:
-                result[eq.field_name] = cm
-    return result
-
-
 def _resolve_term_coefficient(
     term: OperatorTerm,
     parameters: dict[str, float],
@@ -450,22 +399,14 @@ def _resolve_term_target(
     data: SimulationData,
     field_name: str,
     t_idx: int,
-    constraint_momenta: dict[str, NDArray[np.float64]] | None = None,
 ) -> NDArray[np.float64] | None:
     """Resolve the field data a term acts on.
-
-    Parameters
-    ----------
-    constraint_momenta : dict, optional
-        Pre-computed FD-estimated momenta for constraint fields.  When
-        provided, ``pi_N`` references to constraint fields return the
-        FD estimate instead of ``None``.
 
     Returns
     -------
     NDArray or None
         The field/momentum snapshot, or ``None`` if the target is a
-        zero-momentum constraint field with no FD estimate available.
+        zero-momentum constraint field (expected case).
 
     Raises
     ------
@@ -488,11 +429,9 @@ def _resolve_term_target(
             )
             raise ValueError(msg)
         target_name = names[idx]
+        # Constraint field → zero momentum (expected None)
         eq = data.spec.equations[idx]
         if eq.time_derivative_order == 0:
-            # Constraint field: return FD estimate if available
-            if constraint_momenta is not None and target_name in constraint_momenta:
-                return constraint_momenta[target_name]
             return None
         mom = data.momenta.get(target_name)
         if mom is not None:
@@ -504,7 +443,7 @@ def _resolve_term_target(
         raise ValueError(msg)
 
     msg = (
-        f"Unresolvable field reference '{field_name}' -- "
+        f"Unresolvable field reference '{field_name}' — "
         f"not a known field ({list(data.fields.keys())}) "
         f"or momentum pattern (pi_N)"
     )
@@ -551,9 +490,9 @@ def compute_field_energy(  # noqa: PLR0913
     -------
     FieldEnergy
     """
-    validate_array(field_data, "field_data")
+    _validate_array(field_data, "field_data")
     if momentum_data is not None:
-        validate_array(momentum_data, "momentum_data")
+        _validate_array(momentum_data, "momentum_data")
 
     # Kinetic energy density: 0.5 * ⟨π²⟩
     if momentum_data is not None:
@@ -577,7 +516,7 @@ def compute_field_energy(  # noqa: PLR0913
 # ------------------------------------------------------------------
 
 
-def resolve_mass_squared(
+def _resolve_mass_squared(
     data: SimulationData,
     field_idx: int,
     coord_arrays: dict[str, NDArray[np.float64]] | None = None,
@@ -643,14 +582,10 @@ def _compute_virial_potential(
 ) -> float:
     """Virial potential density from dynamical fields' spatial RHS terms.
 
-    ``v_virial = -1/2 * sum_{i: dynamical} <phi_i . RHS_i^{spatial}>``
+    ``⟨v_virial⟩ = -½ Σ_{i: dynamical} ⟨φ_i · RHS_i^{spatial}⟩``
 
     Excludes ``first_derivative_t`` (gyroscopic, do no work) and
-    **dynamical** ``pi_N`` momentum references (velocity-dependent forces).
-    Constraint field momenta (``pi_N`` where field *N* has
-    ``time_derivative_order == 0``) are **included** via backward
-    finite-difference estimation from consecutive snapshots, because
-    the constraint field's time variation represents real energy flow.
+    ``pi_N`` momentum references (velocity-dependent forces).
 
     Supports position-dependent coefficients by evaluating them on the
     grid and performing elementwise averaging.
@@ -667,9 +602,6 @@ def _compute_virial_potential(
     if has_posdep:
         coord_arrays = _build_coord_arrays(data)
 
-    # Estimate constraint momenta via backward FD from consecutive snapshots
-    constraint_momenta = _build_constraint_momenta(data, t_idx)
-
     for eq in data.spec.equations:
         if eq.time_derivative_order < 2:  # noqa: PLR2004
             continue  # skip constraints and first-order
@@ -681,16 +613,11 @@ def _compute_virial_potential(
             if term.operator == "first_derivative_t":
                 continue
 
-            # Skip dynamical momentum references (velocity-dependent forces).
-            # Constraint momenta are included -- they represent real coupling.
-            if _is_momentum_field(term.field) and not _is_constraint_momentum(
-                term.field, data.spec
-            ):
+            # Skip momentum-field references (velocity-dependent)
+            if _is_momentum_field(term.field):
                 continue
 
-            target = _resolve_term_target(
-                data, term.field, t_idx, constraint_momenta,
-            )
+            target = _resolve_term_target(data, term.field, t_idx)
             if target is None:
                 continue
 
@@ -698,7 +625,7 @@ def _compute_virial_potential(
             operated = _apply_spatial_operator(
                 term.operator, target, data.grid_spacing, data.periodic,
             )
-            # coeff may be scalar or ndarray -- numpy handles both
+            # coeff may be scalar or ndarray — numpy handles both
             potential += float((coeff * phi_i * operated).mean())
 
     return -0.5 * potential
@@ -731,7 +658,7 @@ def _compute_constraint_self_energy(
         energy -= 0.5 * float(grad_sq.mean())
 
         # Mass: -½ ⟨m² C²⟩  (NEGATIVE, m² may be scalar or ndarray)
-        m2 = resolve_mass_squared(data, field_idx)
+        m2 = _resolve_mass_squared(data, field_idx)
         energy -= 0.5 * float((m2 * c_field**2).mean())
 
     return energy
@@ -791,7 +718,7 @@ def _accumulate_cross_constraint_terms(
     constraint_names: set[str],
     coord_arrays: dict[str, NDArray[np.float64]] | None,
 ) -> float:
-    """Sum cross-constraint term densities: +1/2 c_ij <C_i . op(C_j)>."""
+    """Sum cross-constraint term densities: +½ c_ij ⟨C_i·op(C_j)⟩."""
     energy = 0.0
 
     for eq in data.spec.equations:
@@ -802,10 +729,7 @@ def _accumulate_cross_constraint_terms(
         for term in eq.rhs_terms:
             if term.field == eq.field_name or term.field not in constraint_names:
                 continue
-            # Skip dynamical momentum references; constraint momenta pass through
-            if _is_momentum_field(term.field) and not _is_constraint_momentum(
-                term.field, data.spec
-            ):
+            if _is_momentum_field(term.field):
                 continue
 
             target = _resolve_term_target(data, term.field, t_idx)
@@ -821,20 +745,116 @@ def _accumulate_cross_constraint_terms(
     return energy
 
 
+def _evaluate_hamiltonian_factor(
+    factor_field: str,
+    factor_operator: str,
+    data: SimulationData,
+    t_idx: int,
+) -> NDArray[np.float64] | None:
+    """Evaluate a single Hamiltonian factor on the grid.
+
+    For ``time_derivative`` operator, returns the stored momentum (canonical).
+    For spatial operators, applies the operator to the field data.
+    For ``identity``, returns the field data directly.
+
+    Returns None if the factor cannot be evaluated (e.g., zero-momentum
+    constraint field for time_derivative).
+    """
+    if factor_operator == "time_derivative":
+        # Maps to canonical momentum stored in simulation.
+        # factor_field is a component name like "phi_0" or "A_1";
+        # look up its stored momentum (None for constraint fields).
+        mom = data.momenta.get(factor_field)
+        if mom is not None:
+            return mom[t_idx]
+        return None
+
+    # Get the field data
+    field_arr = _resolve_term_target(data, factor_field, t_idx)
+    if field_arr is None:
+        return None
+
+    if factor_operator == "identity":
+        return field_arr
+
+    # Apply spatial operator
+    return _apply_spatial_operator(
+        factor_operator, field_arr, data.grid_spacing, data.periodic,
+    )
+
+
+def _compute_hamiltonian_from_canonical(
+    data: SimulationData,
+    t_idx: int,
+) -> float:
+    """Evaluate the symbolic Hamiltonian from canonical structure.
+
+    Computes: ⟨H⟩ = Σ coefficient * ⟨factor_a * factor_b⟩
+
+    Each term is a quadratic product of field values/derivatives, with
+    the ``time_derivative`` operator mapping to the stored canonical
+    momentum. This gives the exact Legendre-transform Hamiltonian,
+    not an ad-hoc assembly.
+
+    Parameters
+    ----------
+    data : SimulationData
+    t_idx : int
+        Snapshot index.
+
+    Returns
+    -------
+    float
+        Spatially-averaged Hamiltonian energy density.
+
+    Raises
+    ------
+    ValueError
+        If ``data.spec.canonical`` is None.
+    """
+    canonical = data.spec.canonical
+    if canonical is None:
+        msg = "_compute_hamiltonian_from_canonical called without canonical structure"
+        raise ValueError(msg)
+
+    total = 0.0
+    for term in canonical.hamiltonian_terms:
+        coeff = float(term.coefficient)
+        # Resolve symbolic coefficient if present
+        if term.coefficient_symbolic is not None and data.parameters:
+            from tidal.symbolic.json_loader import (  # noqa: PLC0415
+                _resolve_symbolic_coeff,  # pyright: ignore[reportPrivateUsage]
+            )
+
+            resolved = _resolve_symbolic_coeff(
+                term.coefficient_symbolic, data.parameters,
+            )
+            if resolved is not None:
+                coeff = float(resolved)
+
+        fa = _evaluate_hamiltonian_factor(
+            term.factor_a.field, term.factor_a.operator, data, t_idx,
+        )
+        fb = _evaluate_hamiltonian_factor(
+            term.factor_b.field, term.factor_b.operator, data, t_idx,
+        )
+        if fa is None or fb is None:
+            continue
+
+        total += coeff * float((fa * fb).mean())
+
+    return total
+
+
 def compute_system_energy(  # noqa: PLR0914
     data: SimulationData,
     t_idx: int,
 ) -> SystemEnergy:
     """Compute Hamiltonian energy density at snapshot *t_idx*.
 
-    Returns spatially-averaged energy density ⟨ε⟩ = H / V_domain, using:
-
-        ⟨ε⟩ = ½ Σ ⟨π_sim²⟩ + ⟨v_virial⟩ + ⟨v_constraint_self⟩ + ⟨v_cross⟩
-
-    where ⟨v_virial⟩ is from dynamical equations' spatial RHS terms
-    (Euler's theorem for quadratic functionals), ⟨v_constraint_self⟩ accounts
-    for temporal gauge components' negative self-energy, and ⟨v_cross⟩
-    captures identity coupling between constraint fields (e.g. gcoup*G*A_0*B_0).
+    When the spec includes canonical structure (from ``tidal derive``),
+    evaluates the Legendre-transform Hamiltonian directly from structured
+    quadratic terms. Otherwise, falls back to the virial-based formula.
 
     Parameters
     ----------
@@ -880,30 +900,27 @@ def compute_system_energy(  # noqa: PLR0914
         mom_snapshot = data.momenta.get(name)
         mom_arr = mom_snapshot[t_idx] if mom_snapshot is not None else None
 
-        m2 = resolve_mass_squared(data, field_idx, coord_arrays=coord_arrays)
+        m2 = _resolve_mass_squared(data, field_idx, coord_arrays=coord_arrays)
         axes = _self_gradient_axes(eq)
         per_field[name] = compute_field_energy(
             field_snapshot, mom_arr, m2, data.grid_spacing, data.periodic,
             gradient_axes=axes,
         )
 
-    # Virial potential from dynamical fields' spatial RHS terms
+    # Use canonical Hamiltonian when available (Phase K: Legendre transform)
+    if data.spec.canonical is not None:
+        total = _compute_hamiltonian_from_canonical(data, t_idx)
+        self_sum = sum(fe.total for fe in per_field.values())
+        interaction = total - self_sum
+        return SystemEnergy(per_field=per_field, interaction=interaction, total=total)
+
+    # Fallback: virial-based formula for legacy specs without canonical structure.
     v_virial = _compute_virial_potential(data, t_idx)
-
-    # Constraint field self-energy (negative, from g^{00} = -1)
     v_constraint = _compute_constraint_self_energy(data, t_idx)
-
-    # Cross-constraint coupling (e.g. gcoup*G*A_0*B_0 between two constraints)
     v_constraint_cross = _compute_constraint_coupling_energy(data, t_idx)
-
-    # Total potential = virial + constraint self + constraint cross
     v_total = v_virial + v_constraint + v_constraint_cross
-
-    # Interaction = total potential minus per-field self-potentials
     self_potential = sum(fe.gradient + fe.mass for fe in per_field.values())
     interaction = v_total - self_potential
-
-    # Total energy = kinetic + total potential
     total_kinetic = sum(fe.kinetic for fe in per_field.values())
     total = total_kinetic + v_total
 
@@ -958,7 +975,7 @@ def compute_energy_timeseries(
 # ------------------------------------------------------------------
 
 
-def validate_array(arr: NDArray[np.float64], label: str) -> None:
+def _validate_array(arr: NDArray[np.float64], label: str) -> None:
     """Check array for non-finite values.
 
     Raises

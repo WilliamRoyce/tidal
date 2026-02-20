@@ -55,7 +55,7 @@ _VALID_MEASUREMENTS = frozenset({
 # ------------------------------------------------------------------
 
 
-def resolve_spec_path(data_path: Path, spec_arg: str | None) -> Path:
+def _resolve_spec_path(data_path: Path, spec_arg: str | None) -> Path:
     """Resolve the JSON spec path from CLI flag or directory metadata.
 
     Resolution order:
@@ -129,7 +129,7 @@ def _parse_field_list(raw: str | None) -> tuple[str, ...] | None:
     return tuple(s.strip() for s in raw.split(",") if s.strip())
 
 
-def load_data(
+def _load_data(
     data_path: Path,
     spec_path: Path,
     param_overrides: list[str],
@@ -138,7 +138,7 @@ def load_data(
 
     Merges ``--param`` overrides with parameters stored in the data.
     """
-    from tidal.cli._simulate import parse_params
+    from tidal.cli._simulate import _parse_params  # pyright: ignore[reportPrivateUsage]
     from tidal.measurement import SimulationData
     from tidal.symbolic import load_equation_system
 
@@ -148,7 +148,7 @@ def load_data(
     # Merge CLI param overrides
     if param_overrides:
         merged = dict(data.parameters)
-        cli_params = parse_params(param_overrides, spec)
+        cli_params = _parse_params(param_overrides, spec)
         merged.update(cli_params)
         from dataclasses import replace
 
@@ -175,26 +175,11 @@ def _run_energy(data: SimulationData) -> dict[str, Any]:
     }
 
 
-def _run_conservation(
-    data: SimulationData,
-    threshold: float,
-    *,
-    energy_result: dict[str, Any] | None = None,
-) -> dict[str, Any]:
-    """Check energy conservation.
-
-    When *energy_result* is provided (from a prior ``_run_energy()`` call),
-    the pre-computed total energy timeseries is reused, avoiding a redundant
-    call to ``compute_energy_timeseries()``.
-    """
+def _run_conservation(data: SimulationData, threshold: float) -> dict[str, Any]:
+    """Check energy conservation."""
     from tidal.measurement import check_energy_conservation
 
-    kwargs: dict[str, Any] = {}
-    if energy_result is not None and "error" not in energy_result:
-        kwargs["total_energy"] = np.array(energy_result["total"], dtype=np.float64)
-        kwargs["times"] = np.array(energy_result["times"], dtype=np.float64)
-
-    diag = check_energy_conservation(data, threshold=threshold, **kwargs)
+    diag = check_energy_conservation(data, threshold=threshold)
     return {
         "max_relative_error": diag.max_relative_error,
         "is_conserved": diag.is_conserved,
@@ -387,9 +372,7 @@ def _run_summary(
     results: dict[str, Any] = {}
 
     results["energy"] = _run_energy(data)
-    results["conservation"] = _run_conservation(
-        data, threshold, energy_result=results["energy"],
-    )
+    results["conservation"] = _run_conservation(data, threshold)
 
     # Auto-detect conversion (needs >= 2 dynamical fields)
     dyn = data.dynamical_fields
@@ -612,9 +595,7 @@ def _run_individual_measurements(  # noqa: C901, PLR0912, PLR0915
 
     if "conservation" in measurements:
         try:
-            results["conservation"] = _run_conservation(
-                data, threshold, energy_result=results.get("energy"),
-            )
+            results["conservation"] = _run_conservation(data, threshold)
         except ValueError as e:
             results["conservation"] = {"error": str(e)}
 
@@ -708,7 +689,7 @@ def measure_command(args: Namespace) -> int:
         print(f"Error: data path not found: {data_path}", file=sys.stderr)
         return 1
 
-    spec_path = resolve_spec_path(data_path, getattr(args, "spec", None))
+    spec_path = _resolve_spec_path(data_path, getattr(args, "spec", None))
     measurements = _parse_measurements(getattr(args, "what", None))
     quiet: bool = getattr(args, "quiet", False)
 
@@ -716,7 +697,7 @@ def measure_command(args: Namespace) -> int:
         print(f"Loading: {data_path.name}")
         print(f"Spec:    {spec_path.name}")
 
-    data = load_data(data_path, spec_path, getattr(args, "param", None) or [])
+    data = _load_data(data_path, spec_path, getattr(args, "param", None) or [])
 
     if not quiet:
         print(

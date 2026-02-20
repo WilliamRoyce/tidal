@@ -20,11 +20,11 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from tidal.measurement._spectral import (
-    build_k_grid,
-    radial_bin,
+    _build_k_grid,  # pyright: ignore[reportPrivateUsage]
+    _radial_bin,  # pyright: ignore[reportPrivateUsage]
 )
 from tidal.measurement._utils import (
-    check_no_position_dependent_terms,
+    _check_no_position_dependent_terms,  # pyright: ignore[reportPrivateUsage]
 )
 
 if TYPE_CHECKING:
@@ -137,22 +137,22 @@ def _bin_and_detect(  # noqa: PLR0913, PLR0917
 
     Returns (wavenumbers, power, peak_frequencies, peak_powers).
     """
-    _k_grid, k_mag = build_k_grid(grid_shape, grid_spacing)
+    _k_grid, k_mag = _build_k_grid(grid_shape, grid_spacing)
 
     # Establish bin structure
-    wn_ref, _ = radial_bin(k_mag, np.zeros_like(k_mag), grid_spacing, grid_shape)
+    wn_ref, _ = _radial_bin(k_mag, np.zeros_like(k_mag), grid_spacing, grid_shape)
     n_modes = len(wn_ref)
     n_freq = len(angular_freqs)
     power = np.zeros((n_modes, n_freq), dtype=np.float64)
 
     for fi in range(n_freq):
-        _, binned = radial_bin(k_mag, spacetime_power[fi], grid_spacing, grid_shape)
+        _, binned = _radial_bin(k_mag, spacetime_power[fi], grid_spacing, grid_shape)
         power[:len(binned), fi] = binned
 
     # Max spatial amplitude per k-bin for activity detection
     max_amp = np.zeros(n_modes, dtype=np.float64)
     for t in range(spatial_fft.shape[0]):
-        _, binned_amp = radial_bin(k_mag, np.abs(spatial_fft[t]), grid_spacing, grid_shape)
+        _, binned_amp = _radial_bin(k_mag, np.abs(spatial_fft[t]), grid_spacing, grid_shape)
         max_amp = np.maximum(max_amp, binned_amp[:n_modes])
 
     # Peak detection per k-bin
@@ -213,7 +213,7 @@ def compute_dispersion(
         timestep is non-uniform, or any equation term is
         position-dependent (uniform medium required).
     """
-    check_no_position_dependent_terms(data, "Dispersion relation omega(k)")
+    _check_no_position_dependent_terms(data, "Dispersion relation omega(k)")
 
     if field_name not in data.spec.component_names:
         msg = f"Field '{field_name}' not in spec fields: {data.spec.component_names}"
