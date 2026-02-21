@@ -420,7 +420,20 @@ or `np.ndarray` (grid-shaped) depending on coordinate dependence.
 - [ ] Update `docs/NEXT_PHASES.md` to reflect completed migration
 - [ ] Update MEMORY.md with new architecture notes
 
-### Future: Phase 7 (Constraint Damping / Dedner GLM)
+### Future: Phase 7 (FieldSet — Typed Field Container)
+
+- [ ] Create `tidal/solver/fieldset.py` with `FieldSet` class
+- [ ] Own field data: `dict[str, np.ndarray]` with typed access and grid shape enforcement
+- [ ] Consolidate field name validation: `parse_field_name()`, momentum naming conventions
+  (`pi_phi_0`), index validation — single source of truth
+- [ ] Handle serialization: flat vector ↔ named fields (from `state.py`), NPZ I/O
+  (from `_io.py`), snapshot packing
+- [ ] Bridge py-pde boundary: `to_field_collection()` / `from_field_collection()` only
+  at CLI output edge
+- [ ] Replace raw `dict[str, np.ndarray]` throughout solver and measurement modules
+- [ ] Enforce invariants: grid shape consistency, field/momentum pairing, immutable metadata
+
+### Future: Phase 8 (Constraint Damping / Dedner GLM)
 
 - [ ] TOML: `[gauge] method = "dedner"`
 - [ ] Auto-compute c_h, c_p from grid/domain
