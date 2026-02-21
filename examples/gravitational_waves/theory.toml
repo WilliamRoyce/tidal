@@ -1,7 +1,8 @@
 # Linearized Gravity: Einstein-Hilbert in 3+1D via xPert
 #
-# Linearizes the Einstein tensor around flat Minkowski background:
-#   G^(1)_ab[h] = 0  (gauge-unfixed linearized Einstein equations)
+# Lagrangian: L = R (Ricci scalar of the Einstein-Hilbert action)
+# Linearizes to quadratic order L^(2) = Perturbation[R, 2] / 2 via xPert,
+# then derives linearized Einstein equations G^(1)_ab[h] = 0 via VarD.
 #
 # Produces 10 component equations (symmetric rank-2 tensor in 4D).
 # Constraint structure: h_00 has no d2_t (Hamiltonian constraint),
@@ -20,8 +21,10 @@ type = "tensor"
 rank = 2
 symmetry = "symmetric"
 
+[lagrangian]
+expression = "RicciScalarCD[]"
+
 [linearization]
-expression = "Einstein[CD][-a, -b]"
 perturbation_field = "h"
 
 [output]

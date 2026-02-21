@@ -324,8 +324,19 @@ def _validate_background_fields(config: dict[str, Any]) -> None:
                 raise TypeError(msg)
 
 
-def _validate_linearization(config: dict[str, Any]) -> None:
+def _validate_linearization(
+    config: dict[str, Any], *, has_lagrangian: bool = False,
+) -> None:
     """Validate optional ``[linearization]`` section.
+
+    Parameters
+    ----------
+    config : dict
+        Full TOML config.
+    has_lagrangian : bool
+        Whether ``[lagrangian]`` is also present.  When *True*,
+        ``[linearization].expression`` is not required (the Lagrangian
+        provides the expression to linearize).
 
     Raises
     ------
@@ -341,10 +352,12 @@ def _validate_linearization(config: dict[str, Any]) -> None:
         msg = "[linearization] must be a table"
         raise TypeError(msg)
 
-    expr = lin.get("expression")
-    if not expr or not isinstance(expr, str) or not expr.strip():
-        msg = "[linearization].expression must be a non-empty string"
-        raise ValueError(msg)
+    # expression is required only for legacy path (no [lagrangian])
+    if not has_lagrangian:
+        expr = lin.get("expression")
+        if not expr or not isinstance(expr, str) or not expr.strip():
+            msg = "[linearization].expression must be a non-empty string"
+            raise ValueError(msg)
 
     pf = lin.get("perturbation_field")
     if not pf or not isinstance(pf, str):
@@ -509,9 +522,16 @@ def _validate_config(config: dict[str, Any]) -> None:
     if not has_lagrangian and not has_linearization:
         msg = "Config must have either [lagrangian] or [linearization]"
         raise ValueError(msg)
-    if has_lagrangian and has_linearization:
-        msg = "[lagrangian] and [linearization] are mutually exclusive"
-        raise ValueError(msg)
+    if has_linearization and not has_lagrangian:
+        import warnings
+
+        warnings.warn(
+            "[linearization] without [lagrangian] is deprecated. "
+            "Provide the Lagrangian in [lagrangian] and use "
+            "[linearization] as a modifier.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
     if has_linearization and config.get("gauge"):
         msg = (
             "[[gauge]] is not supported with [linearization] "
@@ -525,8 +545,8 @@ def _validate_config(config: dict[str, Any]) -> None:
     _validate_background_fields(config)
     if has_lagrangian:
         _validate_lagrangian(config)
-    else:
-        _validate_linearization(config)
+    if has_linearization:
+        _validate_linearization(config, has_lagrangian=has_lagrangian)
     _validate_gauge(config)
     _validate_parameters(config)
 
@@ -1071,6 +1091,85 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
                 "",
             )
         )
+
+    return lines
+
+
+def _wls_linearize_lagrangian(
+    ctx: _WlsContext, *, include_bg: bool = False,
+) -> list[str]:
+    """Preprocess Lagrangian: perturb to 2nd order for linearized theory.
+
+    Overwrites ``{prefix}Lagrangian`` with the quadratic Lagrangian
+    ``L^(2) = Perturbation[L, 2] / 2`` using xPert 2nd-order perturbation.
+    After this, the standard EL and canonical pipelines run unchanged on
+    ``L^(2)`` — a scalar Lagrangian quadratic in the perturbation field.
+
+    Valid for flat Minkowski background where ``√(-g₀) = 1`` and ``L₀ = 0``
+    (Brizuela, Martín-García, Mena Marugán 2009; Carroll 2004, Ch. 7).
+
+    Raises
+    ------
+    ValueError
+        If ``ctx.linearization`` is ``None``.
+    """
+    if ctx.linearization is None:
+        msg = "_wls_linearize_lagrangian called without linearization config"
+        raise ValueError(msg)
+    lin = ctx.linearization
+    pert_field_name = lin["perturbation_field"]
+    pert_sym = f"{ctx.prefix}hpert"
+    eps_sym = f"{ctx.prefix}Epsilon"
+    field_head = f"{ctx.prefix}{pert_field_name.capitalize()}"
+    bg_name = f"{ctx.prefix}Bg"
+
+    lines: list[str] = [
+        "",
+        "(* === Linearization: L → L^(2) via 2nd-order xPert === *)",
+        f"(* Perturbing metric: {ctx.metric} → {ctx.metric} + ε·{pert_field_name} *)",
+        "",
+        "(* Set up metric perturbation via xPert *)",
+        f"{pert_sym}Tensor = SetupMetricPerturbation[{ctx.metric}, {pert_sym}, {eps_sym}];",
+        f'Print["Metric perturbation set up: {ctx.metric} → {ctx.metric} + {eps_sym}·{pert_field_name}"];',
+        "",
+        "(* 2nd-order perturbation of scalar Lagrangian *)",
+        "(* δ²L / 2 gives the quadratic Lagrangian for the perturbation field *)",
+        "(* Valid because: √(-g₀)=1 for Minkowski; L₀=0 on flat background *)",
+        f"l2Raw = Perturbation[{ctx.prefix}Lagrangian, 2];",
+        "l2Raw = ExpandPerturbation[l2Raw];",
+        "",
+        "(* Validate that xPert fully expanded all Perturbation[] wrappers *)",
+        "If[!FreeQ[l2Raw, Perturbation],",
+        '  Throw["Linearization: ExpandPerturbation did not fully expand. '
+        'Unexpanded Perturbation[] wrappers remain."]',
+        "];",
+        "",
+        "(* Replace xPert perturbation notation with declared field tensor *)",
+        f"l2Raw = l2Raw /. {pert_sym}[LI[1], idx__] :> {field_head}[idx];",
+    ]
+
+    # Replace bg → background metric if bg tensor is used
+    if include_bg:
+        lines.extend([
+            "",
+            "(* Replace reference metric bg → background metric *)",
+            f"l2Raw = l2Raw /. {bg_name} -> {ctx.metric};",
+        ])
+
+    # Scalar BG substitutions (e.g., position-dependent couplings)
+    lines.extend(_wls_scalar_background_substitution(ctx, "l2Raw"))
+
+    lines.extend([
+        "",
+        "(* Canonical simplifications *)",
+        "l2Raw = ToCanonical[l2Raw];",
+        f"l2Raw = ContractMetric[l2Raw, {ctx.metric}];",
+        "",
+        "(* Overwrite Lagrangian with quadratic L^(2) = δ²L / 2 *)",
+        f"{ctx.prefix}Lagrangian = l2Raw / 2;",
+        f'Print["Quadratic Lagrangian L^(2): ", Short[{ctx.prefix}Lagrangian, 5]];',
+        "",
+    ])
 
     return lines
 
@@ -1640,8 +1739,13 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
 
     is_linearization = ctx.linearization is not None
 
-    if is_linearization and ctx.linearization is not None:
-        raw_expr: str = str(ctx.linearization["expression"])
+    if is_linearization and ctx.lagrangian_expr:
+        # Lagrangian-first linearization: store the Lagrangian (not the EOM)
+        raw_expr: str = ctx.lagrangian_expr
+        linearized_str = "True"
+    elif is_linearization and ctx.linearization is not None:
+        # Legacy: direct EOM linearization
+        raw_expr = str(ctx.linearization["expression"])
         linearized_str = "True"
     else:
         raw_expr = ctx.lagrangian_expr
@@ -1706,8 +1810,10 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
 
     # Canonical momentum + Hamiltonian pipeline (Phase K)
     # Must run after jsonStructure is built (needs allCompNames from fieldEquations)
-    # and before JSON export. Only for non-linearization paths that have a Lagrangian.
-    if ctx.linearization is None:
+    # and before JSON export. Runs for ALL theories that have a Lagrangian
+    # (including linearization, where {prefix}Lagrangian = L^(2)).
+    # Only skip for legacy linearization (no Lagrangian available).
+    if ctx.lagrangian_expr:
         lines.extend(_wls_canonical_pipeline(ctx))
 
     # Export
@@ -1816,7 +1922,19 @@ def generate_wls(
     lines.extend(_wls_fields(ctx, include_bg=_needs_bg_tensor(config)))
     lines.extend(_wls_derived_fields(ctx))
 
-    if is_linearization:
+    if is_linearization and ctx.lagrangian_expr:
+        # Lagrangian-first linearization: L → L^(2) → standard EL pipeline
+        lines.extend(_wls_lagrangian(ctx))
+        lines.extend(
+            _wls_linearize_lagrangian(ctx, include_bg=_needs_bg_tensor(config))
+        )
+        # Standard EL on the quadratic Lagrangian L^(2)
+        if ctx.is_multi:
+            lines.extend(_wls_euler_lagrange_multi(ctx))
+        else:
+            lines.extend(_wls_euler_lagrange_single(ctx))
+    elif is_linearization:
+        # Legacy: direct EOM linearization (deprecated — no [lagrangian])
         lines.extend(_wls_linearization(ctx, include_bg=_needs_bg_tensor(config)))
     else:
         lines.extend(_wls_lagrangian(ctx))

@@ -2836,17 +2836,17 @@ path = "output.json"
         ret = main(["derive", str(config), "--dry-run"])
         assert ret == 1
 
-    def test_linearization_and_lagrangian_mutually_exclusive(
+    def test_linearization_and_lagrangian_coexist(
         self, tmp_path: Path
     ) -> None:
-        """Having both [lagrangian] and [linearization] should fail."""
+        """[lagrangian] + [linearization] is valid (Lagrangian-first)."""
         config = tmp_path / "theory.toml"
         config.write_text("""
 [theory]
-name = "Bad"
+name = "Lagrangian-first linearization"
 
 [spacetime]
-dimension = 4
+dimension = 3
 metric = "minkowski"
 
 [[fields]]
@@ -2856,17 +2856,16 @@ rank = 2
 symmetry = "symmetric"
 
 [lagrangian]
-expression = "h[]"
+expression = "RicciScalarCD[]"
 
 [linearization]
-expression = "Einstein[CD][-a, -b]"
 perturbation_field = "h"
 
 [output]
 path = "output.json"
 """)
         ret = main(["derive", str(config), "--dry-run"])
-        assert ret == 1
+        assert ret == 0
 
     def test_linearization_or_lagrangian_required(self, tmp_path: Path) -> None:
         """Config with neither [lagrangian] nor [linearization] should fail."""
