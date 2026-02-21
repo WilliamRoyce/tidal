@@ -70,11 +70,6 @@ Begin["`Private`"];
 SetupMetricPerturbation[metric_, pertName_Symbol, paramName_Symbol] := Module[
   {},
 
-  (* Define perturbation parameter if not already defined *)
-  If[!ConstantSymbolQ[paramName],
-    DefConstantSymbol[paramName, PrintAs -> "\[Epsilon]"]
-  ];
-
   (* Define metric perturbation using xPert *)
   (* DefMetricPerturbation[metric, perturbation, parameter] *)
   (* This defines pertName[LI[n], -a, -b] for order n perturbations *)
