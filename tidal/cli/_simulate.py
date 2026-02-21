@@ -6,17 +6,19 @@ import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
 if TYPE_CHECKING:
     from argparse import Namespace
+    from collections.abc import Callable
 
     from pde import CartesianGrid, FieldCollection, MemoryStorage
 
     from tidal.measurement._io import SimulationData
     from tidal.measurement._writer import SnapshotWriter
+    from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem
 
 # Default grid shapes per spatial dimension
@@ -658,6 +660,204 @@ def _save_constraint_output(
     print(f"  Saved data to: {output_path}")
 
 
+# --- IDA solver path ---
+
+
+def _gridinfo_from_pypde(grid: CartesianGrid) -> tuple[GridInfo, tuple[bool, ...]]:
+    """Convert a py-pde CartesianGrid to a TIDAL GridInfo.
+
+    Returns (grid_info, periodic_flags).
+    """
+    from tidal.solver.grid import GridInfo
+
+    periodic_raw = grid.periodic
+    if isinstance(periodic_raw, bool):
+        periodic_flags = tuple([periodic_raw] * grid.num_axes)
+    else:
+        periodic_flags = tuple(bool(p) for p in periodic_raw)
+
+    grid_info = GridInfo(
+        bounds=tuple((float(b[0]), float(b[1])) for b in grid.axes_bounds),
+        shape=tuple(int(s) for s in grid.shape),
+        periodic=periodic_flags,
+    )
+    return grid_info, periodic_flags
+
+
+def _bc_from_args(args: Namespace, periodic_flags: tuple[bool, ...]) -> str | tuple[str, ...]:
+    """Determine BC string for spatial operators from CLI args."""
+    if args.bc:
+        bc_parts = [b.strip().lower() for b in args.bc.split(",")]
+        return tuple(bc_parts) if len(bc_parts) > 1 else bc_parts[0]
+    if all(periodic_flags):
+        return "periodic"
+    if not any(periodic_flags):
+        return "neumann"
+    return tuple("periodic" if p else "neumann" for p in periodic_flags)
+
+
+def _ida_result_to_storage(
+    result: dict[str, Any],
+    spec: EquationSystem,
+    grid: CartesianGrid,
+    grid_shape: tuple[int, ...],
+    n_pts: int,
+) -> MemoryStorage:
+    """Pack IDA result arrays into a py-pde MemoryStorage."""
+    from pde import FieldCollection, MemoryStorage, ScalarField
+
+    storage = MemoryStorage()
+    n_layout = len(spec.state_layout)
+    started = False
+    for i, t in enumerate(result["t"]):
+        y_row = result["y"][i]
+        fc_fields = [
+            ScalarField(
+                grid,
+                data=y_row[j * n_pts : (j + 1) * n_pts].reshape(grid_shape),
+            )
+            for j in range(n_layout)
+        ]
+        fc = FieldCollection(fc_fields)
+        if not started:
+            storage.start_writing(fc)
+            started = True
+        storage.append(fc, time=t)
+    return storage
+
+
+def _setup_ida_disk_writer(  # noqa: PLR0913, PLR0917
+    args: Namespace,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+    periodic_flags: tuple[bool, ...],
+    params: dict[str, float],
+    snapshot_interval: float,
+) -> tuple[SnapshotWriter, Callable[[float, np.ndarray], None]]:
+    """Set up disk-backed SnapshotWriter and IDA callback for streaming.
+
+    Returns (writer, snapshot_callback).
+    """
+    from tidal.measurement._writer import (
+        SnapshotWriter,
+        _field_names_from_spec,
+        compute_snapshot_count,
+    )
+
+    output_dir = Path(args.output) if args.output else Path("output")
+    field_names, momentum_names = _field_names_from_spec(spec)
+    n_snaps = compute_snapshot_count(args.t_end, snapshot_interval)
+
+    writer = SnapshotWriter(
+        output_dir=output_dir,
+        field_names=field_names,
+        momentum_names=momentum_names,
+        grid_shape=grid_info.shape,
+        n_snapshots=n_snaps,
+        grid_spacing=tuple(float(d) for d in grid_info.dx),
+        grid_bounds=grid_info.bounds,
+        periodic=periodic_flags,
+        parameters=params,
+        spec_path=Path(args.json_path),
+    )
+
+    # Build slot maps for unpacking flat vector
+    field_slots_map: dict[str, int] = {}
+    momentum_slots_map: dict[str, int] = {}
+    for idx, (name, slot_type) in enumerate(spec.state_layout):
+        if slot_type == "field":
+            field_slots_map[name] = idx
+        elif slot_type == "momentum":
+            momentum_slots_map[name] = idx
+
+    n_pts = grid_info.num_points
+    field_set = set(field_names)
+    momentum_set = set(momentum_names)
+    shape = grid_info.shape
+
+    def _disk_callback(t: float, y_flat: np.ndarray) -> None:
+        fields_d = {
+            name: y_flat[slot * n_pts : (slot + 1) * n_pts].reshape(shape)
+            for name, slot in field_slots_map.items()
+            if name in field_set
+        }
+        moms_d = {
+            name: y_flat[slot * n_pts : (slot + 1) * n_pts].reshape(shape)
+            for name, slot in momentum_slots_map.items()
+            if name in momentum_set
+        }
+        writer.append(t, fields_d, moms_d)
+
+    return writer, _disk_callback
+
+
+def _simulate_ida(  # noqa: PLR0913, PLR0917
+    args: Namespace,
+    spec: EquationSystem,
+    grid: CartesianGrid,
+    state: FieldCollection,
+    params: dict[str, float],
+    log: object,
+) -> MemoryStorage:
+    """Run simulation via SUNDIALS/IDA (DAE solver).
+
+    Bypasses py-pde's time integration entirely. Uses ``tidal.solver.ida``
+    for the solve, then packs results back into a ``MemoryStorage`` for
+    compatibility with the output pipeline.
+    """
+    from tidal.solver.ida import solve_ida
+
+    grid_info, periodic_flags = _gridinfo_from_pypde(grid)
+    y0 = np.concatenate([np.asarray(f.data).ravel() for f in state])
+    bc = _bc_from_args(args, periodic_flags)
+
+    # Snapshot configuration
+    snapshot_interval = (
+        args.snapshots if args.snapshots is not None else args.t_end / 100.0
+    )
+    num_snapshots = max(int(args.t_end / snapshot_interval) + 1, 2)
+
+    # Set up disk-backed writer if needed
+    fmt = _infer_output_format(args)
+    writer: SnapshotWriter | None = None
+    snapshot_cb = None
+
+    if fmt == "directory":
+        writer, snapshot_cb = _setup_ida_disk_writer(
+            args, spec, grid_info, periodic_flags, params, snapshot_interval,
+        )
+
+    # Run IDA solver
+    log(  # type: ignore[operator]
+        f"Running IDA solver (t=0 → {args.t_end}, {num_snapshots} snapshots)..."
+    )
+    result = solve_ida(
+        spec,
+        grid_info,
+        y0,
+        t_span=(0.0, args.t_end),
+        bc=bc,
+        num_snapshots=num_snapshots,
+        snapshot_callback=snapshot_cb,
+    )
+
+    if not result["success"]:
+        print(f"Error: IDA solver failed: {result['message']}", file=sys.stderr)
+
+    if writer is not None:
+        writer.close()
+        log(  # type: ignore[operator]
+            f"  {writer.count} snapshots streamed to: {writer.output_dir}"
+        )
+
+    # Pack result into MemoryStorage for output pipeline compatibility
+    storage = _ida_result_to_storage(
+        result, spec, grid, grid_info.shape, grid_info.num_points,
+    )
+    log(f"  {len(result['t'])} snapshots stored")  # type: ignore[operator]
+    return storage
+
+
 # --- Command entry point ---
 
 
@@ -704,7 +904,7 @@ def _warn_zero_evolution(pde: object, state: FieldCollection) -> None:
         )
 
 
-def simulate_command(args: Namespace) -> int:  # noqa: PLR0914, PLR0915
+def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0914, PLR0915
     """Execute the simulate command.
 
     Parameters
@@ -773,6 +973,22 @@ def simulate_command(args: Namespace) -> int:  # noqa: PLR0914, PLR0915
     # Step 6: Validate solver parameters and determine dt
     _validate_solver_params(args)
 
+    # IDA path: bypass py-pde time integration entirely
+    if args.scheme == "ida":
+        storage = _simulate_ida(args, spec, grid, state, params, log)
+
+        # Step 8: Output
+        ctx = PlotContext(
+            spec=spec,
+            storage=storage,
+            grid=grid,
+            initial_state=initial_state,
+            params=params,
+        )
+        _generate_output(args, ctx)
+        return 0
+
+    # py-pde path: runge-kutta or scipy
     from tidal.utils import normalize_solve_result
 
     dt = args.dt
@@ -794,11 +1010,11 @@ def simulate_command(args: Namespace) -> int:  # noqa: PLR0914, PLR0915
 
     fmt = _infer_output_format(args)
     use_directory = fmt == "directory"
-    writer: SnapshotWriter | None = None
+    writer_pypde: SnapshotWriter | None = None
 
     if use_directory:
         # Disk-backed streaming: O(1) memory regardless of snapshot count
-        storage, tracker, writer = _setup_disk_backed(
+        storage, tracker, writer_pypde = _setup_disk_backed(
             args, spec, grid, snapshot_interval, params,
         )
     else:
@@ -830,11 +1046,11 @@ def simulate_command(args: Namespace) -> int:  # noqa: PLR0914, PLR0915
             )
         )
 
-    if writer is not None:
-        writer.close()
+    if writer_pypde is not None:
+        writer_pypde.close()
         log(
-            f"  {writer.count} snapshots streamed to: "
-            f"{writer.output_dir}"
+            f"  {writer_pypde.count} snapshots streamed to: "
+            f"{writer_pypde.output_dir}"
         )
     else:
         log(f"  {len(storage)} snapshots stored")

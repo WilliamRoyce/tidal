@@ -72,7 +72,10 @@ class _ResidualCtx:
         self.fields: dict[str, np.ndarray] = {}
 
     def set_arrays(
-        self, y: np.ndarray, yp: np.ndarray, res: np.ndarray,
+        self,
+        y: np.ndarray,
+        yp: np.ndarray,
+        res: np.ndarray,
     ) -> None:
         """Bind per-call arrays and unpack fields from y."""
         self.y = y

@@ -217,9 +217,9 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sim_parser.add_argument(
         "--scheme",
-        choices=["runge-kutta", "scipy"],
+        choices=["runge-kutta", "scipy", "ida"],
         default="runge-kutta",
-        help="Solver scheme (default: runge-kutta)",
+        help="Solver scheme (default: runge-kutta). 'ida' uses SUNDIALS/IDA for DAE systems.",
     )
     sim_parser.add_argument(
         "--snapshots",

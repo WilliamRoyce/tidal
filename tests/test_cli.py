@@ -487,6 +487,36 @@ class TestSimulateCommand:
         ])
         assert ret == 0
 
+    def test_simulate_ida_scheme(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Verify IDA solver runs end-to-end on Klein-Gordon."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--scheme", "ida",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+        captured = capsys.readouterr()
+        assert "IDA solver" in captured.out
+        assert "snapshots stored" in captured.out
+
+    def test_simulate_ida_plane_wave(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """IDA with plane-wave IC should preserve amplitude."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--scheme", "ida",
+            "--ic", "plane-wave",
+            "--t-end", "1.0",
+            "--no-plot",
+        ])
+        assert ret == 0
+
     def test_simulate_custom_snapshots(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
