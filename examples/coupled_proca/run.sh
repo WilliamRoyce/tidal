@@ -12,7 +12,7 @@
 #   - Cross-field identity coupling in constraints (gcoup)
 #
 # Running this script:
-#   cd examples/coupled_proca && uv run bash run.sh
+#   cd examples/coupled_proca && bash run.sh
 #
 # Or run each step manually to learn the tidal CLI:
 #

@@ -12,7 +12,7 @@
 #
 #
 # Running this script:
-#   cd examples/coupled_scattering && uv run bash run.sh
+#   cd examples/coupled_scattering && bash run.sh
 #
 # Or run each step manually to learn the tidal CLI:
 #

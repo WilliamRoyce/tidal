@@ -1,12 +1,22 @@
 #!/usr/bin/env bash
-# Scalar Field in External Potential — Background Field Example
+# Scalar Field in External Potential 1+1D — Background Field Example
 #
-# Demonstrates the [[background_fields]] feature with two variants:
-#   1. Uniform potential: KG equation with constant mass (energy-conserving)
-#   2. Localized potential: position-dependent mass via UnitStep
+# Physics: Demonstrates the [[background_fields]] feature with a localized
+# potential well via UnitStep. A Gaussian wave packet scatters off the
+# potential boundary, producing reflected and transmitted components.
+# Position-dependent mass from the external potential V(x).
 #
-# Running:
-#   cd examples/scalar_potential_well && uv run bash run.sh
+# Running this script:
+#   cd examples/scalar_potential_well && bash run.sh
+#
+# Or run each step manually:
+#   tidal derive theory.toml
+#   tidal inspect ../data/scalar_potential_well.json
+#   tidal simulate ../data/scalar_potential_well.json --param V0=4.0 \
+#     --grid-shape 256 --bounds 0:100 --periodic --ic gaussian \
+#     --ic-component phi_0 --ic-center 15.0 --ic-width 5.0 \
+#     --t-end 20.0 --scheme scipy --output ../data/scalar_potential_well_output
+#   tidal plot ../data/scalar_potential_well_output --type heatmap --quiet
 
 set -euo pipefail
 cd "$(dirname "$0")"

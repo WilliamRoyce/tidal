@@ -7,7 +7,7 @@
 # The mixing length L_mix = pi/omega_dom characterizes the oscillation period.
 #
 # Running this script:
-#   cd examples/coupled_scalars && uv run bash run.sh
+#   cd examples/coupled_scalars && bash run.sh
 #
 # Or run each step manually to learn the tidal CLI:
 #

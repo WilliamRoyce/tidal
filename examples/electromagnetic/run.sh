@@ -1,7 +1,18 @@
 #!/usr/bin/env bash
 # Electromagnetic 1+1D — Full derive → inspect → simulate → plot pipeline
 #
-# To run manually:  cd examples/electromagnetic && tidal derive theory.toml
+# Physics: Maxwell's equations in 1+1D Lorenz gauge. A_0 is a constraint
+# (time_order=0), only A_1 is dynamical. Massless wave propagation at c=1.
+#
+# Running this script:
+#   cd examples/electromagnetic && bash run.sh
+#
+# Or run each step manually:
+#   tidal derive theory.toml
+#   tidal inspect ../data/em_1d.json
+#   tidal simulate ../data/em_1d.json --ic gaussian --ic-component A_1 \
+#     --output ../data/em_output
+#   tidal plot ../data/em_output --type amplitude --quiet
 
 set -euo pipefail
 cd "$(dirname "$0")"

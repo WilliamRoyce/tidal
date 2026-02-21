@@ -10,7 +10,19 @@
 # testing coefficient evaluation for slowly-decaying backgrounds.
 #
 # Running this script:
-#   cd examples/proca_background && uv run bash run.sh
+#   cd examples/proca_background && bash run.sh
+#
+# Or run each step manually:
+#   tidal derive theory.toml
+#   tidal inspect ../data/proca_background.json
+#   tidal simulate ../data/proca_background.json \
+#     --param mA2=1.0 --param mB2=2.0 --param gcoup=0.5 \
+#     --param g0=1.0 --param R=8.0 \
+#     --ic gaussian --ic-component A_1 --ic-amplitude 0.5 --ic-width 3.0 \
+#     --grid-shape 64 --bounds=-30:30,-30:30 --t-end 20.0 \
+#     --bc periodic,periodic --scheme scipy \
+#     --output ../data/proca_background_output
+#   tidal plot ../data/proca_background_output --type amplitude --quiet
 
 set -euo pipefail
 cd "$(dirname "$0")"

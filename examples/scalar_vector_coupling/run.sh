@@ -12,7 +12,7 @@
 # A_0 is a constraint; phi_0, A_1, A_2 are dynamical.
 #
 # Running this script:
-#   cd examples/scalar_vector_coupling && uv run bash run.sh
+#   cd examples/scalar_vector_coupling && bash run.sh
 #
 # Or run each step manually to learn the tidal CLI:
 #

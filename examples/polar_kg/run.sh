@@ -1,11 +1,21 @@
 #!/usr/bin/env bash
 # Polar Klein-Gordon 2+1D — Full derive → inspect → simulate → plot pipeline
 #
-# NOTE: The derive step uses polar coordinates (r, theta) with a coordinate-dependent
-# metric.
-# The simulation works via CLI with --bc and --ic formula flags.
+# Physics: Klein-Gordon in polar coordinates (r, θ). The coordinate-dependent
+# metric (ds² = -dt² + dr² + r²dθ²) produces position-dependent coefficients
+# and Christoffel corrections. Neumann BC in r, periodic in θ.
 #
-# To run manually:  cd examples/polar_kg
+# Running this script:
+#   cd examples/polar_kg && bash run.sh
+#
+# Or run each step manually:
+#   tidal derive theory.toml
+#   tidal inspect ../data/polar_kg.json
+#   tidal simulate ../data/polar_kg.json --param polm2=0.5 \
+#     --grid-shape 128 --bounds 0.5:10,0:6.283185 --bc neumann,periodic \
+#     --ic formula --ic-formula "np.exp(-(x - 3.0)**2 / 0.5)" \
+#     --t-end 8.0 --scheme scipy --output ../data/polar_kg_output
+#   tidal plot ../data/polar_kg_output --type amplitude --quiet
 
 set -euo pipefail
 cd "$(dirname "$0")"

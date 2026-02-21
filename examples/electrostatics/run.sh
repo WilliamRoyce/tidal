@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Electrostatics 2D example
+# Electrostatics 1+1D — Full derive → inspect → simulate pipeline
 #
-# Derives the free scalar field wave equation from a Lagrangian,
-# then demonstrates constraint-mode (Laplace equation) solving.
+# Physics: Free scalar field wave equation derived from a Lagrangian,
+# demonstrating constraint-mode (Laplace equation) solving. The wave
+# equation is ∂²φ/∂t² = ∂²φ/∂x².
 #
-# To run manually:  cd examples/electrostatics
+# Running this script:
+#   cd examples/electrostatics && bash run.sh
+#
+# Or run each step manually:
+#   tidal derive theory.toml
+#   tidal inspect ../data/electrostatics_laplace.json
+#   tidal simulate ../data/electrostatics_laplace.json \
+#     --grid-shape 64 --bounds=-5:5 --t-end 5.0 --ic gaussian --no-plot
 
 set -euo pipefail
 cd "$(dirname "$0")"

@@ -1,11 +1,24 @@
 #!/usr/bin/env bash
 # Spherical Klein-Gordon 3+1D — Full derive → inspect → simulate pipeline
 #
-# NOTE: The derive step uses spherical coordinates (r, theta, phi) with a
-# coordinate-dependent metric and trigonometric coefficient functions.
-# The simulation works via CLI with --bc and --ic formula flags.
+# Physics: Klein-Gordon in spherical coordinates (r, θ, φ). The metric
+# ds² = -dt² + dr² + r²dθ² + r²sin²θ dφ² produces trigonometric
+# coefficient functions and Christoffel corrections. Neumann in r and θ,
+# periodic in φ.
 #
-# To run manually:  cd examples/spherical_kg
+# NOTE: 3D data — tidal plot is for 1D/2D only.
+#
+# Running this script:
+#   cd examples/spherical_kg && bash run.sh
+#
+# Or run each step manually:
+#   tidal derive theory.toml
+#   tidal inspect ../data/spherical_kg.json
+#   tidal simulate ../data/spherical_kg.json --param spm2=0.5 \
+#     --grid-shape 64 --bounds 0.5:8,0.05:3.09,0:6.283185 \
+#     --bc neumann,neumann,periodic \
+#     --ic formula --ic-formula "np.exp(-(x - 3.0)**2 / 0.72)" \
+#     --t-end 5.0 --scheme scipy
 
 set -euo pipefail
 cd "$(dirname "$0")"

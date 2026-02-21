@@ -1,11 +1,23 @@
 #!/usr/bin/env bash
 # Cylindrical Klein-Gordon 3+1D — Full derive → inspect → simulate pipeline
 #
-# NOTE: The derive step uses cylindrical coordinates (r, theta, z) with a
-# coordinate-dependent metric.
-# The simulation works via CLI with --bc and --ic formula flags.
+# Physics: Klein-Gordon in cylindrical coordinates (r, θ, z). The metric
+# ds² = -dt² + dr² + r²dθ² + dz² produces Christoffel corrections and
+# position-dependent coefficients. Neumann in r and z, periodic in θ.
 #
-# To run manually:  cd examples/cylindrical_kg
+# NOTE: 3D data — tidal plot is for 1D/2D only.
+#
+# Running this script:
+#   cd examples/cylindrical_kg && bash run.sh
+#
+# Or run each step manually:
+#   tidal derive theory.toml
+#   tidal inspect ../data/cylindrical_kg.json
+#   tidal simulate ../data/cylindrical_kg.json --param cylm2=0.5 \
+#     --grid-shape 48 --bounds 0.5:8,0:6.283185,-5:5 \
+#     --bc neumann,periodic,neumann \
+#     --ic formula --ic-formula "np.exp(-((x - 3.0)**2 / 0.72) - (z**2 / 1.28))" \
+#     --t-end 4.0 --scheme scipy
 
 set -euo pipefail
 cd "$(dirname "$0")"
