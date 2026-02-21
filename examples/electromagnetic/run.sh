@@ -19,6 +19,7 @@
 #   tidal simulate ../data/em_3d.json --ic plane-wave --ic-component A_2 \
 #     --grid-shape 64 --bounds 0:50 --periodic --t-end 25.0 --scheme scipy \
 #     --output ../data/em_output
+#   tidal plot ../data/em_output --type snapshot --field A_2 --time-index -1 --quiet
 #   tidal plot ../data/em_output --type amplitude --quiet
 
 set -euo pipefail
@@ -43,6 +44,7 @@ tidal simulate ../data/em_3d.json \
   --output ../data/em_output
 
 # Visualize results (plots saved into the simulation output directory)
-tidal plot ../data/em_output --type heatmap --field A_2 --quiet
+# Note: heatmap is 1D-only; use snapshot for 2D spatial fields
+tidal plot ../data/em_output --type snapshot --field A_2 --time-index 0 --quiet
+tidal plot ../data/em_output --type snapshot --field A_2 --time-index -1 --quiet
 tidal plot ../data/em_output --type amplitude --quiet
-tidal plot ../data/em_output --type snapshot --time-index -1 --quiet
