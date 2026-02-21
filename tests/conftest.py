@@ -166,22 +166,23 @@ _COUPLED_SCALARS_SPEC: dict[str, object] = {
     },
 }
 
-_EM_1D_SPEC: dict[str, object] = {
+_EM_3D_SPEC: dict[str, object] = {
     "metadata": {
         "source": "inline-test",
-        "lagrangian_expr": "-1/4 F[-a,-b] F[a,b]",
+        "lagrangian_expr": "-1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]",
         "derived_from": "Euler-Lagrange",
         "gauge": "none",
         "linearized": False,
     },
     "spacetime": {
-        "dimension": 2,
-        "signature": [-1, 1],
-        "coordinates": ["t", "x"],
+        "dimension": 3,
+        "signature": [-1, 1, 1],
+        "coordinates": ["t", "x", "y"],
     },
     "fields": [
         {"name": "A_0", "index": 0, "is_dynamical": True},
         {"name": "A_1", "index": 1, "is_dynamical": True},
+        {"name": "A_2", "index": 2, "is_dynamical": True},
     ],
     "equations": [
         {
@@ -192,7 +193,17 @@ _EM_1D_SPEC: dict[str, object] = {
                 "terms": [
                     {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
                     {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_1"},
+                    {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_0"},
+                    {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_2"},
                 ],
+            },
+            "constraint_solver": {
+                "enabled": True,
+                "method": "auto",
+                "boundary_conditions": {
+                    "x": {"type": "periodic"},
+                    "y": {"type": "periodic"},
+                },
             },
         },
         {
@@ -202,6 +213,20 @@ _EM_1D_SPEC: dict[str, object] = {
                 "type": "linear_combination",
                 "terms": [
                     {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_0"},
+                    {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_1"},
+                    {"coefficient": -1.0, "operator": "cross_derivative_xy", "field": "A_2"},
+                ],
+            },
+        },
+        {
+            "field": "A_2",
+            "lhs": {"expression": "d2_t(A_2)", "order": {"time": 2, "space": 0}},
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_2"},
+                    {"coefficient": -1.0, "operator": "cross_derivative_xy", "field": "A_1"},
+                    {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_0"},
                 ],
             },
         },
@@ -211,13 +236,38 @@ _EM_1D_SPEC: dict[str, object] = {
         "hamiltonian_terms": [
             {
                 "coefficient": -0.5,
+                "factor_a": {"field": "A_0", "operator": "gradient_y"},
+                "factor_b": {"field": "A_0", "operator": "gradient_y"},
+            },
+            {
+                "coefficient": 0.5,
+                "factor_a": {"field": "A_1", "operator": "gradient_y"},
+                "factor_b": {"field": "A_1", "operator": "gradient_y"},
+            },
+            {
+                "coefficient": -0.5,
                 "factor_a": {"field": "A_0", "operator": "gradient_x"},
                 "factor_b": {"field": "A_0", "operator": "gradient_x"},
+            },
+            {
+                "coefficient": -1.0,
+                "factor_a": {"field": "A_1", "operator": "gradient_y"},
+                "factor_b": {"field": "A_2", "operator": "gradient_x"},
+            },
+            {
+                "coefficient": 0.5,
+                "factor_a": {"field": "A_2", "operator": "gradient_x"},
+                "factor_b": {"field": "A_2", "operator": "gradient_x"},
             },
             {
                 "coefficient": 0.5,
                 "factor_a": {"field": "A_1", "operator": "time_derivative"},
                 "factor_b": {"field": "A_1", "operator": "time_derivative"},
+            },
+            {
+                "coefficient": 0.5,
+                "factor_a": {"field": "A_2", "operator": "time_derivative"},
+                "factor_b": {"field": "A_2", "operator": "time_derivative"},
             },
         ],
         "field_rates": {
@@ -225,8 +275,12 @@ _EM_1D_SPEC: dict[str, object] = {
                 {"coefficient": 1.0, "operator": "identity", "field": "pi_1"},
                 {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"},
             ],
+            "A_2": [
+                {"coefficient": 1.0, "operator": "identity", "field": "pi_2"},
+                {"coefficient": 1.0, "operator": "gradient_y", "field": "A_0"},
+            ],
         },
-        "hamiltonian_symbolic": "-1/2*Derivative[0, 1][tidalA0][t[], x[]]^2 + Derivative[1, 0][tidalA1][t[], x[]]^2/2",
+        "hamiltonian_symbolic": "-Derivative[0, 0, 1][tidalA0][t[], x[], y[]]^2/2 + Derivative[0, 0, 1][tidalA1][t[], x[], y[]]^2/2 - Derivative[0, 1, 0][tidalA0][t[], x[], y[]]^2/2 - Derivative[0, 0, 1][tidalA1][t[], x[], y[]]*Derivative[0, 1, 0][tidalA2][t[], x[], y[]] + Derivative[0, 1, 0][tidalA2][t[], x[], y[]]^2/2 + Derivative[1, 0, 0][tidalA1][t[], x[], y[]]^2/2 + Derivative[1, 0, 0][tidalA2][t[], x[], y[]]^2/2",
     },
 }
 
@@ -311,8 +365,8 @@ def inline_coupled_scalars_json(tmp_path_factory: pytest.TempPathFactory) -> Pat
 
 @pytest.fixture(scope="session")
 def inline_em_1d_json(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    """Inline 1D EM JSON spec — A_0 constraint + A_1 dynamical (always available)."""
-    return _write_inline_json(tmp_path_factory, _EM_1D_SPEC, "em_1d.json")
+    """Inline 2+1D EM JSON spec — A_0 constraint + A_1/A_2 dynamical (always available)."""
+    return _write_inline_json(tmp_path_factory, _EM_3D_SPEC, "em_3d.json")
 
 
 @pytest.fixture(scope="session")

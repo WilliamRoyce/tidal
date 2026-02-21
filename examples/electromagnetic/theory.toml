@@ -1,8 +1,9 @@
 [theory]
 name = "Electromagnetism"
+description = "Maxwell's equations in 2+1D — plane-wave propagation"
 
 [spacetime]
-dimension = 2
+dimension = 3
 metric = "minkowski"
 
 [[fields]]
@@ -20,5 +21,15 @@ definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
 # L = -1/4 F_ab F^ab (field strength expanded via derived_fields substitution)
 expression = "-1/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d]"
 
+[constraint_solver]
+enabled = true
+method = "auto"
+
+[constraint_solver.boundary_conditions.x]
+type = "periodic"
+
+[constraint_solver.boundary_conditions.y]
+type = "periodic"
+
 [output]
-path = "../data/em_1d.json"
+path = "../data/em_3d.json"
