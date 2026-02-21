@@ -290,7 +290,9 @@ def _validate_background_fields(config: dict[str, Any]) -> None:
             msg = f"Background field '{fname}' conflicts with a dynamical [[fields]] entry"
             raise ValueError(msg)
         if fname in derived_names:
-            msg = f"Background field '{fname}' conflicts with a [[derived_fields]] entry"
+            msg = (
+                f"Background field '{fname}' conflicts with a [[derived_fields]] entry"
+            )
             raise ValueError(msg)
 
         # Require components
@@ -325,7 +327,9 @@ def _validate_background_fields(config: dict[str, Any]) -> None:
 
 
 def _validate_linearization(
-    config: dict[str, Any], *, has_lagrangian: bool = False,
+    config: dict[str, Any],
+    *,
+    has_lagrangian: bool = False,
 ) -> None:
     """Validate optional ``[linearization]`` section.
 
@@ -370,7 +374,9 @@ def _validate_linearization(
 
 
 def _validate_gauge_entry_preset(
-    i: int, entry: dict[str, Any], field_info: dict[str, Any],
+    i: int,
+    entry: dict[str, Any],
+    field_info: dict[str, Any],
 ) -> None:
     """Validate a named gauge preset against the target field type.
 
@@ -491,7 +497,10 @@ def _validate_gauge(config: dict[str, Any]) -> None:
 
     for i, entry in enumerate(gauge_list):
         field_name, gauge_type = _validate_gauge_entry_common(
-            i, entry, field_map, seen_fields,
+            i,
+            entry,
+            field_map,
+            seen_fields,
         )
 
         if gauge_type in _GAUGE_PRESETS:
@@ -828,7 +837,10 @@ def _needs_bg_tensor(config: dict[str, Any]) -> bool:
 
 
 def _wls_background_component_values(
-    field: dict[str, Any], prefix: str, chart: str, dim: int,
+    field: dict[str, Any],
+    prefix: str,
+    chart: str,
+    dim: int,
 ) -> list[str]:
     """Generate ``ComponentValue`` lines for a single background field."""
     comps: list[int | float | str] = field.get("components", [])
@@ -840,9 +852,7 @@ def _wls_background_component_values(
         lines.append(f"ComponentValue[{prefixed}[], {comps[0]}];")
     elif ftype == "vector":
         for idx, val in enumerate(comps):
-            lines.append(
-                f"ComponentValue[{prefixed}[{{{idx}, -{chart}}}], {val}];"
-            )
+            lines.append(f"ComponentValue[{prefixed}[{{{idx}, -{chart}}}], {val}];")
     else:
         # Tensor rank 2+: iterate over all index tuples
         rank = field.get("rank", 2)
@@ -860,7 +870,8 @@ def _wls_background_component_values(
 
 
 def _wls_validate_backgrounds_after_decompose(
-    ctx: _WlsContext, comp_var: str,
+    ctx: _WlsContext,
+    comp_var: str,
 ) -> list[str]:
     """Generate validation that vector/tensor backgrounds resolved after ToBasis.
 
@@ -871,9 +882,7 @@ def _wls_validate_backgrounds_after_decompose(
     Only emitted when there are non-scalar background fields (scalars use
     explicit ReplaceAll, so they're always resolved).
     """
-    non_scalar_bgs = [
-        f for f in ctx.background_fields if f["type"] != "scalar"
-    ]
+    non_scalar_bgs = [f for f in ctx.background_fields if f["type"] != "scalar"]
     if not non_scalar_bgs:
         return []
 
@@ -887,7 +896,8 @@ def _wls_validate_backgrounds_after_decompose(
 
 
 def _wls_scalar_background_substitution(
-    ctx: _WlsContext, eom_var: str,
+    ctx: _WlsContext,
+    eom_var: str,
 ) -> list[str]:
     """Generate explicit ``ReplaceAll`` for scalar background fields.
 
@@ -907,15 +917,18 @@ def _wls_scalar_background_substitution(
         if not comps:
             continue
         value = comps[0]
-        lines.extend((
-            f"(* Substitute scalar background {field['name']} -> {value} *)",
-            f"{eom_var} = {eom_var} /. {{{prefixed}[] -> {value}}};",
-        ))
+        lines.extend(
+            (
+                f"(* Substitute scalar background {field['name']} -> {value} *)",
+                f"{eom_var} = {eom_var} /. {{{prefixed}[] -> {value}}};",
+            )
+        )
     return lines
 
 
 def _wls_vector_background_substitution(
-    ctx: _WlsContext, comp_var: str,
+    ctx: _WlsContext,
+    comp_var: str,
 ) -> list[str]:
     """Generate explicit ``ReplaceAll`` for vector/tensor background fields.
 
@@ -930,9 +943,7 @@ def _wls_vector_background_substitution(
     diagonal metrics (Minkowski); non-diagonal metrics would need metric
     factors for index raising/lowering.
     """
-    non_scalar_bgs = [
-        f for f in ctx.background_fields if f["type"] != "scalar"
-    ]
+    non_scalar_bgs = [f for f in ctx.background_fields if f["type"] != "scalar"]
     if not non_scalar_bgs:
         return []
 
@@ -946,10 +957,12 @@ def _wls_vector_background_substitution(
         rules: list[str] = []
         if field["type"] == "vector":
             for idx, val in enumerate(comps):
-                rules.extend((
-                    f"{prefixed}[{{{idx}, -{ctx.chart}}}] -> {val}",
-                    f"{prefixed}[{{{idx}, {ctx.chart}}}] -> {val}",
-                ))
+                rules.extend(
+                    (
+                        f"{prefixed}[{{{idx}, -{ctx.chart}}}] -> {val}",
+                        f"{prefixed}[{{{idx}, {ctx.chart}}}] -> {val}",
+                    )
+                )
         else:
             # Tensor rank 2+: iterate over all index tuples
             rank = field.get("rank", 2)
@@ -962,16 +975,20 @@ def _wls_vector_background_substitution(
                 multi_idx.reverse()
                 idx_down = ", ".join(f"{{{k}, -{ctx.chart}}}" for k in multi_idx)
                 idx_up = ", ".join(f"{{{k}, {ctx.chart}}}" for k in multi_idx)
-                rules.extend((
-                    f"{prefixed}[{idx_down}] -> {val}",
-                    f"{prefixed}[{idx_up}] -> {val}",
-                ))
+                rules.extend(
+                    (
+                        f"{prefixed}[{idx_down}] -> {val}",
+                        f"{prefixed}[{idx_up}] -> {val}",
+                    )
+                )
 
         rules_str = ", ".join(rules)
-        lines.extend([
-            f"(* Substitute vector/tensor background {field['name']} *)",
-            f"{comp_var} = {comp_var} /. {{{rules_str}}};",
-        ])
+        lines.extend(
+            [
+                f"(* Substitute vector/tensor background {field['name']} *)",
+                f"{comp_var} = {comp_var} /. {{{rules_str}}};",
+            ]
+        )
 
     return lines
 
@@ -991,7 +1008,9 @@ def _wls_fields(ctx: _WlsContext, *, include_bg: bool = False) -> list[str]:
 
     # Background fields — non-dynamical tensors (not varied by VarD)
     if ctx.background_fields:
-        lines.append("(* Background fields — non-dynamical (not varied in Euler-Lagrange) *)")
+        lines.append(
+            "(* Background fields — non-dynamical (not varied in Euler-Lagrange) *)"
+        )
         for field in ctx.background_fields:
             lines.extend((_generate_field_def(field, ctx.prefix, ctx.manifold), ""))
             # Set component values via xCoba's ComponentValue mechanism.
@@ -1005,17 +1024,19 @@ def _wls_fields(ctx: _WlsContext, *, include_bg: bool = False) -> list[str]:
 
     if include_bg:
         bg_name = f"{ctx.prefix}Bg"
-        lines.extend([
-            "(* Background/reference metric — not perturbed by xPert *)",
-            f"If[!xTensorQ[{bg_name}],",
-            f'  DefTensor[{bg_name}[-a, -b], {ctx.manifold}, Symmetric[{{-a, -b}}], PrintAs -> "bg"]',
-            "];",
-            "(* Explicit zero perturbation: bg is non-dynamical *)",
-            "Unprotect[Perturbation];",
-            f"Perturbation[{bg_name}[__], ___] := 0;",
-            "Protect[Perturbation];",
-            "",
-        ])
+        lines.extend(
+            [
+                "(* Background/reference metric — not perturbed by xPert *)",
+                f"If[!xTensorQ[{bg_name}],",
+                f'  DefTensor[{bg_name}[-a, -b], {ctx.manifold}, Symmetric[{{-a, -b}}], PrintAs -> "bg"]',
+                "];",
+                "(* Explicit zero perturbation: bg is non-dynamical *)",
+                "Unprotect[Perturbation];",
+                f"Perturbation[{bg_name}[__], ___] := 0;",
+                "Protect[Perturbation];",
+                "",
+            ]
+        )
 
     return lines
 
@@ -1095,15 +1116,28 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
     return lines
 
 
-def _wls_linearize_lagrangian(
-    ctx: _WlsContext, *, include_bg: bool = False,
+def _wls_linearize_from_lagrangian(
+    ctx: _WlsContext,
+    *,
+    include_bg: bool = False,
 ) -> list[str]:
-    """Preprocess Lagrangian: perturb to 2nd order for linearized theory.
+    """Lagrangian-first linearization: L → L^(2) → EOM + canonical from L^(2).
 
-    Overwrites ``{prefix}Lagrangian`` with the quadratic Lagrangian
-    ``L^(2) = Perturbation[L, 2] / 2`` using xPert 2nd-order perturbation.
-    After this, the standard EL and canonical pipelines run unchanged on
-    ``L^(2)`` — a scalar Lagrangian quadratic in the perturbation field.
+    Single-path approach using xPert's 2nd-order perturbation:
+
+    1. ``Perturbation[L, 2] / 2`` → L^(2) (quadratic Lagrangian).
+       xPert correctly perturbs all metric-dependent objects (Christoffels,
+       Ricci tensor, etc.) *before* evaluating on the flat background, so
+       L^(2) retains the full linearized Einstein tensor contribution even
+       though R₀ = 0 on Minkowski.
+
+    2. Expand ``Scalar[x]^n`` → ``∏ Scalar[RenameDummies[x]]`` so that VarD
+       can vary through each copy independently (fixes the index-collision
+       problem from Fierz-Pauli trace-squared terms).
+
+    3. ``VarD[H[-a,-b], CD][L^(2)]`` → correct linearized EOM.
+
+    4. Same L^(2) serves the canonical pipeline (momenta π, Hamiltonian H).
 
     Valid for flat Minkowski background where ``√(-g₀) = 1`` and ``L₀ = 0``
     (Brizuela, Martín-García, Mena Marugán 2009; Carroll 2004, Ch. 7).
@@ -1114,62 +1148,137 @@ def _wls_linearize_lagrangian(
         If ``ctx.linearization`` is ``None``.
     """
     if ctx.linearization is None:
-        msg = "_wls_linearize_lagrangian called without linearization config"
+        msg = "_wls_linearize_from_lagrangian called without linearization config"
         raise ValueError(msg)
     lin = ctx.linearization
     pert_field_name = lin["perturbation_field"]
+    pert_field = next(f for f in ctx.fields if f["name"] == pert_field_name)
+    fexpr = _field_expression(pert_field, ctx.prefix)
+
     pert_sym = f"{ctx.prefix}hpert"
     eps_sym = f"{ctx.prefix}Epsilon"
     field_head = f"{ctx.prefix}{pert_field_name.capitalize()}"
     bg_name = f"{ctx.prefix}Bg"
+    ricci_sym = f"Ricci{ctx.cd}"
+    ricci_scalar_sym = f"RicciScalar{ctx.cd}"
 
+    p = ctx.prefix
+
+    # ------------------------------------------------------------------
+    # Step 1: L^(2) = Perturbation[L, 2] / 2 via xPert
+    # ------------------------------------------------------------------
     lines: list[str] = [
         "",
-        "(* === Linearization: L → L^(2) via 2nd-order xPert === *)",
-        f"(* Perturbing metric: {ctx.metric} → {ctx.metric} + ε·{pert_field_name} *)",
+        "(* ============================================================ *)",
+        "(* Lagrangian-first linearization (single-path via L^(2))       *)",
+        "(* L -> L^(2) = Perturbation[L, 2] / 2  (xPert 2nd-order)     *)",
+        "(* Then: VarD[H, CD][L^(2)] -> linearized EOM                   *)",
+        "(* Same L^(2) feeds canonical pipeline (pi, H)                  *)",
+        "(* ============================================================ *)",
         "",
-        "(* Set up metric perturbation via xPert *)",
+        "(* Save original nonlinear Lagrangian *)",
+        f"lOriginal = {p}Lagrangian;",
+        "",
+        "(* Set up metric perturbation: g = eta + epsilon * h  via xPert *)",
         f"{pert_sym}Tensor = SetupMetricPerturbation[{ctx.metric}, {pert_sym}, {eps_sym}];",
-        f'Print["Metric perturbation set up: {ctx.metric} → {ctx.metric} + {eps_sym}·{pert_field_name}"];',
+        f'Print["Perturbation: {ctx.metric} -> {ctx.metric} + {eps_sym} * {pert_field_name}"];',
         "",
-        "(* 2nd-order perturbation of scalar Lagrangian *)",
-        "(* δ²L / 2 gives the quadratic Lagrangian for the perturbation field *)",
-        "(* Valid because: √(-g₀)=1 for Minkowski; L₀=0 on flat background *)",
-        f"l2Raw = Perturbation[{ctx.prefix}Lagrangian, 2];",
+        "(* 2nd-order perturbation of Lagrangian *)",
+        "(* xPert perturbs curvature tensors symbolically BEFORE evaluating *)",
+        "(* on flat background, so L^(2) retains linearized Einstein tensor *)",
+        "l2Raw = Perturbation[lOriginal, 2];",
         "l2Raw = ExpandPerturbation[l2Raw];",
+        'Print["L^(2) raw (expanded): ", Short[l2Raw, 3]];',
         "",
-        "(* Validate that xPert fully expanded all Perturbation[] wrappers *)",
+        "(* Validate that xPert fully expanded *)",
         "If[!FreeQ[l2Raw, Perturbation],",
-        '  Throw["Linearization: ExpandPerturbation did not fully expand. '
-        'Unexpanded Perturbation[] wrappers remain."]',
+        '  Throw["Linearization: ExpandPerturbation did not fully expand L^(2)."]',
         "];",
         "",
-        "(* Replace xPert perturbation notation with declared field tensor *)",
+        "(* Drop 2nd-order metric perturbation h^(2) -- keep h^(1)*h^(1) only *)",
+        f"l2Raw = l2Raw /. {pert_sym}[LI[2], idx__] :> 0;",
+        "",
+        "(* Replace xPert notation with declared field tensor *)",
         f"l2Raw = l2Raw /. {pert_sym}[LI[1], idx__] :> {field_head}[idx];",
     ]
 
-    # Replace bg → background metric if bg tensor is used
+    # Replace bg → metric if bg tensor is used
     if include_bg:
-        lines.extend([
-            "",
-            "(* Replace reference metric bg → background metric *)",
-            f"l2Raw = l2Raw /. {bg_name} -> {ctx.metric};",
-        ])
+        lines.extend(
+            [
+                "",
+                "(* Replace reference metric bg -> background metric *)",
+                f"l2Raw = l2Raw /. {bg_name} -> {ctx.metric};",
+            ]
+        )
 
-    # Scalar BG substitutions (e.g., position-dependent couplings)
+    # Scalar BG substitutions
     lines.extend(_wls_scalar_background_substitution(ctx, "l2Raw"))
 
-    lines.extend([
-        "",
-        "(* Canonical simplifications *)",
-        "l2Raw = ToCanonical[l2Raw];",
-        f"l2Raw = ContractMetric[l2Raw, {ctx.metric}];",
-        "",
-        "(* Overwrite Lagrangian with quadratic L^(2) = δ²L / 2 *)",
-        f"{ctx.prefix}Lagrangian = l2Raw / 2;",
-        f'Print["Quadratic Lagrangian L^(2): ", Short[{ctx.prefix}Lagrangian, 5]];',
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "(* Set background curvature to zero (flat Minkowski) *)",
+            f"l2Raw = l2Raw /. {{{ricci_sym}[__] :> 0, {ricci_scalar_sym}[] :> 0}};",
+            "",
+            "(* Canonical simplifications *)",
+            "l2Raw = ToCanonical[l2Raw];",
+            f"l2Raw = ContractMetric[l2Raw, {ctx.metric}];",
+            "",
+            "(* L^(2) = delta^2 L / 2 *)",
+            f"{p}Lagrangian = l2Raw / 2;",
+            f'Print["L^(2) set: ", Short[{p}Lagrangian, 5]];',
+            "",
+        ]
+    )
+
+    # ------------------------------------------------------------------
+    # Step 2: EOM via VarD[H[-a,-b], CD][L^(2)]
+    # ------------------------------------------------------------------
+    lines.extend(
+        [
+            "(* ------------------------------------------------------------ *)",
+            "(* EOM: VarD[H[-a,-b], CD][L^(2)]                              *)",
+            "(* ------------------------------------------------------------ *)",
+            "",
+            "(* Expand Scalar[x]^n into products with renamed dummies.       *)",
+            "(* This fixes VarD index collision from Fierz-Pauli (tr h)^2:   *)",
+            "(*   Scalar[eta^ab H_ab]^2 -> Scalar[eta^ab H_ab]*Scalar[eta^cd H_cd] *)",
+            f"l2ForVarD = {p}Lagrangian;",
+            "l2ForVarD = l2ForVarD //. Scalar[x_]^n_Integer?Positive :>",
+            "  Times @@ Table[Scalar[RenameDummies[x]], {n}];",
+            'Print["L^(2) for VarD (Scalar expanded): ", Short[l2ForVarD, 5]];',
+            "",
+            "(* Vary L^(2) with respect to perturbation field H *)",
+            f"eomLin = VarD[{field_head}[-a, -b], {ctx.cd}][l2ForVarD];",
+            "eomLin = ToCanonical[eomLin];",
+            f"eomLin = ContractMetric[eomLin, {ctx.metric}];",
+            'Print["Linearized EOM: ", Short[eomLin, 5]];',
+            "",
+        ]
+    )
+
+    lines.extend(
+        [
+            "(* Decompose to components *)",
+            f'componentEqs = DecomposeToComponents[eomLin, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {p}MetricMatrix];',
+            'Print["Components: ", Length[componentEqs]];',
+        ]
+    )
+    lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
+    lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
+
+    # Build fieldEquations table
+    lines.extend(
+        [
+            "",
+            "fieldEquations = Table[",
+            f'  {{"{pert_field_name}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
+            "  {k, Length[componentEqs]}",
+            "];",
+            "",
+        ]
+    )
 
     return lines
 
@@ -1210,19 +1319,23 @@ def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
             lines.append(
                 f"{ctx.prefix}GaugeTerm = {builder}[{pfx_field}, {ctx.metric}, {ctx.cd}, {xi}];"
             )
-        lines.extend((
-            f"{ctx.prefix}Lagrangian = AddGaugeFixingTerm["
-            f"{ctx.prefix}Lagrangian, {ctx.prefix}GaugeTerm];",
-            f"{ctx.prefix}Lagrangian = ToCanonical[{ctx.prefix}Lagrangian];",
-            f"{ctx.prefix}Lagrangian = ContractMetric[{ctx.prefix}Lagrangian, {ctx.metric}];",
-            f'Print["Gauge-fixed Lagrangian '
-            f'({entry["type"]} on {field_name}): ", {ctx.prefix}Lagrangian];',
-            "",
-        ))
+        lines.extend(
+            (
+                f"{ctx.prefix}Lagrangian = AddGaugeFixingTerm["
+                f"{ctx.prefix}Lagrangian, {ctx.prefix}GaugeTerm];",
+                f"{ctx.prefix}Lagrangian = ToCanonical[{ctx.prefix}Lagrangian];",
+                f"{ctx.prefix}Lagrangian = ContractMetric[{ctx.prefix}Lagrangian, {ctx.metric}];",
+                f'Print["Gauge-fixed Lagrangian '
+                f'({entry["type"]} on {field_name}): ", {ctx.prefix}Lagrangian];',
+                "",
+            )
+        )
     return lines
 
 
-def _type_b_zero_component(comp_name: str, field_name: str, gauge_type: str) -> list[str]:
+def _type_b_zero_component(
+    comp_name: str, field_name: str, gauge_type: str
+) -> list[str]:
     """Generate WLS to substitute a component and its derivatives with zero.
 
     Used by temporal gauge (``A_0 = 0``) and axial gauge (``A_n = 0``).
@@ -1237,7 +1350,9 @@ def _type_b_zero_component(comp_name: str, field_name: str, gauge_type: str) -> 
 
 
 def _type_b_coulomb_constraint(
-    ctx: _WlsContext, field_name: str, comp_pfx: str,
+    ctx: _WlsContext,
+    field_name: str,
+    comp_pfx: str,
 ) -> list[str]:
     """Generate WLS to add a Coulomb gauge constraint (spatial divergence = 0).
 
@@ -1287,7 +1402,9 @@ def _wls_gauge_fixing_type_b(ctx: _WlsContext) -> list[str]:
         elif gauge_type == "axial":
             last_spatial = ctx.dim - 1
             lines.extend(
-                _type_b_zero_component(f"{comp_pfx}{last_spatial}", field_name, "axial"),
+                _type_b_zero_component(
+                    f"{comp_pfx}{last_spatial}", field_name, "axial"
+                ),
             )
         elif gauge_type == "coulomb":
             lines.extend(_type_b_coulomb_constraint(ctx, field_name, comp_pfx))
@@ -1373,28 +1490,30 @@ def _wls_euler_lagrange_single(ctx: _WlsContext) -> list[str]:
     # Scalar background fields need explicit substitution (ToBasis won't touch them)
     lines.extend(_wls_scalar_background_substitution(ctx, "eom"))
 
-    lines.extend([
-        "(* Step 5: Decompose to components *)",
-        f'componentEqs = DecomposeToComponents[eom, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
-        'Print["Components: ", Length[componentEqs]];',
-    ])
+    lines.extend(
+        [
+            "(* Step 5: Decompose to components *)",
+            f'componentEqs = DecomposeToComponents[eom, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
+            'Print["Components: ", Length[componentEqs]];',
+        ]
+    )
     lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
     lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
-    lines.extend([
-        "",
-        "fieldEquations = Table[",
-        f'  {{"{fname}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
-        "  {k, Length[componentEqs]}",
-        "];",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "fieldEquations = Table[",
+            f'  {{"{fname}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
+            "  {k, Length[componentEqs]}",
+            "];",
+            "",
+        ]
+    )
 
     return lines
 
 
-def _wls_linearization(
-    ctx: _WlsContext, *, include_bg: bool = False
-) -> list[str]:
+def _wls_linearization(ctx: _WlsContext, *, include_bg: bool = False) -> list[str]:
     """Generate xPert linearization, decomposition, and export lines.
 
     Raises
@@ -1440,33 +1559,39 @@ def _wls_linearization(
 
     # Replace bg tensor with metric (bg = background metric by construction)
     if include_bg:
-        lines.extend((
-            "(* Replace bg with metric — bg is the background by construction *)",
-            f"linExprPlain = linExprPlain /. {bg_name} -> {ctx.metric};",
-        ))
+        lines.extend(
+            (
+                "(* Replace bg with metric — bg is the background by construction *)",
+                f"linExprPlain = linExprPlain /. {bg_name} -> {ctx.metric};",
+            )
+        )
 
     lines.append("linExprPlain = Simplify[linExprPlain];")
 
     # Scalar background fields need explicit substitution (ToBasis won't touch them)
     lines.extend(_wls_scalar_background_substitution(ctx, "linExprPlain"))
 
-    lines.extend([
-        'Print["Converted to plain tensor: ", Short[linExprPlain, 3]];',
-        "",
-        "(* Step 5: Decompose to components *)",
-        f'componentEqs = DecomposeToComponents[linExprPlain, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
-        'Print["Components: ", Length[componentEqs]];',
-    ])
+    lines.extend(
+        [
+            'Print["Converted to plain tensor: ", Short[linExprPlain, 3]];',
+            "",
+            "(* Step 5: Decompose to components *)",
+            f'componentEqs = DecomposeToComponents[linExprPlain, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
+            'Print["Components: ", Length[componentEqs]];',
+        ]
+    )
     lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
     lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
-    lines.extend([
-        "",
-        "fieldEquations = Table[",
-        f'  {{"{pert_field_name}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
-        "  {k, Length[componentEqs]}",
-        "];",
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "fieldEquations = Table[",
+            f'  {{"{pert_field_name}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
+            "  {k, Length[componentEqs]}",
+            "];",
+            "",
+        ]
+    )
 
     return lines
 
@@ -1575,73 +1700,77 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
     # Apply scalar BG substitutions before decomposition
     lines.extend(_wls_scalar_background_substitution(ctx, "lagForCanon"))
 
-    lines.extend([
-        "",
-        "(* Decompose Lagrangian to component form *)",
-        f"lagComp = DecomposeScalarExpression[lagForCanon, {ctx.chart}, {{{all_heads_str}}}, "
-        f'"MetricMatrix" -> {p}MetricMatrix];',
-    ])
+    lines.extend(
+        [
+            "",
+            "(* Decompose Lagrangian to component form *)",
+            f"lagComp = DecomposeScalarExpression[lagForCanon, {ctx.chart}, {{{all_heads_str}}}, "
+            f'"MetricMatrix" -> {p}MetricMatrix];',
+        ]
+    )
 
     # Apply vector BG substitutions after decomposition
     lines.extend(_wls_vector_background_substitution(ctx, "lagComp"))
 
-    lines.extend([
-        'Print["L (components): ", Short[lagComp, 5]];',
-        "",
-        "(* Build velocity-order pattern: {1, 0, ...} for d_t *)",
-        f"coordSyms = ScalarsOfChart[{ctx.chart}];",
-        "nCoords = Length[coordSyms];",
-        "velOrders = Table[If[i == 1, 1, 0], {i, nCoords}];",
-        "",
-        "(* Normalize all Derivative arities to full dimension.  *)",
-        "(* ConvertCDToDerivatives may produce mixed arities     *)",
-        "(* (e.g. Derivative[1,0] and Derivative[0,0,1] in 2+1D) *)",
-        "(* which causes D[] to fail matching. Pad to nCoords.   *)",
-        "lagComp = lagComp /. Derivative[orders__][g_][args__] /;",
-        "  Length[{orders}] < nCoords :>",
-        "  Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
-        "",
-        "(* Map component names to Wolfram function symbols *)",
-        "compToFunc = <||>;",
-    ])
+    lines.extend(
+        [
+            'Print["L (components): ", Short[lagComp, 5]];',
+            "",
+            "(* Build velocity-order pattern: {1, 0, ...} for d_t *)",
+            f"coordSyms = ScalarsOfChart[{ctx.chart}];",
+            "nCoords = Length[coordSyms];",
+            "velOrders = Table[If[i == 1, 1, 0], {i, nCoords}];",
+            "",
+            "(* Normalize all Derivative arities to full dimension.  *)",
+            "(* ConvertCDToDerivatives may produce mixed arities     *)",
+            "(* (e.g. Derivative[1,0] and Derivative[0,0,1] in 2+1D) *)",
+            "(* which causes D[] to fail matching. Pad to nCoords.   *)",
+            "lagComp = lagComp /. Derivative[orders__][g_][args__] /;",
+            "  Length[{orders}] < nCoords :>",
+            "  Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
+            "",
+            "(* Map component names to Wolfram function symbols *)",
+            "compToFunc = <||>;",
+        ]
+    )
 
     # Build component-to-function mapping from Python field definitions
     for field in ctx.fields:
         fname = field["name"]
         head = f"{p}{fname.capitalize()}"
         n_comps = _field_component_count(field, ctx.dim)
-        lines.extend(
-            f'compToFunc["{fname}_{j}"] = {head}{j};' for j in range(n_comps)
-        )
+        lines.extend(f'compToFunc["{fname}_{j}"] = {head}{j};' for j in range(n_comps))
 
-    lines.extend([
-        "",
-        "(* Compute canonical momenta: pi_i = dL/d(d_t q_i) *)",
-        "allCompNames = fieldEquations[[All, 1]];",
-        "piCompList = {};",
-        "canonicalH = 0;",
-        "Do[",
-        "  Module[{compName, compFunc, vel, piComp},",
-        "    compName = allCompNames[[k]];",
-        "    compFunc = compToFunc[compName];",
-        "    vel = Derivative[Sequence @@ velOrders][compFunc][Sequence @@ coordSyms];",
-        "    piComp = D[lagComp, vel];",
-        "    AppendTo[piCompList, {compName, piComp}];",
-        "    canonicalH += piComp * vel;",
-        '    Print["pi(", compName, "): ", piComp];',
-        "  ],",
-        "  {k, Length[allCompNames]}",
-        "];",
-        "",
-        "(* Legendre transform: H = Sigma pi_i * vel_i - L *)",
-        "canonicalH = Expand[canonicalH - lagComp];",
-        'Print["H (components): ", Short[canonicalH, 5]];',
-        "",
-        "(* Parse H into structured quadratic terms *)",
-        "hamiltonianTerms = ParseHamiltonianExpression[canonicalH, allCompNames];",
-        'Print["Hamiltonian terms: ", Length[hamiltonianTerms]];',
-        "",
-    ])
+    lines.extend(
+        [
+            "",
+            "(* Compute canonical momenta: pi_i = dL/d(d_t q_i) *)",
+            "allCompNames = fieldEquations[[All, 1]];",
+            "piCompList = {};",
+            "canonicalH = 0;",
+            "Do[",
+            "  Module[{compName, compFunc, vel, piComp},",
+            "    compName = allCompNames[[k]];",
+            "    compFunc = compToFunc[compName];",
+            "    vel = Derivative[Sequence @@ velOrders][compFunc][Sequence @@ coordSyms];",
+            "    piComp = D[lagComp, vel];",
+            "    AppendTo[piCompList, {compName, piComp}];",
+            "    canonicalH += piComp * vel;",
+            '    Print["pi(", compName, "): ", piComp];',
+            "  ],",
+            "  {k, Length[allCompNames]}",
+            "];",
+            "",
+            "(* Legendre transform: H = Sigma pi_i * vel_i - L *)",
+            "canonicalH = Expand[canonicalH - lagComp];",
+            'Print["H (components): ", Short[canonicalH, 5]];',
+            "",
+            "(* Parse H into structured quadratic terms *)",
+            "hamiltonianTerms = ParseHamiltonianExpression[canonicalH, allCompNames];",
+            'Print["Hamiltonian terms: ", Length[hamiltonianTerms]];',
+            "",
+        ]
+    )
     return lines
 
 
@@ -1664,58 +1793,60 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
     lines: list[str] = _wls_canonical_hamiltonian(ctx, all_heads_str)
 
     # Compute Hamilton's field rates from piCompList (set by _wls_canonical_hamiltonian)
-    lines.extend([
-        "(* Compute Hamilton's 1st equation: dq_i/dt = vel_i(pi, fields) *)",
-        "canonicalFieldRates = <||>;",
-        "",
-        "Do[",
-        "  Module[{compName, piComp, compFunc, vel, spatialRate, piIdx, piTerm, spatialTerms},",
-        "    compName = allCompNames[[k]];",
-        "    piComp = piCompList[[k, 2]];",
-        "    compFunc = compToFunc[compName];",
-        "    vel = Derivative[Sequence @@ velOrders][compFunc][Sequence @@ coordSyms];",
-        "    spatialRate = Expand[vel - piComp];",
-        "",
-        "    (* Warn if spatialRate for DYNAMICAL fields still contains time    *)",
-        "    (* derivatives — indicates non-unit kinetic coefficient.              *)",
-        "    (* Skip for constraints (time_order=0) where pi=0 so vel-pi = vel. *)",
-        "    If[DetectLHSTimeOrder[fieldEquations[[k, 2]], compName] >= 2 &&",
-        "       !FreeQ[spatialRate, Derivative[n_, ___][_][___] /; n > 0],",
-        '      Print["WARNING: Field rate for ", compName,',
-        '        " contains time derivatives (non-unit kinetic coefficient). ",',
-        '        "Field rate may be incorrect."]',
-        "    ];",
-        "",
-        "    piIdx = k - 1;  (* 0-indexed *)",
-        '    piTerm = <|"coefficient" -> 1.0, "operator" -> "identity",',
-        '              "field" -> "pi_" <> ToString[piIdx]|>;',
-        "",
-        "    (* Only compute field rates for dynamical fields (time_order >= 2) *)",
-        "    If[DetectLHSTimeOrder[fieldEquations[[k, 2]], compName] >= 2,",
-        "      If[spatialRate === 0,",
-        "        canonicalFieldRates[compName] = {piTerm},",
-        "        spatialTerms = ParseMultiFieldRHS[spatialRate, compName, allCompNames];",
-        "        canonicalFieldRates[compName] = Prepend[spatialTerms, piTerm]",
-        "      ]",
-        "    ];",
-        '    Print["Field rate ", compName, ": ",',
-        "      If[KeyExistsQ[canonicalFieldRates, compName],",
-        '        canonicalFieldRates[compName], "(constraint - no rate)"]];',
-        "  ],",
-        "  {k, Length[allCompNames]}",
-        "];",
-        "",
-        "(* Inject canonical structure into JSON *)",
-        'jsonStructure["canonical"] = <|',
-        '  "hamiltonian_terms" -> hamiltonianTerms,',
-        '  "field_rates" -> canonicalFieldRates,',
-        '  "hamiltonian_symbolic" -> ToString[canonicalH, InputForm]',
-        "|>;",
-        "",
-        'Print["Canonical structure injected into JSON."];',
-        'Print[""];',
-        "",
-    ])
+    lines.extend(
+        [
+            "(* Compute Hamilton's 1st equation: dq_i/dt = vel_i(pi, fields) *)",
+            "canonicalFieldRates = <||>;",
+            "",
+            "Do[",
+            "  Module[{compName, piComp, compFunc, vel, spatialRate, piIdx, piTerm, spatialTerms},",
+            "    compName = allCompNames[[k]];",
+            "    piComp = piCompList[[k, 2]];",
+            "    compFunc = compToFunc[compName];",
+            "    vel = Derivative[Sequence @@ velOrders][compFunc][Sequence @@ coordSyms];",
+            "    spatialRate = Expand[vel - piComp];",
+            "",
+            "    (* Warn if spatialRate for DYNAMICAL fields still contains time    *)",
+            "    (* derivatives — indicates non-unit kinetic coefficient.              *)",
+            "    (* Skip for constraints (time_order=0) where pi=0 so vel-pi = vel. *)",
+            "    If[DetectLHSTimeOrder[fieldEquations[[k, 2]], compName] >= 2 &&",
+            "       !FreeQ[spatialRate, Derivative[n_, ___][_][___] /; n > 0],",
+            '      Print["WARNING: Field rate for ", compName,',
+            '        " contains time derivatives (non-unit kinetic coefficient). ",',
+            '        "Field rate may be incorrect."]',
+            "    ];",
+            "",
+            "    piIdx = k - 1;  (* 0-indexed *)",
+            '    piTerm = <|"coefficient" -> 1.0, "operator" -> "identity",',
+            '              "field" -> "pi_" <> ToString[piIdx]|>;',
+            "",
+            "    (* Only compute field rates for dynamical fields (time_order >= 2) *)",
+            "    If[DetectLHSTimeOrder[fieldEquations[[k, 2]], compName] >= 2,",
+            "      If[spatialRate === 0,",
+            "        canonicalFieldRates[compName] = {piTerm},",
+            "        spatialTerms = ParseMultiFieldRHS[spatialRate, compName, allCompNames];",
+            "        canonicalFieldRates[compName] = Prepend[spatialTerms, piTerm]",
+            "      ]",
+            "    ];",
+            '    Print["Field rate ", compName, ": ",',
+            "      If[KeyExistsQ[canonicalFieldRates, compName],",
+            '        canonicalFieldRates[compName], "(constraint - no rate)"]];',
+            "  ],",
+            "  {k, Length[allCompNames]}",
+            "];",
+            "",
+            "(* Inject canonical structure into JSON *)",
+            'jsonStructure["canonical"] = <|',
+            '  "hamiltonian_terms" -> hamiltonianTerms,',
+            '  "field_rates" -> canonicalFieldRates,',
+            '  "hamiltonian_symbolic" -> ToString[canonicalH, InputForm]',
+            "|>;",
+            "",
+            'Print["Canonical structure injected into JSON."];',
+            'Print[""];',
+            "",
+        ]
+    )
 
     return lines
 
@@ -1760,9 +1891,9 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
         gauge_parts: list[str] = []
         for g in ctx.gauge:
             if g["type"] == "custom":
-                gauge_parts.append(f'custom({g["field"]})')
+                gauge_parts.append(f"custom({g['field']})")
             else:
-                gauge_parts.append(f'{g["type"]}({g["field"]})')
+                gauge_parts.append(f"{g['type']}({g['field']})")
         gauge_val = "+".join(gauge_parts)
     else:
         gauge_val = "none"
@@ -1923,16 +2054,17 @@ def generate_wls(
     lines.extend(_wls_derived_fields(ctx))
 
     if is_linearization and ctx.lagrangian_expr:
-        # Lagrangian-first linearization: L → L^(2) → standard EL pipeline
+        # Lagrangian-first linearization: single-path via L^(2)
+        # L -> L^(2) = Perturbation[L,2]/2 -> VarD[H,CD][L^(2)] -> EOM
+        # Same L^(2) feeds canonical pipeline (pi, H)
         lines.extend(_wls_lagrangian(ctx))
         lines.extend(
-            _wls_linearize_lagrangian(ctx, include_bg=_needs_bg_tensor(config))
+            _wls_linearize_from_lagrangian(
+                ctx,
+                include_bg=_needs_bg_tensor(config),
+            )
         )
-        # Standard EL on the quadratic Lagrangian L^(2)
-        if ctx.is_multi:
-            lines.extend(_wls_euler_lagrange_multi(ctx))
-        else:
-            lines.extend(_wls_euler_lagrange_single(ctx))
+        # EOM computed inside _wls_linearize_from_lagrangian
     elif is_linearization:
         # Legacy: direct EOM linearization (deprecated — no [lagrangian])
         lines.extend(_wls_linearization(ctx, include_bg=_needs_bg_tensor(config)))

@@ -706,6 +706,351 @@ class TestCanonicalHamiltonianEnergy:
         )
 
 
+class TestAnalyticalEnergyConservation:
+    """Verify canonical Hamiltonian against exact analytical energy.
+
+    Uses synthetic plane-wave data with known analytical energy density
+    to verify the Hamiltonian evaluation pipeline end-to-end.
+    """
+
+    @staticmethod
+    def _make_scalar_planewave_spec(
+        *, m2: float = 1.0,
+    ) -> EquationSystem:
+        """Build a minimal 1+1D massive scalar spec with canonical structure."""
+        eq = ComponentEquation(
+            field_name="phi_0",
+            field_index=0,
+            time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(coefficient=1.0, operator="laplacian_x", field="phi_0"),
+                OperatorTerm(coefficient=-m2, operator="identity", field="phi_0"),
+            ),
+        )
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                # ½ (∂_t φ)²
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(
+                        field="phi_0", operator="time_derivative",
+                    ),
+                    factor_b=HamiltonianFactor(
+                        field="phi_0", operator="time_derivative",
+                    ),
+                ),
+                # ½ (∂_x φ)²
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(
+                        field="phi_0", operator="gradient_x",
+                    ),
+                    factor_b=HamiltonianFactor(
+                        field="phi_0", operator="gradient_x",
+                    ),
+                ),
+                # ½ m² φ²
+                HamiltonianTerm(
+                    coefficient=0.5 * m2,
+                    factor_a=HamiltonianFactor(
+                        field="phi_0", operator="identity",
+                    ),
+                    factor_b=HamiltonianFactor(
+                        field="phi_0", operator="identity",
+                    ),
+                ),
+            ),
+            field_rates={
+                "phi_0": (
+                    OperatorTerm(
+                        coefficient=1.0, operator="identity", field="pi_0",
+                    ),
+                ),
+            },
+            hamiltonian_symbolic="plane wave test",
+        )
+        return EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi_0",),
+            equations=(eq,),
+            mass_matrix=((m2,),),
+            coupling_matrix=((0.0,),),
+            metadata={"source": "test", "parameters": {}},
+            canonical=canonical,
+        )
+
+    def test_plane_wave_energy_matches_analytical(self) -> None:
+        """Free scalar plane wave: ⟨H⟩ = ½ A² ω²."""
+        m2 = 1.0
+        a_amp = 0.3
+        n_grid = 256
+        domain_len = 2 * np.pi
+        dx = domain_len / n_grid
+        x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
+
+        k = 2.0  # wavenumber
+        omega = np.sqrt(k**2 + m2)
+
+        # φ(t=0,x) = A cos(kx), π(t=0,x) = ∂_t φ = A ω sin(kx)
+        # (assuming φ = A cos(ωt - kx) → at t=0: φ = A cos(kx), π = Aω sin(kx))
+        phi = a_amp * np.cos(k * x)
+        pi_field = a_amp * omega * np.sin(k * x)
+
+        spec = self._make_scalar_planewave_spec(m2=m2)
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={"phi_0": phi[np.newaxis]},
+            momenta={"phi_0": pi_field[np.newaxis]},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, domain_len),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+
+        h_eval = _compute_hamiltonian_from_canonical(data, 0)
+
+        # Analytical: ⟨H⟩ = ½ A² ω² (space-averaged energy density)
+        h_analytical = 0.5 * a_amp**2 * omega**2
+        np.testing.assert_allclose(h_eval, h_analytical, rtol=1e-3)
+
+    def test_plane_wave_energy_conserved_across_snapshots(self) -> None:
+        """Verify H(t=0) = H(t=T) for exact plane wave solution."""
+        m2 = 0.5
+        a_amp = 0.2
+        n_grid = 128
+        domain_len = 2 * np.pi
+        dx = domain_len / n_grid
+        x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
+
+        k = 1.0
+        omega = np.sqrt(k**2 + m2)
+
+        # Two snapshots: t=0 and t=T
+        times = np.array([0.0, 1.5])
+        phi_data = np.zeros((2, n_grid))
+        pi_data = np.zeros((2, n_grid))
+        for i, t in enumerate(times):
+            phi_data[i] = a_amp * np.cos(omega * t - k * x)
+            pi_data[i] = a_amp * omega * np.sin(omega * t - k * x)
+
+        spec = self._make_scalar_planewave_spec(m2=m2)
+        data = SimulationData(
+            times=times,
+            fields={"phi_0": phi_data},
+            momenta={"phi_0": pi_data},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, domain_len),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+
+        h0 = _compute_hamiltonian_from_canonical(data, 0)
+        h1 = _compute_hamiltonian_from_canonical(data, 1)
+        np.testing.assert_allclose(h0, h1, rtol=1e-3)
+
+    def test_energy_partition_kinetic_gradient_mass(self) -> None:
+        """Verify individual energy contributions match analytical values.
+
+        For φ = A cos(kx) at t=0 with π = Aω sin(kx):
+          kinetic = ½ ⟨π²⟩ = ¼ A² ω²
+          gradient = ½ ⟨(∂_x φ)²⟩ = ¼ A² k²
+          mass     = ½ m² ⟨φ²⟩ = ¼ A² m²
+        """
+        m2 = 2.0
+        a_amp = 0.4
+        n_grid = 256
+        domain_len = 2 * np.pi
+        dx = domain_len / n_grid
+        x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
+
+        k = 3.0
+        omega = np.sqrt(k**2 + m2)
+
+        phi = a_amp * np.cos(k * x)
+        pi_field = a_amp * omega * np.sin(k * x)
+
+        # Compute individual energy densities directly
+        grad_phi = (np.roll(phi, -1) - np.roll(phi, 1)) / (2 * dx)
+
+        kinetic = 0.5 * float((pi_field**2).mean())
+        gradient = 0.5 * float((grad_phi**2).mean())
+        mass_energy = 0.5 * m2 * float((phi**2).mean())
+
+        np.testing.assert_allclose(kinetic, 0.25 * a_amp**2 * omega**2, rtol=1e-3)
+        np.testing.assert_allclose(gradient, 0.25 * a_amp**2 * k**2, rtol=2e-2)
+        np.testing.assert_allclose(mass_energy, 0.25 * a_amp**2 * m2, rtol=1e-3)
+
+        # Total should be ½ A² ω²
+        total = kinetic + gradient + mass_energy
+        np.testing.assert_allclose(total, 0.5 * a_amp**2 * omega**2, rtol=2e-2)
+
+    def test_coupled_eigenmode_energy(self) -> None:
+        """Coupled scalars in pure eigenmode: H = 1/2 omega_i^2 |a_i|^2.
+
+        Two coupled scalars with mass matrix M = [[m1², g], [g, m2²]].
+        Pure eigenmode initial data gives H from the eigenvalue.
+        """
+        m2_phi = 2.0
+        m2_chi = 3.0
+        g_val = 0.5
+        a_amp = 0.3
+        n_grid = 128
+        domain_len = 2 * np.pi
+        dx = domain_len / n_grid
+
+        # Diagonalize mass matrix
+        m_eff = np.array([[m2_phi, g_val], [g_val, m2_chi]])
+        eigenvalues, eigenvectors = np.linalg.eigh(m_eff)
+
+        # Use the first eigenmode (uniform k=0)
+        mode_1 = eigenvectors[:, 0]
+
+        # Initial condition: pure eigenmode
+        phi_init = a_amp * mode_1[0] * np.ones(n_grid)
+        chi_init = a_amp * mode_1[1] * np.ones(n_grid)
+        # At t=0 with cos(ω₁ t), velocity = 0
+        pi_phi = np.zeros(n_grid)
+        pi_chi = np.zeros(n_grid)
+
+        # Build coupled spec
+        eq_phi = ComponentEquation(
+            field_name="phi_0",
+            field_index=0,
+            time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(
+                    coefficient=-m2_phi, operator="identity", field="phi_0",
+                ),
+                OperatorTerm(
+                    coefficient=-g_val, operator="identity", field="chi_0",
+                ),
+            ),
+        )
+        eq_chi = ComponentEquation(
+            field_name="chi_0",
+            field_index=1,
+            time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(
+                    coefficient=-g_val, operator="identity", field="phi_0",
+                ),
+                OperatorTerm(
+                    coefficient=-m2_chi, operator="identity", field="chi_0",
+                ),
+            ),
+        )
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                # ½ π_φ²
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(
+                        field="phi_0", operator="time_derivative",
+                    ),
+                    factor_b=HamiltonianFactor(
+                        field="phi_0", operator="time_derivative",
+                    ),
+                ),
+                # ½ π_χ²
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(
+                        field="chi_0", operator="time_derivative",
+                    ),
+                    factor_b=HamiltonianFactor(
+                        field="chi_0", operator="time_derivative",
+                    ),
+                ),
+                # ½ m1² φ²
+                HamiltonianTerm(
+                    coefficient=0.5 * m2_phi,
+                    factor_a=HamiltonianFactor(
+                        field="phi_0", operator="identity",
+                    ),
+                    factor_b=HamiltonianFactor(
+                        field="phi_0", operator="identity",
+                    ),
+                ),
+                # ½ m2² χ²
+                HamiltonianTerm(
+                    coefficient=0.5 * m2_chi,
+                    factor_a=HamiltonianFactor(
+                        field="chi_0", operator="identity",
+                    ),
+                    factor_b=HamiltonianFactor(
+                        field="chi_0", operator="identity",
+                    ),
+                ),
+                # g φχ (coupling: coefficient is g, not g/2, because
+                # H has both φ·(g·χ) + χ·(g·φ) combined)
+                HamiltonianTerm(
+                    coefficient=g_val,
+                    factor_a=HamiltonianFactor(
+                        field="phi_0", operator="identity",
+                    ),
+                    factor_b=HamiltonianFactor(
+                        field="chi_0", operator="identity",
+                    ),
+                ),
+            ),
+            field_rates={
+                "phi_0": (
+                    OperatorTerm(
+                        coefficient=1.0, operator="identity", field="pi_0",
+                    ),
+                ),
+                "chi_0": (
+                    OperatorTerm(
+                        coefficient=1.0, operator="identity", field="pi_1",
+                    ),
+                ),
+            },
+            hamiltonian_symbolic="coupled eigenmode test",
+        )
+
+        spec = EquationSystem(
+            n_components=2,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi_0", "chi_0"),
+            equations=(eq_phi, eq_chi),
+            mass_matrix=((m2_phi, g_val), (g_val, m2_chi)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={"source": "test", "parameters": {}},
+            canonical=canonical,
+        )
+
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={
+                "phi_0": phi_init[np.newaxis],
+                "chi_0": chi_init[np.newaxis],
+            },
+            momenta={
+                "phi_0": pi_phi[np.newaxis],
+                "chi_0": pi_chi[np.newaxis],
+            },
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, domain_len),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+
+        h_eval = _compute_hamiltonian_from_canonical(data, 0)
+
+        # Analytical: H = ½ ω₁² A² (eigenmode energy for uniform k=0 mode)
+        # At t=0 with cos(ω₁·0)=1, all energy is potential:
+        # V = ½ Σ_ij M_ij q_i q_j = ½ A² (mode · M · mode)
+        # Since mode is eigenvector: mode · M · mode = λ₁
+        h_analytical = 0.5 * a_amp**2 * eigenvalues[0]
+        np.testing.assert_allclose(h_eval, h_analytical, rtol=1e-10)
+
+
 # ============================================================
 # Conversion probability tests
 # ============================================================

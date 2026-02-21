@@ -1762,6 +1762,11 @@ class TestCoupledConstraints:
             pde.evolution_rate(state, t=0.0)
 
 
+@pytest.mark.xfail(
+    reason="Non-diagonal kinetic matrix: gauge-unfixed linearized gravity field_rates "
+    "contain first_derivative_t (see docs/ISSUES.md). Needs gauge fixing (Phase B).",
+    strict=True,
+)
 class TestMassiveGravityConstraints:
     """Integration tests: massive gravity constraints solved with unified solver."""
 

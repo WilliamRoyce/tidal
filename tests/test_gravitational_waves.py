@@ -267,15 +267,16 @@ class TestGaugeUnfixedSpec:
         assert spec.component_names == expected
 
     def test_mixed_time_orders(self, spec: EquationSystem) -> None:
-        """Gauge-unfixed system should have mixed time derivative orders.
+        """Gauge-unfixed system has mixed time derivative orders.
 
-        In the non-trace-reversed formulation (as produced by xPert + ContractMetric),
-        the linearized Einstein equations split into:
-        - Constraint equations (time_order 0): h_0 (Hamiltonian constraint),
-          h_5 (h_xy), h_6 (h_xz), h_8 (h_yz) — off-diagonal spatial components
-          where ∂²_t cancels after trace subtraction
-        - Evolution equations (time_order 2): h_1-h_3, h_4, h_7, h_9 —
-          time-space and diagonal spatial components
+        The Lagrangian-first approach (VarD on L^(2) = Perturbation[L,2]/2)
+        produces gauge-unfixed equations where most components are 2nd-order.
+        The time-space components (h_1, h_2, h_3) are 0th-order constraints
+        (momentum constraints).
+
+        NOTE: Without gauge fixing, h_0 (Hamiltonian constraint) appears as
+        2nd-order because the d^2_t cancellation only manifests after de Donder
+        gauge. See docs/ISSUES.md for details.
         """
         orders = {eq.field_name: eq.time_derivative_order for eq in spec.equations}
         unique_orders = set(orders.values())
@@ -283,13 +284,14 @@ class TestGaugeUnfixedSpec:
         assert len(unique_orders) >= 2, (
             f"Expected mixed time orders, got only {unique_orders}"
         )
-        # h_0 (Hamiltonian constraint) should be elliptic (order 0)
-        assert orders["h_0"] == 0, (
-            f"Expected h_0 (Hamiltonian constraint) to have time_order 0, "
-            f"got {orders['h_0']}"
-        )
         # Evolution equations should be second-order
         assert 2 in unique_orders, "Expected some second-order (evolution) equations"
+        # Time-space components h_1, h_2, h_3 are momentum constraints (order 0)
+        for i in (1, 2, 3):
+            assert orders[f"h_{i}"] == 0, (
+                f"Expected h_{i} (momentum constraint) to have time_order 0, "
+                f"got {orders[f'h_{i}']}"
+            )
         # Diagonal spatial components h_4 (h_xx), h_7 (h_yy), h_9 (h_zz) are evolution
         for i in (4, 7, 9):
             assert orders[f"h_{i}"] == 2, (

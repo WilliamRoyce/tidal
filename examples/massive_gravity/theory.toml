@@ -39,7 +39,9 @@ symmetry = "symmetric"
 names = ["m2"]
 
 [lagrangian]
-expression = "(RicciScalarCD[] - m2/2 * ((eta[-a, -b] - bg[-a, -b]) eta[a, c] eta[b, d] (eta[-c, -d] - bg[-c, -d]) - (eta[a, b] (eta[-a, -b] - bg[-a, -b]))^2))"
+# Note: trace-squared uses distinct dummy pairs (a,b) and (e,f) to avoid
+# xAct Scalar[] index collision when squaring contractions.
+expression = "(RicciScalarCD[] - m2/2 * ((eta[-a, -b] - bg[-a, -b]) eta[a, c] eta[b, d] (eta[-c, -d] - bg[-c, -d]) - eta[a, b] (eta[-a, -b] - bg[-a, -b]) eta[e, f] (eta[-e, -f] - bg[-e, -f])))"
 
 [linearization]
 perturbation_field = "h"

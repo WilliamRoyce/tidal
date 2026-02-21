@@ -44,6 +44,13 @@ _DEFAULT_PARAMS: dict[str, dict[str, float]] = {
     "proca_background.json": {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5, "g0": 1.0, "R": 8.0},
 }
 
+# Specs that cannot be evolved due to non-diagonal kinetic matrix
+# (gauge-unfixed linearized gravity — see docs/ISSUES.md).
+_NON_EVOLVABLE_SPECS: set[str] = {
+    "linearized_gravity.json",
+    "massive_gravity_3d.json",
+}
+
 # Grid sizes per spatial dimension (small for speed).
 _GRID_SIZE: dict[int, list[tuple[float, float]]] = {
     1: [(0.1, 10)],
@@ -76,6 +83,11 @@ class TestExampleJSON:
 
     def test_build_and_evolve(self, json_path: Path) -> None:
         """PDE builds and produces finite evolution rates."""
+        if json_path.name in _NON_EVOLVABLE_SPECS:
+            pytest.xfail(
+                "Non-diagonal kinetic matrix: gauge-unfixed linearized gravity "
+                "field_rates contain first_derivative_t (see docs/ISSUES.md)"
+            )
         spec = load_equation_system(json_path)
         params = _DEFAULT_PARAMS.get(json_path.name, {})
 

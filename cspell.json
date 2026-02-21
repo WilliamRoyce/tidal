@@ -12,6 +12,7 @@
     "bimetric",
     "blit",
     "Boulware",
+    "Brizuela",
     "cbar",
     "Chern",
     "Christoffel",
@@ -49,6 +50,7 @@
     "eigenmodes",
     "Fierz",
     "functionals",
+    "García",
     "Gaussians",
     "gertsenshtein",
     "gwcart",
@@ -78,7 +80,10 @@
     "llvmlite",
     "lualatex",
     "luuid",
+    "Martín",
+    "Marugán",
     "Mathematica",
+    "Mena",
     "Minkowski",
     "mypy",
     "nabla",
@@ -217,6 +222,7 @@
     "pydata",
     "pylint",
     "pydocstyle",
+    "Lcomp",
     "lmix",
     "mathbf",
     "mathrm",
@@ -252,11 +258,7 @@
     "xycoords",
     "xytext"
   ],
-  "flagWords": [
-    "hte",
-    "teh",
-    "wolfrom"
-  ],
+  "flagWords": ["hte", "linearised", "teh", "wolfrom"],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [
