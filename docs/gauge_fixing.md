@@ -38,11 +38,12 @@ examples continue to work unchanged.
 
 ### Type B — Constraint (applied after EOM derivation)
 
-| Preset     | Fields | Constraint          | Effect                                         |
-| ---------- | ------ | ------------------- | ---------------------------------------------- |
-| `temporal` | vector | `A_0 = 0`           | Zeroes temporal component in all equations     |
-| `coulomb`  | vector | `div A_spatial = 0` | Adds transversality constraint equation        |
-| `axial`    | vector | `A_n = 0`           | Zeroes last spatial component in all equations |
+| Preset     | Fields      | Constraint                              | Effect                                                         |
+| ---------- | ----------- | --------------------------------------- | -------------------------------------------------------------- |
+| `temporal` | vector      | `A_0 = 0`                               | Zeroes temporal component in all equations                     |
+| `coulomb`  | vector      | `div A_spatial = 0`                     | Adds transversality constraint equation                        |
+| `axial`    | vector      | `A_n = 0`                               | Zeroes last spatial component in all equations                 |
+| `tt`       | sym. rank-2 | `h_{0,mu}=0`, `h^i_i=0`, `d^i h_{ij}=0` | TT gauge: temporal + traceless + transverse (GW polarisations) |
 
 Type A presets use Wolfram builder functions in `GaugeFix.wl`.
 Type B presets operate at the component level after `DecomposeToComponents`,
@@ -113,7 +114,11 @@ non-standard gauge choices.
 - For `coulomb`: appends a spatial divergence constraint equation
   (`div A_spatial = 0`) to the equation system as a `time_order=0` equation
 - The original EOM structure is preserved; constraints modify or augment it
-- Presets: `temporal`, `coulomb`, `axial`
+- For `tt` (symmetric rank-2 tensors): applies three conditions — (1) temporal:
+  zero all `h_{0,mu}` components, (2) traceless: substitute last spatial diagonal
+  `h_{d-1,d-1} = -(sum of other spatial diagonals)`, (3) transverse: append
+  `d^i h_{ij} = 0` constraint equations for each spatial direction `j`
+- Presets: `temporal`, `coulomb`, `axial`, `tt`
 
 For named presets, the mechanism is inferred automatically (e.g., `lorenz`
 is always `lagrangian_term`, `temporal` is always `constraint`).
@@ -217,6 +222,15 @@ on one field and `type = "custom"` on another.
 Yes. For example, `lorenz` on field A (Type A) and `temporal` on field B
 (Type B) is valid. Type A modifies the Lagrangian before EL; Type B
 modifies the component equations after decomposition.
+
+**Can I use gauge fixing with linearized theories?**
+Yes. When `[lagrangian]` and `[linearization]` are both present, the pipeline
+applies gauge fixing in the Lagrangian-first linearization path:
+
+- Type A terms are added to L^(2) after xPert expansion
+- Type B constraints are applied after component decomposition
+  This requires `[lagrangian]` — legacy `[linearization]` without `[lagrangian]`
+  does not support `[[gauge]]`.
 
 **What happens if I gauge-fix a field that has no gauge symmetry?**
 For massive fields (Proca), the mass term already breaks gauge symmetry.

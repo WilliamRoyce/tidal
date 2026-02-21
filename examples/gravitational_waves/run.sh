@@ -2,7 +2,7 @@
 # Gravitational Waves 3+1D — Full derive → inspect → simulate pipeline
 #
 # Physics: xPert linearization of the Einstein equations with TT
-# (transverse-traceless) gauge, reducing to physical polarisation modes
+# (transverse-traceless) gauge, reducing to physical polarization modes
 # h_+ and h_×. Gaussian-modulated cosine wave packet propagating along z.
 #
 # NOTE: 3D data — tidal plot is for 1D/2D only.

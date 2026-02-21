@@ -37,15 +37,32 @@ from tidal.utils import normalize_solve_result
 
 DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
 DEDONDER_JSON = DATA_DIR / "linearized_gravity_dedonder.json"
-UNFIXED_JSON = DATA_DIR / "linearized_gravity.json"
+GW_JSON = DATA_DIR / "linearized_gravity.json"
 
 _skip_dedonder = pytest.mark.skipif(
     not DEDONDER_JSON.exists(),
     reason="linearized_gravity_dedonder.json not found",
 )
-_skip_unfixed = pytest.mark.skipif(
-    not UNFIXED_JSON.exists(),
+_skip_gw = pytest.mark.skipif(
+    not GW_JSON.exists(),
     reason="linearized_gravity.json not found (run tidal derive)",
+)
+
+
+def _gw_json_has_gauge(gauge_name: str) -> bool:
+    """Check if the GW JSON has the specified gauge in its metadata."""
+    if not GW_JSON.exists():
+        return False
+    import json
+
+    with open(GW_JSON) as f:
+        data = json.load(f)
+    return data.get("metadata", {}).get("gauge") == gauge_name
+
+
+_skip_gw_tt = pytest.mark.skipif(
+    not _gw_json_has_gauge("tt"),
+    reason="linearized_gravity.json missing or not TT-gauge (re-run tidal derive)",
 )
 
 
@@ -241,140 +258,8 @@ class TestDeDonderPDE:
 # ============================================================
 
 
-@_skip_unfixed
-class TestGaugeUnfixedSpec:
-    """Structural tests for the gauge-unfixed linearized Einstein equations.
 
-    The gauge-unfixed system preserves the full constraint structure of
-    linearized GR: Hamiltonian constraint (h_0, elliptic), momentum
-    constraints (h_1-h_3), and evolution equations (h_4-h_9, second-order).
-    Cross-field time derivatives are correctly classified as RHS terms.
-    """
 
-    @pytest.fixture
-    def spec(self) -> EquationSystem:
-        return load_equation_system(UNFIXED_JSON)
-
-    def test_dimension(self, spec: EquationSystem) -> None:
-        assert spec.dimension == 4
-        assert spec.spatial_dimension == 3
-
-    def test_component_count(self, spec: EquationSystem) -> None:
-        assert spec.n_components == 10
-
-    def test_component_names(self, spec: EquationSystem) -> None:
-        expected = tuple(f"h_{i}" for i in range(10))
-        assert spec.component_names == expected
-
-    def test_mixed_time_orders(self, spec: EquationSystem) -> None:
-        """Gauge-unfixed system has mixed time derivative orders.
-
-        The Lagrangian-first approach (VarD on L^(2) = Perturbation[L,2]/2)
-        produces gauge-unfixed equations where most components are 2nd-order.
-        The time-space components (h_1, h_2, h_3) are 0th-order constraints
-        (momentum constraints).
-
-        NOTE: Without gauge fixing, h_0 (Hamiltonian constraint) appears as
-        2nd-order because the d^2_t cancellation only manifests after de Donder
-        gauge. See docs/ISSUES.md for details.
-        """
-        orders = {eq.field_name: eq.time_derivative_order for eq in spec.equations}
-        unique_orders = set(orders.values())
-        # Should have at least two different time orders (0 and 2)
-        assert len(unique_orders) >= 2, (
-            f"Expected mixed time orders, got only {unique_orders}"
-        )
-        # Evolution equations should be second-order
-        assert 2 in unique_orders, "Expected some second-order (evolution) equations"
-        # Time-space components h_1, h_2, h_3 are momentum constraints (order 0)
-        for i in (1, 2, 3):
-            assert orders[f"h_{i}"] == 0, (
-                f"Expected h_{i} (momentum constraint) to have time_order 0, "
-                f"got {orders[f'h_{i}']}"
-            )
-        # Diagonal spatial components h_4 (h_xx), h_7 (h_yy), h_9 (h_zz) are evolution
-        for i in (4, 7, 9):
-            assert orders[f"h_{i}"] == 2, (
-                f"Expected h_{i} (evolution equation) to have time_order 2, "
-                f"got {orders[f'h_{i}']}"
-            )
-
-    def test_cross_field_coupling_exists(self, spec: EquationSystem) -> None:
-        """Gauge-unfixed equations should have cross-field coupling."""
-        has_cross_coupling = False
-        for eq in spec.equations:
-            for term in eq.rhs_terms:
-                # Check for reference to different field (not pi_ momentum)
-                if term.field != eq.field_name and not term.field.startswith("pi_"):
-                    has_cross_coupling = True
-                    break
-            if has_cross_coupling:
-                break
-
-        assert has_cross_coupling, (
-            "Expected cross-field coupling in gauge-unfixed equations"
-        )
-
-    def test_momentum_references_exist(self, spec: EquationSystem) -> None:
-        """Should reference momentum fields (pi_*) for mixed time-space derivatives."""
-        has_momentum_ref = False
-        for eq in spec.equations:
-            for term in eq.rhs_terms:
-                if term.field.startswith("pi_"):
-                    has_momentum_ref = True
-                    break
-            if has_momentum_ref:
-                break
-
-        assert has_momentum_ref, "Expected momentum field references (pi_*)"
-
-    def test_diverse_operators(self, spec: EquationSystem) -> None:
-        """Gauge-unfixed equations should use multiple operator types."""
-        all_operators: set[str] = set()
-        for eq in spec.equations:
-            all_operators.update(term.operator for term in eq.rhs_terms)
-
-        # Should have directional laplacians, gradients, cross-derivatives
-        assert "laplacian_x" in all_operators
-        assert "laplacian_y" in all_operators
-        assert "laplacian_z" in all_operators
-        # Should have gradients (from mixed time-space terms)
-        has_gradient = any(op.startswith("gradient_") for op in all_operators)
-        assert has_gradient, f"Expected gradient operators, got {all_operators}"
-        # Should have cross-derivatives (from cross terms in linearized Einstein)
-        has_cross = any(op.startswith("cross_derivative_") for op in all_operators)
-        assert has_cross, f"Expected cross_derivative operators, got {all_operators}"
-
-    def test_first_derivative_t_exists(self, spec: EquationSystem) -> None:
-        """Some terms should have first_derivative_t operator (Hubble-like friction)."""
-        has_fdt = False
-        for eq in spec.equations:
-            for term in eq.rhs_terms:
-                if term.operator == "first_derivative_t":
-                    has_fdt = True
-                    break
-            if has_fdt:
-                break
-        assert has_fdt, "Expected first_derivative_t terms in gauge-unfixed equations"
-
-    def test_state_size_reflects_mixed_orders(self, spec: EquationSystem) -> None:
-        """State size should be less than 20 due to constraint/first-order components."""
-        # h_0 is elliptic (order 0, 1 slot), some may be first-order (1 slot each),
-        # evolution eqs are second-order (2 slots each)
-        # So state_size < 2 * n_components
-        assert spec.state_size < 2 * spec.n_components, (
-            f"Expected state_size < {2 * spec.n_components} due to non-second-order components, "
-            f"got {spec.state_size}"
-        )
-
-    def test_metadata(self, spec: EquationSystem) -> None:
-        assert spec.metadata.get("gauge") == "none"
-        assert spec.metadata.get("linearized") is True
-
-    def test_pde_builds(self) -> None:
-        """PDE should build from gauge-unfixed JSON without errors."""
-        pde = build_pde_from_json(UNFIXED_JSON)
-        assert isinstance(pde, PDEFromSpec)
 
 
 # ============================================================
@@ -476,3 +361,124 @@ class TestDeDonderPhysics:
             f"Energy changed by {rel_change:.1%} (initial={initial_energy:.6f}, "
             f"final={final_energy:.6f})"
         )
+
+
+# ============================================================
+# TT gauge system tests
+# ============================================================
+
+
+@_skip_gw_tt
+class TestTTGaugeSpec:
+    """Test that the TT gauge JSON loads correctly.
+
+    TT gauge on 3+1D linearised gravity should:
+    - Zero temporal components (h_0..h_3) — h_0 trivially, h_1..h_3 become constraints
+    - Substitute h_9 (spatial trace) → -(h_4 + h_7), replace h_9's equation
+      with the algebraic traceless constraint
+    - Add transverse constraint equations (d^i h_{ij} = 0)
+    - h_4..h_8 remain as evolution equations (5 dynamical DOF)
+    """
+
+    @pytest.fixture
+    def spec(self) -> EquationSystem:
+        return load_equation_system(GW_JSON)
+
+    def test_dimension(self, spec: EquationSystem) -> None:
+        assert spec.dimension == 4
+        assert spec.spatial_dimension == 3
+
+    def test_component_count(self, spec: EquationSystem) -> None:
+        """TT gauge: 10 original + 3 transverse = 13 components."""
+        assert spec.n_components == 13, (
+            f"Expected 13 components (10 + 3 transverse), got {spec.n_components}"
+        )
+
+    def test_temporal_h0_trivial(self, spec: EquationSystem) -> None:
+        """h_0 (h_{tt}) should be trivially zeroed — constraint with identity(h_0)."""
+        eq_h0 = next(eq for eq in spec.equations if eq.field_name == "h_0")
+        assert eq_h0.time_derivative_order == 0, "h_0 should be a constraint"
+
+    def test_temporal_h1_h3_are_constraints(self, spec: EquationSystem) -> None:
+        """h_1..h_3 (h_{ti}) should become constraint equations after temporal zeroing."""
+        for name in ["h_1", "h_2", "h_3"]:
+            eq = next(eq for eq in spec.equations if eq.field_name == name)
+            assert eq.time_derivative_order == 0, (
+                f"{name} should be constraint (time_order=0), got {eq.time_derivative_order}"
+            )
+
+    def test_spatial_components_h4_h8_are_evolution(self, spec: EquationSystem) -> None:
+        """h_4..h_8 should remain as 2nd-order evolution equations."""
+        for idx in range(4, 9):
+            name = f"h_{idx}"
+            eq = next(eq for eq in spec.equations if eq.field_name == name)
+            assert eq.time_derivative_order == 2, (
+                f"{name} should be evolution (time_order=2), got {eq.time_derivative_order}"
+            )
+
+    def test_h9_is_traceless_constraint(self, spec: EquationSystem) -> None:
+        """h_9 equation should be the traceless constraint (time_order=0)."""
+        eq_h9 = next(eq for eq in spec.equations if eq.field_name == "h_9")
+        assert eq_h9.time_derivative_order == 0, (
+            f"h_9 should be traceless constraint (time_order=0), got {eq_h9.time_derivative_order}"
+        )
+        # Should reference the spatial diagonal components
+        fields = {term.field for term in eq_h9.rhs_terms}
+        spatial_diags = {"h_4", "h_7", "h_9"}
+        assert spatial_diags <= fields, (
+            f"Traceless constraint h_9 should reference spatial diagonals {spatial_diags}, "
+            f"got fields {fields}"
+        )
+
+    def test_transverse_constraints_present(self, spec: EquationSystem) -> None:
+        """3 transverse constraint equations (d^i h_{ij} = 0) should be present."""
+        transverse = [eq for eq in spec.equations if "transverse" in eq.field_name]
+        assert len(transverse) == 3, f"Expected 3 transverse constraints, got {len(transverse)}"
+        for eq in transverse:
+            assert eq.time_derivative_order == 0
+            # Should have gradient-type operators
+            operators = {term.operator for term in eq.rhs_terms}
+            has_gradient = any("gradient" in op for op in operators)
+            assert has_gradient, (
+                f"Transverse constraint {eq.field_name} missing gradient operators: {operators}"
+            )
+
+    def test_evolution_equations_have_laplacians(self, spec: EquationSystem) -> None:
+        """Evolution equations should contain laplacian-type operators."""
+        evolution_eqs = [eq for eq in spec.equations if eq.time_derivative_order == 2]
+        assert len(evolution_eqs) == 5, f"Expected 5 evolution equations, got {len(evolution_eqs)}"
+        for eq in evolution_eqs:
+            operators = {term.operator for term in eq.rhs_terms}
+            has_spatial_deriv = any(
+                "laplacian" in op or "cross_derivative" in op or "gradient" in op
+                for op in operators
+            )
+            assert has_spatial_deriv, (
+                f"Evolution equation {eq.field_name} has no spatial derivative operators: {operators}"
+            )
+
+    def test_no_temporal_field_references_in_evolution(self, spec: EquationSystem) -> None:
+        """Evolution equations should not reference zeroed temporal fields h_0..h_3."""
+        temporal_names = {"h_0", "h_1", "h_2", "h_3"}
+        temporal_momenta = {"pi_0", "pi_1", "pi_2", "pi_3"}
+        evolution_eqs = [eq for eq in spec.equations if eq.time_derivative_order == 2]
+        for eq in evolution_eqs:
+            for term in eq.rhs_terms:
+                assert term.field not in temporal_names, (
+                    f"Evolution eq {eq.field_name} references zeroed field {term.field}"
+                )
+                assert term.field not in temporal_momenta, (
+                    f"Evolution eq {eq.field_name} references zeroed momentum {term.field}"
+                )
+
+    def test_all_coefficients_numeric(self, spec: EquationSystem) -> None:
+        """All coefficients should be numeric (no unsimplified Mathematica expressions)."""
+        for eq in spec.equations:
+            for term in eq.rhs_terms:
+                assert isinstance(term.coefficient, (int, float)), (
+                    f"Non-numeric coefficient in {eq.field_name}: {term.coefficient!r}"
+                )
+
+    def test_metadata(self, spec: EquationSystem) -> None:
+        assert spec.metadata.get("gauge") == "tt"
+        assert spec.metadata.get("linearized") is True

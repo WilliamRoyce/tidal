@@ -69,6 +69,10 @@ _GAUGE_PRESETS: dict[str, dict[str, str]] = {
         "mechanism": "constraint",
         "requires": "vector",
     },
+    "tt": {
+        "mechanism": "constraint",
+        "requires": "tensor",
+    },
 }
 
 
@@ -397,6 +401,9 @@ def _validate_gauge_entry_preset(
     if required_type == "tensor" and field_info["type"] != "tensor":
         msg = f"[[gauge]] entry {i}: '{gauge_type}' requires a tensor field, got '{field_info['type']}'"
         raise ValueError(msg)
+    if gauge_type == "tt" and field_info.get("symmetry") != "symmetric":
+        msg = f"[[gauge]] entry {i}: 'tt' gauge requires a symmetric tensor, got symmetry='{field_info.get('symmetry', 'none')}'"
+        raise ValueError(msg)
 
 
 def _validate_gauge_entry_custom(i: int, entry: dict[str, Any]) -> None:
@@ -541,10 +548,11 @@ def _validate_config(config: dict[str, Any]) -> None:
             DeprecationWarning,
             stacklevel=2,
         )
-    if has_linearization and config.get("gauge"):
+    if has_linearization and not has_lagrangian and config.get("gauge"):
         msg = (
-            "[[gauge]] is not supported with [linearization] "
-            "(gauge fixing requires [lagrangian])"
+            "[[gauge]] with [linearization] requires [lagrangian] "
+            "(Lagrangian-first linearization path). "
+            "Add a [lagrangian] section or remove [[gauge]]."
         )
         raise ValueError(msg)
 
@@ -568,9 +576,10 @@ def _make_prefix(config: dict[str, Any]) -> str:
     name = config.get("theory", {}).get("name", "")
     if not name:
         return "tidal"
-    # Take initials of first 2-3 words, lowercase
+    # Take initials of first 2-3 words (alpha only), lowercase
     words = name.split()
-    prefix = "".join(w[0].lower() for w in words[:3])
+    initials = [w[0].lower() for w in words if w[0].isalpha()]
+    prefix = "".join(initials[:3])
     return prefix if len(prefix) >= _MIN_PREFIX_LEN else "tidal"
 
 
@@ -1233,6 +1242,17 @@ def _wls_linearize_from_lagrangian(
     )
 
     # ------------------------------------------------------------------
+    # Step 1b: Type A gauge fixing (if any) — add L_gf to L^(2)
+    # Perturbation-level gauge terms (current presets) are already
+    # quadratic in the perturbation field, so they are added directly
+    # to L^(2) without further xPert expansion.
+    # ------------------------------------------------------------------
+    if ctx.gauge and any(
+        _resolve_gauge_mechanism(g) == "lagrangian_term" for g in ctx.gauge
+    ):
+        lines.extend(_wls_gauge_fixing_type_a(ctx))
+
+    # ------------------------------------------------------------------
     # Step 2: EOM via VarD[H[-a,-b], CD][L^(2)]
     # ------------------------------------------------------------------
     lines.extend(
@@ -1279,6 +1299,14 @@ def _wls_linearize_from_lagrangian(
             "",
         ]
     )
+
+    # ------------------------------------------------------------------
+    # Step 3: Type B gauge fixing (if any) — constraints on fieldEquations
+    # ------------------------------------------------------------------
+    if ctx.gauge and any(
+        _resolve_gauge_mechanism(g) == "constraint" for g in ctx.gauge
+    ):
+        lines.extend(_wls_gauge_fixing_type_b(ctx))
 
     return lines
 
@@ -1380,6 +1408,121 @@ def _type_b_coulomb_constraint(
     ]
 
 
+def _sym_flat_index(a: int, b: int, dim: int) -> int:
+    """Flat index for symmetric pair ``(a, b)`` in ``dim``-dimensional space.
+
+    Matches the lexicographic ordering used by ``ReplaceRank2FieldComponents``
+    in ``ComponentDecompose.wl``: pairs ``(i, j)`` with ``i <= j``, flattened
+    to ``0, 1, 2, ...``
+    """
+    if a > b:
+        a, b = b, a
+    return a * (2 * dim - 1 - a) // 2 + b
+
+
+def _type_b_tt_gauge(
+    ctx: _WlsContext,
+    field_name: str,
+    comp_pfx: str,
+) -> list[str]:
+    """Generate WLS for TT (transverse-traceless) gauge on a symmetric rank-2 tensor.
+
+    Applies three conditions (dimension-aware):
+
+    1. **Temporal** (``h_{0,mu} = 0``): zero the first ``dim`` components
+       (all pairs with one time index) via ``ReplaceAll``.
+    2. **Transverse** (``partial^i h_{ij} = 0``): append ``dim - 1`` spatial
+       divergence constraint equations.
+    3. **Traceless** (``eta^{ij} h_{ij} = 0``): substitute last spatial diagonal
+       ``h_{d-1,d-1} → -(sum of other spatial diags)`` throughout all equations,
+       ``Expand`` to simplify, then replace h_{d-1,d-1}'s equation with the
+       algebraic traceless constraint.
+
+    Ordering matters: transverse constraints are appended *before* the traceless
+    substitution so that ``h_{d-1,d-1}`` references inside the transverse
+    constraints also get substituted.  Each equation is ``Expand``-ed after
+    substitution to ensure the kinetic matrix simplifies correctly (analytically
+    diagonal after TT substitution).
+    """
+    dim = ctx.dim
+    coords = _COORDS[dim]
+    coord_args = ", ".join(f"{c}[]" for c in coords)
+    lines: list[str] = []
+
+    # --- 1. Temporal: zero h_{0,mu} for mu = 0 .. dim-1 ---
+    for mu in range(dim):
+        idx = _sym_flat_index(0, mu, dim)
+        comp = f"{comp_pfx}{idx}"
+        lines.extend(_type_b_zero_component(comp, field_name, "TT-temporal"))
+
+    # --- 2. Transverse: for each spatial j, sum_i d_i h_{i,j} = 0 ---
+    # Added BEFORE traceless substitution so that h_{d-1,d-1} references
+    # in transverse constraints also get substituted in step 3.
+    for j in range(1, dim):
+        deriv_terms: list[str] = []
+        for i in range(1, dim):
+            flat_idx = _sym_flat_index(i, j, dim)
+            comp = f"{comp_pfx}{flat_idx}"
+            deriv_indices = ", ".join("1" if k == i else "0" for k in range(dim))
+            deriv_terms.append(f"Derivative[{deriv_indices}][{comp}][{coord_args}]")
+
+        constraint_expr = " + ".join(deriv_terms)
+        coord_label = coords[j] if j < len(coords) else str(j)
+        constraint_name = f"{field_name}_transverse_{coord_label}"
+        lines.extend(
+            [
+                f"(* TT transverse: d^i h_{{i,{j}}} = 0 *)",
+                f'AppendTo[fieldEquations, {{"{constraint_name}", {constraint_expr}}}];',
+                f'Print["Added TT transverse constraint: d^i h_{{i,{j}}} = 0"];',
+                "",
+            ]
+        )
+
+    # --- 3. Traceless: h_{d-1,d-1} → -(sum of other spatial diags) ---
+    # Substitute in ALL equations (including transverse constraints from step 2),
+    # then replace h_{d-1,d-1}'s own equation with the algebraic constraint.
+    # Expand after substitution so the kinetic matrix (which is analytically
+    # diagonal after TT) simplifies cleanly.
+    spatial_diag_indices = [_sym_flat_index(i, i, dim) for i in range(1, dim)]
+    last_diag_idx = spatial_diag_indices[-1]
+    other_diag_indices = spatial_diag_indices[:-1]
+    last_comp = f"{comp_pfx}{last_diag_idx}"
+
+    repl_sum = " + ".join(f"{comp_pfx}{idx}[args]" for idx in other_diag_indices)
+    deriv_repl_sum = " + ".join(
+        f"Derivative[d][{comp_pfx}{idx}][args]" for idx in other_diag_indices
+    )
+
+    # Build the traceless constraint expression (sum of spatial diag = 0)
+    trace_terms = " + ".join(
+        f"{comp_pfx}{idx}[{coord_args}]" for idx in spatial_diag_indices
+    )
+
+    lines.extend(
+        [
+            f"(* TT traceless: substitute {last_comp} → -(sum of other spatial diags) *)",
+            f"fieldEquations = fieldEquations /. {{"
+            f"{last_comp}[args___] :> -({repl_sum}), "
+            f"Derivative[d__][{last_comp}][args___] :> -({deriv_repl_sum})}};",
+            "",
+            f"(* Expand all equations to simplify kinetic terms after traceless sub *)",
+            f"fieldEquations = Table[{{fieldEquations[[k, 1]], "
+            f"Expand[fieldEquations[[k, 2]]]}},"
+            f" {{k, Length[fieldEquations]}}];",
+            "",
+            f"(* Replace {last_comp} equation with algebraic traceless constraint *)",
+            f"Do[If[fieldEquations[[k, 1]] === \"{field_name}_{last_diag_idx}\","
+            f" fieldEquations[[k]] = {{\"{field_name}_{last_diag_idx}\", {trace_terms}}}],"
+            f" {{k, Length[fieldEquations]}}];",
+            f'Print["Applied TT traceless: {last_comp} → -(spatial diag sum), '
+            f'eq replaced with constraint"];',
+            "",
+        ]
+    )
+
+    return lines
+
+
 def _wls_gauge_fixing_type_b(ctx: _WlsContext) -> list[str]:
     """Generate Type B gauge-fixing code (constraints applied after decomposition).
 
@@ -1388,6 +1531,7 @@ def _wls_gauge_fixing_type_b(ctx: _WlsContext) -> list[str]:
     - **temporal**: substitute ``A_0 → 0`` (and all derivatives) everywhere
     - **axial**: substitute last spatial component → 0
     - **coulomb**: append ``div A_spatial = 0`` constraint equation
+    - **tt**: temporal zeroing + traceless substitution + transverse constraints
     """
     lines: list[str] = ["(* Gauge fixing: post-decomposition constraints *)"]
     for entry in ctx.gauge:
@@ -1408,6 +1552,8 @@ def _wls_gauge_fixing_type_b(ctx: _WlsContext) -> list[str]:
             )
         elif gauge_type == "coulomb":
             lines.extend(_type_b_coulomb_constraint(ctx, field_name, comp_pfx))
+        elif gauge_type == "tt":
+            lines.extend(_type_b_tt_gauge(ctx, field_name, comp_pfx))
     return lines
 
 

@@ -537,3 +537,96 @@ class TestGaugeToml:
         assert "BuildLorenzGaugeTerm" in wls
         assert "GaugeFix.wl" in wls
         assert ":> 0" in wls
+
+    # --- TT gauge tests ---
+
+    def test_tt_gauge_in_wls(self) -> None:
+        """TT gauge on tensor → temporal zeroing, transverse constraints, traceless substitution."""
+        wls = self._generate({
+            "spacetime": {"dimension": 3, "metric": "minkowski"},
+            "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}],
+            "derived_fields": [],
+            "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
+            "gauge": [{"field": "h", "type": "tt"}],
+        })
+        # Temporal zeroing: h_0, h_1, h_2 = 0 (dim=3, first 3 components)
+        assert "TT-temporal" in wls
+        assert ":> 0" in wls
+        # Transverse constraints (must come BEFORE traceless so substitution catches them)
+        assert "TT transverse" in wls
+        assert "AppendTo[fieldEquations" in wls
+        # Traceless substitution + Expand + constraint replacement
+        assert "TT traceless" in wls
+        assert "Expand[fieldEquations" in wls
+        # Ordering: transverse before traceless (so h_{d-1,d-1} refs get substituted)
+        assert wls.index("TT transverse") < wls.index("TT traceless")
+        # GaugeFix.wl should NOT be loaded for Type B constraints
+        assert "GaugeFix.wl" not in wls
+
+    def test_tt_gauge_with_linearization(self) -> None:
+        """TT gauge + linearization → gauge fixing applied in linearisation path."""
+        wls = self._generate({
+            "spacetime": {"dimension": 4, "metric": "minkowski"},
+            "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}],
+            "derived_fields": [],
+            "lagrangian": {"expression": "RicciScalarCD[]"},
+            "linearization": {"perturbation_field": "h"},
+            "gauge": [{"field": "h", "type": "tt"}],
+        })
+        # Should contain both linearisation AND gauge-fixing code
+        assert "Perturbation" in wls
+        assert "TT-temporal" in wls
+        assert "TT traceless" in wls
+        assert "TT transverse" in wls
+        # GaugeFix.wl should NOT be loaded (TT is Type B only)
+        assert "GaugeFix.wl" not in wls
+
+    def test_gauge_linearization_without_lagrangian_raises(self) -> None:
+        """[[gauge]] + [linearization] without [lagrangian] → ValueError."""
+        import pytest
+
+        from tidal.cli._derive import generate_wls
+
+        config: dict[str, object] = {
+            "theory": {"name": "Test"},
+            "spacetime": {"dimension": 2, "metric": "minkowski"},
+            "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}],
+            "linearization": {
+                "perturbation_field": "h",
+                "expression": "SomeExpression[]",
+            },
+            "gauge": [{"field": "h", "type": "tt"}],
+            "output": {"path": "out.json"},
+        }
+        with pytest.raises(ValueError, match=r"requires \[lagrangian\]"):
+            generate_wls(config)
+
+    def test_gauge_metadata_tt(self) -> None:
+        """TT gauge → metadata string 'tt(h)'."""
+        wls = self._generate({
+            "spacetime": {"dimension": 3, "metric": "minkowski"},
+            "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}],
+            "derived_fields": [],
+            "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
+            "gauge": [{"field": "h", "type": "tt"}],
+        })
+        assert '"gauge" -> "tt(h)"' in wls
+
+    def test_tt_gauge_rejects_vector(self) -> None:
+        """TT gauge on vector field → ValueError."""
+        import pytest
+
+        with pytest.raises(ValueError, match="requires a tensor"):
+            self._generate({"gauge": [{"field": "A", "type": "tt"}]})
+
+    def test_tt_gauge_rejects_non_symmetric(self) -> None:
+        """TT gauge on non-symmetric tensor → ValueError."""
+        import pytest
+
+        with pytest.raises(ValueError, match="requires a symmetric tensor"):
+            self._generate({
+                "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "antisymmetric"}],
+                "derived_fields": [],
+                "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
+                "gauge": [{"field": "h", "type": "tt"}],
+            })
