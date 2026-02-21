@@ -517,6 +517,23 @@ class TestSimulateCommand:
         ])
         assert ret == 0
 
+    def test_simulate_leapfrog_scheme(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Verify leapfrog solver runs end-to-end on Klein-Gordon."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--scheme", "leapfrog",
+            "--t-end", "0.5",
+            "--dt", "0.01",
+            "--no-plot",
+        ])
+        assert ret == 0
+        captured = capsys.readouterr()
+        assert "leapfrog" in captured.out.lower()
+        assert "snapshots stored" in captured.out
+
     def test_simulate_custom_snapshots(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:

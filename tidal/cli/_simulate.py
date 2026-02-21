@@ -858,6 +858,82 @@ def _simulate_ida(  # noqa: PLR0913, PLR0917
     return storage
 
 
+def _simulate_leapfrog(  # noqa: PLR0913, PLR0917
+    args: Namespace,
+    spec: EquationSystem,
+    grid: CartesianGrid,
+    state: FieldCollection,
+    params: dict[str, float],
+    log: object,
+) -> MemoryStorage:
+    """Run simulation via symplectic Störmer-Verlet (leapfrog).
+
+    Only works for pure second-order (wave) systems. Preserves a shadow
+    Hamiltonian — zero secular energy drift for conservative systems.
+
+    Reference: Hairer, Lubich, Wanner, "Geometric Numerical Integration",
+    Springer, 2006.
+    """
+    from tidal.solver.leapfrog import solve_leapfrog
+
+    grid_info, periodic_flags = _gridinfo_from_pypde(grid)
+    y0 = np.concatenate([np.asarray(f.data).ravel() for f in state])
+    bc = _bc_from_args(args, periodic_flags)
+
+    # Leapfrog requires a fixed dt
+    dt = args.dt
+    if dt is None:
+        dt = _CFL_FACTOR * min(
+            float(d) for d in grid_info.dx
+        )
+
+    snapshot_interval = (
+        args.snapshots if args.snapshots is not None else args.t_end / 100.0
+    )
+
+    # Set up disk-backed writer if needed
+    fmt = _infer_output_format(args)
+    writer: SnapshotWriter | None = None
+    snapshot_cb = None
+
+    if fmt == "directory":
+        writer, snapshot_cb = _setup_ida_disk_writer(
+            args, spec, grid_info, periodic_flags, params, snapshot_interval,
+        )
+
+    log(  # type: ignore[operator]
+        f"Running leapfrog solver (t=0 → {args.t_end}, dt={dt:.4f})..."
+    )
+    result = solve_leapfrog(
+        spec,
+        grid_info,
+        y0,
+        t_span=(0.0, args.t_end),
+        dt=dt,
+        bc=bc,
+        snapshot_interval=snapshot_interval,
+        snapshot_callback=snapshot_cb,
+    )
+
+    if not result["success"]:
+        print(
+            f"Error: Leapfrog solver failed: {result['message']}", file=sys.stderr,
+        )
+
+    if writer is not None:
+        writer.close()
+        log(  # type: ignore[operator]
+            f"  {writer.count} snapshots streamed to: {writer.output_dir}"
+        )
+
+    # Pack result into MemoryStorage for output pipeline compatibility
+    storage = _ida_result_to_storage(
+        result, spec, grid, grid_info.shape, grid_info.num_points,
+    )
+    log(f"  {len(result['t'])} snapshots stored")  # type: ignore[operator]
+    return storage
+
+
 # --- Command entry point ---
 
 
@@ -904,7 +980,7 @@ def _warn_zero_evolution(pde: object, state: FieldCollection) -> None:
         )
 
 
-def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0914, PLR0915
+def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, PLR0915
     """Execute the simulate command.
 
     Parameters
@@ -978,6 +1054,20 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0914, PLR0915
         storage = _simulate_ida(args, spec, grid, state, params, log)
 
         # Step 8: Output
+        ctx = PlotContext(
+            spec=spec,
+            storage=storage,
+            grid=grid,
+            initial_state=initial_state,
+            params=params,
+        )
+        _generate_output(args, ctx)
+        return 0
+
+    # Leapfrog path: symplectic Störmer-Verlet for pure Hamiltonian systems
+    if args.scheme == "leapfrog":
+        storage = _simulate_leapfrog(args, spec, grid, state, params, log)
+
         ctx = PlotContext(
             spec=spec,
             storage=storage,
