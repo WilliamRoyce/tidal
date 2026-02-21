@@ -1762,11 +1762,6 @@ class TestCoupledConstraints:
             pde.evolution_rate(state, t=0.0)
 
 
-@pytest.mark.xfail(
-    reason="Non-diagonal kinetic matrix: gauge-unfixed linearized gravity field_rates "
-    "contain first_derivative_t (see docs/ISSUES.md). Needs gauge fixing (Phase B).",
-    strict=True,
-)
 class TestMassiveGravityConstraints:
     """Integration tests: massive gravity constraints solved with unified solver."""
 
@@ -1817,18 +1812,18 @@ class TestMassiveGravityConstraints:
                 f"Rate slot {i} has non-finite values"
             )
 
-    def test_constraint_h0_nonzero(
+    def test_constraint_h1_h2_are_constraints(
         self, massive_gravity_setup: tuple[PDEFromSpec, FieldCollection]
     ) -> None:
-        """h_0 (Helmholtz constraint) is nonzero when h_4 has a Gaussian."""
-        pde, state = massive_gravity_setup
-        pde.evolution_rate(state, t=0.0)
-
-        # h_0 gets a contribution from cross_derivative_xy(h_4)
-        # Find h_0 field slot
-        h0_slot = pde._field_slot_map["h_0"]
-        h0_max = float(np.max(np.abs(state[h0_slot].data)))
-        assert h0_max > 1e-6, f"h_0 should be nonzero, got max={h0_max}"
+        """h_1 and h_2 are constraints (time_order=0) in the new K^{-1} structure."""
+        pde, _ = massive_gravity_setup
+        # After kinetic matrix inversion, h_1 and h_2 have time_order=0
+        for eq in pde.spec.equations:
+            if eq.field_name in ("h_1", "h_2"):
+                assert eq.time_derivative_order == 0, (
+                    f"{eq.field_name} should be a constraint (time_order=0), "
+                    f"got time_order={eq.time_derivative_order}"
+                )
 
     def test_constraint_h3_h5_xy_swap(
         self, massive_gravity_setup: tuple[PDEFromSpec, FieldCollection]

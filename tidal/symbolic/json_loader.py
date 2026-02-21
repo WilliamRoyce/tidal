@@ -487,9 +487,6 @@ class CanonicalStructure:
         h_terms = tuple(
             HamiltonianTerm.from_dict(t) for t in data["hamiltonian_terms"]
         )
-        if not h_terms:
-            msg = "canonical.hamiltonian_terms must be non-empty"
-            raise ValueError(msg)
 
         raw_rates = data.get("field_rates", {})
         field_rates: dict[str, tuple[OperatorTerm, ...]] = {}

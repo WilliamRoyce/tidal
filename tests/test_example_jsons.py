@@ -34,7 +34,8 @@ _DEFAULT_PARAMS: dict[str, dict[str, float]] = {
     "cylindrical_kg.json": {"cylm2": 1.0},
     "sphere_kg.json": {"sphm2": 1.0, "sphR": 1.0},
     "spherical_kg.json": {"spm2": 1.0},
-    "conformal_kg_static.json": {},
+    "conformal_kg_static.json": {"m2": 1.0},
+    "navier_cauchy_2d.json": {"rho": 1.0, "lam": 1.0, "mu": 1.0},
     "massive_3form.json": {"m2": 1.0},
     "scalar_vector_coupling.json": {"phim2": 1.0, "Am2": 0.5, "kCS": 0.3, "gSV": 0.2},
     "massive_gravity_3d.json": {"m2": 1.0},
@@ -42,13 +43,13 @@ _DEFAULT_PARAMS: dict[str, dict[str, float]] = {
     "scalar_potential_well.json": {"V0": 4.0},
     "coupled_scattering.json": {"mPhi2": 1.0, "mChi2": 4.0, "g0": 1.0, "R": 8.0},
     "proca_background.json": {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5, "g0": 1.0, "R": 8.0},
+    "vector_background.json": {"mPhi2": 1.0, "mA2": 2.0, "gBV": 0.5, "B0": 1.0, "W": 3.0, "R": 8.0},
 }
 
-# Specs that cannot be evolved due to non-diagonal kinetic matrix
-# (gauge-unfixed linearized gravity — see docs/ISSUES.md).
+# Specs that cannot be evolved due to nonlinear (field-dependent)
+# EOM coefficients in gauge-unfixed linearized gravity (see docs/ISSUES.md).
 _NON_EVOLVABLE_SPECS: set[str] = {
     "linearized_gravity.json",
-    "massive_gravity_3d.json",
 }
 
 # Grid sizes per spatial dimension (small for speed).

@@ -405,7 +405,10 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
       -1
     ];
     If[Abs[lhsCoeff] =!= 1,
-      rhs = Simplify[-rhs / lhsCoeff]
+      (* Use Expand (not Simplify) to preserve Plus structure for ParseMultiFieldRHS.
+         Simplify may factor out common denominators, collapsing distinct field
+         terms into a single Times expression that ParseMultiFieldRHS cannot parse. *)
+      rhs = Expand[-rhs / lhsCoeff]
     ]
   ];
 

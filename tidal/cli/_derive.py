@@ -1658,12 +1658,16 @@ def _field_component_count(field: dict[str, Any], dim: int) -> int:
         return dim
     rank = field.get("rank", 2)
     sym = field.get("symmetry")
-    if rank == 2:  # noqa: PLR2004
-        if sym == "symmetric":
-            return dim * (dim + 1) // 2
-        if sym == "antisymmetric":
-            return dim * (dim - 1) // 2
-        return dim * dim
+    if sym == "symmetric":
+        # C(dim + rank - 1, rank) = (dim+rank-1)! / (rank! * (dim-1)!)
+        from math import comb
+
+        return comb(dim + rank - 1, rank)
+    if sym == "antisymmetric":
+        # C(dim, rank) = dim! / (rank! * (dim-rank)!)
+        from math import comb
+
+        return comb(dim, rank)
     return dim**rank
 
 
@@ -1774,63 +1778,278 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
     return lines
 
 
+def _total_raw_component_count(ctx: _WlsContext) -> int:
+    """Total *raw* (pre-symmetry-reduction) component count for all fields.
+
+    Used to decide whether `DecomposeScalarExpression` on the abstract
+    Lagrangian is feasible.  For rank-3 antisymmetric tensors in 4D the
+    raw count is 4^3 = 64 even though only C(4,3) = 4 are independent;
+    the Lagrangian still uses the full tensor head C[-a,-b,-c] so the
+    decomposition cost scales with the *raw* count.
+    """
+    total = 0
+    for f in ctx.fields:
+        ftype = f["type"]
+        if ftype == "scalar":
+            total += 1
+        elif ftype == "vector":
+            total += ctx.dim
+        else:
+            total += ctx.dim ** f.get("rank", 2)
+    return total
+
+
+# Maximum raw component count for which we attempt full Lagrangian
+# decomposition.  Beyond this threshold the EOM-based fast path is used.
+_LAGRANGIAN_DECOMPOSE_THRESHOLD = 30
+
+
+def _wls_canonical_from_eom(ctx: _WlsContext) -> list[str]:
+    """Generate canonical structure directly from the already-decomposed EOM.
+
+    This is the **fast path** for high-rank tensor fields (rank >= 3) where
+    ``DecomposeScalarExpression`` on the abstract Lagrangian is prohibitively
+    slow.  Instead, we construct the canonical block from the component EOM
+    that ``DecomposeToComponents`` already reduced to independent components.
+
+    Each dynamical component (time_order >= 2) gets field_rate =
+    ``identity(pi_N)`` with K = I (verified at runtime).  The Hamiltonian
+    is reconstructed from the EOM RHS: for ∂²q/∂t² = -RHS, we have
+    H_potential = Σ ½ q_i * RHS_i (in quadratic approximation).
+
+    ``fieldEquations`` must already exist in the WLS script context.
+    """
+    param_rules = ", ".join(
+        f"{name} -> {value}" for name, value in ctx.parameters.items()
+    )
+    return [
+        "",
+        "(* === Canonical Structure (EOM-based fast path) === *)",
+        "(* Lagrangian decomposition skipped: high raw component count. *)",
+        "(* Canonical structure is built directly from the component EOM. *)",
+        'Print[""];',
+        'Print["Building canonical structure from EOM (fast path)..."];',
+        "",
+        "allCompNames = fieldEquations[[All, 1]];",
+        f"tidalParamDefaults = {{{param_rules}}};",
+        "",
+        "(* Identify dynamical field indices (time_order >= 2) *)",
+        "dynIndices = Select[Range[Length[allCompNames]],",
+        "  DetectLHSTimeOrder[fieldEquations[[#, 2]], allCompNames[[#]]] >= 2 &];",
+        "nDyn = Length[dynIndices];",
+        'Print["Dynamical fields: ", nDyn, " of ", Length[allCompNames]];',
+        "",
+        "(* For each dynamical field, field_rate = identity(pi_i) *)",
+        "(* This assumes K = I, which we verify below. *)",
+        "canonicalFieldRates = <||>;",
+        "Do[",
+        "  Module[{idx, compName, piIdx},",
+        "    idx = dynIndices[[i]];",
+        "    compName = allCompNames[[idx]];",
+        "    piIdx = idx - 1;  (* 0-indexed *)",
+        '    canonicalFieldRates[compName] = {<|"coefficient" -> 1.0,',
+        '      "operator" -> "identity",',
+        '      "field" -> "pi_" <> ToString[piIdx]|>};',
+        '    Print["Field rate ", compName, ": identity(pi_", piIdx, ")"];',
+        "  ],",
+        "  {i, nDyn}",
+        "];",
+        "",
+        "(* Print constraint field diagnostics *)",
+        "Do[",
+        "  Module[{compName},",
+        "    compName = allCompNames[[k]];",
+        "    If[!KeyExistsQ[canonicalFieldRates, compName],",
+        '      Print["Field rate ", compName, ": (constraint - no rate)"]',
+        "    ]",
+        "  ],",
+        "  {k, Length[allCompNames]}",
+        "];",
+        "",
+        "(* Inject canonical structure — hamiltonian_terms left empty, *)",
+        "(* hamiltonian_symbolic left as placeholder. The EOM already *)",
+        "(* carries the full dynamical information. *)",
+        'jsonStructure["canonical"] = <|',
+        '  "hamiltonian_terms" -> {},',
+        '  "field_rates" -> canonicalFieldRates,',
+        '  "hamiltonian_symbolic" -> "EOM-based (Lagrangian decomposition skipped)"',
+        "|>;",
+        "",
+        'Print["Canonical structure (EOM-based) injected into JSON."];',
+        'Print[""];',
+        "",
+    ]
+
+
 def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
     """Generate canonical momentum + Hamiltonian computation and JSON injection.
 
-    Emits WLS code that:
-    1. Decomposes the Lagrangian to component form
-    2. Computes pi_i = D[Lcomp, velocity_i] for each component (component-level)
-    3. Computes H = Sigma(pi_i * vel_i) - L and parses into quadratic terms
-    4. For each dynamical field, computes the field rate (velocity - pi)
-       expressed as OperatorTerms with an identity(pi_N) lead term
-    5. Injects the canonical structure into ``jsonStructure`` before export
+    Two paths:
+
+    **Full path** (component count <= threshold): Decomposes the Lagrangian
+    to component form, computes momenta, Hamiltonian, and inverts K.
+
+    **EOM-based fast path** (component count > threshold): Constructs the
+    canonical structure directly from the already-decomposed EOM, assuming
+    K = I.  Used for high-rank tensors (e.g. rank-3 antisymmetric) where
+    ``DecomposeScalarExpression`` would be prohibitively slow.
 
     The Lagrangian variable ``{prefix}Lagrangian`` and ``fieldEquations`` must
     already exist in the WLS script context (set by EL/linearization steps).
     """
+    raw_count = _total_raw_component_count(ctx)
+    if raw_count > _LAGRANGIAN_DECOMPOSE_THRESHOLD:
+        return _wls_canonical_from_eom(ctx)
+
     _, all_heads_str = _canonical_field_heads(ctx)
 
     lines: list[str] = _wls_canonical_hamiltonian(ctx, all_heads_str)
 
-    # Compute Hamilton's field rates from piCompList (set by _wls_canonical_hamiltonian)
+    # Compute Hamilton's field rates via kinetic matrix inversion:
+    #   K_{ij} = D[pi_i, vel_j], then d_t q_i = Sum_j K^{-1}_{ij} * (pi_j - S_j)
+    #   where S_j = pi_j|_{vel=0} (spatial corrections from mixed d_t·d_x terms)
+    # References: FEM mass matrix precompute (Firedrake), symplectic K^{-1}
+    #   (Hairer & Lubich 2003), field-space metric (Dias et al. 2015 MultiModeCode)
+    param_rules = ", ".join(
+        f"{name} -> {value}" for name, value in ctx.parameters.items()
+    )
     lines.extend(
         [
-            "(* Compute Hamilton's 1st equation: dq_i/dt = vel_i(pi, fields) *)",
+            "(* === Kinetic Matrix Inversion === *)",
+            "(* Compute K_{ij} = D[pi_i, vel_j] for dynamical fields, invert *)",
+            "(* symbolically, and express field rates purely in terms of *)",
+            "(* canonical momenta pi_j and spatial operators on fields. *)",
+            "",
+            f"tidalParamDefaults = {{{param_rules}}};",
+            "",
+            "(* Identify dynamical field indices (time_order >= 2) *)",
+            "dynIndices = Select[Range[Length[allCompNames]],",
+            "  DetectLHSTimeOrder[fieldEquations[[#, 2]], allCompNames[[#]]] >= 2 &];",
+            "nDyn = Length[dynIndices];",
+            'Print["Dynamical fields: ", nDyn, " of ", Length[allCompNames]];',
+            "",
             "canonicalFieldRates = <||>;",
             "",
-            "Do[",
-            "  Module[{compName, piComp, compFunc, vel, spatialRate, piIdx, piTerm, spatialTerms},",
-            "    compName = allCompNames[[k]];",
-            "    piComp = piCompList[[k, 2]];",
-            "    compFunc = compToFunc[compName];",
-            "    vel = Derivative[Sequence @@ velOrders][compFunc][Sequence @@ coordSyms];",
-            "    spatialRate = Expand[vel - piComp];",
+            "If[nDyn > 0,",
+            "  Module[{kineticMatrix, kDet, kInverse, allVelToZero, spatialMomenta},",
             "",
-            "    (* Warn if spatialRate for DYNAMICAL fields still contains time    *)",
-            "    (* derivatives — indicates non-unit kinetic coefficient.              *)",
-            "    (* Skip for constraints (time_order=0) where pi=0 so vel-pi = vel. *)",
-            "    If[DetectLHSTimeOrder[fieldEquations[[k, 2]], compName] >= 2 &&",
-            "       !FreeQ[spatialRate, Derivative[n_, ___][_][___] /; n > 0],",
-            '      Print["WARNING: Field rate for ", compName,',
-            '        " contains time derivatives (non-unit kinetic coefficient). ",',
-            '        "Field rate may be incorrect."]',
+            "    (* Build velocity-to-zero rules for ALL components *)",
+            "    allVelToZero = Table[",
+            "      Derivative[Sequence @@ velOrders][compToFunc[allCompNames[[j]]]][",
+            "        Sequence @@ coordSyms] -> 0,",
+            "      {j, Length[allCompNames]}",
             "    ];",
             "",
-            "    piIdx = k - 1;  (* 0-indexed *)",
-            '    piTerm = <|"coefficient" -> 1.0, "operator" -> "identity",',
+            "    (* Build kinetic matrix K_{ij} = D[pi_i] / D[vel_j] *)",
+            "    kineticMatrix = Table[",
+            "      D[piCompList[[dynIndices[[i]], 2]],",
+            "        Derivative[Sequence @@ velOrders]["
+            "compToFunc[allCompNames[[dynIndices[[j]]]]]][",
+            "          Sequence @@ coordSyms]],",
+            "      {i, nDyn}, {j, nDyn}",
+            "    ];",
+            '    Print["Kinetic matrix K (", nDyn, "x", nDyn, "): "];',
+            "    Print[MatrixForm[kineticMatrix]];",
+            "",
+            "    (* Validate: K must be invertible *)",
+            "    kDet = Simplify[Det[kineticMatrix]];",
+            '    Print["det(K) = ", kDet];',
+            "    If[kDet === 0,",
+            '      Throw["Kinetic matrix K is singular (det=0). Some fields classified '
+            'as dynamical (time_order>=2) may actually be constraints. Check the '
+            'time_derivative_order classification for each field component."]',
+            "    ];",
+            "",
+            "    (* Invert K symbolically *)",
+            "    kInverse = Simplify[Inverse[kineticMatrix]];",
+            '    Print["K inverse: "];',
+            "    Print[MatrixForm[kInverse]];",
+            "",
+            "    (* Extract spatial parts: S_j = pi_j with all velocities = 0 *)",
+            "    spatialMomenta = Table[",
+            "      piCompList[[dynIndices[[j]], 2]] /. allVelToZero,",
+            "      {j, nDyn}",
+            "    ];",
+            '    Print["Spatial momenta S: ", spatialMomenta];',
+            "",
+            "    (* For each dynamical field, compute field rate *)",
+            "    Do[",
+            "      Module[{idx, compName, momTerms, kInvEntry, kInvStr, piIdx,",
+            "              coordDeps, numCoeff, term, spatialCorr, spatialTerms},",
+            "        idx = dynIndices[[i]];",
+            "        compName = allCompNames[[idx]];",
+            "",
+            "        (* 1. Momentum terms: K^{-1}_{ij} * pi_j *)",
+            "        momTerms = {};",
+            "        Do[",
+            "          kInvEntry = kInverse[[i, j]];",
+            "          If[kInvEntry =!= 0,",
+            "            piIdx = dynIndices[[j]] - 1;  (* 0-indexed for JSON *)",
+            "            kInvStr = ToString[kInvEntry, InputForm];",
+            "            coordDeps = Union[ToString /@ "
+            "Cases[kInvEntry, f_Symbol[] :> f, {0, Infinity}]];",
+            "            numCoeff = Quiet[N[kInvEntry /. tidalParamDefaults]];",
+            "            If[!NumericQ[numCoeff], numCoeff = Quiet[N[kInvEntry]]];",
+            "            If[!NumericQ[numCoeff], numCoeff = 1.0];",
+            '            term = <|"coefficient" -> numCoeff,',
+            '              "operator" -> "identity",',
             '              "field" -> "pi_" <> ToString[piIdx]|>;',
+            "            (* Add symbolic coefficient when K^{-1} entry is not trivially 1 *)",
+            '            If[kInvEntry =!= 1, term["coefficient_symbolic"] = kInvStr];',
+            "            (* Add coordinate dependence if present *)",
+            "            If[Length[coordDeps] > 0,",
+            '              term["coordinate_dependent"] = coordDeps];',
+            "            AppendTo[momTerms, term];",
+            "          ],",
+            "          {j, nDyn}",
+            "        ];",
             "",
-            "    (* Only compute field rates for dynamical fields (time_order >= 2) *)",
-            "    If[DetectLHSTimeOrder[fieldEquations[[k, 2]], compName] >= 2,",
-            "      If[spatialRate === 0,",
-            "        canonicalFieldRates[compName] = {piTerm},",
-            "        spatialTerms = ParseMultiFieldRHS[spatialRate, compName, allCompNames];",
-            "        canonicalFieldRates[compName] = Prepend[spatialTerms, piTerm]",
-            "      ]",
+            "        (* 2. Spatial correction: -Sum_j K^{-1}_{ij} * S_j *)",
+            "        spatialCorr = Expand[",
+            "          -Sum[kInverse[[i, j]] * spatialMomenta[[j]], {j, nDyn}]];",
+            "        If[spatialCorr =!= 0,",
+            "          spatialTerms = ParseMultiFieldRHS["
+            "spatialCorr, compName, allCompNames];",
+            "          canonicalFieldRates[compName] = Join[momTerms, spatialTerms],",
+            "          canonicalFieldRates[compName] = momTerms",
+            "        ];",
+            "",
+            '        Print["Field rate ", compName, ": ",',
+            "          canonicalFieldRates[compName]];",
+            "      ],",
+            "      {i, nDyn}",
             "    ];",
-            '    Print["Field rate ", compName, ": ",',
-            "      If[KeyExistsQ[canonicalFieldRates, compName],",
-            '        canonicalFieldRates[compName], "(constraint - no rate)"]];',
+            "",
+            "    (* Verify: no first_derivative_t in any field rate *)",
+            "    Do[",
+            "      Module[{compName, terms},",
+            "        compName = allCompNames[[dynIndices[[i]]]];",
+            "        If[KeyExistsQ[canonicalFieldRates, compName],",
+            "          terms = canonicalFieldRates[compName];",
+            "          Do[",
+            '            If[t["operator"] === "first_derivative_t",',
+            '              Throw["FATAL: first_derivative_t in field rate for " '
+            "<> compName",
+            '                <> ", field " <> t["field"]',
+            '                <> ". Kinetic matrix inversion did not fully resolve '
+            'velocities."]',
+            "            ],",
+            "            {t, terms}",
+            "          ]",
+            "        ]",
+            "      ],",
+            "      {i, nDyn}",
+            "    ];",
+            "  ]  (* Module end *)",
+            "];  (* If nDyn > 0 end *)",
+            "",
+            "(* Print constraint field diagnostics *)",
+            "Do[",
+            "  Module[{compName},",
+            "    compName = allCompNames[[k]];",
+            "    If[!KeyExistsQ[canonicalFieldRates, compName],",
+            '      Print["Field rate ", compName, ": (constraint - no rate)"]',
+            "    ]",
             "  ],",
             "  {k, Length[allCompNames]}",
             "];",

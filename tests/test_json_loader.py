@@ -1652,11 +1652,12 @@ class TestCanonicalStructure:
         assert grad_term.operator == "gradient_x"
         assert grad_term.field == "A_0"
 
-    def test_empty_terms_raises(self) -> None:
+    def test_empty_terms_allowed(self) -> None:
+        """Empty hamiltonian_terms is valid (EOM-based fast path for high-rank tensors)."""
         from tidal.symbolic.json_loader import CanonicalStructure
 
-        with pytest.raises(ValueError, match="non-empty"):
-            CanonicalStructure.from_dict(self._make_canonical_data(h_terms=[]))
+        cs = CanonicalStructure.from_dict(self._make_canonical_data(h_terms=[]))
+        assert cs.hamiltonian_terms == ()
 
     def test_equation_system_with_canonical(self) -> None:
         """EquationSystem.from_dict parses canonical section."""
