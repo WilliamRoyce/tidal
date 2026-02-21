@@ -166,6 +166,70 @@ _COUPLED_SCALARS_SPEC: dict[str, object] = {
     },
 }
 
+_EM_1D_SPEC: dict[str, object] = {
+    "metadata": {
+        "source": "inline-test",
+        "lagrangian_expr": "-1/4 F[-a,-b] F[a,b]",
+        "derived_from": "Euler-Lagrange",
+        "gauge": "none",
+        "linearized": False,
+    },
+    "spacetime": {
+        "dimension": 2,
+        "signature": [-1, 1],
+        "coordinates": ["t", "x"],
+    },
+    "fields": [
+        {"name": "A_0", "index": 0, "is_dynamical": True},
+        {"name": "A_1", "index": 1, "is_dynamical": True},
+    ],
+    "equations": [
+        {
+            "field": "A_0",
+            "lhs": {"expression": "A_0", "order": {"time": 0, "space": 0}},
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
+                    {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_1"},
+                ],
+            },
+        },
+        {
+            "field": "A_1",
+            "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2, "space": 0}},
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_0"},
+                ],
+            },
+        },
+    ],
+    "coupling": {},
+    "canonical": {
+        "hamiltonian_terms": [
+            {
+                "coefficient": -0.5,
+                "factor_a": {"field": "A_0", "operator": "gradient_x"},
+                "factor_b": {"field": "A_0", "operator": "gradient_x"},
+            },
+            {
+                "coefficient": 0.5,
+                "factor_a": {"field": "A_1", "operator": "time_derivative"},
+                "factor_b": {"field": "A_1", "operator": "time_derivative"},
+            },
+        ],
+        "field_rates": {
+            "A_1": [
+                {"coefficient": 1.0, "operator": "identity", "field": "pi_1"},
+                {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"},
+            ],
+        },
+        "hamiltonian_symbolic": "-1/2*Derivative[0, 1][tidalA0][t[], x[]]^2 + Derivative[1, 0][tidalA1][t[], x[]]^2/2",
+    },
+}
+
 _CONSTRAINT_SPEC: dict[str, object] = {
     "metadata": {
         "source": "inline-test",
@@ -243,6 +307,12 @@ def inline_coupled_scalars_json(tmp_path_factory: pytest.TempPathFactory) -> Pat
     return _write_inline_json(
         tmp_path_factory, _COUPLED_SCALARS_SPEC, "coupled_scalars.json"
     )
+
+
+@pytest.fixture(scope="session")
+def inline_em_1d_json(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Inline 1D EM JSON spec — A_0 constraint + A_1 dynamical (always available)."""
+    return _write_inline_json(tmp_path_factory, _EM_1D_SPEC, "em_1d.json")
 
 
 @pytest.fixture(scope="session")

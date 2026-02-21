@@ -638,6 +638,55 @@ class TestSimulateCommand:
         assert "Loading equation specification" not in out
 
 
+class TestZeroEvolutionWarning:
+    """Tests for the zero-evolution diagnostic warning."""
+
+    def test_em_gaussian_warns_zero_evolution(
+        self, inline_em_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Gaussian IC on EM A_1 with π=0 → zero-evolution warning."""
+        ret = main([
+            "simulate", str(inline_em_1d_json),
+            "--ic", "gaussian",
+            "--ic-component", "A_1",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+        captured = capsys.readouterr()
+        assert "all evolution rates are zero" in captured.err
+
+    def test_em_plane_wave_no_warning(
+        self, inline_em_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Plane-wave IC on EM A_1 provides non-zero π → no warning."""
+        ret = main([
+            "simulate", str(inline_em_1d_json),
+            "--ic", "plane-wave",
+            "--ic-component", "A_1",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+        captured = capsys.readouterr()
+        assert "all evolution rates are zero" not in captured.err
+
+    def test_kg_gaussian_no_warning(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """KG Gaussian IC has non-zero dπ/dt from laplacian → no warning."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--ic", "gaussian",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+        captured = capsys.readouterr()
+        assert "all evolution rates are zero" not in captured.err
+
+
 class TestDeriveCommand:
     def test_derive_toml_dry_run(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         config = tmp_path / "theory.toml"

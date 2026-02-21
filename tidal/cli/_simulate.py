@@ -32,6 +32,9 @@ SPATIAL_DIM_2D = 2
 # CFL safety factor for auto-dt computation
 _CFL_FACTOR = 0.5
 
+# Threshold for zero-evolution diagnostic (effectively machine epsilon)
+_ZERO_RATE_THRESHOLD = 1e-14
+
 # Visualization defaults
 DPI = 150
 VMAX_FLOOR = 0.01
@@ -683,6 +686,24 @@ def _validate_solver_params(args: Namespace) -> None:
         raise ValueError(msg)
 
 
+def _warn_zero_evolution(pde: object, state: FieldCollection) -> None:
+    """Warn if all evolution rates are zero at t=0.
+
+    Catches initial conditions that produce static configurations, e.g.
+    pure-gauge EM with Gaussian A_1 and zero conjugate momentum.
+    """
+    rates = pde.evolution_rate(state, t=0.0)  # type: ignore[attr-defined]
+    max_rate = max(float(np.max(np.abs(f.data))) for f in rates)
+    if max_rate < _ZERO_RATE_THRESHOLD:
+        print(
+            "  Warning: all evolution rates are zero at t=0. "
+            "The initial condition may be a static configuration. "
+            "For gauge fields, try --ic plane-wave to provide "
+            "non-zero conjugate momentum.",
+            file=sys.stderr,
+        )
+
+
 def simulate_command(args: Namespace) -> int:  # noqa: PLR0914, PLR0915
     """Execute the simulate command.
 
@@ -734,6 +755,11 @@ def simulate_command(args: Namespace) -> int:  # noqa: PLR0914, PLR0915
     state = _build_initial_state(args, grid, spec, bounds)
     initial_state = state.copy()
     log(f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}")
+
+    # Safety net: warn if all evolution rates are zero at t=0
+    # (e.g., pure-gauge EM with Gaussian IC and π=0)
+    if args.mode != "constraint":
+        _warn_zero_evolution(pde, state)
 
     # Constraint-only mode: single constraint solve, no time evolution
     if args.mode == "constraint":
