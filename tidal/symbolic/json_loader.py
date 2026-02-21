@@ -451,6 +451,76 @@ class HamiltonianTerm:
 
 
 @dataclass(frozen=True)
+class KineticMatrixEntry:
+    """Single entry of the kinetic matrix K_{ij}.
+
+    The kinetic matrix K relates canonical momenta to velocities:
+    ``π_i = K_{ij} · dq_j/dt + S_i``  where S_i are spatial corrections.
+
+    IDA uses K directly in residual form: ``K_{ij} · dq_j/dt - (π_i - S_i) = 0``.
+    Leapfrog solves ``K · v = (π - S)`` via ``np.linalg.solve``.
+
+    Attributes
+    ----------
+    i : int
+        Row index (0-based dynamical field index).
+    j : int
+        Column index (0-based dynamical field index).
+    value : float
+        Numerical value of K_{ij} (evaluated with parameter defaults).
+    symbolic : str | None
+        Exact symbolic expression (Mathematica InputForm), or None if trivial.
+    """
+
+    i: int
+    j: int
+    value: float
+    symbolic: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> KineticMatrixEntry:
+        """Parse from JSON dict."""
+        return cls(
+            i=int(data["i"]),
+            j=int(data["j"]),
+            value=float(data["value"]),
+            symbolic=data.get("symbolic"),
+        )
+
+
+@dataclass(frozen=True)
+class KineticMatrix:
+    """Full kinetic matrix K for the dynamical subsystem.
+
+    Attributes
+    ----------
+    entries : tuple[KineticMatrixEntry, ...]
+        Non-zero entries of K.
+    dimension : int
+        Size of K (number of dynamical fields).
+    """
+
+    entries: tuple[KineticMatrixEntry, ...]
+    dimension: int
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> KineticMatrix:
+        """Parse from JSON ``kinetic_matrix`` section."""
+        return cls(
+            entries=tuple(KineticMatrixEntry.from_dict(e) for e in data["entries"]),
+            dimension=int(data["dimension"]),
+        )
+
+    def to_dense(self) -> list[list[float]]:
+        """Convert to dense NxN matrix (list of lists)."""
+        n = self.dimension
+        matrix = [[0.0] * n for _ in range(n)]
+        for e in self.entries:
+            matrix[e.i][e.j] = e.value
+        return matrix
+
+
+@dataclass(frozen=True)
 class CanonicalStructure:
     """Hamilton's equations derived from Lagrangian via Legendre transform.
 
@@ -467,6 +537,13 @@ class CanonicalStructure:
         Each entry is the full RHS expressed as OperatorTerms, including
         the identity(π_i) term. For scalars: ``[identity(pi_0)]``.
         For Proca: ``[identity(pi_1), gradient_x(A_0)]``.
+    kinetic_matrix : KineticMatrix | None
+        Raw kinetic matrix K_{ij} = ∂π_i/∂(dq_j/dt).
+        Used directly by IDA (residual form) and leapfrog (K·v = π-S solve).
+        None for specs generated before Phase 2.
+    spatial_momenta : dict[str, tuple[OperatorTerm, ...]] | None
+        Spatial corrections S_i per dynamical field.  The momentum relation
+        is ``π_i = K_{ij} · dq_j/dt + S_i``.  None for pre-Phase 2 specs.
     hamiltonian_symbolic : str
         Full symbolic Hamiltonian expression (Mathematica InputForm).
     """
@@ -474,16 +551,12 @@ class CanonicalStructure:
     hamiltonian_terms: tuple[HamiltonianTerm, ...]
     field_rates: dict[str, tuple[OperatorTerm, ...]]
     hamiltonian_symbolic: str
+    kinetic_matrix: KineticMatrix | None = None
+    spatial_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> CanonicalStructure:
-        """Parse from JSON ``canonical`` section.
-
-        Raises
-        ------
-        ValueError
-            If ``hamiltonian_terms`` is empty.
-        """
+        """Parse from JSON ``canonical`` section."""
         h_terms = tuple(
             HamiltonianTerm.from_dict(t) for t in data["hamiltonian_terms"]
         )
@@ -495,10 +568,26 @@ class CanonicalStructure:
                 OperatorTerm.from_dict(t) for t in terms
             )
 
+        # Parse kinetic matrix (new in Phase 2, optional for backward compat)
+        km_data = data.get("kinetic_matrix")
+        kinetic_matrix = KineticMatrix.from_dict(km_data) if km_data else None
+
+        # Parse spatial momenta (new in Phase 2, optional for backward compat)
+        raw_sm = data.get("spatial_momenta")
+        spatial_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
+        if raw_sm is not None:
+            spatial_momenta = {}
+            for field_name, terms in raw_sm.items():
+                spatial_momenta[str(field_name)] = tuple(
+                    OperatorTerm.from_dict(t) for t in terms
+                )
+
         return cls(
             hamiltonian_terms=h_terms,
             field_rates=field_rates,
             hamiltonian_symbolic=str(data.get("hamiltonian_symbolic", "")),
+            kinetic_matrix=kinetic_matrix,
+            spatial_momenta=spatial_momenta,
         )
 
 

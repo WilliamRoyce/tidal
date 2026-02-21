@@ -1734,6 +1734,56 @@ class TestCanonicalStructure:
                 f"Dynamical field '{dname}' should have a field_rates entry"
             )
 
+    def test_kinetic_matrix_parsing(self) -> None:
+        """Parse kinetic_matrix from canonical section."""
+        from tidal.symbolic.json_loader import CanonicalStructure
+
+        data = self._make_canonical_data()
+        data["kinetic_matrix"] = {
+            "entries": [
+                {"i": 0, "j": 0, "value": 1.0},
+                {"i": 0, "j": 1, "value": 0.5, "symbolic": "kappa/2"},
+                {"i": 1, "j": 0, "value": 0.5, "symbolic": "kappa/2"},
+                {"i": 1, "j": 1, "value": 1.0},
+            ],
+            "dimension": 2,
+        }
+        cs = CanonicalStructure.from_dict(data)
+        assert cs.kinetic_matrix is not None
+        assert cs.kinetic_matrix.dimension == 2
+        assert len(cs.kinetic_matrix.entries) == 4
+        dense = cs.kinetic_matrix.to_dense()
+        assert dense == [[1.0, 0.5], [0.5, 1.0]]
+        assert cs.kinetic_matrix.entries[1].symbolic == "kappa/2"
+
+    def test_spatial_momenta_parsing(self) -> None:
+        """Parse spatial_momenta from canonical section."""
+        from tidal.symbolic.json_loader import CanonicalStructure
+
+        data = self._make_canonical_data()
+        data["spatial_momenta"] = {
+            "A_1": [
+                {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"},
+            ],
+            "A_2": [
+                {"coefficient": 1.0, "operator": "gradient_y", "field": "A_0"},
+            ],
+        }
+        cs = CanonicalStructure.from_dict(data)
+        assert cs.spatial_momenta is not None
+        assert len(cs.spatial_momenta) == 2
+        assert cs.spatial_momenta["A_1"][0].operator == "gradient_x"
+        assert cs.spatial_momenta["A_2"][0].field == "A_0"
+
+    def test_backward_compat_no_kinetic_matrix(self) -> None:
+        """Pre-Phase 2 specs without kinetic_matrix → None."""
+        from tidal.symbolic.json_loader import CanonicalStructure
+
+        data = self._make_canonical_data()
+        cs = CanonicalStructure.from_dict(data)
+        assert cs.kinetic_matrix is None
+        assert cs.spatial_momenta is None
+
     def test_equation_system_without_canonical(self) -> None:
         """Legacy specs without canonical section → canonical is None."""
         data: dict[str, Any] = {
