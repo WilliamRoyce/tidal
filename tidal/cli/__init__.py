@@ -6,6 +6,7 @@ Entry point: ``tidal`` command with subcommands:
 - ``tidal inspect``  — Display equation system information from JSON
 - ``tidal simulate`` — Run PDE simulation from JSON specification
 - ``tidal measure``  — Extract physics measurements from simulation output
+- ``tidal plot``     — Generate individual plots from simulation output
 - ``tidal list``     — List available JSON specifications
 - ``tidal validate`` — Validate a JSON equation specification
 """
@@ -22,7 +23,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     """Build the top-level argument parser with subcommands."""
     parser = argparse.ArgumentParser(
         prog="tidal",
-        description="Lagrangian-to-PDE pipeline: derive, inspect, simulate, measure, list.",
+        description="Lagrangian-to-PDE pipeline: derive, inspect, simulate, measure, plot, list.",
     )
     parser.add_argument(
         "--version",
@@ -372,6 +373,128 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Suppress progress messages",
     )
 
+    # --- plot ---
+    plot_parser = sub.add_parser(
+        "plot",
+        help="Generate individual plots from simulation output",
+        description=(
+            "Read disk-backed simulation output and produce a single focused plot. "
+            "Users compose visualizations via multiple calls in shell scripts."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  tidal plot output_dir/ --type heatmap --field phi_0\n"
+            "  tidal plot output_dir/ --type snapshot --time-index -1\n"
+            "  tidal plot output_dir/ --type amplitude --overlay 'exp(-0.1*t)'\n"
+            "  tidal plot output_dir/ --type energy --fields phi_0,chi_0\n"
+            "  tidal plot output_dir/ --type profile --cross-section y=25.0\n"
+            "  tidal plot output_dir/ --type compare --output compare.png"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    plot_parser.add_argument(
+        "data_dir",
+        help="Path to simulation output directory (from 'tidal simulate --output')",
+    )
+    plot_parser.add_argument(
+        "--type",
+        required=True,
+        choices=["heatmap", "snapshot", "amplitude", "energy", "profile", "compare"],
+        help="Plot type to generate",
+    )
+    # Field selection
+    plot_parser.add_argument(
+        "--field",
+        default=None,
+        metavar="NAME",
+        help="Single field for heatmap/snapshot/profile (default: first field)",
+    )
+    plot_parser.add_argument(
+        "--fields",
+        default=None,
+        metavar="NAME[,NAME,...]",
+        help="Multiple fields for amplitude/energy/compare (default: all)",
+    )
+    # Time selection
+    plot_parser.add_argument(
+        "--time-index",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Snapshot index for snapshot type (supports negative: -1 = last)",
+    )
+    plot_parser.add_argument(
+        "--time-indices",
+        default=None,
+        metavar="N,N,...",
+        help="Comma-separated time indices for profile (default: 5 evenly spaced)",
+    )
+    # Spatial slicing
+    plot_parser.add_argument(
+        "--cross-section",
+        default=None,
+        metavar="AXIS=VAL",
+        help="Slice 2D data along axis (e.g. y=25.0) for profile/compare",
+    )
+    # Reference overlay
+    plot_parser.add_argument(
+        "--overlay",
+        default=None,
+        metavar="EXPR",
+        help="Analytic formula vs time for amplitude plot (e.g. 'exp(-0.1*t)')",
+    )
+    # Output options
+    plot_parser.add_argument(
+        "--output",
+        default=None,
+        metavar="PATH",
+        help="Output file path (default: DATA_DIR/{type}.png)",
+    )
+    plot_parser.add_argument(
+        "--dpi",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Output resolution in DPI (default: 150)",
+    )
+    plot_parser.add_argument(
+        "--figsize",
+        default=None,
+        metavar="W,H",
+        help="Figure size in inches (e.g. 8,6)",
+    )
+    plot_parser.add_argument(
+        "--cmap",
+        default=None,
+        metavar="NAME",
+        help="Colormap for heatmap/snapshot (default: RdBu_r)",
+    )
+    plot_parser.add_argument(
+        "--title",
+        default=None,
+        help="Custom figure title",
+    )
+    # Metadata
+    plot_parser.add_argument(
+        "--spec",
+        default=None,
+        metavar="PATH",
+        help="Override JSON spec path (auto-discovered from metadata.json)",
+    )
+    plot_parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="KEY=VAL",
+        help="Override parameter value (repeatable, e.g. --param m2=1.0)",
+    )
+    plot_parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Suppress progress messages",
+    )
+
     return parser
 
 
@@ -385,7 +508,7 @@ def _get_version() -> str:
         return "unknown"
 
 
-def _dispatch(args: argparse.Namespace) -> int:
+def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911
     """Lazily import and run the appropriate command handler.
 
     Parameters
@@ -427,6 +550,10 @@ def _dispatch(args: argparse.Namespace) -> int:
         from tidal.cli._measure import measure_command
 
         return measure_command(args)
+    if args.command == "plot":
+        from tidal.cli._plot_command import plot_command
+
+        return plot_command(args)
     msg = f"Unknown command: {args.command}"
     raise ValueError(msg)
 

@@ -39,7 +39,7 @@ VMAX_FLOOR = 0.01
 # Curated namespace for --ic-formula eval().
 # Includes np for backward compatibility (e.g. np.exp(...) in formulas)
 # plus named math functions for convenience.
-_FORMULA_NAMESPACE: dict[str, object] = {
+FORMULA_NAMESPACE: dict[str, object] = {
     "np": np,
     "pi": np.pi,
     "e": np.e,
@@ -402,7 +402,7 @@ def _apply_formula_ic(
         raise ValueError(msg)
 
     coords = spec.spatial_coordinates
-    namespace = dict(_FORMULA_NAMESPACE)
+    namespace = dict(FORMULA_NAMESPACE)
     for i, name in enumerate(coords):
         namespace[name] = grid.cell_coords[..., i]
 
