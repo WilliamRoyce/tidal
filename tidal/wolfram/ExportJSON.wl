@@ -405,11 +405,15 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
       -1
     ];
     If[Abs[lhsCoeff] =!= 1,
-      (* Use Expand (not Simplify) to preserve Plus structure for ParseMultiFieldRHS.
-         Simplify may factor out common denominators, collapsing distinct field
-         terms into a single Times expression that ParseMultiFieldRHS cannot parse. *)
-      rhs = Expand[-rhs / lhsCoeff]
-    ]
+      rhs = -rhs / lhsCoeff
+    ];
+    (* ALWAYS Expand the RHS to ensure Plus structure for ParseMultiFieldRHS.
+       Total[] (line 395) may trigger Mathematica's auto-factoring, collapsing
+       separate linear terms into a single Times with multiple field heads.
+       Without Expand, ParseMultiFieldRHS misidentifies these as bilinear
+       (field-dependent) coefficients. This is critical for any multi-component
+       system where the LHS coefficient is ±1 (standard wave equations). *)
+    rhs = Expand[rhs]
   ];
 
   (* Parse RHS with cross-field detection *)
@@ -1310,6 +1314,12 @@ ParseHamiltonianExpression[componentExpr_, allFieldNames_List] := Module[
       "Expression (short): ", ToString[Short[componentExpr, 3]]
     ]]
   ];
+
+  (* Ensure expression is fully expanded before splitting into Plus terms.
+     The Legendre transform H = Sum pi*vel - L should produce an expanded
+     expression, but defensive Expand prevents silent failures from
+     auto-factoring (same rationale as the Expand in EquationToJSONMultiField). *)
+  componentExpr = Expand[componentExpr];
 
   (* Split into additive terms *)
   terms = If[Head[componentExpr] === Plus, List @@ componentExpr, {componentExpr}];

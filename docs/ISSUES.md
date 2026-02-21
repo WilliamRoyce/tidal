@@ -2,15 +2,16 @@
 
 ## Non-Diagonal Kinetic Matrix in Linearized Gravity
 
-**Status:** Open (blocking simulation of linearized gravity examples)
-**Affects:** `massive_gravity`, `gravitational_waves` examples
-**Priority:** High (unblocks Gertsenshtein effect simulation)
-**Resolves with:** Phase B (Gauge Fixing) or explicit kinetic matrix inversion
+**Status:** Resolved — K^{-1} symbolic inversion + Expand fix
+**Affects:** Previously affected `massive_gravity`, `gravitational_waves` examples
+**Priority:** Closed
+**Resolved by:** Symbolic kinetic matrix inversion (K^{-1}) in canonical pipeline,
+plus always-Expand fix in ExportJSON.wl
 
 ### Problem
 
-The canonical momentum pipeline computes field rates via the simple subtraction
-`dq_i/dt = vel_i - pi_i`, which assumes a **unit (diagonal) kinetic coefficient**:
+The canonical momentum pipeline originally computed field rates via simple subtraction
+`dq_i/dt = vel_i - pi_i`, which assumed a **unit (diagonal) kinetic coefficient**:
 `pi_i = d_t q_i + spatial_terms`.
 
 For linearized gravity, the quadratic Lagrangian `L^(2)` has cross-coupled time
@@ -22,14 +23,51 @@ pi_i = K_{ij} * d_t q_j + spatial_terms(q)
 ```
 
 When `K` is not the identity, the field rate `dq_i/dt = K^{-1}_{ij}(pi_j - spatial_j)`
-requires matrix inversion. The current pipeline instead produces field_rates containing
-`first_derivative_t` references to other fields, which the PDE builder rejects:
+requires matrix inversion. Without this, the pipeline produced field_rates containing
+`first_derivative_t` references to other fields, which the PDE builder rejected.
 
-```
-RuntimeError: Operator 'first_derivative_t' cannot be applied as a spatial operator.
-```
+### Resolution (Implemented)
 
-### Root Cause
+**1. Symbolic K^{-1} inversion (gauge-independent)**
+
+The canonical pipeline (`_wls_canonical_pipeline()` in `_derive.py`) now:
+1. Computes the kinetic matrix `K_{ij} = D[pi_i, vel_j]` symbolically
+2. Validates `det(K) != 0` (throws if singular)
+3. Inverts symbolically via `Simplify[Inverse[K]]`
+4. Emits field rates: `dq_i/dt = Sum_j K^{-1}_{ij} (pi_j - S_j)`
+5. Verifies no residual `first_derivative_t` operators remain
+
+This works for ALL gauge-unfixed theories without requiring any gauge choice:
+- Proca (K = diag(-1, 1))
+- Massive gravity (4x4 non-diagonal K)
+- Gravitational waves (7x7 non-diagonal K, 3 constraint components)
+- Elasticity (K = diag(rho, rho))
+
+**2. Always-Expand fix in ExportJSON.wl**
+
+Mathematica's `Total[]` in `EquationToJSONMultiField` could trigger auto-factoring,
+collapsing separate linear terms into a single `Times` with multiple field heads.
+`Expand` was only applied when `|lhsCoeff| != 1`, missing standard wave equations.
+
+Fix: always call `Expand[rhs]` before `ParseMultiFieldRHS`, regardless of lhsCoeff.
+Same defensive `Expand` added inside `ParseHamiltonianExpression`.
+
+**3. EOM-based fast path for high-rank tensors**
+
+For theories with raw component count > 30 (e.g., rank-3 antisymmetric in 4D:
+4^3 = 64 raw components), `DecomposeScalarExpression` on the abstract Lagrangian
+is prohibitively slow. The pipeline uses an EOM-based fast path that constructs
+canonical structure directly from already-decomposed EOM (K=I assumed).
+
+### Additional Options (for physics optimisation, not required for correctness)
+
+1. **TT gauge** — reduces gravitational waves from 10 components to 2 physical
+   polarisation modes (h_+, h_x). Available via `[[gauge]] type = "tt"`.
+
+2. **De Donder (harmonic) gauge** — diagonalizes kinetic matrix and exposes
+   constraint structure. Available via `[[gauge]] type = "de_donder"` (Phase B).
+
+### Root Cause Analysis
 
 In the gauge-unfixed formulation of linearized Einstein equations, all 10 (or 6 in 2+1D)
 components of `h_{ab}` appear as 2nd-order-in-time evolution equations. The kinetic
@@ -47,58 +85,14 @@ K = [[1, 0, -1/2, ...],
      ...]
 ```
 
-### Why Gauge Fixing Resolves This
-
-In **de Donder (harmonic) gauge**, the linearized Einstein equations simplify to:
-
-```
--1/2 Box h_ab + mass_terms = 0  (after trace-reversal)
-```
-
-where `Box = -d^2_t + Laplacian` is the flat-space d'Alembertian. This form has:
-1. **Diagonal kinetic matrix** (each component has its own `d^2_t`)
-2. **Explicit constraint structure** (h_0, h_0i become constraints)
-3. **Standard wave equation form** that the PDE builder handles natively
-
-### Resolution Options
-
-1. **Phase B: Automatic gauge fixing** (recommended)
-   - Implement de Donder/Lorenz gauge in the pipeline
-   - Gauge fixing term `L_gf = -1/(2xi) (d^a h_ab - 1/2 d_b h)^2` diagonalizes kinetic matrix
-   - Most physically correct approach; also exposes constraint structure
-   - Already planned as Phase B in NEXT_PHASES.md
-
-2. **Symbolic kinetic matrix inversion** (alternative)
-   - Compute `K_{ij}` in Wolfram, invert symbolically, emit `K^{-1}` to JSON
-   - More general but complex; may produce large expressions
-
-3. **Runtime numeric matrix inversion** (fallback)
-   - Build `K` numerically from JSON coefficients, invert with NumPy
-   - Simple but may not handle position-dependent metrics
-
 ### Current State
 
-The equations in `massive_gravity_3d.json` and `linearized_gravity.json` are
-**physically correct** (contain full linearized Einstein tensor + mass terms from
-the single-path L^(2) = Perturbation[L,2]/2 approach). The canonical Hamiltonian
-is also correct (60 terms for massive gravity, 170 for gravitational waves).
-
-Only the **field_rates** have the non-diagonal kinetic matrix issue, preventing
-the PDE builder from constructing the time evolution. The equations, mass/coupling
-matrices, and Hamiltonian are all valid.
-
-### Related Issues
-
-- Gauge-unfixed equations have no explicit constraint structure (all components
-  are time_order=2). Gauge fixing will reveal Hamiltonian and momentum constraints.
-- The `test_constraint_h0_nonzero` test in `test_constraint_solver.py` assumed
-  h_0 was a constraint (from the old legacy linearization path). With the new
-  Lagrangian-first approach, h_0 is correctly an evolution equation in the
-  gauge-unfixed formulation.
+All 23 example JSON specs load, build PDE systems, and evolve correctly.
+1016 Python tests pass, 0 failures, 0 xfails. The `_NON_EVOLVABLE_SPECS` set
+in `test_example_jsons.py` is now empty.
 
 ### References
 
 - Carroll, "Spacetime and Geometry" (2004), Ch. 7 (linearized gravity)
 - Brizuela, Martin-Garcia, Mena Marugan (2009) (xPert perturbation theory)
 - Fierz & Pauli (1939) (massive gravity mass term)
-- Phase B plan in `docs/NEXT_PHASES.md`

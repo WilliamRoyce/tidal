@@ -46,11 +46,9 @@ _DEFAULT_PARAMS: dict[str, dict[str, float]] = {
     "vector_background.json": {"mPhi2": 1.0, "mA2": 2.0, "gBV": 0.5, "B0": 1.0, "W": 3.0, "R": 8.0},
 }
 
-# Specs that cannot be evolved due to nonlinear (field-dependent)
-# EOM coefficients in gauge-unfixed linearized gravity (see docs/ISSUES.md).
-_NON_EVOLVABLE_SPECS: set[str] = {
-    "linearized_gravity.json",
-}
+# Specs that cannot be evolved (e.g., nonlinear EOM coefficients).
+# Currently empty — K^{-1} inversion resolved the linearized gravity issue.
+_NON_EVOLVABLE_SPECS: set[str] = set()
 
 # Grid sizes per spatial dimension (small for speed).
 _GRID_SIZE: dict[int, list[tuple[float, float]]] = {

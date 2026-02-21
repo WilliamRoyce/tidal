@@ -1990,7 +1990,12 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
             "Cases[kInvEntry, f_Symbol[] :> f, {0, Infinity}]];",
             "            numCoeff = Quiet[N[kInvEntry /. tidalParamDefaults]];",
             "            If[!NumericQ[numCoeff], numCoeff = Quiet[N[kInvEntry]]];",
-            "            If[!NumericQ[numCoeff], numCoeff = 1.0];",
+            "            If[!NumericQ[numCoeff],",
+            '              Throw["FATAL: Cannot evaluate K^{-1} entry '
+            'numerically: " <> ToString[kInvEntry, InputForm]',
+            '                <> ". Ensure all symbolic parameters have '
+            'defaults in [parameters]."]',
+            "            ];",
             '            term = <|"coefficient" -> numCoeff,',
             '              "operator" -> "identity",',
             '              "field" -> "pi_" <> ToString[piIdx]|>;',
