@@ -451,62 +451,28 @@ class HamiltonianTerm:
 
 
 @dataclass(frozen=True)
-class CanonicalCorrection:
-    """A single correction term: π_i = p_i + Σ correction_terms.
-
-    Each correction is: coefficient * operator(constraint_field).
-    For example, for Proca: π_1 = p_1 - gradient_x(A_0)
-    gives coefficient=-1.0, operator="gradient_x", field="A_0".
-
-    Attributes
-    ----------
-    coefficient : float
-        Numeric coefficient.
-    operator : str
-        Differential operator applied to the constraint field.
-    field : str
-        The constraint field name this correction involves.
-    coefficient_symbolic : str | None
-        Symbolic coefficient expression.
-    """
-
-    coefficient: float
-    operator: str
-    field: str
-    coefficient_symbolic: str | None = None
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> CanonicalCorrection:
-        """Parse from JSON dict (same format as OperatorTerm)."""
-        return cls(
-            coefficient=float(data["coefficient"]),
-            operator=str(data["operator"]),
-            field=str(data["field"]),
-            coefficient_symbolic=data.get("coefficient_symbolic"),
-        )
-
-
-@dataclass(frozen=True)
 class CanonicalStructure:
-    """Canonical momentum and Hamiltonian structure derived from Lagrangian.
+    """Hamilton's equations derived from Lagrangian via Legendre transform.
 
-    Computed symbolically via Legendre transform in Wolfram and exported
-    as part of the JSON spec. Used by the PDE builder for canonical
-    evolution and by the energy measurement for Hamiltonian evaluation.
+    Computed symbolically in Wolfram and exported as part of the JSON spec.
+    Used by the PDE builder for canonical evolution (Hamilton's 1st equation)
+    and by the energy measurement for Hamiltonian evaluation.
 
     Attributes
     ----------
     hamiltonian_terms : tuple[HamiltonianTerm, ...]
         Quadratic terms in the component-form Hamiltonian density.
-    corrections : dict[str, tuple[CanonicalCorrection, ...]]
-        Per-component canonical corrections: π_i = p_i + corrections[field_name].
-        Empty tuple for fields where π = p (scalars without gauge coupling).
+    field_rates : dict[str, tuple[OperatorTerm, ...]]
+        Hamilton's 1st equation per component: dq_i/dt = ∂H/∂π_i.
+        Each entry is the full RHS expressed as OperatorTerms, including
+        the identity(π_i) term. For scalars: ``[identity(pi_0)]``.
+        For Proca: ``[identity(pi_1), gradient_x(A_0)]``.
     hamiltonian_symbolic : str
         Full symbolic Hamiltonian expression (Mathematica InputForm).
     """
 
     hamiltonian_terms: tuple[HamiltonianTerm, ...]
-    corrections: dict[str, tuple[CanonicalCorrection, ...]]
+    field_rates: dict[str, tuple[OperatorTerm, ...]]
     hamiltonian_symbolic: str
 
     @classmethod
@@ -525,16 +491,16 @@ class CanonicalStructure:
             msg = "canonical.hamiltonian_terms must be non-empty"
             raise ValueError(msg)
 
-        raw_corrections = data.get("canonical_corrections", {})
-        corrections: dict[str, tuple[CanonicalCorrection, ...]] = {}
-        for field_name, corr_list in raw_corrections.items():
-            corrections[str(field_name)] = tuple(
-                CanonicalCorrection.from_dict(c) for c in corr_list
+        raw_rates = data.get("field_rates", {})
+        field_rates: dict[str, tuple[OperatorTerm, ...]] = {}
+        for field_name, terms in raw_rates.items():
+            field_rates[str(field_name)] = tuple(
+                OperatorTerm.from_dict(t) for t in terms
             )
 
         return cls(
             hamiltonian_terms=h_terms,
-            corrections=corrections,
+            field_rates=field_rates,
             hamiltonian_symbolic=str(data.get("hamiltonian_symbolic", "")),
         )
 

@@ -1576,7 +1576,7 @@ class TestCanonicalStructure:
         self,
         *,
         h_terms: list[dict[str, Any]] | None = None,
-        corrections: dict[str, list[dict[str, Any]]] | None = None,
+        field_rates: dict[str, list[dict[str, Any]]] | None = None,
         symbolic: str = "H_test",
     ) -> dict[str, Any]:
         if h_terms is None:
@@ -1587,16 +1587,18 @@ class TestCanonicalStructure:
                     "factor_b": {"field": "phi_0", "operator": "time_derivative"},
                 },
             ]
-        if corrections is None:
-            corrections = {"phi_0": []}
+        if field_rates is None:
+            field_rates = {"phi_0": [
+                {"coefficient": 1.0, "operator": "identity", "field": "pi_0"},
+            ]}
         return {
             "hamiltonian_terms": h_terms,
-            "canonical_corrections": corrections,
+            "field_rates": field_rates,
             "hamiltonian_symbolic": symbolic,
         }
 
     def test_parse_kg_canonical(self) -> None:
-        """Klein-Gordon: π = p, no corrections."""
+        """Klein-Gordon: dφ/dt = π (single identity term)."""
         from tidal.symbolic.json_loader import CanonicalStructure
 
         data = self._make_canonical_data(
@@ -1621,29 +1623,34 @@ class TestCanonicalStructure:
         )
         cs = CanonicalStructure.from_dict(data)
         assert len(cs.hamiltonian_terms) == 3
-        assert cs.corrections["phi_0"] == ()
+        assert len(cs.field_rates["phi_0"]) == 1
+        assert cs.field_rates["phi_0"][0].operator == "identity"
+        assert cs.field_rates["phi_0"][0].field == "pi_0"
         assert cs.hamiltonian_terms[0].factor_a.operator == "time_derivative"
         assert cs.hamiltonian_terms[2].coefficient_symbolic == "m2"
 
-    def test_parse_proca_corrections(self) -> None:
-        """Proca: π_1 = p_1 - gradient_x(A_0)."""
+    def test_parse_proca_field_rates(self) -> None:
+        """Proca: dA_1/dt = π_1 + gradient_x(A_0)."""
         from tidal.symbolic.json_loader import CanonicalStructure
 
         data = self._make_canonical_data(
-            corrections={
-                "A_0": [],
+            field_rates={
                 "A_1": [
-                    {"coefficient": -1.0, "operator": "gradient_x", "field": "A_0"},
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_1"},
+                    {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"},
                 ],
             },
         )
         cs = CanonicalStructure.from_dict(data)
-        assert len(cs.corrections["A_1"]) == 1
-        corr = cs.corrections["A_1"][0]
-        assert corr.coefficient == -1.0
-        assert corr.operator == "gradient_x"
-        assert corr.field == "A_0"
-        assert cs.corrections["A_0"] == ()
+        assert len(cs.field_rates["A_1"]) == 2
+        pi_term = cs.field_rates["A_1"][0]
+        assert pi_term.coefficient == 1.0
+        assert pi_term.operator == "identity"
+        assert pi_term.field == "pi_1"
+        grad_term = cs.field_rates["A_1"][1]
+        assert grad_term.coefficient == 1.0
+        assert grad_term.operator == "gradient_x"
+        assert grad_term.field == "A_0"
 
     def test_empty_terms_raises(self) -> None:
         from tidal.symbolic.json_loader import CanonicalStructure
@@ -1676,14 +1683,55 @@ class TestCanonicalStructure:
                         "factor_b": {"field": "phi_0", "operator": "time_derivative"},
                     },
                 ],
-                "canonical_corrections": {"phi_0": []},
+                "field_rates": {"phi_0": [
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_0"},
+                ]},
                 "hamiltonian_symbolic": "test",
             },
         }
         spec = EquationSystem.from_dict(data)
         assert spec.canonical is not None
         assert len(spec.canonical.hamiltonian_terms) == 1
-        assert spec.canonical.corrections["phi_0"] == ()
+        assert len(spec.canonical.field_rates["phi_0"]) == 1
+
+    def test_constraint_fields_excluded_from_field_rates(self) -> None:
+        """Constraint fields (time_order=0) must NOT have field_rates entries.
+
+        Uses coupled_proca which has A_0/B_0 constraints and A_1/A_2/B_1/B_2
+        dynamical fields.  Only dynamical fields should appear in field_rates.
+        """
+        path = Path(__file__).parent.parent / "examples" / "data" / "coupled_proca_3d.json"
+        if not path.exists():
+            pytest.skip("coupled_proca_3d.json not found")
+        spec = EquationSystem.from_dict(
+            __import__("json").loads(path.read_text())
+        )
+        assert spec.canonical is not None
+
+        # Identify constraint fields
+        constraint_names = {
+            eq.field_name
+            for eq in spec.equations
+            if eq.time_derivative_order == 0
+        }
+        assert len(constraint_names) > 0, "Expected constraint fields in Proca"
+
+        # No constraint field should appear as a key in field_rates
+        for cname in constraint_names:
+            assert cname not in spec.canonical.field_rates, (
+                f"Constraint field '{cname}' should not have a field_rates entry"
+            )
+
+        # All dynamical fields should have field_rates
+        dynamical_names = {
+            eq.field_name
+            for eq in spec.equations
+            if eq.time_derivative_order >= 2
+        }
+        for dname in dynamical_names:
+            assert dname in spec.canonical.field_rates, (
+                f"Dynamical field '{dname}' should have a field_rates entry"
+            )
 
     def test_equation_system_without_canonical(self) -> None:
         """Legacy specs without canonical section → canonical is None."""

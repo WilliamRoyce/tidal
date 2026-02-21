@@ -753,7 +753,13 @@ def _evaluate_hamiltonian_factor(
 ) -> NDArray[np.float64] | None:
     """Evaluate a single Hamiltonian factor on the grid.
 
-    For ``time_derivative`` operator, returns the stored momentum (canonical).
+    For ``time_derivative`` operator, reconstructs the velocity from
+    ``canonical.field_rates`` (Hamilton's 1st equation).  This is critical
+    for gauge theories (Proca, Chern-Simons) where the canonical momentum
+    differs from the velocity: π_i ≠ ∂_t q_i.  For scalars where π = ∂_t q,
+    the field_rates reduce to ``[identity(pi)]`` and the result equals the
+    stored momentum.
+
     For spatial operators, applies the operator to the field data.
     For ``identity``, returns the field data directly.
 
@@ -761,9 +767,25 @@ def _evaluate_hamiltonian_factor(
     constraint field for time_derivative).
     """
     if factor_operator == "time_derivative":
-        # Maps to canonical momentum stored in simulation.
-        # factor_field is a component name like "phi_0" or "A_1";
-        # look up its stored momentum (None for constraint fields).
+        # Reconstruct velocity: ∂_t q = Σ field_rate_terms
+        # For scalars: vel = pi (no change).
+        # For Proca: vel = pi + gradient_x(A_0), etc.
+        canonical = data.spec.canonical
+        if canonical is not None and factor_field in canonical.field_rates:
+            shape = next(iter(data.fields.values()))[t_idx].shape
+            result: NDArray[np.float64] = np.zeros(shape, dtype=np.float64)
+            for term in canonical.field_rates[factor_field]:
+                target = _resolve_term_target(data, term.field, t_idx)
+                if target is None:
+                    continue
+                if term.operator == "identity":
+                    result += term.coefficient * target
+                else:
+                    result += term.coefficient * _apply_spatial_operator(
+                        term.operator, target, data.grid_spacing, data.periodic,
+                    )
+            return result
+        # Fallback for specs without field_rates (legacy)
         mom = data.momenta.get(factor_field)
         if mom is not None:
             return mom[t_idx]

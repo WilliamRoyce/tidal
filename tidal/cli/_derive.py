@@ -1425,114 +1425,124 @@ def _canonical_field_heads(ctx: _WlsContext) -> tuple[str, str]:
     return ", ".join(field_heads), ", ".join(all_heads)
 
 
-def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str]:
-    """Generate WLS code to compute and parse the Hamiltonian.
+def _field_component_count(field: dict[str, Any], dim: int) -> int:
+    """Return the number of independent components for *field* in *dim* spacetime."""
+    ftype = field["type"]
+    if ftype == "scalar":
+        return 1
+    if ftype == "vector":
+        return dim
+    rank = field.get("rank", 2)
+    sym = field.get("symmetry")
+    if rank == 2:  # noqa: PLR2004
+        if sym == "symmetric":
+            return dim * (dim + 1) // 2
+        if sym == "antisymmetric":
+            return dim * (dim - 1) // 2
+        return dim * dim
+    return dim**rank
 
-    Calls ``LegendreTransformH``, applies scalar BG substitutions, decomposes
-    to components, and parses into structured quadratic terms.
+
+def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str]:
+    """Generate WLS code to compute H via component-level Legendre transform.
+
+    Computes canonical momenta using ``D[Lcomp, velocity_i]`` at the
+    component level, bypassing the abstract-index ``CanonicalMomentum``
+    (which fails when the Lagrangian uses abstract metric contractions).
+
+    Sets up WLS variables: ``lagComp``, ``piCompList``, ``canonicalH``,
+    ``compToFunc``, ``velOrders``, ``coordSyms``, ``allCompNames``,
+    ``hamiltonianTerms``.
     """
     p = ctx.prefix
-    heads_str, _ = _canonical_field_heads(ctx)
 
     lines: list[str] = [
         "",
-        "(* === Phase K: Canonical Momentum & Hamiltonian === *)",
+        "(* === Phase K: Canonical Momentum & Hamiltonian (component-level) === *)",
         'Print[""];',
         'Print["Computing canonical momenta and Hamiltonian..."];',
         "",
-        "(* Compute Hamiltonian via Legendre transform *)",
-        f"{{canonicalH, piList}} = LegendreTransformH[{p}Lagrangian, {{{heads_str}}}, {ctx.chart}, {ctx.cd}];",
-        'Print["H (abstract): ", Short[canonicalH, 3]];',
+        "(* Copy Lagrangian for canonical analysis *)",
+        f"lagForCanon = {p}Lagrangian;",
         "",
+        "(* Re-introduce explicit metric tensors for correct sign handling.       *)",
+        "(* When derived fields are expanded, ContractMetric absorbs the metric   *)",
+        "(* into index positions (raised/lowered). DecomposeScalarExpression needs *)",
+        "(* explicit metric tensors to correctly apply the Minkowski signature     *)",
+        "(* (or any user-supplied metric) during component evaluation.             *)",
+        f"lagForCanon = SeparateMetric[{ctx.metric}][lagForCanon];",
     ]
 
-    # Apply scalar background substitutions to H
-    lines.extend(_wls_scalar_background_substitution(ctx, "canonicalH"))
+    # Apply scalar BG substitutions before decomposition
+    lines.extend(_wls_scalar_background_substitution(ctx, "lagForCanon"))
 
-    lines.extend((
+    lines.extend([
         "",
-        "(* Decompose H to component form *)",
-        f"canonicalHComp = DecomposeScalarExpression[canonicalH, {ctx.chart}, {{{all_heads_str}}}, "
+        "(* Decompose Lagrangian to component form *)",
+        f"lagComp = DecomposeScalarExpression[lagForCanon, {ctx.chart}, {{{all_heads_str}}}, "
         f'"MetricMatrix" -> {p}MetricMatrix];',
-        'Print["H (components): ", Short[canonicalHComp, 5]];',
+    ])
+
+    # Apply vector BG substitutions after decomposition
+    lines.extend(_wls_vector_background_substitution(ctx, "lagComp"))
+
+    lines.extend([
+        'Print["L (components): ", Short[lagComp, 5]];',
+        "",
+        "(* Build velocity-order pattern: {1, 0, ...} for d_t *)",
+        f"coordSyms = ScalarsOfChart[{ctx.chart}];",
+        "nCoords = Length[coordSyms];",
+        "velOrders = Table[If[i == 1, 1, 0], {i, nCoords}];",
+        "",
+        "(* Normalize all Derivative arities to full dimension.  *)",
+        "(* ConvertCDToDerivatives may produce mixed arities     *)",
+        "(* (e.g. Derivative[1,0] and Derivative[0,0,1] in 2+1D) *)",
+        "(* which causes D[] to fail matching. Pad to nCoords.   *)",
+        "lagComp = lagComp /. Derivative[orders__][g_][args__] /;",
+        "  Length[{orders}] < nCoords :>",
+        "  Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
+        "",
+        "(* Map component names to Wolfram function symbols *)",
+        "compToFunc = <||>;",
+    ])
+
+    # Build component-to-function mapping from Python field definitions
+    for field in ctx.fields:
+        fname = field["name"]
+        head = f"{p}{fname.capitalize()}"
+        n_comps = _field_component_count(field, ctx.dim)
+        lines.extend(
+            f'compToFunc["{fname}_{j}"] = {head}{j};' for j in range(n_comps)
+        )
+
+    lines.extend([
+        "",
+        "(* Compute canonical momenta: pi_i = dL/d(d_t q_i) *)",
+        "allCompNames = fieldEquations[[All, 1]];",
+        "piCompList = {};",
+        "canonicalH = 0;",
+        "Do[",
+        "  Module[{compName, compFunc, vel, piComp},",
+        "    compName = allCompNames[[k]];",
+        "    compFunc = compToFunc[compName];",
+        "    vel = Derivative[Sequence @@ velOrders][compFunc][Sequence @@ coordSyms];",
+        "    piComp = D[lagComp, vel];",
+        "    AppendTo[piCompList, {compName, piComp}];",
+        "    canonicalH += piComp * vel;",
+        '    Print["pi(", compName, "): ", piComp];',
+        "  ],",
+        "  {k, Length[allCompNames]}",
+        "];",
+        "",
+        "(* Legendre transform: H = Sigma pi_i * vel_i - L *)",
+        "canonicalH = Expand[canonicalH - lagComp];",
+        'Print["H (components): ", Short[canonicalH, 5]];',
         "",
         "(* Parse H into structured quadratic terms *)",
-        "allCompNames = fieldEquations[[All, 1]];",
-        "hamiltonianTerms = ParseHamiltonianExpression[canonicalHComp, allCompNames];",
+        "hamiltonianTerms = ParseHamiltonianExpression[canonicalH, allCompNames];",
         'Print["Hamiltonian terms: ", Length[hamiltonianTerms]];',
         "",
-    ))
-    return lines
-
-
-def _wls_canonical_scalar_correction(
-    ctx: _WlsContext, fname: str, corr_var: str, all_heads_str: str,
-) -> list[str]:
-    """Generate WLS code for canonical correction of a scalar field."""
-    p = ctx.prefix
-    return [
-        f"(* Decompose scalar correction for {fname} *)",
-        f"{corr_var}Comp = DecomposeScalarExpression[{corr_var}, {ctx.chart}, {{{all_heads_str}}}, "
-        f'"MetricMatrix" -> {p}MetricMatrix];',
-        f'Print["Correction {fname} (comp): ", {corr_var}Comp];',
-        "",
-        "Module[{corrTerms},",
-        f"  If[{corr_var}Comp === 0,",
-        f'    canonicalCorrections["{fname}_0"] = {{}},',
-        f"    corrTerms = ParseMultiFieldRHS[{corr_var}Comp, allCompNames];",
-        f'    canonicalCorrections["{fname}_0"] = corrTerms',
-        "  ]",
-        "];",
-        "",
-    ]
-
-
-def _wls_canonical_vector_correction(
-    ctx: _WlsContext,
-    field: dict[str, Any],
-    field_idx: int,
-    corr_var: str,
-) -> list[str]:
-    """Generate WLS code for canonical correction of a vector/tensor field."""
-    fname = field["name"]
-    fexpr = _field_expression(field, ctx.prefix)
-    rank = 1 if field["type"] == "vector" else field.get("rank", 2)
-
-    # Other fields for DecomposeToComponents
-    other_exprs = [
-        _field_expression(f, ctx.prefix)
-        for j, f in enumerate(ctx.fields) if j != field_idx
-    ]
-    others_str = ", ".join(other_exprs) if other_exprs else ""
-    p = ctx.prefix
-
-    lines: list[str] = [
-        f"(* Decompose correction for {fname} (rank {rank}) *)",
-        f"{corr_var}Comps = DecomposeToComponents[{corr_var}, {fexpr}, {ctx.chart}, {{{others_str}}}, "
-        f'"MetricMatrix" -> {p}MetricMatrix];',
-    ]
-
-    # Substitute vector/tensor BGs (reuse existing helper pattern)
-    lines.extend(_wls_vector_background_substitution(ctx, f"{corr_var}Comps"))
-
-    lines.extend((
-        f'Print["Correction {fname} components: ", Length[{corr_var}Comps]];',
-        "",
-        "Do[",
-        "  Module[{compIdx, compEq, compName, corrTerms},",
-        f"    compIdx = {corr_var}Comps[[k, 1]];",
-        f'    compName = "{fname}_" <> ToString[compIdx];',
-        f"    compEq = {corr_var}Comps[[k, 2]];",
-        "    If[compEq === 0,",
-        "      canonicalCorrections[compName] = {},",
-        "      corrTerms = ParseMultiFieldRHS[compEq, allCompNames];",
-        "      canonicalCorrections[compName] = corrTerms",
-        "    ]",
-        "  ],",
-        f"  {{k, Length[{corr_var}Comps]}}",
-        "];",
-        "",
-    ))
+    ])
     return lines
 
 
@@ -1540,10 +1550,12 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
     """Generate canonical momentum + Hamiltonian computation and JSON injection.
 
     Emits WLS code that:
-    1. Computes H, π via ``LegendreTransformH`` on the Lagrangian
-    2. Decomposes H to components and parses into structured terms
-    3. For each dynamical field, computes canonical corrections π_i - p_i
-    4. Injects the canonical structure into ``jsonStructure`` before export
+    1. Decomposes the Lagrangian to component form
+    2. Computes pi_i = D[Lcomp, velocity_i] for each component (component-level)
+    3. Computes H = Sigma(pi_i * vel_i) - L and parses into quadratic terms
+    4. For each dynamical field, computes the field rate (velocity - pi)
+       expressed as OperatorTerms with an identity(pi_N) lead term
+    5. Injects the canonical structure into ``jsonStructure`` before export
 
     The Lagrangian variable ``{prefix}Lagrangian`` and ``fieldEquations`` must
     already exist in the WLS script context (set by EL/linearization steps).
@@ -1552,62 +1564,59 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
 
     lines: list[str] = _wls_canonical_hamiltonian(ctx, all_heads_str)
 
-    # Compute canonical corrections per dynamical field
-    lines.extend((
-        "(* Compute canonical corrections: π_i - ∂_t(field_i) per component *)",
-        "canonicalCorrections = <||>;",
+    # Compute Hamilton's field rates from piCompList (set by _wls_canonical_hamiltonian)
+    lines.extend([
+        "(* Compute Hamilton's 1st equation: dq_i/dt = vel_i(pi, fields) *)",
+        "canonicalFieldRates = <||>;",
         "",
-    ))
-
-    for i, field in enumerate(ctx.fields):
-        fname = field["name"]
-        fexpr = _field_expression(field, ctx.prefix)
-        pi_var = f"piExpr{fname.capitalize()}"
-        idx = i + 1  # Wolfram is 1-indexed
-
-        lines.extend((
-            f"(* Canonical momentum for {fname} *)",
-            f"{pi_var} = piList[[{idx}, 2]];",
-            f'Print["pi({fname}): ", {pi_var}];',
-            "",
-        ))
-
-        # Apply scalar BG substitutions to pi
-        lines.extend(_wls_scalar_background_substitution(ctx, pi_var))
-
-        # Compute canonical correction: pi minus time derivative of field
-        time_coord = ctx.coords[0]  # always "t"
-        vel_var = f"velExpr{fname.capitalize()}"
-        corr_var = f"corrExpr{fname.capitalize()}"
-        lines.extend((
-            f"{vel_var} = {ctx.cd}[-{time_coord}][{fexpr}];",
-            f"{corr_var} = Expand[ToCanonical[ContractMetric[{pi_var} - {vel_var}]]];",
-            f'Print["Correction {fname}: ", {corr_var}];',
-            "",
-        ))
-
-        if field["type"] == "scalar":
-            lines.extend(
-                _wls_canonical_scalar_correction(ctx, fname, corr_var, all_heads_str)
-            )
-        else:
-            lines.extend(
-                _wls_canonical_vector_correction(ctx, field, i, corr_var)
-            )
-
-    # Inject canonical structure into jsonStructure
-    lines.extend((
+        "Do[",
+        "  Module[{compName, piComp, compFunc, vel, spatialRate, piIdx, piTerm, spatialTerms},",
+        "    compName = allCompNames[[k]];",
+        "    piComp = piCompList[[k, 2]];",
+        "    compFunc = compToFunc[compName];",
+        "    vel = Derivative[Sequence @@ velOrders][compFunc][Sequence @@ coordSyms];",
+        "    spatialRate = Expand[vel - piComp];",
+        "",
+        "    (* Warn if spatialRate for DYNAMICAL fields still contains time    *)",
+        "    (* derivatives — indicates non-unit kinetic coefficient.              *)",
+        "    (* Skip for constraints (time_order=0) where pi=0 so vel-pi = vel. *)",
+        "    If[DetectLHSTimeOrder[fieldEquations[[k, 2]], compName] >= 2 &&",
+        "       !FreeQ[spatialRate, Derivative[n_, ___][_][___] /; n > 0],",
+        '      Print["WARNING: Field rate for ", compName,',
+        '        " contains time derivatives (non-unit kinetic coefficient). ",',
+        '        "Field rate may be incorrect."]',
+        "    ];",
+        "",
+        "    piIdx = k - 1;  (* 0-indexed *)",
+        '    piTerm = <|"coefficient" -> 1.0, "operator" -> "identity",',
+        '              "field" -> "pi_" <> ToString[piIdx]|>;',
+        "",
+        "    (* Only compute field rates for dynamical fields (time_order >= 2) *)",
+        "    If[DetectLHSTimeOrder[fieldEquations[[k, 2]], compName] >= 2,",
+        "      If[spatialRate === 0,",
+        "        canonicalFieldRates[compName] = {piTerm},",
+        "        spatialTerms = ParseMultiFieldRHS[spatialRate, compName, allCompNames];",
+        "        canonicalFieldRates[compName] = Prepend[spatialTerms, piTerm]",
+        "      ]",
+        "    ];",
+        '    Print["Field rate ", compName, ": ",',
+        "      If[KeyExistsQ[canonicalFieldRates, compName],",
+        '        canonicalFieldRates[compName], "(constraint - no rate)"]];',
+        "  ],",
+        "  {k, Length[allCompNames]}",
+        "];",
+        "",
         "(* Inject canonical structure into JSON *)",
         'jsonStructure["canonical"] = <|',
         '  "hamiltonian_terms" -> hamiltonianTerms,',
-        '  "canonical_corrections" -> canonicalCorrections,',
-        '  "hamiltonian_symbolic" -> ToString[canonicalHComp, InputForm]',
+        '  "field_rates" -> canonicalFieldRates,',
+        '  "hamiltonian_symbolic" -> ToString[canonicalH, InputForm]',
         "|>;",
         "",
         'Print["Canonical structure injected into JSON."];',
         'Print[""];',
         "",
-    ))
+    ])
 
     return lines
 

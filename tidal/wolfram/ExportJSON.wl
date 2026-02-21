@@ -214,6 +214,12 @@ Only quadratic terms (exactly 2 field factors) are parsed; non-quadratic terms a
 skipped with a warning. Used by the canonical momentum pipeline (Phase K) to export \
 the Hamiltonian for Python-side energy evaluation.";
 
+ParseMultiFieldRHS::usage =
+  "ParseMultiFieldRHS[eq, currentFieldName, allFieldNames] parses a linear \
+combination of operators applied to fields into a list of term Associations. \
+Each term has keys \"coefficient\", \"operator\", and \"field\". Used by both \
+the equation export pipeline and the canonical field rate computation (Phase K).";
+
 Begin["`Private`"];
 
 (* === JSON Structure Building === *)

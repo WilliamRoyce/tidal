@@ -1563,13 +1563,15 @@ class PDEFromSpec(PDEBase):
         msg = f"Unknown field name: {field_name}"
         raise ValueError(msg)
 
-    def _compute_rhs_for_component(  # noqa: C901, PLR0912, PLR0914, PLR0915
+    def _compute_rhs_for_component(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
         self,
         component_idx: int,
         state: FieldCollection,
         bc: BCDescriptor,
         t: float = 0.0,
         virtual_momenta: dict[str, ScalarField] | None = None,
+        *,
+        skip_constraint_momenta: bool = False,
     ) -> ScalarField:
         """Compute the RHS for a single component's equation.
 
@@ -1590,6 +1592,11 @@ class PDEFromSpec(PDEBase):
             Pre-computed RHS fields for first-order components. When a term
             references ``first_derivative_t`` or ``pi_N`` for a first-order
             component, the virtual momentum is used instead of a state variable.
+        skip_constraint_momenta : bool
+            When ``True``, skip terms whose field references the momentum of a
+            constraint component (``time_derivative_order == 0``).  This converts
+            the Euler-Lagrange RHS into Hamilton's 2nd equation by filtering out
+            constraint-momentum terms that cancel in the Hamiltonian formulation.
 
         Returns
         -------
@@ -1629,6 +1636,12 @@ class PDEFromSpec(PDEBase):
         # Sum all terms from the specification
         for term_idx, term in enumerate(eq.rhs_terms):
             target_field_name = term.field
+
+            # Hamilton's 2nd: skip terms referencing constraint momenta
+            if skip_constraint_momenta and self._is_constraint_momentum_ref(
+                target_field_name,
+            ):
+                continue
 
             # Handle first_derivative_t operator specially
             # d_t(field) = momentum (second-order) or RHS (first-order via virtual_momenta)
@@ -2779,31 +2792,43 @@ class PDEFromSpec(PDEBase):
                 )
         return virtual_momenta
 
-    def _apply_canonical_field_rate(
+    def _is_constraint_momentum_ref(self, field_name: str) -> bool:
+        """Check if *field_name* references momentum of a constraint field.
+
+        Returns ``True`` when *field_name* matches ``pi_N`` and component *N*
+        has ``time_derivative_order == 0`` (i.e. it is a constraint, not an
+        evolved field).  Used to filter constraint-momentum terms from the
+        Euler-Lagrange RHS when computing Hamilton's 2nd equation.
+        """
+        if not field_name.startswith("pi"):
+            return False
+        idx = parse_momentum_field_name(field_name)
+        if idx is None or not (0 <= idx < self.n_components):
+            return False
+        return self.spec.equations[idx].time_derivative_order == 0
+
+    def _evaluate_hamilton_field_rate(
         self,
         field_name: str,
-        momentum: ScalarField,
         state: FieldCollection,
         bc: BCDescriptor,
     ) -> ScalarField:
-        """Compute dA/dt = π + canonical corrections.
+        """Evaluate Hamilton's 1st equation: dq/dt = ∂H/∂π.
 
-        When the spec includes canonical structure (Phase K), the stored
-        momentum is the canonical momentum π, not the velocity p = ∂_t A.
-        The field rate is: dA/dt = π + Σ correction_terms.
+        When the spec includes canonical structure, the field rate is the
+        full Hamilton's 1st equation expressed as OperatorTerms.  This
+        includes the ``identity(π)`` term plus any spatial terms.
 
-        For scalar fields (e.g., Klein-Gordon), π = p and corrections are
-        empty, so this returns momentum unchanged.
+        For scalar fields (Klein-Gordon): ``dφ/dt = π`` (single term).
+        For gauge fields (Proca): ``dA_i/dt = π_i + ∂_i(A_0)``.
 
-        For gauge fields (e.g., Proca), π = p - ∇A_0, so:
-        dA_i/dt = π_i + ∇_i(A_0) = p_i.
+        Falls back to ``momentum.copy()`` when no canonical structure or
+        no field_rates entry exists (backward compatibility).
 
         Parameters
         ----------
         field_name : str
-            Component name (e.g., "A_1").
-        momentum : ScalarField
-            Canonical momentum π from state.
+            Component name (e.g., ``"A_1"``).
         state : FieldCollection
             Full simulation state.
         bc : BCDescriptor
@@ -2812,24 +2837,29 @@ class PDEFromSpec(PDEBase):
         Returns
         -------
         ScalarField
-            Field rate: momentum plus corrections.
+            Field rate dq/dt evaluated on the grid.
+
+        Raises
+        ------
+        TypeError
+            If a state element is not a ``ScalarField``.
         """
         canonical = self.spec.canonical
-        if canonical is None:
+        if canonical is None or field_name not in canonical.field_rates:
+            # No canonical structure → momentum IS velocity
+            momentum_slot = self._momentum_slot_map[field_name]
+            momentum = state[momentum_slot]
+            if not isinstance(momentum, ScalarField):
+                msg = f"Expected ScalarField for momentum, got {type(momentum).__name__}"
+                raise TypeError(msg)
             return momentum.copy()
 
-        corrections = canonical.corrections.get(field_name, ())
-        if not corrections:
-            return momentum.copy()
-
-        result = momentum.copy()
-        for corr in corrections:
-            # Get the constraint field this correction involves
-            constraint_field = self._get_field_from_state(state, corr.field)
-            # Apply the spatial operator
-            operated = self._get_operator(corr.operator, constraint_field, bc)
-            # Apply coefficient and accumulate
-            result += corr.coefficient * operated
+        grid = state.grid
+        result = ScalarField(grid, data=0.0)
+        for term in canonical.field_rates[field_name]:
+            target = self._get_field_from_state(state, term.field)
+            operated = self._get_operator(term.operator, target, bc)
+            result += term.coefficient * operated
         return result
 
     def _evolve_second_order(
@@ -2866,19 +2896,17 @@ class PDEFromSpec(PDEBase):
             field_slot = self._field_slot_map[eq.field_name]
 
             if eq.time_derivative_order >= 2:  # noqa: PLR2004
-                momentum_slot = self._momentum_slot_map[eq.field_name]
-                momentum = state[momentum_slot]
-                if not isinstance(momentum, ScalarField):
-                    msg = f"Expected ScalarField for momentum, got {type(momentum).__name__}"
-                    raise TypeError(msg)
-                # Field rate: dA/dt = π + canonical corrections
-                # When canonical structure is present and the field has
-                # corrections (π ≠ p), apply them: dA/dt = π + Σ c_i * op_i(A_0)
-                rates[field_slot] = self._apply_canonical_field_rate(
-                    eq.field_name, momentum, state, bc,
+                # Hamilton's 1st: dq/dt = ∂H/∂π (evaluated from field_rates)
+                rates[field_slot] = self._evaluate_hamilton_field_rate(
+                    eq.field_name, state, bc,
                 )
+                # Hamilton's 2nd: dπ/dt = -∂H/∂q
+                # When canonical structure is present, constraint-momentum
+                # terms in the EL RHS cancel and must be skipped.
+                momentum_slot = self._momentum_slot_map[eq.field_name]
                 rates[momentum_slot] = self._compute_rhs_for_component(
-                    i, state, bc, t, virtual_momenta
+                    i, state, bc, t, virtual_momenta,
+                    skip_constraint_momenta=(self.spec.canonical is not None),
                 )
             elif eq.time_derivative_order == 1:
                 rates[field_slot] = virtual_momenta[eq.field_name]

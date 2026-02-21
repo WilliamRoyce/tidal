@@ -186,6 +186,13 @@ def _make_single_field_data(
     fields = {"phi_0": np.stack([phi] * n_snapshots)}
     momenta_dict = {"phi_0": np.stack([pi_field] * n_snapshots)}
 
+    # Extract metadata parameters so symbolic coefficients resolve correctly
+    params = {
+        k: float(v)
+        for k, v in spec.metadata.get("parameters", {}).items()
+        if isinstance(v, (int, float))
+    }
+
     return SimulationData(
         times=times,
         fields=fields,
@@ -194,7 +201,7 @@ def _make_single_field_data(
         grid_bounds=((0.0, domain_len),),
         periodic=(True,),
         spec=spec,
-        parameters={},
+        parameters=params,
     )
 
 
@@ -362,7 +369,7 @@ def _make_kg_canonical_structure(m2: float = 1.0) -> CanonicalStructure:
                 factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
             ),
         ),
-        corrections={},
+        field_rates={},
         hamiltonian_symbolic=f"1/2 pi^2 + 1/2 (grad phi)^2 + 1/2 * {m2} * phi^2",
     )
 
@@ -420,7 +427,7 @@ def _make_coupled_canonical_structure(
                 factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
             ),
         ),
-        corrections={},
+        field_rates={},
         hamiltonian_symbolic="coupled scalar H",
     )
 
@@ -572,8 +579,131 @@ class TestCanonicalHamiltonianEnergy:
     def test_no_canonical_raises(self) -> None:
         """_compute_hamiltonian_from_canonical raises without canonical structure."""
         data = _make_sim_data_two_fields(n_snapshots=3)
+        # Strip canonical structure to test the error path
+        spec_no_canon = dataclasses.replace(data.spec, canonical=None)
+        data_no_canon = dataclasses.replace(data, spec=spec_no_canon)
         with pytest.raises(ValueError, match="without canonical"):
-            _compute_hamiltonian_from_canonical(data, 0)
+            _compute_hamiltonian_from_canonical(data_no_canon, 0)
+
+    def test_proca_hamiltonian_uses_velocity_not_momentum(self) -> None:
+        """For Proca fields, time_derivative factor must reconstruct velocity.
+
+        In Proca theory, the canonical momentum is π_i = ∂_t A_i - ∂_i A_0,
+        so the velocity is vel_i = π_i + ∂_i A_0. The kinetic term in H is
+        ½ vel² = ½ (π + ∂_x A_0)², NOT ½ π².  This test creates synthetic
+        data where A_0 is nonzero and verifies the cross-terms are included.
+        """
+        n_grid = 64
+        domain_len = 10.0
+        dx = domain_len / n_grid
+        x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
+
+        # Use periodic-compatible sinusoidal A_0 so gradients wrap correctly
+        k0 = 2 * np.pi / domain_len
+        a0_amp = 0.5
+        a0 = a0_amp * np.sin(k0 * x)  # periodic: A_0(0) ≈ A_0(L)
+
+        # A_1 field and its canonical momentum pi_1
+        a1 = np.cos(k0 * x)
+        pi1 = 0.5 * np.ones(n_grid)
+
+        # Build a minimal 2-component Proca-like spec
+        # A_0: constraint (time_order=0), A_1: dynamical (time_order=2)
+        eq_a0 = ComponentEquation(
+            field_name="A_0",
+            field_index=0,
+            time_derivative_order=0,
+            rhs_terms=(
+                OperatorTerm(coefficient=-1.0, operator="laplacian_x", field="A_1"),
+            ),
+        )
+        eq_a1 = ComponentEquation(
+            field_name="A_1",
+            field_index=1,
+            time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_1"),
+                OperatorTerm(coefficient=-1.0, operator="identity", field="A_1"),
+            ),
+        )
+
+        # Hamiltonian: ½ vel_1² + ½ (∂_x A_1)² + ½ m² A_1²
+        # where vel_1 = time_derivative(A_1) = pi_1 + gradient_x(A_0)
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="A_1", operator="time_derivative"),
+                    factor_b=HamiltonianFactor(field="A_1", operator="time_derivative"),
+                ),
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="A_1", operator="gradient_x"),
+                    factor_b=HamiltonianFactor(field="A_1", operator="gradient_x"),
+                ),
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="A_1", operator="identity"),
+                    factor_b=HamiltonianFactor(field="A_1", operator="identity"),
+                ),
+            ),
+            field_rates={
+                "A_1": (
+                    OperatorTerm(coefficient=1.0, operator="identity", field="pi_1"),
+                    OperatorTerm(coefficient=1.0, operator="gradient_x", field="A_0"),
+                ),
+            },
+            hamiltonian_symbolic="proca test H",
+        )
+
+        spec = EquationSystem(
+            n_components=2,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("A_0", "A_1"),
+            equations=(eq_a0, eq_a1),
+            mass_matrix=((0.0, 0.0), (0.0, 1.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={"source": "test", "parameters": {}},
+            canonical=canonical,
+        )
+
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={"A_0": a0[np.newaxis], "A_1": a1[np.newaxis]},
+            momenta={"A_1": pi1[np.newaxis]},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+
+        h_eval = _compute_hamiltonian_from_canonical(data, 0)
+
+        # Compute expected energy using SAME finite difference stencil
+        # (periodic central differences) as the energy module uses
+        grad_a0 = (np.roll(a0, -1) - np.roll(a0, 1)) / (2 * dx)
+        vel = pi1 + grad_a0  # velocity = pi + d_x(A_0)
+        grad_a1 = (np.roll(a1, -1) - np.roll(a1, 1)) / (2 * dx)
+        h_expected = float(
+            (0.5 * vel**2 + 0.5 * grad_a1**2 + 0.5 * a1**2).mean()
+        )
+
+        # If we had the bug (using pi instead of vel), kinetic term would be
+        # ½ π², missing the cross-terms pi*d_x(A_0) and (d_x A_0)²
+        h_wrong = float(
+            (0.5 * pi1**2 + 0.5 * grad_a1**2 + 0.5 * a1**2).mean()
+        )
+
+        # Verify the correct answer (with velocity reconstruction) matches
+        np.testing.assert_allclose(h_eval, h_expected, rtol=1e-10)
+
+        # Verify the wrong answer (raw momentum) does NOT match
+        assert abs(h_eval - h_wrong) > 0.01, (
+            f"h_eval={h_eval} should differ from h_wrong={h_wrong} "
+            "when A_0 is nonzero"
+        )
 
 
 # ============================================================
@@ -1174,9 +1304,11 @@ class TestVirialPotential:
 
     def test_single_field_zero_interaction(self) -> None:
         """Single KG field has zero interaction energy."""
-        data = _make_single_field_data(n_snapshots=3)
+        # Use high resolution: canonical H uses (∂_x φ)² while per-field uses
+        # -φ·∂²_x φ (equivalent in continuum, O(dx²) difference discretely).
+        data = _make_single_field_data(n_grid=256, n_snapshots=3)
         se = compute_system_energy(data, 0)
-        np.testing.assert_allclose(se.interaction, 0.0, atol=1e-12)
+        np.testing.assert_allclose(se.interaction, 0.0, atol=1e-5)
 
 
 # ============================================================
