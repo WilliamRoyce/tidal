@@ -74,9 +74,7 @@ def validate_field_references(spec: EquationSystem) -> None:
         _validate_canonical_refs(spec, valid_fields)
 
 
-def _validate_canonical_refs(
-    spec: EquationSystem, valid_fields: set[str]
-) -> None:
+def _validate_canonical_refs(spec: EquationSystem, valid_fields: set[str]) -> None:
     """Check canonical field_rates and spatial_momenta references.
 
     Raises
@@ -89,10 +87,7 @@ def _validate_canonical_refs(
 
     for field_name, terms in canonical.field_rates.items():
         for term in terms:
-            if (
-                term.field not in valid_fields
-                and not term.field.startswith("pi_")
-            ):
+            if term.field not in valid_fields and not term.field.startswith("pi_"):
                 msg = (
                     f"Unknown field reference '{term.field}' "
                     f"in field_rates for '{field_name}'."
@@ -171,9 +166,7 @@ def check_mass_sign(
             ):
                 continue
 
-            result = coeff_eval.resolve(
-                term, t=0.0, eq_idx=eq_idx, term_idx=term_idx
-            )
+            result = coeff_eval.resolve(term, t=0.0, eq_idx=eq_idx, term_idx=term_idx)
             if (
                 isinstance(result, np.ndarray)
                 and float(result.min()) * float(result.max()) < 0

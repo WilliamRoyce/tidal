@@ -21,13 +21,15 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from tidal.solver.fields import FieldSet
 from tidal.solver.operators import apply_operator
-from tidal.solver.state import StateLayout, flat_to_fields
+from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from tidal.solver.grid import GridInfo
+    from tidal.solver.rhs import RHSEvaluator
     from tidal.solver.state import SlotInfo
     from tidal.symbolic.json_loader import EquationSystem
 
@@ -41,7 +43,7 @@ _DENSE_THRESHOLD = 100_000
 class _ResidualCtx:
     """Bundles pre-computed data and per-call arrays for IDA residual evaluation.
 
-    The ``y``, ``yp``, ``res``, and ``fields`` attributes are set per-call
+    The ``y``, ``yp``, ``res``, and ``fieldset`` attributes are set per-call
     via ``set_arrays()`` and cleared after each residual evaluation.
     """
 
@@ -53,6 +55,7 @@ class _ResidualCtx:
         bc: str | tuple[str, ...] | None,
         kinetic: np.ndarray | None,
         spatial_momenta: dict | None,
+        rhs_eval: RHSEvaluator | None = None,
     ) -> None:
         self.spec = spec
         self.layout = layout
@@ -62,6 +65,7 @@ class _ResidualCtx:
         self.shape = grid.shape
         self.kinetic = kinetic
         self.spatial_momenta = spatial_momenta
+        self.rhs_eval = rhs_eval
         self.eq_map: dict[str, int] = {
             eq.field_name: i for i, eq in enumerate(spec.equations)
         }
@@ -69,22 +73,35 @@ class _ResidualCtx:
         self.y: np.ndarray = np.empty(0)
         self.yp: np.ndarray = np.empty(0)
         self.res: np.ndarray = np.empty(0)
+        self.fieldset: FieldSet | None = None
+        # Legacy dict for kinetic/field_rates handlers that still use raw arrays
         self.fields: dict[str, np.ndarray] = {}
 
     def set_arrays(
         self,
+        t: float,
         y: np.ndarray,
         yp: np.ndarray,
         res: np.ndarray,
     ) -> None:
         """Bind per-call arrays and unpack fields from y."""
+        self.t = t
         self.y = y
         self.yp = yp
         self.res = res
-        self.fields = flat_to_fields(y, self.layout, self.shape)
+        self.fieldset = FieldSet.from_flat(self.layout, self.shape, y)
+        self.fields = self.fieldset.as_dict()
+
+        # Notify coefficient evaluator of new timestep
+        if self.rhs_eval is not None:
+            self.rhs_eval.begin_timestep(t)
 
     def compute_rhs(self, eq_idx: int) -> np.ndarray:
         """Sum operator terms for a single equation."""
+        if self.rhs_eval is not None and self.fieldset is not None:
+            return self.rhs_eval.evaluate(eq_idx, self.fieldset, self.t)
+
+        # Legacy path: constant coefficients only
         eq = self.spec.equations[eq_idx]
         result = np.zeros(self.shape)
         for term in eq.rhs_terms:
@@ -95,6 +112,12 @@ class _ResidualCtx:
 
     def compute_spatial_mom(self, field_name: str) -> np.ndarray:
         """Compute S_i for dynamical field i from spatial_momenta terms."""
+        if self.rhs_eval is not None and self.fieldset is not None:
+            return self.rhs_eval.evaluate_spatial_momentum(
+                field_name, self.fieldset, self.t
+            )
+
+        # Legacy path
         if self.spatial_momenta is None or field_name not in self.spatial_momenta:
             return np.zeros(self.n)
         result = np.zeros(self.shape)
@@ -182,6 +205,8 @@ def build_residual_fn(
     layout: StateLayout,
     grid: GridInfo,
     bc: str | tuple[str, ...] | None = None,
+    *,
+    parameters: dict[str, float] | None = None,
 ) -> Callable[[float, np.ndarray, np.ndarray, np.ndarray], None]:
     """Build an IDA-compatible residual function from a TIDAL equation spec.
 
@@ -205,6 +230,10 @@ def build_residual_fn(
         Spatial grid.
     bc : str or tuple of str, optional
         Boundary conditions for spatial operators.
+    parameters : dict[str, float], optional
+        Runtime parameter overrides for symbolic coefficients. When
+        provided, enables position-dependent and time-dependent
+        coefficient evaluation via CoefficientEvaluator.
 
     Returns
     -------
@@ -219,6 +248,15 @@ def build_residual_fn(
     else:
         kinetic = None
 
+    # Build RHSEvaluator if parameters provided
+    rhs_eval: RHSEvaluator | None = None
+    if parameters is not None:
+        from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+        from tidal.solver.rhs import RHSEvaluator as _RHSEvaluator  # noqa: PLC0415
+
+        coeff_eval = CoefficientEvaluator(spec, grid, parameters)
+        rhs_eval = _RHSEvaluator(spec, grid, coeff_eval, bc=bc)
+
     ctx = _ResidualCtx(
         spec=spec,
         layout=layout,
@@ -226,16 +264,17 @@ def build_residual_fn(
         bc=bc,
         kinetic=kinetic,
         spatial_momenta=canonical.spatial_momenta if canonical else None,
+        rhs_eval=rhs_eval,
     )
 
     def residual(
-        _t: float,
+        t: float,
         y: np.ndarray,
         yp: np.ndarray,
         res: np.ndarray,
     ) -> None:
         """IDA residual: F(t, y, y') = 0."""
-        ctx.set_arrays(y, yp, res)
+        ctx.set_arrays(t, y, yp, res)
 
         for slot_idx, slot in enumerate(layout.slots):
             if slot.time_order == 0:
@@ -257,6 +296,7 @@ def solve_ida(  # noqa: PLR0913
     t_span: tuple[float, float],
     *,
     bc: str | tuple[str, ...] | None = None,
+    parameters: dict[str, float] | None = None,
     num_snapshots: int = 101,
     rtol: float = 1e-8,
     atol: float = 1e-10,
@@ -277,6 +317,8 @@ def solve_ida(  # noqa: PLR0913
         (t_start, t_end).
     bc : str or tuple, optional
         Boundary conditions.
+    parameters : dict[str, float], optional
+        Runtime parameter overrides for symbolic coefficients.
     num_snapshots : int
         Number of output time points.
     rtol, atol : float
@@ -294,7 +336,7 @@ def solve_ida(  # noqa: PLR0913
     from sksundae.ida import IDA  # noqa: PLC0415
 
     layout = StateLayout.from_spec(spec, grid.num_points)
-    resfn = build_residual_fn(spec, layout, grid, bc)
+    resfn = build_residual_fn(spec, layout, grid, bc, parameters=parameters)
 
     # Initial yp0 — estimate from residual (IDA will correct via calc_initcond)
     yp0 = np.zeros_like(y0)

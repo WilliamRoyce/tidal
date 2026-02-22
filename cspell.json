@@ -54,6 +54,8 @@
     "Gaussians",
     "gertsenshtein",
     "gwcart",
+    "Hairer",
+    "Hamiltonians",
     "Hann",
     "hanning",
     "Hpert",
@@ -79,6 +81,7 @@
     "linearizes",
     "llvmlite",
     "lualatex",
+    "Lubich",
     "luuid",
     "Martín",
     "Marugán",
@@ -121,6 +124,7 @@
     "signdet",
     "Simons",
     "simulable",
+    "sksundae",
     "spcart",
     "sphcart",
     "sphg",
@@ -258,7 +262,12 @@
     "xycoords",
     "xytext"
   ],
-  "flagWords": ["hte", "linearised", "teh", "wolfrom"],
+  "flagWords": [
+    "hte",
+    "linearised",
+    "teh",
+    "wolfrom"
+  ],
   "allowCompoundWords": true,
   "maxNumberOfProblems": 1000,
   "ignorePaths": [

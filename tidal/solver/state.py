@@ -114,24 +114,28 @@ class StateLayout:
                 dyn_idx += 1
 
             field_slot_map[name] = len(slots)
-            slots.append(SlotInfo(
-                name=name,
-                field_name=name,
-                kind=kind,
-                time_order=order,
-                dynamical_index=d_idx,
-            ))
+            slots.append(
+                SlotInfo(
+                    name=name,
+                    field_name=name,
+                    kind=kind,
+                    time_order=order,
+                    dynamical_index=d_idx,
+                )
+            )
 
             if order >= _SECOND_ORDER:
                 mom_name = f"pi_{name}"
                 momentum_slot_map[name] = len(slots)
-                slots.append(SlotInfo(
-                    name=mom_name,
-                    field_name=name,
-                    kind="momentum",
-                    time_order=order,
-                    dynamical_index=d_idx,
-                ))
+                slots.append(
+                    SlotInfo(
+                        name=mom_name,
+                        field_name=name,
+                        kind="momentum",
+                        time_order=order,
+                        dynamical_index=d_idx,
+                    )
+                )
 
         return cls(
             slots=tuple(slots),

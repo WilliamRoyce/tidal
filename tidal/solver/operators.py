@@ -35,7 +35,7 @@ BCSpec = str | tuple[str, ...]
 _VALID_BC = frozenset({"periodic", "neumann", "dirichlet"})
 
 
-def _normalise_bc(bc: BCSpec, grid: GridInfo) -> tuple[str, ...]:
+def _normalize_bc(bc: BCSpec, grid: GridInfo) -> tuple[str, ...]:
     """Expand a BC spec to a per-axis tuple, validating each entry.
 
     Raises
@@ -127,14 +127,12 @@ def gradient(
     np.ndarray
         Gradient array, same shape as *data*.
     """
-    bcs = _normalise_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
+    bcs = _normalize_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
     dx = grid.dx[axis]
     bc_axis = bcs[axis]
 
     if bc_axis == "periodic":
-        return (
-            np.roll(data, -1, axis=axis) - np.roll(data, 1, axis=axis)
-        ) / (2.0 * dx)
+        return (np.roll(data, -1, axis=axis) - np.roll(data, 1, axis=axis)) / (2.0 * dx)
 
     # Ghost-cell path for non-periodic BCs
     padded = _pad_axis(data, axis, bc_axis)
@@ -156,16 +154,14 @@ def directional_laplacian(
 
     Stencil: ``(f[i+1] - 2·f[i] + f[i-1]) / dx²``
     """
-    bcs = _normalise_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
+    bcs = _normalize_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
     dx = grid.dx[axis]
     inv_dx2 = 1.0 / (dx * dx)
     bc_axis = bcs[axis]
 
     if bc_axis == "periodic":
         return (
-            np.roll(data, -1, axis=axis)
-            - 2.0 * data
-            + np.roll(data, 1, axis=axis)
+            np.roll(data, -1, axis=axis) - 2.0 * data + np.roll(data, 1, axis=axis)
         ) * inv_dx2
 
     padded = _pad_axis(data, axis, bc_axis)
@@ -234,21 +230,25 @@ def identity(
 # Each entry maps operator name → callable(data, grid, bc) → ndarray.
 # Partials bind axis arguments for directional operators.
 
+
 def _make_directional_laplacian(ax: int):  # noqa: ANN202
     def _op(data: np.ndarray, grid: GridInfo, bc: BCSpec | None = None) -> np.ndarray:
         return directional_laplacian(data, ax, grid, bc)
+
     return _op
 
 
 def _make_gradient(ax: int):  # noqa: ANN202
     def _op(data: np.ndarray, grid: GridInfo, bc: BCSpec | None = None) -> np.ndarray:
         return gradient(data, ax, grid, bc)
+
     return _op
 
 
 def _make_cross_derivative(ax1: int, ax2: int):  # noqa: ANN202
     def _op(data: np.ndarray, grid: GridInfo, bc: BCSpec | None = None) -> np.ndarray:
         return cross_derivative(data, ax1, ax2, grid, bc)
+
     return _op
 
 

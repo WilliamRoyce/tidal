@@ -30,13 +30,13 @@ the constraint Jacobian is nonsingular.
 py-pde solves only explicit ODEs of the form `du/dt = F(u)`. To force our DAE
 into this framework, we accumulated workarounds:
 
-| Workaround | Location | Problem |
-|-----------|----------|---------|
-| 3-pass `evolution_rate()` | `pde_builder.py:2919-2993` | Fragile ordering; constraints must be solved before evolution |
-| Custom constraint solvers (FFT, matrix, Gauss-Seidel) | `pde_builder.py:1846-2750` | ~900 lines of custom elliptic solver code |
-| K^{-1} symbolic inversion | `_derive.py:2110-2166` | Complicated expressions; fails for large kinetic blocks |
-| Virtual momenta | `pde_builder.py:2759-2793` | Ad-hoc mechanism for 1st-order equations |
-| Manual (q, π) splitting | `pde_builder.py:842-983` | State layout management complexity |
+| Workaround                                            | Location                   | Problem                                                       |
+| ----------------------------------------------------- | -------------------------- | ------------------------------------------------------------- |
+| 3-pass `evolution_rate()`                             | `pde_builder.py:2919-2993` | Fragile ordering; constraints must be solved before evolution |
+| Custom constraint solvers (FFT, matrix, Gauss-Seidel) | `pde_builder.py:1846-2750` | ~900 lines of custom elliptic solver code                     |
+| K^{-1} symbolic inversion                             | `_derive.py:2110-2166`     | Complicated expressions; fails for large kinetic blocks       |
+| Virtual momenta                                       | `pde_builder.py:2759-2793` | Ad-hoc mechanism for 1st-order equations                      |
+| Manual (q, π) splitting                               | `pde_builder.py:842-983`   | State layout management complexity                            |
 
 ### 1.2 The Solution
 
@@ -105,25 +105,25 @@ Three parallel research surveys informed this design:
 
 ### 2.1 Component Replacement Map
 
-| Component | Old (py-pde) | New | Rationale |
-|-----------|-------------|-----|-----------|
-| Time integration | `PDEBase.solve()` (RK4/scipy) | **scikit-sundae IDA** | Native DAE; handles constraints + mass matrices |
-| Field containers | `FieldCollection` / `ScalarField` | **Plain numpy arrays** + `GridInfo` | Remove unnecessary wrapper layer |
-| Grid | `CartesianGrid` | **`GridInfo` dataclass** | Tailored to TIDAL (bounds, shape, periodic, dx, coords) |
-| Spatial operators | `field.laplace(bc)` / custom numpy | **Custom numpy module** | Already 80% custom; consolidate |
-| Storage | `MemoryStorage` / `CallbackTracker` | **Existing `SnapshotWriter`** | Already numpy-based disk-backed storage |
-| Kinetic matrix | K^{-1} symbolic inversion | **K passed directly** to IDA | Simpler expressions; IDA handles implicit solve |
-| Symplectic | N/A | **Störmer-Verlet** (custom) | Energy-conserving option for Hamiltonian systems |
+| Component         | Old (py-pde)                        | New                                 | Rationale                                               |
+| ----------------- | ----------------------------------- | ----------------------------------- | ------------------------------------------------------- |
+| Time integration  | `PDEBase.solve()` (RK4/scipy)       | **scikit-sundae IDA**               | Native DAE; handles constraints + mass matrices         |
+| Field containers  | `FieldCollection` / `ScalarField`   | **Plain numpy arrays** + `GridInfo` | Remove unnecessary wrapper layer                        |
+| Grid              | `CartesianGrid`                     | **`GridInfo` dataclass**            | Tailored to TIDAL (bounds, shape, periodic, dx, coords) |
+| Spatial operators | `field.laplace(bc)` / custom numpy  | **Custom numpy module**             | Already 80% custom; consolidate                         |
+| Storage           | `MemoryStorage` / `CallbackTracker` | **Existing `SnapshotWriter`**       | Already numpy-based disk-backed storage                 |
+| Kinetic matrix    | K^{-1} symbolic inversion           | **K passed directly** to IDA        | Simpler expressions; IDA handles implicit solve         |
+| Symplectic        | N/A                                 | **Störmer-Verlet** (custom)         | Energy-conserving option for Hamiltonian systems        |
 
 ### 2.2 Solver Selection
 
 Users select **one scheme** per simulation via `--scheme`:
 
-| Scheme | Solver | Use Case | Constraints | Energy |
-|--------|--------|----------|-------------|--------|
-| `ida` (default) | SUNDIALS/IDA | All systems | Algebraic (native) | Dissipative OK |
-| `leapfrog` | Störmer-Verlet | Hamiltonian systems | Not supported | Conserved exactly |
-| `scipy` | scipy `solve_ivp` | Simple ODEs | Not supported | Dissipative OK |
+| Scheme          | Solver            | Use Case            | Constraints        | Energy            |
+| --------------- | ----------------- | ------------------- | ------------------ | ----------------- |
+| `ida` (default) | SUNDIALS/IDA      | All systems         | Algebraic (native) | Dissipative OK    |
+| `leapfrog`      | Störmer-Verlet    | Hamiltonian systems | Not supported      | Conserved exactly |
+| `scipy`         | scipy `solve_ivp` | Simple ODEs         | Not supported      | Dissipative OK    |
 
 ### 2.3 Data Flow
 
@@ -162,10 +162,11 @@ The Wolfram pipeline currently (`_derive.py:2054-2220`):
 1. Computes canonical momenta: `π_i = ∂L/∂(∂_t q_i)`
 2. Extracts kinetic matrix: `K_{ij} = ∂π_i/∂(∂_t q_j)`
 3. **Inverts K symbolically**: `K^{-1} = Inverse[K]`
-4. Computes field_rates: `∂_t q_i = K^{-1}_{ij} · (π_j - S_j)`
+4. Computes field*rates: `∂_t q_i = K^{-1}*{ij} · (π_j - S_j)`
 5. Exports K^{-1} coefficients embedded in `field_rates` JSON
 
 This produces complicated expressions for non-diagonal K:
+
 - Chern-Simons (2×2): `dA_1/dt = π_1 - (κ/2)·A_2 + ∇_x A_0`
 - Linearized gravity (7×7): coefficients like `-4/3`, `-2/3` from rational K^{-1}
 
@@ -180,6 +181,7 @@ K_{ij} · ∂_t q_j - π_i + S_i = 0
 No K^{-1} needed. IDA's Newton iteration solves the implicit system.
 
 The Wolfram pipeline simplifies:
+
 1. Compute π_i — same as before
 2. Extract K — same as before
 3. ~~Invert K~~ — removed
@@ -189,6 +191,7 @@ The Wolfram pipeline simplifies:
 ### 3.3 JSON Format Change
 
 **Old** (`field_rates` with K^{-1} embedded):
+
 ```json
 "field_rates": {
   "A_1": [
@@ -201,6 +204,7 @@ The Wolfram pipeline simplifies:
 ```
 
 **New** (`kinetic_matrix` + `spatial_momenta`):
+
 ```json
 "kinetic_matrix": {
   "entries": [
@@ -252,12 +256,12 @@ source.
 
 ### 4.3 Verified Examples
 
-| Example | Coefficient Type | Expression |
-|---------|-----------------|------------|
-| sphere_kg | x-dependent Laplacian | `x[]^2/(2*sphR^2)` |
-| coupled_scattering | Gaussian spatial coupling | `-(g0/E^((x[]^2+y[]^2)/(2*R^2)))` |
-| curved_spacetime | Hubble friction (time-dep) | `-2*H(t)` |
-| vector_background | tanh domain wall | `Tanh[(x[]-x0)/w]` |
+| Example            | Coefficient Type           | Expression                        |
+| ------------------ | -------------------------- | --------------------------------- |
+| sphere_kg          | x-dependent Laplacian      | `x[]^2/(2*sphR^2)`                |
+| coupled_scattering | Gaussian spatial coupling  | `-(g0/E^((x[]^2+y[]^2)/(2*R^2)))` |
+| curved_spacetime   | Hubble friction (time-dep) | `-2*H(t)`                         |
+| vector_background  | tanh domain wall           | `Tanh[(x[]-x0)/w]`                |
 
 All evaluated by `_resolve_coefficient_at_point()` which returns `float` (scalar)
 or `np.ndarray` (grid-shaped) depending on coordinate dependence.
@@ -277,19 +281,22 @@ or `np.ndarray` (grid-shaped) depending on coordinate dependence.
 ## 5. Implementation Checklist
 
 ### Step 0: Documentation
+
 - [x] Create this documentation file (`docs/solver_migration.md`)
 
 ### Phase 1: Foundation (GridInfo + Operators)
 
 #### 1a. GridInfo dataclass
+
 - [ ] Create `tidal/solver/__init__.py`
 - [ ] Create `tidal/solver/grid.py` with `GridInfo` dataclass
   - Properties: `bounds`, `shape`, `periodic`, `dx`, `cell_coords`, `ndim`, `num_points`
   - Test: `tests/test_solver_grid.py`
 - [ ] Verify `GridInfo.cell_coords` matches `CartesianGrid.cell_coords` output
-  for all grid configurations (1D, 2D, 3D, periodic/non-periodic)
+      for all grid configurations (1D, 2D, 3D, periodic/non-periodic)
 
 #### 1b. Spatial operators
+
 - [ ] Create `tidal/solver/operators.py`
   - Functions: `laplacian`, `gradient`, `directional_laplacian`,
     `cross_derivative`, `identity`, `biharmonic`
@@ -300,16 +307,18 @@ or `np.ndarray` (grid-shaped) depending on coordinate dependence.
 - [ ] Operator registry mapping string names → functions
 
 #### 1c. Position-dependent coefficients
+
 - [ ] Verify `_resolve_coefficient_at_point()` works with `GridInfo`
   - Change type signature: `GridBase → GridInfo`
   - `cell_coords` property must have compatible shape
 - [ ] Run sphere_kg, coupled_scattering, curved_spacetime, vector_background
-  coefficient evaluation tests
+      coefficient evaluation tests
 - [ ] Verify `_spatial_cache` produces identical arrays
 
 ### Phase 2: Wolfram Pipeline Changes
 
 #### 2a. Modify `_derive.py`
+
 - [ ] In `_wls_canonical_pipeline()` (lines 2054-2220):
   - Keep K computation (lines 2089-2096)
   - Keep K validation / det(K) check (lines 2101-2107)
@@ -320,6 +329,7 @@ or `np.ndarray` (grid-shaped) depending on coordinate dependence.
   - Add: emit S terms to WLS metadata for JSON export
 
 #### 2b. Modify `ExportJSON.wl`
+
 - [ ] Add `"kinetic_matrix"` section to canonical JSON block
   - Sparse entries: `{"i": i, "j": j, "value": numeric, "symbolic": string}`
   - Dimension field
@@ -328,14 +338,16 @@ or `np.ndarray` (grid-shaped) depending on coordinate dependence.
 - [ ] Remove or make optional the `"field_rates"` section
 
 #### 2c. Modify `json_loader.py`
+
 - [ ] Parse `kinetic_matrix` entries into numpy array on `CanonicalStructure`
 - [ ] Parse `spatial_momenta` into dict of OperatorTerm tuples
 - [ ] Update `CanonicalStructure` dataclass
 - [ ] Backward compatibility: if `field_rates` present (old JSON), still parse
 
 #### 2d. Verification
+
 - [ ] Re-derive chern_simons with new pipeline — verify K matches:
-  K = [[1, κ/2], [-κ/2, 1]]
+      K = [[1, κ/2], [-κ/2, 1]]
 - [ ] Re-derive coupled_proca — verify K is diagonal (identity)
 - [ ] Re-derive linearized_gravity — verify K is 7×7 with known structure
 - [ ] All existing Wolfram tests pass
@@ -343,6 +355,7 @@ or `np.ndarray` (grid-shaped) depending on coordinate dependence.
 ### Phase 3: SUNDIALS/IDA Integration
 
 #### 3a. State management
+
 - [ ] Create `tidal/solver/state.py`
   - `state_to_flat()`: dict of field arrays → flat numpy array
   - `flat_to_fields()`: flat numpy array → dict of field arrays
@@ -350,6 +363,7 @@ or `np.ndarray` (grid-shaped) depending on coordinate dependence.
   - Test: `tests/test_solver_state.py`
 
 #### 3b. IDA residual builder
+
 - [ ] Create `tidal/solver/ida.py`
   - `build_residual_fn(spec, grid)`: returns IDA-compatible residual function
   - Residual logic:
@@ -362,6 +376,7 @@ or `np.ndarray` (grid-shaped) depending on coordinate dependence.
   - Test: `tests/test_solver_ida.py`
 
 #### 3c. Solver setup and integration
+
 - [ ] IDA solver creation with appropriate options:
   - `linsolver='sparse'` with sparsity pattern
   - `calc_initcond='yp0'` for consistent initial conditions
@@ -371,6 +386,7 @@ or `np.ndarray` (grid-shaped) depending on coordinate dependence.
 - [ ] Error handling: IDA convergence failures → clear error messages
 
 #### 3d. CLI integration
+
 - [ ] Modify `_simulate.py`:
   - `--scheme ida` (default): dispatch to SUNDIALS/IDA
   - `--scheme leapfrog`: dispatch to Störmer-Verlet
@@ -383,6 +399,7 @@ or `np.ndarray` (grid-shaped) depending on coordinate dependence.
 - [ ] Update `--help` text for new scheme options
 
 #### 3e. Verification
+
 - [ ] EM plane-wave (`--scheme ida`): amplitude stable (< 1.2× initial)
 - [ ] EM plane-wave: A_0 constraint satisfied automatically (no separate solver)
 - [ ] Coupled Proca (`--scheme ida`): coupled Helmholtz constraints solved
@@ -425,11 +442,11 @@ or `np.ndarray` (grid-shaped) depending on coordinate dependence.
 - [ ] Create `tidal/solver/fieldset.py` with `FieldSet` class
 - [ ] Own field data: `dict[str, np.ndarray]` with typed access and grid shape enforcement
 - [ ] Consolidate field name validation: `parse_field_name()`, momentum naming conventions
-  (`pi_phi_0`), index validation — single source of truth
+      (`pi_phi_0`), index validation — single source of truth
 - [ ] Handle serialization: flat vector ↔ named fields (from `state.py`), NPZ I/O
-  (from `_io.py`), snapshot packing
+      (from `_io.py`), snapshot packing
 - [ ] Bridge py-pde boundary: `to_field_collection()` / `from_field_collection()` only
-  at CLI output edge
+      at CLI output edge
 - [ ] Replace raw `dict[str, np.ndarray]` throughout solver and measurement modules
 - [ ] Enforce invariants: grid shape consistency, field/momentum pairing, immutable metadata
 
@@ -484,6 +501,7 @@ result = solver.solve(t_span, y0, yp0)
 
 The Jacobian `J_{ij} = ∂F_i/∂y_j + α · ∂F_i/∂y'_j` has sparsity determined by
 the equation coupling structure:
+
 - Spatial operators (laplacian, gradient) couple nearest neighbors on the grid
 - Cross-field terms couple different field slots at the same grid point
 - The kinetic matrix K couples field slots at the same grid point
@@ -493,16 +511,17 @@ evaluating any numerical values.
 
 ### 6.4 Performance Expectations
 
-| Grid Size | N (state) | Linear Solver | Expected Step Time |
-|-----------|-----------|---------------|-------------------|
-| 64 | ~640 | dense | < 1 ms |
-| 64×64 | ~40,000 | sparse (SuperLU_MT) | ~10 ms |
-| 128×128 | ~160,000 | sparse or GMRES | ~100 ms |
-| 256×256 | ~650,000 | GMRES + preconditioner | ~1 s |
+| Grid Size | N (state) | Linear Solver          | Expected Step Time |
+| --------- | --------- | ---------------------- | ------------------ |
+| 64        | ~640      | dense                  | < 1 ms             |
+| 64×64     | ~40,000   | sparse (SuperLU_MT)    | ~10 ms             |
+| 128×128   | ~160,000  | sparse or GMRES        | ~100 ms            |
+| 256×256   | ~650,000  | GMRES + preconditioner | ~1 s               |
 
 ### 6.5 Index-1 DAE Requirement
 
 IDA requires index-1 DAEs. TIDAL's constraint equations are index-1 when:
+
 - Gauss's law `∇²A_0 = source`: invertible if BCs are periodic or Dirichlet
   (Neumann on all boundaries has a kernel — requires gauge fixing)
 - Coupled Helmholtz: `(∇² - m²)A_0 = source`: always invertible for m² > 0
@@ -598,40 +617,40 @@ from the grid spacing and domain size.
 
 ### New Files
 
-| File | Purpose |
-|------|---------|
-| `tidal/solver/__init__.py` | Solver package |
-| `tidal/solver/grid.py` | `GridInfo` dataclass |
-| `tidal/solver/operators.py` | Spatial operators (numpy) |
-| `tidal/solver/state.py` | State flattening/unflattening |
-| `tidal/solver/ida.py` | SUNDIALS/IDA integration |
-| `tidal/solver/leapfrog.py` | Störmer-Verlet integrator |
-| `tests/test_solver_grid.py` | GridInfo tests |
-| `tests/test_solver_operators.py` | Operator tests |
-| `tests/test_solver_state.py` | State management tests |
-| `tests/test_solver_ida.py` | IDA integration tests |
-| `tests/test_solver_leapfrog.py` | Leapfrog tests |
+| File                             | Purpose                       |
+| -------------------------------- | ----------------------------- |
+| `tidal/solver/__init__.py`       | Solver package                |
+| `tidal/solver/grid.py`           | `GridInfo` dataclass          |
+| `tidal/solver/operators.py`      | Spatial operators (numpy)     |
+| `tidal/solver/state.py`          | State flattening/unflattening |
+| `tidal/solver/ida.py`            | SUNDIALS/IDA integration      |
+| `tidal/solver/leapfrog.py`       | Störmer-Verlet integrator     |
+| `tests/test_solver_grid.py`      | GridInfo tests                |
+| `tests/test_solver_operators.py` | Operator tests                |
+| `tests/test_solver_state.py`     | State management tests        |
+| `tests/test_solver_ida.py`       | IDA integration tests         |
+| `tests/test_solver_leapfrog.py`  | Leapfrog tests                |
 
 ### Modified Files
 
-| File | Changes |
-|------|---------|
-| `tidal/symbolic/pde_builder.py` | Decouple from py-pde types |
+| File                            | Changes                                   |
+| ------------------------------- | ----------------------------------------- |
+| `tidal/symbolic/pde_builder.py` | Decouple from py-pde types                |
 | `tidal/symbolic/json_loader.py` | Parse `kinetic_matrix`, `spatial_momenta` |
-| `tidal/cli/_simulate.py` | New solver dispatch |
-| `tidal/cli/_derive.py` | Export K (not K^{-1}) |
-| `tidal/wolfram/ExportJSON.wl` | Emit new canonical sections |
-| `tidal/measurement/_writer.py` | Remove py-pde, constraint norms |
-| `tidal/measurement/_io.py` | Remove py-pde, use GridInfo |
-| `pyproject.toml` | py-pde → scikit-sundae |
-| `tests/conftest.py` | Replace fixtures |
-| 17 test files | Replace py-pde imports |
+| `tidal/cli/_simulate.py`        | New solver dispatch                       |
+| `tidal/cli/_derive.py`          | Export K (not K^{-1})                     |
+| `tidal/wolfram/ExportJSON.wl`   | Emit new canonical sections               |
+| `tidal/measurement/_writer.py`  | Remove py-pde, constraint norms           |
+| `tidal/measurement/_io.py`      | Remove py-pde, use GridInfo               |
+| `pyproject.toml`                | py-pde → scikit-sundae                    |
+| `tests/conftest.py`             | Replace fixtures                          |
+| 17 test files                   | Replace py-pde imports                    |
 
 ### Unchanged Files
 
-| File | Why |
-|------|-----|
-| `tidal/symbolic/_eval_utils.py` | Already pure numpy/eval |
-| `tidal/wolfram/CommonUtilities.wl` | No solver dependency |
-| `tidal/wolfram/ComponentDecompose.wl` | No solver dependency |
-| `tidal/wolfram/EulerLagrange.wl` | No solver dependency |
+| File                                  | Why                     |
+| ------------------------------------- | ----------------------- |
+| `tidal/symbolic/_eval_utils.py`       | Already pure numpy/eval |
+| `tidal/wolfram/CommonUtilities.wl`    | No solver dependency    |
+| `tidal/wolfram/ComponentDecompose.wl` | No solver dependency    |
+| `tidal/wolfram/EulerLagrange.wl`      | No solver dependency    |

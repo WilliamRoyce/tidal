@@ -85,16 +85,16 @@ class CoefficientEvaluator:
         for eq_idx, eq in enumerate(spec.equations):
             for term_idx, term in enumerate(eq.rhs_terms):
                 if self._is_constant(term):
-                    self._constants[eq_idx, term_idx] = self._resolve_constant(
-                        term
-                    )
+                    self._constants[eq_idx, term_idx] = self._resolve_constant(term)
 
         # L2: Spatial-only cache (position-dependent, NOT time-dependent)
         self._spatial_cache: dict[tuple[int, int], NDArray[np.float64]] = {}
         self._precompute_spatial()
 
         # L3: Per-timestep cache
-        self._timestep_cache: dict[tuple[int, int, float], float | NDArray[np.float64]] = {}
+        self._timestep_cache: dict[
+            tuple[int, int, float], float | NDArray[np.float64]
+        ] = {}
 
         # Fail-fast: validate all unresolved symbolic terms at init
         self._validate_unresolved()

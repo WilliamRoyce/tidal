@@ -24,13 +24,15 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from tidal.solver.fields import FieldSet
 from tidal.solver.operators import apply_operator
-from tidal.solver.state import StateLayout, flat_to_fields
+from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
     from collections.abc import Callable
 
     from tidal.solver.grid import GridInfo
+    from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem
 
 # Time-derivative order threshold for dynamical (wave) equations
@@ -42,8 +44,9 @@ def _compute_force(  # noqa: PLR0913, PLR0917
     layout: StateLayout,
     grid: GridInfo,
     bc: str | tuple[str, ...] | None,
-    q_flat: np.ndarray,
-    pi_flat: np.ndarray,
+    y: np.ndarray,
+    t: float = 0.0,
+    rhs_eval: RHSEvaluator | None = None,
 ) -> np.ndarray:
     """Compute dpi/dt = F(q) for all momentum slots.
 
@@ -53,16 +56,7 @@ def _compute_force(  # noqa: PLR0913, PLR0917
     n = grid.num_points
     shape = grid.shape
 
-    # Reconstruct full state for field lookup
-    y = np.zeros(layout.total_size)
-    for slot_idx, slot in enumerate(layout.slots):
-        s = slice(slot_idx * n, (slot_idx + 1) * n)
-        if slot.kind == "field":
-            y[s] = q_flat[slot_idx * n : (slot_idx + 1) * n]
-        elif slot.kind == "momentum":
-            y[s] = pi_flat[slot_idx * n : (slot_idx + 1) * n]
-
-    fields = flat_to_fields(y, layout, shape)
+    fieldset = FieldSet.from_flat(layout, shape, y)
     eq_map = {eq.field_name: i for i, eq in enumerate(spec.equations)}
 
     force = np.zeros(layout.total_size)
@@ -73,12 +67,19 @@ def _compute_force(  # noqa: PLR0913, PLR0917
         eq_idx = eq_map.get(slot.field_name)
         if eq_idx is None:
             continue
-        eq = spec.equations[eq_idx]
-        result = np.zeros(shape)
-        for term in eq.rhs_terms:
-            target_data = fields.get(term.field, np.zeros(shape))
-            operated = apply_operator(term.operator, target_data, grid, bc)
-            result += term.coefficient * operated
+
+        if rhs_eval is not None:
+            result = rhs_eval.evaluate(eq_idx, fieldset, t)
+        else:
+            # Legacy path: constant coefficients only
+            eq = spec.equations[eq_idx]
+            result = np.zeros(shape)
+            fields = fieldset.as_dict()
+            for term in eq.rhs_terms:
+                target_data = fields.get(term.field, np.zeros(shape))
+                operated = apply_operator(term.operator, target_data, grid, bc)
+                result += term.coefficient * operated
+
         force[s] = result.ravel()
 
     return force
@@ -90,8 +91,10 @@ def _compute_velocity(  # noqa: PLR0913, PLR0917
     kinetic: np.ndarray | None,
     spatial_momenta: dict | None,
     pi_flat: np.ndarray,
-    fields: dict[str, np.ndarray],
+    fieldset: FieldSet,
     bc: str | tuple[str, ...] | None,
+    t: float = 0.0,
+    rhs_eval: RHSEvaluator | None = None,
 ) -> np.ndarray:
     """Compute dq/dt = K^{-1}(pi - S) for all field slots.
 
@@ -99,7 +102,6 @@ def _compute_velocity(  # noqa: PLR0913, PLR0917
     For non-diagonal K, solves K v = (pi - S) via np.linalg.solve.
     """
     n = grid.num_points
-    shape = grid.shape
     velocity = np.zeros(layout.total_size)
 
     dyn_fields = layout.dynamical_fields
@@ -113,10 +115,15 @@ def _compute_velocity(  # noqa: PLR0913, PLR0917
         mom_slot = layout.momentum_slot_map[fname]
         rhs_vecs[i] = pi_flat[mom_slot * n : (mom_slot + 1) * n]
 
-        if spatial_momenta and fname in spatial_momenta:
-            s_i = np.zeros(shape)
+        if rhs_eval is not None:
+            s_i = rhs_eval.evaluate_spatial_momentum(fname, fieldset, t)
+            rhs_vecs[i] -= s_i
+        elif spatial_momenta and fname in spatial_momenta:
+            # Legacy path
+            fields = fieldset.as_dict()
+            s_i = np.zeros(grid.shape)
             for term in spatial_momenta[fname]:
-                target_data = fields.get(term.field, np.zeros(shape))
+                target_data = fields.get(term.field, np.zeros(grid.shape))
                 operated = apply_operator(term.operator, target_data, grid, bc)
                 s_i += term.coefficient * operated
             rhs_vecs[i] -= s_i.ravel()
@@ -157,7 +164,7 @@ def _drift(
             y[s] += dt * velocity[s]
 
 
-def solve_leapfrog(  # noqa: PLR0913, PLR0914
+def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
     spec: EquationSystem,
     grid: GridInfo,
     y0: np.ndarray,
@@ -165,6 +172,7 @@ def solve_leapfrog(  # noqa: PLR0913, PLR0914
     dt: float,
     *,
     bc: str | tuple[str, ...] | None = None,
+    parameters: dict[str, float] | None = None,
     snapshot_interval: float | None = None,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
 ) -> dict[str, Any]:
@@ -186,6 +194,8 @@ def solve_leapfrog(  # noqa: PLR0913, PLR0914
         Fixed time step.
     bc : str or tuple, optional
         Boundary conditions.
+    parameters : dict[str, float], optional
+        Runtime parameter overrides for symbolic coefficients.
     snapshot_interval : float, optional
         Time between snapshots. If None, only initial and final states saved.
     snapshot_callback : callable, optional
@@ -222,6 +232,15 @@ def solve_leapfrog(  # noqa: PLR0913, PLR0914
         kinetic = np.array(canonical.kinetic_matrix.to_dense())
     spatial_momenta = canonical.spatial_momenta if canonical else None
 
+    # Build RHSEvaluator if parameters provided
+    rhs_eval: RHSEvaluator | None = None
+    if parameters is not None:
+        from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+        from tidal.solver.rhs import RHSEvaluator as _RHSEvaluator  # noqa: PLC0415
+
+        coeff_eval = CoefficientEvaluator(spec, grid, parameters)
+        rhs_eval = _RHSEvaluator(spec, grid, coeff_eval, bc=bc)
+
     # Initialize state
     y = y0.copy()
     t = t_span[0]
@@ -246,18 +265,18 @@ def solve_leapfrog(  # noqa: PLR0913, PLR0914
     n_steps = int((t_end - t) / dt)
     for _step in range(n_steps):
         # Half-kick
-        force = _compute_force(spec, layout, grid, bc, y, y)
+        force = _compute_force(spec, layout, grid, bc, y, t, rhs_eval)
         _half_kick(y, force, dt, layout, n)
 
         # Drift
-        fields = flat_to_fields(y, layout, grid.shape)
+        fieldset = FieldSet.from_flat(layout, grid.shape, y)
         velocity = _compute_velocity(
-            layout, grid, kinetic, spatial_momenta, y, fields, bc,
+            layout, grid, kinetic, spatial_momenta, y, fieldset, bc, t, rhs_eval,
         )
         _drift(y, velocity, dt, layout, n)
 
         # Half-kick
-        force = _compute_force(spec, layout, grid, bc, y, y)
+        force = _compute_force(spec, layout, grid, bc, y, t, rhs_eval)
         _half_kick(y, force, dt, layout, n)
 
         t += dt

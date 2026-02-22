@@ -57,6 +57,10 @@ class RHSEvaluator:
             eq.field_name: i for i, eq in enumerate(spec.equations)
         }
 
+    def begin_timestep(self, t: float) -> None:
+        """Notify the coefficient evaluator of a new timestep."""
+        self._coeff_eval.begin_timestep(t)
+
     def evaluate(
         self,
         eq_idx: int,
@@ -127,9 +131,7 @@ class RHSEvaluator:
         result = np.zeros(self._grid.shape)
         for term in terms:
             target = self._get_field_data(term.field, fields)
-            operated = apply_operator(
-                term.operator, target, self._grid, self._bc
-            )
+            operated = apply_operator(term.operator, target, self._grid, self._bc)
             coeff = self._coeff_eval.resolve(term, t)
             result += coeff * operated
         return result.ravel()
@@ -161,12 +163,8 @@ class RHSEvaluator:
             raise ValueError(msg)
 
         target = self._get_field_data(term.field, fields)
-        operated = apply_operator(
-            term.operator, target, self._grid, self._bc
-        )
-        coeff = self._coeff_eval.resolve(
-            term, t, eq_idx=eq_idx, term_idx=term_idx
-        )
+        operated = apply_operator(term.operator, target, self._grid, self._bc)
+        coeff = self._coeff_eval.resolve(term, t, eq_idx=eq_idx, term_idx=term_idx)
         return coeff * operated
 
     @staticmethod

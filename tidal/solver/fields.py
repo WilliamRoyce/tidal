@@ -74,10 +74,7 @@ class FieldSet:
         """
         idx = self._name_to_idx.get(name)
         if idx is None:
-            msg = (
-                f"Unknown slot '{name}'. "
-                f"Valid slots: {sorted(self._name_to_idx)}"
-            )
+            msg = f"Unknown slot '{name}'. Valid slots: {sorted(self._name_to_idx)}"
             raise KeyError(msg)
         start = idx * self._n
         return self._data[start : start + self._n].reshape(self._grid_shape)
@@ -92,10 +89,7 @@ class FieldSet:
         """
         idx = self._name_to_idx.get(name)
         if idx is None:
-            msg = (
-                f"Unknown slot '{name}'. "
-                f"Valid slots: {sorted(self._name_to_idx)}"
-            )
+            msg = f"Unknown slot '{name}'. Valid slots: {sorted(self._name_to_idx)}"
             raise KeyError(msg)
         start = idx * self._n
         self._data[start : start + self._n] = np.asarray(value).ravel()

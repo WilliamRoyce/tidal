@@ -81,7 +81,10 @@ class PlotContext:
         from tidal.measurement import SimulationData
 
         return SimulationData.from_storage(
-            self.storage, self.spec, self.grid, self.params,
+            self.storage,
+            self.spec,
+            self.grid,
+            self.params,
         )
 
 
@@ -684,7 +687,9 @@ def _gridinfo_from_pypde(grid: CartesianGrid) -> tuple[GridInfo, tuple[bool, ...
     return grid_info, periodic_flags
 
 
-def _bc_from_args(args: Namespace, periodic_flags: tuple[bool, ...]) -> str | tuple[str, ...]:
+def _bc_from_args(
+    args: Namespace, periodic_flags: tuple[bool, ...]
+) -> str | tuple[str, ...]:
     """Determine BC string for spatial operators from CLI args."""
     if args.bc:
         bc_parts = [b.strip().lower() for b in args.bc.split(",")]
@@ -824,7 +829,12 @@ def _simulate_ida(  # noqa: PLR0913, PLR0917
 
     if fmt == "directory":
         writer, snapshot_cb = _setup_ida_disk_writer(
-            args, spec, grid_info, periodic_flags, params, snapshot_interval,
+            args,
+            spec,
+            grid_info,
+            periodic_flags,
+            params,
+            snapshot_interval,
         )
 
     # Run IDA solver
@@ -837,6 +847,7 @@ def _simulate_ida(  # noqa: PLR0913, PLR0917
         y0,
         t_span=(0.0, args.t_end),
         bc=bc,
+        parameters=params,
         num_snapshots=num_snapshots,
         snapshot_callback=snapshot_cb,
     )
@@ -852,7 +863,11 @@ def _simulate_ida(  # noqa: PLR0913, PLR0917
 
     # Pack result into MemoryStorage for output pipeline compatibility
     storage = _ida_result_to_storage(
-        result, spec, grid, grid_info.shape, grid_info.num_points,
+        result,
+        spec,
+        grid,
+        grid_info.shape,
+        grid_info.num_points,
     )
     log(f"  {len(result['t'])} snapshots stored")  # type: ignore[operator]
     return storage
@@ -883,9 +898,7 @@ def _simulate_leapfrog(  # noqa: PLR0913, PLR0917
     # Leapfrog requires a fixed dt
     dt = args.dt
     if dt is None:
-        dt = _CFL_FACTOR * min(
-            float(d) for d in grid_info.dx
-        )
+        dt = _CFL_FACTOR * min(float(d) for d in grid_info.dx)
 
     snapshot_interval = (
         args.snapshots if args.snapshots is not None else args.t_end / 100.0
@@ -898,7 +911,12 @@ def _simulate_leapfrog(  # noqa: PLR0913, PLR0917
 
     if fmt == "directory":
         writer, snapshot_cb = _setup_ida_disk_writer(
-            args, spec, grid_info, periodic_flags, params, snapshot_interval,
+            args,
+            spec,
+            grid_info,
+            periodic_flags,
+            params,
+            snapshot_interval,
         )
 
     log(  # type: ignore[operator]
@@ -911,13 +929,15 @@ def _simulate_leapfrog(  # noqa: PLR0913, PLR0917
         t_span=(0.0, args.t_end),
         dt=dt,
         bc=bc,
+        parameters=params,
         snapshot_interval=snapshot_interval,
         snapshot_callback=snapshot_cb,
     )
 
     if not result["success"]:
         print(
-            f"Error: Leapfrog solver failed: {result['message']}", file=sys.stderr,
+            f"Error: Leapfrog solver failed: {result['message']}",
+            file=sys.stderr,
         )
 
     if writer is not None:
@@ -928,7 +948,11 @@ def _simulate_leapfrog(  # noqa: PLR0913, PLR0917
 
     # Pack result into MemoryStorage for output pipeline compatibility
     storage = _ida_result_to_storage(
-        result, spec, grid, grid_info.shape, grid_info.num_points,
+        result,
+        spec,
+        grid,
+        grid_info.shape,
+        grid_info.num_points,
     )
     log(f"  {len(result['t'])} snapshots stored")  # type: ignore[operator]
     return storage
@@ -1105,7 +1129,11 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
     if use_directory:
         # Disk-backed streaming: O(1) memory regardless of snapshot count
         storage, tracker, writer_pypde = _setup_disk_backed(
-            args, spec, grid, snapshot_interval, params,
+            args,
+            spec,
+            grid,
+            snapshot_interval,
+            params,
         )
     else:
         # In-memory path (for plot output)
@@ -1138,10 +1166,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
 
     if writer_pypde is not None:
         writer_pypde.close()
-        log(
-            f"  {writer_pypde.count} snapshots streamed to: "
-            f"{writer_pypde.output_dir}"
-        )
+        log(f"  {writer_pypde.count} snapshots streamed to: {writer_pypde.output_dir}")
     else:
         log(f"  {len(storage)} snapshots stored")
 
