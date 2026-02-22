@@ -147,20 +147,17 @@ class RHSEvaluator:
         eq_idx: int,
         term_idx: int,
     ) -> np.ndarray:
-        """Evaluate a single operator term.
-
-        Raises
-        ------
-        ValueError
-            If the term uses ``first_derivative_t``.
-        """
+        """Evaluate a single operator term."""
         if term.operator == "first_derivative_t":
-            msg = (
-                f"Operator 'first_derivative_t' on field '{term.field}' "
-                f"is not supported in the solver path. Use the py-pde "
-                f"pde_builder for time-derivative coupling terms."
+            # Time derivative of a field = its momentum (pi = dq/dt for K=I).
+            # For non-identity K, this is approximate; IDA handles it exactly
+            # via the yp vector in residual form.
+            pi_name = f"pi_{term.field}"
+            target = self._get_field_data(pi_name, fields)
+            coeff = self._coeff_eval.resolve(
+                term, t, eq_idx=eq_idx, term_idx=term_idx
             )
-            raise ValueError(msg)
+            return coeff * target
 
         target = self._get_field_data(term.field, fields)
         operated = apply_operator(term.operator, target, self._grid, self._bc)

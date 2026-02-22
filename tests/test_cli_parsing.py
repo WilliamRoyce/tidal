@@ -16,7 +16,6 @@ from tidal.cli._simulate import (
     _build_grid_info,
     _build_initial_y0,
     _infer_output_format,
-    _parse_bc,
     _parse_bounds,
     _parse_grid_shape,
     _parse_params,
@@ -121,50 +120,6 @@ class TestParseSingleBound:
         """Equal bounds (lo == hi) should raise ValueError."""
         with pytest.raises(ValueError, match=r"lower.*must be less than upper"):
             _parse_single_bound("5:5")
-
-
-# ==================== _parse_bc ====================
-
-
-class TestParseBC:
-    @pytest.mark.parametrize(
-        ("raw", "periodic", "dim", "expected"),
-        [
-            (None, True, 1, True),
-            (None, False, 1, False),
-            ("periodic", True, 1, [True]),
-            ("periodic", True, 2, [True, True]),
-            ("neumann", True, 1, [False]),
-            ("neumann,periodic", False, 2, [False, True]),
-            ("periodic,neumann,neumann", True, 3, [True, False, False]),
-        ],
-    )
-    def test_valid(
-        self,
-        raw: str | None,
-        periodic: bool,
-        dim: int,
-        expected: bool | list[bool],
-    ) -> None:
-        assert _parse_bc(raw, periodic=periodic, spatial_dim=dim) == expected
-
-    def test_dirichlet_rejected(self) -> None:
-        """Dirichlet BC is not supported by py-pde and should raise a clear error."""
-        with pytest.raises(ValueError, match=r"Dirichlet.*not supported"):
-            _parse_bc("dirichlet", periodic=True, spatial_dim=1)
-
-    def test_invalid_bc_type(self) -> None:
-        with pytest.raises(ValueError, match="Invalid boundary condition"):
-            _parse_bc("robin", periodic=True, spatial_dim=1)
-
-    def test_wrong_count(self) -> None:
-        with pytest.raises(ValueError, match="--bc"):
-            _parse_bc("neumann,periodic", periodic=True, spatial_dim=1)
-
-    def test_bc_overrides_periodic_flag(self) -> None:
-        """--bc should override --periodic flag."""
-        result = _parse_bc("neumann", periodic=True, spatial_dim=1)
-        assert result == [False]
 
 
 # ==================== _parse_params ====================

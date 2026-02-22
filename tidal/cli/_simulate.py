@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import math
 import sys
-from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, cast
 
@@ -13,8 +12,6 @@ import numpy as np
 if TYPE_CHECKING:
     from argparse import Namespace
     from collections.abc import Callable
-
-    from pde import CartesianGrid, FieldCollection, MemoryStorage
 
     from tidal.measurement._io import SimulationData
     from tidal.measurement._writer import SnapshotWriter
@@ -64,42 +61,6 @@ FORMULA_NAMESPACE: dict[str, object] = {
     "heaviside": np.heaviside,
     "where": np.where,
 }
-
-
-@dataclass(frozen=True)
-class PlotContext:
-    """Bundled context for plot generation."""
-
-    spec: EquationSystem
-    storage: MemoryStorage
-    grid: CartesianGrid
-    initial_state: FieldCollection
-    params: dict[str, float]
-
-    def to_simulation_data(self) -> SimulationData:
-        """Convert to a :class:`~tidal.measurement.SimulationData` for measurement."""
-        from tidal.measurement import SimulationData
-
-        return SimulationData.from_storage(
-            self.storage,
-            self.spec,
-            self.grid,
-            self.params,
-        )
-
-
-def field_slots(spec: EquationSystem) -> dict[str, int]:
-    """Map component names to their field slot indices in the state vector.
-
-    Uses ``spec.state_layout`` which accounts for mixed time-orders:
-    second-order fields have [field, momentum] pairs, while first-order
-    and constraint fields have only [field].
-    """
-    return {
-        name: idx
-        for idx, (name, slot_type) in enumerate(spec.state_layout)
-        if slot_type == "field"
-    }
 
 
 def _parse_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:  # noqa: C901
@@ -232,62 +193,7 @@ def _parse_single_bound(s: str) -> tuple[float, float]:
     return lo, hi
 
 
-_VALID_BC_TYPES = {"periodic", "neumann"}
-
-# Native path supports Dirichlet (our apply_operator handles it; py-pde doesn't)
 _NATIVE_BC_TYPES = frozenset({"periodic", "neumann", "dirichlet"})
-
-
-def _parse_bc(
-    raw: str | None, *, periodic: bool, spatial_dim: int
-) -> bool | list[bool]:
-    """Parse --bc argument into periodic specification for CartesianGrid.
-
-    Parameters
-    ----------
-    raw : str | None
-        Raw --bc argument (e.g. "neumann,periodic").
-    periodic : bool
-        Value from --periodic flag (used when --bc is None).
-    spatial_dim : int
-        Number of spatial dimensions.
-
-    Returns
-    -------
-    bool | list[bool]
-        Single bool or per-axis list for CartesianGrid periodic parameter.
-
-    Raises
-    ------
-    ValueError
-        If BC count doesn't match dimension or BC type is unknown.
-    """
-    if raw is None:
-        return periodic
-
-    bc_list = [b.strip().lower() for b in raw.split(",")]
-
-    if len(bc_list) == 1:
-        bc_list *= spatial_dim
-    elif len(bc_list) != spatial_dim:
-        msg = (
-            f"--bc expects 1 or {spatial_dim} values "
-            f"(got {len(bc_list)}). Example: --bc neumann,periodic"
-        )
-        raise ValueError(msg)
-
-    for bc in bc_list:
-        if bc == "dirichlet":
-            msg = (
-                "Dirichlet boundary conditions are not supported by py-pde's CartesianGrid. "
-                "Use 'neumann' (zero-flux) or 'periodic' instead."
-            )
-            raise ValueError(msg)
-        if bc not in _VALID_BC_TYPES:
-            msg = f"Invalid boundary condition: '{bc}'. Must be one of: {', '.join(sorted(_VALID_BC_TYPES))}"
-            raise ValueError(msg)
-
-    return [bc == "periodic" for bc in bc_list]
 
 
 def _parse_periodic(
@@ -296,11 +202,10 @@ def _parse_periodic(
     periodic: bool,
     spatial_dim: int,
 ) -> tuple[bool, ...]:
-    """Parse boundary spec into periodic flags for GridInfo (native path).
+    """Parse boundary spec into periodic flags for GridInfo.
 
-    Unlike ``_parse_bc`` (which returns ``bool | list[bool]`` for
-    CartesianGrid), this always returns a fixed-length tuple and accepts
-    ``"dirichlet"`` as a valid BC type.
+    Returns a fixed-length tuple of booleans. Accepts ``"dirichlet"``,
+    ``"neumann"``, and ``"periodic"`` as valid BC types.
 
     Parameters
     ----------
@@ -351,10 +256,7 @@ def _build_grid_info(
     spec: EquationSystem,
     bounds: list[tuple[float, float]],
 ) -> GridInfo:
-    """Build GridInfo directly from CLI arguments (no py-pde).
-
-    This is the native-path equivalent of ``_build_grid()``.
-    """
+    """Build GridInfo from CLI arguments."""
     from tidal.solver.grid import GridInfo
 
     shape = _parse_grid_shape(args.grid_shape, spec.spatial_dimension)
@@ -364,26 +266,6 @@ def _build_grid_info(
     return GridInfo(
         bounds=tuple(bounds),
         shape=tuple(shape),
-        periodic=periodic,
-    )
-
-
-def _build_grid(
-    args: Namespace,
-    spec: EquationSystem,
-    bounds: list[tuple[float, float]],
-) -> CartesianGrid:
-    """Build a CartesianGrid from CLI arguments and pre-parsed bounds."""
-    from pde import CartesianGrid
-
-    shape = _parse_grid_shape(args.grid_shape, spec.spatial_dimension)
-    periodic = _parse_bc(
-        args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension
-    )
-
-    return CartesianGrid(
-        bounds=bounds,
-        shape=shape,
         periodic=periodic,
     )
 
@@ -471,139 +353,7 @@ def _validate_formula_ast(expr: str, allowed_names: set[str]) -> None:
             raise TypeError(msg)
 
 
-def _apply_formula_ic(
-    args: Namespace,
-    grid: CartesianGrid,
-    spec: EquationSystem,
-    component: str,
-) -> FieldCollection:
-    """Apply formula-based initial condition.
-
-    Raises
-    ------
-    ValueError
-        If --ic-formula expression is not provided or contains unsafe constructs.
-    """
-    from tidal.symbolic import create_initial_state
-
-    if args.ic_formula is None:
-        msg = "--ic=formula requires --ic-formula=EXPR"
-        raise ValueError(msg)
-
-    coords = spec.spatial_coordinates
-    namespace = dict(FORMULA_NAMESPACE)
-    for i, name in enumerate(coords):
-        namespace[name] = grid.cell_coords[..., i]
-
-    allowed_names = set(namespace.keys())
-    _validate_formula_ast(args.ic_formula, allowed_names)
-
-    field_arr = eval(args.ic_formula, {"__builtins__": {}}, namespace)  # noqa: S307
-    field_arr = np.asarray(field_arr, dtype=float)
-
-    # Broadcast scalar results to grid shape
-    if field_arr.shape == ():
-        field_arr = np.full(grid.shape, float(field_arr))
-
-    return create_initial_state(grid, spec, field_data={component: field_arr})
-
-
-def _build_initial_state(
-    args: Namespace,
-    grid: CartesianGrid,
-    spec: EquationSystem,
-    bounds: list[tuple[float, float]],
-) -> FieldCollection:
-    """Build initial state from CLI IC arguments.
-
-    Uses ``create_initial_state`` which respects ``state_layout`` for
-    mixed time-order systems (constraint + dynamical fields).
-
-    Raises
-    ------
-    ValueError
-        If component name is unknown or IC type is invalid.
-    """
-    from tidal.symbolic import create_initial_state
-    from tidal.vectorfield.initial_conditions import (
-        ComponentGaussianPulse,
-        ComponentPlaneWave,
-    )
-
-    ic_type = args.ic
-    component = args.ic_component or spec.component_names[0]
-
-    if component not in spec.component_names:
-        msg = (
-            f"Unknown component '{component}'. "
-            f"Available: {', '.join(spec.component_names)}"
-        )
-        raise ValueError(msg)
-
-    if ic_type == "zero":
-        if args.ic_component is not None:
-            print(
-                f"  Note: --ic-component '{args.ic_component}' is ignored for zero IC"
-            )
-        return create_initial_state(grid, spec)
-
-    if ic_type == "gaussian":
-        if args.ic_center is not None:
-            center = tuple(float(c) for c in args.ic_center.split(","))
-            if len(center) != spec.spatial_dimension:
-                msg = (
-                    f"--ic-center has {len(center)} values but spatial dimension is "
-                    f"{spec.spatial_dimension}. Expected {spec.spatial_dimension} comma-separated values."
-                )
-                raise ValueError(msg)
-        else:
-            center = tuple((lo + hi) / 2.0 for lo, hi in bounds)
-        domain_size = min(hi - lo for lo, hi in bounds)
-        width = args.ic_width if args.ic_width is not None else domain_size / 10.0
-
-        pulse = ComponentGaussianPulse(
-            center=center,
-            width=width,
-            amplitude=args.ic_amplitude,
-            active_components={component: 1.0},
-        )
-        # Use create_initial_state with field_data for layout-aware IC
-        field_arr = pulse.compute_gaussian(grid)
-        return create_initial_state(grid, spec, field_data={component: field_arr})
-
-    if ic_type == "plane-wave":
-        if args.ic_wavevector is not None:
-            kvec = tuple(float(k) for k in args.ic_wavevector.split(","))
-        else:
-            # Default: one wavelength across domain in x-direction
-            lx = bounds[0][1] - bounds[0][0]
-            kvec = tuple(
-                2.0 * math.pi / lx if i == 0 else 0.0
-                for i in range(spec.spatial_dimension)
-            )
-
-        wave = ComponentPlaneWave(
-            wavevector=kvec,
-            amplitude=args.ic_amplitude,
-            active_components={component: 1.0},
-        )
-        # Use create_initial_state for layout-aware IC
-        field_arr, momentum_arr = wave.compute_plane_wave(grid)
-        return create_initial_state(
-            grid,
-            spec,
-            field_data={component: field_arr},
-            momentum_data={component: momentum_arr},
-        )
-
-    if ic_type == "formula":
-        return _apply_formula_ic(args, grid, spec, component)
-
-    msg = f"Unknown IC type: {ic_type}"
-    raise ValueError(msg)
-
-
-# --- Native initial condition helpers (no py-pde) ---
+# --- Initial condition helpers ---
 
 
 def _gaussian_y0(
@@ -788,7 +538,7 @@ def _build_initial_y0(
 # --- Native output pipeline (no py-pde) ---
 
 
-def _print_summary_native(sim_data: SimulationData) -> None:
+def _print_summary(sim_data: SimulationData) -> None:
     """Print simulation summary using SimulationData (no py-pde types)."""
     times = sim_data.times
     print()
@@ -811,7 +561,7 @@ def _print_summary_native(sim_data: SimulationData) -> None:
             print(f"  {name}: peak {init_peak:.4f} → {final_peak:.4f}")
 
 
-def _generate_output_native(
+def _generate_output(
     args: Namespace,
     sim_data: SimulationData,
     grid_info: GridInfo,
@@ -821,10 +571,10 @@ def _generate_output_native(
 
     if fmt in {"summary", "directory"}:
         if sim_data.n_snapshots > 0:
-            _print_summary_native(sim_data)
+            _print_summary(sim_data)
         return
 
-    _print_summary_native(sim_data)
+    _print_summary(sim_data)
 
     if args.output is not None:
         output_path = Path(args.output)
@@ -834,9 +584,9 @@ def _generate_output_native(
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    from tidal.cli._plot import save_plot_native
+    from tidal.cli._plot import save_plot
 
-    save_plot_native(output_path, sim_data, grid_info)
+    save_plot(output_path, sim_data, grid_info)
 
 
 def _infer_output_format(args: Namespace) -> str:
@@ -867,120 +617,7 @@ def _infer_output_format(args: Namespace) -> str:
     return "png"
 
 
-def _generate_output(args: Namespace, ctx: PlotContext) -> None:
-    """Generate output based on format selection.
-
-    For ``"directory"`` format, this is a no-op — data was already streamed
-    to disk by ``SnapshotWriter`` before this function is called.
-    """
-    fmt = _infer_output_format(args)
-
-    if fmt in {"summary", "directory"}:
-        # Directory/summary: data already on disk; print summary if storage
-        # captured at least one snapshot (may be empty if solver overshot).
-        if len(ctx.storage) > 0:
-            final = cast("FieldCollection", ctx.storage[-1])
-            times = list(ctx.storage.times)
-            _print_summary(ctx.spec, ctx.initial_state, final, times, ctx.params)
-        return
-
-    final = cast("FieldCollection", ctx.storage[-1])
-    times = list(ctx.storage.times)
-
-    # Always print summary
-    _print_summary(ctx.spec, ctx.initial_state, final, times, ctx.params)
-
-    # Determine output path (default: next to JSON spec file)
-    if args.output is not None:
-        output_path = Path(args.output)
-    else:
-        json_file = Path(args.json_path).resolve()
-        output_path = json_file.parent / f"{json_file.stem}_output.png"
-
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    from tidal.cli._plot import save_plot
-
-    save_plot(output_path, ctx)
-
-
-def _print_constraint_summary(
-    spec: EquationSystem,
-    initial: FieldCollection,
-    solved: FieldCollection,
-    params: dict[str, float],
-) -> None:
-    """Print constraint-solve summary to stdout."""
-    print()
-    print("Results (constraint solve):")
-    print(f"  Parameters: {params}")
-    print()
-
-    slots = field_slots(spec)
-    for name in spec.component_names:
-        slot = slots[name]
-        init_peak = float(np.max(np.abs(initial[slot].data)))
-        solved_peak = float(np.max(np.abs(solved[slot].data)))
-        print(f"  {name}: peak {init_peak:.4f} → {solved_peak:.4f}")
-
-
-def _print_summary(
-    spec: EquationSystem,
-    initial: FieldCollection,
-    final: FieldCollection,
-    times: list[float],
-    params: dict[str, float],
-) -> None:
-    """Print simulation summary to stdout."""
-    print()
-    print("Results:")
-    print(f"  Time range: 0.0 → {times[-1]:.2f} ({len(times)} snapshots)")
-    print(f"  Parameters: {params}")
-    print()
-
-    slots = field_slots(spec)
-    for name in spec.component_names:
-        slot = slots[name]
-        init_peak = float(np.max(np.abs(initial[slot].data)))
-        final_peak = float(np.max(np.abs(final[slot].data)))
-        if init_peak > 0:
-            ratio = final_peak / init_peak
-            print(
-                f"  {name}: peak {init_peak:.4f} → {final_peak:.4f} (ratio: {ratio:.4f})"
-            )
-        else:
-            print(f"  {name}: peak {init_peak:.4f} → {final_peak:.4f}")
-
-
-def _save_constraint_output(
-    args: Namespace,
-    spec: EquationSystem,
-    state: FieldCollection,
-) -> None:
-    """Save constraint-solve output to a directory if requested.
-
-    Raises
-    ------
-    ValueError
-        If ``--output`` has a ``.npz`` extension (no longer supported).
-    """
-    if args.no_plot or args.output is None:
-        return
-    output_path = Path(args.output)
-    if output_path.suffix == ".npz":
-        msg = (
-            "NPZ format is no longer supported. "
-            "Use a directory path (no extension) for output."
-        )
-        raise ValueError(msg)
-    output_path.mkdir(parents=True, exist_ok=True)
-    slots = field_slots(spec)
-    for name in spec.component_names:
-        np.save(str(output_path / f"{name}.npy"), state[slots[name]].data)
-    print(f"  Saved data to: {output_path}")
-
-
-# --- BC string derivation (used by both native and legacy paths) ---
+# --- BC string derivation ---
 
 
 def _bc_from_args(
@@ -1000,7 +637,7 @@ def _bc_from_args(
 # --- Native simulation path (no py-pde) ---
 
 
-def _warn_zero_evolution_native(
+def _warn_zero_evolution(
     spec: EquationSystem,
     grid_info: GridInfo,
     y0: np.ndarray,
@@ -1096,7 +733,89 @@ def _setup_disk_writer_native(
     return writer, _disk_callback
 
 
-def _simulate_native(
+def _extract_constraint_bc(
+    spec: EquationSystem,
+) -> tuple[str, ...] | None:
+    """Extract BCs from constraint_solver blocks in the JSON spec.
+
+    Returns a per-axis BC tuple if any constraint equation defines BCs,
+    otherwise None (use global BC).
+    """
+    for eq in spec.equations:
+        if eq.time_derivative_order != 0:
+            continue
+        cs = eq.constraint_solver
+        if cs and cs.enabled and cs.boundary_conditions:
+            bc_list: list[str] = []
+            for coord in spec.spatial_coordinates:
+                bc_entry = cs.boundary_conditions.get(coord)
+                if bc_entry is not None:
+                    bc_list.append(bc_entry.type)
+                else:
+                    bc_list.append("neumann")
+            return tuple(bc_list)
+    return None
+
+
+def _constraint_mode(  # noqa: PLR0913, PLR0917
+    args: Namespace,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+    y0: np.ndarray,
+    params: dict[str, float],
+    bc: str | tuple[str, ...] | None,
+    log: object,
+) -> int:
+    """Solve constraints via IDA's algebraic initial condition solver.
+
+    BCs are taken from the constraint_solver block in the JSON spec when
+    available, overriding the global ``--bc`` argument.
+    """
+    from tidal.measurement._io import SimulationData
+    from tidal.solver.ida import solve_ida
+
+    log_fn = cast("Callable[..., None]", log)
+
+    # Use constraint-specific BCs if defined in the JSON spec
+    constraint_bc = _extract_constraint_bc(spec)
+    if constraint_bc is not None:
+        log_fn(f"  Using constraint BCs from spec: {constraint_bc}")
+        bc = constraint_bc
+
+    log_fn("Solving constraints via IDA...")
+
+    # IDA's calc_initcond="yp0" (the default for DAE systems) adjusts both
+    # algebraic variables in y0 and derivatives in yp0 to satisfy the
+    # constraint equations.  A short time span suffices — we only need
+    # IDA to find consistent initial conditions, not evolve.
+    result = solve_ida(
+        spec, grid_info, y0,
+        t_span=(0.0, 0.01),
+        bc=bc, parameters=params,
+        num_snapshots=2,
+    )
+
+    if not result["success"]:
+        print(f"Error: constraint solve failed: {result['message']}", file=sys.stderr)
+        return 1
+
+    log_fn("  Constraint solve complete.")
+
+    sim_data = SimulationData.from_result(result, spec, grid_info, params)
+    _print_summary(sim_data)
+
+    # Save constraint output if directory requested
+    if args.output is not None:
+        output_path = Path(args.output)
+        output_path.mkdir(parents=True, exist_ok=True)
+        for name, arr in sim_data.fields.items():
+            np.save(str(output_path / f"{name}.npy"), arr[-1])
+        log_fn(f"  Saved data to: {output_path}")
+
+    return 0
+
+
+def _simulate(
     args: Namespace,
     spec: EquationSystem,
     params: dict[str, float],
@@ -1128,8 +847,12 @@ def _simulate_native(
 
     # 4. Diagnostics
     _validate_solver_params(args)
-    if args.mode != "constraint":
-        _warn_zero_evolution_native(spec, grid_info, y0, params, bc)
+
+    # Constraint-only mode: solve algebraic equations via IDA, no time evolution
+    if args.mode == "constraint":
+        return _constraint_mode(args, spec, grid_info, y0, params, bc, log)
+
+    _warn_zero_evolution(spec, grid_info, y0, params, bc)
 
     # 5. Snapshot configuration
     snapshot_interval = (
@@ -1186,17 +909,11 @@ def _simulate_native(
     log(f"  {sim_data.n_snapshots} snapshots stored")
 
     # 9. Output
-    _generate_output_native(args, sim_data, grid_info)
+    _generate_output(args, sim_data, grid_info)
     return 0
 
 
 # --- Command entry point ---
-
-
-def _check_cfl_stability(pde: object, dt: float, grid: CartesianGrid) -> None:
-    """Print CFL stability warnings to stderr."""
-    warnings_list = cast("list[str]", pde.check_stability(dt, grid))  # type: ignore[attr-defined]
-    sys.stderr.writelines(f"  Warning: {w}\n" for w in warnings_list)
 
 
 def _validate_solver_params(args: Namespace) -> None:
@@ -1218,25 +935,7 @@ def _validate_solver_params(args: Namespace) -> None:
         raise ValueError(msg)
 
 
-def _warn_zero_evolution(pde: object, state: FieldCollection) -> None:
-    """Warn if all evolution rates are zero at t=0.
-
-    Catches initial conditions that produce static configurations, e.g.
-    pure-gauge EM with Gaussian A_1 and zero conjugate momentum.
-    """
-    rates = pde.evolution_rate(state, t=0.0)  # type: ignore[attr-defined]
-    max_rate = max(float(np.max(np.abs(f.data))) for f in rates)
-    if max_rate < _ZERO_RATE_THRESHOLD:
-        print(
-            "  Warning: all evolution rates are zero at t=0. "
-            "The initial condition may be a static configuration. "
-            "For gauge fields, try --ic plane-wave to provide "
-            "non-zero conjugate momentum.",
-            file=sys.stderr,
-        )
-
-
-def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0914, PLR0915
+def simulate_command(args: Namespace) -> int:
     """Execute the simulate command.
 
     Parameters
@@ -1274,160 +973,5 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0914, PLR0915
     if params:
         log(f"  Parameters: {params}")
 
-    # ─── Native path (IDA / leapfrog) ───────────────────────
-    # Self-contained: no py-pde imports, no type conversions.
-    if args.scheme in {"ida", "leapfrog"}:
-        return _simulate_native(args, spec, params)
-
-    # ─── Legacy py-pde path (scipy / runge-kutta) ──────────
-    from tidal.symbolic import build_pde_from_json
-
-    # Step 3: Build PDE
-    log("Building PDE...")
-    pde = build_pde_from_json(json_path, parameters=params)
-
-    # Step 4: Create grid
-    bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
-    grid = _build_grid(args, spec, bounds)
-    log(f"  Grid: {'x'.join(str(s) for s in grid.shape)}, bounds: {grid.axes_bounds}")
-
-    # Step 5: Initial conditions
-    state = _build_initial_state(args, grid, spec, bounds)
-    initial_state = state.copy()
-    log(f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}")
-
-    # Safety net: warn if all evolution rates are zero at t=0
-    # (e.g., pure-gauge EM with Gaussian IC and π=0)
-    if args.mode != "constraint":
-        _warn_zero_evolution(pde, state)
-
-    # Constraint-only mode: single constraint solve, no time evolution
-    if args.mode == "constraint":
-        log("Solving constraints...")
-        pde.evolution_rate(state, t=0.0)  # type: ignore[attr-defined]
-        log("  Constraint solve complete.")
-        _print_constraint_summary(spec, initial_state, state, params)
-        _save_constraint_output(args, spec, state)
-        return 0
-
-    # Step 6: Validate solver parameters and determine dt
-    _validate_solver_params(args)
-
-    # py-pde path: runge-kutta or scipy
-    from tidal.utils import normalize_solve_result
-
-    dt = args.dt
-    if dt is None:
-        # Auto dt from grid spacing
-        dt = _CFL_FACTOR * min(
-            (b[1] - b[0]) / s for b, s in zip(grid.axes_bounds, grid.shape, strict=True)
-        )
-
-    _check_cfl_stability(pde, dt, grid)
-
-    # Step 7: Run simulation
-    snapshot_interval = (
-        args.snapshots if args.snapshots is not None else args.t_end / 100.0
-    )
-    log(
-        f"Running simulation (t=0 → {args.t_end}, dt={dt:.4f}, scheme={args.scheme})..."
-    )
-
-    fmt = _infer_output_format(args)
-    use_directory = fmt == "directory"
-    writer_pypde: SnapshotWriter | None = None
-
-    if use_directory:
-        # Disk-backed streaming: O(1) memory regardless of snapshot count
-        storage, tracker, writer_pypde = _setup_disk_backed(
-            args,
-            spec,
-            grid,
-            snapshot_interval,
-            params,
-        )
-    else:
-        # In-memory path (for plot output)
-        from pde import MemoryStorage
-
-        storage = MemoryStorage()
-        tracker = storage.tracker(snapshot_interval)
-
-    # Solve (tracker type varies: StorageTracker for legacy, list for disk-backed)
-    if args.scheme == "scipy":
-        normalize_solve_result(
-            pde.solve(  # type: ignore[attr-defined]
-                state,
-                t_range=args.t_end,
-                dt=dt,
-                solver="scipy",
-                tracker=tracker,  # pyright: ignore[reportArgumentType]
-            )
-        )
-    else:
-        normalize_solve_result(
-            pde.solve(  # type: ignore[attr-defined]
-                state,
-                t_range=args.t_end,
-                dt=dt,
-                scheme=args.scheme,
-                tracker=tracker,  # pyright: ignore[reportArgumentType]
-            )
-        )
-
-    if writer_pypde is not None:
-        writer_pypde.close()
-        log(f"  {writer_pypde.count} snapshots streamed to: {writer_pypde.output_dir}")
-    else:
-        log(f"  {len(storage)} snapshots stored")
-
-    # Step 8: Output
-    ctx = PlotContext(
-        spec=spec,
-        storage=storage,
-        grid=grid,
-        initial_state=initial_state,
-        params=params,
-    )
-    _generate_output(args, ctx)
-
-    return 0
-
-
-def _setup_disk_backed(
-    args: Namespace,
-    spec: EquationSystem,
-    grid: CartesianGrid,
-    snapshot_interval: float,
-    params: dict[str, float],
-) -> tuple[MemoryStorage, list[object], SnapshotWriter]:
-    """Set up SnapshotWriter + CallbackTracker for disk-backed simulation.
-
-    Also creates a minimal MemoryStorage that only stores the final snapshot
-    (for PlotContext summary compatibility).
-
-    Returns (storage, tracker_list, writer).
-    """
-    from pde import CallbackTracker, MemoryStorage
-
-    from tidal.measurement._writer import create_snapshot_callback
-
-    output_dir = Path(args.output) if args.output else Path("output")
-
-    writer, callback = create_snapshot_callback(
-        output_dir=output_dir,
-        spec=spec,
-        grid=grid,
-        t_end=args.t_end,
-        snapshot_interval=snapshot_interval,
-        parameters=params,
-        spec_path=Path(args.json_path),
-    )
-
-    snapshot_tracker = CallbackTracker(callback, interrupts=snapshot_interval)
-
-    # Minimal MemoryStorage for PlotContext summary (only the final snapshot)
-    storage = MemoryStorage()
-    summary_tracker = storage.tracker(args.t_end)
-
-    return storage, [snapshot_tracker, summary_tracker], writer
+    # All simulation goes through the native IDA/leapfrog path
+    return _simulate(args, spec, params)

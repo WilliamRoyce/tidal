@@ -1831,6 +1831,34 @@ wheels = [
 ]
 
 [[package]]
+name = "scikit-sundae"
+version = "1.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "numpy" },
+    { name = "scipy" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/7e/f4/3c9cca7094ab1ab94e4a0ac31ddfe697e5f0a9cedddb2c7b4f2e6c4b1218/scikit_sundae-1.1.1.tar.gz", hash = "sha256:8a88c015c5ad3b5cb5a594cd5fad90fc382fa0a500b345159783a6adbf0f59a4", size = 55966, upload-time = "2026-02-03T18:53:18.849Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/39/de/1feb327b6908913efcee6d0a17d5124e318396c110c33504c665f9b8d14a/scikit_sundae-1.1.1-cp311-cp311-macosx_11_0_arm64.whl", hash = "sha256:ee24a8002c4408665bb4946ba265287dc5c862e31b74683189be761c3c1234b3", size = 8649983, upload-time = "2026-02-03T18:52:43.948Z" },
+    { url = "https://files.pythonhosted.org/packages/c0/78/c0656af533fb39ef5f0758c033c523018a7141abbb4a35b7bfd65b99f3d0/scikit_sundae-1.1.1-cp311-cp311-macosx_11_0_x86_64.whl", hash = "sha256:ef0892d80bd56ab4d53aec667f807e7e87dd1a7a5fa54794d372b0b8fdb4e07c", size = 15362824, upload-time = "2026-02-03T18:52:45.729Z" },
+    { url = "https://files.pythonhosted.org/packages/14/c1/2c21175f58e00eacfe8cb67149d3e15ac0032d58ec092baccf022a507928/scikit_sundae-1.1.1-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:b5b7853fa8e7319d82ebd949ca68fcd296a1cd49bcb450b3048ff013e7b136d5", size = 20414699, upload-time = "2026-02-03T18:52:48.07Z" },
+    { url = "https://files.pythonhosted.org/packages/d8/d6/c04448ee439a70c95a33bcdc367aec02924f7e82ae09d123e932b9e8857e/scikit_sundae-1.1.1-cp311-cp311-win_amd64.whl", hash = "sha256:fb8c3da62c27e2b1a36804cf35f38da1b326dbb87ec28795936c54808da68c10", size = 8332704, upload-time = "2026-02-03T18:52:50.856Z" },
+    { url = "https://files.pythonhosted.org/packages/a1/3f/dafc8552be885a205e49eeb0b97a7d4ff46d72efcfb6056a8690f5497709/scikit_sundae-1.1.1-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:9b7c03b6582300fa099380d8f316d39a061600fac6e1f7b343ca19276aaa7be5", size = 8647180, upload-time = "2026-02-03T18:52:52.58Z" },
+    { url = "https://files.pythonhosted.org/packages/6b/71/3d69ba2356232a2d8d13af83d7f62401f0c9b72ce5eedb2daeda2aff1913/scikit_sundae-1.1.1-cp312-cp312-macosx_11_0_x86_64.whl", hash = "sha256:5234cf5cd832ce9a0a37af5e5835519cbd9a5738f7474fdeaf858e511f9f480f", size = 15351181, upload-time = "2026-02-03T18:52:54.685Z" },
+    { url = "https://files.pythonhosted.org/packages/0a/f1/074cc826e8c9fae1dc92a723a89063959faf95fef2bf23ead41e67636d15/scikit_sundae-1.1.1-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:31955ea3147af4c0aad0312e05dfd1b27f0155237c744350677d93d9b1e07293", size = 20395776, upload-time = "2026-02-03T18:52:57.442Z" },
+    { url = "https://files.pythonhosted.org/packages/99/de/cf5845342a91a517600dead11a17937f14f926878d5a011aef39e7e63e34/scikit_sundae-1.1.1-cp312-cp312-win_amd64.whl", hash = "sha256:fb6b57944841756bd6674e9ba41398fa1ddf7261372cd0c945b4be861818e78f", size = 8311394, upload-time = "2026-02-03T18:52:59.57Z" },
+    { url = "https://files.pythonhosted.org/packages/2b/8d/2d9308f4f41e7e4fd4b8b64bab5b4924d0397312e85f78ac4086b7012b30/scikit_sundae-1.1.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:7b4ef2c8559d3c708b410c7ab00c594990192dfb2a8ca5d1b9ab5db3df179204", size = 8644895, upload-time = "2026-02-03T18:53:01.206Z" },
+    { url = "https://files.pythonhosted.org/packages/39/47/00102421d417981e94d8d0c9a0320c789159fa1475d46dba9d97adca92a5/scikit_sundae-1.1.1-cp313-cp313-macosx_11_0_x86_64.whl", hash = "sha256:3274bc2b6fc291985be35f10cd5213ae9ba01f42305ac7970b23bdfe4751c20b", size = 15348685, upload-time = "2026-02-03T18:53:03.246Z" },
+    { url = "https://files.pythonhosted.org/packages/15/39/e20dff0fe9c8a9b359a010de35ffa72d09988d8789c6f3d053a5de18abc1/scikit_sundae-1.1.1-cp313-cp313-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:ef5397f000267028ac7e01bdeb2f8dfa748ac54852b7dffcfa3f80526f9b6aee", size = 20398937, upload-time = "2026-02-03T18:53:05.453Z" },
+    { url = "https://files.pythonhosted.org/packages/ee/d1/57c3055a5bc67ebbcfad8196414955fe0678c54989dfb7ff349a1285590d/scikit_sundae-1.1.1-cp313-cp313-win_amd64.whl", hash = "sha256:c759a68973ffef7be2f467110feb73a9a2991046f865f9dce8d02a27ebf039a9", size = 8311252, upload-time = "2026-02-03T18:53:08.073Z" },
+    { url = "https://files.pythonhosted.org/packages/fd/0d/7e8197b31221ac9102ca43e6922a931ffbbd17e80574fc285807813efcf9/scikit_sundae-1.1.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:dbf568b891e610a590a77ea8227da66586c37e8bb6961c70285f3bfa9753195a", size = 8648924, upload-time = "2026-02-03T18:53:09.63Z" },
+    { url = "https://files.pythonhosted.org/packages/a0/9a/1c6724e0fac95728fea41922e13a0f7d3c38df9e57511c6d76535d1a7c0b/scikit_sundae-1.1.1-cp314-cp314-macosx_11_0_x86_64.whl", hash = "sha256:9435a2e5c7d36fc8cd03b918576d19133eeaebf0d1d5b2476ced80ef4cd3035e", size = 15348682, upload-time = "2026-02-03T18:53:12.45Z" },
+    { url = "https://files.pythonhosted.org/packages/96/76/a65a96f2582d4b2f5712bf3b933ab8fb4c97a2da640c16798fe67738a9e8/scikit_sundae-1.1.1-cp314-cp314-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:0eaa899313f9a0bdef7b184757165fdec47811314040774e367cc80582f17c04", size = 20364130, upload-time = "2026-02-03T18:53:15.006Z" },
+    { url = "https://files.pythonhosted.org/packages/5a/e8/510ee59a44a54a2d6bd444e0a02e53f705fe203d300712aa8f77939bb758/scikit_sundae-1.1.1-cp314-cp314-win_amd64.whl", hash = "sha256:d53a0cd1fa227e3b173e884341c187360dee303d4c099e6c55963ef684abca2c", size = 8431867, upload-time = "2026-02-03T18:53:17.305Z" },
+]
+
+[[package]]
 name = "scipy"
 version = "1.16.3"
 source = { registry = "https://pypi.org/simple" }
@@ -2029,11 +2057,14 @@ source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
     { name = "numpy" },
-    { name = "py-pde" },
+    { name = "scikit-sundae" },
     { name = "scipy" },
 ]
 
 [package.optional-dependencies]
+legacy = [
+    { name = "py-pde" },
+]
 wolfram = [
     { name = "wolframclient" },
 ]
@@ -2054,11 +2085,12 @@ dev = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.1,<4.0" },
     { name = "numpy", specifier = ">=1.22,<3.0" },
-    { name = "py-pde", specifier = ">=0.38,<1.0" },
+    { name = "py-pde", marker = "extra == 'legacy'", specifier = ">=0.38,<1.0" },
+    { name = "scikit-sundae", specifier = ">=1.0,<2.0" },
     { name = "scipy", specifier = ">=1.10,<2.0" },
     { name = "wolframclient", marker = "extra == 'wolfram'", specifier = ">=1.4.0,<2.0" },
 ]
-provides-extras = ["wolfram"]
+provides-extras = ["wolfram", "legacy"]
 
 [package.metadata.requires-dev]
 dev = [

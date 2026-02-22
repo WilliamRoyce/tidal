@@ -302,6 +302,7 @@ def solve_ida(  # noqa: PLR0913
     atol: float = 1e-10,
     max_steps: int = 50000,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
+    calc_initcond: str | None = None,
 ) -> dict[str, Any]:
     """Solve a TIDAL equation system using SUNDIALS/IDA.
 
@@ -327,6 +328,11 @@ def solve_ida(  # noqa: PLR0913
         Maximum solver steps.
     snapshot_callback : callable, optional
         Called as ``callback(t, y)`` at each output time.
+    calc_initcond : str, optional
+        IDA initial condition calculation mode. ``"yp0"`` (default for mixed
+        DAE) corrects derivatives given y0. ``"y0"`` corrects algebraic
+        variables given yp0 — use this for constraint solving where the
+        algebraic field values are unknown.
 
     Returns
     -------
@@ -356,7 +362,7 @@ def solve_ida(  # noqa: PLR0913
 
     if alg_idx:
         options["algebraic_idx"] = np.array(alg_idx)
-        options["calc_initcond"] = "yp0"
+        options["calc_initcond"] = calc_initcond or "yp0"
         options["calc_init_dt"] = float(t_eval[1] - t_eval[0])
 
     # Choose linear solver based on system size

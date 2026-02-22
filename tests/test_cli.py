@@ -345,10 +345,10 @@ class TestSimulateCommand:
         ])
         assert ret == 1
 
-    def test_simulate_bc_dirichlet_rejected(
+    def test_simulate_bc_dirichlet_accepted(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Dirichlet BC is not supported by py-pde; should fail with clear error."""
+        """Dirichlet BC is supported by the native solver."""
         ret = main([
             "simulate", str(inline_kg_1d_json),
             "--param", "m2=1.0",
@@ -356,10 +356,7 @@ class TestSimulateCommand:
             "--t-end", "0.5",
             "--no-plot",
         ])
-        assert ret == 1
-        err = capsys.readouterr().err
-        assert "Dirichlet" in err
-        assert "not supported" in err
+        assert ret == 0
 
     # --- Feature: --ic formula ---
 
@@ -474,14 +471,13 @@ class TestSimulateCommand:
         ])
         assert ret == 0
 
-    def test_simulate_scipy_scheme(
+    def test_simulate_default_scheme(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Verify scipy solver uses py-pde ScipySolver."""
+        """Verify default scheme (IDA) runs successfully."""
         ret = main([
             "simulate", str(inline_kg_1d_json),
             "--param", "m2=1.0",
-            "--scheme", "scipy",
             "--t-end", "0.5",
             "--no-plot",
         ])
@@ -730,7 +726,7 @@ class TestZeroEvolutionWarning:
             "--ic", "plane-wave",
             "--ic-component", "A_2",
             "--t-end", "5.0",
-            "--scheme", "scipy",
+            "--scheme", "ida",
             "--periodic",
             "--output", str(out_dir),
         ])

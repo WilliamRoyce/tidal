@@ -217,11 +217,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sim_parser.add_argument(
         "--scheme",
-        choices=["runge-kutta", "scipy", "ida", "leapfrog"],
-        default="runge-kutta",
+        choices=["ida", "leapfrog"],
+        default="ida",
         help=(
-            "Solver scheme (default: runge-kutta). "
-            "'ida' uses SUNDIALS/IDA for DAE systems. "
+            "Solver scheme (default: ida). "
+            "'ida' uses SUNDIALS/IDA — handles all equation types "
+            "(wave, diffusion, constraints). "
             "'leapfrog' uses symplectic Störmer-Verlet (pure wave equations only)."
         ),
     )

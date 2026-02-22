@@ -28,7 +28,7 @@
 #     --ic gaussian --ic-component A_1 --ic-amplitude 0.5 --ic-width 0.5 \
 #     --ic-center 1.5708,1.5708 \
 #     --grid-shape 20 --bounds 0:3.14159,0:3.14159 --t-end 20.0 \
-#     --bc periodic,periodic --scheme scipy \
+#     --bc periodic,periodic \
 #     --output ../data/coupled_proca_output
 #
 #   # Step 4: Measure conversion from A-field group to B-field group
@@ -66,7 +66,7 @@ tidal simulate ../data/coupled_proca_3d.json \
   --ic gaussian --ic-component A_1 --ic-amplitude 0.5 --ic-width 0.5 \
   --ic-center 1.5708,1.5708 \
   --grid-shape 20 --bounds 0:3.14159,0:3.14159 --t-end 20.0 \
-  --bc periodic,periodic --scheme scipy \
+  --bc periodic,periodic \
   --output ../data/coupled_proca_output
 
 # Step 4: Measure conversion between vector field groups and mixing length

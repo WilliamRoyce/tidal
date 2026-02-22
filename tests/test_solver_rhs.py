@@ -273,11 +273,11 @@ class TestEvaluateByField:
 
 
 class TestRHSErrors:
-    def test_first_derivative_t_raises(self) -> None:
-        """first_derivative_t operator is not supported in solver path."""
+    def test_first_derivative_t_reads_momentum(self) -> None:
+        """first_derivative_t reads the momentum slot pi_{field}."""
         spec = _make_spec([
             {
-                "coefficient": 1.0,
+                "coefficient": 2.0,
                 "operator": "first_derivative_t",
                 "field": "phi_0",
             },
@@ -288,6 +288,9 @@ class TestRHSErrors:
 
         layout = StateLayout.from_spec(spec, n)
         fs = FieldSet.zeros(layout, (n,))
+        # Set momentum to known values
+        fs["pi_phi_0"] = np.ones(n) * 3.0
 
-        with pytest.raises(ValueError, match="first_derivative_t"):
-            rhs_eval.evaluate(0, fs)
+        result = rhs_eval.evaluate(0, fs)
+        # coefficient * momentum = 2.0 * 3.0 = 6.0
+        np.testing.assert_allclose(result, 6.0)
