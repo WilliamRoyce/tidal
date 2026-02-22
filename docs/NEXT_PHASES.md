@@ -2,7 +2,7 @@
 
 **Created:** February 2026
 **Last Updated:** February 2026
-**Status:** Phase A complete; Phases B–I planned
+**Status:** Phases A, B, J complete; Phases C–I planned
 **Version:** 0.4.0 | **Tests:** 957+ collected | **Examples:** 22 working (1+1D to 3+1D)
 
 ## Context
@@ -377,40 +377,47 @@ Dedalus (Burns et al. 2020) provides a native eigenvalue problem (EVP) capabilit
 
 ---
 
-## Phase J: Constraint Pre-Solve (FFT-Based Initial Conditions)
+## Phase J: Constraint Pre-Solve ✓
 
-**Priority: LOW — only needed for constraint systems with nontrivially violated ICs**
-**Status:** Planned
+**Priority: LOW → Completed**
+**Status:** Complete
 
 ### What and Why
 
-When a DAE system has algebraic constraints (time_order=0 fields like A_0 in electromagnetism or Chern-Simons), the constraint field values must be consistent with the initial conditions of the dynamical fields. Currently, IDA handles this via `calc_initcond="yp0"`, which works when the constraint is trivially satisfied at t=0 (e.g., EM with zero initial momenta → Gauss's law gives A_0=0). However, it fails when the constraint has a nontrivial source:
+When a DAE system has algebraic constraints (time_order=0 fields like A_0 in electromagnetism or Chern-Simons), the constraint field values must be consistent with the initial conditions of the dynamical fields. Previously IDA failed when constraints had nontrivial sources (e.g., Chern-Simons with Gaussian IC on A_1).
 
-- **Chern-Simons**: A_0 satisfies `laplacian(A_0) = kappa * d_y(A_1) - kappa * d_x(A_2)`. With a Gaussian in A_1, the RHS is nonzero, so A_0=0 is inconsistent. IDA's Newton solver fails because the Laplacian with periodic BCs has a zero eigenmode (singular Jacobian).
-- **Any DAE** where the algebraic equation has a nontrivial source term at t=0.
+### Implemented Solution: Three-Tier Solver Architecture
 
-### Proposed Solution
+**`tidal/solver/constraint_solve.py`** — automatic constraint pre-solve before IDA starts:
 
-1. **FFT-based Poisson/Helmholtz solver**: Before passing ICs to IDA, solve each constraint equation spectrally. For periodic BCs, FFT naturally handles the zero mode by setting k=0 component to zero (unique up to a constant, which is unphysical for gauge fields).
-2. **Integration with `solve_ida`**: Add an optional `pre_solve_constraints=True` parameter that runs the spectral solve before `calc_initcond`.
-3. **CLI flag**: `--pre-solve-constraints` to enable this for nontrivial systems.
+1. **Tier 1: FFT (O(N log N))** — for periodic BCs with constant-coefficient self-operators. Uses modified wavenumbers `k_mod = (2/dx)·sin(k·dx/2)` for exact FD-consistency. Handles coupled constraints (block system at each wavenumber).
+2. **Tier 2: Operator Probing → Sparse Matrix (O(N²) build, O(N) solve)** — universal fallback for non-periodic BCs, position-dependent self-coefficients, or unknown operators. Probes `apply_operator()` with unit vectors to build the exact operator matrix.
+3. **Automatic selection**: `_select_method()` checks periodicity, coefficient constancy, and multiplier availability to choose the fastest applicable tier.
+
+**Gauge regularisation for singular Poisson (periodic BCs):**
+- Pure-Laplacian constraints with periodic BCs have a null space (constant functions)
+- FFT: sets zero-mode `u_hat[0,...,0] = 0` (zero-mean gauge)
+- IDA: auto-detects via `_is_pure_laplacian()` and pins one DOF (`A_0[0] = 0`) in the residual
+- This is numerical regularisation, not physics gauge fixing — observables (E, B) depend on derivatives of A_0, not A_0 itself (standard FEniCS/Firedrake/PETSc practice)
+
+**Key files:**
+- **NEW** `tidal/solver/constraint_solve.py` (~450 lines) — three-tier solver
+- **MODIFIED** `tidal/solver/ida.py` — pre-solve integration + gauge regularisation
+- **NEW** `tests/test_solver_constraint_solve.py` — 25 tests (unit + integration + IDA)
 
 ### References
 
 - Standard FFT-based Poisson solvers; see e.g. Numerical Recipes (Press et al. 2007), Sec. 19.4
 - Dedalus (Burns et al. 2020) uses spectral methods for constraint equations natively
-
-### Scope: Small (~2–3 days)
-
-### Dependencies: None (uses existing numpy/scipy FFT infrastructure)
+- FEniCS/Firedrake null-space handling for Poisson with Neumann/periodic BCs
 
 ---
 
 ## Known Limitations
 
-1. **Chern-Simons IDA failure**: Systems where algebraic constraints are nontrivially violated at t=0 fail with `IDACalcIC - The line search failed`. Root cause: singular Laplacian with periodic BCs in the Jacobian. **Fix: Phase J** (constraint pre-solve). Workaround: choose initial conditions that trivially satisfy the constraint.
+1. ~~**Chern-Simons IDA failure**~~: **Resolved by Phase J.** Constraint pre-solve + gauge regularisation handles all DAE systems, including those with nontrivially violated algebraic constraints and singular Laplacian Jacobians.
 
-2. **Non-periodic BCs for constraint mode**: The `--mode constraint` path works with periodic BCs but may fail with Dirichlet/Neumann BCs for certain systems. **Future improvement**.
+2. **Non-periodic BCs for constraint mode**: The `--mode constraint` path works with periodic BCs but may fail with Dirichlet/Neumann BCs for certain systems. Phase J's Tier 2 (operator probing) supports non-periodic BCs for the pre-solve step.
 
 ---
 
@@ -423,7 +430,7 @@ Phase B (Gauge Fixing, optional) ─── COMPLETE
 Phase C (Sweep & Convergence)    ─── Independent, high priority
 Phase F (Adaptive Time-Stepping) ─── Independent, quick win
 Phase G (Absorbing Boundaries)   ─── Independent, uses Phase A infrastructure
-Phase J (Constraint Pre-Solve)   ─── Independent, fixes Chern-Simons IDA failure
+Phase J (Constraint Pre-Solve)   ─── COMPLETE
 Phase H (HDF5/XDMF Output)      ─── Independent, interoperability
 Phase I (Eigenvalue/Dispersion)  ─── Independent, analysis capability
 Phase E (Spectral Methods)       ─── Independent, large scope

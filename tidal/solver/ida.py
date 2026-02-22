@@ -31,7 +31,7 @@ if TYPE_CHECKING:
     from tidal.solver.grid import GridInfo
     from tidal.solver.rhs import RHSEvaluator
     from tidal.solver.state import SlotInfo
-    from tidal.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import ComponentEquation, EquationSystem
 
 # Time-derivative order threshold for dynamical (wave) equations
 _SECOND_ORDER = 2
@@ -73,6 +73,10 @@ class _ResidualCtx:
         self.eq_map: dict[str, int] = {
             eq.field_name: i for i, eq in enumerate(spec.equations)
         }
+        # Detect constraints that need gauge fixing (singular self-operator
+        # with periodic BCs, e.g. pure Laplacian → null space = constants).
+        # Standard approach: pin mean(field)=0 for one row (FEniCS/Firedrake).
+        self._gauge_fix_fields = self._detect_gauge_fix_fields()
         # Per-call state (set via set_arrays)
         self.y: np.ndarray = np.empty(0)
         self.yp: np.ndarray = np.empty(0)
@@ -131,14 +135,75 @@ class _ResidualCtx:
             result += term.coefficient * operated
         return result.ravel()
 
+    def _detect_gauge_fix_fields(self) -> set[str]:
+        """Detect constraints needing gauge fixing (singular operator + periodic BCs).
+
+        A constraint with pure Laplacian self-terms (no identity/mass) and
+        periodic BCs has a singular operator (null space = constants).  IDA's
+        Newton solver needs a full-rank Jacobian, so we replace one equation
+        with mean(field) = 0 — the standard gauge-fixing approach used in
+        FEniCS, Firedrake, and other production PDE solvers.
+
+        This preserves gauge independence: observables are unaffected by the
+        choice of constant offset in the constraint field.
+        """
+        if not self._all_periodic_bcs():
+            return set()
+
+        return {
+            eq.field_name
+            for eq in self.spec.equations
+            if eq.time_derivative_order == 0
+            and eq.constraint_solver.enabled
+            and self._is_pure_laplacian(eq)
+        }
+
+    def _all_periodic_bcs(self) -> bool:
+        """Check if all BCs are periodic."""
+        if self.bc is not None:
+            bcs = (self.bc,) * self.grid.ndim if isinstance(self.bc, str) else tuple(self.bc)
+            return all(b == "periodic" for b in bcs)
+        return all(self.grid.periodic)
+
+    @staticmethod
+    def _is_pure_laplacian(eq: ComponentEquation) -> bool:
+        """Check if eq has Laplacian self-terms but no identity/mass self-term."""
+        laplacian_ops = {"laplacian", "laplacian_x", "laplacian_y", "laplacian_z"}
+        has_lap = False
+        for term in eq.rhs_terms:
+            if term.field != eq.field_name:
+                continue
+            if term.operator in laplacian_ops:
+                has_lap = True
+            elif term.operator == "identity":
+                return False  # Has mass term → not singular
+        return has_lap
+
     def handle_constraint(self, slot_idx: int, slot: SlotInfo) -> None:
-        """Algebraic constraint: RHS = 0."""
+        """Algebraic constraint: RHS = 0, with gauge fixing for singular operators.
+
+        For Poisson-type constraints (pure Laplacian + periodic BCs), the
+        Jacobian is singular.  We replace the first grid point's equation
+        with ``mean(field) = 0`` to pin the gauge freedom, making the
+        Jacobian non-singular while preserving all physical observables.
+        """
         s = slice(slot_idx * self.n, (slot_idx + 1) * self.n)
         eq_idx = self.eq_map.get(slot.field_name)
         if eq_idx is None:
             self.res[s] = 0.0
-        else:
-            self.res[s] = self.compute_rhs(eq_idx).ravel()
+            return
+
+        rhs = self.compute_rhs(eq_idx).ravel()
+        self.res[s] = rhs
+
+        # Gauge fixing: replace first equation with A_0[0] = 0.
+        # For Poisson constraints (pure Laplacian + periodic BCs), the
+        # solution is unique up to a constant.  Pinning one point to zero
+        # selects the unique solution.  Uses a single diagonal Jacobian
+        # entry, compatible with all linear solvers (dense, sparse, GMRES).
+        if slot.field_name in self._gauge_fix_fields:
+            field_slot = self.layout.field_slot_map[slot.field_name]
+            self.res[slot_idx * self.n] = self.y[field_slot * self.n]
 
     def handle_momentum(self, slot_idx: int, slot: SlotInfo) -> None:
         """Hamilton's 2nd: dpi/dt = RHS."""
@@ -346,6 +411,21 @@ def solve_ida(  # noqa: PLR0913
     from sksundae.ida import IDA  # noqa: PLC0415
 
     layout = StateLayout.from_spec(spec, grid.num_points)
+
+    # Pre-solve constraints to produce consistent y0.
+    # Without this, IDA fails on systems like Chern-Simons where
+    # the constraint has a nontrivial source at t=0.
+    has_enabled_constraints = any(
+        eq.time_derivative_order == 0 and eq.constraint_solver.enabled
+        for eq in spec.equations
+    )
+    if has_enabled_constraints:
+        from tidal.solver.constraint_solve import pre_solve_constraints  # noqa: PLC0415
+
+        y0 = pre_solve_constraints(
+            spec, grid, y0, bc=bc, parameters=parameters, t=t_span[0]
+        )
+
     resfn = build_residual_fn(spec, layout, grid, bc, parameters=parameters)
 
     # Initial yp0 — estimate from residual (IDA will correct via calc_initcond)
@@ -367,13 +447,10 @@ def solve_ida(  # noqa: PLR0913
     if alg_idx:
         options["algebraic_idx"] = np.array(alg_idx)
 
-    # Always compute consistent initial conditions.  IDA needs yp0 that
-    # satisfies F(t0, y0, yp0)=0; providing yp0=0 (our default) is rarely
-    # consistent.  "yp0" mode fixes y0 and corrects yp0, which works when
-    # algebraic constraints are trivially satisfied at t=0 (e.g. EM with
-    # zero initial momenta).  For systems where the constraint is
-    # nontrivially violated (e.g. Chern-Simons with nonzero source), a
-    # constraint pre-solve step is needed (future work).
+    # Compute consistent initial conditions.  IDA needs yp0 that satisfies
+    # F(t0, y0, yp0)=0.  The constraint pre-solve above handles nontrivially
+    # violated constraints (e.g. Chern-Simons), producing consistent y0.
+    # "yp0" mode then fixes y0 and corrects yp0.
     options["calc_initcond"] = calc_initcond or "yp0"
     options["calc_init_dt"] = float(t_eval[1] - t_eval[0])
 
