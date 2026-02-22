@@ -18,10 +18,15 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
+from tidal.solver.state import StateLayout
+
 if TYPE_CHECKING:
+    from typing import Any
+
     from numpy.typing import NDArray
     from pde import CartesianGrid, FieldCollection, MemoryStorage
 
+    from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem
 
 
@@ -185,6 +190,84 @@ class SimulationData:
             grid_spacing=spacing,
             grid_bounds=bounds,
             periodic=periodic_flags,
+            spec=spec,
+            parameters=parameters or {},
+        )
+
+    @classmethod
+    def from_result(
+        cls,
+        result: dict[str, Any],
+        spec: EquationSystem,
+        grid_info: GridInfo,
+        parameters: dict[str, float] | None = None,
+    ) -> SimulationData:
+        """Build from a solver result dict (IDA/leapfrog output).
+
+        This is the native-path constructor — no py-pde types involved.
+        Directly slices the flat state vector using ``StateLayout``.
+
+        Parameters
+        ----------
+        result : dict
+            Solver output with keys ``"t"`` (1D times array) and
+            ``"y"`` (2D array of shape ``(n_snapshots, total_flat_size)``).
+        spec : EquationSystem
+            Equation specification.
+        grid_info : GridInfo
+            Spatial grid descriptor.
+        parameters : dict, optional
+            Resolved parameter values.
+
+        Raises
+        ------
+        ValueError
+            If *result* has no snapshots or flat vector size doesn't match
+            the layout.
+        """
+        times = np.asarray(result["t"], dtype=np.float64)
+        y_all = np.asarray(result["y"], dtype=np.float64)
+
+        if len(times) == 0:
+            msg = "Solver result contains no snapshots"
+            raise ValueError(msg)
+
+        layout = StateLayout.from_spec(spec, grid_info.num_points)
+
+        if y_all.ndim == 1:
+            y_all = y_all.reshape(1, -1)
+
+        if y_all.shape[1] != layout.total_size:
+            msg = (
+                f"Flat vector size {y_all.shape[1]} doesn't match "
+                f"layout.total_size {layout.total_size}"
+            )
+            raise ValueError(msg)
+
+        n_pts = grid_info.num_points
+        shape = grid_info.shape
+
+        fields: dict[str, NDArray[np.float64]] = {}
+        momenta: dict[str, NDArray[np.float64]] = {}
+
+        for i, slot in enumerate(layout.slots):
+            start = i * n_pts
+            end = start + n_pts
+            # Slice all snapshots at once: (n_snapshots, *grid_shape)
+            arr = y_all[:, start:end].reshape(-1, *shape)
+
+            if slot.kind == "momentum":
+                momenta[slot.field_name] = arr
+            else:
+                fields[slot.name] = arr
+
+        return cls(
+            times=times,
+            fields=fields,
+            momenta=momenta,
+            grid_spacing=grid_info.dx,
+            grid_bounds=grid_info.bounds,
+            periodic=grid_info.periodic,
             spec=spec,
             parameters=parameters or {},
         )

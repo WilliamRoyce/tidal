@@ -9,14 +9,18 @@ from __future__ import annotations
 from argparse import Namespace
 from types import SimpleNamespace
 
+import numpy as np
 import pytest
 
 from tidal.cli._simulate import (
+    _build_grid_info,
+    _build_initial_y0,
     _infer_output_format,
     _parse_bc,
     _parse_bounds,
     _parse_grid_shape,
     _parse_params,
+    _parse_periodic,
     _parse_single_bound,
 )
 
@@ -630,3 +634,262 @@ class TestGaugeToml:
                 "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
                 "gauge": [{"field": "h", "type": "tt"}],
             })
+
+
+# ==================== _parse_periodic (native path) ====================
+
+
+class TestParsePeriodic:
+    @pytest.mark.parametrize(
+        ("raw", "periodic", "dim", "expected"),
+        [
+            (None, True, 1, (True,)),
+            (None, False, 1, (False,)),
+            (None, True, 2, (True, True)),
+            (None, False, 3, (False, False, False)),
+            ("periodic", True, 1, (True,)),
+            ("periodic", False, 2, (True, True)),
+            ("neumann", True, 1, (False,)),
+            ("neumann,periodic", False, 2, (False, True)),
+            ("periodic,neumann,neumann", True, 3, (True, False, False)),
+        ],
+    )
+    def test_valid(
+        self,
+        raw: str | None,
+        periodic: bool,
+        dim: int,
+        expected: tuple[bool, ...],
+    ) -> None:
+        assert _parse_periodic(raw, periodic=periodic, spatial_dim=dim) == expected
+
+    def test_dirichlet_accepted(self) -> None:
+        """Dirichlet BC is accepted by native path (unlike _parse_bc)."""
+        result = _parse_periodic("dirichlet", periodic=False, spatial_dim=1)
+        assert result == (False,)
+
+    def test_dirichlet_mixed(self) -> None:
+        """Mixed dirichlet/periodic returns correct periodicity."""
+        result = _parse_periodic("dirichlet,periodic", periodic=False, spatial_dim=2)
+        assert result == (False, True)
+
+    def test_invalid_bc_type(self) -> None:
+        with pytest.raises(ValueError, match="Invalid boundary condition"):
+            _parse_periodic("robin", periodic=True, spatial_dim=1)
+
+    def test_wrong_count(self) -> None:
+        with pytest.raises(ValueError, match="--bc"):
+            _parse_periodic("neumann,periodic", periodic=True, spatial_dim=1)
+
+    def test_always_returns_tuple(self) -> None:
+        """_parse_periodic always returns tuple, never bare bool."""
+        result = _parse_periodic(None, periodic=True, spatial_dim=1)
+        assert isinstance(result, tuple)
+        assert len(result) == 1
+
+
+# ==================== _build_grid_info (native path) ====================
+
+
+def _make_grid_args(**kwargs: object) -> Namespace:
+    """Create a Namespace with defaults for grid construction."""
+    defaults: dict[str, object] = {
+        "grid_shape": None,
+        "bounds": None,
+        "bc": None,
+        "periodic": False,
+    }
+    defaults.update(kwargs)
+    return Namespace(**defaults)
+
+
+class TestBuildGridInfo:
+    def _make_spec(self, spatial_dim: int = 1) -> SimpleNamespace:
+        return SimpleNamespace(spatial_dimension=spatial_dim)
+
+    def test_1d_defaults(self) -> None:
+        args = _make_grid_args()
+        spec = self._make_spec(1)
+        gi = _build_grid_info(args, spec, [(0.0, 10.0)])
+        assert gi.shape == (64,)
+        assert gi.bounds == ((0.0, 10.0),)
+        assert gi.periodic == (False,)
+
+    def test_2d_periodic(self) -> None:
+        args = _make_grid_args(periodic=True, grid_shape="16,16")
+        spec = self._make_spec(2)
+        gi = _build_grid_info(args, spec, [(0.0, 10.0), (0.0, 5.0)])
+        assert gi.shape == (16, 16)
+        assert gi.periodic == (True, True)
+        assert gi.bounds == ((0.0, 10.0), (0.0, 5.0))
+
+    def test_dirichlet_bc(self) -> None:
+        """Dirichlet BC produces non-periodic GridInfo."""
+        args = _make_grid_args(bc="dirichlet")
+        spec = self._make_spec(1)
+        gi = _build_grid_info(args, spec, [(0.0, 10.0)])
+        assert gi.periodic == (False,)
+
+    def test_cell_coords_shape(self) -> None:
+        """GridInfo.cell_coords has correct shape."""
+        args = _make_grid_args(grid_shape="8")
+        spec = self._make_spec(1)
+        gi = _build_grid_info(args, spec, [(0.0, 10.0)])
+        assert gi.cell_coords.shape == (8, 1)
+
+
+# ==================== _build_initial_y0 (native path) ====================
+
+
+def _make_kg_spec() -> object:
+    """Create a minimal KG-like spec for IC tests."""
+    from tidal.symbolic.json_loader import EquationSystem
+
+    spec_dict: dict[str, object] = {
+        "metadata": {
+            "source": "inline-test",
+            "parameters": {"m2": 1.0},
+        },
+        "spacetime": {
+            "dimension": 2,
+            "signature": [-1, 1],
+            "coordinates": ["t", "x"],
+        },
+        "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+        "equations": [
+            {
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                    ],
+                },
+            }
+        ],
+    }
+    return EquationSystem.from_dict(spec_dict)
+
+
+def _make_ic_args(**kwargs: object) -> Namespace:
+    """Create a Namespace with defaults for IC construction."""
+    defaults: dict[str, object] = {
+        "ic": "zero",
+        "ic_component": None,
+        "ic_center": None,
+        "ic_width": None,
+        "ic_amplitude": 1.0,
+        "ic_wavevector": None,
+        "ic_formula": None,
+    }
+    defaults.update(kwargs)
+    return Namespace(**defaults)
+
+
+class TestBuildInitialY0:
+    def test_zero_ic(self) -> None:
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(ic="zero")
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+        # KG: 1 field + 1 momentum = 2 slots x 32 points = 64
+        assert y0.shape == (64,)
+        assert np.all(y0 == 0.0)
+
+    def test_gaussian_ic_peak_at_center(self) -> None:
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(64,), periodic=(False,))
+        args = _make_ic_args(ic="gaussian", ic_amplitude=2.0)
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+        # Field occupies first 64 entries, momentum next 64
+        field = y0[:64]
+        momentum = y0[64:]
+
+        # Peak should be at center (~5.0)
+        assert float(np.max(field)) == pytest.approx(2.0, rel=1e-2)
+        # Gaussian IC has zero momentum
+        assert np.max(np.abs(momentum)) == 0.0
+
+    def test_gaussian_ic_matches_legacy(self) -> None:
+        """Native Gaussian IC matches the py-pde-based IC numerically."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(True,))
+        args = _make_ic_args(ic="gaussian", ic_amplitude=1.0)
+        y0_native = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+        # Compute same Gaussian using the formula directly
+        center = 5.0
+        width = 1.0  # domain_size / 10 = 10 / 10
+        x = gi.axes_coords(0)
+        expected_field = 1.0 * np.exp(-(x - center) ** 2 / (2 * width**2))
+
+        np.testing.assert_allclose(y0_native[:32], expected_field, atol=1e-12)
+
+    def test_plane_wave_ic(self) -> None:
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(64,), periodic=(True,))
+        args = _make_ic_args(ic="plane-wave", ic_amplitude=1.0)
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+        field = y0[:64]
+        momentum = y0[64:]
+
+        # cos(k·x) field, -k·sin(k·x) momentum
+        assert float(np.max(np.abs(field))) == pytest.approx(1.0, rel=1e-2)
+        # Momentum should be nonzero (propagating wave)
+        assert float(np.max(np.abs(momentum))) > 0.1
+
+    def test_formula_ic(self) -> None:
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(ic="formula", ic_formula="sin(x)")
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+        field = y0[:32]
+        x = gi.axes_coords(0)
+        np.testing.assert_allclose(field, np.sin(x), atol=1e-12)
+
+    def test_unknown_component_raises(self) -> None:
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(ic="gaussian", ic_component="nonexistent")
+        with pytest.raises(ValueError, match="Unknown component"):
+            _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+    def test_unknown_ic_type_raises(self) -> None:
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(ic="invalid_type")
+        with pytest.raises(ValueError, match="Unknown IC type"):
+            _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+    def test_correct_total_size(self) -> None:
+        """State vector length matches StateLayout expectation."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+        from tidal.solver.state import StateLayout
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(False,))
+        layout = StateLayout.from_spec(spec, gi.num_points)
+
+        args = _make_ic_args(ic="gaussian")
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+        assert y0.shape == (layout.total_size,)

@@ -3975,3 +3975,134 @@ class TestSnapshotCountValidation:
 
         with pytest.raises(ValueError, match="Metadata claims 100 snapshots"):
             SimulationData.from_directory(out, spec)
+
+
+# ==================== SimulationData.from_result() ====================
+
+
+class TestSimulationDataFromResult:
+    """Tests for the native-path constructor that bypasses py-pde."""
+
+    @staticmethod
+    def _kg_spec() -> object:
+        from tidal.symbolic.json_loader import EquationSystem
+
+        return EquationSystem.from_dict({
+            "metadata": {"source": "test", "parameters": {"m2": 1.0}},
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                        ],
+                    },
+                }
+            ],
+        })
+
+    def test_shapes(self) -> None:
+        """Fields and momenta have correct (n_snapshots, *grid_shape)."""
+        from tidal.solver.grid import GridInfo
+
+        spec = self._kg_spec()
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(True,))
+
+        # 2 slots (phi_0, pi_phi_0) x 16 points = 32 flat size
+        n_snaps, n_flat = 5, 32
+        result = {
+            "t": np.linspace(0, 1, n_snaps),
+            "y": np.random.default_rng(42).standard_normal((n_snaps, n_flat)),
+            "success": True,
+            "message": "ok",
+        }
+
+        sd = SimulationData.from_result(result, spec, gi, {"m2": 1.0})
+
+        assert sd.times.shape == (5,)
+        assert "phi_0" in sd.fields
+        assert sd.fields["phi_0"].shape == (5, 16)
+        assert "phi_0" in sd.momenta
+        assert sd.momenta["phi_0"].shape == (5, 16)
+
+    def test_values_match_slicing(self) -> None:
+        """Data in fields/momenta matches manual slicing of y."""
+        from tidal.solver.grid import GridInfo
+
+        spec = self._kg_spec()
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(8,), periodic=(False,))
+
+        rng = np.random.default_rng(123)
+        y = rng.standard_normal((3, 16))  # 2 slots x 8 points
+        result = {"t": np.array([0.0, 0.5, 1.0]), "y": y, "success": True, "message": ""}
+
+        sd = SimulationData.from_result(result, spec, gi)
+
+        # First slot (phi_0): y[:, 0:8]
+        np.testing.assert_array_equal(sd.fields["phi_0"], y[:, :8].reshape(3, 8))
+        # Second slot (pi_phi_0): y[:, 8:16]
+        np.testing.assert_array_equal(sd.momenta["phi_0"], y[:, 8:16].reshape(3, 8))
+
+    def test_grid_metadata(self) -> None:
+        """Grid spacing, bounds, periodic are propagated correctly."""
+        from tidal.solver.grid import GridInfo
+
+        spec = self._kg_spec()
+        gi = GridInfo(bounds=((0.0, 8.0),), shape=(16,), periodic=(True,))
+
+        result = {"t": np.array([0.0]), "y": np.zeros((1, 32)), "success": True, "message": ""}
+        sd = SimulationData.from_result(result, spec, gi, {"m2": 2.0})
+
+        assert sd.grid_spacing == gi.dx
+        assert sd.grid_bounds == gi.bounds
+        assert sd.periodic == (True,)
+        assert sd.parameters == {"m2": 2.0}
+
+    def test_empty_result_raises(self) -> None:
+        """Empty solver result raises ValueError."""
+        from tidal.solver.grid import GridInfo
+
+        spec = self._kg_spec()
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(False,))
+
+        result = {"t": np.array([]), "y": np.zeros((0, 32)), "success": True, "message": ""}
+        with pytest.raises(ValueError, match="no snapshots"):
+            SimulationData.from_result(result, spec, gi)
+
+    def test_roundtrip_save_load(self, tmp_path: Path) -> None:
+        """from_result → save → from_directory → compare."""
+        from tidal.solver.grid import GridInfo
+
+        spec = self._kg_spec()
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(8,), periodic=(True,))
+
+        rng = np.random.default_rng(99)
+        y = rng.standard_normal((4, 16))
+        result = {
+            "t": np.array([0.0, 1.0, 2.0, 3.0]),
+            "y": y,
+            "success": True,
+            "message": "",
+        }
+
+        sd1 = SimulationData.from_result(result, spec, gi, {"m2": 1.0})
+        out_dir = tmp_path / "snapshots"
+        sd1.save(out_dir)
+
+        sd2 = SimulationData.from_directory(out_dir, spec)
+
+        np.testing.assert_allclose(sd2.times, sd1.times)
+        np.testing.assert_allclose(sd2.fields["phi_0"], sd1.fields["phi_0"])
+        np.testing.assert_allclose(sd2.momenta["phi_0"], sd1.momenta["phi_0"])
+        assert sd2.grid_spacing == sd1.grid_spacing
+        assert sd2.grid_bounds == sd1.grid_bounds
+        assert sd2.periodic == sd1.periodic

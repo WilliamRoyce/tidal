@@ -6,7 +6,7 @@ import math
 import sys
 from dataclasses import dataclass
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, cast
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -234,6 +234,9 @@ def _parse_single_bound(s: str) -> tuple[float, float]:
 
 _VALID_BC_TYPES = {"periodic", "neumann"}
 
+# Native path supports Dirichlet (our apply_operator handles it; py-pde doesn't)
+_NATIVE_BC_TYPES = frozenset({"periodic", "neumann", "dirichlet"})
+
 
 def _parse_bc(
     raw: str | None, *, periodic: bool, spatial_dim: int
@@ -285,6 +288,84 @@ def _parse_bc(
             raise ValueError(msg)
 
     return [bc == "periodic" for bc in bc_list]
+
+
+def _parse_periodic(
+    bc_str: str | None,
+    *,
+    periodic: bool,
+    spatial_dim: int,
+) -> tuple[bool, ...]:
+    """Parse boundary spec into periodic flags for GridInfo (native path).
+
+    Unlike ``_parse_bc`` (which returns ``bool | list[bool]`` for
+    CartesianGrid), this always returns a fixed-length tuple and accepts
+    ``"dirichlet"`` as a valid BC type.
+
+    Parameters
+    ----------
+    bc_str : str | None
+        Raw ``--bc`` argument (e.g. ``"neumann,periodic"``).
+    periodic : bool
+        Value from ``--periodic`` flag (used when ``--bc`` is None).
+    spatial_dim : int
+        Number of spatial dimensions.
+
+    Returns
+    -------
+    tuple[bool, ...]
+        Per-axis periodic flags, length ``spatial_dim``.
+
+    Raises
+    ------
+    ValueError
+        If BC count doesn't match dimension or BC type is unknown.
+    """
+    if bc_str is None:
+        return tuple(periodic for _ in range(spatial_dim))
+
+    bc_list = [b.strip().lower() for b in bc_str.split(",")]
+
+    if len(bc_list) == 1:
+        bc_list *= spatial_dim
+    elif len(bc_list) != spatial_dim:
+        msg = (
+            f"--bc expects 1 or {spatial_dim} values "
+            f"(got {len(bc_list)}). Example: --bc neumann,periodic"
+        )
+        raise ValueError(msg)
+
+    for bc in bc_list:
+        if bc not in _NATIVE_BC_TYPES:
+            msg = (
+                f"Invalid boundary condition: '{bc}'. "
+                f"Must be one of: {', '.join(sorted(_NATIVE_BC_TYPES))}"
+            )
+            raise ValueError(msg)
+
+    return tuple(bc == "periodic" for bc in bc_list)
+
+
+def _build_grid_info(
+    args: Namespace,
+    spec: EquationSystem,
+    bounds: list[tuple[float, float]],
+) -> GridInfo:
+    """Build GridInfo directly from CLI arguments (no py-pde).
+
+    This is the native-path equivalent of ``_build_grid()``.
+    """
+    from tidal.solver.grid import GridInfo
+
+    shape = _parse_grid_shape(args.grid_shape, spec.spatial_dimension)
+    periodic = _parse_periodic(
+        args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension
+    )
+    return GridInfo(
+        bounds=tuple(bounds),
+        shape=tuple(shape),
+        periodic=periodic,
+    )
 
 
 def _build_grid(
@@ -522,6 +603,242 @@ def _build_initial_state(
     raise ValueError(msg)
 
 
+# --- Native initial condition helpers (no py-pde) ---
+
+
+def _gaussian_y0(
+    args: Namespace,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+    bounds: list[tuple[float, float]],
+    component: str,
+) -> np.ndarray:
+    """Compute Gaussian IC as flat state vector (native path).
+
+    Raises
+    ------
+    ValueError
+        If ``--ic-center`` dimension count doesn't match spatial dimension.
+    """
+    from tidal.solver.fields import FieldSet
+    from tidal.solver.state import StateLayout
+
+    layout = StateLayout.from_spec(spec, grid_info.num_points)
+
+    if args.ic_center is not None:
+        center = tuple(float(c) for c in args.ic_center.split(","))
+        if len(center) != spec.spatial_dimension:
+            msg = (
+                f"--ic-center has {len(center)} values but spatial dimension is "
+                f"{spec.spatial_dimension}. Expected {spec.spatial_dimension} "
+                f"comma-separated values."
+            )
+            raise ValueError(msg)
+    else:
+        center = tuple((lo + hi) / 2.0 for lo, hi in bounds)
+
+    domain_size = min(hi - lo for lo, hi in bounds)
+    width = args.ic_width if args.ic_width is not None else domain_size / 10.0
+
+    coords = grid_info.cell_coords  # (*grid_shape, ndim)
+    dist_sq = np.zeros(grid_info.shape, dtype=np.float64)
+    for dim in range(grid_info.ndim):
+        if dim < len(center):
+            dist_sq += (coords[..., dim] - center[dim]) ** 2
+
+    field_arr = args.ic_amplitude * np.exp(-dist_sq / (2 * width**2))
+    return FieldSet.from_dict(layout, grid_info.shape, {component: field_arr}).flat.copy()
+
+
+def _plane_wave_y0(
+    args: Namespace,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+    bounds: list[tuple[float, float]],
+    component: str,
+) -> np.ndarray:
+    """Compute plane-wave IC as flat state vector (native path)."""
+    from tidal.solver.fields import FieldSet
+    from tidal.solver.state import StateLayout
+
+    layout = StateLayout.from_spec(spec, grid_info.num_points)
+
+    if args.ic_wavevector is not None:
+        kvec = tuple(float(k) for k in args.ic_wavevector.split(","))
+    else:
+        lx = bounds[0][1] - bounds[0][0]
+        kvec = tuple(
+            2.0 * math.pi / lx if i == 0 else 0.0
+            for i in range(spec.spatial_dimension)
+        )
+
+    coords = grid_info.cell_coords
+    k_dot_x = np.zeros(grid_info.shape, dtype=np.float64)
+    for dim in range(min(grid_info.ndim, len(kvec))):
+        k_dot_x += kvec[dim] * coords[..., dim]
+
+    k_mag = float(np.sqrt(sum(k**2 for k in kvec)))
+    amplitude = args.ic_amplitude
+
+    field_arr = amplitude * np.cos(k_dot_x)
+    momentum_arr = -amplitude * k_mag * np.sin(k_dot_x)
+
+    slot_data: dict[str, np.ndarray] = {component: field_arr}
+    mom_name = f"pi_{component}"
+    if mom_name in FieldSet(layout, grid_info.shape):
+        slot_data[mom_name] = momentum_arr
+
+    return FieldSet.from_dict(layout, grid_info.shape, slot_data).flat.copy()
+
+
+def _formula_y0(
+    args: Namespace,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+    component: str,
+) -> np.ndarray:
+    """Compute formula-based IC as flat state vector (native path).
+
+    Raises
+    ------
+    ValueError
+        If ``--ic-formula`` is not provided or contains unsafe constructs.
+    """
+    from tidal.solver.fields import FieldSet
+    from tidal.solver.state import StateLayout
+
+    layout = StateLayout.from_spec(spec, grid_info.num_points)
+
+    if args.ic_formula is None:
+        msg = "--ic=formula requires --ic-formula=EXPR"
+        raise ValueError(msg)
+
+    namespace = dict(FORMULA_NAMESPACE)
+    for i, name in enumerate(spec.spatial_coordinates):
+        namespace[name] = grid_info.cell_coords[..., i]
+
+    allowed_names = set(namespace.keys())
+    _validate_formula_ast(args.ic_formula, allowed_names)
+
+    field_arr = eval(args.ic_formula, {"__builtins__": {}}, namespace)  # noqa: S307
+    field_arr = np.asarray(field_arr, dtype=float)
+
+    if field_arr.shape == ():
+        field_arr = np.full(grid_info.shape, float(field_arr))
+
+    return FieldSet.from_dict(layout, grid_info.shape, {component: field_arr}).flat.copy()
+
+
+def _build_initial_y0(
+    args: Namespace,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+    bounds: list[tuple[float, float]],
+) -> np.ndarray:
+    """Build initial state as flat numpy vector (native path, no py-pde).
+
+    This is the native-path equivalent of ``_build_initial_state()``.
+    Uses ``GridInfo.cell_coords`` for coordinate arrays and packs results
+    via ``FieldSet.from_dict`` + ``StateLayout``.
+
+    Returns
+    -------
+    np.ndarray
+        Flat state vector of length ``StateLayout.total_size``.
+
+    Raises
+    ------
+    ValueError
+        If component name is unknown or IC type is invalid.
+    """
+    from tidal.solver.fields import FieldSet
+    from tidal.solver.state import StateLayout
+
+    ic_type = args.ic
+    component = args.ic_component or spec.component_names[0]
+
+    if component not in spec.component_names:
+        msg = (
+            f"Unknown component '{component}'. "
+            f"Available: {', '.join(spec.component_names)}"
+        )
+        raise ValueError(msg)
+
+    if ic_type == "zero":
+        if args.ic_component is not None:
+            print(
+                f"  Note: --ic-component '{args.ic_component}' is ignored for zero IC"
+            )
+        layout = StateLayout.from_spec(spec, grid_info.num_points)
+        return FieldSet.zeros(layout, grid_info.shape).flat.copy()
+
+    if ic_type == "gaussian":
+        return _gaussian_y0(args, spec, grid_info, bounds, component)
+
+    if ic_type == "plane-wave":
+        return _plane_wave_y0(args, spec, grid_info, bounds, component)
+
+    if ic_type == "formula":
+        return _formula_y0(args, spec, grid_info, component)
+
+    msg = f"Unknown IC type: {ic_type}"
+    raise ValueError(msg)
+
+
+# --- Native output pipeline (no py-pde) ---
+
+
+def _print_summary_native(sim_data: SimulationData) -> None:
+    """Print simulation summary using SimulationData (no py-pde types)."""
+    times = sim_data.times
+    print()
+    print("Results:")
+    print(f"  Time range: {float(times[0]):.2f} → {float(times[-1]):.2f} ({len(times)} snapshots)")
+    print(f"  Parameters: {sim_data.parameters}")
+    print()
+
+    for name in sim_data.spec.component_names:
+        if name not in sim_data.fields:
+            continue
+        init_peak = float(np.max(np.abs(sim_data.fields[name][0])))
+        final_peak = float(np.max(np.abs(sim_data.fields[name][-1])))
+        if init_peak > 0:
+            ratio = final_peak / init_peak
+            print(
+                f"  {name}: peak {init_peak:.4f} → {final_peak:.4f} (ratio: {ratio:.4f})"
+            )
+        else:
+            print(f"  {name}: peak {init_peak:.4f} → {final_peak:.4f}")
+
+
+def _generate_output_native(
+    args: Namespace,
+    sim_data: SimulationData,
+    grid_info: GridInfo,
+) -> None:
+    """Generate output for the native solver path (no py-pde types)."""
+    fmt = _infer_output_format(args)
+
+    if fmt in {"summary", "directory"}:
+        if sim_data.n_snapshots > 0:
+            _print_summary_native(sim_data)
+        return
+
+    _print_summary_native(sim_data)
+
+    if args.output is not None:
+        output_path = Path(args.output)
+    else:
+        json_file = Path(args.json_path).resolve()
+        output_path = json_file.parent / f"{json_file.stem}_output.png"
+
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    from tidal.cli._plot import save_plot_native
+
+    save_plot_native(output_path, sim_data, grid_info)
+
+
 def _infer_output_format(args: Namespace) -> str:
     """Determine output format from --format or file extension.
 
@@ -663,28 +980,7 @@ def _save_constraint_output(
     print(f"  Saved data to: {output_path}")
 
 
-# --- IDA solver path ---
-
-
-def _gridinfo_from_pypde(grid: CartesianGrid) -> tuple[GridInfo, tuple[bool, ...]]:
-    """Convert a py-pde CartesianGrid to a TIDAL GridInfo.
-
-    Returns (grid_info, periodic_flags).
-    """
-    from tidal.solver.grid import GridInfo
-
-    periodic_raw = grid.periodic
-    if isinstance(periodic_raw, bool):
-        periodic_flags = tuple([periodic_raw] * grid.num_axes)
-    else:
-        periodic_flags = tuple(bool(p) for p in periodic_raw)
-
-    grid_info = GridInfo(
-        bounds=tuple((float(b[0]), float(b[1])) for b in grid.axes_bounds),
-        shape=tuple(int(s) for s in grid.shape),
-        periodic=periodic_flags,
-    )
-    return grid_info, periodic_flags
+# --- BC string derivation (used by both native and legacy paths) ---
 
 
 def _bc_from_args(
@@ -701,57 +997,62 @@ def _bc_from_args(
     return tuple("periodic" if p else "neumann" for p in periodic_flags)
 
 
-def _ida_result_to_storage(
-    result: dict[str, Any],
+# --- Native simulation path (no py-pde) ---
+
+
+def _warn_zero_evolution_native(
     spec: EquationSystem,
-    grid: CartesianGrid,
-    grid_shape: tuple[int, ...],
-    n_pts: int,
-) -> MemoryStorage:
-    """Pack IDA result arrays into a py-pde MemoryStorage."""
-    from pde import FieldCollection, MemoryStorage, ScalarField
+    grid_info: GridInfo,
+    y0: np.ndarray,
+    params: dict[str, float],
+    bc: str | tuple[str, ...] | None,
+) -> None:
+    """Warn if all RHS rates are zero at t=0 (native path)."""
+    from tidal.solver.coefficients import CoefficientEvaluator
+    from tidal.solver.fields import FieldSet
+    from tidal.solver.rhs import RHSEvaluator
+    from tidal.solver.state import StateLayout
 
-    storage = MemoryStorage()
-    n_layout = len(spec.state_layout)
-    started = False
-    for i, t in enumerate(result["t"]):
-        y_row = result["y"][i]
-        fc_fields = [
-            ScalarField(
-                grid,
-                data=y_row[j * n_pts : (j + 1) * n_pts].reshape(grid_shape),
-            )
-            for j in range(n_layout)
-        ]
-        fc = FieldCollection(fc_fields)
-        if not started:
-            storage.start_writing(fc)
-            started = True
-        storage.append(fc, time=t)
-    return storage
+    layout = StateLayout.from_spec(spec, grid_info.num_points)
+    coeff_eval = CoefficientEvaluator(spec, grid_info, params)
+    rhs_eval = RHSEvaluator(spec, grid_info, coeff_eval, bc=bc)
+    fieldset = FieldSet.from_flat(layout, grid_info.shape, y0)
+
+    max_rate = 0.0
+    for eq_idx in range(len(spec.equations)):
+        rhs = rhs_eval.evaluate(eq_idx, fieldset, t=0.0)
+        max_rate = max(max_rate, float(np.max(np.abs(rhs))))
+
+    if max_rate < _ZERO_RATE_THRESHOLD:
+        print(
+            "  Warning: all evolution rates are zero at t=0. "
+            "The initial condition may be a static configuration. "
+            "For gauge fields, try --ic plane-wave to provide "
+            "non-zero conjugate momentum.",
+            file=sys.stderr,
+        )
 
 
-def _setup_ida_disk_writer(  # noqa: PLR0913, PLR0917
+def _setup_disk_writer_native(
     args: Namespace,
     spec: EquationSystem,
     grid_info: GridInfo,
-    periodic_flags: tuple[bool, ...],
     params: dict[str, float],
     snapshot_interval: float,
 ) -> tuple[SnapshotWriter, Callable[[float, np.ndarray], None]]:
-    """Set up disk-backed SnapshotWriter and IDA callback for streaming.
+    """Set up disk-backed SnapshotWriter using StateLayout (no py-pde).
 
     Returns (writer, snapshot_callback).
     """
-    from tidal.measurement._writer import (
-        SnapshotWriter,
-        _field_names_from_spec,
-        compute_snapshot_count,
-    )
+    from tidal.measurement._writer import SnapshotWriter, compute_snapshot_count
+    from tidal.solver.state import StateLayout
 
+    layout = StateLayout.from_spec(spec, grid_info.num_points)
     output_dir = Path(args.output) if args.output else Path("output")
-    field_names, momentum_names = _field_names_from_spec(spec)
     n_snaps = compute_snapshot_count(args.t_end, snapshot_interval)
+
+    field_names = [s.name for s in layout.slots if s.kind != "momentum"]
+    momentum_names = [s.field_name for s in layout.slots if s.kind == "momentum"]
 
     writer = SnapshotWriter(
         output_dir=output_dir,
@@ -761,34 +1062,33 @@ def _setup_ida_disk_writer(  # noqa: PLR0913, PLR0917
         n_snapshots=n_snaps,
         grid_spacing=tuple(float(d) for d in grid_info.dx),
         grid_bounds=grid_info.bounds,
-        periodic=periodic_flags,
+        periodic=grid_info.periodic,
         parameters=params,
         spec_path=Path(args.json_path),
     )
 
-    # Build slot maps for unpacking flat vector
-    field_slots_map: dict[str, int] = {}
-    momentum_slots_map: dict[str, int] = {}
-    for idx, (name, slot_type) in enumerate(spec.state_layout):
-        if slot_type == "field":
-            field_slots_map[name] = idx
-        elif slot_type == "momentum":
-            momentum_slots_map[name] = idx
-
+    # Build slot index maps from layout
     n_pts = grid_info.num_points
+    shape = grid_info.shape
     field_set = set(field_names)
     momentum_set = set(momentum_names)
-    shape = grid_info.shape
+
+    field_slots_map: dict[str, int] = {}
+    momentum_slots_map: dict[str, int] = {}
+    for i, slot in enumerate(layout.slots):
+        if slot.kind == "momentum":
+            momentum_slots_map[slot.field_name] = i
+        elif slot.name in field_set:
+            field_slots_map[slot.name] = i
 
     def _disk_callback(t: float, y_flat: np.ndarray) -> None:
         fields_d = {
-            name: y_flat[slot * n_pts : (slot + 1) * n_pts].reshape(shape)
-            for name, slot in field_slots_map.items()
-            if name in field_set
+            name: y_flat[idx * n_pts : (idx + 1) * n_pts].reshape(shape)
+            for name, idx in field_slots_map.items()
         }
         moms_d = {
-            name: y_flat[slot * n_pts : (slot + 1) * n_pts].reshape(shape)
-            for name, slot in momentum_slots_map.items()
+            name: y_flat[idx * n_pts : (idx + 1) * n_pts].reshape(shape)
+            for name, idx in momentum_slots_map.items()
             if name in momentum_set
         }
         writer.append(t, fields_d, moms_d)
@@ -796,166 +1096,98 @@ def _setup_ida_disk_writer(  # noqa: PLR0913, PLR0917
     return writer, _disk_callback
 
 
-def _simulate_ida(  # noqa: PLR0913, PLR0917
+def _simulate_native(
     args: Namespace,
     spec: EquationSystem,
-    grid: CartesianGrid,
-    state: FieldCollection,
     params: dict[str, float],
-    log: object,
-) -> MemoryStorage:
-    """Run simulation via SUNDIALS/IDA (DAE solver).
+) -> int:
+    """Run simulation via native TIDAL solver (no py-pde).
 
-    Bypasses py-pde's time integration entirely. Uses ``tidal.solver.ida``
-    for the solve, then packs results back into a ``MemoryStorage`` for
-    compatibility with the output pipeline.
+    Self-contained flow: GridInfo -> IC -> solve -> SimulationData -> output.
+    Handles both IDA and leapfrog schemes.
     """
-    from tidal.solver.ida import solve_ida
+    from tidal.measurement._io import SimulationData
 
-    grid_info, periodic_flags = _gridinfo_from_pypde(grid)
-    y0 = np.concatenate([np.asarray(f.data).ravel() for f in state])
-    bc = _bc_from_args(args, periodic_flags)
+    # Progress printer
+    def _noop(*_a: object, **_kw: object) -> None:
+        pass
 
-    # Snapshot configuration
-    snapshot_interval = (
-        args.snapshots if args.snapshots is not None else args.t_end / 100.0
-    )
-    num_snapshots = max(int(args.t_end / snapshot_interval) + 1, 2)
+    log = _noop if args.quiet else print
 
-    # Set up disk-backed writer if needed
-    fmt = _infer_output_format(args)
-    writer: SnapshotWriter | None = None
-    snapshot_cb = None
+    # 1. Grid
+    bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
+    grid_info = _build_grid_info(args, spec, bounds)
+    log(f"  Grid: {'x'.join(str(s) for s in grid_info.shape)}, bounds: {grid_info.bounds}")
 
-    if fmt == "directory":
-        writer, snapshot_cb = _setup_ida_disk_writer(
-            args,
-            spec,
-            grid_info,
-            periodic_flags,
-            params,
-            snapshot_interval,
-        )
+    # 2. BC
+    bc = _bc_from_args(args, grid_info.periodic)
 
-    # Run IDA solver
-    log(  # type: ignore[operator]
-        f"Running IDA solver (t=0 → {args.t_end}, {num_snapshots} snapshots)..."
-    )
-    result = solve_ida(
-        spec,
-        grid_info,
-        y0,
-        t_span=(0.0, args.t_end),
-        bc=bc,
-        parameters=params,
-        num_snapshots=num_snapshots,
-        snapshot_callback=snapshot_cb,
-    )
+    # 3. Initial conditions
+    y0 = _build_initial_y0(args, spec, grid_info, bounds)
+    log(f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}")
 
-    if not result["success"]:
-        print(f"Error: IDA solver failed: {result['message']}", file=sys.stderr)
+    # 4. Diagnostics
+    _validate_solver_params(args)
+    if args.mode != "constraint":
+        _warn_zero_evolution_native(spec, grid_info, y0, params, bc)
 
-    if writer is not None:
-        writer.close()
-        log(  # type: ignore[operator]
-            f"  {writer.count} snapshots streamed to: {writer.output_dir}"
-        )
-
-    # Pack result into MemoryStorage for output pipeline compatibility
-    storage = _ida_result_to_storage(
-        result,
-        spec,
-        grid,
-        grid_info.shape,
-        grid_info.num_points,
-    )
-    log(f"  {len(result['t'])} snapshots stored")  # type: ignore[operator]
-    return storage
-
-
-def _simulate_leapfrog(  # noqa: PLR0913, PLR0917
-    args: Namespace,
-    spec: EquationSystem,
-    grid: CartesianGrid,
-    state: FieldCollection,
-    params: dict[str, float],
-    log: object,
-) -> MemoryStorage:
-    """Run simulation via symplectic Störmer-Verlet (leapfrog).
-
-    Only works for pure second-order (wave) systems. Preserves a shadow
-    Hamiltonian — zero secular energy drift for conservative systems.
-
-    Reference: Hairer, Lubich, Wanner, "Geometric Numerical Integration",
-    Springer, 2006.
-    """
-    from tidal.solver.leapfrog import solve_leapfrog
-
-    grid_info, periodic_flags = _gridinfo_from_pypde(grid)
-    y0 = np.concatenate([np.asarray(f.data).ravel() for f in state])
-    bc = _bc_from_args(args, periodic_flags)
-
-    # Leapfrog requires a fixed dt
-    dt = args.dt
-    if dt is None:
-        dt = _CFL_FACTOR * min(float(d) for d in grid_info.dx)
-
+    # 5. Snapshot configuration
     snapshot_interval = (
         args.snapshots if args.snapshots is not None else args.t_end / 100.0
     )
 
-    # Set up disk-backed writer if needed
+    # 6. Disk writer (if directory output)
     fmt = _infer_output_format(args)
     writer: SnapshotWriter | None = None
-    snapshot_cb = None
+    snapshot_cb: Callable[[float, np.ndarray], None] | None = None
 
     if fmt == "directory":
-        writer, snapshot_cb = _setup_ida_disk_writer(
-            args,
-            spec,
-            grid_info,
-            periodic_flags,
-            params,
-            snapshot_interval,
+        writer, snapshot_cb = _setup_disk_writer_native(
+            args, spec, grid_info, params, snapshot_interval,
         )
 
-    log(  # type: ignore[operator]
-        f"Running leapfrog solver (t=0 → {args.t_end}, dt={dt:.4f})..."
-    )
-    result = solve_leapfrog(
-        spec,
-        grid_info,
-        y0,
-        t_span=(0.0, args.t_end),
-        dt=dt,
-        bc=bc,
-        parameters=params,
-        snapshot_interval=snapshot_interval,
-        snapshot_callback=snapshot_cb,
-    )
+    # 7. Solve
+    if args.scheme == "ida":
+        from tidal.solver.ida import solve_ida
+
+        num_snapshots = max(int(args.t_end / snapshot_interval) + 1, 2)
+        log(f"Running IDA solver (t=0 → {args.t_end}, {num_snapshots} snapshots)...")
+        result = solve_ida(
+            spec, grid_info, y0,
+            t_span=(0.0, args.t_end),
+            bc=bc, parameters=params,
+            num_snapshots=num_snapshots,
+            snapshot_callback=snapshot_cb,
+        )
+    else:  # leapfrog
+        from tidal.solver.leapfrog import solve_leapfrog
+
+        dt = args.dt
+        if dt is None:
+            dt = _CFL_FACTOR * min(float(d) for d in grid_info.dx)
+        log(f"Running leapfrog solver (t=0 → {args.t_end}, dt={dt:.4f})...")
+        result = solve_leapfrog(
+            spec, grid_info, y0,
+            t_span=(0.0, args.t_end), dt=dt,
+            bc=bc, parameters=params,
+            snapshot_interval=snapshot_interval,
+            snapshot_callback=snapshot_cb,
+        )
 
     if not result["success"]:
-        print(
-            f"Error: Leapfrog solver failed: {result['message']}",
-            file=sys.stderr,
-        )
+        print(f"Error: solver failed: {result['message']}", file=sys.stderr)
 
     if writer is not None:
         writer.close()
-        log(  # type: ignore[operator]
-            f"  {writer.count} snapshots streamed to: {writer.output_dir}"
-        )
+        log(f"  {writer.count} snapshots streamed to: {writer.output_dir}")
 
-    # Pack result into MemoryStorage for output pipeline compatibility
-    storage = _ida_result_to_storage(
-        result,
-        spec,
-        grid,
-        grid_info.shape,
-        grid_info.num_points,
-    )
-    log(f"  {len(result['t'])} snapshots stored")  # type: ignore[operator]
-    return storage
+    # 8. Build SimulationData
+    sim_data = SimulationData.from_result(result, spec, grid_info, params)
+    log(f"  {sim_data.n_snapshots} snapshots stored")
+
+    # 9. Output
+    _generate_output_native(args, sim_data, grid_info)
+    return 0
 
 
 # --- Command entry point ---
@@ -1004,7 +1236,7 @@ def _warn_zero_evolution(pde: object, state: FieldCollection) -> None:
         )
 
 
-def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, PLR0915
+def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0914, PLR0915
     """Execute the simulate command.
 
     Parameters
@@ -1017,7 +1249,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
     int
         Exit code.
     """
-    from tidal.symbolic import build_pde_from_json, load_equation_system
+    from tidal.symbolic import load_equation_system
 
     json_path = Path(args.json_path)
     if not json_path.exists():
@@ -1041,6 +1273,14 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
     params = _parse_params(args.param, spec)
     if params:
         log(f"  Parameters: {params}")
+
+    # ─── Native path (IDA / leapfrog) ───────────────────────
+    # Self-contained: no py-pde imports, no type conversions.
+    if args.scheme in {"ida", "leapfrog"}:
+        return _simulate_native(args, spec, params)
+
+    # ─── Legacy py-pde path (scipy / runge-kutta) ──────────
+    from tidal.symbolic import build_pde_from_json
 
     # Step 3: Build PDE
     log("Building PDE...")
@@ -1072,35 +1312,6 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0914, P
 
     # Step 6: Validate solver parameters and determine dt
     _validate_solver_params(args)
-
-    # IDA path: bypass py-pde time integration entirely
-    if args.scheme == "ida":
-        storage = _simulate_ida(args, spec, grid, state, params, log)
-
-        # Step 8: Output
-        ctx = PlotContext(
-            spec=spec,
-            storage=storage,
-            grid=grid,
-            initial_state=initial_state,
-            params=params,
-        )
-        _generate_output(args, ctx)
-        return 0
-
-    # Leapfrog path: symplectic Störmer-Verlet for pure Hamiltonian systems
-    if args.scheme == "leapfrog":
-        storage = _simulate_leapfrog(args, spec, grid, state, params, log)
-
-        ctx = PlotContext(
-            spec=spec,
-            storage=storage,
-            grid=grid,
-            initial_state=initial_state,
-            params=params,
-        )
-        _generate_output(args, ctx)
-        return 0
 
     # py-pde path: runge-kutta or scipy
     from tidal.utils import normalize_solve_result
