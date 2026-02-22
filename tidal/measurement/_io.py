@@ -3,7 +3,7 @@
 Provides ``SimulationData``, a frozen dataclass that stores the full time
 history of field and momentum arrays.  Can be constructed from:
 
-- A live ``MemoryStorage`` object (straight from the solver)
+- A solver result dict (IDA/leapfrog output)
 - A snapshot directory written by :class:`~tidal.measurement.SnapshotWriter`
   (memory-mapped, O(1) RAM)
 """
@@ -24,7 +24,6 @@ if TYPE_CHECKING:
     from typing import Any
 
     from numpy.typing import NDArray
-    from pde import CartesianGrid, FieldCollection, MemoryStorage
 
     from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem
@@ -94,105 +93,6 @@ class SimulationData:
     # ------------------------------------------------------------------
     # Constructors
     # ------------------------------------------------------------------
-
-    @classmethod
-    def from_storage(
-        cls,
-        storage: MemoryStorage,
-        spec: EquationSystem,
-        grid: CartesianGrid,
-        parameters: dict[str, float] | None = None,
-    ) -> SimulationData:
-        """Build from a live ``MemoryStorage`` produced by the solver.
-
-        Iterates through **all** snapshots (not just the final state) so
-        that transient dynamics such as Rabi oscillations are captured.
-
-        Parameters
-        ----------
-        storage : MemoryStorage
-            Time-indexed snapshot collection from the solver.
-        spec : EquationSystem
-            JSON-derived equation specification.
-        grid : CartesianGrid
-            Spatial grid used for the simulation.
-        parameters : dict, optional
-            Resolved parameter values (e.g. ``{"m2": 1.0, "g": 0.5}``).
-
-        Raises
-        ------
-        ValueError
-            If *storage* is empty or snapshot field count does not match
-            ``spec.state_size``.
-        """
-        n = len(storage)
-        if n == 0:
-            msg = "MemoryStorage is empty — no snapshots to extract"
-            raise ValueError(msg)
-
-        # Validate first snapshot size
-        first_snapshot = cast("FieldCollection", storage[0])
-        if len(first_snapshot) != spec.state_size:
-            msg = (
-                f"Snapshot has {len(first_snapshot)} slots but spec.state_size "
-                f"is {spec.state_size}"
-            )
-            raise ValueError(msg)
-
-        # Build slot maps: field_name → slot_idx, momentum_name → slot_idx
-        field_slot_map: dict[str, int] = {}
-        momentum_slot_map: dict[str, int] = {}
-        for idx, (name, slot_type) in enumerate(spec.state_layout):
-            if slot_type == "field":
-                field_slot_map[name] = idx
-            else:  # "momentum"
-                momentum_slot_map[name] = idx
-
-        # Extract full time history
-        times = np.array(storage.times, dtype=np.float64)
-
-        fields: dict[str, NDArray[np.float64]] = {}
-        for name, slot_idx in field_slot_map.items():
-            fields[name] = np.stack(
-                [
-                    np.asarray(
-                        cast("FieldCollection", storage[t])[slot_idx].data,
-                        dtype=np.float64,
-                    )
-                    for t in range(n)
-                ]
-            )
-
-        momenta: dict[str, NDArray[np.float64]] = {}
-        for name, slot_idx in momentum_slot_map.items():
-            momenta[name] = np.stack(
-                [
-                    np.asarray(
-                        cast("FieldCollection", storage[t])[slot_idx].data,
-                        dtype=np.float64,
-                    )
-                    for t in range(n)
-                ]
-            )
-
-        # Grid metadata
-        spacing = tuple(
-            float((b[1] - b[0]) / s)
-            for b, s in zip(grid.axes_bounds, grid.shape, strict=True)
-        )
-        bounds = tuple((float(b[0]), float(b[1])) for b in grid.axes_bounds)
-        periodic_flags = tuple(bool(p) for p in grid.periodic)
-
-        return cls(
-            times=times,
-            fields=fields,
-            momenta=momenta,
-            grid_spacing=spacing,
-            grid_bounds=bounds,
-            periodic=periodic_flags,
-            spec=spec,
-            parameters=parameters or {},
-        )
 
     @classmethod
     def from_result(

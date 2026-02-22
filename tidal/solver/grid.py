@@ -40,8 +40,11 @@ class GridInfo:
     bounds: tuple[tuple[float, float], ...]
     shape: tuple[int, ...]
     periodic: tuple[bool, ...]
+    bc: tuple[str, ...] | None = None
 
-    def __post_init__(self) -> None:
+    _VALID_BC = frozenset({"periodic", "neumann", "dirichlet"})
+
+    def __post_init__(self) -> None:  # noqa: C901
         if len(self.bounds) != len(self.shape):
             msg = (
                 f"bounds has {len(self.bounds)} axes but shape has "
@@ -62,6 +65,27 @@ class GridInfo:
             if n < 2:  # noqa: PLR2004
                 msg = f"shape[{i}] = {n}: need at least 2 cells per axis"
                 raise ValueError(msg)
+        if self.bc is not None:
+            if len(self.bc) != len(self.bounds):
+                msg = (
+                    f"bc has {len(self.bc)} entries but grid has "
+                    f"{len(self.bounds)} axes — must match"
+                )
+                raise ValueError(msg)
+            for i, b in enumerate(self.bc):
+                if b not in self._VALID_BC:
+                    msg = (
+                        f"bc[{i}] = {b!r}: must be one of "
+                        f"{sorted(self._VALID_BC)}"
+                    )
+                    raise ValueError(msg)
+                is_periodic_bc = b == "periodic"
+                if is_periodic_bc != self.periodic[i]:
+                    msg = (
+                        f"bc[{i}] = {b!r} but periodic[{i}] = {self.periodic[i]} "
+                        f"— these must be consistent"
+                    )
+                    raise ValueError(msg)
 
     @property
     def ndim(self) -> int:
@@ -74,26 +98,18 @@ class GridInfo:
         return math.prod(self.shape)
 
     @property
+    def effective_bc(self) -> tuple[str, ...]:
+        """Per-axis BC types, inferred from ``periodic`` if ``bc`` is not set."""
+        if self.bc is not None:
+            return self.bc
+        return tuple("periodic" if p else "neumann" for p in self.periodic)
+
+    @property
     def dx(self) -> tuple[float, ...]:
         """Grid spacing per axis (cell-centred: dx = (hi - lo) / N)."""
         return tuple(
             (hi - lo) / n for (lo, hi), n in zip(self.bounds, self.shape, strict=False)
         )
-
-    @property
-    def discretization(self) -> tuple[float, ...]:
-        """Alias for ``dx`` — matches py-pde CartesianGrid API."""
-        return self.dx
-
-    @property
-    def axes_bounds(self) -> tuple[tuple[float, float], ...]:
-        """Alias for ``bounds`` — matches py-pde CartesianGrid API."""
-        return self.bounds
-
-    @property
-    def num_axes(self) -> int:
-        """Alias for ``ndim`` — matches py-pde CartesianGrid API."""
-        return self.ndim
 
     def axes_coords(self, axis: int) -> np.ndarray:
         """1-D array of cell centres along *axis*.

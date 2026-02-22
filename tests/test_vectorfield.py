@@ -2,13 +2,12 @@
 
 from __future__ import annotations
 
-from typing import cast
-
 import numpy as np
 import pytest
 from numpy.testing import assert_allclose
-from pde import CartesianGrid, FieldCollection
 
+from tidal.solver.fields import FieldSet
+from tidal.solver.grid import GridInfo
 from tidal.symbolic.json_loader import (
     ComponentEquation,
     EquationSystem,
@@ -25,15 +24,15 @@ from tidal.vectorfield.initial_conditions import (
 
 
 @pytest.fixture
-def grid_1d() -> CartesianGrid:
+def grid_1d() -> GridInfo:
     """1D periodic grid."""
-    return CartesianGrid([(0, 100)], 128, periodic=True)
+    return GridInfo(bounds=((0, 100),), shape=(128,), periodic=(True,))
 
 
 @pytest.fixture
-def grid_2d() -> CartesianGrid:
+def grid_2d() -> GridInfo:
     """2D periodic grid."""
-    return CartesianGrid([(0, 50), (0, 50)], [64, 64], periodic=True)
+    return GridInfo(bounds=((0, 50), (0, 50)), shape=(64, 64), periodic=(True, True))
 
 
 @pytest.fixture
@@ -166,7 +165,7 @@ class TestComponentGaussianPulse:
     """Tests for ComponentGaussianPulse."""
 
     def test_create_single_component(
-        self, grid_1d: CartesianGrid, em_spec: EquationSystem
+        self, grid_1d: GridInfo, em_spec: EquationSystem
     ) -> None:
         """Test creating Gaussian pulse in single component."""
         pulse = ComponentGaussianPulse(
@@ -178,21 +177,21 @@ class TestComponentGaussianPulse:
 
         state = pulse.create(grid_1d, em_spec)
 
-        assert isinstance(state, FieldCollection)
-        num_em_states = 4  # A_0, Pi_0, A_1, Pi_1
+        assert isinstance(state, FieldSet)
+        num_em_states = 4  # A_0, pi_A_0, A_1, pi_A_1
         assert len(state) == num_em_states
 
         # A_0 should be zero
-        assert_allclose(state[0].data, 0.0, atol=1e-10)
-        assert_allclose(state[1].data, 0.0, atol=1e-10)
+        assert_allclose(state["A_0"], 0.0, atol=1e-10)
+        assert_allclose(state["pi_A_0"], 0.0, atol=1e-10)
 
         # A_1 should have Gaussian profile
-        assert np.max(state[2].data) > 0
+        assert np.max(state["A_1"]) > 0
         # Momentum should be zero (stationary pulse)
-        assert_allclose(state[3].data, 0.0, atol=1e-10)
+        assert_allclose(state["pi_A_1"], 0.0, atol=1e-10)
 
     def test_create_all_components(
-        self, grid_1d: CartesianGrid, em_spec: EquationSystem
+        self, grid_1d: GridInfo, em_spec: EquationSystem
     ) -> None:
         """Test creating Gaussian pulse in all components."""
         pulse = ComponentGaussianPulse(
@@ -205,14 +204,14 @@ class TestComponentGaussianPulse:
         state = pulse.create(grid_1d, em_spec)
 
         # Both A_0 and A_1 should have the pulse
-        assert np.max(state[0].data) > 0
-        assert np.max(state[2].data) > 0
+        assert np.max(state["A_0"]) > 0
+        assert np.max(state["A_1"]) > 0
 
         # Same profile in both
-        assert_allclose(state[0].data, state[2].data)
+        assert_allclose(state["A_0"], state["A_1"])
 
     def test_gaussian_peak_at_center(
-        self, grid_1d: CartesianGrid, em_spec: EquationSystem
+        self, grid_1d: GridInfo, em_spec: EquationSystem
     ) -> None:
         """Test that Gaussian peak is at the specified center."""
         center = 50.0
@@ -225,17 +224,15 @@ class TestComponentGaussianPulse:
 
         state = pulse.create(grid_1d, em_spec)
 
-        # Find peak location
-        x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
-        peak_idx = np.argmax(state[0].data)
+        x = grid_1d.cell_coords[..., 0]
+        peak_idx = np.argmax(state["A_0"])
         peak_x = x[peak_idx]
 
-        # Should be close to center (within one grid cell)
         dx = x[1] - x[0]
         assert abs(peak_x - center) < dx
 
     def test_gaussian_amplitude(
-        self, grid_1d: CartesianGrid, em_spec: EquationSystem
+        self, grid_1d: GridInfo, em_spec: EquationSystem
     ) -> None:
         """Test that Gaussian has correct peak amplitude."""
         amplitude = 3.5
@@ -248,10 +245,9 @@ class TestComponentGaussianPulse:
 
         state = pulse.create(grid_1d, em_spec)
 
-        # Peak should be approximately amplitude
-        assert_allclose(np.max(state[0].data), amplitude, rtol=0.01)
+        assert_allclose(np.max(state["A_0"]), amplitude, rtol=0.01)
 
-    def test_2d_gaussian(self, grid_2d: CartesianGrid, em_spec: EquationSystem) -> None:
+    def test_2d_gaussian(self, grid_2d: GridInfo, em_spec: EquationSystem) -> None:
         """Test Gaussian in 2D grid."""
         pulse = ComponentGaussianPulse(
             center=(25.0, 25.0),
@@ -263,11 +259,10 @@ class TestComponentGaussianPulse:
         state = pulse.create(grid_2d, em_spec)
 
         # Should have 2D shape
-        assert state[0].data.shape == (64, 64)
+        assert state["A_0"].shape == (64, 64)
 
         # Peak should be at center
-        peak_idx = np.unravel_index(np.argmax(state[0].data), state[0].data.shape)
-        # Center should be around index 32, 32
+        peak_idx = np.unravel_index(np.argmax(state["A_0"]), state["A_0"].shape)
         assert abs(peak_idx[0] - 32) <= 1
         assert abs(peak_idx[1] - 32) <= 1
 
@@ -287,7 +282,7 @@ class TestComponentPlaneWave:
     """Tests for ComponentPlaneWave."""
 
     def test_create_plane_wave(
-        self, grid_1d: CartesianGrid, em_spec: EquationSystem
+        self, grid_1d: GridInfo, em_spec: EquationSystem
     ) -> None:
         """Test creating plane wave initial condition."""
         k = 2 * np.pi / 100  # One wavelength across domain
@@ -301,16 +296,16 @@ class TestComponentPlaneWave:
         state = wave.create(grid_1d, em_spec)
 
         # A_1 field should be cos(kx)
-        x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
+        x = grid_1d.cell_coords[..., 0]
         expected_field = np.cos(k * x)
-        assert_allclose(state[2].data, expected_field, atol=1e-10)
+        assert_allclose(state["A_1"], expected_field, atol=1e-10)
 
         # A_1 momentum should be -k * sin(kx) (for right-moving wave)
         expected_momentum = -k * np.sin(k * x)
-        assert_allclose(state[3].data, expected_momentum, atol=1e-10)
+        assert_allclose(state["pi_A_1"], expected_momentum, atol=1e-10)
 
     def test_plane_wave_with_phase(
-        self, grid_1d: CartesianGrid, em_spec: EquationSystem
+        self, grid_1d: GridInfo, em_spec: EquationSystem
     ) -> None:
         """Test plane wave with non-zero phase."""
         k = 0.1
@@ -324,9 +319,9 @@ class TestComponentPlaneWave:
 
         state = wave.create(grid_1d, em_spec)
 
-        x = cast("np.ndarray", grid_1d.cell_coords[..., 0])
+        x = grid_1d.cell_coords[..., 0]
         expected_field = np.cos(k * x + phase)
-        assert_allclose(state[0].data, expected_field, atol=1e-10)
+        assert_allclose(state["A_0"], expected_field, atol=1e-10)
 
 
 # === Convenience Function Tests ===
@@ -336,7 +331,7 @@ class TestCreateGaussianPulseState:
     """Tests for create_gaussian_pulse_state function."""
 
     def test_single_component(
-        self, grid_1d: CartesianGrid, em_spec: EquationSystem
+        self, grid_1d: GridInfo, em_spec: EquationSystem
     ) -> None:
         """Test creating state with single component pulse."""
         state = create_gaussian_pulse_state(
@@ -349,13 +344,13 @@ class TestCreateGaussianPulseState:
         )
 
         # A_0 should be zero
-        assert_allclose(state[0].data, 0.0)
+        assert_allclose(state["A_0"], 0.0)
 
         # A_1 should have pulse
-        assert np.max(state[2].data) > 0
+        assert np.max(state["A_1"]) > 0
 
     def test_all_components(
-        self, grid_1d: CartesianGrid, em_spec: EquationSystem
+        self, grid_1d: GridInfo, em_spec: EquationSystem
     ) -> None:
         """Test creating state with pulse in all components."""
         state = create_gaussian_pulse_state(
@@ -368,5 +363,5 @@ class TestCreateGaussianPulseState:
         )
 
         # Both components should have pulse
-        assert np.max(state[0].data) > 0
-        assert np.max(state[2].data) > 0
+        assert np.max(state["A_0"]) > 0
+        assert np.max(state["A_1"]) > 0

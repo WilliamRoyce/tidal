@@ -46,18 +46,39 @@ class TestGridInfoValidation:
             GridInfo(bounds=((0, 1),), shape=(1,), periodic=(True,))
 
 
-class TestGridInfoAliases:
-    def test_discretization(self) -> None:
+class TestGridInfoBC:
+    def test_default_bc_none(self) -> None:
         g = GridInfo(bounds=((0, 10),), shape=(20,), periodic=(True,))
-        assert g.discretization == g.dx
+        assert g.bc is None
 
-    def test_axes_bounds(self) -> None:
-        g = GridInfo(bounds=((0, 5),), shape=(10,), periodic=(False,))
-        assert g.axes_bounds == g.bounds
+    def test_explicit_bc(self) -> None:
+        g = GridInfo(bounds=((0, 10),), shape=(20,), periodic=(True,), bc=("periodic",))
+        assert g.bc == ("periodic",)
 
-    def test_num_axes(self) -> None:
-        g = GridInfo(bounds=((0, 1), (0, 2)), shape=(5, 10), periodic=(True, True))
-        assert g.num_axes == g.ndim == 2
+    def test_effective_bc_from_periodic(self) -> None:
+        g = GridInfo(bounds=((0, 1), (0, 2)), shape=(5, 10), periodic=(True, False))
+        assert g.effective_bc == ("periodic", "neumann")
+
+    def test_effective_bc_from_explicit(self) -> None:
+        g = GridInfo(
+            bounds=((0, 1), (0, 2)),
+            shape=(5, 10),
+            periodic=(False, False),
+            bc=("dirichlet", "neumann"),
+        )
+        assert g.effective_bc == ("dirichlet", "neumann")
+
+    def test_bc_length_mismatch(self) -> None:
+        with pytest.raises(ValueError, match="bc has 1 entries"):
+            GridInfo(bounds=((0, 1), (0, 2)), shape=(5, 10), periodic=(True, True), bc=("periodic",))
+
+    def test_bc_invalid_type(self) -> None:
+        with pytest.raises(ValueError, match="must be one of"):
+            GridInfo(bounds=((0, 1),), shape=(10,), periodic=(True,), bc=("invalid",))
+
+    def test_bc_periodic_inconsistency(self) -> None:
+        with pytest.raises(ValueError, match="must be consistent"):
+            GridInfo(bounds=((0, 1),), shape=(10,), periodic=(False,), bc=("periodic",))
 
 
 class TestGridInfoCoords:

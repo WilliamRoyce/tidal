@@ -78,7 +78,7 @@ def _plot_1d(path: Path, sd: SimulationData, gi: GridInfo) -> None:
     plt.tight_layout()
     plt.savefig(path, dpi=DPI, bbox_inches="tight")
     plt.close(fig)
-    print(f"  Saved plot to: {path}")
+    print(f"  Saved plot to: {path.resolve()}")
 
 
 def _plot_2d(path: Path, sd: SimulationData, gi: GridInfo) -> None:
@@ -137,7 +137,7 @@ def _plot_2d(path: Path, sd: SimulationData, gi: GridInfo) -> None:
     plt.tight_layout()
     plt.savefig(path, dpi=DPI, bbox_inches="tight")
     plt.close(fig)
-    print(f"  Saved plot to: {path}")
+    print(f"  Saved plot to: {path.resolve()}")
 
 
 def _plot_component_independence(
@@ -225,7 +225,7 @@ def _plot_3d(path: Path, sd: SimulationData, gi: GridInfo) -> None:
     plt.tight_layout()
     plt.savefig(path, dpi=DPI, bbox_inches="tight")
     plt.close(fig)
-    print(f"  Saved plot to: {path}")
+    print(f"  Saved plot to: {path.resolve()}")
 
 
 def save_plot(path: Path, sd: SimulationData, gi: GridInfo) -> None:

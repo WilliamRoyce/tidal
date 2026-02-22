@@ -9,11 +9,9 @@ from __future__ import annotations
 import dataclasses
 import warnings
 from pathlib import Path
-from typing import cast
 
 import numpy as np
 import pytest
-from pde import CartesianGrid, FieldCollection, MemoryStorage, ScalarField
 
 from tidal.measurement import (
     ConversionResult,
@@ -208,48 +206,6 @@ def _make_single_field_data(
 # ============================================================
 # SimulationData tests
 # ============================================================
-
-
-class TestSimulationDataFromStorage:
-    """Test SimulationData.from_storage."""
-
-    def test_extracts_fields_and_momenta(self) -> None:
-        """from_storage correctly maps state_layout to fields/momenta."""
-        spec = _build_coupled_scalars_spec()
-        grid = CartesianGrid([(0.0, 10.0)], 32, periodic=True)
-
-        # Create synthetic storage with start_writing
-        fields_init = [ScalarField.random_uniform(grid) for _ in range(spec.state_size)]
-        state_init = FieldCollection(fields_init)
-        storage = MemoryStorage()
-        storage.start_writing(state_init)
-        storage.append(state_init, 0.0)
-
-        for t_val in [1.0, 2.0]:
-            fields_t = [
-                ScalarField.random_uniform(grid) for _ in range(spec.state_size)
-            ]
-            state_t = FieldCollection(fields_t)
-            storage.append(state_t, t_val)
-
-        data = SimulationData.from_storage(storage, spec, grid)
-
-        assert data.n_snapshots == 3
-        assert "phi_0" in data.fields
-        assert "chi_0" in data.fields
-        assert "phi_0" in data.momenta  # 2nd order → has momentum
-        assert "chi_0" in data.momenta
-        assert data.fields["phi_0"].shape == (3, 32)
-        assert data.momenta["phi_0"].shape == (3, 32)
-
-    def test_empty_storage_raises(self) -> None:
-        """from_storage raises ValueError on empty storage."""
-        spec = _build_coupled_scalars_spec()
-        grid = CartesianGrid([(0, 10)], 32, periodic=True)
-        storage = MemoryStorage()
-
-        with pytest.raises(ValueError, match="empty"):
-            SimulationData.from_storage(storage, spec, grid)
 
 
 # ============================================================
@@ -1735,138 +1691,6 @@ class TestSelfGradientAxes:
         assert _self_gradient_axes(eq) == []
 
 
-class TestOperatorAwareGradient:
-    """Tests for operator-aware per-field gradient in system energy."""
-
-    def test_vector_single_component_zero_interaction(self) -> None:
-        """Vector field with directional laplacian: interaction = 0 at t=0.
-
-        Mimics Proca A_1 with laplacian_y only.  When only A_1 is excited,
-        interaction should be zero because the per-field gradient only includes
-        the y-axis (matching the virial).
-        """
-        # Build a 2D spec with two fields: A_1 (laplacian_y) + A_2 (laplacian_x)
-        a1_terms = (
-            OperatorTerm(coefficient=1.0, operator="laplacian_y", field="A_1"),
-            OperatorTerm(coefficient=0.5, operator="cross_derivative_xy", field="A_2"),
-            OperatorTerm(coefficient=-1.0, operator="identity", field="A_1"),
-        )
-        a2_terms = (
-            OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_2"),
-            OperatorTerm(coefficient=0.5, operator="cross_derivative_xy", field="A_1"),
-            OperatorTerm(coefficient=-1.0, operator="identity", field="A_2"),
-        )
-        eq_a1 = ComponentEquation(
-            field_name="A_1", field_index=0,
-            time_derivative_order=2, rhs_terms=a1_terms,
-        )
-        eq_a2 = ComponentEquation(
-            field_name="A_2", field_index=1,
-            time_derivative_order=2, rhs_terms=a2_terms,
-        )
-
-        spec = EquationSystem(
-            n_components=2, dimension=3, spatial_dimension=2,
-            equations=(eq_a1, eq_a2),
-            component_names=("A_1", "A_2"),
-            mass_matrix=((1.0, 0.0), (0.0, 1.0)),
-            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
-            metadata={},
-        )
-
-        # 2D grid
-        grid = CartesianGrid(
-            bounds=[(0, np.pi), (0, np.pi)], shape=[16, 16], periodic=True,
-        )
-        x = cast("np.ndarray", grid.cell_coords[..., 0])
-        y = cast("np.ndarray", grid.cell_coords[..., 1])
-        gaussian = 0.5 * np.exp(
-            -((x - np.pi / 2) ** 2 + (y - np.pi / 2) ** 2) / (2 * 0.5**2)
-        )
-
-        # State: A_1 field, A_1 momentum, A_2 field, A_2 momentum
-        fields = [
-            ScalarField(grid, data=gaussian),  # A_1 field
-            ScalarField(grid, data=0.0),        # A_1 momentum
-            ScalarField(grid, data=0.0),        # A_2 field
-            ScalarField(grid, data=0.0),        # A_2 momentum
-        ]
-        state = FieldCollection(fields)
-        storage = MemoryStorage()
-        storage.start_writing(state)
-        storage.append(state, time=0.0)
-
-        data = SimulationData.from_storage(
-            storage, spec, grid, parameters={"m2": 1.0},
-        )
-
-        se = compute_system_energy(data, 0)
-
-        # Key assertion: interaction should be ~0 (not -0.196 as with isotropic)
-        np.testing.assert_allclose(se.interaction, 0.0, atol=1e-10)
-
-        # Per-field gradient for A_1 should only include y-axis
-        # (roughly half of the full gradient)
-        assert se.per_field["A_1"].gradient > 0.0
-        assert se.per_field["A_2"].gradient == 0.0  # A_2 is zero everywhere
-
-    def test_scalar_full_laplacian_unchanged(self) -> None:
-        """Scalar field with full laplacian: gradient uses all axes (no change)."""
-        terms = (
-            OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),
-            OperatorTerm(coefficient=-1.0, operator="identity", field="phi"),
-        )
-        eq = ComponentEquation(
-            field_name="phi", field_index=0,
-            time_derivative_order=2, rhs_terms=terms,
-        )
-        spec = EquationSystem(
-            n_components=1, dimension=3, spatial_dimension=2,
-            equations=(eq,),
-            component_names=("phi",),
-            mass_matrix=((1.0,),),
-            coupling_matrix=((0.0,),),
-            metadata={},
-        )
-
-        grid = CartesianGrid(
-            bounds=[(0, np.pi), (0, np.pi)], shape=[16, 16], periodic=True,
-        )
-        x = cast("np.ndarray", grid.cell_coords[..., 0])
-        y = cast("np.ndarray", grid.cell_coords[..., 1])
-        gaussian = 0.5 * np.exp(
-            -((x - np.pi / 2) ** 2 + (y - np.pi / 2) ** 2) / (2 * 0.5**2)
-        )
-
-        fields = [
-            ScalarField(grid, data=gaussian),  # phi field
-            ScalarField(grid, data=0.0),        # phi momentum
-        ]
-        state = FieldCollection(fields)
-        storage = MemoryStorage()
-        storage.start_writing(state)
-        storage.append(state, time=0.0)
-
-        data = SimulationData.from_storage(
-            storage, spec, grid, parameters={"m2": 1.0},
-        )
-
-        se = compute_system_energy(data, 0)
-
-        # Interaction is zero: single scalar field with full laplacian
-        np.testing.assert_allclose(se.interaction, 0.0, atol=1e-10)
-
-        # Gradient should include both x and y axes
-        # Compare with explicit full gradient computation
-        fe_full = compute_field_energy(
-            gaussian, None, 1.0,
-            data.grid_spacing, data.periodic, gradient_axes=None,
-        )
-        np.testing.assert_allclose(
-            se.per_field["phi"].gradient, fe_full.gradient, rtol=1e-12,
-        )
-
-
 # ============================================================
 # Constraint self-energy tests
 # ============================================================
@@ -2255,77 +2079,6 @@ class TestConstraintCouplingEnergy:
 
         # Cross coupling should be nonzero for this configuration
         assert constraint_cross != 0.0
-
-
-class TestScalarVectorEnergyConservation:
-    """Regression test: scalar-vector coupling conserves energy after pi_N fix.
-
-    The scalar_vector_coupling.json had wrong pi_N indices (parse index instead
-    of global index) which caused spurious -∂_x(∂_tφ) forces in A_1/A_2 equations.
-    With corrected indices, the simulation conserves the virial Hamiltonian.
-    """
-
-    def test_energy_conserved(self) -> None:
-        """Short scalar-vector simulation conserves energy to < 5%."""
-        from tidal.symbolic import build_pde_from_json, load_equation_system
-        from tidal.utils import normalize_solve_result
-
-        json_path = (
-            Path(__file__).resolve().parent.parent
-            / "examples"
-            / "data"
-            / "scalar_vector_coupling.json"
-        )
-        if not json_path.exists():
-            pytest.skip("scalar_vector_coupling.json not found")
-
-        params = {"phim2": 1.0, "Am2": 0.5, "kCS": 0.3, "gSV": 0.2}
-        spec = load_equation_system(str(json_path))
-        pde = build_pde_from_json(str(json_path), parameters=params)
-
-        grid = CartesianGrid([(0, 10), (0, 10)], [32, 32], periodic=True)
-
-        # 7-slot state: phi_0, pi_phi, A_0, A_1, pi_A1, A_2, pi_A2
-        x_coords = cast("np.ndarray", grid.cell_coords[..., 0])
-        y_coords = cast("np.ndarray", grid.cell_coords[..., 1])
-        gaussian = np.exp(-((x_coords - 5.0) ** 2 + (y_coords - 5.0) ** 2) / 2.0)
-
-        state = FieldCollection(
-            [
-                ScalarField(grid, data=gaussian, label="phi_0"),
-                ScalarField(grid, data=0.0, label="pi_phi"),
-                ScalarField(grid, data=0.0, label="A_0"),
-                ScalarField(grid, data=0.0, label="A_1"),
-                ScalarField(grid, data=0.0, label="pi_A1"),
-                ScalarField(grid, data=0.0, label="A_2"),
-                ScalarField(grid, data=0.0, label="pi_A2"),
-            ]
-        )
-
-        storage = MemoryStorage()
-        result = pde.solve(
-            state,
-            t_range=2.0,
-            dt=0.01,
-            scheme="runge-kutta",
-            tracker=storage.tracker(0.2),
-        )
-        normalize_solve_result(result)
-
-        data = SimulationData.from_storage(storage, spec, grid, params)
-
-        energies: list[float] = []
-        for t_idx in range(data.n_snapshots):
-            se = compute_system_energy(data, t_idx)
-            energies.append(se.total)
-
-        e0 = energies[0]
-        max_drift = max(abs(e - e0) for e in energies) / max(abs(e0), 1e-12)
-
-        assert max_drift < 0.05, (
-            f"Energy drift {max_drift:.2%} exceeds 5% threshold. "
-            f"This likely indicates incorrect pi_N indexing in the JSON."
-        )
 
 
 # ============================================================
@@ -2991,7 +2744,6 @@ class TestDispersionRelation:
 from tidal.measurement._writer import (  # noqa: E402
     SnapshotWriter,
     compute_snapshot_count,
-    create_snapshot_callback,
 )
 
 
@@ -3777,115 +3529,6 @@ class TestMemmapMeasurementIntegration:
         np.testing.assert_allclose(
             result_dir.probability, result_mem.probability, rtol=1e-12,
         )
-
-
-# ============================================================
-# Group 16 — create_snapshot_callback helper
-# ============================================================
-
-
-class TestCreateSnapshotCallback:
-    """Tests for the create_snapshot_callback() helper."""
-
-    def test_round_trip(self, tmp_path: Path) -> None:
-        """create_snapshot_callback → write snapshots → from_directory."""
-        spec = _build_coupled_scalars_spec()
-        grid = CartesianGrid([(0, 10)], 16, periodic=True)
-
-        t_end = 4.0
-        snapshot_interval = 1.0
-        params = {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5}
-
-        output_dir = tmp_path / "callback_test"
-        writer, callback = create_snapshot_callback(
-            output_dir=output_dir,
-            spec=spec,
-            grid=grid,
-            t_end=t_end,
-            snapshot_interval=snapshot_interval,
-            parameters=params,
-        )
-
-        # Simulate calling the callback manually
-        rng = np.random.default_rng(123)
-        n_snapshots = int(t_end / snapshot_interval) + 1  # 5
-        field_names = [eq.field_name for eq in spec.equations]
-        mom_names = [
-            eq.field_name
-            for eq in spec.equations
-            if eq.time_derivative_order >= 2
-        ]
-
-        for i in range(n_snapshots):
-            t = i * snapshot_interval
-            # Build a mock FieldCollection-like object with .data attribute
-            slots: list[_MockSlot] = []
-            for _name, _slot_type in spec.state_layout:
-                slots.append(_MockSlot(rng.standard_normal(16)))
-            mock_state = _MockFieldCollection(slots)
-            callback(mock_state, t)
-
-        writer.close()
-
-        # Verify directory was created with correct files
-        assert (output_dir / "metadata.json").exists()
-        assert (output_dir / "times.npy").exists()
-        for name in field_names:
-            assert (output_dir / f"{name}.npy").exists()
-        for name in mom_names:
-            assert (output_dir / f"pi_{name}.npy").exists()
-
-        # Verify we can load it back
-        data = SimulationData.from_directory(output_dir, spec)
-        assert data.n_snapshots == n_snapshots
-        assert len(data.fields) == len(field_names)
-        assert len(data.momenta) == len(mom_names)
-
-    def test_spec_path_stored(self, tmp_path: Path) -> None:
-        """spec_path is written to metadata.json."""
-        spec = _build_coupled_scalars_spec()
-        grid = CartesianGrid([(0, 10)], 16, periodic=True)
-
-        output_dir = tmp_path / "spec_path_test"
-        spec_path = Path("examples/data/coupled_scalars.json")
-        writer, callback = create_snapshot_callback(
-            output_dir=output_dir,
-            spec=spec,
-            grid=grid,
-            t_end=1.0,
-            snapshot_interval=1.0,
-            spec_path=spec_path,
-        )
-
-        # Write minimum snapshots
-        slots = [_MockSlot(np.zeros(16)) for _ in spec.state_layout]
-        mock_state = _MockFieldCollection(slots)
-        callback(mock_state, 0.0)
-        callback(mock_state, 1.0)
-        writer.close()
-
-        import json
-
-        meta = json.loads((output_dir / "metadata.json").read_text())
-        assert "spec_path" in meta
-        assert meta["spec_path"] == str(spec_path)
-
-
-@dataclasses.dataclass
-class _MockSlot:
-    """Minimal mock for a py-pde ScalarField (has .data attribute)."""
-
-    data: np.ndarray
-
-
-class _MockFieldCollection:
-    """Minimal mock for pde.FieldCollection (indexed by int)."""
-
-    def __init__(self, slots: list[_MockSlot]) -> None:
-        self._slots = slots
-
-    def __getitem__(self, idx: int) -> _MockSlot:
-        return self._slots[idx]
 
 
 # ============================================================

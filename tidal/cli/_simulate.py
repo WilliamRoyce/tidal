@@ -263,10 +263,20 @@ def _build_grid_info(
     periodic = _parse_periodic(
         args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension
     )
+    # Compute explicit BC tuple from CLI args
+    bc: tuple[str, ...] | None = None
+    if args.bc:
+        bc_parts = [b.strip().lower() for b in args.bc.split(",")]
+        if len(bc_parts) == 1:
+            bc = tuple(bc_parts[0] for _ in range(spec.spatial_dimension))
+        else:
+            bc = tuple(bc_parts)
+
     return GridInfo(
         bounds=tuple(bounds),
         shape=tuple(shape),
         periodic=periodic,
+        bc=bc,
     )
 
 
@@ -617,23 +627,6 @@ def _infer_output_format(args: Namespace) -> str:
     return "png"
 
 
-# --- BC string derivation ---
-
-
-def _bc_from_args(
-    args: Namespace, periodic_flags: tuple[bool, ...]
-) -> str | tuple[str, ...]:
-    """Determine BC string for spatial operators from CLI args."""
-    if args.bc:
-        bc_parts = [b.strip().lower() for b in args.bc.split(",")]
-        return tuple(bc_parts) if len(bc_parts) > 1 else bc_parts[0]
-    if all(periodic_flags):
-        return "periodic"
-    if not any(periodic_flags):
-        return "neumann"
-    return tuple("periodic" if p else "neumann" for p in periodic_flags)
-
-
 # --- Native simulation path (no py-pde) ---
 
 
@@ -838,8 +831,8 @@ def _simulate(
     grid_info = _build_grid_info(args, spec, bounds)
     log(f"  Grid: {'x'.join(str(s) for s in grid_info.shape)}, bounds: {grid_info.bounds}")
 
-    # 2. BC
-    bc = _bc_from_args(args, grid_info.periodic)
+    # 2. BC (stored in GridInfo, derive tuple for solver calls)
+    bc = grid_info.effective_bc
 
     # 3. Initial conditions
     y0 = _build_initial_y0(args, spec, grid_info, bounds)
@@ -902,7 +895,7 @@ def _simulate(
 
     if writer is not None:
         writer.close()
-        log(f"  {writer.count} snapshots streamed to: {writer.output_dir}")
+        log(f"  {writer.count} snapshots streamed to: {writer.output_dir.resolve()}")
 
     # 8. Build SimulationData
     sim_data = SimulationData.from_result(result, spec, grid_info, params)

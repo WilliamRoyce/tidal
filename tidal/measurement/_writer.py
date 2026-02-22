@@ -452,11 +452,12 @@ def create_snapshot_callback(  # noqa: PLR0913, PLR0917
     field_names, momentum_names = _field_names_from_spec(spec)
     n_snapshots = compute_snapshot_count(t_end, snapshot_interval)
 
+    grid_bounds_raw = grid.bounds
     spacing = tuple(
         float((b[1] - b[0]) / s)
-        for b, s in zip(grid.axes_bounds, grid.shape, strict=True)
+        for b, s in zip(grid_bounds_raw, grid.shape, strict=True)
     )
-    bounds = tuple((float(b[0]), float(b[1])) for b in grid.axes_bounds)
+    bounds = tuple((float(b[0]), float(b[1])) for b in grid_bounds_raw)
     periodic_flags = tuple(bool(p) for p in grid.periodic)
 
     writer = SnapshotWriter(

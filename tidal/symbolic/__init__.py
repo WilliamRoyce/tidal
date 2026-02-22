@@ -15,12 +15,6 @@ from tidal.symbolic.json_loader import (
     OperatorTerm,
     load_equation_system,
 )
-from tidal.symbolic.pde_builder import (
-    PDEFromSpec,
-    build_pde_from_json,
-    create_initial_state,
-    register_operator,
-)
 
 __all__ = [
     "AXIS_LETTERS",
@@ -29,9 +23,5 @@ __all__ = [
     "ConstraintSolverConfig",
     "EquationSystem",
     "OperatorTerm",
-    "PDEFromSpec",
-    "build_pde_from_json",
-    "create_initial_state",
     "load_equation_system",
-    "register_operator",
 ]

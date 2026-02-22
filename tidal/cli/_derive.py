@@ -1505,14 +1505,14 @@ def _type_b_tt_gauge(
             f"{last_comp}[args___] :> -({repl_sum}), "
             f"Derivative[d__][{last_comp}][args___] :> -({deriv_repl_sum})}};",
             "",
-            f"(* Expand all equations to simplify kinetic terms after traceless sub *)",
-            f"fieldEquations = Table[{{fieldEquations[[k, 1]], "
-            f"Expand[fieldEquations[[k, 2]]]}},"
-            f" {{k, Length[fieldEquations]}}];",
+            "(* Expand all equations to simplify kinetic terms after traceless sub *)",
+            "fieldEquations = Table[{fieldEquations[[k, 1]], "
+            "Expand[fieldEquations[[k, 2]]]},"
+            " {k, Length[fieldEquations]}];",
             "",
             f"(* Replace {last_comp} equation with algebraic traceless constraint *)",
-            f"Do[If[fieldEquations[[k, 1]] === \"{field_name}_{last_diag_idx}\","
-            f" fieldEquations[[k]] = {{\"{field_name}_{last_diag_idx}\", {trace_terms}}}],"
+            f'Do[If[fieldEquations[[k, 1]] === "{field_name}_{last_diag_idx}",'
+            f' fieldEquations[[k]] = {{"{field_name}_{last_diag_idx}", {trace_terms}}}],'
             f" {{k, Length[fieldEquations]}}];",
             f'Print["Applied TT traceless: {last_comp} → -(spatial diag sum), '
             f'eq replaced with constraint"];',
@@ -2102,7 +2102,7 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
             '    Print["det(K) = ", kDet];',
             "    If[kDet === 0,",
             '      Throw["Kinetic matrix K is singular (det=0). Some fields classified '
-            'as dynamical (time_order>=2) may actually be constraints. Check the '
+            "as dynamical (time_order>=2) may actually be constraints. Check the "
             'time_derivative_order classification for each field component."]',
             "    ];",
             "",
@@ -2248,8 +2248,7 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
             'jsonStructure["canonical"] = <|',
             '  "hamiltonian_terms" -> hamiltonianTerms,',
             '  "field_rates" -> canonicalFieldRates,',
-            '  "kinetic_matrix" -> <|"entries" -> kEntries, '
-            '"dimension" -> nDyn|>,',
+            '  "kinetic_matrix" -> <|"entries" -> kEntries, "dimension" -> nDyn|>,',
             '  "spatial_momenta" -> spatialMomentaTerms,',
             '  "hamiltonian_symbolic" -> ToString[canonicalH, InputForm]',
             "|>;",
@@ -2562,7 +2561,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:
     if args.save_script:
         save_path = Path(args.save_script)
         save_path.write_text(script_content, encoding="utf-8")
-        print(f"Saved script to: {save_path}")
+        print(f"Saved script to: {save_path.resolve()}")
         if shutil.which("wolframscript") is None:
             print(
                 "Note: wolframscript not found. Run the script manually when available."

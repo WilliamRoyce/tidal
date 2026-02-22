@@ -276,6 +276,6 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
     plt.close(fig)
 
     if not args.quiet:
-        print(f"Saved: {output_path}")
+        print(f"Saved: {output_path.resolve()}")
 
     return 0

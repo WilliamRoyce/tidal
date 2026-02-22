@@ -3,12 +3,11 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
 
 from tidal.symbolic.json_loader import (
-    _STATIC_OPERATORS,
     ComponentEquation,
     EquationSystem,
     LHSStructure,
@@ -17,12 +16,6 @@ from tidal.symbolic.json_loader import (
     load_equation_system,
     validate_json_schema,
 )
-from tidal.symbolic.pde_builder import (
-    _OPERATOR_REGISTRY,
-)
-
-if TYPE_CHECKING:
-    from pde import ScalarField
 
 # === Fixtures ===
 
@@ -616,67 +609,6 @@ class TestFieldReferenceValidation:
                 coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
                 metadata={},
             )
-
-
-# === Phase 8A: Operator Registry Sync Test ===
-
-
-class TestOperatorRegistrySync:
-    """Validate _STATIC_OPERATORS and _OPERATOR_REGISTRY stay consistent."""
-
-    def test_all_registry_operators_are_known(self) -> None:
-        """Every operator in _OPERATOR_REGISTRY must be in _STATIC_OPERATORS."""
-        unknown = set(_OPERATOR_REGISTRY.keys()) - _STATIC_OPERATORS
-        assert unknown == set(), (
-            f"Operators in _OPERATOR_REGISTRY but not in _STATIC_OPERATORS: {sorted(unknown)}. "
-            "Add them to _STATIC_OPERATORS in json_loader.py."
-        )
-
-    def test_all_known_operators_in_registry(self) -> None:
-        """Every _STATIC_OPERATORS entry has a handler in _OPERATOR_REGISTRY."""
-        special_cased = _STATIC_OPERATORS - set(_OPERATOR_REGISTRY.keys())
-        assert special_cased == set(), (
-            f"_STATIC_OPERATORS not in _OPERATOR_REGISTRY: {sorted(special_cased)}. "
-            "Add them to _OPERATOR_REGISTRY (use None handler for special-cased operators)."
-        )
-
-
-class TestRegisterOperator:
-    """Tests for the custom operator registration API."""
-
-    def test_register_and_use_custom_operator(self) -> None:
-        """Registered operator is accepted by is_known_operator and usable in PDE."""
-        from tidal.symbolic.json_loader import (
-            _CUSTOM_OPERATORS,
-            is_known_operator,
-        )
-        from tidal.symbolic.pde_builder import (
-            _OPERATOR_REGISTRY,
-            register_operator,
-        )
-
-        name = "_test_custom_op"
-
-        def _handler(field: ScalarField, _bc: object) -> ScalarField:
-            return field * 2.0  # type: ignore[return-value]
-
-        try:
-            register_operator(name, _handler, min_dim=1)
-            assert is_known_operator(name)
-            assert name in _OPERATOR_REGISTRY
-        finally:
-            # Clean up so other tests aren't affected
-            _OPERATOR_REGISTRY.pop(name, None)
-            _CUSTOM_OPERATORS.discard(name)
-
-    def test_register_shadow_builtin_raises(self) -> None:
-        """Registering an operator that shadows a built-in raises ValueError."""
-        from tidal.symbolic.pde_builder import (
-            register_operator,
-        )
-
-        with pytest.raises(ValueError, match="shadows a built-in"):
-            register_operator("laplacian", lambda f, _bc: f, min_dim=1)
 
 
 # === Phase 8D: Python Validation Tests ===

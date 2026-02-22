@@ -726,7 +726,7 @@ def measure_command(args: Namespace) -> int:
 
         save_measurement_plot(Path(output_path), data, results)
         if not quiet:
-            print(f"  Saved plot to: {output_path}")
+            print(f"  Saved plot to: {Path(output_path).resolve()}")
     elif json_mode:
         print(_format_json(results, data))
     else:

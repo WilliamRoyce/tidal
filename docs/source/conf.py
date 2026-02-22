@@ -48,7 +48,7 @@ autosummary_generate = True
 # Doctest settings
 doctest_global_setup = """
 import numpy as np
-from tidal.symbolic import build_pde_from_json
+from tidal.symbolic import load_equation_system
 """
 
 templates_path = ["_templates"]
