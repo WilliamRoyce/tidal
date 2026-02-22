@@ -268,6 +268,39 @@ OPERATOR_REGISTRY: dict[str, Any] = {
 }
 
 
+# Minimum spatial dimension required by each operator
+_OPERATOR_MIN_DIM: dict[str, int] = {
+    "identity": 1,
+    "laplacian": 1,
+    "laplacian_x": 1,
+    "laplacian_y": 2,
+    "laplacian_z": 3,
+    "gradient_x": 1,
+    "gradient_y": 2,
+    "gradient_z": 3,
+    "cross_derivative_xy": 2,
+    "cross_derivative_xz": 3,
+    "cross_derivative_yz": 3,
+    "biharmonic": 1,
+    "first_derivative_t": 1,
+}
+
+
+def operator_min_dim(name: str) -> int:
+    """Return the minimum spatial dimension required by *name*.
+
+    Raises
+    ------
+    ValueError
+        If *name* is not a recognized operator.
+    """
+    dim = _OPERATOR_MIN_DIM.get(name)
+    if dim is not None:
+        return dim
+    msg = f"Unknown operator {name!r}; known: {sorted(_OPERATOR_MIN_DIM)}"
+    raise ValueError(msg)
+
+
 def apply_operator(
     name: str,
     data: np.ndarray,
