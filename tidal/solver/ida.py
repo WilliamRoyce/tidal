@@ -36,8 +36,12 @@ if TYPE_CHECKING:
 # Time-derivative order threshold for dynamical (wave) equations
 _SECOND_ORDER = 2
 
-# System size threshold for switching from dense to iterative linear solver
-_DENSE_THRESHOLD = 100_000
+# System size thresholds for linear solver selection.
+# Dense Jacobian at N=2000: N^2 * 8 = 32 MB (safe for all environments).
+# Sparse (SuperLU_MT) scales well up to ~200K state variables.
+# Beyond that, matrix-free GMRES avoids storing any Jacobian.
+_DENSE_THRESHOLD = 2_000
+_SPARSE_THRESHOLD = 200_000
 
 
 class _ResidualCtx:
@@ -362,12 +366,27 @@ def solve_ida(  # noqa: PLR0913
 
     if alg_idx:
         options["algebraic_idx"] = np.array(alg_idx)
-        options["calc_initcond"] = calc_initcond or "yp0"
-        options["calc_init_dt"] = float(t_eval[1] - t_eval[0])
 
-    # Choose linear solver based on system size
-    if layout.total_size <= _DENSE_THRESHOLD:
+    # Always compute consistent initial conditions.  IDA needs yp0 that
+    # satisfies F(t0, y0, yp0)=0; providing yp0=0 (our default) is rarely
+    # consistent.  "yp0" mode fixes y0 and corrects yp0 (+ algebraic y
+    # components when present).
+    options["calc_initcond"] = calc_initcond or "yp0"
+    options["calc_init_dt"] = float(t_eval[1] - t_eval[0])
+
+    # Choose linear solver based on system size:
+    # - Dense (LU): fast for small systems, O(N^3) / O(N^2) memory
+    # - Sparse (SuperLU_MT): analytical sparsity pattern, O(nnz) memory
+    # - GMRES: matrix-free, O(krylov_dim * N) memory, no preconditioner
+    n_state = layout.total_size
+    if n_state <= _DENSE_THRESHOLD:
         options["linsolver"] = "dense"
+    elif n_state <= _SPARSE_THRESHOLD:
+        from tidal.solver.sparsity import build_jacobian_sparsity  # noqa: PLC0415
+
+        pattern = build_jacobian_sparsity(spec, layout, grid, bc)
+        options["linsolver"] = "sparse"
+        options["sparsity"] = pattern
     else:
         options["linsolver"] = "gmres"
 

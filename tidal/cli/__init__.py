@@ -217,13 +217,15 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sim_parser.add_argument(
         "--scheme",
-        choices=["ida", "leapfrog"],
-        default="ida",
+        choices=["ida", "leapfrog", "auto"],
+        default="auto",
         help=(
-            "Solver scheme (default: ida). "
-            "'ida' uses SUNDIALS/IDA — handles all equation types "
-            "(wave, diffusion, constraints). "
-            "'leapfrog' uses symplectic Störmer-Verlet (pure wave equations only)."
+            "Solver scheme (default: auto). "
+            "'auto' selects leapfrog for wave/constraint systems, "
+            "ida for systems with dissipation (first_derivative_t) or "
+            "first-order equations. "
+            "'ida' uses SUNDIALS/IDA — handles all equation types. "
+            "'leapfrog' uses symplectic Störmer-Verlet (wave + constraint systems)."
         ),
     )
     sim_parser.add_argument(

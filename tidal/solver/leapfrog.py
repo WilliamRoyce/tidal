@@ -20,6 +20,7 @@ Springer, 2006. Chapter VI: Symplectic Integration of Hamiltonian Systems.
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -164,7 +165,7 @@ def _drift(
             y[s] += dt * velocity[s]
 
 
-def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
+def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
     spec: EquationSystem,
     grid: GridInfo,
     y0: np.ndarray,
@@ -178,7 +179,9 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
 ) -> dict[str, Any]:
     """Solve a TIDAL Hamiltonian system using Stormer-Verlet (leapfrog).
 
-    Only works for second-order (wave) equations.
+    Works for second-order (wave) equations with optional constraint fields.
+    Constraint fields (time_order=0) are frozen at their initial values —
+    correct for gauge-fixed systems (e.g. Coulomb gauge A_0 = 0).
 
     Parameters
     ----------
@@ -209,22 +212,40 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
     Raises
     ------
     ValueError
-        If the system contains non-Hamiltonian (first-order or constraint)
-        equations.
+        If the system contains first-order (diffusion/transport) equations.
+
+    Warns
+    -----
+    UserWarning
+        If constraint fields (time_order=0) are present — they remain frozen
+        at initial values.
     """
     layout = StateLayout.from_spec(spec, grid.num_points)
     n = grid.num_points
     canonical = spec.canonical
 
-    # Validate: leapfrog only works for pure second-order systems
+    # Validate: leapfrog supports second-order (wave) + frozen constraints.
+    # First-order (diffusion/transport) equations require IDA.
+    constraint_fields: list[str] = []
     for slot in layout.slots:
-        if slot.time_order < _SECOND_ORDER and slot.kind != "momentum":
+        if slot.kind == "momentum":
+            continue
+        if slot.time_order == 0:
+            constraint_fields.append(slot.field_name)
+        elif slot.time_order == 1:
             msg = (
-                f"Leapfrog requires all equations to be second-order (wave). "
+                f"Leapfrog does not support first-order equations. "
                 f"Field '{slot.field_name}' has time_order={slot.time_order}. "
-                f"Use --scheme ida for mixed systems."
+                f"Use --scheme ida for first-order (diffusion/transport) systems."
             )
             raise ValueError(msg)
+
+    if constraint_fields:
+        warnings.warn(
+            f"Leapfrog: constraint fields {constraint_fields} frozen at initial "
+            f"values (not evolved). Correct for gauge-fixed systems (e.g. A_0=0).",
+            stacklevel=2,
+        )
 
     # Pre-extract kinetic matrix
     kinetic = None

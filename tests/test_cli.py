@@ -474,7 +474,7 @@ class TestSimulateCommand:
     def test_simulate_default_scheme(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Verify default scheme (IDA) runs successfully."""
+        """Verify default scheme (auto) auto-selects and logs solver choice."""
         ret = main([
             "simulate", str(inline_kg_1d_json),
             "--param", "m2=1.0",
@@ -482,6 +482,10 @@ class TestSimulateCommand:
             "--no-plot",
         ])
         assert ret == 0
+        captured = capsys.readouterr()
+        # Inline KG spec lacks canonical section → auto selects IDA
+        assert "Auto-selected solver:" in captured.out
+        assert "Scheme:" in captured.out
 
     def test_simulate_ida_scheme(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]

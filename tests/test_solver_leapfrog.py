@@ -145,8 +145,8 @@ class TestLeapfrogEnergy:
 
 
 class TestLeapfrogValidation:
-    def test_rejects_constraint_system(self) -> None:
-        """Leapfrog should reject systems with constraints."""
+    def test_warns_on_constraint_system(self) -> None:
+        """Leapfrog should warn (not reject) systems with constraints."""
         data: dict[str, Any] = {
             "spacetime": {"dimension": 3, "signature": [-1, 1, 1]},
             "fields": [
@@ -181,7 +181,34 @@ class TestLeapfrogValidation:
         layout = StateLayout.from_spec(spec, grid.num_points)
 
         y0 = np.zeros(layout.total_size)
-        with pytest.raises(ValueError, match="second-order"):
+        with pytest.warns(UserWarning, match="frozen"):
+            result = solve_leapfrog(spec, grid, y0, t_span=(0.0, 0.1), dt=0.01)
+        assert result["success"]
+
+    def test_rejects_first_order_system(self) -> None:
+        """Leapfrog should reject systems with first-order equations."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 3, "signature": [-1, 1, 1]},
+            "fields": [{"name": "T_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "T_0",
+                    "lhs": {"expression": "d_t(T_0)", "order": {"time": 1}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "T_0"},
+                        ],
+                    },
+                },
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        y0 = np.zeros(layout.total_size)
+        with pytest.raises(ValueError, match="first-order"):
             solve_leapfrog(spec, grid, y0, t_span=(0.0, 1.0), dt=0.01)
 
     def test_snapshot_callback(self) -> None:

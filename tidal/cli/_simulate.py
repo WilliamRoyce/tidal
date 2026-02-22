@@ -808,6 +808,42 @@ def _constraint_mode(  # noqa: PLR0913, PLR0917
     return 0
 
 
+def _resolve_scheme(scheme: str, spec: EquationSystem) -> str:
+    """Resolve ``'auto'`` to ``'leapfrog'`` or ``'ida'`` based on equation operators.
+
+    Selection logic (checked in order):
+
+    1. First-order (time_order=1) equations → IDA (diffusion/transport needs
+       implicit time integration).
+    2. Dissipation (``first_derivative_t`` operator in any RHS) → IDA (breaks
+       symplecticity, leapfrog would not conserve energy).
+    3. No canonical Hamiltonian structure → IDA (leapfrog requires separable
+       H = T(pi) + V(q)).
+    4. Otherwise (all wave + optional constraints, Hamiltonian) → leapfrog
+       (symplectic, O(N) per step, zero Jacobian memory).
+    """
+    if scheme != "auto":
+        return scheme
+
+    # First-order (diffusion/transport) equations → IDA
+    for eq in spec.equations:
+        if eq.time_derivative_order == 1:
+            return "ida"
+
+    # Dissipation (first_derivative_t in any RHS term) → IDA
+    for eq in spec.equations:
+        for term in eq.rhs_terms:
+            if term.operator == "first_derivative_t":
+                return "ida"
+
+    # No canonical Hamiltonian structure → IDA
+    if spec.canonical is None:
+        return "ida"
+
+    # All wave + optional constraints, Hamiltonian structure → leapfrog
+    return "leapfrog"
+
+
 def _simulate(
     args: Namespace,
     spec: EquationSystem,
@@ -841,6 +877,12 @@ def _simulate(
     # 4. Diagnostics
     _validate_solver_params(args)
 
+    # Resolve solver scheme (auto-select based on equation operators)
+    scheme = _resolve_scheme(args.scheme, spec)
+    if args.scheme == "auto":
+        log(f"  Auto-selected solver: {scheme}")
+    log(f"  Scheme: {scheme}")
+
     # Constraint-only mode: solve algebraic equations via IDA, no time evolution
     if args.mode == "constraint":
         return _constraint_mode(args, spec, grid_info, y0, params, bc, log)
@@ -863,7 +905,7 @@ def _simulate(
         )
 
     # 7. Solve
-    if args.scheme == "ida":
+    if scheme == "ida":
         from tidal.solver.ida import solve_ida
 
         num_snapshots = max(int(args.t_end / snapshot_interval) + 1, 2)
@@ -897,8 +939,12 @@ def _simulate(
         writer.close()
         log(f"  {writer.count} snapshots streamed to: {writer.output_dir.resolve()}")
 
-    # 8. Build SimulationData
-    sim_data = SimulationData.from_result(result, spec, grid_info, params)
+    # 8. Build SimulationData — use memory-mapped directory reader when
+    # snapshots were already streamed to disk (avoids double-buffering).
+    if writer is not None:
+        sim_data = SimulationData.from_directory(writer.output_dir, spec)
+    else:
+        sim_data = SimulationData.from_result(result, spec, grid_info, params)
     log(f"  {sim_data.n_snapshots} snapshots stored")
 
     # 9. Output
