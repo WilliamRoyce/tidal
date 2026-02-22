@@ -777,10 +777,9 @@ def _constraint_mode(  # noqa: PLR0913, PLR0917
 
     log_fn("Solving constraints via IDA...")
 
-    # IDA's calc_initcond="yp0" (the default for DAE systems) adjusts both
-    # algebraic variables in y0 and derivatives in yp0 to satisfy the
-    # constraint equations.  A short time span suffices — we only need
-    # IDA to find consistent initial conditions, not evolve.
+    # IDA's calc_initcond="yp0" adjusts yp0 to satisfy F(t0, y0, yp0)=0.
+    # A short time span suffices — we only need IDA to find consistent
+    # initial conditions, not evolve.
     result = solve_ida(
         spec, grid_info, y0,
         t_span=(0.0, 0.01),

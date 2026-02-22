@@ -377,6 +377,43 @@ Dedalus (Burns et al. 2020) provides a native eigenvalue problem (EVP) capabilit
 
 ---
 
+## Phase J: Constraint Pre-Solve (FFT-Based Initial Conditions)
+
+**Priority: LOW — only needed for constraint systems with nontrivially violated ICs**
+**Status:** Planned
+
+### What and Why
+
+When a DAE system has algebraic constraints (time_order=0 fields like A_0 in electromagnetism or Chern-Simons), the constraint field values must be consistent with the initial conditions of the dynamical fields. Currently, IDA handles this via `calc_initcond="yp0"`, which works when the constraint is trivially satisfied at t=0 (e.g., EM with zero initial momenta → Gauss's law gives A_0=0). However, it fails when the constraint has a nontrivial source:
+
+- **Chern-Simons**: A_0 satisfies `laplacian(A_0) = kappa * d_y(A_1) - kappa * d_x(A_2)`. With a Gaussian in A_1, the RHS is nonzero, so A_0=0 is inconsistent. IDA's Newton solver fails because the Laplacian with periodic BCs has a zero eigenmode (singular Jacobian).
+- **Any DAE** where the algebraic equation has a nontrivial source term at t=0.
+
+### Proposed Solution
+
+1. **FFT-based Poisson/Helmholtz solver**: Before passing ICs to IDA, solve each constraint equation spectrally. For periodic BCs, FFT naturally handles the zero mode by setting k=0 component to zero (unique up to a constant, which is unphysical for gauge fields).
+2. **Integration with `solve_ida`**: Add an optional `pre_solve_constraints=True` parameter that runs the spectral solve before `calc_initcond`.
+3. **CLI flag**: `--pre-solve-constraints` to enable this for nontrivial systems.
+
+### References
+
+- Standard FFT-based Poisson solvers; see e.g. Numerical Recipes (Press et al. 2007), Sec. 19.4
+- Dedalus (Burns et al. 2020) uses spectral methods for constraint equations natively
+
+### Scope: Small (~2–3 days)
+
+### Dependencies: None (uses existing numpy/scipy FFT infrastructure)
+
+---
+
+## Known Limitations
+
+1. **Chern-Simons IDA failure**: Systems where algebraic constraints are nontrivially violated at t=0 fail with `IDACalcIC - The line search failed`. Root cause: singular Laplacian with periodic BCs in the Jacobian. **Fix: Phase J** (constraint pre-solve). Workaround: choose initial conditions that trivially satisfy the constraint.
+
+2. **Non-periodic BCs for constraint mode**: The `--mode constraint` path works with periodic BCs but may fail with Dirichlet/Neumann BCs for certain systems. **Future improvement**.
+
+---
+
 ## Implementation Order
 
 ```
@@ -386,6 +423,7 @@ Phase B (Gauge Fixing, optional) ─── COMPLETE
 Phase C (Sweep & Convergence)    ─── Independent, high priority
 Phase F (Adaptive Time-Stepping) ─── Independent, quick win
 Phase G (Absorbing Boundaries)   ─── Independent, uses Phase A infrastructure
+Phase J (Constraint Pre-Solve)   ─── Independent, fixes Chern-Simons IDA failure
 Phase H (HDF5/XDMF Output)      ─── Independent, interoperability
 Phase I (Eigenvalue/Dispersion)  ─── Independent, analysis capability
 Phase E (Spectral Methods)       ─── Independent, large scope

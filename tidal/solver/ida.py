@@ -369,8 +369,11 @@ def solve_ida(  # noqa: PLR0913
 
     # Always compute consistent initial conditions.  IDA needs yp0 that
     # satisfies F(t0, y0, yp0)=0; providing yp0=0 (our default) is rarely
-    # consistent.  "yp0" mode fixes y0 and corrects yp0 (+ algebraic y
-    # components when present).
+    # consistent.  "yp0" mode fixes y0 and corrects yp0, which works when
+    # algebraic constraints are trivially satisfied at t=0 (e.g. EM with
+    # zero initial momenta).  For systems where the constraint is
+    # nontrivially violated (e.g. Chern-Simons with nonzero source), a
+    # constraint pre-solve step is needed (future work).
     options["calc_initcond"] = calc_initcond or "yp0"
     options["calc_init_dt"] = float(t_eval[1] - t_eval[0])
 
