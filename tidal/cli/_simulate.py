@@ -815,11 +815,13 @@ def _resolve_scheme(scheme: str, spec: EquationSystem) -> str:
 
     1. First-order (time_order=1) equations → IDA (diffusion/transport needs
        implicit time integration).
-    2. Dissipation (``first_derivative_t`` operator in any RHS) → IDA (breaks
+    2. Constraint equations (time_order=0) → IDA (algebraic constraints must
+       be solved implicitly at each step; leapfrog would freeze them).
+    3. Dissipation (``first_derivative_t`` operator in any RHS) → IDA (breaks
        symplecticity, leapfrog would not conserve energy).
-    3. No canonical Hamiltonian structure → IDA (leapfrog requires separable
+    4. No canonical Hamiltonian structure → IDA (leapfrog requires separable
        H = T(pi) + V(q)).
-    4. Otherwise (all wave + optional constraints, Hamiltonian) → leapfrog
+    5. Otherwise (all wave, Hamiltonian structure) → leapfrog
        (symplectic, O(N) per step, zero Jacobian memory).
     """
     if scheme != "auto":
@@ -828,6 +830,11 @@ def _resolve_scheme(scheme: str, spec: EquationSystem) -> str:
     # First-order (diffusion/transport) equations → IDA
     for eq in spec.equations:
         if eq.time_derivative_order == 1:
+            return "ida"
+
+    # Constraint equations (time_order=0) → IDA (DAE solver)
+    for eq in spec.equations:
+        if eq.time_derivative_order == 0:
             return "ida"
 
     # Dissipation (first_derivative_t in any RHS term) → IDA
@@ -840,7 +847,7 @@ def _resolve_scheme(scheme: str, spec: EquationSystem) -> str:
     if spec.canonical is None:
         return "ida"
 
-    # All wave + optional constraints, Hamiltonian structure → leapfrog
+    # All wave, Hamiltonian structure → leapfrog
     return "leapfrog"
 
 
