@@ -13,7 +13,7 @@
 #   tidal inspect ../data/sphere_kg.json
 #   tidal simulate ../data/sphere_kg.json --param sphR=2.0 --param sphm2=0.0 \
 #     --grid-shape 128 --bounds=-8:8 --periodic --ic gaussian --ic-width 0.8 \
-#     --t-end 10.0 --scheme scipy --output ../data/sphere_kg_output
+#     --t-end 10.0 --output ../data/sphere_kg_output
 #   tidal plot ../data/sphere_kg_output --type amplitude --quiet
 
 set -euo pipefail
@@ -35,7 +35,6 @@ tidal simulate ../data/sphere_kg.json \
   --ic gaussian \
   --ic-width 0.8 \
   --t-end 10.0 \
-  --scheme scipy \
   --output ../data/sphere_kg_output
 
 # Visualize results (plots saved into the simulation output directory)

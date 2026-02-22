@@ -13,7 +13,7 @@
 #   tidal inspect ../data/proca_1d.json
 #   tidal simulate ../data/proca_1d.json --param procaMassSquared=1.0 \
 #     --grid-shape 512 --bounds 0:100 --periodic --ic gaussian \
-#     --ic-component A_1 --ic-width 5.0 --t-end 30.0 --scheme scipy \
+#     --ic-component A_1 --ic-width 5.0 --t-end 30.0 \
 #     --output ../data/proca_output
 #   tidal plot ../data/proca_output --type amplitude --quiet
 
@@ -36,7 +36,6 @@ tidal simulate ../data/proca_1d.json \
   --ic-component A_1 \
   --ic-width 5.0 \
   --t-end 30.0 \
-  --scheme scipy \
   --output ../data/proca_output
 
 # Visualize results (plots saved into the simulation output directory)

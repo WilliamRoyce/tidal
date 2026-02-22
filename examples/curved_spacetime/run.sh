@@ -14,7 +14,7 @@
 #   tidal inspect ../data/de_sitter_kg.json
 #   tidal simulate ../data/de_sitter_kg.json --param dSH=0.1 --param dSm2=1.0 \
 #     --grid-shape 64 --bounds 0:50 --periodic --ic gaussian --ic-width 3.0 \
-#     --t-end 20.0 --scheme scipy --output ../data/de_sitter_output
+#     --t-end 20.0 --output ../data/de_sitter_output
 #   tidal plot ../data/de_sitter_output --type amplitude --quiet
 
 set -euo pipefail
@@ -37,7 +37,6 @@ tidal simulate ../data/de_sitter_kg.json \
   --ic gaussian \
   --ic-width 3.0 \
   --t-end 20.0 \
-  --scheme scipy \
   --output ../data/de_sitter_output
 
 # Visualize de Sitter results (plots saved into the simulation output directory)
@@ -63,7 +62,6 @@ tidal simulate ../data/conformal_kg_static.json \
   --ic gaussian \
   --ic-width 5.0 \
   --t-end 20.0 \
-  --scheme scipy \
   --output ../data/conformal_kg_output
 
 # Visualize conformal KG results (plots saved into the simulation output directory)

@@ -17,7 +17,7 @@
 #     --grid-shape 4,4,32 --bounds 0:4,0:4,0:20 --periodic \
 #     --ic formula --ic-component h_4 \
 #     --ic-formula "np.exp(-(z - 10.0)**2 / 4.5) * np.cos(0.6283 * (z - 10.0))" \
-#     --t-end 5.0 --scheme scipy
+#     --t-end 5.0
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -37,5 +37,4 @@ tidal simulate ../data/linearized_gravity.json \
   --ic formula \
   --ic-formula "np.exp(-(z - 10.0)**2 / 4.5) * np.cos(0.6283 * (z - 10.0))" \
   --ic-component h_4 \
-  --t-end 5.0 \
-  --scheme scipy
+  --t-end 5.0

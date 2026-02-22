@@ -13,7 +13,7 @@
 #   tidal inspect ../data/navier_cauchy_2d.json
 #   tidal simulate ../data/navier_cauchy_2d.json --grid-shape 64 --bounds 0:10 \
 #     --periodic --ic gaussian --ic-component ux_0 --ic-width 1.0 --t-end 3.0 \
-#     --scheme scipy --output ../data/elasticity_output
+#     --output ../data/elasticity_output
 #   tidal plot ../data/elasticity_output --type amplitude --quiet
 
 set -euo pipefail
@@ -35,7 +35,6 @@ tidal simulate ../data/navier_cauchy_2d.json \
   --ic-component ux_0 \
   --ic-width 1.0 \
   --t-end 3.0 \
-  --scheme scipy \
   --output ../data/elasticity_output
 
 # Visualize results — snapshots of each displacement component

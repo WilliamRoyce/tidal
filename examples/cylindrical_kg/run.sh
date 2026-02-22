@@ -17,7 +17,7 @@
 #     --grid-shape 48 --bounds 0.5:8,0:6.283185,-5:5 \
 #     --bc neumann,periodic,neumann \
 #     --ic formula --ic-formula "np.exp(-((x - 3.0)**2 / 0.72) - (z**2 / 1.28))" \
-#     --t-end 4.0 --scheme scipy
+#     --t-end 4.0
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -37,5 +37,4 @@ tidal simulate ../data/cylindrical_kg.json \
   --bc neumann,periodic,neumann \
   --ic formula \
   --ic-formula "np.exp(-((x - 3.0)**2 / 0.72) - (z**2 / 1.28))" \
-  --t-end 4.0 \
-  --scheme scipy
+  --t-end 4.0

@@ -14,7 +14,7 @@
 #   tidal inspect ../data/massive_gravity_3d.json
 #   tidal simulate ../data/massive_gravity_3d.json --param m2=1.0 \
 #     --grid-shape 64 --bounds 0:50 --periodic --ic gaussian \
-#     --ic-component h_3 --t-end 5.0 --scheme scipy \
+#     --ic-component h_3 --t-end 5.0 \
 #     --output ../data/massive_gravity_output
 #   tidal plot ../data/massive_gravity_output --type amplitude --quiet
 
@@ -37,7 +37,6 @@ tidal simulate ../data/massive_gravity_3d.json \
   --ic gaussian \
   --ic-component h_3 \
   --t-end 5.0 \
-  --scheme scipy \
   --output ../data/massive_gravity_output
 
 # Visualize results (plots saved into the simulation output directory)

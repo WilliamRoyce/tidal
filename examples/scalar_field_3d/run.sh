@@ -14,7 +14,7 @@
 #   tidal inspect ../data/klein_gordon_3d.json
 #   tidal simulate ../data/klein_gordon_3d.json --param m2=1.0 \
 #     --grid-shape 32 --bounds 0:20 --periodic --ic gaussian \
-#     --ic-width 2.0 --t-end 8.0 --scheme scipy
+#     --ic-width 2.0 --t-end 8.0
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -33,5 +33,4 @@ tidal simulate ../data/klein_gordon_3d.json \
   --periodic \
   --ic gaussian \
   --ic-width 2.0 \
-  --t-end 8.0 \
-  --scheme scipy
+  --t-end 8.0

@@ -14,7 +14,7 @@
 #   tidal simulate ../data/polar_kg.json --param polm2=0.5 \
 #     --grid-shape 128 --bounds 0.5:10,0:6.283185 --bc neumann,periodic \
 #     --ic formula --ic-formula "np.exp(-(x - 3.0)**2 / 0.5)" \
-#     --t-end 8.0 --scheme scipy --output ../data/polar_kg_output
+#     --t-end 8.0 --output ../data/polar_kg_output
 #   tidal plot ../data/polar_kg_output --type amplitude --quiet
 
 set -euo pipefail
@@ -36,7 +36,6 @@ tidal simulate ../data/polar_kg.json \
   --ic formula \
   --ic-formula "np.exp(-(x - 3.0)**2 / 0.5)" \
   --t-end 8.0 \
-  --scheme scipy \
   --output ../data/polar_kg_output
 
 # Visualize results (plots saved into the simulation output directory)

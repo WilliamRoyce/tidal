@@ -15,7 +15,7 @@
 #   tidal inspect ../data/massive_3form.json
 #   tidal simulate ../data/massive_3form.json --param m2=1.0 \
 #     --grid-shape 16 --bounds 0:10 --periodic --ic gaussian \
-#     --ic-component C_0 --ic-width 1.5 --t-end 5.0 --scheme scipy
+#     --ic-component C_0 --ic-width 1.5 --t-end 5.0
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -35,5 +35,4 @@ tidal simulate ../data/massive_3form.json \
   --ic gaussian \
   --ic-component C_0 \
   --ic-width 1.5 \
-  --t-end 5.0 \
-  --scheme scipy
+  --t-end 5.0

@@ -28,7 +28,7 @@
 #     --grid-shape 64 --bounds 0:50,0:50 --bc periodic,periodic \
 #     --ic gaussian --ic-component phi_0 --ic-amplitude 1.0 --ic-width 5.0 \
 #     --ic-center 25.0,25.0 \
-#     --t-end 10.0 --scheme scipy \
+#     --t-end 10.0 \
 #     --output ../data/scalar_vector_coupling_output
 #
 #   # Step 4: Measure scalar-to-vector conversion and mixing length
@@ -68,7 +68,6 @@ tidal simulate ../data/scalar_vector_coupling.json \
   --ic gaussian --ic-component phi_0 --ic-amplitude 1.0 --ic-width 5.0 \
   --ic-center 25.0,25.0 \
   --t-end 10.0 \
-  --scheme scipy \
   --output ../data/scalar_vector_coupling_output
 
 # Step 4: Measure scalar-to-vector conversion and characteristic mixing length

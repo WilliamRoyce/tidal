@@ -15,7 +15,7 @@
 #   tidal simulate ../data/scalar_potential_well.json --param V0=4.0 \
 #     --grid-shape 256 --bounds 0:100 --periodic --ic gaussian \
 #     --ic-component phi_0 --ic-center 15.0 --ic-width 5.0 \
-#     --t-end 20.0 --scheme scipy --output ../data/scalar_potential_well_output
+#     --t-end 20.0 --output ../data/scalar_potential_well_output
 #   tidal plot ../data/scalar_potential_well_output --type heatmap --quiet
 
 set -euo pipefail
@@ -38,7 +38,6 @@ tidal simulate ../data/scalar_potential_well.json \
   --ic-center 15.0 \
   --ic-width 5.0 \
   --t-end 20.0 \
-  --scheme scipy \
   --output ../data/scalar_potential_well_output
 
 # Step 4: Visualize (plots saved into the simulation output directory)

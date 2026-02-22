@@ -13,7 +13,7 @@
 #   tidal inspect ../data/chern_simons_3d.json
 #   tidal simulate ../data/chern_simons_3d.json --param kappa=0.5 \
 #     --grid-shape 64 --bounds 0:50 --periodic --ic gaussian \
-#     --ic-component A_1 --ic-width 5.0 --t-end 10.0 --scheme scipy \
+#     --ic-component A_1 --ic-width 5.0 --t-end 10.0 \
 #     --output ../data/chern_simons_output
 #   tidal plot ../data/chern_simons_output --type amplitude --quiet
 
@@ -37,7 +37,6 @@ tidal simulate ../data/chern_simons_3d.json \
   --ic-component A_1 \
   --ic-width 5.0 \
   --t-end 10.0 \
-  --scheme scipy \
   --output ../data/chern_simons_output
 
 # Visualize results — initial and final snapshots for each field

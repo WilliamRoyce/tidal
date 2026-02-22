@@ -28,7 +28,7 @@
 #     --grid-shape 64 --bounds=-50:50,-50:50 --periodic \
 #     --ic gaussian --ic-component phi_0 --ic-center=-25.0,0.0 --ic-width 4.0 \
 #     --ic-amplitude 1.0 \
-#     --t-end 20.0 --scheme scipy --output ../data/coupled_scattering_output
+#     --t-end 20.0 --output ../data/coupled_scattering_output
 #
 #   # Step 4: Measure conversion probability and mixing length
 #   uv run tidal measure ../data/coupled_scattering_output \
@@ -71,7 +71,6 @@ tidal simulate ../data/coupled_scattering.json \
   --ic-width 4.0 \
   --ic-amplitude 1.0 \
   --t-end 20.0 \
-  --scheme scipy \
   --output ../data/coupled_scattering_output
 
 # Step 4: Measure conversion probability and characteristic mixing length
