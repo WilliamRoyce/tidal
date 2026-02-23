@@ -155,6 +155,18 @@ def _biharmonic_mult(
     return lap * lap  # type: ignore[return-value]
 
 
+def _cross_deriv(
+    kvecs: list[np.ndarray], dx: tuple[float, ...], a: int, b: int,
+) -> np.ndarray:
+    """Fourier multiplier for cross_derivative: d^2/(dx_a dx_b).
+
+    FD stencil uses central differences along each axis, giving
+    multiplier = (i*sin(k_a*h_a)/h_a) * (i*sin(k_b*h_b)/h_b)
+               = -sin(k_a*h_a)*sin(k_b*h_b)/(h_a*h_b).
+    """
+    return _grad_axis(kvecs[a], dx[a]) * _grad_axis(kvecs[b], dx[b])
+
+
 _MULTIPLIERS: dict[str, _MultiplierFn] = {
     "identity": lambda kv, _dx: np.ones_like(kv[0]),
     "laplacian": lambda kv, dx: sum(  # type: ignore[return-value,arg-type]
@@ -166,6 +178,9 @@ _MULTIPLIERS: dict[str, _MultiplierFn] = {
     "gradient_x": lambda kv, dx: _grad_axis(kv[0], dx[0]),
     "gradient_y": lambda kv, dx: _grad_axis(kv[1], dx[1]),
     "gradient_z": lambda kv, dx: _grad_axis(kv[2], dx[2]),
+    "cross_derivative_xy": lambda kv, dx: _cross_deriv(kv, dx, 0, 1),
+    "cross_derivative_xz": lambda kv, dx: _cross_deriv(kv, dx, 0, 2),
+    "cross_derivative_yz": lambda kv, dx: _cross_deriv(kv, dx, 1, 2),
     "biharmonic": _biharmonic_mult,
 }
 
@@ -405,7 +420,10 @@ def _fft_solve_coupled(  # noqa: PLR0914
         m_hat[zero_idx] = np.eye(n_c)
         rhs_hat[zero_idx] = 0.0
 
-    u_hat = np.linalg.solve(m_hat, rhs_hat)
+    # np.linalg.solve dispatches to the matrix path (m,m),(m,n)->(m,n)
+    # when ndim >= 2, but rhs_hat is (..., n_c) — a vector per wavenumber.
+    # Add a trailing dim so numpy sees (..., n_c, 1), then squeeze it out.
+    u_hat = np.linalg.solve(m_hat, rhs_hat[..., np.newaxis])[..., 0]
 
     results: dict[str, NDArray[np.float64]] = {}
     for i, name in enumerate(constraint_names):
@@ -607,7 +625,7 @@ def _solve_independent(  # noqa: PLR0913, PLR0917
         fields[terms.field_name] = solution
 
 
-def _solve_coupled(  # noqa: PLR0913, PLR0917
+def _solve_coupled(  # noqa: PLR0913, PLR0917, C901
     groups: list[_ConstraintTerms],
     grid: GridInfo,
     bc: str | tuple[str, ...] | None,
@@ -619,8 +637,17 @@ def _solve_coupled(  # noqa: PLR0913, PLR0917
     """Solve coupled constraints (e.g., coupled Proca A_0 ↔ B_0)."""
     n = grid.num_points
 
-    # Check if FFT path is available for ALL coupled constraints
+    # Check if FFT path is available for ALL coupled constraints.
+    # Must also verify that cross-constraint source operators have FFT
+    # multipliers, since _select_method only checks self-terms.
+    constraint_names = {g.field_name for g in groups}
     all_fft = all(_select_method(g, grid, bc) == "fft" for g in groups)
+    if all_fft:
+        for g in groups:
+            for _, op_name, field_name in g.source_terms:
+                if field_name in constraint_names and op_name not in _MULTIPLIERS:
+                    all_fft = False
+                    break
 
     if all_fft:
         solutions = _fft_solve_coupled(groups, grid, fields, bc, name_map)

@@ -30,7 +30,7 @@ tidal inspect ../data/sphere_kg.json
 tidal simulate ../data/sphere_kg.json \
   --param sphR=2.0 --param sphm2=0.0 \
   --grid-shape 128 \
-  --bounds -8:8 \
+  --bounds=-8:8 \
   --periodic \
   --ic gaussian \
   --ic-width 0.8 \

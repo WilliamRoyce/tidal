@@ -30,10 +30,15 @@ tidal inspect ../data/linearized_gravity.json
 # Gaussian-modulated cosine wave packet propagating along z
 # Quick test: coarser grid + shorter time. For production resolution,
 # use --grid-shape 4,4,64 --bounds 0:4,0:4,0:40 --t-end 15.0
+#
+# NOTE: This system has gauge-unfixed constraints (h_0..h_3, h_9,
+# h_transverse_*) with no self-terms — IDA's IDACalcIC may fail.
+# Phase B (gauge fixing) will resolve this; for now, use leapfrog:
 tidal simulate ../data/linearized_gravity.json \
   --grid-shape 4,4,32 \
   --bounds 0:4,0:4,0:20 \
   --periodic \
+  --scheme leapfrog \
   --ic formula \
   --ic-formula "np.exp(-(z - 10.0)**2 / 4.5) * np.cos(0.6283 * (z - 10.0))" \
   --ic-component h_4 \

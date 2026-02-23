@@ -42,8 +42,8 @@ tidal inspect ../data/vector_background.json
 tidal simulate ../data/vector_background.json \
   --param mPhi2=1.0 --param mA2=2.0 --param gBV=0.5 \
   --param B0=1.0 --param W=3.0 --param R=8.0 \
-  --ic gaussian --ic-width 3.0 --ic-center -15.0,0.0 \
-  --grid-shape 64 --bounds -30:30,-30:30 --t-end 20.0 \
+  --ic gaussian --ic-width 3.0 --ic-center=-15.0,0.0 \
+  --grid-shape 64 --bounds=-30:30,-30:30 --t-end 20.0 \
   --bc periodic,periodic \
   --output ../data/vector_background_output
 

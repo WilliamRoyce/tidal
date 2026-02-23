@@ -26,7 +26,7 @@ tidal inspect ../data/electrostatics_laplace.json
 # Simulate: wave equation with Gaussian initial condition
 tidal simulate ../data/electrostatics_laplace.json \
   --grid-shape 64 \
-  --bounds -5:5 \
+  --bounds=-5:5 \
   --t-end 5.0 \
   --ic gaussian \
   --no-plot
