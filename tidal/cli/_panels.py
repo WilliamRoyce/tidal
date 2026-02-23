@@ -483,3 +483,75 @@ def render_compare(
     ax.set_title("Initial vs Final")
     ax.legend(fontsize=7)
     ax.grid(visible=True, alpha=0.3)
+
+
+def render_hamiltonian(
+    ax: Axes,
+    data: SimulationData,
+    fields: list[str],
+) -> None:
+    """Hamiltonian energy density decomposition vs time.
+
+    Shows per-field energy, interaction energy, and total Hamiltonian
+    energy density over the simulation time.  Uses the canonical
+    Hamiltonian (Legendre transform) when available, otherwise falls
+    back to the virial formula.
+    """
+    from tidal.measurement._energy import compute_energy_timeseries
+
+    times, per_field, interaction, total = compute_energy_timeseries(data)
+
+    for i, name in enumerate(fields):
+        if name in per_field:
+            color = _LINE_COLORS[i % len(_LINE_COLORS)]
+            ax.plot(times, per_field[name], color=color, linewidth=1.5, label=name)
+
+    if len(fields) > 1:
+        ax.plot(
+            times, interaction, color="gray", linestyle="--",
+            linewidth=1.0, alpha=0.7, label="interaction",
+        )
+
+    ax.plot(times, total, "k-", linewidth=1.0, alpha=0.5, label="total")
+    ax.set_xlabel("Time")
+    ax.set_ylabel(r"$\langle \mathcal{H} \rangle$")
+    ax.set_title("Hamiltonian Energy")
+    ax.legend(fontsize=8)
+    ax.grid(visible=True, alpha=0.3)
+
+
+def render_conservation(
+    ax: Axes,
+    data: SimulationData,
+    *,
+    threshold: float = 1e-3,
+) -> None:
+    r"""Relative energy drift :math:`\Delta E / E_0` vs time.
+
+    Annotates the plot with PASS/FAIL based on whether the maximum
+    relative error stays below *threshold*.
+    """
+    from tidal.measurement._diagnostics import check_energy_conservation
+
+    diag = check_energy_conservation(data, threshold=threshold)
+
+    ax.plot(diag.times, diag.relative_error, "k-", linewidth=1.0)
+    ax.axhline(
+        threshold, color="r", linestyle="--", alpha=0.5,
+        label=f"threshold ({threshold:.0e})",
+    )
+    ax.axhline(-threshold, color="r", linestyle="--", alpha=0.5)
+
+    status = "PASS" if diag.is_conserved else "FAIL"
+    color = "green" if diag.is_conserved else "red"
+    ax.annotate(
+        f"{status}\nmax |dE/E| = {diag.max_relative_error:.2e}",
+        xy=(0.95, 0.95), xycoords="axes fraction",
+        ha="right", va="top", fontsize=10, fontweight="bold", color=color,
+        bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8},
+    )
+    ax.set_xlabel("Time")
+    ax.set_ylabel(r"$\Delta E / E_0$")
+    ax.set_title("Energy Conservation")
+    ax.legend(fontsize=8)
+    ax.grid(visible=True, alpha=0.3)

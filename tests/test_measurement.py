@@ -3749,3 +3749,145 @@ class TestSimulationDataFromResult:
         assert sd2.grid_spacing == sd1.grid_spacing
         assert sd2.grid_bounds == sd1.grid_bounds
         assert sd2.periodic == sd1.periodic
+
+
+# ============================================================
+# BC-type persistence and Neumann gradient tests
+# ============================================================
+
+
+class TestBCTypes:
+    """Test bc_types round-trip through save/load and energy computation."""
+
+    @staticmethod
+    def _make_1d_simulation_data(
+        *,
+        bc_types: tuple[str, ...] | None = None,
+    ) -> SimulationData:
+        """Build a minimal 1D SimulationData for testing."""
+        from tidal.symbolic.json_loader import EquationSystem
+
+        spec_dict = {
+            "metadata": {
+                "source": "test-bc",
+                "lagrangian_expr": "test",
+                "derived_from": "test",
+                "gauge": "none",
+                "linearized": False,
+                "parameters": {},
+            },
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {
+                        "expression": "d2_t(phi_0)",
+                        "order": {"time": 2, "space": 0},
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                },
+            ],
+            "coupling": {},
+        }
+        spec = EquationSystem.from_dict(spec_dict)
+        n_x = 64
+        n_t = 5
+        times = np.linspace(0, 1, n_t)
+        fields = {"phi_0": np.random.default_rng(42).standard_normal((n_t, n_x))}
+        momenta = {"phi_0": np.random.default_rng(43).standard_normal((n_t, n_x))}
+        return SimulationData(
+            times=times,
+            fields=fields,
+            momenta=momenta,
+            grid_spacing=(0.1,),
+            grid_bounds=((0.0, 6.4),),
+            periodic=(False,),
+            spec=spec,
+            parameters={},
+            bc_types=bc_types,
+        )
+
+    def test_bc_types_roundtrip(self, tmp_path: Path) -> None:
+        """bc_types survives save → load cycle."""
+        sd1 = self._make_1d_simulation_data(
+            bc_types=("neumann",),
+        )
+        out_dir = tmp_path / "bc_test"
+        sd1.save(out_dir)
+
+        sd2 = SimulationData.from_directory(out_dir, sd1.spec)
+        assert sd2.bc_types == ("neumann",)
+
+    def test_bc_types_none_for_legacy(self, tmp_path: Path) -> None:
+        """Legacy metadata.json without bc_types → bc_types is None."""
+        sd1 = self._make_1d_simulation_data(bc_types=None)
+        out_dir = tmp_path / "legacy_test"
+        sd1.save(out_dir)
+
+        sd2 = SimulationData.from_directory(out_dir, sd1.spec)
+        assert sd2.bc_types is None
+
+    def test_neumann_gradient_energy_symmetric(self) -> None:
+        """Neumann BC uses even-reflection (symmetric) ghost cells.
+
+        cos(pi*x/L) with Neumann BCs: the derivative at boundaries
+        is -sin(pi*x/L) * pi/L which is zero at x=0 and x=L, so
+        Neumann BCs are exact.  Compare gradient energy computed with
+        Neumann vs Dirichlet padding — they should differ because
+        Dirichlet (odd) padding reverses the sign.
+        """
+        from tidal.measurement._energy import _gradient_energy_density
+
+        n_x = 128
+        length = 2 * np.pi
+        dx = length / n_x
+        x = np.linspace(dx / 2, length - dx / 2, n_x)
+        field = np.cos(np.pi * x / length)
+
+        # With Neumann BC (correct for this mode)
+        grad_neumann = _gradient_energy_density(
+            field,
+            grid_spacing=(dx,),
+            periodic=(False,),
+            bc_types=("neumann",),
+        )
+        energy_neumann = 0.5 * float(grad_neumann.mean())
+
+        # Analytic: 0.5 * ⟨(pi/L)² sin²(pi*x/L)⟩ = 0.25 * (pi/L)²
+        k = np.pi / length
+        expected = 0.25 * k**2
+        np.testing.assert_allclose(energy_neumann, expected, rtol=0.01)
+
+    def test_neumann_vs_dirichlet_differ(self) -> None:
+        """Neumann and Dirichlet give different gradient energies for cos mode."""
+        from tidal.measurement._energy import _gradient_energy_density
+
+        n_x = 128
+        length = 2 * np.pi
+        dx = length / n_x
+        x = np.linspace(dx / 2, length - dx / 2, n_x)
+        field = np.cos(np.pi * x / length)
+
+        grad_neumann = _gradient_energy_density(
+            field, (dx,), (False,), bc_types=("neumann",),
+        )
+        grad_dirichlet = _gradient_energy_density(
+            field, (dx,), (False,), bc_types=("dirichlet",),
+        )
+        # They should not be equal — Dirichlet applies odd-reflection
+        # at the boundaries which distorts the cos mode
+        assert not np.allclose(grad_neumann, grad_dirichlet)

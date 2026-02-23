@@ -98,3 +98,5 @@ tidal plot ../data/coupled_scalars_output --type heatmap --field chi_0 --quiet
 tidal plot ../data/coupled_scalars_output --type amplitude --quiet
 tidal plot ../data/coupled_scalars_output --type energy --quiet
 tidal plot ../data/coupled_scalars_output --type compare --quiet
+tidal plot ../data/coupled_scalars_output --type hamiltonian --quiet
+tidal plot ../data/coupled_scalars_output --type conservation --quiet

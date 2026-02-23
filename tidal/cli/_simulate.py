@@ -824,6 +824,7 @@ def _setup_disk_writer_native(
         periodic=grid_info.periodic,
         parameters=params,
         spec_path=Path(args.json_path),
+        bc_types=grid_info.bc_types,
     )
 
     # Build slot index maps from layout

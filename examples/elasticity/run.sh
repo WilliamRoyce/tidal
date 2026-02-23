@@ -41,3 +41,5 @@ tidal simulate ../data/navier_cauchy_2d.json \
 tidal plot ../data/elasticity_output --type snapshot --field ux_0 --time-index -1 --quiet
 tidal plot ../data/elasticity_output --type snapshot --field uy_0 --time-index -1 --quiet
 tidal plot ../data/elasticity_output --type amplitude --quiet
+tidal plot ../data/elasticity_output --type hamiltonian --quiet
+tidal plot ../data/elasticity_output --type conservation --quiet

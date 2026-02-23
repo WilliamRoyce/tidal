@@ -747,3 +747,106 @@ class TestPanelHelpers:
 
         with pytest.raises(ValueError, match="out of range"):
             resolve_time_indices(_MockData(), [10])  # type: ignore[arg-type]
+
+
+# ============================================================
+# Hamiltonian and Conservation plot types
+# ============================================================
+
+
+class TestHamiltonian:
+    def test_hamiltonian_all_fields(
+        self,
+        coupled_scalars_dir: Path,
+        tmp_path: Path,
+    ) -> None:
+        output = tmp_path / "hamiltonian.png"
+        ret = main([
+            "plot", str(coupled_scalars_dir),
+            "--type", "hamiltonian",
+            "--output", str(output),
+            "--quiet",
+        ])
+        assert ret == 0
+        assert output.exists()
+        assert output.stat().st_size > 0
+
+    def test_hamiltonian_selected_fields(
+        self,
+        coupled_scalars_dir: Path,
+        tmp_path: Path,
+    ) -> None:
+        output = tmp_path / "hamiltonian_phi.png"
+        ret = main([
+            "plot", str(coupled_scalars_dir),
+            "--type", "hamiltonian",
+            "--fields", "phi_0",
+            "--output", str(output),
+            "--quiet",
+        ])
+        assert ret == 0
+        assert output.exists()
+
+    def test_hamiltonian_default_filename(
+        self,
+        coupled_scalars_dir: Path,
+    ) -> None:
+        """Without --output, saves to DATA_DIR/hamiltonian.png."""
+        ret = main([
+            "plot", str(coupled_scalars_dir),
+            "--type", "hamiltonian",
+            "--quiet",
+        ])
+        assert ret == 0
+        expected = coupled_scalars_dir / "hamiltonian.png"
+        assert expected.exists()
+        expected.unlink()
+
+
+class TestConservation:
+    def test_conservation_default_threshold(
+        self,
+        coupled_scalars_dir: Path,
+        tmp_path: Path,
+    ) -> None:
+        output = tmp_path / "conservation.png"
+        ret = main([
+            "plot", str(coupled_scalars_dir),
+            "--type", "conservation",
+            "--output", str(output),
+            "--quiet",
+        ])
+        assert ret == 0
+        assert output.exists()
+        assert output.stat().st_size > 0
+
+    def test_conservation_custom_threshold(
+        self,
+        coupled_scalars_dir: Path,
+        tmp_path: Path,
+    ) -> None:
+        output = tmp_path / "conservation_tight.png"
+        ret = main([
+            "plot", str(coupled_scalars_dir),
+            "--type", "conservation",
+            "--threshold", "1e-6",
+            "--output", str(output),
+            "--quiet",
+        ])
+        assert ret == 0
+        assert output.exists()
+
+    def test_conservation_default_filename(
+        self,
+        coupled_scalars_dir: Path,
+    ) -> None:
+        """Without --output, saves to DATA_DIR/conservation.png."""
+        ret = main([
+            "plot", str(coupled_scalars_dir),
+            "--type", "conservation",
+            "--quiet",
+        ])
+        assert ret == 0
+        expected = coupled_scalars_dir / "conservation.png"
+        assert expected.exists()
+        expected.unlink()

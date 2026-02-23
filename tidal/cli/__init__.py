@@ -406,7 +406,8 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     plot_parser.add_argument(
         "--type",
         required=True,
-        choices=["heatmap", "snapshot", "amplitude", "energy", "profile", "compare"],
+        choices=["heatmap", "snapshot", "amplitude", "energy", "profile", "compare",
+                 "hamiltonian", "conservation"],
         help="Plot type to generate",
     )
     # Field selection
@@ -449,6 +450,14 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=None,
         metavar="EXPR",
         help="Analytic formula vs time for amplitude plot (e.g. 'exp(-0.1*t)')",
+    )
+    # Conservation threshold
+    plot_parser.add_argument(
+        "--threshold",
+        type=float,
+        default=None,
+        metavar="T",
+        help="Conservation threshold for --type=conservation (default: 1e-3)",
     )
     # Output options
     plot_parser.add_argument(

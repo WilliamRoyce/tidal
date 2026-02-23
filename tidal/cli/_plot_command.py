@@ -17,7 +17,8 @@ if TYPE_CHECKING:
     from argparse import Namespace
 
 _VALID_TYPES = frozenset(
-    {"heatmap", "snapshot", "amplitude", "energy", "profile", "compare"}
+    {"heatmap", "snapshot", "amplitude", "energy", "profile", "compare",
+     "hamiltonian", "conservation"}
 )
 
 DPI_DEFAULT = 150
@@ -161,7 +162,9 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
         field_names,
         render_amplitude,
         render_compare,
+        render_conservation,
         render_energy,
+        render_hamiltonian,
         render_heatmap,
         render_profile,
         render_snapshot,
@@ -260,6 +263,14 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
         elif plot_type == "compare":
             fields = field_names(data, fields_list)
             render_compare(ax, data, fields, cross_section=cross_section)
+
+        elif plot_type == "hamiltonian":
+            fields = field_names(data, fields_list)
+            render_hamiltonian(ax, data, fields)
+
+        elif plot_type == "conservation":
+            threshold = args.threshold if args.threshold is not None else 1e-3
+            render_conservation(ax, data, threshold=threshold)
 
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)

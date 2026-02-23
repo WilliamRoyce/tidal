@@ -56,6 +56,10 @@ class SimulationData:
         The equation specification (fields, equations, matrices).
     parameters : dict[str, float]
         Resolved parameter values used in the simulation.
+    bc_types : tuple[str, ...] or None
+        Per-axis boundary condition type (e.g. ``("periodic", "neumann")``).
+        ``None`` for legacy data where BC info was not recorded.
+        Used by the energy module for BC-aware gradient computation.
     """
 
     times: NDArray[np.float64]
@@ -66,6 +70,7 @@ class SimulationData:
     periodic: tuple[bool, ...]
     spec: EquationSystem
     parameters: dict[str, float]
+    bc_types: tuple[str, ...] | None = None
 
     # ------------------------------------------------------------------
     # Derived helpers
@@ -170,6 +175,7 @@ class SimulationData:
             periodic=grid_info.periodic,
             spec=spec,
             parameters=parameters or {},
+            bc_types=grid_info.bc_types,
         )
 
     @classmethod
@@ -298,6 +304,12 @@ class SimulationData:
             str(k): float(v) for k, v in raw_params.items()
         }
 
+        # BC types (version 2+; None for legacy data)
+        bc_types: tuple[str, ...] | None = None
+        if "bc_types" in metadata:
+            raw_bc = cast("list[str]", metadata["bc_types"])
+            bc_types = tuple(str(v) for v in raw_bc)
+
         return cls(
             times=times,
             fields=fields,
@@ -307,6 +319,7 @@ class SimulationData:
             periodic=periodic,
             spec=spec,
             parameters=parameters,
+            bc_types=bc_types,
         )
 
     def save(self, path: Path | str) -> Path:
@@ -338,7 +351,7 @@ class SimulationData:
         first_field = next(iter(self.fields.values()))
         grid_shape = list(first_field.shape[1:])  # strip snapshot dim
 
-        metadata = {
+        metadata: dict[str, object] = {
             "version": 1,
             "n_snapshots": self.n_snapshots,
             "grid_shape": grid_shape,
@@ -350,6 +363,8 @@ class SimulationData:
             "momenta": list(self.momenta.keys()),
             "dtype": "float64",
         }
+        if self.bc_types is not None:
+            metadata["bc_types"] = list(self.bc_types)
         (p / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
         return p
 

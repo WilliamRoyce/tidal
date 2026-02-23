@@ -43,3 +43,5 @@ tidal plot ../data/proca_output --type heatmap --field A_1 --quiet
 tidal plot ../data/proca_output --type amplitude --quiet
 tidal plot ../data/proca_output --type energy --quiet
 tidal plot ../data/proca_output --type profile --field A_1 --quiet
+tidal plot ../data/proca_output --type hamiltonian --quiet
+tidal plot ../data/proca_output --type conservation --quiet

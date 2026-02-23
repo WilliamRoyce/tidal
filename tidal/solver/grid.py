@@ -136,6 +136,32 @@ class GridInfo:
         return tuple("periodic" if p else "neumann" for p in self.periodic)
 
     @property
+    def bc_types(self) -> tuple[str, ...]:
+        """Per-axis BC type as simple strings.
+
+        Always returns ``tuple[str, ...]`` — one of ``"periodic"``,
+        ``"neumann"``, ``"dirichlet"``, or ``"robin"`` per axis.
+
+        For structured ``AxisBCSpec`` entries, uses the low-side kind
+        as the representative type (matching the solver's ghost cell
+        convention).  This is the canonical form stored in metadata
+        and used by the energy module for BC-aware gradient computation.
+        """
+        if self.axis_bcs is not None:
+            result: list[str] = []
+            for abc in self.axis_bcs:
+                if abc.periodic:
+                    result.append("periodic")
+                elif abc.low is not None:
+                    result.append(abc.low.kind)
+                else:
+                    result.append("neumann")
+            return tuple(result)
+        if self.bc is not None:
+            return self.bc
+        return tuple("periodic" if p else "neumann" for p in self.periodic)
+
+    @property
     def dx(self) -> tuple[float, ...]:
         """Grid spacing per axis (cell-centred: dx = (hi - lo) / N)."""
         return tuple(

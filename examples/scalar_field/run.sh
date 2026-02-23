@@ -55,3 +55,5 @@ tidal plot ../data/scalar_field_output --type amplitude --quiet
 tidal plot ../data/scalar_field_output --type snapshot --time-index 0 --quiet
 tidal plot ../data/scalar_field_output --type snapshot --time-index -1 --quiet
 tidal plot ../data/scalar_field_output --type profile --quiet
+tidal plot ../data/scalar_field_output --type hamiltonian --quiet
+tidal plot ../data/scalar_field_output --type conservation --quiet
