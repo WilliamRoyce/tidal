@@ -4452,3 +4452,295 @@ class TestDtMetadata:
         diag = check_energy_conservation(sd, threshold=1e-3)
         # Without dt, threshold stays at 1e-3 — random data almost certainly fails
         assert diag.max_relative_error >= 0  # sanity
+
+
+# ============================================================
+# Position-dependent Hamiltonian energy tests
+# ============================================================
+
+
+class TestHamiltonianTermPositionDependent:
+    """Unit tests for HamiltonianTerm.position_dependent auto-detection."""
+
+    def test_constant_coeff_not_position_dependent(self) -> None:
+        term = HamiltonianTerm(
+            coefficient=0.5,
+            factor_a=HamiltonianFactor(field="phi_0", operator="gradient_x"),
+            factor_b=HamiltonianFactor(field="phi_0", operator="gradient_x"),
+            coefficient_symbolic="mPhi2/2",
+        )
+        assert not term.position_dependent
+
+    def test_gaussian_coeff_is_position_dependent(self) -> None:
+        term = HamiltonianTerm(
+            coefficient=1.0,
+            factor_a=HamiltonianFactor(field="chi_0", operator="identity"),
+            factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+            coefficient_symbolic="E^(-1/2*x[]^2/R^2 - y[]^2/(2*R^2))*g0",
+        )
+        assert term.position_dependent
+
+    def test_csc_coeff_is_position_dependent(self) -> None:
+        term = HamiltonianTerm(
+            coefficient=1.0,
+            factor_a=HamiltonianFactor(field="phi_0", operator="gradient_z"),
+            factor_b=HamiltonianFactor(field="phi_0", operator="gradient_z"),
+            coefficient_symbolic="Csc[y[]]^2/(2*x[]^2)",
+        )
+        assert term.position_dependent
+
+    def test_coordinate_dependent_field_takes_priority(self) -> None:
+        # Explicit coordinate_dependent field overrides auto-detection
+        term = HamiltonianTerm(
+            coefficient=1.0,
+            factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+            factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+            coefficient_symbolic="mPhi2/2",  # looks constant
+            coordinate_dependent=("x",),
+        )
+        assert term.position_dependent
+
+    def test_no_symbolic_not_position_dependent(self) -> None:
+        term = HamiltonianTerm(
+            coefficient=0.5,
+            factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+            factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+        )
+        assert not term.position_dependent
+
+    def test_from_dict_parses_coordinate_dependent(self) -> None:
+        data: dict[str, Any] = {
+            "coefficient": 1.0,
+            "factor_a": {"field": "phi_0", "operator": "gradient_z"},
+            "factor_b": {"field": "phi_0", "operator": "gradient_z"},
+            "coefficient_symbolic": "Csc[y[]]^2/(2*x[]^2)",
+            "coordinate_dependent": ["x", "y"],
+        }
+        term = HamiltonianTerm.from_dict(data)
+        assert term.coordinate_dependent == ("x", "y")
+        assert term.position_dependent
+
+    def test_from_dict_without_coordinate_dependent_uses_autodetect(self) -> None:
+        data: dict[str, Any] = {
+            "coefficient": 1.0,
+            "factor_a": {"field": "chi_0", "operator": "identity"},
+            "factor_b": {"field": "phi_0", "operator": "identity"},
+            "coefficient_symbolic": "E^(-1/2*x[]^2/R^2)*g0",
+        }
+        term = HamiltonianTerm.from_dict(data)
+        assert term.coordinate_dependent == ()  # not in JSON
+        assert term.position_dependent  # auto-detected
+
+
+class TestHamiltonianPositionDependentEnergy:
+    """Tests that _compute_hamiltonian_from_canonical evaluates position-dependent
+    Hamiltonian coefficients on the spatial grid rather than using the scalar fallback.
+    """
+
+    def _make_gaussian_coupling_spec(self, g0: float = 1.0, r_scale: float = 4.0) -> EquationSystem:
+        """Build a minimal 2-field spec with a Gaussian interaction Hamiltonian term."""
+        data: dict[str, Any] = {
+            "metadata": {"parameters": {"g0": g0, "R": r_scale}},
+            "spacetime": {
+                "dimension": 3,
+                "signature": [-1, 1, 1],
+                "coordinates": ["t", "x", "y"],
+            },
+            "fields": [
+                {"name": "phi_0", "index": 0, "is_dynamical": True},
+                {"name": "chi_0", "index": 1, "is_dynamical": True},
+            ],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {"coefficient": 1.0, "operator": "laplacian_y", "field": "phi_0"},
+                        ],
+                    },
+                },
+                {
+                    "field": "chi_0",
+                    "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "chi_0"},
+                            {"coefficient": 1.0, "operator": "laplacian_y", "field": "chi_0"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {
+                "hamiltonian_terms": [
+                    # Kinetic: pi²/2
+                    {
+                        "coefficient": 0.5,
+                        "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                        "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+                    },
+                    {
+                        "coefficient": 0.5,
+                        "factor_a": {"field": "chi_0", "operator": "time_derivative"},
+                        "factor_b": {"field": "chi_0", "operator": "time_derivative"},
+                    },
+                    # Position-dependent interaction: g0*exp(-(x²+y²)/2R²) * phi * chi
+                    {
+                        "coefficient": 1.0,
+                        "factor_a": {"field": "chi_0", "operator": "identity"},
+                        "factor_b": {"field": "phi_0", "operator": "identity"},
+                        "coefficient_symbolic": "E^(-1/2*x[]^2/R^2 - y[]^2/(2*R^2))*g0",
+                    },
+                ],
+                "field_rates": {
+                    "phi_0": [{"coefficient": 1.0, "operator": "identity", "field": "pi_0"}],
+                    "chi_0": [{"coefficient": 1.0, "operator": "identity", "field": "pi_1"}],
+                },
+                "kinetic_matrix": {
+                    "entries": [
+                        {"i": 0, "j": 0, "value": 1.0},
+                        {"i": 1, "j": 1, "value": 1.0},
+                    ],
+                    "dimension": 2,
+                },
+                "spatial_momenta": {},
+                "hamiltonian_symbolic": "test",
+            },
+        }
+        return EquationSystem.from_dict(data)
+
+    def _make_sim_data(
+        self, spec: EquationSystem, n: int = 16
+    ) -> SimulationData:
+        """Build a SimulationData with unit fields and zero momenta."""
+        dx = 1.0
+        # phi = 1 everywhere, chi = 1 everywhere
+        phi = np.ones((n, n))
+        chi = np.ones((n, n))
+        pi_phi = np.zeros((n, n))
+        pi_chi = np.zeros((n, n))
+        params = {
+            k: float(v)
+            for k, v in spec.metadata.get("parameters", {}).items()
+            if isinstance(v, (int, float))
+        }
+        return SimulationData(
+            times=np.array([0.0]),
+            fields={"phi_0": phi[np.newaxis], "chi_0": chi[np.newaxis]},
+            momenta={"phi_0": pi_phi[np.newaxis], "chi_0": pi_chi[np.newaxis]},
+            grid_spacing=(dx, dx),
+            grid_bounds=((0.0, n * dx), (0.0, n * dx)),
+            periodic=(True, True),
+            spec=spec,
+            parameters=params,
+        )
+
+    def test_gaussian_interaction_evaluated_on_grid(self) -> None:
+        """Energy with Gaussian coefficient ≠ energy with uniform coefficient=1."""
+        g0 = 1.0
+        r_scale = 4.0
+        spec = self._make_gaussian_coupling_spec(g0=g0, r_scale=r_scale)
+        data = self._make_sim_data(spec, n=16)
+
+        energy = _compute_hamiltonian_from_canonical(data, 0)
+
+        # With phi=chi=1 everywhere, the interaction contribution is:
+        #   <g0 * exp(-(x²+y²)/2R²)> = g0 * spatial_average(Gaussian)
+        # This must be < g0 (the Gaussian is <1 almost everywhere).
+        # If the bug were still present (coeff=1.0), the interaction term would be
+        # exactly g0 * 1.0 = g0 = 1.0, making the total wrong.
+        n = 16
+        dx = 1.0
+        # Cell-centered coordinates (matching _build_coord_arrays: lo + dx/2)
+        xs = np.arange(n) * dx + dx / 2  # 0.5, 1.5, ..., 15.5
+        ys = np.arange(n) * dx + dx / 2
+        xx, yy = np.meshgrid(xs, ys, indexing="ij")
+        expected_interaction = float(
+            (g0 * np.exp(-0.5 * xx**2 / r_scale**2 - yy**2 / (2 * r_scale**2))).mean()
+        )
+
+        # The kinetic terms are 0 (zero momenta), so the total energy = interaction term
+        assert abs(energy - expected_interaction) < 1e-10
+
+    def test_different_g0_gives_different_energy(self) -> None:
+        """Scaling g0 scales the interaction energy proportionally."""
+        spec1 = self._make_gaussian_coupling_spec(g0=1.0)
+        spec2 = self._make_gaussian_coupling_spec(g0=2.0)
+        data1 = self._make_sim_data(spec1, n=16)
+        data2 = self._make_sim_data(spec2, n=16)
+
+        e1 = _compute_hamiltonian_from_canonical(data1, 0)
+        e2 = _compute_hamiltonian_from_canonical(data2, 0)
+
+        # If coefficient were wrongly treated as 1.0, both would be equal
+        assert abs(e2 - 2.0 * e1) < 1e-10
+
+    def test_position_dependent_gradient_coeff(self) -> None:
+        """Hamiltonian with 1/x[]^2 on gradient_x term is evaluated on grid."""
+        data: dict[str, Any] = {
+            "metadata": {},
+            "spacetime": {
+                "dimension": 3,
+                "signature": [-1, 1, 1],
+                "coordinates": ["t", "x", "y"],
+            },
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                        ],
+                    },
+                }
+            ],
+            "canonical": {
+                "hamiltonian_terms": [
+                    # gradient_x^2 with position-dependent coeff 1/x[]^2
+                    {
+                        "coefficient": 0.5,
+                        "factor_a": {"field": "phi_0", "operator": "gradient_x"},
+                        "factor_b": {"field": "phi_0", "operator": "gradient_x"},
+                        "coefficient_symbolic": "1/(2*x[]^2)",
+                    },
+                ],
+                "field_rates": {
+                    "phi_0": [{"coefficient": 1.0, "operator": "identity", "field": "pi_0"}]
+                },
+                "kinetic_matrix": {
+                    "entries": [{"i": 0, "j": 0, "value": 1.0}],
+                    "dimension": 1,
+                },
+                "spatial_momenta": {},
+                "hamiltonian_symbolic": "test",
+            },
+        }
+        spec = EquationSystem.from_dict(data)
+        n = 8
+        dx = 1.0
+        # phi = x (linear ramp), so grad_x(phi) = 1 everywhere
+        xs = np.arange(n, dtype=float) * dx + 0.5  # cell-centred, avoid x=0
+        phi = np.tile(xs[:, np.newaxis], (1, n))
+        pi = np.zeros((n, n))
+        sd = SimulationData(
+            times=np.array([0.0]),
+            fields={"phi_0": phi[np.newaxis]},
+            momenta={"phi_0": pi[np.newaxis]},
+            grid_spacing=(dx, dx),
+            grid_bounds=((0.5, n * dx + 0.5), (0.0, n * dx)),
+            periodic=(False, True),
+            spec=spec,
+            parameters={},
+        )
+        energy = _compute_hamiltonian_from_canonical(sd, 0)
+        # With grad_x(phi)=1 and coeff=1/(2*x²), via IBP:
+        # energy = -<1/(2*x²) * phi * laplacian_x(phi)>
+        # laplacian_x of linear ramp = 0 everywhere (interior), so energy ≈ 0
+        # This just verifies it runs without error and returns a finite value
+        assert np.isfinite(energy)

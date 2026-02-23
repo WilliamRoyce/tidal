@@ -55,7 +55,7 @@ def discover_parameters(spec: object) -> dict[str, list[str]]:
         "ArcCot",
         "ArcSec",
         "ArcCsc",
-        # Hyperbolic (Mathematica)
+        # Hyperbolic (Mathematica)  # noqa: ERA001
         "Sinh",
         "Cosh",
         "Tanh",

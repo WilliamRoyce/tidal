@@ -27,6 +27,11 @@ AXIS_LETTERS: tuple[str, ...] = ("x", "y", "z", "w", "v", "u")
 #: Character class matching all known axis letters (for regex construction).
 _AXIS_RE_CLASS = "[" + "".join(AXIS_LETTERS) + "]"
 
+#: Pattern matching a coordinate call like ``x[]``, ``y[]`` in symbolic expressions.
+#: Used to auto-detect position-dependent coefficients in hamiltonian_terms that
+#: were exported before the ``coordinate_dependent`` field was added.
+_COORD_CALL_RE = re.compile(r"\b[xyzwvut]\s*\[\s*\]")
+
 logger = logging.getLogger(__name__)
 
 #: Set of static operators supported by the pipeline.
@@ -473,12 +478,33 @@ class HamiltonianTerm:
         Second field factor (may equal factor_a for squared terms).
     coefficient_symbolic : str | None
         Symbolic coefficient expression (for parameter override).
+    coordinate_dependent : tuple[str, ...]
+        Spatial axes the coefficient depends on (e.g. ``("x", "y")``).
+        When non-empty, the coefficient must be evaluated on the grid.
+        Older JSON exports omit this field; auto-detection via
+        ``position_dependent`` covers those cases.
     """
 
     coefficient: float
     factor_a: HamiltonianFactor
     factor_b: HamiltonianFactor
     coefficient_symbolic: str | None = None
+    coordinate_dependent: tuple[str, ...] = ()
+
+    @property
+    def position_dependent(self) -> bool:
+        """True if the coefficient is a function of spatial coordinates.
+
+        Returns ``True`` when ``coordinate_dependent`` is non-empty (explicit
+        declaration), or when ``coefficient_symbolic`` contains a coordinate
+        call pattern such as ``x[]`` or ``y[]`` (auto-detection for JSON
+        exports that predate the ``coordinate_dependent`` field).
+        """
+        if self.coordinate_dependent:
+            return True
+        if self.coefficient_symbolic is not None:
+            return bool(_COORD_CALL_RE.search(self.coefficient_symbolic))
+        return False
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> HamiltonianTerm:
@@ -488,6 +514,7 @@ class HamiltonianTerm:
             factor_a=HamiltonianFactor.from_dict(data["factor_a"]),
             factor_b=HamiltonianFactor.from_dict(data["factor_b"]),
             coefficient_symbolic=data.get("coefficient_symbolic"),
+            coordinate_dependent=tuple(data.get("coordinate_dependent", [])),
         )
 
 

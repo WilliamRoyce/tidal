@@ -113,7 +113,7 @@ def _plot_conservation(ax: Axes, results: dict[str, Any]) -> None:
 def _plot_spectrum(ax: Axes, results: dict[str, Any]) -> None:
     """[1,0] Spatial power spectrum (initial + final)."""
     if "spectrum" not in results or "error" in results["spectrum"]:
-        ax.text(0.5, 0.5, "No spectrum data", transform=ax.transAxes, ha="center")
+        ax.set_visible(False)
         return
 
     for name, snap in results["spectrum"].items():
@@ -141,26 +141,13 @@ def _plot_spectral_conversion(ax: Axes, results: dict[str, Any]) -> None:
         "spectral_conversion" not in results
         or "error" in results["spectral_conversion"]
     ):
-        ax.text(
-            0.5,
-            0.5,
-            "No spectral conversion data",
-            transform=ax.transAxes,
-            ha="center",
-        )
+        ax.set_visible(False)
         return
 
     sc = results["spectral_conversion"]
     result = sc.get("_result_obj")
     if result is None:
-        ax.text(
-            0.5,
-            0.5,
-            "Spectral conversion data\n(detail not available)",
-            transform=ax.transAxes,
-            ha="center",
-            va="center",
-        )
+        ax.set_visible(False)
         return
 
     # Create meshgrid for pcolormesh
@@ -203,26 +190,13 @@ def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:  # noqa: C901
     import numpy as np
 
     if "dispersion" not in results or "error" in results["dispersion"]:
-        ax.text(
-            0.5,
-            0.5,
-            "No dispersion data",
-            transform=ax.transAxes,
-            ha="center",
-        )
+        ax.set_visible(False)
         return
 
     disp = results["dispersion"]
     result = disp.get("_result_obj")
     if result is None:
-        ax.text(
-            0.5,
-            0.5,
-            "Dispersion data\n(detail not available)",
-            transform=ax.transAxes,
-            ha="center",
-            va="center",
-        )
+        ax.set_visible(False)
         return
 
     wn = result.wavenumbers

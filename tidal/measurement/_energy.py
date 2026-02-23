@@ -1050,25 +1050,45 @@ def _compute_hamiltonian_from_canonical(
     )
 
     params = _merge_parameters(data)
+    coord_arrays: dict[str, NDArray[np.float64]] | None = None  # lazy-initialised
 
     total = 0.0
     for term in canonical.hamiltonian_terms:
-        coeff = float(term.coefficient)
-        # Resolve symbolic coefficient if present
-        if term.coefficient_symbolic is not None and params:
-            resolved = _resolve_symbolic_coeff(
-                term.coefficient_symbolic,
+        # --- Coefficient resolution ---
+        # Position-dependent coefficients (e.g. Gaussian coupling, Csc[y]/x² in
+        # spherical coordinates) must be evaluated on the spatial grid.  The scalar
+        # path via _resolve_symbolic_coeff() cannot handle expressions that contain
+        # coordinate calls like x[] or y[].
+        if term.position_dependent:
+            if coord_arrays is None:
+                coord_arrays = _build_coord_arrays(data)
+            from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+            coeff: float | NDArray[np.float64] = evaluate_coefficient(
+                term.coefficient_symbolic,  # non-None when position_dependent is True
                 params,
+                data.spec.effective_coordinates,
+                coord_arrays=coord_arrays,
+                t=0.0,
             )
-            if resolved is not None:
-                coeff = float(resolved)
+        else:
+            coeff = float(term.coefficient)
+            if term.coefficient_symbolic is not None and params:
+                resolved = _resolve_symbolic_coeff(
+                    term.coefficient_symbolic,
+                    params,
+                )
+                if resolved is not None:
+                    coeff = float(resolved)
 
         op_a = term.factor_a.operator
         op_b = term.factor_b.operator
 
         # Integration-by-parts path: both factors are spatial gradients.
-        # ⟨∂_a(u) · ∂_b(v)⟩ = -⟨u, ∂²_ab(v)⟩  (exact for periodic BCs)
-        # Uses the SAME 2nd-order stencils as the solver → exact conservation.
+        # ⟨c · ∂_a(u) · ∂_b(v)⟩ = -⟨c · u · ∂²_ab(v)⟩
+        # This is exact when c does not vary along the gradient axis (holds for
+        # all current examples: spherical Csc[y]/x² with ∂_z, conformal factors,
+        # etc.).  Uses the SAME 2nd-order stencils as the solver → exact conservation.
         if op_a in _GRADIENT_AXES and op_b in _GRADIENT_AXES:
             field_a = _resolve_term_target(data, term.factor_a.field, t_idx)
             field_b = _resolve_term_target(data, term.factor_b.field, t_idx)
@@ -1082,7 +1102,7 @@ def _compute_hamiltonian_from_canonical(
                 data.periodic,
                 bc_types=data.bc_types,
             )
-            total += -coeff * float((field_a * operated).mean())
+            total += float((-coeff * field_a * operated).mean())
             continue
 
         # All other terms: identity, time_derivative, mixed
@@ -1101,7 +1121,7 @@ def _compute_hamiltonian_from_canonical(
         if fa is None or fb is None:
             continue
 
-        total += coeff * float((fa * fb).mean())
+        total += float((coeff * fa * fb).mean())
 
     return total
 

@@ -1072,3 +1072,77 @@ class TestConservation:
         expected = coupled_scalars_dir / "conservation.png"
         assert expected.exists()
         expected.unlink()
+
+
+# ============================================================
+# Panel visibility tests (position-dependent error sentinel)
+# ============================================================
+
+
+class TestMeasurePlotEmptyPanels:
+    """Verify that panels with error sentinels are hidden rather than showing
+    empty 'No X data' text.
+    """
+
+    def _make_ax(self) -> Any:  # noqa: ANN401
+        import matplotlib.pyplot as plt
+
+        _, ax = plt.subplots()
+        return ax
+
+    def test_spectrum_panel_hidden_on_error(self) -> None:
+        from tidal.cli._measure_plot import _plot_spectrum
+
+        ax = self._make_ax()
+        results: dict[str, Any] = {
+            "spectrum": {"error": "position-dependent term detected"}
+        }
+        _plot_spectrum(ax, results)
+        assert not ax.get_visible()
+
+    def test_spectrum_panel_hidden_when_missing(self) -> None:
+        from tidal.cli._measure_plot import _plot_spectrum
+
+        ax = self._make_ax()
+        _plot_spectrum(ax, {})
+        assert not ax.get_visible()
+
+    def test_spectral_conversion_panel_hidden_on_error(self) -> None:
+        from tidal.cli._measure_plot import _plot_spectral_conversion
+
+        ax = self._make_ax()
+        results: dict[str, Any] = {
+            "spectral_conversion": {"error": "requires spatially uniform system"}
+        }
+        _plot_spectral_conversion(ax, results)
+        assert not ax.get_visible()
+
+    def test_dispersion_panel_hidden_on_error(self) -> None:
+        from tidal.cli._measure_plot import _plot_dispersion
+
+        ax = self._make_ax()
+        results: dict[str, Any] = {
+            "dispersion": {"error": "requires spatially uniform system"}
+        }
+        _plot_dispersion(ax, results)
+        assert not ax.get_visible()
+
+    def test_spectrum_panel_visible_with_valid_data(self) -> None:
+        """When data is present and correct, the panel should be visible."""
+        import numpy as np
+
+        from tidal.cli._measure_plot import _plot_spectrum
+
+        ax = self._make_ax()
+        wn = np.linspace(0.0, 1.0, 5)
+        power = np.ones(5)
+        results: dict[str, Any] = {
+            "spectrum": {
+                "phi_0": {
+                    "initial": {"wavenumbers": wn, "power": power},
+                    "final": {"wavenumbers": wn, "power": power},
+                }
+            }
+        }
+        _plot_spectrum(ax, results)
+        assert ax.get_visible()

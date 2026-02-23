@@ -1275,14 +1275,19 @@ ParseSingleHamiltonianTerm[term_, fieldHeads_List, allFieldNames_List] := Module
   factorB = ClassifyHamiltonianFactor[fieldFactors[[2]], allFieldNames];
 
   (* Build result *)
-  Module[{result},
+  Module[{result, coordDeps},
     result = <|
       "coefficient" -> numCoeff,
       "factor_a" -> factorA,
       "factor_b" -> factorB
     |>;
     If[symbolicCoeff =!= Null,
-      result["coefficient_symbolic"] = symbolicCoeff
+      result["coefficient_symbolic"] = symbolicCoeff;
+      (* Emit coordinate_dependent when symbolic coefficient contains spatial coords *)
+      coordDeps = Select[IsCoordinateDependentCoefficient[coefficient], # =!= "t" &];
+      If[Length[coordDeps] > 0,
+        result["coordinate_dependent"] = coordDeps
+      ]
     ];
     result
   ]
