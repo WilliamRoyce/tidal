@@ -1523,7 +1523,9 @@ def _type_b_tt_gauge(
     # --- 1. Temporal: zero h_{0,mu} for mu = 0 .. dim-1 ---
     for mu in range(dim):
         idx = _sym_flat_index(0, mu, dim)
-        lines.extend(_type_b_zero_component(f"{comp_pfx}{idx}", field_name, "TT-temporal"))
+        lines.extend(
+            _type_b_zero_component(f"{comp_pfx}{idx}", field_name, "TT-temporal")
+        )
 
     # --- 2. Transverse: d^i h_{i,j} = 0 per spatial j ---
     lines.extend(_tt_transverse_constraints(dim, comp_pfx, field_name, coord_args))

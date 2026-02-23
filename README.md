@@ -40,7 +40,7 @@ For more, visit the [Documentation](https://williamroyce.github.io/torsion-gerts
 ## Current Status (usable today)
 
 - **Lagrangian-to-PDE pipeline (`tidal.symbolic`, `tidal.wolfram`)**: complete symbolic-to-numerical pipeline for deriving field equations from Lagrangian densities. Uses Mathematica/xAct for symbolic derivation (Euler-Lagrange equations, linearization via xPert, component decomposition) → JSON export → native Python solvers for PDE construction and time integration. **Zero hardcoded physics** in the numerical layer — all equations derived symbolically. Includes **22 working examples** spanning 1+1D through 3+1D: scalars, vectors, tensors (rank 3+), coupled multi-field systems, curvilinear coordinates, curved spacetimes, and background-field scattering. See [examples/README.md](examples/README.md) for complete documentation.
-- **Solver architecture (`tidal.solver`)**: four time-integration backends — **IDA** (SUNDIALS DAE solver for systems with algebraic constraints; Hindmarsh et al. 2005), **CVODE** (SUNDIALS BDF adaptive ODE with tolerance control), **leapfrog** (Störmer-Verlet symplectic integrator; Hairer et al. 2006), and **scipy** (`solve_ivp` with DOP853/Radau/BDF). Automatic solver selection based on equation structure: systems with constraints route to IDA, pure wave equations to CVODE or leapfrog. Pure numpy spatial operators (`tidal/solver/operators.py`) with 2nd-order finite-difference stencils. Three-tier constraint pre-solve (FFT → sparse matrix → automatic selection) with gauge regularisation for singular Poisson problems.
+- **Solver architecture (`tidal.solver`)**: four time-integration backends — **IDA** (SUNDIALS DAE solver for systems with algebraic constraints; Hindmarsh et al. 2005), **CVODE** (SUNDIALS BDF adaptive ODE with tolerance control), **leapfrog** (Störmer-Verlet symplectic integrator; Hairer et al. 2006), and **scipy** (`solve_ivp` with DOP853/Radau/BDF). Automatic solver selection based on equation structure: systems with constraints route to IDA, pure wave equations to CVODE or leapfrog. Pure numpy spatial operators (`tidal/solver/operators.py`) with 2nd-order finite-difference stencils. Three-tier constraint pre-solve (FFT → sparse matrix → automatic selection) with gauge regularization for singular Poisson problems.
 - **CLI (`tidal` command)**: unified command-line interface with 7 subcommands — `tidal derive` (Lagrangian → JSON via TOML config), `tidal simulate` (JSON → PDE simulation with plotting), `tidal measure` (post-hoc measurement extraction from snapshot directories: energy, conversion, mixing length, spectra), `tidal inspect` (equation system info), `tidal list` (discover available specs), `tidal validate` (JSON spec validation), `tidal plot` (standalone plotting from simulation output). Supports `theory.toml` configs with `[[derived_fields]]`, `[[background_fields]]`, and optional `[[gauge]]` sections. Zero new dependencies (stdlib argparse + tomllib).
 - **Measurement module (`tidal.measurement`)**: post-hoc analysis of simulation output — Hamiltonian energy density, field conversion probability P(t), spectral conversion P(k,t), dispersion relation omega(k), mixing length, and diagnostics. Disk-backed snapshot storage for long simulations via `SnapshotWriter`.
 - **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), Wolfram Engine 14.3 with xAct tensor framework, optional ffmpeg; Sphinx docs skeleton; type-checked codebase with pytest test suite.
@@ -179,30 +179,30 @@ tidal validate examples/data/klein_gordon_1d.json      # validate JSON spec stru
 
 **Pipeline Examples:**
 
-| Example                   | Dim  | Key Features                                                             |
-| ------------------------- | ---- | ------------------------------------------------------------------------ |
-| `scalar_field/`           | 1+1D | Klein-Gordon, mass term, dispersion                                      |
-| `electromagnetic/`        | 1+1D | Maxwell, Lorenz gauge, massless waves                                    |
-| `proca/`                  | 1+1D | Massive vector field (Proca mass)                                        |
-| `coupled_scalars/`        | 1+1D | Cross-field coupling, mass matrix, energy transfer                       |
-| `chern_simons/`           | 2+1D | Epsilon tensor, topological mass, A_0 constraint                         |
-| `elasticity/`             | 2+1D | Anisotropic laplacian, cross_derivative_xy                               |
-| `curved_spacetime/`       | 2+1D | De Sitter, Hubble friction, time-dependent coefficients                  |
-| `sphere_kg/`              | 2+1D | KG on S², position-dependent coefficients                                |
-| `polar_kg/`               | 2+1D | Polar coordinates, Christoffel auto-detection                            |
-| `electrostatics/`         | 2+1D | Poisson equation, constraint solver                                      |
-| `scalar_vector_coupling/` | 2+1D | Mixed-rank cross-field (scalar+vector), 4 constants, CS+coupling         |
-| `scalar_field_3d/`        | 3+1D | Full 4D KG, 32^3 grid                                                    |
-| `spherical_kg/`           | 3+1D | Spherical coordinates, trig coefficients                                 |
-| `cylindrical_kg/`         | 3+1D | Cylindrical coordinates, mixed curved/flat                               |
-| `gravitational_waves/`    | 3+1D | xPert linearization, TT gauge, constraints                               |
-| `massive_3form/`          | 3+1D | Rank-3 antisymmetric tensor, symmetry reduction                          |
-| `massive_gravity/`        | 2+1D | Linearized massive gravity, Fierz-Pauli mass, xPert, coupled constraints |
-| `coupled_proca/`          | 2+1D | Two massive vectors, coupled Helmholtz constraints, periodic BCs         |
-| `coupled_scattering/`     | 2+1D | Position-dependent Gaussian coupling, background fields, wave scattering |
-| `scalar_potential_well/`  | 1+1D | Background potential well, `[[background_fields]]`, bound states         |
-| `proca_background/`      | 2+1D | Lorentzian scalar background, two Proca vectors, constraint+BG integration |
-| `vector_background/`     | 2+1D | Tanh domain wall vector background, ComponentValue mechanism, sign-changing coupling |
+| Example                   | Dim  | Key Features                                                                         |
+| ------------------------- | ---- | ------------------------------------------------------------------------------------ |
+| `scalar_field/`           | 1+1D | Klein-Gordon, mass term, dispersion                                                  |
+| `electromagnetic/`        | 1+1D | Maxwell, Lorenz gauge, massless waves                                                |
+| `proca/`                  | 1+1D | Massive vector field (Proca mass)                                                    |
+| `coupled_scalars/`        | 1+1D | Cross-field coupling, mass matrix, energy transfer                                   |
+| `chern_simons/`           | 2+1D | Epsilon tensor, topological mass, A_0 constraint                                     |
+| `elasticity/`             | 2+1D | Anisotropic laplacian, cross_derivative_xy                                           |
+| `curved_spacetime/`       | 2+1D | De Sitter, Hubble friction, time-dependent coefficients                              |
+| `sphere_kg/`              | 2+1D | KG on S², position-dependent coefficients                                            |
+| `polar_kg/`               | 2+1D | Polar coordinates, Christoffel auto-detection                                        |
+| `electrostatics/`         | 2+1D | Poisson equation, constraint solver                                                  |
+| `scalar_vector_coupling/` | 2+1D | Mixed-rank cross-field (scalar+vector), 4 constants, CS+coupling                     |
+| `scalar_field_3d/`        | 3+1D | Full 4D KG, 32^3 grid                                                                |
+| `spherical_kg/`           | 3+1D | Spherical coordinates, trig coefficients                                             |
+| `cylindrical_kg/`         | 3+1D | Cylindrical coordinates, mixed curved/flat                                           |
+| `gravitational_waves/`    | 3+1D | xPert linearization, TT gauge, constraints                                           |
+| `massive_3form/`          | 3+1D | Rank-3 antisymmetric tensor, symmetry reduction                                      |
+| `massive_gravity/`        | 2+1D | Linearized massive gravity, Fierz-Pauli mass, xPert, coupled constraints             |
+| `coupled_proca/`          | 2+1D | Two massive vectors, coupled Helmholtz constraints, periodic BCs                     |
+| `coupled_scattering/`     | 2+1D | Position-dependent Gaussian coupling, background fields, wave scattering             |
+| `scalar_potential_well/`  | 1+1D | Background potential well, `[[background_fields]]`, bound states                     |
+| `proca_background/`       | 2+1D | Lorentzian scalar background, two Proca vectors, constraint+BG integration           |
+| `vector_background/`      | 2+1D | Tanh domain wall vector background, ComponentValue mechanism, sign-changing coupling |
 
 See [examples/README.md](examples/README.md) for complete documentation and verification that the Python layer contains zero hardcoded physics.
 

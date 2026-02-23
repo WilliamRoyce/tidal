@@ -15,9 +15,9 @@ gravity). Also implemented Lagrangian-first linearization via xPert's `Perturbat
   conjugate momenta π_i = ∂L/∂(∂_t q_i), constructs Hamiltonian H = Σ π_i·vel_i − L,
   emits first-order evolution equations dq_i/dt and dπ_i/dt. Handles arbitrary multi-field
   systems with cross-coupled kinetic terms.
-- **Symbolic K^{-1} inversion**: For non-diagonal kinetic matrices K_{ij} = D[π_i, vel_j],
+- **Symbolic K^{-1} inversion**: For non-diagonal kinetic matrices K*{ij} = D[π_i, vel_j],
   computes `Inverse[K]` symbolically in Wolfram and emits field rates as
-  `dq_i/dt = Σ_j K^{-1}_{ij} (π_j − S_j)`. Works for Proca (2×2), massive gravity (4×4),
+  `dq_i/dt = Σ_j K^{-1}*{ij} (π_j − S_j)`. Works for Proca (2×2), massive gravity (4×4),
   gravitational waves (7×7), elasticity (2×2 symbolic). Ref: Goldstein, Poole & Safko (2002),
   Chapter 8.
 - **EOM-based fast path**: For high-rank tensors (raw component count > 30, e.g., rank-3
