@@ -67,7 +67,11 @@ class TestLeapfrogBasic:
 
         y0 = np.zeros(layout.total_size)
         result = solve_leapfrog(
-            spec, grid, y0, t_span=(0.0, 1.0), dt=0.01,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            dt=0.01,
         )
         assert result["success"]
         np.testing.assert_allclose(result["y"][-1], 0, atol=1e-14)
@@ -86,7 +90,9 @@ class TestLeapfrogBasic:
         y0[0:n] = np.sin(x)
 
         result = solve_leapfrog(
-            spec, grid, y0,
+            spec,
+            grid,
+            y0,
             t_span=(0.0, 1.0),
             dt=0.01,
             snapshot_interval=1.0,
@@ -123,13 +129,15 @@ class TestLeapfrogEnergy:
 
         def _energy_callback(_t: float, y: np.ndarray) -> None:
             phi = y[0:n]
-            pi = y[n:2 * n]
+            pi = y[n : 2 * n]
             lap_phi = laplacian(phi, grid)
             energy = 0.5 * dx * float(np.sum(pi**2 - phi * lap_phi))
             energies.append(energy)
 
         result = solve_leapfrog(
-            spec, grid, y0,
+            spec,
+            grid,
+            y0,
             t_span=(0.0, 10.0),
             dt=0.01,
             snapshot_interval=0.1,
@@ -160,7 +168,11 @@ class TestLeapfrogValidation:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "A_0",
+                            },
                         ],
                     },
                 },
@@ -170,7 +182,11 @@ class TestLeapfrogValidation:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "A_1"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "A_1",
+                            },
                         ],
                     },
                 },
@@ -197,7 +213,11 @@ class TestLeapfrogValidation:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "T_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "T_0",
+                            },
                         ],
                     },
                 },
@@ -224,7 +244,9 @@ class TestLeapfrogValidation:
             callback_times.append(t)
 
         solve_leapfrog(
-            spec, grid, y0,
+            spec,
+            grid,
+            y0,
             t_span=(0.0, 1.0),
             dt=0.1,
             snapshot_interval=0.5,
@@ -249,7 +271,9 @@ class TestLeapfrogSnapshotCount:
         snapshot_interval = 0.1
 
         result = solve_leapfrog(
-            spec, grid, y0,
+            spec,
+            grid,
+            y0,
             t_span=(0.0, t_end),
             dt=dt,
             snapshot_interval=snapshot_interval,
@@ -274,7 +298,9 @@ class TestLeapfrogSnapshotCount:
         snapshot_interval = 0.1
 
         result = solve_leapfrog(
-            spec, grid, y0,
+            spec,
+            grid,
+            y0,
             t_span=(0.0, t_end),
             dt=dt,
             snapshot_interval=snapshot_interval,

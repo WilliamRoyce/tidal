@@ -1290,7 +1290,10 @@ class TestParameterResolvedMatrices:
             "equations": [
                 {
                     "field": "phi",
-                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(phi)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
@@ -1300,7 +1303,11 @@ class TestParameterResolvedMatrices:
                                 "field": "phi",
                                 "coefficient_symbolic": "-m2",
                             },
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "phi"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi",
+                            },
                         ],
                     },
                 }
@@ -1320,7 +1327,10 @@ class TestParameterResolvedMatrices:
             "equations": [
                 {
                     "field": "phi",
-                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(phi)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
@@ -1341,7 +1351,10 @@ class TestParameterResolvedMatrices:
                 },
                 {
                     "field": "chi",
-                    "lhs": {"expression": "d2_t(chi)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(chi)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
@@ -1378,7 +1391,10 @@ class TestParameterResolvedMatrices:
             "equations": [
                 {
                     "field": "phi",
-                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(phi)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
@@ -1468,7 +1484,11 @@ class TestMetadataParameterParsing:
     def _make_spec_dict(self, params: dict[str, object]) -> dict[str, object]:
         return {
             "metadata": {"parameters": params},
-            "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
             "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
             "equations": [
                 {
@@ -1522,9 +1542,11 @@ class TestCanonicalStructure:
                 },
             ]
         if field_rates is None:
-            field_rates = {"phi_0": [
-                {"coefficient": 1.0, "operator": "identity", "field": "pi_0"},
-            ]}
+            field_rates = {
+                "phi_0": [
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_0"},
+                ]
+            }
         return {
             "hamiltonian_terms": h_terms,
             "field_rates": field_rates,
@@ -1605,7 +1627,11 @@ class TestCanonicalStructure:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 }
@@ -1618,9 +1644,11 @@ class TestCanonicalStructure:
                         "factor_b": {"field": "phi_0", "operator": "time_derivative"},
                     },
                 ],
-                "field_rates": {"phi_0": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_0"},
-                ]},
+                "field_rates": {
+                    "phi_0": [
+                        {"coefficient": 1.0, "operator": "identity", "field": "pi_0"},
+                    ]
+                },
                 "hamiltonian_symbolic": "test",
             },
         }
@@ -1635,19 +1663,17 @@ class TestCanonicalStructure:
         Uses coupled_proca which has A_0/B_0 constraints and A_1/A_2/B_1/B_2
         dynamical fields.  Only dynamical fields should appear in field_rates.
         """
-        path = Path(__file__).parent.parent / "examples" / "data" / "coupled_proca_3d.json"
+        path = (
+            Path(__file__).parent.parent / "examples" / "data" / "coupled_proca_3d.json"
+        )
         if not path.exists():
             pytest.skip("coupled_proca_3d.json not found")
-        spec = EquationSystem.from_dict(
-            __import__("json").loads(path.read_text())
-        )
+        spec = EquationSystem.from_dict(__import__("json").loads(path.read_text()))
         assert spec.canonical is not None
 
         # Identify constraint fields
         constraint_names = {
-            eq.field_name
-            for eq in spec.equations
-            if eq.time_derivative_order == 0
+            eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
         }
         assert len(constraint_names) > 0, "Expected constraint fields in Proca"
 
@@ -1659,9 +1685,7 @@ class TestCanonicalStructure:
 
         # All dynamical fields should have field_rates
         dynamical_names = {
-            eq.field_name
-            for eq in spec.equations
-            if eq.time_derivative_order >= 2
+            eq.field_name for eq in spec.equations if eq.time_derivative_order >= 2
         }
         for dname in dynamical_names:
             assert dname in spec.canonical.field_rates, (
@@ -1730,7 +1754,11 @@ class TestCanonicalStructure:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 }
@@ -1794,7 +1822,9 @@ class TestBoundaryConditionToSideBc:
         assert side.value == 0.0
         assert side.kind == "dirichlet"
 
-    def test_from_dict_warns_irrelevant_fields(self, caplog: pytest.LogCaptureFixture) -> None:
+    def test_from_dict_warns_irrelevant_fields(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
         """Dirichlet with gamma logs a warning about irrelevant fields."""
         from tidal.symbolic.json_loader import BoundaryCondition
 

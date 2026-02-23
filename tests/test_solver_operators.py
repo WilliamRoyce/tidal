@@ -52,6 +52,7 @@ def _neumann_grid_2d(n: int = 64) -> GridInfo:
 # Periodic 1D
 # ---------------------------------------------------------------------------
 
+
 class TestGradientPeriodic1D:
     def test_sine(self) -> None:
         g = _periodic_grid_1d()
@@ -88,6 +89,7 @@ class TestLaplacianPeriodic1D:
 # Periodic 2D
 # ---------------------------------------------------------------------------
 
+
 class TestOperatorsPeriodic2D:
     @pytest.fixture
     def setup(self) -> tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]:
@@ -96,40 +98,54 @@ class TestOperatorsPeriodic2D:
         data = np.sin(xs) * np.cos(ys)  # sin(x)cos(y)
         return g, data, xs, ys
 
-    def test_gradient_x(self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]) -> None:
+    def test_gradient_x(
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+    ) -> None:
         g, data, xs, ys = setup
         result = gradient(data, 0, g)
         np.testing.assert_allclose(result, np.cos(xs) * np.cos(ys), atol=5e-3)
 
-    def test_gradient_y(self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]) -> None:
+    def test_gradient_y(
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+    ) -> None:
         g, data, xs, ys = setup
         result = gradient(data, 1, g)
         np.testing.assert_allclose(result, -np.sin(xs) * np.sin(ys), atol=5e-3)
 
-    def test_laplacian(self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]) -> None:
+    def test_laplacian(
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+    ) -> None:
         g, data, _xs, _ys = setup
         result = laplacian(data, g)
         # ∇²[sin(x)cos(y)] = -2 sin(x)cos(y)
         np.testing.assert_allclose(result, -2 * data, atol=5e-2)
 
-    def test_directional_laplacian_x(self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]) -> None:
+    def test_directional_laplacian_x(
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+    ) -> None:
         g, data, xs, ys = setup
         result = directional_laplacian(data, 0, g)
         np.testing.assert_allclose(result, -np.sin(xs) * np.cos(ys), atol=5e-3)
 
-    def test_cross_derivative(self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]) -> None:
+    def test_cross_derivative(
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+    ) -> None:
         g, data, xs, ys = setup
         result = cross_derivative(data, 0, 1, g)
         # ∂²/(∂x∂y) sin(x)cos(y) = -cos(x)sin(y)
         np.testing.assert_allclose(result, -np.cos(xs) * np.sin(ys), atol=5e-2)
 
-    def test_biharmonic(self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]) -> None:
+    def test_biharmonic(
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+    ) -> None:
         g, data, _xs, _ys = setup
         result = biharmonic(data, g)
         # ∇⁴[sin(x)cos(y)] = 4 sin(x)cos(y)
         np.testing.assert_allclose(result, 4 * data, atol=0.5)
 
-    def test_identity(self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]) -> None:
+    def test_identity(
+        self, setup: tuple[GridInfo, np.ndarray, np.ndarray, np.ndarray]
+    ) -> None:
         g, data, _, _ = setup
         result = identity(data, g)
         assert result is data  # no copy
@@ -167,6 +183,7 @@ class TestNeumannBC:
 # Mixed BCs (per-axis)
 # ---------------------------------------------------------------------------
 
+
 class TestMixedBC:
     def test_per_axis_bc(self) -> None:
         g = GridInfo(
@@ -183,6 +200,7 @@ class TestMixedBC:
 # ---------------------------------------------------------------------------
 # BC validation
 # ---------------------------------------------------------------------------
+
 
 class TestBCValidation:
     def test_unknown_bc(self) -> None:
@@ -201,6 +219,7 @@ class TestBCValidation:
 # ---------------------------------------------------------------------------
 # Operator registry
 # ---------------------------------------------------------------------------
+
 
 class TestApplyOperator:
     def test_known_operator(self) -> None:
@@ -233,6 +252,7 @@ class TestApplyOperator:
 # ---------------------------------------------------------------------------
 # Default BC inference from grid
 # ---------------------------------------------------------------------------
+
 
 class TestDefaultBC:
     def test_periodic_grid_infers_periodic(self) -> None:
@@ -551,7 +571,10 @@ class TestAxisBCSpecWithOperators:
         data = np.sin(xs) * np.sin(ys)  # sin vanishes at y=0,pi
 
         side_d = SideBCSpec(kind="dirichlet")
-        bc = (AxisBCSpec(periodic=True), AxisBCSpec(periodic=False, low=side_d, high=side_d))
+        bc = (
+            AxisBCSpec(periodic=True),
+            AxisBCSpec(periodic=False, low=side_d, high=side_d),
+        )
         result = laplacian(data, g, bc=bc)
         analytic = -2 * data
         np.testing.assert_allclose(result, analytic, atol=5e-2)

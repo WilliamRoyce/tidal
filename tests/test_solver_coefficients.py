@@ -61,9 +61,11 @@ def _make_grid_2d(n: int = 8) -> GridInfo:
 class TestConstantCoefficients:
     def test_numeric_only(self) -> None:
         """No symbolic → return term.coefficient directly."""
-        spec = _make_spec([
-            {"coefficient": 1.5, "operator": "laplacian", "field": "phi_0"},
-        ])
+        spec = _make_spec(
+            [
+                {"coefficient": 1.5, "operator": "laplacian", "field": "phi_0"},
+            ]
+        )
         grid = _make_grid_1d()
         ev = CoefficientEvaluator(spec, grid)
 
@@ -73,14 +75,16 @@ class TestConstantCoefficients:
 
     def test_parameter_override(self) -> None:
         """Symbolic resolved from parameters dict."""
-        spec = _make_spec([
-            {
-                "coefficient": 0.0,
-                "operator": "identity",
-                "field": "phi_0",
-                "coefficient_symbolic": "m2",
-            },
-        ])
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 0.0,
+                    "operator": "identity",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "m2",
+                },
+            ]
+        )
         grid = _make_grid_1d()
         ev = CoefficientEvaluator(spec, grid, parameters={"m2": 2.5})
 
@@ -90,14 +94,16 @@ class TestConstantCoefficients:
 
     def test_negated_parameter(self) -> None:
         """Symbolic ``"-m2"`` resolves to negated parameter value."""
-        spec = _make_spec([
-            {
-                "coefficient": 0.0,
-                "operator": "identity",
-                "field": "phi_0",
-                "coefficient_symbolic": "-m2",
-            },
-        ])
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 0.0,
+                    "operator": "identity",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "-m2",
+                },
+            ]
+        )
         grid = _make_grid_1d()
         ev = CoefficientEvaluator(spec, grid, parameters={"m2": 3.0})
 
@@ -107,14 +113,16 @@ class TestConstantCoefficients:
 
     def test_compound_expression(self) -> None:
         """Symbolic ``"-2*m2"`` resolves as compound expression."""
-        spec = _make_spec([
-            {
-                "coefficient": 0.0,
-                "operator": "identity",
-                "field": "phi_0",
-                "coefficient_symbolic": "-2*m2",
-            },
-        ])
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 0.0,
+                    "operator": "identity",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "-2*m2",
+                },
+            ]
+        )
         grid = _make_grid_1d()
         ev = CoefficientEvaluator(spec, grid, parameters={"m2": 1.5})
 
@@ -207,16 +215,18 @@ class TestPositionDependent:
 class TestTimeDependent:
     def test_varies_with_t(self) -> None:
         """Time-dependent coefficient changes with t."""
-        spec = _make_spec([
-            {
-                "coefficient": 1.0,
-                "operator": "identity",
-                "field": "phi_0",
-                "coefficient_symbolic": "Exp[-t]",
-                "time_dependent": True,
-                "coordinate_dependent": ["t"],
-            },
-        ])
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "identity",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "Exp[-t]",
+                    "time_dependent": True,
+                    "coordinate_dependent": ["t"],
+                },
+            ]
+        )
         grid = _make_grid_1d()
         ev = CoefficientEvaluator(spec, grid)
 
@@ -237,14 +247,16 @@ class TestTimeDependent:
 class TestErrorHandling:
     def test_missing_parameter(self) -> None:
         """Missing parameter in symbolic → ValueError."""
-        spec = _make_spec([
-            {
-                "coefficient": 0.0,
-                "operator": "identity",
-                "field": "phi_0",
-                "coefficient_symbolic": "unknown_param",
-            },
-        ])
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 0.0,
+                    "operator": "identity",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "unknown_param",
+                },
+            ]
+        )
         grid = _make_grid_1d()
         # Should raise during construction (pre-resolve attempt)
         with pytest.raises(ValueError, match="unknown_param"):
@@ -252,14 +264,16 @@ class TestErrorHandling:
 
     def test_nan_expression(self) -> None:
         """Expression producing NaN → ValueError."""
-        spec = _make_spec([
-            {
-                "coefficient": 0.0,
-                "operator": "identity",
-                "field": "phi_0",
-                "coefficient_symbolic": "Sqrt[-1]",
-            },
-        ])
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 0.0,
+                    "operator": "identity",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "Sqrt[-1]",
+                },
+            ]
+        )
         grid = _make_grid_1d()
         # sqrt(-1) gives NaN for real-valued numpy
         with pytest.raises((ValueError, TypeError)):
@@ -267,16 +281,18 @@ class TestErrorHandling:
 
     def test_begin_timestep_clears_cache(self) -> None:
         """L3 timestep cache is cleared by begin_timestep()."""
-        spec = _make_spec([
-            {
-                "coefficient": 1.0,
-                "operator": "identity",
-                "field": "phi_0",
-                "coefficient_symbolic": "Cos[t]",
-                "time_dependent": True,
-                "coordinate_dependent": ["t"],
-            },
-        ])
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "identity",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "Cos[t]",
+                    "time_dependent": True,
+                    "coordinate_dependent": ["t"],
+                },
+            ]
+        )
         grid = _make_grid_1d()
         ev = CoefficientEvaluator(spec, grid)
 

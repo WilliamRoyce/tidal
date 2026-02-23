@@ -55,9 +55,9 @@ class TestParseGridShape:
     @pytest.mark.parametrize(
         ("raw", "dim"),
         [
-            ("32,64", 1),     # 2 values for 1D
-            ("32,64", 3),     # 2 values for 3D
-            ("8,16,32", 2),   # 3 values for 2D
+            ("32,64", 1),  # 2 values for 1D
+            ("32,64", 3),  # 2 values for 3D
+            ("8,16,32", 2),  # 3 values for 2D
         ],
     )
     def test_dimension_mismatch(self, raw: str, dim: int) -> None:
@@ -91,8 +91,8 @@ class TestParseBounds:
     @pytest.mark.parametrize(
         ("raw", "dim"),
         [
-            ("0:20,0:10", 1),   # 2 values for 1D
-            ("0:20,0:10", 3),   # 2 values for 3D
+            ("0:20,0:10", 1),  # 2 values for 1D
+            ("0:20,0:10", 3),  # 2 values for 3D
         ],
     )
     def test_dimension_mismatch(self, raw: str, dim: int) -> None:
@@ -164,7 +164,9 @@ class TestParseParams:
         with pytest.raises(ValueError, match="Must be a number"):
             _parse_params(["m2=abc"], spec)  # type: ignore[arg-type]
 
-    def test_non_numeric_metadata_skipped(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_non_numeric_metadata_skipped(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         spec = _make_spec_stub({"parameters": {"note": "not a number", "m2": 1.0}})
         result = _parse_params([], spec)  # type: ignore[arg-type]
         assert result == {"m2": 1.0}
@@ -182,7 +184,9 @@ class TestParseParams:
         assert "bogus" in err
         assert "not found" in err
 
-    def test_no_warning_for_known_param(self, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_no_warning_for_known_param(
+        self, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         spec = _make_spec_stub({"parameters": {"m2": 1.0}})
         _parse_params(["m2=2.0"], spec)  # type: ignore[arg-type]
         err = capsys.readouterr().err
@@ -194,7 +198,11 @@ class TestParseParams:
 
 def _make_args(**kwargs: object) -> Namespace:
     """Create a Namespace with defaults for _infer_output_format."""
-    defaults: dict[str, object] = {"no_plot": False, "output_format": None, "output": None}
+    defaults: dict[str, object] = {
+        "no_plot": False,
+        "output_format": None,
+        "output": None,
+    }
     defaults.update(kwargs)
     return Namespace(**defaults)
 
@@ -228,7 +236,10 @@ class TestInferOutputFormat:
 
     def test_no_plot_takes_priority(self) -> None:
         """--no-plot should win even if --format or --output is given."""
-        assert _infer_output_format(_make_args(no_plot=True, output_format="png")) == "summary"
+        assert (
+            _infer_output_format(_make_args(no_plot=True, output_format="png"))
+            == "summary"
+        )
 
 
 class TestValidateFormulaAst:
@@ -324,9 +335,7 @@ class TestConstraintSolverToml:
             "theory": {"name": "Test"},
             "spacetime": {"dimension": 3, "metric": "minkowski"},
             "fields": [{"name": "phi", "type": "scalar"}],
-            "lagrangian": {
-                "expression": "CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"
-            },
+            "lagrangian": {"expression": "CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"},
             "output": {"path": "out.json"},
         }
         base.update(config)
@@ -344,29 +353,33 @@ class TestConstraintSolverToml:
 
     def test_constraint_solver_dirichlet_bcs(self) -> None:
         """Dirichlet BC config → correct Wolfram Association syntax."""
-        wls = self._generate({
-            "constraint_solver": {
-                "enabled": True,
-                "boundary_conditions": {
-                    "x": {"type": "dirichlet", "value": 0.0},
-                    "y": {"type": "dirichlet", "value": 0.0},
-                },
+        wls = self._generate(
+            {
+                "constraint_solver": {
+                    "enabled": True,
+                    "boundary_conditions": {
+                        "x": {"type": "dirichlet", "value": 0.0},
+                        "y": {"type": "dirichlet", "value": 0.0},
+                    },
+                }
             }
-        })
+        )
         assert '"type" -> "dirichlet"' in wls
         assert '"value" -> 0.0' in wls
 
     def test_constraint_solver_periodic_bcs(self) -> None:
         """Periodic BC config → Wolfram Association without value key."""
-        wls = self._generate({
-            "constraint_solver": {
-                "enabled": True,
-                "boundary_conditions": {
-                    "x": {"type": "periodic"},
-                    "y": {"type": "periodic"},
-                },
+        wls = self._generate(
+            {
+                "constraint_solver": {
+                    "enabled": True,
+                    "boundary_conditions": {
+                        "x": {"type": "periodic"},
+                        "y": {"type": "periodic"},
+                    },
+                }
             }
-        })
+        )
         assert '"type" -> "periodic"' in wls
         # Periodic BCs should NOT have a "value" key in the BC association
         # (use narrow match to avoid false positives from other WLS template code)
@@ -411,22 +424,24 @@ class TestGaugeToml:
         """Parameter xi=2.0 appears as fourth argument to BuildLorenzGaugeTerm."""
         import re
 
-        wls = self._generate(
-            {"gauge": [{"field": "A", "type": "lorenz", "xi": 2.0}]}
-        )
+        wls = self._generate({"gauge": [{"field": "A", "type": "lorenz", "xi": 2.0}]})
         # xi=2.0 should appear as the fourth argument to the builder call
         assert re.search(r"BuildLorenzGaugeTerm\[.*,\s*2(\.0)?\s*\]", wls)
 
     def test_custom_expression_in_wls(self) -> None:
         """Custom gauge expression → GaugeTerm + AddGaugeFixingTerm in WLS."""
-        wls = self._generate({
-            "gauge": [{
-                "field": "A",
-                "type": "custom",
-                "mechanism": "lagrangian_term",
-                "expression": "-(1/2) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]",
-            }]
-        })
+        wls = self._generate(
+            {
+                "gauge": [
+                    {
+                        "field": "A",
+                        "type": "custom",
+                        "mechanism": "lagrangian_term",
+                        "expression": "-(1/2) * eta[a,b] CD[-a][A[-b]] eta[c,d] CD[-c][A[-d]]",
+                    }
+                ]
+            }
+        )
         assert "GaugeTerm" in wls
         assert "AddGaugeFixingTerm" in wls
 
@@ -474,35 +489,41 @@ class TestGaugeToml:
 
     def test_de_donder_in_wls(self) -> None:
         """De Donder gauge on tensor → BuildDeDonderGaugeTerm in WLS output."""
-        wls = self._generate({
-            "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}],
-            "derived_fields": [],
-            "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
-            "gauge": [{"field": "h", "type": "de_donder"}],
-        })
+        wls = self._generate(
+            {
+                "fields": [
+                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}
+                ],
+                "derived_fields": [],
+                "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
+                "gauge": [{"field": "h", "type": "de_donder"}],
+            }
+        )
         assert "BuildDeDonderGaugeTerm" in wls
         assert "GaugeFix.wl" in wls
         assert "ToCanonical" in wls
 
     def test_mixed_type_a_and_b_in_wls(self) -> None:
         """Mixed Type A + Type B: loads GaugeFix.wl for Type A, has substitution for Type B."""
-        wls = self._generate({
-            "fields": [
-                {"name": "A", "type": "vector"},
-                {"name": "B", "type": "vector"},
-            ],
-            "derived_fields": [],
-            "lagrangian": {
-                "expression": (
-                    "-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] "
-                    "- 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-c][B[-d]]"
-                )
-            },
-            "gauge": [
-                {"field": "A", "type": "lorenz"},
-                {"field": "B", "type": "temporal"},
-            ],
-        })
+        wls = self._generate(
+            {
+                "fields": [
+                    {"name": "A", "type": "vector"},
+                    {"name": "B", "type": "vector"},
+                ],
+                "derived_fields": [],
+                "lagrangian": {
+                    "expression": (
+                        "-1/2 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]] "
+                        "- 1/2 CD[-a][B[-b]] eta[a,c] eta[b,d] CD[-c][B[-d]]"
+                    )
+                },
+                "gauge": [
+                    {"field": "A", "type": "lorenz"},
+                    {"field": "B", "type": "temporal"},
+                ],
+            }
+        )
         assert "BuildLorenzGaugeTerm" in wls
         assert "GaugeFix.wl" in wls
         assert ":> 0" in wls
@@ -511,13 +532,17 @@ class TestGaugeToml:
 
     def test_tt_gauge_in_wls(self) -> None:
         """TT gauge on tensor → temporal zeroing, transverse constraints, traceless substitution."""
-        wls = self._generate({
-            "spacetime": {"dimension": 3, "metric": "minkowski"},
-            "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}],
-            "derived_fields": [],
-            "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
-            "gauge": [{"field": "h", "type": "tt"}],
-        })
+        wls = self._generate(
+            {
+                "spacetime": {"dimension": 3, "metric": "minkowski"},
+                "fields": [
+                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}
+                ],
+                "derived_fields": [],
+                "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
+                "gauge": [{"field": "h", "type": "tt"}],
+            }
+        )
         # Temporal zeroing: h_0, h_1, h_2 = 0 (dim=3, first 3 components)
         assert "TT-temporal" in wls
         assert ":> 0" in wls
@@ -533,16 +558,20 @@ class TestGaugeToml:
         assert "GaugeFix.wl" not in wls
 
     def test_tt_gauge_with_linearization(self) -> None:
-        """TT gauge + linearization → gauge fixing applied in linearisation path."""
-        wls = self._generate({
-            "spacetime": {"dimension": 4, "metric": "minkowski"},
-            "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}],
-            "derived_fields": [],
-            "lagrangian": {"expression": "RicciScalarCD[]"},
-            "linearization": {"perturbation_field": "h"},
-            "gauge": [{"field": "h", "type": "tt"}],
-        })
-        # Should contain both linearisation AND gauge-fixing code
+        """TT gauge + linearization → gauge fixing applied in linearization path."""
+        wls = self._generate(
+            {
+                "spacetime": {"dimension": 4, "metric": "minkowski"},
+                "fields": [
+                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}
+                ],
+                "derived_fields": [],
+                "lagrangian": {"expression": "RicciScalarCD[]"},
+                "linearization": {"perturbation_field": "h"},
+                "gauge": [{"field": "h", "type": "tt"}],
+            }
+        )
+        # Should contain both linearization AND gauge-fixing code
         assert "Perturbation" in wls
         assert "TT-temporal" in wls
         assert "TT traceless" in wls
@@ -559,7 +588,9 @@ class TestGaugeToml:
         config: dict[str, object] = {
             "theory": {"name": "Test"},
             "spacetime": {"dimension": 2, "metric": "minkowski"},
-            "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}],
+            "fields": [
+                {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}
+            ],
             "linearization": {
                 "perturbation_field": "h",
                 "expression": "SomeExpression[]",
@@ -572,13 +603,17 @@ class TestGaugeToml:
 
     def test_gauge_metadata_tt(self) -> None:
         """TT gauge → metadata string 'tt(h)'."""
-        wls = self._generate({
-            "spacetime": {"dimension": 3, "metric": "minkowski"},
-            "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}],
-            "derived_fields": [],
-            "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
-            "gauge": [{"field": "h", "type": "tt"}],
-        })
+        wls = self._generate(
+            {
+                "spacetime": {"dimension": 3, "metric": "minkowski"},
+                "fields": [
+                    {"name": "h", "type": "tensor", "rank": 2, "symmetry": "symmetric"}
+                ],
+                "derived_fields": [],
+                "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
+                "gauge": [{"field": "h", "type": "tt"}],
+            }
+        )
         assert '"gauge" -> "tt(h)"' in wls
 
     def test_tt_gauge_rejects_vector(self) -> None:
@@ -593,12 +628,23 @@ class TestGaugeToml:
         import pytest
 
         with pytest.raises(ValueError, match="requires a symmetric tensor"):
-            self._generate({
-                "fields": [{"name": "h", "type": "tensor", "rank": 2, "symmetry": "antisymmetric"}],
-                "derived_fields": [],
-                "lagrangian": {"expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"},
-                "gauge": [{"field": "h", "type": "tt"}],
-            })
+            self._generate(
+                {
+                    "fields": [
+                        {
+                            "name": "h",
+                            "type": "tensor",
+                            "rank": 2,
+                            "symmetry": "antisymmetric",
+                        }
+                    ],
+                    "derived_fields": [],
+                    "lagrangian": {
+                        "expression": "h[-a, -b] eta[a, c] eta[b, d] h[-c, -d]"
+                    },
+                    "gauge": [{"field": "h", "type": "tt"}],
+                }
+            )
 
 
 # ==================== _parse_periodic (native path) ====================
@@ -902,7 +948,11 @@ def _make_kg_spec() -> EquationSystem:
                     "type": "linear_combination",
                     "terms": [
                         {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
-                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_x",
+                            "field": "phi_0",
+                        },
                     ],
                 },
             }
@@ -969,7 +1019,7 @@ class TestBuildInitialY0:
         center = 5.0
         width = 1.0  # domain_size / 10 = 10 / 10
         x = gi.axes_coords(0)
-        expected_field = 1.0 * np.exp(-(x - center) ** 2 / (2 * width**2))
+        expected_field = 1.0 * np.exp(-((x - center) ** 2) / (2 * width**2))
 
         np.testing.assert_allclose(y0_native[:32], expected_field, atol=1e-12)
 
@@ -1049,7 +1099,9 @@ def _make_wave_spec() -> EquationSystem:
                 "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
                 "rhs": {
                     "type": "linear_combination",
-                    "terms": [{"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}],
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}
+                    ],
                 },
             }
         ],
@@ -1061,8 +1113,15 @@ def _make_wave_spec() -> EquationSystem:
                     "factor_b": {"field": "phi_0", "operator": "time_derivative"},
                 },
             ],
-            "field_rates": {"phi_0": [{"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}]},
-            "kinetic_matrix": {"entries": [{"i": 0, "j": 0, "value": 1.0}], "dimension": 1},
+            "field_rates": {
+                "phi_0": [
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}
+                ]
+            },
+            "kinetic_matrix": {
+                "entries": [{"i": 0, "j": 0, "value": 1.0}],
+                "dimension": 1,
+            },
             "spatial_momenta": {},
             "hamiltonian_symbolic": "test",
         },
@@ -1086,7 +1145,9 @@ def _make_constraint_spec() -> EquationSystem:
                 "lhs": {"expression": "A_0", "order": {"time": 0}},
                 "rhs": {
                     "type": "linear_combination",
-                    "terms": [{"coefficient": 1.0, "operator": "gradient_x", "field": "A_1"}],
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "gradient_x", "field": "A_1"}
+                    ],
                 },
             },
             {
@@ -1094,7 +1155,9 @@ def _make_constraint_spec() -> EquationSystem:
                 "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2}},
                 "rhs": {
                     "type": "linear_combination",
-                    "terms": [{"coefficient": 1.0, "operator": "laplacian_x", "field": "A_1"}],
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_1"}
+                    ],
                 },
             },
         ],
@@ -1117,7 +1180,11 @@ def _make_dissipative_spec() -> EquationSystem:
                     "type": "linear_combination",
                     "terms": [
                         {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
-                        {"coefficient": -0.1, "operator": "first_derivative_t", "field": "phi_0"},
+                        {
+                            "coefficient": -0.1,
+                            "operator": "first_derivative_t",
+                            "field": "phi_0",
+                        },
                     ],
                 },
             }
@@ -1130,8 +1197,15 @@ def _make_dissipative_spec() -> EquationSystem:
                     "factor_b": {"field": "phi_0", "operator": "time_derivative"},
                 },
             ],
-            "field_rates": {"phi_0": [{"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}]},
-            "kinetic_matrix": {"entries": [{"i": 0, "j": 0, "value": 1.0}], "dimension": 1},
+            "field_rates": {
+                "phi_0": [
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}
+                ]
+            },
+            "kinetic_matrix": {
+                "entries": [{"i": 0, "j": 0, "value": 1.0}],
+                "dimension": 1,
+            },
             "spatial_momenta": {},
             "hamiltonian_symbolic": "test",
         },

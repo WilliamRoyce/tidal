@@ -107,9 +107,7 @@ date-released: 2026-01-01
         bumper = VersionBumper("0.2.0", dry_run=True)
         monkeypatch.setattr(bumper, "root", mock_project)
         monkeypatch.setattr(bumper, "pyproject_toml", mock_project / "pyproject.toml")
-        monkeypatch.setattr(
-            bumper, "init_py", mock_project / "tidal" / "__init__.py"
-        )
+        monkeypatch.setattr(bumper, "init_py", mock_project / "tidal" / "__init__.py")
         monkeypatch.setattr(bumper, "citation_cff", mock_project / "CITATION.cff")
 
         versions = bumper._get_all_current_versions()

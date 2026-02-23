@@ -332,7 +332,9 @@ def _make_kg_canonical_structure(m2: float = 1.0) -> CanonicalStructure:
 
 
 def _make_coupled_canonical_structure(
-    m2_phi: float, m2_chi: float, g: float,
+    m2_phi: float,
+    m2_chi: float,
+    g: float,
 ) -> CanonicalStructure:
     """Build canonical structure for two coupled scalars.
 
@@ -530,7 +532,9 @@ class TestCanonicalHamiltonianEnergy:
 
         # For scalar fields with periodic BCs, both paths should agree
         np.testing.assert_allclose(
-            se_canonical.total, se_virial.total, rtol=1e-10,
+            se_canonical.total,
+            se_virial.total,
+            rtol=1e-10,
         )
 
     def test_no_canonical_raises(self) -> None:
@@ -644,23 +648,18 @@ class TestCanonicalHamiltonianEnergy:
         grad_a0 = (np.roll(a0, -1) - np.roll(a0, 1)) / (2 * dx)
         vel = pi1 + grad_a0  # velocity = pi + d_x(A_0)
         lap_a1 = (np.roll(a1, -1) - 2 * a1 + np.roll(a1, 1)) / dx**2
-        h_expected = float(
-            (0.5 * vel**2 + (-0.5) * a1 * lap_a1 + 0.5 * a1**2).mean()
-        )
+        h_expected = float((0.5 * vel**2 + (-0.5) * a1 * lap_a1 + 0.5 * a1**2).mean())
 
         # If we had the bug (using pi instead of vel), kinetic term would be
         # ½ π², missing the cross-terms pi*d_x(A_0) and (d_x A_0)²
-        h_wrong = float(
-            (0.5 * pi1**2 + (-0.5) * a1 * lap_a1 + 0.5 * a1**2).mean()
-        )
+        h_wrong = float((0.5 * pi1**2 + (-0.5) * a1 * lap_a1 + 0.5 * a1**2).mean())
 
         # Verify the correct answer (with velocity reconstruction) matches
         np.testing.assert_allclose(h_eval, h_expected, rtol=1e-10)
 
         # Verify the wrong answer (raw momentum) does NOT match
         assert abs(h_eval - h_wrong) > 0.01, (
-            f"h_eval={h_eval} should differ from h_wrong={h_wrong} "
-            "when A_0 is nonzero"
+            f"h_eval={h_eval} should differ from h_wrong={h_wrong} when A_0 is nonzero"
         )
 
 
@@ -677,18 +676,36 @@ class TestIBPHamiltonian:
         """gradient_x * gradient_x -> laplacian_x."""
         from tidal.measurement._energy import _gradient_pair_to_second_order
 
-        assert _gradient_pair_to_second_order("gradient_x", "gradient_x") == "laplacian_x"
-        assert _gradient_pair_to_second_order("gradient_y", "gradient_y") == "laplacian_y"
-        assert _gradient_pair_to_second_order("gradient_z", "gradient_z") == "laplacian_z"
+        assert (
+            _gradient_pair_to_second_order("gradient_x", "gradient_x") == "laplacian_x"
+        )
+        assert (
+            _gradient_pair_to_second_order("gradient_y", "gradient_y") == "laplacian_y"
+        )
+        assert (
+            _gradient_pair_to_second_order("gradient_z", "gradient_z") == "laplacian_z"
+        )
 
     def test_gradient_pair_to_second_order_cross_axis(self) -> None:
         """gradient_x * gradient_y -> cross_derivative_xy (sorted)."""
         from tidal.measurement._energy import _gradient_pair_to_second_order
 
-        assert _gradient_pair_to_second_order("gradient_x", "gradient_y") == "cross_derivative_xy"
-        assert _gradient_pair_to_second_order("gradient_y", "gradient_x") == "cross_derivative_xy"
-        assert _gradient_pair_to_second_order("gradient_x", "gradient_z") == "cross_derivative_xz"
-        assert _gradient_pair_to_second_order("gradient_z", "gradient_y") == "cross_derivative_yz"
+        assert (
+            _gradient_pair_to_second_order("gradient_x", "gradient_y")
+            == "cross_derivative_xy"
+        )
+        assert (
+            _gradient_pair_to_second_order("gradient_y", "gradient_x")
+            == "cross_derivative_xy"
+        )
+        assert (
+            _gradient_pair_to_second_order("gradient_x", "gradient_z")
+            == "cross_derivative_xz"
+        )
+        assert (
+            _gradient_pair_to_second_order("gradient_z", "gradient_y")
+            == "cross_derivative_yz"
+        )
 
     def test_ibp_gradient_term_matches_laplacian(self) -> None:
         """IBP converts ½⟨(∂_x φ)²⟩ to -½⟨φ·∂²_x φ⟩ using 3-point laplacian.
@@ -799,19 +816,25 @@ class TestIBPHamiltonian:
         )
 
         eq_u = ComponentEquation(
-            field_name="u_0", field_index=0, time_derivative_order=2,
+            field_name="u_0",
+            field_index=0,
+            time_derivative_order=2,
             rhs_terms=(
                 OperatorTerm(coefficient=1.0, operator="laplacian", field="u_0"),
             ),
         )
         eq_v = ComponentEquation(
-            field_name="v_0", field_index=1, time_derivative_order=2,
+            field_name="v_0",
+            field_index=1,
+            time_derivative_order=2,
             rhs_terms=(
                 OperatorTerm(coefficient=1.0, operator="laplacian", field="v_0"),
             ),
         )
         spec = EquationSystem(
-            n_components=2, dimension=3, spatial_dimension=2,
+            n_components=2,
+            dimension=3,
+            spatial_dimension=2,
             component_names=("u_0", "v_0"),
             equations=(eq_u, eq_v),
             mass_matrix=((0.0, 0.0), (0.0, 0.0)),
@@ -854,8 +877,12 @@ class TestIBPHamiltonian:
                 HamiltonianTerm(
                     coefficient=1.0,
                     coefficient_symbolic="rho/2",
-                    factor_a=HamiltonianFactor(field="phi_0", operator="time_derivative"),
-                    factor_b=HamiltonianFactor(field="phi_0", operator="time_derivative"),
+                    factor_a=HamiltonianFactor(
+                        field="phi_0", operator="time_derivative"
+                    ),
+                    factor_b=HamiltonianFactor(
+                        field="phi_0", operator="time_derivative"
+                    ),
                 ),
             ),
             field_rates={
@@ -872,13 +899,17 @@ class TestIBPHamiltonian:
         )
 
         eq = ComponentEquation(
-            field_name="phi_0", field_index=0, time_derivative_order=2,
+            field_name="phi_0",
+            field_index=0,
+            time_derivative_order=2,
             rhs_terms=(
                 OperatorTerm(coefficient=1.0, operator="laplacian_x", field="phi_0"),
             ),
         )
         spec = EquationSystem(
-            n_components=1, dimension=2, spatial_dimension=1,
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
             component_names=("phi_0",),
             equations=(eq,),
             mass_matrix=((0.0,),),
@@ -929,13 +960,17 @@ class TestIBPHamiltonian:
         )
 
         eq = ComponentEquation(
-            field_name="phi_0", field_index=0, time_derivative_order=2,
+            field_name="phi_0",
+            field_index=0,
+            time_derivative_order=2,
             rhs_terms=(
                 OperatorTerm(coefficient=1.0, operator="laplacian_x", field="phi_0"),
             ),
         )
         spec = EquationSystem(
-            n_components=1, dimension=2, spatial_dimension=1,
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
             component_names=("phi_0",),
             equations=(eq,),
             mass_matrix=((0.0,),),
@@ -974,7 +1009,8 @@ class TestAnalyticalEnergyConservation:
 
     @staticmethod
     def _make_scalar_planewave_spec(
-        *, m2: float = 1.0,
+        *,
+        m2: float = 1.0,
     ) -> EquationSystem:
         """Build a minimal 1+1D massive scalar spec with canonical structure."""
         eq = ComponentEquation(
@@ -992,37 +1028,45 @@ class TestAnalyticalEnergyConservation:
                 HamiltonianTerm(
                     coefficient=0.5,
                     factor_a=HamiltonianFactor(
-                        field="phi_0", operator="time_derivative",
+                        field="phi_0",
+                        operator="time_derivative",
                     ),
                     factor_b=HamiltonianFactor(
-                        field="phi_0", operator="time_derivative",
+                        field="phi_0",
+                        operator="time_derivative",
                     ),
                 ),
                 # ½ (∂_x φ)²
                 HamiltonianTerm(
                     coefficient=0.5,
                     factor_a=HamiltonianFactor(
-                        field="phi_0", operator="gradient_x",
+                        field="phi_0",
+                        operator="gradient_x",
                     ),
                     factor_b=HamiltonianFactor(
-                        field="phi_0", operator="gradient_x",
+                        field="phi_0",
+                        operator="gradient_x",
                     ),
                 ),
                 # ½ m² φ²
                 HamiltonianTerm(
                     coefficient=0.5 * m2,
                     factor_a=HamiltonianFactor(
-                        field="phi_0", operator="identity",
+                        field="phi_0",
+                        operator="identity",
                     ),
                     factor_b=HamiltonianFactor(
-                        field="phi_0", operator="identity",
+                        field="phi_0",
+                        operator="identity",
                     ),
                 ),
             ),
             field_rates={
                 "phi_0": (
                     OperatorTerm(
-                        coefficient=1.0, operator="identity", field="pi_0",
+                        coefficient=1.0,
+                        operator="identity",
+                        field="pi_0",
                     ),
                 ),
             },
@@ -1182,10 +1226,14 @@ class TestAnalyticalEnergyConservation:
             time_derivative_order=2,
             rhs_terms=(
                 OperatorTerm(
-                    coefficient=-m2_phi, operator="identity", field="phi_0",
+                    coefficient=-m2_phi,
+                    operator="identity",
+                    field="phi_0",
                 ),
                 OperatorTerm(
-                    coefficient=-g_val, operator="identity", field="chi_0",
+                    coefficient=-g_val,
+                    operator="identity",
+                    field="chi_0",
                 ),
             ),
         )
@@ -1195,10 +1243,14 @@ class TestAnalyticalEnergyConservation:
             time_derivative_order=2,
             rhs_terms=(
                 OperatorTerm(
-                    coefficient=-g_val, operator="identity", field="phi_0",
+                    coefficient=-g_val,
+                    operator="identity",
+                    field="phi_0",
                 ),
                 OperatorTerm(
-                    coefficient=-m2_chi, operator="identity", field="chi_0",
+                    coefficient=-m2_chi,
+                    operator="identity",
+                    field="chi_0",
                 ),
             ),
         )
@@ -1208,40 +1260,48 @@ class TestAnalyticalEnergyConservation:
                 HamiltonianTerm(
                     coefficient=0.5,
                     factor_a=HamiltonianFactor(
-                        field="phi_0", operator="time_derivative",
+                        field="phi_0",
+                        operator="time_derivative",
                     ),
                     factor_b=HamiltonianFactor(
-                        field="phi_0", operator="time_derivative",
+                        field="phi_0",
+                        operator="time_derivative",
                     ),
                 ),
                 # ½ π_χ²
                 HamiltonianTerm(
                     coefficient=0.5,
                     factor_a=HamiltonianFactor(
-                        field="chi_0", operator="time_derivative",
+                        field="chi_0",
+                        operator="time_derivative",
                     ),
                     factor_b=HamiltonianFactor(
-                        field="chi_0", operator="time_derivative",
+                        field="chi_0",
+                        operator="time_derivative",
                     ),
                 ),
                 # ½ m1² φ²
                 HamiltonianTerm(
                     coefficient=0.5 * m2_phi,
                     factor_a=HamiltonianFactor(
-                        field="phi_0", operator="identity",
+                        field="phi_0",
+                        operator="identity",
                     ),
                     factor_b=HamiltonianFactor(
-                        field="phi_0", operator="identity",
+                        field="phi_0",
+                        operator="identity",
                     ),
                 ),
                 # ½ m2² χ²
                 HamiltonianTerm(
                     coefficient=0.5 * m2_chi,
                     factor_a=HamiltonianFactor(
-                        field="chi_0", operator="identity",
+                        field="chi_0",
+                        operator="identity",
                     ),
                     factor_b=HamiltonianFactor(
-                        field="chi_0", operator="identity",
+                        field="chi_0",
+                        operator="identity",
                     ),
                 ),
                 # g φχ (coupling: coefficient is g, not g/2, because
@@ -1249,22 +1309,28 @@ class TestAnalyticalEnergyConservation:
                 HamiltonianTerm(
                     coefficient=g_val,
                     factor_a=HamiltonianFactor(
-                        field="phi_0", operator="identity",
+                        field="phi_0",
+                        operator="identity",
                     ),
                     factor_b=HamiltonianFactor(
-                        field="chi_0", operator="identity",
+                        field="chi_0",
+                        operator="identity",
                     ),
                 ),
             ),
             field_rates={
                 "phi_0": (
                     OperatorTerm(
-                        coefficient=1.0, operator="identity", field="pi_0",
+                        coefficient=1.0,
+                        operator="identity",
+                        field="pi_0",
                     ),
                 ),
                 "chi_0": (
                     OperatorTerm(
-                        coefficient=1.0, operator="identity", field="pi_1",
+                        coefficient=1.0,
+                        operator="identity",
+                        field="pi_1",
                     ),
                 ),
             },
@@ -1927,8 +1993,10 @@ class TestSelfGradientAxes:
         """Equation with isotropic 'laplacian' → None (all axes)."""
         terms = (OperatorTerm(coefficient=1.0, operator="laplacian", field="phi"),)
         eq = ComponentEquation(
-            field_name="phi", field_index=0,
-            time_derivative_order=2, rhs_terms=terms,
+            field_name="phi",
+            field_index=0,
+            time_derivative_order=2,
+            rhs_terms=terms,
         )
         assert _self_gradient_axes(eq) is None
 
@@ -1940,8 +2008,10 @@ class TestSelfGradientAxes:
             OperatorTerm(coefficient=-1.0, operator="identity", field="A_1"),
         )
         eq = ComponentEquation(
-            field_name="A_1", field_index=0,
-            time_derivative_order=2, rhs_terms=terms,
+            field_name="A_1",
+            field_index=0,
+            time_derivative_order=2,
+            rhs_terms=terms,
         )
         assert _self_gradient_axes(eq) == [1]
 
@@ -1952,8 +2022,10 @@ class TestSelfGradientAxes:
             OperatorTerm(coefficient=-1.0, operator="identity", field="A_2"),
         )
         eq = ComponentEquation(
-            field_name="A_2", field_index=1,
-            time_derivative_order=2, rhs_terms=terms,
+            field_name="A_2",
+            field_index=1,
+            time_derivative_order=2,
+            rhs_terms=terms,
         )
         assert _self_gradient_axes(eq) == [0]
 
@@ -1964,8 +2036,10 @@ class TestSelfGradientAxes:
             OperatorTerm(coefficient=1.0, operator="laplacian_y", field="phi"),
         )
         eq = ComponentEquation(
-            field_name="phi", field_index=0,
-            time_derivative_order=2, rhs_terms=terms,
+            field_name="phi",
+            field_index=0,
+            time_derivative_order=2,
+            rhs_terms=terms,
         )
         assert _self_gradient_axes(eq) == [0, 1]
 
@@ -1976,20 +2050,22 @@ class TestSelfGradientAxes:
             OperatorTerm(coefficient=0.5, operator="laplacian_x", field="A_2"),
         )
         eq = ComponentEquation(
-            field_name="A_1", field_index=0,
-            time_derivative_order=2, rhs_terms=terms,
+            field_name="A_1",
+            field_index=0,
+            time_derivative_order=2,
+            rhs_terms=terms,
         )
         # Only laplacian_y(A_1) is self; laplacian_x(A_2) is cross-field
         assert _self_gradient_axes(eq) == [1]
 
     def test_no_laplacian_returns_empty(self) -> None:
         """Equation with no laplacian at all → empty list."""
-        terms = (
-            OperatorTerm(coefficient=-1.0, operator="identity", field="phi"),
-        )
+        terms = (OperatorTerm(coefficient=-1.0, operator="identity", field="phi"),)
         eq = ComponentEquation(
-            field_name="phi", field_index=0,
-            time_derivative_order=2, rhs_terms=terms,
+            field_name="phi",
+            field_index=0,
+            time_derivative_order=2,
+            rhs_terms=terms,
         )
         assert _self_gradient_axes(eq) == []
 
@@ -2257,20 +2333,32 @@ def _make_two_constraint_spec() -> EquationSystem:
         spatial_dimension=1,
         equations=(eq_a0, eq_a1, eq_b0, eq_b1),
         component_names=("A_0", "A_1", "B_0", "B_1"),
-        mass_matrix=((1.0, 0.0, 0.0, 0.0), (0.0, 1.0, 0.0, 0.0),
-                      (0.0, 0.0, 2.0, 0.0), (0.0, 0.0, 0.0, 2.0)),
-        coupling_matrix=((0.0, 0.0, -0.5, 0.0), (0.0, 0.0, 0.0, -0.5),
-                          (-0.5, 0.0, 0.0, 0.0), (0.0, -0.5, 0.0, 0.0)),
+        mass_matrix=(
+            (1.0, 0.0, 0.0, 0.0),
+            (0.0, 1.0, 0.0, 0.0),
+            (0.0, 0.0, 2.0, 0.0),
+            (0.0, 0.0, 0.0, 2.0),
+        ),
+        coupling_matrix=(
+            (0.0, 0.0, -0.5, 0.0),
+            (0.0, 0.0, 0.0, -0.5),
+            (-0.5, 0.0, 0.0, 0.0),
+            (0.0, -0.5, 0.0, 0.0),
+        ),
         metadata={"parameters": {"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5}},
         coordinates=("t", "x"),
-        mass_matrix_symbolic=(("-mA2", None, None, None),
-                               (None, "-mA2", None, None),
-                               (None, None, "-mB2", None),
-                               (None, None, None, "-mB2")),
-        coupling_matrix_symbolic=((None, None, "gcoup", None),
-                                   (None, None, None, "gcoup"),
-                                   ("gcoup", None, None, None),
-                                   (None, "gcoup", None, None)),
+        mass_matrix_symbolic=(
+            ("-mA2", None, None, None),
+            (None, "-mA2", None, None),
+            (None, None, "-mB2", None),
+            (None, None, None, "-mB2"),
+        ),
+        coupling_matrix_symbolic=(
+            (None, None, "gcoup", None),
+            (None, None, None, "gcoup"),
+            ("gcoup", None, None, None),
+            (None, "gcoup", None, None),
+        ),
     )
 
 
@@ -2509,7 +2597,9 @@ class TestMixingLength:
         result = compute_mixing_length(conv)
 
         # dL = (pi/omega^2) * HWHM where HWHM = FWHM/2
-        expected_unc = (np.pi / (result.dominant_frequency**2)) * result.frequency_fwhm / 2.0
+        expected_unc = (
+            (np.pi / (result.dominant_frequency**2)) * result.frequency_fwhm / 2.0
+        )
         assert abs(result.mixing_length_uncertainty - expected_unc) < 1e-10
         # Clean signal over long time → narrow peak → small uncertainty
         assert result.mixing_length_uncertainty < result.mixing_length * 0.1
@@ -2571,7 +2661,9 @@ class TestMixingSpectrum:
         assert abs(spectrum.dominant_frequency - omega_0) / omega_0 < 0.05
         # Mixing length = π/ω
         expected_lmix = np.pi / omega_0
-        assert abs(spectrum.dominant_mixing_length - expected_lmix) / expected_lmix < 0.05
+        assert (
+            abs(spectrum.dominant_mixing_length - expected_lmix) / expected_lmix < 0.05
+        )
 
     def test_two_frequencies(self) -> None:
         """Two-frequency signal shows two peaks, dominant is the stronger one."""
@@ -2622,7 +2714,9 @@ class TestMixingSpectrum:
 
         # Both use the same FFT; mixing_length = π/ω_dom from the dominant peak
         assert abs(mixing_result.mixing_length - spectrum.dominant_mixing_length) < 0.01
-        assert abs(mixing_result.dominant_frequency - spectrum.dominant_frequency) < 0.01
+        assert (
+            abs(mixing_result.dominant_frequency - spectrum.dominant_frequency) < 0.01
+        )
 
 
 # ============================================================
@@ -2685,7 +2779,10 @@ class TestSpectralConversion:
         # Very high floor raises (all modes below threshold)
         with pytest.raises(ValueError, match="no modes above energy floor"):
             compute_spectral_conversion(
-                data, "phi_0", "chi_0", energy_floor=1e10,
+                data,
+                "phi_0",
+                "chi_0",
+                energy_floor=1e10,
             )
         # Normal case: inactive modes have P=0
         result = compute_spectral_conversion(data, "phi_0", "chi_0")
@@ -2711,7 +2808,9 @@ class TestGroupSpectralConversion:
         pairwise = compute_spectral_conversion(data, "phi_0", "chi_0")
         group = compute_group_spectral_conversion(data, "phi_0", "chi_0")
         np.testing.assert_allclose(
-            group.probability, pairwise.probability, atol=1e-15,
+            group.probability,
+            pairwise.probability,
+            atol=1e-15,
         )
 
     def test_overlap_raises(self) -> None:
@@ -2719,7 +2818,9 @@ class TestGroupSpectralConversion:
         data = _make_sim_data_two_fields(n_snapshots=5)
         with pytest.raises(ValueError, match="overlap"):
             compute_group_spectral_conversion(
-                data, "phi_0", ["phi_0", "chi_0"],
+                data,
+                "phi_0",
+                ["phi_0", "chi_0"],
             )
 
     def test_none_target_auto_selects(self) -> None:
@@ -2753,7 +2854,8 @@ class TestResolveTermTarget:
         eq0 = spec.equations[0]
         constraint_eq = dataclasses.replace(eq0, time_derivative_order=0)
         constraint_spec = dataclasses.replace(
-            spec, equations=(constraint_eq, spec.equations[1]),
+            spec,
+            equations=(constraint_eq, spec.equations[1]),
         )
 
         data = _make_sim_data_two_fields(n_snapshots=3)
@@ -2825,7 +2927,11 @@ class TestSpectralEnergyPhysics:
 
         # Spectral energy
         _wn, se_bins = compute_spectral_energy(
-            field_arr, mom_arr, m2, (dx,), (True,),
+            field_arr,
+            mom_arr,
+            m2,
+            (dx,),
+            (True,),
         )
         spectral_total = float(se_bins.sum())
 
@@ -2841,7 +2947,11 @@ class TestSpectralEnergyPhysics:
         m2_tachyonic = -1.0
 
         wavenumbers, se = compute_spectral_energy(
-            field, momentum, m2_tachyonic, (dx,), (True,),
+            field,
+            momentum,
+            m2_tachyonic,
+            (dx,),
+            (True,),
         )
         # Should produce finite results (some bins may be negative)
         assert np.all(np.isfinite(se))
@@ -2966,7 +3076,9 @@ class TestDispersionRelation:
 
         # Should match within Rayleigh resolution
         np.testing.assert_allclose(
-            detected_omega, omega0, atol=2 * result.rayleigh_resolution,
+            detected_omega,
+            omega0,
+            atol=2 * result.rayleigh_resolution,
         )
 
     def test_kg_dispersion_curve(self) -> None:
@@ -2987,7 +3099,8 @@ class TestDispersionRelation:
 
             # Within 2x Rayleigh resolution
             np.testing.assert_allclose(
-                omega_detected, omega_expected,
+                omega_detected,
+                omega_expected,
                 atol=2 * result.rayleigh_resolution,
             )
 
@@ -3718,7 +3831,8 @@ class TestCrashRecoveryHardened:
 
         # Corrupt entry 3 with NaN (simulating partial write)
         times_mmap = np.load(
-            str(output_dir / "times.npy"), mmap_mode="r+",
+            str(output_dir / "times.npy"),
+            mmap_mode="r+",
         )
         times_mmap[3] = float("nan")
         times_mmap.flush()
@@ -3830,7 +3944,9 @@ class TestMemmapMeasurementIntegration:
         result_dir = compute_conversion_probability(data_dir, "phi_0", "chi_0")
 
         np.testing.assert_allclose(
-            result_dir.probability, result_mem.probability, rtol=1e-12,
+            result_dir.probability,
+            result_mem.probability,
+            rtol=1e-12,
         )
 
 
@@ -3852,11 +3968,13 @@ class TestSimulationDataSave:
         np.testing.assert_array_almost_equal(loaded.times, data.times)
         for name in data.fields:
             np.testing.assert_array_almost_equal(
-                loaded.fields[name], data.fields[name],
+                loaded.fields[name],
+                data.fields[name],
             )
         for name in data.momenta:
             np.testing.assert_array_almost_equal(
-                loaded.momenta[name], data.momenta[name],
+                loaded.momenta[name],
+                data.momenta[name],
             )
         assert loaded.grid_spacing == data.grid_spacing
         assert loaded.grid_bounds == data.grid_bounds
@@ -3909,9 +4027,7 @@ class TestSnapshotCountValidation:
             "n_snapshots": 100,
             "fields": [eq.field_name for eq in spec.equations],
             "momenta": [
-                eq.field_name
-                for eq in spec.equations
-                if eq.time_derivative_order >= 2
+                eq.field_name for eq in spec.equations if eq.time_derivative_order >= 2
             ],
             "grid_spacing": [1.0],
             "grid_bounds": [[0.0, 8.0]],
@@ -3933,28 +4049,41 @@ class TestSimulationDataFromResult:
     def _kg_spec() -> EquationSystem:
         from tidal.symbolic.json_loader import EquationSystem
 
-        return EquationSystem.from_dict({
-            "metadata": {"source": "test", "parameters": {"m2": 1.0}},
-            "spacetime": {
-                "dimension": 2,
-                "signature": [-1, 1],
-                "coordinates": ["t", "x"],
-            },
-            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
-            "equations": [
-                {
-                    "field": "phi_0",
-                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
-                    "rhs": {
-                        "type": "linear_combination",
-                        "terms": [
-                            {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
-                        ],
-                    },
-                }
-            ],
-        })
+        return EquationSystem.from_dict(
+            {
+                "metadata": {"source": "test", "parameters": {"m2": 1.0}},
+                "spacetime": {
+                    "dimension": 2,
+                    "signature": [-1, 1],
+                    "coordinates": ["t", "x"],
+                },
+                "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+                "equations": [
+                    {
+                        "field": "phi_0",
+                        "lhs": {
+                            "expression": "d2_t(phi_0)",
+                            "order": {"time": 2, "space": 0},
+                        },
+                        "rhs": {
+                            "type": "linear_combination",
+                            "terms": [
+                                {
+                                    "coefficient": -1.0,
+                                    "operator": "identity",
+                                    "field": "phi_0",
+                                },
+                                {
+                                    "coefficient": 1.0,
+                                    "operator": "laplacian_x",
+                                    "field": "phi_0",
+                                },
+                            ],
+                        },
+                    }
+                ],
+            }
+        )
 
     def test_shapes(self) -> None:
         """Fields and momenta have correct (n_snapshots, *grid_shape)."""
@@ -3989,7 +4118,12 @@ class TestSimulationDataFromResult:
 
         rng = np.random.default_rng(123)
         y = rng.standard_normal((3, 16))  # 2 slots x 8 points
-        result = {"t": np.array([0.0, 0.5, 1.0]), "y": y, "success": True, "message": ""}
+        result = {
+            "t": np.array([0.0, 0.5, 1.0]),
+            "y": y,
+            "success": True,
+            "message": "",
+        }
 
         sd = SimulationData.from_result(result, spec, gi)
 
@@ -4005,7 +4139,12 @@ class TestSimulationDataFromResult:
         spec = self._kg_spec()
         gi = GridInfo(bounds=((0.0, 8.0),), shape=(16,), periodic=(True,))
 
-        result = {"t": np.array([0.0]), "y": np.zeros((1, 32)), "success": True, "message": ""}
+        result = {
+            "t": np.array([0.0]),
+            "y": np.zeros((1, 32)),
+            "success": True,
+            "message": "",
+        }
         sd = SimulationData.from_result(result, spec, gi, {"m2": 2.0})
 
         assert sd.grid_spacing == gi.dx
@@ -4020,7 +4159,12 @@ class TestSimulationDataFromResult:
         spec = self._kg_spec()
         gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(False,))
 
-        result = {"t": np.array([]), "y": np.zeros((0, 32)), "success": True, "message": ""}
+        result = {
+            "t": np.array([]),
+            "y": np.zeros((0, 32)),
+            "success": True,
+            "message": "",
+        }
         with pytest.raises(ValueError, match="no snapshots"):
             SimulationData.from_result(result, spec, gi)
 
@@ -4186,10 +4330,16 @@ class TestBCTypes:
         field = np.cos(np.pi * x / length)
 
         grad_neumann = _gradient_energy_density(
-            field, (dx,), (False,), bc_types=("neumann",),
+            field,
+            (dx,),
+            (False,),
+            bc_types=("neumann",),
         )
         grad_dirichlet = _gradient_energy_density(
-            field, (dx,), (False,), bc_types=("dirichlet",),
+            field,
+            (dx,),
+            (False,),
+            bc_types=("dirichlet",),
         )
         # They should not be equal — Dirichlet applies odd-reflection
         # at the boundaries which distorts the cos mode
@@ -4201,7 +4351,8 @@ class TestDtMetadata:
 
     @staticmethod
     def _make_sim_data(
-        *, dt: float | None = None,
+        *,
+        dt: float | None = None,
     ) -> SimulationData:
         """Build a minimal SimulationData with dt."""
         from tidal.symbolic.json_loader import EquationSystem

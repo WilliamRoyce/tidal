@@ -23,7 +23,11 @@ class TestGridInfoConstruction:
         assert g.dx == pytest.approx((0.5, 0.5))
 
     def test_3d(self) -> None:
-        g = GridInfo(bounds=((0, 1), (0, 2), (0, 3)), shape=(4, 5, 6), periodic=(False, True, False))
+        g = GridInfo(
+            bounds=((0, 1), (0, 2), (0, 3)),
+            shape=(4, 5, 6),
+            periodic=(False, True, False),
+        )
         assert g.ndim == 3
         assert g.num_points == 120
         assert g.dx == pytest.approx((0.25, 0.4, 0.5))
@@ -71,7 +75,12 @@ class TestGridInfoBC:
 
     def test_bc_length_mismatch(self) -> None:
         with pytest.raises(ValueError, match="bc has 1 entries"):
-            GridInfo(bounds=((0, 1), (0, 2)), shape=(5, 10), periodic=(True, True), bc=("periodic",))
+            GridInfo(
+                bounds=((0, 1), (0, 2)),
+                shape=(5, 10),
+                periodic=(True, True),
+                bc=("periodic",),
+            )
 
     def test_bc_invalid_type(self) -> None:
         with pytest.raises(ValueError, match="must be one of"):
@@ -123,7 +132,11 @@ class TestGridInfoCoords:
         np.testing.assert_allclose(cc[..., 1], ys)
 
     def test_3d_coord_arrays(self) -> None:
-        g = GridInfo(bounds=((0, 1), (0, 2), (0, 3)), shape=(4, 5, 6), periodic=(False, True, False))
+        g = GridInfo(
+            bounds=((0, 1), (0, 2), (0, 3)),
+            shape=(4, 5, 6),
+            periodic=(False, True, False),
+        )
         xs, _ys, zs = g.coord_arrays()
         assert xs.shape == (4, 5, 6)
         # z constant along axes 0, 1
@@ -137,7 +150,9 @@ class TestGridInfoAxisBCs:
         side = SideBCSpec(kind="neumann")
         abc = AxisBCSpec(periodic=False, low=side, high=side)
         g = GridInfo(
-            bounds=((0, 10),), shape=(64,), periodic=(False,),
+            bounds=((0, 10),),
+            shape=(64,),
+            periodic=(False,),
             axis_bcs=(abc,),
         )
         assert g.axis_bcs is not None
@@ -147,7 +162,9 @@ class TestGridInfoAxisBCs:
     def test_axis_bcs_periodic(self) -> None:
         abc = AxisBCSpec(periodic=True)
         g = GridInfo(
-            bounds=((0, 10),), shape=(64,), periodic=(True,),
+            bounds=((0, 10),),
+            shape=(64,),
+            periodic=(True,),
             axis_bcs=(abc,),
         )
         assert g.axis_bcs is not None
@@ -158,7 +175,9 @@ class TestGridInfoAxisBCs:
         abc = AxisBCSpec(periodic=False, low=side, high=side)
         with pytest.raises(ValueError, match="axis_bcs has 1 entries but grid has 2"):
             GridInfo(
-                bounds=((0, 10), (0, 5)), shape=(32, 32), periodic=(False, False),
+                bounds=((0, 10), (0, 5)),
+                shape=(32, 32),
+                periodic=(False, False),
                 axis_bcs=(abc,),
             )
 
@@ -166,7 +185,9 @@ class TestGridInfoAxisBCs:
         abc = AxisBCSpec(periodic=True)
         with pytest.raises(ValueError, match=r"axis_bcs.*periodic.*must be consistent"):
             GridInfo(
-                bounds=((0, 10),), shape=(64,), periodic=(False,),
+                bounds=((0, 10),),
+                shape=(64,),
+                periodic=(False,),
                 axis_bcs=(abc,),
             )
 
@@ -175,7 +196,9 @@ class TestGridInfoAxisBCs:
         side = SideBCSpec(kind="dirichlet", value=1.0)
         abc = AxisBCSpec(periodic=False, low=side, high=side)
         g = GridInfo(
-            bounds=((0, 10),), shape=(64,), periodic=(False,),
+            bounds=((0, 10),),
+            shape=(64,),
+            periodic=(False,),
             axis_bcs=(abc,),
         )
         ebc = g.effective_bc
@@ -184,7 +207,9 @@ class TestGridInfoAxisBCs:
     def test_effective_bc_falls_back_to_bc_strings(self) -> None:
         """Without axis_bcs, effective_bc returns string tuple."""
         g = GridInfo(
-            bounds=((0, 10),), shape=(64,), periodic=(False,),
+            bounds=((0, 10),),
+            shape=(64,),
+            periodic=(False,),
             bc=("neumann",),
         )
         assert g.effective_bc == ("neumann",)
@@ -197,7 +222,9 @@ class TestGridInfoAxisBCs:
     def test_robin_in_bc_string(self) -> None:
         """Robin is a valid bc string type."""
         g = GridInfo(
-            bounds=((0, 10),), shape=(64,), periodic=(False,),
+            bounds=((0, 10),),
+            shape=(64,),
+            periodic=(False,),
             bc=("robin",),
         )
         assert g.bc == ("robin",)

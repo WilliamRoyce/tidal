@@ -214,7 +214,11 @@ _EM_3D_SPEC: dict[str, object] = {
                 "terms": [
                     {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_0"},
                     {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_1"},
-                    {"coefficient": -1.0, "operator": "cross_derivative_xy", "field": "A_2"},
+                    {
+                        "coefficient": -1.0,
+                        "operator": "cross_derivative_xy",
+                        "field": "A_2",
+                    },
                 ],
             },
         },
@@ -225,7 +229,11 @@ _EM_3D_SPEC: dict[str, object] = {
                 "type": "linear_combination",
                 "terms": [
                     {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_2"},
-                    {"coefficient": -1.0, "operator": "cross_derivative_xy", "field": "A_1"},
+                    {
+                        "coefficient": -1.0,
+                        "operator": "cross_derivative_xy",
+                        "field": "A_1",
+                    },
                     {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_0"},
                 ],
             },
@@ -392,15 +400,24 @@ def coupled_scalars_dir(
     from tidal.cli import main
 
     output = tmp_path_factory.mktemp("measure") / "coupled_scalars_out"
-    ret = main([
-        "simulate", str(inline_coupled_scalars_json),
-        "--param", "mPhi2=1.0",
-        "--param", "mChi2=4.0",
-        "--param", "gCpl=0.5",
-        "--t-end", "5.0",
-        "--grid-shape", "32",
-        "--output", str(output),
-    ])
+    ret = main(
+        [
+            "simulate",
+            str(inline_coupled_scalars_json),
+            "--param",
+            "mPhi2=1.0",
+            "--param",
+            "mChi2=4.0",
+            "--param",
+            "gCpl=0.5",
+            "--t-end",
+            "5.0",
+            "--grid-shape",
+            "32",
+            "--output",
+            str(output),
+        ]
+    )
     assert ret == 0, "coupled_scalars simulation failed"
     assert output.is_dir(), "Snapshot directory was not created"
     return output

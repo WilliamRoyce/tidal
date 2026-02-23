@@ -32,7 +32,11 @@ from tidal.symbolic.json_loader import (
 def _make_em_2d_spec() -> EquationSystem:
     """Build EM 2+1D spec inline (Maxwell A_0 constraint + A_1, A_2 wave eqs)."""
     data: dict[str, Any] = {
-        "spacetime": {"dimension": 3, "signature": [-1, 1, 1], "coordinates": ["t", "x", "y"]},
+        "spacetime": {
+            "dimension": 3,
+            "signature": [-1, 1, 1],
+            "coordinates": ["t", "x", "y"],
+        },
         "fields": [
             {"name": "A_0", "index": 0, "is_dynamical": True},
             {"name": "A_1", "index": 1, "is_dynamical": True},
@@ -46,9 +50,17 @@ def _make_em_2d_spec() -> EquationSystem:
                     "type": "linear_combination",
                     "terms": [
                         {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
-                        {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_1"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_x",
+                            "field": "pi_1",
+                        },
                         {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_0"},
-                        {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_2"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_y",
+                            "field": "pi_2",
+                        },
                     ],
                 },
                 "constraint_solver": {
@@ -66,9 +78,17 @@ def _make_em_2d_spec() -> EquationSystem:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_0"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_x",
+                            "field": "pi_0",
+                        },
                         {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_1"},
-                        {"coefficient": -1.0, "operator": "cross_derivative_xy", "field": "A_2"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "cross_derivative_xy",
+                            "field": "A_2",
+                        },
                     ],
                 },
             },
@@ -79,8 +99,16 @@ def _make_em_2d_spec() -> EquationSystem:
                     "type": "linear_combination",
                     "terms": [
                         {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_2"},
-                        {"coefficient": -1.0, "operator": "cross_derivative_xy", "field": "A_1"},
-                        {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_0"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "cross_derivative_xy",
+                            "field": "A_1",
+                        },
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_y",
+                            "field": "pi_0",
+                        },
                     ],
                 },
             },
@@ -105,8 +133,12 @@ def _make_em_2d_spec() -> EquationSystem:
                 "dimension": 2,
             },
             "spatial_momenta": {
-                "A_1": [{"coefficient": -1.0, "operator": "gradient_x", "field": "A_0"}],
-                "A_2": [{"coefficient": -1.0, "operator": "gradient_y", "field": "A_0"}],
+                "A_1": [
+                    {"coefficient": -1.0, "operator": "gradient_x", "field": "A_0"}
+                ],
+                "A_2": [
+                    {"coefficient": -1.0, "operator": "gradient_y", "field": "A_0"}
+                ],
             },
             "hamiltonian_symbolic": "test",
         },
@@ -118,7 +150,11 @@ def _make_chern_simons_spec() -> EquationSystem:
     """Build Chern-Simons 2+1D spec inline (A_0 constraint + A_1, A_2 with kappa coupling)."""
     data: dict[str, Any] = {
         "metadata": {"parameters": {"kappa": 0.5}},
-        "spacetime": {"dimension": 3, "signature": [-1, 1, 1], "coordinates": ["t", "x", "y"]},
+        "spacetime": {
+            "dimension": 3,
+            "signature": [-1, 1, 1],
+            "coordinates": ["t", "x", "y"],
+        },
         "fields": [
             {"name": "A_0", "index": 0, "is_dynamical": True},
             {"name": "A_1", "index": 1, "is_dynamical": True},
@@ -131,12 +167,30 @@ def _make_chern_simons_spec() -> EquationSystem:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "gradient_x", "field": "A_2", "coefficient_symbolic": "kappa"},
+                        {
+                            "coefficient": 1.0,
+                            "operator": "gradient_x",
+                            "field": "A_2",
+                            "coefficient_symbolic": "kappa",
+                        },
                         {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
-                        {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_1"},
-                        {"coefficient": -1.0, "operator": "gradient_y", "field": "A_1", "coefficient_symbolic": "-kappa"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_x",
+                            "field": "pi_1",
+                        },
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_y",
+                            "field": "A_1",
+                            "coefficient_symbolic": "-kappa",
+                        },
                         {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_0"},
-                        {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_2"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_y",
+                            "field": "pi_2",
+                        },
                     ],
                 },
                 "constraint_solver": {
@@ -154,11 +208,29 @@ def _make_chern_simons_spec() -> EquationSystem:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "first_derivative_t", "field": "A_2", "coefficient_symbolic": "kappa"},
-                        {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_0"},
-                        {"coefficient": -1.0, "operator": "gradient_y", "field": "A_0", "coefficient_symbolic": "-kappa"},
+                        {
+                            "coefficient": 1.0,
+                            "operator": "first_derivative_t",
+                            "field": "A_2",
+                            "coefficient_symbolic": "kappa",
+                        },
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_x",
+                            "field": "pi_0",
+                        },
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_y",
+                            "field": "A_0",
+                            "coefficient_symbolic": "-kappa",
+                        },
                         {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_1"},
-                        {"coefficient": -1.0, "operator": "cross_derivative_xy", "field": "A_2"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "cross_derivative_xy",
+                            "field": "A_2",
+                        },
                     ],
                 },
             },
@@ -168,11 +240,29 @@ def _make_chern_simons_spec() -> EquationSystem:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0", "coefficient_symbolic": "kappa"},
+                        {
+                            "coefficient": 1.0,
+                            "operator": "gradient_x",
+                            "field": "A_0",
+                            "coefficient_symbolic": "kappa",
+                        },
                         {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_2"},
-                        {"coefficient": -1.0, "operator": "first_derivative_t", "field": "A_1", "coefficient_symbolic": "-kappa"},
-                        {"coefficient": -1.0, "operator": "cross_derivative_xy", "field": "A_1"},
-                        {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_0"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "first_derivative_t",
+                            "field": "A_1",
+                            "coefficient_symbolic": "-kappa",
+                        },
+                        {
+                            "coefficient": -1.0,
+                            "operator": "cross_derivative_xy",
+                            "field": "A_1",
+                        },
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_y",
+                            "field": "pi_0",
+                        },
                     ],
                 },
             },
@@ -182,12 +272,22 @@ def _make_chern_simons_spec() -> EquationSystem:
             "field_rates": {
                 "A_1": [
                     {"coefficient": 1.0, "operator": "identity", "field": "pi_1"},
-                    {"coefficient": -0.5, "operator": "identity", "field": "A_2", "coefficient_symbolic": "-1/2*kappa"},
+                    {
+                        "coefficient": -0.5,
+                        "operator": "identity",
+                        "field": "A_2",
+                        "coefficient_symbolic": "-1/2*kappa",
+                    },
                     {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"},
                 ],
                 "A_2": [
                     {"coefficient": 1.0, "operator": "identity", "field": "pi_2"},
-                    {"coefficient": 0.5, "operator": "identity", "field": "A_1", "coefficient_symbolic": "kappa/2"},
+                    {
+                        "coefficient": 0.5,
+                        "operator": "identity",
+                        "field": "A_1",
+                        "coefficient_symbolic": "kappa/2",
+                    },
                     {"coefficient": 1.0, "operator": "gradient_y", "field": "A_0"},
                 ],
             },
@@ -199,8 +299,12 @@ def _make_chern_simons_spec() -> EquationSystem:
                 "dimension": 2,
             },
             "spatial_momenta": {
-                "A_1": [{"coefficient": -1.0, "operator": "gradient_x", "field": "A_0"}],
-                "A_2": [{"coefficient": -1.0, "operator": "gradient_y", "field": "A_0"}],
+                "A_1": [
+                    {"coefficient": -1.0, "operator": "gradient_x", "field": "A_0"}
+                ],
+                "A_2": [
+                    {"coefficient": -1.0, "operator": "gradient_y", "field": "A_0"}
+                ],
             },
             "hamiltonian_symbolic": "test",
         },
@@ -228,9 +332,14 @@ def _make_kg_spec() -> EquationSystem:
         "canonical": {
             "hamiltonian_terms": [],
             "field_rates": {
-                "phi_0": [{"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}],
+                "phi_0": [
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}
+                ],
             },
-            "kinetic_matrix": {"entries": [{"i": 0, "j": 0, "value": 1.0}], "dimension": 1},
+            "kinetic_matrix": {
+                "entries": [{"i": 0, "j": 0, "value": 1.0}],
+                "dimension": 1,
+            },
             "spatial_momenta": {},
             "hamiltonian_symbolic": "test",
         },
@@ -288,9 +397,14 @@ def _make_helmholtz_spec() -> EquationSystem:
         "canonical": {
             "hamiltonian_terms": [],
             "field_rates": {
-                "rho_0": [{"coefficient": 1.0, "operator": "identity", "field": "pi_1"}],
+                "rho_0": [
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_1"}
+                ],
             },
-            "kinetic_matrix": {"entries": [{"i": 0, "j": 0, "value": 1.0}], "dimension": 1},
+            "kinetic_matrix": {
+                "entries": [{"i": 0, "j": 0, "value": 1.0}],
+                "dimension": 1,
+            },
             "spatial_momenta": {},
             "hamiltonian_symbolic": "test",
         },
@@ -313,7 +427,9 @@ class TestClassifyTerms:
         coeff_eval = CoefficientEvaluator(spec, grid)
 
         eq = spec.equations[0]
-        terms = _classify_terms(0, eq.rhs_terms, "A_0", coeff_eval, 0.0, eq.constraint_solver)
+        terms = _classify_terms(
+            0, eq.rhs_terms, "A_0", coeff_eval, 0.0, eq.constraint_solver
+        )
 
         # Self-terms: laplacian_x(A_0) + laplacian_y(A_0)
         assert len(terms.self_terms) == 2
@@ -336,7 +452,9 @@ class TestClassifyTerms:
         coeff_eval = CoefficientEvaluator(spec, grid)
 
         eq = spec.equations[0]
-        terms = _classify_terms(0, eq.rhs_terms, "A_0", coeff_eval, 0.0, eq.constraint_solver)
+        terms = _classify_terms(
+            0, eq.rhs_terms, "A_0", coeff_eval, 0.0, eq.constraint_solver
+        )
         assert not terms.has_position_dependent_self
 
 
@@ -684,7 +802,11 @@ class TestPreSolveConstraints:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "A_0",
+                            },
                         ],
                     },
                     "constraint_solver": {"enabled": False},
@@ -695,7 +817,11 @@ class TestPreSolveConstraints:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "A_1"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "A_1",
+                            },
                         ],
                     },
                 },
@@ -703,7 +829,9 @@ class TestPreSolveConstraints:
             "canonical": {
                 "hamiltonian_terms": [],
                 "field_rates": {
-                    "A_1": [{"coefficient": 1.0, "operator": "identity", "field": "pi_1"}],
+                    "A_1": [
+                        {"coefficient": 1.0, "operator": "identity", "field": "pi_1"}
+                    ],
                 },
                 "kinetic_matrix": {
                     "entries": [{"i": 0, "j": 0, "value": 1.0}],
@@ -714,9 +842,7 @@ class TestPreSolveConstraints:
             },
         }
         spec = EquationSystem.from_dict(data)
-        grid = GridInfo(
-            bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True)
-        )
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
         layout = StateLayout.from_spec(spec, grid.num_points)
         y0 = np.random.default_rng(42).standard_normal(layout.total_size)
 
@@ -832,7 +958,7 @@ class TestPreSolveConstraints:
         residual = laplacian(phi, grid, "periodic") - phi + rho
         assert float(np.max(np.abs(residual))) < 1e-10
 
-    def test_doesnt_mutate_input(self) -> None:
+    def test_does_not_mutate_input(self) -> None:
         """pre_solve_constraints should not modify the input y0."""
         spec = _make_em_2d_spec()
         grid = GridInfo(
@@ -864,9 +990,7 @@ def _has_sundials() -> bool:
 
 
 class TestIDAWithPreSolve:
-    @pytest.mark.skipif(
-        not _has_sundials(), reason="sksundae not available"
-    )
+    @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
     def test_helmholtz_ida_succeeds(self) -> None:
         """IDA solve with Helmholtz constraint pre-solve succeeds.
 
@@ -902,9 +1026,7 @@ class TestIDAWithPreSolve:
         assert result["success"], f"IDA failed: {result['message']}"
         assert len(result["t"]) == 5
 
-    @pytest.mark.skipif(
-        not _has_sundials(), reason="sksundae not available"
-    )
+    @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
     def test_chern_simons_ida_succeeds(self) -> None:
         """Full IDA solve on Chern-Simons: pre-solve + gauge fixing.
 
@@ -949,11 +1071,11 @@ class TestIDAWithPreSolve:
         assert abs(a0_final[0]) < 1e-10
 
 
-class TestGaugeRegularisationWarnings:
-    """Verify that gauge regularisation emits user-visible warnings."""
+class TestGaugeRegularizationWarnings:
+    """Verify that gauge regularization emits user-visible warnings."""
 
     def test_fft_singular_mode_warns(self) -> None:
-        """FFT pre-solve emits UserWarning when zero-mode is regularised."""
+        """FFT pre-solve emits UserWarning when zero-mode is regularized."""
         spec = _make_chern_simons_spec()
         grid = GridInfo(
             bounds=((0, 50), (0, 50)),
@@ -974,11 +1096,9 @@ class TestGaugeRegularisationWarnings:
                 spec, grid, y0, bc="periodic", parameters={"kappa": 0.5}
             )
 
-    @pytest.mark.skipif(
-        not _has_sundials(), reason="sksundae not available"
-    )
+    @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
     def test_ida_gauge_pin_warns(self) -> None:
-        """IDA solver emits UserWarning for gauge regularisation (point-pinning)."""
+        """IDA solver emits UserWarning for gauge regularization (point-pinning)."""
         from tidal.solver.ida import solve_ida
 
         spec = _make_chern_simons_spec()
@@ -1027,13 +1147,9 @@ class TestGaugeRegularisationWarnings:
         # Pass AxisBCSpec instead of string — should still find FFT path
         bc = (AxisBCSpec(periodic=True), AxisBCSpec(periodic=True))
         with pytest.warns(UserWarning, match="singular mode"):
-            pre_solve_constraints(
-                spec, grid, y0, bc=bc, parameters={"kappa": 0.5}
-            )
+            pre_solve_constraints(spec, grid, y0, bc=bc, parameters={"kappa": 0.5})
 
-    @pytest.mark.skipif(
-        not _has_sundials(), reason="sksundae not available"
-    )
+    @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
     def test_ida_gauge_fix_with_axis_bc_spec(self) -> None:
         """IDA gauge-fix detection works with AxisBCSpec periodic BCs."""
         from tidal.solver.ida import solve_ida
@@ -1056,12 +1172,17 @@ class TestGaugeRegularisationWarnings:
         bc = (AxisBCSpec(periodic=True), AxisBCSpec(periodic=True))
         with pytest.warns(UserWarning, match="pinning A_0"):
             solve_ida(
-                spec, grid, y0, (0.0, 0.1),
-                bc=bc, parameters={"kappa": 0.5}, num_snapshots=3,
+                spec,
+                grid,
+                y0,
+                (0.0, 0.1),
+                bc=bc,
+                parameters={"kappa": 0.5},
+                num_snapshots=3,
             )
 
     def test_helmholtz_no_gauge_warning(self) -> None:
-        """Helmholtz constraint (non-singular) emits no gauge regularisation warning."""
+        """Helmholtz constraint (non-singular) emits no gauge regularization warning."""
         spec = _make_helmholtz_spec()
         grid = GridInfo(
             bounds=((0, 2 * np.pi), (0, 2 * np.pi)),
@@ -1250,9 +1371,7 @@ def _make_multi_no_self_term_spec() -> EquationSystem:
 class TestNoSelfTermConstraints:
     """Test IDA handling of constraints with no self-referencing terms."""
 
-    @pytest.mark.skipif(
-        not _has_sundials(), reason="sksundae not available"
-    )
+    @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
     def test_ida_no_self_term_freezes_field(self) -> None:
         """IDA freezes no-self-term constraint field at zero."""
         from tidal.solver.ida import solve_ida
@@ -1266,14 +1385,16 @@ class TestNoSelfTermConstraints:
         # Give h_1 a Gaussian initial condition
         h1_slot = layout.field_slot_map["h_1"]
         x = grid.coord_arrays()[0]
-        y0[h1_slot * n : (h1_slot + 1) * n] = np.exp(
-            -((x - 5) ** 2) / 2
-        ).ravel()
+        y0[h1_slot * n : (h1_slot + 1) * n] = np.exp(-((x - 5) ** 2) / 2).ravel()
 
         with pytest.warns(UserWarning, match="no self-referencing"):
             result = solve_ida(
-                spec, grid, y0, (0.0, 0.5),
-                bc="periodic", num_snapshots=3,
+                spec,
+                grid,
+                y0,
+                (0.0, 0.5),
+                bc="periodic",
+                num_snapshots=3,
             )
 
         assert result["success"], result["message"]
@@ -1286,9 +1407,7 @@ class TestNoSelfTermConstraints:
                 f"h_0 should be frozen at zero, got max={np.abs(h0_data).max()}"
             )
 
-    @pytest.mark.skipif(
-        not _has_sundials(), reason="sksundae not available"
-    )
+    @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
     def test_ida_no_self_term_warns(self) -> None:
         """IDA emits UserWarning for no-self-term constraints."""
         from tidal.solver.ida import solve_ida
@@ -1300,8 +1419,12 @@ class TestNoSelfTermConstraints:
 
         with pytest.warns(UserWarning, match="Freezing 'h_0' at zero"):
             solve_ida(
-                spec, grid, y0, (0.0, 0.1),
-                bc="periodic", num_snapshots=3,
+                spec,
+                grid,
+                y0,
+                (0.0, 0.1),
+                bc="periodic",
+                num_snapshots=3,
             )
 
     def test_sparsity_no_self_term_diagonal(self) -> None:
@@ -1329,9 +1452,7 @@ class TestNoSelfTermConstraints:
                 f"Missing diagonal entry at ({i},{i}) for no-self-term field"
             )
 
-    @pytest.mark.skipif(
-        not _has_sundials(), reason="sksundae not available"
-    )
+    @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
     def test_ida_ic_consistency_warns_when_violated(self) -> None:
         """IDA emits UserWarning when IC violates a no-self-term constraint."""
         from tidal.solver.ida import solve_ida
@@ -1346,19 +1467,19 @@ class TestNoSelfTermConstraints:
         # will have nonzero residual → IC consistency warning
         h1_slot = layout.field_slot_map["h_1"]
         x = grid.coord_arrays()[0]
-        y0[h1_slot * n : (h1_slot + 1) * n] = np.exp(
-            -((x - 5) ** 2) / 2
-        ).ravel()
+        y0[h1_slot * n : (h1_slot + 1) * n] = np.exp(-((x - 5) ** 2) / 2).ravel()
 
         with pytest.warns(UserWarning, match="does not satisfy subsidiary"):
             solve_ida(
-                spec, grid, y0, (0.0, 0.5),
-                bc="periodic", num_snapshots=3,
+                spec,
+                grid,
+                y0,
+                (0.0, 0.5),
+                bc="periodic",
+                num_snapshots=3,
             )
 
-    @pytest.mark.skipif(
-        not _has_sundials(), reason="sksundae not available"
-    )
+    @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
     def test_ida_ic_consistency_no_warn_when_satisfied(self) -> None:
         """No IC consistency warning when initial data satisfies constraint."""
         import warnings as _warnings
@@ -1374,16 +1495,20 @@ class TestNoSelfTermConstraints:
         with _warnings.catch_warnings(record=True) as caught:
             _warnings.simplefilter("always")
             solve_ida(
-                spec, grid, y0, (0.0, 0.1),
-                bc="periodic", num_snapshots=3,
+                spec,
+                grid,
+                y0,
+                (0.0, 0.1),
+                bc="periodic",
+                num_snapshots=3,
             )
 
-        ic_warns = [w for w in caught if "does not satisfy subsidiary" in str(w.message)]
+        ic_warns = [
+            w for w in caught if "does not satisfy subsidiary" in str(w.message)
+        ]
         assert len(ic_warns) == 0, "Should not warn when IC satisfies constraint"
 
-    @pytest.mark.skipif(
-        not _has_sundials(), reason="sksundae not available"
-    )
+    @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
     def test_ida_multi_constraint_joint_ic_check(self) -> None:
         """Multiple no-self-term constraints: single warning lists all violations.
 
@@ -1413,12 +1538,18 @@ class TestNoSelfTermConstraints:
         with _warnings.catch_warnings(record=True) as caught:
             _warnings.simplefilter("always")
             solve_ida(
-                spec, grid, y0, (0.0, 0.5),
-                bc="periodic", num_snapshots=3,
+                spec,
+                grid,
+                y0,
+                (0.0, 0.5),
+                bc="periodic",
+                num_snapshots=3,
             )
 
         # Should get exactly ONE summary warning mentioning both constraints
-        ic_warns = [w for w in caught if "does not satisfy subsidiary" in str(w.message)]
+        ic_warns = [
+            w for w in caught if "does not satisfy subsidiary" in str(w.message)
+        ]
         assert len(ic_warns) == 1, f"Expected 1 summary warning, got {len(ic_warns)}"
         msg = str(ic_warns[0].message)
         assert "c_0" in msg, "Warning should mention c_0"

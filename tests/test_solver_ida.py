@@ -99,12 +99,12 @@ class TestResidualFunction:
         # State: phi = sin(x), pi = cos(x)
         y = np.zeros(layout.total_size)
         y[0:n] = np.sin(x)  # phi
-        y[n:2 * n] = np.cos(x)  # pi
+        y[n : 2 * n] = np.cos(x)  # pi
 
         # Correct yp for Hamilton's 1st: dq/dt = pi (K=I, S=0)
         yp = np.zeros(layout.total_size)
         yp[0:n] = np.cos(x)  # d(phi)/dt = pi = cos(x)
-        yp[n:2 * n] = 0  # d(pi)/dt = laplacian(phi) = -sin(x) — but we leave it 0
+        yp[n : 2 * n] = 0  # d(pi)/dt = laplacian(phi) = -sin(x) — but we leave it 0
 
         res = np.zeros(layout.total_size)
         resfn(0.0, y, yp, res)
@@ -113,8 +113,8 @@ class TestResidualFunction:
         np.testing.assert_allclose(res[0:n], 0, atol=1e-14)
 
         # Momentum slot residual: yp[pi] - laplacian(phi) = 0 - (-sin(x))
-        # O(dx²) discretisation error on 16-point grid
-        np.testing.assert_allclose(res[n:2 * n], np.sin(x), atol=0.02)
+        # O(dx²) discretization error on 16-point grid
+        np.testing.assert_allclose(res[n : 2 * n], np.sin(x), atol=0.02)
 
 
 class TestIDAIntegration:
@@ -133,7 +133,9 @@ class TestIDAIntegration:
         y0[0:n] = np.sin(x)
 
         result = solve_ida(
-            spec, grid, y0,
+            spec,
+            grid,
+            y0,
             t_span=(0.0, 1.0),
             num_snapshots=11,
             rtol=1e-6,
@@ -278,9 +280,7 @@ class TestFallbackWarnings:
             warnings.simplefilter("always")
             resfn(0.0, y, yp, res)
 
-        identity_warnings = [
-            x for x in w if "assuming K = I" in str(x.message)
-        ]
+        identity_warnings = [x for x in w if "assuming K = I" in str(x.message)]
         assert len(identity_warnings) >= 1, (
             "Expected warning about identity K assumption for multi-field system"
         )
@@ -298,8 +298,11 @@ class TestFallbackWarnings:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian",
-                             "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 }
@@ -319,9 +322,7 @@ class TestFallbackWarnings:
             warnings.simplefilter("always")
             resfn(0.0, y, yp, res)
 
-        identity_warnings = [
-            x for x in w if "assuming K = I" in str(x.message)
-        ]
+        identity_warnings = [x for x in w if "assuming K = I" in str(x.message)]
         assert len(identity_warnings) == 0, (
             "Single-field system should not warn about K = I"
         )

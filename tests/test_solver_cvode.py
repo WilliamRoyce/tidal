@@ -66,7 +66,11 @@ class TestCVODEBasic:
 
         y0 = np.zeros(layout.total_size)
         result = solve_cvode(
-            spec, grid, y0, t_span=(0.0, 1.0), bc="periodic",
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            bc="periodic",
             num_snapshots=5,
         )
         assert result["success"]
@@ -84,8 +88,14 @@ class TestCVODEBasic:
         y0[:64] = np.sin(x)
 
         result = solve_cvode(
-            spec, grid, y0, t_span=(0.0, 2.0), bc="periodic",
-            rtol=1e-8, atol=1e-10, num_snapshots=11,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 2.0),
+            bc="periodic",
+            rtol=1e-8,
+            atol=1e-10,
+            num_snapshots=11,
         )
         assert result["success"]
 
@@ -103,7 +113,11 @@ class TestCVODEBasic:
 
         y0 = np.zeros(layout.total_size)
         result = solve_cvode(
-            spec, grid, y0, t_span=(0.0, 0.1), bc="periodic",
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 0.1),
+            bc="periodic",
             num_snapshots=3,
         )
         assert set(result.keys()) == {"t", "y", "success", "message"}
@@ -116,7 +130,11 @@ class TestCVODEBasic:
 
         y0 = np.zeros(layout.total_size)
         result = solve_cvode(
-            spec, grid, y0, t_span=(0.0, 1.0), bc="periodic",
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            bc="periodic",
             num_snapshots=21,
         )
         assert result["success"]
@@ -131,8 +149,13 @@ class TestCVODEBasic:
 
         for method in ("BDF", "Adams"):
             result = solve_cvode(
-                spec, grid, y0, t_span=(0.0, 0.5), bc="periodic",
-                method=method, num_snapshots=5,
+                spec,
+                grid,
+                y0,
+                t_span=(0.0, 0.5),
+                bc="periodic",
+                method=method,
+                num_snapshots=5,
             )
             assert result["success"], f"Method {method} failed"
 
@@ -150,15 +173,27 @@ class TestCVODEBasic:
 
         # Loose tolerance
         r1 = solve_cvode(
-            spec, grid, y0, t_span=(0.0, 1.0), bc="periodic",
-            rtol=1e-4, atol=1e-6, num_snapshots=5,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            bc="periodic",
+            rtol=1e-4,
+            atol=1e-6,
+            num_snapshots=5,
         )
         err1 = float(np.max(np.abs(r1["y"][-1][:64] - expected_phi)))
 
         # Tight tolerance
         r2 = solve_cvode(
-            spec, grid, y0, t_span=(0.0, 1.0), bc="periodic",
-            rtol=1e-10, atol=1e-12, num_snapshots=5,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            bc="periodic",
+            rtol=1e-10,
+            atol=1e-12,
+            num_snapshots=5,
         )
         err2 = float(np.max(np.abs(r2["y"][-1][:64] - expected_phi)))
 
@@ -177,8 +212,13 @@ class TestCVODEBasic:
             callback_times.append(t)
 
         result = solve_cvode(
-            spec, grid, y0, t_span=(0.0, 1.0), bc="periodic",
-            num_snapshots=11, snapshot_callback=cb,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            bc="periodic",
+            num_snapshots=11,
+            snapshot_callback=cb,
         )
         assert result["success"]
         assert len(callback_times) == 11

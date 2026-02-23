@@ -198,7 +198,8 @@ class TestBackgroundFieldValidation:
     """TOML validation edge cases for [[background_fields]]."""
 
     def test_background_gradient_in_lagrangian_raises(
-        self, tmp_path: pathlib.Path,
+        self,
+        tmp_path: pathlib.Path,
     ) -> None:
         """CD[-a][G[]] in Lagrangian should raise with clear error message."""
         from tidal.cli._derive import _validate_config
@@ -223,7 +224,8 @@ class TestBackgroundFieldValidation:
             _validate_config(config)
 
     def test_background_no_gradient_passes(
-        self, tmp_path: pathlib.Path,
+        self,
+        tmp_path: pathlib.Path,
     ) -> None:
         """G[] * phi[] (no gradient) should pass validation."""
         from tidal.cli._derive import _validate_config
@@ -245,7 +247,8 @@ class TestBackgroundFieldValidation:
         _validate_config(config)
 
     def test_multiple_background_fields(
-        self, tmp_path: pathlib.Path,
+        self,
+        tmp_path: pathlib.Path,
     ) -> None:
         """Two background fields in same config should work."""
         from tidal.cli import main
@@ -286,7 +289,8 @@ path = "output.json"
         assert ret == 0
 
     def test_background_with_derived_fields(
-        self, tmp_path: pathlib.Path,
+        self,
+        tmp_path: pathlib.Path,
     ) -> None:
         """Background and derived fields should coexist."""
         from tidal.cli import main
@@ -365,27 +369,35 @@ def _make_position_dependent_sim_data(
 
     if position_dependent_coupling:
         # Add position-dependent cross-field coupling
-        phi_terms_list.append(OperatorTerm(
-            coefficient=-0.1,
-            operator="identity",
-            field="chi_0",
-            coefficient_symbolic="-g0 * exp(-(x()^2 + y()^2))",
-            coordinate_dependent=("x", "y"),
-        ))
-        chi_terms_list.append(OperatorTerm(
-            coefficient=-0.1,
-            operator="identity",
-            field="phi_0",
-            coefficient_symbolic="-g0 * exp(-(x()^2 + y()^2))",
-            coordinate_dependent=("x", "y"),
-        ))
+        phi_terms_list.append(
+            OperatorTerm(
+                coefficient=-0.1,
+                operator="identity",
+                field="chi_0",
+                coefficient_symbolic="-g0 * exp(-(x()^2 + y()^2))",
+                coordinate_dependent=("x", "y"),
+            )
+        )
+        chi_terms_list.append(
+            OperatorTerm(
+                coefficient=-0.1,
+                operator="identity",
+                field="phi_0",
+                coefficient_symbolic="-g0 * exp(-(x()^2 + y()^2))",
+                coordinate_dependent=("x", "y"),
+            )
+        )
 
     eq_phi = ComponentEquation(
-        field_name="phi_0", field_index=0, time_derivative_order=2,
+        field_name="phi_0",
+        field_index=0,
+        time_derivative_order=2,
         rhs_terms=tuple(phi_terms_list),
     )
     eq_chi = ComponentEquation(
-        field_name="chi_0", field_index=1, time_derivative_order=2,
+        field_name="chi_0",
+        field_index=1,
+        time_derivative_order=2,
         rhs_terms=tuple(chi_terms_list),
     )
 
@@ -396,7 +408,9 @@ def _make_position_dependent_sim_data(
         component_names=("phi_0", "chi_0"),
         equations=(eq_phi, eq_chi),
         mass_matrix=((1.0, 0.0), (0.0, 1.0)),
-        coupling_matrix=((0.0, 0.1), (0.1, 0.0)) if position_dependent_coupling else ((0.0, 0.0), (0.0, 0.0)),
+        coupling_matrix=((0.0, 0.1), (0.1, 0.0))
+        if position_dependent_coupling
+        else ((0.0, 0.0), (0.0, 0.0)),
         metadata={},
         coordinates=("t", "x", "y"),
     )
@@ -500,10 +514,7 @@ class TestProcaScalarBackground:
     """Tests for coupled Proca with Lorentzian scalar background."""
 
     TOML_PATH = (
-        Path(__file__).parent.parent
-        / "examples"
-        / "proca_background"
-        / "theory.toml"
+        Path(__file__).parent.parent / "examples" / "proca_background" / "theory.toml"
     )
 
     def test_proca_background_wls_dry_run(self) -> None:
@@ -533,7 +544,9 @@ class TestProcaScalarBackground:
         xg, yg = np.meshgrid(x, y, indexing="ij")
 
         result = evaluate_coefficient(
-            expr, params, ("t", "x", "y"),
+            expr,
+            params,
+            ("t", "x", "y"),
             coord_arrays={"x": xg, "y": yg},
         )
         assert isinstance(result, np.ndarray)
@@ -554,7 +567,9 @@ class TestProcaScalarBackground:
         a0_terms = (
             OperatorTerm(coefficient=-1.0, operator="laplacian", field="A_0"),
             OperatorTerm(
-                coefficient=-0.5, operator="identity", field="B_1",
+                coefficient=-0.5,
+                operator="identity",
+                field="B_1",
                 coefficient_symbolic="-0.5 * (1 + (x()^2 + y()^2) / 64)**(-1)",
                 coordinate_dependent=("x", "y"),
             ),
@@ -564,15 +579,28 @@ class TestProcaScalarBackground:
             OperatorTerm(coefficient=-2.0, operator="identity", field="B_1"),
         )
         spec = EquationSystem(
-            n_components=2, dimension=3, spatial_dimension=2,
+            n_components=2,
+            dimension=3,
+            spatial_dimension=2,
             component_names=("A_0", "B_1"),
             equations=(
-                ComponentEquation(field_name="A_0", field_index=0, time_derivative_order=0, rhs_terms=a0_terms),
-                ComponentEquation(field_name="B_1", field_index=1, time_derivative_order=2, rhs_terms=b1_terms),
+                ComponentEquation(
+                    field_name="A_0",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=a0_terms,
+                ),
+                ComponentEquation(
+                    field_name="B_1",
+                    field_index=1,
+                    time_derivative_order=2,
+                    rhs_terms=b1_terms,
+                ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 2.0)),
             coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
-            metadata={}, coordinates=("t", "x", "y"),
+            metadata={},
+            coordinates=("t", "x", "y"),
         )
         data = SimulationData(
             times=np.array([0.0, 1.0]),
@@ -595,23 +623,34 @@ class TestProcaScalarBackground:
         from tidal.measurement._energy import compute_system_energy
 
         # B_1 dynamic field with constant mass; A_0 constraint (no energy contribution)
-        a0_terms = (
-            OperatorTerm(coefficient=-1.0, operator="laplacian", field="A_0"),
-        )
+        a0_terms = (OperatorTerm(coefficient=-1.0, operator="laplacian", field="A_0"),)
         b1_terms = (
             OperatorTerm(coefficient=1.0, operator="laplacian", field="B_1"),
             OperatorTerm(coefficient=-2.0, operator="identity", field="B_1"),
         )
         spec = EquationSystem(
-            n_components=2, dimension=3, spatial_dimension=2,
+            n_components=2,
+            dimension=3,
+            spatial_dimension=2,
             component_names=("A_0", "B_1"),
             equations=(
-                ComponentEquation(field_name="A_0", field_index=0, time_derivative_order=0, rhs_terms=a0_terms),
-                ComponentEquation(field_name="B_1", field_index=1, time_derivative_order=2, rhs_terms=b1_terms),
+                ComponentEquation(
+                    field_name="A_0",
+                    field_index=0,
+                    time_derivative_order=0,
+                    rhs_terms=a0_terms,
+                ),
+                ComponentEquation(
+                    field_name="B_1",
+                    field_index=1,
+                    time_derivative_order=2,
+                    rhs_terms=b1_terms,
+                ),
             ),
             mass_matrix=((0.0, 0.0), (0.0, 2.0)),
             coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
-            metadata={}, coordinates=("t", "x", "y"),
+            metadata={},
+            coordinates=("t", "x", "y"),
         )
         # Uniform B_1 = 1.0: KE=0, PE = m²/2 * integral of B_1^2
         n_grid = 16
@@ -645,10 +684,7 @@ class TestVectorBackground:
     """Tests for scalar-vector coupling with tanh domain wall vector background."""
 
     TOML_PATH = (
-        Path(__file__).parent.parent
-        / "examples"
-        / "vector_background"
-        / "theory.toml"
+        Path(__file__).parent.parent / "examples" / "vector_background" / "theory.toml"
     )
 
     def test_vector_background_wls_dry_run(self) -> None:
@@ -676,11 +712,10 @@ class TestVectorBackground:
         wls = generate_wls(config, config_dir=self.TOML_PATH.parent)
 
         # Count ComponentValue lines for the background B
-        cv_lines = [
-            line for line in wls.splitlines()
-            if "ComponentValue[vbdB[" in line
-        ]
-        assert len(cv_lines) == 3, f"Expected 3 ComponentValue lines, got {len(cv_lines)}: {cv_lines}"
+        cv_lines = [line for line in wls.splitlines() if "ComponentValue[vbdB[" in line]
+        assert len(cv_lines) == 3, (
+            f"Expected 3 ComponentValue lines, got {len(cv_lines)}: {cv_lines}"
+        )
         # B_2 has tanh profile
         assert any("Tanh" in line for line in cv_lines)
 
@@ -710,8 +745,7 @@ class TestVectorBackground:
 
         # Vector BGs use /. (ReplaceAll) after DecomposeToComponents
         replace_all_lines = [
-            line for line in wls.splitlines()
-            if "/." in line and "vbdB" in line
+            line for line in wls.splitlines() if "/." in line and "vbdB" in line
         ]
         assert len(replace_all_lines) > 0, (
             "Vector background B should use ReplaceAll after decomposition"
@@ -734,7 +768,9 @@ class TestVectorBackground:
         xg, yg = np.meshgrid(x, y, indexing="ij")
 
         result = evaluate_coefficient(
-            expr, params, ("t", "x", "y"),
+            expr,
+            params,
+            ("t", "x", "y"),
             coord_arrays={"x": xg, "y": yg},
         )
         assert isinstance(result, np.ndarray)
@@ -770,7 +806,9 @@ class TestVectorBackground:
             "spacetime": {"dimension": 3, "metric": "minkowski"},
             "fields": [{"name": "phi", "type": "scalar"}],
             "constants": {"names": ["B0"]},
-            "background_fields": [{"name": "B", "type": "vector", "components": ["0", "B0"]}],
+            "background_fields": [
+                {"name": "B", "type": "vector", "components": ["0", "B0"]}
+            ],
             "lagrangian": {"expression": "CD[-a][phi[]] eta[a,b] CD[-b][phi[]]"},
             "output": {"path": "out.json"},
         }
@@ -786,7 +824,9 @@ class TestVectorBackground:
             OperatorTerm(coefficient=1.0, operator="laplacian", field="phi_0"),
             OperatorTerm(coefficient=-1.0, operator="identity", field="phi_0"),
             OperatorTerm(
-                coefficient=-0.5, operator="identity", field="A_2",
+                coefficient=-0.5,
+                operator="identity",
+                field="A_2",
                 coefficient_symbolic="-gBV * B0 * tanh(x / W) * exp(-(x**2 + y**2) / (2 * R**2))",
                 coordinate_dependent=("x", "y"),
             ),
@@ -795,21 +835,36 @@ class TestVectorBackground:
             OperatorTerm(coefficient=1.0, operator="laplacian", field="A_2"),
             OperatorTerm(coefficient=-2.0, operator="identity", field="A_2"),
             OperatorTerm(
-                coefficient=-0.5, operator="identity", field="phi_0",
+                coefficient=-0.5,
+                operator="identity",
+                field="phi_0",
                 coefficient_symbolic="-gBV * B0 * tanh(x / W) * exp(-(x**2 + y**2) / (2 * R**2))",
                 coordinate_dependent=("x", "y"),
             ),
         )
         spec = EquationSystem(
-            n_components=2, dimension=3, spatial_dimension=2,
+            n_components=2,
+            dimension=3,
+            spatial_dimension=2,
             component_names=("phi_0", "A_2"),
             equations=(
-                ComponentEquation(field_name="phi_0", field_index=0, time_derivative_order=2, rhs_terms=phi_terms),
-                ComponentEquation(field_name="A_2", field_index=1, time_derivative_order=2, rhs_terms=a2_terms),
+                ComponentEquation(
+                    field_name="phi_0",
+                    field_index=0,
+                    time_derivative_order=2,
+                    rhs_terms=phi_terms,
+                ),
+                ComponentEquation(
+                    field_name="A_2",
+                    field_index=1,
+                    time_derivative_order=2,
+                    rhs_terms=a2_terms,
+                ),
             ),
             mass_matrix=((1.0, 0.0), (0.0, 2.0)),
             coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
-            metadata={}, coordinates=("t", "x", "y"),
+            metadata={},
+            coordinates=("t", "x", "y"),
         )
         n_grid = 16
         dx = 20.0 / n_grid
