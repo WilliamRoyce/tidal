@@ -529,23 +529,31 @@ def render_conservation(
     r"""Relative energy drift :math:`\Delta E / E_0` vs time.
 
     Annotates the plot with PASS/FAIL based on whether the maximum
-    relative error stays below *threshold*.
+    relative error stays below *threshold*.  When ``data.dt`` is
+    available, the threshold is automatically scaled by the shadow-
+    Hamiltonian bound (``10 * dt²``), and the effective value is shown.
     """
     from tidal.measurement._diagnostics import check_energy_conservation
 
     diag = check_energy_conservation(data, threshold=threshold)
 
+    # Compute effective threshold (may differ from input after dt² scaling)
+    effective_threshold = threshold
+    if data.dt is not None:
+        effective_threshold = max(threshold, 10.0 * data.dt ** 2)
+
     ax.plot(diag.times, diag.relative_error, "k-", linewidth=1.0)
     ax.axhline(
-        threshold, color="r", linestyle="--", alpha=0.5,
-        label=f"threshold ({threshold:.0e})",
+        effective_threshold, color="r", linestyle="--", alpha=0.5,
+        label=f"threshold ({effective_threshold:.1e})",
     )
-    ax.axhline(-threshold, color="r", linestyle="--", alpha=0.5)
+    ax.axhline(-effective_threshold, color="r", linestyle="--", alpha=0.5)
 
     status = "PASS" if diag.is_conserved else "FAIL"
     color = "green" if diag.is_conserved else "red"
+    dt_note = f"  (dt={data.dt:.4f})" if data.dt is not None else ""
     ax.annotate(
-        f"{status}\nmax |dE/E| = {diag.max_relative_error:.2e}",
+        f"{status}\nmax |dE/E| = {diag.max_relative_error:.2e}{dt_note}",
         xy=(0.95, 0.95), xycoords="axes fraction",
         ha="right", va="top", fontsize=10, fontweight="bold", color=color,
         bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8},

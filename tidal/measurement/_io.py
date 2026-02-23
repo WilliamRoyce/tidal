@@ -71,6 +71,7 @@ class SimulationData:
     spec: EquationSystem
     parameters: dict[str, float]
     bc_types: tuple[str, ...] | None = None
+    dt: float | None = None
 
     # ------------------------------------------------------------------
     # Derived helpers
@@ -106,6 +107,7 @@ class SimulationData:
         spec: EquationSystem,
         grid_info: GridInfo,
         parameters: dict[str, float] | None = None,
+        dt: float | None = None,
     ) -> SimulationData:
         """Build from a solver result dict (IDA/leapfrog output).
 
@@ -123,6 +125,8 @@ class SimulationData:
             Spatial grid descriptor.
         parameters : dict, optional
             Resolved parameter values.
+        dt : float, optional
+            Time-step size used by the solver (for conservation diagnostics).
 
         Raises
         ------
@@ -176,6 +180,7 @@ class SimulationData:
             spec=spec,
             parameters=parameters or {},
             bc_types=grid_info.bc_types,
+            dt=dt,
         )
 
     @classmethod
@@ -310,6 +315,11 @@ class SimulationData:
             raw_bc = cast("list[str]", metadata["bc_types"])
             bc_types = tuple(str(v) for v in raw_bc)
 
+        # Solver time-step (for conservation diagnostics); None for legacy
+        dt_val: float | None = None
+        if "dt" in metadata:
+            dt_val = float(metadata["dt"])  # type: ignore[arg-type]
+
         return cls(
             times=times,
             fields=fields,
@@ -320,6 +330,7 @@ class SimulationData:
             spec=spec,
             parameters=parameters,
             bc_types=bc_types,
+            dt=dt_val,
         )
 
     def save(self, path: Path | str) -> Path:
@@ -365,6 +376,8 @@ class SimulationData:
         }
         if self.bc_types is not None:
             metadata["bc_types"] = list(self.bc_types)
+        if self.dt is not None:
+            metadata["dt"] = self.dt
         (p / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
         return p
 

@@ -112,6 +112,7 @@ class SnapshotWriter:
         spec_path: Path | None = None,
         flush_interval: int = _DEFAULT_FLUSH_INTERVAL,
         bc_types: tuple[str, ...] | None = None,
+        dt: float | None = None,
     ) -> None:
         if n_snapshots < 1:
             msg = f"n_snapshots must be >= 1, got {n_snapshots}"
@@ -145,6 +146,7 @@ class SnapshotWriter:
         self._parameters = parameters or {}
         self._spec_path = spec_path
         self._bc_types = bc_types
+        self._dt = dt
         self._count = 0
         self._closed = False
         self._flush_interval = max(flush_interval, 1)
@@ -318,6 +320,8 @@ class SnapshotWriter:
         }
         if self._bc_types is not None:
             metadata["bc_types"] = list(self._bc_types)
+        if self._dt is not None:
+            metadata["dt"] = self._dt
         if self._spec_path is not None:
             metadata["spec_path"] = str(self._spec_path)
 

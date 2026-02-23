@@ -18,8 +18,7 @@
 #   # Step 3: Simulate — Gaussian pulse with mass-induced dispersion
 #   tidal simulate ../data/klein_gordon_1d.json \
 #     --param m2=1.0 --grid-shape 256 --bounds 0:100 --periodic \
-#     --ic gaussian --ic-width 5.0 --t-end 30.0 \
-#     --output ../data/scalar_field_output
+#     --ic gaussian --ic-width 5.0 --t-end 30.0 --output ../data/scalar_field_output
 #
 #   # Step 4: Generate plots from simulation output
 #   tidal plot ../data/scalar_field_output --type heatmap --quiet
@@ -46,7 +45,6 @@ tidal simulate ../data/klein_gordon_1d.json \
   --ic gaussian \
   --ic-width 5.0 \
   --t-end 30.0 \
-  --snapshots 0.1 \
   --output ../data/scalar_field_output
 
 # Visualize results (plots saved into the simulation output directory)

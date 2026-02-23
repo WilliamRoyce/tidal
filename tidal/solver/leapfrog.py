@@ -20,6 +20,7 @@ Springer, 2006. Chapter VI: Symplectic Integration of Hamiltonian Systems.
 
 from __future__ import annotations
 
+import math
 import warnings
 from typing import TYPE_CHECKING, Any
 
@@ -267,10 +268,12 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
     t = t_span[0]
     t_end = t_span[1]
 
-    # Snapshot collection
+    # Snapshot collection — use integer-based indexing to avoid FP drift.
+    # Each snapshot trigger recomputes the target time from the integer
+    # index, preventing accumulated floating-point error in long runs.
     if snapshot_interval is None:
         snapshot_interval = t_end - t
-    next_snapshot = t
+    snapshot_idx = 0
     times: list[float] = []
     snapshots: list[np.ndarray] = []
 
@@ -282,8 +285,12 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
 
     _save(t)
 
-    # Leapfrog loop
-    n_steps = int((t_end - t) / dt)
+    # Leapfrog loop — use ceil to guarantee reaching t_end.
+    # int() truncates (e.g. int(153.8) = 153), causing t_final < t_end and
+    # missing the last snapshot.  ceil() ensures we always reach or slightly
+    # overshoot t_end.  The -1e-10 handles exact division (10.0/0.1 = 100.0)
+    # without adding an unnecessary extra step.
+    n_steps = max(1, math.ceil((t_end - t) / dt - 1e-10))
     for _step in range(n_steps):
         # Half-kick
         force = _compute_force(spec, layout, grid, bc, y, t, rhs_eval)
@@ -302,10 +309,10 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
 
         t += dt
 
-        # Snapshot check
-        if t >= next_snapshot + snapshot_interval - dt * 0.01:
+        # Snapshot check (integer-based to avoid FP accumulation)
+        if t >= (snapshot_idx + 1) * snapshot_interval - dt * 0.01:
             _save(t)
-            next_snapshot += snapshot_interval
+            snapshot_idx += 1
 
     # Ensure final state is saved
     if not times or abs(times[-1] - t) > dt * 0.01:

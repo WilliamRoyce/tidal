@@ -232,3 +232,59 @@ class TestLeapfrogValidation:
         )
         # Should have t=0.0, t≈0.5, t≈1.0 (3 snapshots)
         assert len(callback_times) >= 3
+
+
+class TestLeapfrogSnapshotCount:
+    """Verify integer-based snapshot indexing produces exact counts."""
+
+    def test_snapshot_count_exact(self) -> None:
+        """Leapfrog produces exactly the expected number of snapshots."""
+        spec = _make_kg_spec()
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        y0 = np.zeros(layout.total_size)
+        dt = 0.01
+        t_end = 1.0
+        snapshot_interval = 0.1
+
+        result = solve_leapfrog(
+            spec, grid, y0,
+            t_span=(0.0, t_end),
+            dt=dt,
+            snapshot_interval=snapshot_interval,
+        )
+        assert result["success"]
+
+        # Expected: int(1.0 / 0.1) + 1 = 11 snapshots (t=0, 0.1, ..., 1.0)
+        expected = int(t_end / snapshot_interval) + 1
+        assert len(result["t"]) == expected, (
+            f"Expected {expected} snapshots, got {len(result['t'])}"
+        )
+
+    def test_snapshot_count_when_dt_exceeds_interval(self) -> None:
+        """When dt > snapshot_interval, one snapshot per step."""
+        spec = _make_kg_spec()
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        y0 = np.zeros(layout.total_size)
+        dt = 0.15  # larger than snapshot_interval
+        t_end = 1.0
+        snapshot_interval = 0.1
+
+        result = solve_leapfrog(
+            spec, grid, y0,
+            t_span=(0.0, t_end),
+            dt=dt,
+            snapshot_interval=snapshot_interval,
+        )
+        assert result["success"]
+
+        # With dt=0.15 > interval=0.1, each step triggers a snapshot.
+        # n_steps = int(1.0/0.15) = 6, plus initial = 7, plus final ≈ 8
+        n_steps = int(t_end / dt)
+        n_snapshots = len(result["t"])
+        # Should be close to n_steps + 1 (+ possible final)
+        assert n_snapshots >= n_steps + 1
+        assert n_snapshots <= n_steps + 2  # at most +1 final save

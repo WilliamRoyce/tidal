@@ -792,12 +792,13 @@ def _warn_zero_evolution(
         )
 
 
-def _setup_disk_writer_native(
+def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     args: Namespace,
     spec: EquationSystem,
     grid_info: GridInfo,
     params: dict[str, float],
     snapshot_interval: float,
+    dt: float | None = None,
 ) -> tuple[SnapshotWriter, Callable[[float, np.ndarray], None]]:
     """Set up disk-backed SnapshotWriter using StateLayout (no py-pde).
 
@@ -825,6 +826,7 @@ def _setup_disk_writer_native(
         parameters=params,
         spec_path=Path(args.json_path),
         bc_types=grid_info.bc_types,
+        dt=dt,
     )
 
     # Build slot index maps from layout
@@ -1039,7 +1041,7 @@ def _resolve_scheme(scheme: str, spec: EquationSystem) -> str:
     return "leapfrog"
 
 
-def _simulate(
+def _simulate(  # noqa: C901, PLR0915
     args: Namespace,
     spec: EquationSystem,
     params: dict[str, float],
@@ -1084,22 +1086,34 @@ def _simulate(
 
     _warn_zero_evolution(spec, grid_info, y0, params, bc)
 
-    # 5. Snapshot configuration
+    # 5. Compute dt for leapfrog (needed before snapshot configuration)
+    dt: float | None = None
+    if scheme != "ida":
+        dt = args.dt
+        if dt is None:
+            dt = _compute_cfl_dt(spec, grid_info, params)
+
+    # 6. Snapshot configuration — clamp interval to dt for leapfrog,
+    # since the solver can't save more often than once per timestep.
     snapshot_interval = (
         args.snapshots if args.snapshots is not None else args.t_end / 100.0
     )
+    if dt is not None and snapshot_interval < dt:
+        log(f"  Note: snapshot interval {snapshot_interval:.4f} < dt {dt:.4f}; "
+            f"saving every step")
+        snapshot_interval = dt
 
-    # 6. Disk writer (if directory output)
+    # 7. Disk writer (if directory output)
     fmt = _infer_output_format(args)
     writer: SnapshotWriter | None = None
     snapshot_cb: Callable[[float, np.ndarray], None] | None = None
 
     if fmt == "directory":
         writer, snapshot_cb = _setup_disk_writer_native(
-            args, spec, grid_info, params, snapshot_interval,
+            args, spec, grid_info, params, snapshot_interval, dt=dt,
         )
 
-    # 7. Solve
+    # 8. Solve
     if scheme == "ida":
         from tidal.solver.ida import solve_ida
 
@@ -1115,9 +1129,7 @@ def _simulate(
     else:  # leapfrog
         from tidal.solver.leapfrog import solve_leapfrog
 
-        dt = args.dt
-        if dt is None:
-            dt = _compute_cfl_dt(spec, grid_info, params)
+        assert dt is not None  # computed in step 5
         log(f"Running leapfrog solver (t=0 → {args.t_end}, dt={dt:.4f})...")
         result = solve_leapfrog(
             spec, grid_info, y0,
@@ -1139,7 +1151,7 @@ def _simulate(
     if writer is not None:
         sim_data = SimulationData.from_directory(writer.output_dir, spec)
     else:
-        sim_data = SimulationData.from_result(result, spec, grid_info, params)
+        sim_data = SimulationData.from_result(result, spec, grid_info, params, dt=dt)
     log(f"  {sim_data.n_snapshots} snapshots stored")
 
     # 9. Output
