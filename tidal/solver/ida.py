@@ -151,7 +151,15 @@ class _ResidualCtx:
 
         For such fields, ``handle_constraint`` freezes them at zero
         (``res = y[field]``), making the Jacobian non-singular (identity block).
-        The original equation becomes an initial-data consistency condition.
+        The original equation becomes an initial-data consistency condition
+        that should be verified by ``check_no_self_term_ic``.
+
+        **Extensibility:** Fields with ``constraint_solver.enabled = True``
+        are excluded — the constraint pre-solve path handles them (and
+        raises ``ValueError`` if they truly have no self-terms, which is
+        the correct fail-fast for gauge-fixed specs that *should* have
+        self-terms).  When Phase B gauge-fixing adds self-terms to these
+        equations, they will naturally exit this set.
 
         Emits ``UserWarning`` for each detected field.
         """
@@ -159,18 +167,29 @@ class _ResidualCtx:
         for eq in self.spec.equations:
             if eq.time_derivative_order != 0:
                 continue
+            # Skip fields with constraint_solver enabled — they go through
+            # the pre_solve path which has its own validation.
+            if eq.constraint_solver.enabled:
+                continue
             has_self = any(t.field == eq.field_name for t in eq.rhs_terms)
             if not has_self:
                 result.add(eq.field_name)
 
+        # Describe what each frozen equation originally constrains
         for name in sorted(result):
+            eq_idx = self.eq_map[name]
+            eq = self.spec.equations[eq_idx]
+            other_fields = sorted({t.field for t in eq.rhs_terms})
+            constraint_desc = ", ".join(other_fields) if other_fields else "none"
+
             warnings.warn(
                 f"Constraint equation for '{name}' has no self-referencing "
                 f"terms (field does not appear in its own RHS). Freezing "
-                f"'{name}' at zero — the original equation becomes an "
-                f"initial-data consistency condition. If this field should "
-                f"be non-zero, restructure the equation to include a "
-                f"self-term.",
+                f"'{name}' at zero. The original equation (involving "
+                f"[{constraint_desc}]) becomes an initial-data consistency "
+                f"condition — ensure the IC satisfies it. Applying a gauge "
+                f"condition (e.g. via [gauge] in the TOML) may add "
+                f"self-terms that resolve this automatically.",
                 UserWarning,
                 stacklevel=2,
             )
@@ -442,6 +461,89 @@ def build_residual_fn(
     return residual
 
 
+_IC_RESIDUAL_TOL = 1e-10
+"""Tolerance for initial-data subsidiary constraint residual check."""
+
+
+def _check_no_self_term_ic(
+    spec: EquationSystem,
+    layout: StateLayout,
+    grid: GridInfo,
+    y0: np.ndarray,
+    bc: str | tuple[str, ...] | None,
+) -> None:
+    """Verify initial data satisfies no-self-term constraint equations.
+
+    For each constraint equation where the field has no self-referencing
+    terms (frozen at zero by IDA), evaluates the original constraint RHS
+    at t=0 and warns if the residual is non-negligible.
+
+    These equations are subsidiary conditions (e.g. momentum constraints,
+    transversality) that must be **jointly** satisfied by the initial data
+    for physical consistency.  When multiple constraints are violated, a
+    single summary warning lists all of them so the user can see the full
+    set of conditions that need to be met.
+    """
+    n = grid.num_points
+
+    # Build field dict from y0
+    fields: dict[str, np.ndarray] = {}
+    for name, slot_idx in layout.field_slot_map.items():
+        fields[name] = y0[slot_idx * n : (slot_idx + 1) * n].reshape(grid.shape)
+    for name, slot_idx in layout.momentum_slot_map.items():
+        fields[f"pi_{name}"] = y0[slot_idx * n : (slot_idx + 1) * n].reshape(grid.shape)
+
+    violations: list[tuple[str, float, list[str]]] = []
+    for eq in spec.equations:
+        if eq.time_derivative_order != 0:
+            continue
+        if eq.constraint_solver.enabled:
+            continue
+        has_self = any(t.field == eq.field_name for t in eq.rhs_terms)
+        if has_self:
+            continue
+
+        rhs = _eval_constraint_rhs(eq, fields, grid, bc)
+        max_res = float(np.max(np.abs(rhs)))
+        if max_res > _IC_RESIDUAL_TOL:
+            other_fields = sorted({t.field for t in eq.rhs_terms})
+            violations.append((eq.field_name, max_res, other_fields))
+
+    if not violations:
+        return
+
+    # Build a comprehensive summary of all violated subsidiary constraints
+    lines = [
+        "Initial data does not satisfy subsidiary constraint(s) "
+        "(not enforced at runtime — frozen fields):"
+    ]
+    for field_name, max_res, involved in violations:
+        lines.append(
+            f"  {field_name}: max|residual| = {max_res:.2e} "
+            f"(involves [{', '.join(involved)}])"
+        )
+    lines.append(
+        "For physical consistency, choose initial conditions that "
+        "jointly satisfy all subsidiary constraints."
+    )
+    warnings.warn("\n".join(lines), UserWarning, stacklevel=2)
+
+
+def _eval_constraint_rhs(
+    eq: ComponentEquation,
+    fields: dict[str, np.ndarray],
+    grid: GridInfo,
+    bc: str | tuple[str, ...] | None,
+) -> np.ndarray:
+    """Evaluate a constraint equation's RHS using constant coefficients."""
+    rhs = np.zeros(grid.shape)
+    for term in eq.rhs_terms:
+        target = fields.get(term.field, np.zeros(grid.shape))
+        operated = apply_operator(term.operator, target, grid, bc)
+        rhs += term.coefficient * operated
+    return rhs
+
+
 def solve_ida(  # noqa: PLR0913
     spec: EquationSystem,
     grid: GridInfo,
@@ -519,6 +621,11 @@ def solve_ida(  # noqa: PLR0913
         y0 = pre_solve_constraints(
             spec, grid, y0, bc=bc, parameters=parameters, t=t_span[0]
         )
+
+    # Check that IC satisfies subsidiary constraints (no-self-term equations).
+    # These are frozen at zero by IDA, so the original equation becomes a
+    # consistency condition on the initial data.
+    _check_no_self_term_ic(spec, layout, grid, y0, bc)
 
     resfn = build_residual_fn(spec, layout, grid, bc, parameters=parameters)
 

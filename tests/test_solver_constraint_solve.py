@@ -940,6 +940,95 @@ def _make_no_self_term_spec() -> EquationSystem:
     return EquationSystem.from_dict(data)
 
 
+def _make_multi_no_self_term_spec() -> EquationSystem:
+    """Spec with TWO no-self-term constraint equations.
+
+    Models the gravitational-waves-like scenario: two constraint fields
+    (c_0, c_1) each constrain a dynamical field (h_0) via gradients, but
+    neither constraint field appears in its own equation.
+
+    c_0's constraint: gradient_x(h_0) = 0
+    c_1's constraint: gradient_y(h_0) = 0
+
+    Both must be jointly satisfied: h_0's IC must have zero gradients
+    in both x and y directions (i.e. h_0 must be constant or zero).
+    """
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 3, "signature": [-1, 1, 1]},
+        "fields": [
+            {"name": "c_0", "index": 0},
+            {"name": "c_1", "index": 1},
+            {"name": "h_0", "index": 2},
+        ],
+        "equations": [
+            {
+                "field": "c_0",
+                "lhs": {"expression": "c_0", "order": {"time": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_x",
+                            "field": "h_0",
+                        },
+                    ],
+                },
+            },
+            {
+                "field": "c_1",
+                "lhs": {"expression": "c_1", "order": {"time": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_y",
+                            "field": "h_0",
+                        },
+                    ],
+                },
+            },
+            {
+                "field": "h_0",
+                "lhs": {
+                    "expression": "d2_t(h_0)",
+                    "order": {"time": 2},
+                },
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian",
+                            "field": "h_0",
+                        },
+                    ],
+                },
+            },
+        ],
+        "canonical": {
+            "hamiltonian_terms": [],
+            "field_rates": {
+                "h_0": [
+                    {
+                        "coefficient": 1.0,
+                        "operator": "identity",
+                        "field": "pi_2",
+                    },
+                ],
+            },
+            "kinetic_matrix": {
+                "entries": [{"i": 0, "j": 0, "value": 1.0}],
+                "dimension": 1,
+            },
+            "spatial_momenta": {},
+            "hamiltonian_symbolic": "test",
+        },
+    }
+    return EquationSystem.from_dict(data)
+
+
 class TestNoSelfTermConstraints:
     """Test IDA handling of constraints with no self-referencing terms."""
 
@@ -1021,3 +1110,98 @@ class TestNoSelfTermConstraints:
             assert h0_block[i, i] != 0, (
                 f"Missing diagonal entry at ({i},{i}) for no-self-term field"
             )
+
+    @pytest.mark.skipif(
+        not _has_sundials(), reason="sksundae not available"
+    )
+    def test_ida_ic_consistency_warns_when_violated(self) -> None:
+        """IDA emits UserWarning when IC violates a no-self-term constraint."""
+        from tidal.solver.ida import solve_ida
+
+        spec = _make_no_self_term_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        # Set h_1 to a Gaussian — h_0's equation (gradient_x of h_1)
+        # will have nonzero residual → IC consistency warning
+        h1_slot = layout.field_slot_map["h_1"]
+        x = grid.coord_arrays()[0]
+        y0[h1_slot * n : (h1_slot + 1) * n] = np.exp(
+            -((x - 5) ** 2) / 2
+        ).ravel()
+
+        with pytest.warns(UserWarning, match="does not satisfy subsidiary"):
+            solve_ida(
+                spec, grid, y0, (0.0, 0.5),
+                bc="periodic", num_snapshots=3,
+            )
+
+    @pytest.mark.skipif(
+        not _has_sundials(), reason="sksundae not available"
+    )
+    def test_ida_ic_consistency_no_warn_when_satisfied(self) -> None:
+        """No IC consistency warning when initial data satisfies constraint."""
+        import warnings as _warnings
+
+        from tidal.solver.ida import solve_ida
+
+        spec = _make_no_self_term_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(16,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.total_size)
+        # All zeros → constraint RHS = gradient_x(h_1) = 0 → satisfied
+
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            solve_ida(
+                spec, grid, y0, (0.0, 0.1),
+                bc="periodic", num_snapshots=3,
+            )
+
+        ic_warns = [w for w in caught if "does not satisfy subsidiary" in str(w.message)]
+        assert len(ic_warns) == 0, "Should not warn when IC satisfies constraint"
+
+    @pytest.mark.skipif(
+        not _has_sundials(), reason="sksundae not available"
+    )
+    def test_ida_multi_constraint_joint_ic_check(self) -> None:
+        """Multiple no-self-term constraints: single warning lists all violations.
+
+        Two constraint fields (c_0, c_1) each impose gradient conditions
+        on h_0.  A Gaussian IC on h_0 violates both — the warning should
+        mention both c_0 and c_1 in a single message.
+        """
+        from tidal.solver.ida import solve_ida
+
+        spec = _make_multi_no_self_term_spec()
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        # Set h_0 to a 2D Gaussian — violates both gradient_x and gradient_y
+        h0_slot = layout.field_slot_map["h_0"]
+        x_arr, y_arr = grid.coord_arrays()
+        y0[h0_slot * n : (h0_slot + 1) * n] = np.exp(
+            -((x_arr - 5) ** 2 + (y_arr - 5) ** 2) / 2
+        ).ravel()
+
+        import warnings as _warnings
+
+        with _warnings.catch_warnings(record=True) as caught:
+            _warnings.simplefilter("always")
+            solve_ida(
+                spec, grid, y0, (0.0, 0.5),
+                bc="periodic", num_snapshots=3,
+            )
+
+        # Should get exactly ONE summary warning mentioning both constraints
+        ic_warns = [w for w in caught if "does not satisfy subsidiary" in str(w.message)]
+        assert len(ic_warns) == 1, f"Expected 1 summary warning, got {len(ic_warns)}"
+        msg = str(ic_warns[0].message)
+        assert "c_0" in msg, "Warning should mention c_0"
+        assert "c_1" in msg, "Warning should mention c_1"
