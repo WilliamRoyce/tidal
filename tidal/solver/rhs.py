@@ -12,7 +12,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from tidal.solver.operators import apply_operator
+from tidal.solver.operators import BCSpec, apply_operator
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -47,7 +47,7 @@ class RHSEvaluator:
         spec: EquationSystem,
         grid: GridInfo,
         coeff_eval: CoefficientEvaluator,
-        bc: str | tuple[str, ...] | None = None,
+        bc: BCSpec | None = None,
     ) -> None:
         self._spec = spec
         self._grid = grid

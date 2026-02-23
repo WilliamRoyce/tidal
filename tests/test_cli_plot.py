@@ -6,7 +6,7 @@ and interaction with the SimulationData / disk-backed output pipeline.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import pytest
 
@@ -22,11 +22,11 @@ if TYPE_CHECKING:
 
 
 @pytest.fixture(scope="session")
-def _inline_2d_spec(tmp_path_factory: pytest.TempPathFactory) -> Path:
+def inline_2d_spec(tmp_path_factory: pytest.TempPathFactory) -> Path:
     """Write an inline 2+1D Klein-Gordon JSON spec."""
     import json
 
-    spec = {
+    spec: dict[str, Any] = {
         "metadata": {
             "source": "inline-test-2d",
             "lagrangian_expr": "-1/2 (d phi)^2",
@@ -67,14 +67,14 @@ def _inline_2d_spec(tmp_path_factory: pytest.TempPathFactory) -> Path:
 
 @pytest.fixture(scope="session")
 def two_d_sim_dir(
-    _inline_2d_spec: Path,
+    inline_2d_spec: Path,
     tmp_path_factory: pytest.TempPathFactory,
 ) -> Path:
     """Run a short 2D simulation for 2D plot tests."""
     output = tmp_path_factory.mktemp("plot2d") / "sim_out"
     ret = main([
         "simulate",
-        str(_inline_2d_spec),
+        str(inline_2d_spec),
         "--t-end", "2.0",
         "--grid-shape", "16,16",
         "--bounds", "0:10,0:10",

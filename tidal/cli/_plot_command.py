@@ -102,7 +102,10 @@ def _parse_figsize(raw: str | None) -> tuple[float, float] | None:
 
 def _validate_overlay(formula: str) -> None:
     """Validate an overlay formula using AST analysis."""
-    from tidal.cli._simulate import FORMULA_NAMESPACE, _validate_formula_ast
+    from tidal.cli._simulate import (
+        FORMULA_NAMESPACE,
+        _validate_formula_ast,  # pyright: ignore[reportPrivateUsage]
+    )
 
     allowed = set(FORMULA_NAMESPACE.keys()) | {"t"}
     _validate_formula_ast(formula, allowed)
@@ -157,7 +160,10 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
     mpl.use("Agg")
     import matplotlib.pyplot as plt
 
-    from tidal.cli._measure import _load_data, _resolve_spec_path
+    from tidal.cli._measure import (
+        _load_data,  # pyright: ignore[reportPrivateUsage]
+        _resolve_spec_path,  # pyright: ignore[reportPrivateUsage]
+    )
     from tidal.cli._panels import (
         field_names,
         render_amplitude,

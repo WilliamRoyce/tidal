@@ -306,7 +306,7 @@ class SnapshotWriter:
         self._momentum_mmaps.clear()
 
         # Write metadata
-        metadata = {
+        metadata: dict[str, Any] = {
             "version": _FORMAT_VERSION,
             "n_snapshots": self._count,
             "grid_spacing": list(self._grid_spacing),

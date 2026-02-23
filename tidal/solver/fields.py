@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import numpy as np
+from typing_extensions import override
 
 if TYPE_CHECKING:
     from tidal.solver.state import StateLayout
@@ -102,6 +103,7 @@ class FieldSet:
         """Return the number of slots."""
         return len(self._name_to_idx)
 
+    @override
     def __repr__(self) -> str:
         slots = ", ".join(self._name_to_idx)
         return f"FieldSet(slots=[{slots}], grid_shape={self._grid_shape})"

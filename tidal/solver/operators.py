@@ -196,7 +196,7 @@ def _normalize_bc(bc: BCSpec, grid: GridInfo) -> tuple[str | AxisBCSpec, ...]:
             if b not in _VALID_BC:
                 msg = f"Unknown BC type {b!r} for axis {i}; valid: {sorted(_VALID_BC)}"
                 raise ValueError(msg)
-        elif not isinstance(b, AxisBCSpec):
+        elif not isinstance(b, AxisBCSpec):  # pyright: ignore[reportUnnecessaryIsInstance]
             msg = f"BC entry {i} must be str or AxisBCSpec, got {type(b).__name__}"
             raise TypeError(msg)
 

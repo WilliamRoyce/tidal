@@ -396,13 +396,13 @@ class TestProbeMatrix:
         mat = _probe_operator_matrix([(1.0, "laplacian")], grid, "periodic")
 
         # Dense version for inspection
-        md = mat.toarray()
+        md: Any = mat.toarray()  # pyright: ignore[reportUnknownVariableType]
         # Diagonal should be -2/dx²
-        np.testing.assert_allclose(np.diag(md), -2.0 / dx**2, atol=1e-12)
+        np.testing.assert_allclose(np.diag(md), -2.0 / dx**2, atol=1e-12)  # pyright: ignore[reportUnknownArgumentType]
         # Off-diagonals should be 1/dx²
         for i in range(n):
-            assert abs(md[i, (i + 1) % n] - 1.0 / dx**2) < 1e-12
-            assert abs(md[i, (i - 1) % n] - 1.0 / dx**2) < 1e-12
+            assert abs(md[i, (i + 1) % n] - 1.0 / dx**2) < 1e-12  # pyright: ignore[reportUnknownArgumentType]
+            assert abs(md[i, (i - 1) % n] - 1.0 / dx**2) < 1e-12  # pyright: ignore[reportUnknownArgumentType]
 
     def test_probe_matches_fft_for_poisson(self) -> None:
         """Cross-validate: probing and FFT give same solution up to a constant.
@@ -697,7 +697,7 @@ class TestPreSolveConstraints:
 def _has_sundials() -> bool:
     """Check if sksundae is importable."""
     try:
-        import sksundae  # noqa: F401
+        import sksundae  # noqa: F401  # pyright: ignore[reportMissingTypeStubs, reportUnusedImport]
     except ImportError:
         return False
     else:
@@ -1162,7 +1162,7 @@ class TestNoSelfTermConstraints:
         h0_end = (h0_slot + 1) * n
 
         # Extract h_0's row block
-        h0_block = pattern[h0_start:h0_end, h0_start:h0_end]
+        h0_block: Any = pattern[h0_start:h0_end, h0_start:h0_end]  # pyright: ignore[reportUnknownVariableType]
 
         # Should have diagonal entries (at minimum)
         for i in range(n):

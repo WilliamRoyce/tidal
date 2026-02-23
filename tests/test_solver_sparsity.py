@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-from scipy import sparse
+from scipy import sparse  # pyright: ignore[reportMissingTypeStubs]
 
 from tidal.solver.grid import GridInfo
 from tidal.solver.sparsity import (
@@ -204,7 +204,7 @@ class TestBuildJacobianSparsity:
         pattern = build_jacobian_sparsity(spec, layout, grid, "periodic")
 
         # Both slots are non-constraint (phi_0: field, pi_phi_0: momentum)
-        diag = pattern.diagonal()
+        diag: Any = pattern.diagonal()  # pyright: ignore[reportUnknownVariableType]
         assert np.all(diag > 0), "Diagonal entries missing"
 
     def test_em_2d_constraint_no_diagonal(self) -> None:
@@ -243,7 +243,7 @@ class TestBuildJacobianSparsity:
         pattern = build_jacobian_sparsity(spec, layout, grid, "periodic")
 
         # Convert to dense for inspection
-        dense = pattern.toarray()
+        dense: Any = pattern.toarray()  # pyright: ignore[reportUnknownVariableType]
         # The momentum slot (slot 1) equation references laplacian(phi_0).
         # For periodic 1D with 8 points, point 0 couples to point 7 (wrap).
         # Momentum rows are [8..15], phi columns are [0..7].
@@ -258,7 +258,7 @@ class TestBuildJacobianSparsity:
 
         pattern = build_jacobian_sparsity(spec, layout, grid, "neumann")
 
-        dense = pattern.toarray()
+        dense: Any = pattern.toarray()  # pyright: ignore[reportUnknownVariableType]
         # Row 8 (momentum[0]) should NOT have nonzero at col 7 (phi[7])
         # because boundary point 0 doesn't wrap to point 7
         assert dense[8, 7] == 0, "Unexpected wrapping entry for non-periodic BC"
@@ -293,7 +293,7 @@ class TestBuildJacobianSparsity:
         )
 
         # Sparse solve (force sparse via direct IDA construction)
-        from sksundae.ida import IDA
+        from sksundae.ida import IDA  # pyright: ignore[reportMissingTypeStubs]
 
         from tidal.solver.ida import build_residual_fn
         from tidal.solver.sparsity import (
@@ -312,7 +312,7 @@ class TestBuildJacobianSparsity:
             calc_initcond="yp0",
             calc_init_dt=float(t_eval[1] - t_eval[0]),
         )
-        result_sparse = solver.solve(t_eval, y0, yp0)
+        result_sparse: Any = solver.solve(t_eval, y0, yp0)
 
         assert result_dense["success"], f"Dense solve failed: {result_dense['message']}"
         assert result_sparse.success, f"Sparse solve failed: {result_sparse.message}"

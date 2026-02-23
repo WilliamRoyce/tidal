@@ -43,13 +43,15 @@ from __future__ import annotations
 import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from scipy import sparse
-from scipy.sparse.linalg import spsolve
+from scipy import sparse  # pyright: ignore[reportMissingTypeStubs]
+from scipy.sparse.linalg import (  # pyright: ignore[reportMissingTypeStubs]
+    spsolve,  # pyright: ignore[reportUnknownVariableType]
+)
 
-from tidal.solver.operators import apply_operator, is_periodic_bc
+from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 
 # Numerical tolerance thresholds
 _SINGULAR_TOL = 1e-14  # Below this, a Fourier multiplier is treated as singular
@@ -192,7 +194,7 @@ _MULTIPLIERS: dict[str, _MultiplierFn] = {
 def _select_method(
     terms: _ConstraintTerms,
     grid: GridInfo,
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
 ) -> str:
     """Determine solver method: 'fft' or 'matrix'.
 
@@ -257,7 +259,7 @@ def _evaluate_source(
     source_terms: list[tuple[float | NDArray[np.float64], str, str]],
     fields: FieldSet,
     grid: GridInfo,
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
     name_map: dict[str, str] | None = None,
 ) -> NDArray[np.float64]:
     """Compute source RHS: b = Σ coeff_i * operator_i(field_i)."""
@@ -279,7 +281,7 @@ def _evaluate_source(
 
 def _build_wavenumber_grids(
     grid: GridInfo,
-) -> tuple[list[NDArray[np.float64]], tuple[float, ...]]:
+) -> tuple[list[Any], tuple[float, ...]]:
     """Build wavenumber grids for FFT-based solving."""
     k_1d = [
         2.0 * np.pi * np.fft.fftfreq(grid.shape[ax], d=grid.dx[ax])
@@ -354,7 +356,7 @@ def _fft_solve_coupled(  # noqa: PLR0914
     groups: list[_ConstraintTerms],
     grid: GridInfo,
     fields: FieldSet,
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
     name_map: dict[str, str] | None = None,
 ) -> dict[str, NDArray[np.float64]]:
     """Solve coupled constraints via block FFT.
@@ -442,7 +444,7 @@ def _fft_solve_coupled(  # noqa: PLR0914
 def _probe_operator_matrix(
     self_terms: list[tuple[float | NDArray[np.float64], str]],
     grid: GridInfo,
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
 ) -> sparse.csc_matrix:
     """Build sparse matrix by probing apply_operator() with unit vectors.
 
@@ -472,7 +474,7 @@ def _probe_operator_matrix(
         for row in nz:
             mat[row, j] = col_flat[row]
 
-    return mat.tocsc()
+    return mat.tocsc()  # type: ignore[return-value]
 
 
 def _matrix_solve(
@@ -482,8 +484,8 @@ def _matrix_solve(
 ) -> NDArray[np.float64]:
     """Solve op_matrix @ u = -source_rhs via sparse direct factorization."""
     rhs = -source_rhs.ravel()
-    u = spsolve(op_matrix, rhs)
-    return u.reshape(grid_shape)
+    u: Any = spsolve(op_matrix, rhs)  # pyright: ignore[reportUnknownVariableType]
+    return u.reshape(grid_shape)  # type: ignore[return-value]
 
 
 # ---------------------------------------------------------------------------
@@ -496,7 +498,7 @@ def pre_solve_constraints(  # noqa: PLR0913
     grid: GridInfo,
     y0: NDArray[np.float64],
     *,
-    bc: str | tuple[str, ...] | None = None,
+    bc: BCSpec | None = None,
     parameters: dict[str, float] | None = None,
     t: float = 0.0,
 ) -> NDArray[np.float64]:
@@ -607,7 +609,7 @@ def pre_solve_constraints(  # noqa: PLR0913
 def _solve_independent(  # noqa: PLR0913, PLR0917
     groups: list[_ConstraintTerms],
     grid: GridInfo,
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
     fields: FieldSet,
     layout: StateLayout,
     y0: NDArray[np.float64],
@@ -634,7 +636,7 @@ def _solve_independent(  # noqa: PLR0913, PLR0917
 def _solve_coupled(  # noqa: PLR0913, PLR0917, C901
     groups: list[_ConstraintTerms],
     grid: GridInfo,
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
     fields: FieldSet,
     layout: StateLayout,
     y0: NDArray[np.float64],

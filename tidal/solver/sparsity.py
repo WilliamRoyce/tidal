@@ -18,10 +18,11 @@ import itertools
 from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy import sparse
+from scipy import sparse  # pyright: ignore[reportMissingTypeStubs]
 
 if TYPE_CHECKING:
     from tidal.solver.grid import GridInfo
+    from tidal.solver.operators import BCSpec
     from tidal.solver.state import StateLayout
     from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
 
@@ -436,7 +437,7 @@ def build_jacobian_sparsity(
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
-    _bc: str | tuple[str, ...] | None,
+    _bc: BCSpec | None,
 ) -> sparse.csc_matrix:
     """Build the analytical Jacobian sparsity pattern for IDA.
 

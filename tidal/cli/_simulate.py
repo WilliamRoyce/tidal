@@ -16,7 +16,7 @@ if TYPE_CHECKING:
     from tidal.measurement._io import SimulationData
     from tidal.measurement._writer import SnapshotWriter
     from tidal.solver.grid import GridInfo
-    from tidal.solver.operators import AxisBCSpec
+    from tidal.solver.operators import AxisBCSpec, BCSpec
     from tidal.symbolic.json_loader import EquationSystem
 
 # Default grid shapes per spatial dimension
@@ -764,7 +764,7 @@ def _warn_zero_evolution(
     grid_info: GridInfo,
     y0: np.ndarray,
     params: dict[str, float],
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
 ) -> None:
     """Warn if all RHS rates are zero at t=0 (native path)."""
     from tidal.solver.coefficients import CoefficientEvaluator
@@ -888,7 +888,7 @@ def _constraint_mode(  # noqa: PLR0913, PLR0917
     grid_info: GridInfo,
     y0: np.ndarray,
     params: dict[str, float],
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
     log: object,
 ) -> int:
     """Solve constraints via IDA's algebraic initial condition solver.

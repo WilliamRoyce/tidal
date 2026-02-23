@@ -27,7 +27,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from tidal.solver.fields import FieldSet
-from tidal.solver.operators import apply_operator
+from tidal.solver.operators import BCSpec, apply_operator
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
@@ -45,7 +45,7 @@ def compute_force(  # noqa: PLR0913, PLR0917
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
     y: np.ndarray,
     t: float = 0.0,
     rhs_eval: RHSEvaluator | None = None,
@@ -94,7 +94,7 @@ def compute_velocity(  # noqa: PLR0913, PLR0917
     spatial_momenta: Mapping[str, Sequence[OperatorTerm]] | None,
     pi_flat: np.ndarray,
     fieldset: FieldSet,
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
     t: float = 0.0,
     rhs_eval: RHSEvaluator | None = None,
 ) -> np.ndarray:
@@ -173,7 +173,7 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
     t_span: tuple[float, float],
     dt: float,
     *,
-    bc: str | tuple[str, ...] | None = None,
+    bc: BCSpec | None = None,
     parameters: dict[str, float] | None = None,
     snapshot_interval: float | None = None,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,

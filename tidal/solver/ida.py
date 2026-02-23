@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from tidal.solver.fields import FieldSet
-from tidal.solver.operators import apply_operator, is_periodic_bc
+from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
@@ -32,7 +32,11 @@ if TYPE_CHECKING:
     from tidal.solver.grid import GridInfo
     from tidal.solver.rhs import RHSEvaluator
     from tidal.solver.state import SlotInfo
-    from tidal.symbolic.json_loader import ComponentEquation, EquationSystem
+    from tidal.symbolic.json_loader import (
+        ComponentEquation,
+        EquationSystem,
+        OperatorTerm,
+    )
 
 # Time-derivative order threshold for dynamical (wave) equations
 _SECOND_ORDER = 2
@@ -57,9 +61,9 @@ class _ResidualCtx:
         spec: EquationSystem,
         layout: StateLayout,
         grid: GridInfo,
-        bc: str | tuple[str, ...] | None,
+        bc: BCSpec | None,
         kinetic: np.ndarray | None,
-        spatial_momenta: dict | None,
+        spatial_momenta: dict[str, tuple[OperatorTerm, ...]] | None,
         rhs_eval: RHSEvaluator | None = None,
     ) -> None:
         self.spec = spec
@@ -420,7 +424,7 @@ def build_residual_fn(
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
-    bc: str | tuple[str, ...] | None = None,
+    bc: BCSpec | None = None,
     *,
     parameters: dict[str, float] | None = None,
 ) -> Callable[[float, np.ndarray, np.ndarray, np.ndarray], None]:
@@ -514,7 +518,7 @@ def _check_no_self_term_ic(
     layout: StateLayout,
     grid: GridInfo,
     y0: np.ndarray,
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
 ) -> None:
     """Verify initial data satisfies no-self-term constraint equations.
 
@@ -577,7 +581,7 @@ def _eval_constraint_rhs(
     eq: ComponentEquation,
     fields: dict[str, np.ndarray],
     grid: GridInfo,
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
 ) -> np.ndarray:
     """Evaluate a constraint equation's RHS using constant coefficients."""
     rhs = np.zeros(grid.shape)
@@ -594,7 +598,7 @@ def solve_ida(  # noqa: PLR0913
     y0: np.ndarray,
     t_span: tuple[float, float],
     *,
-    bc: str | tuple[str, ...] | None = None,
+    bc: BCSpec | None = None,
     parameters: dict[str, float] | None = None,
     num_snapshots: int = 101,
     rtol: float = 1e-8,
@@ -648,7 +652,9 @@ def solve_ida(  # noqa: PLR0913
         To disable for a specific field, set
         ``constraint_solver.enabled = false`` in the JSON spec.
     """
-    from sksundae.ida import IDA  # noqa: PLC0415
+    from sksundae.ida import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
+        IDA,
+    )
 
     layout = StateLayout.from_spec(spec, grid.num_points)
 
@@ -716,7 +722,7 @@ def solve_ida(  # noqa: PLR0913
         options["linsolver"] = "gmres"
 
     solver = IDA(resfn, **options)
-    result = solver.solve(t_eval, y0, yp0)
+    result: Any = solver.solve(t_eval, y0, yp0)
 
     # Call snapshot callback at each output time
     if snapshot_callback is not None and result.success:

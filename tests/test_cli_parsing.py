@@ -669,8 +669,10 @@ def _make_grid_args(**kwargs: object) -> Namespace:
 
 
 class TestBuildGridInfo:
-    def _make_spec(self, spatial_dim: int = 1) -> SimpleNamespace:
-        return SimpleNamespace(spatial_dimension=spatial_dim)
+    def _make_spec(self, spatial_dim: int = 1) -> EquationSystem:
+        from typing import cast
+
+        return cast("EquationSystem", SimpleNamespace(spatial_dimension=spatial_dim))
 
     def test_1d_defaults(self) -> None:
         args = _make_grid_args()
@@ -877,7 +879,7 @@ class TestParseAxisBcs:
 # ==================== _build_initial_y0 (native path) ====================
 
 
-def _make_kg_spec() -> object:
+def _make_kg_spec() -> EquationSystem:
     """Create a minimal KG-like spec for IC tests."""
     from tidal.symbolic.json_loader import EquationSystem
 

@@ -17,7 +17,9 @@ import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from scipy.integrate import solve_ivp
+from scipy.integrate import (  # pyright: ignore[reportMissingTypeStubs]
+    solve_ivp,  # pyright: ignore[reportUnknownVariableType]
+)
 
 from tidal.solver.fields import FieldSet
 from tidal.solver.leapfrog import compute_force, compute_velocity
@@ -27,6 +29,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
     from tidal.solver.grid import GridInfo
+    from tidal.solver.operators import BCSpec
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
 
@@ -41,7 +44,7 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
     kinetic: np.ndarray | None,
     spatial_momenta: Mapping[str, Sequence[OperatorTerm]] | None,
     rhs_eval: RHSEvaluator,
@@ -82,7 +85,7 @@ def solve_scipy(  # noqa: PLR0913
     y0: np.ndarray,
     t_span: tuple[float, float],
     *,
-    bc: str | tuple[str, ...] | None = None,
+    bc: BCSpec | None = None,
     parameters: dict[str, float] | None = None,
     method: str = "DOP853",
     rtol: float = 1e-8,
@@ -180,18 +183,18 @@ def solve_scipy(  # noqa: PLR0913
         pattern = build_jacobian_sparsity(spec, layout, grid, bc)
         ivp_kwargs["jac_sparsity"] = pattern
 
-    result = solve_ivp(rhs_fn, t_span, y0, method=method, **ivp_kwargs)
+    result: Any = solve_ivp(rhs_fn, t_span, y0, method=method, **ivp_kwargs)  # pyright: ignore[reportUnknownVariableType]
 
     # solve_ivp returns y as (n_states, n_times) — transpose to (n_times, n_states)
-    y_out = result.y.T if result.y is not None else np.empty((0, len(y0)))
-    t_out = result.t if result.t is not None else np.empty(0)
+    y_out: np.ndarray = result.y.T if result.y is not None else np.empty((0, len(y0)))  # pyright: ignore[reportUnknownVariableType]
+    t_out: np.ndarray = result.t if result.t is not None else np.empty(0)  # pyright: ignore[reportUnknownVariableType]
 
     # Call snapshot callback at each output time
     if snapshot_callback is not None and result.success:
-        for i in range(len(t_out)):
-            snapshot_callback(t_out[i], y_out[i])
+        for i in range(len(t_out)):  # pyright: ignore[reportUnknownArgumentType]
+            snapshot_callback(t_out[i], y_out[i])  # pyright: ignore[reportUnknownArgumentType]
 
-    msg = result.message or (
+    msg: str = result.message or (  # pyright: ignore[reportUnknownVariableType]
         "scipy integration completed" if result.success else "scipy integration failed"
     )
     return {

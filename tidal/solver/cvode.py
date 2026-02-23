@@ -32,6 +32,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
     from tidal.solver.grid import GridInfo
+    from tidal.solver.operators import BCSpec
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
 
@@ -47,7 +48,7 @@ def _build_rhsfn(  # noqa: PLR0913, PLR0917
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
-    bc: str | tuple[str, ...] | None,
+    bc: BCSpec | None,
     kinetic: np.ndarray | None,
     spatial_momenta: Mapping[str, Sequence[OperatorTerm]] | None,
     rhs_eval: RHSEvaluator,
@@ -88,7 +89,7 @@ def solve_cvode(  # noqa: PLR0913
     y0: np.ndarray,
     t_span: tuple[float, float],
     *,
-    bc: str | tuple[str, ...] | None = None,
+    bc: BCSpec | None = None,
     parameters: dict[str, float] | None = None,
     method: str = "BDF",
     rtol: float = 1e-8,
@@ -138,7 +139,9 @@ def solve_cvode(  # noqa: PLR0913
         If constraint fields (time_order=0) are present — they remain frozen
         at initial values.
     """
-    from sksundae.cvode import CVODE  # noqa: PLC0415
+    from sksundae.cvode import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
+        CVODE,
+    )
 
     layout = StateLayout.from_spec(spec, grid.num_points)
     canonical = spec.canonical
@@ -199,7 +202,7 @@ def solve_cvode(  # noqa: PLR0913
     # Build time evaluation points
     t_eval = np.linspace(t_span[0], t_span[1], num_snapshots)
 
-    result = solver.solve(t_eval, y0)
+    result: Any = solver.solve(t_eval, y0)
 
     # Call snapshot callback at each output time
     if snapshot_callback is not None and result.success:

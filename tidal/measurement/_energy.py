@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -848,8 +848,8 @@ def _evaluate_hamiltonian_factor(
         canonical = data.spec.canonical
         if canonical is not None and factor_field in canonical.field_rates:
             params = _merge_parameters(data)
-            shape = next(iter(data.fields.values()))[t_idx].shape
-            result: NDArray[np.float64] = np.zeros(shape, dtype=np.float64)
+            shape = cast("tuple[int, ...]", next(iter(data.fields.values()))[t_idx].shape)
+            result = cast("NDArray[np.float64]", np.zeros(shape, dtype=np.float64))
             for term in canonical.field_rates[factor_field]:
                 target = _resolve_term_target(data, term.field, t_idx)
                 if target is None:

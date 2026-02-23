@@ -9,6 +9,7 @@ from __future__ import annotations
 import dataclasses
 import warnings
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -3929,7 +3930,7 @@ class TestSimulationDataFromResult:
     """Tests for the native-path constructor that bypasses py-pde."""
 
     @staticmethod
-    def _kg_spec() -> object:
+    def _kg_spec() -> EquationSystem:
         from tidal.symbolic.json_loader import EquationSystem
 
         return EquationSystem.from_dict({
@@ -4069,7 +4070,7 @@ class TestBCTypes:
         """Build a minimal 1D SimulationData for testing."""
         from tidal.symbolic.json_loader import EquationSystem
 
-        spec_dict = {
+        spec_dict: dict[str, Any] = {
             "metadata": {
                 "source": "test-bc",
                 "lagrangian_expr": "test",
@@ -4205,7 +4206,7 @@ class TestDtMetadata:
         """Build a minimal SimulationData with dt."""
         from tidal.symbolic.json_loader import EquationSystem
 
-        spec_dict = {
+        spec_dict: dict[str, Any] = {
             "metadata": {
                 "source": "test-dt",
                 "lagrangian_expr": "test",

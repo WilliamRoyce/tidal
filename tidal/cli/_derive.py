@@ -492,7 +492,7 @@ def _validate_gauge(config: dict[str, Any]) -> None:
         type, targets a scalar (no gauge freedom), duplicates a field, or
         is missing required keys for custom gauges.
     """
-    gauge_list = config.get("gauge", [])
+    gauge_list: list[dict[str, Any]] = config.get("gauge", [])
     if not gauge_list:
         return
     if not isinstance(gauge_list, list):  # pyright: ignore[reportUnnecessaryIsInstance]
@@ -1420,6 +1420,78 @@ def _sym_flat_index(a: int, b: int, dim: int) -> int:
     return a * (2 * dim - 1 - a) // 2 + b
 
 
+def _tt_transverse_constraints(
+    dim: int,
+    comp_pfx: str,
+    field_name: str,
+    coord_args: str,
+) -> list[str]:
+    """Generate WLS for TT transverse constraints: d^i h_{i,j} = 0 per spatial j."""
+    coords = _COORDS[dim]
+    lines: list[str] = []
+    for j in range(1, dim):
+        deriv_terms: list[str] = []
+        for i in range(1, dim):
+            flat_idx = _sym_flat_index(i, j, dim)
+            comp = f"{comp_pfx}{flat_idx}"
+            deriv_indices = ", ".join("1" if k == i else "0" for k in range(dim))
+            deriv_terms.append(f"Derivative[{deriv_indices}][{comp}][{coord_args}]")
+
+        constraint_expr = " + ".join(deriv_terms)
+        coord_label = coords[j] if j < len(coords) else str(j)
+        constraint_name = f"{field_name}_transverse_{coord_label}"
+        lines.extend(
+            [
+                f"(* TT transverse: d^i h_{{i,{j}}} = 0 *)",
+                f'AppendTo[fieldEquations, {{"{constraint_name}", {constraint_expr}}}];',
+                f'Print["Added TT transverse constraint: d^i h_{{i,{j}}} = 0"];',
+                "",
+            ]
+        )
+    return lines
+
+
+def _tt_traceless_substitution(
+    dim: int,
+    comp_pfx: str,
+    field_name: str,
+    coord_args: str,
+) -> list[str]:
+    """Generate WLS for TT traceless substitution: h_{d-1,d-1} → -(other diags)."""
+    spatial_diag_indices = [_sym_flat_index(i, i, dim) for i in range(1, dim)]
+    last_diag_idx = spatial_diag_indices[-1]
+    other_diag_indices = spatial_diag_indices[:-1]
+    last_comp = f"{comp_pfx}{last_diag_idx}"
+
+    repl_sum = " + ".join(f"{comp_pfx}{idx}[args]" for idx in other_diag_indices)
+    deriv_repl_sum = " + ".join(
+        f"Derivative[d][{comp_pfx}{idx}][args]" for idx in other_diag_indices
+    )
+    trace_terms = " + ".join(
+        f"{comp_pfx}{idx}[{coord_args}]" for idx in spatial_diag_indices
+    )
+
+    return [
+        f"(* TT traceless: substitute {last_comp} → -(sum of other spatial diags) *)",
+        f"fieldEquations = fieldEquations /. {{"
+        f"{last_comp}[args___] :> -({repl_sum}), "
+        f"Derivative[d__][{last_comp}][args___] :> -({deriv_repl_sum})}};",
+        "",
+        "(* Expand all equations to simplify kinetic terms after traceless sub *)",
+        "fieldEquations = Table[{fieldEquations[[k, 1]], "
+        "Expand[fieldEquations[[k, 2]]]},"
+        " {k, Length[fieldEquations]}];",
+        "",
+        f"(* Replace {last_comp} equation with algebraic traceless constraint *)",
+        f'Do[If[fieldEquations[[k, 1]] === "{field_name}_{last_diag_idx}",'
+        f' fieldEquations[[k]] = {{"{field_name}_{last_diag_idx}", {trace_terms}}}],'
+        f" {{k, Length[fieldEquations]}}];",
+        f'Print["Applied TT traceless: {last_comp} → -(spatial diag sum), '
+        f'eq replaced with constraint"];',
+        "",
+    ]
+
+
 def _type_b_tt_gauge(
     ctx: _WlsContext,
     field_name: str,
@@ -1445,80 +1517,19 @@ def _type_b_tt_gauge(
     diagonal after TT substitution).
     """
     dim = ctx.dim
-    coords = _COORDS[dim]
-    coord_args = ", ".join(f"{c}[]" for c in coords)
+    coord_args = ", ".join(f"{c}[]" for c in _COORDS[dim])
     lines: list[str] = []
 
     # --- 1. Temporal: zero h_{0,mu} for mu = 0 .. dim-1 ---
     for mu in range(dim):
         idx = _sym_flat_index(0, mu, dim)
-        comp = f"{comp_pfx}{idx}"
-        lines.extend(_type_b_zero_component(comp, field_name, "TT-temporal"))
+        lines.extend(_type_b_zero_component(f"{comp_pfx}{idx}", field_name, "TT-temporal"))
 
-    # --- 2. Transverse: for each spatial j, sum_i d_i h_{i,j} = 0 ---
-    # Added BEFORE traceless substitution so that h_{d-1,d-1} references
-    # in transverse constraints also get substituted in step 3.
-    for j in range(1, dim):
-        deriv_terms: list[str] = []
-        for i in range(1, dim):
-            flat_idx = _sym_flat_index(i, j, dim)
-            comp = f"{comp_pfx}{flat_idx}"
-            deriv_indices = ", ".join("1" if k == i else "0" for k in range(dim))
-            deriv_terms.append(f"Derivative[{deriv_indices}][{comp}][{coord_args}]")
-
-        constraint_expr = " + ".join(deriv_terms)
-        coord_label = coords[j] if j < len(coords) else str(j)
-        constraint_name = f"{field_name}_transverse_{coord_label}"
-        lines.extend(
-            [
-                f"(* TT transverse: d^i h_{{i,{j}}} = 0 *)",
-                f'AppendTo[fieldEquations, {{"{constraint_name}", {constraint_expr}}}];',
-                f'Print["Added TT transverse constraint: d^i h_{{i,{j}}} = 0"];',
-                "",
-            ]
-        )
+    # --- 2. Transverse: d^i h_{i,j} = 0 per spatial j ---
+    lines.extend(_tt_transverse_constraints(dim, comp_pfx, field_name, coord_args))
 
     # --- 3. Traceless: h_{d-1,d-1} → -(sum of other spatial diags) ---
-    # Substitute in ALL equations (including transverse constraints from step 2),
-    # then replace h_{d-1,d-1}'s own equation with the algebraic constraint.
-    # Expand after substitution so the kinetic matrix (which is analytically
-    # diagonal after TT) simplifies cleanly.
-    spatial_diag_indices = [_sym_flat_index(i, i, dim) for i in range(1, dim)]
-    last_diag_idx = spatial_diag_indices[-1]
-    other_diag_indices = spatial_diag_indices[:-1]
-    last_comp = f"{comp_pfx}{last_diag_idx}"
-
-    repl_sum = " + ".join(f"{comp_pfx}{idx}[args]" for idx in other_diag_indices)
-    deriv_repl_sum = " + ".join(
-        f"Derivative[d][{comp_pfx}{idx}][args]" for idx in other_diag_indices
-    )
-
-    # Build the traceless constraint expression (sum of spatial diag = 0)
-    trace_terms = " + ".join(
-        f"{comp_pfx}{idx}[{coord_args}]" for idx in spatial_diag_indices
-    )
-
-    lines.extend(
-        [
-            f"(* TT traceless: substitute {last_comp} → -(sum of other spatial diags) *)",
-            f"fieldEquations = fieldEquations /. {{"
-            f"{last_comp}[args___] :> -({repl_sum}), "
-            f"Derivative[d__][{last_comp}][args___] :> -({deriv_repl_sum})}};",
-            "",
-            "(* Expand all equations to simplify kinetic terms after traceless sub *)",
-            "fieldEquations = Table[{fieldEquations[[k, 1]], "
-            "Expand[fieldEquations[[k, 2]]]},"
-            " {k, Length[fieldEquations]}];",
-            "",
-            f"(* Replace {last_comp} equation with algebraic traceless constraint *)",
-            f'Do[If[fieldEquations[[k, 1]] === "{field_name}_{last_diag_idx}",'
-            f' fieldEquations[[k]] = {{"{field_name}_{last_diag_idx}", {trace_terms}}}],'
-            f" {{k, Length[fieldEquations]}}];",
-            f'Print["Applied TT traceless: {last_comp} → -(spatial diag sum), '
-            f'eq replaced with constraint"];',
-            "",
-        ]
-    )
+    lines.extend(_tt_traceless_substitution(dim, comp_pfx, field_name, coord_args))
 
     return lines
 
