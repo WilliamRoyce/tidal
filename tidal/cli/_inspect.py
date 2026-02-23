@@ -34,37 +34,89 @@ def discover_parameters(spec: object) -> dict[str, list[str]]:
     # Match bare identifiers (possibly preceded by '-'), ignoring math functions/operators
     ident_re = re.compile(r"[A-Za-z_]\w*")
 
-    # Known math functions/constants to exclude
+    # Known math functions/constants to exclude (Mathematica + Python names)
     math_names = {
+        # Constants
         "E",
         "Pi",
+        "I",
+        "Infinity",
+        # Basic trig (Mathematica)
         "Sin",
         "Cos",
         "Tan",
+        "Cot",
+        "Sec",
+        "Csc",
+        # Inverse trig (Mathematica)
+        "ArcSin",
+        "ArcCos",
+        "ArcTan",
+        "ArcCot",
+        "ArcSec",
+        "ArcCsc",
+        # Hyperbolic (Mathematica)
+        "Sinh",
+        "Cosh",
+        "Tanh",
+        "Coth",
+        "Sech",
+        "Csch",
+        "ArcSinh",
+        "ArcCosh",
+        "ArcTanh",
+        # Exponential / logarithm
         "Exp",
         "Log",
+        "Log2",
+        "Log10",
+        # Algebraic
         "Sqrt",
         "Power",
         "Abs",
         "Sign",
+        "Re",
+        "Im",
+        "Conjugate",
+        # Rounding / integer
         "Floor",
         "Ceiling",
         "Round",
         "Mod",
+        "Quotient",
+        "IntegerPart",
+        "FractionalPart",
+        # Calculus / special
+        "Derivative",
+        "D",
+        "Integrate",
+        "Sum",
+        "Product",
+        "Max",
+        "Min",
+        # Python names for the same
         "sin",
         "cos",
         "tan",
+        "cot",
+        "sec",
+        "csc",
         "exp",
         "log",
         "sqrt",
         "abs",
+        "np",
+        # Coordinate variable names
         "t",
         "x",
         "y",
         "z",
         "w",
         "v",
-        "u",  # coordinates
+        "u",
+        "r",
+        "theta",
+        "phi",
     }
 
     for eq in spec.equations:
