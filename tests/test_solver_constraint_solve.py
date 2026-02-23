@@ -30,23 +30,182 @@ from tidal.symbolic.json_loader import (
 
 
 def _make_em_2d_spec() -> EquationSystem:
-    """Load real EM 2+1D spec from examples/data/em_3d.json."""
-    from pathlib import Path
-
-    from tidal.symbolic.json_loader import load_equation_system
-
-    spec_path = Path(__file__).parent.parent / "examples" / "data" / "em_3d.json"
-    return load_equation_system(spec_path)
+    """Build EM 2+1D spec inline (Maxwell A_0 constraint + A_1, A_2 wave eqs)."""
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 3, "signature": [-1, 1, 1], "coordinates": ["t", "x", "y"]},
+        "fields": [
+            {"name": "A_0", "index": 0, "is_dynamical": True},
+            {"name": "A_1", "index": 1, "is_dynamical": True},
+            {"name": "A_2", "index": 2, "is_dynamical": True},
+        ],
+        "equations": [
+            {
+                "field": "A_0",
+                "lhs": {"expression": "A_0", "order": {"time": 0, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
+                        {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_1"},
+                        {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_0"},
+                        {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_2"},
+                    ],
+                },
+                "constraint_solver": {
+                    "enabled": True,
+                    "method": "auto",
+                    "boundary_conditions": {
+                        "x": {"type": "periodic"},
+                        "y": {"type": "periodic"},
+                    },
+                },
+            },
+            {
+                "field": "A_1",
+                "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_0"},
+                        {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_1"},
+                        {"coefficient": -1.0, "operator": "cross_derivative_xy", "field": "A_2"},
+                    ],
+                },
+            },
+            {
+                "field": "A_2",
+                "lhs": {"expression": "d2_t(A_2)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_2"},
+                        {"coefficient": -1.0, "operator": "cross_derivative_xy", "field": "A_1"},
+                        {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_0"},
+                    ],
+                },
+            },
+        ],
+        "canonical": {
+            "hamiltonian_terms": [],
+            "field_rates": {
+                "A_1": [
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_1"},
+                    {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"},
+                ],
+                "A_2": [
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_2"},
+                    {"coefficient": 1.0, "operator": "gradient_y", "field": "A_0"},
+                ],
+            },
+            "kinetic_matrix": {
+                "entries": [
+                    {"i": 0, "j": 0, "value": 1.0},
+                    {"i": 1, "j": 1, "value": 1.0},
+                ],
+                "dimension": 2,
+            },
+            "spatial_momenta": {
+                "A_1": [{"coefficient": -1.0, "operator": "gradient_x", "field": "A_0"}],
+                "A_2": [{"coefficient": -1.0, "operator": "gradient_y", "field": "A_0"}],
+            },
+            "hamiltonian_symbolic": "test",
+        },
+    }
+    return EquationSystem.from_dict(data)
 
 
 def _make_chern_simons_spec() -> EquationSystem:
-    """Load real Chern-Simons 2+1D spec from examples/data/chern_simons_3d.json."""
-    from pathlib import Path
-
-    from tidal.symbolic.json_loader import load_equation_system
-
-    spec_path = Path(__file__).parent.parent / "examples" / "data" / "chern_simons_3d.json"
-    return load_equation_system(spec_path)
+    """Build Chern-Simons 2+1D spec inline (A_0 constraint + A_1, A_2 with kappa coupling)."""
+    data: dict[str, Any] = {
+        "metadata": {"parameters": {"kappa": 0.5}},
+        "spacetime": {"dimension": 3, "signature": [-1, 1, 1], "coordinates": ["t", "x", "y"]},
+        "fields": [
+            {"name": "A_0", "index": 0, "is_dynamical": True},
+            {"name": "A_1", "index": 1, "is_dynamical": True},
+            {"name": "A_2", "index": 2, "is_dynamical": True},
+        ],
+        "equations": [
+            {
+                "field": "A_0",
+                "lhs": {"expression": "A_0", "order": {"time": 0, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "gradient_x", "field": "A_2", "coefficient_symbolic": "kappa"},
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
+                        {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_1"},
+                        {"coefficient": -1.0, "operator": "gradient_y", "field": "A_1", "coefficient_symbolic": "-kappa"},
+                        {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_0"},
+                        {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_2"},
+                    ],
+                },
+                "constraint_solver": {
+                    "enabled": True,
+                    "method": "auto",
+                    "boundary_conditions": {
+                        "x": {"type": "periodic"},
+                        "y": {"type": "periodic"},
+                    },
+                },
+            },
+            {
+                "field": "A_1",
+                "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "first_derivative_t", "field": "A_2", "coefficient_symbolic": "kappa"},
+                        {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_0"},
+                        {"coefficient": -1.0, "operator": "gradient_y", "field": "A_0", "coefficient_symbolic": "-kappa"},
+                        {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_1"},
+                        {"coefficient": -1.0, "operator": "cross_derivative_xy", "field": "A_2"},
+                    ],
+                },
+            },
+            {
+                "field": "A_2",
+                "lhs": {"expression": "d2_t(A_2)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0", "coefficient_symbolic": "kappa"},
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_2"},
+                        {"coefficient": -1.0, "operator": "first_derivative_t", "field": "A_1", "coefficient_symbolic": "-kappa"},
+                        {"coefficient": -1.0, "operator": "cross_derivative_xy", "field": "A_1"},
+                        {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_0"},
+                    ],
+                },
+            },
+        ],
+        "canonical": {
+            "hamiltonian_terms": [],
+            "field_rates": {
+                "A_1": [
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_1"},
+                    {"coefficient": -0.5, "operator": "identity", "field": "A_2", "coefficient_symbolic": "-1/2*kappa"},
+                    {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"},
+                ],
+                "A_2": [
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_2"},
+                    {"coefficient": 0.5, "operator": "identity", "field": "A_1", "coefficient_symbolic": "kappa/2"},
+                    {"coefficient": 1.0, "operator": "gradient_y", "field": "A_0"},
+                ],
+            },
+            "kinetic_matrix": {
+                "entries": [
+                    {"i": 0, "j": 0, "value": 1.0},
+                    {"i": 1, "j": 1, "value": 1.0},
+                ],
+                "dimension": 2,
+            },
+            "spatial_momenta": {
+                "A_1": [{"coefficient": -1.0, "operator": "gradient_x", "field": "A_0"}],
+                "A_2": [{"coefficient": -1.0, "operator": "gradient_y", "field": "A_0"}],
+            },
+            "hamiltonian_symbolic": "test",
+        },
+    }
+    return EquationSystem.from_dict(data)
 
 
 def _make_kg_spec() -> EquationSystem:
