@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from tidal.solver._sksundae import SundialsResult, call_ida
 from tidal.solver.fields import FieldSet
 from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 from tidal.solver.state import StateLayout
@@ -652,10 +653,6 @@ def solve_ida(  # noqa: PLR0913
         To disable for a specific field, set
         ``constraint_solver.enabled = false`` in the JSON spec.
     """
-    from sksundae.ida import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
-        IDA,
-    )
-
     layout = StateLayout.from_spec(spec, grid.num_points)
 
     # Pre-solve constraints to produce consistent y0.
@@ -721,8 +718,7 @@ def solve_ida(  # noqa: PLR0913
     else:
         options["linsolver"] = "gmres"
 
-    solver = IDA(resfn, **options)
-    result: Any = solver.solve(t_eval, y0, yp0)
+    result: SundialsResult = call_ida(resfn, t_eval, y0, yp0, **options)
 
     # Call snapshot callback at each output time
     if snapshot_callback is not None and result.success:

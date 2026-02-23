@@ -46,11 +46,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from scipy import sparse  # pyright: ignore[reportMissingTypeStubs]
-from scipy.sparse.linalg import (  # pyright: ignore[reportMissingTypeStubs]
-    spsolve,  # pyright: ignore[reportUnknownVariableType]
-)
 
+from tidal.solver._scipy_types import SparseMatrix, lil_matrix, sparse_solve
 from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 
 # Numerical tolerance thresholds
@@ -445,7 +442,7 @@ def _probe_operator_matrix(
     self_terms: list[tuple[float | NDArray[np.float64], str]],
     grid: GridInfo,
     bc: BCSpec | None,
-) -> sparse.csc_matrix:
+) -> SparseMatrix:
     """Build sparse matrix by probing apply_operator() with unit vectors.
 
     Each column j is computed by applying the self-operator (with resolved
@@ -459,7 +456,7 @@ def _probe_operator_matrix(
     - Any operator in OPERATOR_REGISTRY (existing or future)
     """
     n = grid.num_points
-    mat = sparse.lil_matrix((n, n))
+    mat = lil_matrix((n, n))
 
     for j in range(n):
         e_j: NDArray[np.float64] = np.zeros(grid.shape)
@@ -474,18 +471,17 @@ def _probe_operator_matrix(
         for row in nz:
             mat[row, j] = col_flat[row]
 
-    return mat.tocsc()  # type: ignore[return-value]
+    return mat.tocsc()
 
 
 def _matrix_solve(
-    op_matrix: sparse.csc_matrix,
+    op_matrix: SparseMatrix,
     source_rhs: NDArray[np.float64],
     grid_shape: tuple[int, ...],
 ) -> NDArray[np.float64]:
     """Solve op_matrix @ u = -source_rhs via sparse direct factorization."""
     rhs = -source_rhs.ravel()
-    u: Any = spsolve(op_matrix, rhs)  # pyright: ignore[reportUnknownVariableType]
-    return u.reshape(grid_shape)  # type: ignore[return-value]
+    return sparse_solve(op_matrix, rhs).reshape(grid_shape)
 
 
 # ---------------------------------------------------------------------------

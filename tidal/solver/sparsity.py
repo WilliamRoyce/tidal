@@ -18,7 +18,8 @@ import itertools
 from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy import sparse  # pyright: ignore[reportMissingTypeStubs]
+
+from tidal.solver._scipy_types import SparseMatrix, coo_matrix, csc_matrix
 
 if TYPE_CHECKING:
     from tidal.solver.grid import GridInfo
@@ -421,19 +422,19 @@ class _SparsityBuilder:
         if eq_idx is not None:
             self.add_rhs_couplings(slot_idx, eq_idx)
 
-    def assemble(self) -> sparse.csc_matrix:
+    def assemble(self) -> SparseMatrix:
         """Assemble accumulated entries into a CSC sparse matrix."""
         n_total = self.layout.total_size
         if not self.all_rows:
-            return sparse.csc_matrix((n_total, n_total))
+            return csc_matrix((n_total, n_total))
 
         rows = np.concatenate(self.all_rows)
         cols = np.concatenate(self.all_cols)
         data = np.ones(len(rows), dtype=np.float64)
 
         # Deduplicate via COO -> CSC conversion (scipy handles duplicates)
-        pattern = sparse.coo_matrix((data, (rows, cols)), shape=(n_total, n_total))
-        return sparse.csc_matrix(pattern)
+        pattern = coo_matrix((data, (rows, cols)), shape=(n_total, n_total))
+        return csc_matrix(pattern)
 
 
 # ---------------------------------------------------------------------------
@@ -446,7 +447,7 @@ def build_jacobian_sparsity(
     layout: StateLayout,
     grid: GridInfo,
     _bc: BCSpec | None,
-) -> sparse.csc_matrix:
+) -> SparseMatrix:
     """Build the analytical Jacobian sparsity pattern for IDA.
 
     Constructs the nonzero structure of ``J = dF/dy + cj * dF/dyp`` from
@@ -467,8 +468,8 @@ def build_jacobian_sparsity(
 
     Returns
     -------
-    scipy.sparse.csc_matrix
-        Binary sparsity pattern of shape ``(N_total, N_total)``.
+    SparseMatrix
+        Binary CSC sparsity pattern of shape ``(N_total, N_total)``.
     """
     builder = _SparsityBuilder(spec, layout, grid)
 

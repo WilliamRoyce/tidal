@@ -17,10 +17,8 @@ import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from scipy.integrate import (  # pyright: ignore[reportMissingTypeStubs]
-    solve_ivp,  # pyright: ignore[reportUnknownVariableType]
-)
 
+from tidal.solver._scipy_types import IVPResult, call_solve_ivp
 from tidal.solver.fields import FieldSet
 from tidal.solver.leapfrog import compute_force, compute_velocity
 from tidal.solver.state import StateLayout
@@ -174,39 +172,33 @@ def solve_scipy(  # noqa: PLR0913
     # Build time evaluation points
     t_eval = np.linspace(t_span[0], t_span[1], num_snapshots)
 
-    # Prepare solve_ivp kwargs
-    ivp_kwargs: dict[str, Any] = {
-        "rtol": rtol,
-        "atol": atol,
-        "max_step": max_step,
-        "t_eval": t_eval,
-        "dense_output": False,
-    }
-
     # For implicit methods, provide Jacobian sparsity
+    jac_sparsity = None
     if method in _IMPLICIT_METHODS:
         from tidal.solver.sparsity import build_jacobian_sparsity  # noqa: PLC0415
 
-        pattern = build_jacobian_sparsity(spec, layout, grid, bc)
-        ivp_kwargs["jac_sparsity"] = pattern
+        jac_sparsity = build_jacobian_sparsity(spec, layout, grid, bc)
 
-    result: Any = solve_ivp(rhs_fn, t_span, y0, method=method, **ivp_kwargs)  # pyright: ignore[reportUnknownVariableType]
-
-    # solve_ivp returns y as (n_states, n_times) — transpose to (n_times, n_states)
-    y_out: np.ndarray = result.y.T if result.y is not None else np.empty((0, len(y0)))  # pyright: ignore[reportUnknownVariableType]
-    t_out: np.ndarray = result.t if result.t is not None else np.empty(0)  # pyright: ignore[reportUnknownVariableType]
+    result: IVPResult = call_solve_ivp(
+        rhs_fn,
+        t_span,
+        y0,
+        method=method,
+        t_eval=t_eval,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+        jac_sparsity=jac_sparsity,
+    )
 
     # Call snapshot callback at each output time
     if snapshot_callback is not None and result.success:
-        for i in range(len(t_out)):  # pyright: ignore[reportUnknownArgumentType]
-            snapshot_callback(t_out[i], y_out[i])  # pyright: ignore[reportUnknownArgumentType]
+        for i in range(len(result.t)):
+            snapshot_callback(result.t[i], result.y[i])
 
-    msg: str = result.message or (  # pyright: ignore[reportUnknownVariableType]
-        "scipy integration completed" if result.success else "scipy integration failed"
-    )
     return {
-        "t": t_out,
-        "y": y_out,
+        "t": result.t,
+        "y": result.y,
         "success": result.success,
-        "message": msg,
+        "message": result.message,
     }

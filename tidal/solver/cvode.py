@@ -24,6 +24,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from tidal.solver._sksundae import SundialsResult, call_cvode
 from tidal.solver.fields import FieldSet
 from tidal.solver.leapfrog import compute_force, compute_velocity
 from tidal.solver.state import StateLayout
@@ -147,10 +148,6 @@ def solve_cvode(  # noqa: PLR0913
         If constraint fields (time_order=0) are present — they remain frozen
         at initial values.
     """
-    from sksundae.cvode import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
-        CVODE,
-    )
-
     layout = StateLayout.from_spec(spec, grid.num_points)
     canonical = spec.canonical
 
@@ -204,12 +201,10 @@ def solve_cvode(  # noqa: PLR0913
     else:
         options["linsolver"] = "gmres"
 
-    solver = CVODE(rhsfn, **options)
-
     # Build time evaluation points
     t_eval = np.linspace(t_span[0], t_span[1], num_snapshots)
 
-    result: Any = solver.solve(t_eval, y0)
+    result: SundialsResult = call_cvode(rhsfn, t_eval, y0, **options)
 
     # Call snapshot callback at each output time
     if snapshot_callback is not None and result.success:
