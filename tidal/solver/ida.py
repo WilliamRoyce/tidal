@@ -74,6 +74,10 @@ class _ResidualCtx:
         self.eq_map: dict[str, int] = {
             eq.field_name: i for i, eq in enumerate(spec.equations)
         }
+        # Detect constraints with no self-referencing terms — the field
+        # doesn't appear in its own equation (e.g. momentum constraints
+        # from gauge DOF).  These are frozen at zero.
+        self._no_self_term_fields = self._detect_no_self_term_fields()
         # Detect constraints that need gauge fixing (singular self-operator
         # with periodic BCs, e.g. pure Laplacian → null space = constants).
         # Standard approach: pin mean(field)=0 for one row (FEniCS/Firedrake).
@@ -135,6 +139,43 @@ class _ResidualCtx:
             operated = apply_operator(term.operator, target_data, self.grid, self.bc)
             result += term.coefficient * operated
         return result.ravel()
+
+    def _detect_no_self_term_fields(self) -> set[str]:
+        """Detect constraint equations where the field has no self-referencing terms.
+
+        When a constraint equation's RHS references only *other* fields (not the
+        constraint field itself), the Jacobian ∂F/∂field = 0, making IDA's
+        Newton solver singular.  These typically arise from gauge degrees of
+        freedom (e.g. lapse/shift in linearized gravity) whose EOM constrain
+        momenta rather than the field value.
+
+        For such fields, ``handle_constraint`` freezes them at zero
+        (``res = y[field]``), making the Jacobian non-singular (identity block).
+        The original equation becomes an initial-data consistency condition.
+
+        Emits ``UserWarning`` for each detected field.
+        """
+        result: set[str] = set()
+        for eq in self.spec.equations:
+            if eq.time_derivative_order != 0:
+                continue
+            has_self = any(t.field == eq.field_name for t in eq.rhs_terms)
+            if not has_self:
+                result.add(eq.field_name)
+
+        for name in sorted(result):
+            warnings.warn(
+                f"Constraint equation for '{name}' has no self-referencing "
+                f"terms (field does not appear in its own RHS). Freezing "
+                f"'{name}' at zero — the original equation becomes an "
+                f"initial-data consistency condition. If this field should "
+                f"be non-zero, restructure the equation to include a "
+                f"self-term.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        return result
 
     def _detect_gauge_fix_fields(self) -> set[str]:
         """Detect constraints needing gauge fixing (singular operator + periodic BCs).
@@ -213,13 +254,15 @@ class _ResidualCtx:
         return has_lap
 
     def handle_constraint(self, slot_idx: int, slot: SlotInfo) -> None:
-        """Algebraic constraint: RHS = 0, with gauge regularisation for singular operators.
+        """Algebraic constraint: RHS = 0, with special handling for edge cases.
 
-        For Poisson-type constraints (pure Laplacian + periodic BCs), the
-        Jacobian is singular.  We replace the first grid point's equation
-        with ``field[0] = 0`` to pin the gauge freedom, making the
-        Jacobian non-singular.  A ``UserWarning`` is emitted by
-        ``_detect_gauge_fix_fields`` so the user knows this choice is active.
+        Three cases:
+
+        1. **No self-terms** (field absent from its own RHS): freeze at zero.
+           Residual ``res = y[field]`` → Jacobian = I (non-singular).
+        2. **Gauge regularisation** (pure Laplacian + periodic BCs): pin
+           ``field[0] = 0`` to remove null-space ambiguity.
+        3. **Normal**: ``res = RHS(y, t)`` (algebraic equation).
         """
         s = slice(slot_idx * self.n, (slot_idx + 1) * self.n)
         eq_idx = self.eq_map.get(slot.field_name)
@@ -227,10 +270,17 @@ class _ResidualCtx:
             self.res[s] = 0.0
             return
 
+        # Case 1: no self-terms — freeze field at zero.
+        if slot.field_name in self._no_self_term_fields:
+            field_slot = self.layout.field_slot_map[slot.field_name]
+            fs = slice(field_slot * self.n, (field_slot + 1) * self.n)
+            self.res[s] = self.y[fs]
+            return
+
         rhs = self.compute_rhs(eq_idx).ravel()
         self.res[s] = rhs
 
-        # Gauge fixing: replace first equation with A_0[0] = 0.
+        # Case 2: gauge fixing — replace first equation with field[0] = 0.
         # For Poisson constraints (pure Laplacian + periodic BCs), the
         # solution is unique up to a constant.  Pinning one point to zero
         # selects the unique solution.  Uses a single diagonal Jacobian

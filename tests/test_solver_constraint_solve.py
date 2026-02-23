@@ -864,3 +864,160 @@ class TestGaugeRegularisationWarnings:
             _warnings.simplefilter("error", UserWarning)
             # Should NOT warn — Helmholtz has mass term, not singular
             pre_solve_constraints(spec, grid, y0, bc="periodic")
+
+
+# ---------------------------------------------------------------------------
+# No-self-term constraint tests (IDA freezes field at zero)
+# ---------------------------------------------------------------------------
+
+
+def _make_no_self_term_spec() -> EquationSystem:
+    """Spec with a constraint equation that has no self-referencing terms.
+
+    Models the situation from linearized gravity: constraint field h_0 has
+    an equation involving only gradients of h_1 (a dynamical field),
+    not h_0 itself.  h_1 is a dynamical wave field.
+    """
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 2, "signature": [-1, 1]},
+        "fields": [
+            {"name": "h_0", "index": 0},
+            {"name": "h_1", "index": 1},
+        ],
+        "equations": [
+            {
+                "field": "h_0",
+                "lhs": {"expression": "h_0", "order": {"time": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        # Only references h_1, NOT h_0
+                        {
+                            "coefficient": -0.5,
+                            "operator": "gradient_x",
+                            "field": "h_1",
+                        },
+                    ],
+                },
+            },
+            {
+                "field": "h_1",
+                "lhs": {
+                    "expression": "d2_t(h_1)",
+                    "order": {"time": 2},
+                },
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian",
+                            "field": "h_1",
+                        },
+                    ],
+                },
+            },
+        ],
+        "canonical": {
+            "hamiltonian_terms": [],
+            "field_rates": {
+                "h_1": [
+                    {
+                        "coefficient": 1.0,
+                        "operator": "identity",
+                        "field": "pi_1",
+                    },
+                ],
+            },
+            "kinetic_matrix": {
+                "entries": [{"i": 0, "j": 0, "value": 1.0}],
+                "dimension": 1,
+            },
+            "spatial_momenta": {},
+            "hamiltonian_symbolic": "test",
+        },
+    }
+    return EquationSystem.from_dict(data)
+
+
+class TestNoSelfTermConstraints:
+    """Test IDA handling of constraints with no self-referencing terms."""
+
+    @pytest.mark.skipif(
+        not _has_sundials(), reason="sksundae not available"
+    )
+    def test_ida_no_self_term_freezes_field(self) -> None:
+        """IDA freezes no-self-term constraint field at zero."""
+        from tidal.solver.ida import solve_ida
+
+        spec = _make_no_self_term_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        # Give h_1 a Gaussian initial condition
+        h1_slot = layout.field_slot_map["h_1"]
+        x = grid.coord_arrays()[0]
+        y0[h1_slot * n : (h1_slot + 1) * n] = np.exp(
+            -((x - 5) ** 2) / 2
+        ).ravel()
+
+        with pytest.warns(UserWarning, match="no self-referencing"):
+            result = solve_ida(
+                spec, grid, y0, (0.0, 0.5),
+                bc="periodic", num_snapshots=3,
+            )
+
+        assert result["success"], result["message"]
+
+        # h_0 should be frozen at zero throughout
+        h0_slot = layout.field_slot_map["h_0"]
+        for yi in result["y"]:
+            h0_data = yi[h0_slot * n : (h0_slot + 1) * n]
+            assert np.allclose(h0_data, 0.0, atol=1e-12), (
+                f"h_0 should be frozen at zero, got max={np.abs(h0_data).max()}"
+            )
+
+    @pytest.mark.skipif(
+        not _has_sundials(), reason="sksundae not available"
+    )
+    def test_ida_no_self_term_warns(self) -> None:
+        """IDA emits UserWarning for no-self-term constraints."""
+        from tidal.solver.ida import solve_ida
+
+        spec = _make_no_self_term_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(16,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.total_size)
+
+        with pytest.warns(UserWarning, match="Freezing 'h_0' at zero"):
+            solve_ida(
+                spec, grid, y0, (0.0, 0.1),
+                bc="periodic", num_snapshots=3,
+            )
+
+    def test_sparsity_no_self_term_diagonal(self) -> None:
+        """Sparsity pattern has diagonal block for no-self-term constraints."""
+        from tidal.solver.sparsity import build_jacobian_sparsity
+
+        spec = _make_no_self_term_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        pattern = build_jacobian_sparsity(spec, layout, grid, "periodic")
+
+        # h_0 is slot 0 — should have diagonal entries (identity coupling)
+        h0_slot = layout.field_slot_map["h_0"]
+        h0_start = h0_slot * n
+        h0_end = (h0_slot + 1) * n
+
+        # Extract h_0's row block
+        h0_block = pattern[h0_start:h0_end, h0_start:h0_end]
+
+        # Should have diagonal entries (at minimum)
+        for i in range(n):
+            assert h0_block[i, i] != 0, (
+                f"Missing diagonal entry at ({i},{i}) for no-self-term field"
+            )

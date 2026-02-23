@@ -345,8 +345,18 @@ class _SparsityBuilder:
             self.add_block(row_slot, col_slot, offsets)
 
     def handle_constraint(self, slot_idx: int, eq_idx: int | None) -> None:
-        """Constraint: res = RHS(y) -- no yp coupling, no cj*I diagonal."""
+        """Constraint: res = RHS(y) -- no yp coupling, no cj*I diagonal.
+
+        If the equation has no self-referencing terms, the IDA residual
+        is ``res = y[field]`` (freeze at zero) → diagonal Jacobian block.
+        """
         if eq_idx is not None:
+            eq = self.spec.equations[eq_idx]
+            has_self = any(t.field == eq.field_name for t in eq.rhs_terms)
+            if not has_self:
+                # No self-terms: residual is y[field] → identity coupling
+                self.add_diagonal(slot_idx)
+                return
             self.add_rhs_couplings(slot_idx, eq_idx)
 
     def handle_momentum(self, slot_idx: int, eq_idx: int | None) -> None:

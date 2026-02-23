@@ -31,6 +31,11 @@ SPATIAL_DIM_2D = 2
 # CFL safety factor for auto-dt computation
 _CFL_FACTOR = 0.5
 
+# Laplacian-like operators that contribute to the wave speed
+_LAPLACIAN_OPS = frozenset({
+    "laplacian", "laplacian_x", "laplacian_y", "laplacian_z",
+})
+
 # Threshold for zero-evolution diagnostic (effectively machine epsilon)
 _ZERO_RATE_THRESHOLD = 1e-14
 
@@ -807,6 +812,65 @@ def _constraint_mode(  # noqa: PLR0913, PLR0917
     return 0
 
 
+def _compute_cfl_dt(
+    spec: EquationSystem,
+    grid: GridInfo,
+    params: dict[str, float],
+) -> float:
+    """Compute CFL-safe dt accounting for position-dependent coefficients.
+
+    For each dynamical equation (time_order >= 2), sums the absolute values
+    of all laplacian-type coefficient magnitudes.  For position-dependent
+    coefficients, evaluates on the grid and takes the spatial maximum.
+
+    Returns ``CFL_FACTOR * dx_min / sqrt(max_c2)`` where ``max_c2`` is the
+    maximum summed laplacian coefficient across all equations and grid points.
+    Falls back to ``CFL_FACTOR * dx_min`` when no laplacian terms exist.
+    """
+    from tidal.symbolic._eval_utils import evaluate_coefficient
+
+    dx_min = min(float(d) for d in grid.dx)
+    coords = spec.coordinates[1:]  # spatial only
+    coord_arrays = dict(zip(coords, grid.coord_arrays(), strict=False))
+
+    max_c2 = 0.0
+
+    for eq in spec.equations:
+        if eq.time_derivative_order < 2:  # noqa: PLR2004
+            continue
+
+        # Sum |coefficient| for all laplacian-type self-terms
+        c2_grid: float | np.ndarray = 0.0
+        for term in eq.rhs_terms:
+            if term.operator not in _LAPLACIAN_OPS:
+                continue
+            if term.field != eq.field_name:
+                continue  # cross-field laplacian — skip for CFL estimate
+
+            if term.coefficient_symbolic is not None and term.position_dependent:
+                val = evaluate_coefficient(
+                    term.coefficient_symbolic,
+                    params,
+                    coords,
+                    coord_arrays=coord_arrays,
+                )
+                c2_grid = c2_grid + np.abs(val)  # noqa: PLR6104
+            else:
+                c2_grid = c2_grid + abs(term.coefficient)  # noqa: PLR6104
+
+        if isinstance(c2_grid, np.ndarray):
+            eq_max = float(np.max(c2_grid))
+        else:
+            eq_max = float(c2_grid)
+
+        max_c2 = max(max_c2, eq_max)
+
+    if max_c2 > 0:
+        return float(_CFL_FACTOR * dx_min / math.sqrt(max_c2))
+
+    return float(_CFL_FACTOR * dx_min)
+
+
 def _resolve_scheme(scheme: str, spec: EquationSystem) -> str:
     """Resolve ``'auto'`` to ``'leapfrog'`` or ``'ida'`` based on equation operators.
 
@@ -928,7 +992,7 @@ def _simulate(
 
         dt = args.dt
         if dt is None:
-            dt = _CFL_FACTOR * min(float(d) for d in grid_info.dx)
+            dt = _compute_cfl_dt(spec, grid_info, params)
         log(f"Running leapfrog solver (t=0 → {args.t_end}, dt={dt:.4f})...")
         result = solve_leapfrog(
             spec, grid_info, y0,
