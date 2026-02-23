@@ -194,6 +194,32 @@ ClassifyOperatorType::usage =
 a list {operatorName, isMixedTimeSpace} where operatorName is one of: \"identity\", \
 \"laplacian\", \"laplacian_x/y/z\", \"gradient_x/y/z\", \"cross_derivative_xy/xz/yz\".";
 
+(* === Phase K: Canonical Momentum / Hamiltonian Export === *)
+
+ClassifyHamiltonianFactor::usage =
+  "ClassifyHamiltonianFactor[factor, allFieldNames] classifies a single field-dependent \
+factor in a Hamiltonian term. Returns an Association with \"field\" (component name) \
+and \"operator\" keys. operator is one of: \"identity\" (bare field), \
+\"time_derivative\" (maps to canonical momentum at evaluation time), \
+\"gradient_x\"/\"gradient_y\"/\"gradient_z\" (spatial gradients), \
+\"laplacian_x\"/\"laplacian_y\"/\"laplacian_z\" (second spatial derivatives), \
+or \"cross_derivative_xy\"/etc. for mixed spatial derivatives.";
+
+ParseHamiltonianExpression::usage =
+  "ParseHamiltonianExpression[componentExpr, allFieldNames] parses a component-form \
+Hamiltonian density (scalar expression in Derivative[...][f][...] form) into a list \
+of structured quadratic term Associations. Each term has keys \"coefficient\", \
+\"factor_a\" and \"factor_b\" (each with \"field\" and \"operator\" subkeys). \
+Only quadratic terms (exactly 2 field factors) are parsed; non-quadratic terms are \
+skipped with a warning. Used by the canonical momentum pipeline (Phase K) to export \
+the Hamiltonian for Python-side energy evaluation.";
+
+ParseMultiFieldRHS::usage =
+  "ParseMultiFieldRHS[eq, currentFieldName, allFieldNames] parses a linear \
+combination of operators applied to fields into a list of term Associations. \
+Each term has keys \"coefficient\", \"operator\", and \"field\". Used by both \
+the equation export pipeline and the canonical field rate computation (Phase K).";
+
 Begin["`Private`"];
 
 (* === JSON Structure Building === *)
@@ -379,8 +405,15 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
       -1
     ];
     If[Abs[lhsCoeff] =!= 1,
-      rhs = Simplify[-rhs / lhsCoeff]
-    ]
+      rhs = -rhs / lhsCoeff
+    ];
+    (* ALWAYS Expand the RHS to ensure Plus structure for ParseMultiFieldRHS.
+       Total[] (line 395) may trigger Mathematica's auto-factoring, collapsing
+       separate linear terms into a single Times with multiple field heads.
+       Without Expand, ParseMultiFieldRHS misidentifies these as bilinear
+       (field-dependent) coefficients. This is critical for any multi-component
+       system where the LHS coefficient is ±1 (standard wave equations). *)
+    rhs = Expand[rhs]
   ];
 
   (* Parse RHS with cross-field detection *)
@@ -1106,6 +1139,206 @@ ConstraintSolverHints[fieldName_String, timeOrder_Integer, metadata_Association]
     "boundary_conditions" -> bcAssoc
   |>
 ];
+
+
+(* === Phase K: Hamiltonian Term Parsing === *)
+(*
+  After computing H via LegendreTransformH and decomposing to component form
+  via DecomposeScalarExpression, the Hamiltonian is a sum of quadratic terms
+  in component fields and their derivatives.  Each term has the structure:
+
+    coefficient * factor_a * factor_b
+
+  where factor_a, factor_b are each:
+    - fieldHead[t, x, y] (identity operator)
+    - Derivative[dt, dx, dy][fieldHead][t, x, y] (derivative operator)
+
+  For squared terms: coefficient * factor^2 (factor_a = factor_b).
+
+  ClassifyHamiltonianFactor identifies the field name and operator type.
+  ParseHamiltonianExpression parses the full expanded expression.
+*)
+
+(* Classify a single field-dependent factor in a Hamiltonian term *)
+ClassifyHamiltonianFactor[factor_, allFieldNames_List] := Module[
+  {functionHeads, matchResult, fieldName, profile, timeOrder, spatialOrders, operator},
+
+  (* Extract function head and match to field name *)
+  functionHeads = ExtractFunctionHeads[factor];
+  matchResult = MatchFieldToHeads[functionHeads, allFieldNames, "unknown"];
+  fieldName = matchResult[[1]];
+
+  If[fieldName === "unknown",
+    Throw[StringJoin[
+      "ClassifyHamiltonianFactor: Cannot match factor '",
+      ToString[factor, InputForm], "' to any known field name: ",
+      ToString[allFieldNames]
+    ]]
+  ];
+
+  (* Classify the operator based on derivative structure *)
+  If[FreeQ[factor, Derivative],
+    (* No derivative: identity (bare field value) *)
+    operator = "identity",
+    (* Has derivative: classify *)
+    profile = ExtractDerivativeProfile[factor];
+    If[Length[profile] == 0,
+      Throw[StringJoin[
+        "ClassifyHamiltonianFactor: Derivative pattern found but profile empty for '",
+        ToString[factor, InputForm], "'."
+      ]]
+    ];
+    timeOrder = First[profile];
+    spatialOrders = Rest[profile];
+    Which[
+      (* Pure first-order time derivative: maps to canonical momentum at evaluation *)
+      timeOrder == 1 && Max[spatialOrders] == 0,
+        operator = "time_derivative",
+      (* Pure spatial derivative *)
+      timeOrder == 0,
+        operator = ClassifySpatialProfile[spatialOrders],
+      (* Mixed time-space: should not appear in properly simplified H *)
+      True,
+        Print["WARNING: Mixed time-space derivative in Hamiltonian factor: ",
+          ToString[factor, InputForm]];
+        operator = "mixed_" <> ToString[timeOrder] <> "_" <>
+          StringJoin[Riffle[ToString /@ spatialOrders, "_"]]
+    ]
+  ];
+
+  <|"field" -> fieldName, "operator" -> operator|>
+];
+
+
+(* Parse a single expanded term of the Hamiltonian into structured form *)
+(* Returns an Association with coefficient, factor_a, factor_b, or Nothing if not quadratic *)
+ParseSingleHamiltonianTerm[term_, fieldHeads_List, allFieldNames_List] := Module[
+  {factors, fieldFactors = {}, coeffFactors = {},
+   factorA, factorB, coefficient, numCoeff, symbolicCoeff = Null},
+
+  (* Split Times expression into individual factors *)
+  factors = If[Head[term] === Times, List @@ term, {term}];
+
+  (* Classify each factor as field-dependent or coefficient *)
+  Do[
+    Which[
+      (* Squared derivative: Power[Derivative[...][f][...], 2] *)
+      MatchQ[factor, Power[Derivative[__][f_][__], n_Integer] /; MemberQ[fieldHeads, f] && n == 2],
+        AppendTo[fieldFactors, factor[[1]]];
+        AppendTo[fieldFactors, factor[[1]]],
+
+      (* Squared bare field: Power[f[...], 2] *)
+      MatchQ[factor, Power[f_Symbol[__], n_Integer] /; MemberQ[fieldHeads, f] && n == 2],
+        AppendTo[fieldFactors, factor[[1]]];
+        AppendTo[fieldFactors, factor[[1]]],
+
+      (* Single derivative field factor: Derivative[...][f][...] *)
+      MatchQ[factor, Derivative[__][f_][__] /; MemberQ[fieldHeads, f]],
+        AppendTo[fieldFactors, factor],
+
+      (* Single bare field factor: f[...] *)
+      MatchQ[factor, f_Symbol[__] /; MemberQ[fieldHeads, f]],
+        AppendTo[fieldFactors, factor],
+
+      (* Everything else is part of the coefficient *)
+      True,
+        AppendTo[coeffFactors, factor]
+    ],
+    {factor, factors}
+  ];
+
+  (* Must have exactly 2 field factors for a quadratic term *)
+  If[Length[fieldFactors] != 2,
+    If[Length[fieldFactors] > 0,
+      Print["WARNING: Hamiltonian term has ", Length[fieldFactors],
+        " field factors (expected 2): ", ToString[Short[term], InputForm]]
+    ];
+    Return[Nothing]
+  ];
+
+  (* Compute coefficient (product of non-field factors) *)
+  coefficient = If[Length[coeffFactors] > 0, Times @@ coeffFactors, 1];
+
+  (* Separate numeric and symbolic parts *)
+  If[NumericQ[coefficient],
+    numCoeff = N[coefficient],
+    (* Try N[] for simple symbolic expressions *)
+    If[NumericQ[Quiet[N[coefficient]]],
+      numCoeff = Quiet[N[coefficient]],
+      numCoeff = 1.0;
+      symbolicCoeff = ToString[coefficient, InputForm]
+    ]
+  ];
+
+  (* Classify both field factors *)
+  factorA = ClassifyHamiltonianFactor[fieldFactors[[1]], allFieldNames];
+  factorB = ClassifyHamiltonianFactor[fieldFactors[[2]], allFieldNames];
+
+  (* Build result *)
+  Module[{result},
+    result = <|
+      "coefficient" -> numCoeff,
+      "factor_a" -> factorA,
+      "factor_b" -> factorB
+    |>;
+    If[symbolicCoeff =!= Null,
+      result["coefficient_symbolic"] = symbolicCoeff
+    ];
+    result
+  ]
+];
+
+
+(* Parse the full expanded Hamiltonian expression into structured quadratic terms *)
+ParseHamiltonianExpression[componentExpr_, allFieldNames_List] := Module[
+  {terms, fieldHeads, result},
+
+  (* Discover all function heads that correspond to known fields *)
+  fieldHeads = Union[Join[
+    Cases[componentExpr, f_Symbol[__] :> f, {0, Infinity}],
+    Cases[componentExpr, Derivative[__][f_][__] :> f, {0, Infinity}]
+  ]];
+
+  (* Filter to only heads that match known field names *)
+  fieldHeads = Select[fieldHeads, Function[h,
+    Module[{match},
+      match = MatchFieldToHeads[{ToString[h]}, allFieldNames, ""];
+      match[[1]] =!= ""
+    ]
+  ]];
+
+  If[Length[fieldHeads] == 0,
+    Throw[StringJoin[
+      "ParseHamiltonianExpression: No known field heads found in expression. ",
+      "Expected fields: ", ToString[allFieldNames], ". ",
+      "Expression (short): ", ToString[Short[componentExpr, 3]]
+    ]]
+  ];
+
+  (* Ensure expression is fully expanded before splitting into Plus terms.
+     The Legendre transform H = Sum pi*vel - L should produce an expanded
+     expression, but defensive Expand prevents silent failures from
+     auto-factoring (same rationale as the Expand in EquationToJSONMultiField). *)
+  componentExpr = Expand[componentExpr];
+
+  (* Split into additive terms *)
+  terms = If[Head[componentExpr] === Plus, List @@ componentExpr, {componentExpr}];
+
+  (* Parse each term *)
+  result = Map[ParseSingleHamiltonianTerm[#, fieldHeads, allFieldNames] &, terms];
+  result = DeleteCases[result, Nothing];
+
+  If[Length[result] == 0,
+    Throw[StringJoin[
+      "ParseHamiltonianExpression: No quadratic terms found. ",
+      "The Hamiltonian should be quadratic in fields/momenta. ",
+      "Expression (short): ", ToString[Short[componentExpr, 3]]
+    ]]
+  ];
+
+  result
+];
+
 
 End[];
 EndPackage[];

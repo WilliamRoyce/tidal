@@ -11,11 +11,8 @@
 #   - Two Helmholtz scales (mA2 vs mB2)
 #   - Cross-field identity coupling in constraints (gcoup)
 #
-# See also:
-#   measure_conversion.py      — detailed measurement analysis
-#
 # Running this script:
-#   cd examples/coupled_proca && uv run bash run.sh
+#   cd examples/coupled_proca && bash run.sh
 #
 # Or run each step manually to learn the tidal CLI:
 #
@@ -25,11 +22,13 @@
 #   # Step 2: Inspect the generated equation system (6 fields, 6x6 matrices)
 #   uv run tidal inspect ../data/coupled_proca_3d.json
 #
-#   # Step 3: Simulate (Gaussian IC, periodic BCs, 16x16 grid)
+#   # Step 3: Simulate (Gaussian IC, periodic BCs, 20x20 grid on [0,π]²)
 #   uv run tidal simulate ../data/coupled_proca_3d.json \
 #     --param mA2=1.0 --param mB2=2.0 --param gcoup=0.5 \
-#     --ic gaussian --grid-shape 16 --t-end 2.0 --dt 0.05 \
-#     --bc periodic,periodic --scheme runge-kutta \
+#     --ic gaussian --ic-component A_1 --ic-amplitude 0.5 --ic-width 0.5 \
+#     --ic-center 1.5708,1.5708 \
+#     --grid-shape 20 --bounds 0:3.14159,0:3.14159 --t-end 20.0 \
+#     --bc periodic,periodic \
 #     --output ../data/coupled_proca_output
 #
 #   # Step 4: Measure conversion from A-field group to B-field group
@@ -47,9 +46,9 @@
 #
 #   # Step 7: Combined plot with all measurements
 #   uv run tidal measure ../data/coupled_proca_output \
-#     --what conversion,mixing,spectral_conversion,dispersion \
+#     --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
 #     --source A_0,A_1,A_2 --target B_0,B_1,B_2 \
-#     --output ../data/coupled_proca_measurement.png
+#     --output ../data/coupled_proca_output/measurement.png
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -64,8 +63,10 @@ tidal inspect ../data/coupled_proca_3d.json
 # Gaussian IC with periodic BCs; constraint solver auto-detects A_0, B_0
 tidal simulate ../data/coupled_proca_3d.json \
   --param mA2=1.0 --param mB2=2.0 --param gcoup=0.5 \
-  --ic gaussian --grid-shape 16 --t-end 2.0 --dt 0.05 \
-  --bc periodic,periodic --scheme runge-kutta \
+  --ic gaussian --ic-component A_1 --ic-amplitude 0.5 --ic-width 0.5 \
+  --ic-center 1.5708,1.5708 \
+  --grid-shape 20 --bounds 0:3.14159,0:3.14159 --t-end 20.0 \
+  --bc periodic,periodic \
   --output ../data/coupled_proca_output
 
 # Step 4: Measure conversion between vector field groups and mixing length
@@ -87,6 +88,10 @@ tidal measure ../data/coupled_proca_output \
 
 # Step 7: Combined measurement plot (all panels in one figure)
 tidal measure ../data/coupled_proca_output \
-  --what conversion,mixing,spectral_conversion,dispersion \
+  --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
   --source A_0,A_1,A_2 --target B_0,B_1,B_2 \
-  --output ../data/coupled_proca_measurement.png
+  --output ../data/coupled_proca_output/measurement.png
+
+# Step 8: Individual plots (saved into the simulation output directory)
+tidal plot ../data/coupled_proca_output --type snapshot --field A_1 --time-index -1 --quiet
+tidal plot ../data/coupled_proca_output --type amplitude --quiet

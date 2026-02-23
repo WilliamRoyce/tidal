@@ -55,13 +55,13 @@ cd examples/scalar_field
 bash run.sh
 ```
 
-### With Python scripts
+### Running examples
 
-Examples with a `simulation.py` or `kg_from_lagrangian.py` can be run directly:
+Each example directory has a `run.sh` that runs the full pipeline:
 
 ```bash
-uv run python examples/scalar_field/kg_from_lagrangian.py
-uv run python examples/scalar_vector_coupling/simulation.py
+cd examples/scalar_field && bash run.sh
+cd examples/scalar_vector_coupling && bash run.sh
 ```
 
 ## Example Completeness

@@ -19,5 +19,15 @@ expression = "-1/2 * (CD[-a][A[-b]] eta[a, c] eta[b, d] CD[-c][A[-d]] - CD[-a][A
 [parameters]
 kappa = 0.5
 
+[constraint_solver]
+enabled = true
+method = "auto"
+
+[constraint_solver.boundary_conditions.x]
+type = "periodic"
+
+[constraint_solver.boundary_conditions.y]
+type = "periodic"
+
 [output]
 path = "../data/chern_simons_3d.json"

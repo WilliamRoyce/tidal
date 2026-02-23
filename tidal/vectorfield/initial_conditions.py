@@ -7,15 +7,17 @@ for field systems derived from Lagrangians.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import numpy as np
-from pde import FieldCollection, ScalarField
+
+from tidal.solver.fields import FieldSet
+from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
-    from pde.grids.base import GridBase
 
+    from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem
 
 
@@ -66,12 +68,12 @@ class ComponentGaussianPulse:
             msg = "width must be positive"
             raise ValueError(msg)
 
-    def compute_gaussian(self, grid: GridBase) -> NDArray[np.float64]:
+    def compute_gaussian(self, grid: GridInfo) -> NDArray[np.float64]:
         """Compute Gaussian profile on the grid.
 
         Parameters
         ----------
-        grid : GridBase
+        grid : GridInfo
             The simulation grid.
 
         Returns
@@ -79,61 +81,51 @@ class ComponentGaussianPulse:
         NDArray[np.float64]
             Gaussian profile values at each grid point.
         """
-        # Get grid coordinates
-        coords = cast("np.ndarray", grid.cell_coords)
+        coords = grid.cell_coords
 
         # Compute squared distance from center
         dist_sq = np.zeros(grid.shape, dtype=np.float64)
-        for dim in range(grid.num_axes):
+        for dim in range(grid.ndim):
             if dim < len(self.center):
                 dist_sq += (coords[..., dim] - self.center[dim]) ** 2
-            # If center doesn't specify this dimension, treat as centered at 0
 
-        # Compute Gaussian
         return self.amplitude * np.exp(-dist_sq / (2 * self.width**2))
 
-    def create(self, grid: GridBase, spec: EquationSystem) -> FieldCollection:
+    def create(self, grid: GridInfo, spec: EquationSystem) -> FieldSet:
         """Create initial state with Gaussian pulses in specified components.
 
         Parameters
         ----------
-        grid : GridBase
+        grid : GridInfo
             The simulation grid.
         spec : EquationSystem
             The equation specification (determines component count and names).
 
         Returns
         -------
-        FieldCollection
-            Initial state with 2 * n_components fields (field + momentum pairs).
+        FieldSet
+            Initial state with field + momentum slots.
         """
         gaussian = self.compute_gaussian(grid)
 
-        # Determine which components get the pulse
         if self.active_components is None:
-            # Default: all components get the pulse
             active = dict.fromkeys(spec.component_names, 1.0)
         else:
             active = self.active_components
 
-        fields: list[ScalarField] = []
-
-        for name in spec.component_names:
-            # Field component
+        slot_data: dict[str, NDArray[np.float64]] = {}
+        for eq in spec.equations:
+            name = eq.field_name
             if name in active:
-                field_data = active[name] * gaussian
+                slot_data[name] = active[name] * gaussian
             else:
-                field_data = np.zeros(grid.shape, dtype=np.float64)
+                slot_data[name] = np.zeros(grid.shape, dtype=np.float64)
+            # Only 2nd-order fields have momentum slots
+            if eq.time_derivative_order >= 2:  # noqa: PLR2004
+                slot_data[f"pi_{name}"] = np.zeros(grid.shape, dtype=np.float64)
 
-            # Use extend to add both field and momentum components at once
-            fields.extend(
-                (
-                    ScalarField(grid, data=field_data),
-                    ScalarField(grid, data=0.0),  # Momentum component (always zero)
-                )
-            )
-
-        return FieldCollection(fields)
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        return FieldSet.from_dict(layout, grid.shape, slot_data)
 
 
 @dataclass
@@ -176,7 +168,8 @@ class ComponentPlaneWave:
     active_components: dict[str, float] | None = None
 
     def compute_plane_wave(
-        self, grid: GridBase
+        self,
+        grid: GridInfo,
     ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         """Compute plane wave field and momentum on the grid.
 
@@ -185,82 +178,72 @@ class ComponentPlaneWave:
         tuple[NDArray, NDArray]
             (field_data, momentum_data) arrays.
         """
-        coords = cast("np.ndarray", grid.cell_coords)
+        coords = grid.cell_coords
 
-        # Compute k · x
         k_dot_x = np.zeros(grid.shape, dtype=np.float64)
-        for dim in range(min(grid.num_axes, len(self.wavevector))):
+        for dim in range(min(grid.ndim, len(self.wavevector))):
             k_dot_x += self.wavevector[dim] * coords[..., dim]
 
-        # Compute |k| (omega for massless)
         k_mag = np.sqrt(sum(k**2 for k in self.wavevector))
 
-        # Field: amplitude · cos(k·x + phase)
         field_data = self.amplitude * np.cos(k_dot_x + self.phase)
-
-        # Momentum: -amplitude · omega · sin(k·x + phase) for right-moving wave
         momentum_data = -self.amplitude * k_mag * np.sin(k_dot_x + self.phase)
 
         return field_data, momentum_data
 
-    def create(self, grid: GridBase, spec: EquationSystem) -> FieldCollection:
+    def create(self, grid: GridInfo, spec: EquationSystem) -> FieldSet:
         """Create initial state with plane waves in specified components.
 
         Parameters
         ----------
-        grid : GridBase
+        grid : GridInfo
             The simulation grid.
         spec : EquationSystem
             The equation specification.
 
         Returns
         -------
-        FieldCollection
+        FieldSet
             Initial state with propagating plane waves.
         """
         field_template, momentum_template = self.compute_plane_wave(grid)
 
-        # Determine which components get the wave
         if self.active_components is None:
             active = dict.fromkeys(spec.component_names, 1.0)
         else:
             active = self.active_components
 
-        fields: list[ScalarField] = []
-
-        for name in spec.component_names:
+        slot_data: dict[str, NDArray[np.float64]] = {}
+        for eq in spec.equations:
+            name = eq.field_name
             if name in active:
                 rel_amp = active[name]
-                field_data = rel_amp * field_template
-                momentum_data = rel_amp * momentum_template
+                slot_data[name] = rel_amp * field_template
+                if eq.time_derivative_order >= 2:  # noqa: PLR2004
+                    slot_data[f"pi_{name}"] = rel_amp * momentum_template
             else:
-                field_data = np.zeros(grid.shape, dtype=np.float64)
-                momentum_data = np.zeros(grid.shape, dtype=np.float64)
+                slot_data[name] = np.zeros(grid.shape, dtype=np.float64)
+                if eq.time_derivative_order >= 2:  # noqa: PLR2004
+                    slot_data[f"pi_{name}"] = np.zeros(grid.shape, dtype=np.float64)
 
-            fields.extend(
-                (
-                    ScalarField(grid, data=field_data),
-                    ScalarField(grid, data=momentum_data),
-                )
-            )
-
-        return FieldCollection(fields)
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        return FieldSet.from_dict(layout, grid.shape, slot_data)
 
 
 def create_gaussian_pulse_state(  # noqa: PLR0913
-    grid: GridBase,
+    grid: GridInfo,
     spec: EquationSystem,
     center: tuple[float, ...],
     width: float,
     amplitude: float = 1.0,
     *,
     component: str | None = None,
-) -> FieldCollection:
+) -> FieldSet:
     """Return a Gaussian pulse initial state.
 
     Parameters
     ----------
-    grid : GridBase
+    grid : GridInfo
         The simulation grid.
     spec : EquationSystem
         The equation specification.
@@ -276,7 +259,7 @@ def create_gaussian_pulse_state(  # noqa: PLR0913
 
     Returns
     -------
-    FieldCollection
+    FieldSet
         Initial state with Gaussian pulse.
 
     Examples

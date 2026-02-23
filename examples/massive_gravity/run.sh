@@ -1,12 +1,22 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Massive Gravity 2+1D example (Fierz-Pauli)
-# See also: simulation.py (Python simulation)
+# Massive Gravity 2+1D (Fierz-Pauli) — Full derive → inspect → simulate → plot pipeline
 #
-# Fierz-Pauli mass term: G^(1)_ab - m^2 (h_ab - eta_ab h) = 0
-# The trace h = eta^cd h_cd couples diagonal metric components (h_0, h_3, h_5).
-# This is the unique ghost-free linear mass term for spin-2.
+# Physics: Fierz-Pauli mass term: G^(1)_ab - m² (h_ab - η_ab h) = 0
+# The trace h = η^cd h_cd couples diagonal metric components (h_0, h_3, h_5).
+# This is the unique ghost-free linear mass term for spin-2. Uses xPert
+# linearization with L^(2) preprocessing.
 #
-# To run manually:  cd examples/massive_gravity
+# Running this script:
+#   cd examples/massive_gravity && bash run.sh
+#
+# Or run each step manually:
+#   tidal derive theory.toml
+#   tidal inspect ../data/massive_gravity_3d.json
+#   tidal simulate ../data/massive_gravity_3d.json --param m2=1.0 \
+#     --grid-shape 64 --bounds 0:50 --periodic --ic gaussian \
+#     --ic-component h_3 --t-end 5.0 \
+#     --output ../data/massive_gravity_output
+#   tidal plot ../data/massive_gravity_output --type amplitude --quiet
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -27,12 +37,15 @@ tidal simulate ../data/massive_gravity_3d.json \
   --ic gaussian \
   --ic-component h_3 \
   --t-end 5.0 \
-  --dt 0.005
+  --output ../data/massive_gravity_output
+
+# Visualize results (plots saved into the simulation output directory)
+tidal plot ../data/massive_gravity_output --type snapshot --field h_3 --time-index 0 --quiet
+tidal plot ../data/massive_gravity_output --type snapshot --field h_3 --time-index -1 --quiet
+tidal plot ../data/massive_gravity_output --type amplitude --overlay 'cos(sqrt(2)*t)*0.5' --quiet
+tidal plot ../data/massive_gravity_output --type profile --field h_3 --cross-section y=25.0 --quiet
 
 # For parameter sweep (vary mass):
 # for m2 in 0.5 1.0 2.0; do
 #   tidal simulate ../data/massive_gravity_3d.json --param m2=$m2
 # done
-
-# For detailed simulation with physics validation, use:
-# python simulation.py

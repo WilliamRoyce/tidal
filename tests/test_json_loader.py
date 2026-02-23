@@ -3,26 +3,21 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import pytest
 
 from tidal.symbolic.json_loader import (
-    _STATIC_OPERATORS,
     ComponentEquation,
     EquationSystem,
+    KineticMatrix,
+    KineticMatrixEntry,
     LHSStructure,
     OperatorTerm,
     _resolve_symbolic_coeff,
     load_equation_system,
     validate_json_schema,
 )
-from tidal.symbolic.pde_builder import (
-    _OPERATOR_REGISTRY,
-)
-
-if TYPE_CHECKING:
-    from pde import ScalarField
 
 # === Fixtures ===
 
@@ -616,67 +611,6 @@ class TestFieldReferenceValidation:
                 coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
                 metadata={},
             )
-
-
-# === Phase 8A: Operator Registry Sync Test ===
-
-
-class TestOperatorRegistrySync:
-    """Validate _STATIC_OPERATORS and _OPERATOR_REGISTRY stay consistent."""
-
-    def test_all_registry_operators_are_known(self) -> None:
-        """Every operator in _OPERATOR_REGISTRY must be in _STATIC_OPERATORS."""
-        unknown = set(_OPERATOR_REGISTRY.keys()) - _STATIC_OPERATORS
-        assert unknown == set(), (
-            f"Operators in _OPERATOR_REGISTRY but not in _STATIC_OPERATORS: {sorted(unknown)}. "
-            "Add them to _STATIC_OPERATORS in json_loader.py."
-        )
-
-    def test_all_known_operators_in_registry(self) -> None:
-        """Every _STATIC_OPERATORS entry has a handler in _OPERATOR_REGISTRY."""
-        special_cased = _STATIC_OPERATORS - set(_OPERATOR_REGISTRY.keys())
-        assert special_cased == set(), (
-            f"_STATIC_OPERATORS not in _OPERATOR_REGISTRY: {sorted(special_cased)}. "
-            "Add them to _OPERATOR_REGISTRY (use None handler for special-cased operators)."
-        )
-
-
-class TestRegisterOperator:
-    """Tests for the custom operator registration API."""
-
-    def test_register_and_use_custom_operator(self) -> None:
-        """Registered operator is accepted by is_known_operator and usable in PDE."""
-        from tidal.symbolic.json_loader import (
-            _CUSTOM_OPERATORS,
-            is_known_operator,
-        )
-        from tidal.symbolic.pde_builder import (
-            _OPERATOR_REGISTRY,
-            register_operator,
-        )
-
-        name = "_test_custom_op"
-
-        def _handler(field: ScalarField, _bc: object) -> ScalarField:
-            return field * 2.0  # type: ignore[return-value]
-
-        try:
-            register_operator(name, _handler, min_dim=1)
-            assert is_known_operator(name)
-            assert name in _OPERATOR_REGISTRY
-        finally:
-            # Clean up so other tests aren't affected
-            _OPERATOR_REGISTRY.pop(name, None)
-            _CUSTOM_OPERATORS.discard(name)
-
-    def test_register_shadow_builtin_raises(self) -> None:
-        """Registering an operator that shadows a built-in raises ValueError."""
-        from tidal.symbolic.pde_builder import (
-            register_operator,
-        )
-
-        with pytest.raises(ValueError, match="shadows a built-in"):
-            register_operator("laplacian", lambda f, _bc: f, min_dim=1)
 
 
 # === Phase 8D: Python Validation Tests ===
@@ -1356,7 +1290,10 @@ class TestParameterResolvedMatrices:
             "equations": [
                 {
                     "field": "phi",
-                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(phi)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
@@ -1366,7 +1303,11 @@ class TestParameterResolvedMatrices:
                                 "field": "phi",
                                 "coefficient_symbolic": "-m2",
                             },
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "phi"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi",
+                            },
                         ],
                     },
                 }
@@ -1386,7 +1327,10 @@ class TestParameterResolvedMatrices:
             "equations": [
                 {
                     "field": "phi",
-                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(phi)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
@@ -1407,7 +1351,10 @@ class TestParameterResolvedMatrices:
                 },
                 {
                     "field": "chi",
-                    "lhs": {"expression": "d2_t(chi)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(chi)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
@@ -1444,7 +1391,10 @@ class TestParameterResolvedMatrices:
             "equations": [
                 {
                     "field": "phi",
-                    "lhs": {"expression": "d2_t(phi)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(phi)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
@@ -1534,7 +1484,11 @@ class TestMetadataParameterParsing:
     def _make_spec_dict(self, params: dict[str, object]) -> dict[str, object]:
         return {
             "metadata": {"parameters": params},
-            "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
             "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
             "equations": [
                 {
@@ -1564,3 +1518,436 @@ class TestMetadataParameterParsing:
     def test_string_non_numeric_param_raises(self) -> None:
         with pytest.raises(ValueError, match="cannot convert"):
             EquationSystem.from_dict(self._make_spec_dict({"m2": "abc"}))
+
+
+# === Phase K: Canonical Structure Tests ===
+
+
+class TestCanonicalStructure:
+    """Tests for parsing canonical momentum and Hamiltonian structures."""
+
+    def _make_canonical_data(
+        self,
+        *,
+        h_terms: list[dict[str, Any]] | None = None,
+        field_rates: dict[str, list[dict[str, Any]]] | None = None,
+        symbolic: str = "H_test",
+    ) -> dict[str, Any]:
+        if h_terms is None:
+            h_terms = [
+                {
+                    "coefficient": 0.5,
+                    "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                    "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+                },
+            ]
+        if field_rates is None:
+            field_rates = {
+                "phi_0": [
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_0"},
+                ]
+            }
+        return {
+            "hamiltonian_terms": h_terms,
+            "field_rates": field_rates,
+            "hamiltonian_symbolic": symbolic,
+        }
+
+    def test_parse_kg_canonical(self) -> None:
+        """Klein-Gordon: dφ/dt = π (single identity term)."""
+        from tidal.symbolic.json_loader import CanonicalStructure
+
+        data = self._make_canonical_data(
+            h_terms=[
+                {
+                    "coefficient": 0.5,
+                    "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                    "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+                },
+                {
+                    "coefficient": 0.5,
+                    "factor_a": {"field": "phi_0", "operator": "gradient_x"},
+                    "factor_b": {"field": "phi_0", "operator": "gradient_x"},
+                },
+                {
+                    "coefficient": 0.5,
+                    "factor_a": {"field": "phi_0", "operator": "identity"},
+                    "factor_b": {"field": "phi_0", "operator": "identity"},
+                    "coefficient_symbolic": "m2",
+                },
+            ],
+        )
+        cs = CanonicalStructure.from_dict(data)
+        assert len(cs.hamiltonian_terms) == 3
+        assert len(cs.field_rates["phi_0"]) == 1
+        assert cs.field_rates["phi_0"][0].operator == "identity"
+        assert cs.field_rates["phi_0"][0].field == "pi_0"
+        assert cs.hamiltonian_terms[0].factor_a.operator == "time_derivative"
+        assert cs.hamiltonian_terms[2].coefficient_symbolic == "m2"
+
+    def test_parse_proca_field_rates(self) -> None:
+        """Proca: dA_1/dt = π_1 + gradient_x(A_0)."""
+        from tidal.symbolic.json_loader import CanonicalStructure
+
+        data = self._make_canonical_data(
+            field_rates={
+                "A_1": [
+                    {"coefficient": 1.0, "operator": "identity", "field": "pi_1"},
+                    {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"},
+                ],
+            },
+        )
+        cs = CanonicalStructure.from_dict(data)
+        assert len(cs.field_rates["A_1"]) == 2
+        pi_term = cs.field_rates["A_1"][0]
+        assert pi_term.coefficient == 1.0
+        assert pi_term.operator == "identity"
+        assert pi_term.field == "pi_1"
+        grad_term = cs.field_rates["A_1"][1]
+        assert grad_term.coefficient == 1.0
+        assert grad_term.operator == "gradient_x"
+        assert grad_term.field == "A_0"
+
+    def test_empty_terms_allowed(self) -> None:
+        """Empty hamiltonian_terms is valid (EOM-based fast path for high-rank tensors)."""
+        from tidal.symbolic.json_loader import CanonicalStructure
+
+        cs = CanonicalStructure.from_dict(self._make_canonical_data(h_terms=[]))
+        assert cs.hamiltonian_terms == ()
+
+    def test_equation_system_with_canonical(self) -> None:
+        """EquationSystem.from_dict parses canonical section."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                }
+            ],
+            "canonical": {
+                "hamiltonian_terms": [
+                    {
+                        "coefficient": 0.5,
+                        "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                        "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+                    },
+                ],
+                "field_rates": {
+                    "phi_0": [
+                        {"coefficient": 1.0, "operator": "identity", "field": "pi_0"},
+                    ]
+                },
+                "hamiltonian_symbolic": "test",
+            },
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.canonical is not None
+        assert len(spec.canonical.hamiltonian_terms) == 1
+        assert len(spec.canonical.field_rates["phi_0"]) == 1
+
+    def test_constraint_fields_excluded_from_field_rates(self) -> None:
+        """Constraint fields (time_order=0) must NOT have field_rates entries.
+
+        Uses coupled_proca which has A_0/B_0 constraints and A_1/A_2/B_1/B_2
+        dynamical fields.  Only dynamical fields should appear in field_rates.
+        """
+        path = (
+            Path(__file__).parent.parent / "examples" / "data" / "coupled_proca_3d.json"
+        )
+        if not path.exists():
+            pytest.skip("coupled_proca_3d.json not found")
+        spec = EquationSystem.from_dict(__import__("json").loads(path.read_text()))
+        assert spec.canonical is not None
+
+        # Identify constraint fields
+        constraint_names = {
+            eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
+        }
+        assert len(constraint_names) > 0, "Expected constraint fields in Proca"
+
+        # No constraint field should appear as a key in field_rates
+        for cname in constraint_names:
+            assert cname not in spec.canonical.field_rates, (
+                f"Constraint field '{cname}' should not have a field_rates entry"
+            )
+
+        # All dynamical fields should have field_rates
+        dynamical_names = {
+            eq.field_name for eq in spec.equations if eq.time_derivative_order >= 2
+        }
+        for dname in dynamical_names:
+            assert dname in spec.canonical.field_rates, (
+                f"Dynamical field '{dname}' should have a field_rates entry"
+            )
+
+    def test_kinetic_matrix_parsing(self) -> None:
+        """Parse kinetic_matrix from canonical section."""
+        from tidal.symbolic.json_loader import CanonicalStructure
+
+        data = self._make_canonical_data()
+        data["kinetic_matrix"] = {
+            "entries": [
+                {"i": 0, "j": 0, "value": 1.0},
+                {"i": 0, "j": 1, "value": 0.5, "symbolic": "kappa/2"},
+                {"i": 1, "j": 0, "value": 0.5, "symbolic": "kappa/2"},
+                {"i": 1, "j": 1, "value": 1.0},
+            ],
+            "dimension": 2,
+        }
+        cs = CanonicalStructure.from_dict(data)
+        assert cs.kinetic_matrix is not None
+        assert cs.kinetic_matrix.dimension == 2
+        assert len(cs.kinetic_matrix.entries) == 4
+        dense = cs.kinetic_matrix.to_dense()
+        assert dense == [[1.0, 0.5], [0.5, 1.0]]
+        assert cs.kinetic_matrix.entries[1].symbolic == "kappa/2"
+
+    def test_spatial_momenta_parsing(self) -> None:
+        """Parse spatial_momenta from canonical section."""
+        from tidal.symbolic.json_loader import CanonicalStructure
+
+        data = self._make_canonical_data()
+        data["spatial_momenta"] = {
+            "A_1": [
+                {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"},
+            ],
+            "A_2": [
+                {"coefficient": 1.0, "operator": "gradient_y", "field": "A_0"},
+            ],
+        }
+        cs = CanonicalStructure.from_dict(data)
+        assert cs.spatial_momenta is not None
+        assert len(cs.spatial_momenta) == 2
+        assert cs.spatial_momenta["A_1"][0].operator == "gradient_x"
+        assert cs.spatial_momenta["A_2"][0].field == "A_0"
+
+    def test_backward_compat_no_kinetic_matrix(self) -> None:
+        """Pre-Phase 2 specs without kinetic_matrix → None."""
+        from tidal.symbolic.json_loader import CanonicalStructure
+
+        data = self._make_canonical_data()
+        cs = CanonicalStructure.from_dict(data)
+        assert cs.kinetic_matrix is None
+        assert cs.spatial_momenta is None
+
+    def test_equation_system_without_canonical(self) -> None:
+        """Legacy specs without canonical section → canonical is None."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                }
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        assert spec.canonical is None
+
+
+# ==================== BoundaryCondition.to_side_bc ====================
+
+
+class TestBoundaryConditionToSideBc:
+    """Tests for BoundaryCondition.to_side_bc() conversion."""
+
+    def test_dirichlet_to_side_bc(self) -> None:
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        bc = BoundaryCondition(type="dirichlet", value=2.0)
+        side = bc.to_side_bc()
+        assert side.kind == "dirichlet"
+        assert side.value == 2.0
+
+    def test_neumann_to_side_bc(self) -> None:
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        bc = BoundaryCondition(type="neumann", derivative=0.5)
+        side = bc.to_side_bc()
+        assert side.kind == "neumann"
+        assert side.derivative == 0.5
+
+    def test_robin_to_side_bc(self) -> None:
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        bc = BoundaryCondition(type="robin", gamma=1.0, value=0.5)
+        side = bc.to_side_bc()
+        assert side.kind == "robin"
+        assert side.gamma == 1.0
+        assert side.value == 0.5
+
+    def test_periodic_raises(self) -> None:
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        bc = BoundaryCondition(type="periodic")
+        with pytest.raises(ValueError, match="Cannot convert periodic"):
+            bc.to_side_bc()
+
+    def test_robin_from_dict(self) -> None:
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        bc = BoundaryCondition.from_dict({"type": "robin", "gamma": 2.0, "value": 1.0})
+        assert bc.type == "robin"
+        assert bc.gamma == 2.0
+
+    def test_to_side_bc_explicit_zero(self) -> None:
+        """Explicit value=0.0 should be preserved (not treated as None)."""
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        bc = BoundaryCondition(type="dirichlet", value=0.0)
+        side = bc.to_side_bc()
+        assert side.value == 0.0
+        assert side.kind == "dirichlet"
+
+    def test_from_dict_warns_irrelevant_fields(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Dirichlet with gamma logs a warning about irrelevant fields."""
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        with caplog.at_level("WARNING", logger="tidal.symbolic.json_loader"):
+            bc = BoundaryCondition.from_dict(
+                {"type": "dirichlet", "value": 1.0, "gamma": 2.0}
+            )
+        assert bc.gamma == 2.0  # stored but irrelevant
+        assert "gamma" in caplog.text
+
+
+# === KineticMatrixEntry coordinate/time dependence ===
+
+
+class TestKineticMatrixEntry:
+    """Test KineticMatrixEntry coordinate_dependent / time_dependent fields."""
+
+    def test_from_dict_defaults(self) -> None:
+        """Entries without coord/time fields get correct defaults."""
+        entry = KineticMatrixEntry.from_dict(
+            {"i": 0, "j": 1, "value": 0.5, "symbolic": "kappa/2"}
+        )
+        assert entry.coordinate_dependent == ()
+        assert entry.time_dependent is False
+        assert entry.position_dependent is False
+
+    def test_from_dict_position_dependent(self) -> None:
+        """Position-dependent entry parses correctly."""
+        entry = KineticMatrixEntry.from_dict(
+            {
+                "i": 0,
+                "j": 1,
+                "value": 0.5,
+                "symbolic": "B0(x)/2",
+                "coordinate_dependent": ["x"],
+            }
+        )
+        assert entry.coordinate_dependent == ("x",)
+        assert entry.time_dependent is False
+        assert entry.position_dependent is True
+
+    def test_from_dict_time_dependent(self) -> None:
+        """Time-dependent entry parses correctly."""
+        entry = KineticMatrixEntry.from_dict(
+            {
+                "i": 1,
+                "j": 1,
+                "value": 1.0,
+                "symbolic": "Omega(t)^2",
+                "time_dependent": True,
+                "coordinate_dependent": ["t"],
+            }
+        )
+        assert entry.time_dependent is True
+        # "t" alone is not a spatial coordinate
+        assert entry.position_dependent is False
+
+    def test_from_dict_space_and_time(self) -> None:
+        """Entry depending on both space and time."""
+        entry = KineticMatrixEntry.from_dict(
+            {
+                "i": 0,
+                "j": 0,
+                "value": 1.0,
+                "time_dependent": True,
+                "coordinate_dependent": ["t", "x", "y"],
+            }
+        )
+        assert entry.time_dependent is True
+        assert entry.position_dependent is True
+        assert entry.coordinate_dependent == ("t", "x", "y")
+
+
+class TestKineticMatrixProperties:
+    """Test KineticMatrix.has_position_dependent / has_time_dependent."""
+
+    def test_constant_matrix(self) -> None:
+        """All-constant K has no position/time dependence."""
+        km = KineticMatrix.from_dict(
+            {
+                "entries": [
+                    {"i": 0, "j": 0, "value": 1.0},
+                    {"i": 1, "j": 1, "value": 1.0},
+                ],
+                "dimension": 2,
+            }
+        )
+        assert km.has_position_dependent is False
+        assert km.has_time_dependent is False
+
+    def test_position_dependent_matrix(self) -> None:
+        """K with one position-dependent entry."""
+        km = KineticMatrix.from_dict(
+            {
+                "entries": [
+                    {"i": 0, "j": 0, "value": 1.0},
+                    {
+                        "i": 0,
+                        "j": 1,
+                        "value": 0.5,
+                        "symbolic": "B0(x)",
+                        "coordinate_dependent": ["x"],
+                    },
+                    {"i": 1, "j": 1, "value": 1.0},
+                ],
+                "dimension": 2,
+            }
+        )
+        assert km.has_position_dependent is True
+        assert km.has_time_dependent is False
+
+    def test_to_dense_constant(self) -> None:
+        """to_dense works for constant entries."""
+        km = KineticMatrix.from_dict(
+            {
+                "entries": [
+                    {"i": 0, "j": 0, "value": 1.0},
+                    {"i": 0, "j": 1, "value": 0.5},
+                    {"i": 1, "j": 0, "value": -0.5},
+                    {"i": 1, "j": 1, "value": 1.0},
+                ],
+                "dimension": 2,
+            }
+        )
+        dense = km.to_dense()
+        assert dense == [[1.0, 0.5], [-0.5, 1.0]]

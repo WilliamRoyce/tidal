@@ -54,19 +54,16 @@ Different masses test heterogeneous constraint operators.
 ## Running
 
 ```bash
-# Simulation script
-uv run python examples/coupled_proca/simulation.py
+# Full pipeline (derive + simulate + measure + plot)
+cd examples/coupled_proca && bash run.sh
 
-# Or via CLI
-./examples/coupled_proca/run.sh
-
-# Re-derive from Lagrangian (requires wolframscript)
+# Or re-derive from Lagrangian only (requires wolframscript)
 tidal derive examples/coupled_proca/theory.toml
 ```
 
 ## Measurement
 
-`measure_coupling.py` uses the measurement module to compute:
+`tidal measure` computes:
 - **Group conversion**: `A_1 -> {A_2, B_1, B_2}` energy transfer via `compute_group_conversion`
 - **Spectral conversion** P(k,t) and **dispersion** omega(k)
 - **Energy conservation diagnostics**: O(dx^2) convergent with periodic BCs

@@ -1,11 +1,20 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Elasticity (Navier-Cauchy) 2+1D example
-# See also: elasticity_from_lagrangian.py (Python simulation)
+# Elasticity (Navier-Cauchy) 2+1D — Full derive → inspect → simulate → plot pipeline
 #
-# The elasticity Lagrangian uses component-derivative notation (CD[{idx, -chart}])
-# because the Lame parameters produce anisotropic spatial coefficients.
+# Physics: The elasticity Lagrangian uses component-derivative notation
+# (CD[{idx, -chart}]) because the Lamé parameters produce anisotropic spatial
+# coefficients. Two displacement fields (ux, uy) are coupled via shear.
 #
-# To run manually:  cd examples/elasticity
+# Running this script:
+#   cd examples/elasticity && bash run.sh
+#
+# Or run each step manually:
+#   tidal derive theory.toml
+#   tidal inspect ../data/navier_cauchy_2d.json
+#   tidal simulate ../data/navier_cauchy_2d.json --grid-shape 128 --bounds 0:10 \
+#     --periodic --ic gaussian --ic-component ux_0 --ic-width 1.0 --t-end 3.0 \
+#     --output ../data/elasticity_output
+#   tidal plot ../data/elasticity_output --type amplitude --quiet
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -19,11 +28,18 @@ tidal inspect ../data/navier_cauchy_2d.json
 # Run simulation (Gaussian pulse in ux displacement)
 # Parameters rho, lambda, mu are baked into the JSON as numeric coefficients
 tidal simulate ../data/navier_cauchy_2d.json \
-  --grid-shape 64 \
+  --grid-shape 128 \
   --bounds 0:10 \
   --periodic \
   --ic gaussian \
   --ic-component ux_0 \
   --ic-width 1.0 \
   --t-end 3.0 \
-  --dt 0.005
+  --output ../data/elasticity_output
+
+# Visualize results — snapshots of each displacement component
+tidal plot ../data/elasticity_output --type snapshot --field ux_0 --time-index -1 --quiet
+tidal plot ../data/elasticity_output --type snapshot --field uy_0 --time-index -1 --quiet
+tidal plot ../data/elasticity_output --type amplitude --quiet
+tidal plot ../data/elasticity_output --type hamiltonian --quiet
+tidal plot ../data/elasticity_output --type conservation --quiet

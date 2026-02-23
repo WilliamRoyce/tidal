@@ -38,16 +38,18 @@ if TYPE_CHECKING:
     from tidal.measurement._conversion import ConversionResult
     from tidal.measurement._io import SimulationData
 
-_VALID_MEASUREMENTS = frozenset({
-    "summary",
-    "energy",
-    "conversion",
-    "mixing",
-    "spectrum",
-    "spectral_conversion",
-    "dispersion",
-    "conservation",
-})
+_VALID_MEASUREMENTS = frozenset(
+    {
+        "summary",
+        "energy",
+        "conversion",
+        "mixing",
+        "spectrum",
+        "spectral_conversion",
+        "dispersion",
+        "conservation",
+    }
+)
 
 
 # ------------------------------------------------------------------
@@ -307,7 +309,9 @@ def _run_spectral_conversion(
 
     dyn = data.dynamical_fields
     if not dyn:
-        msg = "No dynamical fields found — spectral conversion requires at least 2 fields"
+        msg = (
+            "No dynamical fields found — spectral conversion requires at least 2 fields"
+        )
         raise ValueError(msg)
     if source is None:
         source = (dyn[0],)
@@ -335,7 +339,9 @@ def _run_spectral_conversion(
         "n_modes": len(result.wavenumbers),
         "n_active_modes": n_active,
         "peak_mode_k": float(result.wavenumbers[peak_k_idx]) if n_active > 0 else None,
-        "peak_mode_P": float(result.probability[-1, peak_k_idx]) if n_active > 0 else None,
+        "peak_mode_P": float(result.probability[-1, peak_k_idx])
+        if n_active > 0
+        else None,
         "_result_obj": result,
     }
 
@@ -429,11 +435,13 @@ def _format_text_section_conservation(lines: list[str], cons: dict[str, Any]) ->
         lines.append(f"Energy Conservation: ERROR ({cons['error']})")
     else:
         status = "PASS" if cons["is_conserved"] else "FAIL"
-        lines.extend([
-            f"Energy Conservation: {status}",
-            f"  max |dE/E| = {cons['max_relative_error']:.2e}",
-            f"  threshold  = {cons['threshold']:.0e}",
-        ])
+        lines.extend(
+            [
+                f"Energy Conservation: {status}",
+                f"  max |dE/E| = {cons['max_relative_error']:.2e}",
+                f"  threshold  = {cons['threshold']:.0e}",
+            ]
+        )
     lines.append("")
 
 
@@ -445,10 +453,12 @@ def _format_text_section_energy(lines: list[str], eng: dict[str, Any]) -> None:
         lines.append("Per-Field Energy (final):")
         for name, series in eng["per_field"].items():
             lines.append(f"  {name}: {series[-1]:.6f}")
-        lines.extend([
-            f"  interaction: {eng['interaction'][-1]:.6f}",
-            f"  total:       {eng['total'][-1]:.6f}",
-        ])
+        lines.extend(
+            [
+                f"  interaction: {eng['interaction'][-1]:.6f}",
+                f"  total:       {eng['total'][-1]:.6f}",
+            ]
+        )
     lines.append("")
 
 
@@ -459,11 +469,13 @@ def _format_text_section_conversion(lines: list[str], conv: dict[str, Any]) -> N
     else:
         src = ", ".join(conv["source"])
         tgt = ", ".join(conv["target"])
-        lines.extend([
-            f"Conversion ({src} -> {tgt}):",
-            f"  Peak P(t) = {conv['peak_probability']:.6f}",
-            f"  at t = {conv['peak_time']:.2f}",
-        ])
+        lines.extend(
+            [
+                f"Conversion ({src} -> {tgt}):",
+                f"  Peak P(t) = {conv['peak_probability']:.6f}",
+                f"  at t = {conv['peak_time']:.2f}",
+            ]
+        )
     lines.append("")
 
 
@@ -472,14 +484,16 @@ def _format_text_section_mixing(lines: list[str], mix: dict[str, Any]) -> None:
     if "error" in mix:
         lines.append(f"Mixing Length: not extracted ({mix['error']})")
     else:
-        lines.extend([
-            "Mixing Length:",
-            f"  L_mix     = {mix['mixing_length']:.4f}"
-            f" +/- {mix['mixing_length_uncertainty']:.4f}",
-            f"  omega_dom = {mix['dominant_frequency']:.4f}"
-            f"  (FWHM = {mix['frequency_fwhm']:.4f})",
-            f"  Rayleigh  = {mix['rayleigh_resolution']:.4f}",
-        ])
+        lines.extend(
+            [
+                "Mixing Length:",
+                f"  L_mix     = {mix['mixing_length']:.4f}"
+                f" +/- {mix['mixing_length_uncertainty']:.4f}",
+                f"  omega_dom = {mix['dominant_frequency']:.4f}"
+                f"  (FWHM = {mix['frequency_fwhm']:.4f})",
+                f"  Rayleigh  = {mix['rayleigh_resolution']:.4f}",
+            ]
+        )
     lines.append("")
 
 
@@ -496,7 +510,8 @@ def _format_text_section_spectrum(lines: list[str], spec: dict[str, Any]) -> Non
 
 
 def _format_text_section_spectral_conversion(
-    lines: list[str], sc: dict[str, Any],
+    lines: list[str],
+    sc: dict[str, Any],
 ) -> None:
     """Append spectral conversion section to *lines*."""
     if "error" in sc:
@@ -504,30 +519,37 @@ def _format_text_section_spectral_conversion(
     else:
         src = ", ".join(sc["source"])
         tgt = ", ".join(sc["target"])
-        lines.extend([
-            f"Spectral Conversion ({src} -> {tgt}):",
-            f"  Active k-modes: {sc['n_active_modes']} / {sc['n_modes']}",
-        ])
+        lines.extend(
+            [
+                f"Spectral Conversion ({src} -> {tgt}):",
+                f"  Active k-modes: {sc['n_active_modes']} / {sc['n_modes']}",
+            ]
+        )
         if sc["peak_mode_k"] is not None:
-            lines.extend([
-                f"  Peak P(k, t_final) at |k| = {sc['peak_mode_k']:.4f}",
-                f"    P(k) = {sc['peak_mode_P']:.6f}",
-            ])
+            lines.extend(
+                [
+                    f"  Peak P(k, t_final) at |k| = {sc['peak_mode_k']:.4f}",
+                    f"    P(k) = {sc['peak_mode_P']:.6f}",
+                ]
+            )
     lines.append("")
 
 
 def _format_text_section_dispersion(
-    lines: list[str], disp: dict[str, Any],
+    lines: list[str],
+    disp: dict[str, Any],
 ) -> None:
     """Append dispersion section to *lines*."""
     if "error" in disp:
         lines.append(f"Dispersion: ERROR ({disp['error']})")
     else:
-        lines.extend([
-            f"Dispersion ({disp['field']}):",
-            f"  Active k-modes: {disp['n_active_modes']} / {disp['n_modes']}",
-            f"  Rayleigh resolution: {disp['rayleigh_resolution']:.4f} rad/time",
-        ])
+        lines.extend(
+            [
+                f"Dispersion ({disp['field']}):",
+                f"  Active k-modes: {disp['n_active_modes']} / {disp['n_modes']}",
+                f"  Rayleigh resolution: {disp['rayleigh_resolution']:.4f} rad/time",
+            ]
+        )
     lines.append("")
 
 
@@ -536,16 +558,18 @@ def _format_text(results: dict[str, Any], data: SimulationData) -> str:
     lines: list[str] = []
     sep = "=" * 64
 
-    lines.extend([
-        sep,
-        f"Measurement: {', '.join(data.fields.keys())}",
-        sep,
-        "",
-        "Simulation:",
-        f"  Time range: {float(data.times[0]):.1f} -> {float(data.times[-1]):.1f}"
-        f"  ({data.n_snapshots} snapshots)",
-        f"  Fields: {', '.join(data.fields.keys())}",
-    ])
+    lines.extend(
+        [
+            sep,
+            f"Measurement: {', '.join(data.fields.keys())}",
+            sep,
+            "",
+            "Simulation:",
+            f"  Time range: {float(data.times[0]):.1f} -> {float(data.times[-1]):.1f}"
+            f"  ({data.n_snapshots} snapshots)",
+            f"  Fields: {', '.join(data.fields.keys())}",
+        ]
+    )
     if data.parameters:
         param_str = ", ".join(f"{k}={v}" for k, v in data.parameters.items())
         lines.append(f"  Parameters: {param_str}")
@@ -646,7 +670,9 @@ def _run_individual_measurements(  # noqa: C901, PLR0912, PLR0915
 
         try:
             results["spectral_conversion"] = _run_spectral_conversion(
-                data, source, target,
+                data,
+                source,
+                target,
             )
         except ValueError as e:
             results["spectral_conversion"] = {"error": str(e)}
@@ -726,7 +752,7 @@ def measure_command(args: Namespace) -> int:
 
         save_measurement_plot(Path(output_path), data, results)
         if not quiet:
-            print(f"  Saved plot to: {output_path}")
+            print(f"  Saved plot to: {Path(output_path).resolve()}")
     elif json_mode:
         print(_format_json(results, data))
     else:

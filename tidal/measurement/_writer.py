@@ -111,6 +111,8 @@ class SnapshotWriter:
         parameters: dict[str, float] | None = None,
         spec_path: Path | None = None,
         flush_interval: int = _DEFAULT_FLUSH_INTERVAL,
+        bc_types: tuple[str, ...] | None = None,
+        dt: float | None = None,
     ) -> None:
         if n_snapshots < 1:
             msg = f"n_snapshots must be >= 1, got {n_snapshots}"
@@ -143,6 +145,8 @@ class SnapshotWriter:
         self._periodic = periodic
         self._parameters = parameters or {}
         self._spec_path = spec_path
+        self._bc_types = bc_types
+        self._dt = dt
         self._count = 0
         self._closed = False
         self._flush_interval = max(flush_interval, 1)
@@ -236,8 +240,7 @@ class SnapshotWriter:
             arr = fields[name]
             if arr.shape != self._grid_shape:
                 msg = (
-                    f"Field '{name}' has shape {arr.shape}, "
-                    f"expected {self._grid_shape}"
+                    f"Field '{name}' has shape {arr.shape}, expected {self._grid_shape}"
                 )
                 raise ValueError(msg)
             self._field_mmaps[name][idx] = arr
@@ -302,7 +305,7 @@ class SnapshotWriter:
         self._momentum_mmaps.clear()
 
         # Write metadata
-        metadata = {
+        metadata: dict[str, Any] = {
             "version": _FORMAT_VERSION,
             "n_snapshots": self._count,
             "grid_spacing": list(self._grid_spacing),
@@ -314,6 +317,10 @@ class SnapshotWriter:
             "momenta": self._momentum_names,
             "dtype": "float64",
         }
+        if self._bc_types is not None:
+            metadata["bc_types"] = list(self._bc_types)
+        if self._dt is not None:
+            metadata["dt"] = self._dt
         if self._spec_path is not None:
             metadata["spec_path"] = str(self._spec_path)
 
@@ -452,11 +459,12 @@ def create_snapshot_callback(  # noqa: PLR0913, PLR0917
     field_names, momentum_names = _field_names_from_spec(spec)
     n_snapshots = compute_snapshot_count(t_end, snapshot_interval)
 
+    grid_bounds_raw = grid.bounds
     spacing = tuple(
         float((b[1] - b[0]) / s)
-        for b, s in zip(grid.axes_bounds, grid.shape, strict=True)
+        for b, s in zip(grid_bounds_raw, grid.shape, strict=True)
     )
-    bounds = tuple((float(b[0]), float(b[1])) for b in grid.axes_bounds)
+    bounds = tuple((float(b[0]), float(b[1])) for b in grid_bounds_raw)
     periodic_flags = tuple(bool(p) for p in grid.periodic)
 
     writer = SnapshotWriter(

@@ -1,5 +1,57 @@
 # Changelog
 
+## Canonical Momentum Pipeline & K^{-1} Inversion (February 2026)
+
+**Status:** COMPLETE
+
+**Summary:** Implemented the full canonical momentum (Hamiltonian) pipeline for deriving
+first-order evolution equations from second-order Lagrangian field theory, including
+symbolic kinetic matrix inversion for non-diagonal systems (linearized gravity, massive
+gravity). Also implemented Lagrangian-first linearization via xPert's `Perturbation[L, 2]`.
+
+**New features:**
+
+- **Canonical momentum pipeline** (`_wls_canonical_pipeline()` in `_derive.py`): Computes
+  conjugate momenta π_i = ∂L/∂(∂_t q_i), constructs Hamiltonian H = Σ π_i·vel_i − L,
+  emits first-order evolution equations dq_i/dt and dπ_i/dt. Handles arbitrary multi-field
+  systems with cross-coupled kinetic terms.
+- **Symbolic K^{-1} inversion**: For non-diagonal kinetic matrices K*{ij} = D[π_i, vel_j],
+  computes `Inverse[K]` symbolically in Wolfram and emits field rates as
+  `dq_i/dt = Σ_j K^{-1}*{ij} (π_j − S_j)`. Works for Proca (2×2), massive gravity (4×4),
+  gravitational waves (7×7), elasticity (2×2 symbolic). Ref: Goldstein, Poole & Safko (2002),
+  Chapter 8.
+- **EOM-based fast path**: For high-rank tensors (raw component count > 30, e.g., rank-3
+  antisymmetric in 4D: 64 raw → 4 independent), bypasses expensive `DecomposeScalarExpression`
+  on the Lagrangian and builds canonical structure directly from already-decomposed EOM (K=I).
+- **Lagrangian-first linearization** (`_wls_linearize_from_lagrangian()`): Single-path
+  L → L^(2) = Perturbation[L, 2] / 2 → VarD[H, CD][L^(2)] → EOM. Includes `Scalar[]` fix:
+  `Scalar[x]^n → ∏ Scalar[RenameDummies[x]]` before VarD (fixes Fierz-Pauli trace-squared).
+  Ref: Brizuela et al. (2009) for xPert perturbation theory.
+
+**Bug fixes:**
+
+- **Always-Expand before ParseMultiFieldRHS** (`ExportJSON.wl`): `Total[]` could trigger
+  Mathematica auto-factoring, collapsing separate linear terms into a single `Times` with
+  multiple field heads. `Expand[rhs]` now called unconditionally before parsing.
+- **Defensive Expand in ParseHamiltonianExpression** (`ExportJSON.wl`): Same class of bug —
+  function splits on `Head[expr] === Plus` without ensuring expansion first.
+- **K^{-1} numeric fallback → fatal error** (`_derive.py`): Silent fallback to 1.0 when
+  `N[kInvEntry /. defaults]` fails replaced with `Throw[]`. Per fail-fast principle: wrong
+  physics that looks right is worse than a crash.
+- **`linearized_gravity.json` now evolvable**: Removed from `_NON_EVOLVABLE_SPECS` — K^{-1}
+  inversion resolves all non-diagonal kinetic matrix issues without gauge fixing.
+
+**Documentation:**
+
+- `docs/ISSUES.md` rewritten with accurate K^{-1} resolution status
+- Alternative approaches documented in memory (Julia DifferentialEquations.jl, PETSc TS,
+  SUNDIALS IDA, gauge fixing, symplectic integrators, NumPy inversion). Refs: Rackauckas &
+  Nie (2017), Balay et al. (2024), Hindmarsh et al. (2005), Hairer & Lubich (2003).
+
+**Tests:** 1011 Python tests passing, 0 failures. All 23 example JSON specs load, build, and evolve.
+
+---
+
 ## Background Fields & Repository Cleanup (February 2026)
 
 **Status:** COMPLETE
@@ -1019,18 +1071,18 @@ With `set -e`, the first form causes premature exit.
 
 ### 🛠️ Files Modified
 
-| File                                               | Changes                                               |
-| -------------------------------------------------- | ----------------------------------------------------- |
-| `tidal/wolfram/CommonUtilities.wl` | Enhanced coefficient extraction, fixed IsCovDOperator |
-| `tidal/wolfram/Linearize.wl`       | Added 3 private helper usage strings                  |
-| `tests/wolfram/test_euler_lagrange.wls`            | Fixed DefMetric syntax                                |
-| `tests/wolfram/test_common_utilities.wls`          | Verified with fixed utilities                         |
-| `tests/wolfram/test_export_json.wls`               | Verified with fixed patterns                          |
-| `scripts/run_wolfram_tests.sh`                     | Fixed bash arithmetic, enhanced output                |
-| `scripts/run_examples.sh`                          | NEW: Regenerate all JSON files                        |
-| `scripts/full_test.sh`                             | NEW: Complete test suite                              |
-| `scripts/validate_pipeline.sh`                     | NEW: End-to-end validation                            |
-| `scripts/lint_wolfram.sh`                          | NEW: Wolfram syntax checking                          |
+| File                                      | Changes                                               |
+| ----------------------------------------- | ----------------------------------------------------- |
+| `tidal/wolfram/CommonUtilities.wl`        | Enhanced coefficient extraction, fixed IsCovDOperator |
+| `tidal/wolfram/Linearize.wl`              | Added 3 private helper usage strings                  |
+| `tests/wolfram/test_euler_lagrange.wls`   | Fixed DefMetric syntax                                |
+| `tests/wolfram/test_common_utilities.wls` | Verified with fixed utilities                         |
+| `tests/wolfram/test_export_json.wls`      | Verified with fixed patterns                          |
+| `scripts/run_wolfram_tests.sh`            | Fixed bash arithmetic, enhanced output                |
+| `scripts/run_examples.sh`                 | NEW: Regenerate all JSON files                        |
+| `scripts/full_test.sh`                    | NEW: Complete test suite                              |
+| `scripts/validate_pipeline.sh`            | NEW: End-to-end validation                            |
+| `scripts/lint_wolfram.sh`                 | NEW: Wolfram syntax checking                          |
 
 ---
 

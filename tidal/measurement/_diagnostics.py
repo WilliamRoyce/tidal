@@ -48,6 +48,12 @@ def check_energy_conservation(
 ) -> EnergyDiagnostics:
     """Check whether energy density is conserved over the simulation.
 
+    For symplectic (leapfrog) solvers, the physical Hamiltonian oscillates
+    by O(dt²) around the shadow Hamiltonian.  When ``data.dt`` is available,
+    the threshold is automatically raised to ``max(threshold, 10 * dt²)``
+    so that the expected shadow-Hamiltonian offset does not cause false
+    FAIL results.
+
     Parameters
     ----------
     data : SimulationData
@@ -66,6 +72,14 @@ def check_energy_conservation(
     if threshold <= 0:
         msg = f"threshold must be positive, got {threshold}"
         raise ValueError(msg)
+
+    # Scale threshold by shadow-Hamiltonian bound when dt is known.
+    # Störmer-Verlet conserves H̃ = H + O(dt²); the physical H oscillates
+    # by O(dt²) around H̃.  The factor 10 accounts for O(1) prefactors
+    # (wave speed, multi-field interactions).
+    if data.dt is not None:
+        shadow_bound = 10.0 * data.dt**2
+        threshold = max(threshold, shadow_bound)
 
     times, _per_field, _interaction, total = compute_energy_timeseries(data)
 

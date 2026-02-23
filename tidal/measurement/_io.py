@@ -3,7 +3,7 @@
 Provides ``SimulationData``, a frozen dataclass that stores the full time
 history of field and momentum arrays.  Can be constructed from:
 
-- A live ``MemoryStorage`` object (straight from the solver)
+- A solver result dict (IDA/leapfrog output)
 - A snapshot directory written by :class:`~tidal.measurement.SnapshotWriter`
   (memory-mapped, O(1) RAM)
 """
@@ -18,10 +18,14 @@ from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
-if TYPE_CHECKING:
-    from numpy.typing import NDArray
-    from pde import CartesianGrid, FieldCollection, MemoryStorage
+from tidal.solver.state import StateLayout
 
+if TYPE_CHECKING:
+    from typing import Any
+
+    from numpy.typing import NDArray
+
+    from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem
 
 
@@ -52,6 +56,10 @@ class SimulationData:
         The equation specification (fields, equations, matrices).
     parameters : dict[str, float]
         Resolved parameter values used in the simulation.
+    bc_types : tuple[str, ...] or None
+        Per-axis boundary condition type (e.g. ``("periodic", "neumann")``).
+        ``None`` for legacy data where BC info was not recorded.
+        Used by the energy module for BC-aware gradient computation.
     """
 
     times: NDArray[np.float64]
@@ -62,6 +70,8 @@ class SimulationData:
     periodic: tuple[bool, ...]
     spec: EquationSystem
     parameters: dict[str, float]
+    bc_types: tuple[str, ...] | None = None
+    dt: float | None = None
 
     # ------------------------------------------------------------------
     # Derived helpers
@@ -91,102 +101,86 @@ class SimulationData:
     # ------------------------------------------------------------------
 
     @classmethod
-    def from_storage(
+    def from_result(
         cls,
-        storage: MemoryStorage,
+        result: dict[str, Any],
         spec: EquationSystem,
-        grid: CartesianGrid,
+        grid_info: GridInfo,
         parameters: dict[str, float] | None = None,
+        dt: float | None = None,
     ) -> SimulationData:
-        """Build from a live ``MemoryStorage`` produced by the solver.
+        """Build from a solver result dict (IDA/leapfrog output).
 
-        Iterates through **all** snapshots (not just the final state) so
-        that transient dynamics such as Rabi oscillations are captured.
+        This is the native-path constructor — no py-pde types involved.
+        Directly slices the flat state vector using ``StateLayout``.
 
         Parameters
         ----------
-        storage : MemoryStorage
-            Time-indexed snapshot collection from the solver.
+        result : dict
+            Solver output with keys ``"t"`` (1D times array) and
+            ``"y"`` (2D array of shape ``(n_snapshots, total_flat_size)``).
         spec : EquationSystem
-            JSON-derived equation specification.
-        grid : CartesianGrid
-            Spatial grid used for the simulation.
+            Equation specification.
+        grid_info : GridInfo
+            Spatial grid descriptor.
         parameters : dict, optional
-            Resolved parameter values (e.g. ``{"m2": 1.0, "g": 0.5}``).
+            Resolved parameter values.
+        dt : float, optional
+            Time-step size used by the solver (for conservation diagnostics).
 
         Raises
         ------
         ValueError
-            If *storage* is empty or snapshot field count does not match
-            ``spec.state_size``.
+            If *result* has no snapshots or flat vector size doesn't match
+            the layout.
         """
-        n = len(storage)
-        if n == 0:
-            msg = "MemoryStorage is empty — no snapshots to extract"
+        times = np.asarray(result["t"], dtype=np.float64)
+        y_all = np.asarray(result["y"], dtype=np.float64)
+
+        if len(times) == 0:
+            msg = "Solver result contains no snapshots"
             raise ValueError(msg)
 
-        # Validate first snapshot size
-        first_snapshot = cast("FieldCollection", storage[0])
-        if len(first_snapshot) != spec.state_size:
+        layout = StateLayout.from_spec(spec, grid_info.num_points)
+
+        if y_all.ndim == 1:
+            y_all = y_all.reshape(1, -1)
+
+        if y_all.shape[1] != layout.total_size:
             msg = (
-                f"Snapshot has {len(first_snapshot)} slots but spec.state_size "
-                f"is {spec.state_size}"
+                f"Flat vector size {y_all.shape[1]} doesn't match "
+                f"layout.total_size {layout.total_size}"
             )
             raise ValueError(msg)
 
-        # Build slot maps: field_name → slot_idx, momentum_name → slot_idx
-        field_slot_map: dict[str, int] = {}
-        momentum_slot_map: dict[str, int] = {}
-        for idx, (name, slot_type) in enumerate(spec.state_layout):
-            if slot_type == "field":
-                field_slot_map[name] = idx
-            else:  # "momentum"
-                momentum_slot_map[name] = idx
-
-        # Extract full time history
-        times = np.array(storage.times, dtype=np.float64)
+        n_pts = grid_info.num_points
+        shape = grid_info.shape
 
         fields: dict[str, NDArray[np.float64]] = {}
-        for name, slot_idx in field_slot_map.items():
-            fields[name] = np.stack(
-                [
-                    np.asarray(
-                        cast("FieldCollection", storage[t])[slot_idx].data,
-                        dtype=np.float64,
-                    )
-                    for t in range(n)
-                ]
-            )
-
         momenta: dict[str, NDArray[np.float64]] = {}
-        for name, slot_idx in momentum_slot_map.items():
-            momenta[name] = np.stack(
-                [
-                    np.asarray(
-                        cast("FieldCollection", storage[t])[slot_idx].data,
-                        dtype=np.float64,
-                    )
-                    for t in range(n)
-                ]
-            )
 
-        # Grid metadata
-        spacing = tuple(
-            float((b[1] - b[0]) / s)
-            for b, s in zip(grid.axes_bounds, grid.shape, strict=True)
-        )
-        bounds = tuple((float(b[0]), float(b[1])) for b in grid.axes_bounds)
-        periodic_flags = tuple(bool(p) for p in grid.periodic)
+        for i, slot in enumerate(layout.slots):
+            start = i * n_pts
+            end = start + n_pts
+            # Slice all snapshots at once: (n_snapshots, *grid_shape)
+            arr = y_all[:, start:end].reshape(-1, *shape)
+
+            if slot.kind == "momentum":
+                momenta[slot.field_name] = arr
+            else:
+                fields[slot.name] = arr
 
         return cls(
             times=times,
             fields=fields,
             momenta=momenta,
-            grid_spacing=spacing,
-            grid_bounds=bounds,
-            periodic=periodic_flags,
+            grid_spacing=grid_info.dx,
+            grid_bounds=grid_info.bounds,
+            periodic=grid_info.periodic,
             spec=spec,
             parameters=parameters or {},
+            bc_types=grid_info.bc_types,
+            dt=dt,
         )
 
     @classmethod
@@ -298,8 +292,7 @@ class SimulationData:
                 metadata.get("grid_shape", [1] * spec.spatial_dimension),
             )
             grid_bounds = tuple(
-                (0.0, float(s) * grid_spacing[i])
-                for i, s in enumerate(raw_shape)
+                (0.0, float(s) * grid_spacing[i]) for i, s in enumerate(raw_shape)
             )
 
         periodic: tuple[bool, ...]
@@ -311,9 +304,18 @@ class SimulationData:
 
         # Parameters
         raw_params = cast("dict[str, float]", metadata.get("parameters", {}))
-        parameters: dict[str, float] = {
-            str(k): float(v) for k, v in raw_params.items()
-        }
+        parameters: dict[str, float] = {str(k): float(v) for k, v in raw_params.items()}
+
+        # BC types (version 2+; None for legacy data)
+        bc_types: tuple[str, ...] | None = None
+        if "bc_types" in metadata:
+            raw_bc = cast("list[str]", metadata["bc_types"])
+            bc_types = tuple(str(v) for v in raw_bc)
+
+        # Solver time-step (for conservation diagnostics); None for legacy
+        dt_val: float | None = None
+        if "dt" in metadata:
+            dt_val = float(metadata["dt"])  # type: ignore[arg-type]
 
         return cls(
             times=times,
@@ -324,6 +326,8 @@ class SimulationData:
             periodic=periodic,
             spec=spec,
             parameters=parameters,
+            bc_types=bc_types,
+            dt=dt_val,
         )
 
     def save(self, path: Path | str) -> Path:
@@ -355,7 +359,7 @@ class SimulationData:
         first_field = next(iter(self.fields.values()))
         grid_shape = list(first_field.shape[1:])  # strip snapshot dim
 
-        metadata = {
+        metadata: dict[str, object] = {
             "version": 1,
             "n_snapshots": self.n_snapshots,
             "grid_shape": grid_shape,
@@ -367,6 +371,10 @@ class SimulationData:
             "momenta": list(self.momenta.keys()),
             "dtype": "float64",
         }
+        if self.bc_types is not None:
+            metadata["bc_types"] = list(self.bc_types)
+        if self.dt is not None:
+            metadata["dt"] = self.dt
         (p / "metadata.json").write_text(json.dumps(metadata, indent=2) + "\n")
         return p
 

@@ -13,10 +13,10 @@ TIDAL stores **every snapshot in RAM** twice:
 
 Memory formula: `n_snapshots x (n_fields + n_momenta) x prod(grid_shape) x 8 bytes`
 
-| Example | Grid | Snapshots | Slots | Memory |
-|---------|------|-----------|-------|--------|
-| coupled_proca (2+1D) | 96^2 | 1,250 | 10 | **880 MB** |
-| gravitational_waves (3+1D) | 64^3 | 500 | 14 | **14 GB** |
+| Example                    | Grid | Snapshots | Slots | Memory     |
+| -------------------------- | ---- | --------- | ----- | ---------- |
+| coupled_proca (2+1D)       | 96^2 | 1,250     | 10    | **880 MB** |
+| gravitational_waves (3+1D) | 64^3 | 500       | 14    | **14 GB**  |
 
 At 3+1D grid sizes or long time series, the process is OOM-killed well before the simulation completes.
 
@@ -75,6 +75,7 @@ numpy supports `mmap_mode` when loading NPZ files.
 Pre-allocate one `.npy` file per field with shape `(n_snapshots, *grid_shape)`, write via `numpy.memmap(mode='w+')`, read via `numpy.load(mmap_mode='r')`.
 
 **Pros:**
+
 - Zero dependencies (pure numpy).
 - C-contiguous time-first layout matches our sequential access pattern (snapshot-by-snapshot iteration).
 - Julia reads `.npy` natively (`NPZ.jl`, `Mmap.mmap()`). C/Rust have `.npy` parsers.
@@ -83,6 +84,7 @@ Pre-allocate one `.npy` file per field with shape `(n_snapshots, *grid_shape)`, 
 - Works on any POSIX filesystem, Windows, VMs, HPC clusters.
 
 **Cons:**
+
 - No compression (float64 data compresses poorly anyway; ~1.5-2x with Blosc).
 - No random-access chunking (but our access is sequential along time axis, so this is fine).
 - One file per field (manageable; typical simulations have 4-10 fields).
@@ -110,10 +112,13 @@ output_dir/
   "version": 1,
   "n_snapshots": 1250,
   "grid_spacing": [0.5208, 0.5208],
-  "grid_bounds": [[0, 50], [0, 50]],
+  "grid_bounds": [
+    [0, 50],
+    [0, 50]
+  ],
   "grid_shape": [96, 96],
   "periodic": [true, true],
-  "parameters": {"mA": 1.0, "mB": 1.0, "g": 0.1},
+  "parameters": { "mA": 1.0, "mB": 1.0, "g": 0.1 },
   "spec_path": "examples/data/coupled_proca.json",
   "fields": ["A_1", "A_2", "B_1", "B_2"],
   "momenta": ["A_1", "A_2", "B_1", "B_2"],
@@ -145,6 +150,7 @@ writer.close()  # writes metadata.json
 ```
 
 Key properties:
+
 - Each `append()` writes to pre-allocated memmap rows. O(1) memory, O(grid_size) I/O.
 - `flush()` on each append for crash resilience.
 - `metadata.json` written at `close()`. If missing (crash), snapshot count is recoverable from `times.npy` by finding the last non-zero entry.
@@ -176,13 +182,13 @@ When `metadata.json` is missing (writer wasn't closed due to crash/kill):
 
 ### Access Pattern Analysis
 
-| Measurement Function | Access Pattern | Mmap Behavior |
-|---------------------|---------------|---------------|
-| `compute_energy_timeseries` | Sequential over time | Optimal: sequential page faults along time axis |
-| `compute_conversion_probability` | Sequential over time | Optimal: same as above |
-| `compute_spectrum` | All snapshots of one field | Full scan: pages loaded sequentially |
-| `compute_dispersion` | Full field + temporal FFT | Full scan: all pages loaded |
-| `compute_mixing_length` | Derived from conversion result | No direct field access |
+| Measurement Function             | Access Pattern                 | Mmap Behavior                                   |
+| -------------------------------- | ------------------------------ | ----------------------------------------------- |
+| `compute_energy_timeseries`      | Sequential over time           | Optimal: sequential page faults along time axis |
+| `compute_conversion_probability` | Sequential over time           | Optimal: same as above                          |
+| `compute_spectrum`               | All snapshots of one field     | Full scan: pages loaded sequentially            |
+| `compute_dispersion`             | Full field + temporal FFT      | Full scan: all pages loaded                     |
+| `compute_mixing_length`          | Derived from conversion result | No direct field access                          |
 
 All access patterns are sequential along the first (time) axis, which is exactly what C-contiguous memmap optimizes for.
 

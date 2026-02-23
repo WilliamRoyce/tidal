@@ -11,11 +11,8 @@
 #
 # A_0 is a constraint; phi_0, A_1, A_2 are dynamical.
 #
-# See also:
-#   measure_conversion.py        — detailed measurement analysis
-#
 # Running this script:
-#   cd examples/scalar_vector_coupling && uv run bash run.sh
+#   cd examples/scalar_vector_coupling && bash run.sh
 #
 # Or run each step manually to learn the tidal CLI:
 #
@@ -25,11 +22,13 @@
 #   # Step 2: Inspect the generated equation system (4 fields, 4x4 matrices)
 #   uv run tidal inspect ../data/scalar_vector_coupling.json
 #
-#   # Step 3: Simulate with Gaussian IC for phi (periodic BCs, 48x48 grid)
+#   # Step 3: Simulate with Gaussian IC for phi (periodic BCs, 64x64 grid on [0,50]²)
 #   uv run tidal simulate ../data/scalar_vector_coupling.json \
 #     --param phim2=1.0 --param Am2=0.5 --param kCS=0.3 --param gSV=0.2 \
-#     --grid-shape 48 --bounds 0:10,0:10 --bc periodic,periodic \
-#     --ic gaussian --t-end 5.0 --dt 0.005 \
+#     --grid-shape 64 --bounds 0:50,0:50 --bc periodic,periodic \
+#     --ic gaussian --ic-component phi_0 --ic-amplitude 1.0 --ic-width 5.0 \
+#     --ic-center 25.0,25.0 \
+#     --t-end 10.0 \
 #     --output ../data/scalar_vector_coupling_output
 #
 #   # Step 4: Measure scalar-to-vector conversion and mixing length
@@ -46,9 +45,9 @@
 #
 #   # Step 7: Combined plot with all measurements
 #   uv run tidal measure ../data/scalar_vector_coupling_output \
-#     --what conversion,mixing,spectral_conversion,dispersion \
+#     --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
 #     --source phi_0 --target A_0,A_1,A_2 \
-#     --output ../data/scalar_vector_coupling_measurement.png
+#     --output ../data/scalar_vector_coupling_output/measurement.png
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -63,12 +62,12 @@ tidal inspect ../data/scalar_vector_coupling.json
 # Gaussian IC for phi; periodic BCs ensure energy conservation
 tidal simulate ../data/scalar_vector_coupling.json \
   --param phim2=1.0 --param Am2=0.5 --param kCS=0.3 --param gSV=0.2 \
-  --grid-shape 48 \
-  --bounds 0:10,0:10 \
+  --grid-shape 64 \
+  --bounds 0:50,0:50 \
   --bc periodic,periodic \
-  --ic gaussian \
-  --t-end 5.0 \
-  --dt 0.005 \
+  --ic gaussian --ic-component phi_0 --ic-amplitude 1.0 --ic-width 5.0 \
+  --ic-center 25.0,25.0 \
+  --t-end 10.0 \
   --output ../data/scalar_vector_coupling_output
 
 # Step 4: Measure scalar-to-vector conversion and characteristic mixing length
@@ -91,6 +90,12 @@ tidal measure ../data/scalar_vector_coupling_output \
 
 # Step 7: Combined measurement plot (all panels in one figure)
 tidal measure ../data/scalar_vector_coupling_output \
-  --what conversion,mixing,spectral_conversion,dispersion \
+  --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
   --source phi_0 --target A_0,A_1,A_2 \
-  --output ../data/scalar_vector_coupling_measurement.png
+  --output ../data/scalar_vector_coupling_output/measurement.png
+
+# Step 8: Individual plots (saved into the simulation output directory)
+tidal plot ../data/scalar_vector_coupling_output --type snapshot --field phi_0 --time-index 0 --quiet
+tidal plot ../data/scalar_vector_coupling_output --type snapshot --field phi_0 --time-index -1 --quiet
+tidal plot ../data/scalar_vector_coupling_output --type amplitude --quiet
+tidal plot ../data/scalar_vector_coupling_output --type energy --quiet

@@ -1,29 +1,43 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Gravitational Waves 3+1D example
+# Gravitational Waves 3+1D — Full derive → inspect → simulate pipeline
 #
-# This example uses xPert linearization of the Einstein equations.
-# The TOML config produces gauge-unfixed linearized Einstein equations (10 components).
-# The simulation uses --ic formula for TT-gauge initial conditions.
+# Physics: xPert linearization of the Einstein equations with TT
+# (transverse-traceless) gauge, reducing to physical polarization modes
+# h_+ and h_×. Gaussian-modulated cosine wave packet propagating along z.
 #
-# To run manually:  cd examples/gravitational_waves
+# NOTE: 3D data — tidal plot is for 1D/2D only.
+#
+# Running this script:
+#   cd examples/gravitational_waves && bash run.sh
+#
+# Or run each step manually:
+#   tidal derive theory.toml
+#   tidal inspect ../data/linearized_gravity.json
+#   tidal simulate ../data/linearized_gravity.json \
+#     --grid-shape 4,4,32 --bounds 0:4,0:4,0:20 --periodic \
+#     --ic formula --ic-component h_4 \
+#     --ic-formula "np.exp(-(z - 10.0)**2 / 4.5) * np.cos(0.6283 * (z - 10.0))" \
+#     --t-end 5.0
 
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# Derive equations from TOML config (xPert linearization, gauge-unfixed)
+# Derive TT gauge-fixed linearized Einstein equations
 tidal derive theory.toml
-
-# Inspect the equation system (10 components: h_00..h_33)
 tidal inspect ../data/linearized_gravity.json
 
-# Simulate with TT-gauge h_plus (h_4 = h_xx) initial condition
-# This applies a Gaussian-modulated cosine wave packet along z
+# Simulate with h_plus (h_4 = h_xx) initial condition
+# Gaussian-modulated cosine wave packet propagating along z
+# Quick test: coarser grid + shorter time. For production resolution,
+# use --grid-shape 4,4,64 --bounds 0:4,0:4,0:40 --t-end 15.0
+#
+# NOTE: Gauge-unfixed constraints (h_1..h_3, h_transverse_*) have no
+# self-terms — IDA automatically freezes these at zero (temporal gauge).
 tidal simulate ../data/linearized_gravity.json \
-  --grid-shape 4,4,64 \
-  --bounds 0:4,0:4,0:40 \
+  --grid-shape 4,4,32 \
+  --bounds 0:4,0:4,0:20 \
   --periodic \
   --ic formula \
-  --ic-formula "np.exp(-(z - 20.0)**2 / 18.0) * np.cos(0.6283 * (z - 20.0))" \
+  --ic-formula "np.exp(-(z - 10.0)**2 / 4.5) * np.cos(0.6283 * (z - 10.0))" \
   --ic-component h_4 \
-  --t-end 15.0 \
-  --dt 0.01
+  --t-end 5.0

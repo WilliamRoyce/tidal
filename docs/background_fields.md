@@ -4,6 +4,11 @@ Background fields are non-dynamical tensors that appear in the Lagrangian
 but are NOT varied in the Euler-Lagrange derivation. They survive as
 (possibly position-dependent) coefficients in the equations of motion.
 
+This feature is essential for simulating the Gertsenshtein effect
+(Gertsenshtein 1962; Domcke & Garcia-Cely 2023), where a static external
+magnetic field B₀(x) catalyses photon-graviton conversion. It also enables
+general probe-field approximations and theories with fixed external sources.
+
 ## Pipeline Trace
 
 ### 1. TOML Declaration
@@ -16,6 +21,7 @@ components = ["g0 * Exp[-(x[]^2 + y[]^2) / (2 * R^2)]"]
 ```
 
 Component values can be:
+
 - **Numbers**: `0`, `1.0` (constant)
 - **Strings**: Wolfram expressions evaluated symbolically (may depend on coordinates)
 
@@ -51,24 +57,24 @@ Component values can be:
 
 Four levels of caching prevent redundant evaluation:
 
-| Level | Cache | What | Lifetime |
-|-------|-------|------|----------|
-| L0 | `_preresolved` | Fully constant coefficients (no `eval()` needed) | Instance (construction) |
-| L1 | `_expr_cache` | Mathematica→Python string conversion | Instance (singleton) |
-| L2 | `_spatial_cache` | Grid arrays for spatial-only coefficients | Instance (populated on first RHS call) |
-| L3 | `coeff_cache` | Per-RHS-call results | Single `_compute_rhs_for_component()` call |
+| Level | Cache            | What                                             | Lifetime                                   |
+| ----- | ---------------- | ------------------------------------------------ | ------------------------------------------ |
+| L0    | `_preresolved`   | Fully constant coefficients (no `eval()` needed) | Instance (construction)                    |
+| L1    | `_expr_cache`    | Mathematica→Python string conversion             | Instance (singleton)                       |
+| L2    | `_spatial_cache` | Grid arrays for spatial-only coefficients        | Instance (populated on first RHS call)     |
+| L3    | `coeff_cache`    | Per-RHS-call results                             | Single `_compute_rhs_for_component()` call |
 
 **Key behavior**: Spatial-only coefficients (`position_dependent=True`, `time_dependent=False`) are evaluated once on the grid and cached persistently across all timesteps. Time-dependent coefficients are re-evaluated each substep. Fully constant coefficients (neither position- nor time-dependent) are resolved once at construction time (L0) with no `eval()` at runtime.
 
 ## Supported Patterns
 
-| Pattern | Example | Status |
-|---------|---------|--------|
-| Constant background | `components = ["B0"]` | Fully supported |
-| Position-dependent scalar | `components = ["g0 * Exp[-r^2]"]` | Fully supported |
-| Position-dependent vector | `components = [0, 0, "B0 * Sin[x[]]"]` | Fully supported |
-| Time-dependent background | `components = ["g0 * Cos[t[]]"]` | Works (Python-level tested) |
-| Background field gradient | `CD[-a][G[]]` in Lagrangian | **NOT supported** — raises error |
+| Pattern                   | Example                                | Status                           |
+| ------------------------- | -------------------------------------- | -------------------------------- |
+| Constant background       | `components = ["B0"]`                  | Fully supported                  |
+| Position-dependent scalar | `components = ["g0 * Exp[-r^2]"]`      | Fully supported                  |
+| Position-dependent vector | `components = [0, 0, "B0 * Sin[x[]]"]` | Fully supported                  |
+| Time-dependent background | `components = ["g0 * Cos[t[]]"]`       | Works (Python-level tested)      |
+| Background field gradient | `CD[-a][G[]]` in Lagrangian            | **NOT supported** — raises error |
 
 ## Known Limitations
 
@@ -91,11 +97,13 @@ To support a new Mathematica function (e.g., `Gamma[x]`), update
 `_eval_utils.py` only — `pde_builder.py` delegates to it automatically:
 
 1. **String conversion**: Add to `_FUNCTION_MAP` in `_eval_utils.py`:
+
    ```python
    ("Gamma", "gamma"),
    ```
 
 2. **Evaluation namespace**: Add to `build_eval_namespace()` in `_eval_utils.py`:
+
    ```python
    ns["gamma"] = special.gamma
    ```
@@ -104,3 +112,12 @@ To support a new Mathematica function (e.g., `Gamma[x]`), update
 
 `PDEFromSpec._mathematica_to_python()` and `PDEFromSpec._build_base_namespace()`
 both delegate to `_eval_utils.py`, so no changes are needed in `pde_builder.py`.
+
+## References
+
+- Gertsenshtein (1962), "Wave resonance of light and gravitational waves", JETP 14, 84 — original prediction requiring external B-field as background
+- Domcke & Garcia-Cely (2023), "A simple derivation of the Gertsenshtein effect", [arXiv:2301.02072](https://arxiv.org/abs/2301.02072) — modern derivation with inhomogeneous background profiles
+- Martín-García et al., "xAct: Efficient tensor computer algebra for Mathematica", [xact.es](http://www.xact.es/) — symbolic tensor algebra (`VarD`, `ComponentValue`, `ToBasis`)
+- Zwicker (2020), "py-pde: A Python package for solving partial differential equations", JOSS 5(48), 2158 — PDE solver backend
+
+See [`docs/references.md`](references.md) for the full citation list.

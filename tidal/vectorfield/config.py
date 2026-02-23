@@ -90,8 +90,7 @@ class ComponentFieldParams:
         is_massless = all(
             spec.mass_matrix[i][i] == 0.0
             and (
-                not spec.mass_matrix_symbolic
-                or spec.mass_matrix_symbolic[i][i] is None
+                not spec.mass_matrix_symbolic or spec.mass_matrix_symbolic[i][i] is None
             )
             for i in range(spec.n_components)
         )

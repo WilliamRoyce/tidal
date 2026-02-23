@@ -56,12 +56,12 @@ tidal derive examples/electromagnetic/theory.toml
 
 **Stage 2 - Simulation**:
 ```bash
-python examples/electromagnetic/em_from_lagrangian.py
+cd examples/electromagnetic && bash run.sh
 ```
 - Loads equation specification from JSON
 - Builds PDE dynamically (no hardcoded wave equation)
 - Simulates Gaussian pulse in A₁ component
-- Output: `outputs/em_from_lagrangian_output.png`
+- Outputs: heatmap and amplitude plots in `examples/data/`
 
 **Physics**: Massless EM waves propagating at c = 1, clean wave splitting
 
@@ -81,12 +81,12 @@ tidal derive examples/scalar_field/theory.toml
 
 **Stage 2 - Simulation**:
 ```bash
-python examples/scalar_field/kg_from_lagrangian.py
+cd examples/scalar_field && bash run.sh
 ```
 - Loads equation specification from JSON
 - Builds PDE with both Laplacian and mass terms
 - Simulates Gaussian pulse with dispersion
-- Output: `outputs/kg_from_lagrangian_output.png`
+- Outputs: heatmap, amplitude, snapshot, and profile plots in `examples/data/`
 
 **Physics**: Massive scalar field with dispersion (amplitude decreases due to spreading)
 
@@ -136,11 +136,8 @@ tidal derive examples/electromagnetic/theory.toml
 # Verify JSON was created
 cat examples/data/em_1d.json | jq '.equations[0].rhs.terms'
 
-# Stage 2: Simulate
-python examples/electromagnetic/em_from_lagrangian.py
-
-# Check output
-ls -lh outputs/em_from_lagrangian_output.png
+# Stage 2: Simulate and plot
+cd examples/electromagnetic && bash run.sh
 ```
 
 ### Klein-Gordon Example
@@ -151,11 +148,8 @@ tidal derive examples/scalar_field/theory.toml
 # Verify JSON was created
 cat examples/data/klein_gordon_1d.json | jq '.equations[0].rhs.terms'
 
-# Stage 2: Simulate
-python examples/scalar_field/kg_from_lagrangian.py
-
-# Check output
-ls -lh outputs/kg_from_lagrangian_output.png
+# Stage 2: Simulate and plot
+cd examples/scalar_field && bash run.sh
 ```
 
 ---
@@ -188,7 +182,7 @@ These examples demonstrate that the pipeline handles non-Cartesian coordinate sy
 tidal derive examples/polar_kg/theory.toml
 
 # Stage 2: Simulate
-python examples/polar_kg/polar_kg_simulation.py
+cd examples/polar_kg && bash run.sh
 ```
 
 **Key features**: `gradient_x` with 1/r coefficient, `laplacian_y` with 1/r², mixed periodic BCs.
@@ -199,7 +193,7 @@ python examples/polar_kg/polar_kg_simulation.py
 
 ```bash
 tidal derive examples/spherical_kg/theory.toml
-python examples/spherical_kg/spherical_kg_simulation.py
+cd examples/spherical_kg && bash run.sh
 ```
 
 **Key features**: 6 RHS terms, trigonometric coefficients (`Cot`, `Csc`), `gradient_y` with cot(θ)/r².
@@ -210,7 +204,7 @@ python examples/spherical_kg/spherical_kg_simulation.py
 
 ```bash
 tidal derive examples/cylindrical_kg/theory.toml
-python examples/cylindrical_kg/cylindrical_kg_simulation.py
+cd examples/cylindrical_kg && bash run.sh
 ```
 
 **Key features**: Mixed curved (r, θ) and flat (z) spatial directions, `laplacian_z` with constant coefficient.
@@ -233,13 +227,13 @@ tidal derive examples/scalar_field_3d/theory.toml
 
 **Stage 2 - Simulation**:
 ```bash
-python examples/scalar_field_3d/kg_3d_simulation.py
+cd examples/scalar_field_3d && bash run.sh
 ```
 - Loads equation specification from JSON
 - 32³ = 32,768 cell 3D grid with periodic boundary conditions
 - 3D Gaussian pulse at rest (momentum = 0)
 - Runge-Kutta (RK4) time integration
-- Output: `outputs/kg_3d_output.png` (4-panel visualization)
+- Output: 4-panel visualization (z-profile, xy-slices, amplitude)
 
 **Visualization**:
 - Panel 1: φ(z) profile at x=y=center (initial vs final)
@@ -259,7 +253,7 @@ python examples/scalar_field_3d/kg_3d_simulation.py
 
 ```bash
 tidal derive examples/proca/theory.toml
-uv run python examples/proca/proca_simulation.py
+cd examples/proca && bash run.sh
 ```
 
 **Key features**: Massive vector field, Proca mass term, uses `[[derived_fields]]` for field strength tensor F_ab.
@@ -272,7 +266,7 @@ uv run python examples/proca/proca_simulation.py
 
 ```bash
 tidal derive examples/coupled_scalars/theory.toml
-uv run python examples/coupled_scalars/coupled_from_lagrangian.py
+cd examples/coupled_scalars && bash run.sh
 ```
 
 **Key features**: Cross-field coupling via `identity` operator on other field, mass matrix, mode-mixing, energy transfer between fields.
@@ -285,7 +279,7 @@ uv run python examples/coupled_scalars/coupled_from_lagrangian.py
 
 ```bash
 tidal derive examples/chern_simons/theory.toml
-uv run python examples/chern_simons/chern_simons_simulation.py
+cd examples/chern_simons && bash run.sh
 ```
 
 **Key features**: Epsilon tensor (automated), topological mass, A_0 constraint equation (time_derivative_order=0), cross-field gradient coupling.
@@ -298,7 +292,6 @@ uv run python examples/chern_simons/chern_simons_simulation.py
 
 ```bash
 cd examples/elasticity && bash run.sh
-uv run python examples/elasticity/elasticity_simulation.py
 ```
 
 **Key features**: Anisotropic laplacian (`laplacian_x`, `laplacian_y` with different coefficients), `cross_derivative_xy` operator.
@@ -311,7 +304,6 @@ uv run python examples/elasticity/elasticity_simulation.py
 
 ```bash
 cd examples/curved_spacetime && bash run.sh
-uv run python examples/curved_spacetime/curved_spacetime_simulation.py
 ```
 
 **Key features**: Time-dependent coefficients (Hubble friction `exp(2Ht)`), Christoffel auto-detection, `first_derivative_t` operator.
@@ -324,7 +316,7 @@ uv run python examples/curved_spacetime/curved_spacetime_simulation.py
 
 ```bash
 tidal derive examples/sphere_kg/theory.toml
-uv run python examples/sphere_kg/sphere_kg_simulation.py
+cd examples/sphere_kg && bash run.sh
 ```
 
 **Key features**: Position-dependent coefficients (stereographic metric), `_resolve_coefficient_at_point` evaluator.
@@ -373,7 +365,7 @@ tidal derive examples/massive_3form/theory.toml
 
 ```bash
 tidal derive examples/scalar_vector_coupling/theory.toml
-uv run python examples/scalar_vector_coupling/scalar_vector_coupling_simulation.py
+cd examples/scalar_vector_coupling && bash run.sh
 ```
 
 **Key features**: Mixed-rank cross-field coupling (scalar + vector), 4 symbolic constants (phim2, Am2, kCS, gSV), 4x4 mass/coupling matrices, cross-field `first_derivative_t` and `gradient` operators, `[[derived_fields]]` for F_ab, A_0 constraint.
@@ -386,7 +378,7 @@ uv run python examples/scalar_vector_coupling/scalar_vector_coupling_simulation.
 
 ```bash
 tidal derive examples/massive_gravity/theory.toml
-uv run python examples/massive_gravity/simulation.py
+cd examples/massive_gravity && bash run.sh
 ```
 
 **Key features**: xPert linearization, Fierz-Pauli mass term, 6 symmetric tensor components (h_tt constraint, h_tx/h_ty first-order, h_xx/h_xy/h_yy evolution), coupled constraint solver with FFT+SVD regularization, dispersion `ω²=k²+m²`.
@@ -399,7 +391,7 @@ uv run python examples/massive_gravity/simulation.py
 
 ```bash
 tidal derive examples/coupled_proca/theory.toml
-uv run python examples/coupled_proca/simulation.py
+cd examples/coupled_proca && bash run.sh
 ```
 
 **Key features**: Two massive vector fields with cross-coupling, coupled Helmholtz constraints (A_0, B_0), periodic boundary conditions, FFT constraint solver, 6×6 mass/coupling matrices.
@@ -412,7 +404,7 @@ uv run python examples/coupled_proca/simulation.py
 
 ```bash
 tidal derive examples/coupled_scattering/theory.toml
-uv run python examples/coupled_scattering/coupled_scattering_simulation.py
+cd examples/coupled_scattering && bash run.sh
 ```
 
 **Key features**: Position-dependent Gaussian coupling via `[[background_fields]]`, wave packet scattering, conversion probability measurement, `_eval_utils.py` coefficient evaluation.
@@ -425,7 +417,7 @@ uv run python examples/coupled_scattering/coupled_scattering_simulation.py
 
 ```bash
 tidal derive examples/scalar_potential_well/theory.toml
-uv run python examples/scalar_potential_well/potential_well_simulation.py
+cd examples/scalar_potential_well && bash run.sh
 ```
 
 **Key features**: Non-dynamical background scalar field via `[[background_fields]]`, position-dependent mass term, Gaussian potential well profile, bound state dynamics.
@@ -434,28 +426,32 @@ uv run python examples/scalar_potential_well/potential_well_simulation.py
 
 ## Example Completeness
 
-| Example | `theory.toml` | `run.sh` | Simulation `.py` |
-|---------|:---:|:---:|:---:|
-| scalar_field | Y | Y | Y |
-| electromagnetic | Y | Y | Y |
-| proca | Y | Y | Y |
-| coupled_scalars | Y | Y | Y |
-| chern_simons | Y | Y | Y |
-| elasticity | Y | Y | Y |
-| curved_spacetime | * | Y | Y |
-| sphere_kg | Y | Y | Y |
-| polar_kg | Y | Y | Y |
-| electrostatics | Y | Y | Y |
-| scalar_vector_coupling | Y | Y | Y |
-| scalar_field_3d | Y | Y | Y |
-| spherical_kg | Y | Y | Y |
-| cylindrical_kg | Y | Y | Y |
-| gravitational_waves | Y | Y | Y |
-| massive_3form | Y | Y | Y |
-| massive_gravity | Y | Y | Y |
-| coupled_proca | Y | Y | Y |
-| coupled_scattering | Y | Y | Y |
-| scalar_potential_well | Y | Y | Y |
+All examples use `theory.toml` + `run.sh` for the full derive → simulate → plot pipeline. No standalone Python scripts are needed.
+
+| Example | `theory.toml` | `run.sh` |
+|---------|:---:|:---:|
+| scalar_field | Y | Y |
+| electromagnetic | Y | Y |
+| proca | Y | Y |
+| coupled_scalars | Y | Y |
+| chern_simons | Y | Y |
+| elasticity | Y | Y |
+| curved_spacetime | * | Y |
+| sphere_kg | Y | Y |
+| polar_kg | Y | Y |
+| electrostatics | Y | Y |
+| scalar_vector_coupling | Y | Y |
+| scalar_field_3d | Y | Y |
+| spherical_kg | Y | Y |
+| cylindrical_kg | Y | Y |
+| gravitational_waves | Y | Y |
+| massive_3form | Y | Y |
+| massive_gravity | Y | Y |
+| coupled_proca | Y | Y |
+| coupled_scattering | Y | Y |
+| scalar_potential_well | Y | Y |
+| proca_background | Y | Y |
+| vector_background | Y | Y |
 
 *Note: `curved_spacetime` uses two separate TOML files (`de_sitter.toml`, `conformal_static.toml`) instead of a single `theory.toml`.*
 
@@ -540,12 +536,12 @@ For cases requiring custom Wolfram logic (gauge fixing, xPert linearization):
    - Call `DecomposeToComponents`
    - Call `BuildMultiFieldJSONStructure` and export
 
-2. **Create Python simulation** (e.g., `examples/new_field/simulate.py`):
-   - Load JSON: `spec = load_equation_system("../data/new_field.json")`
-   - Build PDE: `pde = build_pde_from_json("../data/new_field.json")`
-   - Create initial conditions
-   - Run simulation
-   - Visualize results
+2. **Create `run.sh`** to simulate and plot:
+   ```bash
+   tidal simulate ../data/new_field.json --param m2=1.0 --ic gaussian --output ../data/new_field_output
+   tidal plot ../data/new_field_output --type heatmap --output ../data/new_field_heatmap.png --quiet
+   tidal plot ../data/new_field_output --type amplitude --output ../data/new_field_amplitude.png --quiet
+   ```
 
 The pipeline handles the rest automatically!
 

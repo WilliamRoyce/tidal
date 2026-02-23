@@ -1,7 +1,7 @@
 (* ::Package:: *)
 (*
    MODULE: EulerLagrange.wl
-   PURPOSE: Derive equations of motion from Lagrangian densities via Euler-Lagrange equations
+   PURPOSE: Derive equations of motion from Lagrangian densities
 
    DEPENDENCIES:
      - xAct`xTensor` (tensor calculus, variational derivatives)
@@ -11,11 +11,22 @@
        → EulerLagrangeEquation (uses xAct VarD for functional derivative δL/δφ)
        → Equation of motion (tensor form)
 
+   NOTE: Canonical momentum and Hamiltonian computation is now performed at
+   the component level in _derive.py (_wls_canonical_pipeline). The old
+   abstract-index CanonicalMomentum/LegendreTransformH functions have been
+   removed — they were superseded by the component-level Legendre transform
+   which correctly handles gauge theories (Proca, Chern-Simons, etc.).
+
    KEY FEATURES:
      - Handles scalar and vector fields
      - Supports first and second-order derivative terms in Lagrangian
      - Works with abstract indices (converts to components via ComponentDecompose)
      - Automatic simplification via xAct's NoScalar and SortCovDs
+
+   REFERENCES:
+     - ADM formalism with xAct: arXiv:2210.10103
+     - xCPS package: github.com/juanmargalef/xCPS
+     - VarD with auxiliary tensors: xAct examples (Lagrangian-variation-xPert-VarD.nb)
 
    USAGE PATTERN:
      DefManifold[M2, 2, {a, b, c, d}];
@@ -78,28 +89,6 @@ EulerLagrangeEquation[lagrangian_, field_, covd_] := Module[
   eom
 ];
 
+
 End[];
 EndPackage[];
-
-(* Example usage (commented out for package import):
-
-<< TorsionGertsenshtein`EulerLagrange`;
-<< xAct`xTensor`;
-
-(* Setup 1+1D Minkowski spacetime *)
-DefManifold[M2, 2, {a, b, c, d}];
-DefMetric[-1, eta[-a, -b], M2];
-CD = CovDOfMetric[eta[-a, -b]];
-
-(* Define scalar field for Klein-Gordon *)
-DefTensor[phi[], M2];
-DefConstantSymbol[m2];
-
-(* Klein-Gordon Lagrangian: L = -1/2 (d_a phi)(d^a phi) - 1/2 m^2 phi^2 *)
-KGLagrangian = -1/2 CD[-a][phi[]] CD[a][phi[]] - 1/2 m2 phi[]^2;
-
-(* Compute EOM *)
-eom = EulerLagrangeEquation[KGLagrangian, phi[], CD];
-(* Should give: Box[phi] - m^2 phi = 0 *)
-
-*)

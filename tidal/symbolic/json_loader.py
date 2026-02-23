@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from tidal.solver.operators import SideBCSpec
+
 #: Canonical spatial axis letters, ordered by dimension index.
 #: Supports up to 6 spatial dimensions (sufficient for all foreseeable physics).
 AXIS_LETTERS: tuple[str, ...] = ("x", "y", "z", "w", "v", "u")
@@ -48,9 +50,7 @@ _STATIC_OPERATORS: frozenset[str] = frozenset(
 )
 
 #: Pattern for generic single-axis Nth-order derivatives: derivative_3_x, derivative_5_y, etc.
-_GENERIC_SINGLE_AXIS_RE = re.compile(
-    r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$"
-)
+_GENERIC_SINGLE_AXIS_RE = re.compile(r"^derivative_(\d+)_(" + _AXIS_RE_CLASS + r")$")
 
 #: Pattern for generic multi-axis derivatives: derivative_2x_1y, derivative_3x_2z, etc.
 _GENERIC_MULTI_AXIS_RE = re.compile(
@@ -230,7 +230,9 @@ class OperatorTerm:
         )
 
 
-_VALID_BC_TYPES: frozenset[str] = frozenset({"periodic", "dirichlet", "neumann"})
+_VALID_BC_TYPES: frozenset[str] = frozenset(
+    {"periodic", "dirichlet", "neumann", "robin"}
+)
 
 
 @dataclass(frozen=True)
@@ -240,16 +242,19 @@ class BoundaryCondition:
     Attributes
     ----------
     type : str
-        One of "periodic", "dirichlet", or "neumann".
+        One of "periodic", "dirichlet", "neumann", or "robin".
     value : float | None
-        Fixed value for Dirichlet BCs.
+        Fixed value for Dirichlet BCs, or Robin beta.
     derivative : float | None
         Fixed normal derivative for Neumann BCs.
+    gamma : float | None
+        Robin coefficient gamma in d_n f + gamma*f = beta.
     """
 
     type: str
     value: float | None = None
     derivative: float | None = None
+    gamma: float | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> BoundaryCondition:
@@ -262,12 +267,48 @@ class BoundaryCondition:
         """
         bc_type = str(data["type"])
         if bc_type not in _VALID_BC_TYPES:
-            msg = f"Unknown BC type: {bc_type!r}. Valid types: {sorted(_VALID_BC_TYPES)}"
+            msg = (
+                f"Unknown BC type: {bc_type!r}. Valid types: {sorted(_VALID_BC_TYPES)}"
+            )
             raise ValueError(msg)
+        # Warn on irrelevant fields
+        irrelevant_fields: dict[str, set[str]] = {
+            "periodic": {"value", "derivative", "gamma"},
+            "dirichlet": {"derivative", "gamma"},
+            "neumann": {"gamma"},
+        }
+        extra = {
+            k for k in irrelevant_fields.get(bc_type, set()) if data.get(k) is not None
+        }
+        if extra:
+            logger.warning(
+                "%s BC ignores field(s): %s", bc_type, ", ".join(sorted(extra))
+            )
         return cls(
             type=bc_type,
             value=data.get("value"),
             derivative=data.get("derivative"),
+            gamma=data.get("gamma"),
+        )
+
+    def to_side_bc(self) -> SideBCSpec:
+        """Convert to a ``SideBCSpec`` for the operator layer.
+
+        Raises
+        ------
+        ValueError
+            If the BC type is "periodic" (not representable as a side BC).
+        """
+        from tidal.solver.operators import SideBCSpec  # noqa: PLC0415
+
+        if self.type == "periodic":
+            msg = "Cannot convert periodic BC to SideBCSpec"
+            raise ValueError(msg)
+        return SideBCSpec(
+            kind=self.type,
+            value=self.value if self.value is not None else 0.0,
+            derivative=self.derivative if self.derivative is not None else 0.0,
+            gamma=self.gamma if self.gamma is not None else 0.0,
         )
 
 
@@ -387,6 +428,238 @@ class ConstraintSolverConfig:
         )
 
 
+# === Phase K: Canonical Momentum Structures ===
+
+
+@dataclass(frozen=True)
+class HamiltonianFactor:
+    """One factor in a quadratic Hamiltonian term.
+
+    Represents a field (or its time/spatial derivative) that appears as a
+    multiplicative factor in a term of the component-form Hamiltonian density.
+
+    Attributes
+    ----------
+    field : str
+        Component field name (e.g., "A_1", "phi_0").
+    operator : str
+        Differential operator: "identity" (bare field), "time_derivative"
+        (∂_t field, maps to canonical momentum at evaluation), or a spatial
+        operator ("gradient_x", "laplacian", etc.).
+    """
+
+    field: str
+    operator: str
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> HamiltonianFactor:
+        """Parse from JSON dict."""
+        return cls(field=str(data["field"]), operator=str(data["operator"]))
+
+
+@dataclass(frozen=True)
+class HamiltonianTerm:
+    """A single quadratic term in the Hamiltonian density.
+
+    H = Σ coefficient * factor_a * factor_b
+
+    Attributes
+    ----------
+    coefficient : float
+        Numeric coefficient.
+    factor_a : HamiltonianFactor
+        First field factor.
+    factor_b : HamiltonianFactor
+        Second field factor (may equal factor_a for squared terms).
+    coefficient_symbolic : str | None
+        Symbolic coefficient expression (for parameter override).
+    """
+
+    coefficient: float
+    factor_a: HamiltonianFactor
+    factor_b: HamiltonianFactor
+    coefficient_symbolic: str | None = None
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> HamiltonianTerm:
+        """Parse from JSON dict."""
+        return cls(
+            coefficient=float(data["coefficient"]),
+            factor_a=HamiltonianFactor.from_dict(data["factor_a"]),
+            factor_b=HamiltonianFactor.from_dict(data["factor_b"]),
+            coefficient_symbolic=data.get("coefficient_symbolic"),
+        )
+
+
+@dataclass(frozen=True)
+class KineticMatrixEntry:
+    """Single entry of the kinetic matrix K_{ij}.
+
+    The kinetic matrix K relates canonical momenta to velocities:
+    ``pi_i = K_{ij} * dq_j/dt + S_i``  where S_i are spatial corrections.
+
+    IDA uses K directly in residual form: ``K_{ij} * dq_j/dt - (pi_i - S_i) = 0``.
+    Leapfrog solves ``K * v = (pi - S)`` via ``np.linalg.solve``.
+
+    Attributes
+    ----------
+    i : int
+        Row index (0-based dynamical field index).
+    j : int
+        Column index (0-based dynamical field index).
+    value : float
+        Numerical value of K_{ij} (evaluated with parameter defaults).
+    symbolic : str | None
+        Exact symbolic expression (Mathematica InputForm), or None if trivial.
+    time_dependent : bool
+        Whether the entry depends on time (e.g., time-varying metric).
+    coordinate_dependent : tuple[str, ...]
+        Coordinate names the entry depends on (e.g., ``("x",)`` for a
+        spatially varying background field).  Empty tuple for constant entries.
+        Follows the same convention as :class:`OperatorTerm`.
+    """
+
+    i: int
+    j: int
+    value: float
+    symbolic: str | None = None
+    time_dependent: bool = False
+    coordinate_dependent: tuple[str, ...] = ()
+
+    @property
+    def position_dependent(self) -> bool:
+        """Whether the entry depends on spatial coordinates."""
+        return bool(set(self.coordinate_dependent) - {"t"})
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> KineticMatrixEntry:
+        """Parse from JSON dict."""
+        return cls(
+            i=int(data["i"]),
+            j=int(data["j"]),
+            value=float(data["value"]),
+            symbolic=data.get("symbolic"),
+            time_dependent=bool(data.get("time_dependent", False)),
+            coordinate_dependent=tuple(data.get("coordinate_dependent", ())),
+        )
+
+
+@dataclass(frozen=True)
+class KineticMatrix:
+    """Full kinetic matrix K for the dynamical subsystem.
+
+    Attributes
+    ----------
+    entries : tuple[KineticMatrixEntry, ...]
+        Non-zero entries of K.
+    dimension : int
+        Size of K (number of dynamical fields).
+    """
+
+    entries: tuple[KineticMatrixEntry, ...]
+    dimension: int
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> KineticMatrix:
+        """Parse from JSON ``kinetic_matrix`` section."""
+        return cls(
+            entries=tuple(KineticMatrixEntry.from_dict(e) for e in data["entries"]),
+            dimension=int(data["dimension"]),
+        )
+
+    @property
+    def has_position_dependent(self) -> bool:
+        """Whether any entry depends on spatial coordinates."""
+        return any(e.position_dependent for e in self.entries)
+
+    @property
+    def has_time_dependent(self) -> bool:
+        """Whether any entry depends on time."""
+        return any(e.time_dependent for e in self.entries)
+
+    def to_dense(self) -> list[list[float]]:
+        """Convert to dense NxN matrix (list of lists).
+
+        For constant (non-coordinate-dependent) entries only.  Position-
+        or time-dependent entries require grid evaluation via
+        :class:`~tidal.solver.coefficients.CoefficientEvaluator`.
+        """
+        n = self.dimension
+        matrix = [[0.0] * n for _ in range(n)]
+        for e in self.entries:
+            matrix[e.i][e.j] = e.value
+        return matrix
+
+
+@dataclass(frozen=True)
+class CanonicalStructure:
+    """Hamilton's equations derived from Lagrangian via Legendre transform.
+
+    Computed symbolically in Wolfram and exported as part of the JSON spec.
+    Used by the PDE builder for canonical evolution (Hamilton's 1st equation)
+    and by the energy measurement for Hamiltonian evaluation.
+
+    Attributes
+    ----------
+    hamiltonian_terms : tuple[HamiltonianTerm, ...]
+        Quadratic terms in the component-form Hamiltonian density.
+    field_rates : dict[str, tuple[OperatorTerm, ...]]
+        Hamilton's 1st equation per component: dq_i/dt = ∂H/∂π_i.
+        Each entry is the full RHS expressed as OperatorTerms, including
+        the identity(π_i) term. For scalars: ``[identity(pi_0)]``.
+        For Proca: ``[identity(pi_1), gradient_x(A_0)]``.
+    kinetic_matrix : KineticMatrix | None
+        Raw kinetic matrix K_{ij} = ∂π_i/∂(dq_j/dt).
+        Used directly by IDA (residual form) and leapfrog (K·v = π-S solve).
+        None for specs generated before Phase 2.
+    spatial_momenta : dict[str, tuple[OperatorTerm, ...]] | None
+        Spatial corrections S_i per dynamical field.  The momentum relation
+        is ``π_i = K_{ij} · dq_j/dt + S_i``.  None for pre-Phase 2 specs.
+    hamiltonian_symbolic : str
+        Full symbolic Hamiltonian expression (Mathematica InputForm).
+    """
+
+    hamiltonian_terms: tuple[HamiltonianTerm, ...]
+    field_rates: dict[str, tuple[OperatorTerm, ...]]
+    hamiltonian_symbolic: str
+    kinetic_matrix: KineticMatrix | None = None
+    spatial_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
+
+    @classmethod
+    def from_dict(cls, data: Mapping[str, Any]) -> CanonicalStructure:
+        """Parse from JSON ``canonical`` section."""
+        h_terms = tuple(HamiltonianTerm.from_dict(t) for t in data["hamiltonian_terms"])
+
+        raw_rates = data.get("field_rates", {})
+        field_rates: dict[str, tuple[OperatorTerm, ...]] = {}
+        for field_name, terms in raw_rates.items():
+            field_rates[str(field_name)] = tuple(
+                OperatorTerm.from_dict(t) for t in terms
+            )
+
+        # Parse kinetic matrix (new in Phase 2, optional for backward compat)
+        km_data = data.get("kinetic_matrix")
+        kinetic_matrix = KineticMatrix.from_dict(km_data) if km_data else None
+
+        # Parse spatial momenta (new in Phase 2, optional for backward compat)
+        raw_sm = data.get("spatial_momenta")
+        spatial_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
+        if raw_sm is not None:
+            spatial_momenta = {}
+            for field_name, terms in raw_sm.items():
+                spatial_momenta[str(field_name)] = tuple(
+                    OperatorTerm.from_dict(t) for t in terms
+                )
+
+        return cls(
+            hamiltonian_terms=h_terms,
+            field_rates=field_rates,
+            hamiltonian_symbolic=str(data.get("hamiltonian_symbolic", "")),
+            kinetic_matrix=kinetic_matrix,
+            spatial_momenta=spatial_momenta,
+        )
+
+
 @dataclass(frozen=True)
 class ComponentEquation:
     """Equation of motion for a single field component.
@@ -486,9 +759,7 @@ class ComponentEquation:
         )
 
 
-def _resolve_symbolic_coeff(
-    sym: str, parameters: Mapping[str, float]
-) -> float | None:
+def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float | None:
     """Resolve a symbolic coefficient string with parameter values.
 
     Handles simple names (``"m2"``), negated names (``"-m2"``), and
@@ -547,6 +818,11 @@ class EquationSystem:
         Coordinate names from JSON spacetime.coordinates (e.g., ("t", "x", "y")).
         Defaults to empty tuple; use ``effective_coordinates`` for a guaranteed
         non-empty result that infers names from dimension when not set.
+    canonical : CanonicalStructure | None
+        Canonical momentum and Hamiltonian structure from Legendre transform.
+        Present when the JSON spec includes a ``"canonical"`` section (generated
+        by ``tidal derive`` for non-linearization theories). None for legacy
+        specs or linearization theories.
     """
 
     n_components: int
@@ -560,6 +836,7 @@ class EquationSystem:
     coordinates: tuple[str, ...] = ()
     mass_matrix_symbolic: tuple[tuple[str | None, ...], ...] = ()
     coupling_matrix_symbolic: tuple[tuple[str | None, ...], ...] = ()
+    canonical: CanonicalStructure | None = None
 
     def __post_init__(self) -> None:
         """Validate the equation system.
@@ -592,14 +869,15 @@ class EquationSystem:
         # matrices that don't match the convention: matrix[i][j] = -(identity coeff).
         raw_params = self.metadata.get("parameters", {})
         check_params: dict[str, float] = {
-            k: float(v)
-            for k, v in raw_params.items()
-            if isinstance(v, (int, float))
+            k: float(v) for k, v in raw_params.items() if isinstance(v, (int, float))
         }
         expected_mass, expected_coupling, _, _ = self._compute_matrices_from_terms(
             self.equations, self.component_names, parameters=check_params or None
         )
-        if self.mass_matrix != expected_mass or self.coupling_matrix != expected_coupling:
+        if (
+            self.mass_matrix != expected_mass
+            or self.coupling_matrix != expected_coupling
+        ):
             import warnings  # noqa: PLC0415
 
             warnings.warn(
@@ -746,10 +1024,7 @@ class EquationSystem:
                     # Prefer symbolic + params for numeric value; fall back
                     # to the raw numeric coefficient (shape factor).
                     effective_coeff = term.coefficient
-                    if (
-                        term.coefficient_symbolic is not None
-                        and parameters
-                    ):
+                    if term.coefficient_symbolic is not None and parameters:
                         resolved = _resolve_symbolic_coeff(
                             term.coefficient_symbolic, parameters
                         )
@@ -897,6 +1172,12 @@ class EquationSystem:
         # Extract coordinate names
         coordinates = tuple(str(c) for c in spacetime.get("coordinates", []))
 
+        # Parse canonical structure (Phase K) — optional for backward compat
+        canonical_data = data.get("canonical")
+        canonical: CanonicalStructure | None = None
+        if canonical_data is not None:
+            canonical = CanonicalStructure.from_dict(canonical_data)
+
         return cls(
             n_components=n_components,
             dimension=dimension,
@@ -909,6 +1190,7 @@ class EquationSystem:
             coordinates=coordinates,
             mass_matrix_symbolic=mass_matrix_symbolic,
             coupling_matrix_symbolic=coupling_matrix_symbolic,
+            canonical=canonical,
         )
 
 

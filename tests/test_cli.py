@@ -345,10 +345,10 @@ class TestSimulateCommand:
         ])
         assert ret == 1
 
-    def test_simulate_bc_dirichlet_rejected(
+    def test_simulate_bc_dirichlet_accepted(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Dirichlet BC is not supported by py-pde; should fail with clear error."""
+        """Dirichlet BC is supported by the native solver."""
         ret = main([
             "simulate", str(inline_kg_1d_json),
             "--param", "m2=1.0",
@@ -356,10 +356,7 @@ class TestSimulateCommand:
             "--t-end", "0.5",
             "--no-plot",
         ])
-        assert ret == 1
-        err = capsys.readouterr().err
-        assert "Dirichlet" in err
-        assert "not supported" in err
+        assert ret == 0
 
     # --- Feature: --ic formula ---
 
@@ -474,18 +471,83 @@ class TestSimulateCommand:
         ])
         assert ret == 0
 
-    def test_simulate_scipy_scheme(
+    def test_simulate_default_scheme(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Verify scipy solver uses py-pde ScipySolver."""
+        """Verify default scheme (auto) auto-selects and logs solver choice."""
         ret = main([
             "simulate", str(inline_kg_1d_json),
             "--param", "m2=1.0",
-            "--scheme", "scipy",
             "--t-end", "0.5",
             "--no-plot",
         ])
         assert ret == 0
+        captured = capsys.readouterr()
+        # Inline KG spec lacks canonical section → auto selects IDA
+        assert "Auto-selected solver:" in captured.out
+        assert "Scheme:" in captured.out
+
+    def test_auto_selects_ida_for_constraints(
+        self, inline_em_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Constraint equations (time_order=0) should auto-select IDA."""
+        ret = main([
+            "simulate", str(inline_em_1d_json),
+            "--ic", "plane-wave",
+            "--ic-component", "A_2",
+            "--t-end", "0.1",
+            "--no-plot",
+        ])
+        assert ret == 0
+        captured = capsys.readouterr()
+        assert "Auto-selected solver: ida" in captured.out
+
+    def test_simulate_ida_scheme(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Verify IDA solver runs end-to-end on Klein-Gordon."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--scheme", "ida",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+        captured = capsys.readouterr()
+        assert "IDA solver" in captured.out
+        assert "snapshots stored" in captured.out
+
+    def test_simulate_ida_plane_wave(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """IDA with plane-wave IC should preserve amplitude."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--scheme", "ida",
+            "--ic", "plane-wave",
+            "--t-end", "1.0",
+            "--no-plot",
+        ])
+        assert ret == 0
+
+    def test_simulate_leapfrog_scheme(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Verify leapfrog solver runs end-to-end on Klein-Gordon."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--scheme", "leapfrog",
+            "--t-end", "0.5",
+            "--dt", "0.01",
+            "--no-plot",
+        ])
+        assert ret == 0
+        captured = capsys.readouterr()
+        assert "leapfrog" in captured.out.lower()
+        assert "snapshots stored" in captured.out
 
     def test_simulate_custom_snapshots(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
@@ -636,6 +698,68 @@ class TestSimulateCommand:
         out = capsys.readouterr().out
         assert "Results:" in out
         assert "Loading equation specification" not in out
+
+
+class TestZeroEvolutionWarning:
+    """Tests for the zero-evolution diagnostic warning."""
+
+    def test_em_plane_wave_no_warning(
+        self, inline_em_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Plane-wave IC on EM A_2 (transverse) provides non-zero π → no warning."""
+        ret = main([
+            "simulate", str(inline_em_1d_json),
+            "--ic", "plane-wave",
+            "--ic-component", "A_2",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+        captured = capsys.readouterr()
+        assert "all evolution rates are zero" not in captured.err
+
+    def test_kg_gaussian_no_warning(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """KG Gaussian IC has non-zero dπ/dt from laplacian → no warning."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--ic", "gaussian",
+            "--t-end", "0.5",
+            "--no-plot",
+        ])
+        assert ret == 0
+        captured = capsys.readouterr()
+        assert "all evolution rates are zero" not in captured.err
+
+    def test_em_plane_wave_amplitude_stable(
+        self, inline_em_1d_json: Path, tmp_path: Path,
+    ) -> None:
+        """EM plane-wave in A_2 (transverse): amplitude stays bounded (no growth)."""
+        import numpy as np
+
+        out_dir = tmp_path / "em_stable"
+        ret = main([
+            "simulate", str(inline_em_1d_json),
+            "--ic", "plane-wave",
+            "--ic-component", "A_2",
+            "--t-end", "5.0",
+            "--scheme", "ida",
+            "--periodic",
+            "--output", str(out_dir),
+        ])
+        assert ret == 0
+
+        # Read final snapshot from disk-backed storage
+        a2_data = np.load(str(out_dir / "A_2.npy"), mmap_mode="r")
+        final_peak = float(np.max(np.abs(a2_data[-1])))
+        initial_peak = 1.0  # plane-wave amplitude
+        # Amplitude should stay within 20% of initial (generous tolerance for numerics)
+        assert final_peak < 1.2 * initial_peak, (
+            f"A_2 amplitude grew from {initial_peak:.3f} to {final_peak:.3f} — "
+            f"constraint solver may not be active"
+        )
 
 
 class TestDeriveCommand:
@@ -1084,6 +1208,189 @@ path = "output.json"
         assert "VarD" not in out
         # Parameter default value in metadata
         assert '"m2" -> 1.0' in out
+
+
+class TestGaugeFixing:
+    """Tests for ``[[gauge]]`` TOML → validation and WLS generation."""
+
+    _BASE_TOML = """\
+[theory]
+name = "EM"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+[lagrangian]
+expression = "-1/4 F[-a, -b] eta[a, c] eta[b, d] F[-c, -d]"
+
+[output]
+path = "output.json"
+"""
+
+    def test_gauge_lorenz_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Lorenz gauge on vector field → GaugeFix.wl loaded + builder in WLS."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "lorenz"
+xi = 1.0
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "GaugeFix.wl" in out
+        assert "BuildLorenzGaugeTerm" in out
+        assert "AddGaugeFixingTerm" in out
+
+    def test_gauge_custom_lagrangian_term_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Custom gauge expression → appears in WLS output."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "custom"
+mechanism = "lagrangian_term"
+expression = "-(1/2) * eta[a,b] CD[-a][A[-c]] eta[c,d] CD[-b][A[-d]]"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        assert "GaugeTerm" in out
+        assert "AddGaugeFixingTerm" in out
+
+    def test_gauge_metadata_lorenz(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Lorenz gauge metadata string in WLS."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "lorenz"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert '"gauge" -> "lorenz(A)"' in out
+
+    def test_gauge_metadata_none_default(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """No [[gauge]] → 'gauge -> none' in metadata."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML)
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert '"gauge" -> "none"' in out
+
+    def test_gauge_bad_field_ref(self, tmp_path: Path) -> None:
+        """Reject field='Z' not declared in [[fields]]."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "Z"
+type = "lorenz"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_bad_type(self, tmp_path: Path) -> None:
+        """Reject unknown gauge type."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "unknown"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_scalar_not_allowed(self, tmp_path: Path) -> None:
+        """Lorenz gauge on scalar field → exit code 1."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[lagrangian]
+expression = "phi[]^2"
+
+[output]
+path = "output.json"
+
+[[gauge]]
+field = "phi"
+type = "lorenz"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_duplicate_field(self, tmp_path: Path) -> None:
+        """Two gauge entries for same field → exit code 1."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "lorenz"
+
+[[gauge]]
+field = "A"
+type = "lorenz"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_custom_missing_expression(self, tmp_path: Path) -> None:
+        """Custom gauge without expression key is rejected."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "custom"
+mechanism = "lagrangian_term"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_gauge_custom_missing_mechanism(self, tmp_path: Path) -> None:
+        """Custom gauge without mechanism key is rejected."""
+        config = tmp_path / "theory.toml"
+        config.write_text(self._BASE_TOML + """
+[[gauge]]
+field = "A"
+type = "custom"
+expression = "eta[a,b] CD[-a][A[-b]]"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
 
 
 class TestDeriveAbsolutePaths:
@@ -2653,17 +2960,17 @@ path = "output.json"
         ret = main(["derive", str(config), "--dry-run"])
         assert ret == 1
 
-    def test_linearization_and_lagrangian_mutually_exclusive(
+    def test_linearization_and_lagrangian_coexist(
         self, tmp_path: Path
     ) -> None:
-        """Having both [lagrangian] and [linearization] should fail."""
+        """[lagrangian] + [linearization] is valid (Lagrangian-first)."""
         config = tmp_path / "theory.toml"
         config.write_text("""
 [theory]
-name = "Bad"
+name = "Lagrangian-first linearization"
 
 [spacetime]
-dimension = 4
+dimension = 3
 metric = "minkowski"
 
 [[fields]]
@@ -2673,17 +2980,16 @@ rank = 2
 symmetry = "symmetric"
 
 [lagrangian]
-expression = "h[]"
+expression = "RicciScalarCD[]"
 
 [linearization]
-expression = "Einstein[CD][-a, -b]"
 perturbation_field = "h"
 
 [output]
 path = "output.json"
 """)
         ret = main(["derive", str(config), "--dry-run"])
-        assert ret == 1
+        assert ret == 0
 
     def test_linearization_or_lagrangian_required(self, tmp_path: Path) -> None:
         """Config with neither [lagrangian] nor [linearization] should fail."""

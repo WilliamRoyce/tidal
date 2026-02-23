@@ -15,7 +15,8 @@ It extracts quantitative physics from simulation output: per-field energy
 decomposition, wave conversion probability, Fourier spectral analysis, and
 energy conservation diagnostics. The primary use case is measuring the
 Gertsenshtein effect — the conversion of electromagnetic waves to
-gravitational waves (and vice versa) in coupled field systems.
+gravitational waves (and vice versa) in coupled field systems
+(Gertsenshtein 1962; Domcke & Garcia-Cely 2023, [arXiv:2301.02072](https://arxiv.org/abs/2301.02072)).
 
 All measurements operate on `SimulationData`, a uniform abstraction over
 the full time history of field and momentum arrays. Data can come from a
@@ -282,8 +283,10 @@ spatial average (mean over grid points). Constraint fields
 (`time_derivative_order == 0`) are excluded from per-field energy.
 
 **Gradient computation:** For periodic axes, the gradient uses spectral
-(FFT) differentiation (`ik * FFT(phi)`) for exact accuracy. For
-non-periodic axes, 2nd-order central finite differences are used instead.
+(FFT) differentiation (`ik * FFT(phi)`) for exact accuracy (following
+the approach used in spectral PDE solvers such as Dedalus; Burns et al.
+2020). For non-periodic axes, 2nd-order central finite differences are
+used instead.
 
 ### Virial Potential Density
 
@@ -568,6 +571,15 @@ All functions follow the project's fail-fast convention:
 - **Dirichlet BCs + cross_derivative operators:** The discrete ghost-cell stencil breaks self-adjointness at boundary cells, causing ~30% energy drift. Periodic BCs conserve to ~1e-10. See [HAMILTONIAN.md](HAMILTONIAN.md) Section 7, item 5 for the full analysis and SBP as a future remedy.
 - **Position-dependent coefficients:** Energy computation requires constant `m²` and coupling coefficients. Spatially varying coefficients raise `ValueError`. Future: evaluate at each grid point during virial integration.
 - **Quadratic Lagrangians only:** The virial formula is exact for degree-2 potentials. Higher-order Lagrangians would need explicit potential density integration.
+
+## References
+
+- Gertsenshtein (1962), "Wave resonance of light and gravitational waves", JETP 14, 84
+- Domcke & Garcia-Cely (2023), "A simple derivation of the Gertsenshtein effect", [arXiv:2301.02072](https://arxiv.org/abs/2301.02072)
+- Burns et al. (2020), "Dedalus: A Flexible Framework for Numerical Simulations with Spectral Methods", Phys. Rev. Research 2, 023068, [arXiv:1905.10388](https://arxiv.org/abs/1905.10388)
+- Zwicker (2020), "py-pde: A Python package for solving partial differential equations", JOSS 5(48), 2158
+
+See [`docs/references.md`](../../docs/references.md) for the full citation list.
 
 ## Tests
 

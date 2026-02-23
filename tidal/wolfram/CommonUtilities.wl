@@ -535,7 +535,7 @@ GenerateCDRules[dim_Integer, chart_] := GenerateCDRules[dim, chart] = Module[
         If[idx >= arity - 1 && arity > 2,
           f_[{idx, chartSign*chart}][Derivative[orders__][g_][args__]] /;
             isCDlike[f[{idx, chartSign*chart}]] && Length[{orders}] < arity :>
-            With[{paddedOrders = PadRight[{orders}, arity, 0]},
+            With[{paddedOrders = PadRight[{orders}, Max[arity, idx + 1], 0]},
               With[{newOrders = ReplacePart[paddedOrders, idx + 1 -> paddedOrders[[idx + 1]] + 1]},
                 Derivative[Sequence @@ newOrders][g][args]
               ]

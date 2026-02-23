@@ -6,12 +6,8 @@
 # producing Rabi-like oscillations in the conversion probability P(t).
 # The mixing length L_mix = pi/omega_dom characterizes the oscillation period.
 #
-# See also:
-#   coupled_from_lagrangian.py   — Python simulation script
-#   measure_conversion.py        — detailed measurement analysis
-#
 # Running this script:
-#   cd examples/coupled_scalars && uv run bash run.sh
+#   cd examples/coupled_scalars && bash run.sh
 #
 # Or run each step manually to learn the tidal CLI:
 #
@@ -26,7 +22,8 @@
 #     --param mPhi2=1.0 --param mChi2=4.0 --param gCpl=0.5 \
 #     --grid-shape 256 --bounds 0:100 --periodic \
 #     --ic gaussian --ic-component phi_0 --ic-center 30.0 --ic-width 5.0 \
-#     --t-end 20.0 --dt 0.01 --output ../data/coupled_scalars_output
+#     --ic-amplitude 1.0 \
+#     --t-end 20.0 --output ../data/coupled_scalars_output
 #
 #   # Step 4: Measure conversion probability and characteristic mixing length
 #   uv run tidal measure ../data/coupled_scalars_output \
@@ -42,9 +39,9 @@
 #
 #   # Step 7: Combined plot with all measurements
 #   uv run tidal measure ../data/coupled_scalars_output \
-#     --what conversion,mixing,spectral_conversion,dispersion \
+#     --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
 #     --source phi_0 --target chi_0 \
-#     --output ../data/coupled_scalars_measurement.png
+#     --output ../data/coupled_scalars_output/measurement.png
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -66,8 +63,8 @@ tidal simulate ../data/coupled_scalars.json \
   --ic-component phi_0 \
   --ic-center 30.0 \
   --ic-width 5.0 \
+  --ic-amplitude 1.0 \
   --t-end 20.0 \
-  --dt 0.01 \
   --output ../data/coupled_scalars_output
 
 # Step 4: Measure conversion probability and characteristic mixing length
@@ -91,6 +88,15 @@ tidal measure ../data/coupled_scalars_output \
 
 # Step 7: Combined measurement plot (all panels in one figure)
 tidal measure ../data/coupled_scalars_output \
-  --what conversion,mixing,spectral_conversion,dispersion \
+  --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
   --source phi_0 --target chi_0 \
-  --output ../data/coupled_scalars_measurement.png
+  --output ../data/coupled_scalars_output/measurement.png
+
+# Step 8: Individual plots (saved into the simulation output directory)
+tidal plot ../data/coupled_scalars_output --type heatmap --field phi_0 --quiet
+tidal plot ../data/coupled_scalars_output --type heatmap --field chi_0 --quiet
+tidal plot ../data/coupled_scalars_output --type amplitude --quiet
+tidal plot ../data/coupled_scalars_output --type energy --quiet
+tidal plot ../data/coupled_scalars_output --type compare --quiet
+tidal plot ../data/coupled_scalars_output --type hamiltonian --quiet
+tidal plot ../data/coupled_scalars_output --type conservation --quiet

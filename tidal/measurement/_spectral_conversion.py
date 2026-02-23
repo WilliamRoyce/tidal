@@ -98,8 +98,11 @@ def _field_spectral_energy_series(
     mom_all = data.momenta.get(field_name)
     mom_0 = mom_all[0] if mom_all is not None else None
     wavenumbers, e0 = compute_spectral_energy(
-        data.fields[field_name][0], mom_0, mass_squared,
-        data.grid_spacing, data.periodic,
+        data.fields[field_name][0],
+        mom_0,
+        mass_squared,
+        data.grid_spacing,
+        data.periodic,
     )
     n_modes = len(wavenumbers)
     energy = np.zeros((data.n_snapshots, n_modes), dtype=np.float64)
@@ -108,8 +111,11 @@ def _field_spectral_energy_series(
     for t_idx in range(1, data.n_snapshots):
         mom_t = mom_all[t_idx] if mom_all is not None else None
         _wn, e_t = compute_spectral_energy(
-            data.fields[field_name][t_idx], mom_t, mass_squared,
-            data.grid_spacing, data.periodic,
+            data.fields[field_name][t_idx],
+            mom_t,
+            mass_squared,
+            data.grid_spacing,
+            data.periodic,
         )
         energy[t_idx] = e_t
 
@@ -258,7 +264,9 @@ def compute_group_spectral_conversion(
         msg = f"Source and target groups overlap on: {sorted(overlap)}"
         raise ValueError(msg)
     if not tgt:
-        msg = "Target group is empty — no dynamical fields remain after excluding source"
+        msg = (
+            "Target group is empty — no dynamical fields remain after excluding source"
+        )
         raise ValueError(msg)
 
     # Sum spectral energies across group members
@@ -266,11 +274,15 @@ def compute_group_spectral_conversion(
         group: tuple[str, ...],
     ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         wn, total = _field_spectral_energy_series(
-            data, group[0], _resolve_mass_squared(data, names.index(group[0])),
+            data,
+            group[0],
+            _resolve_mass_squared(data, names.index(group[0])),
         )
         for f in group[1:]:
             _wn, e = _field_spectral_energy_series(
-                data, f, _resolve_mass_squared(data, names.index(f)),
+                data,
+                f,
+                _resolve_mass_squared(data, names.index(f)),
             )
             total += e
         return wn, total

@@ -1,12 +1,20 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Sphere Klein-Gordon 2+1D example (stereographic projection)
-# See also: sphere_kg_simulation.py (Python simulation)
+# Sphere Klein-Gordon 2+1D (stereographic projection) — Full pipeline
 #
-# NOTE: The derive step uses stereographic projection coordinates with
-# position-dependent metric.
-# The simulate step works fully via CLI (all periodic BCs, 2D Cartesian grid).
+# Physics: Klein-Gordon on S² via stereographic projection. Position-dependent
+# conformal factor Ω(r) = 2R²/(R² + r²) produces variable wave speed.
+# The metric is coordinate-dependent, exercising Christoffel auto-detection.
 #
-# To run manually:  cd examples/sphere_kg
+# Running this script:
+#   cd examples/sphere_kg && bash run.sh
+#
+# Or run each step manually:
+#   tidal derive theory.toml
+#   tidal inspect ../data/sphere_kg.json
+#   tidal simulate ../data/sphere_kg.json --param sphR=2.0 --param sphm2=0.0 \
+#     --grid-shape 128 --bounds=-8:8 --periodic --ic gaussian --ic-width 0.8 \
+#     --t-end 10.0 --output ../data/sphere_kg_output
+#   tidal plot ../data/sphere_kg_output --type amplitude --quiet
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -22,9 +30,15 @@ tidal inspect ../data/sphere_kg.json
 tidal simulate ../data/sphere_kg.json \
   --param sphR=2.0 --param sphm2=0.0 \
   --grid-shape 128 \
-  --bounds -8:8 \
+  --bounds=-8:8 \
   --periodic \
   --ic gaussian \
   --ic-width 0.8 \
   --t-end 10.0 \
-  --dt 0.005
+  --output ../data/sphere_kg_output
+
+# Visualize results (plots saved into the simulation output directory)
+tidal plot ../data/sphere_kg_output --type snapshot --time-index 0 --quiet
+tidal plot ../data/sphere_kg_output --type snapshot --time-index -1 --quiet
+tidal plot ../data/sphere_kg_output --type profile --cross-section y=0.0 --quiet
+tidal plot ../data/sphere_kg_output --type amplitude --quiet

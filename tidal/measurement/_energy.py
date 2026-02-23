@@ -24,7 +24,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -40,6 +40,15 @@ _ENERGY_FLOOR: float = 1e-12
 
 # Axis letter → numpy axis index (spatial axes only).
 _AXIS_MAP: dict[str, int] = {"x": 0, "y": 1, "z": 2}
+
+# Gradient operator → axis index.  Used by the integration-by-parts
+# Hamiltonian evaluation to convert gradient-product terms into the
+# equivalent second-order operators (laplacian / cross_derivative).
+_GRADIENT_AXES: dict[str, int] = {
+    "gradient_x": 0,
+    "gradient_y": 1,
+    "gradient_z": 2,
+}
 
 # Pattern for momentum field references: pi_0, pi_1, pi0, pi1, etc.
 _MOMENTUM_RE = re.compile(r"^pi_?(\d+)$")
@@ -116,26 +125,60 @@ def _pad_dirichlet(
     return np.pad(field, pad_width, mode="reflect", reflect_type="odd")
 
 
+def _pad_neumann(
+    field: NDArray[np.float64],
+    axis: int,
+) -> NDArray[np.float64]:
+    """Pad *field* with one symmetric ghost cell per side on *axis*.
+
+    For Neumann BCs (``∂field/∂n = 0`` at the boundary), the ghost cell
+    value equals the adjacent interior cell.  This is equivalent to
+    ``np.pad(..., mode='reflect', reflect_type='even')``.
+    """
+    pad_width = [(0, 0)] * field.ndim
+    pad_width[axis] = (1, 1)
+    return np.pad(field, pad_width, mode="reflect", reflect_type="even")
+
+
 def _first_derivative(
     field: NDArray[np.float64],
     axis: int,
     dx: float,
     *,
-    is_periodic: bool,
+    is_periodic: bool = False,
+    bc_type: str | None = None,
 ) -> NDArray[np.float64]:
     """Single-axis first derivative via central differences.
 
-    Uses ``np.roll`` for periodic wrapping, Dirichlet ghost cells for
+    Uses ``np.roll`` for periodic wrapping, ghost-cell padding for
     non-periodic axes.  Both paths use the same 2-point central stencil
     ``(f[i+1] - f[i-1]) / (2 dx)``, matching py-pde's finite-difference
     operators so the virial energy tracks the PDE solver's conserved
     Hamiltonian exactly.
-    """
-    if is_periodic:
-        return (np.roll(field, -1, axis=axis) - np.roll(field, 1, axis=axis)) / (2.0 * dx)
 
-    # Central difference with Dirichlet ghost cells: (f[i+1] - f[i-1]) / (2dx)
-    padded = _pad_dirichlet(field, axis)
+    Parameters
+    ----------
+    bc_type : str or None
+        Boundary condition type: ``"periodic"``, ``"neumann"``, or
+        ``"dirichlet"``.  When provided, overrides *is_periodic*.
+    is_periodic : bool
+        Legacy parameter — used only when *bc_type* is ``None``.
+    """
+    effective_bc = (
+        bc_type if bc_type is not None else ("periodic" if is_periodic else "dirichlet")
+    )
+
+    if effective_bc == "periodic":
+        return (np.roll(field, -1, axis=axis) - np.roll(field, 1, axis=axis)) / (
+            2.0 * dx
+        )
+
+    # Central difference with ghost cells: (f[i+1] - f[i-1]) / (2dx)
+    padded = (
+        _pad_neumann(field, axis)
+        if effective_bc == "neumann"
+        else _pad_dirichlet(field, axis)
+    )
     slc_plus: list[slice] = [slice(None)] * field.ndim
     slc_minus: list[slice] = [slice(None)] * field.ndim
     slc_plus[axis] = slice(2, None)
@@ -148,25 +191,40 @@ def _second_derivative(
     axis: int,
     dx: float,
     *,
-    is_periodic: bool,
+    is_periodic: bool = False,
+    bc_type: str | None = None,
 ) -> NDArray[np.float64]:
     """Single-axis second derivative via 3-point central stencil.
 
-    Uses ``np.roll`` for periodic wrapping, Dirichlet ghost cells for
+    Uses ``np.roll`` for periodic wrapping, ghost-cell padding for
     non-periodic axes.  Both paths use ``(f[i+1] - 2f[i] + f[i-1]) / dx²``,
     matching py-pde's finite-difference operators so the virial energy
     tracks the PDE solver's conserved Hamiltonian exactly.
+
+    Parameters
+    ----------
+    bc_type : str or None
+        Boundary condition type: ``"periodic"``, ``"neumann"``, or
+        ``"dirichlet"``.  When provided, overrides *is_periodic*.
+    is_periodic : bool
+        Legacy parameter — used only when *bc_type* is ``None``.
     """
-    if is_periodic:
+    effective_bc = (
+        bc_type if bc_type is not None else ("periodic" if is_periodic else "dirichlet")
+    )
+
+    if effective_bc == "periodic":
         return (
-            np.roll(field, -1, axis=axis)
-            - 2.0 * field
-            + np.roll(field, 1, axis=axis)
+            np.roll(field, -1, axis=axis) - 2.0 * field + np.roll(field, 1, axis=axis)
         ) / (dx * dx)
 
-    # Standard 3-point stencil with Dirichlet ghost cells:
+    # Standard 3-point stencil with ghost cells:
     # (f[i+1] - 2f[i] + f[i-1]) / dx²
-    padded = _pad_dirichlet(field, axis)
+    padded = (
+        _pad_neumann(field, axis)
+        if effective_bc == "neumann"
+        else _pad_dirichlet(field, axis)
+    )
     slc_center: list[slice] = [slice(None)] * field.ndim
     slc_plus: list[slice] = [slice(None)] * field.ndim
     slc_minus: list[slice] = [slice(None)] * field.ndim
@@ -206,7 +264,7 @@ def _self_gradient_axes(eq: ComponentEquation) -> list[int] | None:
         if term.operator == "laplacian":
             return None  # full laplacian → use all axes
         if term.operator.startswith("laplacian_"):
-            letter = term.operator[len("laplacian_"):]
+            letter = term.operator[len("laplacian_") :]
             if letter in _AXIS_MAP:
                 axes.add(_AXIS_MAP[letter])
     return sorted(axes)
@@ -222,6 +280,7 @@ def _gradient_energy_density(
     grid_spacing: tuple[float, ...],
     periodic: tuple[bool, ...],
     axes: list[int] | None = None,
+    bc_types: tuple[str, ...] | None = None,
 ) -> NDArray[np.float64]:
     """Gradient energy density consistent with the virial potential formula.
 
@@ -239,17 +298,25 @@ def _gradient_energy_density(
     axes : list[int] | None
         If ``None``, sum over all spatial axes (isotropic gradient).
         Otherwise, sum only over the specified axis indices.
+    bc_types : tuple[str, ...] | None
+        Per-axis BC type (``"periodic"``, ``"neumann"``, ``"dirichlet"``).
+        When ``None``, falls back to ``periodic`` booleans (legacy behavior).
     """
     result: NDArray[np.float64] = np.zeros_like(field)
     iter_axes = range(len(grid_spacing)) if axes is None else axes
     for axis in iter_axes:
         dx = grid_spacing[axis]
-        if periodic[axis]:
+        bc = (
+            bc_types[axis]
+            if bc_types is not None
+            else ("periodic" if periodic[axis] else "dirichlet")
+        )
+        if bc == "periodic":
             # Virial-consistent: -φ · ∂²φ/∂x² (exact discrete IBP)
-            result -= field * _second_derivative(field, axis, dx, is_periodic=True)
+            result -= field * _second_derivative(field, axis, dx, bc_type="periodic")
         else:
             # Gradient squared: (∂φ/∂x)² (correct for non-periodic BCs)
-            grad = _first_derivative(field, axis, dx, is_periodic=False)
+            grad = _first_derivative(field, axis, dx, bc_type=bc)
             result += grad**2
     return result
 
@@ -259,13 +326,30 @@ def _gradient_energy_density(
 # ------------------------------------------------------------------
 
 
+def _effective_bc(
+    axis: int,
+    periodic: tuple[bool, ...],
+    bc_types: tuple[str, ...] | None,
+) -> str:
+    """Resolve effective BC type for a single axis."""
+    if bc_types is not None:
+        return bc_types[axis]
+    return "periodic" if periodic[axis] else "dirichlet"
+
+
 def _apply_spatial_operator(
     operator: str,
     field: NDArray[np.float64],
     grid_spacing: tuple[float, ...],
     periodic: tuple[bool, ...],
+    bc_types: tuple[str, ...] | None = None,
 ) -> NDArray[np.float64]:
     """Apply a named spatial operator to a field array.
+
+    Parameters
+    ----------
+    bc_types : tuple[str, ...] | None
+        Per-axis BC type.  When ``None``, falls back to ``periodic`` booleans.
 
     Raises
     ------
@@ -277,33 +361,58 @@ def _apply_spatial_operator(
 
     # gradient_{x,y,z}
     if operator.startswith("gradient_"):
-        axis_letter = operator[len("gradient_"):]
+        axis_letter = operator[len("gradient_") :]
         if axis_letter in _AXIS_MAP:
             ax = _AXIS_MAP[axis_letter]
-            return _first_derivative(field, ax, grid_spacing[ax], is_periodic=periodic[ax])
+            return _first_derivative(
+                field,
+                ax,
+                grid_spacing[ax],
+                bc_type=_effective_bc(ax, periodic, bc_types),
+            )
 
     # laplacian_{x,y,z}
     if operator.startswith("laplacian_"):
-        axis_letter = operator[len("laplacian_"):]
+        axis_letter = operator[len("laplacian_") :]
         if axis_letter in _AXIS_MAP:
             ax = _AXIS_MAP[axis_letter]
-            return _second_derivative(field, ax, grid_spacing[ax], is_periodic=periodic[ax])
+            return _second_derivative(
+                field,
+                ax,
+                grid_spacing[ax],
+                bc_type=_effective_bc(ax, periodic, bc_types),
+            )
 
     # laplacian (isotropic sum)
     if operator == "laplacian":
         result: NDArray[np.float64] = np.zeros_like(field)
         for ax in range(len(grid_spacing)):
-            result += _second_derivative(field, ax, grid_spacing[ax], is_periodic=periodic[ax])
+            result += _second_derivative(
+                field,
+                ax,
+                grid_spacing[ax],
+                bc_type=_effective_bc(ax, periodic, bc_types),
+            )
         return result
 
     # cross_derivative_{xy,xz,yz}
     if operator.startswith("cross_derivative_"):
-        axes_str = operator[len("cross_derivative_"):]
+        axes_str = operator[len("cross_derivative_") :]
         if len(axes_str) == 2 and axes_str[0] in _AXIS_MAP and axes_str[1] in _AXIS_MAP:  # noqa: PLR2004
             ax0 = _AXIS_MAP[axes_str[0]]
             ax1 = _AXIS_MAP[axes_str[1]]
-            tmp = _first_derivative(field, ax0, grid_spacing[ax0], is_periodic=periodic[ax0])
-            return _first_derivative(tmp, ax1, grid_spacing[ax1], is_periodic=periodic[ax1])
+            tmp = _first_derivative(
+                field,
+                ax0,
+                grid_spacing[ax0],
+                bc_type=_effective_bc(ax0, periodic, bc_types),
+            )
+            return _first_derivative(
+                tmp,
+                ax1,
+                grid_spacing[ax1],
+                bc_type=_effective_bc(ax1, periodic, bc_types),
+            )
 
     msg = f"Unknown spatial operator for energy measurement: '{operator}'"
     raise ValueError(msg)
@@ -463,6 +572,7 @@ def compute_field_energy(  # noqa: PLR0913
     periodic: tuple[bool, ...],
     *,
     gradient_axes: list[int] | None = None,
+    bc_types: tuple[str, ...] | None = None,
 ) -> FieldEnergy:
     """Compute canonical energy density for a single field at one snapshot.
 
@@ -485,6 +595,8 @@ def compute_field_energy(  # noqa: PLR0913
         Spatial axes to include in gradient energy.  ``None`` uses all
         axes (isotropic gradient).  Pass a subset for operator-aware
         gradient (e.g. ``[1]`` when the PDE has only ``laplacian_y``).
+    bc_types : tuple[str, ...] | None
+        Per-axis BC type.  When ``None``, falls back to ``periodic``.
 
     Returns
     -------
@@ -501,14 +613,22 @@ def compute_field_energy(  # noqa: PLR0913
         kinetic = 0.0
 
     # Gradient energy density: 0.5 * ⟨|∇φ|²⟩ (over specified axes)
-    grad_sq = _gradient_energy_density(field_data, grid_spacing, periodic, axes=gradient_axes)
+    grad_sq = _gradient_energy_density(
+        field_data,
+        grid_spacing,
+        periodic,
+        axes=gradient_axes,
+        bc_types=bc_types,
+    )
     gradient = 0.5 * float(grad_sq.mean())
 
     # Mass energy density: 0.5 * ⟨m² φ²⟩ (m² may be scalar or ndarray)
     mass_energy = 0.5 * float((mass_squared * field_data**2).mean())
 
     total = kinetic + gradient + mass_energy
-    return FieldEnergy(kinetic=kinetic, gradient=gradient, mass=mass_energy, total=total)
+    return FieldEnergy(
+        kinetic=kinetic, gradient=gradient, mass=mass_energy, total=total
+    )
 
 
 # ------------------------------------------------------------------
@@ -546,7 +666,11 @@ def _resolve_mass_squared(
     eq = data.spec.equations[field_idx]
     field_name = eq.field_name
     for term in eq.rhs_terms:
-        if term.operator == "identity" and term.field == field_name and term.position_dependent:
+        if (
+            term.operator == "identity"
+            and term.field == field_name
+            and term.position_dependent
+        ):
             sym = term.coefficient_symbolic
             if sym is None:
                 return float(term.coefficient)
@@ -555,7 +679,9 @@ def _resolve_mass_squared(
             from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
 
             coeff = evaluate_coefficient(
-                sym, data.parameters, data.spec.effective_coordinates,
+                sym,
+                data.parameters,
+                data.spec.effective_coordinates,
                 coord_arrays=coord_arrays,
             )
             # Convention: mass_matrix[i][i] = -(coefficient of identity(field_i))
@@ -563,7 +689,11 @@ def _resolve_mass_squared(
                 return -coeff
             return -float(coeff)
 
-    sym_row = data.spec.mass_matrix_symbolic[field_idx] if data.spec.mass_matrix_symbolic else ()
+    sym_row = (
+        data.spec.mass_matrix_symbolic[field_idx]
+        if data.spec.mass_matrix_symbolic
+        else ()
+    )
     if field_idx < len(sym_row):
         sym_val = sym_row[field_idx]
         if sym_val is not None:
@@ -595,9 +725,7 @@ def _compute_virial_potential(
     # Build coordinate arrays once (lazy, only if needed)
     coord_arrays: dict[str, NDArray[np.float64]] | None = None
     has_posdep = any(
-        term.position_dependent
-        for eq in data.spec.equations
-        for term in eq.rhs_terms
+        term.position_dependent for eq in data.spec.equations for term in eq.rhs_terms
     )
     if has_posdep:
         coord_arrays = _build_coord_arrays(data)
@@ -623,7 +751,11 @@ def _compute_virial_potential(
 
             coeff = _resolve_coefficient_on_grid(term, data, coord_arrays or {})
             operated = _apply_spatial_operator(
-                term.operator, target, data.grid_spacing, data.periodic,
+                term.operator,
+                target,
+                data.grid_spacing,
+                data.periodic,
+                bc_types=data.bc_types,
             )
             # coeff may be scalar or ndarray — numpy handles both
             potential += float((coeff * phi_i * operated).mean())
@@ -654,7 +786,12 @@ def _compute_constraint_self_energy(
         c_field = data.fields[name][t_idx]
 
         # Gradient: -½ ⟨|∇C|²⟩  (NEGATIVE)
-        grad_sq = _gradient_energy_density(c_field, data.grid_spacing, data.periodic)
+        grad_sq = _gradient_energy_density(
+            c_field,
+            data.grid_spacing,
+            data.periodic,
+            bc_types=data.bc_types,
+        )
         energy -= 0.5 * float(grad_sq.mean())
 
         # Mass: -½ ⟨m² C²⟩  (NEGATIVE, m² may be scalar or ndarray)
@@ -708,7 +845,10 @@ def _compute_constraint_coupling_energy(
         coord_arrays = _build_coord_arrays(data)
 
     return _accumulate_cross_constraint_terms(
-        data, t_idx, constraint_names, coord_arrays,
+        data,
+        t_idx,
+        constraint_names,
+        coord_arrays,
     )
 
 
@@ -738,11 +878,232 @@ def _accumulate_cross_constraint_terms(
 
             coeff = _resolve_coefficient_on_grid(term, data, coord_arrays or {})
             operated = _apply_spatial_operator(
-                term.operator, target, data.grid_spacing, data.periodic,
+                term.operator,
+                target,
+                data.grid_spacing,
+                data.periodic,
+                bc_types=data.bc_types,
             )
             energy += 0.5 * float((coeff * c_i * operated).mean())
 
     return energy
+
+
+def _evaluate_hamiltonian_factor(
+    factor_field: str,
+    factor_operator: str,
+    data: SimulationData,
+    t_idx: int,
+) -> NDArray[np.float64] | None:
+    """Evaluate a single Hamiltonian factor on the grid.
+
+    For ``time_derivative`` operator, reconstructs the velocity from
+    ``canonical.field_rates`` (Hamilton's 1st equation).  This is critical
+    for gauge theories (Proca, Chern-Simons) where the canonical momentum
+    differs from the velocity: π_i ≠ ∂_t q_i.  For scalars where π = ∂_t q,
+    the field_rates reduce to ``[identity(pi)]`` and the result equals the
+    stored momentum.
+
+    For spatial operators, applies the operator to the field data.
+    For ``identity``, returns the field data directly.
+
+    Returns None if the factor cannot be evaluated (e.g., zero-momentum
+    constraint field for time_derivative).
+    """
+    if factor_operator == "time_derivative":
+        # Reconstruct velocity: ∂_t q = Σ field_rate_terms
+        # For scalars: vel = pi (no change).
+        # For Proca: vel = pi + gradient_x(A_0), etc.
+        canonical = data.spec.canonical
+        if canonical is not None and factor_field in canonical.field_rates:
+            params = _merge_parameters(data)
+            shape = cast(
+                "tuple[int, ...]", next(iter(data.fields.values()))[t_idx].shape
+            )
+            result = cast("NDArray[np.float64]", np.zeros(shape, dtype=np.float64))
+            for term in canonical.field_rates[factor_field]:
+                target = _resolve_term_target(data, term.field, t_idx)
+                if target is None:
+                    continue
+                coeff = _resolve_term_coefficient(term, params)
+                if term.operator == "identity":
+                    result += coeff * target
+                else:
+                    result += coeff * _apply_spatial_operator(
+                        term.operator,
+                        target,
+                        data.grid_spacing,
+                        data.periodic,
+                        bc_types=data.bc_types,
+                    )
+            return result
+        # Fallback for specs without field_rates (legacy).
+        # For multi-field systems pi != velocity when K != I, so warn.
+        mom = data.momenta.get(factor_field)
+        if mom is not None:
+            if data.spec.n_components > 1:
+                import warnings  # noqa: PLC0415
+
+                warnings.warn(
+                    f"No field_rates for '{factor_field}'; using raw "
+                    f"momentum as velocity. For systems with non-diagonal "
+                    f"kinetic matrix (K != I), this gives incorrect energy. "
+                    f"Regenerate JSON with current pipeline ('tidal derive').",
+                    UserWarning,
+                    stacklevel=2,
+                )
+            return mom[t_idx]
+        return None
+
+    # Get the field data
+    field_arr = _resolve_term_target(data, factor_field, t_idx)
+    if field_arr is None:
+        return None
+
+    if factor_operator == "identity":
+        return field_arr
+
+    # Apply spatial operator
+    return _apply_spatial_operator(
+        factor_operator,
+        field_arr,
+        data.grid_spacing,
+        data.periodic,
+        bc_types=data.bc_types,
+    )
+
+
+def _gradient_pair_to_second_order(op_a: str, op_b: str) -> str:
+    """Map a pair of gradient operators to the equivalent 2nd-order operator.
+
+    Uses integration-by-parts identity (exact for periodic BCs):
+    ``⟨∂_a u, ∂_b v⟩ = -⟨u, ∂²_ab v⟩`` where ``∂²_ab`` is laplacian
+    (same axis) or cross_derivative (different axes).
+    """
+    ax_a = _GRADIENT_AXES[op_a]
+    ax_b = _GRADIENT_AXES[op_b]
+    if ax_a == ax_b:
+        return f"laplacian_{'xyz'[ax_a]}"
+    lo, hi = sorted([ax_a, ax_b])
+    return f"cross_derivative_{'xyz'[lo]}{'xyz'[hi]}"
+
+
+def _merge_parameters(data: SimulationData) -> dict[str, float]:
+    """Merge spec metadata parameters with runtime parameters.
+
+    Spec metadata provides defaults (from theory.toml); runtime parameters
+    (from ``--param`` CLI flags) override them.
+    """
+    import contextlib  # noqa: PLC0415
+
+    raw_meta = data.spec.metadata.get("parameters", {})
+    params: dict[str, float] = {}
+    if isinstance(raw_meta, dict):
+        for k, v in raw_meta.items():  # type: ignore[union-attr]
+            with contextlib.suppress(ValueError, TypeError):
+                params[str(k)] = float(v)  # type: ignore[arg-type]
+    params.update(data.parameters)
+    return params
+
+
+def _compute_hamiltonian_from_canonical(
+    data: SimulationData,
+    t_idx: int,
+) -> float:
+    """Evaluate the symbolic Hamiltonian from canonical structure.
+
+    For spatial gradient terms, uses **integration by parts** to convert
+    gradient products into second-order operators::
+
+        coeff * ⟨∂_a(u) · ∂_b(v)⟩  →  -coeff * ⟨u, ∂²_ab(v)⟩
+
+    This ensures the measured Hamiltonian uses the **same** finite-difference
+    stencils as the solver (3-point laplacian, cascaded-gradient cross
+    derivative), making it exactly the conserved quantity of the discrete
+    system.  Without IBP, the central-difference gradient squared (5-point
+    "wide" stencil) differs from the solver's 3-point laplacian by O(dx²),
+    producing spurious time-varying energy drift.
+
+    Parameters
+    ----------
+    data : SimulationData
+    t_idx : int
+        Snapshot index.
+
+    Returns
+    -------
+    float
+        Spatially-averaged Hamiltonian energy density.
+
+    Raises
+    ------
+    ValueError
+        If ``data.spec.canonical`` is None.
+    """
+    canonical = data.spec.canonical
+    if canonical is None:
+        msg = "_compute_hamiltonian_from_canonical called without canonical structure"
+        raise ValueError(msg)
+
+    from tidal.symbolic.json_loader import (  # noqa: PLC0415
+        _resolve_symbolic_coeff,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    params = _merge_parameters(data)
+
+    total = 0.0
+    for term in canonical.hamiltonian_terms:
+        coeff = float(term.coefficient)
+        # Resolve symbolic coefficient if present
+        if term.coefficient_symbolic is not None and params:
+            resolved = _resolve_symbolic_coeff(
+                term.coefficient_symbolic,
+                params,
+            )
+            if resolved is not None:
+                coeff = float(resolved)
+
+        op_a = term.factor_a.operator
+        op_b = term.factor_b.operator
+
+        # Integration-by-parts path: both factors are spatial gradients.
+        # ⟨∂_a(u) · ∂_b(v)⟩ = -⟨u, ∂²_ab(v)⟩  (exact for periodic BCs)
+        # Uses the SAME 2nd-order stencils as the solver → exact conservation.
+        if op_a in _GRADIENT_AXES and op_b in _GRADIENT_AXES:
+            field_a = _resolve_term_target(data, term.factor_a.field, t_idx)
+            field_b = _resolve_term_target(data, term.factor_b.field, t_idx)
+            if field_a is None or field_b is None:
+                continue
+            second_op = _gradient_pair_to_second_order(op_a, op_b)
+            operated = _apply_spatial_operator(
+                second_op,
+                field_b,
+                data.grid_spacing,
+                data.periodic,
+                bc_types=data.bc_types,
+            )
+            total += -coeff * float((field_a * operated).mean())
+            continue
+
+        # All other terms: identity, time_derivative, mixed
+        fa = _evaluate_hamiltonian_factor(
+            term.factor_a.field,
+            term.factor_a.operator,
+            data,
+            t_idx,
+        )
+        fb = _evaluate_hamiltonian_factor(
+            term.factor_b.field,
+            term.factor_b.operator,
+            data,
+            t_idx,
+        )
+        if fa is None or fb is None:
+            continue
+
+        total += coeff * float((fa * fb).mean())
+
+    return total
 
 
 def compute_system_energy(  # noqa: PLR0914
@@ -751,14 +1112,9 @@ def compute_system_energy(  # noqa: PLR0914
 ) -> SystemEnergy:
     """Compute Hamiltonian energy density at snapshot *t_idx*.
 
-    Returns spatially-averaged energy density ⟨ε⟩ = H / V_domain, using:
-
-        ⟨ε⟩ = ½ Σ ⟨π_sim²⟩ + ⟨v_virial⟩ + ⟨v_constraint_self⟩ + ⟨v_cross⟩
-
-    where ⟨v_virial⟩ is from dynamical equations' spatial RHS terms
-    (Euler's theorem for quadratic functionals), ⟨v_constraint_self⟩ accounts
-    for temporal gauge components' negative self-energy, and ⟨v_cross⟩
-    captures identity coupling between constraint fields (e.g. gcoup*G*A_0*B_0).
+    When the spec includes canonical structure (from ``tidal derive``),
+    evaluates the Legendre-transform Hamiltonian directly from structured
+    quadratic terms. Otherwise, falls back to the virial-based formula.
 
     Parameters
     ----------
@@ -807,27 +1163,29 @@ def compute_system_energy(  # noqa: PLR0914
         m2 = _resolve_mass_squared(data, field_idx, coord_arrays=coord_arrays)
         axes = _self_gradient_axes(eq)
         per_field[name] = compute_field_energy(
-            field_snapshot, mom_arr, m2, data.grid_spacing, data.periodic,
+            field_snapshot,
+            mom_arr,
+            m2,
+            data.grid_spacing,
+            data.periodic,
             gradient_axes=axes,
+            bc_types=data.bc_types,
         )
 
-    # Virial potential from dynamical fields' spatial RHS terms
+    # Use canonical Hamiltonian when available (Phase K: Legendre transform)
+    if data.spec.canonical is not None:
+        total = _compute_hamiltonian_from_canonical(data, t_idx)
+        self_sum = sum(fe.total for fe in per_field.values())
+        interaction = total - self_sum
+        return SystemEnergy(per_field=per_field, interaction=interaction, total=total)
+
+    # Fallback: virial-based formula for legacy specs without canonical structure.
     v_virial = _compute_virial_potential(data, t_idx)
-
-    # Constraint field self-energy (negative, from g^{00} = -1)
     v_constraint = _compute_constraint_self_energy(data, t_idx)
-
-    # Cross-constraint coupling (e.g. gcoup*G*A_0*B_0 between two constraints)
     v_constraint_cross = _compute_constraint_coupling_energy(data, t_idx)
-
-    # Total potential = virial + constraint self + constraint cross
     v_total = v_virial + v_constraint + v_constraint_cross
-
-    # Interaction = total potential minus per-field self-potentials
     self_potential = sum(fe.gradient + fe.mass for fe in per_field.values())
     interaction = v_total - self_potential
-
-    # Total energy = kinetic + total potential
     total_kinetic = sum(fe.kinetic for fe in per_field.values())
     total = total_kinetic + v_total
 

@@ -72,6 +72,18 @@ rank-0 -> {{}}, rank-1 -> {{0},{1},...}, symmetric rank-2 -> upper triangle, \
 non-symmetric rank-2 -> all pairs. For rank >= 3, returns all tuples (symmetry \
 reduction not yet implemented for rank 3+).";
 
+DecomposeScalarExpression::usage =
+  "DecomposeScalarExpression[expr, chart, allFieldHeads, opts] converts a scalar \
+tensor expression (e.g., a Hamiltonian density) to component form using the same \
+pipeline as DecomposeToComponents. allFieldHeads is a list of ALL tensor field \
+heads that appear in the expression (primary + additional + background). \
+The result is a single scalar expression in Derivative[...][field][coords] form. \
+Options: \"ComputeChristoffels\" -> Automatic, \"MetricMatrix\" -> None.";
+
+ValidateNoUnresolvedBackgrounds::usage =
+  "ValidateNoUnresolvedBackgrounds[expr, bgHeads] checks that no abstract background \
+field symbols remain unresolved in the component expression.";
+
 (* Error messages *)
 DecomposeToComponents::badopt =
   "Invalid value for option \"ComputeChristoffels\": `1`. Expected Automatic, True, or False.";
@@ -535,6 +547,104 @@ ReplaceHigherRankFieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module
 
   result
 ];
+
+
+(* === Scalar Expression Decomposition (Phase K: Canonical Momentum) === *)
+(*
+  DecomposeScalarExpression: converts a scalar tensor expression (like the
+  Hamiltonian density H) to component form. Uses the same pipeline as
+  the scalar case in DecomposeToComponents:
+    1. ToBasis → TraceBasisDummy → EvaluateChristoffelComponents
+    2. EvaluateEpsilonComponents → Evaluate metric
+    3. ReplaceTensorFieldComponents → ConvertCDToDerivatives
+
+  Unlike DecomposeToComponents (which takes a tensor EOM + field to determine
+  which components to extract), this function takes a scalar expression and
+  returns a single component-form expression.
+
+  allFieldHeads: ALL tensor field heads appearing in the expression.
+  This includes primary fields, additional (cross-coupled) fields,
+  and background fields.  All must be passed so that
+  ReplaceTensorFieldComponents converts them to coordinate functions.
+*)
+
+DecomposeScalarExpression[expr_, chart_, allFieldHeads_List] :=
+  DecomposeScalarExpression[expr, chart, allFieldHeads,
+    "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None];
+
+DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern[DecomposeToComponents]] := Module[
+  {componentExpr, metricMatrix, computeChristoffelsOption, shouldComputeChristoffels,
+   coords, dim, coordSyms},
+
+  metricMatrix = OptionValue[DecomposeToComponents, {opts}, "MetricMatrix"];
+  computeChristoffelsOption = OptionValue[DecomposeToComponents, {opts}, "ComputeChristoffels"];
+
+  coords = GetCoordinateSymbols[chart];
+  dim = GetChartDimension[chart];
+  coordSyms = coords;
+
+  (* Auto-detect whether Christoffel computation is needed *)
+  shouldComputeChristoffels = Which[
+    computeChristoffelsOption === True, True,
+    computeChristoffelsOption === False, False,
+    computeChristoffelsOption === Automatic,
+      If[metricMatrix === None, False, IsNonConstantMetric[metricMatrix, coords]],
+    True, False
+  ];
+
+  componentExpr = expr;
+
+  (* For curved spacetime: expand Christoffel symbols to metric derivatives *)
+  If[shouldComputeChristoffels && metricMatrix =!= None,
+    Module[{covdOps, covdOp},
+      covdOps = Cases[componentExpr, (f_)[_][_] /; CovDQ[f] :> f, {0, Infinity}] // DeleteDuplicates;
+      If[Length[covdOps] > 0,
+        covdOp = covdOps[[1]];
+        componentExpr = ExpandChristoffelsToMetricDerivatives[componentExpr, covdOp, chart]
+      ]
+    ]
+  ];
+
+  (* Convert to chart basis *)
+  componentExpr = ToBasis[chart][componentExpr];
+  componentExpr = TraceBasisDummy[componentExpr];
+
+  (* Evaluate Christoffel symbols (0 for flat spacetime) *)
+  If[!shouldComputeChristoffels,
+    componentExpr = EvaluateChristoffelComponents[componentExpr, chart, False]
+  ];
+  componentExpr = Expand[componentExpr];
+
+  (* Evaluate epsilon tensor components *)
+  componentExpr = EvaluateEpsilonComponents[componentExpr, chart];
+  componentExpr = Expand[componentExpr];
+
+  (* Evaluate metric components *)
+  If[metricMatrix =!= None,
+    componentExpr = EvaluateMetricComponents[componentExpr, chart, metricMatrix],
+    componentExpr = EvaluateMinkowskiMetric[componentExpr, chart]
+  ];
+  componentExpr = Expand[componentExpr];
+
+  (* For curved spacetime: evaluate partial derivatives of metric *)
+  If[metricMatrix =!= None,
+    componentExpr = EvaluatePDMetric[componentExpr, chart, metricMatrix];
+    componentExpr = Expand[componentExpr]
+  ];
+
+  (* Replace ALL tensor fields with named scalar component functions *)
+  Do[
+    componentExpr = ReplaceTensorFieldComponents[componentExpr, afh, chart, coordSyms, dim],
+    {afh, allFieldHeads}
+  ];
+
+  (* Convert coordinate derivatives to Derivative form *)
+  componentExpr = ConvertCDToDerivatives[componentExpr, chart];
+  componentExpr = Expand[componentExpr];
+
+  componentExpr
+];
+
 
 End[];
 EndPackage[];

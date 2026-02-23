@@ -40,7 +40,12 @@ def _plot_conversion(ax: Axes, results: dict[str, Any]) -> None:
 
     ax.plot(conv_result.times, conv_result.probability, "b-", linewidth=1.5)
     peak_idx = int(np.argmax(conv_result.probability))
-    ax.plot(conv_result.times[peak_idx], conv_result.probability[peak_idx], "ro", markersize=6)
+    ax.plot(
+        conv_result.times[peak_idx],
+        conv_result.probability[peak_idx],
+        "ro",
+        markersize=6,
+    )
     ax.set_ylim(bottom=0)
     src, tgt = ", ".join(conv["source"]), ", ".join(conv["target"])
     ax.set_ylabel(rf"$P(t) = E_{{\mathrm{{{tgt}}}}} / E_{{\mathrm{{{src}}}}}(0)$")
@@ -50,8 +55,12 @@ def _plot_conversion(ax: Axes, results: dict[str, Any]) -> None:
         ax.annotate(
             f"$L_{{mix}}$ = {mix['mixing_length']:.2f}"
             f" $\\pm$ {mix['mixing_length_uncertainty']:.2f}",
-            xy=(0.95, 0.95), xycoords="axes fraction", ha="right", va="top",
-            fontsize=9, color="green",
+            xy=(0.95, 0.95),
+            xycoords="axes fraction",
+            ha="right",
+            va="top",
+            fontsize=9,
+            color="green",
             bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8},
         )
 
@@ -66,7 +75,9 @@ def _plot_energy(ax: Axes, results: dict[str, Any]) -> None:
     times = eng["times"]
     for name, series in eng["per_field"].items():
         ax.plot(times, series, label=name, linewidth=1.2)
-    ax.plot(times, eng["interaction"], "--", label="interaction", linewidth=1.0, alpha=0.7)
+    ax.plot(
+        times, eng["interaction"], "--", label="interaction", linewidth=1.0, alpha=0.7
+    )
     ax.plot(times, eng["total"], "k-", label="total", linewidth=1.0, alpha=0.5)
     ax.legend(fontsize=7, ncol=2)
 
@@ -89,7 +100,10 @@ def _plot_conservation(ax: Axes, results: dict[str, Any]) -> None:
     if "conservation" in results and "error" not in results["conservation"]:
         threshold = results["conservation"]["threshold"]
         ax.axhline(
-            threshold, color="r", linestyle="--", alpha=0.5,
+            threshold,
+            color="r",
+            linestyle="--",
+            alpha=0.5,
             label=f"threshold ({threshold:.0e})",
         )
         ax.axhline(-threshold, color="r", linestyle="--", alpha=0.5)
@@ -104,12 +118,17 @@ def _plot_spectrum(ax: Axes, results: dict[str, Any]) -> None:
 
     for name, snap in results["spectrum"].items():
         ax.semilogy(
-            snap["initial"]["wavenumbers"], snap["initial"]["power"],
-            label=f"{name}(t=0)", alpha=0.7,
+            snap["initial"]["wavenumbers"],
+            snap["initial"]["power"],
+            label=f"{name}(t=0)",
+            alpha=0.7,
         )
         ax.semilogy(
-            snap["final"]["wavenumbers"], snap["final"]["power"],
-            "--", label=f"{name}(t=final)", alpha=0.7,
+            snap["final"]["wavenumbers"],
+            snap["final"]["power"],
+            "--",
+            label=f"{name}(t=final)",
+            alpha=0.7,
         )
     ax.legend(fontsize=7)
 
@@ -118,10 +137,16 @@ def _plot_spectral_conversion(ax: Axes, results: dict[str, Any]) -> None:
     """[1,0] Per-mode spectral conversion P(k,t) heatmap."""
     import numpy as np
 
-    if "spectral_conversion" not in results or "error" in results["spectral_conversion"]:
+    if (
+        "spectral_conversion" not in results
+        or "error" in results["spectral_conversion"]
+    ):
         ax.text(
-            0.5, 0.5, "No spectral conversion data",
-            transform=ax.transAxes, ha="center",
+            0.5,
+            0.5,
+            "No spectral conversion data",
+            transform=ax.transAxes,
+            ha="center",
         )
         return
 
@@ -129,8 +154,12 @@ def _plot_spectral_conversion(ax: Axes, results: dict[str, Any]) -> None:
     result = sc.get("_result_obj")
     if result is None:
         ax.text(
-            0.5, 0.5, "Spectral conversion data\n(detail not available)",
-            transform=ax.transAxes, ha="center", va="center",
+            0.5,
+            0.5,
+            "Spectral conversion data\n(detail not available)",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
         )
         return
 
@@ -146,7 +175,9 @@ def _plot_spectral_conversion(ax: Axes, results: dict[str, Any]) -> None:
         return
 
     mesh = ax.pcolormesh(
-        wn, times, prob,
+        wn,
+        times,
+        prob,
         shading="nearest",
         cmap="inferno",
     )
@@ -173,8 +204,11 @@ def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:  # noqa: C901
 
     if "dispersion" not in results or "error" in results["dispersion"]:
         ax.text(
-            0.5, 0.5, "No dispersion data",
-            transform=ax.transAxes, ha="center",
+            0.5,
+            0.5,
+            "No dispersion data",
+            transform=ax.transAxes,
+            ha="center",
         )
         return
 
@@ -182,8 +216,12 @@ def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:  # noqa: C901
     result = disp.get("_result_obj")
     if result is None:
         ax.text(
-            0.5, 0.5, "Dispersion data\n(detail not available)",
-            transform=ax.transAxes, ha="center", va="center",
+            0.5,
+            0.5,
+            "Dispersion data\n(detail not available)",
+            transform=ax.transAxes,
+            ha="center",
+            va="center",
         )
         return
 
@@ -200,10 +238,13 @@ def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:  # noqa: C901
     log_max = float(log_power.max())
 
     mesh = ax.pcolormesh(
-        wn, freqs, log_power.T,
+        wn,
+        freqs,
+        log_power.T,
         shading="nearest",
         cmap="viridis",
-        vmin=log_max - 20, vmax=log_max,
+        vmin=log_max - 20,
+        vmax=log_max,
     )
     ax.figure.colorbar(mesh, ax=ax, label=r"$\log_{10} S(k, \omega)$", pad=0.02)  # pyright: ignore[reportOptionalMemberAccess]
 
@@ -211,15 +252,21 @@ def _plot_dispersion(ax: Axes, results: dict[str, Any]) -> None:  # noqa: C901
     active = result.peak_frequencies > 0.0
     if np.any(active):
         ax.plot(
-            wn[active], result.peak_frequencies[active],
-            "w--", linewidth=1.5, alpha=0.9, label=r"$\omega(k)$ peak",
+            wn[active],
+            result.peak_frequencies[active],
+            "w--",
+            linewidth=1.5,
+            alpha=0.9,
+            label=r"$\omega(k)$ peak",
         )
         ax.legend(fontsize=8, loc="upper left")
 
     # Data-driven axis cropping
     # k-axis: match spectral conversion's active_modes range when available
     sc_obj = None
-    if "spectral_conversion" in results and "error" not in results.get("spectral_conversion", {}):
+    if "spectral_conversion" in results and "error" not in results.get(
+        "spectral_conversion", {}
+    ):
         sc_obj = results["spectral_conversion"].get("_result_obj")
     if sc_obj is not None and np.any(sc_obj.active_modes):
         ax.set_xlim(0, float(sc_obj.wavenumbers[sc_obj.active_modes].max()) * 1.15)
@@ -267,7 +314,10 @@ def _plot_mixing_spectrum(ax: Axes, results: dict[str, Any]) -> None:
 
     ax.semilogy(spectrum.frequencies, spectrum.power, "b-", linewidth=0.5, alpha=0.7)
     ax.axvline(
-        spectrum.dominant_frequency, color="red", linestyle="--", alpha=0.7,
+        spectrum.dominant_frequency,
+        color="red",
+        linestyle="--",
+        alpha=0.7,
         label=rf"$\omega_{{\mathrm{{dom}}}}$ = {spectrum.dominant_frequency:.2f}",
     )
     x_max = min(10 * spectrum.dominant_frequency, spectrum.frequencies[-1])
@@ -287,33 +337,43 @@ def _plot_summary_text(ax: Axes, data: SimulationData, results: dict[str, Any]) 
 
     if "conservation" in results and "error" not in results["conservation"]:
         cons = results["conservation"]
-        lines.extend([
-            f"Conservation: {'PASS' if cons['is_conserved'] else 'FAIL'}",
-            f"  max |dE/E| = {cons['max_relative_error']:.2e}",
-            "",
-        ])
+        lines.extend(
+            [
+                f"Conservation: {'PASS' if cons['is_conserved'] else 'FAIL'}",
+                f"  max |dE/E| = {cons['max_relative_error']:.2e}",
+                "",
+            ]
+        )
 
     if "conversion" in results and "error" not in results["conversion"]:
         conv = results["conversion"]
-        lines.extend([
-            f"Peak P(t) = {conv['peak_probability']:.6f}",
-            f"  at t = {conv['peak_time']:.2f}",
-            "",
-        ])
+        lines.extend(
+            [
+                f"Peak P(t) = {conv['peak_probability']:.6f}",
+                f"  at t = {conv['peak_time']:.2f}",
+                "",
+            ]
+        )
 
     if "mixing" in results and "error" not in results["mixing"]:
         mix = results["mixing"]
-        lines.extend([
-            f"L_mix = {mix['mixing_length']:.4f}",
-            f"  +/- {mix['mixing_length_uncertainty']:.4f}",
-            f"omega_dom = {mix['dominant_frequency']:.4f}",
-            "",
-        ])
+        lines.extend(
+            [
+                f"L_mix = {mix['mixing_length']:.4f}",
+                f"  +/- {mix['mixing_length_uncertainty']:.4f}",
+                f"omega_dom = {mix['dominant_frequency']:.4f}",
+                "",
+            ]
+        )
 
     ax.text(
-        0.05, 0.95, "\n".join(lines),
-        transform=ax.transAxes, fontsize=10,
-        verticalalignment="top", fontfamily="monospace",
+        0.05,
+        0.95,
+        "\n".join(lines),
+        transform=ax.transAxes,
+        fontsize=10,
+        verticalalignment="top",
+        fontfamily="monospace",
     )
     ax.axis("off")
 
@@ -350,7 +410,9 @@ def save_measurement_plot(
     # Row 1 — priority: dispersion > spectral_conversion > spectrum
     if "dispersion" in results and "error" not in results.get("dispersion", {}):
         _plot_dispersion(axes[1, 0], results)
-    elif "spectral_conversion" in results and "error" not in results.get("spectral_conversion", {}):
+    elif "spectral_conversion" in results and "error" not in results.get(
+        "spectral_conversion", {}
+    ):
         _plot_spectral_conversion(axes[1, 0], results)
     else:
         _plot_spectrum(axes[1, 0], results)

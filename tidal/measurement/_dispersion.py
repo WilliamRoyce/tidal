@@ -106,9 +106,9 @@ def _spacetime_fft(
     n_snapshots = field_snapshots.shape[0]
 
     # Spatial rfftn per snapshot -> complex coefficients
-    spatial_fft = np.stack([
-        np.fft.rfftn(field_snapshots[t]) for t in range(n_snapshots)
-    ])
+    spatial_fft = np.stack(
+        [np.fft.rfftn(field_snapshots[t]) for t in range(n_snapshots)]
+    )
 
     # Temporal fft (complex input -> must use fft, not rfft).
     # Keep only strictly positive frequencies (skip DC and negative Nyquist).
@@ -119,7 +119,8 @@ def _spacetime_fft(
     # Angular frequencies for the positive temporal bins
     raw_t_freqs = np.fft.fftfreq(n_snapshots, d=dt)
     angular_freqs = np.asarray(
-        2.0 * np.pi * raw_t_freqs[1:n_pos], dtype=np.float64,
+        2.0 * np.pi * raw_t_freqs[1:n_pos],
+        dtype=np.float64,
     )
 
     return angular_freqs, spatial_fft, spacetime_power
@@ -132,7 +133,9 @@ def _bin_and_detect(  # noqa: PLR0913, PLR0917
     grid_shape: tuple[int, ...],
     grid_spacing: tuple[float, ...],
     min_amplitude: float,
-) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]]:
+) -> tuple[
+    NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]
+]:
     """Radially bin S(k, omega) and detect peaks.
 
     Returns (wavenumbers, power, peak_frequencies, peak_powers).
@@ -147,12 +150,14 @@ def _bin_and_detect(  # noqa: PLR0913, PLR0917
 
     for fi in range(n_freq):
         _, binned = _radial_bin(k_mag, spacetime_power[fi], grid_spacing, grid_shape)
-        power[:len(binned), fi] = binned
+        power[: len(binned), fi] = binned
 
     # Max spatial amplitude per k-bin for activity detection
     max_amp = np.zeros(n_modes, dtype=np.float64)
     for t in range(spatial_fft.shape[0]):
-        _, binned_amp = _radial_bin(k_mag, np.abs(spatial_fft[t]), grid_spacing, grid_shape)
+        _, binned_amp = _radial_bin(
+            k_mag, np.abs(spatial_fft[t]), grid_spacing, grid_shape
+        )
         max_amp = np.maximum(max_amp, binned_amp[:n_modes])
 
     # Peak detection per k-bin
@@ -227,8 +232,12 @@ def compute_dispersion(
 
     angular_freqs, spatial_fft, spacetime_power = _spacetime_fft(field_snapshots, dt)
     wn, power, peak_freqs, peak_pow = _bin_and_detect(
-        angular_freqs, spatial_fft, spacetime_power,
-        field_snapshots.shape[1:], data.grid_spacing, min_amplitude,
+        angular_freqs,
+        spatial_fft,
+        spacetime_power,
+        field_snapshots.shape[1:],
+        data.grid_spacing,
+        min_amplitude,
     )
 
     return DispersionResult(

@@ -76,7 +76,11 @@ def _field_energy_series(
         mom_all = data.momenta.get(field_name)
         mom_arr = mom_all[t_idx] if mom_all is not None else None
         fe = compute_field_energy(
-            field_arr, mom_arr, mass_squared, data.grid_spacing, data.periodic,
+            field_arr,
+            mom_arr,
+            mass_squared,
+            data.grid_spacing,
+            data.periodic,
         )
         energies.append(fe.total)
     return np.array(energies, dtype=np.float64)
@@ -124,10 +128,14 @@ def compute_conversion_probability(
         raise ValueError(msg)
 
     source_arr = _field_energy_series(
-        data, source_field, _resolve_mass_squared(data, names.index(source_field)),
+        data,
+        source_field,
+        _resolve_mass_squared(data, names.index(source_field)),
     )
     target_arr = _field_energy_series(
-        data, target_field, _resolve_mass_squared(data, names.index(target_field)),
+        data,
+        target_field,
+        _resolve_mass_squared(data, names.index(target_field)),
     )
     total_arr = source_arr + target_arr
 
@@ -141,7 +149,11 @@ def compute_conversion_probability(
 
     probability = target_arr / e_source_0
     e_total_0 = total_arr[0]
-    relative_error = (total_arr - e_total_0) / e_total_0 if e_total_0 >= _ENERGY_FLOOR else np.zeros_like(total_arr)
+    relative_error = (
+        (total_arr - e_total_0) / e_total_0
+        if e_total_0 >= _ENERGY_FLOOR
+        else np.zeros_like(total_arr)
+    )
 
     return ConversionResult(
         times=data.times.copy(),
@@ -163,7 +175,9 @@ def _group_energy_series(
     names = data.spec.component_names
     total: NDArray[np.float64] = np.zeros(data.n_snapshots, dtype=np.float64)
     for f in field_group:
-        total += _field_energy_series(data, f, _resolve_mass_squared(data, names.index(f)))
+        total += _field_energy_series(
+            data, f, _resolve_mass_squared(data, names.index(f))
+        )
     return total
 
 
@@ -224,7 +238,9 @@ def compute_group_conversion(
         msg = f"Source and target groups overlap on: {sorted(overlap)}"
         raise ValueError(msg)
     if not tgt:
-        msg = "Target group is empty — no dynamical fields remain after excluding source"
+        msg = (
+            "Target group is empty — no dynamical fields remain after excluding source"
+        )
         raise ValueError(msg)
 
     # Sum energies across group members

@@ -1,8 +1,20 @@
 #!/usr/bin/env bash
-# CLI equivalents for the Klein-Gordon 3+1D example
-# See also: kg_3d_simulation.py (Python simulation)
+# Klein-Gordon 3+1D — Full derive → inspect → simulate pipeline
 #
-# To run manually:  cd examples/scalar_field_3d && tidal derive theory.toml
+# Physics: Massive Klein-Gordon scalar field in 3+1D flat spacetime.
+# ∂²φ/∂t² = ∇²φ - m²φ with 3D isotropic Gaussian initial condition.
+#
+# NOTE: 3D data — tidal plot is for 1D/2D only.
+#
+# Running this script:
+#   cd examples/scalar_field_3d && bash run.sh
+#
+# Or run each step manually:
+#   tidal derive theory.toml
+#   tidal inspect ../data/klein_gordon_3d.json
+#   tidal simulate ../data/klein_gordon_3d.json --param m2=1.0 \
+#     --grid-shape 32 --bounds 0:20 --periodic --ic gaussian \
+#     --ic-width 2.0 --t-end 8.0
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -21,5 +33,4 @@ tidal simulate ../data/klein_gordon_3d.json \
   --periodic \
   --ic gaussian \
   --ic-width 2.0 \
-  --t-end 8.0 \
-  --dt 0.05
+  --t-end 8.0
