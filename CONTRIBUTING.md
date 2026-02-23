@@ -26,7 +26,7 @@ This project follows a standard code of conduct:
 
 ### Prerequisites
 
-- Python 3.11 (required for Numba compatibility)
+- Python 3.11 (required for `tomllib` stdlib + tested configuration)
 - [uv](https://github.com/astral-sh/uv) package manager
 - Git
 - A GitHub account
@@ -63,7 +63,7 @@ uv run pre-commit install
 ### 3. Verify Setup
 
 ```bash
-# Run tests (900+ Python tests)
+# Run tests (915 Python tests)
 uv run pytest
 
 # Run linter
@@ -437,36 +437,50 @@ Understanding the codebase:
 
 ```
 tidal/                   # TIDAL project root
-├── tidal/    # Main package
+├── tidal/               # Main package
 │   ├── symbolic/             # Lagrangian-to-PDE pipeline (Python side)
 │   │   ├── json_loader.py   # Load equations from JSON → EquationSystem
-│   │   ├── pde_builder.py   # Build PDEBase from spec → PDEFromSpec
+│   │   ├── _eval_utils.py   # Mathematica→Python expression conversion
 │   │   └── __init__.py
-│   ├── cli/                  # CLI (`tidal` command)
-│   │   ├── __main__.py      # Entry point (tidal derive/simulate/inspect/list/validate)
+│   ├── solver/               # PDE time-integration backends
+│   │   ├── ida.py           # SUNDIALS IDA (DAE solver)
+│   │   ├── cvode.py         # SUNDIALS CVODE (adaptive BDF ODE)
+│   │   ├── leapfrog.py      # Störmer-Verlet symplectic integrator
+│   │   ├── fields.py        # FieldSet typed container
+│   │   ├── coefficients.py  # CoefficientEvaluator (4-level cache)
+│   │   ├── rhs.py           # RHSEvaluator (operator+coefficient application)
+│   │   ├── operators.py     # Pure numpy spatial operators (FD stencils)
+│   │   ├── grid.py          # GridInfo minimal grid dataclass
+│   │   ├── state.py         # StateLayout (field→slice mapping)
+│   │   ├── validation.py    # SpecValidator (CFL, mass sign, dimensions)
+│   │   └── constraint_solve.py  # Three-tier constraint pre-solve
+│   ├── cli/                  # CLI (`tidal` command, 7 subcommands)
+│   │   ├── __init__.py      # Entry point + argument parsing
 │   │   ├── _derive.py       # tidal derive: TOML → .wls → wolframscript
 │   │   ├── _simulate.py     # tidal simulate: JSON → PDE → solve → plot
+│   │   ├── _measure.py      # tidal measure: post-hoc analysis
 │   │   ├── _inspect.py      # tidal inspect: display equation system info
 │   │   ├── _list.py         # tidal list: discover available JSON specs
 │   │   ├── _validate.py     # tidal validate: JSON spec validation
-│   │   └── _plot.py         # Plotting utilities for simulate
+│   │   ├── _plot.py         # Plotting utilities for simulate
+│   │   └── _plot_command.py # tidal plot: standalone plotting
 │   ├── wolfram/              # Mathematica/xAct pipeline modules
 │   │   ├── EulerLagrange.wl
 │   │   ├── ComponentDecompose.wl
 │   │   ├── ExportJSON.wl
+│   │   ├── GaugeFix.wl
 │   │   ├── CommonUtilities.wl
 │   │   └── ...
-│   ├── measurement/          # Post-hoc analysis (energy, conversion, spectra)
-│   └── utils.py              # Shared utilities
-├── tests/                    # Test suite (900+ Python tests)
+│   └── measurement/          # Post-hoc analysis (energy, conversion, spectra)
+├── tests/                    # Test suite (915 Python tests)
 │   ├── conftest.py          # Shared fixtures
 │   ├── test_cli.py          # CLI integration tests
-│   ├── test_cli_parsing.py  # CLI argument parsing tests
-│   ├── test_scalar_vector_physics.py  # Physics stress tests
+│   ├── test_solver_ida.py   # IDA solver tests
+│   ├── test_solver_leapfrog.py  # Leapfrog tests
 │   └── test_*.py            # Other test modules
-├── examples/                 # 20 pipeline examples
-│   ├── data/                # Generated JSON specifications (20 files)
-│   └── {example}/           # Each has theory.toml, run.sh; most have simulation.py
+├── examples/                 # 22 pipeline examples
+│   ├── data/                # Generated JSON specifications (24 files)
+│   └── {example}/           # Each has theory.toml, run.sh
 ├── docs/                     # Documentation
 │   └── source/              # Sphinx source files
 └── pyproject.toml           # Project configuration

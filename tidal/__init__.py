@@ -1,7 +1,8 @@
 """TIDAL: Tensor Integration and Derivation for Any Lagrangian.
 
 A symbolic physics pipeline for deriving PDEs from Lagrangians using
-xAct/Mathematica and simulating them with py-pde.
+xAct/Mathematica and simulating them with native solvers (SUNDIALS
+IDA/CVODE, leapfrog, scipy) and numpy spatial operators.
 
 This package provides:
 - `symbolic`: Lagrangian-to-PDE pipeline (symbolic computation layer)

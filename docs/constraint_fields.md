@@ -14,9 +14,9 @@ orders on the LHS:
 
 | `time_derivative_order` | Type                 | Mathematical character             | Solver treatment                         |
 | ----------------------- | -------------------- | ---------------------------------- | ---------------------------------------- |
-| 2                       | **Dynamical** (wave) | Hyperbolic: `∂²_t φ = RHS`         | ODE-integrated (Runge-Kutta / DOP853)    |
+| 2                       | **Dynamical** (wave) | Hyperbolic: `∂²_t φ = RHS`         | ODE-integrated (CVODE / IDA / scipy)     |
 | 1                       | **First-order**      | Parabolic/advective: `∂_t φ = RHS` | ODE-integrated                           |
-| 0                       | **Constraint**       | Elliptic: `0 = RHS`                | Solved at each instant (FFT / iterative) |
+| 0                       | **Constraint**       | Elliptic: `0 = RHS`                | Algebraic in IDA; pre-solved (FFT / sparse) |
 
 Constraint fields are **not** integrated forward in time. They are determined
 by an elliptic equation at each instant, given the current state of the
@@ -99,35 +99,36 @@ equations can reference them. The state layout for coupled Proca
 (`A_0, A_1, π_1, A_2, π_2, B_0, B_1, π_4, B_2, π_5`) includes both
 constraint fields (`A_0`, `B_0`) and dynamical fields with their momenta.
 
-### Evolution Rate
+### Solver Treatment
 
-At each `evolution_rate(state, t)` call (`pde_builder.py`):
+**With IDA (DAE solver — default for systems with constraints):**
 
-1. **Pass 1a — Constraint solve:** `_evolve_constraints()` solves the elliptic
-   equations for all constraint fields, updating their values in-place.
-   It then computes `∂_t(constraint_field)` analytically (see below).
-2. **Pass 1b — First-order momenta:** `_evolve_first_order()` computes virtual
-   momenta for `time_derivative_order = 1` fields.
-3. **Pass 2 — Rates:** `_evolve_second_order()` builds the full rate vector.
-   For constraint fields, the rate is zero (the integrator should not modify
-   them — the constraint solver handles that).
+Constraint equations are treated as algebraic equations within the DAE
+system. IDA's Newton iteration simultaneously solves for all field values
+(dynamical + constraint) at each timestep. The constraint pre-solve module
+(`tidal/solver/constraint_solve.py`) ensures consistent initial conditions
+before IDA starts. See `tidal/solver/ida.py` for the residual construction.
 
-### The ODE rate for constraint fields is zero
-
-```python
-# pde_builder.py, _evolve_second_order():
-if eq.time_derivative_order >= 2:
-    rates[field_slot] = momentum.copy()
-    rates[momentum_slot] = compute_rhs(...)
-elif eq.time_derivative_order == 1:
-    rates[field_slot] = virtual_momenta[field_name]
-else:
-    rates[field_slot] = ScalarField(grid, data=0.0)  # constraint
+**Residual structure:** For constraint fields, the IDA residual is:
+```
+F_i = RHS_i(state)   (algebraic: no time derivative on LHS)
+```
+For dynamical fields:
+```
+F_i = yp_i - RHS_i(state)   (differential: yp = dy/dt)
 ```
 
-The zero rate tells the ODE integrator "don't change this field." The
-constraint solver overrides the field value at the start of the next
-`evolution_rate()` call.
+**Constraint pre-solve** (`tidal/solver/constraint_solve.py`): Three-tier
+solver runs before IDA to find constraint field values consistent with the
+initial dynamical field state:
+1. **Tier 1 (FFT)** — periodic BCs, constant coefficients (O(N log N))
+2. **Tier 2 (Sparse probe)** — non-periodic BCs or variable coefficients (O(N²) build, O(N) solve)
+3. **Automatic selection** — `_select_method()` chooses the fastest applicable tier
+
+**Gauge regularisation** for singular Poisson with periodic BCs: the zero
+Fourier mode is pinned (`u_hat[0,...,0] = 0`) to fix the gauge freedom.
+This is numerical regularisation, not physics gauge fixing — observables
+depend on derivatives of the constraint field, not its absolute value.
 
 ---
 

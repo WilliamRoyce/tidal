@@ -3,7 +3,7 @@
 This document outlines the planned improvements and features for the TIDAL symbolic physics pipeline project.
 
 **Last Updated:** February 2026
-**Project Status:** Phase 13+ Complete, CLI + measurement module done (980+ Python tests + ~115 Wolfram tests)
+**Project Status:** Phase 13+ Complete, CLI + measurement + solver migration done (915 Python tests + ~115 Wolfram tests)
 
 ## Overview
 
@@ -87,7 +87,7 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 | Issue                                               | Priority    | Type          | Status             |
 | --------------------------------------------------- | ----------- | ------------- | ------------------ |
 | [#70] Support Rank-3+ Tensor Decomposition          | 🔴 Critical | Feature       | ✅ Done (Phase 13) |
-| [#TBD] Implement Automatic Gauge Fixing             | 🔴 Critical | Feature       | Remaining          |
+| [#TBD] Implement Automatic Gauge Fixing             | 🔴 Critical | Feature       | ✅ Done (Phase B)  |
 | [#79] Handle Mixed Time-Space Cross-Derivatives     | 🟡 Medium   | Bug           | ✅ Done            |
 | [#TBD] Expand \_mathematica_to_python Function Set  | 🟡 Medium   | Feature       | ✅ Done            |
 | [#TBD] Add Non-Cartesian Coordinate System Examples | 🟡 Medium   | Documentation | ✅ Done            |
@@ -103,7 +103,6 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 **Remaining:**
 
-- Automatic gauge fixing (Lorenz/Coulomb in Wolfram layer)
 - Wolfram tests in GitHub Actions CI
 
 ---
@@ -135,7 +134,7 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 | Feature                                                                                     | Status      |
 | ------------------------------------------------------------------------------------------- | ----------- |
-| CLI (`tidal` command) — 6 subcommands (derive, inspect, simulate, measure, list, validate)  | ✅ Complete |
+| CLI (`tidal` command) — 7 subcommands (derive, inspect, simulate, measure, list, validate, plot) | ✅ Complete |
 | Measurement module — energy, conversion P(t), mixing, spectral, dispersion, disk-backed I/O | ✅ Complete |
 | `theory.toml` configuration with `[[derived_fields]]`                                       | ✅ Complete |
 | Scalar-vector coupling stress test (mixed-rank cross-field)                                 | ✅ Complete |
@@ -196,17 +195,21 @@ Issues should be tagged with appropriate labels:
 
 ## Current Focus
 
-**As of v0.3.1:**
+**As of v0.4.0:**
 
 - ✅ Phase 13+ completed: All core pipeline features implemented
-- ✅ CLI (`tidal` command) implemented: 6 subcommands, zero new dependencies
+- ✅ Solver migration: SUNDIALS IDA/CVODE + leapfrog + scipy replaces py-pde
+- ✅ Adaptive time-stepping: tolerance-controlled integration (Phase F)
+- ✅ Background fields: position-dependent coefficients (Phase A)
+- ✅ Gauge fixing: optional per-field Lorenz/de Donder/Coulomb/temporal/axial (Phase B)
+- ✅ Constraint pre-solve: FFT/sparse three-tier solver (Phase J)
+- ✅ CLI (`tidal` command) implemented: 7 subcommands, zero new dependencies
 - ✅ Measurement module: energy, conversion P(t), mixing, spectral, dispersion, disk-backed I/O
-- ✅ 18 working examples spanning 1+1D through 3+1D
-- ✅ 980+ Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
-- ✅ Project renamed to TIDAL with professional branding (logo, Makefile, community docs)
-- ✅ 17 of 25 original issues resolved (68%)
-- 🔄 **Primary remaining focus:** Phase 2 (Testing & CI) — animation tests, codecov, Wolfram CI
-- 🔄 **Secondary:** Automatic gauge fixing (#6), architecture diagrams (#17), pipeline CI (#18)
+- ✅ 22 working examples spanning 1+1D through 3+1D
+- ✅ 915 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
+- ✅ 19 of 25 original issues resolved (76%)
+- 🔄 **Primary remaining focus:** Phase D (Gertsenshtein example — the project's raison d'être)
+- 🔄 **Secondary:** Phase C (parameter sweeps & convergence), Phase 2 (Wolfram CI)
 
 ---
 
@@ -214,29 +217,26 @@ Issues should be tagged with appropriate labels:
 
 ### Long-Term Goals
 
-1. **Full General Relativity Support**
-   - Riemann curvature tensor (rank 4)
-   - Einstein field equations
-   - Black hole spacetime examples
+1. **Gertsenshtein Effect (Phase D)**
+   - Coupled EM-gravity simulation from a single `theory.toml`
+   - Validation against analytical thin-magnet formula (Domcke & Garcia-Cely 2023)
+   - Automated analytic benchmark tests
 
-2. **Non-Abelian Gauge Theories**
-   - Yang-Mills equations
+2. **Linearized General Relativity Extensions**
+   - Linearized gravity already works (10-component, gauge-unfixed and gauge-fixed)
+   - Extend to Poincaré gauge theory (torsion modes, propagating degrees of freedom)
+   - Parameter window scanning for viable mode configurations
+
+3. **Non-Abelian Gauge Theories**
+   - Yang-Mills equations (linearized sector)
    - SU(2) and SU(3) gauge groups
-   - Automatic gauge fixing for non-Abelian theories
 
-3. **Quantum Field Theory Features**
-   - Renormalization group equations
-   - Loop corrections automation
-   - Feynman diagram generation
-
-4. **Interactive Visualization**
-   - Real-time parameter adjustment
-   - Web-based simulation viewer
-   - Interactive 3D visualization
+4. **Spectral Spatial Discretisation (Phase E)**
+   - FFT-based operators for exponential convergence on periodic domains
+   - Chebyshev for non-periodic directions (following Dedalus architecture)
 
 5. **Performance Scaling**
    - GPU acceleration for large grids
-   - Distributed computing support
    - Adaptive mesh refinement
 
 ---
@@ -268,9 +268,9 @@ This project follows [Semantic Versioning](https://semver.org/):
 - **MINOR** (0.X.0): New features (3+1D examples, JSON schema extensions)
 - **PATCH** (0.0.X): Bug fixes, documentation improvements
 
-**Current Version:** 0.3.1
-**Previous Milestones:** 0.3.0 delivered Phase 3 + CLI + rename to TIDAL
-**Next Major Release (1.0.0):** Phase 2 completion (test coverage, Wolfram CI) + gauge automation
+**Current Version:** 0.4.0
+**Previous Milestones:** 0.3.0 delivered Phase 3 + CLI + rename to TIDAL; 0.4.0 delivered solver migration + gauge fixing + background fields + adaptive timestepping + constraint pre-solve
+**Next Major Release (1.0.0):** Phase D (Gertsenshtein example) + Phase C (convergence analysis) + Wolfram CI
 
 ---
 

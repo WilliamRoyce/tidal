@@ -2,12 +2,12 @@
 
 **Created:** February 2026
 **Last Updated:** February 2026
-**Status:** Phases A, B, J complete; Phases C–I planned
-**Version:** 0.4.0 | **Tests:** 957+ collected | **Examples:** 22 working (1+1D to 3+1D)
+**Status:** Phases A, B, F, J complete; Phases C–E, G–I planned
+**Version:** 0.4.0 | **Tests:** 915 collected | **Examples:** 22 working (1+1D to 3+1D)
 
 ## Context
 
-TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → PDE simulation (py-pde) → measurement/analysis. With 22 working examples spanning 1+1D to 3+1D, a full CLI (`tidal derive|simulate|measure|inspect|list|validate`), and a comprehensive measurement module (energy, conversion P(t), dispersion, mixing, spectral), the project is mature and ready for its next major advances.
+TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) → measurement/analysis. With 22 working examples spanning 1+1D to 3+1D, a full CLI (`tidal derive|simulate|measure|inspect|list|validate|plot`), and a comprehensive measurement module (energy, conversion P(t), dispersion, mixing, spectral), the project is mature and ready for its next major advances.
 
 The project's core research motivation is the **Gertsenshtein effect** (electromagnetic ↔ gravitational wave conversion in external magnetic fields). The project operates exclusively in the **linearised regime** — all Lagrangians are quadratic, producing linear PDEs. The phases below are ordered by their impact toward enabling realistic Gertsenshtein simulations, while also broadening TIDAL's general utility as a linearised field theory simulation framework.
 
@@ -213,7 +213,7 @@ This is the integration example that combines Phase A (and optionally Phase B) i
 
 ### What and Why
 
-TIDAL currently uses py-pde's 2nd-order finite-difference spatial discretisation. For wave propagation (the core use case), spectral methods (FFT-based) offer exponential convergence for smooth solutions on periodic domains. The Dedalus framework (Burns et al. 2020) demonstrates that spectral methods are the natural foundation for PDE solvers targeting wave physics.
+TIDAL currently uses 2nd-order finite-difference spatial discretisation (native numpy operators in `tidal/solver/operators.py`). For wave propagation (the core use case), spectral methods (FFT-based) offer exponential convergence for smooth solutions on periodic domains. The Dedalus framework (Burns et al. 2020) demonstrates that spectral methods are the natural foundation for PDE solvers targeting wave physics.
 
 ### What It Enables
 
@@ -239,32 +239,28 @@ TIDAL currently uses py-pde's 2nd-order finite-difference spatial discretisation
 
 ---
 
-## Phase F: Adaptive Time-Stepping and Efficiency
+## Phase F: Adaptive Time-Stepping and Efficiency ✓
 
 **Priority: MEDIUM — required for production-quality long-duration runs**
-**Status:** Planned
+**Status:** Complete
 
-### What and Why
+Tolerance-controlled adaptive time-stepping via SUNDIALS CVODE (BDF) and IDA (DAE) replaces manual `dt` selection with error-controlled solvers (Hindmarsh et al. 2005). Users specify accuracy targets via `--rtol`/`--atol` instead of guessing a stable `dt`. This eliminates the fundamental fragility of fixed-step integration: a `dt` that satisfies CFL for one parameter set can be unstable for another, producing plausible but incorrect output. Berlin et al. (2024, arXiv:2405.08865) document these numerical challenges for resonant mixing simulations.
 
-The Gertsenshtein conversion timescale can be vastly different from the wave oscillation timescale. Fixed-step integration either wastes time on the fast scale or under-resolves the slow scale. The existing `--scheme scipy` wraps `solve_ivp` but doesn't expose tolerance controls or method choices.
+**Key deliverables (all complete):**
 
-### What It Enables
+- Four solver paths: **CVODE** (adaptive BDF ODE), **IDA** (implicit DAE), **scipy** (`solve_ivp` with DOP853/Radau/BDF), **leapfrog** (Störmer-Verlet symplectic)
+- CLI: `--scheme cvode|ida|scipy|leapfrog`, `--rtol`, `--atol`
+- Automatic solver selection: systems with algebraic constraints → IDA; pure wave equations → CVODE or leapfrog
+- Snapshot interpolation for non-uniform timesteps from adaptive solvers
+- Smart CFL estimation for leapfrog; tolerance control for CVODE/IDA
+- Sparse Jacobian computation for IDA to prevent out-of-memory on large systems
 
-- Efficient long-duration simulations with scale separation
-- Stiff system support (large m²)
-- Event-based stopping (e.g., stop when P exceeds a threshold)
-- Publication-quality accuracy control
+See `docs/adaptive_timestepping.md` for the full architecture documentation.
 
-### Implementation Details
+### References
 
-1. **CLI**: `--rtol 1e-8 --atol 1e-10 --method DOP853`
-2. **Event detection**: Stop on P > threshold or energy conservation failure
-3. **Snapshot interpolation**: Uniform-time resampling for FFT-based measurements
-4. **Implicit methods**: BDF/Radau for stiff systems
-
-### Scope: Small-Medium (~2–4 days)
-
-### Dependencies: None
+- Hindmarsh et al. (2005), "SUNDIALS: Suite of Nonlinear and Differential/Algebraic Equation Solvers", ACM TOMS 31(3)
+- Hairer, Lubich & Wanner (2006), _Geometric Numerical Integration_, Springer, 2nd ed.
 
 ---
 
@@ -425,28 +421,27 @@ When a DAE system has algebraic constraints (time_order=0 fields like A_0 in ele
 
 ```
 Phase A (Background Fields)      ─── COMPLETE
-Phase D (Gertsenshtein Example)  ─── Requires A; B optional for cleaner equations
 Phase B (Gauge Fixing, optional) ─── COMPLETE
-Phase C (Sweep & Convergence)    ─── Independent, high priority
-Phase F (Adaptive Time-Stepping) ─── Independent, quick win
-Phase G (Absorbing Boundaries)   ─── Independent, uses Phase A infrastructure
+Phase F (Adaptive Time-Stepping) ─── COMPLETE
 Phase J (Constraint Pre-Solve)   ─── COMPLETE
+Phase D (Gertsenshtein Example)  ─── Requires A; B optional for cleaner equations
+Phase C (Sweep & Convergence)    ─── Independent, high priority
+Phase G (Absorbing Boundaries)   ─── Independent, uses Phase A infrastructure
 Phase H (HDF5/XDMF Output)      ─── Independent, interoperability
 Phase I (Eigenvalue/Dispersion)  ─── Independent, analysis capability
 Phase E (Spectral Methods)       ─── Independent, large scope
 ```
 
-**Critical path to Gertsenshtein:** A (done), B (done) → D (~3–5 days)
+**Critical path to Gertsenshtein:** A (done), B (done), F (done) → D (~3–5 days)
 
 **Recommended order for maximum impact:**
 
-1. **D** (Gertsenshtein Example) — the project's raison d'être, unblocked by A+B
+1. **D** (Gertsenshtein Example) — the project's raison d'être, unblocked by A+B+F
 2. **C** (Sweep & Convergence) — required for publication-quality validation of D
 3. **G** (Absorbing Boundaries) — extends D to realistic finite-magnet geometries
-4. **F** (Adaptive Time-Stepping) — quick win for production runs
-5. **I** (Eigenvalue/Dispersion) — analysis tool for parameter exploration
-6. **H** (HDF5/XDMF Output) — interoperability with standard tools
-7. **E** (Spectral Methods) — large scope, significant accuracy payoff
+4. **I** (Eigenvalue/Dispersion) — analysis tool for parameter exploration
+5. **H** (HDF5/XDMF Output) — interoperability with standard tools
+6. **E** (Spectral Methods) — large scope, significant accuracy payoff
 
 ---
 

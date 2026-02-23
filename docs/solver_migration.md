@@ -6,7 +6,7 @@ Replace TIDAL's py-pde numerical backend with SUNDIALS/IDA (via scikit-sundae)
 for native DAE support, eliminating the need for bolted-on constraint solvers,
 symbolic K^{-1} inversion, and manual Hamiltonian splitting.
 
-**Status**: Implementation in progress.
+**Status**: Implementation complete (February 2026). IDA, CVODE, leapfrog, and scipy backends all operational. State management (`FieldSet`, `StateLayout`), spatial operators, and grid infrastructure (`GridInfo`) fully implemented.
 
 ---
 
