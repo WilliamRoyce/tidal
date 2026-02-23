@@ -863,9 +863,21 @@ def _evaluate_hamiltonian_factor(
                         bc_types=data.bc_types,
                     )
             return result
-        # Fallback for specs without field_rates (legacy)
+        # Fallback for specs without field_rates (legacy).
+        # For multi-field systems pi != velocity when K != I, so warn.
         mom = data.momenta.get(factor_field)
         if mom is not None:
+            if data.spec.n_components > 1:
+                import warnings  # noqa: PLC0415
+
+                warnings.warn(
+                    f"No field_rates for '{factor_field}'; using raw "
+                    f"momentum as velocity. For systems with non-diagonal "
+                    f"kinetic matrix (K != I), this gives incorrect energy. "
+                    f"Regenerate JSON with current pipeline ('tidal derive').",
+                    UserWarning,
+                    stacklevel=2,
+                )
             return mom[t_idx]
         return None
 

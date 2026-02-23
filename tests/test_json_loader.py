@@ -10,6 +10,8 @@ import pytest
 from tidal.symbolic.json_loader import (
     ComponentEquation,
     EquationSystem,
+    KineticMatrix,
+    KineticMatrixEntry,
     LHSStructure,
     OperatorTerm,
     _resolve_symbolic_coeff,
@@ -1802,3 +1804,120 @@ class TestBoundaryConditionToSideBc:
             )
         assert bc.gamma == 2.0  # stored but irrelevant
         assert "gamma" in caplog.text
+
+
+# === KineticMatrixEntry coordinate/time dependence ===
+
+
+class TestKineticMatrixEntry:
+    """Test KineticMatrixEntry coordinate_dependent / time_dependent fields."""
+
+    def test_from_dict_defaults(self) -> None:
+        """Entries without coord/time fields get correct defaults."""
+        entry = KineticMatrixEntry.from_dict(
+            {"i": 0, "j": 1, "value": 0.5, "symbolic": "kappa/2"}
+        )
+        assert entry.coordinate_dependent == ()
+        assert entry.time_dependent is False
+        assert entry.position_dependent is False
+
+    def test_from_dict_position_dependent(self) -> None:
+        """Position-dependent entry parses correctly."""
+        entry = KineticMatrixEntry.from_dict(
+            {
+                "i": 0,
+                "j": 1,
+                "value": 0.5,
+                "symbolic": "B0(x)/2",
+                "coordinate_dependent": ["x"],
+            }
+        )
+        assert entry.coordinate_dependent == ("x",)
+        assert entry.time_dependent is False
+        assert entry.position_dependent is True
+
+    def test_from_dict_time_dependent(self) -> None:
+        """Time-dependent entry parses correctly."""
+        entry = KineticMatrixEntry.from_dict(
+            {
+                "i": 1,
+                "j": 1,
+                "value": 1.0,
+                "symbolic": "Omega(t)^2",
+                "time_dependent": True,
+                "coordinate_dependent": ["t"],
+            }
+        )
+        assert entry.time_dependent is True
+        # "t" alone is not a spatial coordinate
+        assert entry.position_dependent is False
+
+    def test_from_dict_space_and_time(self) -> None:
+        """Entry depending on both space and time."""
+        entry = KineticMatrixEntry.from_dict(
+            {
+                "i": 0,
+                "j": 0,
+                "value": 1.0,
+                "time_dependent": True,
+                "coordinate_dependent": ["t", "x", "y"],
+            }
+        )
+        assert entry.time_dependent is True
+        assert entry.position_dependent is True
+        assert entry.coordinate_dependent == ("t", "x", "y")
+
+
+class TestKineticMatrixProperties:
+    """Test KineticMatrix.has_position_dependent / has_time_dependent."""
+
+    def test_constant_matrix(self) -> None:
+        """All-constant K has no position/time dependence."""
+        km = KineticMatrix.from_dict(
+            {
+                "entries": [
+                    {"i": 0, "j": 0, "value": 1.0},
+                    {"i": 1, "j": 1, "value": 1.0},
+                ],
+                "dimension": 2,
+            }
+        )
+        assert km.has_position_dependent is False
+        assert km.has_time_dependent is False
+
+    def test_position_dependent_matrix(self) -> None:
+        """K with one position-dependent entry."""
+        km = KineticMatrix.from_dict(
+            {
+                "entries": [
+                    {"i": 0, "j": 0, "value": 1.0},
+                    {
+                        "i": 0,
+                        "j": 1,
+                        "value": 0.5,
+                        "symbolic": "B0(x)",
+                        "coordinate_dependent": ["x"],
+                    },
+                    {"i": 1, "j": 1, "value": 1.0},
+                ],
+                "dimension": 2,
+            }
+        )
+        assert km.has_position_dependent is True
+        assert km.has_time_dependent is False
+
+    def test_to_dense_constant(self) -> None:
+        """to_dense works for constant entries."""
+        km = KineticMatrix.from_dict(
+            {
+                "entries": [
+                    {"i": 0, "j": 0, "value": 1.0},
+                    {"i": 0, "j": 1, "value": 0.5},
+                    {"i": 1, "j": 0, "value": -0.5},
+                    {"i": 1, "j": 1, "value": 1.0},
+                ],
+                "dimension": 2,
+            }
+        )
+        dense = km.to_dense()
+        assert dense == [[1.0, 0.5], [-0.5, 1.0]]

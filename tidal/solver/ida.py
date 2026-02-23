@@ -89,6 +89,9 @@ class _ResidualCtx:
         self.fieldset: FieldSet | None = None
         # Legacy dict for kinetic/field_rates handlers that still use raw arrays
         self.fields: dict[str, np.ndarray] = {}
+        # Track which fallback warnings have been issued (fire once per field)
+        self._warned_field_rates: set[str] = set()
+        self._warned_identity_k: set[str] = set()
 
     def set_arrays(
         self,
@@ -348,7 +351,24 @@ class _ResidualCtx:
         self.res[s] = k_yp - (pi - s_i)
 
     def _handle_field_rates(self, s: slice, field_name: str) -> None:
-        """Fallback: use field_rates when K not available."""
+        """Fallback: use field_rates when K not available.
+
+        This path fires when the JSON spec has ``field_rates`` (old format
+        with K^{-1} embedded) but no ``kinetic_matrix``.  Results are
+        correct, but the spec should be regenerated with the current
+        pipeline to get the preferred ``kinetic_matrix`` format.
+        """
+        if field_name not in self._warned_field_rates:
+            self._warned_field_rates.add(field_name)
+            warnings.warn(
+                f"Using field_rates fallback for '{field_name}' because "
+                f"kinetic_matrix is missing from the JSON spec. This uses "
+                f"the old K^{{-1}} format. Regenerate JSON with current "
+                f"pipeline ('tidal derive') to use the preferred "
+                f"kinetic_matrix format.",
+                UserWarning,
+                stacklevel=2,
+            )
         canonical = self.spec.canonical
         assert canonical is not None
         rate = np.zeros(self.shape)
@@ -359,7 +379,27 @@ class _ResidualCtx:
         self.res[s] = self.yp[s] - rate.ravel()
 
     def _handle_identity_k(self, s: slice, field_name: str) -> None:
-        """Identity K: dq/dt = pi."""
+        """Identity K: dq/dt = pi.
+
+        This path fires when neither ``kinetic_matrix`` nor ``field_rates``
+        is available.  For single-field systems this is always correct
+        (K = 1).  For multi-field systems, K might be non-diagonal, and
+        assuming K = I would silently give wrong dynamics.
+        """
+        if field_name not in self._warned_identity_k:
+            self._warned_identity_k.add(field_name)
+            n_dyn = len(self.layout.dynamical_fields)
+            if n_dyn > 1:
+                warnings.warn(
+                    f"Multi-field system ({n_dyn} dynamical fields) "
+                    f"missing both kinetic_matrix and field_rates for "
+                    f"'{field_name}'; assuming K = I (identity). If the "
+                    f"kinetic matrix is non-diagonal, results will be "
+                    f"incorrect. Regenerate JSON with current pipeline "
+                    f"('tidal derive').",
+                    UserWarning,
+                    stacklevel=2,
+                )
         n = self.n
         mom_slot = self.layout.momentum_slot_map[field_name]
         pi = self.y[mom_slot * n : (mom_slot + 1) * n]

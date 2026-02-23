@@ -494,10 +494,10 @@ class KineticMatrixEntry:
     """Single entry of the kinetic matrix K_{ij}.
 
     The kinetic matrix K relates canonical momenta to velocities:
-    ``π_i = K_{ij} · dq_j/dt + S_i``  where S_i are spatial corrections.
+    ``pi_i = K_{ij} * dq_j/dt + S_i``  where S_i are spatial corrections.
 
-    IDA uses K directly in residual form: ``K_{ij} · dq_j/dt - (π_i - S_i) = 0``.
-    Leapfrog solves ``K · v = (π - S)`` via ``np.linalg.solve``.
+    IDA uses K directly in residual form: ``K_{ij} * dq_j/dt - (pi_i - S_i) = 0``.
+    Leapfrog solves ``K * v = (pi - S)`` via ``np.linalg.solve``.
 
     Attributes
     ----------
@@ -509,12 +509,25 @@ class KineticMatrixEntry:
         Numerical value of K_{ij} (evaluated with parameter defaults).
     symbolic : str | None
         Exact symbolic expression (Mathematica InputForm), or None if trivial.
+    time_dependent : bool
+        Whether the entry depends on time (e.g., time-varying metric).
+    coordinate_dependent : tuple[str, ...]
+        Coordinate names the entry depends on (e.g., ``("x",)`` for a
+        spatially varying background field).  Empty tuple for constant entries.
+        Follows the same convention as :class:`OperatorTerm`.
     """
 
     i: int
     j: int
     value: float
     symbolic: str | None = None
+    time_dependent: bool = False
+    coordinate_dependent: tuple[str, ...] = ()
+
+    @property
+    def position_dependent(self) -> bool:
+        """Whether the entry depends on spatial coordinates."""
+        return bool(set(self.coordinate_dependent) - {"t"})
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> KineticMatrixEntry:
@@ -524,6 +537,8 @@ class KineticMatrixEntry:
             j=int(data["j"]),
             value=float(data["value"]),
             symbolic=data.get("symbolic"),
+            time_dependent=bool(data.get("time_dependent", False)),
+            coordinate_dependent=tuple(data.get("coordinate_dependent", ())),
         )
 
 
@@ -550,8 +565,23 @@ class KineticMatrix:
             dimension=int(data["dimension"]),
         )
 
+    @property
+    def has_position_dependent(self) -> bool:
+        """Whether any entry depends on spatial coordinates."""
+        return any(e.position_dependent for e in self.entries)
+
+    @property
+    def has_time_dependent(self) -> bool:
+        """Whether any entry depends on time."""
+        return any(e.time_dependent for e in self.entries)
+
     def to_dense(self) -> list[list[float]]:
-        """Convert to dense NxN matrix (list of lists)."""
+        """Convert to dense NxN matrix (list of lists).
+
+        For constant (non-coordinate-dependent) entries only.  Position-
+        or time-dependent entries require grid evaluation via
+        :class:`~tidal.solver.coefficients.CoefficientEvaluator`.
+        """
         n = self.dimension
         matrix = [[0.0] * n for _ in range(n)]
         for e in self.entries:
