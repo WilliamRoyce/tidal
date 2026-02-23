@@ -186,7 +186,7 @@ def check_robin_stability(grid: GridInfo) -> list[str]:
 
     The ghost-cell formula denominator is ``gamma * dx + 2``.  When
     ``gamma * dx >= 2`` the mirror factor ``(2 - gamma*dx)/(gamma*dx + 2)``
-    becomes non-positive, which can destabilise the scheme.
+    becomes non-positive, which can destabilize the scheme.
 
     Returns a list of warning strings (empty if all clear).
     """

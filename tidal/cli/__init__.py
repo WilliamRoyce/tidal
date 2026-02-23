@@ -217,15 +217,47 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sim_parser.add_argument(
         "--scheme",
-        choices=["ida", "leapfrog", "auto"],
+        choices=["ida", "leapfrog", "cvode", "scipy", "auto"],
         default="auto",
         help=(
             "Solver scheme (default: auto). "
-            "'auto' selects leapfrog for wave/constraint systems, "
-            "ida for systems with dissipation (first_derivative_t) or "
-            "first-order equations. "
-            "'ida' uses SUNDIALS/IDA — handles all equation types. "
-            "'leapfrog' uses symplectic Störmer-Verlet (wave + constraint systems)."
+            "'auto' selects the best adaptive solver: cvode for wave systems, "
+            "ida for DAE/dissipative systems. "
+            "'cvode' uses SUNDIALS/CVODE — adaptive BDF/Adams for wave systems. "
+            "'ida' uses SUNDIALS/IDA — handles all equation types including constraints. "
+            "'scipy' uses scipy.integrate.solve_ivp — DOP853/RK45/Radau/BDF. "
+            "'leapfrog' uses symplectic Störmer-Verlet (fixed dt, zero energy drift)."
+        ),
+    )
+    sim_parser.add_argument(
+        "--rtol",
+        type=float,
+        default=1e-8,
+        help="Relative tolerance for adaptive solvers (default: 1e-8)",
+    )
+    sim_parser.add_argument(
+        "--atol",
+        type=float,
+        default=1e-10,
+        help="Absolute tolerance for adaptive solvers (default: 1e-10)",
+    )
+    sim_parser.add_argument(
+        "--method",
+        type=str,
+        default=None,
+        help=(
+            "Integration method (default: auto). "
+            "cvode: 'BDF' (default) or 'Adams'. "
+            "scipy: 'DOP853' (default), 'RK45', 'Radau', 'BDF', 'RK23', 'LSODA'."
+        ),
+    )
+    sim_parser.add_argument(
+        "--max-step",
+        type=float,
+        default=None,
+        help=(
+            "Maximum step size for adaptive solvers. "
+            "Default: unbounded for cvode/ida, CFL dt for scipy."
         ),
     )
     sim_parser.add_argument(

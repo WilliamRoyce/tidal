@@ -999,57 +999,62 @@ def _compute_cfl_dt(
 
 
 def _resolve_scheme(scheme: str, spec: EquationSystem) -> str:
-    """Resolve ``'auto'`` to ``'leapfrog'`` or ``'ida'`` based on equation operators.
+    """Resolve ``'auto'`` to the best adaptive solver for the equation system.
 
-    Selection logic (checked in order):
+    Auto-selection ALWAYS picks an adaptive, tolerance-controlled solver.
+    Leapfrog is opt-in only (``--scheme leapfrog``).
 
-    1. First-order (time_order=1) equations → IDA (diffusion/transport needs
+    Detection algorithm (checked in order):
+
+    1. Constraint equations (time_order=0) → IDA (algebraic constraints need
+       DAE residual form).
+    2. First-order (time_order=1) equations → IDA (diffusion/transport needs
        implicit time integration).
-    2. Constraint equations (time_order=0) → IDA (algebraic constraints must
-       be solved implicitly at each step; leapfrog would freeze them).
     3. Dissipation (``first_derivative_t`` operator in any RHS) → IDA (breaks
-       symplecticity, leapfrog would not conserve energy).
-    4. No canonical Hamiltonian structure → IDA (leapfrog requires separable
-       H = T(pi) + V(q)).
-    5. Otherwise (all wave, Hamiltonian structure) → leapfrog
-       (symplectic, O(N) per step, zero Jacobian memory).
+       symplecticity, BDF handles well).
+    4. No canonical Hamiltonian structure → IDA (leapfrog/CVODE require
+       separable H = T(pi) + V(q)).
+    5. Pure wave (all second-order, Hamiltonian) → CVODE BDF (adaptive,
+       tolerance-controlled, same SUNDIALS ecosystem as IDA).
+
+    Reference: Hindmarsh et al., "SUNDIALS", ACM TOMS, 2005.
     """
     if scheme != "auto":
         return scheme
 
-    # First-order (diffusion/transport) equations → IDA
-    for eq in spec.equations:
-        if eq.time_derivative_order == 1:
-            return "ida"
-
-    # Constraint equations (time_order=0) → IDA (DAE solver)
+    # 1. Constraint equations (time_order=0) → IDA (DAE solver required)
     for eq in spec.equations:
         if eq.time_derivative_order == 0:
             return "ida"
 
-    # Dissipation (first_derivative_t in any RHS term) → IDA
+    # 2. First-order (diffusion/transport) equations → IDA
+    for eq in spec.equations:
+        if eq.time_derivative_order == 1:
+            return "ida"
+
+    # 3. Dissipation (first_derivative_t in any RHS term) → IDA
     for eq in spec.equations:
         for term in eq.rhs_terms:
             if term.operator == "first_derivative_t":
                 return "ida"
 
-    # No canonical Hamiltonian structure → IDA
+    # 4. No canonical Hamiltonian structure → IDA
     if spec.canonical is None:
         return "ida"
 
-    # All wave, Hamiltonian structure → leapfrog
-    return "leapfrog"
+    # 5. Pure wave, Hamiltonian → CVODE BDF (adaptive, tolerance-controlled)
+    return "cvode"
 
 
-def _simulate(  # noqa: C901, PLR0915
+def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     args: Namespace,
     spec: EquationSystem,
     params: dict[str, float],
 ) -> int:
-    """Run simulation via native TIDAL solver (no py-pde).
+    """Run simulation via native TIDAL solver.
 
     Self-contained flow: GridInfo -> IC -> solve -> SimulationData -> output.
-    Handles both IDA and leapfrog schemes.
+    Handles IDA, CVODE, scipy, and leapfrog schemes.
     """
     from tidal.measurement._io import SimulationData
 
@@ -1088,7 +1093,7 @@ def _simulate(  # noqa: C901, PLR0915
 
     # 5. Compute dt for leapfrog (needed before snapshot configuration)
     dt: float | None = None
-    if scheme != "ida":
+    if scheme == "leapfrog":
         dt = args.dt
         if dt is None:
             dt = _compute_cfl_dt(spec, grid_info, params)
@@ -1102,6 +1107,8 @@ def _simulate(  # noqa: C901, PLR0915
         log(f"  Note: snapshot interval {snapshot_interval:.4f} < dt {dt:.4f}; "
             f"saving every step")
         snapshot_interval = dt
+
+    num_snapshots = max(int(args.t_end / snapshot_interval) + 1, 2)
 
     # 7. Disk writer (if directory output)
     fmt = _infer_output_format(args)
@@ -1117,12 +1124,48 @@ def _simulate(  # noqa: C901, PLR0915
     if scheme == "ida":
         from tidal.solver.ida import solve_ida
 
-        num_snapshots = max(int(args.t_end / snapshot_interval) + 1, 2)
-        log(f"Running IDA solver (t=0 → {args.t_end}, {num_snapshots} snapshots)...")
+        log(f"Running IDA solver (t=0 → {args.t_end}, {num_snapshots} snapshots, "
+            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})...")
         result = solve_ida(
             spec, grid_info, y0,
             t_span=(0.0, args.t_end),
             bc=bc, parameters=params,
+            num_snapshots=num_snapshots,
+            rtol=args.rtol, atol=args.atol,
+            snapshot_callback=snapshot_cb,
+        )
+    elif scheme == "cvode":
+        from tidal.solver.cvode import solve_cvode
+
+        method = args.method or "BDF"
+        max_step = args.max_step or 0.0
+        log(f"Running CVODE solver ({method}, t=0 → {args.t_end}, "
+            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})...")
+        result = solve_cvode(
+            spec, grid_info, y0,
+            t_span=(0.0, args.t_end),
+            bc=bc, parameters=params,
+            method=method,
+            rtol=args.rtol, atol=args.atol,
+            max_step=max_step,
+            num_snapshots=num_snapshots,
+            snapshot_callback=snapshot_cb,
+        )
+    elif scheme == "scipy":
+        from tidal.solver.scipy_solver import solve_scipy
+
+        method = args.method or "DOP853"
+        cfl_dt = _compute_cfl_dt(spec, grid_info, params)
+        max_step = args.max_step if args.max_step is not None else cfl_dt
+        log(f"Running scipy solver ({method}, t=0 → {args.t_end}, "
+            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})...")
+        result = solve_scipy(
+            spec, grid_info, y0,
+            t_span=(0.0, args.t_end),
+            bc=bc, parameters=params,
+            method=method,
+            rtol=args.rtol, atol=args.atol,
+            max_step=max_step,
             num_snapshots=num_snapshots,
             snapshot_callback=snapshot_cb,
         )
@@ -1168,7 +1211,9 @@ def _validate_solver_params(args: Namespace) -> None:
     Raises
     ------
     ValueError
-        If ``--t-end``, ``--dt``, or ``--snapshots`` are non-positive.
+        If ``--t-end``, ``--dt``, ``--snapshots``, ``--rtol``, ``--atol``,
+        or ``--max-step`` are non-positive, or if tolerance flags are used
+        with leapfrog.
     """
     if args.t_end <= 0:
         msg = f"--t-end must be positive, got {args.t_end}"
@@ -1178,6 +1223,15 @@ def _validate_solver_params(args: Namespace) -> None:
         raise ValueError(msg)
     if args.snapshots is not None and args.snapshots <= 0:
         msg = f"--snapshots must be positive, got {args.snapshots}"
+        raise ValueError(msg)
+    if args.rtol <= 0:
+        msg = f"--rtol must be positive, got {args.rtol}"
+        raise ValueError(msg)
+    if args.atol <= 0:
+        msg = f"--atol must be positive, got {args.atol}"
+        raise ValueError(msg)
+    if args.max_step is not None and args.max_step <= 0:
+        msg = f"--max-step must be positive, got {args.max_step}"
         raise ValueError(msg)
 
 

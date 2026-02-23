@@ -8,9 +8,13 @@ from __future__ import annotations
 
 from argparse import Namespace
 from types import SimpleNamespace
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
+
+if TYPE_CHECKING:
+    from tidal.symbolic.json_loader import EquationSystem
 
 from tidal.cli._simulate import (
     _bc_entry_to_axis_bc,
@@ -24,6 +28,8 @@ from tidal.cli._simulate import (
     _parse_params,
     _parse_periodic,
     _parse_single_bound,
+    _resolve_scheme,
+    _validate_solver_params,
 )
 
 # ==================== _parse_grid_shape ====================
@@ -1023,3 +1029,172 @@ class TestBuildInitialY0:
         args = _make_ic_args(ic="gaussian")
         y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
         assert y0.shape == (layout.total_size,)
+
+
+# ==================== _resolve_scheme ====================
+
+
+def _make_wave_spec() -> EquationSystem:
+    """Minimal wave spec (second-order, Hamiltonian) → should select cvode."""
+    from tidal.symbolic.json_loader import EquationSystem
+
+    data: dict[str, object] = {
+        "spacetime": {"dimension": 2, "signature": [-1, 1]},
+        "fields": [{"name": "phi_0", "index": 0}],
+        "equations": [
+            {
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [{"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}],
+                },
+            }
+        ],
+        "canonical": {
+            "hamiltonian_terms": [
+                {
+                    "coefficient": 0.5,
+                    "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                    "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+                },
+            ],
+            "field_rates": {"phi_0": [{"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}]},
+            "kinetic_matrix": {"entries": [{"i": 0, "j": 0, "value": 1.0}], "dimension": 1},
+            "spatial_momenta": {},
+            "hamiltonian_symbolic": "test",
+        },
+    }
+    return EquationSystem.from_dict(data)
+
+
+def _make_constraint_spec() -> EquationSystem:
+    """Spec with constraint (time_order=0) → should select ida."""
+    from tidal.symbolic.json_loader import EquationSystem
+
+    data: dict[str, object] = {
+        "spacetime": {"dimension": 3, "signature": [-1, 1, 1]},
+        "fields": [
+            {"name": "A_0", "index": 0},
+            {"name": "A_1", "index": 1},
+        ],
+        "equations": [
+            {
+                "field": "A_0",
+                "lhs": {"expression": "A_0", "order": {"time": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [{"coefficient": 1.0, "operator": "gradient_x", "field": "A_1"}],
+                },
+            },
+            {
+                "field": "A_1",
+                "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [{"coefficient": 1.0, "operator": "laplacian_x", "field": "A_1"}],
+                },
+            },
+        ],
+    }
+    return EquationSystem.from_dict(data)
+
+
+def _make_dissipative_spec() -> EquationSystem:
+    """Spec with first_derivative_t (dissipation) → should select ida."""
+    from tidal.symbolic.json_loader import EquationSystem
+
+    data: dict[str, object] = {
+        "spacetime": {"dimension": 2, "signature": [-1, 1]},
+        "fields": [{"name": "phi_0", "index": 0}],
+        "equations": [
+            {
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                        {"coefficient": -0.1, "operator": "first_derivative_t", "field": "phi_0"},
+                    ],
+                },
+            }
+        ],
+        "canonical": {
+            "hamiltonian_terms": [
+                {
+                    "coefficient": 0.5,
+                    "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                    "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+                },
+            ],
+            "field_rates": {"phi_0": [{"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}]},
+            "kinetic_matrix": {"entries": [{"i": 0, "j": 0, "value": 1.0}], "dimension": 1},
+            "spatial_momenta": {},
+            "hamiltonian_symbolic": "test",
+        },
+    }
+    return EquationSystem.from_dict(data)
+
+
+class TestResolveScheme:
+    def test_explicit_scheme_passthrough(self) -> None:
+        """Non-auto schemes should pass through unchanged."""
+        spec = _make_wave_spec()
+        assert _resolve_scheme("ida", spec) == "ida"
+        assert _resolve_scheme("leapfrog", spec) == "leapfrog"
+        assert _resolve_scheme("cvode", spec) == "cvode"
+        assert _resolve_scheme("scipy", spec) == "scipy"
+
+    def test_auto_selects_cvode_for_wave(self) -> None:
+        """Pure wave system should auto-select cvode."""
+        spec = _make_wave_spec()
+        assert _resolve_scheme("auto", spec) == "cvode"
+
+    def test_auto_selects_ida_for_constraints(self) -> None:
+        """System with constraint equations should auto-select ida."""
+        spec = _make_constraint_spec()
+        assert _resolve_scheme("auto", spec) == "ida"
+
+    def test_auto_selects_ida_for_dissipation(self) -> None:
+        """System with first_derivative_t should auto-select ida."""
+        spec = _make_dissipative_spec()
+        assert _resolve_scheme("auto", spec) == "ida"
+
+
+# ==================== _validate_solver_params ====================
+
+
+def _make_solver_args(**kwargs: object) -> Namespace:
+    """Create a Namespace with defaults for _validate_solver_params."""
+    defaults: dict[str, object] = {
+        "t_end": 10.0,
+        "dt": None,
+        "snapshots": None,
+        "rtol": 1e-8,
+        "atol": 1e-10,
+        "max_step": None,
+    }
+    defaults.update(kwargs)
+    return Namespace(**defaults)
+
+
+class TestValidateSolverParams:
+    def test_valid_defaults(self) -> None:
+        """Default values should pass validation."""
+        _validate_solver_params(_make_solver_args())
+
+    def test_rtol_positive(self) -> None:
+        """--rtol must be positive."""
+        with pytest.raises(ValueError, match="--rtol must be positive"):
+            _validate_solver_params(_make_solver_args(rtol=-1e-8))
+
+    def test_atol_positive(self) -> None:
+        """--atol must be positive."""
+        with pytest.raises(ValueError, match="--atol must be positive"):
+            _validate_solver_params(_make_solver_args(atol=0))
+
+    def test_max_step_positive(self) -> None:
+        """--max-step must be positive when provided."""
+        with pytest.raises(ValueError, match="--max-step must be positive"):
+            _validate_solver_params(_make_solver_args(max_step=-1.0))

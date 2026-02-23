@@ -31,17 +31,17 @@ from tidal.solver.operators import apply_operator
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Mapping, Sequence
 
     from tidal.solver.grid import GridInfo
     from tidal.solver.rhs import RHSEvaluator
-    from tidal.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
 
 # Time-derivative order threshold for dynamical (wave) equations
 _SECOND_ORDER = 2
 
 
-def _compute_force(  # noqa: PLR0913, PLR0917
+def compute_force(  # noqa: PLR0913, PLR0917
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
@@ -87,11 +87,11 @@ def _compute_force(  # noqa: PLR0913, PLR0917
     return force
 
 
-def _compute_velocity(  # noqa: PLR0913, PLR0917
+def compute_velocity(  # noqa: PLR0913, PLR0917
     layout: StateLayout,
     grid: GridInfo,
     kinetic: np.ndarray | None,
-    spatial_momenta: dict | None,
+    spatial_momenta: Mapping[str, Sequence[OperatorTerm]] | None,
     pi_flat: np.ndarray,
     fieldset: FieldSet,
     bc: str | tuple[str, ...] | None,
@@ -293,18 +293,18 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
     n_steps = max(1, math.ceil((t_end - t) / dt - 1e-10))
     for _step in range(n_steps):
         # Half-kick
-        force = _compute_force(spec, layout, grid, bc, y, t, rhs_eval)
+        force = compute_force(spec, layout, grid, bc, y, t, rhs_eval)
         _half_kick(y, force, dt, layout, n)
 
         # Drift
         fieldset = FieldSet.from_flat(layout, grid.shape, y)
-        velocity = _compute_velocity(
+        velocity = compute_velocity(
             layout, grid, kinetic, spatial_momenta, y, fieldset, bc, t, rhs_eval,
         )
         _drift(y, velocity, dt, layout, n)
 
         # Half-kick
-        force = _compute_force(spec, layout, grid, bc, y, t, rhs_eval)
+        force = compute_force(spec, layout, grid, bc, y, t, rhs_eval)
         _half_kick(y, force, dt, layout, n)
 
         t += dt

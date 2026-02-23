@@ -47,7 +47,7 @@ BuildDeDonderGaugeTerm::usage =
   "BuildDeDonderGaugeTerm[field, metric, covd, xi] returns the de Donder \
 gauge-fixing term -(1/(2*xi))*metric^{be}*(D_b)(D_e) where \
 D_b = metric^{ac} covd_a field_{cb} - (1/2) covd_b (metric^{cd} field_{cd}). \
-For linearised gravity with xi=1, this reduces Einstein equations to \
+For linearized gravity with xi=1, this reduces Einstein equations to \
 uncoupled wave equations.  Example: BuildDeDonderGaugeTerm[h, eta, CD, 1]";
 
 Begin["`Private`"];
