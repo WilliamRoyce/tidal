@@ -637,19 +637,20 @@ class TestCanonicalHamiltonianEnergy:
 
         h_eval = _compute_hamiltonian_from_canonical(data, 0)
 
-        # Compute expected energy using SAME finite difference stencil
-        # (periodic central differences) as the energy module uses
+        # Compute expected energy using SAME finite difference stencils
+        # as the solver.  The IBP path evaluates ½ gradient_x(A_1)² as
+        # -½ A_1 · laplacian_x(A_1), matching the 3-point laplacian stencil.
         grad_a0 = (np.roll(a0, -1) - np.roll(a0, 1)) / (2 * dx)
         vel = pi1 + grad_a0  # velocity = pi + d_x(A_0)
-        grad_a1 = (np.roll(a1, -1) - np.roll(a1, 1)) / (2 * dx)
+        lap_a1 = (np.roll(a1, -1) - 2 * a1 + np.roll(a1, 1)) / dx**2
         h_expected = float(
-            (0.5 * vel**2 + 0.5 * grad_a1**2 + 0.5 * a1**2).mean()
+            (0.5 * vel**2 + (-0.5) * a1 * lap_a1 + 0.5 * a1**2).mean()
         )
 
         # If we had the bug (using pi instead of vel), kinetic term would be
         # ½ π², missing the cross-terms pi*d_x(A_0) and (d_x A_0)²
         h_wrong = float(
-            (0.5 * pi1**2 + 0.5 * grad_a1**2 + 0.5 * a1**2).mean()
+            (0.5 * pi1**2 + (-0.5) * a1 * lap_a1 + 0.5 * a1**2).mean()
         )
 
         # Verify the correct answer (with velocity reconstruction) matches
@@ -660,6 +661,307 @@ class TestCanonicalHamiltonianEnergy:
             f"h_eval={h_eval} should differ from h_wrong={h_wrong} "
             "when A_0 is nonzero"
         )
+
+
+class TestIBPHamiltonian:
+    """Test integration-by-parts Hamiltonian evaluation for gradient terms.
+
+    The IBP path converts gradient-product Hamiltonian terms into
+    second-order operator form:  coeff * ⟨∂_a(u)·∂_b(v)⟩ → -coeff * ⟨u, ∂²_ab(v)⟩.
+    This ensures the computed Hamiltonian uses the SAME FD stencils as the
+    solver, making it exactly the conserved quantity of the discrete system.
+    """
+
+    def test_gradient_pair_to_second_order_same_axis(self) -> None:
+        """gradient_x * gradient_x -> laplacian_x."""
+        from tidal.measurement._energy import _gradient_pair_to_second_order
+
+        assert _gradient_pair_to_second_order("gradient_x", "gradient_x") == "laplacian_x"
+        assert _gradient_pair_to_second_order("gradient_y", "gradient_y") == "laplacian_y"
+        assert _gradient_pair_to_second_order("gradient_z", "gradient_z") == "laplacian_z"
+
+    def test_gradient_pair_to_second_order_cross_axis(self) -> None:
+        """gradient_x * gradient_y -> cross_derivative_xy (sorted)."""
+        from tidal.measurement._energy import _gradient_pair_to_second_order
+
+        assert _gradient_pair_to_second_order("gradient_x", "gradient_y") == "cross_derivative_xy"
+        assert _gradient_pair_to_second_order("gradient_y", "gradient_x") == "cross_derivative_xy"
+        assert _gradient_pair_to_second_order("gradient_x", "gradient_z") == "cross_derivative_xz"
+        assert _gradient_pair_to_second_order("gradient_z", "gradient_y") == "cross_derivative_yz"
+
+    def test_ibp_gradient_term_matches_laplacian(self) -> None:
+        """IBP converts ½⟨(∂_x φ)²⟩ to -½⟨φ·∂²_x φ⟩ using 3-point laplacian.
+
+        For periodic BCs, these should match to machine precision.
+        """
+        n_grid = 128
+        domain_len = 2 * np.pi
+        dx = domain_len / n_grid
+        x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
+
+        # Smooth periodic field: sin(2x) + 0.3 cos(5x)
+        phi = np.sin(2 * x) + 0.3 * np.cos(5 * x)
+
+        # Gradient-product form: ½ Σ (D_c φ)²
+        grad_phi = (np.roll(phi, -1) - np.roll(phi, 1)) / (2 * dx)
+        energy_grad = 0.5 * float((grad_phi**2).mean())
+
+        # Laplacian form: -½ ⟨φ, L φ⟩ using 3-point stencil
+        lap_phi = (np.roll(phi, -1) - 2 * phi + np.roll(phi, 1)) / dx**2
+        energy_ibp = -0.5 * float((phi * lap_phi).mean())
+
+        # These differ by O(dx²) ≈ 2e-3 — NOT the same!
+        assert abs(energy_grad - energy_ibp) > 1e-5, (
+            "Gradient and IBP forms should differ due to stencil mismatch"
+        )
+
+        # Build canonical structure with gradient_x * gradient_x term
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="phi_0", operator="gradient_x"),
+                    factor_b=HamiltonianFactor(field="phi_0", operator="gradient_x"),
+                ),
+            ),
+            field_rates={},
+            hamiltonian_symbolic="test",
+        )
+
+        eq = ComponentEquation(
+            field_name="phi_0",
+            field_index=0,
+            time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(coefficient=1.0, operator="laplacian_x", field="phi_0"),
+            ),
+        )
+        spec = EquationSystem(
+            n_components=1,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("phi_0",),
+            equations=(eq,),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={"source": "test"},
+            canonical=canonical,
+        )
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={"phi_0": phi[np.newaxis]},
+            momenta={},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, domain_len),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+
+        h_eval = _compute_hamiltonian_from_canonical(data, 0)
+
+        # IBP path should give the LAPLACIAN form (matching solver), not gradient form
+        np.testing.assert_allclose(h_eval, energy_ibp, rtol=1e-12)
+
+    def test_ibp_cross_derivative_term(self) -> None:
+        """IBP converts ⟨∂_x(u)·∂_y(v)⟩ to -⟨u, ∂²_xy(v)⟩.
+
+        Verifies cross-derivative terms are correctly handled.
+        Uses u = v = sin(x+y) so that ⟨∂_x(u)·∂_y(v)⟩ = ⟨cos²(x+y)⟩ = ½.
+        """
+        n_grid = 32
+        domain_len = 2 * np.pi
+        dx = domain_len / n_grid
+        coords = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
+        xx, yy = np.meshgrid(coords, coords, indexing="ij")
+
+        # sin(x+y) has non-zero ⟨∂_x · ∂_y⟩ cross term
+        u_data = np.sin(xx + yy)
+        v_data = np.sin(xx + yy)
+
+        # IBP form: -⟨u, cross_derivative_xy(v)⟩
+        # Cross derivative = D_c^x(D_c^y(v))
+        dv_dy = (np.roll(v_data, -1, axis=1) - np.roll(v_data, 1, axis=1)) / (2 * dx)
+        d2v_dxdy = (np.roll(dv_dy, -1, axis=0) - np.roll(dv_dy, 1, axis=0)) / (2 * dx)
+        energy_ibp = -1.0 * float((u_data * d2v_dxdy).mean())
+
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                HamiltonianTerm(
+                    coefficient=1.0,
+                    factor_a=HamiltonianFactor(field="u_0", operator="gradient_x"),
+                    factor_b=HamiltonianFactor(field="v_0", operator="gradient_y"),
+                ),
+            ),
+            field_rates={},
+            hamiltonian_symbolic="test cross",
+        )
+
+        eq_u = ComponentEquation(
+            field_name="u_0", field_index=0, time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(coefficient=1.0, operator="laplacian", field="u_0"),
+            ),
+        )
+        eq_v = ComponentEquation(
+            field_name="v_0", field_index=1, time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(coefficient=1.0, operator="laplacian", field="v_0"),
+            ),
+        )
+        spec = EquationSystem(
+            n_components=2, dimension=3, spatial_dimension=2,
+            component_names=("u_0", "v_0"),
+            equations=(eq_u, eq_v),
+            mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={"source": "test"},
+            canonical=canonical,
+        )
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={"u_0": u_data[np.newaxis], "v_0": v_data[np.newaxis]},
+            momenta={},
+            grid_spacing=(dx, dx),
+            grid_bounds=((0.0, domain_len), (0.0, domain_len)),
+            periodic=(True, True),
+            spec=spec,
+            parameters={},
+        )
+
+        h_eval = _compute_hamiltonian_from_canonical(data, 0)
+        np.testing.assert_allclose(h_eval, energy_ibp, rtol=1e-12)
+
+    def test_field_rates_symbolic_resolution(self) -> None:
+        """field_rate coefficients are resolved via symbolic expressions.
+
+        With rho=2, field_rate coefficient_symbolic="rho^(-1)" should give 0.5,
+        not the placeholder coefficient=1.0.
+        """
+        n_grid = 32
+        dx = 0.1
+
+        phi = np.ones(n_grid)
+        pi_data = 2.0 * np.ones(n_grid)
+
+        # KE term: rho/2 * (d_t phi)^2 = rho/2 * (pi/rho)^2 = pi^2/(2*rho)
+        # With rho=2, pi=2: KE = 4/(2*2) = 1.0
+        rho = 2.0
+
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                HamiltonianTerm(
+                    coefficient=1.0,
+                    coefficient_symbolic="rho/2",
+                    factor_a=HamiltonianFactor(field="phi_0", operator="time_derivative"),
+                    factor_b=HamiltonianFactor(field="phi_0", operator="time_derivative"),
+                ),
+            ),
+            field_rates={
+                "phi_0": (
+                    OperatorTerm(
+                        coefficient=1.0,
+                        operator="identity",
+                        field="pi_0",
+                        coefficient_symbolic="rho^(-1)",
+                    ),
+                ),
+            },
+            hamiltonian_symbolic="test rho",
+        )
+
+        eq = ComponentEquation(
+            field_name="phi_0", field_index=0, time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(coefficient=1.0, operator="laplacian_x", field="phi_0"),
+            ),
+        )
+        spec = EquationSystem(
+            n_components=1, dimension=2, spatial_dimension=1,
+            component_names=("phi_0",),
+            equations=(eq,),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={"source": "test", "parameters": {"rho": rho}},
+            canonical=canonical,
+        )
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={"phi_0": phi[np.newaxis]},
+            momenta={"phi_0": pi_data[np.newaxis]},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, n_grid * dx),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},  # Empty — should merge from spec metadata
+        )
+
+        h_eval = _compute_hamiltonian_from_canonical(data, 0)
+
+        # velocity = pi / rho = 2/2 = 1
+        # KE = (rho/2) * vel² = (2/2) * 1² = 1.0
+        expected = rho / 2 * (pi_data[0] / rho) ** 2
+        np.testing.assert_allclose(h_eval, expected, rtol=1e-12)
+
+    def test_parameter_merge_from_spec_metadata(self) -> None:
+        """Parameters from spec metadata are used when data.parameters is empty.
+
+        The symbolic coefficient "mu/2" should resolve to 0.5 with mu=1.0
+        from spec metadata, even when data.parameters={}.
+        """
+        n_grid = 32
+        dx = 0.1
+
+        phi = np.ones(n_grid) * 0.5
+
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                HamiltonianTerm(
+                    coefficient=1.0,  # placeholder
+                    coefficient_symbolic="mu/2",
+                    factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                    factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+                ),
+            ),
+            field_rates={},
+            hamiltonian_symbolic="test merge",
+        )
+
+        eq = ComponentEquation(
+            field_name="phi_0", field_index=0, time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(coefficient=1.0, operator="laplacian_x", field="phi_0"),
+            ),
+        )
+        spec = EquationSystem(
+            n_components=1, dimension=2, spatial_dimension=1,
+            component_names=("phi_0",),
+            equations=(eq,),
+            mass_matrix=((0.0,),),
+            coupling_matrix=((0.0,),),
+            metadata={"source": "test", "parameters": {"mu": 1.0}},
+            canonical=canonical,
+        )
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={"phi_0": phi[np.newaxis]},
+            momenta={},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, n_grid * dx),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},  # Empty! Metadata should fill in.
+        )
+
+        h_eval = _compute_hamiltonian_from_canonical(data, 0)
+
+        # mu/2 * ⟨φ²⟩ = 0.5 * 0.25 = 0.125
+        expected = 0.5 * float((phi**2).mean())
+        np.testing.assert_allclose(h_eval, expected, rtol=1e-12)
+
+        # Without the metadata merge, coefficient would be 1.0 (placeholder)
+        h_wrong = 1.0 * float((phi**2).mean())
+        assert abs(h_eval - h_wrong) > 0.01
 
 
 class TestAnalyticalEnergyConservation:

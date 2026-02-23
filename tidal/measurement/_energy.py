@@ -41,6 +41,13 @@ _ENERGY_FLOOR: float = 1e-12
 # Axis letter → numpy axis index (spatial axes only).
 _AXIS_MAP: dict[str, int] = {"x": 0, "y": 1, "z": 2}
 
+# Gradient operator → axis index.  Used by the integration-by-parts
+# Hamiltonian evaluation to convert gradient-product terms into the
+# equivalent second-order operators (laplacian / cross_derivative).
+_GRADIENT_AXES: dict[str, int] = {
+    "gradient_x": 0, "gradient_y": 1, "gradient_z": 2,
+}
+
 # Pattern for momentum field references: pi_0, pi_1, pi0, pi1, etc.
 _MOMENTUM_RE = re.compile(r"^pi_?(\d+)$")
 
@@ -840,16 +847,18 @@ def _evaluate_hamiltonian_factor(
         # For Proca: vel = pi + gradient_x(A_0), etc.
         canonical = data.spec.canonical
         if canonical is not None and factor_field in canonical.field_rates:
+            params = _merge_parameters(data)
             shape = next(iter(data.fields.values()))[t_idx].shape
             result: NDArray[np.float64] = np.zeros(shape, dtype=np.float64)
             for term in canonical.field_rates[factor_field]:
                 target = _resolve_term_target(data, term.field, t_idx)
                 if target is None:
                     continue
+                coeff = _resolve_term_coefficient(term, params)
                 if term.operator == "identity":
-                    result += term.coefficient * target
+                    result += coeff * target
                 else:
-                    result += term.coefficient * _apply_spatial_operator(
+                    result += coeff * _apply_spatial_operator(
                         term.operator, target, data.grid_spacing, data.periodic,
                         bc_types=data.bc_types,
                     )
@@ -875,18 +884,56 @@ def _evaluate_hamiltonian_factor(
     )
 
 
+def _gradient_pair_to_second_order(op_a: str, op_b: str) -> str:
+    """Map a pair of gradient operators to the equivalent 2nd-order operator.
+
+    Uses integration-by-parts identity (exact for periodic BCs):
+    ``⟨∂_a u, ∂_b v⟩ = -⟨u, ∂²_ab v⟩`` where ``∂²_ab`` is laplacian
+    (same axis) or cross_derivative (different axes).
+    """
+    ax_a = _GRADIENT_AXES[op_a]
+    ax_b = _GRADIENT_AXES[op_b]
+    if ax_a == ax_b:
+        return f"laplacian_{'xyz'[ax_a]}"
+    lo, hi = sorted([ax_a, ax_b])
+    return f"cross_derivative_{'xyz'[lo]}{'xyz'[hi]}"
+
+
+def _merge_parameters(data: SimulationData) -> dict[str, float]:
+    """Merge spec metadata parameters with runtime parameters.
+
+    Spec metadata provides defaults (from theory.toml); runtime parameters
+    (from ``--param`` CLI flags) override them.
+    """
+    import contextlib  # noqa: PLC0415
+
+    raw_meta = data.spec.metadata.get("parameters", {})
+    params: dict[str, float] = {}
+    if isinstance(raw_meta, dict):
+        for k, v in raw_meta.items():  # type: ignore[union-attr]
+            with contextlib.suppress(ValueError, TypeError):
+                params[str(k)] = float(v)  # type: ignore[arg-type]
+    params.update(data.parameters)
+    return params
+
+
 def _compute_hamiltonian_from_canonical(
     data: SimulationData,
     t_idx: int,
 ) -> float:
     """Evaluate the symbolic Hamiltonian from canonical structure.
 
-    Computes: ⟨H⟩ = Σ coefficient * ⟨factor_a * factor_b⟩
+    For spatial gradient terms, uses **integration by parts** to convert
+    gradient products into second-order operators::
 
-    Each term is a quadratic product of field values/derivatives, with
-    the ``time_derivative`` operator mapping to the stored canonical
-    momentum. This gives the exact Legendre-transform Hamiltonian,
-    not an ad-hoc assembly.
+        coeff * ⟨∂_a(u) · ∂_b(v)⟩  →  -coeff * ⟨u, ∂²_ab(v)⟩
+
+    This ensures the measured Hamiltonian uses the **same** finite-difference
+    stencils as the solver (3-point laplacian, cascaded-gradient cross
+    derivative), making it exactly the conserved quantity of the discrete
+    system.  Without IBP, the central-difference gradient squared (5-point
+    "wide" stencil) differs from the solver's 3-point laplacian by O(dx²),
+    producing spurious time-varying energy drift.
 
     Parameters
     ----------
@@ -909,21 +956,43 @@ def _compute_hamiltonian_from_canonical(
         msg = "_compute_hamiltonian_from_canonical called without canonical structure"
         raise ValueError(msg)
 
+    from tidal.symbolic.json_loader import (  # noqa: PLC0415
+        _resolve_symbolic_coeff,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    params = _merge_parameters(data)
+
     total = 0.0
     for term in canonical.hamiltonian_terms:
         coeff = float(term.coefficient)
         # Resolve symbolic coefficient if present
-        if term.coefficient_symbolic is not None and data.parameters:
-            from tidal.symbolic.json_loader import (  # noqa: PLC0415
-                _resolve_symbolic_coeff,  # pyright: ignore[reportPrivateUsage]
-            )
-
+        if term.coefficient_symbolic is not None and params:
             resolved = _resolve_symbolic_coeff(
-                term.coefficient_symbolic, data.parameters,
+                term.coefficient_symbolic, params,
             )
             if resolved is not None:
                 coeff = float(resolved)
 
+        op_a = term.factor_a.operator
+        op_b = term.factor_b.operator
+
+        # Integration-by-parts path: both factors are spatial gradients.
+        # ⟨∂_a(u) · ∂_b(v)⟩ = -⟨u, ∂²_ab(v)⟩  (exact for periodic BCs)
+        # Uses the SAME 2nd-order stencils as the solver → exact conservation.
+        if op_a in _GRADIENT_AXES and op_b in _GRADIENT_AXES:
+            field_a = _resolve_term_target(data, term.factor_a.field, t_idx)
+            field_b = _resolve_term_target(data, term.factor_b.field, t_idx)
+            if field_a is None or field_b is None:
+                continue
+            second_op = _gradient_pair_to_second_order(op_a, op_b)
+            operated = _apply_spatial_operator(
+                second_op, field_b, data.grid_spacing, data.periodic,
+                bc_types=data.bc_types,
+            )
+            total += -coeff * float((field_a * operated).mean())
+            continue
+
+        # All other terms: identity, time_derivative, mixed
         fa = _evaluate_hamiltonian_factor(
             term.factor_a.field, term.factor_a.operator, data, t_idx,
         )
