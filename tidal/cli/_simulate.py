@@ -798,6 +798,58 @@ def _warn_zero_evolution(
         )
 
 
+def _check_mass_stability(
+    args: Namespace,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+    params: dict[str, float],
+) -> None:
+    """Run the pre-simulation pointwise mass stability check.
+
+    Warns (or aborts with --require-stable) if the coupled mass matrix has
+    a negative eigenvalue at any grid point, indicating exponentially growing
+    modes.
+    """
+    from tidal.solver.coefficients import CoefficientEvaluator
+    from tidal.solver.validation import check_pointwise_mass_stability
+
+    coeff_eval = CoefficientEvaluator(spec, grid_info, params)
+    warnings = check_pointwise_mass_stability(coeff_eval, spec, grid_info)
+    require_stable: bool = getattr(args, "require_stable", False)
+    for msg in warnings:
+        if require_stable:
+            print(f"Error: {msg}", file=sys.stderr)
+        else:
+            print(f"  Warning: {msg}", file=sys.stderr)
+    if require_stable and warnings:
+        sys.exit(1)
+
+
+def _check_result_finite(result: dict) -> None:  # type: ignore[type-arg]
+    """Raise SimulationDivergedError if the final state contains NaN or Inf.
+
+    This is a single post-simulation check — zero per-step overhead.
+
+    Raises
+    ------
+    SimulationDivergedError
+        If the final state contains non-finite values.
+    """
+    from tidal.solver._exceptions import SimulationDivergedError
+
+    y = result.get("y")
+    if y is None or len(y) == 0:
+        return
+    final = y[-1]
+    if not np.isfinite(final).all():
+        msg = (
+            "Simulation produced non-finite values (NaN or Inf). "
+            "The system is likely physically unstable. "
+            "Run with --require-stable to check before simulating."
+        )
+        raise SimulationDivergedError(msg)
+
+
 def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     args: Namespace,
     spec: EquationSystem,
@@ -1101,6 +1153,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         return _constraint_mode(args, spec, grid_info, y0, params, bc, log)
 
     _warn_zero_evolution(spec, grid_info, y0, params, bc)
+    _check_mass_stability(args, spec, grid_info, params)
 
     # 5. Compute dt for leapfrog (needed before snapshot configuration)
     dt: float | None = None
@@ -1225,6 +1278,10 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     if not result["success"]:
         print(f"Error: solver failed: {result['message']}", file=sys.stderr)
 
+    # Post-simulation divergence check: verify final state is finite.
+    # This is a single check at the end — zero per-step overhead.
+    _check_result_finite(result)
+
     if writer is not None:
         writer.close()
         log(f"  {writer.count} snapshots streamed to: {writer.output_dir.resolve()}")
@@ -1314,4 +1371,12 @@ def simulate_command(args: Namespace) -> int:
         log(f"  Parameters: {params}")
 
     # All simulation goes through the native IDA/leapfrog path
-    return _simulate(args, spec, params)
+    try:
+        return _simulate(args, spec, params)
+    except Exception as exc:
+        from tidal.solver._exceptions import SimulationDivergedError
+
+        if isinstance(exc, SimulationDivergedError):
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        raise

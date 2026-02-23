@@ -13,6 +13,7 @@ from tidal.solver.operators import AxisBCSpec, SideBCSpec
 from tidal.solver.validation import (
     check_cfl_stability,
     check_mass_sign,
+    check_pointwise_mass_stability,
     check_robin_stability,
     validate_field_references,
     validate_operator_dimensions,
@@ -301,3 +302,89 @@ class TestCheckRobinStability:
             axis_bcs=(abc,),
         )
         assert check_robin_stability(grid) == []
+
+
+# ---------------------------------------------------------------------------
+# Tests — pointwise mass stability
+# ---------------------------------------------------------------------------
+
+
+def _make_coupled_spec(m_phi2: float, m_chi2: float, g0: float) -> EquationSystem:
+    """Two coupled scalar fields with constant cross-coupling."""
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 2, "signature": [-1, 1]},
+        "fields": [{"name": "phi_0", "index": 0}, {"name": "chi_0", "index": 1}],
+        "equations": [
+            {
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": -m_phi2, "operator": "identity", "field": "phi_0"},
+                        {"coefficient": -g0, "operator": "identity", "field": "chi_0"},
+                    ],
+                },
+            },
+            {
+                "field": "chi_0",
+                "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": -m_chi2, "operator": "identity", "field": "chi_0"},
+                        {"coefficient": -g0, "operator": "identity", "field": "phi_0"},
+                    ],
+                },
+            },
+        ],
+    }
+    return EquationSystem.from_dict(data)
+
+
+class TestPointwiseMassStability:
+    def test_stable_diagonal(self) -> None:
+        """Decoupled system with positive masses is stable."""
+        spec = _make_coupled_spec(m_phi2=1.0, m_chi2=1.0, g0=0.0)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        assert result == []
+
+    def test_stable_coupled_constant(self) -> None:
+        """Coupled system satisfying det > 0 (mPhi2*mChi2 > g0^2) is stable."""
+        spec = _make_coupled_spec(m_phi2=1.0, m_chi2=4.0, g0=1.0)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        assert result == []
+
+    def test_unstable_coupled_constant(self) -> None:
+        """Coupled system violating det > 0 (g0^2 > mPhi2*mChi2) is unstable."""
+        # det = 1.0*0.5 - 1.0^2 = -0.5 < 0
+        spec = _make_coupled_spec(m_phi2=1.0, m_chi2=0.5, g0=1.0)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        assert len(result) == 1
+        assert "eigenvalue" in result[0]
+
+    def test_unstable_boundary_condition(self) -> None:
+        """g0 = sqrt(mPhi2*mChi2) exactly is on the stability boundary (det=0)."""
+        import math
+        g0 = math.sqrt(1.0 * 1.0)  # exactly on boundary → det = 0, min eigenvalue = 0
+        spec = _make_coupled_spec(m_phi2=1.0, m_chi2=1.0, g0=g0)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        # det=0: zero eigenvalue — within tolerance, so no warning expected
+        assert result == []
+
+    def test_strongly_unstable(self) -> None:
+        """Large coupling completely dominates — clearly unstable."""
+        spec = _make_coupled_spec(m_phi2=0.1, m_chi2=0.1, g0=5.0)
+        grid = GridInfo(bounds=((0, 10),), shape=(4,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        assert len(result) == 1
+        assert "unstable" in result[0].lower()

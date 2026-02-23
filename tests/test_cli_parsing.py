@@ -1274,3 +1274,24 @@ class TestValidateSolverParams:
         """--max-step must be positive when provided."""
         with pytest.raises(ValueError, match="--max-step must be positive"):
             _validate_solver_params(_make_solver_args(max_step=-1.0))
+
+
+# ==================== --require-stable flag ====================
+
+
+class TestRequireStableFlag:
+    def test_require_stable_default_false(self) -> None:
+        """--require-stable defaults to False."""
+        from tidal.cli import _build_parser
+
+        parser = _build_parser()
+        args = parser.parse_args(["simulate", "spec.json"])
+        assert args.require_stable is False
+
+    def test_require_stable_set_true(self) -> None:
+        """--require-stable flag sets the attribute to True."""
+        from tidal.cli import _build_parser
+
+        parser = _build_parser()
+        args = parser.parse_args(["simulate", "spec.json", "--require-stable"])
+        assert args.require_stable is True

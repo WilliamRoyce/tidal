@@ -18,7 +18,7 @@ if TYPE_CHECKING:
     from tidal.solver.state import StateLayout
 
 
-class FieldSet:
+class FieldSet:  # noqa: PLR0904
     """Typed container owning named field data on a grid.
 
     Backed by a single contiguous flat ``np.ndarray``.  Named access
@@ -217,3 +217,13 @@ class FieldSet:
             if name in fs:
                 fs[name] = arr
         return fs
+
+    # ---- Diagnostics ----
+
+    def max_norm(self) -> float:
+        """Maximum absolute value across all slots."""
+        return float(np.max(np.abs(self._data)))
+
+    def check_finite(self) -> bool:
+        """Return True iff all values are finite (no NaN or Inf)."""
+        return bool(np.isfinite(self._data).all())

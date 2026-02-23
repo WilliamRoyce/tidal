@@ -181,6 +181,85 @@ def check_mass_sign(
     return warnings
 
 
+def check_pointwise_mass_stability(
+    coeff_eval: CoefficientEvaluator,
+    spec: EquationSystem,
+    grid: GridInfo,
+) -> list[str]:
+    """Check eigenvalues of the pointwise mass/coupling matrix M[i,j](x,y).
+
+    Builds M[i,j](x,y) from all identity-operator EOM terms (constant and
+    position-dependent), then verifies that all eigenvalues are positive at
+    every grid point.  A negative eigenvalue indicates an exponentially
+    growing (tachyonic) mode.
+
+    This check runs once pre-simulation using the pre-computed spatial cache
+    in CoefficientEvaluator — zero runtime cost during the actual simulation.
+
+    Returns a list of warning strings (empty if stable).
+
+    Notes
+    -----
+    The stability condition is that the potential matrix M (defined as the
+    *negative* of the identity-operator coefficient matrix) is
+    positive-semidefinite at every grid point.  For coupled scalars with
+    Gaussian coupling ``G(x,y) = g0*exp(-r^2/2R^2)``, this reduces to
+    ``mPhi2 * mChi2 > G(x,y)^2`` everywhere, i.e. ``mPhi2 * mChi2 > g0^2``
+    at the coupling peak.
+    """
+    import numpy as np  # noqa: PLC0415
+
+    n = len(spec.component_names)
+    grid_shape = grid.shape
+
+    # Build pot[i,j](x,y) as ndarray of shape (n, n, *grid_shape).
+    # Convention: pot[i,j] = -(coefficient of identity(field_j) in equation_i)
+    pot = np.zeros((n, n, *grid_shape))
+
+    for eq_idx, eq in enumerate(spec.equations):
+        for term_idx, term in enumerate(eq.rhs_terms):
+            if term.operator != "identity":
+                continue
+            try:
+                j = spec.component_names.index(term.field)
+            except ValueError:
+                continue  # Momentum or unknown field — skip
+            coeff = coeff_eval.resolve(term, t=0.0, eq_idx=eq_idx, term_idx=term_idx)
+            if isinstance(coeff, np.ndarray):
+                pot[eq_idx, j] -= coeff  # position-dependent: subtract broadcast array
+            else:
+                pot[eq_idx, j] -= float(coeff)  # constant: subtract scalar
+
+    # Vectorised eigenvalue check: reshape to (n_grid, n, n) batch.
+    # eigvalsh assumes symmetric matrix — true for physical Lagrangians where
+    # cross-coupling terms are symmetric (same coupling in both field equations).
+    pot_flat = pot.reshape(n, n, -1).transpose(2, 0, 1)  # (n_grid, n, n)
+    eigenvalues = np.linalg.eigvalsh(pot_flat)  # (n_grid, n), real-valued
+    min_per_point = eigenvalues.min(axis=1)  # (n_grid,) minimum eigenvalue per point
+    global_min = float(min_per_point.min())
+
+    tolerance = 1e-10
+    if global_min >= -tolerance:
+        return []
+
+    # Find the worst grid point for a diagnostic message
+    worst_flat = int(min_per_point.argmin())
+    worst_idx = np.unravel_index(worst_flat, grid_shape)
+    # spatial coordinates = effective_coordinates[1:] (skip the time coordinate)
+    spatial_coords = spec.effective_coordinates[1:]
+    coord_strs = [
+        f"{spatial_coords[d]}={grid.axes_coords(d)[worst_idx[d]]:.4g}"
+        for d in range(len(grid_shape))
+    ]
+    return [
+        f"Coupled mass matrix has minimum eigenvalue {global_min:.4g} at "
+        f"({', '.join(coord_strs)}). The system has exponentially growing "
+        f"modes — it will be unstable. "
+        f"Check that the mass matrix is positive-definite at all grid points "
+        f"(e.g. for Gaussian-coupled scalars: mPhi2 * mChi2 > g0^2)."
+    ]
+
+
 def check_robin_stability(grid: GridInfo) -> list[str]:
     """Check Robin BC ghost-cell formula stability.
 

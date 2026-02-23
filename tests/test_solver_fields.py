@@ -308,3 +308,49 @@ class TestFieldSetRoundTrip:
 
         fs["phi_0"] = np.arange(8, dtype=np.float64)
         np.testing.assert_array_equal(flat[:8], np.arange(8))
+
+
+class TestFieldSetDiagnostics:
+    def test_max_norm(self) -> None:
+        """max_norm returns the largest absolute value across all slots."""
+        spec = _make_kg_spec()
+        layout = StateLayout.from_spec(spec, 8)
+        fs = FieldSet(layout, (8,))
+        fs["phi_0"] = np.array([1.0, -3.0, 2.0, 0.0, 0.5, -0.5, 1.5, -2.5])
+        fs["pi_phi_0"] = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+        assert fs.max_norm() == pytest.approx(3.0)
+
+    def test_max_norm_all_zeros(self) -> None:
+        """max_norm returns 0.0 when all fields are zero."""
+        spec = _make_kg_spec()
+        layout = StateLayout.from_spec(spec, 4)
+        fs = FieldSet(layout, (4,))
+        assert fs.max_norm() == pytest.approx(0.0)
+
+    def test_check_finite_true(self) -> None:
+        """check_finite returns True when all values are finite."""
+        spec = _make_kg_spec()
+        layout = StateLayout.from_spec(spec, 8)
+        fs = FieldSet(layout, (8,))
+        fs["phi_0"] = np.linspace(-1.0, 1.0, 8)
+        assert fs.check_finite() is True
+
+    def test_check_finite_false_nan(self) -> None:
+        """check_finite returns False when a NaN is present."""
+        spec = _make_kg_spec()
+        layout = StateLayout.from_spec(spec, 8)
+        fs = FieldSet(layout, (8,))
+        arr = np.linspace(-1.0, 1.0, 8)
+        arr[3] = float("nan")
+        fs["phi_0"] = arr
+        assert fs.check_finite() is False
+
+    def test_check_finite_false_inf(self) -> None:
+        """check_finite returns False when an Inf is present."""
+        spec = _make_kg_spec()
+        layout = StateLayout.from_spec(spec, 8)
+        fs = FieldSet(layout, (8,))
+        arr = np.linspace(-1.0, 1.0, 8)
+        arr[0] = float("inf")
+        fs["phi_0"] = arr
+        assert fs.check_finite() is False
