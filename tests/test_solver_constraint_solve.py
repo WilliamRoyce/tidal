@@ -782,3 +782,85 @@ class TestIDAWithPreSolve:
         a0_slot = layout.field_slot_map["A_0"]
         a0_final = result["y"][-1][a0_slot * n : (a0_slot + 1) * n]
         assert abs(a0_final[0]) < 1e-10
+
+
+class TestGaugeRegularisationWarnings:
+    """Verify that gauge regularisation emits user-visible warnings."""
+
+    def test_fft_singular_mode_warns(self) -> None:
+        """FFT pre-solve emits UserWarning when zero-mode is regularised."""
+        spec = _make_chern_simons_spec()
+        grid = GridInfo(
+            bounds=((0, 50), (0, 50)),
+            shape=(16, 16),
+            periodic=(True, True),
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+        x_arr, y_arr = grid.coord_arrays()
+
+        y0 = np.zeros(layout.total_size)
+        gaussian = np.exp(-((x_arr - 25) ** 2 + (y_arr - 25) ** 2) / (2 * 5**2))
+        a1_slot = layout.field_slot_map["A_1"]
+        y0[a1_slot * n : (a1_slot + 1) * n] = gaussian.ravel()
+
+        with pytest.warns(UserWarning, match="singular mode"):
+            pre_solve_constraints(
+                spec, grid, y0, bc="periodic", parameters={"kappa": 0.5}
+            )
+
+    @pytest.mark.skipif(
+        not _has_sundials(), reason="sksundae not available"
+    )
+    def test_ida_gauge_pin_warns(self) -> None:
+        """IDA solver emits UserWarning for gauge regularisation (point-pinning)."""
+        from tidal.solver.ida import solve_ida
+
+        spec = _make_chern_simons_spec()
+        grid = GridInfo(
+            bounds=((0, 50), (0, 50)),
+            shape=(16, 16),
+            periodic=(True, True),
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+        x_arr, y_arr = grid.coord_arrays()
+
+        y0 = np.zeros(layout.total_size)
+        gaussian = np.exp(-((x_arr - 25) ** 2 + (y_arr - 25) ** 2) / (2 * 5**2))
+        a1_slot = layout.field_slot_map["A_1"]
+        y0[a1_slot * n : (a1_slot + 1) * n] = gaussian.ravel()
+
+        with pytest.warns(UserWarning, match="pinning A_0"):
+            solve_ida(
+                spec,
+                grid,
+                y0,
+                (0.0, 0.1),
+                bc="periodic",
+                parameters={"kappa": 0.5},
+                num_snapshots=3,
+            )
+
+    def test_helmholtz_no_gauge_warning(self) -> None:
+        """Helmholtz constraint (non-singular) emits no gauge regularisation warning."""
+        spec = _make_helmholtz_spec()
+        grid = GridInfo(
+            bounds=((0, 2 * np.pi), (0, 2 * np.pi)),
+            shape=(16, 16),
+            periodic=(True, True),
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+        x_arr, _ = grid.coord_arrays()
+
+        y0 = np.zeros(layout.total_size)
+        rho_slot = layout.field_slot_map["rho_0"]
+        y0[rho_slot * n : (rho_slot + 1) * n] = np.cos(x_arr).ravel()
+
+        import warnings as _warnings
+
+        with _warnings.catch_warnings():
+            _warnings.simplefilter("error", UserWarning)
+            # Should NOT warn — Helmholtz has mass term, not singular
+            pre_solve_constraints(spec, grid, y0, bc="periodic")

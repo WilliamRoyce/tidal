@@ -40,6 +40,7 @@ References
 
 from __future__ import annotations
 
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
@@ -311,6 +312,15 @@ def _fft_solve_single(
                 f"Poisson-type constraints."
             )
             raise ValueError(msg)
+        n_singular = int(np.sum(is_singular))
+        warnings.warn(
+            f"FFT constraint pre-solve: field '{terms.field_name}' has "
+            f"{n_singular} singular mode(s) in Fourier space (null space "
+            f"of operator). Setting u_hat = 0 at these modes (zero-mean "
+            f"gauge). Solution is unique up to these modes.",
+            UserWarning,
+            stacklevel=3,
+        )
         safe_mult = np.where(is_singular, 1.0, multiplier)
         u_hat = np.where(is_singular, 0.0, -source_hat / safe_mult)
     else:
@@ -383,6 +393,15 @@ def _fft_solve_coupled(  # noqa: PLR0914
                 "and source has nonzero mean. Check compatibility."
             )
             raise ValueError(msg)
+        coupled_names = ", ".join(constraint_names)
+        warnings.warn(
+            f"FFT coupled constraint pre-solve: system "
+            f"[{coupled_names}] is singular at zero wavenumber (null "
+            f"space of operator). Setting zero-mode to identity/zero "
+            f"(zero-mean gauge). Solution is unique up to constants.",
+            UserWarning,
+            stacklevel=3,
+        )
         m_hat[zero_idx] = np.eye(n_c)
         rhs_hat[zero_idx] = 0.0
 
@@ -492,6 +511,15 @@ def pre_solve_constraints(  # noqa: PLR0913
     ValueError
         If a constraint is incompatible (singular operator with nonzero
         projection in null space), or has no self-terms.
+
+    Warns
+    -----
+    UserWarning
+        When the FFT solver encounters singular modes (null space of the
+        operator) and regularises by setting ``u_hat = 0`` at those modes.
+        This is a numerical gauge choice (zero-mean).  To disable
+        automatic constraint solving for a field, set
+        ``constraint_solver.enabled = false`` in the JSON spec.
     """
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
     from tidal.solver.fields import FieldSet  # noqa: PLC0415

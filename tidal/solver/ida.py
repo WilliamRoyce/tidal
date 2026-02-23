@@ -17,6 +17,7 @@ scikit-sundae: NREL, BSD-3 license.
 
 from __future__ import annotations
 
+import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -140,23 +141,55 @@ class _ResidualCtx:
 
         A constraint with pure Laplacian self-terms (no identity/mass) and
         periodic BCs has a singular operator (null space = constants).  IDA's
-        Newton solver needs a full-rank Jacobian, so we replace one equation
-        with mean(field) = 0 — the standard gauge-fixing approach used in
-        FEniCS, Firedrake, and other production PDE solvers.
+        Newton solver needs a full-rank Jacobian, so we pin one DOF to zero
+        — the standard approach used in FEniCS, Firedrake, and PETSc.
 
-        This preserves gauge independence: observables are unaffected by the
-        choice of constant offset in the constraint field.
+        Emits ``UserWarning`` for each gauge-regularised field so the user
+        knows this numerical choice is being made.  If the JSON spec already
+        carries gauge metadata mentioning the field, an additional conflict
+        warning is emitted.
         """
         if not self._all_periodic_bcs():
             return set()
 
-        return {
+        result = {
             eq.field_name
             for eq in self.spec.equations
             if eq.time_derivative_order == 0
             and eq.constraint_solver.enabled
             and self._is_pure_laplacian(eq)
         }
+
+        gauge_str = self.spec.metadata.get("gauge", "none")
+
+        for name in sorted(result):
+            warnings.warn(
+                f"Numerical gauge regularisation: pinning {name}[0] = 0 to "
+                f"resolve singular operator (pure Laplacian + periodic BCs "
+                f"\u2192 null space contains constants). The solution is "
+                f"unique only up to an additive constant; this pins that "
+                f"constant to zero. To disable, set "
+                f"constraint_solver.enabled = false for '{name}' in the "
+                f"JSON spec.",
+                UserWarning,
+                stacklevel=2,
+            )
+            # Check for potential conflict with explicit gauge fixing
+            if gauge_str != "none" and name.split("_")[0] in gauge_str:
+                warnings.warn(
+                    f"JSON spec has gauge metadata '{gauge_str}' which may "
+                    f"already constrain '{name}'. The automatic "
+                    f"regularisation (pin {name}[0]=0) could conflict with "
+                    f"the applied gauge. If the gauge was intended to remove "
+                    f"the null space, check that it actually modifies the "
+                    f"constraint equation structure (e.g. adds an "
+                    f"identity/mass term). To suppress, set "
+                    f"constraint_solver.enabled = false for '{name}'.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+
+        return result
 
     def _all_periodic_bcs(self) -> bool:
         """Check if all BCs are periodic."""
@@ -180,12 +213,13 @@ class _ResidualCtx:
         return has_lap
 
     def handle_constraint(self, slot_idx: int, slot: SlotInfo) -> None:
-        """Algebraic constraint: RHS = 0, with gauge fixing for singular operators.
+        """Algebraic constraint: RHS = 0, with gauge regularisation for singular operators.
 
         For Poisson-type constraints (pure Laplacian + periodic BCs), the
         Jacobian is singular.  We replace the first grid point's equation
-        with ``mean(field) = 0`` to pin the gauge freedom, making the
-        Jacobian non-singular while preserving all physical observables.
+        with ``field[0] = 0`` to pin the gauge freedom, making the
+        Jacobian non-singular.  A ``UserWarning`` is emitted by
+        ``_detect_gauge_fix_fields`` so the user knows this choice is active.
         """
         s = slice(slot_idx * self.n, (slot_idx + 1) * self.n)
         eq_idx = self.eq_map.get(slot.field_name)
@@ -407,6 +441,16 @@ def solve_ida(  # noqa: PLR0913
     -------
     dict
         Result dictionary with keys: ``t``, ``y``, ``success``, ``message``.
+
+    Warns
+    -----
+    UserWarning
+        When constraint pre-solve encounters singular modes (FFT path), or
+        when a constraint field is detected as needing gauge regularisation
+        (pure Laplacian + periodic BCs → ``field[0] = 0`` pinning).  These
+        are numerical choices to resolve the null space of the operator.
+        To disable for a specific field, set
+        ``constraint_solver.enabled = false`` in the JSON spec.
     """
     from sksundae.ida import IDA  # noqa: PLC0415
 
