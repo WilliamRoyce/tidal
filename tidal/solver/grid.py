@@ -42,7 +42,7 @@ class GridInfo:
     periodic: tuple[bool, ...]
     bc: tuple[str, ...] | None = None
 
-    _VALID_BC = frozenset({"periodic", "neumann", "dirichlet"})
+    _VALID_BC = frozenset({"periodic", "neumann", "dirichlet", "robin"})
 
     def __post_init__(self) -> None:  # noqa: C901
         if len(self.bounds) != len(self.shape):
