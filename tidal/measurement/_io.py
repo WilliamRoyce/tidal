@@ -21,10 +21,9 @@ import numpy as np
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
-    from typing import Any
-
     from numpy.typing import NDArray
 
+    from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem
 
@@ -103,7 +102,7 @@ class SimulationData:
     @classmethod
     def from_result(
         cls,
-        result: dict[str, Any],
+        result: SolverResult,
         spec: EquationSystem,
         grid_info: GridInfo,
         parameters: dict[str, float] | None = None,

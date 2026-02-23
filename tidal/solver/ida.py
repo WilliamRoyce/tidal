@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from tidal.solver._sksundae import SundialsResult, call_ida
+from tidal.solver._types import DENSE_THRESHOLD, SPARSE_THRESHOLD, SolverResult
 from tidal.solver.fields import FieldSet
 from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 from tidal.solver.state import StateLayout
@@ -41,13 +42,6 @@ if TYPE_CHECKING:
 
 # Time-derivative order threshold for dynamical (wave) equations
 _SECOND_ORDER = 2
-
-# System size thresholds for linear solver selection.
-# Dense Jacobian at N=2000: N^2 * 8 = 32 MB (safe for all environments).
-# Sparse (SuperLU_MT) scales well up to ~200K state variables.
-# Beyond that, matrix-free GMRES avoids storing any Jacobian.
-_DENSE_THRESHOLD = 2_000
-_SPARSE_THRESHOLD = 200_000
 
 
 class _ResidualCtx:
@@ -607,7 +601,7 @@ def solve_ida(  # noqa: PLR0913
     max_steps: int = 50000,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
     calc_initcond: str | None = None,
-) -> dict[str, Any]:
+) -> SolverResult:
     """Solve a TIDAL equation system using SUNDIALS/IDA.
 
     Parameters
@@ -707,9 +701,9 @@ def solve_ida(  # noqa: PLR0913
     # - Sparse (SuperLU_MT): analytical sparsity pattern, O(nnz) memory
     # - GMRES: matrix-free, O(krylov_dim * N) memory, no preconditioner
     n_state = layout.total_size
-    if n_state <= _DENSE_THRESHOLD:
+    if n_state <= DENSE_THRESHOLD:
         options["linsolver"] = "dense"
-    elif n_state <= _SPARSE_THRESHOLD:
+    elif n_state <= SPARSE_THRESHOLD:
         from tidal.solver.sparsity import build_jacobian_sparsity  # noqa: PLC0415
 
         pattern = build_jacobian_sparsity(spec, layout, grid, bc)

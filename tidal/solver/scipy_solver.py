@@ -14,7 +14,7 @@ J. Comp. Appl. Math. 6, 1980.
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -26,6 +26,7 @@ from tidal.solver.state import StateLayout
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
+    from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
     from tidal.solver.rhs import RHSEvaluator
@@ -99,7 +100,7 @@ def solve_scipy(  # noqa: PLR0913
     max_step: float = np.inf,
     num_snapshots: int = 101,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
-) -> dict[str, Any]:
+) -> SolverResult:
     """Solve a TIDAL equation system using scipy.integrate.solve_ivp.
 
     Parameters

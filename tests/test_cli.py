@@ -762,6 +762,79 @@ class TestZeroEvolutionWarning:
         )
 
 
+class TestRequireStable:
+    """Tests for the --require-stable flag end-to-end."""
+
+    def test_require_stable_aborts_on_unstable_spec(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Unstable coupled spec + --require-stable should sys.exit(1)."""
+        import json
+
+        # g0^2 = 25 > mPhi2 * mChi2 = 0.01  =>  strongly unstable
+        spec_data = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+            "fields": [
+                {"name": "phi_0", "index": 0, "is_dynamical": True},
+                {"name": "chi_0", "index": 1, "is_dynamical": True},
+            ],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": -0.1, "operator": "identity", "field": "phi_0"},
+                            {"coefficient": -5.0, "operator": "identity", "field": "chi_0"},
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                        ],
+                    },
+                },
+                {
+                    "field": "chi_0",
+                    "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": -0.1, "operator": "identity", "field": "chi_0"},
+                            {"coefficient": -5.0, "operator": "identity", "field": "phi_0"},
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "chi_0"},
+                        ],
+                    },
+                },
+            ],
+        }
+        spec_path = tmp_path / "unstable.json"
+        spec_path.write_text(json.dumps(spec_data, indent=2))
+
+        with pytest.raises(SystemExit, match="1"):
+            main([
+                "simulate", str(spec_path),
+                "--t-end", "0.5",
+                "--no-plot",
+                "--require-stable",
+            ])
+
+        err = capsys.readouterr().err
+        assert "eigenvalue" in err.lower()
+
+    def test_stable_spec_passes_with_require_stable(
+        self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Stable spec + --require-stable should complete successfully."""
+        ret = main([
+            "simulate", str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--t-end", "0.5",
+            "--no-plot",
+            "--require-stable",
+        ])
+        assert ret == 0
+        err = capsys.readouterr().err
+        assert "eigenvalue" not in err.lower()
+
+
 class TestDeriveCommand:
     def test_derive_toml_dry_run(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
         config = tmp_path / "theory.toml"

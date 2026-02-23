@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import math
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -33,6 +33,7 @@ from tidal.solver.state import StateLayout
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping, Sequence
 
+    from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
@@ -183,7 +184,7 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
     parameters: dict[str, float] | None = None,
     snapshot_interval: float | None = None,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
-) -> dict[str, Any]:
+) -> SolverResult:
     """Solve a TIDAL Hamiltonian system using Stormer-Verlet (leapfrog).
 
     Works for second-order (wave) equations with optional constraint fields.

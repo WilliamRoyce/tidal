@@ -53,6 +53,8 @@
     "eigenfrequency",
     "eigenmode",
     "eigenmodes",
+    "eigvals",
+    "eigvalsh",
     "Fierz",
     "functionals",
     "García",

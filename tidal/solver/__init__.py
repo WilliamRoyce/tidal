@@ -1,6 +1,7 @@
 """TIDAL solver package — grid, spatial operators, time integrators."""
 
 from tidal.solver._exceptions import SimulationDivergedError
+from tidal.solver._types import SolverResult
 from tidal.solver.coefficients import CoefficientEvaluator
 from tidal.solver.fields import FieldSet
 from tidal.solver.grid import GridInfo
@@ -22,6 +23,7 @@ __all__ = [
     "GridInfo",
     "RHSEvaluator",
     "SimulationDivergedError",
+    "SolverResult",
     "StateLayout",
     "apply_operator",
     "check_cfl_stability",

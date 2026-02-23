@@ -25,6 +25,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from tidal.solver._sksundae import SundialsResult, call_cvode
+from tidal.solver._types import DENSE_THRESHOLD, SPARSE_THRESHOLD, SolverResult
 from tidal.solver.fields import FieldSet
 from tidal.solver.leapfrog import compute_force, compute_velocity
 from tidal.solver.state import StateLayout
@@ -36,10 +37,6 @@ if TYPE_CHECKING:
     from tidal.solver.operators import BCSpec
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
-
-# System size thresholds for linear solver selection (same as IDA).
-_DENSE_THRESHOLD = 2_000
-_SPARSE_THRESHOLD = 200_000
 
 # Time-derivative order threshold for dynamical (wave) equations
 _SECOND_ORDER = 2
@@ -107,7 +104,7 @@ def solve_cvode(  # noqa: PLR0913
     max_num_steps: int = 50000,
     num_snapshots: int = 101,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
-) -> dict[str, Any]:
+) -> SolverResult:
     """Solve a TIDAL equation system using SUNDIALS/CVODE.
 
     Parameters
@@ -190,9 +187,9 @@ def solve_cvode(  # noqa: PLR0913
 
     # Choose linear solver based on system size (same thresholds as IDA)
     n_state = layout.total_size
-    if n_state <= _DENSE_THRESHOLD:
+    if n_state <= DENSE_THRESHOLD:
         options["linsolver"] = "dense"
-    elif n_state <= _SPARSE_THRESHOLD:
+    elif n_state <= SPARSE_THRESHOLD:
         from tidal.solver.sparsity import build_jacobian_sparsity  # noqa: PLC0415
 
         pattern = build_jacobian_sparsity(spec, layout, grid, bc)

@@ -9,7 +9,10 @@ from __future__ import annotations
 import dataclasses
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from tidal.solver._types import SolverResult
 
 import numpy as np
 import pytest
@@ -4094,7 +4097,7 @@ class TestSimulationDataFromResult:
 
         # 2 slots (phi_0, pi_phi_0) x 16 points = 32 flat size
         n_snaps, n_flat = 5, 32
-        result = {
+        result: SolverResult = {
             "t": np.linspace(0, 1, n_snaps),
             "y": np.random.default_rng(42).standard_normal((n_snaps, n_flat)),
             "success": True,
@@ -4118,7 +4121,7 @@ class TestSimulationDataFromResult:
 
         rng = np.random.default_rng(123)
         y = rng.standard_normal((3, 16))  # 2 slots x 8 points
-        result = {
+        result: SolverResult = {
             "t": np.array([0.0, 0.5, 1.0]),
             "y": y,
             "success": True,
@@ -4139,7 +4142,7 @@ class TestSimulationDataFromResult:
         spec = self._kg_spec()
         gi = GridInfo(bounds=((0.0, 8.0),), shape=(16,), periodic=(True,))
 
-        result = {
+        result: SolverResult = {
             "t": np.array([0.0]),
             "y": np.zeros((1, 32)),
             "success": True,
@@ -4159,7 +4162,7 @@ class TestSimulationDataFromResult:
         spec = self._kg_spec()
         gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(False,))
 
-        result = {
+        result: SolverResult = {
             "t": np.array([]),
             "y": np.zeros((0, 32)),
             "success": True,
@@ -4177,7 +4180,7 @@ class TestSimulationDataFromResult:
 
         rng = np.random.default_rng(99)
         y = rng.standard_normal((4, 16))
-        result = {
+        result: SolverResult = {
             "t": np.array([0.0, 1.0, 2.0, 3.0]),
             "y": y,
             "success": True,

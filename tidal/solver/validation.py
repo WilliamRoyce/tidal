@@ -181,7 +181,7 @@ def check_mass_sign(
     return warnings
 
 
-def check_pointwise_mass_stability(
+def check_pointwise_mass_stability(  # noqa: PLR0914
     coeff_eval: CoefficientEvaluator,
     spec: EquationSystem,
     grid: GridInfo,
@@ -230,17 +230,29 @@ def check_pointwise_mass_stability(
             else:
                 pot[eq_idx, j] -= float(coeff)  # constant: subtract scalar
 
-    # Vectorised eigenvalue check: reshape to (n_grid, n, n) batch.
-    # eigvalsh assumes symmetric matrix — true for physical Lagrangians where
-    # cross-coupling terms are symmetric (same coupling in both field equations).
+    # Vectorized eigenvalue check: reshape to (n_grid, n, n) batch.
     pot_flat = pot.reshape(n, n, -1).transpose(2, 0, 1)  # (n_grid, n, n)
-    eigenvalues = np.linalg.eigvalsh(pot_flat)  # (n_grid, n), real-valued
+
+    # Check symmetry: physical Lagrangians produce symmetric coupling, but
+    # validate rather than assume so asymmetric cases don't silently give
+    # wrong eigenvalues from eigvalsh.
+    warnings_out: list[str] = []
+    sym_diff = float(np.abs(pot_flat - pot_flat.transpose(0, 2, 1)).max())
+    if n > 1 and sym_diff > 1e-12:  # noqa: PLR2004
+        warnings_out.append(
+            f"Mass/coupling matrix is asymmetric (max |M-M^T| = {sym_diff:.2e}). "
+            f"Using general eigenvalues; stability check may be less precise."
+        )
+        eigenvalues = np.linalg.eigvals(pot_flat).real  # general case
+    else:
+        eigenvalues = np.linalg.eigvalsh(pot_flat)  # faster, guaranteed real
+
     min_per_point = eigenvalues.min(axis=1)  # (n_grid,) minimum eigenvalue per point
     global_min = float(min_per_point.min())
 
     tolerance = 1e-10
     if global_min >= -tolerance:
-        return []
+        return warnings_out  # may contain asymmetry warning only
 
     # Find the worst grid point for a diagnostic message
     worst_flat = int(min_per_point.argmin())
@@ -251,13 +263,14 @@ def check_pointwise_mass_stability(
         f"{spatial_coords[d]}={grid.axes_coords(d)[worst_idx[d]]:.4g}"
         for d in range(len(grid_shape))
     ]
-    return [
+    warnings_out.append(
         f"Coupled mass matrix has minimum eigenvalue {global_min:.4g} at "
         f"({', '.join(coord_strs)}). The system has exponentially growing "
-        f"modes — it will be unstable. "
+        f"modes -- it will be unstable. "
         f"Check that the mass matrix is positive-definite at all grid points "
         f"(e.g. for Gaussian-coupled scalars: mPhi2 * mChi2 > g0^2)."
-    ]
+    )
+    return warnings_out
 
 
 def check_robin_stability(grid: GridInfo) -> list[str]:

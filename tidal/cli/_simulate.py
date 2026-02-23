@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from tidal.measurement._io import SimulationData
     from tidal.measurement._writer import SnapshotWriter
+    from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import AxisBCSpec, BCSpec
     from tidal.symbolic.json_loader import EquationSystem
@@ -825,7 +826,7 @@ def _check_mass_stability(
         sys.exit(1)
 
 
-def _check_result_finite(result: dict) -> None:  # type: ignore[type-arg]
+def _check_result_finite(result: SolverResult) -> None:
     """Raise SimulationDivergedError if the final state contains NaN or Inf.
 
     This is a single post-simulation check — zero per-step overhead.
@@ -837,8 +838,8 @@ def _check_result_finite(result: dict) -> None:  # type: ignore[type-arg]
     """
     from tidal.solver._exceptions import SimulationDivergedError
 
-    y = result.get("y")
-    if y is None or len(y) == 0:
+    y = result["y"]
+    if len(y) == 0:
         return
     final = y[-1]
     if not np.isfinite(final).all():
