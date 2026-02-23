@@ -6,6 +6,7 @@ import numpy as np
 import pytest
 
 from tidal.solver.grid import GridInfo
+from tidal.solver.operators import AxisBCSpec, SideBCSpec
 
 
 class TestGridInfoConstruction:
@@ -127,6 +128,79 @@ class TestGridInfoCoords:
         assert xs.shape == (4, 5, 6)
         # z constant along axes 0, 1
         np.testing.assert_allclose(zs[0, 0, :], zs[1, 2, :])
+
+
+class TestGridInfoAxisBCs:
+    """Tests for GridInfo with structured AxisBCSpec."""
+
+    def test_axis_bcs_neumann(self) -> None:
+        side = SideBCSpec(kind="neumann")
+        abc = AxisBCSpec(periodic=False, low=side, high=side)
+        g = GridInfo(
+            bounds=((0, 10),), shape=(64,), periodic=(False,),
+            axis_bcs=(abc,),
+        )
+        assert g.axis_bcs is not None
+        assert g.axis_bcs[0].low is not None
+        assert g.axis_bcs[0].low.kind == "neumann"
+
+    def test_axis_bcs_periodic(self) -> None:
+        abc = AxisBCSpec(periodic=True)
+        g = GridInfo(
+            bounds=((0, 10),), shape=(64,), periodic=(True,),
+            axis_bcs=(abc,),
+        )
+        assert g.axis_bcs is not None
+        assert g.axis_bcs[0].periodic
+
+    def test_axis_bcs_length_mismatch_raises(self) -> None:
+        side = SideBCSpec(kind="neumann")
+        abc = AxisBCSpec(periodic=False, low=side, high=side)
+        with pytest.raises(ValueError, match="axis_bcs has 1 entries but grid has 2"):
+            GridInfo(
+                bounds=((0, 10), (0, 5)), shape=(32, 32), periodic=(False, False),
+                axis_bcs=(abc,),
+            )
+
+    def test_axis_bcs_periodic_mismatch_raises(self) -> None:
+        abc = AxisBCSpec(periodic=True)
+        with pytest.raises(ValueError, match=r"axis_bcs.*periodic.*must be consistent"):
+            GridInfo(
+                bounds=((0, 10),), shape=(64,), periodic=(False,),
+                axis_bcs=(abc,),
+            )
+
+    def test_effective_bc_returns_axis_bcs(self) -> None:
+        """When axis_bcs is set, effective_bc returns AxisBCSpec tuple."""
+        side = SideBCSpec(kind="dirichlet", value=1.0)
+        abc = AxisBCSpec(periodic=False, low=side, high=side)
+        g = GridInfo(
+            bounds=((0, 10),), shape=(64,), periodic=(False,),
+            axis_bcs=(abc,),
+        )
+        ebc = g.effective_bc
+        assert isinstance(ebc[0], AxisBCSpec)
+
+    def test_effective_bc_falls_back_to_bc_strings(self) -> None:
+        """Without axis_bcs, effective_bc returns string tuple."""
+        g = GridInfo(
+            bounds=((0, 10),), shape=(64,), periodic=(False,),
+            bc=("neumann",),
+        )
+        assert g.effective_bc == ("neumann",)
+
+    def test_effective_bc_infers_from_periodic(self) -> None:
+        """Without bc or axis_bcs, effective_bc infers from periodic flags."""
+        g = GridInfo(bounds=((0, 10),), shape=(64,), periodic=(True,))
+        assert g.effective_bc == ("periodic",)
+
+    def test_robin_in_bc_string(self) -> None:
+        """Robin is a valid bc string type."""
+        g = GridInfo(
+            bounds=((0, 10),), shape=(64,), periodic=(False,),
+            bc=("robin",),
+        )
+        assert g.bc == ("robin",)
 
 
 class TestGridInfoFrozen:

@@ -1736,3 +1736,49 @@ class TestCanonicalStructure:
         }
         spec = EquationSystem.from_dict(data)
         assert spec.canonical is None
+
+
+# ==================== BoundaryCondition.to_side_bc ====================
+
+
+class TestBoundaryConditionToSideBc:
+    """Tests for BoundaryCondition.to_side_bc() conversion."""
+
+    def test_dirichlet_to_side_bc(self) -> None:
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        bc = BoundaryCondition(type="dirichlet", value=2.0)
+        side = bc.to_side_bc()
+        assert side.kind == "dirichlet"
+        assert side.value == 2.0
+
+    def test_neumann_to_side_bc(self) -> None:
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        bc = BoundaryCondition(type="neumann", derivative=0.5)
+        side = bc.to_side_bc()
+        assert side.kind == "neumann"
+        assert side.derivative == 0.5
+
+    def test_robin_to_side_bc(self) -> None:
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        bc = BoundaryCondition(type="robin", gamma=1.0, value=0.5)
+        side = bc.to_side_bc()
+        assert side.kind == "robin"
+        assert side.gamma == 1.0
+        assert side.value == 0.5
+
+    def test_periodic_raises(self) -> None:
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        bc = BoundaryCondition(type="periodic")
+        with pytest.raises(ValueError, match="Cannot convert periodic"):
+            bc.to_side_bc()
+
+    def test_robin_from_dict(self) -> None:
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        bc = BoundaryCondition.from_dict({"type": "robin", "gamma": 2.0, "value": 1.0})
+        assert bc.type == "robin"
+        assert bc.gamma == 2.0

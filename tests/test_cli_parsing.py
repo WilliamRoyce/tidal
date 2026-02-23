@@ -13,9 +13,12 @@ import numpy as np
 import pytest
 
 from tidal.cli._simulate import (
+    _bc_entry_to_axis_bc,
     _build_grid_info,
     _build_initial_y0,
     _infer_output_format,
+    _parse_axis_bcs,
+    _parse_bc_entry,
     _parse_bounds,
     _parse_grid_shape,
     _parse_params,
@@ -359,8 +362,9 @@ class TestConstraintSolverToml:
             }
         })
         assert '"type" -> "periodic"' in wls
-        # Periodic BCs should NOT have a "value" key
-        assert '"value"' not in wls
+        # Periodic BCs should NOT have a "value" key in the BC association
+        # (use narrow match to avoid false positives from other WLS template code)
+        assert '"value" -> 0' not in wls
 
 
 class TestGaugeToml:
@@ -630,7 +634,7 @@ class TestParsePeriodic:
 
     def test_invalid_bc_type(self) -> None:
         with pytest.raises(ValueError, match="Invalid boundary condition"):
-            _parse_periodic("robin", periodic=True, spatial_dim=1)
+            _parse_periodic("absorbing", periodic=True, spatial_dim=1)
 
     def test_wrong_count(self) -> None:
         with pytest.raises(ValueError, match="--bc"):
@@ -691,6 +695,173 @@ class TestBuildGridInfo:
         spec = self._make_spec(1)
         gi = _build_grid_info(args, spec, [(0.0, 10.0)])
         assert gi.cell_coords.shape == (8, 1)
+
+    def test_robin_bc_creates_axis_bcs(self) -> None:
+        """Robin BC through CLI creates AxisBCSpec in GridInfo."""
+        args = _make_grid_args(bc="robin:gamma=1:beta=0")
+        spec = self._make_spec(1)
+        gi = _build_grid_info(args, spec, [(0.0, 10.0)])
+        assert gi.axis_bcs is not None
+        assert len(gi.axis_bcs) == 1
+        assert not gi.axis_bcs[0].periodic
+        assert gi.axis_bcs[0].low is not None
+        assert gi.axis_bcs[0].low.kind == "robin"
+
+    def test_nonzero_dirichlet_creates_axis_bcs(self) -> None:
+        """Non-zero Dirichlet BC through CLI creates AxisBCSpec."""
+        args = _make_grid_args(bc="dirichlet:2.0")
+        spec = self._make_spec(1)
+        gi = _build_grid_info(args, spec, [(0.0, 10.0)])
+        assert gi.axis_bcs is not None
+        assert gi.axis_bcs[0].low is not None
+        assert gi.axis_bcs[0].low.value == 2.0
+
+    def test_mixed_bc_2d_with_axis_bcs(self) -> None:
+        """Mixed neumann/periodic in 2D creates correct axis_bcs."""
+        args = _make_grid_args(bc="neumann,periodic")
+        spec = self._make_spec(2)
+        gi = _build_grid_info(args, spec, [(0.0, 10.0), (0.0, 5.0)])
+        assert gi.axis_bcs is not None
+        assert not gi.axis_bcs[0].periodic
+        assert gi.axis_bcs[1].periodic
+
+
+# ==================== _parse_bc_entry ====================
+
+
+class TestParseBcEntry:
+    """Tests for the extended BC parsing syntax."""
+
+    def test_simple_periodic(self) -> None:
+        bc_type, params = _parse_bc_entry("periodic")
+        assert bc_type == "periodic"
+        assert params == {}
+
+    def test_simple_neumann(self) -> None:
+        bc_type, params = _parse_bc_entry("neumann")
+        assert bc_type == "neumann"
+        assert params == {}
+
+    def test_dirichlet_with_value(self) -> None:
+        bc_type, params = _parse_bc_entry("dirichlet:1.5")
+        assert bc_type == "dirichlet"
+        assert params == {"value": 1.5}
+
+    def test_neumann_with_deriv(self) -> None:
+        bc_type, params = _parse_bc_entry("neumann:0.5")
+        assert bc_type == "neumann"
+        assert params == {"deriv": 0.5}
+
+    def test_neumann_with_keyword(self) -> None:
+        bc_type, params = _parse_bc_entry("neumann:deriv=0.5")
+        assert bc_type == "neumann"
+        assert params == {"deriv": 0.5}
+
+    def test_robin_with_keywords(self) -> None:
+        bc_type, params = _parse_bc_entry("robin:gamma=1.0:beta=0.5")
+        assert bc_type == "robin"
+        assert params == {"gamma": 1.0, "beta": 0.5}
+
+    def test_invalid_type_raises(self) -> None:
+        with pytest.raises(ValueError, match="Invalid boundary condition"):
+            _parse_bc_entry("absorbing")
+
+    def test_bad_value_raises(self) -> None:
+        with pytest.raises(ValueError, match="Invalid BC parameter"):
+            _parse_bc_entry("dirichlet:abc")
+
+    def test_bad_keyword_value_raises(self) -> None:
+        with pytest.raises(ValueError, match="Invalid BC parameter value"):
+            _parse_bc_entry("robin:gamma=abc")
+
+    def test_case_insensitive(self) -> None:
+        bc_type, _params = _parse_bc_entry("  Periodic  ")
+        assert bc_type == "periodic"
+
+
+# ==================== _bc_entry_to_axis_bc ====================
+
+
+class TestBcEntryToAxisBc:
+    """Tests for _bc_entry_to_axis_bc conversion."""
+
+    def test_periodic(self) -> None:
+        abc = _bc_entry_to_axis_bc("periodic", {})
+        assert abc.periodic
+
+    def test_periodic_with_params_raises(self) -> None:
+        with pytest.raises(ValueError, match="Periodic BC does not accept"):
+            _bc_entry_to_axis_bc("periodic", {"value": 1.0})
+
+    def test_dirichlet_default(self) -> None:
+        abc = _bc_entry_to_axis_bc("dirichlet", {})
+        assert not abc.periodic
+        assert abc.low is not None
+        assert abc.low.kind == "dirichlet"
+        assert abc.low.value == 0.0
+
+    def test_dirichlet_nonzero(self) -> None:
+        abc = _bc_entry_to_axis_bc("dirichlet", {"value": 3.0})
+        assert abc.low is not None
+        assert abc.low.value == 3.0
+        assert abc.high is not None
+        assert abc.high.value == 3.0  # symmetric by default
+
+    def test_neumann_with_derivative(self) -> None:
+        abc = _bc_entry_to_axis_bc("neumann", {"deriv": 0.5})
+        assert abc.low is not None
+        assert abc.low.kind == "neumann"
+        assert abc.low.derivative == 0.5
+
+    def test_robin(self) -> None:
+        abc = _bc_entry_to_axis_bc("robin", {"gamma": 1.0, "beta": 0.5})
+        assert abc.low is not None
+        assert abc.low.kind == "robin"
+        assert abc.low.gamma == 1.0
+        assert abc.low.value == 0.5  # beta maps to value
+
+    def test_unknown_type_raises(self) -> None:
+        with pytest.raises(ValueError, match="Unknown BC type"):
+            _bc_entry_to_axis_bc("absorbing", {})
+
+
+# ==================== _parse_axis_bcs ====================
+
+
+class TestParseAxisBcs:
+    """Tests for full --bc string to AxisBCSpec tuple parsing."""
+
+    def test_none_returns_none(self) -> None:
+        assert _parse_axis_bcs(None, spatial_dim=1) is None
+
+    def test_single_neumann(self) -> None:
+        result = _parse_axis_bcs("neumann", spatial_dim=1)
+        assert result is not None
+        assert len(result) == 1
+        assert not result[0].periodic
+
+    def test_broadcast_1_to_2d(self) -> None:
+        result = _parse_axis_bcs("periodic", spatial_dim=2)
+        assert result is not None
+        assert len(result) == 2
+        assert all(r.periodic for r in result)
+
+    def test_mixed_2d(self) -> None:
+        result = _parse_axis_bcs("dirichlet,periodic", spatial_dim=2)
+        assert result is not None
+        assert not result[0].periodic
+        assert result[1].periodic
+
+    def test_wrong_count_raises(self) -> None:
+        with pytest.raises(ValueError, match="--bc expects"):
+            _parse_axis_bcs("neumann,periodic,dirichlet", spatial_dim=2)
+
+    def test_extended_syntax(self) -> None:
+        result = _parse_axis_bcs("dirichlet:2.0,periodic", spatial_dim=2)
+        assert result is not None
+        assert result[0].low is not None
+        assert result[0].low.value == 2.0
+        assert result[1].periodic
 
 
 # ==================== _build_initial_y0 (native path) ====================

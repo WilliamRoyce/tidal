@@ -18,6 +18,8 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from collections.abc import Mapping
 
+    from tidal.solver.operators import SideBCSpec
+
 #: Canonical spatial axis letters, ordered by dimension index.
 #: Supports up to 6 spatial dimensions (sufficient for all foreseeable physics).
 AXIS_LETTERS: tuple[str, ...] = ("x", "y", "z", "w", "v", "u")
@@ -230,7 +232,9 @@ class OperatorTerm:
         )
 
 
-_VALID_BC_TYPES: frozenset[str] = frozenset({"periodic", "dirichlet", "neumann"})
+_VALID_BC_TYPES: frozenset[str] = frozenset(
+    {"periodic", "dirichlet", "neumann", "robin"}
+)
 
 
 @dataclass(frozen=True)
@@ -240,16 +244,19 @@ class BoundaryCondition:
     Attributes
     ----------
     type : str
-        One of "periodic", "dirichlet", or "neumann".
+        One of "periodic", "dirichlet", "neumann", or "robin".
     value : float | None
-        Fixed value for Dirichlet BCs.
+        Fixed value for Dirichlet BCs, or Robin beta.
     derivative : float | None
         Fixed normal derivative for Neumann BCs.
+    gamma : float | None
+        Robin coefficient gamma in d_n f + gamma*f = beta.
     """
 
     type: str
     value: float | None = None
     derivative: float | None = None
+    gamma: float | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> BoundaryCondition:
@@ -268,6 +275,27 @@ class BoundaryCondition:
             type=bc_type,
             value=data.get("value"),
             derivative=data.get("derivative"),
+            gamma=data.get("gamma"),
+        )
+
+    def to_side_bc(self) -> SideBCSpec:
+        """Convert to a ``SideBCSpec`` for the operator layer.
+
+        Raises
+        ------
+        ValueError
+            If the BC type is "periodic" (not representable as a side BC).
+        """
+        from tidal.solver.operators import SideBCSpec  # noqa: PLC0415
+
+        if self.type == "periodic":
+            msg = "Cannot convert periodic BC to SideBCSpec"
+            raise ValueError(msg)
+        return SideBCSpec(
+            kind=self.type,
+            value=self.value or 0.0,
+            derivative=self.derivative or 0.0,
+            gamma=self.gamma or 0.0,
         )
 
 

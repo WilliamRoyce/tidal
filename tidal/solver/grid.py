@@ -9,8 +9,12 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import numpy as np
+
+if TYPE_CHECKING:
+    from tidal.solver.operators import AxisBCSpec
 
 
 @dataclass(frozen=True)
@@ -25,6 +29,11 @@ class GridInfo:
         Number of grid cells per axis, e.g. ``(64, 64)``.
     periodic : tuple of bool
         Whether each axis is periodic, e.g. ``(True, True)``.
+    bc : tuple of str, optional
+        Legacy per-axis BC type strings (e.g. ``("neumann", "periodic")``).
+    axis_bcs : tuple of AxisBCSpec, optional
+        Structured per-axis BC specs with per-side values and Robin support.
+        Takes precedence over ``bc`` when set.
 
     Examples
     --------
@@ -41,10 +50,11 @@ class GridInfo:
     shape: tuple[int, ...]
     periodic: tuple[bool, ...]
     bc: tuple[str, ...] | None = None
+    axis_bcs: tuple[AxisBCSpec, ...] | None = None
 
     _VALID_BC = frozenset({"periodic", "neumann", "dirichlet", "robin"})
 
-    def __post_init__(self) -> None:  # noqa: C901
+    def __post_init__(self) -> None:  # noqa: C901, PLR0912
         if len(self.bounds) != len(self.shape):
             msg = (
                 f"bounds has {len(self.bounds)} axes but shape has "
@@ -86,6 +96,20 @@ class GridInfo:
                         f"— these must be consistent"
                     )
                     raise ValueError(msg)
+        if self.axis_bcs is not None:
+            if len(self.axis_bcs) != len(self.bounds):
+                msg = (
+                    f"axis_bcs has {len(self.axis_bcs)} entries but grid has "
+                    f"{len(self.bounds)} axes — must match"
+                )
+                raise ValueError(msg)
+            for i, abc in enumerate(self.axis_bcs):
+                if abc.periodic != self.periodic[i]:
+                    msg = (
+                        f"axis_bcs[{i}].periodic = {abc.periodic} but "
+                        f"periodic[{i}] = {self.periodic[i]} — must be consistent"
+                    )
+                    raise ValueError(msg)
 
     @property
     def ndim(self) -> int:
@@ -98,8 +122,15 @@ class GridInfo:
         return math.prod(self.shape)
 
     @property
-    def effective_bc(self) -> tuple[str, ...]:
-        """Per-axis BC types, inferred from ``periodic`` if ``bc`` is not set."""
+    def effective_bc(self) -> tuple[str, ...] | tuple[AxisBCSpec, ...]:
+        """Per-axis BC specs.
+
+        Returns ``AxisBCSpec`` tuple if ``axis_bcs`` is set (structured BCs
+        with per-side values), otherwise falls back to string tuple from
+        ``bc`` or infers from ``periodic``.
+        """
+        if self.axis_bcs is not None:
+            return self.axis_bcs
         if self.bc is not None:
             return self.bc
         return tuple("periodic" if p else "neumann" for p in self.periodic)

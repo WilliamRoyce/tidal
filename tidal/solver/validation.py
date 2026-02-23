@@ -179,3 +179,33 @@ def check_mass_sign(
                     f"max={float(result.max()):.4g})."
                 )
     return warnings
+
+
+def check_robin_stability(grid: GridInfo) -> list[str]:
+    """Check Robin BC ghost-cell formula stability.
+
+    The ghost-cell formula denominator is ``gamma * dx + 2``.  When
+    ``gamma * dx >= 2`` the mirror factor ``(2 - gamma*dx)/(gamma*dx + 2)``
+    becomes non-positive, which can destabilise the scheme.
+
+    Returns a list of warning strings (empty if all clear).
+    """
+    warnings: list[str] = []
+    if grid.axis_bcs is None:
+        return warnings
+
+    for i, abc in enumerate(grid.axis_bcs):
+        if abc.periodic:
+            continue
+        dx = grid.dx[i]
+        for side_label, side in [("low", abc.low), ("high", abc.high)]:
+            if side is None or side.kind != "robin":
+                continue
+            if side.gamma * dx >= 2.0:  # noqa: PLR2004
+                warnings.append(
+                    f"Robin BC on axis {i} ({side_label}): "
+                    f"gamma*dx = {side.gamma * dx:.4g} >= 2. "
+                    f"Ghost-cell formula becomes unstable. "
+                    f"Increase grid resolution or decrease gamma."
+                )
+    return warnings

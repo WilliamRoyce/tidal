@@ -9,9 +9,11 @@ import pytest
 
 from tidal.solver.coefficients import CoefficientEvaluator
 from tidal.solver.grid import GridInfo
+from tidal.solver.operators import AxisBCSpec, SideBCSpec
 from tidal.solver.validation import (
     check_cfl_stability,
     check_mass_sign,
+    check_robin_stability,
     validate_field_references,
     validate_operator_dimensions,
 )
@@ -243,3 +245,59 @@ class TestMassSign:
         coeff_eval = CoefficientEvaluator(spec, grid)
         result = check_mass_sign(coeff_eval, spec)
         assert len(result) == 0
+
+
+# ---------------------------------------------------------------------------
+# check_robin_stability
+# ---------------------------------------------------------------------------
+
+
+class TestCheckRobinStability:
+    """Tests for Robin BC ghost-cell stability check."""
+
+    def test_no_axis_bcs_returns_empty(self) -> None:
+        grid = GridInfo(bounds=((0, 10),), shape=(64,), periodic=(False,))
+        assert check_robin_stability(grid) == []
+
+    def test_stable_robin(self) -> None:
+        """gamma*dx < 2 should produce no warnings."""
+        side = SideBCSpec(kind="robin", gamma=1.0, value=0.0)
+        abc = AxisBCSpec(periodic=False, low=side, high=side)
+        grid = GridInfo(
+            bounds=((0, 10),), shape=(64,), periodic=(False,),
+            axis_bcs=(abc,),
+        )
+        result = check_robin_stability(grid)
+        assert len(result) == 0
+
+    def test_unstable_robin_warns(self) -> None:
+        """gamma*dx >= 2 should produce a warning."""
+        # dx = 10/4 = 2.5, gamma = 1.0 -> gamma*dx = 2.5 >= 2
+        side = SideBCSpec(kind="robin", gamma=1.0, value=0.0)
+        abc = AxisBCSpec(periodic=False, low=side, high=side)
+        grid = GridInfo(
+            bounds=((0, 10),), shape=(4,), periodic=(False,),
+            axis_bcs=(abc,),
+        )
+        result = check_robin_stability(grid)
+        assert len(result) > 0
+        assert "unstable" in result[0].lower()
+
+    def test_periodic_axis_skipped(self) -> None:
+        """Periodic axes are not checked for Robin stability."""
+        abc = AxisBCSpec(periodic=True)
+        grid = GridInfo(
+            bounds=((0, 10),), shape=(4,), periodic=(True,),
+            axis_bcs=(abc,),
+        )
+        assert check_robin_stability(grid) == []
+
+    def test_neumann_not_warned(self) -> None:
+        """Neumann BC should not trigger Robin stability warning."""
+        side = SideBCSpec(kind="neumann")
+        abc = AxisBCSpec(periodic=False, low=side, high=side)
+        grid = GridInfo(
+            bounds=((0, 10),), shape=(4,), periodic=(False,),
+            axis_bcs=(abc,),
+        )
+        assert check_robin_stability(grid) == []

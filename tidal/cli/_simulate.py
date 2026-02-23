@@ -16,6 +16,7 @@ if TYPE_CHECKING:
     from tidal.measurement._io import SimulationData
     from tidal.measurement._writer import SnapshotWriter
     from tidal.solver.grid import GridInfo
+    from tidal.solver.operators import AxisBCSpec
     from tidal.symbolic.json_loader import EquationSystem
 
 # Default grid shapes per spatial dimension
@@ -198,7 +199,91 @@ def _parse_single_bound(s: str) -> tuple[float, float]:
     return lo, hi
 
 
-_NATIVE_BC_TYPES = frozenset({"periodic", "neumann", "dirichlet"})
+_NATIVE_BC_TYPES = frozenset({"periodic", "neumann", "dirichlet", "robin"})
+
+
+def _parse_bc_entry(entry: str) -> tuple[str, dict[str, float]]:
+    """Parse a single BC entry like ``"dirichlet:1.0"`` or ``"robin:gamma=1:beta=0"``.
+
+    Returns ``(bc_type, params)`` where params is a dict of keyword arguments.
+
+    Supported formats:
+    - ``"periodic"`` -- simple BC type
+    - ``"dirichlet:1.0"`` -- BC type with positional value
+    - ``"neumann:deriv=0.5"`` -- BC type with keyword argument
+    - ``"robin:gamma=1:beta=0"`` -- BC type with multiple keyword arguments
+
+    Raises
+    ------
+    ValueError
+        If the BC type is unknown or parameters are malformed.
+    """
+    parts = entry.strip().lower().split(":")
+    bc_type = parts[0]
+    if bc_type not in _NATIVE_BC_TYPES:
+        msg = (
+            f"Invalid boundary condition: '{bc_type}'. "
+            f"Must be one of: {', '.join(sorted(_NATIVE_BC_TYPES))}"
+        )
+        raise ValueError(msg)
+
+    params: dict[str, float] = {}
+    for part in parts[1:]:
+        if "=" in part:
+            key, val_str = part.split("=", 1)
+            try:
+                params[key.strip()] = float(val_str.strip())
+            except ValueError:
+                msg = f"Invalid BC parameter value: '{part}' (expected key=number)"
+                raise ValueError(msg) from None
+        else:
+            # Positional value: "dirichlet:1.0" or "neumann:0.5"
+            try:
+                val = float(part.strip())
+            except ValueError:
+                msg = f"Invalid BC parameter: '{part}' (expected number or key=number)"
+                raise ValueError(msg) from None
+            if bc_type == "neumann":
+                params["deriv"] = val
+            else:
+                params["value"] = val
+
+    return bc_type, params
+
+
+def _bc_entry_to_axis_bc(
+    bc_type: str, params: dict[str, float]
+) -> AxisBCSpec:
+    """Convert a parsed BC entry to an AxisBCSpec.
+
+    Raises
+    ------
+    ValueError
+        If the BC type is unknown or parameters are invalid.
+    """
+    from tidal.solver.operators import AxisBCSpec, SideBCSpec
+
+    if bc_type == "periodic":
+        if params:
+            msg = "Periodic BC does not accept parameters"
+            raise ValueError(msg)
+        return AxisBCSpec(periodic=True)
+
+    if bc_type == "dirichlet":
+        side = SideBCSpec(kind="dirichlet", value=params.get("value", 0.0))
+    elif bc_type == "neumann":
+        side = SideBCSpec(kind="neumann", derivative=params.get("deriv", 0.0))
+    elif bc_type == "robin":
+        side = SideBCSpec(
+            kind="robin",
+            value=params.get("beta", 0.0),
+            gamma=params.get("gamma", 0.0),
+        )
+    else:
+        msg = f"Unknown BC type: {bc_type!r}"
+        raise ValueError(msg)
+
+    return AxisBCSpec(periodic=False, low=side, high=side)
 
 
 def _parse_periodic(
@@ -209,8 +294,9 @@ def _parse_periodic(
 ) -> tuple[bool, ...]:
     """Parse boundary spec into periodic flags for GridInfo.
 
-    Returns a fixed-length tuple of booleans. Accepts ``"dirichlet"``,
-    ``"neumann"``, and ``"periodic"`` as valid BC types.
+    Returns a fixed-length tuple of booleans.  Accepts simple types
+    (``"periodic"``, ``"neumann"``, ``"dirichlet"``, ``"robin"``)
+    and extended syntax (``"dirichlet:1.0"``, ``"robin:gamma=1:beta=0"``).
 
     Parameters
     ----------
@@ -245,15 +331,48 @@ def _parse_periodic(
         )
         raise ValueError(msg)
 
-    for bc in bc_list:
-        if bc not in _NATIVE_BC_TYPES:
-            msg = (
-                f"Invalid boundary condition: '{bc}'. "
-                f"Must be one of: {', '.join(sorted(_NATIVE_BC_TYPES))}"
-            )
-            raise ValueError(msg)
+    result: list[bool] = []
+    for entry in bc_list:
+        bc_type, _params = _parse_bc_entry(entry)
+        result.append(bc_type == "periodic")
 
-    return tuple(bc == "periodic" for bc in bc_list)
+    return tuple(result)
+
+
+def _parse_axis_bcs(
+    bc_str: str | None,
+    *,
+    spatial_dim: int,
+) -> tuple[AxisBCSpec, ...] | None:
+    """Parse ``--bc`` string into structured AxisBCSpec objects.
+
+    Returns ``None`` when ``--bc`` is not specified (use default inference).
+    Returns a tuple of ``AxisBCSpec`` when explicit BCs are given.
+
+    Raises
+    ------
+    ValueError
+        If BC count doesn't match dimension or parameters are invalid.
+    """
+    if bc_str is None:
+        return None
+
+    bc_list = [b.strip().lower() for b in bc_str.split(",")]
+    if len(bc_list) == 1:
+        bc_list *= spatial_dim
+    elif len(bc_list) != spatial_dim:
+        msg = (
+            f"--bc expects 1 or {spatial_dim} values "
+            f"(got {len(bc_list)}). Example: --bc neumann,periodic"
+        )
+        raise ValueError(msg)
+
+    specs: list[AxisBCSpec] = []
+    for entry in bc_list:
+        bc_type, params = _parse_bc_entry(entry)
+        specs.append(_bc_entry_to_axis_bc(bc_type, params))
+
+    return tuple(specs)
 
 
 def _build_grid_info(
@@ -268,20 +387,25 @@ def _build_grid_info(
     periodic = _parse_periodic(
         args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension
     )
-    # Compute explicit BC tuple from CLI args
+    axis_bcs = _parse_axis_bcs(
+        args.bc, spatial_dim=spec.spatial_dimension
+    )
+
+    # Legacy string BC tuple for backward compat with GridInfo.bc
     bc: tuple[str, ...] | None = None
     if args.bc:
-        bc_parts = [b.strip().lower() for b in args.bc.split(",")]
-        if len(bc_parts) == 1:
-            bc = tuple(bc_parts[0] for _ in range(spec.spatial_dimension))
+        bc_list = [b.strip().lower().split(":")[0] for b in args.bc.split(",")]
+        if len(bc_list) == 1:
+            bc = tuple(bc_list[0] for _ in range(spec.spatial_dimension))
         else:
-            bc = tuple(bc_parts)
+            bc = tuple(bc_list)
 
     return GridInfo(
         bounds=tuple(bounds),
         shape=tuple(shape),
         periodic=periodic,
         bc=bc,
+        axis_bcs=axis_bcs,
     )
 
 
