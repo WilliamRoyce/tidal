@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from tidal.solver.fields import FieldSet
-from tidal.solver.operators import apply_operator
+from tidal.solver.operators import apply_operator, is_periodic_bc
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
@@ -204,7 +204,7 @@ class _ResidualCtx:
         Newton solver needs a full-rank Jacobian, so we pin one DOF to zero
         — the standard approach used in FEniCS, Firedrake, and PETSc.
 
-        Emits ``UserWarning`` for each gauge-regularised field so the user
+        Emits ``UserWarning`` for each gauge-regularized field so the user
         knows this numerical choice is being made.  If the JSON spec already
         carries gauge metadata mentioning the field, an additional conflict
         warning is emitted.
@@ -224,7 +224,7 @@ class _ResidualCtx:
 
         for name in sorted(result):
             warnings.warn(
-                f"Numerical gauge regularisation: pinning {name}[0] = 0 to "
+                f"Numerical gauge regularization: pinning {name}[0] = 0 to "
                 f"resolve singular operator (pure Laplacian + periodic BCs "
                 f"\u2192 null space contains constants). The solution is "
                 f"unique only up to an additive constant; this pins that "
@@ -239,7 +239,7 @@ class _ResidualCtx:
                 warnings.warn(
                     f"JSON spec has gauge metadata '{gauge_str}' which may "
                     f"already constrain '{name}'. The automatic "
-                    f"regularisation (pin {name}[0]=0) could conflict with "
+                    f"regularization (pin {name}[0]=0) could conflict with "
                     f"the applied gauge. If the gauge was intended to remove "
                     f"the null space, check that it actually modifies the "
                     f"constraint equation structure (e.g. adds an "
@@ -254,8 +254,12 @@ class _ResidualCtx:
     def _all_periodic_bcs(self) -> bool:
         """Check if all BCs are periodic."""
         if self.bc is not None:
-            bcs = (self.bc,) * self.grid.ndim if isinstance(self.bc, str) else tuple(self.bc)
-            return all(b == "periodic" for b in bcs)
+            bcs = (
+                (self.bc,) * self.grid.ndim
+                if isinstance(self.bc, str)
+                else tuple(self.bc)
+            )
+            return all(is_periodic_bc(b) for b in bcs)
         return all(self.grid.periodic)
 
     @staticmethod
@@ -279,7 +283,7 @@ class _ResidualCtx:
 
         1. **No self-terms** (field absent from its own RHS): freeze at zero.
            Residual ``res = y[field]`` → Jacobian = I (non-singular).
-        2. **Gauge regularisation** (pure Laplacian + periodic BCs): pin
+        2. **Gauge regularization** (pure Laplacian + periodic BCs): pin
            ``field[0] = 0`` to remove null-space ambiguity.
         3. **Normal**: ``res = RHS(y, t)`` (algebraic equation).
         """
@@ -598,7 +602,7 @@ def solve_ida(  # noqa: PLR0913
     -----
     UserWarning
         When constraint pre-solve encounters singular modes (FFT path), or
-        when a constraint field is detected as needing gauge regularisation
+        when a constraint field is detected as needing gauge regularization
         (pure Laplacian + periodic BCs → ``field[0] = 0`` pinning).  These
         are numerical choices to resolve the null space of the operator.
         To disable for a specific field, set

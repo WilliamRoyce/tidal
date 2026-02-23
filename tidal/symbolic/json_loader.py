@@ -271,6 +271,17 @@ class BoundaryCondition:
         if bc_type not in _VALID_BC_TYPES:
             msg = f"Unknown BC type: {bc_type!r}. Valid types: {sorted(_VALID_BC_TYPES)}"
             raise ValueError(msg)
+        # Warn on irrelevant fields
+        irrelevant_fields: dict[str, set[str]] = {
+            "periodic": {"value", "derivative", "gamma"},
+            "dirichlet": {"derivative", "gamma"},
+            "neumann": {"gamma"},
+        }
+        extra = {k for k in irrelevant_fields.get(bc_type, set()) if data.get(k) is not None}
+        if extra:
+            logger.warning(
+                "%s BC ignores field(s): %s", bc_type, ", ".join(sorted(extra))
+            )
         return cls(
             type=bc_type,
             value=data.get("value"),
@@ -293,9 +304,9 @@ class BoundaryCondition:
             raise ValueError(msg)
         return SideBCSpec(
             kind=self.type,
-            value=self.value or 0.0,
-            derivative=self.derivative or 0.0,
-            gamma=self.gamma or 0.0,
+            value=self.value if self.value is not None else 0.0,
+            derivative=self.derivative if self.derivative is not None else 0.0,
+            gamma=self.gamma if self.gamma is not None else 0.0,
         )
 
 

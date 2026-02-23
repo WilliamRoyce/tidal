@@ -1782,3 +1782,23 @@ class TestBoundaryConditionToSideBc:
         bc = BoundaryCondition.from_dict({"type": "robin", "gamma": 2.0, "value": 1.0})
         assert bc.type == "robin"
         assert bc.gamma == 2.0
+
+    def test_to_side_bc_explicit_zero(self) -> None:
+        """Explicit value=0.0 should be preserved (not treated as None)."""
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        bc = BoundaryCondition(type="dirichlet", value=0.0)
+        side = bc.to_side_bc()
+        assert side.value == 0.0
+        assert side.kind == "dirichlet"
+
+    def test_from_dict_warns_irrelevant_fields(self, caplog: pytest.LogCaptureFixture) -> None:
+        """Dirichlet with gamma logs a warning about irrelevant fields."""
+        from tidal.symbolic.json_loader import BoundaryCondition
+
+        with caplog.at_level("WARNING", logger="tidal.symbolic.json_loader"):
+            bc = BoundaryCondition.from_dict(
+                {"type": "dirichlet", "value": 1.0, "gamma": 2.0}
+            )
+        assert bc.gamma == 2.0  # stored but irrelevant
+        assert "gamma" in caplog.text

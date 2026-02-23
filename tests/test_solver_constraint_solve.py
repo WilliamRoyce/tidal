@@ -17,7 +17,7 @@ from tidal.solver.constraint_solve import (
     pre_solve_constraints,
 )
 from tidal.solver.grid import GridInfo
-from tidal.solver.operators import apply_operator, laplacian
+from tidal.solver.operators import AxisBCSpec, apply_operator, laplacian
 from tidal.solver.state import StateLayout
 from tidal.symbolic.json_loader import (
     ConstraintSolverConfig,
@@ -240,6 +240,12 @@ class TestSelectMethod:
         """Explicit non-periodic bc forces matrix even if grid is periodic."""
         terms, grid = self._make_terms(periodic=True, pos_dep=False)
         assert _select_method(terms, grid, ("neumann", "neumann")) == "matrix"
+
+    def test_fft_with_axis_bc_spec_periodic(self) -> None:
+        """AxisBCSpec periodic objects should route to FFT, not matrix."""
+        terms, grid = self._make_terms(periodic=True, pos_dep=False)
+        bc = (AxisBCSpec(periodic=True), AxisBCSpec(periodic=True))
+        assert _select_method(terms, grid, bc) == "fft"
 
 
 # ---------------------------------------------------------------------------
@@ -840,6 +846,59 @@ class TestGaugeRegularisationWarnings:
                 bc="periodic",
                 parameters={"kappa": 0.5},
                 num_snapshots=3,
+            )
+
+    def test_fft_with_axis_bc_spec_periodic(self) -> None:
+        """AxisBCSpec periodic objects should still trigger FFT pre-solve."""
+        spec = _make_chern_simons_spec()
+        grid = GridInfo(
+            bounds=((0, 50), (0, 50)),
+            shape=(16, 16),
+            periodic=(True, True),
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+        x_arr, y_arr = grid.coord_arrays()
+
+        y0 = np.zeros(layout.total_size)
+        gaussian = np.exp(-((x_arr - 25) ** 2 + (y_arr - 25) ** 2) / (2 * 5**2))
+        a1_slot = layout.field_slot_map["A_1"]
+        y0[a1_slot * n : (a1_slot + 1) * n] = gaussian.ravel()
+
+        # Pass AxisBCSpec instead of string — should still find FFT path
+        bc = (AxisBCSpec(periodic=True), AxisBCSpec(periodic=True))
+        with pytest.warns(UserWarning, match="singular mode"):
+            pre_solve_constraints(
+                spec, grid, y0, bc=bc, parameters={"kappa": 0.5}
+            )
+
+    @pytest.mark.skipif(
+        not _has_sundials(), reason="sksundae not available"
+    )
+    def test_ida_gauge_fix_with_axis_bc_spec(self) -> None:
+        """IDA gauge-fix detection works with AxisBCSpec periodic BCs."""
+        from tidal.solver.ida import solve_ida
+
+        spec = _make_chern_simons_spec()
+        grid = GridInfo(
+            bounds=((0, 50), (0, 50)),
+            shape=(16, 16),
+            periodic=(True, True),
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+        x_arr, y_arr = grid.coord_arrays()
+
+        y0 = np.zeros(layout.total_size)
+        gaussian = np.exp(-((x_arr - 25) ** 2 + (y_arr - 25) ** 2) / (2 * 5**2))
+        a1_slot = layout.field_slot_map["A_1"]
+        y0[a1_slot * n : (a1_slot + 1) * n] = gaussian.ravel()
+
+        bc = (AxisBCSpec(periodic=True), AxisBCSpec(periodic=True))
+        with pytest.warns(UserWarning, match="pinning A_0"):
+            solve_ida(
+                spec, grid, y0, (0.0, 0.1),
+                bc=bc, parameters={"kappa": 0.5}, num_snapshots=3,
             )
 
     def test_helmholtz_no_gauge_warning(self) -> None:

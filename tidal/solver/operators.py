@@ -68,7 +68,12 @@ class SideBCSpec:
     value: float = 0.0
     """Dirichlet boundary value V, or Robin inhomogeneity β."""
     derivative: float = 0.0
-    """Neumann normal derivative D (outward convention)."""
+    """Neumann ghost-cell offset D.
+
+    Ghost cell is placed at ``interior + dx * D``.  For homogeneous Neumann
+    (zero normal flux), set D=0.  The sign is the same at both low and high
+    boundaries (py-pde convention; see Zwicker, JOSS 2020).
+    """
     gamma: float = 0.0
     """Robin coefficient gamma in d_n f + gamma*f = beta. Must be >= 0."""
 
@@ -96,6 +101,7 @@ class SideBCSpec:
         if self.kind == "dirichlet":
             return (2.0 * self.value, -1.0)
         # Robin: d_n f + gamma*f = beta
+        # When gamma*dx >= 2, factor <= 0 (unstable); see check_robin_stability().
         denom = self.gamma * dx + 2.0
         return (
             2.0 * dx * self.value / denom,
@@ -146,14 +152,23 @@ def _str_to_axis_bc(bc_str: str) -> AxisBCSpec:
     return AxisBCSpec(periodic=False, low=side, high=side)
 
 
+def is_periodic_bc(bc_entry: str | AxisBCSpec) -> bool:
+    """Check whether a single axis BC entry is periodic.
+
+    Handles both legacy string BCs and structured ``AxisBCSpec`` objects,
+    so callers don't need to type-check manually.
+    """
+    if isinstance(bc_entry, str):
+        return bc_entry == "periodic"
+    return bc_entry.periodic
+
+
 # Legacy type alias — widened to accept structured specs
 BCSpec = str | tuple[str, ...] | tuple[AxisBCSpec, ...]
 """Single BC string, per-axis strings, or per-axis ``AxisBCSpec`` objects."""
 
 
-def _normalize_bc(
-    bc: BCSpec, grid: GridInfo
-) -> tuple[str | AxisBCSpec, ...]:
+def _normalize_bc(bc: BCSpec, grid: GridInfo) -> tuple[str | AxisBCSpec, ...]:
     """Expand a BC spec to a per-axis tuple, validating each entry.
 
     Returns a tuple of either strings or ``AxisBCSpec`` objects (never mixed
@@ -249,7 +264,7 @@ def _pad_axis(
         interior_lo = np.take(data, [0], axis=axis)
         interior_hi = np.take(data, [n - 1], axis=axis)
 
-        # Optimised path: skip addition when const == 0 (homogeneous BCs)
+        # Optimized path: skip addition when const == 0 (homogeneous BCs)
         left = f_lo * interior_lo if c_lo == 0.0 else c_lo + f_lo * interior_lo
         right = f_hi * interior_hi if c_hi == 0.0 else c_hi + f_hi * interior_hi
 

@@ -49,7 +49,7 @@ import numpy as np
 from scipy import sparse
 from scipy.sparse.linalg import spsolve
 
-from tidal.solver.operators import apply_operator
+from tidal.solver.operators import apply_operator, is_periodic_bc
 
 # Numerical tolerance thresholds
 _SINGULAR_TOL = 1e-14  # Below this, a Fourier multiplier is treated as singular
@@ -148,7 +148,8 @@ _MultiplierFn = Callable[
 
 
 def _biharmonic_mult(
-    kvecs: list[np.ndarray], dx: tuple[float, ...],
+    kvecs: list[np.ndarray],
+    dx: tuple[float, ...],
 ) -> np.ndarray:
     """Fourier multiplier for biharmonic = (laplacian)^2."""
     lap = sum(_lap_axis(kvecs[i], dx[i]) for i in range(len(kvecs)))
@@ -156,7 +157,10 @@ def _biharmonic_mult(
 
 
 def _cross_deriv(
-    kvecs: list[np.ndarray], dx: tuple[float, ...], a: int, b: int,
+    kvecs: list[np.ndarray],
+    dx: tuple[float, ...],
+    a: int,
+    b: int,
 ) -> np.ndarray:
     """Fourier multiplier for cross_derivative: d^2/(dx_a dx_b).
 
@@ -204,7 +208,7 @@ def _select_method(
     all_periodic = all(grid.periodic)
     if bc is not None:
         bcs = (bc,) * grid.ndim if isinstance(bc, str) else tuple(bc)
-        all_periodic = all(b == "periodic" for b in bcs)
+        all_periodic = all(is_periodic_bc(b) for b in bcs)
 
     if not all_periodic:
         return "matrix"
@@ -317,7 +321,9 @@ def _fft_solve_single(
     if np.any(is_singular):
         source_at_singular = np.abs(source_hat[is_singular])
         max_source = float(np.max(np.abs(source_hat))) + 1e-30
-        max_incompatible = float(np.max(source_at_singular)) if source_at_singular.size > 0 else 0.0
+        max_incompatible = (
+            float(np.max(source_at_singular)) if source_at_singular.size > 0 else 0.0
+        )
         if max_incompatible > _COMPAT_TOL * max_source:
             msg = (
                 f"Constraint for '{terms.field_name}' is incompatible: "
@@ -370,13 +376,9 @@ def _fft_solve_coupled(  # noqa: PLR0914
     sources: list[NDArray[np.float64]] = []
     for group in groups:
         non_constraint = [
-            (c, op, f)
-            for c, op, f in group.source_terms
-            if f not in name_to_idx
+            (c, op, f) for c, op, f in group.source_terms if f not in name_to_idx
         ]
-        sources.append(
-            _evaluate_source(non_constraint, fields, grid, bc, name_map)
-        )
+        sources.append(_evaluate_source(non_constraint, fields, grid, bc, name_map))
 
     # Build multiplier matrix and RHS in Fourier space
     m_hat = np.zeros((*grid.shape, n_c, n_c), dtype=np.complex128)
@@ -534,7 +536,7 @@ def pre_solve_constraints(  # noqa: PLR0913
     -----
     UserWarning
         When the FFT solver encounters singular modes (null space of the
-        operator) and regularises by setting ``u_hat = 0`` at those modes.
+        operator) and regularizes by setting ``u_hat = 0`` at those modes.
         This is a numerical gauge choice (zero-mean).  To disable
         automatic constraint solving for a field, set
         ``constraint_solver.enabled = false`` in the JSON spec.
@@ -569,7 +571,11 @@ def pre_solve_constraints(  # noqa: PLR0913
     groups: list[_ConstraintTerms] = []
     for eq_idx, eq in constraint_eqs:
         terms = _classify_terms(
-            eq_idx, eq.rhs_terms, eq.field_name, coeff_eval, t,
+            eq_idx,
+            eq.rhs_terms,
+            eq.field_name,
+            coeff_eval,
+            t,
             eq.constraint_solver,
         )
         if not terms.self_terms:
@@ -674,7 +680,11 @@ def _solve_coupled(  # noqa: PLR0913, PLR0917, C901
                     op_mat = _probe_operator_matrix(terms.self_terms, grid, bc)
                     solution = _matrix_solve(op_mat, source, grid.shape)
 
-                old = fields[terms.field_name] if terms.field_name in fields else np.zeros(grid.shape)
+                old = (
+                    fields[terms.field_name]
+                    if terms.field_name in fields
+                    else np.zeros(grid.shape)
+                )
                 change = float(np.max(np.abs(solution - old)))
                 max_change = max(max_change, change)
 

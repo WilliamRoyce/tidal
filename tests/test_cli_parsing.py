@@ -766,6 +766,10 @@ class TestParseBcEntry:
         with pytest.raises(ValueError, match="Invalid boundary condition"):
             _parse_bc_entry("absorbing")
 
+    def test_trailing_colon_raises(self) -> None:
+        with pytest.raises(ValueError, match="Invalid BC parameter"):
+            _parse_bc_entry("dirichlet:")
+
     def test_bad_value_raises(self) -> None:
         with pytest.raises(ValueError, match="Invalid BC parameter"):
             _parse_bc_entry("dirichlet:abc")
