@@ -815,14 +815,18 @@ def _check_mass_stability(
     from tidal.solver.validation import check_pointwise_mass_stability
 
     coeff_eval = CoefficientEvaluator(spec, grid_info, params)
-    warnings = check_pointwise_mass_stability(coeff_eval, spec, grid_info)
+    stability = check_pointwise_mass_stability(coeff_eval, spec, grid_info)
     require_stable: bool = getattr(args, "require_stable", False)
-    for msg in warnings:
+    # Informational notes (e.g. asymmetric matrix) — always printed, never fatal
+    for note in stability.notes:
+        print(f"  Note: {note}", file=sys.stderr)
+    # Stability errors (negative eigenvalues) — fatal with --require-stable
+    for msg in stability.errors:
         if require_stable:
             print(f"Error: {msg}", file=sys.stderr)
         else:
             print(f"  Warning: {msg}", file=sys.stderr)
-    if require_stable and warnings:
+    if require_stable and stability.errors:
         sys.exit(1)
 
 

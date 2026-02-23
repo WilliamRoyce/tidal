@@ -808,13 +808,14 @@ class TestRequireStable:
         spec_path = tmp_path / "unstable.json"
         spec_path.write_text(json.dumps(spec_data, indent=2))
 
-        with pytest.raises(SystemExit, match="1"):
+        with pytest.raises(SystemExit) as exc_info:
             main([
                 "simulate", str(spec_path),
                 "--t-end", "0.5",
                 "--no-plot",
                 "--require-stable",
             ])
+        assert exc_info.value.code == 1
 
         err = capsys.readouterr().err
         assert "eigenvalue" in err.lower()

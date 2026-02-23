@@ -9,6 +9,7 @@ from tidal.solver.operators import OPERATOR_REGISTRY, apply_operator, operator_m
 from tidal.solver.rhs import RHSEvaluator
 from tidal.solver.state import StateLayout
 from tidal.solver.validation import (
+    StabilityResult,
     check_cfl_stability,
     check_mass_sign,
     check_pointwise_mass_stability,
@@ -24,6 +25,7 @@ __all__ = [
     "RHSEvaluator",
     "SimulationDivergedError",
     "SolverResult",
+    "StabilityResult",
     "StateLayout",
     "apply_operator",
     "check_cfl_stability",

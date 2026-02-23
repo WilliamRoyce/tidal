@@ -133,6 +133,10 @@ class SimulationData:
             If *result* has no snapshots or flat vector size doesn't match
             the layout.
         """
+        if not result["success"]:
+            msg = f"Cannot build SimulationData from failed solver result: {result['message']}"
+            raise ValueError(msg)
+
         times = np.asarray(result["t"], dtype=np.float64)
         y_all = np.asarray(result["y"], dtype=np.float64)
 

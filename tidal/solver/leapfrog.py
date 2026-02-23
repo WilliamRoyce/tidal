@@ -334,8 +334,8 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
         _save(t)
 
     return {
-        "t": np.array(times),
-        "y": np.array(snapshots),
+        "t": np.asarray(times, dtype=np.float64),
+        "y": np.asarray(snapshots, dtype=np.float64),
         "success": True,
         "message": "Leapfrog integration completed",
     }

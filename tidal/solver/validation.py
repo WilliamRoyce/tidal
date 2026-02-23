@@ -181,11 +181,25 @@ def check_mass_sign(
     return warnings
 
 
+class StabilityResult:
+    """Result from :func:`check_pointwise_mass_stability`.
+
+    Separates fatal stability *errors* (negative eigenvalues) from
+    informational *notes* (e.g. asymmetric matrix detected).
+    """
+
+    __slots__ = ("errors", "notes")
+
+    def __init__(self) -> None:
+        self.errors: list[str] = []
+        self.notes: list[str] = []
+
+
 def check_pointwise_mass_stability(  # noqa: PLR0914
     coeff_eval: CoefficientEvaluator,
     spec: EquationSystem,
     grid: GridInfo,
-) -> list[str]:
+) -> StabilityResult:
     """Check eigenvalues of the pointwise mass/coupling matrix M[i,j](x,y).
 
     Builds M[i,j](x,y) from all identity-operator EOM terms (constant and
@@ -196,7 +210,8 @@ def check_pointwise_mass_stability(  # noqa: PLR0914
     This check runs once pre-simulation using the pre-computed spatial cache
     in CoefficientEvaluator — zero runtime cost during the actual simulation.
 
-    Returns a list of warning strings (empty if stable).
+    Returns a :class:`StabilityResult` with ``errors`` (instability) and
+    ``notes`` (informational diagnostics like asymmetry detection).
 
     Notes
     -----
@@ -209,6 +224,7 @@ def check_pointwise_mass_stability(  # noqa: PLR0914
     """
     import numpy as np  # noqa: PLC0415
 
+    result = StabilityResult()
     n = len(spec.component_names)
     grid_shape = grid.shape
 
@@ -233,13 +249,13 @@ def check_pointwise_mass_stability(  # noqa: PLR0914
     # Vectorized eigenvalue check: reshape to (n_grid, n, n) batch.
     pot_flat = pot.reshape(n, n, -1).transpose(2, 0, 1)  # (n_grid, n, n)
 
-    # Check symmetry: physical Lagrangians produce symmetric coupling, but
-    # validate rather than assume so asymmetric cases don't silently give
-    # wrong eigenvalues from eigvalsh.
-    warnings_out: list[str] = []
+    # Check symmetry with *relative* tolerance: scale by matrix norm so that
+    # large-amplitude systems (O(1e6)) don't trigger false asymmetry warnings
+    # from floating-point roundoff.
     sym_diff = float(np.abs(pot_flat - pot_flat.transpose(0, 2, 1)).max())
-    if n > 1 and sym_diff > 1e-12:  # noqa: PLR2004
-        warnings_out.append(
+    mat_scale = max(float(np.abs(pot_flat).max()), 1.0)
+    if n > 1 and sym_diff > 1e-12 * mat_scale:
+        result.notes.append(
             f"Mass/coupling matrix is asymmetric (max |M-M^T| = {sym_diff:.2e}). "
             f"Using general eigenvalues; stability check may be less precise."
         )
@@ -252,7 +268,7 @@ def check_pointwise_mass_stability(  # noqa: PLR0914
 
     tolerance = 1e-10
     if global_min >= -tolerance:
-        return warnings_out  # may contain asymmetry warning only
+        return result
 
     # Find the worst grid point for a diagnostic message
     worst_flat = int(min_per_point.argmin())
@@ -263,14 +279,14 @@ def check_pointwise_mass_stability(  # noqa: PLR0914
         f"{spatial_coords[d]}={grid.axes_coords(d)[worst_idx[d]]:.4g}"
         for d in range(len(grid_shape))
     ]
-    warnings_out.append(
+    result.errors.append(
         f"Coupled mass matrix has minimum eigenvalue {global_min:.4g} at "
         f"({', '.join(coord_strs)}). The system has exponentially growing "
         f"modes -- it will be unstable. "
         f"Check that the mass matrix is positive-definite at all grid points "
         f"(e.g. for Gaussian-coupled scalars: mPhi2 * mChi2 > g0^2)."
     )
-    return warnings_out
+    return result
 
 
 def check_robin_stability(grid: GridInfo) -> list[str]:
