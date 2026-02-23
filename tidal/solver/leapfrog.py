@@ -145,8 +145,11 @@ def compute_velocity(  # noqa: PLR0913, PLR0917
 
 
 def _half_kick(
-    y: np.ndarray, force: np.ndarray, dt: float,
-    layout: StateLayout, n: int,
+    y: np.ndarray,
+    force: np.ndarray,
+    dt: float,
+    layout: StateLayout,
+    n: int,
 ) -> None:
     """Apply half-kick: pi += (dt/2) F(q), in-place."""
     for slot_idx, slot in enumerate(layout.slots):
@@ -156,8 +159,11 @@ def _half_kick(
 
 
 def _drift(
-    y: np.ndarray, velocity: np.ndarray, dt: float,
-    layout: StateLayout, n: int,
+    y: np.ndarray,
+    velocity: np.ndarray,
+    dt: float,
+    layout: StateLayout,
+    n: int,
 ) -> None:
     """Apply drift: q += dt v, in-place."""
     for slot_idx, slot in enumerate(layout.slots):
@@ -299,7 +305,15 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
         # Drift
         fieldset = FieldSet.from_flat(layout, grid.shape, y)
         velocity = compute_velocity(
-            layout, grid, kinetic, spatial_momenta, y, fieldset, bc, t, rhs_eval,
+            layout,
+            grid,
+            kinetic,
+            spatial_momenta,
+            y,
+            fieldset,
+            bc,
+            t,
+            rhs_eval,
         )
         _drift(y, velocity, dt, layout, n)
 

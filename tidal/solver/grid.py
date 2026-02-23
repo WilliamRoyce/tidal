@@ -84,10 +84,7 @@ class GridInfo:
                 raise ValueError(msg)
             for i, b in enumerate(self.bc):
                 if b not in self._VALID_BC:
-                    msg = (
-                        f"bc[{i}] = {b!r}: must be one of "
-                        f"{sorted(self._VALID_BC)}"
-                    )
+                    msg = f"bc[{i}] = {b!r}: must be one of {sorted(self._VALID_BC)}"
                     raise ValueError(msg)
                 is_periodic_bc = b == "periodic"
                 if is_periodic_bc != self.periodic[i]:

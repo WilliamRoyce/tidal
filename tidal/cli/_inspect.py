@@ -237,11 +237,13 @@ def _build_json_output(spec: object, *, show_params: bool) -> dict[str, Any]:
             }
             for term in eq.rhs_terms
         ]
-        equations.append({
-            "field_name": eq.field_name,
-            "time_derivative_order": eq.time_derivative_order,
-            "terms": terms,
-        })
+        equations.append(
+            {
+                "field_name": eq.field_name,
+                "time_derivative_order": eq.time_derivative_order,
+                "terms": terms,
+            }
+        )
 
     result: dict[str, Any] = {
         "spacetime": {

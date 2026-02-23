@@ -78,7 +78,7 @@ def check_energy_conservation(
     # by O(dt²) around H̃.  The factor 10 accounts for O(1) prefactors
     # (wave speed, multi-field interactions).
     if data.dt is not None:
-        shadow_bound = 10.0 * data.dt ** 2
+        shadow_bound = 10.0 * data.dt**2
         threshold = max(threshold, shadow_bound)
 
     times, _per_field, _interaction, total = compute_energy_timeseries(data)

@@ -168,7 +168,8 @@ class ComponentPlaneWave:
     active_components: dict[str, float] | None = None
 
     def compute_plane_wave(
-        self, grid: GridInfo,
+        self,
+        grid: GridInfo,
     ) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
         """Compute plane wave field and momentum on the grid.
 

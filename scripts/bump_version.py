@@ -146,7 +146,11 @@ class VersionBumper:
         print("  ✓ All target files exist")
 
         # Check git status
-        if not self.allow_dirty and not self.dry_run and self._has_uncommitted_changes():
+        if (
+            not self.allow_dirty
+            and not self.dry_run
+            and self._has_uncommitted_changes()
+        ):
             msg = (
                 "Git working directory has uncommitted changes.\n"
                 "Commit or stash changes first, or use --allow-dirty flag."

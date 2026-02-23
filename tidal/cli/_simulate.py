@@ -33,9 +33,14 @@ SPATIAL_DIM_2D = 2
 _CFL_FACTOR = 0.5
 
 # Laplacian-like operators that contribute to the wave speed
-_LAPLACIAN_OPS = frozenset({
-    "laplacian", "laplacian_x", "laplacian_y", "laplacian_z",
-})
+_LAPLACIAN_OPS = frozenset(
+    {
+        "laplacian",
+        "laplacian_x",
+        "laplacian_y",
+        "laplacian_z",
+    }
+)
 
 # Threshold for zero-evolution diagnostic (effectively machine epsilon)
 _ZERO_RATE_THRESHOLD = 1e-14
@@ -251,9 +256,7 @@ def _parse_bc_entry(entry: str) -> tuple[str, dict[str, float]]:
     return bc_type, params
 
 
-def _bc_entry_to_axis_bc(
-    bc_type: str, params: dict[str, float]
-) -> AxisBCSpec:
+def _bc_entry_to_axis_bc(bc_type: str, params: dict[str, float]) -> AxisBCSpec:
     """Convert a parsed BC entry to an AxisBCSpec.
 
     Raises
@@ -387,9 +390,7 @@ def _build_grid_info(
     periodic = _parse_periodic(
         args.bc, periodic=args.periodic, spatial_dim=spec.spatial_dimension
     )
-    axis_bcs = _parse_axis_bcs(
-        args.bc, spatial_dim=spec.spatial_dimension
-    )
+    axis_bcs = _parse_axis_bcs(args.bc, spatial_dim=spec.spatial_dimension)
 
     # Legacy string BC tuple for backward compat with GridInfo.bc
     bc: tuple[str, ...] | None = None
@@ -536,7 +537,9 @@ def _gaussian_y0(
             dist_sq += (coords[..., dim] - center[dim]) ** 2
 
     field_arr = args.ic_amplitude * np.exp(-dist_sq / (2 * width**2))
-    return FieldSet.from_dict(layout, grid_info.shape, {component: field_arr}).flat.copy()
+    return FieldSet.from_dict(
+        layout, grid_info.shape, {component: field_arr}
+    ).flat.copy()
 
 
 def _plane_wave_y0(
@@ -557,8 +560,7 @@ def _plane_wave_y0(
     else:
         lx = bounds[0][1] - bounds[0][0]
         kvec = tuple(
-            2.0 * math.pi / lx if i == 0 else 0.0
-            for i in range(spec.spatial_dimension)
+            2.0 * math.pi / lx if i == 0 else 0.0 for i in range(spec.spatial_dimension)
         )
 
     coords = grid_info.cell_coords
@@ -615,7 +617,9 @@ def _formula_y0(
     if field_arr.shape == ():
         field_arr = np.full(grid_info.shape, float(field_arr))
 
-    return FieldSet.from_dict(layout, grid_info.shape, {component: field_arr}).flat.copy()
+    return FieldSet.from_dict(
+        layout, grid_info.shape, {component: field_arr}
+    ).flat.copy()
 
 
 def _build_initial_y0(
@@ -682,7 +686,9 @@ def _print_summary(sim_data: SimulationData) -> None:
     times = sim_data.times
     print()
     print("Results:")
-    print(f"  Time range: {float(times[0]):.2f} → {float(times[-1]):.2f} ({len(times)} snapshots)")
+    print(
+        f"  Time range: {float(times[0]):.2f} → {float(times[-1]):.2f} ({len(times)} snapshots)"
+    )
     print(f"  Parameters: {sim_data.parameters}")
     print()
 
@@ -913,9 +919,12 @@ def _constraint_mode(  # noqa: PLR0913, PLR0917
     # A short time span suffices — we only need IDA to find consistent
     # initial conditions, not evolve.
     result = solve_ida(
-        spec, grid_info, y0,
+        spec,
+        grid_info,
+        y0,
         t_span=(0.0, 0.01),
-        bc=bc, parameters=params,
+        bc=bc,
+        parameters=params,
         num_snapshots=2,
     )
 
@@ -1067,7 +1076,9 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # 1. Grid
     bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
     grid_info = _build_grid_info(args, spec, bounds)
-    log(f"  Grid: {'x'.join(str(s) for s in grid_info.shape)}, bounds: {grid_info.bounds}")
+    log(
+        f"  Grid: {'x'.join(str(s) for s in grid_info.shape)}, bounds: {grid_info.bounds}"
+    )
 
     # 2. BC (stored in GridInfo, derive tuple for solver calls)
     bc = grid_info.effective_bc
@@ -1104,8 +1115,10 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         args.snapshots if args.snapshots is not None else args.t_end / 100.0
     )
     if dt is not None and snapshot_interval < dt:
-        log(f"  Note: snapshot interval {snapshot_interval:.4f} < dt {dt:.4f}; "
-            f"saving every step")
+        log(
+            f"  Note: snapshot interval {snapshot_interval:.4f} < dt {dt:.4f}; "
+            f"saving every step"
+        )
         snapshot_interval = dt
 
     num_snapshots = max(int(args.t_end / snapshot_interval) + 1, 2)
@@ -1117,21 +1130,32 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     if fmt == "directory":
         writer, snapshot_cb = _setup_disk_writer_native(
-            args, spec, grid_info, params, snapshot_interval, dt=dt,
+            args,
+            spec,
+            grid_info,
+            params,
+            snapshot_interval,
+            dt=dt,
         )
 
     # 8. Solve
     if scheme == "ida":
         from tidal.solver.ida import solve_ida
 
-        log(f"Running IDA solver (t=0 → {args.t_end}, {num_snapshots} snapshots, "
-            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})...")
+        log(
+            f"Running IDA solver (t=0 → {args.t_end}, {num_snapshots} snapshots, "
+            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})..."
+        )
         result = solve_ida(
-            spec, grid_info, y0,
+            spec,
+            grid_info,
+            y0,
             t_span=(0.0, args.t_end),
-            bc=bc, parameters=params,
+            bc=bc,
+            parameters=params,
             num_snapshots=num_snapshots,
-            rtol=args.rtol, atol=args.atol,
+            rtol=args.rtol,
+            atol=args.atol,
             snapshot_callback=snapshot_cb,
         )
     elif scheme == "cvode":
@@ -1139,14 +1163,20 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
         method = args.method or "BDF"
         max_step = args.max_step or 0.0
-        log(f"Running CVODE solver ({method}, t=0 → {args.t_end}, "
-            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})...")
+        log(
+            f"Running CVODE solver ({method}, t=0 → {args.t_end}, "
+            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})..."
+        )
         result = solve_cvode(
-            spec, grid_info, y0,
+            spec,
+            grid_info,
+            y0,
             t_span=(0.0, args.t_end),
-            bc=bc, parameters=params,
+            bc=bc,
+            parameters=params,
             method=method,
-            rtol=args.rtol, atol=args.atol,
+            rtol=args.rtol,
+            atol=args.atol,
             max_step=max_step,
             num_snapshots=num_snapshots,
             snapshot_callback=snapshot_cb,
@@ -1157,14 +1187,20 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         method = args.method or "DOP853"
         cfl_dt = _compute_cfl_dt(spec, grid_info, params)
         max_step = args.max_step if args.max_step is not None else cfl_dt
-        log(f"Running scipy solver ({method}, t=0 → {args.t_end}, "
-            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})...")
+        log(
+            f"Running scipy solver ({method}, t=0 → {args.t_end}, "
+            f"rtol={args.rtol:.0e}, atol={args.atol:.0e})..."
+        )
         result = solve_scipy(
-            spec, grid_info, y0,
+            spec,
+            grid_info,
+            y0,
             t_span=(0.0, args.t_end),
-            bc=bc, parameters=params,
+            bc=bc,
+            parameters=params,
             method=method,
-            rtol=args.rtol, atol=args.atol,
+            rtol=args.rtol,
+            atol=args.atol,
             max_step=max_step,
             num_snapshots=num_snapshots,
             snapshot_callback=snapshot_cb,
@@ -1175,9 +1211,13 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         assert dt is not None  # computed in step 5
         log(f"Running leapfrog solver (t=0 → {args.t_end}, dt={dt:.4f})...")
         result = solve_leapfrog(
-            spec, grid_info, y0,
-            t_span=(0.0, args.t_end), dt=dt,
-            bc=bc, parameters=params,
+            spec,
+            grid_info,
+            y0,
+            t_span=(0.0, args.t_end),
+            dt=dt,
+            bc=bc,
+            parameters=params,
             snapshot_interval=snapshot_interval,
             snapshot_callback=snapshot_cb,
         )

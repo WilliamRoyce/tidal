@@ -292,8 +292,7 @@ class SimulationData:
                 metadata.get("grid_shape", [1] * spec.spatial_dimension),
             )
             grid_bounds = tuple(
-                (0.0, float(s) * grid_spacing[i])
-                for i, s in enumerate(raw_shape)
+                (0.0, float(s) * grid_spacing[i]) for i, s in enumerate(raw_shape)
             )
 
         periodic: tuple[bool, ...]
@@ -305,9 +304,7 @@ class SimulationData:
 
         # Parameters
         raw_params = cast("dict[str, float]", metadata.get("parameters", {}))
-        parameters: dict[str, float] = {
-            str(k): float(v) for k, v in raw_params.items()
-        }
+        parameters: dict[str, float] = {str(k): float(v) for k, v in raw_params.items()}
 
         # BC types (version 2+; None for legacy data)
         bc_types: tuple[str, ...] | None = None

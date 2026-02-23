@@ -154,9 +154,7 @@ class RHSEvaluator:
             # via the yp vector in residual form.
             pi_name = f"pi_{term.field}"
             target = self._get_field_data(pi_name, fields)
-            coeff = self._coeff_eval.resolve(
-                term, t, eq_idx=eq_idx, term_idx=term_idx
-            )
+            coeff = self._coeff_eval.resolve(term, t, eq_idx=eq_idx, term_idx=term_idx)
             return coeff * target
 
         target = self._get_field_data(term.field, fields)

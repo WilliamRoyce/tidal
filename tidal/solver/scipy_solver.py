@@ -59,7 +59,15 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
         force = compute_force(spec, layout, grid, bc, y, t, rhs_eval)
         fieldset = FieldSet.from_flat(layout, grid.shape, y)
         velocity = compute_velocity(
-            layout, grid, kinetic, spatial_momenta, y, fieldset, bc, t, rhs_eval,
+            layout,
+            grid,
+            kinetic,
+            spatial_momenta,
+            y,
+            fieldset,
+            bc,
+            t,
+            rhs_eval,
         )
 
         for slot_idx, slot in enumerate(layout.slots):
@@ -138,8 +146,7 @@ def solve_scipy(  # noqa: PLR0913
 
     # Warn about constraint fields (frozen at IC)
     constraint_fields = [
-        s.field_name for s in layout.slots
-        if s.kind == "field" and s.time_order == 0
+        s.field_name for s in layout.slots if s.kind == "field" and s.time_order == 0
     ]
     if constraint_fields:
         warnings.warn(

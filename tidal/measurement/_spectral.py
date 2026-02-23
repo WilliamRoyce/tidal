@@ -79,7 +79,9 @@ def _build_k_grid(
         n = field_shape[axis]
         dx = grid_spacing[axis]
         if axis == ndim - 1:
-            freq = np.asarray(np.fft.rfftfreq(n, d=dx) * (2.0 * np.pi), dtype=np.float64)
+            freq = np.asarray(
+                np.fft.rfftfreq(n, d=dx) * (2.0 * np.pi), dtype=np.float64
+            )
         else:
             freq = np.asarray(np.fft.fftfreq(n, d=dx) * (2.0 * np.pi), dtype=np.float64)
         k_arrays.append(freq)
@@ -111,7 +113,9 @@ def _radial_bin(
 
     bin_indices = np.clip(np.digitize(k_mag.ravel(), bin_edges) - 1, 0, n_bins - 1)
     v_flat = values.ravel()
-    binned = np.bincount(bin_indices, weights=v_flat, minlength=n_bins).astype(np.float64)
+    binned = np.bincount(bin_indices, weights=v_flat, minlength=n_bins).astype(
+        np.float64
+    )
     return bin_centers, binned
 
 
@@ -250,7 +254,9 @@ def compute_mode_amplitudes(
 
     # Compute spectrum at first snapshot to get wavenumber bins
     first = compute_spectrum(
-        data.fields[field_name][0], data.grid_spacing, data.periodic,
+        data.fields[field_name][0],
+        data.grid_spacing,
+        data.periodic,
     )
     n_modes = len(first.wavenumbers)
 
@@ -259,7 +265,9 @@ def compute_mode_amplitudes(
 
     for t_idx in range(1, data.n_snapshots):
         snap = compute_spectrum(
-            data.fields[field_name][t_idx], data.grid_spacing, data.periodic,
+            data.fields[field_name][t_idx],
+            data.grid_spacing,
+            data.periodic,
         )
         amplitudes[t_idx] = np.sqrt(snap.power_spectrum)
 

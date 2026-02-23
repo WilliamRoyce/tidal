@@ -55,7 +55,9 @@ def _axis_offsets(axis: int, ndim: int, deltas: list[int]) -> list[tuple[int, ..
 
 
 def _cross_offsets(
-    ax1: int, ax2: int, ndim: int,
+    ax1: int,
+    ax2: int,
+    ndim: int,
 ) -> list[tuple[int, ...]]:
     """Build offsets for cross-derivative d^2/(dx_i dx_j).
 
@@ -89,7 +91,9 @@ def _biharmonic_offsets(ndim: int) -> list[tuple[int, ...]]:
     return list(offsets_set)
 
 
-def _gradient_or_laplacian_offsets(name: str, ndim: int) -> list[tuple[int, ...]] | None:
+def _gradient_or_laplacian_offsets(
+    name: str, ndim: int
+) -> list[tuple[int, ...]] | None:
     """Try to resolve gradient_X or laplacian_X operators."""
     if name.startswith("gradient_"):
         ax = _AXIS_MAP.get(name[-1])
@@ -366,7 +370,9 @@ class _SparsityBuilder:
         if eq_idx is not None:
             self.add_rhs_couplings(slot_idx, eq_idx)
 
-    def handle_dynamical_field(self, slot_idx: int, field_name: str, dyn_i: int | None) -> None:
+    def handle_dynamical_field(
+        self, slot_idx: int, field_name: str, dyn_i: int | None
+    ) -> None:
         """Dynamical field: res = K*yp - (pi - S)."""
         zero = (0,) * self.ndim
         canonical = self.canonical
@@ -383,7 +389,9 @@ class _SparsityBuilder:
         if canonical and canonical.spatial_momenta:
             sm_terms = canonical.spatial_momenta.get(field_name)
             if sm_terms:
-                for col_slot, offsets in _rhs_couplings(sm_terms, self.layout, self.ndim):
+                for col_slot, offsets in _rhs_couplings(
+                    sm_terms, self.layout, self.ndim
+                ):
                     self.add_block(slot_idx, col_slot, offsets)
 
         # Fallback: field_rates coupling
@@ -472,7 +480,9 @@ def build_jacobian_sparsity(
         elif slot.kind == "momentum":
             builder.handle_momentum(slot_idx, eq_idx)
         elif slot.time_order >= _SECOND_ORDER and slot.kind == "field":
-            builder.handle_dynamical_field(slot_idx, slot.field_name, slot.dynamical_index)
+            builder.handle_dynamical_field(
+                slot_idx, slot.field_name, slot.dynamical_index
+            )
         elif slot.time_order == 1:
             builder.handle_first_order(slot_idx, eq_idx)
 

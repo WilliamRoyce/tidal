@@ -240,8 +240,7 @@ class SnapshotWriter:
             arr = fields[name]
             if arr.shape != self._grid_shape:
                 msg = (
-                    f"Field '{name}' has shape {arr.shape}, "
-                    f"expected {self._grid_shape}"
+                    f"Field '{name}' has shape {arr.shape}, expected {self._grid_shape}"
                 )
                 raise ValueError(msg)
             self._field_mmaps[name][idx] = arr

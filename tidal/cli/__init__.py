@@ -438,8 +438,16 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     plot_parser.add_argument(
         "--type",
         required=True,
-        choices=["heatmap", "snapshot", "amplitude", "energy", "profile", "compare",
-                 "hamiltonian", "conservation"],
+        choices=[
+            "heatmap",
+            "snapshot",
+            "amplitude",
+            "energy",
+            "profile",
+            "compare",
+            "hamiltonian",
+            "conservation",
+        ],
         help="Plot type to generate",
     )
     # Field selection

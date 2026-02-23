@@ -17,8 +17,16 @@ if TYPE_CHECKING:
     from argparse import Namespace
 
 _VALID_TYPES = frozenset(
-    {"heatmap", "snapshot", "amplitude", "energy", "profile", "compare",
-     "hamiltonian", "conservation"}
+    {
+        "heatmap",
+        "snapshot",
+        "amplitude",
+        "energy",
+        "profile",
+        "compare",
+        "hamiltonian",
+        "conservation",
+    }
 )
 
 DPI_DEFAULT = 150

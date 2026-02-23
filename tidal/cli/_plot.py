@@ -152,9 +152,11 @@ def _plot_component_independence(
             continue
         comp_peaks = _amplitude_peaks(sd.fields[comp_name])
         ax.plot(
-            sd.times, comp_peaks,
+            sd.times,
+            comp_peaks,
             color=colors[(i - 1) % len(colors)],
-            linewidth=2, label=comp_name,
+            linewidth=2,
+            label=comp_name,
         )
     ax.set_xlabel("Time")
     ax.set_ylabel("max |field|")
@@ -182,7 +184,10 @@ def _plot_3d(path: Path, sd: SimulationData, gi: GridInfo) -> None:
     z_1d = gi.axes_coords(2)
     ax.plot(z_1d, field_hist[0, ic, ic, :], "b-", linewidth=2, label="t=0")
     ax.plot(
-        z_1d, field_hist[-1, ic, ic, :], "r-", linewidth=2,
+        z_1d,
+        field_hist[-1, ic, ic, :],
+        "r-",
+        linewidth=2,
         label=f"t={float(times[-1]):.1f}",
     )
     ax.set_xlabel("z")

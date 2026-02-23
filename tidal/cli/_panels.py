@@ -508,8 +508,13 @@ def render_hamiltonian(
 
     if len(fields) > 1:
         ax.plot(
-            times, interaction, color="gray", linestyle="--",
-            linewidth=1.0, alpha=0.7, label="interaction",
+            times,
+            interaction,
+            color="gray",
+            linestyle="--",
+            linewidth=1.0,
+            alpha=0.7,
+            label="interaction",
         )
 
     ax.plot(times, total, "k-", linewidth=1.0, alpha=0.5, label="total")
@@ -540,11 +545,14 @@ def render_conservation(
     # Compute effective threshold (may differ from input after dt² scaling)
     effective_threshold = threshold
     if data.dt is not None:
-        effective_threshold = max(threshold, 10.0 * data.dt ** 2)
+        effective_threshold = max(threshold, 10.0 * data.dt**2)
 
     ax.plot(diag.times, diag.relative_error, "k-", linewidth=1.0)
     ax.axhline(
-        effective_threshold, color="r", linestyle="--", alpha=0.5,
+        effective_threshold,
+        color="r",
+        linestyle="--",
+        alpha=0.5,
         label=f"threshold ({effective_threshold:.1e})",
     )
     ax.axhline(-effective_threshold, color="r", linestyle="--", alpha=0.5)
@@ -554,8 +562,13 @@ def render_conservation(
     dt_note = f"  (dt={data.dt:.4f})" if data.dt is not None else ""
     ax.annotate(
         f"{status}\nmax |dE/E| = {diag.max_relative_error:.2e}{dt_note}",
-        xy=(0.95, 0.95), xycoords="axes fraction",
-        ha="right", va="top", fontsize=10, fontweight="bold", color=color,
+        xy=(0.95, 0.95),
+        xycoords="axes fraction",
+        ha="right",
+        va="top",
+        fontsize=10,
+        fontweight="bold",
+        color=color,
         bbox={"boxstyle": "round,pad=0.3", "fc": "white", "alpha": 0.8},
     )
     ax.set_xlabel("Time")
