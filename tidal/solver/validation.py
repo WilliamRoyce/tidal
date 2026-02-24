@@ -233,6 +233,7 @@ def check_pointwise_mass_stability(  # noqa: PLR0914
     pot = np.zeros((n, n, *grid_shape))
 
     for eq_idx, eq in enumerate(spec.equations):
+        i = spec.component_names.index(eq.field_name)  # field index for matrix row
         for term_idx, term in enumerate(eq.rhs_terms):
             if term.operator != "identity":
                 continue
@@ -242,9 +243,9 @@ def check_pointwise_mass_stability(  # noqa: PLR0914
                 continue  # Momentum or unknown field — skip
             coeff = coeff_eval.resolve(term, t=0.0, eq_idx=eq_idx, term_idx=term_idx)
             if isinstance(coeff, np.ndarray):
-                pot[eq_idx, j] -= coeff  # position-dependent: subtract broadcast array
+                pot[i, j] -= coeff  # position-dependent: subtract broadcast array
             else:
-                pot[eq_idx, j] -= float(coeff)  # constant: subtract scalar
+                pot[i, j] -= float(coeff)  # constant: subtract scalar
 
     # Vectorized eigenvalue check: reshape to (n_grid, n, n) batch.
     pot_flat = pot.reshape(n, n, -1).transpose(2, 0, 1)  # (n_grid, n, n)

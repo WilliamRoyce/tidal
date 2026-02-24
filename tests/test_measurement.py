@@ -4171,6 +4171,38 @@ class TestSimulationDataFromResult:
         with pytest.raises(ValueError, match="no snapshots"):
             SimulationData.from_result(result, spec, gi)
 
+    def test_failed_result_raises(self) -> None:
+        """from_result() must reject results with success=False."""
+        from tidal.solver.grid import GridInfo
+
+        spec = self._kg_spec()
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(False,))
+
+        result: SolverResult = {
+            "t": np.array([0.0, 0.5]),
+            "y": np.zeros((2, 32)),
+            "success": False,
+            "message": "Adaptive step failed to converge",
+        }
+        with pytest.raises(ValueError, match="failed solver result"):
+            SimulationData.from_result(result, spec, gi)
+
+    def test_snapshot_time_mismatch_raises(self) -> None:
+        """from_result() must detect mismatch between len(t) and y.shape[0]."""
+        from tidal.solver.grid import GridInfo
+
+        spec = self._kg_spec()
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(False,))
+
+        result: SolverResult = {
+            "t": np.linspace(0, 1, 6),   # 6 time points
+            "y": np.zeros((3, 32)),       # only 3 state vectors
+            "success": True,
+            "message": "",
+        }
+        with pytest.raises(ValueError, match="Snapshot count mismatch"):
+            SimulationData.from_result(result, spec, gi)
+
     def test_roundtrip_save_load(self, tmp_path: Path) -> None:
         """from_result → save → from_directory → compare."""
         from tidal.solver.grid import GridInfo

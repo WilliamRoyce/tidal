@@ -156,6 +156,13 @@ class SimulationData:
             )
             raise ValueError(msg)
 
+        if y_all.shape[0] != len(times):
+            msg = (
+                f"Snapshot count mismatch: {len(times)} time points but "
+                f"{y_all.shape[0]} state vectors in result['y']"
+            )
+            raise ValueError(msg)
+
         n_pts = grid_info.num_points
         shape = grid_info.shape
 

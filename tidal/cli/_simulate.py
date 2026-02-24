@@ -1282,6 +1282,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     if not result["success"]:
         print(f"Error: solver failed: {result['message']}", file=sys.stderr)
+        return 1
 
     # Post-simulation divergence check: verify final state is finite.
     # This is a single check at the end — zero per-step overhead.

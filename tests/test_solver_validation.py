@@ -602,3 +602,54 @@ class TestPointwiseMassStability:
         result = check_pointwise_mass_stability(coeff_eval, spec, grid)
         # Gaussian coupling peak is 0.1 << 1.0 diagonal → stable
         assert result.errors == []
+
+    def test_equations_in_different_order_than_fields(self) -> None:
+        """Stability check is correct when equation order ≠ field order.
+
+        If `eq_idx` is used as the matrix row instead of the field index,
+        the mass matrix is transposed/scrambled when the JSON lists equations
+        in a different order from fields.  This test constructs such a spec:
+        fields = [phi_0, chi_0] but equations = [chi_0_eq, phi_0_eq].
+        With asymmetric masses the wrong-index bug produces wrong eigenvalues.
+        """
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            # fields: phi_0 first, chi_0 second
+            "fields": [{"name": "phi_0", "index": 0}, {"name": "chi_0", "index": 1}],
+            # equations: chi_0 first (REVERSED), phi_0 second
+            "equations": [
+                {
+                    "field": "chi_0",
+                    "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": -4.0, "operator": "identity", "field": "chi_0"},
+                        ],
+                    },
+                },
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
+                        ],
+                    },
+                },
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        # component_names should be (phi_0, chi_0) (fields order)
+        assert list(spec.component_names) == ["phi_0", "chi_0"]
+        # equations are in reverse order
+        assert spec.equations[0].field_name == "chi_0"
+
+        grid = GridInfo(bounds=((0, 10),), shape=(4,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        # Both masses are positive (1.0, 4.0) — must be stable regardless of equation order
+        assert result.errors == [], (
+            "Stability check gave wrong result when equation order ≠ field order"
+        )
