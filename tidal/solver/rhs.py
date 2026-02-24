@@ -56,6 +56,11 @@ class RHSEvaluator:
         self._eq_map: dict[str, int] = {
             eq.field_name: i for i, eq in enumerate(spec.equations)
         }
+        # Legacy pi_N → pi_field_name resolution for unregenerated JSONs.
+        # New JSONs use pi_field_name directly; this map handles old pi_N refs.
+        self._pi_name_map: dict[str, str] = {}
+        for i, eq in enumerate(spec.equations):
+            self._pi_name_map[f"pi_{i}"] = f"pi_{eq.field_name}"
 
     def begin_timestep(self, t: float) -> None:
         """Notify the coefficient evaluator of a new timestep."""
@@ -162,9 +167,24 @@ class RHSEvaluator:
         coeff = self._coeff_eval.resolve(term, t, eq_idx=eq_idx, term_idx=term_idx)
         return coeff * operated
 
-    @staticmethod
-    def _get_field_data(field_name: str, fields: FieldSet) -> np.ndarray:
-        """Get field data, returning zeros for unknown fields."""
+    def _get_field_data(self, field_name: str, fields: FieldSet) -> np.ndarray:
+        """Get field data.  Raises on unknown field references.
+
+        Handles legacy ``pi_N`` references via ``_pi_name_map``.
+
+        Raises
+        ------
+        ValueError
+            If *field_name* cannot be resolved to any known field.
+        """
         if field_name in fields:
             return fields[field_name]
-        return np.zeros(fields.grid_shape)
+        # Legacy pi_N → pi_field_name resolution
+        resolved = self._pi_name_map.get(field_name)
+        if resolved is not None and resolved in fields:
+            return fields[resolved]
+        msg = (
+            f"Unknown field reference '{field_name}'. "
+            f"Available: {sorted(fields.slot_names)}"
+        )
+        raise ValueError(msg)

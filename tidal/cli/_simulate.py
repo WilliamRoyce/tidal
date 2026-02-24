@@ -784,6 +784,16 @@ def _warn_zero_evolution(
     rhs_eval = RHSEvaluator(spec, grid_info, coeff_eval, bc=bc)
     fieldset = FieldSet.from_flat(layout, grid_info.shape, y0)
 
+    # Inject zero constraint velocities so pi_field_name refs resolve.
+    # At t=0 the actual velocities are unknown (IDA computes them), but
+    # zero is the best estimate for this diagnostic check.
+    for eq in spec.equations:
+        if eq.time_derivative_order == 0:
+            fieldset.set_aux(
+                f"pi_{eq.field_name}",
+                np.zeros(grid_info.shape),
+            )
+
     max_rate = 0.0
     for eq_idx in range(len(spec.equations)):
         rhs = rhs_eval.evaluate(eq_idx, fieldset, t=0.0)

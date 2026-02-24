@@ -939,8 +939,9 @@ class EquationSystem:
         """Validate that all field references in equation terms are valid.
 
         Field references can be:
-        - Regular field names (e.g., "A_0", "A_1", "phi")
-        - Momentum field names (e.g., "pi_0", "pi_1") for mixed time-space derivatives
+        - Regular field names (e.g., ``"A_0"``, ``"A_1"``, ``"phi"``)
+        - Momentum names: ``"pi_field_name"`` (e.g., ``"pi_A_1"``)
+        - Legacy momentum names: ``"pi_N"`` (e.g., ``"pi_0"``)
 
         Raises
         ------
@@ -948,40 +949,22 @@ class EquationSystem:
             If a field reference is invalid.
         """
         valid_fields = set(self.component_names)
+        # Build valid momentum references: canonical pi_field_name + legacy pi_N
+        valid_momenta = {f"pi_{name}" for name in self.component_names}
+        valid_momenta.update(f"pi_{i}" for i in range(self.n_components))
 
         for eq in self.equations:
             for term in eq.rhs_terms:
                 field_ref = term.field
 
-                # Check for momentum field reference (pi_*)
                 if field_ref.startswith("pi_"):
-                    parts = field_ref.split("_")
-                    if len(parts) != 2:  # noqa: PLR2004
+                    if field_ref not in valid_momenta:
                         msg = (
-                            f"Invalid momentum field reference '{field_ref}' "
+                            f"Invalid momentum reference '{field_ref}' "
                             f"in equation for {eq.field_name}. "
-                            f"Expected format 'pi_N' where N is a numeric index."
+                            f"Valid: {sorted(valid_momenta)}."
                         )
                         raise ValueError(msg)
-
-                    idx_str = parts[1]
-                    if not idx_str.isdigit():
-                        msg = (
-                            f"Invalid momentum field index in '{field_ref}' "
-                            f"(equation for {eq.field_name}). "
-                            f"Expected numeric index, got '{idx_str}'."
-                        )
-                        raise ValueError(msg)
-
-                    idx = int(idx_str)
-                    if not (0 <= idx < self.n_components):
-                        msg = (
-                            f"Momentum field index {idx} out of range in '{field_ref}' "
-                            f"(equation for {eq.field_name}). "
-                            f"Valid indices: 0 to {self.n_components - 1}."
-                        )
-                        raise ValueError(msg)
-                # Regular field reference
                 elif field_ref not in valid_fields:
                     msg = (
                         f"Unknown field reference '{field_ref}' "

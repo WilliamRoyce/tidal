@@ -534,7 +534,7 @@ class TestFieldReferenceValidation:
 
     def test_momentum_reference_out_of_range_raises(self) -> None:
         """Test that out-of-range momentum reference raises ValueError."""
-        with pytest.raises(ValueError, match="out of range"):
+        with pytest.raises(ValueError, match="Invalid momentum reference"):
             EquationSystem(
                 n_components=2,
                 dimension=3,
@@ -560,8 +560,8 @@ class TestFieldReferenceValidation:
 
     def test_malformed_momentum_reference_raises(self) -> None:
         """Test that malformed momentum reference raises ValueError."""
-        # Non-numeric index
-        with pytest.raises(ValueError, match="numeric index"):
+        # Non-numeric index (invalid momentum reference)
+        with pytest.raises(ValueError, match="Invalid momentum reference"):
             EquationSystem(
                 n_components=2,
                 dimension=3,
@@ -586,7 +586,7 @@ class TestFieldReferenceValidation:
             )
 
         # Wrong format (too many underscores)
-        with pytest.raises(ValueError, match="pi_N"):
+        with pytest.raises(ValueError, match="Invalid momentum reference"):
             EquationSystem(
                 n_components=2,
                 dimension=3,

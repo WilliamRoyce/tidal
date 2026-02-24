@@ -35,7 +35,7 @@ class FieldSet:  # noqa: PLR0904
         If ``None``, initializes to zeros.
     """
 
-    __slots__ = ("_data", "_grid_shape", "_layout", "_n", "_name_to_idx")
+    __slots__ = ("_aux", "_data", "_grid_shape", "_layout", "_n", "_name_to_idx")
 
     def __init__(
         self,
@@ -63,22 +63,29 @@ class FieldSet:  # noqa: PLR0904
         for i, slot in enumerate(layout.slots):
             self._name_to_idx[slot.name] = i
 
+        # Auxiliary fields not backed by the flat state array (e.g.
+        # constraint velocities injected from IDA's yp vector).
+        self._aux: dict[str, np.ndarray] = {}
+
     # ---- Named access (zero-copy views) ----
 
     def __getitem__(self, name: str) -> np.ndarray:
-        """Return grid-shaped view of named slot.
+        """Return grid-shaped view of named slot or auxiliary field.
 
         Raises
         ------
         KeyError
-            If *name* is not a valid slot name.
+            If *name* is not a valid slot or auxiliary name.
         """
         idx = self._name_to_idx.get(name)
-        if idx is None:
-            msg = f"Unknown slot '{name}'. Valid slots: {sorted(self._name_to_idx)}"
-            raise KeyError(msg)
-        start = idx * self._n
-        return self._data[start : start + self._n].reshape(self._grid_shape)
+        if idx is not None:
+            start = idx * self._n
+            return self._data[start : start + self._n].reshape(self._grid_shape)
+        if name in self._aux:
+            return self._aux[name]
+        valid = sorted(set(self._name_to_idx) | set(self._aux))
+        msg = f"Unknown slot '{name}'. Valid: {valid}"
+        raise KeyError(msg)
 
     def __setitem__(self, name: str, value: np.ndarray) -> None:
         """Write grid-shaped data into named slot.
@@ -96,8 +103,8 @@ class FieldSet:  # noqa: PLR0904
         self._data[start : start + self._n] = np.asarray(value).ravel()
 
     def __contains__(self, name: object) -> bool:
-        """Check if *name* is a valid slot name."""
-        return name in self._name_to_idx
+        """Check if *name* is a valid slot or auxiliary name."""
+        return name in self._name_to_idx or name in self._aux
 
     def __len__(self) -> int:
         """Return the number of slots."""
@@ -107,6 +114,15 @@ class FieldSet:  # noqa: PLR0904
     def __repr__(self) -> str:
         slots = ", ".join(self._name_to_idx)
         return f"FieldSet(slots=[{slots}], grid_shape={self._grid_shape})"
+
+    # ---- Auxiliary fields ----
+
+    def set_aux(self, name: str, data: np.ndarray) -> None:
+        """Register an auxiliary named field (not backed by flat array).
+
+        Used to inject constraint velocities from IDA's ``yp`` vector.
+        """
+        self._aux[name] = data
 
     # ---- Flat array access ----
 
@@ -163,14 +179,19 @@ class FieldSet:  # noqa: PLR0904
         return {name: self[name] for name in self.momentum_names}
 
     def as_dict(self) -> dict[str, np.ndarray]:
-        """Return dict of all slot names → grid-shaped views (zero-copy)."""
-        return {name: self[name] for name in self.slot_names}
+        """Return dict of all slot names + aux → grid-shaped views."""
+        d = {name: self[name] for name in self.slot_names}
+        d.update(self._aux)
+        return d
 
     # ---- Constructors ----
 
     def copy(self) -> FieldSet:
-        """Deep copy (new flat array)."""
-        return FieldSet(self._layout, self._grid_shape, self._data.copy())
+        """Deep copy (new flat array, copied aux)."""
+        fs = FieldSet(self._layout, self._grid_shape, self._data.copy())
+        for k, v in self._aux.items():
+            fs._aux[k] = v.copy()
+        return fs
 
     @classmethod
     def zeros(cls, layout: StateLayout, grid_shape: tuple[int, ...]) -> FieldSet:

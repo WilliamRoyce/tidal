@@ -346,12 +346,12 @@ TestTrue["Symbolic mass_matrix_symbolic populated",
   symbolicResult["mass_matrix_symbolic"] =!= Null &&
   symbolicResult["mass_matrix_symbolic"][[1, 1]] === "-procaMassSquared"];
 
-(* Test: Identity term referencing momentum field (pi_0) — should be ignored *)
+(* Test: Identity term referencing momentum field (pi_A_0) — should be ignored *)
 momentumEqs = {
   <|
     "rhs" -> <|
       "terms" -> {
-        <|"coefficient" -> 1.0, "operator" -> "gradient_x", "field" -> "pi_0"|>,
+        <|"coefficient" -> 1.0, "operator" -> "gradient_x", "field" -> "pi_A_0"|>,
         <|"coefficient" -> -2.0, "operator" -> "identity", "field" -> "A_0"|>
       }
     |>
@@ -587,35 +587,35 @@ TestCase["ExtractDerivativeProfile: unapplied Derivative",
   TorsionGertsenshtein`ExportJSON`ExtractDerivativeProfile[
     Derivative[1, 2][testf]]];
 
-(* === Test Group: FieldToMomentumName global index === *)
+(* === Test Group: FieldToMomentumName — pi_field_name convention === *)
 Print[""];
-Print["Test Group: FieldToMomentumName global index"];
+Print["Test Group: FieldToMomentumName pi_field_name"];
 
-(* Single-base system: parse index = global index *)
+(* Single-base system *)
 TestCase["FieldToMomentumName: single base A_0",
-  "pi_0",
+  "pi_A_0",
   TorsionGertsenshtein`ExportJSON`FieldToMomentumName["A_0", {"A_0", "A_1", "A_2"}]];
 
 TestCase["FieldToMomentumName: single base A_2",
-  "pi_2",
+  "pi_A_2",
   TorsionGertsenshtein`ExportJSON`FieldToMomentumName["A_2", {"A_0", "A_1", "A_2"}]];
 
-(* Multi-base system: parse index != global index *)
-TestCase["FieldToMomentumName: multi-base A_0 at global 1",
-  "pi_1",
+(* Multi-base system: pi_ prefix + field name regardless of global position *)
+TestCase["FieldToMomentumName: multi-base A_0",
+  "pi_A_0",
   TorsionGertsenshtein`ExportJSON`FieldToMomentumName["A_0", {"phi_0", "A_0", "A_1", "A_2"}]];
 
-TestCase["FieldToMomentumName: multi-base A_1 at global 2",
-  "pi_2",
+TestCase["FieldToMomentumName: multi-base A_1",
+  "pi_A_1",
   TorsionGertsenshtein`ExportJSON`FieldToMomentumName["A_1", {"phi_0", "A_0", "A_1", "A_2"}]];
 
-(* Two vector bases: B_0 at global 3 *)
-TestCase["FieldToMomentumName: two vectors B_0 at global 3",
-  "pi_3",
+(* Two vector bases *)
+TestCase["FieldToMomentumName: two vectors B_0",
+  "pi_B_0",
   TorsionGertsenshtein`ExportJSON`FieldToMomentumName["B_0", {"A_0", "A_1", "A_2", "B_0", "B_1", "B_2"}]];
 
-TestCase["FieldToMomentumName: two vectors B_1 at global 4",
-  "pi_4",
+TestCase["FieldToMomentumName: two vectors B_1",
+  "pi_B_1",
   TorsionGertsenshtein`ExportJSON`FieldToMomentumName["B_1", {"A_0", "A_1", "A_2", "B_0", "B_1", "B_2"}]];
 
 (* Error case: field not in list *)

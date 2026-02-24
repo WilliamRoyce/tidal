@@ -56,7 +56,9 @@ def validate_field_references(spec: EquationSystem) -> None:
         If a field reference is invalid.
     """
     valid_fields = set(spec.component_names)
-    # Also accept momentum names (pi_N format)
+    # Accept momentum names in pi_field_name format (e.g. pi_A_1)
+    valid_fields.update(f"pi_{eq.field_name}" for eq in spec.equations)
+    # Legacy: also accept pi_N (global index) for unregenerated JSONs
     valid_fields.update(f"pi_{i}" for i in range(spec.n_components))
 
     for eq in spec.equations:

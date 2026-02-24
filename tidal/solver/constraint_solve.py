@@ -230,20 +230,25 @@ def _select_method(
 def _build_name_map(spec: EquationSystem) -> dict[str, str]:
     """Build a map from JSON field references to FieldSet slot names.
 
-    JSON uses ``pi_N`` (numeric index) for momentum references, but
-    ``StateLayout`` creates slots named ``pi_{field_name}`` (e.g.
-    ``pi_A_1``).  This map resolves those references.
+    The canonical naming convention is ``pi_{field_name}`` (e.g.
+    ``pi_A_1``), matching ``StateLayout`` slot names.  Legacy JSONs may
+    still use ``pi_N`` (numeric global index); those are mapped here too.
     """
     name_map: dict[str, str] = {}
     for eq in spec.equations:
         # Field names map to themselves
         name_map[eq.field_name] = eq.field_name
-        # Momentum references: pi_N → pi_{field_name}
+        # Momentum references: canonical pi_field_name
         if eq.time_derivative_order >= _SECOND_ORDER:
-            pi_idx = f"pi_{eq.field_index}"
             pi_slot = f"pi_{eq.field_name}"
-            name_map[pi_idx] = pi_slot
-            name_map[pi_slot] = pi_slot  # Also accept direct slot names
+            name_map[pi_slot] = pi_slot
+    # Legacy pi_N → pi_field_name mapping (for unregenerated JSONs)
+    for i, eq in enumerate(spec.equations):
+        if eq.time_derivative_order >= _SECOND_ORDER:
+            pi_legacy = f"pi_{i}"  # global position (0-indexed)
+            pi_slot = f"pi_{eq.field_name}"
+            if pi_legacy not in name_map:
+                name_map[pi_legacy] = pi_slot
     return name_map
 
 

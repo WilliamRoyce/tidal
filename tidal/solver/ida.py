@@ -105,6 +105,17 @@ class _ResidualCtx:
         self.yp = yp
         self.res = res
         self.fieldset = FieldSet.from_flat(self.layout, self.shape, y)
+
+        # Inject constraint velocities from yp so that
+        # first_derivative_t(constraint) and gradient_x(pi_constraint)
+        # resolve correctly in the RHSEvaluator.
+        for eq in self.spec.equations:
+            if eq.time_derivative_order == 0:
+                slot_idx = self.layout.field_slot_map[eq.field_name]
+                start = slot_idx * self.n
+                vel = yp[start : start + self.n].reshape(self.shape)
+                self.fieldset.set_aux(f"pi_{eq.field_name}", vel)
+
         self.fields = self.fieldset.as_dict()
 
         # Notify coefficient evaluator of new timestep

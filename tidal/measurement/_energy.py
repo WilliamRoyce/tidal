@@ -50,7 +50,8 @@ _GRADIENT_AXES: dict[str, int] = {
     "gradient_z": 2,
 }
 
-# Pattern for momentum field references: pi_0, pi_1, pi0, pi1, etc.
+# Legacy pattern for old-style numeric momentum references: pi_0, pi_1, etc.
+# New convention is pi_field_name (e.g. pi_A_1). Both are supported.
 _MOMENTUM_RE = re.compile(r"^pi_?(\d+)$")
 
 
@@ -424,8 +425,12 @@ def _apply_spatial_operator(
 
 
 def _is_momentum_field(field_name: str) -> bool:
-    """Check if a field name is a momentum reference (pi_N / piN)."""
-    return _MOMENTUM_RE.match(field_name) is not None
+    """Check if a field name is a momentum reference (pi_field_name or legacy pi_N)."""
+    if not field_name.startswith("pi_") or len(field_name) <= 3:
+        return False
+    # New convention: pi_field_name (non-numeric suffix)
+    # Legacy convention: pi_N (numeric suffix)
+    return True
 
 
 def _resolve_term_coefficient(
@@ -526,20 +531,37 @@ def _resolve_term_target(
     if field_name in data.fields:
         return data.fields[field_name][t_idx]
 
-    # Momentum reference: pi_N or piN
-    m = _MOMENTUM_RE.match(field_name)
-    if m is not None:
-        idx = int(m.group(1))
+    # Momentum reference: pi_field_name (new) or pi_N (legacy)
+    if field_name.startswith("pi_") and len(field_name) > 3:
+        suffix = field_name[3:]
         names = data.spec.component_names
-        if idx >= len(names):
-            msg = (
-                f"Momentum reference '{field_name}' resolves to index {idx}, "
-                f"but spec only has {len(names)} fields: {names}"
-            )
-            raise ValueError(msg)
-        target_name = names[idx]
+
+        # New convention: suffix is a field name (e.g. "A_1")
+        if suffix in names:
+            target_name = suffix
+            eq_idx = names.index(target_name)
+        else:
+            # Legacy convention: suffix is a numeric index
+            m = _MOMENTUM_RE.match(field_name)
+            if m is None:
+                msg = (
+                    f"Momentum reference '{field_name}': suffix '{suffix}' "
+                    f"is not a known field ({names}) or numeric index"
+                )
+                raise ValueError(msg)
+            idx = int(m.group(1))
+            if idx >= len(names):
+                msg = (
+                    f"Momentum reference '{field_name}' resolves to "
+                    f"index {idx}, but spec only has {len(names)} "
+                    f"fields: {names}"
+                )
+                raise ValueError(msg)
+            target_name = names[idx]
+            eq_idx = idx
+
         # Constraint field → zero momentum (expected None)
-        eq = data.spec.equations[idx]
+        eq = data.spec.equations[eq_idx]
         if eq.time_derivative_order == 0:
             return None
         mom = data.momenta.get(target_name)
@@ -554,7 +576,7 @@ def _resolve_term_target(
     msg = (
         f"Unresolvable field reference '{field_name}' — "
         f"not a known field ({list(data.fields.keys())}) "
-        f"or momentum pattern (pi_N)"
+        f"or momentum pattern (pi_field_name / pi_N)"
     )
     raise ValueError(msg)
 

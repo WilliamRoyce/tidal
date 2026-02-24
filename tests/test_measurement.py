@@ -2054,19 +2054,26 @@ class TestApplySpatialOperator:
 class TestIsMomentumField:
     """Test _is_momentum_field regex."""
 
-    def test_pi_underscore(self) -> None:
+    def test_pi_underscore_numeric(self) -> None:
+        """Legacy pi_N format (numeric index)."""
         assert _is_momentum_field("pi_0") is True
         assert _is_momentum_field("pi_1") is True
         assert _is_momentum_field("pi_12") is True
 
+    def test_pi_field_name(self) -> None:
+        """New pi_field_name format."""
+        assert _is_momentum_field("pi_A_0") is True
+        assert _is_momentum_field("pi_A_1") is True
+        assert _is_momentum_field("pi_phi_0") is True
+
     def test_pi_no_underscore(self) -> None:
-        assert _is_momentum_field("pi0") is True
-        assert _is_momentum_field("pi1") is True
+        """No-underscore format is NOT supported."""
+        assert _is_momentum_field("pi0") is False
+        assert _is_momentum_field("pi1") is False
 
     def test_regular_fields(self) -> None:
         assert _is_momentum_field("phi_0") is False
         assert _is_momentum_field("A_0") is False
-        assert _is_momentum_field("pi_phi") is False  # non-numeric
 
 
 # ============================================================

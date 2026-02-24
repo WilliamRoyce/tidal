@@ -647,11 +647,10 @@ ParseFieldName[name_String] := Module[{match},
   ]]
 ];
 
-(* Map field name to momentum field name using GLOBAL component index *)
-(* allFieldNames is the full ordered list of component names in the JSON. *)
-(* The numeric suffix in "pi_N" must be the 0-based global position, NOT *)
-(* the parse index from the field name, because multiple field bases can *)
-(* share the same parse index (e.g., phi_0 and A_0 both have index 0). *)
+(* Map field name to canonical momentum name: pi_{fieldName}.             *)
+(* This matches the StateLayout naming convention in the Python solver.  *)
+(* For example: FieldToMomentumName["A_0", {"phi_0","A_0","A_1","A_2"}] *)
+(*   -> "pi_A_0"                                                         *)
 FieldToMomentumName[fieldName_String, allFieldNames_List] := Module[{pos},
   pos = FirstPosition[allFieldNames, fieldName];
   If[MissingQ[pos],
@@ -660,7 +659,7 @@ FieldToMomentumName[fieldName_String, allFieldNames_List] := Module[{pos},
       "' not found in field list: ", ToString[allFieldNames]
     ]]
   ];
-  "pi_" <> ToString[pos[[1]] - 1]  (* 0-indexed global position *)
+  "pi_" <> fieldName
 ];
 
 (* Classify spatial operator in a mixed time-space derivative *)
