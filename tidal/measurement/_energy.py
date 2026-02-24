@@ -988,6 +988,57 @@ def _gradient_pair_to_second_order(op_a: str, op_b: str) -> str:
     return f"cross_derivative_{'xyz'[lo]}{'xyz'[hi]}"
 
 
+def _gradient_product_density(
+    op_a: str,
+    field_a: NDArray[np.float64],
+    op_b: str,
+    field_b: NDArray[np.float64],
+    grid_spacing: tuple[float, ...],
+    periodic: tuple[bool, ...],
+    bc_types: tuple[str, ...] | None = None,
+) -> NDArray[np.float64]:
+    """Pointwise density for the gradient inner product ⟨∂_a f, ∂_b g⟩.
+
+    Returns a grid array whose spatial mean gives the gradient inner product.
+    Returning an array (not a scalar) allows callers to weight by
+    position-dependent coefficients before taking ``.mean()``.
+
+    For **periodic** axes: uses integration by parts (IBP)
+        ``density = -f · ∂²_ab(g)``
+    matching the solver's 3-point laplacian stencil (exact discrete IBP).
+
+    For **non-periodic** axes: uses direct central-difference
+        ``density = ∂_a(f) · ∂_b(g)``
+    because discrete IBP has boundary contributions
+    (cf. :func:`_gradient_energy_density`).
+
+    This is the **single source of truth** for gradient-product evaluation.
+    Both the standalone gradient×gradient Hamiltonian path and the kinetic
+    bilinear expansion dispatch here, guaranteeing stencil consistency for
+    terms that must cancel (e.g. ``½(∂_x A_0)²`` from kinetic ``- ½(∂_x A_0)²``
+    standalone in Proca/CS theories).
+    """
+    ax_a = _GRADIENT_AXES[op_a]
+    bc_a = _effective_bc(ax_a, periodic, bc_types)
+
+    if bc_a == "periodic":
+        # IBP: ⟨∂_a f, ∂_b g⟩ = mean(-f · ∂²_ab g)
+        second_op = _gradient_pair_to_second_order(op_a, op_b)
+        operated = _apply_spatial_operator(
+            second_op, field_b, grid_spacing, periodic, bc_types=bc_types,
+        )
+        return -(field_a * operated)
+
+    # Non-periodic: direct gradient product
+    grad_a = _apply_spatial_operator(
+        op_a, field_a, grid_spacing, periodic, bc_types=bc_types,
+    )
+    grad_b = _apply_spatial_operator(
+        op_b, field_b, grid_spacing, periodic, bc_types=bc_types,
+    )
+    return grad_a * grad_b
+
+
 def _merge_parameters(data: SimulationData) -> dict[str, float]:
     """Merge spec metadata parameters with runtime parameters.
 
@@ -1006,16 +1057,67 @@ def _merge_parameters(data: SimulationData) -> dict[str, float]:
     return params
 
 
+def _build_vel_components(
+    rate_terms: tuple[OperatorTerm, ...],
+    data: SimulationData,
+    t_idx: int,
+    params: dict[str, float],
+    coord_arrays: dict[str, NDArray[np.float64]] | None,
+) -> tuple[
+    list[tuple[float | NDArray[np.float64], str, NDArray[np.float64]]],
+    dict[str, NDArray[np.float64]] | None,
+]:
+    """Resolve field_rate terms into (coefficient, operator, field_data) triples.
+
+    Each triple represents one addend in the velocity reconstruction:
+    ``vel = Σ c_i · op_i(field_i)``.
+
+    Coefficients are resolved as ``float`` for constant terms and
+    ``NDArray`` for position-dependent terms (via
+    :func:`~tidal.symbolic._eval_utils.evaluate_coefficient`).
+
+    Returns the component list **and** the (possibly initialised)
+    ``coord_arrays`` so the caller can pass it to subsequent calls without
+    redundant re-computation.
+    """
+    comps: list[tuple[float | NDArray[np.float64], str, NDArray[np.float64]]] = []
+    for rt in rate_terms:
+        rt_target = _resolve_term_target(data, rt.field, t_idx)
+        if rt_target is None:
+            continue
+        if rt.position_dependent:
+            if coord_arrays is None:
+                coord_arrays = _build_coord_arrays(data)
+            from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+            rt_c: float | NDArray[np.float64] = evaluate_coefficient(
+                rt.coefficient_symbolic,
+                params,
+                data.spec.effective_coordinates,
+                coord_arrays=coord_arrays,
+                t=0.0,
+            )
+        else:
+            rt_c = _resolve_term_coefficient(rt, params)
+        comps.append((rt_c, rt.operator, rt_target))
+    return comps, coord_arrays
+
+
 def _compute_hamiltonian_from_canonical(
     data: SimulationData,
     t_idx: int,
 ) -> float:
     """Evaluate the symbolic Hamiltonian from canonical structure.
 
-    For spatial gradient terms, uses **integration by parts** to convert
-    gradient products into second-order operators::
+    For spatial gradient terms, uses :func:`_gradient_product_density` —
+    the single source of truth for gradient inner products.  BC-aware:
+    periodic → IBP, non-periodic → central-difference.
 
-        coeff * ⟨∂_a(u) · ∂_b(v)⟩  →  -coeff * ⟨u, ∂²_ab(v)⟩
+    For kinetic (``time_derivative × time_derivative``) terms, performs
+    bilinear expansion of the velocity via ``field_rates`` and dispatches
+    gradient sub-pairs through the same helper.  This guarantees that
+    ``(∂_x A_0)²`` terms appearing in both kinetic and standalone blocks
+    use **identical** discrete stencils and cancel exactly.
 
     This ensures the measured Hamiltonian uses the **same** finite-difference
     stencils as the solver (3-point laplacian, cascaded-gradient cross
@@ -1084,28 +1186,93 @@ def _compute_hamiltonian_from_canonical(
         op_a = term.factor_a.operator
         op_b = term.factor_b.operator
 
-        # Integration-by-parts path: both factors are spatial gradients.
-        # ⟨c · ∂_a(u) · ∂_b(v)⟩ = -⟨c · u · ∂²_ab(v)⟩
-        # This is exact when c does not vary along the gradient axis (holds for
-        # all current examples: spherical Csc[y]/x² with ∂_z, conformal factors,
-        # etc.).  Uses the SAME 2nd-order stencils as the solver → exact conservation.
+        # Gradient×gradient path: use _gradient_product_density (single source
+        # of truth).  BC-aware: periodic→IBP, non-periodic→CD.
+        # The helper returns a pointwise density array; coeff (possibly
+        # position-dependent NDArray) is multiplied in before .mean().
         if op_a in _GRADIENT_AXES and op_b in _GRADIENT_AXES:
             field_a = _resolve_term_target(data, term.factor_a.field, t_idx)
             field_b = _resolve_term_target(data, term.factor_b.field, t_idx)
             if field_a is None or field_b is None:
                 continue
-            second_op = _gradient_pair_to_second_order(op_a, op_b)
-            operated = _apply_spatial_operator(
-                second_op,
-                field_b,
-                data.grid_spacing,
-                data.periodic,
-                bc_types=data.bc_types,
+            density = _gradient_product_density(
+                op_a, field_a, op_b, field_b,
+                data.grid_spacing, data.periodic, bc_types=data.bc_types,
             )
-            total += float((-coeff * field_a * operated).mean())
+            total += float((coeff * density).mean())
             continue
 
-        # All other terms: identity, time_derivative, mixed
+        # Kinetic: time_derivative × time_derivative with bilinear expansion.
+        # Expand velocity via field_rates: vel_A = Σ c_j · op_j(f_j)
+        # ⟨vel_A, vel_B⟩ = Σ_ij ci cj ⟨op_i(f_i), op_j(f_j)⟩
+        # Uses _gradient_product_density for gradient sub-pairs → stencil-
+        # consistent with the standalone gradient×gradient path above.
+        if op_a == "time_derivative" and op_b == "time_derivative":
+            fname_a = term.factor_a.field
+            fname_b = term.factor_b.field
+            rates_a = (
+                canonical.field_rates.get(fname_a)
+                if canonical is not None else None
+            )
+            rates_b = (
+                canonical.field_rates.get(fname_b)
+                if canonical is not None else None
+            )
+            if rates_a is not None and rates_b is not None:
+                vel_a = _build_vel_components(
+                    rates_a, data, t_idx, params, coord_arrays,
+                )
+                coord_arrays = vel_a[1]  # may have been lazy-initialised
+                vel_b_comps = (
+                    vel_a[0]
+                    if fname_a == fname_b
+                    else _build_vel_components(
+                        rates_b, data, t_idx, params, coord_arrays,
+                    )[0]
+                )
+                bilinear_total = 0.0
+                for ci, opi, fi in vel_a[0]:
+                    for cj, opj, fj in vel_b_comps:
+                        if opi in _GRADIENT_AXES and opj in _GRADIENT_AXES:
+                            sub_density = _gradient_product_density(
+                                opi, fi, opj, fj,
+                                data.grid_spacing, data.periodic,
+                                bc_types=data.bc_types,
+                            )
+                        else:
+                            fi_val = (
+                                _apply_spatial_operator(
+                                    opi, fi, data.grid_spacing,
+                                    data.periodic, bc_types=data.bc_types,
+                                ) if opi != "identity" else fi
+                            )
+                            fj_val = (
+                                _apply_spatial_operator(
+                                    opj, fj, data.grid_spacing,
+                                    data.periodic, bc_types=data.bc_types,
+                                ) if opj != "identity" else fj
+                            )
+                            sub_density = fi_val * fj_val
+                        # coeff · ci · cj · density — all potentially NDArray
+                        bilinear_total += float(
+                            (coeff * ci * cj * sub_density).mean()
+                        )
+                total += bilinear_total
+                continue
+
+            # Fallback: no field_rates → direct evaluation (legacy)
+            fa = _evaluate_hamiltonian_factor(
+                fname_a, "time_derivative", data, t_idx,
+            )
+            fb = _evaluate_hamiltonian_factor(
+                fname_b, "time_derivative", data, t_idx,
+            )
+            if fa is None or fb is None:
+                continue
+            total += float((coeff * fa * fb).mean())
+            continue
+
+        # All other terms: identity, mixed operator×identity, etc.
         fa = _evaluate_hamiltonian_factor(
             term.factor_a.field,
             term.factor_a.operator,

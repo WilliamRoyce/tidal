@@ -645,13 +645,25 @@ class TestCanonicalHamiltonianEnergy:
 
         h_eval = _compute_hamiltonian_from_canonical(data, 0)
 
-        # Compute expected energy using SAME finite difference stencils
-        # as the solver.  The IBP path evaluates ½ gradient_x(A_1)² as
-        # -½ A_1 · laplacian_x(A_1), matching the 3-point laplacian stencil.
+        # Compute expected energy using the bilinear expansion stencils.
+        # The kinetic ½ vel² = ½(pi + ∂_x A_0)² is expanded bilinearly:
+        #   ½ pi²             (identity × identity)
+        #   + pi · grad_CD(A_0) (identity × gradient: CD)
+        #   + ½ IBP(∂_x A_0)²  (gradient × gradient: IBP via _gradient_product_density)
+        # Standalone gradient²: -½ A_1 · lap(A_1) (IBP)
+        # Mass: ½ A_1²
         grad_a0 = (np.roll(a0, -1) - np.roll(a0, 1)) / (2 * dx)
-        vel = pi1 + grad_a0  # velocity = pi + d_x(A_0)
+        lap_a0 = (np.roll(a0, -1) - 2 * a0 + np.roll(a0, 1)) / dx**2
         lap_a1 = (np.roll(a1, -1) - 2 * a1 + np.roll(a1, 1)) / dx**2
-        h_expected = float((0.5 * vel**2 + (-0.5) * a1 * lap_a1 + 0.5 * a1**2).mean())
+        h_expected = float(
+            (
+                0.5 * pi1**2
+                + pi1 * grad_a0
+                + 0.5 * (-a0 * lap_a0)
+                + (-0.5) * a1 * lap_a1
+                + 0.5 * a1**2
+            ).mean()
+        )
 
         # If we had the bug (using pi instead of vel), kinetic term would be
         # ½ π², missing the cross-terms pi*d_x(A_0) and (d_x A_0)²
@@ -663,6 +675,129 @@ class TestCanonicalHamiltonianEnergy:
         # Verify the wrong answer (raw momentum) does NOT match
         assert abs(h_eval - h_wrong) > 0.01, (
             f"h_eval={h_eval} should differ from h_wrong={h_wrong} when A_0 is nonzero"
+        )
+
+    def test_kinetic_gradient_cancellation_is_exact(self) -> None:
+        """Kinetic ½(∂_t A_1)² and standalone -½(∂_x A_0)² cancel exactly.
+
+        H = ½(π + ∂_x A_0)² - ½(∂_x A_0)² = ½π² + π·∂_x A_0
+
+        Both (∂_x A_0)² terms must use the SAME stencil to cancel.  Before
+        the bilinear expansion fix, the kinetic path used central-difference
+        (CD) for the gradient while the standalone path used IBP → 3-point
+        laplacian, causing an O(dx²) residual that oscillated with A_0.
+        """
+        n_grid = 64
+        domain_len = 10.0
+        dx = domain_len / n_grid
+        x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
+
+        k0 = 2 * np.pi / domain_len
+        a0 = 0.8 * np.sin(k0 * x)
+        a1 = np.zeros(n_grid)  # A_1 not relevant here
+        pi1 = 0.6 * np.cos(k0 * x)
+
+        eq_a0 = ComponentEquation(
+            field_name="A_0",
+            field_index=0,
+            time_derivative_order=0,
+            rhs_terms=(
+                OperatorTerm(coefficient=-1.0, operator="laplacian_x", field="A_1"),
+            ),
+        )
+        eq_a1 = ComponentEquation(
+            field_name="A_1",
+            field_index=1,
+            time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_1"),
+            ),
+        )
+
+        # Hamiltonian: ½ vel_1² - ½ (∂_x A_0)²
+        # where vel_1 = pi_1 + ∂_x A_0
+        # After cancellation: H = ½ π² + π · ∂_x A_0
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="A_1", operator="time_derivative"),
+                    factor_b=HamiltonianFactor(field="A_1", operator="time_derivative"),
+                ),
+                HamiltonianTerm(
+                    coefficient=-0.5,
+                    factor_a=HamiltonianFactor(field="A_0", operator="gradient_x"),
+                    factor_b=HamiltonianFactor(field="A_0", operator="gradient_x"),
+                ),
+            ),
+            field_rates={
+                "A_1": (
+                    OperatorTerm(coefficient=1.0, operator="identity", field="pi_1"),
+                    OperatorTerm(coefficient=1.0, operator="gradient_x", field="A_0"),
+                ),
+            },
+            hamiltonian_symbolic="cancellation test",
+        )
+
+        spec = EquationSystem(
+            n_components=2,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("A_0", "A_1"),
+            equations=(eq_a0, eq_a1),
+            mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={"source": "test", "parameters": {}},
+            canonical=canonical,
+        )
+
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={"A_0": a0[np.newaxis], "A_1": a1[np.newaxis]},
+            momenta={"A_1": pi1[np.newaxis]},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+
+        h_eval = _compute_hamiltonian_from_canonical(data, 0)
+
+        # Expected: H = ½π² + π·∂_x A_0 (using IBP laplacian for gradient²)
+        # The (∂_x A_0)² from kinetic cancels the standalone -½(∂_x A_0)².
+        # Use IBP for both the ½π² and the cross-term π·∂_x A_0.
+        # The cross-term from bilinear: 2 × ½ × 1 × 1 × pi1 × ∂_x A_0
+        # = pi1 · ∂_x A_0  (factor of 2 from the ij+ji symmetry in vel²)
+        # But actually for ½ vel² with vel = pi + grad(A_0):
+        # ½ vel² = ½ pi² + pi · grad(A_0) + ½ (grad A_0)²
+        # Then -½ (grad A_0)² cancels → H = ½ pi² + pi · grad(A_0)
+        #
+        # For the IBP stencil, grad(A_0) inside bilinear becomes:
+        # identity×identity: ½ pi² → ½ mean(pi1²)
+        # identity×gradient: pi · grad(A_0) → done via _apply_spatial_operator
+        # gradient×gradient: ½(grad A_0)² → done via _gradient_product_density
+        # standalone: -½(grad A_0)² → done via _gradient_product_density (SAME!)
+        #
+        # So the IBP ½(grad A_0)² and IBP -½(grad A_0)² cancel exactly.
+        # Expected result: ½ mean(pi²) + mean(pi · grad_CD(A_0))
+        # where grad_CD is the central-difference gradient used for
+        # the identity×gradient cross-term.
+        grad_a0_cd = (np.roll(a0, -1) - np.roll(a0, 1)) / (2 * dx)
+        h_expected = float((0.5 * pi1**2 + pi1 * grad_a0_cd).mean())
+
+        np.testing.assert_allclose(h_eval, h_expected, rtol=1e-10)
+
+        # Verify this is NOT what the old code produced.  The old code
+        # evaluated the kinetic term via CD gradient (wide stencil) but
+        # the standalone via IBP (3-point laplacian).  The residual is:
+        # ½(CD²-IBP) for (∂_x A_0)²
+        lap_a0_ibp = (np.roll(a0, -1) - 2 * a0 + np.roll(a0, 1)) / dx**2
+        ibp_grad_sq = float((-a0 * lap_a0_ibp).mean())
+        cd_grad_sq = float((grad_a0_cd**2).mean())
+        stencil_residual = 0.5 * (cd_grad_sq - ibp_grad_sq)
+        assert abs(stencil_residual) > 1e-4, (
+            "Test is only meaningful if the stencil residual is nonzero"
         )
 
 
