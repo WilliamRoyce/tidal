@@ -3155,6 +3155,89 @@ class TestDispersionRelation:
         result = compute_dispersion(data, "phi_0")
         assert np.all(result.frequencies > 0.0)
 
+    def test_constraint_field_raises(self) -> None:
+        """Requesting a constraint field should raise ValueError."""
+        spec = _make_constraint_spec()
+        n = 32
+        dx = 10.0 / n
+        times = np.linspace(0.0, 5.0, 10)
+        k0 = 2.0 * np.pi / 10.0
+        omega0 = float(np.sqrt(k0**2 + 0.5))
+        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
+        a1_field = np.stack([np.cos(k0 * x) * np.cos(omega0 * t) for t in times])
+        data = SimulationData(
+            times=times,
+            fields={"A_0": np.zeros((10, n)), "A_1": a1_field},
+            momenta={"A_1": np.zeros((10, n))},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={"Am2": 0.5},
+        )
+        with pytest.raises(ValueError, match="constraint"):
+            compute_dispersion(data, "A_0")
+
+    def test_constraint_in_group_raises(self) -> None:
+        """A group containing a constraint field should raise ValueError."""
+        spec = _make_constraint_spec()
+        n = 32
+        dx = 10.0 / n
+        times = np.linspace(0.0, 5.0, 10)
+        k0 = 2.0 * np.pi / 10.0
+        omega0 = float(np.sqrt(k0**2 + 0.5))
+        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
+        a1_field = np.stack([np.cos(k0 * x) * np.cos(omega0 * t) for t in times])
+        data = SimulationData(
+            times=times,
+            fields={"A_0": np.zeros((10, n)), "A_1": a1_field},
+            momenta={"A_1": np.zeros((10, n))},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={"Am2": 0.5},
+        )
+        with pytest.raises(ValueError, match="constraint"):
+            compute_dispersion(data, ["A_0", "A_1"])
+
+    def test_group_field_name_joined(self) -> None:
+        """Group dispersion: field_name should be comma-joined field names."""
+        data = _make_sim_data_two_fields(n_snapshots=64)
+        result = compute_dispersion(data, ["phi_0", "chi_0"])
+        assert result.field_name == "phi_0, chi_0"
+
+    def test_group_power_geq_single(self) -> None:
+        """Group spectral power should be >= either individual field's power.
+
+        S_group(k,w) = S_phi(k,w) + S_chi(k,w) so group >= individual.
+        """
+        data = _make_sim_data_two_fields(n_snapshots=64)
+        result_group = compute_dispersion(data, ["phi_0", "chi_0"])
+        result_phi = compute_dispersion(data, "phi_0")
+
+        # Group power must be element-wise >= phi-only power
+        np.testing.assert_array_less(
+            result_phi.power - 1e-10,
+            result_group.power,
+        )
+
+    def test_group_shapes_consistent(self) -> None:
+        """Group dispersion arrays should have correct and consistent shapes."""
+        data = _make_sim_data_two_fields(n_snapshots=64)
+        result = compute_dispersion(data, ["phi_0", "chi_0"])
+        n_modes = len(result.wavenumbers)
+        n_freq = len(result.frequencies)
+        assert result.power.shape == (n_modes, n_freq)
+        assert result.peak_frequencies.shape == (n_modes,)
+        assert result.peak_powers.shape == (n_modes,)
+
+    def test_single_string_backward_compat(self) -> None:
+        """Passing a single str still works (backward-compatible path)."""
+        data = _make_plane_wave_data()
+        result = compute_dispersion(data, "phi_0")
+        assert result.field_name == "phi_0"
+
 
 # ============================================================
 # Group 12 — SnapshotWriter and disk-backed storage

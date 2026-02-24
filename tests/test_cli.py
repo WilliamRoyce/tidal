@@ -2097,6 +2097,51 @@ class TestMeasureCommand:
         assert output.exists()
         assert output.stat().st_size > 0
 
+    def test_measure_dispersion_group_field_name(
+        self,
+        coupled_scalars_dir: Path,
+        inline_coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--source phi_0,chi_0 should sum group power and join field names."""
+        import json as json_mod
+
+        capsys.readouterr()
+        ret = main([
+            "measure", str(coupled_scalars_dir),
+            "--spec", str(inline_coupled_scalars_json),
+            "--what", "dispersion",
+            "--source", "phi_0,chi_0",
+            "--json", "--quiet",
+        ])
+        assert ret == 0
+        data = json_mod.loads(capsys.readouterr().out)
+        assert "dispersion" in data
+        assert data["dispersion"]["field"] == "phi_0, chi_0"
+
+    def test_measure_dispersion_no_source_uses_all_dynamical(
+        self,
+        coupled_scalars_dir: Path,
+        inline_coupled_scalars_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--what=dispersion without --source uses all dynamical fields."""
+        import json as json_mod
+
+        capsys.readouterr()
+        ret = main([
+            "measure", str(coupled_scalars_dir),
+            "--spec", str(inline_coupled_scalars_json),
+            "--what", "dispersion",
+            "--json", "--quiet",
+        ])
+        assert ret == 0
+        data = json_mod.loads(capsys.readouterr().out)
+        assert "dispersion" in data
+        # Both phi_0 and chi_0 are dynamical — all should be included
+        assert "phi_0" in data["dispersion"]["field"]
+        assert "chi_0" in data["dispersion"]["field"]
+
 
 class TestBackgroundFields:
     """Tests for [[background_fields]] TOML feature — WLS generation dry-runs."""

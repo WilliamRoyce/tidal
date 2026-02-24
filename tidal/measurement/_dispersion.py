@@ -10,6 +10,13 @@ The key insight is to use complex spatial FFT coefficients (not amplitudes
 |phi_hat|) to avoid frequency doubling artifacts.  The temporal FFT of the
 complex coefficient phi_hat(k, t) correctly identifies the oscillation
 frequency omega(k).
+
+For a group of fields the group spectral power is summed:
+
+    S_group(k, omega) = sum_i |FFT(phi_i)(k, omega)|^2
+
+This is rotationally covariant within the field group and reveals the actual
+physical mode structure without depending on a particular component choice.
 """
 
 from __future__ import annotations
@@ -28,6 +35,8 @@ from tidal.measurement._utils import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Sequence
+
     from numpy.typing import NDArray
 
     from tidal.measurement._io import SimulationData
@@ -47,13 +56,14 @@ class DispersionResult:
     frequencies : ndarray, shape ``(n_freq,)``
         Angular frequencies ``omega`` (rad/time), excluding DC.
     power : ndarray, shape ``(n_modes, n_freq)``
-        Spectral power ``S(k, omega) = |A_hat(k, omega)|^2``.
+        Spectral power ``S(k, omega) = sum_i |A_hat_i(k, omega)|^2``
+        summed over all fields in the group.
     peak_frequencies : ndarray, shape ``(n_modes,)``
         Dominant angular frequency at each k-bin (0.0 for inactive modes).
     peak_powers : ndarray, shape ``(n_modes,)``
         Spectral power at the dominant frequency per k-bin.
     field_name : str
-        Which field this dispersion was computed for.
+        Which field (or comma-joined group) this dispersion was computed for.
     rayleigh_resolution : float
         ``2*pi/T`` -- minimum resolvable frequency difference.
     """
@@ -128,7 +138,7 @@ def _spacetime_fft(
 
 def _bin_and_detect(  # noqa: PLR0913, PLR0917
     angular_freqs: NDArray[np.float64],
-    spatial_fft: NDArray[np.complex128],
+    spatial_amp: NDArray[np.float64],
     spacetime_power: NDArray[np.float64],
     grid_shape: tuple[int, ...],
     grid_spacing: tuple[float, ...],
@@ -137,6 +147,13 @@ def _bin_and_detect(  # noqa: PLR0913, PLR0917
     NDArray[np.float64], NDArray[np.float64], NDArray[np.float64], NDArray[np.float64]
 ]:
     """Radially bin S(k, omega) and detect peaks.
+
+    Parameters
+    ----------
+    spatial_amp : ndarray, shape ``(n_snapshots, *rfft_shape)``
+        Spatial amplitude array (absolute values, already real).  For a
+        single field this is ``|spatial_fft|``; for a group it is the
+        element-wise sum of ``|spatial_fft_i|`` over all fields.
 
     Returns (wavenumbers, power, peak_frequencies, peak_powers).
     """
@@ -154,9 +171,9 @@ def _bin_and_detect(  # noqa: PLR0913, PLR0917
 
     # Max spatial amplitude per k-bin for activity detection
     max_amp = np.zeros(n_modes, dtype=np.float64)
-    for t in range(spatial_fft.shape[0]):
+    for t in range(spatial_amp.shape[0]):
         _, binned_amp = _radial_bin(
-            k_mag, np.abs(spatial_fft[t]), grid_spacing, grid_shape
+            k_mag, spatial_amp[t], grid_spacing, grid_shape
         )
         max_amp = np.maximum(max_amp, binned_amp[:n_modes])
 
@@ -176,9 +193,9 @@ def _bin_and_detect(  # noqa: PLR0913, PLR0917
     return wn_ref, power, peak_frequencies, peak_powers
 
 
-def compute_dispersion(
+def compute_dispersion(  # noqa: PLR0914
     data: SimulationData,
-    field_name: str,
+    field_names: str | Sequence[str],
     *,
     min_amplitude: float = 1e-12,
 ) -> DispersionResult:
@@ -186,26 +203,33 @@ def compute_dispersion(
 
     Algorithm
     ---------
-    1. For each snapshot, compute spatial ``rfftn`` to get complex
-       Fourier coefficients ``phi_hat(k, t)``.
+    1. For each field in *field_names*, compute spatial ``rfftn`` per
+       snapshot to get complex Fourier coefficients ``phi_hat_i(k, t)``.
     2. For each spatial mode ``k``, temporal FFT of the **complex**
-       coefficient gives ``S(k, omega)``.
-    3. Radially bin ``S(k, omega)`` into ``|k|`` shells.
-    4. Peak detection: ``argmax(S)`` per k-bin extracts ``omega(k)``.
-    5. Modes with max power below threshold are marked inactive.
+       coefficient gives ``S_i(k, omega)``.
+    3. Sum spectral power across all fields:
+       ``S_group(k, omega) = sum_i S_i(k, omega)``.
+    4. Radially bin ``S_group(k, omega)`` into ``|k|`` shells.
+    5. Peak detection: ``argmax(S_group)`` per k-bin extracts ``omega(k)``.
+    6. Modes with combined max amplitude below threshold are inactive.
 
     Using complex coefficients (not ``|phi_hat|``) avoids frequency
     doubling artifacts from taking the absolute value before FFT.
+    Summing power over a field group makes the measurement rotationally
+    covariant within the group (no dependence on which single component
+    is selected).
 
     Parameters
     ----------
     data : SimulationData
         Simulation output with time-resolved field snapshots.
-    field_name : str
-        Which field to extract the dispersion relation for.
+    field_names : str or sequence of str
+        Field or group of fields to extract the dispersion relation for.
+        All fields must be dynamical (``time_derivative_order >= 2``);
+        constraint fields raise ``ValueError``.
     min_amplitude : float, optional
-        Modes with max ``|phi_hat(k, t)|`` below this threshold are
-        treated as inactive.  Default ``1e-12``.
+        Modes with combined max ``|phi_hat(k, t)|`` below this threshold
+        are treated as inactive.  Default ``1e-12``.
 
     Returns
     -------
@@ -214,28 +238,62 @@ def compute_dispersion(
     Raises
     ------
     ValueError
-        If *field_name* is unknown, fewer than 3 snapshots, the
+        If any field is unknown, is a constraint field
+        (``time_derivative_order < 2``), fewer than 3 snapshots, the
         timestep is non-uniform, or any equation term is
         position-dependent (uniform medium required).
     """
     _check_no_position_dependent_terms(data, "Dispersion relation omega(k)")
 
-    if field_name not in data.spec.component_names:
-        msg = f"Field '{field_name}' not in spec fields: {data.spec.component_names}"
+    # Normalise to list
+    if isinstance(field_names, str):
+        names: list[str] = [field_names]
+    else:
+        names = list(field_names)
+
+    if not names:
+        msg = "field_names must not be empty"
         raise ValueError(msg)
+
+    # Validate all field names and check they are dynamical
+    for fname in names:
+        if fname not in data.spec.component_names:
+            msg = f"Field '{fname}' not in spec fields: {data.spec.component_names}"
+            raise ValueError(msg)
+        eq = next(e for e in data.spec.equations if e.field_name == fname)
+        if eq.time_derivative_order < 2:  # noqa: PLR2004
+            msg = (
+                f"Field '{fname}' is a constraint (time_derivative_order="
+                f"{eq.time_derivative_order}). Dispersion requires a dynamical "
+                f"field (time_derivative_order >= 2)."
+            )
+            raise ValueError(msg)
 
     _validate_timestep(data)
 
-    field_snapshots = data.fields[field_name]
     dt = float(data.times[1] - data.times[0])
     rayleigh = 2.0 * np.pi / float(data.times[-1] - data.times[0])
 
-    angular_freqs, spatial_fft, spacetime_power = _spacetime_fft(field_snapshots, dt)
-    wn, power, peak_freqs, peak_pow = _bin_and_detect(
+    # First field: seed the accumulators
+    first_snapshots = data.fields[names[0]]
+    angular_freqs, first_sfft, spacetime_power_total = _spacetime_fft(
+        first_snapshots, dt
+    )
+    spatial_amp_sum = np.abs(first_sfft)
+    grid_shape = first_snapshots.shape[1:]
+
+    # Remaining fields: add their spectral power and amplitude
+    for fname in names[1:]:
+        field_snapshots = data.fields[fname]
+        _, sfft, power = _spacetime_fft(field_snapshots, dt)
+        spacetime_power_total += power
+        spatial_amp_sum += np.abs(sfft)
+
+    wn, power_binned, peak_freqs, peak_pow = _bin_and_detect(
         angular_freqs,
-        spatial_fft,
-        spacetime_power,
-        field_snapshots.shape[1:],
+        spatial_amp_sum,
+        spacetime_power_total,
+        grid_shape,
         data.grid_spacing,
         min_amplitude,
     )
@@ -243,9 +301,9 @@ def compute_dispersion(
     return DispersionResult(
         wavenumbers=wn,
         frequencies=angular_freqs,
-        power=power,
+        power=power_binned,
         peak_frequencies=peak_freqs,
         peak_powers=peak_pow,
-        field_name=field_name,
+        field_name=", ".join(names),
         rayleigh_resolution=rayleigh,
     )
