@@ -725,10 +725,15 @@ def solve_ida(  # noqa: PLR0913
 
     result: SundialsResult = call_ida(resfn, t_eval, y0, yp0, **options)
 
-    # Call snapshot callback at each output time
+    # Call snapshot callback at each output time.
+    # IDA provides yp (time-derivative vector) which includes constraint
+    # velocities — passed to callback for disk storage.
     if snapshot_callback is not None and result.success:
+        yp = result.yp
         for i in range(len(result.t)):
-            snapshot_callback(result.t[i], result.y[i])
+            snapshot_callback(
+                result.t[i], result.y[i], yp[i] if yp is not None else None
+            )
 
     return {
         "t": result.t,

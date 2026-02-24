@@ -23,12 +23,16 @@ class SundialsResult:
 
     Both CVODE and IDA return result objects with identical attribute names
     and the same array shape convention (``n_times`` x ``n_states``).
+
+    IDA additionally provides ``yp`` (time-derivative vector) which is used
+    to extract constraint field velocities for energy measurement.
     """
 
     t: NDArray[np.float64]
     y: NDArray[np.float64]  # shape (n_times, n_states) — TIDAL convention
     success: bool
     message: str
+    yp: NDArray[np.float64] | None = None  # IDA only: shape (n_times, n_states)
 
 
 def call_cvode(
@@ -113,4 +117,5 @@ def call_ida(
         y=np.asarray(raw.y, dtype=np.float64),  # pyright: ignore[reportUnknownArgumentType,reportUnknownMemberType]
         success=bool(raw.success),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
         message=str(raw.message),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        yp=np.asarray(raw.yp, dtype=np.float64),  # pyright: ignore[reportUnknownArgumentType,reportUnknownMemberType]
     )

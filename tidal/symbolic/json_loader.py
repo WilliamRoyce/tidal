@@ -642,6 +642,14 @@ class CanonicalStructure:
     spatial_momenta : dict[str, tuple[OperatorTerm, ...]] | None
         Spatial corrections S_i per dynamical field.  The momentum relation
         is ``π_i = K_{ij} · dq_j/dt + S_i``.  None for pre-Phase 2 specs.
+    constraint_momenta : dict[str, tuple[OperatorTerm, ...]] | None
+        Canonical momenta for constraint fields (``time_derivative_order=0``).
+        ``π(q_i) = ∂L/∂(∂_t q_i)`` expressed as OperatorTerms.  Non-zero
+        when the Lagrangian couples to ``∂_t(constraint)`` (e.g. divergence-
+        type scalar-vector coupling ``gSV * φ * ∂_a A^a``).  Exported for
+        diagnostic purposes — the Legendre transform analytically cancels
+        ``π(q)*∂_t(q)`` so these do not appear in the Hamiltonian.
+        None for pre-constraint-momenta specs.
     hamiltonian_symbolic : str
         Full symbolic Hamiltonian expression (Mathematica InputForm).
     """
@@ -651,6 +659,7 @@ class CanonicalStructure:
     hamiltonian_symbolic: str
     kinetic_matrix: KineticMatrix | None = None
     spatial_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
+    constraint_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> CanonicalStructure:
@@ -678,12 +687,23 @@ class CanonicalStructure:
                     OperatorTerm.from_dict(t) for t in terms
                 )
 
+        # Parse constraint momenta (optional, for constraint fields with π ≠ 0)
+        raw_cm = data.get("constraint_momenta")
+        constraint_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
+        if raw_cm is not None and raw_cm:
+            constraint_momenta = {}
+            for field_name, terms in raw_cm.items():
+                constraint_momenta[str(field_name)] = tuple(
+                    OperatorTerm.from_dict(t) for t in terms
+                )
+
         return cls(
             hamiltonian_terms=h_terms,
             field_rates=field_rates,
             hamiltonian_symbolic=str(data.get("hamiltonian_symbolic", "")),
             kinetic_matrix=kinetic_matrix,
             spatial_momenta=spatial_momenta,
+            constraint_momenta=constraint_momenta,
         )
 
 

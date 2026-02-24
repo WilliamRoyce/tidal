@@ -872,10 +872,12 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     params: dict[str, float],
     snapshot_interval: float,
     dt: float | None = None,
-) -> tuple[SnapshotWriter, Callable[[float, np.ndarray], None]]:
+) -> tuple[SnapshotWriter, Callable[..., None]]:
     """Set up disk-backed SnapshotWriter using StateLayout (no py-pde).
 
-    Returns (writer, snapshot_callback).
+    Returns (writer, snapshot_callback).  The callback accepts
+    ``(t, y_flat)`` or ``(t, y_flat, yp_flat)`` — IDA passes ``yp``
+    for constraint velocity extraction.
     """
     from tidal.measurement._writer import SnapshotWriter, compute_snapshot_count
     from tidal.solver.state import StateLayout
@@ -887,10 +889,26 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     field_names = [s.name for s in layout.slots if s.kind != "momentum"]
     momentum_names = [s.field_name for s in layout.slots if s.kind == "momentum"]
 
+    # Identify constraint fields whose velocities should be written to disk.
+    # IDA provides exact ∂_t(constraint) via yp — needed for energy measurement
+    # when the constraint has non-zero canonical momentum.
+    constraint_names = [
+        eq.field_name
+        for eq in spec.equations
+        if eq.time_derivative_order == 0
+    ]
+    constraint_slot_map: dict[str, int] = {}
+    for cname in constraint_names:
+        if cname in layout.field_slot_map:
+            constraint_slot_map[cname] = layout.field_slot_map[cname]
+
+    # Include constraint velocity names alongside dynamical momenta
+    all_momentum_names = momentum_names + list(constraint_slot_map.keys())
+
     writer = SnapshotWriter(
         output_dir=output_dir,
         field_names=field_names,
-        momentum_names=momentum_names,
+        momentum_names=all_momentum_names,
         grid_shape=grid_info.shape,
         n_snapshots=n_snaps,
         grid_spacing=tuple(float(d) for d in grid_info.dx),
@@ -916,7 +934,11 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
         elif slot.name in field_set:
             field_slots_map[slot.name] = i
 
-    def _disk_callback(t: float, y_flat: np.ndarray) -> None:
+    def _disk_callback(
+        t: float,
+        y_flat: np.ndarray,
+        yp_flat: np.ndarray | None = None,
+    ) -> None:
         fields_d = {
             name: y_flat[idx * n_pts : (idx + 1) * n_pts].reshape(shape)
             for name, idx in field_slots_map.items()
@@ -926,6 +948,14 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
             for name, idx in momentum_slots_map.items()
             if name in momentum_set
         }
+        # Extract constraint velocities from IDA's yp vector
+        if yp_flat is not None:
+            for cname, slot_idx in constraint_slot_map.items():
+                moms_d[cname] = (
+                    yp_flat[slot_idx * n_pts : (slot_idx + 1) * n_pts].reshape(
+                        shape
+                    )
+                )
         writer.append(t, fields_d, moms_d)
 
     return writer, _disk_callback
