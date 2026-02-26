@@ -20,7 +20,8 @@
     "source=${localEnv:HOME}/.local/wolfram/engine/14.3,target=/home/vscode/.local/wolfram/engine/14.3,type=bind",
     "source=${localEnv:HOME}/.local/wolfram/userbase,target=/home/vscode/.local/wolfram/userbase,type=bind",
     "source=/etc/machine-id,target=/etc/machine-id,type=bind,readonly",
-    "source=${localEnv:HOME}/.cache/Wolfram,target=/home/vscode/.cache/Wolfram,type=bind"
+    "source=${localEnv:HOME}/.cache/Wolfram,target=/home/vscode/.cache/Wolfram,type=bind",
+    "source=claude-code-data,target=/home/vscode/.claude,type=volume"
   ],
   "remoteEnv": {
     "WOLFRAM_USERBASE": "/home/vscode/.local/wolfram/userbase",

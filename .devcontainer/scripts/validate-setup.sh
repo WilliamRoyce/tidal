@@ -212,8 +212,8 @@ check_xperm_mathlink() {
         return 1
     fi
 
-    # Check for MathLink executable
-    XPERM_BIN=$(find "$XPERM_DIR/mathlink" -name "xperm" -type f 2>/dev/null | head -1)
+    # Check for MathLink executable (named xperm.linux.64-bit)
+    XPERM_BIN=$(find "$XPERM_DIR/mathlink" -name "xperm.linux.64-bit" -type f 2>/dev/null | head -1)
     if [ -z "$XPERM_BIN" ]; then
         fail_check "xPerm MathLink executable not found" \
                    "Compile with: bash .devcontainer/scripts/build-xperm.sh"
@@ -243,17 +243,23 @@ check_xact_tests() {
     # Run tests (quietly)
     TEMP_LOG=$(mktemp)
     if bash "$TEST_SCRIPT" > "$TEMP_LOG" 2>&1; then
-        # Parse results
-        PASSED=$(grep -oP '\d+(?= passed)' "$TEMP_LOG" | tail -1)
-        TOTAL=$(grep -oP '\d+(?= total)' "$TEMP_LOG" | tail -1)
-
-        rm -f "$TEMP_LOG"
-
-        if [ "$PASSED" == "$TOTAL" ] && [ "$TOTAL" -gt 0 ]; then
-            pass_check "All $TOTAL tests passed"
+        # Check for success message
+        if grep -q "All Tests Passed" "$TEMP_LOG"; then
+            # Parse test counts
+            PASSED=$(grep "Passed:" "$TEMP_LOG" | head -1 | grep -oP '\d+' | head -1)
+            TOTAL=$(grep "Total Tests:" "$TEMP_LOG" | grep -oP '\d+' | head -1)
+            
+            rm -f "$TEMP_LOG"
+            
+            if [ -n "$PASSED" ] && [ -n "$TOTAL" ]; then
+                pass_check "All $TOTAL tests passed"
+            else
+                pass_check "Test suite passed"
+            fi
             return 0
         else
-            fail_check "Only $PASSED/$TOTAL tests passed" \
+            rm -f "$TEMP_LOG"
+            fail_check "Test suite failed" \
                        "Debug with: bash $TEST_SCRIPT"
             return 1
         fi
@@ -333,15 +339,15 @@ if [ "$VERBOSE" = true ]; then
 fi
 
 # Run all checks
-check_wolfram_installation
-check_wolfram_kernel
-check_wolframscript
-check_activation
-check_xact_installation
-check_xperm_mathlink
-check_xact_tests
-check_vscode_extensions
-check_python_wolframclient
+check_wolfram_installation || true
+check_wolfram_kernel || true
+check_wolframscript || true
+check_activation || true
+check_xact_installation || true
+check_xperm_mathlink || true
+check_xact_tests || true
+check_vscode_extensions || true
+check_python_wolframclient || true
 
 # Summary
 print_section "Summary"
