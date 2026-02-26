@@ -7,6 +7,7 @@ __pycache__/
 importtime.log
 third_party/
 .claude
+.claude-memory-backup/
 wolfram_test_output.txt
 .coverage
 /examples/data/**/*.npy
