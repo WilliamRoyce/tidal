@@ -175,7 +175,7 @@ class SimulationData:
             # Slice all snapshots at once: (n_snapshots, *grid_shape)
             arr = y_all[:, start:end].reshape(-1, *shape)
 
-            if slot.kind == "momentum":
+            if slot.kind == "velocity":
                 momenta[slot.field_name] = arr
             else:
                 fields[slot.name] = arr
@@ -280,7 +280,7 @@ class SimulationData:
         momenta: dict[str, NDArray[np.float64]] = {}
         momentum_names = cast("list[str]", metadata.get("momenta", []))
         for name in momentum_names:
-            npy = p / f"pi_{name}.npy"
+            npy = p / f"v_{name}.npy"
             if npy.exists():
                 momenta[name] = np.load(str(npy), mmap_mode="r")[:n]
 
@@ -363,7 +363,7 @@ class SimulationData:
         for name, arr in self.fields.items():
             np.save(str(p / f"{name}.npy"), np.asarray(arr))
         for name, arr in self.momenta.items():
-            np.save(str(p / f"pi_{name}.npy"), np.asarray(arr))
+            np.save(str(p / f"v_{name}.npy"), np.asarray(arr))
 
         # Infer grid shape from the first field array
         first_field = next(iter(self.fields.values()))

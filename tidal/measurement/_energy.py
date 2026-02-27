@@ -4,7 +4,7 @@ Computes the spatially-averaged Hamiltonian energy density ⟨ε⟩ = H / V_doma
 for any quadratic Lagrangian by reconstructing it from the Euler-Lagrange
 equations in the JSON spec:
 
-    ⟨ε⟩ = ½ Σ_{dyn} ⟨π_sim²⟩        (kinetic, using simulation momenta)
+    ⟨ε⟩ = ½ Σ_{dyn} ⟨v²⟩             (kinetic, using simulation velocities)
          + ⟨v_virial⟩                 (from dynamical fields' spatial RHS terms)
          + ⟨v_constraint_self⟩        (constraint field gradient + mass, sign-flipped)
          + ⟨v_constraint_cross⟩       (cross-constraint identity coupling)
@@ -22,9 +22,8 @@ are invariant under this normalization.
 
 from __future__ import annotations
 
-import re
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -49,10 +48,6 @@ _GRADIENT_AXES: dict[str, int] = {
     "gradient_y": 1,
     "gradient_z": 2,
 }
-
-# Legacy pattern for old-style numeric momentum references: pi_0, pi_1, etc.
-# New convention is pi_field_name (e.g. pi_A_1). Both are supported.
-_MOMENTUM_RE = re.compile(r"^pi_?(\d+)$")
 
 
 @dataclass(frozen=True)
@@ -424,13 +419,9 @@ def _apply_spatial_operator(
 # ------------------------------------------------------------------
 
 
-def _is_momentum_field(field_name: str) -> bool:
-    """Check if a field name is a momentum reference (pi_field_name or legacy pi_N)."""
-    if not field_name.startswith("pi_") or len(field_name) <= 3:
-        return False
-    # New convention: pi_field_name (non-numeric suffix)
-    # Legacy convention: pi_N (numeric suffix)
-    return True
+def _is_velocity_field(field_name: str) -> bool:
+    """Check if a field name is a velocity reference (v_field_name, e.g. v_A_1)."""
+    return field_name.startswith("v_") and len(field_name) > 2
 
 
 def _resolve_term_coefficient(
@@ -519,64 +510,50 @@ def _resolve_term_target(
     Returns
     -------
     NDArray or None
-        The field/momentum snapshot, or ``None`` if the target is a
-        zero-momentum constraint field (expected case).
+        The field/velocity snapshot, or ``None`` if the target is a
+        zero-velocity constraint field (expected case).
 
     Raises
     ------
     ValueError
-        If *field_name* cannot be resolved to any known field or momentum.
+        If *field_name* cannot be resolved to any known field or velocity.
     """
     # Direct field reference
     if field_name in data.fields:
         return data.fields[field_name][t_idx]
 
-    # Momentum reference: pi_field_name (new) or pi_N (legacy)
-    if field_name.startswith("pi_") and len(field_name) > 3:
-        suffix = field_name[3:]
+    # Velocity reference: v_field_name (e.g. "v_A_1")
+    if field_name.startswith("v_") and len(field_name) > 2:
+        suffix = field_name[2:]
         names = data.spec.component_names
 
-        # New convention: suffix is a field name (e.g. "A_1")
-        if suffix in names:
-            target_name = suffix
-            eq_idx = names.index(target_name)
-        else:
-            # Legacy convention: suffix is a numeric index
-            m = _MOMENTUM_RE.match(field_name)
-            if m is None:
-                msg = (
-                    f"Momentum reference '{field_name}': suffix '{suffix}' "
-                    f"is not a known field ({names}) or numeric index"
-                )
-                raise ValueError(msg)
-            idx = int(m.group(1))
-            if idx >= len(names):
-                msg = (
-                    f"Momentum reference '{field_name}' resolves to "
-                    f"index {idx}, but spec only has {len(names)} "
-                    f"fields: {names}"
-                )
-                raise ValueError(msg)
-            target_name = names[idx]
-            eq_idx = idx
+        if suffix not in names:
+            msg = (
+                f"Velocity reference '{field_name}': suffix '{suffix}' "
+                f"is not a known field ({names})"
+            )
+            raise ValueError(msg)
 
-        # Constraint field → zero momentum (expected None)
+        target_name = suffix
+        eq_idx = names.index(target_name)
+
+        # Constraint field → zero velocity (expected None)
         eq = data.spec.equations[eq_idx]
         if eq.time_derivative_order == 0:
             return None
-        mom = data.momenta.get(target_name)
-        if mom is not None:
-            return mom[t_idx]
+        vel = data.momenta.get(target_name)
+        if vel is not None:
+            return vel[t_idx]
         msg = (
-            f"Momentum reference '{field_name}' resolves to field "
-            f"'{target_name}', but no momentum data found"
+            f"Velocity reference '{field_name}' resolves to field "
+            f"'{target_name}', but no velocity data found"
         )
         raise ValueError(msg)
 
     msg = (
         f"Unresolvable field reference '{field_name}' — "
         f"not a known field ({list(data.fields.keys())}) "
-        f"or momentum pattern (pi_field_name / pi_N)"
+        f"or velocity pattern (v_field_name)"
     )
     raise ValueError(msg)
 
@@ -737,7 +714,7 @@ def _compute_virial_potential(
     ``⟨v_virial⟩ = -½ Σ_{i: dynamical} ⟨φ_i · RHS_i^{spatial}⟩``
 
     Excludes ``first_derivative_t`` (gyroscopic, do no work) and
-    ``pi_N`` momentum references (velocity-dependent forces).
+    ``v_N`` velocity references (velocity-dependent forces).
 
     Supports position-dependent coefficients by evaluating them on the
     grid and performing elementwise averaging.
@@ -763,8 +740,8 @@ def _compute_virial_potential(
             if term.operator == "first_derivative_t":
                 continue
 
-            # Skip momentum-field references (velocity-dependent)
-            if _is_momentum_field(term.field):
+            # Skip velocity-field references (velocity-dependent)
+            if _is_velocity_field(term.field):
                 continue
 
             target = _resolve_term_target(data, term.field, t_idx)
@@ -891,7 +868,7 @@ def _accumulate_cross_constraint_terms(
         for term in eq.rhs_terms:
             if term.field == eq.field_name or term.field not in constraint_names:
                 continue
-            if _is_momentum_field(term.field):
+            if _is_velocity_field(term.field):
                 continue
 
             target = _resolve_term_target(data, term.field, t_idx)
@@ -919,62 +896,19 @@ def _evaluate_hamiltonian_factor(
 ) -> NDArray[np.float64] | None:
     """Evaluate a single Hamiltonian factor on the grid.
 
-    For ``time_derivative`` operator, reconstructs the velocity from
-    ``canonical.field_rates`` (Hamilton's 1st equation).  This is critical
-    for gauge theories (Proca, Chern-Simons) where the canonical momentum
-    differs from the velocity: π_i ≠ ∂_t q_i.  For scalars where π = ∂_t q,
-    the field_rates reduce to ``[identity(pi)]`` and the result equals the
-    stored momentum.
+    For ``time_derivative`` operator, reads the velocity directly from
+    ``data.momenta`` (which stores velocities v = dq/dt in the E-L form).
 
     For spatial operators, applies the operator to the field data.
     For ``identity``, returns the field data directly.
 
-    Returns None if the factor cannot be evaluated (e.g., zero-momentum
-    constraint field for time_derivative).
+    Returns None if the factor cannot be evaluated (e.g., constraint
+    field without stored velocity for time_derivative).
     """
     if factor_operator == "time_derivative":
-        # Reconstruct velocity: ∂_t q = Σ field_rate_terms
-        # For scalars: vel = pi (no change).
-        # For Proca: vel = pi + gradient_x(A_0), etc.
-        canonical = data.spec.canonical
-        if canonical is not None and factor_field in canonical.field_rates:
-            params = _merge_parameters(data)
-            shape = cast(
-                "tuple[int, ...]", next(iter(data.fields.values()))[t_idx].shape
-            )
-            result = cast("NDArray[np.float64]", np.zeros(shape, dtype=np.float64))
-            for term in canonical.field_rates[factor_field]:
-                target = _resolve_term_target(data, term.field, t_idx)
-                if target is None:
-                    continue
-                coeff = _resolve_term_coefficient(term, params)
-                if term.operator == "identity":
-                    result += coeff * target
-                else:
-                    result += coeff * _apply_spatial_operator(
-                        term.operator,
-                        target,
-                        data.grid_spacing,
-                        data.periodic,
-                        bc_types=data.bc_types,
-                    )
-            return result
-        # Fallback for specs without field_rates (legacy).
-        # For multi-field systems pi != velocity when K != I, so warn.
-        mom = data.momenta.get(factor_field)
-        if mom is not None:
-            if data.spec.n_components > 1:
-                import warnings  # noqa: PLC0415
-
-                warnings.warn(
-                    f"No field_rates for '{factor_field}'; using raw "
-                    f"momentum as velocity. For systems with non-diagonal "
-                    f"kinetic matrix (K != I), this gives incorrect energy. "
-                    f"Regenerate JSON with current pipeline ('tidal derive').",
-                    UserWarning,
-                    stacklevel=2,
-                )
-            return mom[t_idx]
+        vel = data.momenta.get(factor_field)
+        if vel is not None:
+            return vel[t_idx]
         return None
 
     # Get the field data
@@ -1047,16 +981,28 @@ def _gradient_product_density(
         # IBP: ⟨∂_a f, ∂_b g⟩ = mean(-f · ∂²_ab g)
         second_op = _gradient_pair_to_second_order(op_a, op_b)
         operated = _apply_spatial_operator(
-            second_op, field_b, grid_spacing, periodic, bc_types=bc_types,
+            second_op,
+            field_b,
+            grid_spacing,
+            periodic,
+            bc_types=bc_types,
         )
         return -(field_a * operated)
 
     # Non-periodic: direct gradient product
     grad_a = _apply_spatial_operator(
-        op_a, field_a, grid_spacing, periodic, bc_types=bc_types,
+        op_a,
+        field_a,
+        grid_spacing,
+        periodic,
+        bc_types=bc_types,
     )
     grad_b = _apply_spatial_operator(
-        op_b, field_b, grid_spacing, periodic, bc_types=bc_types,
+        op_b,
+        field_b,
+        grid_spacing,
+        periodic,
+        bc_types=bc_types,
     )
     return grad_a * grad_b
 
@@ -1079,52 +1025,6 @@ def _merge_parameters(data: SimulationData) -> dict[str, float]:
     return params
 
 
-def _build_vel_components(
-    rate_terms: tuple[OperatorTerm, ...],
-    data: SimulationData,
-    t_idx: int,
-    params: dict[str, float],
-    coord_arrays: dict[str, NDArray[np.float64]] | None,
-) -> tuple[
-    list[tuple[float | NDArray[np.float64], str, NDArray[np.float64]]],
-    dict[str, NDArray[np.float64]] | None,
-]:
-    """Resolve field_rate terms into (coefficient, operator, field_data) triples.
-
-    Each triple represents one addend in the velocity reconstruction:
-    ``vel = Σ c_i · op_i(field_i)``.
-
-    Coefficients are resolved as ``float`` for constant terms and
-    ``NDArray`` for position-dependent terms (via
-    :func:`~tidal.symbolic._eval_utils.evaluate_coefficient`).
-
-    Returns the component list **and** the (possibly initialised)
-    ``coord_arrays`` so the caller can pass it to subsequent calls without
-    redundant re-computation.
-    """
-    comps: list[tuple[float | NDArray[np.float64], str, NDArray[np.float64]]] = []
-    for rt in rate_terms:
-        rt_target = _resolve_term_target(data, rt.field, t_idx)
-        if rt_target is None:
-            continue
-        if rt.position_dependent:
-            if coord_arrays is None:
-                coord_arrays = _build_coord_arrays(data)
-            from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
-
-            rt_c: float | NDArray[np.float64] = evaluate_coefficient(
-                rt.coefficient_symbolic,
-                params,
-                data.spec.effective_coordinates,
-                coord_arrays=coord_arrays,
-                t=0.0,
-            )
-        else:
-            rt_c = _resolve_term_coefficient(rt, params)
-        comps.append((rt_c, rt.operator, rt_target))
-    return comps, coord_arrays
-
-
 def _compute_hamiltonian_from_canonical(
     data: SimulationData,
     t_idx: int,
@@ -1135,11 +1035,9 @@ def _compute_hamiltonian_from_canonical(
     the single source of truth for gradient inner products.  BC-aware:
     periodic → IBP, non-periodic → central-difference.
 
-    For kinetic (``time_derivative × time_derivative``) terms, performs
-    bilinear expansion of the velocity via ``field_rates`` and dispatches
-    gradient sub-pairs through the same helper.  This guarantees that
-    ``(∂_x A_0)²`` terms appearing in both kinetic and standalone blocks
-    use **identical** discrete stencils and cancel exactly.
+    For kinetic (``time_derivative × time_derivative``) terms, reads
+    velocities directly from ``data.momenta`` (which stores v = dq/dt
+    in the E-L velocity form).  No field_rates expansion needed.
 
     This ensures the measured Hamiltonian uses the **same** finite-difference
     stencils as the solver (3-point laplacian, cascaded-gradient cross
@@ -1218,80 +1116,27 @@ def _compute_hamiltonian_from_canonical(
             if field_a is None or field_b is None:
                 continue
             density = _gradient_product_density(
-                op_a, field_a, op_b, field_b,
-                data.grid_spacing, data.periodic, bc_types=data.bc_types,
+                op_a,
+                field_a,
+                op_b,
+                field_b,
+                data.grid_spacing,
+                data.periodic,
+                bc_types=data.bc_types,
             )
             total += float((coeff * density).mean())
             continue
 
-        # Kinetic: time_derivative × time_derivative with bilinear expansion.
-        # Expand velocity via field_rates: vel_A = Σ c_j · op_j(f_j)
-        # ⟨vel_A, vel_B⟩ = Σ_ij ci cj ⟨op_i(f_i), op_j(f_j)⟩
-        # Uses _gradient_product_density for gradient sub-pairs → stencil-
-        # consistent with the standalone gradient×gradient path above.
+        # Kinetic: time_derivative × time_derivative — direct velocity lookup.
+        # In E-L velocity form, data.momenta stores v = dq/dt directly.
+        # No field_rates expansion needed: vel_A = data.momenta[field_A].
         if op_a == "time_derivative" and op_b == "time_derivative":
             fname_a = term.factor_a.field
             fname_b = term.factor_b.field
-            rates_a = (
-                canonical.field_rates.get(fname_a)
-                if canonical is not None else None
-            )
-            rates_b = (
-                canonical.field_rates.get(fname_b)
-                if canonical is not None else None
-            )
-            if rates_a is not None and rates_b is not None:
-                vel_a = _build_vel_components(
-                    rates_a, data, t_idx, params, coord_arrays,
-                )
-                coord_arrays = vel_a[1]  # may have been lazy-initialised
-                vel_b_comps = (
-                    vel_a[0]
-                    if fname_a == fname_b
-                    else _build_vel_components(
-                        rates_b, data, t_idx, params, coord_arrays,
-                    )[0]
-                )
-                bilinear_total = 0.0
-                for ci, opi, fi in vel_a[0]:
-                    for cj, opj, fj in vel_b_comps:
-                        if opi in _GRADIENT_AXES and opj in _GRADIENT_AXES:
-                            sub_density = _gradient_product_density(
-                                opi, fi, opj, fj,
-                                data.grid_spacing, data.periodic,
-                                bc_types=data.bc_types,
-                            )
-                        else:
-                            fi_val = (
-                                _apply_spatial_operator(
-                                    opi, fi, data.grid_spacing,
-                                    data.periodic, bc_types=data.bc_types,
-                                ) if opi != "identity" else fi
-                            )
-                            fj_val = (
-                                _apply_spatial_operator(
-                                    opj, fj, data.grid_spacing,
-                                    data.periodic, bc_types=data.bc_types,
-                                ) if opj != "identity" else fj
-                            )
-                            sub_density = fi_val * fj_val
-                        # coeff · ci · cj · density — all potentially NDArray
-                        bilinear_total += float(
-                            (coeff * ci * cj * sub_density).mean()
-                        )
-                total += bilinear_total
-                continue
-
-            # Fallback: no field_rates → direct evaluation (legacy)
-            fa = _evaluate_hamiltonian_factor(
-                fname_a, "time_derivative", data, t_idx,
-            )
-            fb = _evaluate_hamiltonian_factor(
-                fname_b, "time_derivative", data, t_idx,
-            )
-            if fa is None or fb is None:
-                continue
-            total += float((coeff * fa * fb).mean())
+            vel_a = data.momenta.get(fname_a)
+            vel_b = data.momenta.get(fname_b)
+            if vel_a is not None and vel_b is not None:
+                total += float((coeff * vel_a[t_idx] * vel_b[t_idx]).mean())
             continue
 
         # All other terms: identity, mixed operator×identity, etc.

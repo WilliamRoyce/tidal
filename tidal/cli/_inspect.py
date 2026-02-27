@@ -131,7 +131,7 @@ def discover_parameters(spec: object) -> dict[str, list[str]]:
                 # Skip field names (they appear in field references, not as params)
                 if match in spec.component_names:
                     continue
-                if match.startswith("pi_"):
+                if match.startswith("v_"):
                     continue
                 param_map.setdefault(match, [])
                 if eq.field_name not in param_map[match]:

@@ -13,7 +13,7 @@ Directory structure::
       metadata.json          # Grid info, parameters, field list, snapshot count
       times.npy              # shape (n_snapshots,), float64
       phi_0.npy              # shape (n_snapshots, *grid_shape), float64
-      pi_phi_0.npy           # shape (n_snapshots, *grid_shape), float64
+      v_phi_0.npy            # shape (n_snapshots, *grid_shape), float64
       ...
 """
 
@@ -81,7 +81,7 @@ class SnapshotWriter:
         Names of field arrays to store (e.g. ``["phi_0", "chi_0"]``).
     momentum_names : list[str]
         Names of momentum arrays to store (e.g. ``["phi_0", "chi_0"]``).
-        Stored as ``pi_{name}.npy``.
+        Stored as ``v_{name}.npy``.
     grid_shape : tuple[int, ...]
         Spatial grid shape (e.g. ``(96, 96)``).
     n_snapshots : int
@@ -174,7 +174,7 @@ class SnapshotWriter:
         ] = {}
         for name in momentum_names:
             self._momentum_mmaps[name] = _open_memmap(
-                self._output_dir / f"pi_{name}.npy",
+                self._output_dir / f"v_{name}.npy",
                 shape=snapshot_shape,
             )
 
@@ -486,7 +486,7 @@ def create_snapshot_callback(  # noqa: PLR0913, PLR0917
     for idx, (name, slot_type) in enumerate(spec.state_layout):
         if slot_type == "field":
             field_slots[name] = idx
-        elif slot_type == "momentum":
+        elif slot_type == "velocity":
             momentum_slots[name] = idx
 
     field_set = set(field_names)

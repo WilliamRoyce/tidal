@@ -172,9 +172,7 @@ def _bin_and_detect(  # noqa: PLR0913, PLR0917
     # Max spatial amplitude per k-bin for activity detection
     max_amp = np.zeros(n_modes, dtype=np.float64)
     for t in range(spatial_amp.shape[0]):
-        _, binned_amp = _radial_bin(
-            k_mag, spatial_amp[t], grid_spacing, grid_shape
-        )
+        _, binned_amp = _radial_bin(k_mag, spatial_amp[t], grid_spacing, grid_shape)
         max_amp = np.maximum(max_amp, binned_amp[:n_modes])
 
     # Peak detection per k-bin

@@ -576,7 +576,7 @@ def _plane_wave_y0(
     momentum_arr = -amplitude * k_mag * np.sin(k_dot_x)
 
     slot_data: dict[str, np.ndarray] = {component: field_arr}
-    mom_name = f"pi_{component}"
+    mom_name = f"v_{component}"
     if mom_name in FieldSet(layout, grid_info.shape):
         slot_data[mom_name] = momentum_arr
 
@@ -784,13 +784,13 @@ def _warn_zero_evolution(
     rhs_eval = RHSEvaluator(spec, grid_info, coeff_eval, bc=bc)
     fieldset = FieldSet.from_flat(layout, grid_info.shape, y0)
 
-    # Inject zero constraint velocities so pi_field_name refs resolve.
+    # Inject zero constraint velocities so v_field_name refs resolve.
     # At t=0 the actual velocities are unknown (IDA computes them), but
     # zero is the best estimate for this diagnostic check.
     for eq in spec.equations:
         if eq.time_derivative_order == 0:
             fieldset.set_aux(
-                f"pi_{eq.field_name}",
+                f"v_{eq.field_name}",
                 np.zeros(grid_info.shape),
             )
 
@@ -886,16 +886,13 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     output_dir = Path(args.output) if args.output else Path("output")
     n_snaps = compute_snapshot_count(args.t_end, snapshot_interval)
 
-    field_names = [s.name for s in layout.slots if s.kind != "momentum"]
-    momentum_names = [s.field_name for s in layout.slots if s.kind == "momentum"]
+    field_names = [s.name for s in layout.slots if s.kind != "velocity"]
+    momentum_names = [s.field_name for s in layout.slots if s.kind == "velocity"]
 
     # Identify constraint fields whose velocities should be written to disk.
-    # IDA provides exact ∂_t(constraint) via yp — needed for energy measurement
-    # when the constraint has non-zero canonical momentum.
+    # IDA provides exact ∂_t(constraint) via yp — needed for energy measurement.
     constraint_names = [
-        eq.field_name
-        for eq in spec.equations
-        if eq.time_derivative_order == 0
+        eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
     ]
     constraint_slot_map: dict[str, int] = {}
     for cname in constraint_names:
@@ -929,7 +926,7 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     field_slots_map: dict[str, int] = {}
     momentum_slots_map: dict[str, int] = {}
     for i, slot in enumerate(layout.slots):
-        if slot.kind == "momentum":
+        if slot.kind == "velocity":
             momentum_slots_map[slot.field_name] = i
         elif slot.name in field_set:
             field_slots_map[slot.name] = i
@@ -951,11 +948,9 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
         # Extract constraint velocities from IDA's yp vector
         if yp_flat is not None:
             for cname, slot_idx in constraint_slot_map.items():
-                moms_d[cname] = (
-                    yp_flat[slot_idx * n_pts : (slot_idx + 1) * n_pts].reshape(
-                        shape
-                    )
-                )
+                moms_d[cname] = yp_flat[
+                    slot_idx * n_pts : (slot_idx + 1) * n_pts
+                ].reshape(shape)
         writer.append(t, fields_d, moms_d)
 
     return writer, _disk_callback
