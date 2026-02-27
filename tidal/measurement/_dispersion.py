@@ -243,7 +243,7 @@ def compute_dispersion(  # noqa: PLR0914
     """
     _check_no_position_dependent_terms(data, "Dispersion relation omega(k)")
 
-    # Normalise to list
+    # Normalize to list
     if isinstance(field_names, str):
         names: list[str] = [field_names]
     else:

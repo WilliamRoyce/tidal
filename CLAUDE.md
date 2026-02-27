@@ -1,6 +1,6 @@
 # TIDAL: Tensor Integration and Derivation for Any Lagrangian
 
-Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) with numpy spatial operators. All PDEs derive from the Lagrangian via symbolic computation -- never manually hardcode equations. Operates exclusively in the linearised regime (quadratic Lagrangians, linear PDEs).
+Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) with numpy spatial operators. All PDEs derive from the Lagrangian via symbolic computation -- never manually hardcode equations. Operates exclusively in the linearized regime (quadratic Lagrangians, linear PDEs).
 
 ## Project Structure
 

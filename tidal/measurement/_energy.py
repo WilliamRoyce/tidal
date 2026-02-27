@@ -1076,7 +1076,7 @@ def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
     )
 
     params = _merge_parameters(data)
-    coord_arrays: dict[str, NDArray[np.float64]] | None = None  # lazy-initialised
+    coord_arrays: dict[str, NDArray[np.float64]] | None = None  # lazy-initialized
 
     # Volume element: sqrt|g_spatial| for curved coordinates.
     # None -> flat spacetime, volume_weight stays 1.0 (no grid allocation).
