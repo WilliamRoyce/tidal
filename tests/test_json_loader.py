@@ -22,8 +22,8 @@ from tidal.symbolic.json_loader import (
 
 @pytest.fixture
 def em_json_path() -> Path:
-    """Path to the EM 1D JSON file."""
-    return Path(__file__).parent.parent / "examples" / "data" / "em_1d.json"
+    """Path to the EM 3D JSON file."""
+    return Path(__file__).parent.parent / "examples" / "data" / "em_3d.json"
 
 
 @pytest.fixture
@@ -410,10 +410,11 @@ class TestLoadEquationSystem:
 
         system = load_equation_system(em_json_path)
 
-        num_em_components = 2
+        num_em_components = 3
         assert system.n_components == num_em_components
         assert "A_0" in system.component_names
         assert "A_1" in system.component_names
+        assert "A_2" in system.component_names
 
     def test_load_kg_file(self, kg_json_path: Path) -> None:
         """Test loading Klein-Gordon equations from file."""
@@ -438,7 +439,7 @@ class TestLoadEquationSystem:
             pytest.skip(f"Test file not found: {em_json_path}")
 
         system = load_equation_system(str(em_json_path))
-        num_em_components = 2
+        num_em_components = 3
         assert system.n_components == num_em_components
 
 
