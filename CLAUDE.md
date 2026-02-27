@@ -32,11 +32,11 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - Cross-field decomposition requires passing `additionalFields` to `DecomposeToComponents`
 - Background fields declared via `[[background_fields]]` TOML section
 - Gauge fixing via `[[gauge]]` TOML section (presets: Lorenz, de Donder, Coulomb, temporal, axial)
-- Momentum naming: use field name (pi_phi_0), normalised at source in Wolfram pipeline
+- Velocity naming: v_{field_name} (e.g., v_phi_0, v_A_1) — E-L velocity form, not canonical momenta
 
 ## Architecture Reference
 
-See `docs/MEMORY.md` for the complete architecture reference covering: solver backends, canonical momentum pipeline, mass/coupling matrices, Christoffel computation, background fields, gauge fixing, xAct patterns, operators, examples, and known issues.
+See `docs/MEMORY.md` for the complete architecture reference covering: solver backends, E-L velocity form, mass/coupling matrices, Christoffel computation, background fields, gauge fixing, xAct patterns, operators, examples, and known issues.
 
 See also: `docs/troubleshooting.md`, `docs/background_fields.md`, `docs/constraint_fields.md`, `docs/solver_migration.md`, `docs/gauge_fixing.md`, `docs/adaptive_timestepping.md`, `docs/architecture/README.md`.
 

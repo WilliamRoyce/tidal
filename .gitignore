@@ -13,6 +13,9 @@ wolfram_test_output.txt
 /examples/data/**/*.npy
 /examples/data/**/*.json
 
+.claude-memory-backup/
+.claude-session-context/
+
 # Build artifacts
 docs/build/
 coverage.xml

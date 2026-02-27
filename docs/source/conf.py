@@ -13,7 +13,7 @@ extensions = [
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
     "sphinx.ext.autosummary",  # Auto-generate summary tables
-    "sphinx.ext.doctest",      # Test docstring examples
+    "sphinx.ext.doctest",  # Test docstring examples
     "myst_parser",
 ]
 

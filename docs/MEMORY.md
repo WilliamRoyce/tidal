@@ -36,16 +36,17 @@ The project operates exclusively in the **linearised regime**: all Lagrangians a
 
 The PDE time-stepping layer uses four backends, automatically selected based on equation structure:
 
-| Backend | Library | Use Case | Key Feature |
-|---------|---------|----------|-------------|
-| **IDA** | SUNDIALS (scikit-sundae) | DAE systems (algebraic constraints) | Implicit Newton iteration, sparse Jacobian |
-| **CVODE** | SUNDIALS (scikit-sundae) | Adaptive ODE (wave equations) | BDF, tolerance control (`--rtol`/`--atol`) |
-| **Leapfrog** | Native (numpy) | Symplectic integration | Exact energy conservation (shadow Hamiltonian) |
-| **scipy** | scipy.integrate | General-purpose adaptive ODE | DOP853, Radau, BDF via `solve_ivp` |
+| Backend      | Library                  | Use Case                            | Key Feature                                    |
+| ------------ | ------------------------ | ----------------------------------- | ---------------------------------------------- |
+| **IDA**      | SUNDIALS (scikit-sundae) | DAE systems (algebraic constraints) | Implicit Newton iteration, sparse Jacobian     |
+| **CVODE**    | SUNDIALS (scikit-sundae) | Adaptive ODE (wave equations)       | BDF, tolerance control (`--rtol`/`--atol`)     |
+| **Leapfrog** | Native (numpy)           | Symplectic integration              | Exact energy conservation (shadow Hamiltonian) |
+| **scipy**    | scipy.integrate          | General-purpose adaptive ODE        | DOP853, Radau, BDF via `solve_ivp`             |
 
 **Spatial operators** are pure numpy (`tidal/solver/operators.py`): 2nd-order FD stencils for laplacian, gradient, cross_derivative, with periodic / Dirichlet / Neumann BC support.
 
 **Key solver classes** (all in `tidal/solver/`):
+
 - `FieldSet` (`fields.py`): typed container, contiguous flat array, zero-copy views
 - `CoefficientEvaluator` (`coefficients.py`): 4-level cache (L0 preresolved → L1 expression → L2 spatial grid → L3 per-call)
 - `RHSEvaluator` (`rhs.py`): unified operator + coefficient application
@@ -72,9 +73,10 @@ The PDE time-stepping layer uses four backends, automatically selected based on 
 ### Canonical Momentum Pipeline
 
 The Wolfram pipeline performs the full Legendre transform:
-1. Compute conjugate momenta: π_i = ∂L/∂(∂_t q_i) = K_{ij} · ∂_t q_j + S_i
+
+1. Compute conjugate momenta: π*i = ∂L/∂(∂_t q_i) = K*{ij} · ∂_t q_j + S_i
 2. Invert kinetic matrix symbolically: `Inverse[K]` in Wolfram
-3. Emit first-order evolution: dq_i/dt = K^{-1}_{ij} (π_j − S_j)
+3. Emit first-order evolution: dq*i/dt = K^{-1}*{ij} (π_j − S_j)
 
 **JSON canonical structure** stores K + S separately (`kinetic_matrix` + `spatial_momenta`), plus pre-inverted `field_rates` and `hamiltonian_terms`. This decomposition is solver-agnostic: IDA uses K directly (implicit), leapfrog uses `np.linalg.solve(K, rhs)`.
 
@@ -133,15 +135,15 @@ See `docs/gauge_fixing.md` for tutorial and developer guide.
 
 The `tidal` CLI provides 7 subcommands with zero new dependencies (stdlib argparse + tomllib):
 
-| Command                     | Description                                                  |
-| --------------------------- | ------------------------------------------------------------ |
-| `tidal derive theory.toml`  | Generate .wls from TOML, run wolframscript to produce JSON   |
+| Command                     | Description                                                           |
+| --------------------------- | --------------------------------------------------------------------- |
+| `tidal derive theory.toml`  | Generate .wls from TOML, run wolframscript to produce JSON            |
 | `tidal simulate spec.json`  | Full simulation with plotting (`--param`, `--ic`, `--bc`, `--scheme`) |
-| `tidal measure result_dir/` | Extract physics measurements (energy, conversion, mixing, spectra)   |
-| `tidal inspect spec.json`   | Display equation system info (fields, operators, parameters) |
-| `tidal list`                | Discover available JSON specs in `examples/data/`            |
-| `tidal validate spec.json`  | Validate JSON equation specification structure               |
-| `tidal plot result_dir/`    | Standalone plotting from simulation output directories       |
+| `tidal measure result_dir/` | Extract physics measurements (energy, conversion, mixing, spectra)    |
+| `tidal inspect spec.json`   | Display equation system info (fields, operators, parameters)          |
+| `tidal list`                | Discover available JSON specs in `examples/data/`                     |
+| `tidal validate spec.json`  | Validate JSON equation specification structure                        |
+| `tidal plot result_dir/`    | Standalone plotting from simulation output directories                |
 
 **TOML Configuration:**
 
@@ -187,30 +189,32 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 
 ## Example Implementations
 
-| Example                   | Dim  | Key Features                                                               |
-| ------------------------- | ---- | -------------------------------------------------------------------------- |
-| `scalar_field/`           | 1+1D | KG, mass term, dispersion                                                  |
-| `electromagnetic/`        | 1+1D | Maxwell, Lorenz gauge                                                      |
-| `proca/`                  | 1+1D | Massive vector (Proca mass)                                                |
-| `coupled_scalars/`        | 1+1D | Cross-field coupling, mass matrix                                          |
-| `scalar_potential_well/`  | 1+1D | Background potential well, `[[background_fields]]`                         |
-| `chern_simons/`           | 2+1D | Epsilon tensor, A_0 constraint                                             |
-| `elasticity/`             | 2+1D | Anisotropic laplacian, cross_derivative_xy                                 |
-| `curved_spacetime/`       | 2+1D | Hubble friction, time-dependent coefficients                               |
-| `sphere_kg/`              | 2+1D | Position-dependent coefficients, S²                                        |
-| `polar_kg/`               | 2+1D | Polar coordinates, Christoffel auto-detection                              |
-| `electrostatics/`         | 2+1D | Poisson constraint, no time evolution                                      |
-| `scalar_vector_coupling/` | 2+1D | Mixed-rank cross-field (scalar+vector), 4 constants                        |
-| `massive_gravity/`        | 2+1D | Linearized massive gravity, xPert, coupled constraints                     |
-| `coupled_proca/`          | 2+1D | Two massive vectors, coupled Helmholtz, periodic BCs                       |
-| `coupled_scattering/`     | 2+1D | Position-dependent Gaussian coupling, background fields                    |
-| `proca_background/`       | 2+1D | Lorentzian scalar BG, two Proca vectors, constraint+BG integration         |
-| `vector_background/`      | 2+1D | Tanh domain wall vector BG, ComponentValue mechanism                       |
-| `scalar_field_3d/`        | 3+1D | Full 4D KG                                                                 |
-| `spherical_kg/`           | 3+1D | Spherical coordinates, trig coefficients                                   |
-| `cylindrical_kg/`         | 3+1D | Cylindrical, mixed curved/flat                                             |
-| `gravitational_waves/`    | 3+1D | xPert linearization, TT gauge, constraints                                 |
-| `massive_3form/`          | 3+1D | Rank-3 antisymmetric, symmetry reduction 64→4                              |
+| Example                   | Dim  | Key Features                                                       |
+| ------------------------- | ---- | ------------------------------------------------------------------ |
+| `scalar_field/`           | 1+1D | KG, mass term, dispersion                                          |
+| `electromagnetic/`        | 1+1D | Maxwell, Lorenz gauge                                              |
+| `proca/`                  | 1+1D | Massive vector (Proca mass)                                        |
+| `coupled_scalars/`        | 1+1D | Cross-field coupling, mass matrix                                  |
+| `scalar_potential_well/`  | 1+1D | Background potential well, `[[background_fields]]`                 |
+| `chern_simons/`           | 2+1D | Epsilon tensor, A_0 constraint                                     |
+| `elasticity/`             | 2+1D | Anisotropic laplacian, cross_derivative_xy                         |
+| `curved_spacetime/`       | 2+1D | Hubble friction, time-dependent coefficients                       |
+| `sphere_kg/`              | 2+1D | Position-dependent coefficients, S²                                |
+| `polar_kg/`               | 2+1D | Polar coordinates, Christoffel auto-detection                      |
+| `electrostatics/`         | 2+1D | Poisson constraint, no time evolution                              |
+| `scalar_vector_coupling/` | 2+1D | Mixed-rank cross-field (scalar+vector), 4 constants                |
+| `massive_gravity/`        | 2+1D | Linearized massive gravity, xPert, coupled constraints             |
+| `coupled_proca/`          | 2+1D | Two massive vectors, coupled Helmholtz, periodic BCs               |
+| `coupled_scattering/`     | 2+1D | Position-dependent Gaussian coupling, background fields            |
+| `proca_background/`       | 2+1D | Lorentzian scalar BG, two Proca vectors, constraint+BG integration |
+| `vector_background/`      | 2+1D | Tanh domain wall vector BG, ComponentValue mechanism               |
+| `scalar_field_3d/`        | 3+1D | Full 4D KG                                                         |
+| `spherical_kg/`           | 3+1D | Spherical coordinates, trig coefficients                           |
+| `cylindrical_kg/`         | 3+1D | Cylindrical, mixed curved/flat                                     |
+| `gravitational_waves/`    | 3+1D | xPert linearization, TT gauge, constraints                         |
+| `massive_3form/`          | 3+1D | Rank-3 antisymmetric, symmetry reduction 64→4                      |
+| `gravitational_waves/`    | 3+1D | xPert linearization, TT gauge, constraints                         |
+| `massive_3form/`          | 3+1D | Rank-3 antisymmetric, symmetry reduction 64→4                      |
 
 ## Testing Guidelines
 
