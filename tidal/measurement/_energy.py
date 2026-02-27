@@ -421,7 +421,7 @@ def _apply_spatial_operator(
 
 def _is_velocity_field(field_name: str) -> bool:
     """Check if a field name is a velocity reference (v_field_name, e.g. v_A_1)."""
-    return field_name.startswith("v_") and len(field_name) > 2
+    return field_name.startswith("v_") and len(field_name) > len("v_")
 
 
 def _resolve_term_coefficient(
@@ -523,7 +523,7 @@ def _resolve_term_target(
         return data.fields[field_name][t_idx]
 
     # Velocity reference: v_field_name (e.g. "v_A_1")
-    if field_name.startswith("v_") and len(field_name) > 2:
+    if field_name.startswith("v_") and len(field_name) > len("v_"):
         suffix = field_name[2:]
         names = data.spec.component_names
 
@@ -948,7 +948,7 @@ def _gradient_pair_to_second_order(op_a: str, op_b: str) -> str:
     return f"cross_derivative_{'xyz'[lo]}{'xyz'[hi]}"
 
 
-def _gradient_product_density(
+def _gradient_product_density(  # noqa: PLR0913, PLR0917
     op_a: str,
     field_a: NDArray[np.float64],
     op_b: str,
@@ -973,7 +973,7 @@ def _gradient_product_density(
     (cf. :func:`_gradient_energy_density`).
 
     This is the **single source of truth** for gradient-product evaluation.
-    Both the standalone gradient×gradient Hamiltonian path and the kinetic
+    Both the standalone gradient x gradient Hamiltonian path and the kinetic
     bilinear expansion dispatch here, guaranteeing stencil consistency for
     terms that must cancel (e.g. ``½(∂_x A_0)²`` from kinetic ``- ½(∂_x A_0)²``
     standalone in Proca/CS theories).
@@ -1039,7 +1039,7 @@ def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
     the single source of truth for gradient inner products.  BC-aware:
     periodic → IBP, non-periodic → central-difference.
 
-    For kinetic (``time_derivative × time_derivative``) terms, reads
+    For kinetic (``time_derivative x time_derivative``) terms, reads
     velocities directly from ``data.velocities`` (which stores v = dq/dt
     in the E-L velocity form).  No field_rates expansion needed.
 
@@ -1126,7 +1126,7 @@ def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
         op_a = term.factor_a.operator
         op_b = term.factor_b.operator
 
-        # Gradient×gradient path: use _gradient_product_density (single source
+        # Gradient x gradient path: use _gradient_product_density (single source
         # of truth).  BC-aware: periodic→IBP, non-periodic→CD.
         # The helper returns a pointwise density array; coeff (possibly
         # position-dependent NDArray) is multiplied in before .mean().
@@ -1147,7 +1147,7 @@ def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
             total += float((coeff * density * volume_weight).mean())
             continue
 
-        # Kinetic: time_derivative × time_derivative — direct velocity lookup.
+        # Kinetic: time_derivative x time_derivative — direct velocity lookup.
         # In E-L velocity form, data.velocities stores v = dq/dt directly.
         # No field_rates expansion needed: vel_A = data.velocities[field_A].
         if op_a == "time_derivative" and op_b == "time_derivative":
@@ -1161,7 +1161,7 @@ def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
                 )
             continue
 
-        # All other terms: identity, mixed operator×identity, etc.
+        # All other terms: identity, mixed operator x identity, etc.
         fa = _evaluate_hamiltonian_factor(
             term.factor_a.field,
             term.factor_a.operator,
