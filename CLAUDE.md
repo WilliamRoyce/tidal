@@ -43,3 +43,7 @@ See also: `docs/troubleshooting.md`, `docs/background_fields.md`, `docs/constrai
 ## Memory Backup
 
 Claude auto-memory files are backed up to `.claude-memory-backup/` (git-ignored). On container rebuild, memory is auto-restored from this backup if the volume is empty. Manual sync: `bash .devcontainer/scripts/sync-claude-memory.sh backup|restore|status`.
+
+## Session Persistence Workaround
+
+The VS Code Claude Code extension has a known bug where past conversations disappear from the dropdown on window reload (upstream: https://github.com/anthropics/claude-code/issues/18619). Session `.jsonl` files persist on disk but the index files are never written. To rebuild the index and restore sessions in the dropdown: `bash .devcontainer/scripts/reindex-claude-sessions.sh`. This runs automatically on container rebuild via `postCreateCommand`.
