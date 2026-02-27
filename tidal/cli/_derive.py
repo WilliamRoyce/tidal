@@ -970,6 +970,9 @@ def _wls_vector_background_substitution(
                     (
                         f"{prefixed}[{{{idx}, -{ctx.chart}}}] -> {val}",
                         f"{prefixed}[{{{idx}, {ctx.chart}}}] -> {val}",
+                        # Component function form (after ReplaceTensorFieldComponents
+                        # converts vbdB[{i, -chart}] -> vbdBi[t, x, y])
+                        f"{prefixed}{idx}[__] -> {val}",
                     )
                 )
         else:
@@ -984,10 +987,14 @@ def _wls_vector_background_substitution(
                 multi_idx.reverse()
                 idx_down = ", ".join(f"{{{k}, -{ctx.chart}}}" for k in multi_idx)
                 idx_up = ", ".join(f"{{{k}, {ctx.chart}}}" for k in multi_idx)
+                # Component function name: head + concatenated index digits
+                comp_name = "".join(str(k) for k in multi_idx)
                 rules.extend(
                     (
                         f"{prefixed}[{idx_down}] -> {val}",
                         f"{prefixed}[{idx_up}] -> {val}",
+                        # Component function form (after ReplaceTensorFieldComponents)
+                        f"{prefixed}{comp_name}[__] -> {val}",
                     )
                 )
 
