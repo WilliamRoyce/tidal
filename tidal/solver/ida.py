@@ -500,7 +500,7 @@ def solve_ida(  # noqa: PLR0913
     rtol: float = 1e-8,
     atol: float = 1e-10,
     max_steps: int = 50000,
-    snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
+    snapshot_callback: Callable[..., None] | None = None,
     calc_initcond: str | None = None,
 ) -> SolverResult:
     """Solve a TIDAL equation system using SUNDIALS/IDA.

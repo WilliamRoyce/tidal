@@ -1523,7 +1523,7 @@ class TestCanonicalStructure:
         """Old JSON with field_rates must raise ValueError (force re-derive)."""
         from tidal.symbolic.json_loader import CanonicalStructure
 
-        data = {
+        data: dict[str, Any] = {
             "hamiltonian_terms": [],
             "field_rates": {
                 "phi_0": [

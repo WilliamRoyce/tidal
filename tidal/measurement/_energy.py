@@ -1106,8 +1106,9 @@ def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
                 coord_arrays = _build_coord_arrays(data)
             from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
 
+            assert term.coefficient_symbolic is not None  # guaranteed when position_dependent
             coeff: float | NDArray[np.float64] = evaluate_coefficient(
-                term.coefficient_symbolic,  # non-None when position_dependent is True
+                term.coefficient_symbolic,
                 params,
                 data.spec.effective_coordinates,
                 coord_arrays=coord_arrays,
