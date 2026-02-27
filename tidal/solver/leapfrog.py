@@ -1,18 +1,15 @@
-"""Stormer-Verlet (leapfrog) integrator for TIDAL Hamiltonian systems.
+"""Stormer-Verlet (leapfrog) integrator for TIDAL systems.
 
-Symplectic integrator for separable Hamiltonians:
-    H = T(pi) + V(q)
-    T = 1/2 pi^T K^{-1} pi  (kinetic, includes spatial momenta corrections)
-    V = V(q)                  (potential, from spatial operators)
+Symplectic integrator for second-order E-L equations using velocity form:
+    dq/dt = v          (trivial kinematic)
+    dv/dt = E-L RHS    (from equations[] array)
 
 The Stormer-Verlet scheme preserves a shadow Hamiltonian to machine
-precision, giving zero secular energy drift for conservative systems.
+precision, giving zero secular energy drift for conservative systems
+with velocity-independent forces.
 
 **Not appropriate for**: dissipative systems, absorbing BCs, constraint
 damping, or energy outflow -- use IDA instead.
-
-For non-diagonal K: solve K v = (pi - S) per step via ``np.linalg.solve``.
-K is typically 1x1 to 10x10 -- microseconds per solve.
 
 Reference: Hairer, Lubich, Wanner, "Geometric Numerical Integration",
 Springer, 2006. Chapter VI: Symplectic Integration of Hamiltonian Systems.
@@ -22,7 +19,7 @@ from __future__ import annotations
 
 import math
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -31,11 +28,12 @@ from tidal.solver.operators import BCSpec, apply_operator
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Callable
 
+    from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.rhs import RHSEvaluator
-    from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
+    from tidal.symbolic.json_loader import EquationSystem
 
 # Time-derivative order threshold for dynamical (wave) equations
 _SECOND_ORDER = 2
@@ -50,11 +48,7 @@ def compute_force(  # noqa: PLR0913, PLR0917
     t: float = 0.0,
     rhs_eval: RHSEvaluator | None = None,
 ) -> np.ndarray:
-    """Compute dpi/dt = F(q) for all momentum slots.
-
-    Evaluates the RHS of each second-order equation (spatial operators
-    applied to field values). Returns a flat array over all slots.
-    """
+    """Compute dv/dt = E-L RHS for all velocity slots."""
     n = grid.num_points
     shape = grid.shape
 
@@ -63,7 +57,7 @@ def compute_force(  # noqa: PLR0913, PLR0917
 
     force = np.zeros(layout.total_size)
     for slot_idx, slot in enumerate(layout.slots):
-        if slot.kind != "momentum":
+        if slot.kind != "velocity":
             continue
         s = slice(slot_idx * n, (slot_idx + 1) * n)
         eq_idx = eq_map.get(slot.field_name)
@@ -87,59 +81,20 @@ def compute_force(  # noqa: PLR0913, PLR0917
     return force
 
 
-def compute_velocity(  # noqa: PLR0913, PLR0917
+def compute_velocity(
     layout: StateLayout,
-    grid: GridInfo,
-    kinetic: np.ndarray | None,
-    spatial_momenta: Mapping[str, Sequence[OperatorTerm]] | None,
-    pi_flat: np.ndarray,
-    fieldset: FieldSet,
-    bc: BCSpec | None,
-    t: float = 0.0,
-    rhs_eval: RHSEvaluator | None = None,
+    y: np.ndarray,
 ) -> np.ndarray:
-    """Compute dq/dt = K^{-1}(pi - S) for all field slots.
-
-    For identity K (most cases), this is just pi.
-    For non-diagonal K, solves K v = (pi - S) via np.linalg.solve.
-    """
-    n = grid.num_points
+    """Read dq/dt = v directly from velocity slots in the state vector."""
+    n = layout.num_points
     velocity = np.zeros(layout.total_size)
 
-    dyn_fields = layout.dynamical_fields
-    n_dyn = len(dyn_fields)
-    if n_dyn == 0:
-        return velocity
-
-    # Build per-field RHS: rhs[i] = pi_i - S_i
-    rhs_vecs = np.zeros((n_dyn, n))
-    for i, fname in enumerate(dyn_fields):
-        mom_slot = layout.momentum_slot_map[fname]
-        rhs_vecs[i] = pi_flat[mom_slot * n : (mom_slot + 1) * n]
-
-        if rhs_eval is not None:
-            s_i = rhs_eval.evaluate_spatial_momentum(fname, fieldset, t)
-            rhs_vecs[i] -= s_i
-        elif spatial_momenta and fname in spatial_momenta:
-            # Legacy path
-            fields = fieldset.as_dict()
-            s_i = np.zeros(grid.shape)
-            for term in spatial_momenta[fname]:
-                target_data = fields.get(term.field, np.zeros(grid.shape))
-                operated = apply_operator(term.operator, target_data, grid, bc)
-                s_i += term.coefficient * operated
-            rhs_vecs[i] -= s_i.ravel()
-
-    # Solve K v = rhs
-    if kinetic is None or np.allclose(kinetic, np.eye(n_dyn)):
-        vel_vecs = rhs_vecs
-    else:
-        vel_vecs = np.linalg.solve(kinetic, rhs_vecs)
-
-    for i, fname in enumerate(dyn_fields):
-        field_slot = layout.field_slot_map[fname]
-        s = slice(field_slot * n, (field_slot + 1) * n)
-        velocity[s] = vel_vecs[i]
+    for slot_idx, slot in enumerate(layout.slots):
+        if not (slot.kind == "field" and slot.time_order >= _SECOND_ORDER):
+            continue
+        s = slice(slot_idx * n, (slot_idx + 1) * n)
+        vel_slot = layout.velocity_slot_map[slot.field_name]
+        velocity[s] = y[vel_slot * n : (vel_slot + 1) * n]
 
     return velocity
 
@@ -151,9 +106,9 @@ def _half_kick(
     layout: StateLayout,
     n: int,
 ) -> None:
-    """Apply half-kick: pi += (dt/2) F(q), in-place."""
+    """Apply half-kick: v += (dt/2) F(q), in-place."""
     for slot_idx, slot in enumerate(layout.slots):
-        if slot.kind == "momentum":
+        if slot.kind == "velocity":
             s = slice(slot_idx * n, (slot_idx + 1) * n)
             y[s] += 0.5 * dt * force[s]
 
@@ -172,7 +127,7 @@ def _drift(
             y[s] += dt * velocity[s]
 
 
-def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
+def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
     spec: EquationSystem,
     grid: GridInfo,
     y0: np.ndarray,
@@ -183,7 +138,7 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
     parameters: dict[str, float] | None = None,
     snapshot_interval: float | None = None,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
-) -> dict[str, Any]:
+) -> SolverResult:
     """Solve a TIDAL Hamiltonian system using Stormer-Verlet (leapfrog).
 
     Works for second-order (wave) equations with optional constraint fields.
@@ -197,7 +152,7 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
     grid : GridInfo
         Spatial grid.
     y0 : np.ndarray
-        Initial state vector (flat: [q_0, pi_0, q_1, pi_1, ...]).
+        Initial state vector (flat: [q_0, v_0, q_1, v_1, ...]).
     t_span : tuple[float, float]
         (t_start, t_end).
     dt : float
@@ -229,13 +184,12 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
     """
     layout = StateLayout.from_spec(spec, grid.num_points)
     n = grid.num_points
-    canonical = spec.canonical
 
     # Validate: leapfrog supports second-order (wave) + frozen constraints.
     # First-order (diffusion/transport) equations require IDA.
     constraint_fields: list[str] = []
     for slot in layout.slots:
-        if slot.kind == "momentum":
+        if slot.kind == "velocity":
             continue
         if slot.time_order == 0:
             constraint_fields.append(slot.field_name)
@@ -253,12 +207,6 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
             f"values (not evolved). Correct for gauge-fixed systems (e.g. A_0=0).",
             stacklevel=2,
         )
-
-    # Pre-extract kinetic matrix
-    kinetic = None
-    if canonical and canonical.kinetic_matrix:
-        kinetic = np.array(canonical.kinetic_matrix.to_dense())
-    spatial_momenta = canonical.spatial_momenta if canonical else None
 
     # Build RHSEvaluator if parameters provided
     rhs_eval: RHSEvaluator | None = None
@@ -303,18 +251,7 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
         _half_kick(y, force, dt, layout, n)
 
         # Drift
-        fieldset = FieldSet.from_flat(layout, grid.shape, y)
-        velocity = compute_velocity(
-            layout,
-            grid,
-            kinetic,
-            spatial_momenta,
-            y,
-            fieldset,
-            bc,
-            t,
-            rhs_eval,
-        )
+        velocity = compute_velocity(layout, y)
         _drift(y, velocity, dt, layout, n)
 
         # Half-kick
@@ -333,8 +270,8 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914, PLR0915
         _save(t)
 
     return {
-        "t": np.array(times),
-        "y": np.array(snapshots),
+        "t": np.asarray(times, dtype=np.float64),
+        "y": np.asarray(snapshots, dtype=np.float64),
         "success": True,
         "message": "Leapfrog integration completed",
     }

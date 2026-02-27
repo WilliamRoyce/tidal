@@ -18,7 +18,8 @@ import itertools
 from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy import sparse  # pyright: ignore[reportMissingTypeStubs]
+
+from tidal.solver._scipy_types import SparseMatrix, coo_matrix, csc_matrix
 
 if TYPE_CHECKING:
     from tidal.solver.grid import GridInfo
@@ -245,11 +246,11 @@ def _stencil_block(
 
 
 def _find_slot_for_field(layout: StateLayout, field_ref: str) -> int | None:
-    """Map a field reference (e.g. ``"A_0"`` or ``"pi_1"``) to a slot index.
+    """Map a field reference (e.g. ``"A_0"`` or ``"v_A_1"``) to a slot index.
 
     The field_ref may be:
     - A field name (``"A_0"``) -> field slot
-    - A momentum name (``"pi_A_1"`` or ``"pi_1"``) -> momentum slot
+    - A velocity name (``"v_A_1"``) -> velocity slot
     """
     # Direct match on slot name
     for i, slot in enumerate(layout.slots):
@@ -260,15 +261,15 @@ def _find_slot_for_field(layout: StateLayout, field_ref: str) -> int | None:
     if field_ref in layout.field_slot_map:
         return layout.field_slot_map[field_ref]
 
-    # Try as momentum reference: "pi_X" -> momentum slot for field X
-    if field_ref.startswith("pi_"):
-        base_field = field_ref[3:]  # Strip "pi_" prefix
-        if base_field in layout.momentum_slot_map:
-            return layout.momentum_slot_map[base_field]
-        # Also try finding a field whose momentum slot name matches
-        for slot_idx in layout.momentum_slot_map.values():
-            mom_slot = layout.slots[slot_idx]
-            if mom_slot.name == field_ref:
+    # Try as velocity reference: "v_X" -> velocity slot for field X
+    if field_ref.startswith("v_"):
+        base_field = field_ref[2:]  # Strip "v_" prefix
+        if base_field in layout.velocity_slot_map:
+            return layout.velocity_slot_map[base_field]
+        # Also try finding a field whose velocity slot name matches
+        for slot_idx in layout.velocity_slot_map.values():
+            vel_slot = layout.slots[slot_idx]
+            if vel_slot.name == field_ref:
                 return slot_idx
 
     return None
@@ -281,15 +282,15 @@ def _rhs_couplings(
 ) -> list[tuple[int, list[tuple[int, ...]]]]:
     """Extract (col_slot_idx, stencil_offsets) for each RHS term.
 
-    For ``first_derivative_t(field)``, the coupling target is the momentum
-    slot ``pi_{field}`` with identity stencil.
+    For ``first_derivative_t(field)``, the coupling target is the velocity
+    slot ``v_{field}`` with identity stencil.
     """
     couplings: list[tuple[int, list[tuple[int, ...]]]] = []
     for term in terms:
         if term.operator == "first_derivative_t":
-            # Couples to momentum of the referenced field
-            pi_name = f"pi_{term.field}"
-            col_slot = _find_slot_for_field(layout, pi_name)
+            # Couples to velocity of the referenced field
+            vel_name = f"v_{term.field}"
+            col_slot = _find_slot_for_field(layout, vel_name)
             if col_slot is not None:
                 couplings.append((col_slot, [((0,) * ndim)]))
         else:
@@ -319,7 +320,6 @@ class _SparsityBuilder:
         self.grid = grid
         self.n = grid.num_points
         self.ndim = grid.ndim
-        self.canonical = spec.canonical
         self.eq_map: dict[str, int] = {
             eq.field_name: i for i, eq in enumerate(spec.equations)
         }
@@ -364,56 +364,22 @@ class _SparsityBuilder:
                 return
             self.add_rhs_couplings(slot_idx, eq_idx)
 
-    def handle_momentum(self, slot_idx: int, eq_idx: int | None) -> None:
-        """Momentum: res = yp - RHS(y) -- diagonal from cj*I + RHS coupling."""
+    def handle_velocity(self, slot_idx: int, eq_idx: int | None) -> None:
+        """Velocity: res = yp - RHS(y) -- diagonal from cj*I + RHS coupling."""
         self.add_diagonal(slot_idx)
         if eq_idx is not None:
             self.add_rhs_couplings(slot_idx, eq_idx)
 
-    def handle_dynamical_field(
-        self, slot_idx: int, field_name: str, dyn_i: int | None
-    ) -> None:
-        """Dynamical field: res = K*yp - (pi - S)."""
-        zero = (0,) * self.ndim
-        canonical = self.canonical
+    def handle_dynamical_field(self, slot_idx: int, field_name: str) -> None:
+        """Dynamical field: res = yp - v (trivial kinematic)."""
+        # yp coupling (diagonal)
+        self.add_diagonal(slot_idx)
 
-        # yp coupling from kinetic matrix
-        self._add_kinetic_coupling(slot_idx, dyn_i)
-
-        # y coupling: momentum slot (pi_i) via identity
-        if field_name in self.layout.momentum_slot_map:
-            mom_slot = self.layout.momentum_slot_map[field_name]
-            self.add_block(slot_idx, mom_slot, [zero])
-
-        # y coupling: spatial_momenta S_i
-        if canonical and canonical.spatial_momenta:
-            sm_terms = canonical.spatial_momenta.get(field_name)
-            if sm_terms:
-                for col_slot, offsets in _rhs_couplings(
-                    sm_terms, self.layout, self.ndim
-                ):
-                    self.add_block(slot_idx, col_slot, offsets)
-
-        # Fallback: field_rates coupling
-        if canonical and field_name in canonical.field_rates:
-            fr_terms = canonical.field_rates[field_name]
-            for col_slot, offsets in _rhs_couplings(fr_terms, self.layout, self.ndim):
-                self.add_block(slot_idx, col_slot, offsets)
-
-    def _add_kinetic_coupling(self, slot_idx: int, dyn_i: int | None) -> None:
-        """Add yp coupling from kinetic matrix K_{ij} * yp_j."""
-        zero = (0,) * self.ndim
-        canonical = self.canonical
-        if dyn_i is not None and canonical and canonical.kinetic_matrix:
-            k_dense = canonical.kinetic_matrix.to_dense()
-            for j, dyn_field in enumerate(self.layout.dynamical_fields):
-                if k_dense[dyn_i][j] != 0:
-                    fs = self.layout.field_slot_map[dyn_field]
-                    self.add_diagonal(slot_idx)  # Self from cj*I
-                    if fs != slot_idx:
-                        self.add_block(slot_idx, fs, [zero])
-        else:
-            self.add_diagonal(slot_idx)  # cj*I from yp
+        # y coupling: identity coupling to velocity slot
+        if field_name in self.layout.velocity_slot_map:
+            zero = (0,) * self.ndim
+            vel_slot = self.layout.velocity_slot_map[field_name]
+            self.add_block(slot_idx, vel_slot, [zero])
 
     def handle_first_order(self, slot_idx: int, eq_idx: int | None) -> None:
         """First-order: res = yp - RHS(y) -- diagonal + RHS."""
@@ -421,19 +387,19 @@ class _SparsityBuilder:
         if eq_idx is not None:
             self.add_rhs_couplings(slot_idx, eq_idx)
 
-    def assemble(self) -> sparse.csc_matrix:
+    def assemble(self) -> SparseMatrix:
         """Assemble accumulated entries into a CSC sparse matrix."""
         n_total = self.layout.total_size
         if not self.all_rows:
-            return sparse.csc_matrix((n_total, n_total))
+            return csc_matrix((n_total, n_total))
 
         rows = np.concatenate(self.all_rows)
         cols = np.concatenate(self.all_cols)
         data = np.ones(len(rows), dtype=np.float64)
 
         # Deduplicate via COO -> CSC conversion (scipy handles duplicates)
-        pattern = sparse.coo_matrix((data, (rows, cols)), shape=(n_total, n_total))
-        return sparse.csc_matrix(pattern)
+        pattern = coo_matrix((data, (rows, cols)), shape=(n_total, n_total))
+        return csc_matrix(pattern)
 
 
 # ---------------------------------------------------------------------------
@@ -446,7 +412,7 @@ def build_jacobian_sparsity(
     layout: StateLayout,
     grid: GridInfo,
     _bc: BCSpec | None,
-) -> sparse.csc_matrix:
+) -> SparseMatrix:
     """Build the analytical Jacobian sparsity pattern for IDA.
 
     Constructs the nonzero structure of ``J = dF/dy + cj * dF/dyp`` from
@@ -467,8 +433,8 @@ def build_jacobian_sparsity(
 
     Returns
     -------
-    scipy.sparse.csc_matrix
-        Binary sparsity pattern of shape ``(N_total, N_total)``.
+    SparseMatrix
+        Binary CSC sparsity pattern of shape ``(N_total, N_total)``.
     """
     builder = _SparsityBuilder(spec, layout, grid)
 
@@ -477,12 +443,10 @@ def build_jacobian_sparsity(
 
         if slot.time_order == 0:
             builder.handle_constraint(slot_idx, eq_idx)
-        elif slot.kind == "momentum":
-            builder.handle_momentum(slot_idx, eq_idx)
+        elif slot.kind == "velocity":
+            builder.handle_velocity(slot_idx, eq_idx)
         elif slot.time_order >= _SECOND_ORDER and slot.kind == "field":
-            builder.handle_dynamical_field(
-                slot_idx, slot.field_name, slot.dynamical_index
-            )
+            builder.handle_dynamical_field(slot_idx, slot.field_name)
         elif slot.time_order == 1:
             builder.handle_first_order(slot_idx, eq_idx)
 

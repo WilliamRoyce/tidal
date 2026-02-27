@@ -46,11 +46,8 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from scipy import sparse  # pyright: ignore[reportMissingTypeStubs]
-from scipy.sparse.linalg import (  # pyright: ignore[reportMissingTypeStubs]
-    spsolve,  # pyright: ignore[reportUnknownVariableType]
-)
 
+from tidal.solver._scipy_types import SparseMatrix, lil_matrix, sparse_solve
 from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 
 # Numerical tolerance thresholds
@@ -233,20 +230,17 @@ def _select_method(
 def _build_name_map(spec: EquationSystem) -> dict[str, str]:
     """Build a map from JSON field references to FieldSet slot names.
 
-    JSON uses ``pi_N`` (numeric index) for momentum references, but
-    ``StateLayout`` creates slots named ``pi_{field_name}`` (e.g.
-    ``pi_A_1``).  This map resolves those references.
+    The canonical naming convention is ``v_{field_name}`` (e.g.
+    ``v_A_1``), matching ``StateLayout`` slot names.
     """
     name_map: dict[str, str] = {}
     for eq in spec.equations:
         # Field names map to themselves
         name_map[eq.field_name] = eq.field_name
-        # Momentum references: pi_N → pi_{field_name}
+        # Velocity references: canonical v_field_name
         if eq.time_derivative_order >= _SECOND_ORDER:
-            pi_idx = f"pi_{eq.field_index}"
-            pi_slot = f"pi_{eq.field_name}"
-            name_map[pi_idx] = pi_slot
-            name_map[pi_slot] = pi_slot  # Also accept direct slot names
+            vel_slot = f"v_{eq.field_name}"
+            name_map[vel_slot] = vel_slot
     return name_map
 
 
@@ -445,7 +439,7 @@ def _probe_operator_matrix(
     self_terms: list[tuple[float | NDArray[np.float64], str]],
     grid: GridInfo,
     bc: BCSpec | None,
-) -> sparse.csc_matrix:
+) -> SparseMatrix:
     """Build sparse matrix by probing apply_operator() with unit vectors.
 
     Each column j is computed by applying the self-operator (with resolved
@@ -459,7 +453,7 @@ def _probe_operator_matrix(
     - Any operator in OPERATOR_REGISTRY (existing or future)
     """
     n = grid.num_points
-    mat = sparse.lil_matrix((n, n))
+    mat = lil_matrix((n, n))
 
     for j in range(n):
         e_j: NDArray[np.float64] = np.zeros(grid.shape)
@@ -474,18 +468,17 @@ def _probe_operator_matrix(
         for row in nz:
             mat[row, j] = col_flat[row]
 
-    return mat.tocsc()  # type: ignore[return-value]
+    return mat.tocsc()
 
 
 def _matrix_solve(
-    op_matrix: sparse.csc_matrix,
+    op_matrix: SparseMatrix,
     source_rhs: NDArray[np.float64],
     grid_shape: tuple[int, ...],
 ) -> NDArray[np.float64]:
     """Solve op_matrix @ u = -source_rhs via sparse direct factorization."""
     rhs = -source_rhs.ravel()
-    u: Any = spsolve(op_matrix, rhs)  # pyright: ignore[reportUnknownVariableType]
-    return u.reshape(grid_shape)  # type: ignore[return-value]
+    return sparse_solve(op_matrix, rhs).reshape(grid_shape)
 
 
 # ---------------------------------------------------------------------------
@@ -566,7 +559,7 @@ def pre_solve_constraints(  # noqa: PLR0913
     y0_out = y0.copy()
     fields = FieldSet.from_flat(layout, grid.shape, y0_out)
 
-    # Build name map: JSON field references (e.g. "pi_1") → FieldSet slot names
+    # Build name map: JSON field references (e.g. "v_A_1") → FieldSet slot names
     name_map = _build_name_map(spec)
 
     # Classify terms for each constraint

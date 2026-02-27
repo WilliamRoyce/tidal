@@ -292,6 +292,15 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         action="store_true",
         help="Suppress progress messages (results and errors still shown)",
     )
+    sim_parser.add_argument(
+        "--require-stable",
+        action="store_true",
+        default=False,
+        help=(
+            "Abort if the pre-simulation stability check detects an unstable "
+            "mass matrix (negative eigenvalue). Default: warn only."
+        ),
+    )
 
     # --- list ---
     list_parser = sub.add_parser(

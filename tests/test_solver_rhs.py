@@ -65,9 +65,11 @@ def _make_evaluator(
 class TestRHSBasic:
     def test_single_laplacian(self) -> None:
         """Laplacian of sin(x) should give -sin(x)."""
-        spec = _make_spec([
-            {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
-        ])
+        spec = _make_spec(
+            [
+                {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+            ]
+        )
         n = 64
         grid = _make_grid(n)
         rhs_eval, _ = _make_evaluator(spec, grid)
@@ -83,10 +85,12 @@ class TestRHSBasic:
 
     def test_multiple_terms(self) -> None:
         """Two terms: laplacian + identity (wave equation with mass)."""
-        spec = _make_spec([
-            {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
-            {"coefficient": -2.0, "operator": "identity", "field": "phi_0"},
-        ])
+        spec = _make_spec(
+            [
+                {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                {"coefficient": -2.0, "operator": "identity", "field": "phi_0"},
+            ]
+        )
         n = 64
         grid = _make_grid(n)
         rhs_eval, _ = _make_evaluator(spec, grid)
@@ -165,9 +169,11 @@ class TestRHSBasic:
 
     def test_zero_field_gives_zero(self) -> None:
         """Zero-valued field produces zero RHS contribution."""
-        spec = _make_spec([
-            {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
-        ])
+        spec = _make_spec(
+            [
+                {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+            ]
+        )
         n = 16
         grid = _make_grid(n)
         rhs_eval, _ = _make_evaluator(spec, grid)
@@ -187,14 +193,16 @@ class TestRHSBasic:
 class TestRHSCoefficients:
     def test_parameter_override(self) -> None:
         """Parameter override flows through to RHS result."""
-        spec = _make_spec([
-            {
-                "coefficient": 0.0,
-                "operator": "identity",
-                "field": "phi_0",
-                "coefficient_symbolic": "-m2",
-            },
-        ])
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 0.0,
+                    "operator": "identity",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "-m2",
+                },
+            ]
+        )
         n = 16
         grid = _make_grid(n)
         rhs_eval, _ = _make_evaluator(spec, grid, params={"m2": 4.0})
@@ -208,15 +216,17 @@ class TestRHSCoefficients:
 
     def test_position_dependent(self) -> None:
         """Position-dependent coefficient multiplied correctly."""
-        spec = _make_spec([
-            {
-                "coefficient": 1.0,
-                "operator": "identity",
-                "field": "phi_0",
-                "coefficient_symbolic": "Cos[x[]]",
-                "coordinate_dependent": ["x"],
-            },
-        ])
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "identity",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "Cos[x[]]",
+                    "coordinate_dependent": ["x"],
+                },
+            ]
+        )
         n = 32
         grid = _make_grid(n)
         rhs_eval, _ = _make_evaluator(spec, grid)
@@ -238,9 +248,11 @@ class TestRHSCoefficients:
 class TestEvaluateByField:
     def test_lookup_by_name(self) -> None:
         """evaluate_by_field looks up the equation for a field name."""
-        spec = _make_spec([
-            {"coefficient": 2.0, "operator": "identity", "field": "phi_0"},
-        ])
+        spec = _make_spec(
+            [
+                {"coefficient": 2.0, "operator": "identity", "field": "phi_0"},
+            ]
+        )
         n = 8
         grid = _make_grid(n)
         rhs_eval, _ = _make_evaluator(spec, grid)
@@ -254,9 +266,11 @@ class TestEvaluateByField:
 
     def test_unknown_field_raises(self) -> None:
         """evaluate_by_field raises KeyError for unknown field."""
-        spec = _make_spec([
-            {"coefficient": 1.0, "operator": "identity", "field": "phi_0"},
-        ])
+        spec = _make_spec(
+            [
+                {"coefficient": 1.0, "operator": "identity", "field": "phi_0"},
+            ]
+        )
         grid = _make_grid(8)
         rhs_eval, _ = _make_evaluator(spec, grid)
 
@@ -265,32 +279,3 @@ class TestEvaluateByField:
 
         with pytest.raises(KeyError, match="nonexistent"):
             rhs_eval.evaluate_by_field("nonexistent", fs)
-
-
-# ---------------------------------------------------------------------------
-# Tests — error handling
-# ---------------------------------------------------------------------------
-
-
-class TestRHSErrors:
-    def test_first_derivative_t_reads_momentum(self) -> None:
-        """first_derivative_t reads the momentum slot pi_{field}."""
-        spec = _make_spec([
-            {
-                "coefficient": 2.0,
-                "operator": "first_derivative_t",
-                "field": "phi_0",
-            },
-        ])
-        n = 16
-        grid = _make_grid(n)
-        rhs_eval, _ = _make_evaluator(spec, grid)
-
-        layout = StateLayout.from_spec(spec, n)
-        fs = FieldSet.zeros(layout, (n,))
-        # Set momentum to known values
-        fs["pi_phi_0"] = np.ones(n) * 3.0
-
-        result = rhs_eval.evaluate(0, fs)
-        # coefficient * momentum = 2.0 * 3.0 = 6.0
-        np.testing.assert_allclose(result, 6.0)

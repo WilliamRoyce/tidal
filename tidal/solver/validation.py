@@ -48,16 +48,14 @@ def validate_operator_dimensions(spec: EquationSystem) -> None:
 def validate_field_references(spec: EquationSystem) -> None:
     """Check that all term field references point to valid fields.
 
-    Also checks canonical field_rates and spatial_momenta references.
-
     Raises
     ------
     ValueError
         If a field reference is invalid.
     """
     valid_fields = set(spec.component_names)
-    # Also accept momentum names (pi_N format)
-    valid_fields.update(f"pi_{i}" for i in range(spec.n_components))
+    # Accept velocity names in v_field_name format (e.g. v_A_1)
+    valid_fields.update(f"v_{eq.field_name}" for eq in spec.equations)
 
     for eq in spec.equations:
         for term in eq.rhs_terms:
@@ -68,41 +66,6 @@ def validate_field_references(spec: EquationSystem) -> None:
                     f"Valid fields: {sorted(valid_fields)}."
                 )
                 raise ValueError(msg)
-
-    # Check canonical references
-    if spec.canonical is not None:
-        _validate_canonical_refs(spec, valid_fields)
-
-
-def _validate_canonical_refs(spec: EquationSystem, valid_fields: set[str]) -> None:
-    """Check canonical field_rates and spatial_momenta references.
-
-    Raises
-    ------
-    ValueError
-        If a canonical reference is invalid.
-    """
-    canonical = spec.canonical
-    assert canonical is not None
-
-    for field_name, terms in canonical.field_rates.items():
-        for term in terms:
-            if term.field not in valid_fields and not term.field.startswith("pi_"):
-                msg = (
-                    f"Unknown field reference '{term.field}' "
-                    f"in field_rates for '{field_name}'."
-                )
-                raise ValueError(msg)
-
-    if canonical.spatial_momenta is not None:
-        for field_name, terms in canonical.spatial_momenta.items():
-            for term in terms:
-                if term.field not in valid_fields:
-                    msg = (
-                        f"Unknown field reference '{term.field}' "
-                        f"in spatial_momenta for '{field_name}'."
-                    )
-                    raise ValueError(msg)
 
 
 def check_cfl_stability(
@@ -179,6 +142,115 @@ def check_mass_sign(
                     f"max={float(result.max()):.4g})."
                 )
     return warnings
+
+
+class StabilityResult:
+    """Result from :func:`check_pointwise_mass_stability`.
+
+    Separates fatal stability *errors* (negative eigenvalues) from
+    informational *notes* (e.g. asymmetric matrix detected).
+    """
+
+    __slots__ = ("errors", "notes")
+
+    def __init__(self) -> None:
+        self.errors: list[str] = []
+        self.notes: list[str] = []
+
+
+def check_pointwise_mass_stability(  # noqa: PLR0914
+    coeff_eval: CoefficientEvaluator,
+    spec: EquationSystem,
+    grid: GridInfo,
+) -> StabilityResult:
+    """Check eigenvalues of the pointwise mass/coupling matrix M[i,j](x,y).
+
+    Builds M[i,j](x,y) from all identity-operator EOM terms (constant and
+    position-dependent), then verifies that all eigenvalues are positive at
+    every grid point.  A negative eigenvalue indicates an exponentially
+    growing (tachyonic) mode.
+
+    This check runs once pre-simulation using the pre-computed spatial cache
+    in CoefficientEvaluator — zero runtime cost during the actual simulation.
+
+    Returns a :class:`StabilityResult` with ``errors`` (instability) and
+    ``notes`` (informational diagnostics like asymmetry detection).
+
+    Notes
+    -----
+    The stability condition is that the potential matrix M (defined as the
+    *negative* of the identity-operator coefficient matrix) is
+    positive-semidefinite at every grid point.  For coupled scalars with
+    Gaussian coupling ``G(x,y) = g0*exp(-r^2/2R^2)``, this reduces to
+    ``mPhi2 * mChi2 > G(x,y)^2`` everywhere, i.e. ``mPhi2 * mChi2 > g0^2``
+    at the coupling peak.
+    """
+    import numpy as np  # noqa: PLC0415
+
+    result = StabilityResult()
+    n = len(spec.component_names)
+    grid_shape = grid.shape
+
+    # Build pot[i,j](x,y) as ndarray of shape (n, n, *grid_shape).
+    # Convention: pot[i,j] = -(coefficient of identity(field_j) in equation_i)
+    pot = np.zeros((n, n, *grid_shape))
+
+    for eq_idx, eq in enumerate(spec.equations):
+        i = spec.component_names.index(eq.field_name)  # field index for matrix row
+        for term_idx, term in enumerate(eq.rhs_terms):
+            if term.operator != "identity":
+                continue
+            try:
+                j = spec.component_names.index(term.field)
+            except ValueError:
+                continue  # Momentum or unknown field — skip
+            coeff = coeff_eval.resolve(term, t=0.0, eq_idx=eq_idx, term_idx=term_idx)
+            if isinstance(coeff, np.ndarray):
+                pot[i, j] -= coeff  # position-dependent: subtract broadcast array
+            else:
+                pot[i, j] -= float(coeff)  # constant: subtract scalar
+
+    # Vectorized eigenvalue check: reshape to (n_grid, n, n) batch.
+    pot_flat = pot.reshape(n, n, -1).transpose(2, 0, 1)  # (n_grid, n, n)
+
+    # Check symmetry with *relative* tolerance: scale by matrix norm so that
+    # large-amplitude systems (O(1e6)) don't trigger false asymmetry warnings
+    # from floating-point roundoff.
+    sym_diff = float(np.abs(pot_flat - pot_flat.transpose(0, 2, 1)).max())
+    mat_scale = max(float(np.abs(pot_flat).max()), 1.0)
+    if n > 1 and sym_diff > 1e-12 * mat_scale:
+        result.notes.append(
+            f"Mass/coupling matrix is asymmetric (max |M-M^T| = {sym_diff:.2e}). "
+            f"Using general eigenvalues; stability check may be less precise."
+        )
+        eigenvalues = np.linalg.eigvals(pot_flat).real  # general case
+    else:
+        eigenvalues = np.linalg.eigvalsh(pot_flat)  # faster, guaranteed real
+
+    min_per_point = eigenvalues.min(axis=1)  # (n_grid,) minimum eigenvalue per point
+    global_min = float(min_per_point.min())
+
+    tolerance = 1e-10
+    if global_min >= -tolerance:
+        return result
+
+    # Find the worst grid point for a diagnostic message
+    worst_flat = int(min_per_point.argmin())
+    worst_idx = np.unravel_index(worst_flat, grid_shape)
+    # spatial coordinates = effective_coordinates[1:] (skip the time coordinate)
+    spatial_coords = spec.effective_coordinates[1:]
+    coord_strs = [
+        f"{spatial_coords[d]}={grid.axes_coords(d)[worst_idx[d]]:.4g}"
+        for d in range(len(grid_shape))
+    ]
+    result.errors.append(
+        f"Coupled mass matrix has minimum eigenvalue {global_min:.4g} at "
+        f"({', '.join(coord_strs)}). The system has exponentially growing "
+        f"modes -- it will be unstable. "
+        f"Check that the mass matrix is positive-definite at all grid points "
+        f"(e.g. for Gaussian-coupled scalars: mPhi2 * mChi2 > g0^2)."
+    )
+    return result
 
 
 def check_robin_stability(grid: GridInfo) -> list[str]:

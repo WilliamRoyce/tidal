@@ -1113,17 +1113,6 @@ def _make_wave_spec() -> EquationSystem:
                     "factor_b": {"field": "phi_0", "operator": "time_derivative"},
                 },
             ],
-            "field_rates": {
-                "phi_0": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}
-                ]
-            },
-            "kinetic_matrix": {
-                "entries": [{"i": 0, "j": 0, "value": 1.0}],
-                "dimension": 1,
-            },
-            "spatial_momenta": {},
-            "hamiltonian_symbolic": "test",
         },
     }
     return EquationSystem.from_dict(data)
@@ -1197,17 +1186,6 @@ def _make_dissipative_spec() -> EquationSystem:
                     "factor_b": {"field": "phi_0", "operator": "time_derivative"},
                 },
             ],
-            "field_rates": {
-                "phi_0": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}
-                ]
-            },
-            "kinetic_matrix": {
-                "entries": [{"i": 0, "j": 0, "value": 1.0}],
-                "dimension": 1,
-            },
-            "spatial_momenta": {},
-            "hamiltonian_symbolic": "test",
         },
     }
     return EquationSystem.from_dict(data)
@@ -1274,3 +1252,24 @@ class TestValidateSolverParams:
         """--max-step must be positive when provided."""
         with pytest.raises(ValueError, match="--max-step must be positive"):
             _validate_solver_params(_make_solver_args(max_step=-1.0))
+
+
+# ==================== --require-stable flag ====================
+
+
+class TestRequireStableFlag:
+    def test_require_stable_default_false(self) -> None:
+        """--require-stable defaults to False."""
+        from tidal.cli import _build_parser
+
+        parser = _build_parser()
+        args = parser.parse_args(["simulate", "spec.json"])
+        assert args.require_stable is False
+
+    def test_require_stable_set_true(self) -> None:
+        """--require-stable flag sets the attribute to True."""
+        from tidal.cli import _build_parser
+
+        parser = _build_parser()
+        args = parser.parse_args(["simulate", "spec.json", "--require-stable"])
+        assert args.require_stable is True

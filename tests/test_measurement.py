@@ -9,7 +9,10 @@ from __future__ import annotations
 import dataclasses
 import warnings
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from tidal.solver._types import SolverResult
 
 import numpy as np
 import pytest
@@ -47,7 +50,7 @@ from tidal.measurement._energy import (
     _compute_virial_potential,
     _evaluate_hamiltonian_factor,
     _gradient_energy_density,
-    _is_momentum_field,
+    _is_velocity_field,
     _resolve_term_target,
     _self_gradient_axes,
 )
@@ -116,7 +119,7 @@ def _make_sim_data_two_fields(
     c = eigenvectors.T @ ic  # coefficients in eigenmode basis
 
     fields_lists: dict[str, list[np.ndarray]] = {"phi_0": [], "chi_0": []}
-    momenta_lists: dict[str, list[np.ndarray]] = {"phi_0": [], "chi_0": []}
+    velocities_lists: dict[str, list[np.ndarray]] = {"phi_0": [], "chi_0": []}
 
     for t in times:
         # Mode amplitudes
@@ -135,11 +138,11 @@ def _make_sim_data_two_fields(
 
         fields_lists["phi_0"].append(phi_arr)
         fields_lists["chi_0"].append(chi_arr)
-        momenta_lists["phi_0"].append(pi_phi_arr)
-        momenta_lists["chi_0"].append(pi_chi_arr)
+        velocities_lists["phi_0"].append(pi_phi_arr)
+        velocities_lists["chi_0"].append(pi_chi_arr)
 
     fields_np = {k: np.stack(v) for k, v in fields_lists.items()}
-    momenta_np = {k: np.stack(v) for k, v in momenta_lists.items()}
+    velocities_np = {k: np.stack(v) for k, v in velocities_lists.items()}
 
     # Extract metadata parameters so symbolic coefficients resolve correctly
     params = {
@@ -151,7 +154,7 @@ def _make_sim_data_two_fields(
     return SimulationData(
         times=times,
         fields=fields_np,
-        momenta=momenta_np,
+        velocities=velocities_np,
         grid_spacing=grid_spacing,
         grid_bounds=grid_bounds,
         periodic=periodic,
@@ -183,7 +186,7 @@ def _make_single_field_data(
     pi_field = np.zeros(n_grid)
 
     fields = {"phi_0": np.stack([phi] * n_snapshots)}
-    momenta_dict = {"phi_0": np.stack([pi_field] * n_snapshots)}
+    velocities_dict = {"phi_0": np.stack([pi_field] * n_snapshots)}
 
     # Extract metadata parameters so symbolic coefficients resolve correctly
     params = {
@@ -195,7 +198,7 @@ def _make_single_field_data(
     return SimulationData(
         times=times,
         fields=fields,
-        momenta=momenta_dict,
+        velocities=velocities_dict,
         grid_spacing=(dx,),
         grid_bounds=((0.0, domain_len),),
         periodic=(True,),
@@ -222,7 +225,7 @@ class TestFieldEnergy:
         data = _make_single_field_data()
         fe = compute_field_energy(
             data.fields["phi_0"][0],
-            data.momenta["phi_0"][0],
+            data.velocities["phi_0"][0],
             mass_squared=1.0,
             grid_spacing=data.grid_spacing,
             periodic=data.periodic,
@@ -326,8 +329,6 @@ def _make_kg_canonical_structure(m2: float = 1.0) -> CanonicalStructure:
                 factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
             ),
         ),
-        field_rates={},
-        hamiltonian_symbolic=f"1/2 pi^2 + 1/2 (grad phi)^2 + 1/2 * {m2} * phi^2",
     )
 
 
@@ -386,8 +387,6 @@ def _make_coupled_canonical_structure(
                 factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
             ),
         ),
-        field_rates={},
-        hamiltonian_symbolic="coupled scalar H",
     )
 
 
@@ -406,7 +405,7 @@ class TestCanonicalHamiltonianEnergy:
         data = _make_sim_data_two_fields(n_snapshots=3)
         result = _evaluate_hamiltonian_factor("phi_0", "time_derivative", data, 0)
         assert result is not None
-        np.testing.assert_array_equal(result, data.momenta["phi_0"][0])
+        np.testing.assert_array_equal(result, data.velocities["phi_0"][0])
 
     def test_evaluate_factor_gradient(self) -> None:
         """gradient_x factor applies first derivative."""
@@ -428,7 +427,7 @@ class TestCanonicalHamiltonianEnergy:
         data_with_canonical = SimulationData(
             times=data.times,
             fields=data.fields,
-            momenta=data.momenta,
+            velocities=data.velocities,
             grid_spacing=data.grid_spacing,
             grid_bounds=data.grid_bounds,
             periodic=data.periodic,
@@ -441,7 +440,7 @@ class TestCanonicalHamiltonianEnergy:
         # Compare with standard field energy (should match for scalars)
         fe = compute_field_energy(
             data.fields["phi_0"][0],
-            data.momenta["phi_0"][0],
+            data.velocities["phi_0"][0],
             m2_phi,
             data.grid_spacing,
             data.periodic,
@@ -462,7 +461,7 @@ class TestCanonicalHamiltonianEnergy:
         data_c = SimulationData(
             times=data.times,
             fields=data.fields,
-            momenta=data.momenta,
+            velocities=data.velocities,
             grid_spacing=data.grid_spacing,
             grid_bounds=data.grid_bounds,
             periodic=data.periodic,
@@ -491,7 +490,7 @@ class TestCanonicalHamiltonianEnergy:
         data_c = SimulationData(
             times=data.times,
             fields=data.fields,
-            momenta=data.momenta,
+            velocities=data.velocities,
             grid_spacing=data.grid_spacing,
             grid_bounds=data.grid_bounds,
             periodic=data.periodic,
@@ -521,7 +520,7 @@ class TestCanonicalHamiltonianEnergy:
         data_c = SimulationData(
             times=data.times,
             fields=data.fields,
-            momenta=data.momenta,
+            velocities=data.velocities,
             grid_spacing=data.grid_spacing,
             grid_bounds=data.grid_bounds,
             periodic=data.periodic,
@@ -546,27 +545,23 @@ class TestCanonicalHamiltonianEnergy:
         with pytest.raises(ValueError, match="without canonical"):
             _compute_hamiltonian_from_canonical(data_no_canon, 0)
 
-    def test_proca_hamiltonian_uses_velocity_not_momentum(self) -> None:
-        """For Proca fields, time_derivative factor must reconstruct velocity.
+    def test_proca_hamiltonian_uses_velocity_directly(self) -> None:
+        """For Proca fields, time_derivative factor reads velocity directly.
 
-        In Proca theory, the canonical momentum is π_i = ∂_t A_i - ∂_i A_0,
-        so the velocity is vel_i = π_i + ∂_i A_0. The kinetic term in H is
-        ½ vel² = ½ (π + ∂_x A_0)², NOT ½ π².  This test creates synthetic
-        data where A_0 is nonzero and verifies the cross-terms are included.
+        In E-L velocity form, data.velocities stores v = dq/dt. The kinetic
+        term ½ v² is evaluated directly — no field_rates bilinear expansion.
         """
         n_grid = 64
         domain_len = 10.0
         dx = domain_len / n_grid
         x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
 
-        # Use periodic-compatible sinusoidal A_0 so gradients wrap correctly
         k0 = 2 * np.pi / domain_len
-        a0_amp = 0.5
-        a0 = a0_amp * np.sin(k0 * x)  # periodic: A_0(0) ≈ A_0(L)
+        a0 = 0.5 * np.sin(k0 * x)
 
-        # A_1 field and its canonical momentum pi_1
+        # A_1 field and its velocity v_1 = dA_1/dt
         a1 = np.cos(k0 * x)
-        pi1 = 0.5 * np.ones(n_grid)
+        v1 = 0.5 * np.ones(n_grid)
 
         # Build a minimal 2-component Proca-like spec
         # A_0: constraint (time_order=0), A_1: dynamical (time_order=2)
@@ -588,8 +583,8 @@ class TestCanonicalHamiltonianEnergy:
             ),
         )
 
-        # Hamiltonian: ½ vel_1² + ½ (∂_x A_1)² + ½ m² A_1²
-        # where vel_1 = time_derivative(A_1) = pi_1 + gradient_x(A_0)
+        # Hamiltonian: ½ v_1² + ½ (∂_x A_1)² + ½ m² A_1²
+        # In E-L form, time_derivative(A_1) = v_A_1 read directly from state
         canonical = CanonicalStructure(
             hamiltonian_terms=(
                 HamiltonianTerm(
@@ -608,13 +603,6 @@ class TestCanonicalHamiltonianEnergy:
                     factor_b=HamiltonianFactor(field="A_1", operator="identity"),
                 ),
             ),
-            field_rates={
-                "A_1": (
-                    OperatorTerm(coefficient=1.0, operator="identity", field="pi_1"),
-                    OperatorTerm(coefficient=1.0, operator="gradient_x", field="A_0"),
-                ),
-            },
-            hamiltonian_symbolic="proca test H",
         )
 
         spec = EquationSystem(
@@ -632,7 +620,7 @@ class TestCanonicalHamiltonianEnergy:
         data = SimulationData(
             times=np.array([0.0]),
             fields={"A_0": a0[np.newaxis], "A_1": a1[np.newaxis]},
-            momenta={"A_1": pi1[np.newaxis]},
+            velocities={"A_1": v1[np.newaxis]},
             grid_spacing=(dx,),
             grid_bounds=((0.0, 10.0),),
             periodic=(True,),
@@ -642,25 +630,98 @@ class TestCanonicalHamiltonianEnergy:
 
         h_eval = _compute_hamiltonian_from_canonical(data, 0)
 
-        # Compute expected energy using SAME finite difference stencils
-        # as the solver.  The IBP path evaluates ½ gradient_x(A_1)² as
-        # -½ A_1 · laplacian_x(A_1), matching the 3-point laplacian stencil.
-        grad_a0 = (np.roll(a0, -1) - np.roll(a0, 1)) / (2 * dx)
-        vel = pi1 + grad_a0  # velocity = pi + d_x(A_0)
+        # In E-L velocity form:
+        # H = ½ v_1² + ½ (∂_x A_1)² + ½ A_1²
+        # Kinetic: ½ v1² directly
+        # Gradient: IBP → -½ A_1 · lap(A_1)
+        # Mass: ½ A_1²
         lap_a1 = (np.roll(a1, -1) - 2 * a1 + np.roll(a1, 1)) / dx**2
-        h_expected = float((0.5 * vel**2 + (-0.5) * a1 * lap_a1 + 0.5 * a1**2).mean())
+        h_expected = float((0.5 * v1**2 + (-0.5) * a1 * lap_a1 + 0.5 * a1**2).mean())
 
-        # If we had the bug (using pi instead of vel), kinetic term would be
-        # ½ π², missing the cross-terms pi*d_x(A_0) and (d_x A_0)²
-        h_wrong = float((0.5 * pi1**2 + (-0.5) * a1 * lap_a1 + 0.5 * a1**2).mean())
-
-        # Verify the correct answer (with velocity reconstruction) matches
         np.testing.assert_allclose(h_eval, h_expected, rtol=1e-10)
 
-        # Verify the wrong answer (raw momentum) does NOT match
-        assert abs(h_eval - h_wrong) > 0.01, (
-            f"h_eval={h_eval} should differ from h_wrong={h_wrong} when A_0 is nonzero"
+    def test_kinetic_and_gradient_terms_independent(self) -> None:
+        """In E-L velocity form, kinetic and gradient terms are independent.
+
+        H = ½ v² - ½ (∂_x A_0)²
+        Kinetic: ½ v² reads velocity directly from data.velocities
+        Gradient: -½ (∂_x A_0)² uses IBP stencil
+        No bilinear expansion — terms evaluate independently.
+        """
+        n_grid = 64
+        domain_len = 10.0
+        dx = domain_len / n_grid
+        x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
+
+        k0 = 2 * np.pi / domain_len
+        a0 = 0.8 * np.sin(k0 * x)
+        a1 = np.zeros(n_grid)
+        v1 = 0.6 * np.cos(k0 * x)  # velocity v = dA_1/dt
+
+        eq_a0 = ComponentEquation(
+            field_name="A_0",
+            field_index=0,
+            time_derivative_order=0,
+            rhs_terms=(
+                OperatorTerm(coefficient=-1.0, operator="laplacian_x", field="A_1"),
+            ),
         )
+        eq_a1 = ComponentEquation(
+            field_name="A_1",
+            field_index=1,
+            time_derivative_order=2,
+            rhs_terms=(
+                OperatorTerm(coefficient=1.0, operator="laplacian_x", field="A_1"),
+            ),
+        )
+
+        # H = ½ v_1² - ½ (∂_x A_0)²
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="A_1", operator="time_derivative"),
+                    factor_b=HamiltonianFactor(field="A_1", operator="time_derivative"),
+                ),
+                HamiltonianTerm(
+                    coefficient=-0.5,
+                    factor_a=HamiltonianFactor(field="A_0", operator="gradient_x"),
+                    factor_b=HamiltonianFactor(field="A_0", operator="gradient_x"),
+                ),
+            ),
+        )
+
+        spec = EquationSystem(
+            n_components=2,
+            dimension=2,
+            spatial_dimension=1,
+            component_names=("A_0", "A_1"),
+            equations=(eq_a0, eq_a1),
+            mass_matrix=((0.0, 0.0), (0.0, 0.0)),
+            coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
+            metadata={"source": "test", "parameters": {}},
+            canonical=canonical,
+        )
+
+        data = SimulationData(
+            times=np.array([0.0]),
+            fields={"A_0": a0[np.newaxis], "A_1": a1[np.newaxis]},
+            velocities={"A_1": v1[np.newaxis]},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={},
+        )
+
+        h_eval = _compute_hamiltonian_from_canonical(data, 0)
+
+        # Expected: H = ½ v² - ½ (∂_x A_0)² (IBP)
+        # IBP: ⟨(∂_x A_0)²⟩ = -⟨A_0 · lap(A_0)⟩
+        lap_a0 = (np.roll(a0, -1) - 2 * a0 + np.roll(a0, 1)) / dx**2
+        h_expected = float((0.5 * v1**2 - 0.5 * (-a0 * lap_a0)).mean())
+
+        np.testing.assert_allclose(h_eval, h_expected, rtol=1e-10)
 
 
 class TestIBPHamiltonian:
@@ -742,8 +803,6 @@ class TestIBPHamiltonian:
                     factor_b=HamiltonianFactor(field="phi_0", operator="gradient_x"),
                 ),
             ),
-            field_rates={},
-            hamiltonian_symbolic="test",
         )
 
         eq = ComponentEquation(
@@ -768,7 +827,7 @@ class TestIBPHamiltonian:
         data = SimulationData(
             times=np.array([0.0]),
             fields={"phi_0": phi[np.newaxis]},
-            momenta={},
+            velocities={},
             grid_spacing=(dx,),
             grid_bounds=((0.0, domain_len),),
             periodic=(True,),
@@ -811,8 +870,6 @@ class TestIBPHamiltonian:
                     factor_b=HamiltonianFactor(field="v_0", operator="gradient_y"),
                 ),
             ),
-            field_rates={},
-            hamiltonian_symbolic="test cross",
         )
 
         eq_u = ComponentEquation(
@@ -845,7 +902,7 @@ class TestIBPHamiltonian:
         data = SimulationData(
             times=np.array([0.0]),
             fields={"u_0": u_data[np.newaxis], "v_0": v_data[np.newaxis]},
-            momenta={},
+            velocities={},
             grid_spacing=(dx, dx),
             grid_bounds=((0.0, domain_len), (0.0, domain_len)),
             periodic=(True, True),
@@ -855,85 +912,6 @@ class TestIBPHamiltonian:
 
         h_eval = _compute_hamiltonian_from_canonical(data, 0)
         np.testing.assert_allclose(h_eval, energy_ibp, rtol=1e-12)
-
-    def test_field_rates_symbolic_resolution(self) -> None:
-        """field_rate coefficients are resolved via symbolic expressions.
-
-        With rho=2, field_rate coefficient_symbolic="rho^(-1)" should give 0.5,
-        not the placeholder coefficient=1.0.
-        """
-        n_grid = 32
-        dx = 0.1
-
-        phi = np.ones(n_grid)
-        pi_data = 2.0 * np.ones(n_grid)
-
-        # KE term: rho/2 * (d_t phi)^2 = rho/2 * (pi/rho)^2 = pi^2/(2*rho)
-        # With rho=2, pi=2: KE = 4/(2*2) = 1.0
-        rho = 2.0
-
-        canonical = CanonicalStructure(
-            hamiltonian_terms=(
-                HamiltonianTerm(
-                    coefficient=1.0,
-                    coefficient_symbolic="rho/2",
-                    factor_a=HamiltonianFactor(
-                        field="phi_0", operator="time_derivative"
-                    ),
-                    factor_b=HamiltonianFactor(
-                        field="phi_0", operator="time_derivative"
-                    ),
-                ),
-            ),
-            field_rates={
-                "phi_0": (
-                    OperatorTerm(
-                        coefficient=1.0,
-                        operator="identity",
-                        field="pi_0",
-                        coefficient_symbolic="rho^(-1)",
-                    ),
-                ),
-            },
-            hamiltonian_symbolic="test rho",
-        )
-
-        eq = ComponentEquation(
-            field_name="phi_0",
-            field_index=0,
-            time_derivative_order=2,
-            rhs_terms=(
-                OperatorTerm(coefficient=1.0, operator="laplacian_x", field="phi_0"),
-            ),
-        )
-        spec = EquationSystem(
-            n_components=1,
-            dimension=2,
-            spatial_dimension=1,
-            component_names=("phi_0",),
-            equations=(eq,),
-            mass_matrix=((0.0,),),
-            coupling_matrix=((0.0,),),
-            metadata={"source": "test", "parameters": {"rho": rho}},
-            canonical=canonical,
-        )
-        data = SimulationData(
-            times=np.array([0.0]),
-            fields={"phi_0": phi[np.newaxis]},
-            momenta={"phi_0": pi_data[np.newaxis]},
-            grid_spacing=(dx,),
-            grid_bounds=((0.0, n_grid * dx),),
-            periodic=(True,),
-            spec=spec,
-            parameters={},  # Empty — should merge from spec metadata
-        )
-
-        h_eval = _compute_hamiltonian_from_canonical(data, 0)
-
-        # velocity = pi / rho = 2/2 = 1
-        # KE = (rho/2) * vel² = (2/2) * 1² = 1.0
-        expected = rho / 2 * (pi_data[0] / rho) ** 2
-        np.testing.assert_allclose(h_eval, expected, rtol=1e-12)
 
     def test_parameter_merge_from_spec_metadata(self) -> None:
         """Parameters from spec metadata are used when data.parameters is empty.
@@ -955,8 +933,6 @@ class TestIBPHamiltonian:
                     factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
                 ),
             ),
-            field_rates={},
-            hamiltonian_symbolic="test merge",
         )
 
         eq = ComponentEquation(
@@ -981,7 +957,7 @@ class TestIBPHamiltonian:
         data = SimulationData(
             times=np.array([0.0]),
             fields={"phi_0": phi[np.newaxis]},
-            momenta={},
+            velocities={},
             grid_spacing=(dx,),
             grid_bounds=((0.0, n_grid * dx),),
             periodic=(True,),
@@ -1061,16 +1037,6 @@ class TestAnalyticalEnergyConservation:
                     ),
                 ),
             ),
-            field_rates={
-                "phi_0": (
-                    OperatorTerm(
-                        coefficient=1.0,
-                        operator="identity",
-                        field="pi_0",
-                    ),
-                ),
-            },
-            hamiltonian_symbolic="plane wave test",
         )
         return EquationSystem(
             n_components=1,
@@ -1105,7 +1071,7 @@ class TestAnalyticalEnergyConservation:
         data = SimulationData(
             times=np.array([0.0]),
             fields={"phi_0": phi[np.newaxis]},
-            momenta={"phi_0": pi_field[np.newaxis]},
+            velocities={"phi_0": pi_field[np.newaxis]},
             grid_spacing=(dx,),
             grid_bounds=((0.0, domain_len),),
             periodic=(True,),
@@ -1143,7 +1109,7 @@ class TestAnalyticalEnergyConservation:
         data = SimulationData(
             times=times,
             fields={"phi_0": phi_data},
-            momenta={"phi_0": pi_data},
+            velocities={"phi_0": pi_data},
             grid_spacing=(dx,),
             grid_bounds=((0.0, domain_len),),
             periodic=(True,),
@@ -1318,23 +1284,6 @@ class TestAnalyticalEnergyConservation:
                     ),
                 ),
             ),
-            field_rates={
-                "phi_0": (
-                    OperatorTerm(
-                        coefficient=1.0,
-                        operator="identity",
-                        field="pi_0",
-                    ),
-                ),
-                "chi_0": (
-                    OperatorTerm(
-                        coefficient=1.0,
-                        operator="identity",
-                        field="pi_1",
-                    ),
-                ),
-            },
-            hamiltonian_symbolic="coupled eigenmode test",
         )
 
         spec = EquationSystem(
@@ -1355,7 +1304,7 @@ class TestAnalyticalEnergyConservation:
                 "phi_0": phi_init[np.newaxis],
                 "chi_0": chi_init[np.newaxis],
             },
-            momenta={
+            velocities={
                 "phi_0": pi_phi[np.newaxis],
                 "chi_0": pi_chi[np.newaxis],
             },
@@ -1637,7 +1586,7 @@ class TestDecoupledFields:
         omega_phi = np.sqrt(max(m2_phi, 0.0))
 
         fields_np: dict[str, np.ndarray] = {}
-        momenta_np: dict[str, np.ndarray] = {}
+        velocities_np: dict[str, np.ndarray] = {}
 
         phi_list: list[np.ndarray] = []
         chi_list: list[np.ndarray] = []
@@ -1652,13 +1601,13 @@ class TestDecoupledFields:
 
         fields_np["phi_0"] = np.stack(phi_list)
         fields_np["chi_0"] = np.stack(chi_list)
-        momenta_np["phi_0"] = np.stack(pi_phi_list)
-        momenta_np["chi_0"] = np.stack(pi_chi_list)
+        velocities_np["phi_0"] = np.stack(pi_phi_list)
+        velocities_np["chi_0"] = np.stack(pi_chi_list)
 
         data = SimulationData(
             times=times,
             fields=fields_np,
-            momenta=momenta_np,
+            velocities=velocities_np,
             grid_spacing=(dx,),
             grid_bounds=((0.0, 10.0),),
             periodic=(True,),
@@ -1757,7 +1706,7 @@ class TestPositionDependentMass:
                 "phi_0": np.ones((2, 32)),
                 "chi_0": np.zeros((2, 32)),
             },
-            momenta={
+            velocities={
                 "phi_0": np.zeros((2, 32)),
                 "chi_0": np.zeros((2, 32)),
             },
@@ -1913,22 +1862,28 @@ class TestApplySpatialOperator:
             _apply_spatial_operator("unknown_op", field, (0.1,), (True,))
 
 
-class TestIsMomentumField:
-    """Test _is_momentum_field regex."""
+class TestIsVelocityField:
+    """Test _is_velocity_field prefix check."""
 
-    def test_pi_underscore(self) -> None:
-        assert _is_momentum_field("pi_0") is True
-        assert _is_momentum_field("pi_1") is True
-        assert _is_momentum_field("pi_12") is True
+    def test_v_underscore_numeric(self) -> None:
+        """v_N format (numeric index)."""
+        assert _is_velocity_field("v_0") is True
+        assert _is_velocity_field("v_1") is True
+        assert _is_velocity_field("v_12") is True
 
-    def test_pi_no_underscore(self) -> None:
-        assert _is_momentum_field("pi0") is True
-        assert _is_momentum_field("pi1") is True
+    def test_v_field_name(self) -> None:
+        """v_field_name format."""
+        assert _is_velocity_field("v_A_0") is True
+        assert _is_velocity_field("v_A_1") is True
+        assert _is_velocity_field("v_phi_0") is True
+
+    def test_v_too_short(self) -> None:
+        """v_ alone is too short (len <= 2)."""
+        assert _is_velocity_field("v_") is False
 
     def test_regular_fields(self) -> None:
-        assert _is_momentum_field("phi_0") is False
-        assert _is_momentum_field("A_0") is False
-        assert _is_momentum_field("pi_phi") is False  # non-numeric
+        assert _is_velocity_field("phi_0") is False
+        assert _is_velocity_field("A_1") is False
 
 
 # ============================================================
@@ -1946,7 +1901,7 @@ class TestVirialPotential:
         v_virial = _compute_virial_potential(data, 0)
         fe = compute_field_energy(
             data.fields["phi_0"][0],
-            data.momenta["phi_0"][0],
+            data.velocities["phi_0"][0],
             mass_squared=float(data.spec.mass_matrix[0][0]),
             grid_spacing=data.grid_spacing,
             periodic=data.periodic,
@@ -2147,7 +2102,7 @@ class TestConstraintSelfEnergy:
         data = SimulationData(
             times=np.array([0.0]),
             fields={"A_0": a0_field[np.newaxis, :], "A_1": np.zeros((1, n))},
-            momenta={"A_1": np.zeros((1, n))},
+            velocities={"A_1": np.zeros((1, n))},
             grid_spacing=(dx,),
             grid_bounds=((0.0, 10.0),),
             periodic=(True,),
@@ -2175,7 +2130,7 @@ class TestConstraintSelfEnergy:
         data = SimulationData(
             times=np.array([0.0]),
             fields={"A_1": np.ones((1, n))},
-            momenta={"A_1": np.zeros((1, n))},
+            velocities={"A_1": np.zeros((1, n))},
             grid_spacing=(10.0 / n,),
             grid_bounds=((0.0, 10.0),),
             periodic=(True,),
@@ -2205,7 +2160,7 @@ class TestVirialWithConstraints:
         data = SimulationData(
             times=np.array([0.0]),
             fields={"A_0": a0[np.newaxis, :], "A_1": a1[np.newaxis, :]},
-            momenta={"A_1": pi_a1[np.newaxis, :]},
+            velocities={"A_1": pi_a1[np.newaxis, :]},
             grid_spacing=(dx,),
             grid_bounds=((0.0, 10.0),),
             periodic=(True,),
@@ -2384,7 +2339,7 @@ class TestConstraintCouplingEnergy:
                 "B_0": b0[np.newaxis, :],
                 "B_1": np.zeros((1, n)),
             },
-            momenta={
+            velocities={
                 "A_1": np.zeros((1, n)),
                 "B_1": np.zeros((1, n)),
             },
@@ -2415,7 +2370,7 @@ class TestConstraintCouplingEnergy:
                 "A_0": np.ones((1, n)),
                 "A_1": np.zeros((1, n)),
             },
-            momenta={"A_1": np.zeros((1, n))},
+            velocities={"A_1": np.zeros((1, n))},
             grid_spacing=(dx,),
             grid_bounds=((0.0, 10.0),),
             periodic=(True,),
@@ -2447,7 +2402,7 @@ class TestConstraintCouplingEnergy:
                 "B_0": b0[np.newaxis, :],
                 "B_1": b1[np.newaxis, :],
             },
-            momenta={
+            velocities={
                 "A_1": np.zeros((1, n)),
                 "B_1": np.zeros((1, n)),
             },
@@ -2861,16 +2816,16 @@ class TestResolveTermTarget:
         data = _make_sim_data_two_fields(n_snapshots=3)
         # Replace spec with the constraint version
         constraint_data = dataclasses.replace(data, spec=constraint_spec)
-        # pi_0 refers to the first field — which is now a constraint
-        result = _resolve_term_target(constraint_data, "pi_0", 0)
+        # v_phi_0 refers to the first field — which is now a constraint
+        result = _resolve_term_target(constraint_data, "v_phi_0", 0)
         assert result is None
 
-    def test_momentum_out_of_range_raises(self) -> None:
-        """Momentum index beyond spec fields should raise ValueError."""
+    def test_momentum_unknown_field_raises(self) -> None:
+        """Momentum for unknown field should raise ValueError."""
         data = _make_sim_data_two_fields(n_snapshots=3)
-        # pi_99 is out of range for a 2-field spec
-        with pytest.raises(ValueError, match="resolves to index 99"):
-            _resolve_term_target(data, "pi_99", 0)
+        # v_nonexistent is not a known field name
+        with pytest.raises(ValueError, match="not a known field"):
+            _resolve_term_target(data, "v_nonexistent", 0)
 
 
 class TestBincountRegression:
@@ -2943,12 +2898,12 @@ class TestSpectralEnergyPhysics:
         n_grid = 32
         dx = 1.0
         field = np.random.default_rng(42).standard_normal(n_grid)
-        momentum = np.random.default_rng(43).standard_normal(n_grid)
+        velocity = np.random.default_rng(43).standard_normal(n_grid)
         m2_tachyonic = -1.0
 
         wavenumbers, se = compute_spectral_energy(
             field,
-            momentum,
+            velocity,
             m2_tachyonic,
             (dx,),
             (True,),
@@ -2992,18 +2947,18 @@ def _make_plane_wave_data(
 
     amplitude = 1.0
     fields_list: list[np.ndarray] = []
-    momenta_list: list[np.ndarray] = []
+    velocities_list: list[np.ndarray] = []
 
     for t in times:
         phi = amplitude * np.cos(k0 * x) * np.cos(omega0 * t)
         pi_field = -amplitude * omega0 * np.cos(k0 * x) * np.sin(omega0 * t)
         fields_list.append(phi)
-        momenta_list.append(pi_field)
+        velocities_list.append(pi_field)
 
     return SimulationData(
         times=times,
         fields={"phi_0": np.stack(fields_list)},
-        momenta={"phi_0": np.stack(momenta_list)},
+        velocities={"phi_0": np.stack(velocities_list)},
         grid_spacing=(dx,),
         grid_bounds=((0.0, domain_len),),
         periodic=(True,),
@@ -3152,6 +3107,89 @@ class TestDispersionRelation:
         result = compute_dispersion(data, "phi_0")
         assert np.all(result.frequencies > 0.0)
 
+    def test_constraint_field_raises(self) -> None:
+        """Requesting a constraint field should raise ValueError."""
+        spec = _make_constraint_spec()
+        n = 32
+        dx = 10.0 / n
+        times = np.linspace(0.0, 5.0, 10)
+        k0 = 2.0 * np.pi / 10.0
+        omega0 = float(np.sqrt(k0**2 + 0.5))
+        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
+        a1_field = np.stack([np.cos(k0 * x) * np.cos(omega0 * t) for t in times])
+        data = SimulationData(
+            times=times,
+            fields={"A_0": np.zeros((10, n)), "A_1": a1_field},
+            velocities={"A_1": np.zeros((10, n))},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={"Am2": 0.5},
+        )
+        with pytest.raises(ValueError, match="constraint"):
+            compute_dispersion(data, "A_0")
+
+    def test_constraint_in_group_raises(self) -> None:
+        """A group containing a constraint field should raise ValueError."""
+        spec = _make_constraint_spec()
+        n = 32
+        dx = 10.0 / n
+        times = np.linspace(0.0, 5.0, 10)
+        k0 = 2.0 * np.pi / 10.0
+        omega0 = float(np.sqrt(k0**2 + 0.5))
+        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
+        a1_field = np.stack([np.cos(k0 * x) * np.cos(omega0 * t) for t in times])
+        data = SimulationData(
+            times=times,
+            fields={"A_0": np.zeros((10, n)), "A_1": a1_field},
+            velocities={"A_1": np.zeros((10, n))},
+            grid_spacing=(dx,),
+            grid_bounds=((0.0, 10.0),),
+            periodic=(True,),
+            spec=spec,
+            parameters={"Am2": 0.5},
+        )
+        with pytest.raises(ValueError, match="constraint"):
+            compute_dispersion(data, ["A_0", "A_1"])
+
+    def test_group_field_name_joined(self) -> None:
+        """Group dispersion: field_name should be comma-joined field names."""
+        data = _make_sim_data_two_fields(n_snapshots=64)
+        result = compute_dispersion(data, ["phi_0", "chi_0"])
+        assert result.field_name == "phi_0, chi_0"
+
+    def test_group_power_geq_single(self) -> None:
+        """Group spectral power should be >= either individual field's power.
+
+        S_group(k,w) = S_phi(k,w) + S_chi(k,w) so group >= individual.
+        """
+        data = _make_sim_data_two_fields(n_snapshots=64)
+        result_group = compute_dispersion(data, ["phi_0", "chi_0"])
+        result_phi = compute_dispersion(data, "phi_0")
+
+        # Group power must be element-wise >= phi-only power
+        np.testing.assert_array_less(
+            result_phi.power - 1e-10,
+            result_group.power,
+        )
+
+    def test_group_shapes_consistent(self) -> None:
+        """Group dispersion arrays should have correct and consistent shapes."""
+        data = _make_sim_data_two_fields(n_snapshots=64)
+        result = compute_dispersion(data, ["phi_0", "chi_0"])
+        n_modes = len(result.wavenumbers)
+        n_freq = len(result.frequencies)
+        assert result.power.shape == (n_modes, n_freq)
+        assert result.peak_frequencies.shape == (n_modes,)
+        assert result.peak_powers.shape == (n_modes,)
+
+    def test_single_string_backward_compat(self) -> None:
+        """Passing a single str still works (backward-compatible path)."""
+        data = _make_plane_wave_data()
+        result = compute_dispersion(data, "phi_0")
+        assert result.field_name == "phi_0"
+
 
 # ============================================================
 # Group 12 — SnapshotWriter and disk-backed storage
@@ -3184,7 +3222,7 @@ class TestSnapshotWriter:
             "phi_0": rng.standard_normal((n_snapshots, n_grid)),
             "chi_0": rng.standard_normal((n_snapshots, n_grid)),
         }
-        expected_momenta: dict[str, np.ndarray] = {
+        expected_velocities: dict[str, np.ndarray] = {
             "phi_0": rng.standard_normal((n_snapshots, n_grid)),
             "chi_0": rng.standard_normal((n_snapshots, n_grid)),
         }
@@ -3193,7 +3231,7 @@ class TestSnapshotWriter:
         with SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=["phi_0", "chi_0"],
+            velocity_names=["phi_0", "chi_0"],
             grid_shape=grid_shape,
             n_snapshots=n_snapshots,
             grid_spacing=grid_spacing,
@@ -3209,8 +3247,8 @@ class TestSnapshotWriter:
                         "chi_0": expected_fields["chi_0"][i],
                     },
                     {
-                        "phi_0": expected_momenta["phi_0"][i],
-                        "chi_0": expected_momenta["chi_0"][i],
+                        "phi_0": expected_velocities["phi_0"][i],
+                        "chi_0": expected_velocities["chi_0"][i],
                     },
                 )
 
@@ -3220,7 +3258,7 @@ class TestSnapshotWriter:
         np.testing.assert_allclose(data.times, expected_times)
         for name in ("phi_0", "chi_0"):
             np.testing.assert_allclose(data.fields[name], expected_fields[name])
-            np.testing.assert_allclose(data.momenta[name], expected_momenta[name])
+            np.testing.assert_allclose(data.velocities[name], expected_velocities[name])
 
         assert data.grid_spacing == grid_spacing
         assert data.grid_bounds == grid_bounds
@@ -3237,7 +3275,7 @@ class TestSnapshotWriter:
         with SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=["phi_0", "chi_0"],
+            velocity_names=["phi_0", "chi_0"],
             grid_shape=(n_grid,),
             n_snapshots=n_snapshots,
             grid_spacing=(1.0,),
@@ -3255,7 +3293,7 @@ class TestSnapshotWriter:
 
         # Memory-mapped arrays should be np.memmap instances
         assert isinstance(data.fields["phi_0"], np.memmap)
-        assert isinstance(data.momenta["phi_0"], np.memmap)
+        assert isinstance(data.velocities["phi_0"], np.memmap)
         assert isinstance(data.times, np.memmap)
 
     def test_count_property(self, tmp_path: Path) -> None:
@@ -3264,7 +3302,7 @@ class TestSnapshotWriter:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=3,
             grid_spacing=(1.0,),
@@ -3285,7 +3323,7 @@ class TestSnapshotWriter:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=1,
             grid_spacing=(1.0,),
@@ -3303,7 +3341,7 @@ class TestSnapshotWriter:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=2,
             grid_spacing=(1.0,),
@@ -3320,7 +3358,7 @@ class TestSnapshotWriter:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=2,
             grid_spacing=(1.0,),
@@ -3337,7 +3375,7 @@ class TestSnapshotWriter:
             SnapshotWriter(
                 output_dir=Path("/tmp/unused"),
                 field_names=["phi_0"],
-                momentum_names=[],
+                velocity_names=[],
                 grid_shape=(4,),
                 n_snapshots=0,
                 grid_spacing=(1.0,),
@@ -3351,7 +3389,7 @@ class TestSnapshotWriter:
             SnapshotWriter(
                 output_dir=Path("/tmp/unused"),
                 field_names=[],
-                momentum_names=[],
+                velocity_names=[],
                 grid_shape=(4,),
                 n_snapshots=1,
                 grid_spacing=(1.0,),
@@ -3369,7 +3407,7 @@ class TestSnapshotWriter:
         with SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=["phi_0", "chi_0"],
+            velocity_names=["phi_0", "chi_0"],
             grid_shape=(n_grid,),
             n_snapshots=1,
             grid_spacing=(2.5,),
@@ -3392,7 +3430,7 @@ class TestSnapshotWriter:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=5,
             grid_spacing=(1.0,),
@@ -3421,7 +3459,7 @@ class TestSnapshotWriter:
         with SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=["phi_0", "chi_0"],
+            velocity_names=["phi_0", "chi_0"],
             grid_shape=grid_shape,
             n_snapshots=n_snapshots,
             grid_spacing=(1.0, 1.0),
@@ -3448,7 +3486,7 @@ class TestSnapshotWriter:
         with SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=1,
             grid_spacing=(1.0,),
@@ -3477,7 +3515,7 @@ class TestCrashRecovery:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=["phi_0", "chi_0"],
+            velocity_names=["phi_0", "chi_0"],
             grid_shape=(n_grid,),
             n_snapshots=n_snapshots,
             grid_spacing=(2.5,),
@@ -3514,7 +3552,7 @@ class TestCrashRecovery:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=["phi_0", "chi_0"],
+            velocity_names=["phi_0", "chi_0"],
             grid_shape=(n_grid,),
             n_snapshots=n_snapshots,
             grid_spacing=(2.5,),
@@ -3561,7 +3599,7 @@ class TestSimulationDataLoad:
         with SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=["phi_0", "chi_0"],
+            velocity_names=["phi_0", "chi_0"],
             grid_shape=(n_grid,),
             n_snapshots=n_snapshots,
             grid_spacing=(2.5,),
@@ -3619,7 +3657,7 @@ class TestSnapshotWriterValidation:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=2,
             grid_spacing=(1.0,),
@@ -3636,7 +3674,7 @@ class TestSnapshotWriterValidation:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=2,
             grid_spacing=(1.0,),
@@ -3653,7 +3691,7 @@ class TestSnapshotWriterValidation:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=3,
             grid_spacing=(1.0,),
@@ -3672,7 +3710,7 @@ class TestSnapshotWriterValidation:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=2,
             grid_spacing=(1.0,),
@@ -3689,7 +3727,7 @@ class TestSnapshotWriterValidation:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=1,
             grid_spacing=(1.0,),
@@ -3700,20 +3738,20 @@ class TestSnapshotWriterValidation:
             writer.append(0.0, {"phi_0": np.zeros(8)}, {})
         writer.close()
 
-    def test_wrong_momentum_shape_raises(self, tmp_path: Path) -> None:
-        """Momentum with wrong shape raises ValueError."""
+    def test_wrong_velocity_shape_raises(self, tmp_path: Path) -> None:
+        """Velocity with wrong shape raises ValueError."""
         output_dir = tmp_path / "shape_m"
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0"],
-            momentum_names=["phi_0"],
+            velocity_names=["phi_0"],
             grid_shape=(4,),
             n_snapshots=1,
             grid_spacing=(1.0,),
             grid_bounds=((0.0, 4.0),),
             periodic=(False,),
         )
-        with pytest.raises(ValueError, match="Momentum 'phi_0' has shape"):
+        with pytest.raises(ValueError, match="Velocity 'phi_0' has shape"):
             writer.append(0.0, {"phi_0": np.zeros(4)}, {"phi_0": np.zeros(8)})
         writer.close()
 
@@ -3725,7 +3763,7 @@ class TestSnapshotWriterValidation:
             SnapshotWriter(
                 output_dir=file_path,
                 field_names=["phi_0"],
-                momentum_names=[],
+                velocity_names=[],
                 grid_shape=(4,),
                 n_snapshots=1,
                 grid_spacing=(1.0,),
@@ -3741,7 +3779,7 @@ class TestSnapshotWriterValidation:
         with SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=1,
             grid_spacing=(1.0,),
@@ -3756,7 +3794,7 @@ class TestSnapshotWriterValidation:
         with SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0"],
-            momentum_names=[],
+            velocity_names=[],
             grid_shape=(4,),
             n_snapshots=1,
             grid_spacing=(1.0,),
@@ -3782,7 +3820,7 @@ class TestSnapshotWriterValidation:
         with SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=["phi_0", "chi_0"],
+            velocity_names=["phi_0", "chi_0"],
             grid_shape=grid_shape,
             n_snapshots=n_snapshots,
             grid_spacing=(1.0, 1.0, 1.0),
@@ -3812,7 +3850,7 @@ class TestCrashRecoveryHardened:
         writer = SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=["phi_0", "chi_0"],
+            velocity_names=["phi_0", "chi_0"],
             grid_shape=(n_grid,),
             n_snapshots=10,
             grid_spacing=(2.5,),
@@ -3855,7 +3893,7 @@ class TestCrashRecoveryHardened:
         with SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=["phi_0", "chi_0"],
+            velocity_names=["phi_0", "chi_0"],
             grid_shape=(n_grid,),
             n_snapshots=3,
             grid_spacing=(2.5,),
@@ -3891,7 +3929,7 @@ class TestMemmapMeasurementIntegration:
         with SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=["phi_0", "chi_0"],
+            velocity_names=["phi_0", "chi_0"],
             grid_shape=(16,),
             n_snapshots=5,
             grid_spacing=data_mem.grid_spacing,
@@ -3903,7 +3941,7 @@ class TestMemmapMeasurementIntegration:
                 writer.append(
                     float(data_mem.times[t_idx]),
                     {n: data_mem.fields[n][t_idx] for n in data_mem.fields},
-                    {n: data_mem.momenta[n][t_idx] for n in data_mem.momenta},
+                    {n: data_mem.velocities[n][t_idx] for n in data_mem.velocities},
                 )
 
         # Load from directory (memmap)
@@ -3923,7 +3961,7 @@ class TestMemmapMeasurementIntegration:
         with SnapshotWriter(
             output_dir=output_dir,
             field_names=["phi_0", "chi_0"],
-            momentum_names=["phi_0", "chi_0"],
+            velocity_names=["phi_0", "chi_0"],
             grid_shape=(16,),
             n_snapshots=11,
             grid_spacing=data_mem.grid_spacing,
@@ -3935,7 +3973,7 @@ class TestMemmapMeasurementIntegration:
                 writer.append(
                     float(data_mem.times[t_idx]),
                     {n: data_mem.fields[n][t_idx] for n in data_mem.fields},
-                    {n: data_mem.momenta[n][t_idx] for n in data_mem.momenta},
+                    {n: data_mem.velocities[n][t_idx] for n in data_mem.velocities},
                 )
 
         data_dir = SimulationData.from_directory(output_dir, data_mem.spec)
@@ -3971,10 +4009,10 @@ class TestSimulationDataSave:
                 loaded.fields[name],
                 data.fields[name],
             )
-        for name in data.momenta:
+        for name in data.velocities:
             np.testing.assert_array_almost_equal(
-                loaded.momenta[name],
-                data.momenta[name],
+                loaded.velocities[name],
+                data.velocities[name],
             )
         assert loaded.grid_spacing == data.grid_spacing
         assert loaded.grid_bounds == data.grid_bounds
@@ -4002,7 +4040,7 @@ class TestSimulationDataSave:
         assert meta["grid_spacing"] == list(data.grid_spacing)
         assert meta["periodic"] == list(data.periodic)
         assert set(meta["fields"]) == set(data.fields.keys())
-        assert set(meta["momenta"]) == set(data.momenta.keys())
+        assert set(meta["momenta"]) == set(data.velocities.keys())
 
 
 class TestSnapshotCountValidation:
@@ -4021,7 +4059,7 @@ class TestSnapshotCountValidation:
         for eq in spec.equations:
             np.save(str(out / f"{eq.field_name}.npy"), np.zeros((3, 8)))
             if eq.time_derivative_order >= 2:
-                np.save(str(out / f"pi_{eq.field_name}.npy"), np.zeros((3, 8)))
+                np.save(str(out / f"v_{eq.field_name}.npy"), np.zeros((3, 8)))
 
         meta = {
             "n_snapshots": 100,
@@ -4092,9 +4130,9 @@ class TestSimulationDataFromResult:
         spec = self._kg_spec()
         gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(True,))
 
-        # 2 slots (phi_0, pi_phi_0) x 16 points = 32 flat size
+        # 2 slots (phi_0, v_phi_0) x 16 points = 32 flat size
         n_snaps, n_flat = 5, 32
-        result = {
+        result: SolverResult = {
             "t": np.linspace(0, 1, n_snaps),
             "y": np.random.default_rng(42).standard_normal((n_snaps, n_flat)),
             "success": True,
@@ -4106,8 +4144,8 @@ class TestSimulationDataFromResult:
         assert sd.times.shape == (5,)
         assert "phi_0" in sd.fields
         assert sd.fields["phi_0"].shape == (5, 16)
-        assert "phi_0" in sd.momenta
-        assert sd.momenta["phi_0"].shape == (5, 16)
+        assert "phi_0" in sd.velocities
+        assert sd.velocities["phi_0"].shape == (5, 16)
 
     def test_values_match_slicing(self) -> None:
         """Data in fields/momenta matches manual slicing of y."""
@@ -4118,7 +4156,7 @@ class TestSimulationDataFromResult:
 
         rng = np.random.default_rng(123)
         y = rng.standard_normal((3, 16))  # 2 slots x 8 points
-        result = {
+        result: SolverResult = {
             "t": np.array([0.0, 0.5, 1.0]),
             "y": y,
             "success": True,
@@ -4129,8 +4167,8 @@ class TestSimulationDataFromResult:
 
         # First slot (phi_0): y[:, 0:8]
         np.testing.assert_array_equal(sd.fields["phi_0"], y[:, :8].reshape(3, 8))
-        # Second slot (pi_phi_0): y[:, 8:16]
-        np.testing.assert_array_equal(sd.momenta["phi_0"], y[:, 8:16].reshape(3, 8))
+        # Second slot (v_phi_0): y[:, 8:16]
+        np.testing.assert_array_equal(sd.velocities["phi_0"], y[:, 8:16].reshape(3, 8))
 
     def test_grid_metadata(self) -> None:
         """Grid spacing, bounds, periodic are propagated correctly."""
@@ -4139,7 +4177,7 @@ class TestSimulationDataFromResult:
         spec = self._kg_spec()
         gi = GridInfo(bounds=((0.0, 8.0),), shape=(16,), periodic=(True,))
 
-        result = {
+        result: SolverResult = {
             "t": np.array([0.0]),
             "y": np.zeros((1, 32)),
             "success": True,
@@ -4159,13 +4197,45 @@ class TestSimulationDataFromResult:
         spec = self._kg_spec()
         gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(False,))
 
-        result = {
+        result: SolverResult = {
             "t": np.array([]),
             "y": np.zeros((0, 32)),
             "success": True,
             "message": "",
         }
         with pytest.raises(ValueError, match="no snapshots"):
+            SimulationData.from_result(result, spec, gi)
+
+    def test_failed_result_raises(self) -> None:
+        """from_result() must reject results with success=False."""
+        from tidal.solver.grid import GridInfo
+
+        spec = self._kg_spec()
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(False,))
+
+        result: SolverResult = {
+            "t": np.array([0.0, 0.5]),
+            "y": np.zeros((2, 32)),
+            "success": False,
+            "message": "Adaptive step failed to converge",
+        }
+        with pytest.raises(ValueError, match="failed solver result"):
+            SimulationData.from_result(result, spec, gi)
+
+    def test_snapshot_time_mismatch_raises(self) -> None:
+        """from_result() must detect mismatch between len(t) and y.shape[0]."""
+        from tidal.solver.grid import GridInfo
+
+        spec = self._kg_spec()
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(False,))
+
+        result: SolverResult = {
+            "t": np.linspace(0, 1, 6),  # 6 time points
+            "y": np.zeros((3, 32)),  # only 3 state vectors
+            "success": True,
+            "message": "",
+        }
+        with pytest.raises(ValueError, match="Snapshot count mismatch"):
             SimulationData.from_result(result, spec, gi)
 
     def test_roundtrip_save_load(self, tmp_path: Path) -> None:
@@ -4177,7 +4247,7 @@ class TestSimulationDataFromResult:
 
         rng = np.random.default_rng(99)
         y = rng.standard_normal((4, 16))
-        result = {
+        result: SolverResult = {
             "t": np.array([0.0, 1.0, 2.0, 3.0]),
             "y": y,
             "success": True,
@@ -4192,7 +4262,7 @@ class TestSimulationDataFromResult:
 
         np.testing.assert_allclose(sd2.times, sd1.times)
         np.testing.assert_allclose(sd2.fields["phi_0"], sd1.fields["phi_0"])
-        np.testing.assert_allclose(sd2.momenta["phi_0"], sd1.momenta["phi_0"])
+        np.testing.assert_allclose(sd2.velocities["phi_0"], sd1.velocities["phi_0"])
         assert sd2.grid_spacing == sd1.grid_spacing
         assert sd2.grid_bounds == sd1.grid_bounds
         assert sd2.periodic == sd1.periodic
@@ -4255,11 +4325,11 @@ class TestBCTypes:
         n_t = 5
         times = np.linspace(0, 1, n_t)
         fields = {"phi_0": np.random.default_rng(42).standard_normal((n_t, n_x))}
-        momenta = {"phi_0": np.random.default_rng(43).standard_normal((n_t, n_x))}
+        vels = {"phi_0": np.random.default_rng(43).standard_normal((n_t, n_x))}
         return SimulationData(
             times=times,
             fields=fields,
-            momenta=momenta,
+            velocities=vels,
             grid_spacing=(0.1,),
             grid_bounds=((0.0, 6.4),),
             periodic=(False,),
@@ -4398,11 +4468,11 @@ class TestDtMetadata:
         n_t = 5
         times = np.linspace(0, 1, n_t)
         fields = {"phi_0": np.random.default_rng(42).standard_normal((n_t, n_x))}
-        momenta = {"phi_0": np.random.default_rng(43).standard_normal((n_t, n_x))}
+        vels = {"phi_0": np.random.default_rng(43).standard_normal((n_t, n_x))}
         return SimulationData(
             times=times,
             fields=fields,
-            momenta=momenta,
+            velocities=vels,
             grid_spacing=(0.1,),
             grid_bounds=((0.0, 6.4),),
             periodic=(True,),
@@ -4452,3 +4522,293 @@ class TestDtMetadata:
         diag = check_energy_conservation(sd, threshold=1e-3)
         # Without dt, threshold stays at 1e-3 — random data almost certainly fails
         assert diag.max_relative_error >= 0  # sanity
+
+
+# ============================================================
+# Position-dependent Hamiltonian energy tests
+# ============================================================
+
+
+class TestHamiltonianTermPositionDependent:
+    """Unit tests for HamiltonianTerm.position_dependent auto-detection."""
+
+    def test_constant_coeff_not_position_dependent(self) -> None:
+        term = HamiltonianTerm(
+            coefficient=0.5,
+            factor_a=HamiltonianFactor(field="phi_0", operator="gradient_x"),
+            factor_b=HamiltonianFactor(field="phi_0", operator="gradient_x"),
+            coefficient_symbolic="mPhi2/2",
+        )
+        assert not term.position_dependent
+
+    def test_gaussian_coeff_is_position_dependent(self) -> None:
+        term = HamiltonianTerm(
+            coefficient=1.0,
+            factor_a=HamiltonianFactor(field="chi_0", operator="identity"),
+            factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+            coefficient_symbolic="E^(-1/2*x[]^2/R^2 - y[]^2/(2*R^2))*g0",
+        )
+        assert term.position_dependent
+
+    def test_csc_coeff_is_position_dependent(self) -> None:
+        term = HamiltonianTerm(
+            coefficient=1.0,
+            factor_a=HamiltonianFactor(field="phi_0", operator="gradient_z"),
+            factor_b=HamiltonianFactor(field="phi_0", operator="gradient_z"),
+            coefficient_symbolic="Csc[y[]]^2/(2*x[]^2)",
+        )
+        assert term.position_dependent
+
+    def test_coordinate_dependent_field_takes_priority(self) -> None:
+        # Explicit coordinate_dependent field overrides auto-detection
+        term = HamiltonianTerm(
+            coefficient=1.0,
+            factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+            factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+            coefficient_symbolic="mPhi2/2",  # looks constant
+            coordinate_dependent=("x",),
+        )
+        assert term.position_dependent
+
+    def test_no_symbolic_not_position_dependent(self) -> None:
+        term = HamiltonianTerm(
+            coefficient=0.5,
+            factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+            factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+        )
+        assert not term.position_dependent
+
+    def test_from_dict_parses_coordinate_dependent(self) -> None:
+        data: dict[str, Any] = {
+            "coefficient": 1.0,
+            "factor_a": {"field": "phi_0", "operator": "gradient_z"},
+            "factor_b": {"field": "phi_0", "operator": "gradient_z"},
+            "coefficient_symbolic": "Csc[y[]]^2/(2*x[]^2)",
+            "coordinate_dependent": ["x", "y"],
+        }
+        term = HamiltonianTerm.from_dict(data)
+        assert term.coordinate_dependent == ("x", "y")
+        assert term.position_dependent
+
+    def test_from_dict_without_coordinate_dependent_uses_autodetect(self) -> None:
+        data: dict[str, Any] = {
+            "coefficient": 1.0,
+            "factor_a": {"field": "chi_0", "operator": "identity"},
+            "factor_b": {"field": "phi_0", "operator": "identity"},
+            "coefficient_symbolic": "E^(-1/2*x[]^2/R^2)*g0",
+        }
+        term = HamiltonianTerm.from_dict(data)
+        assert term.coordinate_dependent == ()  # not in JSON
+        assert term.position_dependent  # auto-detected
+
+
+class TestHamiltonianPositionDependentEnergy:
+    """Tests that _compute_hamiltonian_from_canonical evaluates position-dependent
+    Hamiltonian coefficients on the spatial grid rather than using the scalar fallback.
+    """
+
+    def _make_gaussian_coupling_spec(
+        self, g0: float = 1.0, r_scale: float = 4.0
+    ) -> EquationSystem:
+        """Build a minimal 2-field spec with a Gaussian interaction Hamiltonian term."""
+        data: dict[str, Any] = {
+            "metadata": {"parameters": {"g0": g0, "R": r_scale}},
+            "spacetime": {
+                "dimension": 3,
+                "signature": [-1, 1, 1],
+                "coordinates": ["t", "x", "y"],
+            },
+            "fields": [
+                {"name": "phi_0", "index": 0, "is_dynamical": True},
+                {"name": "chi_0", "index": 1, "is_dynamical": True},
+            ],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_y",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                },
+                {
+                    "field": "chi_0",
+                    "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "chi_0",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_y",
+                                "field": "chi_0",
+                            },
+                        ],
+                    },
+                },
+            ],
+            "canonical": {
+                "hamiltonian_terms": [
+                    # Kinetic: pi²/2
+                    {
+                        "coefficient": 0.5,
+                        "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                        "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+                    },
+                    {
+                        "coefficient": 0.5,
+                        "factor_a": {"field": "chi_0", "operator": "time_derivative"},
+                        "factor_b": {"field": "chi_0", "operator": "time_derivative"},
+                    },
+                    # Position-dependent interaction: g0*exp(-(x²+y²)/2R²) * phi * chi
+                    {
+                        "coefficient": 1.0,
+                        "factor_a": {"field": "chi_0", "operator": "identity"},
+                        "factor_b": {"field": "phi_0", "operator": "identity"},
+                        "coefficient_symbolic": "E^(-1/2*x[]^2/R^2 - y[]^2/(2*R^2))*g0",
+                    },
+                ],
+            },
+        }
+        return EquationSystem.from_dict(data)
+
+    def _make_sim_data(self, spec: EquationSystem, n: int = 16) -> SimulationData:
+        """Build a SimulationData with unit fields and zero momenta."""
+        dx = 1.0
+        # phi = 1 everywhere, chi = 1 everywhere
+        phi = np.ones((n, n))
+        chi = np.ones((n, n))
+        pi_phi = np.zeros((n, n))
+        pi_chi = np.zeros((n, n))
+        params = {
+            k: float(v)
+            for k, v in spec.metadata.get("parameters", {}).items()
+            if isinstance(v, (int, float))
+        }
+        return SimulationData(
+            times=np.array([0.0]),
+            fields={"phi_0": phi[np.newaxis], "chi_0": chi[np.newaxis]},
+            velocities={"phi_0": pi_phi[np.newaxis], "chi_0": pi_chi[np.newaxis]},
+            grid_spacing=(dx, dx),
+            grid_bounds=((0.0, n * dx), (0.0, n * dx)),
+            periodic=(True, True),
+            spec=spec,
+            parameters=params,
+        )
+
+    def test_gaussian_interaction_evaluated_on_grid(self) -> None:
+        """Energy with Gaussian coefficient ≠ energy with uniform coefficient=1."""
+        g0 = 1.0
+        r_scale = 4.0
+        spec = self._make_gaussian_coupling_spec(g0=g0, r_scale=r_scale)
+        data = self._make_sim_data(spec, n=16)
+
+        energy = _compute_hamiltonian_from_canonical(data, 0)
+
+        # With phi=chi=1 everywhere, the interaction contribution is:
+        #   <g0 * exp(-(x²+y²)/2R²)> = g0 * spatial_average(Gaussian)
+        # This must be < g0 (the Gaussian is <1 almost everywhere).
+        # If the bug were still present (coeff=1.0), the interaction term would be
+        # exactly g0 * 1.0 = g0 = 1.0, making the total wrong.
+        n = 16
+        dx = 1.0
+        # Cell-centered coordinates (matching _build_coord_arrays: lo + dx/2)
+        xs = np.arange(n) * dx + dx / 2  # 0.5, 1.5, ..., 15.5
+        ys = np.arange(n) * dx + dx / 2
+        xx, yy = np.meshgrid(xs, ys, indexing="ij")
+        expected_interaction = float(
+            (g0 * np.exp(-0.5 * xx**2 / r_scale**2 - yy**2 / (2 * r_scale**2))).mean()
+        )
+
+        # The kinetic terms are 0 (zero momenta), so the total energy = interaction term
+        assert abs(energy - expected_interaction) < 1e-10
+
+    def test_different_g0_gives_different_energy(self) -> None:
+        """Scaling g0 scales the interaction energy proportionally."""
+        spec1 = self._make_gaussian_coupling_spec(g0=1.0)
+        spec2 = self._make_gaussian_coupling_spec(g0=2.0)
+        data1 = self._make_sim_data(spec1, n=16)
+        data2 = self._make_sim_data(spec2, n=16)
+
+        e1 = _compute_hamiltonian_from_canonical(data1, 0)
+        e2 = _compute_hamiltonian_from_canonical(data2, 0)
+
+        # If coefficient were wrongly treated as 1.0, both would be equal
+        assert abs(e2 - 2.0 * e1) < 1e-10
+
+    def test_position_dependent_gradient_coeff(self) -> None:
+        """Hamiltonian with 1/x[]^2 on gradient_x term is evaluated on grid."""
+        data: dict[str, Any] = {
+            "metadata": {},
+            "spacetime": {
+                "dimension": 3,
+                "signature": [-1, 1, 1],
+                "coordinates": ["t", "x", "y"],
+            },
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                }
+            ],
+            "canonical": {
+                "hamiltonian_terms": [
+                    # gradient_x^2 with position-dependent coeff 1/x[]^2
+                    {
+                        "coefficient": 0.5,
+                        "factor_a": {"field": "phi_0", "operator": "gradient_x"},
+                        "factor_b": {"field": "phi_0", "operator": "gradient_x"},
+                        "coefficient_symbolic": "1/(2*x[]^2)",
+                    },
+                ],
+            },
+        }
+        spec = EquationSystem.from_dict(data)
+        n = 8
+        dx = 1.0
+        # phi = x (linear ramp), so grad_x(phi) = 1 everywhere
+        xs = np.arange(n, dtype=float) * dx + 0.5  # cell-centred, avoid x=0
+        phi = np.tile(xs[:, np.newaxis], (1, n))
+        pi = np.zeros((n, n))
+        sd = SimulationData(
+            times=np.array([0.0]),
+            fields={"phi_0": phi[np.newaxis]},
+            velocities={"phi_0": pi[np.newaxis]},
+            grid_spacing=(dx, dx),
+            grid_bounds=((0.5, n * dx + 0.5), (0.0, n * dx)),
+            periodic=(False, True),
+            spec=spec,
+            parameters={},
+        )
+        energy = _compute_hamiltonian_from_canonical(sd, 0)
+        # With grad_x(phi)=1 and coeff=1/(2*x²), via IBP:
+        # energy = -<1/(2*x²) * phi * laplacian_x(phi)>
+        # laplacian_x of linear ramp = 0 everywhere (interior), so energy ≈ 0
+        # This just verifies it runs without error and returns a finite value
+        assert np.isfinite(energy)

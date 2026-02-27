@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 
     from tidal.measurement._io import SimulationData
     from tidal.measurement._writer import SnapshotWriter
+    from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import AxisBCSpec, BCSpec
     from tidal.symbolic.json_loader import EquationSystem
@@ -575,7 +576,7 @@ def _plane_wave_y0(
     momentum_arr = -amplitude * k_mag * np.sin(k_dot_x)
 
     slot_data: dict[str, np.ndarray] = {component: field_arr}
-    mom_name = f"pi_{component}"
+    mom_name = f"v_{component}"
     if mom_name in FieldSet(layout, grid_info.shape):
         slot_data[mom_name] = momentum_arr
 
@@ -783,6 +784,16 @@ def _warn_zero_evolution(
     rhs_eval = RHSEvaluator(spec, grid_info, coeff_eval, bc=bc)
     fieldset = FieldSet.from_flat(layout, grid_info.shape, y0)
 
+    # Inject zero constraint velocities so v_field_name refs resolve.
+    # At t=0 the actual velocities are unknown (IDA computes them), but
+    # zero is the best estimate for this diagnostic check.
+    for eq in spec.equations:
+        if eq.time_derivative_order == 0:
+            fieldset.set_aux(
+                f"v_{eq.field_name}",
+                np.zeros(grid_info.shape),
+            )
+
     max_rate = 0.0
     for eq_idx in range(len(spec.equations)):
         rhs = rhs_eval.evaluate(eq_idx, fieldset, t=0.0)
@@ -798,6 +809,62 @@ def _warn_zero_evolution(
         )
 
 
+def _check_mass_stability(
+    args: Namespace,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+    params: dict[str, float],
+) -> None:
+    """Run the pre-simulation pointwise mass stability check.
+
+    Warns (or aborts with --require-stable) if the coupled mass matrix has
+    a negative eigenvalue at any grid point, indicating exponentially growing
+    modes.
+    """
+    from tidal.solver.coefficients import CoefficientEvaluator
+    from tidal.solver.validation import check_pointwise_mass_stability
+
+    coeff_eval = CoefficientEvaluator(spec, grid_info, params)
+    stability = check_pointwise_mass_stability(coeff_eval, spec, grid_info)
+    require_stable: bool = getattr(args, "require_stable", False)
+    # Informational notes (e.g. asymmetric matrix) — always printed, never fatal
+    for note in stability.notes:
+        print(f"  Note: {note}", file=sys.stderr)
+    # Stability errors (negative eigenvalues) — fatal with --require-stable
+    for msg in stability.errors:
+        if require_stable:
+            print(f"Error: {msg}", file=sys.stderr)
+        else:
+            print(f"  Warning: {msg}", file=sys.stderr)
+    if require_stable and stability.errors:
+        sys.exit(1)
+
+
+def _check_result_finite(result: SolverResult) -> None:
+    """Raise SimulationDivergedError if the final state contains NaN or Inf.
+
+    This is a single post-simulation check — zero per-step overhead.
+
+    Raises
+    ------
+    SimulationDivergedError
+        If the final state contains non-finite values.
+    """
+    from tidal.solver._exceptions import SimulationDivergedError
+
+    y = result["y"]
+    if len(y) == 0:
+        return
+    final = y[-1]
+    if not np.isfinite(final).all():
+        msg = (
+            "Simulation produced non-finite values (NaN or Inf). "
+            "The system is likely physically unstable. "
+            "Run with --require-stable to check before simulating."
+        )
+        raise SimulationDivergedError(msg)
+
+
 def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     args: Namespace,
     spec: EquationSystem,
@@ -805,10 +872,12 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     params: dict[str, float],
     snapshot_interval: float,
     dt: float | None = None,
-) -> tuple[SnapshotWriter, Callable[[float, np.ndarray], None]]:
+) -> tuple[SnapshotWriter, Callable[..., None]]:
     """Set up disk-backed SnapshotWriter using StateLayout (no py-pde).
 
-    Returns (writer, snapshot_callback).
+    Returns (writer, snapshot_callback).  The callback accepts
+    ``(t, y_flat)`` or ``(t, y_flat, yp_flat)`` — IDA passes ``yp``
+    for constraint velocity extraction.
     """
     from tidal.measurement._writer import SnapshotWriter, compute_snapshot_count
     from tidal.solver.state import StateLayout
@@ -817,13 +886,26 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     output_dir = Path(args.output) if args.output else Path("output")
     n_snaps = compute_snapshot_count(args.t_end, snapshot_interval)
 
-    field_names = [s.name for s in layout.slots if s.kind != "momentum"]
-    momentum_names = [s.field_name for s in layout.slots if s.kind == "momentum"]
+    field_names = [s.name for s in layout.slots if s.kind != "velocity"]
+    velocity_names = [s.field_name for s in layout.slots if s.kind == "velocity"]
+
+    # Identify constraint fields whose velocities should be written to disk.
+    # IDA provides exact ∂_t(constraint) via yp — needed for energy measurement.
+    constraint_names = [
+        eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
+    ]
+    constraint_slot_map: dict[str, int] = {}
+    for cname in constraint_names:
+        if cname in layout.field_slot_map:
+            constraint_slot_map[cname] = layout.field_slot_map[cname]
+
+    # Include constraint velocity names alongside dynamical velocities
+    all_velocity_names = velocity_names + list(constraint_slot_map.keys())
 
     writer = SnapshotWriter(
         output_dir=output_dir,
         field_names=field_names,
-        momentum_names=momentum_names,
+        velocity_names=all_velocity_names,
         grid_shape=grid_info.shape,
         n_snapshots=n_snaps,
         grid_spacing=tuple(float(d) for d in grid_info.dx),
@@ -839,27 +921,37 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     n_pts = grid_info.num_points
     shape = grid_info.shape
     field_set = set(field_names)
-    momentum_set = set(momentum_names)
+    velocity_set = set(velocity_names)
 
     field_slots_map: dict[str, int] = {}
-    momentum_slots_map: dict[str, int] = {}
+    velocity_slots_map: dict[str, int] = {}
     for i, slot in enumerate(layout.slots):
-        if slot.kind == "momentum":
-            momentum_slots_map[slot.field_name] = i
+        if slot.kind == "velocity":
+            velocity_slots_map[slot.field_name] = i
         elif slot.name in field_set:
             field_slots_map[slot.name] = i
 
-    def _disk_callback(t: float, y_flat: np.ndarray) -> None:
+    def _disk_callback(
+        t: float,
+        y_flat: np.ndarray,
+        yp_flat: np.ndarray | None = None,
+    ) -> None:
         fields_d = {
             name: y_flat[idx * n_pts : (idx + 1) * n_pts].reshape(shape)
             for name, idx in field_slots_map.items()
         }
-        moms_d = {
+        vels_d = {
             name: y_flat[idx * n_pts : (idx + 1) * n_pts].reshape(shape)
-            for name, idx in momentum_slots_map.items()
-            if name in momentum_set
+            for name, idx in velocity_slots_map.items()
+            if name in velocity_set
         }
-        writer.append(t, fields_d, moms_d)
+        # Extract constraint velocities from IDA's yp vector
+        if yp_flat is not None:
+            for cname, slot_idx in constraint_slot_map.items():
+                vels_d[cname] = yp_flat[
+                    slot_idx * n_pts : (slot_idx + 1) * n_pts
+                ].reshape(shape)
+        writer.append(t, fields_d, vels_d)
 
     return writer, _disk_callback
 
@@ -1101,6 +1193,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         return _constraint_mode(args, spec, grid_info, y0, params, bc, log)
 
     _warn_zero_evolution(spec, grid_info, y0, params, bc)
+    _check_mass_stability(args, spec, grid_info, params)
 
     # 5. Compute dt for leapfrog (needed before snapshot configuration)
     dt: float | None = None
@@ -1224,6 +1317,11 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     if not result["success"]:
         print(f"Error: solver failed: {result['message']}", file=sys.stderr)
+        return 1
+
+    # Post-simulation divergence check: verify final state is finite.
+    # This is a single check at the end — zero per-step overhead.
+    _check_result_finite(result)
 
     if writer is not None:
         writer.close()
@@ -1314,4 +1412,12 @@ def simulate_command(args: Namespace) -> int:
         log(f"  Parameters: {params}")
 
     # All simulation goes through the native IDA/leapfrog path
-    return _simulate(args, spec, params)
+    try:
+        return _simulate(args, spec, params)
+    except Exception as exc:
+        from tidal.solver._exceptions import SimulationDivergedError
+
+        if isinstance(exc, SimulationDivergedError):
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+        raise

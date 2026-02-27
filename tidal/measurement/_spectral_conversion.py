@@ -95,7 +95,7 @@ def _field_spectral_energy_series(
         Energy per wavenumber bin at each snapshot.
     """
     # First snapshot — establishes the k-binning
-    mom_all = data.momenta.get(field_name)
+    mom_all = data.velocities.get(field_name)
     mom_0 = mom_all[0] if mom_all is not None else None
     wavenumbers, e0 = compute_spectral_energy(
         data.fields[field_name][0],

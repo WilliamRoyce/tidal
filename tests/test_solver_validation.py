@@ -13,6 +13,7 @@ from tidal.solver.operators import AxisBCSpec, SideBCSpec
 from tidal.solver.validation import (
     check_cfl_stability,
     check_mass_sign,
+    check_pointwise_mass_stability,
     check_robin_stability,
     validate_field_references,
     validate_operator_dimensions,
@@ -161,9 +162,7 @@ class TestCFLStability:
         spec = _make_spec(
             [{"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}],
         )
-        grid = GridInfo(
-            bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,)
-        )
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,))
         dx = grid.dx[0]
         dt = dx * 0.5  # Well within CFL
         warnings = check_cfl_stability(spec, grid, dt)
@@ -174,9 +173,7 @@ class TestCFLStability:
         spec = _make_spec(
             [{"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}],
         )
-        grid = GridInfo(
-            bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,)
-        )
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,))
         dt = 10.0  # Way too large
         warnings = check_cfl_stability(spec, grid, dt)
         assert len(warnings) == 1
@@ -188,9 +185,7 @@ class TestCFLStability:
             [{"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}],
             order=0,
         )
-        grid = GridInfo(
-            bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,)
-        )
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,))
         warnings = check_cfl_stability(spec, grid, dt=100.0)
         assert len(warnings) == 0
 
@@ -214,9 +209,7 @@ class TestMassSign:
                 },
             ],
         )
-        grid = GridInfo(
-            bounds=((0, 2 * np.pi),), shape=(32,), periodic=(True,)
-        )
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(32,), periodic=(True,))
         import warnings as w
 
         with w.catch_warnings():
@@ -239,9 +232,7 @@ class TestMassSign:
                 },
             ],
         )
-        grid = GridInfo(
-            bounds=((0, 2 * np.pi),), shape=(32,), periodic=(True,)
-        )
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(32,), periodic=(True,))
         coeff_eval = CoefficientEvaluator(spec, grid)
         result = check_mass_sign(coeff_eval, spec)
         assert len(result) == 0
@@ -264,7 +255,9 @@ class TestCheckRobinStability:
         side = SideBCSpec(kind="robin", gamma=1.0, value=0.0)
         abc = AxisBCSpec(periodic=False, low=side, high=side)
         grid = GridInfo(
-            bounds=((0, 10),), shape=(64,), periodic=(False,),
+            bounds=((0, 10),),
+            shape=(64,),
+            periodic=(False,),
             axis_bcs=(abc,),
         )
         result = check_robin_stability(grid)
@@ -276,7 +269,9 @@ class TestCheckRobinStability:
         side = SideBCSpec(kind="robin", gamma=1.0, value=0.0)
         abc = AxisBCSpec(periodic=False, low=side, high=side)
         grid = GridInfo(
-            bounds=((0, 10),), shape=(4,), periodic=(False,),
+            bounds=((0, 10),),
+            shape=(4,),
+            periodic=(False,),
             axis_bcs=(abc,),
         )
         result = check_robin_stability(grid)
@@ -287,7 +282,9 @@ class TestCheckRobinStability:
         """Periodic axes are not checked for Robin stability."""
         abc = AxisBCSpec(periodic=True)
         grid = GridInfo(
-            bounds=((0, 10),), shape=(4,), periodic=(True,),
+            bounds=((0, 10),),
+            shape=(4,),
+            periodic=(True,),
             axis_bcs=(abc,),
         )
         assert check_robin_stability(grid) == []
@@ -297,7 +294,435 @@ class TestCheckRobinStability:
         side = SideBCSpec(kind="neumann")
         abc = AxisBCSpec(periodic=False, low=side, high=side)
         grid = GridInfo(
-            bounds=((0, 10),), shape=(4,), periodic=(False,),
+            bounds=((0, 10),),
+            shape=(4,),
+            periodic=(False,),
             axis_bcs=(abc,),
         )
         assert check_robin_stability(grid) == []
+
+
+# ---------------------------------------------------------------------------
+# Tests — pointwise mass stability
+# ---------------------------------------------------------------------------
+
+
+def _make_coupled_spec(m_phi2: float, m_chi2: float, g0: float) -> EquationSystem:
+    """Two coupled scalar fields with constant cross-coupling."""
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 2, "signature": [-1, 1]},
+        "fields": [{"name": "phi_0", "index": 0}, {"name": "chi_0", "index": 1}],
+        "equations": [
+            {
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": -m_phi2,
+                            "operator": "identity",
+                            "field": "phi_0",
+                        },
+                        {"coefficient": -g0, "operator": "identity", "field": "chi_0"},
+                    ],
+                },
+            },
+            {
+                "field": "chi_0",
+                "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": -m_chi2,
+                            "operator": "identity",
+                            "field": "chi_0",
+                        },
+                        {"coefficient": -g0, "operator": "identity", "field": "phi_0"},
+                    ],
+                },
+            },
+        ],
+    }
+    return EquationSystem.from_dict(data)
+
+
+class TestPointwiseMassStability:
+    def test_stable_diagonal(self) -> None:
+        """Decoupled system with positive masses is stable."""
+        spec = _make_coupled_spec(m_phi2=1.0, m_chi2=1.0, g0=0.0)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        assert result.errors == []
+        assert result.notes == []
+
+    def test_stable_coupled_constant(self) -> None:
+        """Coupled system satisfying det > 0 (mPhi2*mChi2 > g0^2) is stable."""
+        spec = _make_coupled_spec(m_phi2=1.0, m_chi2=4.0, g0=1.0)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        assert result.errors == []
+        assert result.notes == []
+
+    def test_unstable_coupled_constant(self) -> None:
+        """Coupled system violating det > 0 (g0^2 > mPhi2*mChi2) is unstable."""
+        # det = 1.0*0.5 - 1.0^2 = -0.5 < 0
+        spec = _make_coupled_spec(m_phi2=1.0, m_chi2=0.5, g0=1.0)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        assert len(result.errors) == 1
+        assert "eigenvalue" in result.errors[0]
+
+    def test_unstable_boundary_condition(self) -> None:
+        """g0 = sqrt(mPhi2*mChi2) exactly is on the stability boundary (det=0)."""
+        import math
+
+        g0 = math.sqrt(1.0 * 1.0)  # exactly on boundary → det = 0, min eigenvalue = 0
+        spec = _make_coupled_spec(m_phi2=1.0, m_chi2=1.0, g0=g0)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        # det=0: zero eigenvalue — within tolerance, so no warning expected
+        assert result.errors == []
+
+    def test_strongly_unstable(self) -> None:
+        """Large coupling completely dominates — clearly unstable."""
+        spec = _make_coupled_spec(m_phi2=0.1, m_chi2=0.1, g0=5.0)
+        grid = GridInfo(bounds=((0, 10),), shape=(4,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        assert len(result.errors) == 1
+        assert "unstable" in result.errors[0].lower()
+
+    def test_single_field_stable(self) -> None:
+        """Single field with positive mass is stable (1x1 matrix)."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                },
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        assert result.errors == []
+
+    def test_2d_grid(self) -> None:
+        """Stability check works on a 2D grid (broadcast correctness)."""
+        spec = _make_coupled_spec(m_phi2=1.0, m_chi2=1.0, g0=0.5)
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10)),
+            shape=(4, 4),
+            periodic=(True, True),
+        )
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        assert result.errors == []
+
+    def test_constraint_equation_no_false_positive(self) -> None:
+        """Constraint field (time_order=0) should not cause spurious warnings."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 3, "signature": [-1, 1, 1]},
+            "fields": [
+                {"name": "A_0", "index": 0},
+                {"name": "A_1", "index": 1},
+            ],
+            "equations": [
+                {
+                    "field": "A_0",
+                    "lhs": {"expression": "0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "A_0",
+                            },
+                        ],
+                    },
+                },
+                {
+                    "field": "A_1",
+                    "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "A_1",
+                            },
+                        ],
+                    },
+                },
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10)),
+            shape=(4, 4),
+            periodic=(True, True),
+        )
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        # A_0 has no identity term; A_1 has positive mass. Should pass.
+        assert result.errors == []
+
+    def test_asymmetric_stable_no_instability_error(self) -> None:
+        """Asymmetric but stable coupling: note emitted, no error."""
+        # Matrix: [[1.0, 0.5], [0.3, 1.0]] — asymmetric, but eigenvalues
+        # are 0.613 and 1.387, both positive → stable.
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}, {"name": "chi_0", "index": 1}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": -0.5,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
+                        ],
+                    },
+                },
+                {
+                    "field": "chi_0",
+                    "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
+                            {
+                                "coefficient": -0.3,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                },
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(4,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        # Asymmetry detected as informational note
+        assert any("asymmetric" in n.lower() for n in result.notes)
+        # But stable — no errors
+        assert result.errors == []
+
+    def test_asymmetric_unstable_detected(self) -> None:
+        """Asymmetric and unstable coupling: both note and error emitted."""
+        # Matrix: [[0.1, 0.5], [0.3, 0.1]] — asymmetric AND unstable
+        # (coupling dominates diagonal).
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}, {"name": "chi_0", "index": 1}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -0.1,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": -5.0,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
+                        ],
+                    },
+                },
+                {
+                    "field": "chi_0",
+                    "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -0.1,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
+                            {
+                                "coefficient": -3.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                },
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(4,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        # Asymmetry detected as informational note
+        assert any("asymmetric" in n.lower() for n in result.notes)
+        # Instability detected as error
+        assert len(result.errors) == 1
+        assert "unstable" in result.errors[0].lower()
+
+    def test_2d_position_dependent_coupling(self) -> None:
+        """Position-dependent coupling on a 2D grid (core use case)."""
+        import warnings as w
+
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 3, "signature": [-1, 1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}, {"name": "chi_0", "index": 1}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "chi_0",
+                                "coefficient_symbolic": "-0.1*Exp[-(x[]^2 + y[]^2)/2]",
+                                "coordinate_dependent": ["x", "y"],
+                            },
+                        ],
+                    },
+                },
+                {
+                    "field": "chi_0",
+                    "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-0.1*Exp[-(x[]^2 + y[]^2)/2]",
+                                "coordinate_dependent": ["x", "y"],
+                            },
+                        ],
+                    },
+                },
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(
+            bounds=((-5, 5), (-5, 5)),
+            shape=(8, 8),
+            periodic=(False, False),
+        )
+        with w.catch_warnings():
+            w.simplefilter("ignore")
+            coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        # Gaussian coupling peak is 0.1 << 1.0 diagonal → stable
+        assert result.errors == []
+
+    def test_equations_in_different_order_than_fields(self) -> None:
+        """Stability check is correct when equation order ≠ field order.
+
+        If `eq_idx` is used as the matrix row instead of the field index,
+        the mass matrix is transposed/scrambled when the JSON lists equations
+        in a different order from fields.  This test constructs such a spec:
+        fields = [phi_0, chi_0] but equations = [chi_0_eq, phi_0_eq].
+        With asymmetric masses the wrong-index bug produces wrong eigenvalues.
+        """
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            # fields: phi_0 first, chi_0 second
+            "fields": [{"name": "phi_0", "index": 0}, {"name": "chi_0", "index": 1}],
+            # equations: chi_0 first (REVERSED), phi_0 second
+            "equations": [
+                {
+                    "field": "chi_0",
+                    "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -4.0,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
+                        ],
+                    },
+                },
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                },
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        # component_names should be (phi_0, chi_0) (fields order)
+        assert list(spec.component_names) == ["phi_0", "chi_0"]
+        # equations are in reverse order
+        assert spec.equations[0].field_name == "chi_0"
+
+        grid = GridInfo(bounds=((0, 10),), shape=(4,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        # Both masses are positive (1.0, 4.0) — must be stable regardless of equation order
+        assert result.errors == [], (
+            "Stability check gave wrong result when equation order ≠ field order"
+        )

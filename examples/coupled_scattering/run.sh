@@ -10,6 +10,11 @@
 # This demonstrates parametric mode conversion — directly analogous to the
 # Gertsenshtein effect (phi=photon, chi=graviton, G=background B-field).
 #
+# Stability condition: mPhi2 * mChi2 > g0^2 (positive-definite mass matrix).
+# With defaults (mPhi2=1, mChi2=5, g0=1): det = 5-1 = 4 > 0. STABLE.
+# If you lower mChi2 below g0^2/mPhi2 = 1.0 the simulation will blow up.
+# tidal simulate warns automatically; use --require-stable to abort instead.
+#
 #
 # Running this script:
 #   cd examples/coupled_scattering && bash run.sh
@@ -28,7 +33,7 @@
 #     --grid-shape 64 --bounds=-50:50,-50:50 --periodic \
 #     --ic gaussian --ic-component phi_0 --ic-center=-25.0,0.0 --ic-width 4.0 \
 #     --ic-amplitude 1.0 \
-#     --t-end 20.0 --output ../data/coupled_scattering_output
+#     --t-end 200.0 --output ../data/coupled_scattering_output
 #
 #   # Step 4: Measure conversion probability and mixing length
 #   uv run tidal measure ../data/coupled_scattering_output \
@@ -61,7 +66,7 @@ tidal inspect ../data/coupled_scattering.json
 # Gaussian pulse in phi at x=-25; disperses into coupling region at origin.
 # Chi starts at zero. Coupling G(x,y) is Gaussian, radius R=8.
 tidal simulate ../data/coupled_scattering.json \
-  --param mPhi2=1.0 --param mChi2=4.0 --param g0=1.0 --param R=8.0 \
+  --param mPhi2=1.0 --param mChi2=5.0 --param g0=1.0 --param R=8.0 \
   --grid-shape 64 \
   --bounds=-50:50,-50:50 \
   --periodic \
@@ -70,7 +75,7 @@ tidal simulate ../data/coupled_scattering.json \
   --ic-center=-25.0,0.0 \
   --ic-width 4.0 \
   --ic-amplitude 1.0 \
-  --t-end 20.0 \
+  --t-end 200.0 \
   --output ../data/coupled_scattering_output
 
 # Step 4: Measure conversion probability and characteristic mixing length

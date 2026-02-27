@@ -157,7 +157,7 @@ def compute_spectrum(
 
 def compute_spectral_energy(
     field_data: NDArray[np.float64],
-    momentum_data: NDArray[np.float64] | None,
+    velocity_data: NDArray[np.float64] | None,
     mass_squared: float | NDArray[np.float64],
     grid_spacing: tuple[float, ...],
     _periodic: tuple[bool, ...],
@@ -171,7 +171,7 @@ def compute_spectral_energy(
     ----------
     field_data : ndarray
         Field snapshot.
-    momentum_data : ndarray or None
+    velocity_data : ndarray or None
         Momentum snapshot (None for constraint fields).
     mass_squared : float or ndarray
         Mass-squared term (scalar or position-dependent array).
@@ -214,9 +214,9 @@ def compute_spectral_energy(
     norm = 1.0 / (n_total * n_total)
     energy_field = 0.5 * (k_sq + mass_squared) * np.abs(phi_hat) ** 2 * norm
 
-    if momentum_data is not None:
-        _validate_array(momentum_data, "momentum_data")
-        pi_hat = np.fft.rfftn(momentum_data)
+    if velocity_data is not None:
+        _validate_array(velocity_data, "velocity_data")
+        pi_hat = np.fft.rfftn(velocity_data)
         energy_total = energy_field + 0.5 * np.abs(pi_hat) ** 2 * norm
     else:
         energy_total = energy_field

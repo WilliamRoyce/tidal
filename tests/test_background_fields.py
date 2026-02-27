@@ -70,7 +70,7 @@ class TestBackgroundEnergy:
         data = SimulationData(
             spec=spec,
             fields={"phi": np.zeros((2, 8, 8))},
-            momenta={"pi_phi": np.zeros((2, 8, 8))},
+            velocities={"phi": np.zeros((2, 8, 8))},
             times=np.array([0.0, 1.0]),
             grid_spacing=(10.0 / 8, 10.0 / 8),
             grid_bounds=((0.0, 10.0), (0.0, 10.0)),
@@ -119,7 +119,7 @@ class TestBackgroundEnergy:
         data = SimulationData(
             spec=spec,
             fields={"phi": np.ones((2, 8, 8))},
-            momenta={"pi_phi": np.zeros((2, 8, 8))},
+            velocities={"phi": np.zeros((2, 8, 8))},
             times=np.array([0.0, 1.0]),
             grid_spacing=(10.0 / 8, 10.0 / 8),
             grid_bounds=((0.0, 10.0), (0.0, 10.0)),
@@ -169,7 +169,7 @@ class TestBackgroundEnergy:
         data = SimulationData(
             spec=spec,
             fields={"phi": np.ones((2, 16, 16))},
-            momenta={"pi_phi": np.zeros((2, 16, 16))},
+            velocities={"phi": np.zeros((2, 16, 16))},
             times=np.array([0.0, 1.0]),
             grid_spacing=(10.0 / 16, 10.0 / 16),
             grid_bounds=((-5.0, 5.0), (-5.0, 5.0)),
@@ -427,7 +427,7 @@ def _make_position_dependent_sim_data(
             "phi_0": rng.standard_normal(shape),
             "chi_0": rng.standard_normal(shape) * 0.01,
         },
-        momenta={
+        velocities={
             "phi_0": rng.standard_normal(shape),
             "chi_0": rng.standard_normal(shape) * 0.01,
         },
@@ -608,7 +608,7 @@ class TestProcaScalarBackground:
                 "A_0": np.zeros((2, 16, 16)),
                 "B_1": np.ones((2, 16, 16)) * 0.1,
             },
-            momenta={"B_1": np.zeros((2, 16, 16))},
+            velocities={"B_1": np.zeros((2, 16, 16))},
             grid_spacing=(1.25, 1.25),
             grid_bounds=((-10.0, 10.0), (-10.0, 10.0)),
             periodic=(True, True),
@@ -661,7 +661,7 @@ class TestProcaScalarBackground:
                 "A_0": np.zeros((1, n_grid, n_grid)),
                 "B_1": np.ones((1, n_grid, n_grid)),
             },
-            momenta={"B_1": np.zeros((1, n_grid, n_grid))},
+            velocities={"B_1": np.zeros((1, n_grid, n_grid))},
             grid_spacing=(dx, dx),
             grid_bounds=((-10.0, 10.0), (-10.0, 10.0)),
             periodic=(True, True),
@@ -874,7 +874,7 @@ class TestVectorBackground:
                 "phi_0": np.ones((1, n_grid, n_grid)),
                 "A_2": np.zeros((1, n_grid, n_grid)),
             },
-            momenta={
+            velocities={
                 "phi_0": np.zeros((1, n_grid, n_grid)),
                 "A_2": np.zeros((1, n_grid, n_grid)),
             },

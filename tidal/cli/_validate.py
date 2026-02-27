@@ -71,9 +71,9 @@ def _check_field_references(spec: object) -> list[str]:
         return []
 
     errors: list[str] = []
-    # Build set of all valid field names (components + momenta)
+    # Build set of all valid field names (components + velocities)
     valid_names = set(spec.component_names)
-    valid_names.update(f"pi_{name}" for name in spec.component_names)
+    valid_names.update(f"v_{name}" for name in spec.component_names)
 
     for eq in spec.equations:
         errors.extend(

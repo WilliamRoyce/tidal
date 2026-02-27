@@ -191,10 +191,10 @@ _EM_3D_SPEC: dict[str, object] = {
             "rhs": {
                 "type": "linear_combination",
                 "terms": [
-                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
-                    {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_1"},
-                    {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_0"},
-                    {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_2"},
+                    {"coefficient": -1.0, "operator": "laplacian_x", "field": "A_0"},
+                    {"coefficient": 1.0, "operator": "gradient_x", "field": "v_A_1"},
+                    {"coefficient": -1.0, "operator": "laplacian_y", "field": "A_0"},
+                    {"coefficient": 1.0, "operator": "gradient_y", "field": "v_A_2"},
                 ],
             },
             "constraint_solver": {
@@ -212,7 +212,6 @@ _EM_3D_SPEC: dict[str, object] = {
             "rhs": {
                 "type": "linear_combination",
                 "terms": [
-                    {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_0"},
                     {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_1"},
                     {
                         "coefficient": -1.0,
@@ -228,13 +227,12 @@ _EM_3D_SPEC: dict[str, object] = {
             "rhs": {
                 "type": "linear_combination",
                 "terms": [
-                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_2"},
                     {
                         "coefficient": -1.0,
                         "operator": "cross_derivative_xy",
                         "field": "A_1",
                     },
-                    {"coefficient": -1.0, "operator": "gradient_y", "field": "pi_0"},
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_2"},
                 ],
             },
         },
@@ -278,16 +276,6 @@ _EM_3D_SPEC: dict[str, object] = {
                 "factor_b": {"field": "A_2", "operator": "time_derivative"},
             },
         ],
-        "field_rates": {
-            "A_1": [
-                {"coefficient": 1.0, "operator": "identity", "field": "pi_1"},
-                {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"},
-            ],
-            "A_2": [
-                {"coefficient": 1.0, "operator": "identity", "field": "pi_2"},
-                {"coefficient": 1.0, "operator": "gradient_y", "field": "A_0"},
-            ],
-        },
         "hamiltonian_symbolic": "-Derivative[0, 0, 1][tidalA0][t[], x[], y[]]^2/2 + Derivative[0, 0, 1][tidalA1][t[], x[], y[]]^2/2 - Derivative[0, 1, 0][tidalA0][t[], x[], y[]]^2/2 - Derivative[0, 0, 1][tidalA1][t[], x[], y[]]*Derivative[0, 1, 0][tidalA2][t[], x[], y[]] + Derivative[0, 1, 0][tidalA2][t[], x[], y[]]^2/2 + Derivative[1, 0, 0][tidalA1][t[], x[], y[]]^2/2 + Derivative[1, 0, 0][tidalA2][t[], x[], y[]]^2/2",
     },
 }

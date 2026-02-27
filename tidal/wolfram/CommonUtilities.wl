@@ -601,10 +601,19 @@ ExtractFieldHead[field_] := If[Head[field] === Symbol, field, Head[field]];
 
 (* === Levi-Civita (Epsilon) Tensor Evaluation === *)
 (* Evaluates epsilon tensor components to numeric ±1 values *)
-(* For Minkowski signature (-,+,+,...), the sign conventions are: *)
-(*   - Covariant ε_012... = -√|g| = -1 (in flat space, √|g|=1 for Minkowski) *)
-(*   - Contravariant ε^012... = +1/√|g| = +1 *)
-(*   - Mixed indices: each raised index contributes metric factor η^ii *)
+(*
+   Convention (matches xAct's native epsilon from DefMetric):
+     - Covariant ε_{012...} = +√|det(g)| * LeviCivitaSymbol({0,1,2,...})
+     - For Minkowski (-,+,+): ε_{012} = +1, ε^{012} = -1
+     - This is the standard GR convention (MTW, Wald, Carroll)
+     - Mixed indices: contract with inverse metric g^{ij} for each raised index
+
+   For curved metrics with general g_{ij}:
+     - ε_{i₁...iₙ} = √|det(g)| * [i₁...iₙ]  (Levi-Civita symbol * volume factor)
+     - Index raising: ε^{i}_{jk} = Σ_m g^{im} * ε_{mjk}
+     - Diagonal metrics: g^{ii} = 1/g_{ii}, so index raising simplifies to multiplication
+     - Non-diagonal metrics: full contraction sum is computed
+*)
 
 (* Levi-Civita symbol: +1 for even permutations, -1 for odd, 0 for repeated *)
 LeviCivitaValue[indices_List] := Module[{n = Length[indices]},
@@ -627,43 +636,76 @@ EvaluateEpsilonComponents[expr_, chart_] :=
   EvaluateEpsilonComponents[expr, chart, None];
 
 EvaluateEpsilonComponents[expr_, chart_, metricMatrix_] := Module[
-  {rules, isEpsilon, evaluateEpsilonN, detFactor},
+  {rules, isEpsilon, evaluateEpsilonN, detFactor, invMetric, getInvMetricComponent},
 
-  (* For general metrics, ε_{ij...} = -√|det(g)| * Signature({i,j,...}) *)
-  (* For Minkowski det(g) = -1, so √|det(g)| = 1 (no effect) *)
+  (* Volume factor: √|det(g)| *)
   detFactor = If[metricMatrix === None, 1,
     Simplify[Sqrt[Abs[Det[metricMatrix]]]]
   ];
+
+  (* Inverse metric for index raising (general curved metrics) *)
+  invMetric = If[metricMatrix === None, None,
+    Simplify[Inverse[metricMatrix]]
+  ];
+
+  (* Get inverse metric component g^{ij} *)
+  (* Falls back to Minkowski η^{ij} = diag(-1,+1,+1,...) when no metric provided *)
+  getInvMetricComponent[i_Integer, j_Integer] :=
+    If[invMetric =!= None,
+      invMetric[[i + 1, j + 1]],
+      (* Minkowski fallback: diagonal with η^{00}=-1, η^{ii}=+1 *)
+      If[i == j, MinkowskiMetricFactor[i], 0]
+    ];
 
   (* Check if symbol is an epsilon tensor using xAct introspection *)
   (* Falls back to string matching for edge cases xAct doesn't handle *)
   isEpsilon[s_] := IsEpsilonTensor[s] || StringMatchQ[ToString[s], "*epsilon*", IgnoreCase -> True];
 
   (*
-     For epsilon tensors with mixed indices:
-     Start from fully covariant ε_{ijk...} = -Signature[{i,j,k,...}] (Minkowski convention)
-     Each raised index multiplies by η^ii (the metric component)
+     For epsilon tensors with mixed indices, we use general index raising:
+       ε^{i₁...iₖ}_{jₖ₊₁...jₙ} = Σ_{m₁...mₖ} g^{i₁m₁}...g^{iₖmₖ} * ε_{m₁...mₖ jₖ₊₁...jₙ}
+     where fully covariant ε_{i₁...iₙ} = √|det(g)| * Signature[{i₁,...,iₙ}]
 
-     Example: ε_{i j}^{k} = ε_{i j m} η^{m k}
-       For i=0, j=1, k=0: ε_{0 1 m} η^{m 0} = ε_{0 1 0} η^{0 0} = 0 * (-1) = 0
-       For i=0, j=1, k=2: ε_{0 1 m} η^{m 2} = ε_{0 1 2} η^{2 2} = (-1) * (+1) = -1
+     For diagonal metrics this reduces to multiplying by g^{ii} per raised index.
+     For non-diagonal metrics the full contraction sum is computed.
 
      When xAct puts indices, chart (not -chart) means raised index.
      So {i, -chart}, {j, -chart}, {k, chart} means ε_{i j}^k
   *)
 
-  (* Dimension-agnostic epsilon tensor evaluation *)
-  (* Works for any dimension: extracts indices and up/down flags from argument list *)
+  (* Dimension-agnostic epsilon tensor evaluation with general metric support *)
   evaluateEpsilonN[indices_List, isUpFlags_List] := Module[
-    {baseValue, metricFactor},
-    (* Base: fully covariant Levi-Civita = -√|det(g)| * Signature({indices}) *)
-    baseValue = -detFactor * LeviCivitaValue[indices];
-    (* Metric factors for raised indices: each raised index i contributes η^{ii} *)
-    metricFactor = Product[
-      If[isUpFlags[[k]], MinkowskiMetricFactor[indices[[k]]], 1],
-      {k, Length[indices]}
+    {n = Length[indices], raisedPositions, dummyCombos, total = 0},
+
+    (* Find positions (1-based) of raised indices *)
+    raisedPositions = Flatten[Position[isUpFlags, True]];
+
+    If[Length[raisedPositions] == 0,
+      (* All covariant: ε_{i₁...iₙ} = √|det(g)| * LeviCivitaSymbol *)
+      Return[detFactor * LeviCivitaValue[indices]]
     ];
-    baseValue * metricFactor
+
+    (* General case: contract each raised index with inverse metric *)
+    (* Sum over all dummy index combinations for the raised positions *)
+    dummyCombos = Tuples[Range[0, n - 1], Length[raisedPositions]];
+
+    Do[
+      Module[{newIdx = indices, mFactor = 1},
+        Do[
+          Module[{pos = raisedPositions[[k]], orig, dummy},
+            orig = indices[[pos]];
+            dummy = combo[[k]];
+            newIdx = ReplacePart[newIdx, pos -> dummy];
+            mFactor *= getInvMetricComponent[orig, dummy]
+          ],
+          {k, Length[raisedPositions]}
+        ];
+        total += mFactor * detFactor * LeviCivitaValue[newIdx]
+      ],
+      {combo, dummyCombos}
+    ];
+
+    total
   ];
 
   (* Single dimension-agnostic rule: matches any epsilon tensor with integer basis indices *)

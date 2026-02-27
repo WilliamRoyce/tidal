@@ -348,16 +348,20 @@ def _run_spectral_conversion(
 
 def _run_dispersion(
     data: SimulationData,
-    field_name: str,
+    field_names: list[str],
 ) -> dict[str, Any]:
-    """Compute dispersion relation omega(k) for a single field."""
+    """Compute dispersion relation omega(k) for a field group.
+
+    Spectral power is summed over all fields in *field_names*, making the
+    measurement rotationally covariant within the group.
+    """
     from tidal.measurement import compute_dispersion
 
-    result = compute_dispersion(data, field_name)
+    result = compute_dispersion(data, field_names)
     n_active = int(np.count_nonzero(result.peak_frequencies > 0.0))
 
     return {
-        "field": field_name,
+        "field": result.field_name,
         "n_modes": len(result.wavenumbers),
         "n_active_modes": n_active,
         "rayleigh_resolution": result.rayleigh_resolution,
@@ -679,18 +683,30 @@ def _run_individual_measurements(  # noqa: C901, PLR0912, PLR0915
 
     if "dispersion" in measurements:
         source = _parse_field_list(getattr(args, "source", None))
-        # Default to first dynamical field if no --source
-        dyn = data.dynamical_fields
+        dyn_set = set(data.dynamical_fields)
+
         if source is not None:
-            field_name = source[0]
-        elif dyn:
-            field_name = dyn[0]
+            # Filter source list to dynamical fields only.  Constraint fields
+            # (time_derivative_order=0) have no temporal oscillation and produce
+            # a flat S(k,omega) spectrum.
+            dyn_in_source = [f for f in source if f in dyn_set]
+            if not dyn_in_source:
+                # Entire source list is constraints — fall back to all dynamical fields
+                dyn_in_source = list(data.dynamical_fields)
+                print(
+                    "Note: dispersion: no dynamical fields in --source list; "
+                    f"using all dynamical fields: {dyn_in_source}",
+                    file=sys.stderr,
+                )
         else:
+            dyn_in_source = list(data.dynamical_fields)
+
+        if not dyn_in_source:
             print("Error: no dynamical fields for dispersion", file=sys.stderr)
             return 1
 
         try:
-            results["dispersion"] = _run_dispersion(data, field_name)
+            results["dispersion"] = _run_dispersion(data, dyn_in_source)
         except ValueError as e:
             results["dispersion"] = {"error": str(e)}
 

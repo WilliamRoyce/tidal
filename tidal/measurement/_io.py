@@ -1,7 +1,7 @@
 """Uniform data abstraction for simulation output.
 
 Provides ``SimulationData``, a frozen dataclass that stores the full time
-history of field and momentum arrays.  Can be constructed from:
+history of field and velocity arrays.  Can be constructed from:
 
 - A solver result dict (IDA/leapfrog output)
 - A snapshot directory written by :class:`~tidal.measurement.SnapshotWriter`
@@ -21,10 +21,9 @@ import numpy as np
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
-    from typing import Any
-
     from numpy.typing import NDArray
 
+    from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem
 
@@ -33,9 +32,9 @@ if TYPE_CHECKING:
 class SimulationData:
     """Full time-history of a simulation, ready for measurement.
 
-    Both *fields* and *momenta* store arrays of shape
+    Both *fields* and *velocities* store arrays of shape
     ``(n_snapshots, *grid_shape)`` — one spatial snapshot per recorded time.
-    Constraint fields (``time_derivative_order == 0``) have no momentum entry.
+    Constraint fields (``time_derivative_order == 0``) have no velocity entry.
 
     Attributes
     ----------
@@ -43,9 +42,9 @@ class SimulationData:
         Snapshot times.
     fields : dict[str, ndarray]
         Mapping ``field_name → (n_snapshots, *grid_shape)`` arrays.
-    momenta : dict[str, ndarray]
-        Mapping ``field_name → (n_snapshots, *grid_shape)`` arrays.
-        Only present for 2nd-order (wave) fields.
+    velocities : dict[str, ndarray]
+        Mapping ``field_name → (n_snapshots, *grid_shape)`` velocity arrays
+        (v = dq/dt). Only present for 2nd-order (wave) fields.
     grid_spacing : tuple[float, ...]
         Cell size per spatial axis, e.g. ``(dx, dy)``.
     grid_bounds : tuple[tuple[float, float], ...]
@@ -64,7 +63,7 @@ class SimulationData:
 
     times: NDArray[np.float64]
     fields: dict[str, NDArray[np.float64]]
-    momenta: dict[str, NDArray[np.float64]]
+    velocities: dict[str, NDArray[np.float64]]
     grid_spacing: tuple[float, ...]
     grid_bounds: tuple[tuple[float, float], ...]
     periodic: tuple[bool, ...]
@@ -89,7 +88,7 @@ class SimulationData:
 
     @property
     def dynamical_fields(self) -> tuple[str, ...]:
-        """Field names with ``time_derivative_order >= 2`` (have momenta)."""
+        """Field names with ``time_derivative_order >= 2`` (have velocities)."""
         return tuple(
             eq.field_name
             for eq in self.spec.equations
@@ -103,7 +102,7 @@ class SimulationData:
     @classmethod
     def from_result(
         cls,
-        result: dict[str, Any],
+        result: SolverResult,
         spec: EquationSystem,
         grid_info: GridInfo,
         parameters: dict[str, float] | None = None,
@@ -134,6 +133,10 @@ class SimulationData:
             If *result* has no snapshots or flat vector size doesn't match
             the layout.
         """
+        if not result["success"]:
+            msg = f"Cannot build SimulationData from failed solver result: {result['message']}"
+            raise ValueError(msg)
+
         times = np.asarray(result["t"], dtype=np.float64)
         y_all = np.asarray(result["y"], dtype=np.float64)
 
@@ -153,11 +156,18 @@ class SimulationData:
             )
             raise ValueError(msg)
 
+        if y_all.shape[0] != len(times):
+            msg = (
+                f"Snapshot count mismatch: {len(times)} time points but "
+                f"{y_all.shape[0]} state vectors in result['y']"
+            )
+            raise ValueError(msg)
+
         n_pts = grid_info.num_points
         shape = grid_info.shape
 
         fields: dict[str, NDArray[np.float64]] = {}
-        momenta: dict[str, NDArray[np.float64]] = {}
+        velocities: dict[str, NDArray[np.float64]] = {}
 
         for i, slot in enumerate(layout.slots):
             start = i * n_pts
@@ -165,15 +175,15 @@ class SimulationData:
             # Slice all snapshots at once: (n_snapshots, *grid_shape)
             arr = y_all[:, start:end].reshape(-1, *shape)
 
-            if slot.kind == "momentum":
-                momenta[slot.field_name] = arr
+            if slot.kind == "velocity":
+                velocities[slot.field_name] = arr
             else:
                 fields[slot.name] = arr
 
         return cls(
             times=times,
             fields=fields,
-            momenta=momenta,
+            velocities=velocities,
             grid_spacing=grid_info.dx,
             grid_bounds=grid_info.bounds,
             periodic=grid_info.periodic,
@@ -236,7 +246,7 @@ class SimulationData:
             metadata = {
                 "n_snapshots": n_recovered,
                 "fields": list(spec.component_names),
-                "momenta": [
+                "velocities": [
                     eq.field_name
                     for eq in spec.equations
                     if eq.time_derivative_order >= 2  # noqa: PLR2004
@@ -266,13 +276,17 @@ class SimulationData:
             if npy.exists():
                 fields[name] = np.load(str(npy), mmap_mode="r")[:n]
 
-        # Load momenta (memory-mapped)
-        momenta: dict[str, NDArray[np.float64]] = {}
-        momentum_names = cast("list[str]", metadata.get("momenta", []))
-        for name in momentum_names:
-            npy = p / f"pi_{name}.npy"
+        # Load velocities (memory-mapped)
+        velocities: dict[str, NDArray[np.float64]] = {}
+        # Accept both "velocities" (new) and "momenta" (legacy) metadata keys
+        velocity_names = cast(
+            "list[str]",
+            metadata.get("velocities", metadata.get("momenta", [])),
+        )
+        for name in velocity_names:
+            npy = p / f"v_{name}.npy"
             if npy.exists():
-                momenta[name] = np.load(str(npy), mmap_mode="r")[:n]
+                velocities[name] = np.load(str(npy), mmap_mode="r")[:n]
 
         # Grid metadata — from metadata.json or spec defaults
         grid_spacing: tuple[float, ...]
@@ -320,7 +334,7 @@ class SimulationData:
         return cls(
             times=times,
             fields=fields,
-            momenta=momenta,
+            velocities=velocities,
             grid_spacing=grid_spacing,
             grid_bounds=grid_bounds,
             periodic=periodic,
@@ -352,8 +366,8 @@ class SimulationData:
         np.save(str(p / "times.npy"), np.asarray(self.times))
         for name, arr in self.fields.items():
             np.save(str(p / f"{name}.npy"), np.asarray(arr))
-        for name, arr in self.momenta.items():
-            np.save(str(p / f"pi_{name}.npy"), np.asarray(arr))
+        for name, arr in self.velocities.items():
+            np.save(str(p / f"v_{name}.npy"), np.asarray(arr))
 
         # Infer grid shape from the first field array
         first_field = next(iter(self.fields.values()))
@@ -368,7 +382,8 @@ class SimulationData:
             "periodic": list(self.periodic),
             "parameters": self.parameters,
             "fields": list(self.fields.keys()),
-            "momenta": list(self.momenta.keys()),
+            "velocities": list(self.velocities.keys()),
+            "momenta": list(self.velocities.keys()),  # backward compat
             "dtype": "float64",
         }
         if self.bc_types is not None:

@@ -41,17 +41,6 @@ def _make_kg_spec() -> EquationSystem:
                     "factor_b": {"field": "phi_0", "operator": "time_derivative"},
                 },
             ],
-            "field_rates": {
-                "phi_0": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"},
-                ]
-            },
-            "kinetic_matrix": {
-                "entries": [{"i": 0, "j": 0, "value": 1.0}],
-                "dimension": 1,
-            },
-            "spatial_momenta": {},
-            "hamiltonian_symbolic": "test",
         },
     }
     return EquationSystem.from_dict(data)
@@ -66,7 +55,11 @@ class TestScipyBasic:
 
         y0 = np.zeros(layout.total_size)
         result = solve_scipy(
-            spec, grid, y0, t_span=(0.0, 1.0), bc="periodic",
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            bc="periodic",
             num_snapshots=5,
         )
         assert result["success"]
@@ -80,7 +73,11 @@ class TestScipyBasic:
         y0 = np.zeros(layout.total_size)
 
         result = solve_scipy(
-            spec, grid, y0, t_span=(0.0, 0.5), bc="periodic",
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 0.5),
+            bc="periodic",
             num_snapshots=5,
         )
         assert result["success"]
@@ -97,8 +94,14 @@ class TestScipyBasic:
         y0[:64] = np.sin(x)
 
         result = solve_scipy(
-            spec, grid, y0, t_span=(0.0, 2.0), bc="periodic",
-            rtol=1e-8, atol=1e-10, num_snapshots=11,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 2.0),
+            bc="periodic",
+            rtol=1e-8,
+            atol=1e-10,
+            num_snapshots=11,
             max_step=0.1,
         )
         assert result["success"]
@@ -117,8 +120,14 @@ class TestScipyBasic:
 
         for method in ("RK45", "DOP853"):
             result = solve_scipy(
-                spec, grid, y0, t_span=(0.0, 0.2), bc="periodic",
-                method=method, num_snapshots=3, max_step=0.1,
+                spec,
+                grid,
+                y0,
+                t_span=(0.0, 0.2),
+                bc="periodic",
+                method=method,
+                num_snapshots=3,
+                max_step=0.1,
             )
             assert result["success"], f"Method {method} failed"
 
@@ -130,7 +139,11 @@ class TestScipyBasic:
         y0 = np.zeros(layout.total_size)
 
         result = solve_scipy(
-            spec, grid, y0, t_span=(0.0, 0.1), bc="periodic",
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 0.1),
+            bc="periodic",
             num_snapshots=3,
         )
         assert set(result.keys()) == {"t", "y", "success", "message"}
@@ -148,8 +161,13 @@ class TestScipyBasic:
             callback_times.append(t)
 
         result = solve_scipy(
-            spec, grid, y0, t_span=(0.0, 1.0), bc="periodic",
-            num_snapshots=11, snapshot_callback=cb,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            bc="periodic",
+            num_snapshots=11,
+            snapshot_callback=cb,
         )
         assert result["success"]
         assert len(callback_times) == 11

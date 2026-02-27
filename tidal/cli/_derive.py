@@ -970,6 +970,9 @@ def _wls_vector_background_substitution(
                     (
                         f"{prefixed}[{{{idx}, -{ctx.chart}}}] -> {val}",
                         f"{prefixed}[{{{idx}, {ctx.chart}}}] -> {val}",
+                        # Component function form (after ReplaceTensorFieldComponents
+                        # converts vbdB[{i, -chart}] -> vbdBi[t, x, y])
+                        f"{prefixed}{idx}[__] -> {val}",
                     )
                 )
         else:
@@ -984,10 +987,14 @@ def _wls_vector_background_substitution(
                 multi_idx.reverse()
                 idx_down = ", ".join(f"{{{k}, -{ctx.chart}}}" for k in multi_idx)
                 idx_up = ", ".join(f"{{{k}, {ctx.chart}}}" for k in multi_idx)
+                # Component function name: head + concatenated index digits
+                comp_name = "".join(str(k) for k in multi_idx)
                 rules.extend(
                     (
                         f"{prefixed}[{idx_down}] -> {val}",
                         f"{prefixed}[{idx_up}] -> {val}",
+                        # Component function form (after ReplaceTensorFieldComponents)
+                        f"{prefixed}{comp_name}[__] -> {val}",
                     )
                 )
 
@@ -1968,73 +1975,37 @@ def _wls_canonical_from_eom(ctx: _WlsContext) -> list[str]:
 
     This is the **fast path** for high-rank tensor fields (rank >= 3) where
     ``DecomposeScalarExpression`` on the abstract Lagrangian is prohibitively
-    slow.  Instead, we construct the canonical block from the component EOM
-    that ``DecomposeToComponents`` already reduced to independent components.
+    slow.
 
-    Each dynamical component (time_order >= 2) gets field_rate =
-    ``identity(pi_N)`` with K = I (verified at runtime).  The Hamiltonian
-    is reconstructed from the EOM RHS: for ∂²q/∂t² = -RHS, we have
-    H_potential = Σ ½ q_i * RHS_i (in quadratic approximation).
+    E-L velocity form: equations are preserved as-is.  Only hamiltonian_terms
+    are injected (empty for fast path — H reconstruction is optional).
 
     ``fieldEquations`` must already exist in the WLS script context.
     """
-    param_rules = ", ".join(
-        f"{name} -> {value}" for name, value in ctx.parameters.items()
-    )
+    p = ctx.prefix
     return [
         "",
         "(* === Canonical Structure (EOM-based fast path) === *)",
         "(* Lagrangian decomposition skipped: high raw component count. *)",
-        "(* Canonical structure is built directly from the component EOM. *)",
+        "(* E-L equations preserved as-is. hamiltonian_terms left empty. *)",
         'Print[""];',
         'Print["Building canonical structure from EOM (fast path)..."];',
         "",
-        "allCompNames = fieldEquations[[All, 1]];",
-        f"tidalParamDefaults = {{{param_rules}}};",
+        "(* Compute spatial volume element sqrt|det(g_spatial)| *)",
+        f"sqrtDetGSpatial = Simplify[Sqrt[Abs[Det[{p}MetricMatrix[[2;;, 2;;]]]]]];",
+        'Print["sqrt|g_spatial|: ", sqrtDetGSpatial];',
         "",
-        "(* Identify dynamical field indices (time_order >= 2) *)",
-        "dynIndices = Select[Range[Length[allCompNames]],",
-        "  DetectLHSTimeOrder[fieldEquations[[#, 2]], allCompNames[[#]]] >= 2 &];",
-        "nDyn = Length[dynIndices];",
-        'Print["Dynamical fields: ", nDyn, " of ", Length[allCompNames]];',
-        "",
-        "(* For each dynamical field, field_rate = identity(pi_i) *)",
-        "(* This assumes K = I, which we verify below. *)",
-        "canonicalFieldRates = <||>;",
-        "Do[",
-        "  Module[{idx, compName, piIdx},",
-        "    idx = dynIndices[[i]];",
-        "    compName = allCompNames[[idx]];",
-        "    piIdx = idx - 1;  (* 0-indexed *)",
-        '    canonicalFieldRates[compName] = {<|"coefficient" -> 1.0,',
-        '      "operator" -> "identity",',
-        '      "field" -> "pi_" <> ToString[piIdx]|>};',
-        '    Print["Field rate ", compName, ": identity(pi_", piIdx, ")"];',
-        "  ],",
-        "  {i, nDyn}",
-        "];",
-        "",
-        "(* Print constraint field diagnostics *)",
-        "Do[",
-        "  Module[{compName},",
-        "    compName = allCompNames[[k]];",
-        "    If[!KeyExistsQ[canonicalFieldRates, compName],",
-        '      Print["Field rate ", compName, ": (constraint - no rate)"]',
-        "    ]",
-        "  ],",
-        "  {k, Length[allCompNames]}",
-        "];",
-        "",
-        "(* Inject canonical structure — hamiltonian_terms left empty, *)",
-        "(* hamiltonian_symbolic left as placeholder. The EOM already *)",
-        "(* carries the full dynamical information. *)",
-        'jsonStructure["canonical"] = <|',
-        '  "hamiltonian_terms" -> {},',
-        '  "field_rates" -> canonicalFieldRates,',
-        '  "hamiltonian_symbolic" -> "EOM-based (Lagrangian decomposition skipped)"',
+        "(* Inject canonical structure — hamiltonian_terms empty (fast path). *)",
+        "canonicalSection = <|",
+        '  "hamiltonian_terms" -> {}',
         "|>;",
+        "If[sqrtDetGSpatial =!= 1,",
+        '  canonicalSection["volume_element"] = ToString[sqrtDetGSpatial, InputForm]',
+        "];",
+        'jsonStructure["canonical"] = canonicalSection;',
         "",
-        'Print["Canonical structure (EOM-based) injected into JSON."];',
+        'Print["Canonical structure (EOM-based, hamiltonian_terms empty) injected."];',
+        'Print["E-L equations preserved (no Hamilton equation injection)."];',
         'Print[""];',
         "",
     ]
@@ -2064,209 +2035,31 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
 
     lines: list[str] = _wls_canonical_hamiltonian(ctx, all_heads_str)
 
-    # Compute Hamilton's field rates via kinetic matrix inversion:
-    #   K_{ij} = D[pi_i, vel_j], then d_t q_i = Sum_j K^{-1}_{ij} * (pi_j - S_j)
-    #   where S_j = pi_j|_{vel=0} (spatial corrections from mixed d_t·d_x terms)
-    # References: FEM mass matrix precompute (Firedrake), symplectic K^{-1}
-    #   (Hairer & Lubich 2003), field-space metric (Dias et al. 2015 MultiModeCode)
-    param_rules = ", ".join(
-        f"{name} -> {value}" for name, value in ctx.parameters.items()
-    )
+    # E-L velocity form: keep original E-L equations, only inject
+    # Hamiltonian terms for energy measurement.
+    p = ctx.prefix
     lines.extend(
         [
-            "(* === Kinetic Matrix Inversion === *)",
-            "(* Compute K_{ij} = D[pi_i, vel_j] for dynamical fields, invert *)",
-            "(* symbolically, and express field rates purely in terms of *)",
-            "(* canonical momenta pi_j and spatial operators on fields. *)",
+            "(* === E-L Velocity Form: Inject Canonical Structure === *)",
+            "(* E-L equations are preserved as-is in equations[] array. *)",
+            "(* Only hamiltonian_terms are injected for energy measurement. *)",
             "",
-            f"tidalParamDefaults = {{{param_rules}}};",
-            "",
-            "(* Identify dynamical field indices (time_order >= 2) *)",
-            "dynIndices = Select[Range[Length[allCompNames]],",
-            "  DetectLHSTimeOrder[fieldEquations[[#, 2]], allCompNames[[#]]] >= 2 &];",
-            "nDyn = Length[dynIndices];",
-            'Print["Dynamical fields: ", nDyn, " of ", Length[allCompNames]];',
-            "",
-            "canonicalFieldRates = <||>;",
-            "",
-            "If[nDyn > 0,",
-            "  Module[{kineticMatrix, kDet, kInverse, allVelToZero, spatialMomenta},",
-            "",
-            "    (* Build velocity-to-zero rules for ALL components *)",
-            "    allVelToZero = Table[",
-            "      Derivative[Sequence @@ velOrders][compToFunc[allCompNames[[j]]]][",
-            "        Sequence @@ coordSyms] -> 0,",
-            "      {j, Length[allCompNames]}",
-            "    ];",
-            "",
-            "    (* Build kinetic matrix K_{ij} = D[pi_i] / D[vel_j] *)",
-            "    kineticMatrix = Table[",
-            "      D[piCompList[[dynIndices[[i]], 2]],",
-            "        Derivative[Sequence @@ velOrders]["
-            "compToFunc[allCompNames[[dynIndices[[j]]]]]][",
-            "          Sequence @@ coordSyms]],",
-            "      {i, nDyn}, {j, nDyn}",
-            "    ];",
-            '    Print["Kinetic matrix K (", nDyn, "x", nDyn, "): "];',
-            "    Print[MatrixForm[kineticMatrix]];",
-            "",
-            "    (* Validate: K must be invertible *)",
-            "    kDet = Simplify[Det[kineticMatrix]];",
-            '    Print["det(K) = ", kDet];',
-            "    If[kDet === 0,",
-            '      Throw["Kinetic matrix K is singular (det=0). Some fields classified '
-            "as dynamical (time_order>=2) may actually be constraints. Check the "
-            'time_derivative_order classification for each field component."]',
-            "    ];",
-            "",
-            "    (* Invert K symbolically *)",
-            "    kInverse = Simplify[Inverse[kineticMatrix]];",
-            '    Print["K inverse: "];',
-            "    Print[MatrixForm[kInverse]];",
-            "",
-            "    (* Extract spatial parts: S_j = pi_j with all velocities = 0 *)",
-            "    spatialMomenta = Table[",
-            "      piCompList[[dynIndices[[j]], 2]] /. allVelToZero,",
-            "      {j, nDyn}",
-            "    ];",
-            '    Print["Spatial momenta S: ", spatialMomenta];',
-            "",
-            "    (* === Export kinetic matrix K entries === *)",
-            "    kEntries = {};",
-            "    Do[",
-            "      Module[{entry, kVal, numVal, symStr},",
-            "        kVal = kineticMatrix[[i, j]];",
-            "        If[kVal =!= 0,",
-            "          numVal = Quiet[N[kVal /. tidalParamDefaults]];",
-            "          If[!NumericQ[numVal], numVal = Quiet[N[kVal]]];",
-            "          If[!NumericQ[numVal],",
-            '            Throw["FATAL: Cannot evaluate K[" <> ToString[i]',
-            '              <> "," <> ToString[j] <> "] = " '
-            "<> ToString[kVal, InputForm]",
-            '              <> " numerically."]',
-            "          ];",
-            '          entry = <|"i" -> i - 1, "j" -> j - 1, "value" -> numVal|>;',
-            "          symStr = ToString[kVal, InputForm];",
-            "          If[kVal =!= numVal,",
-            '            entry["symbolic"] = symStr];',
-            "          AppendTo[kEntries, entry];",
-            "        ]",
-            "      ],",
-            "      {i, nDyn}, {j, nDyn}",
-            "    ];",
-            "",
-            "    (* === Export spatial momenta S per dynamical field === *)",
-            "    spatialMomentaTerms = <||>;",
-            "    Do[",
-            "      Module[{idx, compName, sj, sTerms},",
-            "        idx = dynIndices[[j]];",
-            "        compName = allCompNames[[idx]];",
-            "        sj = Expand[spatialMomenta[[j]]];",
-            "        If[sj =!= 0,",
-            "          sTerms = ParseMultiFieldRHS[sj, compName, allCompNames];",
-            "          spatialMomentaTerms[compName] = sTerms;",
-            "        ];",
-            "      ],",
-            "      {j, nDyn}",
-            "    ];",
-            "",
-            "    (* For each dynamical field, compute field rate *)",
-            "    Do[",
-            "      Module[{idx, compName, momTerms, kInvEntry, kInvStr, piIdx,",
-            "              coordDeps, numCoeff, term, spatialCorr, spatialTerms},",
-            "        idx = dynIndices[[i]];",
-            "        compName = allCompNames[[idx]];",
-            "",
-            "        (* 1. Momentum terms: K^{-1}_{ij} * pi_j *)",
-            "        momTerms = {};",
-            "        Do[",
-            "          kInvEntry = kInverse[[i, j]];",
-            "          If[kInvEntry =!= 0,",
-            "            piIdx = dynIndices[[j]] - 1;  (* 0-indexed for JSON *)",
-            "            kInvStr = ToString[kInvEntry, InputForm];",
-            "            coordDeps = Union[ToString /@ "
-            "Cases[kInvEntry, f_Symbol[] :> f, {0, Infinity}]];",
-            "            numCoeff = Quiet[N[kInvEntry /. tidalParamDefaults]];",
-            "            If[!NumericQ[numCoeff], numCoeff = Quiet[N[kInvEntry]]];",
-            "            If[!NumericQ[numCoeff],",
-            '              Throw["FATAL: Cannot evaluate K^{-1} entry '
-            'numerically: " <> ToString[kInvEntry, InputForm]',
-            '                <> ". Ensure all symbolic parameters have '
-            'defaults in [parameters]."]',
-            "            ];",
-            '            term = <|"coefficient" -> numCoeff,',
-            '              "operator" -> "identity",',
-            '              "field" -> "pi_" <> ToString[piIdx]|>;',
-            "            (* Add symbolic coefficient when K^{-1} entry is not trivially 1 *)",
-            '            If[kInvEntry =!= 1, term["coefficient_symbolic"] = kInvStr];',
-            "            (* Add coordinate dependence if present *)",
-            "            If[Length[coordDeps] > 0,",
-            '              term["coordinate_dependent"] = coordDeps];',
-            "            AppendTo[momTerms, term];",
-            "          ],",
-            "          {j, nDyn}",
-            "        ];",
-            "",
-            "        (* 2. Spatial correction: -Sum_j K^{-1}_{ij} * S_j *)",
-            "        spatialCorr = Expand[",
-            "          -Sum[kInverse[[i, j]] * spatialMomenta[[j]], {j, nDyn}]];",
-            "        If[spatialCorr =!= 0,",
-            "          spatialTerms = ParseMultiFieldRHS["
-            "spatialCorr, compName, allCompNames];",
-            "          canonicalFieldRates[compName] = Join[momTerms, spatialTerms],",
-            "          canonicalFieldRates[compName] = momTerms",
-            "        ];",
-            "",
-            '        Print["Field rate ", compName, ": ",',
-            "          canonicalFieldRates[compName]];",
-            "      ],",
-            "      {i, nDyn}",
-            "    ];",
-            "",
-            "    (* Verify: no first_derivative_t in any field rate *)",
-            "    Do[",
-            "      Module[{compName, terms},",
-            "        compName = allCompNames[[dynIndices[[i]]]];",
-            "        If[KeyExistsQ[canonicalFieldRates, compName],",
-            "          terms = canonicalFieldRates[compName];",
-            "          Do[",
-            '            If[t["operator"] === "first_derivative_t",',
-            '              Throw["FATAL: first_derivative_t in field rate for " '
-            "<> compName",
-            '                <> ", field " <> t["field"]',
-            '                <> ". Kinetic matrix inversion did not fully resolve '
-            'velocities."]',
-            "            ],",
-            "            {t, terms}",
-            "          ]",
-            "        ]",
-            "      ],",
-            "      {i, nDyn}",
-            "    ];",
-            "  ]  (* Module end *)",
-            "];  (* If nDyn > 0 end *)",
-            "",
-            "(* Print constraint field diagnostics *)",
-            "Do[",
-            "  Module[{compName},",
-            "    compName = allCompNames[[k]];",
-            "    If[!KeyExistsQ[canonicalFieldRates, compName],",
-            '      Print["Field rate ", compName, ": (constraint - no rate)"]',
-            "    ]",
-            "  ],",
-            "  {k, Length[allCompNames]}",
-            "];",
+            "(* Compute spatial volume element sqrt|det(g_spatial)| for energy integration *)",
+            f"sqrtDetGSpatial = Simplify[Sqrt[Abs[Det[{p}MetricMatrix[[2;;, 2;;]]]]]];",
+            'Print["sqrt|g_spatial|: ", sqrtDetGSpatial];',
             "",
             "(* Inject canonical structure into JSON *)",
-            'jsonStructure["canonical"] = <|',
-            '  "hamiltonian_terms" -> hamiltonianTerms,',
-            '  "field_rates" -> canonicalFieldRates,',
-            '  "kinetic_matrix" -> <|"entries" -> kEntries, "dimension" -> nDyn|>,',
-            '  "spatial_momenta" -> spatialMomentaTerms,',
-            '  "hamiltonian_symbolic" -> ToString[canonicalH, InputForm]',
+            "canonicalSection = <|",
+            '  "hamiltonian_terms" -> hamiltonianTerms',
             "|>;",
+            "(* Only include volume_element when non-trivial (curved coordinates) *)",
+            "If[sqrtDetGSpatial =!= 1,",
+            '  canonicalSection["volume_element"] = ToString[sqrtDetGSpatial, InputForm]',
+            "];",
+            'jsonStructure["canonical"] = canonicalSection;',
             "",
-            'Print["Canonical structure injected into JSON."];',
+            'Print["Canonical structure (hamiltonian_terms only) injected into JSON."];',
+            'Print["E-L equations preserved (no Hamilton equation injection)."];',
             'Print[""];',
             "",
         ]

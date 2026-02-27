@@ -76,20 +76,22 @@ class TestStateLayout:
         assert layout.algebraic_indices == list(range(8))  # constraint slot
 
     def test_mixed_orders(self) -> None:
-        spec = _make_spec([
-            _constraint_eq("A_0"),
-            _first_order_eq("psi_0"),
-            _wave_eq("phi_0"),
-        ])
+        spec = _make_spec(
+            [
+                _constraint_eq("A_0"),
+                _first_order_eq("psi_0"),
+                _wave_eq("phi_0"),
+            ]
+        )
         layout = StateLayout.from_spec(spec, num_points=4)
-        assert layout.num_slots == 4  # constraint + first_order + field + momentum
+        assert layout.num_slots == 4  # constraint + first_order + field + velocity
         assert layout.slots[0].kind == "constraint"
         assert layout.slots[0].time_order == 0
         assert layout.slots[1].kind == "field"
         assert layout.slots[1].time_order == 1
         assert layout.slots[2].kind == "field"
         assert layout.slots[2].time_order == 2
-        assert layout.slots[3].kind == "momentum"
+        assert layout.slots[3].kind == "velocity"
 
     def test_two_coupled_waves(self) -> None:
         spec = _make_spec([_wave_eq("phi_0"), _wave_eq("chi_0")])
@@ -108,14 +110,14 @@ class TestFlatConversions:
 
         fields = {
             "phi_0": np.sin(np.linspace(0, 2 * np.pi, 8)),
-            "pi_phi_0": np.zeros(8),
+            "v_phi_0": np.zeros(8),
         }
         flat = state_to_flat(fields, layout)
         assert flat.shape == (16,)
 
         recovered = flat_to_fields(flat, layout, grid.shape)
         np.testing.assert_allclose(recovered["phi_0"], fields["phi_0"])
-        np.testing.assert_allclose(recovered["pi_phi_0"], fields["pi_phi_0"])
+        np.testing.assert_allclose(recovered["v_phi_0"], fields["v_phi_0"])
 
     def test_2d_round_trip(self) -> None:
         spec = _make_spec([_wave_eq()], dim=3)
@@ -125,7 +127,7 @@ class TestFlatConversions:
         xs, ys = grid.coord_arrays()
         fields = {
             "phi_0": np.sin(xs) * np.cos(ys),
-            "pi_phi_0": np.zeros((4, 4)),
+            "v_phi_0": np.zeros((4, 4)),
         }
         flat = state_to_flat(fields, layout)
         assert flat.shape == (32,)

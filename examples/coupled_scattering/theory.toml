@@ -46,8 +46,12 @@ components = ["g0 * Exp[-(x[]^2 + y[]^2) / (2 * R^2)]"]
 [lagrangian]
 expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - 1/2 CD[-a][chi[]] eta[a, b] CD[-b][chi[]] - mPhi2/2 * phi[]^2 - mChi2/2 * chi[]^2 - G[] * phi[] * chi[]"
 
-# Stability requirement: mPhi2 * mChi2 > g0^2 (positive-definite mass matrix).
-# With these values: det = 1*4 - 1 = 3 > 0.
+# Stability requirement: all eigenvalues of the pointwise mass matrix must be
+# positive.  For this example the condition is mPhi2 * mChi2 > g0^2 (from
+# det(M) > 0 at the coupling peak where G = g0).
+# With these defaults: det = 1*4 - 1^2 = 3 > 0.  Minimum stable mChi2 = g0^2/mPhi2 = 1.0.
+# Using mChi2 < 1.0 (with g0=1, mPhi2=1) causes exponential blow-up.
+# tidal simulate will warn automatically if parameters violate this condition.
 [parameters]
 mPhi2 = 1.0
 mChi2 = 4.0

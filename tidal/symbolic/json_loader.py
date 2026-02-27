@@ -27,6 +27,11 @@ AXIS_LETTERS: tuple[str, ...] = ("x", "y", "z", "w", "v", "u")
 #: Character class matching all known axis letters (for regex construction).
 _AXIS_RE_CLASS = "[" + "".join(AXIS_LETTERS) + "]"
 
+#: Pattern matching a coordinate call like ``x[]``, ``y[]`` in symbolic expressions.
+#: Used to auto-detect position-dependent coefficients in hamiltonian_terms that
+#: were exported before the ``coordinate_dependent`` field was added.
+_COORD_CALL_RE = re.compile(r"\b[xyzwvut]\s*\[\s*\]")
+
 logger = logging.getLogger(__name__)
 
 #: Set of static operators supported by the pipeline.
@@ -473,12 +478,33 @@ class HamiltonianTerm:
         Second field factor (may equal factor_a for squared terms).
     coefficient_symbolic : str | None
         Symbolic coefficient expression (for parameter override).
+    coordinate_dependent : tuple[str, ...]
+        Spatial axes the coefficient depends on (e.g. ``("x", "y")``).
+        When non-empty, the coefficient must be evaluated on the grid.
+        Older JSON exports omit this field; auto-detection via
+        ``position_dependent`` covers those cases.
     """
 
     coefficient: float
     factor_a: HamiltonianFactor
     factor_b: HamiltonianFactor
     coefficient_symbolic: str | None = None
+    coordinate_dependent: tuple[str, ...] = ()
+
+    @property
+    def position_dependent(self) -> bool:
+        """True if the coefficient is a function of spatial coordinates.
+
+        Returns ``True`` when ``coordinate_dependent`` is non-empty (explicit
+        declaration), or when ``coefficient_symbolic`` contains a coordinate
+        call pattern such as ``x[]`` or ``y[]`` (auto-detection for JSON
+        exports that predate the ``coordinate_dependent`` field).
+        """
+        if self.coordinate_dependent:
+            return True
+        if self.coefficient_symbolic is not None:
+            return bool(_COORD_CALL_RE.search(self.coefficient_symbolic))
+        return False
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> HamiltonianTerm:
@@ -488,176 +514,52 @@ class HamiltonianTerm:
             factor_a=HamiltonianFactor.from_dict(data["factor_a"]),
             factor_b=HamiltonianFactor.from_dict(data["factor_b"]),
             coefficient_symbolic=data.get("coefficient_symbolic"),
+            coordinate_dependent=tuple(data.get("coordinate_dependent", [])),
         )
-
-
-@dataclass(frozen=True)
-class KineticMatrixEntry:
-    """Single entry of the kinetic matrix K_{ij}.
-
-    The kinetic matrix K relates canonical momenta to velocities:
-    ``pi_i = K_{ij} * dq_j/dt + S_i``  where S_i are spatial corrections.
-
-    IDA uses K directly in residual form: ``K_{ij} * dq_j/dt - (pi_i - S_i) = 0``.
-    Leapfrog solves ``K * v = (pi - S)`` via ``np.linalg.solve``.
-
-    Attributes
-    ----------
-    i : int
-        Row index (0-based dynamical field index).
-    j : int
-        Column index (0-based dynamical field index).
-    value : float
-        Numerical value of K_{ij} (evaluated with parameter defaults).
-    symbolic : str | None
-        Exact symbolic expression (Mathematica InputForm), or None if trivial.
-    time_dependent : bool
-        Whether the entry depends on time (e.g., time-varying metric).
-    coordinate_dependent : tuple[str, ...]
-        Coordinate names the entry depends on (e.g., ``("x",)`` for a
-        spatially varying background field).  Empty tuple for constant entries.
-        Follows the same convention as :class:`OperatorTerm`.
-    """
-
-    i: int
-    j: int
-    value: float
-    symbolic: str | None = None
-    time_dependent: bool = False
-    coordinate_dependent: tuple[str, ...] = ()
-
-    @property
-    def position_dependent(self) -> bool:
-        """Whether the entry depends on spatial coordinates."""
-        return bool(set(self.coordinate_dependent) - {"t"})
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> KineticMatrixEntry:
-        """Parse from JSON dict."""
-        return cls(
-            i=int(data["i"]),
-            j=int(data["j"]),
-            value=float(data["value"]),
-            symbolic=data.get("symbolic"),
-            time_dependent=bool(data.get("time_dependent", False)),
-            coordinate_dependent=tuple(data.get("coordinate_dependent", ())),
-        )
-
-
-@dataclass(frozen=True)
-class KineticMatrix:
-    """Full kinetic matrix K for the dynamical subsystem.
-
-    Attributes
-    ----------
-    entries : tuple[KineticMatrixEntry, ...]
-        Non-zero entries of K.
-    dimension : int
-        Size of K (number of dynamical fields).
-    """
-
-    entries: tuple[KineticMatrixEntry, ...]
-    dimension: int
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> KineticMatrix:
-        """Parse from JSON ``kinetic_matrix`` section."""
-        return cls(
-            entries=tuple(KineticMatrixEntry.from_dict(e) for e in data["entries"]),
-            dimension=int(data["dimension"]),
-        )
-
-    @property
-    def has_position_dependent(self) -> bool:
-        """Whether any entry depends on spatial coordinates."""
-        return any(e.position_dependent for e in self.entries)
-
-    @property
-    def has_time_dependent(self) -> bool:
-        """Whether any entry depends on time."""
-        return any(e.time_dependent for e in self.entries)
-
-    def to_dense(self) -> list[list[float]]:
-        """Convert to dense NxN matrix (list of lists).
-
-        For constant (non-coordinate-dependent) entries only.  Position-
-        or time-dependent entries require grid evaluation via
-        :class:`~tidal.solver.coefficients.CoefficientEvaluator`.
-        """
-        n = self.dimension
-        matrix = [[0.0] * n for _ in range(n)]
-        for e in self.entries:
-            matrix[e.i][e.j] = e.value
-        return matrix
 
 
 @dataclass(frozen=True)
 class CanonicalStructure:
-    """Hamilton's equations derived from Lagrangian via Legendre transform.
+    """Canonical structure: Hamiltonian terms for energy measurement.
 
-    Computed symbolically in Wolfram and exported as part of the JSON spec.
-    Used by the PDE builder for canonical evolution (Hamilton's 1st equation)
-    and by the energy measurement for Hamiltonian evaluation.
+    The Hamiltonian's bilinear terms are used by energy measurement to
+    compute H(q, v).  The E-L equations are stored in the ``equations``
+    array directly.
 
     Attributes
     ----------
     hamiltonian_terms : tuple[HamiltonianTerm, ...]
         Quadratic terms in the component-form Hamiltonian density.
-    field_rates : dict[str, tuple[OperatorTerm, ...]]
-        Hamilton's 1st equation per component: dq_i/dt = ∂H/∂π_i.
-        Each entry is the full RHS expressed as OperatorTerms, including
-        the identity(π_i) term. For scalars: ``[identity(pi_0)]``.
-        For Proca: ``[identity(pi_1), gradient_x(A_0)]``.
-    kinetic_matrix : KineticMatrix | None
-        Raw kinetic matrix K_{ij} = ∂π_i/∂(dq_j/dt).
-        Used directly by IDA (residual form) and leapfrog (K·v = π-S solve).
-        None for specs generated before Phase 2.
-    spatial_momenta : dict[str, tuple[OperatorTerm, ...]] | None
-        Spatial corrections S_i per dynamical field.  The momentum relation
-        is ``π_i = K_{ij} · dq_j/dt + S_i``.  None for pre-Phase 2 specs.
-    hamiltonian_symbolic : str
-        Full symbolic Hamiltonian expression (Mathematica InputForm).
+        Used by energy measurement to compute H(q, v).
+    volume_element : str or None
+        Symbolic expression for ``sqrt|det(g_spatial)|``, the spatial
+        volume element.  ``None`` for flat (Minkowski) spacetimes where
+        the volume element is 1.  Used by energy measurement to weight
+        the Hamiltonian density before spatial integration.
     """
 
     hamiltonian_terms: tuple[HamiltonianTerm, ...]
-    field_rates: dict[str, tuple[OperatorTerm, ...]]
-    hamiltonian_symbolic: str
-    kinetic_matrix: KineticMatrix | None = None
-    spatial_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
+    volume_element: str | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> CanonicalStructure:
-        """Parse from JSON ``canonical`` section."""
-        h_terms = tuple(HamiltonianTerm.from_dict(t) for t in data["hamiltonian_terms"])
+        """Parse from JSON ``canonical`` section.
 
-        raw_rates = data.get("field_rates", {})
-        field_rates: dict[str, tuple[OperatorTerm, ...]] = {}
-        for field_name, terms in raw_rates.items():
-            field_rates[str(field_name)] = tuple(
-                OperatorTerm.from_dict(t) for t in terms
+        Raises
+        ------
+        ValueError
+            If the JSON contains ``field_rates`` (old Hamilton form).
+            Re-derive with ``tidal derive`` to get E-L velocity form.
+        """
+        if "field_rates" in data:
+            msg = (
+                "JSON contains 'field_rates' (old Hamilton form). "
+                "Re-derive with 'tidal derive' to get E-L velocity form."
             )
-
-        # Parse kinetic matrix (new in Phase 2, optional for backward compat)
-        km_data = data.get("kinetic_matrix")
-        kinetic_matrix = KineticMatrix.from_dict(km_data) if km_data else None
-
-        # Parse spatial momenta (new in Phase 2, optional for backward compat)
-        raw_sm = data.get("spatial_momenta")
-        spatial_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
-        if raw_sm is not None:
-            spatial_momenta = {}
-            for field_name, terms in raw_sm.items():
-                spatial_momenta[str(field_name)] = tuple(
-                    OperatorTerm.from_dict(t) for t in terms
-                )
-
-        return cls(
-            hamiltonian_terms=h_terms,
-            field_rates=field_rates,
-            hamiltonian_symbolic=str(data.get("hamiltonian_symbolic", "")),
-            kinetic_matrix=kinetic_matrix,
-            spatial_momenta=spatial_momenta,
-        )
+            raise ValueError(msg)
+        h_terms = tuple(HamiltonianTerm.from_dict(t) for t in data["hamiltonian_terms"])
+        vol_elem = data.get("volume_element")  # None for flat spacetimes
+        return cls(hamiltonian_terms=h_terms, volume_element=vol_elem)
 
 
 @dataclass(frozen=True)
@@ -912,8 +814,8 @@ class EquationSystem:
         """Validate that all field references in equation terms are valid.
 
         Field references can be:
-        - Regular field names (e.g., "A_0", "A_1", "phi")
-        - Momentum field names (e.g., "pi_0", "pi_1") for mixed time-space derivatives
+        - Regular field names (e.g., ``"A_0"``, ``"A_1"``, ``"phi"``)
+        - Velocity names: ``"v_field_name"`` (e.g., ``"v_A_1"``)
 
         Raises
         ------
@@ -921,47 +823,32 @@ class EquationSystem:
             If a field reference is invalid.
         """
         valid_fields = set(self.component_names)
+        # Build valid velocity references: v_field_name
+        valid_velocities = {f"v_{name}" for name in self.component_names}
 
         for eq in self.equations:
             for term in eq.rhs_terms:
                 field_ref = term.field
 
-                # Check for momentum field reference (pi_*)
-                if field_ref.startswith("pi_"):
-                    parts = field_ref.split("_")
-                    if len(parts) != 2:  # noqa: PLR2004
-                        msg = (
-                            f"Invalid momentum field reference '{field_ref}' "
-                            f"in equation for {eq.field_name}. "
-                            f"Expected format 'pi_N' where N is a numeric index."
-                        )
-                        raise ValueError(msg)
-
-                    idx_str = parts[1]
-                    if not idx_str.isdigit():
-                        msg = (
-                            f"Invalid momentum field index in '{field_ref}' "
-                            f"(equation for {eq.field_name}). "
-                            f"Expected numeric index, got '{idx_str}'."
-                        )
-                        raise ValueError(msg)
-
-                    idx = int(idx_str)
-                    if not (0 <= idx < self.n_components):
-                        msg = (
-                            f"Momentum field index {idx} out of range in '{field_ref}' "
-                            f"(equation for {eq.field_name}). "
-                            f"Valid indices: 0 to {self.n_components - 1}."
-                        )
-                        raise ValueError(msg)
-                # Regular field reference
-                elif field_ref not in valid_fields:
+                # Check regular field names first (a field named "v_0" is
+                # a valid field, not a velocity reference)
+                if field_ref in valid_fields:
+                    continue
+                if field_ref in valid_velocities:
+                    continue
+                if field_ref.startswith("v_"):
                     msg = (
-                        f"Unknown field reference '{field_ref}' "
+                        f"Invalid velocity reference '{field_ref}' "
                         f"in equation for {eq.field_name}. "
-                        f"Valid fields: {sorted(valid_fields)}."
+                        f"Valid: {sorted(valid_velocities)}."
                     )
                     raise ValueError(msg)
+                msg = (
+                    f"Unknown field reference '{field_ref}' "
+                    f"in equation for {eq.field_name}. "
+                    f"Valid fields: {sorted(valid_fields)}."
+                )
+                raise ValueError(msg)
 
     @staticmethod
     def _compute_matrices_from_terms(
@@ -977,7 +864,7 @@ class EquationSystem:
         """Extract mass and coupling matrices from identity operator terms.
 
         Scans each equation's RHS terms for ``identity`` operators acting on
-        known field names (not momentum references like ``pi_N``).
+        known field names (not velocity references like ``v_N``).
 
         Convention: ``matrix[i][j] = -(coefficient)`` where ``coefficient``
         is the numeric coefficient of the ``identity(field_j)`` term in

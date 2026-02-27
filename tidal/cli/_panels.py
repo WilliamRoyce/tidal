@@ -72,9 +72,9 @@ def single_field(data: SimulationData, requested: str | None) -> str:
     """
     all_names = list(data.fields.keys())
     if requested is None:
-        # Prefer first dynamical field (has momentum) over constraint fields
+        # Prefer first dynamical field (has velocity) over constraint fields
         for name in all_names:
-            if name in data.momenta:
+            if name in data.velocities:
                 return name
         return all_names[0]
     if requested not in data.fields:

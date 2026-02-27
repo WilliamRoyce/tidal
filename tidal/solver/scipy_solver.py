@@ -14,24 +14,23 @@ J. Comp. Appl. Math. 6, 1980.
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
 import numpy as np
-from scipy.integrate import (  # pyright: ignore[reportMissingTypeStubs]
-    solve_ivp,  # pyright: ignore[reportUnknownVariableType]
-)
 
+from tidal.solver._scipy_types import IVPResult, call_solve_ivp
 from tidal.solver.fields import FieldSet
 from tidal.solver.leapfrog import compute_force, compute_velocity
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Callable
 
+    from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
     from tidal.solver.rhs import RHSEvaluator
-    from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
+    from tidal.symbolic.json_loader import EquationSystem
 
 # Time-derivative order threshold for dynamical (wave) equations
 _SECOND_ORDER = 2
@@ -40,13 +39,11 @@ _SECOND_ORDER = 2
 _IMPLICIT_METHODS = {"Radau", "BDF"}
 
 
-def _build_rhs_fn(  # noqa: PLR0913, PLR0917
+def _build_rhs_fn(
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
     bc: BCSpec | None,
-    kinetic: np.ndarray | None,
-    spatial_momenta: Mapping[str, Sequence[OperatorTerm]] | None,
     rhs_eval: RHSEvaluator,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
     """Build the scipy RHS closure: ``rhs_fn(t, y) -> dydt``."""
@@ -57,22 +54,12 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
         dydt = np.zeros_like(y)
 
         force = compute_force(spec, layout, grid, bc, y, t, rhs_eval)
+        velocity = compute_velocity(layout, y)
         fieldset = FieldSet.from_flat(layout, grid.shape, y)
-        velocity = compute_velocity(
-            layout,
-            grid,
-            kinetic,
-            spatial_momenta,
-            y,
-            fieldset,
-            bc,
-            t,
-            rhs_eval,
-        )
 
         for slot_idx, slot in enumerate(layout.slots):
             s = slice(slot_idx * n, (slot_idx + 1) * n)
-            if slot.kind == "momentum":
+            if slot.kind == "velocity":
                 dydt[s] = force[s]
             elif slot.kind == "field" and slot.time_order >= _SECOND_ORDER:
                 dydt[s] = velocity[s]
@@ -101,7 +88,7 @@ def solve_scipy(  # noqa: PLR0913
     max_step: float = np.inf,
     num_snapshots: int = 101,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
-) -> dict[str, Any]:
+) -> SolverResult:
     """Solve a TIDAL equation system using scipy.integrate.solve_ivp.
 
     Parameters
@@ -142,7 +129,6 @@ def solve_scipy(  # noqa: PLR0913
         at initial values.
     """
     layout = StateLayout.from_spec(spec, grid.num_points)
-    canonical = spec.canonical
 
     # Warn about constraint fields (frozen at IC)
     constraint_fields = [
@@ -155,12 +141,6 @@ def solve_scipy(  # noqa: PLR0913
             stacklevel=2,
         )
 
-    # Pre-extract kinetic matrix
-    kinetic = None
-    if canonical and canonical.kinetic_matrix:
-        kinetic = np.array(canonical.kinetic_matrix.to_dense())
-    spatial_momenta = canonical.spatial_momenta if canonical else None
-
     # Build RHSEvaluator for coefficient resolution
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
     from tidal.solver.rhs import RHSEvaluator  # noqa: PLC0415
@@ -169,44 +149,38 @@ def solve_scipy(  # noqa: PLR0913
     rhs_eval = RHSEvaluator(spec, grid, coeff_eval, bc=bc)
 
     # Build RHS closure
-    rhs_fn = _build_rhs_fn(spec, layout, grid, bc, kinetic, spatial_momenta, rhs_eval)
+    rhs_fn = _build_rhs_fn(spec, layout, grid, bc, rhs_eval)
 
     # Build time evaluation points
     t_eval = np.linspace(t_span[0], t_span[1], num_snapshots)
 
-    # Prepare solve_ivp kwargs
-    ivp_kwargs: dict[str, Any] = {
-        "rtol": rtol,
-        "atol": atol,
-        "max_step": max_step,
-        "t_eval": t_eval,
-        "dense_output": False,
-    }
-
     # For implicit methods, provide Jacobian sparsity
+    jac_sparsity = None
     if method in _IMPLICIT_METHODS:
         from tidal.solver.sparsity import build_jacobian_sparsity  # noqa: PLC0415
 
-        pattern = build_jacobian_sparsity(spec, layout, grid, bc)
-        ivp_kwargs["jac_sparsity"] = pattern
+        jac_sparsity = build_jacobian_sparsity(spec, layout, grid, bc)
 
-    result: Any = solve_ivp(rhs_fn, t_span, y0, method=method, **ivp_kwargs)  # pyright: ignore[reportUnknownVariableType]
-
-    # solve_ivp returns y as (n_states, n_times) — transpose to (n_times, n_states)
-    y_out: np.ndarray = result.y.T if result.y is not None else np.empty((0, len(y0)))  # pyright: ignore[reportUnknownVariableType]
-    t_out: np.ndarray = result.t if result.t is not None else np.empty(0)  # pyright: ignore[reportUnknownVariableType]
+    result: IVPResult = call_solve_ivp(
+        rhs_fn,
+        t_span,
+        y0,
+        method=method,
+        t_eval=t_eval,
+        rtol=rtol,
+        atol=atol,
+        max_step=max_step,
+        jac_sparsity=jac_sparsity,
+    )
 
     # Call snapshot callback at each output time
     if snapshot_callback is not None and result.success:
-        for i in range(len(t_out)):  # pyright: ignore[reportUnknownArgumentType]
-            snapshot_callback(t_out[i], y_out[i])  # pyright: ignore[reportUnknownArgumentType]
+        for i in range(len(result.t)):
+            snapshot_callback(result.t[i], result.y[i])
 
-    msg: str = result.message or (  # pyright: ignore[reportUnknownVariableType]
-        "scipy integration completed" if result.success else "scipy integration failed"
-    )
     return {
-        "t": t_out,
-        "y": y_out,
+        "t": result.t,
+        "y": result.y,
         "success": result.success,
-        "message": msg,
+        "message": result.message,
     }

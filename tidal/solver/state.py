@@ -2,7 +2,7 @@
 
 IDA and leapfrog operate on flat numpy arrays.  This module provides:
 
-- ``StateLayout``: describes which slots map to which fields/momenta
+- ``StateLayout``: describes which slots map to which fields/velocities
 - ``state_to_flat`` / ``flat_to_fields``: convert between flat vectors and
   named field dictionaries
 """
@@ -35,12 +35,12 @@ class SlotInfo:
     Attributes
     ----------
     name : str
-        Field or momentum name (e.g. ``"phi_0"`` or ``"pi_phi_0"``).
+        Field or velocity name (e.g. ``"phi_0"`` or ``"v_phi_0"``).
     field_name : str
         The physical field this slot belongs to (always the field name,
-        even for momentum slots).
+        even for velocity slots).
     kind : str
-        One of ``"field"``, ``"momentum"``, ``"constraint"``.
+        One of ``"field"``, ``"velocity"``, ``"constraint"``.
     time_order : int
         Original LHS time-derivative order (0, 1, or 2).
     dynamical_index : int | None
@@ -75,8 +75,8 @@ class StateLayout:
         Grid points per slot (``grid.num_points``).
     field_slot_map : dict[str, int]
         Maps field name → slot index.
-    momentum_slot_map : dict[str, int]
-        Maps field name → momentum slot index (second-order fields only).
+    velocity_slot_map : dict[str, int]
+        Maps field name → velocity slot index (second-order fields only).
     dynamical_fields : tuple[str, ...]
         Names of dynamical fields (time_order >= 2), in order.
     """
@@ -84,8 +84,13 @@ class StateLayout:
     slots: tuple[SlotInfo, ...]
     num_points: int
     field_slot_map: dict[str, int]
-    momentum_slot_map: dict[str, int]
+    velocity_slot_map: dict[str, int]
     dynamical_fields: tuple[str, ...]
+
+    @property
+    def momentum_slot_map(self) -> dict[str, int]:
+        """Alias for ``velocity_slot_map`` (transition aid)."""
+        return self.velocity_slot_map
 
     @classmethod
     def from_spec(cls, spec: EquationSystem, num_points: int) -> StateLayout:
@@ -93,11 +98,11 @@ class StateLayout:
 
         Follows the same ordering as py-pde FieldCollection:
         for each equation, emit a field slot; if second-order, also emit
-        a momentum slot immediately after.
+        a velocity slot immediately after.
         """
         slots: list[SlotInfo] = []
         field_slot_map: dict[str, int] = {}
-        momentum_slot_map: dict[str, int] = {}
+        velocity_slot_map: dict[str, int] = {}
         dynamical_fields: list[str] = []
         dyn_idx = 0
 
@@ -125,13 +130,13 @@ class StateLayout:
             )
 
             if order >= _SECOND_ORDER:
-                mom_name = f"pi_{name}"
-                momentum_slot_map[name] = len(slots)
+                vel_name = f"v_{name}"
+                velocity_slot_map[name] = len(slots)
                 slots.append(
                     SlotInfo(
-                        name=mom_name,
+                        name=vel_name,
                         field_name=name,
-                        kind="momentum",
+                        kind="velocity",
                         time_order=order,
                         dynamical_index=d_idx,
                     )
@@ -141,7 +146,7 @@ class StateLayout:
             slots=tuple(slots),
             num_points=num_points,
             field_slot_map=field_slot_map,
-            momentum_slot_map=momentum_slot_map,
+            velocity_slot_map=velocity_slot_map,
             dynamical_fields=tuple(dynamical_fields),
         )
 
@@ -184,7 +189,7 @@ def state_to_flat(
     Parameters
     ----------
     fields : dict[str, np.ndarray]
-        Mapping from slot name (e.g. ``"phi_0"``, ``"pi_phi_0"``) to
+        Mapping from slot name (e.g. ``"phi_0"``, ``"v_phi_0"``) to
         grid-shaped arrays.
     layout : StateLayout
         State layout descriptor.
