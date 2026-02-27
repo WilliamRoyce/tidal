@@ -70,15 +70,18 @@ The PDE time-stepping layer uses four backends, automatically selected based on 
 - **Derivative conversion:** `CommonUtilities.wl` handles both 2-arg (1+1D) and 3-arg (2+1D) Derivative forms
 - **Supports:** 1+1D (t,x), 2+1D (t,x,y), 3+1D (t,x,y,z), extensible to higher
 
-### Canonical Momentum Pipeline
+### E-L Velocity Form (Current)
 
-The Wolfram pipeline performs the full Legendre transform:
+State vector stores velocities `v = dq/dt` directly (not canonical momenta). The JSON `equations[]` array contains original Euler-Lagrange equations as derived by the Wolfram pipeline. No Legendre transform, no `field_rates`, no K-inversion at runtime.
 
-1. Compute conjugate momenta: π*i = ∂L/∂(∂_t q_i) = K*{ij} · ∂_t q_j + S_i
-2. Invert kinetic matrix symbolically: `Inverse[K]` in Wolfram
-3. Emit first-order evolution: dq*i/dt = K^{-1}*{ij} (π_j − S_j)
+- **State:** `(q, v, A₀)` where `v_X = dX/dt`
+- **Kinematic:** `dq/dt = v` (trivial identity)
+- **Dynamic:** `dv/dt = RHS` (E-L equations from JSON)
+- **JSON canonical structure:** `hamiltonian_terms` (bilinear H for energy) + optional `volume_element` (sqrt|g_spatial| for curved coordinates)
+- **Velocity naming:** `v_{field_name}` (e.g., `v_phi_0`, `v_A_1`), slot kind `"velocity"`
+- **SimulationData:** `.velocities` attribute stores `v = dq/dt` (renamed from `.momenta`)
 
-**JSON canonical structure** stores K + S separately (`kinetic_matrix` + `spatial_momenta`), plus pre-inverted `field_rates` and `hamiltonian_terms`. This decomposition is solver-agnostic: IDA uses K directly (implicit), leapfrog uses `np.linalg.solve(K, rhs)`.
+**Volume-weighted energy:** For curved coordinates, `E = ∫ H(x) √|g_spatial| d^n x`. The Wolfram pipeline computes `sqrt|det(g_spatial)|` from `MetricMatrix[[2;;, 2;;]]` and injects it as `canonical.volume_element` in the JSON. Omitted for flat spacetimes (fast path: scalar 1.0 multiply).
 
 ### Mass/Coupling Matrix Auto-Computation (Phase 12)
 
@@ -185,7 +188,7 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 
 `identity`, `laplacian`, `laplacian_{x,y,z}`, `gradient_{x,y,z}`, `cross_derivative_{xy,xz,yz}`, `first_derivative_t`, `biharmonic`
 
-- All support cross-field application and momentum (`pi_i`) references
+- All support cross-field application and velocity (`v_i`) references. `first_derivative_t` resolves to velocity slot at runtime.
 
 ## Example Implementations
 
@@ -220,7 +223,7 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 
 ### Test Counts
 
-- **915 Python tests** + **~115 Wolfram tests** passing
+- **945 Python tests** + **~115 Wolfram tests** passing
 - Run: `uv run pytest tests/` and `./scripts/full_test.sh`
 
 ### Verification Pattern

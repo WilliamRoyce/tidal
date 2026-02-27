@@ -10,7 +10,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - `tidal/cli/` -- CLI entry points (7 subcommands: derive, simulate, measure, inspect, list, validate, plot)
 - `tidal/measurement/` -- Physics measurements (energy, conversion, mixing, spectra)
 - `examples/` -- 22 physics examples (1+1D through 3+1D), each with theory.toml + .wls + data/*.json
-- `tests/` -- ~915 Python tests + ~115 Wolfram tests
+- `tests/` -- ~945 Python tests + ~115 Wolfram tests
 - `docs/` -- Architecture docs (MEMORY.md is the main reference)
 
 ## Key Commands
