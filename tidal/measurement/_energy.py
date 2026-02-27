@@ -541,7 +541,7 @@ def _resolve_term_target(
         eq = data.spec.equations[eq_idx]
         if eq.time_derivative_order == 0:
             return None
-        vel = data.momenta.get(target_name)
+        vel = data.velocities.get(target_name)
         if vel is not None:
             return vel[t_idx]
         msg = (
@@ -565,13 +565,14 @@ def _resolve_term_target(
 
 def compute_field_energy(  # noqa: PLR0913
     field_data: NDArray[np.float64],
-    momentum_data: NDArray[np.float64] | None,
+    velocity_data: NDArray[np.float64] | None,
     mass_squared: float | NDArray[np.float64],
     grid_spacing: tuple[float, ...],
     periodic: tuple[bool, ...],
     *,
     gradient_axes: list[int] | None = None,
     bc_types: tuple[str, ...] | None = None,
+    volume_weight: float | NDArray[np.float64] = 1.0,
 ) -> FieldEnergy:
     """Compute canonical energy density for a single field at one snapshot.
 
@@ -581,8 +582,8 @@ def compute_field_energy(  # noqa: PLR0913
     ----------
     field_data : ndarray, shape ``(*grid_shape)``
         Field values on the spatial grid.
-    momentum_data : ndarray or None
-        Conjugate momentum ``π``.  ``None`` for constraint fields.
+    velocity_data : ndarray or None
+        Velocity ``v = dq/dt``.  ``None`` for constraint fields.
     mass_squared : float | ndarray
         Diagonal mass matrix entry ``m²``.  May be a scalar (constant mass)
         or a grid-shaped ndarray (position-dependent mass).
@@ -596,22 +597,25 @@ def compute_field_energy(  # noqa: PLR0913
         gradient (e.g. ``[1]`` when the PDE has only ``laplacian_y``).
     bc_types : tuple[str, ...] | None
         Per-axis BC type.  When ``None``, falls back to ``periodic``.
+    volume_weight : float or ndarray
+        Spatial volume element ``sqrt|g_spatial|`` for curved coordinates.
+        Defaults to 1.0 (flat/Cartesian).
 
     Returns
     -------
     FieldEnergy
     """
     _validate_array(field_data, "field_data")
-    if momentum_data is not None:
-        _validate_array(momentum_data, "momentum_data")
+    if velocity_data is not None:
+        _validate_array(velocity_data, "velocity_data")
 
-    # Kinetic energy density: 0.5 * ⟨π²⟩
-    if momentum_data is not None:
-        kinetic = 0.5 * float((momentum_data**2).mean())
+    # Kinetic energy density: 0.5 * ⟨v² * sqrt|g|⟩
+    if velocity_data is not None:
+        kinetic = 0.5 * float((velocity_data**2 * volume_weight).mean())
     else:
         kinetic = 0.0
 
-    # Gradient energy density: 0.5 * ⟨|∇φ|²⟩ (over specified axes)
+    # Gradient energy density: 0.5 * ⟨|∇φ|² * sqrt|g|⟩ (over specified axes)
     grad_sq = _gradient_energy_density(
         field_data,
         grid_spacing,
@@ -619,10 +623,10 @@ def compute_field_energy(  # noqa: PLR0913
         axes=gradient_axes,
         bc_types=bc_types,
     )
-    gradient = 0.5 * float(grad_sq.mean())
+    gradient = 0.5 * float((grad_sq * volume_weight).mean())
 
-    # Mass energy density: 0.5 * ⟨m² φ²⟩ (m² may be scalar or ndarray)
-    mass_energy = 0.5 * float((mass_squared * field_data**2).mean())
+    # Mass energy density: 0.5 * ⟨m² φ² * sqrt|g|⟩ (m² may be scalar or ndarray)
+    mass_energy = 0.5 * float((mass_squared * field_data**2 * volume_weight).mean())
 
     total = kinetic + gradient + mass_energy
     return FieldEnergy(
@@ -897,7 +901,7 @@ def _evaluate_hamiltonian_factor(
     """Evaluate a single Hamiltonian factor on the grid.
 
     For ``time_derivative`` operator, reads the velocity directly from
-    ``data.momenta`` (which stores velocities v = dq/dt in the E-L form).
+    ``data.velocities`` (which stores velocities v = dq/dt in the E-L form).
 
     For spatial operators, applies the operator to the field data.
     For ``identity``, returns the field data directly.
@@ -906,7 +910,7 @@ def _evaluate_hamiltonian_factor(
     field without stored velocity for time_derivative).
     """
     if factor_operator == "time_derivative":
-        vel = data.momenta.get(factor_field)
+        vel = data.velocities.get(factor_field)
         if vel is not None:
             return vel[t_idx]
         return None
@@ -1025,7 +1029,7 @@ def _merge_parameters(data: SimulationData) -> dict[str, float]:
     return params
 
 
-def _compute_hamiltonian_from_canonical(
+def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
     data: SimulationData,
     t_idx: int,
 ) -> float:
@@ -1036,7 +1040,7 @@ def _compute_hamiltonian_from_canonical(
     periodic → IBP, non-periodic → central-difference.
 
     For kinetic (``time_derivative × time_derivative``) terms, reads
-    velocities directly from ``data.momenta`` (which stores v = dq/dt
+    velocities directly from ``data.velocities`` (which stores v = dq/dt
     in the E-L velocity form).  No field_rates expansion needed.
 
     This ensures the measured Hamiltonian uses the **same** finite-difference
@@ -1073,6 +1077,22 @@ def _compute_hamiltonian_from_canonical(
 
     params = _merge_parameters(data)
     coord_arrays: dict[str, NDArray[np.float64]] | None = None  # lazy-initialised
+
+    # Volume element: sqrt|g_spatial| for curved coordinates.
+    # None -> flat spacetime, volume_weight stays 1.0 (no grid allocation).
+    volume_weight: float | NDArray[np.float64] = 1.0
+    if canonical.volume_element is not None:
+        if coord_arrays is None:
+            coord_arrays = _build_coord_arrays(data)
+        from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+        volume_weight = evaluate_coefficient(
+            canonical.volume_element,
+            params,
+            data.spec.effective_coordinates,
+            coord_arrays=coord_arrays,
+            t=0.0,
+        )
 
     total = 0.0
     for term in canonical.hamiltonian_terms:
@@ -1124,19 +1144,21 @@ def _compute_hamiltonian_from_canonical(
                 data.periodic,
                 bc_types=data.bc_types,
             )
-            total += float((coeff * density).mean())
+            total += float((coeff * density * volume_weight).mean())
             continue
 
         # Kinetic: time_derivative × time_derivative — direct velocity lookup.
-        # In E-L velocity form, data.momenta stores v = dq/dt directly.
-        # No field_rates expansion needed: vel_A = data.momenta[field_A].
+        # In E-L velocity form, data.velocities stores v = dq/dt directly.
+        # No field_rates expansion needed: vel_A = data.velocities[field_A].
         if op_a == "time_derivative" and op_b == "time_derivative":
             fname_a = term.factor_a.field
             fname_b = term.factor_b.field
-            vel_a = data.momenta.get(fname_a)
-            vel_b = data.momenta.get(fname_b)
+            vel_a = data.velocities.get(fname_a)
+            vel_b = data.velocities.get(fname_b)
             if vel_a is not None and vel_b is not None:
-                total += float((coeff * vel_a[t_idx] * vel_b[t_idx]).mean())
+                total += float(
+                    (coeff * vel_a[t_idx] * vel_b[t_idx] * volume_weight).mean()
+                )
             continue
 
         # All other terms: identity, mixed operator×identity, etc.
@@ -1155,7 +1177,7 @@ def _compute_hamiltonian_from_canonical(
         if fa is None or fb is None:
             continue
 
-        total += float((coeff * fa * fb).mean())
+        total += float((coeff * fa * fb * volume_weight).mean())
 
     return total
 
@@ -1193,6 +1215,7 @@ def compute_system_energy(  # noqa: PLR0914
     # only the corresponding axes contribute to per-field gradient energy.
 
     # Pre-build coordinate arrays once if any field has position-dependent mass
+    # or we need the volume element for curved coordinates.
     coord_arrays: dict[str, NDArray[np.float64]] | None = None
     has_posdep_mass = any(
         term.operator == "identity"
@@ -1201,8 +1224,30 @@ def compute_system_energy(  # noqa: PLR0914
         for eq in data.spec.equations
         for term in eq.rhs_terms
     )
-    if has_posdep_mass:
+    needs_coord_arrays = has_posdep_mass or (
+        data.spec.canonical is not None
+        and data.spec.canonical.volume_element is not None
+    )
+    if needs_coord_arrays:
         coord_arrays = _build_coord_arrays(data)
+
+    # Volume element: sqrt|g_spatial| for curved coordinates.
+    # 1.0 for flat spacetimes (no grid allocation, scalar multiply is no-op).
+    volume_weight: float | NDArray[np.float64] = 1.0
+    if (
+        data.spec.canonical is not None
+        and data.spec.canonical.volume_element is not None
+        and coord_arrays is not None
+    ):
+        from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+        volume_weight = evaluate_coefficient(
+            data.spec.canonical.volume_element,
+            _merge_parameters(data),
+            data.spec.effective_coordinates,
+            coord_arrays=coord_arrays,
+            t=0.0,
+        )
 
     per_field: dict[str, FieldEnergy] = {}
     for field_idx, eq in enumerate(data.spec.equations):
@@ -1211,19 +1256,20 @@ def compute_system_energy(  # noqa: PLR0914
             continue
 
         field_snapshot = data.fields[name][t_idx]
-        mom_snapshot = data.momenta.get(name)
-        mom_arr = mom_snapshot[t_idx] if mom_snapshot is not None else None
+        vel_snapshot = data.velocities.get(name)
+        vel_arr = vel_snapshot[t_idx] if vel_snapshot is not None else None
 
         m2 = _resolve_mass_squared(data, field_idx, coord_arrays=coord_arrays)
         axes = _self_gradient_axes(eq)
         per_field[name] = compute_field_energy(
             field_snapshot,
-            mom_arr,
+            vel_arr,
             m2,
             data.grid_spacing,
             data.periodic,
             gradient_axes=axes,
             bc_types=data.bc_types,
+            volume_weight=volume_weight,
         )
 
     # Use canonical Hamiltonian when available (Phase K: Legendre transform)

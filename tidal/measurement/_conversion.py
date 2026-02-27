@@ -73,7 +73,7 @@ def _field_energy_series(
     energies: list[float] = []
     for t_idx in range(data.n_snapshots):
         field_arr = data.fields[field_name][t_idx]
-        mom_all = data.momenta.get(field_name)
+        mom_all = data.velocities.get(field_name)
         mom_arr = mom_all[t_idx] if mom_all is not None else None
         fe = compute_field_energy(
             field_arr,

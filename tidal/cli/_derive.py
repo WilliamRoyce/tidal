@@ -1970,7 +1970,7 @@ def _total_raw_component_count(ctx: _WlsContext) -> int:
 _LAGRANGIAN_DECOMPOSE_THRESHOLD = 30
 
 
-def _wls_canonical_from_eom(_ctx: _WlsContext) -> list[str]:
+def _wls_canonical_from_eom(ctx: _WlsContext) -> list[str]:
     """Generate canonical structure directly from the already-decomposed EOM.
 
     This is the **fast path** for high-rank tensor fields (rank >= 3) where
@@ -1982,6 +1982,7 @@ def _wls_canonical_from_eom(_ctx: _WlsContext) -> list[str]:
 
     ``fieldEquations`` must already exist in the WLS script context.
     """
+    p = ctx.prefix
     return [
         "",
         "(* === Canonical Structure (EOM-based fast path) === *)",
@@ -1990,10 +1991,18 @@ def _wls_canonical_from_eom(_ctx: _WlsContext) -> list[str]:
         'Print[""];',
         'Print["Building canonical structure from EOM (fast path)..."];',
         "",
+        "(* Compute spatial volume element sqrt|det(g_spatial)| *)",
+        f"sqrtDetGSpatial = Simplify[Sqrt[Abs[Det[{p}MetricMatrix[[2;;, 2;;]]]]]];",
+        'Print["sqrt|g_spatial|: ", sqrtDetGSpatial];',
+        "",
         "(* Inject canonical structure — hamiltonian_terms empty (fast path). *)",
-        'jsonStructure["canonical"] = <|',
+        "canonicalSection = <|",
         '  "hamiltonian_terms" -> {}',
         "|>;",
+        "If[sqrtDetGSpatial =!= 1,",
+        '  canonicalSection["volume_element"] = ToString[sqrtDetGSpatial, InputForm]',
+        "];",
+        'jsonStructure["canonical"] = canonicalSection;',
         "",
         'Print["Canonical structure (EOM-based, hamiltonian_terms empty) injected."];',
         'Print["E-L equations preserved (no Hamilton equation injection)."];',
@@ -2028,16 +2037,26 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
 
     # E-L velocity form: keep original E-L equations, only inject
     # Hamiltonian terms for energy measurement.
+    p = ctx.prefix
     lines.extend(
         [
             "(* === E-L Velocity Form: Inject Canonical Structure === *)",
             "(* E-L equations are preserved as-is in equations[] array. *)",
             "(* Only hamiltonian_terms are injected for energy measurement. *)",
             "",
-            "(* Inject canonical structure into JSON (hamiltonian_terms only) *)",
-            'jsonStructure["canonical"] = <|',
+            "(* Compute spatial volume element sqrt|det(g_spatial)| for energy integration *)",
+            f"sqrtDetGSpatial = Simplify[Sqrt[Abs[Det[{p}MetricMatrix[[2;;, 2;;]]]]]];",
+            'Print["sqrt|g_spatial|: ", sqrtDetGSpatial];',
+            "",
+            "(* Inject canonical structure into JSON *)",
+            "canonicalSection = <|",
             '  "hamiltonian_terms" -> hamiltonianTerms',
             "|>;",
+            "(* Only include volume_element when non-trivial (curved coordinates) *)",
+            "If[sqrtDetGSpatial =!= 1,",
+            '  canonicalSection["volume_element"] = ToString[sqrtDetGSpatial, InputForm]',
+            "];",
+            'jsonStructure["canonical"] = canonicalSection;',
             "",
             'Print["Canonical structure (hamiltonian_terms only) injected into JSON."];',
             'Print["E-L equations preserved (no Hamilton equation injection)."];',

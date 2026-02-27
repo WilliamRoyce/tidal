@@ -62,7 +62,7 @@ def _open_memmap(
 class SnapshotWriter:
     """Stream simulation snapshots to disk with O(1) memory.
 
-    Pre-allocates one ``.npy`` file per field/momentum (plus ``times.npy``)
+    Pre-allocates one ``.npy`` file per field/velocity (plus ``times.npy``)
     using ``numpy.memmap``, then writes each snapshot in-place.  The exact
     number of snapshots must be known at construction time — compute it as
     ``int(t_end / snapshot_interval) + 1``.
@@ -70,8 +70,8 @@ class SnapshotWriter:
     Use as a context manager for automatic ``close()``::
 
         with SnapshotWriter(output_dir, ...) as writer:
-            for t, fields, momenta in simulation:
-                writer.append(t, fields, momenta)
+            for t, fields, velocities in simulation:
+                writer.append(t, fields, velocities)
 
     Parameters
     ----------
@@ -79,8 +79,8 @@ class SnapshotWriter:
         Directory to create.  Must not already exist.
     field_names : list[str]
         Names of field arrays to store (e.g. ``["phi_0", "chi_0"]``).
-    momentum_names : list[str]
-        Names of momentum arrays to store (e.g. ``["phi_0", "chi_0"]``).
+    velocity_names : list[str]
+        Names of velocity arrays to store (e.g. ``["phi_0", "chi_0"]``).
         Stored as ``v_{name}.npy``.
     grid_shape : tuple[int, ...]
         Spatial grid shape (e.g. ``(96, 96)``).
@@ -102,7 +102,7 @@ class SnapshotWriter:
         self,
         output_dir: Path,
         field_names: list[str],
-        momentum_names: list[str],
+        velocity_names: list[str],
         grid_shape: tuple[int, ...],
         n_snapshots: int,
         grid_spacing: tuple[float, ...],
@@ -139,7 +139,7 @@ class SnapshotWriter:
         self._n_snapshots = n_snapshots
         self._grid_shape = grid_shape
         self._field_names = list(field_names)
-        self._momentum_names = list(momentum_names)
+        self._velocity_names = list(velocity_names)
         self._grid_spacing = grid_spacing
         self._grid_bounds = grid_bounds
         self._periodic = periodic
@@ -168,12 +168,12 @@ class SnapshotWriter:
                 shape=snapshot_shape,
             )
 
-        # Pre-allocate per-momentum .npy files
-        self._momentum_mmaps: dict[
+        # Pre-allocate per-velocity .npy files
+        self._velocity_mmaps: dict[
             str, np.memmap[tuple[int, ...], np.dtype[np.float64]]
         ] = {}
-        for name in momentum_names:
-            self._momentum_mmaps[name] = _open_memmap(
+        for name in velocity_names:
+            self._velocity_mmaps[name] = _open_memmap(
                 self._output_dir / f"v_{name}.npy",
                 shape=snapshot_shape,
             )
@@ -186,7 +186,7 @@ class SnapshotWriter:
         self,
         t: float,
         fields: dict[str, NDArray[np.float64]],
-        momenta: dict[str, NDArray[np.float64]],
+        velocities: dict[str, NDArray[np.float64]],
     ) -> None:
         """Write one snapshot at the next time index.
 
@@ -196,14 +196,14 @@ class SnapshotWriter:
             Simulation time for this snapshot.
         fields : dict[str, ndarray]
             Mapping ``field_name → spatial_array`` for this snapshot.
-        momenta : dict[str, ndarray]
-            Mapping ``field_name → spatial_array`` for momenta.
+        velocities : dict[str, ndarray]
+            Mapping ``field_name → spatial_array`` for velocities.
 
         Raises
         ------
         ValueError
             If the writer is closed, the snapshot count is exceeded,
-            the time is non-finite or non-monotonic, or a field/momentum
+            the time is non-finite or non-monotonic, or a field/velocity
             array has the wrong shape.
         """
         if self._closed:
@@ -245,18 +245,18 @@ class SnapshotWriter:
                 raise ValueError(msg)
             self._field_mmaps[name][idx] = arr
 
-        for name in self._momentum_names:
-            if name not in momenta:
-                msg = f"Missing momentum '{name}' in snapshot {idx}"
+        for name in self._velocity_names:
+            if name not in velocities:
+                msg = f"Missing velocity '{name}' in snapshot {idx}"
                 raise ValueError(msg)
-            arr = momenta[name]
+            arr = velocities[name]
             if arr.shape != self._grid_shape:
                 msg = (
-                    f"Momentum '{name}' has shape {arr.shape}, "
+                    f"Velocity '{name}' has shape {arr.shape}, "
                     f"expected {self._grid_shape}"
                 )
                 raise ValueError(msg)
-            self._momentum_mmaps[name][idx] = arr
+            self._velocity_mmaps[name][idx] = arr
 
         self._count += 1
 
@@ -300,9 +300,9 @@ class SnapshotWriter:
         for mmap in self._field_mmaps.values():
             del mmap
         self._field_mmaps.clear()
-        for mmap in self._momentum_mmaps.values():
+        for mmap in self._velocity_mmaps.values():
             del mmap
-        self._momentum_mmaps.clear()
+        self._velocity_mmaps.clear()
 
         # Write metadata
         metadata: dict[str, Any] = {
@@ -314,7 +314,8 @@ class SnapshotWriter:
             "periodic": list(self._periodic),
             "parameters": self._parameters,
             "fields": self._field_names,
-            "momenta": self._momentum_names,
+            "velocities": self._velocity_names,
+            "momenta": self._velocity_names,  # backward compat
             "dtype": "float64",
         }
         if self._bc_types is not None:
@@ -351,7 +352,7 @@ class SnapshotWriter:
         self._times_mmap.flush()
         for mmap in self._field_mmaps.values():
             mmap.flush()
-        for mmap in self._momentum_mmaps.values():
+        for mmap in self._velocity_mmaps.values():
             mmap.flush()
 
 
@@ -389,7 +390,7 @@ def _field_names_from_spec(
     *,
     exclude_constraints: bool = False,
 ) -> tuple[list[str], list[str]]:
-    """Extract field and momentum names from an equation spec.
+    """Extract field and velocity names from an equation spec.
 
     Parameters
     ----------
@@ -402,18 +403,18 @@ def _field_names_from_spec(
     -------
     field_names : list[str]
         Field names to store.
-    momentum_names : list[str]
-        Momentum names to store (fields with ``time_derivative_order >= 2``).
+    velocity_names : list[str]
+        Velocity names to store (fields with ``time_derivative_order >= 2``).
     """
     field_names: list[str] = []
-    momentum_names: list[str] = []
+    velocity_names: list[str] = []
     for eq in spec.equations:
         if exclude_constraints and eq.time_derivative_order == 0:
             continue
         field_names.append(eq.field_name)
         if eq.time_derivative_order >= 2:  # noqa: PLR2004
-            momentum_names.append(eq.field_name)
-    return field_names, momentum_names
+            velocity_names.append(eq.field_name)
+    return field_names, velocity_names
 
 
 def create_snapshot_callback(  # noqa: PLR0913, PLR0917
@@ -436,7 +437,7 @@ def create_snapshot_callback(  # noqa: PLR0913, PLR0917
     output_dir : Path or str
         Directory to write snapshot files into.
     spec : EquationSystem
-        Equation system (provides field/momentum names and state layout).
+        Equation system (provides field/velocity names and state layout).
     grid : CartesianGrid
         py-pde grid (provides shape, spacing, bounds, periodicity).
     t_end : float
@@ -456,7 +457,7 @@ def create_snapshot_callback(  # noqa: PLR0913, PLR0917
         Pass to ``CallbackTracker(callback, interrupts=snapshot_interval)``.
     """
     out = Path(output_dir)
-    field_names, momentum_names = _field_names_from_spec(spec)
+    field_names, velocity_names = _field_names_from_spec(spec)
     n_snapshots = compute_snapshot_count(t_end, snapshot_interval)
 
     grid_bounds_raw = grid.bounds
@@ -470,7 +471,7 @@ def create_snapshot_callback(  # noqa: PLR0913, PLR0917
     writer = SnapshotWriter(
         output_dir=out,
         field_names=field_names,
-        momentum_names=momentum_names,
+        velocity_names=velocity_names,
         grid_shape=tuple(grid.shape),
         n_snapshots=n_snapshots,
         grid_spacing=spacing,
@@ -482,15 +483,15 @@ def create_snapshot_callback(  # noqa: PLR0913, PLR0917
 
     # Build slot maps from spec.state_layout
     field_slots: dict[str, int] = {}
-    momentum_slots: dict[str, int] = {}
+    velocity_slots: dict[str, int] = {}
     for idx, (name, slot_type) in enumerate(spec.state_layout):
         if slot_type == "field":
             field_slots[name] = idx
         elif slot_type == "velocity":
-            momentum_slots[name] = idx
+            velocity_slots[name] = idx
 
     field_set = set(field_names)
-    momentum_set = set(momentum_names)
+    velocity_set = set(velocity_names)
 
     def _on_snapshot(state_view: Any, time: float) -> None:  # noqa: ANN401
         fields = {
@@ -498,11 +499,11 @@ def create_snapshot_callback(  # noqa: PLR0913, PLR0917
             for name, slot in field_slots.items()
             if name in field_set
         }
-        moms = {
+        vels = {
             name: np.asarray(state_view[slot].data, dtype=np.float64)
-            for name, slot in momentum_slots.items()
-            if name in momentum_set
+            for name, slot in velocity_slots.items()
+            if name in velocity_set
         }
-        writer.append(time, fields, moms)
+        writer.append(time, fields, vels)
 
     return writer, _on_snapshot

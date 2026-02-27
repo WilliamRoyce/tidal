@@ -887,7 +887,7 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     n_snaps = compute_snapshot_count(args.t_end, snapshot_interval)
 
     field_names = [s.name for s in layout.slots if s.kind != "velocity"]
-    momentum_names = [s.field_name for s in layout.slots if s.kind == "velocity"]
+    velocity_names = [s.field_name for s in layout.slots if s.kind == "velocity"]
 
     # Identify constraint fields whose velocities should be written to disk.
     # IDA provides exact ∂_t(constraint) via yp — needed for energy measurement.
@@ -899,13 +899,13 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
         if cname in layout.field_slot_map:
             constraint_slot_map[cname] = layout.field_slot_map[cname]
 
-    # Include constraint velocity names alongside dynamical momenta
-    all_momentum_names = momentum_names + list(constraint_slot_map.keys())
+    # Include constraint velocity names alongside dynamical velocities
+    all_velocity_names = velocity_names + list(constraint_slot_map.keys())
 
     writer = SnapshotWriter(
         output_dir=output_dir,
         field_names=field_names,
-        momentum_names=all_momentum_names,
+        velocity_names=all_velocity_names,
         grid_shape=grid_info.shape,
         n_snapshots=n_snaps,
         grid_spacing=tuple(float(d) for d in grid_info.dx),
@@ -921,13 +921,13 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     n_pts = grid_info.num_points
     shape = grid_info.shape
     field_set = set(field_names)
-    momentum_set = set(momentum_names)
+    velocity_set = set(velocity_names)
 
     field_slots_map: dict[str, int] = {}
-    momentum_slots_map: dict[str, int] = {}
+    velocity_slots_map: dict[str, int] = {}
     for i, slot in enumerate(layout.slots):
         if slot.kind == "velocity":
-            momentum_slots_map[slot.field_name] = i
+            velocity_slots_map[slot.field_name] = i
         elif slot.name in field_set:
             field_slots_map[slot.name] = i
 
@@ -940,18 +940,18 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
             name: y_flat[idx * n_pts : (idx + 1) * n_pts].reshape(shape)
             for name, idx in field_slots_map.items()
         }
-        moms_d = {
+        vels_d = {
             name: y_flat[idx * n_pts : (idx + 1) * n_pts].reshape(shape)
-            for name, idx in momentum_slots_map.items()
-            if name in momentum_set
+            for name, idx in velocity_slots_map.items()
+            if name in velocity_set
         }
         # Extract constraint velocities from IDA's yp vector
         if yp_flat is not None:
             for cname, slot_idx in constraint_slot_map.items():
-                moms_d[cname] = yp_flat[
+                vels_d[cname] = yp_flat[
                     slot_idx * n_pts : (slot_idx + 1) * n_pts
                 ].reshape(shape)
-        writer.append(t, fields_d, moms_d)
+        writer.append(t, fields_d, vels_d)
 
     return writer, _disk_callback
 
