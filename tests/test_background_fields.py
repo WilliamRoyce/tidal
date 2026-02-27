@@ -70,7 +70,7 @@ class TestBackgroundEnergy:
         data = SimulationData(
             spec=spec,
             fields={"phi": np.zeros((2, 8, 8))},
-            momenta={"pi_phi": np.zeros((2, 8, 8))},
+            momenta={"phi": np.zeros((2, 8, 8))},
             times=np.array([0.0, 1.0]),
             grid_spacing=(10.0 / 8, 10.0 / 8),
             grid_bounds=((0.0, 10.0), (0.0, 10.0)),
@@ -119,7 +119,7 @@ class TestBackgroundEnergy:
         data = SimulationData(
             spec=spec,
             fields={"phi": np.ones((2, 8, 8))},
-            momenta={"pi_phi": np.zeros((2, 8, 8))},
+            momenta={"phi": np.zeros((2, 8, 8))},
             times=np.array([0.0, 1.0]),
             grid_spacing=(10.0 / 8, 10.0 / 8),
             grid_bounds=((0.0, 10.0), (0.0, 10.0)),
@@ -169,7 +169,7 @@ class TestBackgroundEnergy:
         data = SimulationData(
             spec=spec,
             fields={"phi": np.ones((2, 16, 16))},
-            momenta={"pi_phi": np.zeros((2, 16, 16))},
+            momenta={"phi": np.zeros((2, 16, 16))},
             times=np.array([0.0, 1.0]),
             grid_spacing=(10.0 / 16, 10.0 / 16),
             grid_bounds=((-5.0, 5.0), (-5.0, 5.0)),

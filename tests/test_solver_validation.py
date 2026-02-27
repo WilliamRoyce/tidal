@@ -162,9 +162,7 @@ class TestCFLStability:
         spec = _make_spec(
             [{"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}],
         )
-        grid = GridInfo(
-            bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,)
-        )
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,))
         dx = grid.dx[0]
         dt = dx * 0.5  # Well within CFL
         warnings = check_cfl_stability(spec, grid, dt)
@@ -175,9 +173,7 @@ class TestCFLStability:
         spec = _make_spec(
             [{"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}],
         )
-        grid = GridInfo(
-            bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,)
-        )
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,))
         dt = 10.0  # Way too large
         warnings = check_cfl_stability(spec, grid, dt)
         assert len(warnings) == 1
@@ -189,9 +185,7 @@ class TestCFLStability:
             [{"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"}],
             order=0,
         )
-        grid = GridInfo(
-            bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,)
-        )
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,))
         warnings = check_cfl_stability(spec, grid, dt=100.0)
         assert len(warnings) == 0
 
@@ -215,9 +209,7 @@ class TestMassSign:
                 },
             ],
         )
-        grid = GridInfo(
-            bounds=((0, 2 * np.pi),), shape=(32,), periodic=(True,)
-        )
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(32,), periodic=(True,))
         import warnings as w
 
         with w.catch_warnings():
@@ -240,9 +232,7 @@ class TestMassSign:
                 },
             ],
         )
-        grid = GridInfo(
-            bounds=((0, 2 * np.pi),), shape=(32,), periodic=(True,)
-        )
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(32,), periodic=(True,))
         coeff_eval = CoefficientEvaluator(spec, grid)
         result = check_mass_sign(coeff_eval, spec)
         assert len(result) == 0
@@ -265,7 +255,9 @@ class TestCheckRobinStability:
         side = SideBCSpec(kind="robin", gamma=1.0, value=0.0)
         abc = AxisBCSpec(periodic=False, low=side, high=side)
         grid = GridInfo(
-            bounds=((0, 10),), shape=(64,), periodic=(False,),
+            bounds=((0, 10),),
+            shape=(64,),
+            periodic=(False,),
             axis_bcs=(abc,),
         )
         result = check_robin_stability(grid)
@@ -277,7 +269,9 @@ class TestCheckRobinStability:
         side = SideBCSpec(kind="robin", gamma=1.0, value=0.0)
         abc = AxisBCSpec(periodic=False, low=side, high=side)
         grid = GridInfo(
-            bounds=((0, 10),), shape=(4,), periodic=(False,),
+            bounds=((0, 10),),
+            shape=(4,),
+            periodic=(False,),
             axis_bcs=(abc,),
         )
         result = check_robin_stability(grid)
@@ -288,7 +282,9 @@ class TestCheckRobinStability:
         """Periodic axes are not checked for Robin stability."""
         abc = AxisBCSpec(periodic=True)
         grid = GridInfo(
-            bounds=((0, 10),), shape=(4,), periodic=(True,),
+            bounds=((0, 10),),
+            shape=(4,),
+            periodic=(True,),
             axis_bcs=(abc,),
         )
         assert check_robin_stability(grid) == []
@@ -298,7 +294,9 @@ class TestCheckRobinStability:
         side = SideBCSpec(kind="neumann")
         abc = AxisBCSpec(periodic=False, low=side, high=side)
         grid = GridInfo(
-            bounds=((0, 10),), shape=(4,), periodic=(False,),
+            bounds=((0, 10),),
+            shape=(4,),
+            periodic=(False,),
             axis_bcs=(abc,),
         )
         assert check_robin_stability(grid) == []
@@ -321,7 +319,11 @@ def _make_coupled_spec(m_phi2: float, m_chi2: float, g0: float) -> EquationSyste
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": -m_phi2, "operator": "identity", "field": "phi_0"},
+                        {
+                            "coefficient": -m_phi2,
+                            "operator": "identity",
+                            "field": "phi_0",
+                        },
                         {"coefficient": -g0, "operator": "identity", "field": "chi_0"},
                     ],
                 },
@@ -332,7 +334,11 @@ def _make_coupled_spec(m_phi2: float, m_chi2: float, g0: float) -> EquationSyste
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": -m_chi2, "operator": "identity", "field": "chi_0"},
+                        {
+                            "coefficient": -m_chi2,
+                            "operator": "identity",
+                            "field": "chi_0",
+                        },
                         {"coefficient": -g0, "operator": "identity", "field": "phi_0"},
                     ],
                 },
@@ -374,6 +380,7 @@ class TestPointwiseMassStability:
     def test_unstable_boundary_condition(self) -> None:
         """g0 = sqrt(mPhi2*mChi2) exactly is on the stability boundary (det=0)."""
         import math
+
         g0 = math.sqrt(1.0 * 1.0)  # exactly on boundary → det = 0, min eigenvalue = 0
         spec = _make_coupled_spec(m_phi2=1.0, m_chi2=1.0, g0=g0)
         grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
@@ -403,7 +410,11 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 },
@@ -419,7 +430,9 @@ class TestPointwiseMassStability:
         """Stability check works on a 2D grid (broadcast correctness)."""
         spec = _make_coupled_spec(m_phi2=1.0, m_chi2=1.0, g0=0.5)
         grid = GridInfo(
-            bounds=((0, 10), (0, 10)), shape=(4, 4), periodic=(True, True),
+            bounds=((0, 10), (0, 10)),
+            shape=(4, 4),
+            periodic=(True, True),
         )
         coeff_eval = CoefficientEvaluator(spec, grid, {})
         result = check_pointwise_mass_stability(coeff_eval, spec, grid)
@@ -440,7 +453,11 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "A_0",
+                            },
                         ],
                     },
                 },
@@ -450,7 +467,11 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -1.0, "operator": "identity", "field": "A_1"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "A_1",
+                            },
                         ],
                     },
                 },
@@ -458,7 +479,9 @@ class TestPointwiseMassStability:
         }
         spec = EquationSystem.from_dict(data)
         grid = GridInfo(
-            bounds=((0, 10), (0, 10)), shape=(4, 4), periodic=(True, True),
+            bounds=((0, 10), (0, 10)),
+            shape=(4, 4),
+            periodic=(True, True),
         )
         coeff_eval = CoefficientEvaluator(spec, grid, {})
         result = check_pointwise_mass_stability(coeff_eval, spec, grid)
@@ -479,8 +502,16 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
-                            {"coefficient": -0.5, "operator": "identity", "field": "chi_0"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": -0.5,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
                         ],
                     },
                 },
@@ -490,8 +521,16 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -1.0, "operator": "identity", "field": "chi_0"},
-                            {"coefficient": -0.3, "operator": "identity", "field": "phi_0"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
+                            {
+                                "coefficient": -0.3,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 },
@@ -520,8 +559,16 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -0.1, "operator": "identity", "field": "phi_0"},
-                            {"coefficient": -5.0, "operator": "identity", "field": "chi_0"},
+                            {
+                                "coefficient": -0.1,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": -5.0,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
                         ],
                     },
                 },
@@ -531,8 +578,16 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -0.1, "operator": "identity", "field": "chi_0"},
-                            {"coefficient": -3.0, "operator": "identity", "field": "phi_0"},
+                            {
+                                "coefficient": -0.1,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
+                            {
+                                "coefficient": -3.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 },
@@ -562,7 +617,11 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
                             {
                                 "coefficient": -1.0,
                                 "operator": "identity",
@@ -579,7 +638,11 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -1.0, "operator": "identity", "field": "chi_0"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
                             {
                                 "coefficient": -1.0,
                                 "operator": "identity",
@@ -594,7 +657,9 @@ class TestPointwiseMassStability:
         }
         spec = EquationSystem.from_dict(data)
         grid = GridInfo(
-            bounds=((-5, 5), (-5, 5)), shape=(8, 8), periodic=(False, False),
+            bounds=((-5, 5), (-5, 5)),
+            shape=(8, 8),
+            periodic=(False, False),
         )
         with w.catch_warnings():
             w.simplefilter("ignore")
@@ -624,7 +689,11 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -4.0, "operator": "identity", "field": "chi_0"},
+                            {
+                                "coefficient": -4.0,
+                                "operator": "identity",
+                                "field": "chi_0",
+                            },
                         ],
                     },
                 },
@@ -634,7 +703,11 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 },

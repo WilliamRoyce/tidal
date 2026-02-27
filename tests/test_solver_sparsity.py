@@ -109,14 +109,6 @@ def _make_kg_1d_spec() -> EquationSystem:
         ],
         "canonical": {
             "hamiltonian_terms": [],
-            "field_rates": {
-                "phi_0": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_0"},
-                ],
-            },
-            "kinetic_matrix": {"entries": [{"i": 0, "j": 0, "value": 1.0, "symbolic": "1"}], "dimension": 1},
-            "spatial_momenta": {},
-            "hamiltonian_symbolic": "",
         },
     }
     return EquationSystem.from_dict(data)
@@ -138,7 +130,11 @@ def _make_em_2d_spec() -> EquationSystem:
                     "type": "linear_combination",
                     "terms": [
                         {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
-                        {"coefficient": -1.0, "operator": "gradient_x", "field": "pi_1"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_x",
+                            "field": "v_A_1",
+                        },
                     ],
                 },
             },
@@ -155,14 +151,6 @@ def _make_em_2d_spec() -> EquationSystem:
         ],
         "canonical": {
             "hamiltonian_terms": [],
-            "field_rates": {
-                "A_1": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_1"},
-                ],
-            },
-            "kinetic_matrix": {"entries": [{"i": 0, "j": 0, "value": 1.0, "symbolic": "1"}], "dimension": 1},
-            "spatial_momenta": {},
-            "hamiltonian_symbolic": "",
         },
     }
     return EquationSystem.from_dict(data)
@@ -224,7 +212,9 @@ class TestBuildJacobianSparsity:
     def test_em_2d_sparsity(self) -> None:
         """EM 2D pattern should be very sparse."""
         spec = _make_em_2d_spec()
-        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True))
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+        )
         layout = StateLayout.from_spec(spec, grid.num_points)
 
         pattern = build_jacobian_sparsity(spec, layout, grid, ("periodic", "periodic"))
@@ -288,8 +278,13 @@ class TestBuildJacobianSparsity:
 
         # Dense solve (small system, under _DENSE_THRESHOLD)
         result_dense = solve_ida(
-            spec, grid, y0, t_span=(0.0, 0.5),
-            bc="periodic", parameters=params, num_snapshots=5,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 0.5),
+            bc="periodic",
+            parameters=params,
+            num_snapshots=5,
         )
 
         # Sparse solve (force sparse via direct IDA construction)
@@ -307,8 +302,10 @@ class TestBuildJacobianSparsity:
 
         solver = IDA(
             resfn,
-            rtol=1e-8, atol=1e-10,
-            linsolver="sparse", sparsity=pattern,
+            rtol=1e-8,
+            atol=1e-10,
+            linsolver="sparse",
+            sparsity=pattern,
             calc_initcond="yp0",
             calc_init_dt=float(t_eval[1] - t_eval[0]),
         )
@@ -317,6 +314,8 @@ class TestBuildJacobianSparsity:
         assert result_dense["success"], f"Dense solve failed: {result_dense['message']}"
         assert result_sparse.success, f"Sparse solve failed: {result_sparse.message}"
         np.testing.assert_allclose(
-            result_sparse.y[-1], result_dense["y"][-1],
-            rtol=1e-5, atol=1e-8,
+            result_sparse.y[-1],
+            result_dense["y"][-1],
+            rtol=1e-5,
+            atol=1e-8,
         )

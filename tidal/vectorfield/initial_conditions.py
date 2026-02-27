@@ -122,7 +122,7 @@ class ComponentGaussianPulse:
                 slot_data[name] = np.zeros(grid.shape, dtype=np.float64)
             # Only 2nd-order fields have momentum slots
             if eq.time_derivative_order >= 2:  # noqa: PLR2004
-                slot_data[f"pi_{name}"] = np.zeros(grid.shape, dtype=np.float64)
+                slot_data[f"v_{name}"] = np.zeros(grid.shape, dtype=np.float64)
 
         layout = StateLayout.from_spec(spec, grid.num_points)
         return FieldSet.from_dict(layout, grid.shape, slot_data)
@@ -220,11 +220,11 @@ class ComponentPlaneWave:
                 rel_amp = active[name]
                 slot_data[name] = rel_amp * field_template
                 if eq.time_derivative_order >= 2:  # noqa: PLR2004
-                    slot_data[f"pi_{name}"] = rel_amp * momentum_template
+                    slot_data[f"v_{name}"] = rel_amp * momentum_template
             else:
                 slot_data[name] = np.zeros(grid.shape, dtype=np.float64)
                 if eq.time_derivative_order >= 2:  # noqa: PLR2004
-                    slot_data[f"pi_{name}"] = np.zeros(grid.shape, dtype=np.float64)
+                    slot_data[f"v_{name}"] = np.zeros(grid.shape, dtype=np.float64)
 
         layout = StateLayout.from_spec(spec, grid.num_points)
         return FieldSet.from_dict(layout, grid.shape, slot_data)

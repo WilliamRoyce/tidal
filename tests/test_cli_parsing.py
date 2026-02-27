@@ -1113,17 +1113,6 @@ def _make_wave_spec() -> EquationSystem:
                     "factor_b": {"field": "phi_0", "operator": "time_derivative"},
                 },
             ],
-            "field_rates": {
-                "phi_0": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}
-                ]
-            },
-            "kinetic_matrix": {
-                "entries": [{"i": 0, "j": 0, "value": 1.0}],
-                "dimension": 1,
-            },
-            "spatial_momenta": {},
-            "hamiltonian_symbolic": "test",
         },
     }
     return EquationSystem.from_dict(data)
@@ -1197,17 +1186,6 @@ def _make_dissipative_spec() -> EquationSystem:
                     "factor_b": {"field": "phi_0", "operator": "time_derivative"},
                 },
             ],
-            "field_rates": {
-                "phi_0": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}
-                ]
-            },
-            "kinetic_matrix": {
-                "entries": [{"i": 0, "j": 0, "value": 1.0}],
-                "dimension": 1,
-            },
-            "spatial_momenta": {},
-            "hamiltonian_symbolic": "test",
         },
     }
     return EquationSystem.from_dict(data)

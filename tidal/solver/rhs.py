@@ -15,8 +15,6 @@ import numpy as np
 from tidal.solver.operators import BCSpec, apply_operator
 
 if TYPE_CHECKING:
-    from numpy.typing import NDArray
-
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.fields import FieldSet
     from tidal.solver.grid import GridInfo
@@ -56,11 +54,6 @@ class RHSEvaluator:
         self._eq_map: dict[str, int] = {
             eq.field_name: i for i, eq in enumerate(spec.equations)
         }
-        # Legacy pi_N → pi_field_name resolution for unregenerated JSONs.
-        # New JSONs use pi_field_name directly; this map handles old pi_N refs.
-        self._pi_name_map: dict[str, str] = {}
-        for i, eq in enumerate(spec.equations):
-            self._pi_name_map[f"pi_{i}"] = f"pi_{eq.field_name}"
 
     def begin_timestep(self, t: float) -> None:
         """Notify the coefficient evaluator of a new timestep."""
@@ -115,32 +108,6 @@ class RHSEvaluator:
             raise KeyError(msg)
         return self.evaluate(eq_idx, fields, t)
 
-    def evaluate_spatial_momentum(
-        self,
-        field_name: str,
-        fields: FieldSet,
-        t: float = 0.0,
-    ) -> NDArray[np.float64]:
-        """Compute spatial momentum S_i for dynamical field *field_name*.
-
-        Returns flat array of length ``grid.num_points``.
-        Returns zeros if no spatial_momenta defined for this field.
-        """
-        canonical = self._spec.canonical
-        if canonical is None or canonical.spatial_momenta is None:
-            return np.zeros(self._grid.num_points)
-        terms = canonical.spatial_momenta.get(field_name)
-        if terms is None:
-            return np.zeros(self._grid.num_points)
-
-        result = np.zeros(self._grid.shape)
-        for term in terms:
-            target = self._get_field_data(term.field, fields)
-            operated = apply_operator(term.operator, target, self._grid, self._bc)
-            coeff = self._coeff_eval.resolve(term, t)
-            result += coeff * operated
-        return result.ravel()
-
     # ---- Internal ----
 
     def _evaluate_term(
@@ -152,25 +119,38 @@ class RHSEvaluator:
         eq_idx: int,
         term_idx: int,
     ) -> np.ndarray:
-        """Evaluate a single operator term."""
-        if term.operator == "first_derivative_t":
-            # Time derivative of a field = its momentum (pi = dq/dt for K=I).
-            # For non-identity K, this is approximate; IDA handles it exactly
-            # via the yp vector in residual form.
-            pi_name = f"pi_{term.field}"
-            target = self._get_field_data(pi_name, fields)
-            coeff = self._coeff_eval.resolve(term, t, eq_idx=eq_idx, term_idx=term_idx)
-            return coeff * target
+        """Evaluate a single operator term.
 
+        For ``first_derivative_t`` operators (E-L velocity form), resolves
+        the time derivative by reading the velocity slot ``v_{field}``
+        directly from the state vector.
+
+        Raises
+        ------
+        ValueError
+            If a ``first_derivative_t`` term references a field whose
+            velocity slot is not present in the state.
+        """
+        if term.operator == "first_derivative_t":
+            vel_name = f"v_{term.field}"
+            if vel_name not in fields:
+                msg = (
+                    f"Cannot resolve first_derivative_t({term.field}): "
+                    f"velocity slot '{vel_name}' not found. "
+                    f"Available: {sorted(fields.slot_names)}"
+                )
+                raise ValueError(msg)
+            operated = fields[vel_name]
+            coeff = self._coeff_eval.resolve(term, t, eq_idx=eq_idx, term_idx=term_idx)
+            return coeff * operated
         target = self._get_field_data(term.field, fields)
         operated = apply_operator(term.operator, target, self._grid, self._bc)
         coeff = self._coeff_eval.resolve(term, t, eq_idx=eq_idx, term_idx=term_idx)
         return coeff * operated
 
-    def _get_field_data(self, field_name: str, fields: FieldSet) -> np.ndarray:
+    @staticmethod
+    def _get_field_data(field_name: str, fields: FieldSet) -> np.ndarray:
         """Get field data.  Raises on unknown field references.
-
-        Handles legacy ``pi_N`` references via ``_pi_name_map``.
 
         Raises
         ------
@@ -179,10 +159,6 @@ class RHSEvaluator:
         """
         if field_name in fields:
             return fields[field_name]
-        # Legacy pi_N → pi_field_name resolution
-        resolved = self._pi_name_map.get(field_name)
-        if resolved is not None and resolved in fields:
-            return fields[resolved]
         msg = (
             f"Unknown field reference '{field_name}'. "
             f"Available: {sorted(fields.slot_names)}"

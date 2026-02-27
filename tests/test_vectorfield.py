@@ -178,17 +178,17 @@ class TestComponentGaussianPulse:
         state = pulse.create(grid_1d, em_spec)
 
         assert isinstance(state, FieldSet)
-        num_em_states = 4  # A_0, pi_A_0, A_1, pi_A_1
+        num_em_states = 4  # A_0, v_A_0, A_1, v_A_1
         assert len(state) == num_em_states
 
         # A_0 should be zero
         assert_allclose(state["A_0"], 0.0, atol=1e-10)
-        assert_allclose(state["pi_A_0"], 0.0, atol=1e-10)
+        assert_allclose(state["v_A_0"], 0.0, atol=1e-10)
 
         # A_1 should have Gaussian profile
         assert np.max(state["A_1"]) > 0
         # Momentum should be zero (stationary pulse)
-        assert_allclose(state["pi_A_1"], 0.0, atol=1e-10)
+        assert_allclose(state["v_A_1"], 0.0, atol=1e-10)
 
     def test_create_all_components(
         self, grid_1d: GridInfo, em_spec: EquationSystem
@@ -302,7 +302,7 @@ class TestComponentPlaneWave:
 
         # A_1 momentum should be -k * sin(kx) (for right-moving wave)
         expected_momentum = -k * np.sin(k * x)
-        assert_allclose(state["pi_A_1"], expected_momentum, atol=1e-10)
+        assert_allclose(state["v_A_1"], expected_momentum, atol=1e-10)
 
     def test_plane_wave_with_phase(
         self, grid_1d: GridInfo, em_spec: EquationSystem
@@ -330,9 +330,7 @@ class TestComponentPlaneWave:
 class TestCreateGaussianPulseState:
     """Tests for create_gaussian_pulse_state function."""
 
-    def test_single_component(
-        self, grid_1d: GridInfo, em_spec: EquationSystem
-    ) -> None:
+    def test_single_component(self, grid_1d: GridInfo, em_spec: EquationSystem) -> None:
         """Test creating state with single component pulse."""
         state = create_gaussian_pulse_state(
             grid_1d,
@@ -349,9 +347,7 @@ class TestCreateGaussianPulseState:
         # A_1 should have pulse
         assert np.max(state["A_1"]) > 0
 
-    def test_all_components(
-        self, grid_1d: GridInfo, em_spec: EquationSystem
-    ) -> None:
+    def test_all_components(self, grid_1d: GridInfo, em_spec: EquationSystem) -> None:
         """Test creating state with pulse in all components."""
         state = create_gaussian_pulse_state(
             grid_1d,

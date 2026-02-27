@@ -50,7 +50,7 @@ from tidal.measurement._energy import (
     _compute_virial_potential,
     _evaluate_hamiltonian_factor,
     _gradient_energy_density,
-    _is_momentum_field,
+    _is_velocity_field,
     _resolve_term_target,
     _self_gradient_axes,
 )
@@ -329,8 +329,6 @@ def _make_kg_canonical_structure(m2: float = 1.0) -> CanonicalStructure:
                 factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
             ),
         ),
-        field_rates={},
-        hamiltonian_symbolic=f"1/2 pi^2 + 1/2 (grad phi)^2 + 1/2 * {m2} * phi^2",
     )
 
 
@@ -389,8 +387,6 @@ def _make_coupled_canonical_structure(
                 factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
             ),
         ),
-        field_rates={},
-        hamiltonian_symbolic="coupled scalar H",
     )
 
 
@@ -549,27 +545,23 @@ class TestCanonicalHamiltonianEnergy:
         with pytest.raises(ValueError, match="without canonical"):
             _compute_hamiltonian_from_canonical(data_no_canon, 0)
 
-    def test_proca_hamiltonian_uses_velocity_not_momentum(self) -> None:
-        """For Proca fields, time_derivative factor must reconstruct velocity.
+    def test_proca_hamiltonian_uses_velocity_directly(self) -> None:
+        """For Proca fields, time_derivative factor reads velocity directly.
 
-        In Proca theory, the canonical momentum is π_i = ∂_t A_i - ∂_i A_0,
-        so the velocity is vel_i = π_i + ∂_i A_0. The kinetic term in H is
-        ½ vel² = ½ (π + ∂_x A_0)², NOT ½ π².  This test creates synthetic
-        data where A_0 is nonzero and verifies the cross-terms are included.
+        In E-L velocity form, data.momenta stores v = dq/dt. The kinetic
+        term ½ v² is evaluated directly — no field_rates bilinear expansion.
         """
         n_grid = 64
         domain_len = 10.0
         dx = domain_len / n_grid
         x = np.linspace(dx / 2, domain_len - dx / 2, n_grid)
 
-        # Use periodic-compatible sinusoidal A_0 so gradients wrap correctly
         k0 = 2 * np.pi / domain_len
-        a0_amp = 0.5
-        a0 = a0_amp * np.sin(k0 * x)  # periodic: A_0(0) ≈ A_0(L)
+        a0 = 0.5 * np.sin(k0 * x)
 
-        # A_1 field and its canonical momentum pi_1
+        # A_1 field and its velocity v_1 = dA_1/dt
         a1 = np.cos(k0 * x)
-        pi1 = 0.5 * np.ones(n_grid)
+        v1 = 0.5 * np.ones(n_grid)
 
         # Build a minimal 2-component Proca-like spec
         # A_0: constraint (time_order=0), A_1: dynamical (time_order=2)
@@ -591,8 +583,8 @@ class TestCanonicalHamiltonianEnergy:
             ),
         )
 
-        # Hamiltonian: ½ vel_1² + ½ (∂_x A_1)² + ½ m² A_1²
-        # where vel_1 = time_derivative(A_1) = pi_1 + gradient_x(A_0)
+        # Hamiltonian: ½ v_1² + ½ (∂_x A_1)² + ½ m² A_1²
+        # In E-L form, time_derivative(A_1) = v_A_1 read directly from state
         canonical = CanonicalStructure(
             hamiltonian_terms=(
                 HamiltonianTerm(
@@ -611,13 +603,6 @@ class TestCanonicalHamiltonianEnergy:
                     factor_b=HamiltonianFactor(field="A_1", operator="identity"),
                 ),
             ),
-            field_rates={
-                "A_1": (
-                    OperatorTerm(coefficient=1.0, operator="identity", field="pi_1"),
-                    OperatorTerm(coefficient=1.0, operator="gradient_x", field="A_0"),
-                ),
-            },
-            hamiltonian_symbolic="proca test H",
         )
 
         spec = EquationSystem(
@@ -635,7 +620,7 @@ class TestCanonicalHamiltonianEnergy:
         data = SimulationData(
             times=np.array([0.0]),
             fields={"A_0": a0[np.newaxis], "A_1": a1[np.newaxis]},
-            momenta={"A_1": pi1[np.newaxis]},
+            momenta={"A_1": v1[np.newaxis]},
             grid_spacing=(dx,),
             grid_bounds=((0.0, 10.0),),
             periodic=(True,),
@@ -645,47 +630,23 @@ class TestCanonicalHamiltonianEnergy:
 
         h_eval = _compute_hamiltonian_from_canonical(data, 0)
 
-        # Compute expected energy using the bilinear expansion stencils.
-        # The kinetic ½ vel² = ½(pi + ∂_x A_0)² is expanded bilinearly:
-        #   ½ pi²             (identity × identity)
-        #   + pi · grad_CD(A_0) (identity × gradient: CD)
-        #   + ½ IBP(∂_x A_0)²  (gradient × gradient: IBP via _gradient_product_density)
-        # Standalone gradient²: -½ A_1 · lap(A_1) (IBP)
+        # In E-L velocity form:
+        # H = ½ v_1² + ½ (∂_x A_1)² + ½ A_1²
+        # Kinetic: ½ v1² directly
+        # Gradient: IBP → -½ A_1 · lap(A_1)
         # Mass: ½ A_1²
-        grad_a0 = (np.roll(a0, -1) - np.roll(a0, 1)) / (2 * dx)
-        lap_a0 = (np.roll(a0, -1) - 2 * a0 + np.roll(a0, 1)) / dx**2
         lap_a1 = (np.roll(a1, -1) - 2 * a1 + np.roll(a1, 1)) / dx**2
-        h_expected = float(
-            (
-                0.5 * pi1**2
-                + pi1 * grad_a0
-                + 0.5 * (-a0 * lap_a0)
-                + (-0.5) * a1 * lap_a1
-                + 0.5 * a1**2
-            ).mean()
-        )
+        h_expected = float((0.5 * v1**2 + (-0.5) * a1 * lap_a1 + 0.5 * a1**2).mean())
 
-        # If we had the bug (using pi instead of vel), kinetic term would be
-        # ½ π², missing the cross-terms pi*d_x(A_0) and (d_x A_0)²
-        h_wrong = float((0.5 * pi1**2 + (-0.5) * a1 * lap_a1 + 0.5 * a1**2).mean())
-
-        # Verify the correct answer (with velocity reconstruction) matches
         np.testing.assert_allclose(h_eval, h_expected, rtol=1e-10)
 
-        # Verify the wrong answer (raw momentum) does NOT match
-        assert abs(h_eval - h_wrong) > 0.01, (
-            f"h_eval={h_eval} should differ from h_wrong={h_wrong} when A_0 is nonzero"
-        )
+    def test_kinetic_and_gradient_terms_independent(self) -> None:
+        """In E-L velocity form, kinetic and gradient terms are independent.
 
-    def test_kinetic_gradient_cancellation_is_exact(self) -> None:
-        """Kinetic ½(∂_t A_1)² and standalone -½(∂_x A_0)² cancel exactly.
-
-        H = ½(π + ∂_x A_0)² - ½(∂_x A_0)² = ½π² + π·∂_x A_0
-
-        Both (∂_x A_0)² terms must use the SAME stencil to cancel.  Before
-        the bilinear expansion fix, the kinetic path used central-difference
-        (CD) for the gradient while the standalone path used IBP → 3-point
-        laplacian, causing an O(dx²) residual that oscillated with A_0.
+        H = ½ v² - ½ (∂_x A_0)²
+        Kinetic: ½ v² reads velocity directly from data.momenta
+        Gradient: -½ (∂_x A_0)² uses IBP stencil
+        No bilinear expansion — terms evaluate independently.
         """
         n_grid = 64
         domain_len = 10.0
@@ -694,8 +655,8 @@ class TestCanonicalHamiltonianEnergy:
 
         k0 = 2 * np.pi / domain_len
         a0 = 0.8 * np.sin(k0 * x)
-        a1 = np.zeros(n_grid)  # A_1 not relevant here
-        pi1 = 0.6 * np.cos(k0 * x)
+        a1 = np.zeros(n_grid)
+        v1 = 0.6 * np.cos(k0 * x)  # velocity v = dA_1/dt
 
         eq_a0 = ComponentEquation(
             field_name="A_0",
@@ -714,9 +675,7 @@ class TestCanonicalHamiltonianEnergy:
             ),
         )
 
-        # Hamiltonian: ½ vel_1² - ½ (∂_x A_0)²
-        # where vel_1 = pi_1 + ∂_x A_0
-        # After cancellation: H = ½ π² + π · ∂_x A_0
+        # H = ½ v_1² - ½ (∂_x A_0)²
         canonical = CanonicalStructure(
             hamiltonian_terms=(
                 HamiltonianTerm(
@@ -730,13 +689,6 @@ class TestCanonicalHamiltonianEnergy:
                     factor_b=HamiltonianFactor(field="A_0", operator="gradient_x"),
                 ),
             ),
-            field_rates={
-                "A_1": (
-                    OperatorTerm(coefficient=1.0, operator="identity", field="pi_1"),
-                    OperatorTerm(coefficient=1.0, operator="gradient_x", field="A_0"),
-                ),
-            },
-            hamiltonian_symbolic="cancellation test",
         )
 
         spec = EquationSystem(
@@ -754,7 +706,7 @@ class TestCanonicalHamiltonianEnergy:
         data = SimulationData(
             times=np.array([0.0]),
             fields={"A_0": a0[np.newaxis], "A_1": a1[np.newaxis]},
-            momenta={"A_1": pi1[np.newaxis]},
+            momenta={"A_1": v1[np.newaxis]},
             grid_spacing=(dx,),
             grid_bounds=((0.0, 10.0),),
             periodic=(True,),
@@ -764,41 +716,12 @@ class TestCanonicalHamiltonianEnergy:
 
         h_eval = _compute_hamiltonian_from_canonical(data, 0)
 
-        # Expected: H = ½π² + π·∂_x A_0 (using IBP laplacian for gradient²)
-        # The (∂_x A_0)² from kinetic cancels the standalone -½(∂_x A_0)².
-        # Use IBP for both the ½π² and the cross-term π·∂_x A_0.
-        # The cross-term from bilinear: 2 × ½ × 1 × 1 × pi1 × ∂_x A_0
-        # = pi1 · ∂_x A_0  (factor of 2 from the ij+ji symmetry in vel²)
-        # But actually for ½ vel² with vel = pi + grad(A_0):
-        # ½ vel² = ½ pi² + pi · grad(A_0) + ½ (grad A_0)²
-        # Then -½ (grad A_0)² cancels → H = ½ pi² + pi · grad(A_0)
-        #
-        # For the IBP stencil, grad(A_0) inside bilinear becomes:
-        # identity×identity: ½ pi² → ½ mean(pi1²)
-        # identity×gradient: pi · grad(A_0) → done via _apply_spatial_operator
-        # gradient×gradient: ½(grad A_0)² → done via _gradient_product_density
-        # standalone: -½(grad A_0)² → done via _gradient_product_density (SAME!)
-        #
-        # So the IBP ½(grad A_0)² and IBP -½(grad A_0)² cancel exactly.
-        # Expected result: ½ mean(pi²) + mean(pi · grad_CD(A_0))
-        # where grad_CD is the central-difference gradient used for
-        # the identity×gradient cross-term.
-        grad_a0_cd = (np.roll(a0, -1) - np.roll(a0, 1)) / (2 * dx)
-        h_expected = float((0.5 * pi1**2 + pi1 * grad_a0_cd).mean())
+        # Expected: H = ½ v² - ½ (∂_x A_0)² (IBP)
+        # IBP: ⟨(∂_x A_0)²⟩ = -⟨A_0 · lap(A_0)⟩
+        lap_a0 = (np.roll(a0, -1) - 2 * a0 + np.roll(a0, 1)) / dx**2
+        h_expected = float((0.5 * v1**2 - 0.5 * (-a0 * lap_a0)).mean())
 
         np.testing.assert_allclose(h_eval, h_expected, rtol=1e-10)
-
-        # Verify this is NOT what the old code produced.  The old code
-        # evaluated the kinetic term via CD gradient (wide stencil) but
-        # the standalone via IBP (3-point laplacian).  The residual is:
-        # ½(CD²-IBP) for (∂_x A_0)²
-        lap_a0_ibp = (np.roll(a0, -1) - 2 * a0 + np.roll(a0, 1)) / dx**2
-        ibp_grad_sq = float((-a0 * lap_a0_ibp).mean())
-        cd_grad_sq = float((grad_a0_cd**2).mean())
-        stencil_residual = 0.5 * (cd_grad_sq - ibp_grad_sq)
-        assert abs(stencil_residual) > 1e-4, (
-            "Test is only meaningful if the stencil residual is nonzero"
-        )
 
 
 class TestIBPHamiltonian:
@@ -880,8 +803,6 @@ class TestIBPHamiltonian:
                     factor_b=HamiltonianFactor(field="phi_0", operator="gradient_x"),
                 ),
             ),
-            field_rates={},
-            hamiltonian_symbolic="test",
         )
 
         eq = ComponentEquation(
@@ -949,8 +870,6 @@ class TestIBPHamiltonian:
                     factor_b=HamiltonianFactor(field="v_0", operator="gradient_y"),
                 ),
             ),
-            field_rates={},
-            hamiltonian_symbolic="test cross",
         )
 
         eq_u = ComponentEquation(
@@ -994,85 +913,6 @@ class TestIBPHamiltonian:
         h_eval = _compute_hamiltonian_from_canonical(data, 0)
         np.testing.assert_allclose(h_eval, energy_ibp, rtol=1e-12)
 
-    def test_field_rates_symbolic_resolution(self) -> None:
-        """field_rate coefficients are resolved via symbolic expressions.
-
-        With rho=2, field_rate coefficient_symbolic="rho^(-1)" should give 0.5,
-        not the placeholder coefficient=1.0.
-        """
-        n_grid = 32
-        dx = 0.1
-
-        phi = np.ones(n_grid)
-        pi_data = 2.0 * np.ones(n_grid)
-
-        # KE term: rho/2 * (d_t phi)^2 = rho/2 * (pi/rho)^2 = pi^2/(2*rho)
-        # With rho=2, pi=2: KE = 4/(2*2) = 1.0
-        rho = 2.0
-
-        canonical = CanonicalStructure(
-            hamiltonian_terms=(
-                HamiltonianTerm(
-                    coefficient=1.0,
-                    coefficient_symbolic="rho/2",
-                    factor_a=HamiltonianFactor(
-                        field="phi_0", operator="time_derivative"
-                    ),
-                    factor_b=HamiltonianFactor(
-                        field="phi_0", operator="time_derivative"
-                    ),
-                ),
-            ),
-            field_rates={
-                "phi_0": (
-                    OperatorTerm(
-                        coefficient=1.0,
-                        operator="identity",
-                        field="pi_0",
-                        coefficient_symbolic="rho^(-1)",
-                    ),
-                ),
-            },
-            hamiltonian_symbolic="test rho",
-        )
-
-        eq = ComponentEquation(
-            field_name="phi_0",
-            field_index=0,
-            time_derivative_order=2,
-            rhs_terms=(
-                OperatorTerm(coefficient=1.0, operator="laplacian_x", field="phi_0"),
-            ),
-        )
-        spec = EquationSystem(
-            n_components=1,
-            dimension=2,
-            spatial_dimension=1,
-            component_names=("phi_0",),
-            equations=(eq,),
-            mass_matrix=((0.0,),),
-            coupling_matrix=((0.0,),),
-            metadata={"source": "test", "parameters": {"rho": rho}},
-            canonical=canonical,
-        )
-        data = SimulationData(
-            times=np.array([0.0]),
-            fields={"phi_0": phi[np.newaxis]},
-            momenta={"phi_0": pi_data[np.newaxis]},
-            grid_spacing=(dx,),
-            grid_bounds=((0.0, n_grid * dx),),
-            periodic=(True,),
-            spec=spec,
-            parameters={},  # Empty — should merge from spec metadata
-        )
-
-        h_eval = _compute_hamiltonian_from_canonical(data, 0)
-
-        # velocity = pi / rho = 2/2 = 1
-        # KE = (rho/2) * vel² = (2/2) * 1² = 1.0
-        expected = rho / 2 * (pi_data[0] / rho) ** 2
-        np.testing.assert_allclose(h_eval, expected, rtol=1e-12)
-
     def test_parameter_merge_from_spec_metadata(self) -> None:
         """Parameters from spec metadata are used when data.parameters is empty.
 
@@ -1093,8 +933,6 @@ class TestIBPHamiltonian:
                     factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
                 ),
             ),
-            field_rates={},
-            hamiltonian_symbolic="test merge",
         )
 
         eq = ComponentEquation(
@@ -1199,16 +1037,6 @@ class TestAnalyticalEnergyConservation:
                     ),
                 ),
             ),
-            field_rates={
-                "phi_0": (
-                    OperatorTerm(
-                        coefficient=1.0,
-                        operator="identity",
-                        field="pi_0",
-                    ),
-                ),
-            },
-            hamiltonian_symbolic="plane wave test",
         )
         return EquationSystem(
             n_components=1,
@@ -1456,23 +1284,6 @@ class TestAnalyticalEnergyConservation:
                     ),
                 ),
             ),
-            field_rates={
-                "phi_0": (
-                    OperatorTerm(
-                        coefficient=1.0,
-                        operator="identity",
-                        field="pi_0",
-                    ),
-                ),
-                "chi_0": (
-                    OperatorTerm(
-                        coefficient=1.0,
-                        operator="identity",
-                        field="pi_1",
-                    ),
-                ),
-            },
-            hamiltonian_symbolic="coupled eigenmode test",
         )
 
         spec = EquationSystem(
@@ -2051,29 +1862,28 @@ class TestApplySpatialOperator:
             _apply_spatial_operator("unknown_op", field, (0.1,), (True,))
 
 
-class TestIsMomentumField:
-    """Test _is_momentum_field regex."""
+class TestIsVelocityField:
+    """Test _is_velocity_field prefix check."""
 
-    def test_pi_underscore_numeric(self) -> None:
-        """Legacy pi_N format (numeric index)."""
-        assert _is_momentum_field("pi_0") is True
-        assert _is_momentum_field("pi_1") is True
-        assert _is_momentum_field("pi_12") is True
+    def test_v_underscore_numeric(self) -> None:
+        """v_N format (numeric index)."""
+        assert _is_velocity_field("v_0") is True
+        assert _is_velocity_field("v_1") is True
+        assert _is_velocity_field("v_12") is True
 
-    def test_pi_field_name(self) -> None:
-        """New pi_field_name format."""
-        assert _is_momentum_field("pi_A_0") is True
-        assert _is_momentum_field("pi_A_1") is True
-        assert _is_momentum_field("pi_phi_0") is True
+    def test_v_field_name(self) -> None:
+        """v_field_name format."""
+        assert _is_velocity_field("v_A_0") is True
+        assert _is_velocity_field("v_A_1") is True
+        assert _is_velocity_field("v_phi_0") is True
 
-    def test_pi_no_underscore(self) -> None:
-        """No-underscore format is NOT supported."""
-        assert _is_momentum_field("pi0") is False
-        assert _is_momentum_field("pi1") is False
+    def test_v_too_short(self) -> None:
+        """v_ alone is too short (len <= 2)."""
+        assert _is_velocity_field("v_") is False
 
     def test_regular_fields(self) -> None:
-        assert _is_momentum_field("phi_0") is False
-        assert _is_momentum_field("A_0") is False
+        assert _is_velocity_field("phi_0") is False
+        assert _is_velocity_field("A_1") is False
 
 
 # ============================================================
@@ -3006,16 +2816,16 @@ class TestResolveTermTarget:
         data = _make_sim_data_two_fields(n_snapshots=3)
         # Replace spec with the constraint version
         constraint_data = dataclasses.replace(data, spec=constraint_spec)
-        # pi_0 refers to the first field — which is now a constraint
-        result = _resolve_term_target(constraint_data, "pi_0", 0)
+        # v_phi_0 refers to the first field — which is now a constraint
+        result = _resolve_term_target(constraint_data, "v_phi_0", 0)
         assert result is None
 
-    def test_momentum_out_of_range_raises(self) -> None:
-        """Momentum index beyond spec fields should raise ValueError."""
+    def test_momentum_unknown_field_raises(self) -> None:
+        """Momentum for unknown field should raise ValueError."""
         data = _make_sim_data_two_fields(n_snapshots=3)
-        # pi_99 is out of range for a 2-field spec
-        with pytest.raises(ValueError, match="resolves to index 99"):
-            _resolve_term_target(data, "pi_99", 0)
+        # v_nonexistent is not a known field name
+        with pytest.raises(ValueError, match="not a known field"):
+            _resolve_term_target(data, "v_nonexistent", 0)
 
 
 class TestBincountRegression:
@@ -4249,7 +4059,7 @@ class TestSnapshotCountValidation:
         for eq in spec.equations:
             np.save(str(out / f"{eq.field_name}.npy"), np.zeros((3, 8)))
             if eq.time_derivative_order >= 2:
-                np.save(str(out / f"pi_{eq.field_name}.npy"), np.zeros((3, 8)))
+                np.save(str(out / f"v_{eq.field_name}.npy"), np.zeros((3, 8)))
 
         meta = {
             "n_snapshots": 100,
@@ -4320,7 +4130,7 @@ class TestSimulationDataFromResult:
         spec = self._kg_spec()
         gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(True,))
 
-        # 2 slots (phi_0, pi_phi_0) x 16 points = 32 flat size
+        # 2 slots (phi_0, v_phi_0) x 16 points = 32 flat size
         n_snaps, n_flat = 5, 32
         result: SolverResult = {
             "t": np.linspace(0, 1, n_snaps),
@@ -4357,7 +4167,7 @@ class TestSimulationDataFromResult:
 
         # First slot (phi_0): y[:, 0:8]
         np.testing.assert_array_equal(sd.fields["phi_0"], y[:, :8].reshape(3, 8))
-        # Second slot (pi_phi_0): y[:, 8:16]
+        # Second slot (v_phi_0): y[:, 8:16]
         np.testing.assert_array_equal(sd.momenta["phi_0"], y[:, 8:16].reshape(3, 8))
 
     def test_grid_metadata(self) -> None:
@@ -4420,8 +4230,8 @@ class TestSimulationDataFromResult:
         gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(False,))
 
         result: SolverResult = {
-            "t": np.linspace(0, 1, 6),   # 6 time points
-            "y": np.zeros((3, 32)),       # only 3 state vectors
+            "t": np.linspace(0, 1, 6),  # 6 time points
+            "y": np.zeros((3, 32)),  # only 3 state vectors
             "success": True,
             "message": "",
         }
@@ -4797,7 +4607,9 @@ class TestHamiltonianPositionDependentEnergy:
     Hamiltonian coefficients on the spatial grid rather than using the scalar fallback.
     """
 
-    def _make_gaussian_coupling_spec(self, g0: float = 1.0, r_scale: float = 4.0) -> EquationSystem:
+    def _make_gaussian_coupling_spec(
+        self, g0: float = 1.0, r_scale: float = 4.0
+    ) -> EquationSystem:
         """Build a minimal 2-field spec with a Gaussian interaction Hamiltonian term."""
         data: dict[str, Any] = {
             "metadata": {"parameters": {"g0": g0, "R": r_scale}},
@@ -4817,8 +4629,16 @@ class TestHamiltonianPositionDependentEnergy:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
-                            {"coefficient": 1.0, "operator": "laplacian_y", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_y",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 },
@@ -4828,8 +4648,16 @@ class TestHamiltonianPositionDependentEnergy:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "chi_0"},
-                            {"coefficient": 1.0, "operator": "laplacian_y", "field": "chi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "chi_0",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_y",
+                                "field": "chi_0",
+                            },
                         ],
                     },
                 },
@@ -4855,26 +4683,11 @@ class TestHamiltonianPositionDependentEnergy:
                         "coefficient_symbolic": "E^(-1/2*x[]^2/R^2 - y[]^2/(2*R^2))*g0",
                     },
                 ],
-                "field_rates": {
-                    "phi_0": [{"coefficient": 1.0, "operator": "identity", "field": "pi_0"}],
-                    "chi_0": [{"coefficient": 1.0, "operator": "identity", "field": "pi_1"}],
-                },
-                "kinetic_matrix": {
-                    "entries": [
-                        {"i": 0, "j": 0, "value": 1.0},
-                        {"i": 1, "j": 1, "value": 1.0},
-                    ],
-                    "dimension": 2,
-                },
-                "spatial_momenta": {},
-                "hamiltonian_symbolic": "test",
             },
         }
         return EquationSystem.from_dict(data)
 
-    def _make_sim_data(
-        self, spec: EquationSystem, n: int = 16
-    ) -> SimulationData:
+    def _make_sim_data(self, spec: EquationSystem, n: int = 16) -> SimulationData:
         """Build a SimulationData with unit fields and zero momenta."""
         dx = 1.0
         # phi = 1 everywhere, chi = 1 everywhere
@@ -4955,7 +4768,11 @@ class TestHamiltonianPositionDependentEnergy:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 }
@@ -4970,15 +4787,6 @@ class TestHamiltonianPositionDependentEnergy:
                         "coefficient_symbolic": "1/(2*x[]^2)",
                     },
                 ],
-                "field_rates": {
-                    "phi_0": [{"coefficient": 1.0, "operator": "identity", "field": "pi_0"}]
-                },
-                "kinetic_matrix": {
-                    "entries": [{"i": 0, "j": 0, "value": 1.0}],
-                    "dimension": 1,
-                },
-                "spatial_momenta": {},
-                "hamiltonian_symbolic": "test",
             },
         }
         spec = EquationSystem.from_dict(data)

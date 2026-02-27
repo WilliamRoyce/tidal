@@ -24,13 +24,13 @@ from tidal.solver.leapfrog import compute_force, compute_velocity
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Mapping, Sequence
+    from collections.abc import Callable
 
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
     from tidal.solver.rhs import RHSEvaluator
-    from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
+    from tidal.symbolic.json_loader import EquationSystem
 
 # Time-derivative order threshold for dynamical (wave) equations
 _SECOND_ORDER = 2
@@ -39,13 +39,11 @@ _SECOND_ORDER = 2
 _IMPLICIT_METHODS = {"Radau", "BDF"}
 
 
-def _build_rhs_fn(  # noqa: PLR0913, PLR0917
+def _build_rhs_fn(
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
     bc: BCSpec | None,
-    kinetic: np.ndarray | None,
-    spatial_momenta: Mapping[str, Sequence[OperatorTerm]] | None,
     rhs_eval: RHSEvaluator,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
     """Build the scipy RHS closure: ``rhs_fn(t, y) -> dydt``."""
@@ -56,22 +54,12 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
         dydt = np.zeros_like(y)
 
         force = compute_force(spec, layout, grid, bc, y, t, rhs_eval)
+        velocity = compute_velocity(layout, y)
         fieldset = FieldSet.from_flat(layout, grid.shape, y)
-        velocity = compute_velocity(
-            layout,
-            grid,
-            kinetic,
-            spatial_momenta,
-            y,
-            fieldset,
-            bc,
-            t,
-            rhs_eval,
-        )
 
         for slot_idx, slot in enumerate(layout.slots):
             s = slice(slot_idx * n, (slot_idx + 1) * n)
-            if slot.kind == "momentum":
+            if slot.kind == "velocity":
                 dydt[s] = force[s]
             elif slot.kind == "field" and slot.time_order >= _SECOND_ORDER:
                 dydt[s] = velocity[s]
@@ -141,7 +129,6 @@ def solve_scipy(  # noqa: PLR0913
         at initial values.
     """
     layout = StateLayout.from_spec(spec, grid.num_points)
-    canonical = spec.canonical
 
     # Warn about constraint fields (frozen at IC)
     constraint_fields = [
@@ -154,12 +141,6 @@ def solve_scipy(  # noqa: PLR0913
             stacklevel=2,
         )
 
-    # Pre-extract kinetic matrix
-    kinetic = None
-    if canonical and canonical.kinetic_matrix:
-        kinetic = np.array(canonical.kinetic_matrix.to_dense())
-    spatial_momenta = canonical.spatial_momenta if canonical else None
-
     # Build RHSEvaluator for coefficient resolution
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
     from tidal.solver.rhs import RHSEvaluator  # noqa: PLC0415
@@ -168,7 +149,7 @@ def solve_scipy(  # noqa: PLR0913
     rhs_eval = RHSEvaluator(spec, grid, coeff_eval, bc=bc)
 
     # Build RHS closure
-    rhs_fn = _build_rhs_fn(spec, layout, grid, bc, kinetic, spatial_momenta, rhs_eval)
+    rhs_fn = _build_rhs_fn(spec, layout, grid, bc, rhs_eval)
 
     # Build time evaluation points
     t_eval = np.linspace(t_span[0], t_span[1], num_snapshots)

@@ -48,18 +48,14 @@ def validate_operator_dimensions(spec: EquationSystem) -> None:
 def validate_field_references(spec: EquationSystem) -> None:
     """Check that all term field references point to valid fields.
 
-    Also checks canonical field_rates and spatial_momenta references.
-
     Raises
     ------
     ValueError
         If a field reference is invalid.
     """
     valid_fields = set(spec.component_names)
-    # Accept momentum names in pi_field_name format (e.g. pi_A_1)
-    valid_fields.update(f"pi_{eq.field_name}" for eq in spec.equations)
-    # Legacy: also accept pi_N (global index) for unregenerated JSONs
-    valid_fields.update(f"pi_{i}" for i in range(spec.n_components))
+    # Accept velocity names in v_field_name format (e.g. v_A_1)
+    valid_fields.update(f"v_{eq.field_name}" for eq in spec.equations)
 
     for eq in spec.equations:
         for term in eq.rhs_terms:
@@ -70,41 +66,6 @@ def validate_field_references(spec: EquationSystem) -> None:
                     f"Valid fields: {sorted(valid_fields)}."
                 )
                 raise ValueError(msg)
-
-    # Check canonical references
-    if spec.canonical is not None:
-        _validate_canonical_refs(spec, valid_fields)
-
-
-def _validate_canonical_refs(spec: EquationSystem, valid_fields: set[str]) -> None:
-    """Check canonical field_rates and spatial_momenta references.
-
-    Raises
-    ------
-    ValueError
-        If a canonical reference is invalid.
-    """
-    canonical = spec.canonical
-    assert canonical is not None
-
-    for field_name, terms in canonical.field_rates.items():
-        for term in terms:
-            if term.field not in valid_fields and not term.field.startswith("pi_"):
-                msg = (
-                    f"Unknown field reference '{term.field}' "
-                    f"in field_rates for '{field_name}'."
-                )
-                raise ValueError(msg)
-
-    if canonical.spatial_momenta is not None:
-        for field_name, terms in canonical.spatial_momenta.items():
-            for term in terms:
-                if term.field not in valid_fields:
-                    msg = (
-                        f"Unknown field reference '{term.field}' "
-                        f"in spatial_momenta for '{field_name}'."
-                    )
-                    raise ValueError(msg)
 
 
 def check_cfl_stability(

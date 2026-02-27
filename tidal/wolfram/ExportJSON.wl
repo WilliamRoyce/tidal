@@ -220,6 +220,7 @@ combination of operators applied to fields into a list of term Associations. \
 Each term has keys \"coefficient\", \"operator\", and \"field\". Used by both \
 the equation export pipeline and the canonical field rate computation (Phase K).";
 
+
 Begin["`Private`"];
 
 (* === JSON Structure Building === *)
@@ -418,6 +419,12 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
 
   (* Parse RHS with cross-field detection *)
   rhsTerms = ParseMultiFieldRHS[rhs, fieldName, allFieldNames];
+
+  (* NOTE: The pi_ sign hack that was previously here (negating coefficients of
+     momentum terms in wave equations) has been removed. The root cause — metric
+     contractions absorbing into field tensors (V^a = g^{ab} V_b) and then mapping
+     both covariant and contravariant to the same scalar — is now fixed in
+     ComponentDecompose.wl via SeparateMetric applied before ToBasis. *)
 
   (* Build structured LHS for flexible PDE types *)
   lhsStructure = BuildLHSStructure[fieldName, lhsTimeOrder];
@@ -647,25 +654,25 @@ ParseFieldName[name_String] := Module[{match},
   ]]
 ];
 
-(* Map field name to canonical momentum name: pi_{fieldName}.             *)
+(* Map field name to velocity slot name: v_{fieldName}.                  *)
 (* This matches the StateLayout naming convention in the Python solver.  *)
-(* For example: FieldToMomentumName["A_0", {"phi_0","A_0","A_1","A_2"}] *)
-(*   -> "pi_A_0"                                                         *)
-FieldToMomentumName[fieldName_String, allFieldNames_List] := Module[{pos},
+(* For example: FieldToVelocityName["A_0", {"phi_0","A_0","A_1","A_2"}] *)
+(*   -> "v_A_0"                                                          *)
+FieldToVelocityName[fieldName_String, allFieldNames_List] := Module[{pos},
   pos = FirstPosition[allFieldNames, fieldName];
   If[MissingQ[pos],
     Throw[StringJoin[
-      "FieldToMomentumName: field '", fieldName,
+      "FieldToVelocityName: field '", fieldName,
       "' not found in field list: ", ToString[allFieldNames]
     ]]
   ];
-  "pi_" <> fieldName
+  "v_" <> fieldName
 ];
 
 (* Classify spatial operator in a mixed time-space derivative *)
 (* Strips the time order (must be exactly 1) and classifies the spatial part *)
-(* using ClassifySpatialProfile. Since d_t phi = pi, mixed derivatives become *)
-(* spatial operators on the momentum field: d_t d_x phi = d_x(pi), *)
+(* using ClassifySpatialProfile. Since d_t phi = v, mixed derivatives become *)
+(* spatial operators on the velocity field: d_t d_x phi = d_x(v), *)
 (* d_t d_x d_y phi = d_x d_y(pi) = cross_derivative_xy(pi), etc. *)
 ExtractSpatialOperatorFromMixed[term_] := Module[
   {profile, timeOrder, spatialOrders},
@@ -767,7 +774,25 @@ ExtractFunctionHeads[term_] := Union[Join[
 MatchFieldToHeads[functionHeads_List, allFieldNames_List, defaultField_String] := Module[
   {matchedField = defaultField, foundFieldHead = Null},
 
-  (* For each field name like "A_0", "phi_0", find matching function head *)
+  (* Priority 1: exact head -> field name mapping via Global`$FieldHeadMapping. *)
+  (* This handles velocity function symbols whose names use absolute field    *)
+  (* indices that don't match the field name's own subscript index.           *)
+  (* Uses Global` context since this package is in Private`.                  *)
+  (* Safe no-op when $FieldHeadMapping is undefined.                          *)
+  If[AssociationQ[Global`$FieldHeadMapping],
+    Do[
+      If[KeyExistsQ[Global`$FieldHeadMapping, head] &&
+         MemberQ[allFieldNames, Global`$FieldHeadMapping[head]],
+        matchedField = Global`$FieldHeadMapping[head];
+        foundFieldHead = head;
+        Break[]
+      ],
+      {head, functionHeads}
+    ];
+    If[foundFieldHead =!= Null, Return[{matchedField, foundFieldHead}]]
+  ];
+
+  (* Priority 2: heuristic base+index matching *)
   (* Strategy: Match BOTH base name and index *)
   (* E.g., "A_0" matches "csA0" (base "A/a" + index "0") *)
   (* E.g., "phi_0" matches "cplPhi0" (base "phi" + index "0") *)
@@ -1072,9 +1097,9 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
   operator = operatorResult[[1]];
   isMixedTimeSpace = operatorResult[[2]];
 
-  (* Convert to momentum field if mixed time-space derivative *)
+  (* Convert to velocity field if mixed time-space derivative *)
   If[isMixedTimeSpace,
-    targetField = FieldToMomentumName[targetField, allFieldNames]
+    targetField = FieldToVelocityName[targetField, allFieldNames]
   ];
 
   (* Step 5: Detect nonlinear (field-dependent) coefficients *)

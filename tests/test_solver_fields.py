@@ -17,7 +17,7 @@ from tidal.symbolic.json_loader import EquationSystem
 
 
 def _make_kg_spec() -> EquationSystem:
-    """Klein-Gordon 1D: second-order → 2 slots (phi_0, pi_phi_0)."""
+    """Klein-Gordon 1D: second-order → 2 slots (phi_0, v_phi_0)."""
     data: dict[str, Any] = {
         "spacetime": {"dimension": 2, "signature": [-1, 1]},
         "fields": [{"name": "phi_0", "index": 0}],
@@ -99,10 +99,10 @@ class TestFieldSetConstruction:
         layout = StateLayout.from_spec(spec, 8)
         phi = np.ones(8)
         pi = np.full(8, 2.0)
-        fs = FieldSet.from_dict(layout, (8,), {"phi_0": phi, "pi_phi_0": pi})
+        fs = FieldSet.from_dict(layout, (8,), {"phi_0": phi, "v_phi_0": pi})
 
         np.testing.assert_array_equal(fs["phi_0"], 1.0)
-        np.testing.assert_array_equal(fs["pi_phi_0"], 2.0)
+        np.testing.assert_array_equal(fs["v_phi_0"], 2.0)
 
     def test_from_dict_partial(self) -> None:
         """Missing slots should default to zero."""
@@ -111,7 +111,7 @@ class TestFieldSetConstruction:
         fs = FieldSet.from_dict(layout, (8,), {"phi_0": np.ones(8)})
 
         np.testing.assert_array_equal(fs["phi_0"], 1.0)
-        np.testing.assert_array_equal(fs["pi_phi_0"], 0.0)
+        np.testing.assert_array_equal(fs["v_phi_0"], 0.0)
 
     def test_from_dict_extra_keys_ignored(self) -> None:
         """Extra keys not in layout should be silently ignored."""
@@ -147,8 +147,8 @@ class TestFieldSetAccess:
         layout = StateLayout.from_spec(spec, 8)
         fs = FieldSet.zeros(layout, (8,))
 
-        fs["pi_phi_0"] = np.full(8, 2.72)
-        np.testing.assert_array_equal(fs["pi_phi_0"], 2.72)
+        fs["v_phi_0"] = np.full(8, 2.72)
+        np.testing.assert_array_equal(fs["v_phi_0"], 2.72)
 
     def test_contains(self) -> None:
         spec = _make_kg_spec()
@@ -156,7 +156,7 @@ class TestFieldSetAccess:
         fs = FieldSet.zeros(layout, (8,))
 
         assert "phi_0" in fs
-        assert "pi_phi_0" in fs
+        assert "v_phi_0" in fs
         assert "nonexistent" not in fs
 
     def test_unknown_slot_raises_keyerror(self) -> None:
@@ -185,7 +185,7 @@ class TestFieldSetAccess:
         # A_0 is constraint (1 slot), phi_0 is 2nd order (2 slots: field + mom)
         assert fs["A_0"].shape == (4, 4)
         assert fs["phi_0"].shape == (4, 4)
-        assert fs["pi_phi_0"].shape == (4, 4)
+        assert fs["v_phi_0"].shape == (4, 4)
 
 
 class TestFieldSetMetadata:
@@ -202,20 +202,20 @@ class TestFieldSetMetadata:
         layout = StateLayout.from_spec(spec, 4)
         fs = FieldSet.zeros(layout, (4,))
 
-        assert fs.momentum_names == ("pi_phi_0",)
+        assert fs.velocity_names == ("v_phi_0",)
 
     def test_slot_names(self) -> None:
         spec = _make_coupled_spec()
         layout = StateLayout.from_spec(spec, 4)
         fs = FieldSet.zeros(layout, (4,))
 
-        assert fs.slot_names == ("A_0", "phi_0", "pi_phi_0")
+        assert fs.slot_names == ("A_0", "phi_0", "v_phi_0")
 
     def test_len(self) -> None:
         spec = _make_kg_spec()
         layout = StateLayout.from_spec(spec, 8)
         fs = FieldSet.zeros(layout, (8,))
-        assert len(fs) == 2  # phi_0 + pi_phi_0
+        assert len(fs) == 2  # phi_0 + v_phi_0
 
     def test_repr(self) -> None:
         spec = _make_kg_spec()
@@ -223,7 +223,7 @@ class TestFieldSetMetadata:
         fs = FieldSet.zeros(layout, (8,))
         r = repr(fs)
         assert "phi_0" in r
-        assert "pi_phi_0" in r
+        assert "v_phi_0" in r
         assert "(8,)" in r
 
 
@@ -242,11 +242,11 @@ class TestFieldSetDicts:
         spec = _make_coupled_spec()
         layout = StateLayout.from_spec(spec, 4)
         fs = FieldSet.zeros(layout, (4,))
-        fs["pi_phi_0"] = np.full(4, 5.0)
+        fs["v_phi_0"] = np.full(4, 5.0)
 
         md = fs.momenta_dict()
-        assert set(md.keys()) == {"pi_phi_0"}
-        np.testing.assert_array_equal(md["pi_phi_0"], 5.0)
+        assert set(md.keys()) == {"v_phi_0"}
+        np.testing.assert_array_equal(md["v_phi_0"], 5.0)
 
     def test_as_dict(self) -> None:
         spec = _make_coupled_spec()
@@ -254,7 +254,7 @@ class TestFieldSetDicts:
         fs = FieldSet.zeros(layout, (4,))
 
         d = fs.as_dict()
-        assert set(d.keys()) == {"A_0", "phi_0", "pi_phi_0"}
+        assert set(d.keys()) == {"A_0", "phi_0", "v_phi_0"}
 
     def test_dict_views_are_zero_copy(self) -> None:
         """Dict values should be views, not copies."""
@@ -289,7 +289,7 @@ class TestFieldSetRoundTrip:
         layout = StateLayout.from_spec(spec, 16)
         original = {
             "phi_0": np.sin(np.linspace(0, 2 * np.pi, 16)),
-            "pi_phi_0": np.cos(np.linspace(0, 2 * np.pi, 16)),
+            "v_phi_0": np.cos(np.linspace(0, 2 * np.pi, 16)),
         }
         fs1 = FieldSet.from_dict(layout, (16,), original)
 
@@ -317,7 +317,7 @@ class TestFieldSetDiagnostics:
         layout = StateLayout.from_spec(spec, 8)
         fs = FieldSet(layout, (8,))
         fs["phi_0"] = np.array([1.0, -3.0, 2.0, 0.0, 0.5, -0.5, 1.5, -2.5])
-        fs["pi_phi_0"] = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
+        fs["v_phi_0"] = np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0])
         assert fs.max_norm() == pytest.approx(3.0)
 
     def test_max_norm_all_zeros(self) -> None:

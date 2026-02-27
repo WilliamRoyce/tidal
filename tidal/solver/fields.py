@@ -27,7 +27,7 @@ class FieldSet:  # noqa: PLR0904
     Parameters
     ----------
     layout : StateLayout
-        Describes the slot structure (field/momentum names and ordering).
+        Describes the slot structure (field/velocity names and ordering).
     grid_shape : tuple[int, ...]
         Shape of the spatial grid (e.g. ``(64,)`` or ``(32, 32)``).
     data : np.ndarray, optional
@@ -147,21 +147,26 @@ class FieldSet:  # noqa: PLR0904
     def field_names(self) -> tuple[str, ...]:
         """Ordered field slot names (e.g. ``("phi_0", "A_0")``).
 
-        Excludes momentum slots.
+        Excludes velocity slots.
         """
         return tuple(
-            slot.name for slot in self._layout.slots if slot.kind != "momentum"
+            slot.name for slot in self._layout.slots if slot.kind != "velocity"
         )
 
     @property
-    def momentum_names(self) -> tuple[str, ...]:
-        """Ordered momentum slot names (e.g. ``("pi_phi_0",)``).
+    def velocity_names(self) -> tuple[str, ...]:
+        """Ordered velocity slot names (e.g. ``("v_phi_0",)``).
 
         Only present for second-order equations.
         """
         return tuple(
-            slot.name for slot in self._layout.slots if slot.kind == "momentum"
+            slot.name for slot in self._layout.slots if slot.kind == "velocity"
         )
+
+    @property
+    def momentum_names(self) -> tuple[str, ...]:
+        """Alias for ``velocity_names`` (transition aid)."""
+        return self.velocity_names
 
     @property
     def slot_names(self) -> tuple[str, ...]:
@@ -174,9 +179,13 @@ class FieldSet:  # noqa: PLR0904
         """Return dict of field name → grid-shaped view (zero-copy)."""
         return {name: self[name] for name in self.field_names}
 
+    def velocities_dict(self) -> dict[str, np.ndarray]:
+        """Return dict of velocity name → grid-shaped view (zero-copy)."""
+        return {name: self[name] for name in self.velocity_names}
+
     def momenta_dict(self) -> dict[str, np.ndarray]:
-        """Return dict of momentum name → grid-shaped view (zero-copy)."""
-        return {name: self[name] for name in self.momentum_names}
+        """Alias for ``velocities_dict`` (transition aid)."""
+        return self.velocities_dict()
 
     def as_dict(self) -> dict[str, np.ndarray]:
         """Return dict of all slot names + aux → grid-shaped views."""

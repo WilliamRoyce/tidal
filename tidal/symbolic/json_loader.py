@@ -519,192 +519,40 @@ class HamiltonianTerm:
 
 
 @dataclass(frozen=True)
-class KineticMatrixEntry:
-    """Single entry of the kinetic matrix K_{ij}.
-
-    The kinetic matrix K relates canonical momenta to velocities:
-    ``pi_i = K_{ij} * dq_j/dt + S_i``  where S_i are spatial corrections.
-
-    IDA uses K directly in residual form: ``K_{ij} * dq_j/dt - (pi_i - S_i) = 0``.
-    Leapfrog solves ``K * v = (pi - S)`` via ``np.linalg.solve``.
-
-    Attributes
-    ----------
-    i : int
-        Row index (0-based dynamical field index).
-    j : int
-        Column index (0-based dynamical field index).
-    value : float
-        Numerical value of K_{ij} (evaluated with parameter defaults).
-    symbolic : str | None
-        Exact symbolic expression (Mathematica InputForm), or None if trivial.
-    time_dependent : bool
-        Whether the entry depends on time (e.g., time-varying metric).
-    coordinate_dependent : tuple[str, ...]
-        Coordinate names the entry depends on (e.g., ``("x",)`` for a
-        spatially varying background field).  Empty tuple for constant entries.
-        Follows the same convention as :class:`OperatorTerm`.
-    """
-
-    i: int
-    j: int
-    value: float
-    symbolic: str | None = None
-    time_dependent: bool = False
-    coordinate_dependent: tuple[str, ...] = ()
-
-    @property
-    def position_dependent(self) -> bool:
-        """Whether the entry depends on spatial coordinates."""
-        return bool(set(self.coordinate_dependent) - {"t"})
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> KineticMatrixEntry:
-        """Parse from JSON dict."""
-        return cls(
-            i=int(data["i"]),
-            j=int(data["j"]),
-            value=float(data["value"]),
-            symbolic=data.get("symbolic"),
-            time_dependent=bool(data.get("time_dependent", False)),
-            coordinate_dependent=tuple(data.get("coordinate_dependent", ())),
-        )
-
-
-@dataclass(frozen=True)
-class KineticMatrix:
-    """Full kinetic matrix K for the dynamical subsystem.
-
-    Attributes
-    ----------
-    entries : tuple[KineticMatrixEntry, ...]
-        Non-zero entries of K.
-    dimension : int
-        Size of K (number of dynamical fields).
-    """
-
-    entries: tuple[KineticMatrixEntry, ...]
-    dimension: int
-
-    @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> KineticMatrix:
-        """Parse from JSON ``kinetic_matrix`` section."""
-        return cls(
-            entries=tuple(KineticMatrixEntry.from_dict(e) for e in data["entries"]),
-            dimension=int(data["dimension"]),
-        )
-
-    @property
-    def has_position_dependent(self) -> bool:
-        """Whether any entry depends on spatial coordinates."""
-        return any(e.position_dependent for e in self.entries)
-
-    @property
-    def has_time_dependent(self) -> bool:
-        """Whether any entry depends on time."""
-        return any(e.time_dependent for e in self.entries)
-
-    def to_dense(self) -> list[list[float]]:
-        """Convert to dense NxN matrix (list of lists).
-
-        For constant (non-coordinate-dependent) entries only.  Position-
-        or time-dependent entries require grid evaluation via
-        :class:`~tidal.solver.coefficients.CoefficientEvaluator`.
-        """
-        n = self.dimension
-        matrix = [[0.0] * n for _ in range(n)]
-        for e in self.entries:
-            matrix[e.i][e.j] = e.value
-        return matrix
-
-
-@dataclass(frozen=True)
 class CanonicalStructure:
-    """Hamilton's equations derived from Lagrangian via Legendre transform.
+    """Canonical structure: Hamiltonian terms for energy measurement.
 
-    Computed symbolically in Wolfram and exported as part of the JSON spec.
-    Used by the PDE builder for canonical evolution (Hamilton's 1st equation)
-    and by the energy measurement for Hamiltonian evaluation.
+    The Hamiltonian's bilinear terms are used by energy measurement to
+    compute H(q, v).  The E-L equations are stored in the ``equations``
+    array directly.
 
     Attributes
     ----------
     hamiltonian_terms : tuple[HamiltonianTerm, ...]
         Quadratic terms in the component-form Hamiltonian density.
-    field_rates : dict[str, tuple[OperatorTerm, ...]]
-        Hamilton's 1st equation per component: dq_i/dt = ∂H/∂π_i.
-        Each entry is the full RHS expressed as OperatorTerms, including
-        the identity(π_i) term. For scalars: ``[identity(pi_0)]``.
-        For Proca: ``[identity(pi_1), gradient_x(A_0)]``.
-    kinetic_matrix : KineticMatrix | None
-        Raw kinetic matrix K_{ij} = ∂π_i/∂(dq_j/dt).
-        Used directly by IDA (residual form) and leapfrog (K·v = π-S solve).
-        None for specs generated before Phase 2.
-    spatial_momenta : dict[str, tuple[OperatorTerm, ...]] | None
-        Spatial corrections S_i per dynamical field.  The momentum relation
-        is ``π_i = K_{ij} · dq_j/dt + S_i``.  None for pre-Phase 2 specs.
-    constraint_momenta : dict[str, tuple[OperatorTerm, ...]] | None
-        Canonical momenta for constraint fields (``time_derivative_order=0``).
-        ``π(q_i) = ∂L/∂(∂_t q_i)`` expressed as OperatorTerms.  Non-zero
-        when the Lagrangian couples to ``∂_t(constraint)`` (e.g. divergence-
-        type scalar-vector coupling ``gSV * φ * ∂_a A^a``).  Exported for
-        diagnostic purposes — the Legendre transform analytically cancels
-        ``π(q)*∂_t(q)`` so these do not appear in the Hamiltonian.
-        None for pre-constraint-momenta specs.
-    hamiltonian_symbolic : str
-        Full symbolic Hamiltonian expression (Mathematica InputForm).
+        Used by energy measurement to compute H(q, v).
     """
 
     hamiltonian_terms: tuple[HamiltonianTerm, ...]
-    field_rates: dict[str, tuple[OperatorTerm, ...]]
-    hamiltonian_symbolic: str
-    kinetic_matrix: KineticMatrix | None = None
-    spatial_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
-    constraint_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> CanonicalStructure:
-        """Parse from JSON ``canonical`` section."""
-        h_terms = tuple(HamiltonianTerm.from_dict(t) for t in data["hamiltonian_terms"])
+        """Parse from JSON ``canonical`` section.
 
-        raw_rates = data.get("field_rates", {})
-        field_rates: dict[str, tuple[OperatorTerm, ...]] = {}
-        for field_name, terms in raw_rates.items():
-            field_rates[str(field_name)] = tuple(
-                OperatorTerm.from_dict(t) for t in terms
+        Raises
+        ------
+        ValueError
+            If the JSON contains ``field_rates`` (old Hamilton form).
+            Re-derive with ``tidal derive`` to get E-L velocity form.
+        """
+        if "field_rates" in data:
+            msg = (
+                "JSON contains 'field_rates' (old Hamilton form). "
+                "Re-derive with 'tidal derive' to get E-L velocity form."
             )
-
-        # Parse kinetic matrix (new in Phase 2, optional for backward compat)
-        km_data = data.get("kinetic_matrix")
-        kinetic_matrix = KineticMatrix.from_dict(km_data) if km_data else None
-
-        # Parse spatial momenta (new in Phase 2, optional for backward compat)
-        raw_sm = data.get("spatial_momenta")
-        spatial_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
-        if raw_sm is not None:
-            spatial_momenta = {}
-            for field_name, terms in raw_sm.items():
-                spatial_momenta[str(field_name)] = tuple(
-                    OperatorTerm.from_dict(t) for t in terms
-                )
-
-        # Parse constraint momenta (optional, for constraint fields with π ≠ 0)
-        raw_cm = data.get("constraint_momenta")
-        constraint_momenta: dict[str, tuple[OperatorTerm, ...]] | None = None
-        if raw_cm is not None and raw_cm:
-            constraint_momenta = {}
-            for field_name, terms in raw_cm.items():
-                constraint_momenta[str(field_name)] = tuple(
-                    OperatorTerm.from_dict(t) for t in terms
-                )
-
-        return cls(
-            hamiltonian_terms=h_terms,
-            field_rates=field_rates,
-            hamiltonian_symbolic=str(data.get("hamiltonian_symbolic", "")),
-            kinetic_matrix=kinetic_matrix,
-            spatial_momenta=spatial_momenta,
-            constraint_momenta=constraint_momenta,
-        )
+            raise ValueError(msg)
+        h_terms = tuple(HamiltonianTerm.from_dict(t) for t in data["hamiltonian_terms"])
+        return cls(hamiltonian_terms=h_terms)
 
 
 @dataclass(frozen=True)
@@ -960,8 +808,7 @@ class EquationSystem:
 
         Field references can be:
         - Regular field names (e.g., ``"A_0"``, ``"A_1"``, ``"phi"``)
-        - Momentum names: ``"pi_field_name"`` (e.g., ``"pi_A_1"``)
-        - Legacy momentum names: ``"pi_N"`` (e.g., ``"pi_0"``)
+        - Velocity names: ``"v_field_name"`` (e.g., ``"v_A_1"``)
 
         Raises
         ------
@@ -969,29 +816,32 @@ class EquationSystem:
             If a field reference is invalid.
         """
         valid_fields = set(self.component_names)
-        # Build valid momentum references: canonical pi_field_name + legacy pi_N
-        valid_momenta = {f"pi_{name}" for name in self.component_names}
-        valid_momenta.update(f"pi_{i}" for i in range(self.n_components))
+        # Build valid velocity references: v_field_name
+        valid_velocities = {f"v_{name}" for name in self.component_names}
 
         for eq in self.equations:
             for term in eq.rhs_terms:
                 field_ref = term.field
 
-                if field_ref.startswith("pi_"):
-                    if field_ref not in valid_momenta:
-                        msg = (
-                            f"Invalid momentum reference '{field_ref}' "
-                            f"in equation for {eq.field_name}. "
-                            f"Valid: {sorted(valid_momenta)}."
-                        )
-                        raise ValueError(msg)
-                elif field_ref not in valid_fields:
+                # Check regular field names first (a field named "v_0" is
+                # a valid field, not a velocity reference)
+                if field_ref in valid_fields:
+                    continue
+                if field_ref in valid_velocities:
+                    continue
+                if field_ref.startswith("v_"):
                     msg = (
-                        f"Unknown field reference '{field_ref}' "
+                        f"Invalid velocity reference '{field_ref}' "
                         f"in equation for {eq.field_name}. "
-                        f"Valid fields: {sorted(valid_fields)}."
+                        f"Valid: {sorted(valid_velocities)}."
                     )
                     raise ValueError(msg)
+                msg = (
+                    f"Unknown field reference '{field_ref}' "
+                    f"in equation for {eq.field_name}. "
+                    f"Valid fields: {sorted(valid_fields)}."
+                )
+                raise ValueError(msg)
 
     @staticmethod
     def _compute_matrices_from_terms(
@@ -1007,7 +857,7 @@ class EquationSystem:
         """Extract mass and coupling matrices from identity operator terms.
 
         Scans each equation's RHS terms for ``identity`` operators acting on
-        known field names (not momentum references like ``pi_N``).
+        known field names (not velocity references like ``v_N``).
 
         Convention: ``matrix[i][j] = -(coefficient)`` where ``coefficient``
         is the numeric coefficient of the ``identity(field_j)`` term in

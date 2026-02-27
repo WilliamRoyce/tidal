@@ -53,13 +53,13 @@ def _make_em_2d_spec() -> EquationSystem:
                         {
                             "coefficient": -1.0,
                             "operator": "gradient_x",
-                            "field": "pi_1",
+                            "field": "v_A_1",
                         },
                         {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_0"},
                         {
                             "coefficient": -1.0,
                             "operator": "gradient_y",
-                            "field": "pi_2",
+                            "field": "v_A_2",
                         },
                     ],
                 },
@@ -78,11 +78,6 @@ def _make_em_2d_spec() -> EquationSystem:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {
-                            "coefficient": -1.0,
-                            "operator": "gradient_x",
-                            "field": "pi_0",
-                        },
                         {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_1"},
                         {
                             "coefficient": -1.0,
@@ -98,49 +93,18 @@ def _make_em_2d_spec() -> EquationSystem:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_2"},
                         {
                             "coefficient": -1.0,
                             "operator": "cross_derivative_xy",
                             "field": "A_1",
                         },
-                        {
-                            "coefficient": -1.0,
-                            "operator": "gradient_y",
-                            "field": "pi_0",
-                        },
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_2"},
                     ],
                 },
             },
         ],
         "canonical": {
             "hamiltonian_terms": [],
-            "field_rates": {
-                "A_1": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_1"},
-                    {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"},
-                ],
-                "A_2": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_2"},
-                    {"coefficient": 1.0, "operator": "gradient_y", "field": "A_0"},
-                ],
-            },
-            "kinetic_matrix": {
-                "entries": [
-                    {"i": 0, "j": 0, "value": 1.0},
-                    {"i": 1, "j": 1, "value": 1.0},
-                ],
-                "dimension": 2,
-            },
-            "spatial_momenta": {
-                "A_1": [
-                    {"coefficient": -1.0, "operator": "gradient_x", "field": "A_0"}
-                ],
-                "A_2": [
-                    {"coefficient": -1.0, "operator": "gradient_y", "field": "A_0"}
-                ],
-            },
-            "hamiltonian_symbolic": "test",
         },
     }
     return EquationSystem.from_dict(data)
@@ -177,7 +141,7 @@ def _make_chern_simons_spec() -> EquationSystem:
                         {
                             "coefficient": -1.0,
                             "operator": "gradient_x",
-                            "field": "pi_1",
+                            "field": "v_A_1",
                         },
                         {
                             "coefficient": -1.0,
@@ -189,7 +153,7 @@ def _make_chern_simons_spec() -> EquationSystem:
                         {
                             "coefficient": -1.0,
                             "operator": "gradient_y",
-                            "field": "pi_2",
+                            "field": "v_A_2",
                         },
                     ],
                 },
@@ -209,21 +173,17 @@ def _make_chern_simons_spec() -> EquationSystem:
                     "type": "linear_combination",
                     "terms": [
                         {
-                            "coefficient": 1.0,
-                            "operator": "first_derivative_t",
-                            "field": "A_2",
-                            "coefficient_symbolic": "kappa",
+                            "coefficient": -0.25,
+                            "operator": "identity",
+                            "field": "A_1",
+                            "coefficient_symbolic": "-1/4*kappa^2",
                         },
+                        {"coefficient": 1.0, "operator": "identity", "field": "A_1"},
                         {
-                            "coefficient": -1.0,
-                            "operator": "gradient_x",
-                            "field": "pi_0",
-                        },
-                        {
-                            "coefficient": -1.0,
+                            "coefficient": -0.5,
                             "operator": "gradient_y",
                             "field": "A_0",
-                            "coefficient_symbolic": "-kappa",
+                            "coefficient_symbolic": "-1/2*kappa",
                         },
                         {"coefficient": 1.0, "operator": "laplacian_y", "field": "A_1"},
                         {
@@ -241,72 +201,35 @@ def _make_chern_simons_spec() -> EquationSystem:
                     "type": "linear_combination",
                     "terms": [
                         {
-                            "coefficient": 1.0,
+                            "coefficient": -0.25,
+                            "operator": "identity",
+                            "field": "A_2",
+                            "coefficient_symbolic": "-1/4*kappa^2",
+                        },
+                        {
+                            "coefficient": -0.5,
+                            "operator": "identity",
+                            "field": "v_A_2",
+                            "coefficient_symbolic": "-1/2*kappa",
+                        },
+                        {
+                            "coefficient": 0.5,
                             "operator": "gradient_x",
                             "field": "A_0",
-                            "coefficient_symbolic": "kappa",
-                        },
-                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_2"},
-                        {
-                            "coefficient": -1.0,
-                            "operator": "first_derivative_t",
-                            "field": "A_1",
-                            "coefficient_symbolic": "-kappa",
+                            "coefficient_symbolic": "kappa/2",
                         },
                         {
                             "coefficient": -1.0,
                             "operator": "cross_derivative_xy",
                             "field": "A_1",
                         },
-                        {
-                            "coefficient": -1.0,
-                            "operator": "gradient_y",
-                            "field": "pi_0",
-                        },
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_2"},
                     ],
                 },
             },
         ],
         "canonical": {
             "hamiltonian_terms": [],
-            "field_rates": {
-                "A_1": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_1"},
-                    {
-                        "coefficient": -0.5,
-                        "operator": "identity",
-                        "field": "A_2",
-                        "coefficient_symbolic": "-1/2*kappa",
-                    },
-                    {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"},
-                ],
-                "A_2": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_2"},
-                    {
-                        "coefficient": 0.5,
-                        "operator": "identity",
-                        "field": "A_1",
-                        "coefficient_symbolic": "kappa/2",
-                    },
-                    {"coefficient": 1.0, "operator": "gradient_y", "field": "A_0"},
-                ],
-            },
-            "kinetic_matrix": {
-                "entries": [
-                    {"i": 0, "j": 0, "value": 1.0},
-                    {"i": 1, "j": 1, "value": 1.0},
-                ],
-                "dimension": 2,
-            },
-            "spatial_momenta": {
-                "A_1": [
-                    {"coefficient": -1.0, "operator": "gradient_x", "field": "A_0"}
-                ],
-                "A_2": [
-                    {"coefficient": -1.0, "operator": "gradient_y", "field": "A_0"}
-                ],
-            },
-            "hamiltonian_symbolic": "test",
         },
     }
     return EquationSystem.from_dict(data)
@@ -331,17 +254,6 @@ def _make_kg_spec() -> EquationSystem:
         ],
         "canonical": {
             "hamiltonian_terms": [],
-            "field_rates": {
-                "phi_0": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_phi_0"}
-                ],
-            },
-            "kinetic_matrix": {
-                "entries": [{"i": 0, "j": 0, "value": 1.0}],
-                "dimension": 1,
-            },
-            "spatial_momenta": {},
-            "hamiltonian_symbolic": "test",
         },
     }
     return EquationSystem.from_dict(data)
@@ -396,17 +308,6 @@ def _make_helmholtz_spec() -> EquationSystem:
         ],
         "canonical": {
             "hamiltonian_terms": [],
-            "field_rates": {
-                "rho_0": [
-                    {"coefficient": 1.0, "operator": "identity", "field": "pi_1"}
-                ],
-            },
-            "kinetic_matrix": {
-                "entries": [{"i": 0, "j": 0, "value": 1.0}],
-                "dimension": 1,
-            },
-            "spatial_momenta": {},
-            "hamiltonian_symbolic": "test",
         },
     }
     return EquationSystem.from_dict(data)
@@ -437,11 +338,11 @@ class TestClassifyTerms:
             assert op in {"laplacian_x", "laplacian_y"}
             assert coeff == 1.0
 
-        # Source terms: gradient_x(pi_1) + gradient_y(pi_2)
+        # Source terms: gradient_x(pi_A_1) + gradient_y(pi_A_2)
         assert len(terms.source_terms) == 2
         for _coeff, op, field in terms.source_terms:
             assert op in {"gradient_x", "gradient_y"}
-            assert field in {"pi_1", "pi_2"}
+            assert field in {"v_A_1", "v_A_2"}
 
     def test_position_dependent_detection(self) -> None:
         """has_position_dependent_self should be False for constant coeffs."""
@@ -828,17 +729,6 @@ class TestPreSolveConstraints:
             ],
             "canonical": {
                 "hamiltonian_terms": [],
-                "field_rates": {
-                    "A_1": [
-                        {"coefficient": 1.0, "operator": "identity", "field": "pi_1"}
-                    ],
-                },
-                "kinetic_matrix": {
-                    "entries": [{"i": 0, "j": 0, "value": 1.0}],
-                    "dimension": 1,
-                },
-                "spatial_momenta": {},
-                "hamiltonian_symbolic": "test",
             },
         }
         spec = EquationSystem.from_dict(data)
@@ -859,7 +749,7 @@ class TestPreSolveConstraints:
         )
         layout = StateLayout.from_spec(spec, grid.num_points)
 
-        # All zeros: pi_1 = pi_2 = 0 → source = 0 → A_0 = 0
+        # All zeros: pi_A_1 = pi_A_2 = 0 → source = 0 → A_0 = 0
         y0 = np.zeros(layout.total_size)
         y0_out = pre_solve_constraints(spec, grid, y0, bc="periodic")
 
@@ -882,7 +772,7 @@ class TestPreSolveConstraints:
         x_arr, y_arr = grid.coord_arrays()
 
         y0 = np.zeros(layout.total_size)
-        # Set pi_1 = cos(x)*cos(y) (zero-mean for compatibility)
+        # Set pi_A_1 = cos(x)*cos(y) (zero-mean for compatibility)
         pi1_slot = layout.momentum_slot_map["A_1"]
         y0[pi1_slot * n : (pi1_slot + 1) * n] = (np.cos(x_arr) * np.cos(y_arr)).ravel()
 
@@ -1259,21 +1149,6 @@ def _make_no_self_term_spec() -> EquationSystem:
         ],
         "canonical": {
             "hamiltonian_terms": [],
-            "field_rates": {
-                "h_1": [
-                    {
-                        "coefficient": 1.0,
-                        "operator": "identity",
-                        "field": "pi_1",
-                    },
-                ],
-            },
-            "kinetic_matrix": {
-                "entries": [{"i": 0, "j": 0, "value": 1.0}],
-                "dimension": 1,
-            },
-            "spatial_momenta": {},
-            "hamiltonian_symbolic": "test",
         },
     }
     return EquationSystem.from_dict(data)
@@ -1348,21 +1223,6 @@ def _make_multi_no_self_term_spec() -> EquationSystem:
         ],
         "canonical": {
             "hamiltonian_terms": [],
-            "field_rates": {
-                "h_0": [
-                    {
-                        "coefficient": 1.0,
-                        "operator": "identity",
-                        "field": "pi_2",
-                    },
-                ],
-            },
-            "kinetic_matrix": {
-                "entries": [{"i": 0, "j": 0, "value": 1.0}],
-                "dimension": 1,
-            },
-            "spatial_momenta": {},
-            "hamiltonian_symbolic": "test",
         },
     }
     return EquationSystem.from_dict(data)

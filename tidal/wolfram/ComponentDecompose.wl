@@ -80,6 +80,14 @@ heads that appear in the expression (primary + additional + background). \
 The result is a single scalar expression in Derivative[...][field][coords] form. \
 Options: \"ComputeChristoffels\" -> Automatic, \"MetricMatrix\" -> None.";
 
+SeparateFieldMetrics::usage =
+  "SeparateFieldMetrics[expr, chart] applies xAct's SeparateMetric to undo metric \
+contractions in tensor expressions. Converts V^a (= g^{ab} V_{-b}) back to explicit \
+g^{ab} * V_{-b}, ensuring all field tensor indices are in their canonical (covariant) \
+form before ToBasis decomposition. This prevents sign errors when mapping tensor \
+components to scalar functions (e.g., V^0 = -V_0 for Minkowski temporal component). \
+The metric is automatically extracted from the covariant derivative in the expression.";
+
 ValidateNoUnresolvedBackgrounds::usage =
   "ValidateNoUnresolvedBackgrounds[expr, bgHeads] checks that no abstract background \
 field symbols remain unresolved in the component expression.";
@@ -90,6 +98,34 @@ DecomposeToComponents::badopt =
 
 
 Begin["`Private`"];
+
+(* === Metric Separation for Correct Index Positions === *)
+(*
+   After EulerLagrange applies ContractMetric, field tensors may have raised indices:
+     V^a = g^{ab} V_{-b}  (metric absorbed into field)
+   This causes sign errors when mapping to scalars: V^0 = -V_0 for Minkowski.
+
+   SeparateFieldMetrics undoes this by applying xAct's SeparateMetric, making the
+   metric contraction explicit: V^a → g^{ab} * V_{-b}. After ToBasis, fields then
+   have only covariant (canonical/defined) indices, and the metric factors evaluate
+   to numerical values in EvaluateMetricComponents.
+*)
+
+SeparateFieldMetrics[expr_, chart_] := Module[
+  {covdOps, metric},
+
+  (* Extract the covariant derivative operator from the expression *)
+  covdOps = Cases[expr, (f_)[_][_] /; CovDQ[f] :> f, {0, Infinity}] // DeleteDuplicates;
+  If[Length[covdOps] == 0, Return[expr]];
+
+  (* Get the metric associated with the CovD via xAct introspection *)
+  metric = MetricOfCovD[covdOps[[1]]];
+
+  (* SeparateMetric: V^a → g^{ab} V_{-b}, making metric contraction explicit *)
+  (* This is the inverse of ContractMetric applied in EulerLagrange.wl *)
+  SeparateMetric[metric][expr]
+];
+
 
 (* === Component Decomposition === *)
 
@@ -173,6 +209,10 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
       componentEq = eom
     ];
 
+    (* Separate metric contractions before ToBasis *)
+    (* Ensures cross-field vector/tensor terms have covariant indices *)
+    componentEq = SeparateFieldMetrics[componentEq, chart];
+
     componentEq = ToBasis[chart][componentEq];
     componentEq = TraceBasisDummy[componentEq];
 
@@ -184,7 +224,8 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
 
     (* Evaluate epsilon tensor components to numeric ±1 values *)
     (* This handles Chern-Simons and other topological terms with Levi-Civita *)
-    componentEq = EvaluateEpsilonComponents[componentEq, chart];
+    (* Pass metricMatrix for correct volume factor and index raising in curved spacetimes *)
+    componentEq = EvaluateEpsilonComponents[componentEq, chart, metricMatrix];
     componentEq = Expand[componentEq];
 
     (* Get coordinate symbols *)
@@ -295,6 +336,11 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
     componentEq = eom /. replacements;
   ];
 
+  (* Step 1.5: Separate metric contractions to ensure covariant field indices *)
+  (* SeparateMetric undoes ContractMetric: V^a → g^{ab} V_{-b} *)
+  (* Must happen BEFORE ToBasis so fields have canonical (down) indices in basis *)
+  componentEq = SeparateFieldMetrics[componentEq, chart];
+
   (* Step 2: ToBasis *)
   componentEq = ToBasis[chart][componentEq];
 
@@ -312,7 +358,8 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   componentEq = Expand[componentEq];
 
   (* Step 6: Evaluate epsilon tensors *)
-  componentEq = EvaluateEpsilonComponents[componentEq, chart];
+  (* Pass metricMatrix for correct volume factor and index raising in curved spacetimes *)
+  componentEq = EvaluateEpsilonComponents[componentEq, chart, metricMatrix];
   componentEq = Expand[componentEq];
 
   (* Step 7: Evaluate metric components *)
@@ -453,10 +500,19 @@ ReplaceTensorFieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module[
 
     rank === 1,
       With[{ch = chart, cs = coordSyms},
+        (* After SeparateMetric, all field indices should be covariant (-ch) *)
         result = result /. {
-          fh[{i_Integer, -ch}] :> Symbol[ToString[fh] <> ToString[Abs[i]]][Sequence @@ cs],
-          fh[{i_Integer, ch}] :> Symbol[ToString[fh] <> ToString[Abs[i]]][Sequence @@ cs]
-        }
+          fh[{i_Integer, -ch}] :> Symbol[ToString[fh] <> ToString[Abs[i]]][Sequence @@ cs]
+        };
+        (* Safety fallback: if any contravariant field indices remain, warn and replace *)
+        If[!FreeQ[result, fh[{_Integer, ch}]],
+          Print["WARNING: Unexpected contravariant index for field ", fh,
+                ". SeparateMetric may not have fully separated metric contractions. ",
+                "Falling back to direct replacement (may produce incorrect signs)."];
+          result = result /. {
+            fh[{i_Integer, ch}] :> Symbol[ToString[fh] <> ToString[Abs[i]]][Sequence @@ cs]
+          }
+        ]
       ],
 
     rank === 2,
@@ -492,22 +548,35 @@ ReplaceRank2FieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module[
       Module[{pair = pairs[[k]], seqIdx = k - 1, sym},
         sym = Symbol[ToString[fh] <> ToString[seqIdx]];
 
-        (* All index configurations: down-down, up-up, mixed *)
+        (* Primary: covariant-covariant (canonical after SeparateMetric) *)
         result = result /. {
-          fh[{pair[[1]], -ch}, {pair[[2]], -ch}] :> sym[Sequence @@ cs],
-          fh[{pair[[1]], ch}, {pair[[2]], ch}] :> sym[Sequence @@ cs],
-          fh[{pair[[1]], ch}, {pair[[2]], -ch}] :> sym[Sequence @@ cs],
-          fh[{pair[[1]], -ch}, {pair[[2]], ch}] :> sym[Sequence @@ cs]
+          fh[{pair[[1]], -ch}, {pair[[2]], -ch}] :> sym[Sequence @@ cs]
         };
 
-        (* For symmetric: also map swapped indices to same component *)
+        (* For symmetric: also map swapped covariant indices to same component *)
         If[symQ && pair[[1]] =!= pair[[2]],
           result = result /. {
-            fh[{pair[[2]], -ch}, {pair[[1]], -ch}] :> sym[Sequence @@ cs],
-            fh[{pair[[2]], ch}, {pair[[1]], ch}] :> sym[Sequence @@ cs],
-            fh[{pair[[2]], ch}, {pair[[1]], -ch}] :> sym[Sequence @@ cs],
-            fh[{pair[[2]], -ch}, {pair[[1]], ch}] :> sym[Sequence @@ cs]
+            fh[{pair[[2]], -ch}, {pair[[1]], -ch}] :> sym[Sequence @@ cs]
           }
+        ];
+
+        (* Safety fallback: if any non-covariant index configs remain for this pair *)
+        If[!FreeQ[result, fh[{pair[[1]], _}, {pair[[2]], _}]] ||
+           (symQ && pair[[1]] =!= pair[[2]] && !FreeQ[result, fh[{pair[[2]], _}, {pair[[1]], _}]]),
+          Print["WARNING: Non-covariant rank-2 indices for field ", fh,
+                " at pair ", pair, ". Falling back to all-config replacement."];
+          result = result /. {
+            fh[{pair[[1]], ch}, {pair[[2]], ch}] :> sym[Sequence @@ cs],
+            fh[{pair[[1]], ch}, {pair[[2]], -ch}] :> sym[Sequence @@ cs],
+            fh[{pair[[1]], -ch}, {pair[[2]], ch}] :> sym[Sequence @@ cs]
+          };
+          If[symQ && pair[[1]] =!= pair[[2]],
+            result = result /. {
+              fh[{pair[[2]], ch}, {pair[[1]], ch}] :> sym[Sequence @@ cs],
+              fh[{pair[[2]], ch}, {pair[[1]], -ch}] :> sym[Sequence @@ cs],
+              fh[{pair[[2]], -ch}, {pair[[1]], ch}] :> sym[Sequence @@ cs]
+            }
+          ]
         ]
       ],
       {k, 1, Length[pairs]}
@@ -528,17 +597,25 @@ ReplaceHigherRankFieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module
 
   With[{ch = chart, cs = coordSyms},
     Do[
-      Module[{tuple = tuples[[k]], seqIdx = k - 1, sym, indexConfigs},
+      Module[{tuple = tuples[[k]], seqIdx = k - 1, sym, indexConfigs, pattern},
         sym = Symbol[ToString[fh] <> ToString[seqIdx]];
 
-        (* Generate all 2^rank index sign configurations (chart/-chart per slot) *)
-        indexConfigs = Tuples[{ch, -ch}, rank];
-        Do[
-          Module[{pattern},
-            pattern = Table[{tuple[[n]], config[[n]]}, {n, rank}];
-            result = result /. {fh @@ pattern :> sym[Sequence @@ cs]}
-          ],
-          {config, indexConfigs}
+        (* Primary: all-covariant (canonical after SeparateMetric) *)
+        pattern = Table[{tuple[[n]], -ch}, {n, rank}];
+        result = result /. {fh @@ pattern :> sym[Sequence @@ cs]};
+
+        (* Safety fallback: if field still appears with this tuple, try all configs *)
+        If[!FreeQ[result, fh],
+          indexConfigs = Tuples[{ch, -ch}, rank];
+          Do[
+            Module[{pat},
+              pat = Table[{tuple[[n]], config[[n]]}, {n, rank}];
+              If[pat =!= pattern,  (* Skip already-applied covariant config *)
+                result = result /. {fh @@ pat :> sym[Sequence @@ cs]}
+              ]
+            ],
+            {config, indexConfigs}
+          ]
         ]
       ],
       {k, 1, Length[tuples]}
@@ -605,6 +682,10 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
     ]
   ];
 
+  (* Separate metric contractions before ToBasis *)
+  (* Ensures all field tensor indices are in canonical (covariant) form *)
+  componentExpr = SeparateFieldMetrics[componentExpr, chart];
+
   (* Convert to chart basis *)
   componentExpr = ToBasis[chart][componentExpr];
   componentExpr = TraceBasisDummy[componentExpr];
@@ -616,7 +697,8 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
   componentExpr = Expand[componentExpr];
 
   (* Evaluate epsilon tensor components *)
-  componentExpr = EvaluateEpsilonComponents[componentExpr, chart];
+  (* Pass metricMatrix for correct volume factor and index raising in curved spacetimes *)
+  componentExpr = EvaluateEpsilonComponents[componentExpr, chart, metricMatrix];
   componentExpr = Expand[componentExpr];
 
   (* Evaluate metric components *)

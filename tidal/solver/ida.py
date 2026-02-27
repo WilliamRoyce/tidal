@@ -2,13 +2,13 @@
 
 Builds IDA-compatible residual functions from TIDAL equation specs.
 Handles arbitrary mixes of:
-- Second-order (wave) equations via Hamiltonian splitting
+- Second-order (wave) equations via E-L velocity form
 - First-order (diffusion/transport) equations
 - Algebraic (constraint) equations
 
-The kinetic matrix K is used directly in residual form:
-    K_{ij} * dq_j/dt - (pi_i - S_i) = 0
-No K^{-1} inversion needed — IDA's Newton iteration handles it.
+Euler-Lagrange velocity form:
+- Velocity slot: dv/dt = E-L RHS (second-order equation)
+- Field slot:    dq/dt = v      (trivial kinematic)
 
 Reference: Hindmarsh et al., "SUNDIALS: Suite of Nonlinear and
 Differential/Algebraic Equation Solvers", ACM TOMS 31(3), 2005.
@@ -37,7 +37,6 @@ if TYPE_CHECKING:
     from tidal.symbolic.json_loader import (
         ComponentEquation,
         EquationSystem,
-        OperatorTerm,
     )
 
 # Time-derivative order threshold for dynamical (wave) equations
@@ -51,14 +50,12 @@ class _ResidualCtx:
     via ``set_arrays()`` and cleared after each residual evaluation.
     """
 
-    def __init__(  # noqa: PLR0913, PLR0917
+    def __init__(
         self,
         spec: EquationSystem,
         layout: StateLayout,
         grid: GridInfo,
         bc: BCSpec | None,
-        kinetic: np.ndarray | None,
-        spatial_momenta: dict[str, tuple[OperatorTerm, ...]] | None,
         rhs_eval: RHSEvaluator | None = None,
     ) -> None:
         self.spec = spec
@@ -67,8 +64,6 @@ class _ResidualCtx:
         self.bc = bc
         self.n = grid.num_points
         self.shape = grid.shape
-        self.kinetic = kinetic
-        self.spatial_momenta = spatial_momenta
         self.rhs_eval = rhs_eval
         self.eq_map: dict[str, int] = {
             eq.field_name: i for i, eq in enumerate(spec.equations)
@@ -86,11 +81,8 @@ class _ResidualCtx:
         self.yp: np.ndarray = np.empty(0)
         self.res: np.ndarray = np.empty(0)
         self.fieldset: FieldSet | None = None
-        # Legacy dict for kinetic/field_rates handlers that still use raw arrays
+        # Dict for legacy constant-coefficient path in compute_rhs
         self.fields: dict[str, np.ndarray] = {}
-        # Track which fallback warnings have been issued (fire once per field)
-        self._warned_field_rates: set[str] = set()
-        self._warned_identity_k: set[str] = set()
 
     def set_arrays(
         self,
@@ -106,15 +98,15 @@ class _ResidualCtx:
         self.res = res
         self.fieldset = FieldSet.from_flat(self.layout, self.shape, y)
 
-        # Inject constraint velocities from yp so that
-        # first_derivative_t(constraint) and gradient_x(pi_constraint)
+        # Inject constraint velocities from yp so that velocity-dependent
+        # operators (first_derivative_t, gradient_x of velocity slots)
         # resolve correctly in the RHSEvaluator.
         for eq in self.spec.equations:
             if eq.time_derivative_order == 0:
                 slot_idx = self.layout.field_slot_map[eq.field_name]
                 start = slot_idx * self.n
                 vel = yp[start : start + self.n].reshape(self.shape)
-                self.fieldset.set_aux(f"pi_{eq.field_name}", vel)
+                self.fieldset.set_aux(f"v_{eq.field_name}", vel)
 
         self.fields = self.fieldset.as_dict()
 
@@ -135,23 +127,6 @@ class _ResidualCtx:
             operated = apply_operator(term.operator, target_data, self.grid, self.bc)
             result += term.coefficient * operated
         return result
-
-    def compute_spatial_mom(self, field_name: str) -> np.ndarray:
-        """Compute S_i for dynamical field i from spatial_momenta terms."""
-        if self.rhs_eval is not None and self.fieldset is not None:
-            return self.rhs_eval.evaluate_spatial_momentum(
-                field_name, self.fieldset, self.t
-            )
-
-        # Legacy path
-        if self.spatial_momenta is None or field_name not in self.spatial_momenta:
-            return np.zeros(self.n)
-        result = np.zeros(self.shape)
-        for term in self.spatial_momenta[field_name]:
-            target_data = self.fields.get(term.field, np.zeros(self.shape))
-            operated = apply_operator(term.operator, target_data, self.grid, self.bc)
-            result += term.coefficient * operated
-        return result.ravel()
 
     def _detect_no_self_term_fields(self) -> set[str]:
         """Detect constraint equations where the field has no self-referencing terms.
@@ -325,95 +300,20 @@ class _ResidualCtx:
             field_slot = self.layout.field_slot_map[slot.field_name]
             self.res[slot_idx * self.n] = self.y[field_slot * self.n]
 
-    def handle_momentum(self, slot_idx: int, slot: SlotInfo) -> None:
-        """Hamilton's 2nd: dpi/dt = RHS."""
+    def handle_velocity(self, slot_idx: int, slot: SlotInfo) -> None:
+        """E-L equation: dv/dt = RHS."""
         s = slice(slot_idx * self.n, (slot_idx + 1) * self.n)
         eq_idx = self.eq_map[slot.field_name]
-        mom_rhs = self.compute_rhs(eq_idx)
-        self.res[s] = self.yp[s] - mom_rhs.ravel()
+        vel_rhs = self.compute_rhs(eq_idx)
+        self.res[s] = self.yp[s] - vel_rhs.ravel()
 
     def handle_dynamical_field(self, slot_idx: int, slot: SlotInfo) -> None:
-        """Hamilton's 1st: K*dq/dt = pi - S (or fallback)."""
+        """Trivial kinematic: dq/dt = v."""
         s = slice(slot_idx * self.n, (slot_idx + 1) * self.n)
-        dyn_i = slot.dynamical_index
-        canonical = self.spec.canonical
-
-        if dyn_i is not None and self.kinetic is not None:
-            self._handle_kinetic(s, dyn_i, slot.field_name)
-        elif canonical and slot.field_name in canonical.field_rates:
-            self._handle_field_rates(s, slot.field_name)
-        else:
-            self._handle_identity_k(s, slot.field_name)
-
-    def _handle_kinetic(self, s: slice, dyn_i: int, field_name: str) -> None:
-        """K_{ij} * yp_j - (pi_i - S_i) = 0."""
-        assert self.kinetic is not None
         n = self.n
-        k_yp = np.zeros(n)
-        for j, dyn_field in enumerate(self.layout.dynamical_fields):
-            if self.kinetic[dyn_i, j] != 0:
-                fs = self.layout.field_slot_map[dyn_field]
-                k_yp += self.kinetic[dyn_i, j] * self.yp[fs * n : (fs + 1) * n]
-
-        mom_slot = self.layout.momentum_slot_map[field_name]
-        pi = self.y[mom_slot * n : (mom_slot + 1) * n]
-        s_i = self.compute_spatial_mom(field_name)
-        self.res[s] = k_yp - (pi - s_i)
-
-    def _handle_field_rates(self, s: slice, field_name: str) -> None:
-        """Fallback: use field_rates when K not available.
-
-        This path fires when the JSON spec has ``field_rates`` (old format
-        with K^{-1} embedded) but no ``kinetic_matrix``.  Results are
-        correct, but the spec should be regenerated with the current
-        pipeline to get the preferred ``kinetic_matrix`` format.
-        """
-        if field_name not in self._warned_field_rates:
-            self._warned_field_rates.add(field_name)
-            warnings.warn(
-                f"Using field_rates fallback for '{field_name}' because "
-                f"kinetic_matrix is missing from the JSON spec. This uses "
-                f"the old K^{{-1}} format. Regenerate JSON with current "
-                f"pipeline ('tidal derive') to use the preferred "
-                f"kinetic_matrix format.",
-                UserWarning,
-                stacklevel=2,
-            )
-        canonical = self.spec.canonical
-        assert canonical is not None
-        rate = np.zeros(self.shape)
-        for term in canonical.field_rates[field_name]:
-            target_data = self.fields.get(term.field, np.zeros(self.shape))
-            operated = apply_operator(term.operator, target_data, self.grid, self.bc)
-            rate += term.coefficient * operated
-        self.res[s] = self.yp[s] - rate.ravel()
-
-    def _handle_identity_k(self, s: slice, field_name: str) -> None:
-        """Identity K: dq/dt = pi.
-
-        This path fires when neither ``kinetic_matrix`` nor ``field_rates``
-        is available.  For single-field systems this is always correct
-        (K = 1).  For multi-field systems, K might be non-diagonal, and
-        assuming K = I would silently give wrong dynamics.
-        """
-        if field_name not in self._warned_identity_k:
-            self._warned_identity_k.add(field_name)
-            n_dyn = len(self.layout.dynamical_fields)
-            if n_dyn > 1:
-                warnings.warn(
-                    f"Multi-field system ({n_dyn} dynamical fields) "
-                    f"missing both kinetic_matrix and field_rates for "
-                    f"'{field_name}'; assuming K = I (identity). If the "
-                    f"kinetic matrix is non-diagonal, results will be "
-                    f"incorrect. Regenerate JSON with current pipeline "
-                    f"('tidal derive').",
-                    UserWarning,
-                    stacklevel=2,
-                )
-        n = self.n
-        mom_slot = self.layout.momentum_slot_map[field_name]
-        pi = self.y[mom_slot * n : (mom_slot + 1) * n]
-        self.res[s] = self.yp[s] - pi
+        vel_slot = self.layout.velocity_slot_map[slot.field_name]
+        v = self.y[vel_slot * n : (vel_slot + 1) * n]
+        self.res[s] = self.yp[s] - v
 
     def handle_first_order(self, slot_idx: int, slot: SlotInfo) -> None:
         """First-order: dy/dt = RHS."""
@@ -443,8 +343,8 @@ def build_residual_fn(
 
     - **Constraint** (time_order=0): ``res = RHS(y, t)`` (algebraic, = 0)
     - **First-order field** (time_order=1): ``res = yp - RHS(y, t)``
-    - **Second-order field slot**: ``res = K_{ij} * yp_j - (pi_i - S_i)``
-    - **Second-order momentum slot**: ``res = yp - RHS(y, t)``
+    - **Second-order field slot**: ``res = yp - v`` (trivial kinematic)
+    - **Second-order velocity slot**: ``res = yp - RHS(y, t)`` (E-L equation)
 
     Parameters
     ----------
@@ -466,14 +366,6 @@ def build_residual_fn(
     Callable
         IDA residual function with signature ``(t, y, yp, res) -> None``.
     """
-    canonical = spec.canonical
-
-    # Pre-extract kinetic matrix as dense numpy array
-    if canonical and canonical.kinetic_matrix:
-        kinetic = np.array(canonical.kinetic_matrix.to_dense())
-    else:
-        kinetic = None
-
     # Build RHSEvaluator if parameters provided
     rhs_eval: RHSEvaluator | None = None
     if parameters is not None:
@@ -488,8 +380,6 @@ def build_residual_fn(
         layout=layout,
         grid=grid,
         bc=bc,
-        kinetic=kinetic,
-        spatial_momenta=canonical.spatial_momenta if canonical else None,
         rhs_eval=rhs_eval,
     )
 
@@ -505,8 +395,8 @@ def build_residual_fn(
         for slot_idx, slot in enumerate(layout.slots):
             if slot.time_order == 0:
                 ctx.handle_constraint(slot_idx, slot)
-            elif slot.kind == "momentum":
-                ctx.handle_momentum(slot_idx, slot)
+            elif slot.kind == "velocity":
+                ctx.handle_velocity(slot_idx, slot)
             elif slot.time_order >= _SECOND_ORDER and slot.kind == "field":
                 ctx.handle_dynamical_field(slot_idx, slot)
             elif slot.time_order == 1:
@@ -544,8 +434,8 @@ def _check_no_self_term_ic(
     fields: dict[str, np.ndarray] = {}
     for name, slot_idx in layout.field_slot_map.items():
         fields[name] = y0[slot_idx * n : (slot_idx + 1) * n].reshape(grid.shape)
-    for name, slot_idx in layout.momentum_slot_map.items():
-        fields[f"pi_{name}"] = y0[slot_idx * n : (slot_idx + 1) * n].reshape(grid.shape)
+    for name, slot_idx in layout.velocity_slot_map.items():
+        fields[f"v_{name}"] = y0[slot_idx * n : (slot_idx + 1) * n].reshape(grid.shape)
 
     violations: list[tuple[str, float, list[str]]] = []
     for eq in spec.equations:
