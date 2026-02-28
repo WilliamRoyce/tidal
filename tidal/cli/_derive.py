@@ -520,6 +520,66 @@ def _validate_gauge(config: dict[str, Any]) -> None:
             raise ValueError(msg)
 
 
+# --- Spatial coordinates per dimension (excluding time) ---
+_SPATIAL_COORDS: dict[int, list[str]] = {
+    2: ["x"],
+    3: ["x", "y"],
+    4: ["x", "y", "z"],
+}
+
+
+def _validate_reduction(config: dict[str, Any]) -> None:
+    """Validate optional ``[reduction]`` section.
+
+    The plane-wave reduction zeroes all transverse spatial derivatives,
+    reducing the spacetime dimension to 1+1D (or 2+1D for partial
+    reductions in future).
+
+    Raises
+    ------
+    ValueError
+        If reduction config is invalid (bad type, axis, or dimension).
+    """
+    reduction = config.get("reduction")
+    if reduction is None:
+        return
+
+    rtype = reduction.get("type")
+    if rtype != "plane_wave":
+        msg = (
+            f"[reduction] type must be 'plane_wave', got '{rtype}'. "
+            "Other reduction types may be added in future."
+        )
+        raise ValueError(msg)
+
+    dim: int = config["spacetime"]["dimension"]
+    min_reducible_dim = 3  # need at least 2 spatial dimensions
+    if dim < min_reducible_dim:
+        msg = (
+            f"[reduction] cannot reduce a {dim - 1}+1D theory further. "
+            "Plane-wave reduction requires at least 2 spatial dimensions."
+        )
+        raise ValueError(msg)
+
+    prop_axis = reduction.get("propagation_axis")
+    if not prop_axis:
+        msg = "[reduction] requires 'propagation_axis' (e.g., 'x', 'y', or 'z')"
+        raise ValueError(msg)
+
+    spatial = _SPATIAL_COORDS.get(dim)
+    if spatial is None:
+        msg = f"[reduction] unsupported dimension {dim}"
+        raise ValueError(msg)
+
+    if prop_axis not in spatial:
+        msg = (
+            f"[reduction] propagation_axis '{prop_axis}' is not a valid "
+            f"spatial coordinate for dimension {dim}. "
+            f"Valid axes: {spatial}"
+        )
+        raise ValueError(msg)
+
+
 def _validate_config(config: dict[str, Any]) -> None:
     """Validate TOML config structure.
 
@@ -565,6 +625,7 @@ def _validate_config(config: dict[str, Any]) -> None:
     if has_linearization:
         _validate_linearization(config, has_lagrangian=has_lagrangian)
     _validate_gauge(config)
+    _validate_reduction(config)
     _validate_parameters(config)
 
 
@@ -743,6 +804,7 @@ class _WlsContext:
     linearization: dict[str, Any] | None
     constraint_solver: dict[str, Any] | None
     gauge: list[dict[str, Any]]
+    reduction: dict[str, Any] | None
 
 
 def _wls_header(ctx: _WlsContext) -> list[str]:
@@ -1577,6 +1639,163 @@ def _wls_gauge_fixing_type_b(ctx: _WlsContext) -> list[str]:
     return lines
 
 
+def _wls_plane_wave_reduction_lagrangian(ctx: _WlsContext) -> list[str]:
+    """Generate Wolfram code to zero transverse derivatives in the Lagrangian.
+
+    For plane-wave reduction, all spatial derivatives except along the
+    propagation axis are set to zero.  This is applied to ``{prefix}Lagrangian``
+    **before** E-L derivation / component decomposition for efficiency.
+
+    The Wolfram substitution zeros any ``Derivative`` whose order in a
+    transverse coordinate slot is > 0.
+    """
+    if ctx.reduction is None:
+        return []
+
+    prop_axis = ctx.reduction["propagation_axis"]
+    coords = ctx.coords  # e.g. ["t", "x", "y", "z"]
+    spatial = coords[1:]  # e.g. ["x", "y", "z"]
+    killed = [c for c in spatial if c != prop_axis]
+
+    # Build the substitution rules: for each killed axis, zero derivatives
+    # Derivative slots are 1-indexed: slot 1 = t, slot 2 = x, slot 3 = y, ...
+    rules: list[str] = []
+    for c in killed:
+        slot = coords.index(c) + 1  # 1-indexed Wolfram slot
+        rules.append(
+            f"  Derivative[ords__][f_][args___] /; {{ords}}[[{slot}]] > 0 :> 0"
+        )
+
+    p = ctx.prefix
+    lines: list[str] = [
+        "",
+        "(* ============================================================ *)",
+        "(* Plane-wave reduction: zero transverse derivatives            *)",
+        f'(* Propagation axis: {prop_axis}, killed axes: {", ".join(killed):<20s}*)',
+        "(* Applied BEFORE E-L derivation for efficiency                  *)",
+        "(* ============================================================ *)",
+        "",
+        f'Print["Applying plane-wave reduction (propagation axis: {prop_axis})"];',
+        f'Print["Zeroing derivatives w.r.t. transverse axes: {", ".join(killed)}"];',
+        "",
+        f"{p}Lagrangian = {p}Lagrangian /. {{",
+        ",\n".join(rules),
+        "};",
+        f"{p}Lagrangian = Expand[{p}Lagrangian];",
+        f'Print["Lagrangian after plane-wave reduction: ", Short[{p}Lagrangian, 5]];',
+        "",
+    ]
+    return lines
+
+
+def _wls_plane_wave_reduction_equations(ctx: _WlsContext) -> list[str]:
+    """Generate Wolfram code to zero transverse derivatives in fieldEquations.
+
+    For the linearization path, the abstract Lagrangian uses covariant
+    derivatives (``CD``) that don't match the ``Derivative`` pattern.
+    This function applies the reduction after component decomposition,
+    when equations are in explicit ``Derivative[ords__][f_][args__]`` form.
+
+    Also used as a fallback/defence-in-depth for the non-linearization path.
+    """
+    if ctx.reduction is None:
+        return []
+
+    prop_axis = ctx.reduction["propagation_axis"]
+    coords = ctx.coords
+    killed = [c for c in coords[1:] if c != prop_axis]
+
+    rules: list[str] = []
+    for c in killed:
+        slot = coords.index(c) + 1
+        rules.append(
+            f"  Derivative[ords__][f_][args___] /; {{ords}}[[{slot}]] > 0 :> 0"
+        )
+
+    lines: list[str] = [
+        "",
+        "(* === Plane-wave reduction: zero transverse derivatives in fieldEquations === *)",
+        f'Print["Zeroing transverse derivatives in component equations ({", ".join(killed)})"];',
+        "",
+        "fieldEquations = fieldEquations /. {",
+        ",\n".join(rules),
+        "};",
+        "fieldEquations = Table[",
+        "  {fieldEquations[[k, 1]], Expand[fieldEquations[[k, 2]]]},",
+        "  {k, Length[fieldEquations]}",
+        "];",
+        "",
+    ]
+    return lines
+
+
+def _wls_plane_wave_field_elimination(ctx: _WlsContext) -> list[str]:
+    """Generate Wolfram code to iteratively eliminate zero fields.
+
+    After plane-wave reduction and component decomposition, some fields may
+    have identically zero equations (all their terms were killed).  This
+    function iteratively:
+
+    1. Finds fields whose RHS is identically zero.
+    2. Substitutes those fields (and their derivatives) with zero in all
+       remaining equations.
+    3. Removes the zero-field equations from ``fieldEquations``.
+    4. Repeats until no more fields can be eliminated.
+    """
+    if ctx.reduction is None:
+        return []
+
+    lines: list[str] = [
+        "",
+        "(* === Plane-wave reduction: iterative zero-field elimination === *)",
+        'Print["Eliminating fields with identically zero equations..."];',
+        "",
+        "stable = False;",
+        "While[!stable,",
+        "  zeroFieldNames = {};",
+        "  Do[",
+        "    If[fieldEquations[[k, 2]] === 0,",
+        "      AppendTo[zeroFieldNames, fieldEquations[[k, 1]]]",
+        "    ],",
+        "    {k, Length[fieldEquations]}",
+        "  ];",
+        "",
+        "  If[Length[zeroFieldNames] == 0,",
+        "    stable = True,",
+        "    (* else: build substitution rules and eliminate *)",
+        '    Print["Eliminating zero fields: ", zeroFieldNames];',
+        "    zeroRules = {};",
+        "    allHeads = Union@Cases[",
+        "      fieldEquations[[All, 2]],",
+        "      f_Symbol[__] :> f, {0, Infinity}",
+        "    ];",
+        "    Do[",
+        "      Do[",
+        '        If[StringContainsQ[ToString[head], StringReplace[zfn, "_" -> ""]],',
+        "          AppendTo[zeroRules, head[___] :> 0];",
+        "          AppendTo[zeroRules, Derivative[__][head][___] :> 0]",
+        "        ],",
+        "        {head, allHeads}",
+        "      ],",
+        "      {zfn, zeroFieldNames}",
+        "    ];",
+        "    fieldEquations = fieldEquations /. zeroRules;",
+        "    fieldEquations = Select[fieldEquations,",
+        "      !MemberQ[zeroFieldNames, #[[1]]] &];",
+        "    fieldEquations = Table[",
+        "      {fieldEquations[[k, 1]], Expand[fieldEquations[[k, 2]]]},",
+        "      {k, Length[fieldEquations]}",
+        "    ];",
+        "  ]",
+        "];",
+        "",
+        'Print["Fields after reduction: ", Length[fieldEquations]];',
+        'Print["Surviving fields: ", fieldEquations[[All, 1]]];',
+        "",
+    ]
+    return lines
+
+
 def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
     """Generate Euler-Lagrange, decomposition, and export lines for multi-field."""
     lines: list[str] = ["(* Step 4: Euler-Lagrange equations *)"]
@@ -1899,6 +2118,33 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
             "  Length[{orders}] < nCoords :>",
             "  Derivative[Sequence @@ PadRight[{orders}, nCoords, 0]][g][args];",
             "",
+        ]
+    )
+
+    # Apply plane-wave reduction to the component-form Lagrangian
+    if ctx.reduction is not None:
+        prop_axis = ctx.reduction["propagation_axis"]
+        coords = ctx.coords
+        killed = [c for c in coords[1:] if c != prop_axis]
+        rules: list[str] = []
+        for c in killed:
+            slot = coords.index(c) + 1
+            rules.append(
+                f"  Derivative[ords__][f_][args___] /; {{ords}}[[{slot}]] > 0 :> 0"
+            )
+        lines.extend(
+            [
+                "(* Plane-wave reduction: zero transverse derivatives in Lagrangian components *)",
+                "lagComp = lagComp /. {",
+                ",\n".join(rules),
+                "};",
+                "lagComp = Expand[lagComp];",
+                "",
+            ]
+        )
+
+    lines.extend(
+        [
             "(* Map component names to Wolfram function symbols *)",
             "compToFunc = <||>;",
         ]
@@ -1970,6 +2216,50 @@ def _total_raw_component_count(ctx: _WlsContext) -> int:
 _LAGRANGIAN_DECOMPOSE_THRESHOLD = 30
 
 
+def _wls_volume_element_code(ctx: _WlsContext) -> list[str]:
+    """Generate Wolfram code to compute spatial volume element.
+
+    When plane-wave reduction is active, computes a **factored** volume
+    element: for each diagonal metric entry, drop multiplicative factors
+    that depend on killed coordinates.  This gives the correct reduced
+    volume element for energy integration (e.g. r² for spherical → radial).
+
+    When no reduction, computes the standard ``√|det(g_spatial)|``.
+    """
+    p = ctx.prefix
+    if ctx.reduction is None:
+        return [
+            "(* Compute spatial volume element sqrt|det(g_spatial)| for energy integration *)",
+            f"sqrtDetGSpatial = Simplify[Sqrt[Abs[Det[{p}MetricMatrix[[2;;, 2;;]]]]]];",
+            'Print["sqrt|g_spatial|: ", sqrtDetGSpatial];',
+        ]
+
+    # Plane-wave reduction: factored volume element
+    prop_axis = ctx.reduction["propagation_axis"]
+    coords = ctx.coords
+    killed = [c for c in coords[1:] if c != prop_axis]
+    killed_vars = ", ".join(f"{c}[]" for c in killed)
+
+    return [
+        "(* Compute REDUCED volume element for plane-wave reduction *)",
+        "(* For each diagonal metric entry, drop factors depending on killed coordinates *)",
+        f"spatialMetric = {p}MetricMatrix[[2;;, 2;;]];",
+        f"killedVars = {{{killed_vars}}};",
+        "reducedDet = 1;",
+        "Do[",
+        "  gii = spatialMetric[[k, k]];",
+        "  (* Factorize and keep only factors free of killed variables *)",
+        "  factors = If[Head[gii] === Times, List @@ gii, {gii}];",
+        "  survivingFactors = Select[factors,",
+        "    FreeQ[#, Alternatives @@ killedVars] &];",
+        "  reducedDet = reducedDet * Times @@ survivingFactors,",
+        "  {k, Length[spatialMetric]}",
+        "];",
+        "sqrtDetGSpatial = Simplify[Sqrt[Abs[reducedDet]]];",
+        f'Print["Reduced volume element (killed: {", ".join(killed)}): ", sqrtDetGSpatial];',
+    ]
+
+
 def _wls_canonical_from_eom(ctx: _WlsContext) -> list[str]:
     """Generate canonical structure directly from the already-decomposed EOM.
 
@@ -1982,7 +2272,6 @@ def _wls_canonical_from_eom(ctx: _WlsContext) -> list[str]:
 
     ``fieldEquations`` must already exist in the WLS script context.
     """
-    p = ctx.prefix
     return [
         "",
         "(* === Canonical Structure (EOM-based fast path) === *)",
@@ -1991,9 +2280,7 @@ def _wls_canonical_from_eom(ctx: _WlsContext) -> list[str]:
         'Print[""];',
         'Print["Building canonical structure from EOM (fast path)..."];',
         "",
-        "(* Compute spatial volume element sqrt|det(g_spatial)| *)",
-        f"sqrtDetGSpatial = Simplify[Sqrt[Abs[Det[{p}MetricMatrix[[2;;, 2;;]]]]]];",
-        'Print["sqrt|g_spatial|: ", sqrtDetGSpatial];',
+        *_wls_volume_element_code(ctx),
         "",
         "(* Inject canonical structure — hamiltonian_terms empty (fast path). *)",
         "canonicalSection = <|",
@@ -2037,16 +2324,13 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
 
     # E-L velocity form: keep original E-L equations, only inject
     # Hamiltonian terms for energy measurement.
-    p = ctx.prefix
     lines.extend(
         [
             "(* === E-L Velocity Form: Inject Canonical Structure === *)",
             "(* E-L equations are preserved as-is in equations[] array. *)",
             "(* Only hamiltonian_terms are injected for energy measurement. *)",
             "",
-            "(* Compute spatial volume element sqrt|det(g_spatial)| for energy integration *)",
-            f"sqrtDetGSpatial = Simplify[Sqrt[Abs[Det[{p}MetricMatrix[[2;;, 2;;]]]]]];",
-            'Print["sqrt|g_spatial|: ", sqrtDetGSpatial];',
+            *_wls_volume_element_code(ctx),
             "",
             "(* Inject canonical structure into JSON *)",
             "canonicalSection = <|",
@@ -2246,6 +2530,7 @@ def generate_wls(
         linearization=config.get("linearization"),
         constraint_solver=config.get("constraint_solver"),
         gauge=config.get("gauge", []),
+        reduction=config.get("reduction"),
     )
 
     is_linearization = ctx.linearization is not None
@@ -2282,11 +2567,16 @@ def generate_wls(
             )
         )
         # EOM computed inside _wls_linearize_from_lagrangian
+        # Reduction applied inside _wls_linearize_from_lagrangian (after L^(2))
     elif is_linearization:
         # Legacy: direct EOM linearization (deprecated — no [lagrangian])
         lines.extend(_wls_linearization(ctx, include_bg=_needs_bg_tensor(config)))
     else:
         lines.extend(_wls_lagrangian(ctx))
+        # Plane-wave reduction: zero transverse derivatives in Lagrangian
+        # BEFORE gauge fixing and EL derivation for efficiency
+        if ctx.reduction is not None:
+            lines.extend(_wls_plane_wave_reduction_lagrangian(ctx))
         # Type A gauge fixing: modify Lagrangian before EL derivation
         if has_type_a:
             lines.extend(_wls_gauge_fixing_type_a(ctx))
@@ -2297,6 +2587,13 @@ def generate_wls(
         # Type B gauge fixing: constraints applied after decomposition
         if has_type_b:
             lines.extend(_wls_gauge_fixing_type_b(ctx))
+
+    # Plane-wave reduction: zero transverse derivatives in fieldEquations
+    # (essential for linearization path where abstract L uses CD, not Derivative;
+    #  defence-in-depth for non-linearization path where Lagrangian was already reduced)
+    if ctx.reduction is not None:
+        lines.extend(_wls_plane_wave_reduction_equations(ctx))
+        lines.extend(_wls_plane_wave_field_elimination(ctx))
 
     lines.extend(_wls_metadata_and_export(config, ctx))
 
@@ -2387,26 +2684,53 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:
     finally:
         tmp_path.unlink(missing_ok=True)
 
-    # Post-validate output JSON if wolframscript succeeded
-    if ret == 0:
-        raw_output = args.output or config.get("output", {}).get("path", "output.json")
-        resolved = Path(raw_output)
-        if not resolved.is_absolute():
-            resolved = (config_path.parent.resolve() / resolved).resolve()
-        if resolved.exists():
-            try:
-                from tidal.symbolic.json_loader import (
-                    load_equation_system,
-                )
+    # Resolve output path for post-processing and validation
+    raw_output = args.output or config.get("output", {}).get("path", "output.json")
+    resolved = Path(raw_output)
+    if not resolved.is_absolute():
+        resolved = (config_path.parent.resolve() / resolved).resolve()
 
-                spec = load_equation_system(resolved)
-                print()
-                print(
-                    f"Validation: JSON loaded successfully ({spec.n_components} components)"
-                )
-            except Exception as exc:  # noqa: BLE001
-                print(f"\nWarning: JSON validation failed: {exc}", file=sys.stderr)
-                ret = 1
+    # Post-process: apply plane-wave reduction to JSON if configured
+    if ret == 0 and config.get("reduction") is not None and resolved.exists():
+        import json
+
+        from tidal.symbolic.reduction import reduce_spec
+
+        spec_data = json.loads(resolved.read_text(encoding="utf-8"))
+        try:
+            reduced = reduce_spec(spec_data, config["reduction"])
+            resolved.write_text(json.dumps(reduced, indent="\t"), encoding="utf-8")
+            red = config["reduction"]
+            print(
+                f"\nApplied {red['type']} reduction along "
+                f"{red['propagation_axis']}: "
+                f"{spec_data['spacetime']['dimension']}D → "
+                f"{reduced['spacetime']['dimension']}D"
+            )
+            eliminated = reduced["metadata"].get("reduction", {}).get(
+                "eliminated_fields", []
+            )
+            if eliminated:
+                print(f"Eliminated fields: {', '.join(eliminated)}")
+        except Exception as exc:  # noqa: BLE001
+            print(f"\nError: Plane-wave reduction failed: {exc}", file=sys.stderr)
+            ret = 1
+
+    # Post-validate output JSON if wolframscript succeeded
+    if ret == 0 and resolved.exists():
+        try:
+            from tidal.symbolic.json_loader import (
+                load_equation_system,
+            )
+
+            spec = load_equation_system(resolved)
+            print()
+            print(
+                f"Validation: JSON loaded successfully ({spec.n_components} components)"
+            )
+        except Exception as exc:  # noqa: BLE001
+            print(f"\nWarning: JSON validation failed: {exc}", file=sys.stderr)
+            ret = 1
 
     return ret
 

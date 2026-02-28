@@ -1,0 +1,29 @@
+[theory]
+name = "Spherical Klein-Gordon (radial plane wave)"
+
+[spacetime]
+dimension = 4
+metric = "diagonal"
+# ds^2 = -dt^2 + dr^2 + r^2 d(theta)^2 + r^2 sin^2(theta) d(phi)^2
+# Coordinates: {t, x, y, z} = {t, r, theta, phi}
+diagonal = [-1, 1, "x[]^2", "x[]^2*Sin[y[]]^2"]
+
+[[fields]]
+name = "phi"
+type = "scalar"
+
+[constants]
+names = ["spm2"]
+
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - spm2/2 phi[]^2"
+
+[parameters]
+spm2 = 0.0
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "x"
+
+[output]
+path = "../data/spherical_kg_1d.json"
