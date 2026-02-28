@@ -969,8 +969,9 @@ def _gradient_product_density(  # noqa: PLR0913, PLR0917
 
     For **non-periodic** axes: uses direct central-difference
         ``density = ∂_a(f) · ∂_b(g)``
-    because discrete IBP has boundary contributions
-    (cf. :func:`_gradient_energy_density`).
+    because discrete IBP requires a constant integration weight and breaks
+    down when the energy integral includes a position-dependent volume
+    element (e.g. ``r²`` in spherical coordinates).
 
     This is the **single source of truth** for gradient-product evaluation.
     Both the standalone gradient x gradient Hamiltonian path and the kinetic

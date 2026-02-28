@@ -17,10 +17,10 @@
 # IDA correctly handles the TT gauge constraints. The physical DOFs are
 # h_4 (h_+ = h_xx) and h_5 (h_x = h_xy), each satisfying d2t = d2z.
 #
-# Note: --ic-component h_4 initializes only h_4 without its traceless
-# partner h_7 = -h_4. This violates the transverse subsidiary constraint
-# but does not affect the wave equation dynamics (h_4 is self-contained).
-# For fully TT-gauge-consistent IC, one would need h_4 = -h_7 = Gaussian.
+# The unified constraint IC solver automatically determines:
+#   h_7 = -h_4 (from transverse_z constraint: gradient(h_4) + gradient(h_7) = 0)
+#   h_9 = -(h_4 + h_7) (from traceless constraint)
+#   h_6 = h_8 = 0 (from transverse_x/y constraints)
 #
 # Running this script:
 #   cd examples/gravitational_waves_1d && bash run.sh
@@ -28,22 +28,66 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
+OUT=../data/gw_plane_wave_1d_output
+
 # Derive equations from Lagrangian (requires wolframscript)
-tidal derive theory.toml
+# tidal derive theory.toml
 
 # Inspect the equation system (should show 1+1D, 12 fields with constraints)
 tidal inspect ../data/gw_plane_wave_1d.json
 
-# Run 1D simulation (Gaussian pulse on h_+ polarization)
+# Run 1D simulation (Gaussian pulse on h_+ polarization, periodic BCs)
 tidal simulate ../data/gw_plane_wave_1d.json \
   --grid-shape 256 \
   --bounds=-10:10 \
-  --bc neumann \
+  --periodic \
   --ic gaussian \
   --ic-width 1.0 \
   --ic-component h_4 \
-  --t-end 8.0
+  --t-end 8.0 \
+  --output "$OUT"
+
+# --- Analysis plots ---
+
+# Spacetime heatmap: h_4 (plus polarization) evolution
+tidal plot "$OUT" --type heatmap --field h_4 \
+  --title "GW h_+ polarization (x-t)" \
+  --output "$OUT/heatmap_h_4.png"
+
+# Spacetime heatmap: h_7 (traceless partner, should be -h_4)
+tidal plot "$OUT" --type heatmap --field h_7 \
+  --title "GW h_7 = -h_+ (traceless partner)" \
+  --output "$OUT/heatmap_h_7.png"
+
+# Profile evolution: h_4 at multiple time snapshots
+tidal plot "$OUT" --type profile --field h_4 \
+  --time-indices 0,25,50,75,100 \
+  --title "h_+ profile evolution" \
+  --output "$OUT/profile_h_4.png"
+
+# Profile evolution: h_7 at multiple time snapshots
+tidal plot "$OUT" --type profile --field h_7 \
+  --time-indices 0,25,50,75,100 \
+  --title "h_7 profile evolution" \
+  --output "$OUT/profile_h_7.png"
+
+# Multi-field peak amplitude
+tidal plot "$OUT" --type amplitude \
+  --fields h_4,h_5,h_7 \
+  --title "GW field amplitudes" \
+  --output "$OUT/amplitude_dynamical.png"
+
+# Compare h_4 initial/final vs h_7
+tidal plot "$OUT" --type compare \
+  --fields h_4,h_7 \
+  --title "h_4 vs h_7 (TT constraint: h_7 = -h_4)" \
+  --output "$OUT/compare_h4_h7.png"
 
 # Energy conservation measurement (currently blocked by unsupported
 # mixed_* Hamiltonian operators — see .github-issues-pending.md)
-# tidal measure output/ --what conservation
+# tidal plot "$OUT" --type conservation
+# tidal plot "$OUT" --type hamiltonian --fields h_4,h_5,h_7
+
+echo ""
+echo "Analysis complete. Plots saved to: $OUT/"
+ls -la "$OUT"/*.png 2>/dev/null || echo "  (no plots generated)"
