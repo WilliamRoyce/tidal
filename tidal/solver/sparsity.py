@@ -318,9 +318,7 @@ class _SparsityBuilder:
         self.grid = grid
         self.n = grid.num_points
         self.ndim = grid.ndim
-        self.eq_map: dict[str, int] = {
-            eq.field_name: i for i, eq in enumerate(spec.equations)
-        }
+        self.eq_map: dict[str, int] = spec.equation_map
         self.all_rows: list[np.ndarray] = []
         self.all_cols: list[np.ndarray] = []
 

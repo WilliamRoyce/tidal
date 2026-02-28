@@ -45,8 +45,7 @@ def _build_rhs_fn(
     rhs_eval: RHSEvaluator,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
     """Build the scipy RHS closure: ``rhs_fn(t, y) -> dydt``."""
-    n = grid.num_points
-    eq_map = {eq.field_name: i for i, eq in enumerate(spec.equations)}
+    eq_map = spec.equation_map
 
     def rhs_fn(t: float, y: np.ndarray) -> np.ndarray:
         dydt = np.zeros_like(y)
@@ -56,7 +55,7 @@ def _build_rhs_fn(
         fieldset = FieldSet.from_flat(layout, grid.shape, y)
 
         for slot_idx, slot in enumerate(layout.slots):
-            s = slice(slot_idx * n, (slot_idx + 1) * n)
+            s = layout.slot_slice(slot_idx)
             if slot.kind == "velocity":
                 dydt[s] = force[s]
             elif slot.kind == "field" and slot.time_order >= SECOND_ORDER:

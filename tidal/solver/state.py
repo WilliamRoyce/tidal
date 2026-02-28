@@ -10,6 +10,7 @@ IDA and leapfrog operate on flat numpy arrays.  This module provides:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -149,6 +150,11 @@ class StateLayout:
             dynamical_fields=tuple(dynamical_fields),
         )
 
+    @cached_property
+    def slot_name_to_idx(self) -> dict[str, int]:
+        """Map from slot name to slot index. Cached on frozen dataclass."""
+        return {slot.name: i for i, slot in enumerate(self.slots)}
+
     @property
     def total_size(self) -> int:
         """Total flat vector length (num_slots * num_points)."""
@@ -158,6 +164,11 @@ class StateLayout:
     def num_slots(self) -> int:
         """Number of slots in the state vector."""
         return len(self.slots)
+
+    def slot_slice(self, slot_idx: int) -> slice:
+        """Return the flat-array slice for a given slot index."""
+        n = self.num_points
+        return slice(slot_idx * n, (slot_idx + 1) * n)
 
     @property
     def algebraic_indices(self) -> list[int]:

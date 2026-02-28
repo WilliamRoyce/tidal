@@ -28,6 +28,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from numpy.typing import NDArray
 
     from tidal.measurement._io import SimulationData
@@ -1030,9 +1032,88 @@ def _merge_parameters(data: SimulationData) -> dict[str, float]:
     return params
 
 
-def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
+@dataclass
+class _HamiltonianContext:
+    """Pre-computed snapshot-invariant data for Hamiltonian evaluation.
+
+    Hoisting these computations out of the per-snapshot loop avoids
+    redundant parameter merging, coordinate array construction, volume
+    element evaluation, and per-term coefficient resolution.
+    """
+
+    params: dict[str, float]
+    coord_arrays: dict[str, NDArray[np.float64]] | None
+    volume_weight: float | NDArray[np.float64]
+    term_coeffs: list[float | NDArray[np.float64]]
+    resolve_symbolic: Callable[..., float | None]
+
+
+def _prepare_hamiltonian_context(data: SimulationData) -> _HamiltonianContext:
+    """Build a reusable context for repeated Hamiltonian evaluations."""
+    canonical = data.spec.canonical
+    assert canonical is not None
+
+    from tidal.symbolic.json_loader import (  # noqa: PLC0415
+        _resolve_symbolic_coeff,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    params = _merge_parameters(data)
+    coord_arrays: dict[str, NDArray[np.float64]] | None = None
+
+    # Volume element
+    volume_weight: float | NDArray[np.float64] = 1.0
+    if canonical.volume_element is not None:
+        coord_arrays = _build_coord_arrays(data)
+        from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+        volume_weight = evaluate_coefficient(
+            canonical.volume_element,
+            params,
+            data.spec.effective_coordinates,
+            coord_arrays=coord_arrays,
+            t=0.0,
+        )
+
+    # Pre-resolve all term coefficients
+    term_coeffs: list[float | NDArray[np.float64]] = []
+    for term in canonical.hamiltonian_terms:
+        if term.position_dependent:
+            if coord_arrays is None:
+                coord_arrays = _build_coord_arrays(data)
+            from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+            assert term.coefficient_symbolic is not None
+            coeff: float | NDArray[np.float64] = evaluate_coefficient(
+                term.coefficient_symbolic,
+                params,
+                data.spec.effective_coordinates,
+                coord_arrays=coord_arrays,
+                t=0.0,
+            )
+        else:
+            coeff = float(term.coefficient)
+            if term.coefficient_symbolic is not None and params:
+                resolved = _resolve_symbolic_coeff(
+                    term.coefficient_symbolic,
+                    params,
+                )
+                if resolved is not None:
+                    coeff = float(resolved)
+        term_coeffs.append(coeff)
+
+    return _HamiltonianContext(
+        params=params,
+        coord_arrays=coord_arrays,
+        volume_weight=volume_weight,
+        term_coeffs=term_coeffs,
+        resolve_symbolic=_resolve_symbolic_coeff,
+    )
+
+
+def _compute_hamiltonian_from_canonical(  # noqa: PLR0914
     data: SimulationData,
     t_idx: int,
+    ctx: _HamiltonianContext | None = None,
 ) -> float:
     """Evaluate the symbolic Hamiltonian from canonical structure.
 
@@ -1072,58 +1153,16 @@ def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
         msg = "_compute_hamiltonian_from_canonical called without canonical structure"
         raise ValueError(msg)
 
-    from tidal.symbolic.json_loader import (  # noqa: PLC0415
-        _resolve_symbolic_coeff,  # pyright: ignore[reportPrivateUsage]
-    )
+    # Use pre-computed context when available (timeseries path),
+    # otherwise compute inline (single-snapshot callers).
+    if ctx is None:
+        ctx = _prepare_hamiltonian_context(data)
 
-    params = _merge_parameters(data)
-    coord_arrays: dict[str, NDArray[np.float64]] | None = None  # lazy-initialized
-
-    # Volume element: sqrt|g_spatial| for curved coordinates.
-    # None -> flat spacetime, volume_weight stays 1.0 (no grid allocation).
-    volume_weight: float | NDArray[np.float64] = 1.0
-    if canonical.volume_element is not None:
-        if coord_arrays is None:
-            coord_arrays = _build_coord_arrays(data)
-        from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
-
-        volume_weight = evaluate_coefficient(
-            canonical.volume_element,
-            params,
-            data.spec.effective_coordinates,
-            coord_arrays=coord_arrays,
-            t=0.0,
-        )
+    volume_weight = ctx.volume_weight
 
     total = 0.0
-    for term in canonical.hamiltonian_terms:
-        # --- Coefficient resolution ---
-        # Position-dependent coefficients (e.g. Gaussian coupling, Csc[y]/x² in
-        # spherical coordinates) must be evaluated on the spatial grid.  The scalar
-        # path via _resolve_symbolic_coeff() cannot handle expressions that contain
-        # coordinate calls like x[] or y[].
-        if term.position_dependent:
-            if coord_arrays is None:
-                coord_arrays = _build_coord_arrays(data)
-            from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
-
-            assert term.coefficient_symbolic is not None  # guaranteed when position_dependent
-            coeff: float | NDArray[np.float64] = evaluate_coefficient(
-                term.coefficient_symbolic,
-                params,
-                data.spec.effective_coordinates,
-                coord_arrays=coord_arrays,
-                t=0.0,
-            )
-        else:
-            coeff = float(term.coefficient)
-            if term.coefficient_symbolic is not None and params:
-                resolved = _resolve_symbolic_coeff(
-                    term.coefficient_symbolic,
-                    params,
-                )
-                if resolved is not None:
-                    coeff = float(resolved)
+    for term_idx, term in enumerate(canonical.hamiltonian_terms):
+        coeff: float | NDArray[np.float64] = ctx.term_coeffs[term_idx]
 
         op_a = term.factor_a.operator
         op_b = term.factor_b.operator
@@ -1187,6 +1226,7 @@ def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
 def compute_system_energy(  # noqa: PLR0914
     data: SimulationData,
     t_idx: int,
+    _ctx: _HamiltonianContext | None = None,
 ) -> SystemEnergy:
     """Compute Hamiltonian energy density at snapshot *t_idx*.
 
@@ -1276,7 +1316,7 @@ def compute_system_energy(  # noqa: PLR0914
 
     # Use canonical Hamiltonian when available (Phase K: Legendre transform)
     if data.spec.canonical is not None:
-        total = _compute_hamiltonian_from_canonical(data, t_idx)
+        total = _compute_hamiltonian_from_canonical(data, t_idx, ctx=_ctx)
         self_sum = sum(fe.total for fe in per_field.values())
         interaction = total - self_sum
         return SystemEnergy(per_field=per_field, interaction=interaction, total=total)
@@ -1313,27 +1353,41 @@ def compute_energy_timeseries(
     total : ndarray, shape ``(n_snapshots,)``
     """
     n = data.n_snapshots
-    per_field_arrays: dict[str, list[float]] = {}
-    interaction_list: list[float] = []
-    total_list: list[float] = []
 
-    for t_idx in range(n):
-        se = compute_system_energy(data, t_idx)
-        for name, fe in se.per_field.items():
-            per_field_arrays.setdefault(name, []).append(fe.total)
-        interaction_list.append(se.interaction)
-        total_list.append(se.total)
+    # Pre-compute Hamiltonian context once (avoids re-merging parameters,
+    # rebuilding coord arrays, and re-resolving coefficients per snapshot).
+    ctx: _HamiltonianContext | None = None
+    if data.spec.canonical is not None:
+        ctx = _prepare_hamiltonian_context(data)
 
+    # Compute first snapshot to discover field names, then pre-allocate.
+    se0 = compute_system_energy(data, 0, _ctx=ctx)
+    field_names = list(se0.per_field.keys())
     per_field_np: dict[str, NDArray[np.float64]] = {
-        name: np.array(vals, dtype=np.float64)
-        for name, vals in per_field_arrays.items()
+        name: np.empty(n, dtype=np.float64) for name in field_names
     }
+    interaction = np.empty(n, dtype=np.float64)
+    total = np.empty(n, dtype=np.float64)
+
+    # Fill snapshot 0
+    for name, fe in se0.per_field.items():
+        per_field_np[name][0] = fe.total
+    interaction[0] = se0.interaction
+    total[0] = se0.total
+
+    # Fill remaining snapshots
+    for t_idx in range(1, n):
+        se = compute_system_energy(data, t_idx, _ctx=ctx)
+        for name, fe in se.per_field.items():
+            per_field_np[name][t_idx] = fe.total
+        interaction[t_idx] = se.interaction
+        total[t_idx] = se.total
 
     return (
         data.times.copy(),
         per_field_np,
-        np.array(interaction_list, dtype=np.float64),
-        np.array(total_list, dtype=np.float64),
+        interaction,
+        total,
     )
 
 

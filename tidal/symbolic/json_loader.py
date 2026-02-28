@@ -12,6 +12,7 @@ import math
 import re
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
+from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -981,6 +982,11 @@ class EquationSystem:
     def spatial_coordinates(self) -> tuple[str, ...]:
         """Spatial coordinate names (all except first, which is time)."""
         return self.effective_coordinates[1:]
+
+    @cached_property
+    def equation_map(self) -> dict[str, int]:
+        """Map from field name to equation index. Cached on frozen dataclass."""
+        return {eq.field_name: i for i, eq in enumerate(self.equations)}
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914

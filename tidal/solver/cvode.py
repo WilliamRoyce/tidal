@@ -52,8 +52,7 @@ def _build_rhsfn(
     rhs_eval: RHSEvaluator,
 ) -> Callable[[float, np.ndarray, np.ndarray], None]:
     """Build the CVODE RHS closure: ``rhsfn(t, y, yp)``."""
-    n = grid.num_points
-    eq_map = {eq.field_name: i for i, eq in enumerate(spec.equations)}
+    eq_map = spec.equation_map
 
     def rhsfn(t: float, y: np.ndarray, yp: np.ndarray) -> None:
         force = compute_force(spec, layout, grid, bc, y, t, rhs_eval)
@@ -61,7 +60,7 @@ def _build_rhsfn(
         fieldset = FieldSet.from_flat(layout, grid.shape, y)
 
         for slot_idx, slot in enumerate(layout.slots):
-            s = slice(slot_idx * n, (slot_idx + 1) * n)
+            s = layout.slot_slice(slot_idx)
             if slot.kind == "velocity":
                 yp[s] = force[s]
             elif slot.kind == "field" and slot.time_order >= SECOND_ORDER:

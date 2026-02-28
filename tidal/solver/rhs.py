@@ -51,9 +51,7 @@ class RHSEvaluator:
         self._grid = grid
         self._coeff_eval = coeff_eval
         self._bc = bc
-        self._eq_map: dict[str, int] = {
-            eq.field_name: i for i, eq in enumerate(spec.equations)
-        }
+        self._eq_map: dict[str, int] = spec.equation_map
         self._result_buffer = np.zeros(grid.shape)
 
     def begin_timestep(self, t: float) -> None:

@@ -64,9 +64,7 @@ class _ResidualCtx:
         self.n = grid.num_points
         self.shape = grid.shape
         self.rhs_eval = rhs_eval
-        self.eq_map: dict[str, int] = {
-            eq.field_name: i for i, eq in enumerate(spec.equations)
-        }
+        self.eq_map: dict[str, int] = spec.equation_map
         # Detect constraints with no self-referencing terms — the field
         # doesn't appear in its own equation (e.g. momentum constraints
         # from gauge DOF).  These are frozen at zero.
@@ -80,8 +78,8 @@ class _ResidualCtx:
         self.yp: np.ndarray = np.empty(0)
         self.res: np.ndarray = np.empty(0)
         self.fieldset: FieldSet | None = None
-        # Dict for legacy constant-coefficient path in compute_rhs
-        self.fields: dict[str, np.ndarray] = {}
+        # Dict for legacy constant-coefficient path in compute_rhs (lazy)
+        self.fields: dict[str, np.ndarray] | None = None
 
     def set_arrays(
         self,
@@ -107,7 +105,7 @@ class _ResidualCtx:
                 vel = yp[start : start + self.n].reshape(self.shape)
                 self.fieldset.set_aux(f"v_{eq.field_name}", vel)
 
-        self.fields = self.fieldset.as_dict()
+        self.fields = None  # Reset lazy cache
 
         # Notify coefficient evaluator of new timestep
         if self.rhs_eval is not None:
@@ -119,6 +117,9 @@ class _ResidualCtx:
             return self.rhs_eval.evaluate(eq_idx, self.fieldset, self.t)
 
         # Legacy path: constant coefficients only
+        if self.fields is None:
+            assert self.fieldset is not None
+            self.fields = self.fieldset.as_dict()
         eq = self.spec.equations[eq_idx]
         result = np.zeros(self.shape)
         for term in eq.rhs_terms:
