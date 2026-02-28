@@ -195,7 +195,8 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--ic-wavevector",
         default=None,
         metavar="K[,K,K]",
-        help="Wavevector for plane-wave IC (e.g. 0.1,0.0,0.0)",
+        help="Wavevector for plane-wave or gaussian IC (e.g. 3 or 0.1,0.0,0.0). "
+        "With gaussian: creates a travelling wave packet (positive k = right-mover)",
     )
     # Mode
     sim_parser.add_argument(

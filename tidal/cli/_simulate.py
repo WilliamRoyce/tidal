@@ -506,6 +506,10 @@ def _gaussian_y0(
 ) -> np.ndarray:
     """Compute Gaussian IC as flat state vector (native path).
 
+    When ``--ic-wavevector`` is provided, creates a travelling wave packet:
+    a Gaussian envelope modulated by a carrier wave, with matching velocity
+    for unidirectional propagation.  Positive wavevector gives a right-mover.
+
     Raises
     ------
     ValueError
@@ -537,9 +541,25 @@ def _gaussian_y0(
         if dim < len(center):
             dist_sq += (coords[..., dim] - center[dim]) ** 2
 
-    field_arr = args.ic_amplitude * np.exp(-dist_sq / (2 * width**2))
+    envelope = args.ic_amplitude * np.exp(-dist_sq / (2 * width**2))
+
+    slot_data: dict[str, np.ndarray] = {}
+
+    if args.ic_wavevector is not None:
+        kvec = tuple(float(k) for k in args.ic_wavevector.split(","))
+        k_dot_x = np.zeros(grid_info.shape, dtype=np.float64)
+        for dim in range(min(grid_info.ndim, len(kvec))):
+            k_dot_x += kvec[dim] * coords[..., dim]
+        k_mag = float(np.sqrt(sum(k**2 for k in kvec)))
+        slot_data[component] = envelope * np.cos(k_dot_x)
+        vel_name = f"v_{component}"
+        if vel_name in FieldSet(layout, grid_info.shape):
+            slot_data[vel_name] = envelope * k_mag * np.sin(k_dot_x)
+    else:
+        slot_data[component] = envelope
+
     return FieldSet.from_dict(
-        layout, grid_info.shape, {component: field_arr}
+        layout, grid_info.shape, slot_data
     ).flat.copy()
 
 
