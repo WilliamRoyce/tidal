@@ -170,6 +170,44 @@ class StateLayout:
         n = self.num_points
         return slice(slot_idx * n, (slot_idx + 1) * n)
 
+    # ---- Pre-computed slot groups (branch-free hot-path iteration) ----
+
+    @cached_property
+    def velocity_slot_groups(self) -> tuple[tuple[int, slice, str], ...]:
+        """Pre-computed ``(slot_idx, flat_slice, field_name)`` for velocity slots."""
+        return tuple(
+            (i, self.slot_slice(i), s.field_name)
+            for i, s in enumerate(self.slots)
+            if s.kind == "velocity"
+        )
+
+    @cached_property
+    def dynamical_field_slot_groups(self) -> tuple[tuple[int, slice, int], ...]:
+        """Pre-computed ``(slot_idx, flat_slice, vel_slot_idx)`` for 2nd-order fields."""
+        return tuple(
+            (i, self.slot_slice(i), self.velocity_slot_map[s.field_name])
+            for i, s in enumerate(self.slots)
+            if s.kind == "field" and s.time_order >= SECOND_ORDER
+        )
+
+    @cached_property
+    def first_order_slot_groups(self) -> tuple[tuple[int, slice, str], ...]:
+        """Pre-computed ``(slot_idx, flat_slice, field_name)`` for 1st-order fields."""
+        return tuple(
+            (i, self.slot_slice(i), s.field_name)
+            for i, s in enumerate(self.slots)
+            if s.kind == "field" and s.time_order == 1
+        )
+
+    @cached_property
+    def constraint_slot_groups(self) -> tuple[tuple[int, slice, str], ...]:
+        """Pre-computed ``(slot_idx, flat_slice, field_name)`` for constraint slots."""
+        return tuple(
+            (i, self.slot_slice(i), s.field_name)
+            for i, s in enumerate(self.slots)
+            if s.time_order == 0
+        )
+
     @property
     def algebraic_indices(self) -> list[int]:
         """Flat indices of algebraic (constraint) variables for IDA.

@@ -23,7 +23,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL, SECOND_ORDER
+from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
 from tidal.solver._setup import (
     build_rhs_evaluator,
     configure_linear_solver,
@@ -53,27 +53,25 @@ def _build_rhsfn(
 ) -> Callable[[float, np.ndarray, np.ndarray], None]:
     """Build the CVODE RHS closure: ``rhsfn(t, y, yp)``."""
     eq_map = spec.equation_map
+    fs = FieldSet.zeros(layout, grid.shape)
 
     def rhsfn(t: float, y: np.ndarray, yp: np.ndarray) -> None:
-        force = compute_force(spec, layout, grid, bc, y, t, rhs_eval)
+        force = compute_force(spec, layout, grid, bc, y, t, rhs_eval, fieldset=fs)
         velocity = compute_velocity(layout, y)
-        fieldset = FieldSet.from_flat(layout, grid.shape, y)
 
-        for slot_idx, slot in enumerate(layout.slots):
-            s = layout.slot_slice(slot_idx)
-            if slot.kind == "velocity":
-                yp[s] = force[s]
-            elif slot.kind == "field" and slot.time_order >= SECOND_ORDER:
-                yp[s] = velocity[s]
-            elif slot.kind == "field" and slot.time_order == 1:
-                eq_idx = eq_map.get(slot.field_name)
-                if eq_idx is not None:
-                    result = rhs_eval.evaluate(eq_idx, fieldset, t)
-                    yp[s] = result.ravel()
-                else:
-                    yp[s] = 0.0
+        for _si, s, _fn in layout.velocity_slot_groups:
+            yp[s] = force[s]
+        for _si, s, _vs in layout.dynamical_field_slot_groups:
+            yp[s] = velocity[s]
+        for _si, s, field_name in layout.first_order_slot_groups:
+            eq_idx = eq_map.get(field_name)
+            if eq_idx is not None:
+                result = rhs_eval.evaluate(eq_idx, fs, t)
+                yp[s] = result.ravel()
             else:
                 yp[s] = 0.0
+        for _si, s, _fn in layout.constraint_slot_groups:
+            yp[s] = 0.0
 
     return rhsfn
 

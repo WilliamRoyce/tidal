@@ -219,6 +219,15 @@ class FieldSet:  # noqa: PLR0904
         """
         return cls(layout, grid_shape, flat)
 
+    def rebind(self, flat: np.ndarray) -> None:
+        """Replace the underlying flat array reference (zero-copy, zero-alloc).
+
+        Used by solver loops to reuse a single FieldSet instead of
+        allocating a new one each timestep.  Auxiliary fields are cleared.
+        """
+        self._data = flat
+        self._aux.clear()
+
     @classmethod
     def from_dict(
         cls,

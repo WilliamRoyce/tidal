@@ -22,7 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL, SECOND_ORDER
+from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
 from tidal.solver._setup import configure_linear_solver
 from tidal.solver._sksundae import SundialsResult, call_ida
 from tidal.solver.fields import FieldSet
@@ -77,6 +77,7 @@ class _ResidualCtx:
         self.y: np.ndarray = np.empty(0)
         self.yp: np.ndarray = np.empty(0)
         self.res: np.ndarray = np.empty(0)
+        self._reusable_fieldset = FieldSet.zeros(layout, grid.shape)
         self.fieldset: FieldSet | None = None
         # Dict for legacy constant-coefficient path in compute_rhs (lazy)
         self.fields: dict[str, np.ndarray] | None = None
@@ -93,7 +94,8 @@ class _ResidualCtx:
         self.y = y
         self.yp = yp
         self.res = res
-        self.fieldset = FieldSet.from_flat(self.layout, self.shape, y)
+        self._reusable_fieldset.rebind(y)
+        self.fieldset = self._reusable_fieldset
 
         # Inject constraint velocities from yp so that velocity-dependent
         # operators (first_derivative_t, gradient_x of velocity slots)
@@ -392,15 +394,14 @@ def build_residual_fn(
         """IDA residual: F(t, y, y') = 0."""
         ctx.set_arrays(t, y, yp, res)
 
-        for slot_idx, slot in enumerate(layout.slots):
-            if slot.time_order == 0:
-                ctx.handle_constraint(slot_idx, slot)
-            elif slot.kind == "velocity":
-                ctx.handle_velocity(slot_idx, slot)
-            elif slot.time_order >= SECOND_ORDER and slot.kind == "field":
-                ctx.handle_dynamical_field(slot_idx, slot)
-            elif slot.time_order == 1:
-                ctx.handle_first_order(slot_idx, slot)
+        for slot_idx, _s, _fn in layout.constraint_slot_groups:
+            ctx.handle_constraint(slot_idx, layout.slots[slot_idx])
+        for slot_idx, _s, _fn in layout.velocity_slot_groups:
+            ctx.handle_velocity(slot_idx, layout.slots[slot_idx])
+        for slot_idx, _s, _vs in layout.dynamical_field_slot_groups:
+            ctx.handle_dynamical_field(slot_idx, layout.slots[slot_idx])
+        for slot_idx, _s, _fn in layout.first_order_slot_groups:
+            ctx.handle_first_order(slot_idx, layout.slots[slot_idx])
 
     return residual
 

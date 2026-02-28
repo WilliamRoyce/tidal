@@ -72,6 +72,14 @@ _FUNCTION_MAP: list[tuple[str, str]] = [
     ("BesselY", "yv"),
 ]
 
+# Pre-compiled regex patterns for mathematica_to_python (avoid re-compilation per call)
+_RE_E_POWER = re.compile(r"\bE\^")
+_RE_RATIONAL = re.compile(r"Rational\[([^,\]]+),\s*([^,\]]+)\]")
+_RE_PI = re.compile(r"\bPi\b")
+_COMPILED_FUNCTION_PATTERNS: list[tuple[re.Pattern[str], str]] = [
+    (re.compile(rf"\b{mma}\b"), py) for mma, py in _FUNCTION_MAP
+]
+
 _COMPARISON_OPS: dict[str, str] = {
     "LessEqual": "<=",
     "Less": "<",
@@ -369,7 +377,7 @@ def mathematica_to_python(
     result = expr
 
     # E^(...) → exp(...)
-    result = re.sub(r"\bE\^", "exp", result)
+    result = _RE_E_POWER.sub("exp", result)
 
     # Power[x, y] → (x)**(y)
     result = _convert_power(result)
@@ -378,7 +386,7 @@ def mathematica_to_python(
     result = _convert_arctan2(result)
 
     # Rational[p, q] → (p)/(q)
-    result = re.sub(r"Rational\[([^,\]]+),\s*([^,\]]+)\]", r"(\1)/(\2)", result)
+    result = _RE_RATIONAL.sub(r"(\1)/(\2)", result)
 
     # Inequality → comparison chains
     result = _convert_inequality(result)
@@ -387,11 +395,11 @@ def mathematica_to_python(
     result = _convert_piecewise(result)
 
     # Function name conversions
-    for mma_func, py_func in _FUNCTION_MAP:
-        result = re.sub(rf"\b{mma_func}\b", py_func, result)
+    for pat, py_func in _COMPILED_FUNCTION_PATTERNS:
+        result = pat.sub(py_func, result)
 
     # Pi → np.pi
-    result = re.sub(r"\bPi\b", "np.pi", result)
+    result = _RE_PI.sub("np.pi", result)
 
     # Mathematica brackets → Python parens
     result = result.replace("[", "(").replace("]", ")")

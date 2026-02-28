@@ -53,6 +53,7 @@ class RHSEvaluator:
         self._bc = bc
         self._eq_map: dict[str, int] = spec.equation_map
         self._result_buffer = np.zeros(grid.shape)
+        self._term_buffer = np.zeros(grid.shape)
 
     def begin_timestep(self, t: float) -> None:
         """Notify the coefficient evaluator of a new timestep."""
@@ -85,10 +86,14 @@ class RHSEvaluator:
         eq = self._spec.equations[eq_idx]
         result = self._result_buffer
         result.fill(0.0)
+        temp = self._term_buffer
         for term_idx, term in enumerate(eq.rhs_terms):
-            result += self._evaluate_term(
-                term, fields, t, eq_idx=eq_idx, term_idx=term_idx
+            operated = self._apply_operator(term, fields)
+            coeff = self._coeff_eval.resolve(
+                term, t, eq_idx=eq_idx, term_idx=term_idx
             )
+            np.multiply(coeff, operated, out=temp)
+            result += temp
         return result
 
     def evaluate_by_field(
@@ -112,20 +117,14 @@ class RHSEvaluator:
 
     # ---- Internal ----
 
-    def _evaluate_term(
+    def _apply_operator(
         self,
         term: OperatorTerm,
         fields: FieldSet,
-        t: float,
-        *,
-        eq_idx: int,
-        term_idx: int,
     ) -> np.ndarray:
-        """Evaluate a single operator term.
+        """Apply the spatial operator for a term, returning the operated data.
 
-        For ``first_derivative_t`` operators (E-L velocity form), resolves
-        the time derivative by reading the velocity slot ``v_{field}``
-        directly from the state vector.
+        For ``first_derivative_t``, resolves to the velocity slot.
 
         Raises
         ------
@@ -142,11 +141,25 @@ class RHSEvaluator:
                     f"Available: {sorted(fields.slot_names)}"
                 )
                 raise ValueError(msg)
-            operated = fields[vel_name]
-            coeff = self._coeff_eval.resolve(term, t, eq_idx=eq_idx, term_idx=term_idx)
-            return coeff * operated
+            return fields[vel_name]
         target = self._get_field_data(term.field, fields)
-        operated = apply_operator(term.operator, target, self._grid, self._bc)
+        return apply_operator(term.operator, target, self._grid, self._bc)
+
+    def _evaluate_term(
+        self,
+        term: OperatorTerm,
+        fields: FieldSet,
+        t: float,
+        *,
+        eq_idx: int,
+        term_idx: int,
+    ) -> np.ndarray:
+        """Evaluate a single operator term (allocating variant).
+
+        Delegates to ``_apply_operator`` for the spatial operator, then
+        multiplies by the resolved coefficient.  Returns a new array.
+        """
+        operated = self._apply_operator(term, fields)
         coeff = self._coeff_eval.resolve(term, t, eq_idx=eq_idx, term_idx=term_idx)
         return coeff * operated
 
