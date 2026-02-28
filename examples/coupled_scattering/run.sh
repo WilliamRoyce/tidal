@@ -9,8 +9,10 @@
 #   d2t(chi) = d2z(chi) - mChi2 chi - G(z) phi
 #
 # Analogy: phi=photon, chi=graviton, G(z)=background magnetic field.
-# An incident phi plane wave enters the coupling region and partially
-# converts to chi radiation (Gertsenshtein-effect analogue).
+# A phi wave packet (Gaussian envelope with carrier k=3) starts at x=-20,
+# well outside the coupling region at the origin. The wavevector gives it
+# rightward velocity, so it propagates cleanly into the coupling region
+# and excites chi radiation (Gertsenshtein-effect analogue).
 #
 # The 1D reduction eliminates geometric spreading and 2D interference,
 # giving clean conversion signals and unambiguous heatmaps.
@@ -32,9 +34,10 @@ tidal inspect ../data/coupled_scattering.json
 # ============================================================================
 # Run 1: Resonant conversion (mPhi2 = mChi2 = 1.0)
 # ============================================================================
-# Equal masses give maximum mode conversion. A phi plane wave (k=3) enters
-# the coupling region at the origin and progressively converts to chi.
-# Group velocity: v_g = k/sqrt(k^2 + m^2) ~ 0.95 for k=3, m^2=1.
+# Equal masses give maximum mode conversion. A phi wave packet (Gaussian
+# envelope, carrier k=3) starts at x=-20, well outside the coupling region
+# (origin, R=5). It propagates rightward into the coupling and excites
+# chi radiation via parametric conversion.
 
 OUT1=../data/coupled_scattering_resonant
 
@@ -43,7 +46,8 @@ tidal simulate ../data/coupled_scattering.json \
   --grid-shape 512 \
   --bounds=-40:40 \
   --periodic \
-  --ic plane-wave --ic-component phi_0 --ic-wavevector 3 \
+  --scheme leapfrog \
+  --ic gaussian --ic-component phi_0 --ic-center=-20.0 --ic-width 3.0 --ic-wavevector 3 \
   --t-end 80.0 \
   --output "$OUT1"
 
@@ -101,9 +105,9 @@ echo "=== Run 1 (resonant) complete. Plots: $OUT1/ ==="
 # ============================================================================
 # Run 2: Non-degenerate (mChi2 = 4.0, mass mismatch)
 # ============================================================================
-# Unequal masses reduce conversion efficiency and introduce oscillatory
-# (Rabi-like) energy exchange. The chi wave is dispersive with slower
-# group velocity: v_g(chi) = k/sqrt(k^2+4) ~ 0.83 for k=3.
+# Unequal masses reduce conversion efficiency. Same Gaussian pulse from
+# x=-20 enters the coupling region, but the heavier chi field responds
+# more weakly and disperses differently.
 
 OUT2=../data/coupled_scattering_nondegenerate
 
@@ -112,7 +116,8 @@ tidal simulate ../data/coupled_scattering.json \
   --grid-shape 512 \
   --bounds=-40:40 \
   --periodic \
-  --ic plane-wave --ic-component phi_0 --ic-wavevector 3 \
+  --scheme leapfrog \
+  --ic gaussian --ic-component phi_0 --ic-center=-20.0 --ic-width 3.0 --ic-wavevector 3 \
   --t-end 80.0 \
   --output "$OUT2"
 
@@ -142,50 +147,50 @@ echo ""
 echo "=== Run 2 (non-degenerate) complete. Plots: $OUT2/ ==="
 
 # ============================================================================
-# Run 3: Gaussian IC — pulse splitting through coupling region
+# Run 3: Strong coupling (g0 = 0.9, near stability threshold)
 # ============================================================================
-# A stationary Gaussian centered at the origin (inside the coupling region)
-# splits into left/right movers. Conversion begins immediately as the
-# pulse overlaps with G(x). Shows transient behavior vs the steady-state
-# plane-wave case above.
+# Stronger coupling (g0^2=0.81 vs threshold at mPhi2*mChi2=1.0) produces
+# more dramatic chi excitation. Same pulse from x=-20 enters the coupling
+# region with much larger energy transfer.
 
-OUT3=../data/coupled_scattering_gaussian
+OUT3=../data/coupled_scattering_strong
 
 tidal simulate ../data/coupled_scattering.json \
-  --param mPhi2=1.0 --param mChi2=1.0 --param g0=0.5 --param R=5.0 \
+  --param mPhi2=1.0 --param mChi2=1.0 --param g0=0.9 --param R=5.0 \
   --grid-shape 512 \
   --bounds=-40:40 \
   --periodic \
-  --ic gaussian --ic-center 0.0 --ic-width 3.0 \
-  --t-end 40.0 \
+  --scheme leapfrog \
+  --ic gaussian --ic-component phi_0 --ic-center=-20.0 --ic-width 3.0 --ic-wavevector 3 \
+  --t-end 80.0 \
   --output "$OUT3"
 
-# --- Gaussian plots ---
+# --- Strong coupling plots ---
 
 tidal plot "$OUT3" --type heatmap --field phi_0 \
-  --title "phi (Gaussian IC, splits L/R)" \
+  --title "phi (strong coupling g0=0.9)" \
   --output "$OUT3/heatmap_phi_0.png"
 
 tidal plot "$OUT3" --type heatmap --field chi_0 \
-  --title "chi (generated from Gaussian)" \
+  --title "chi (strong coupling g0=0.9)" \
   --output "$OUT3/heatmap_chi_0.png"
 
 tidal plot "$OUT3" --type amplitude --fields phi_0,chi_0 \
-  --title "Amplitude evolution (Gaussian IC)" \
+  --title "Amplitude evolution (strong coupling)" \
   --output "$OUT3/amplitude.png"
 
 tidal plot "$OUT3" --type profile --field phi_0 \
-  --time-indices 0,20,40,60,80 \
-  --title "phi pulse splitting" \
+  --time-indices 0,25,50,75,100 \
+  --title "phi profile (strong coupling)" \
   --output "$OUT3/profile_phi_0.png"
 
 tidal plot "$OUT3" --type profile --field chi_0 \
-  --time-indices 0,20,40,60,80 \
-  --title "chi generation from pulse" \
+  --time-indices 0,25,50,75,100 \
+  --title "chi excitation (strong coupling)" \
   --output "$OUT3/profile_chi_0.png"
 
 tidal plot "$OUT3" --type conservation \
-  --title "Energy conservation (Gaussian)" \
+  --title "Energy conservation (strong coupling)" \
   --output "$OUT3/conservation.png"
 
 tidal measure "$OUT3" \
@@ -193,10 +198,10 @@ tidal measure "$OUT3" \
   --source phi_0 --target chi_0
 
 echo ""
-echo "=== Run 3 (Gaussian) complete. Plots: $OUT3/ ==="
+echo "=== Run 3 (strong coupling) complete. Plots: $OUT3/ ==="
 
 echo ""
 echo "All runs complete."
 echo "  Resonant:        $OUT1/"
 echo "  Non-degenerate:  $OUT2/"
-echo "  Gaussian:        $OUT3/"
+echo "  Strong coupling: $OUT3/"
