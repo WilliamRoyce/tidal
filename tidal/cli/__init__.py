@@ -16,6 +16,8 @@ from __future__ import annotations
 import argparse
 import sys
 
+from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
+
 __all__ = ["main"]
 
 
@@ -232,14 +234,14 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     sim_parser.add_argument(
         "--rtol",
         type=float,
-        default=1e-8,
-        help="Relative tolerance for adaptive solvers (default: 1e-8)",
+        default=DEFAULT_RTOL,
+        help=f"Relative tolerance for adaptive solvers (default: {DEFAULT_RTOL})",
     )
     sim_parser.add_argument(
         "--atol",
         type=float,
-        default=1e-10,
-        help="Absolute tolerance for adaptive solvers (default: 1e-10)",
+        default=DEFAULT_ATOL,
+        help=f"Absolute tolerance for adaptive solvers (default: {DEFAULT_ATOL})",
     )
     sim_parser.add_argument(
         "--method",

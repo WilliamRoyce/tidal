@@ -22,6 +22,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
 from tidal.solver._sksundae import SundialsResult, call_ida
 from tidal.solver._types import DENSE_THRESHOLD, SPARSE_THRESHOLD, SolverResult
 from tidal.solver.fields import FieldSet
@@ -414,8 +415,8 @@ def solve_ida(  # noqa: PLR0913
     bc: BCSpec | None = None,
     parameters: dict[str, float] | None = None,
     num_snapshots: int = 101,
-    rtol: float = 1e-8,
-    atol: float = 1e-10,
+    rtol: float = DEFAULT_RTOL,
+    atol: float = DEFAULT_ATOL,
     max_steps: int = 50000,
     snapshot_callback: Callable[..., None] | None = None,
     calc_initcond: str | None = None,

@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
 from tidal.solver._scipy_types import IVPResult, call_solve_ivp
 from tidal.solver.fields import FieldSet
 from tidal.solver.leapfrog import compute_force, compute_velocity
@@ -83,8 +84,8 @@ def solve_scipy(  # noqa: PLR0913
     bc: BCSpec | None = None,
     parameters: dict[str, float] | None = None,
     method: str = "DOP853",
-    rtol: float = 1e-8,
-    atol: float = 1e-10,
+    rtol: float = DEFAULT_RTOL,
+    atol: float = DEFAULT_ATOL,
     max_step: float = np.inf,
     num_snapshots: int = 101,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
