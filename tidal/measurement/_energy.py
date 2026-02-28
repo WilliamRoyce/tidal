@@ -353,7 +353,7 @@ def _apply_spatial_operator(
         If the operator is unknown.
     """
     if operator == "identity":
-        return field.copy()
+        return field
 
     # gradient_{x,y,z}
     if operator.startswith("gradient_"):

@@ -14,11 +14,10 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from tidal.solver._defaults import SECOND_ORDER
+
 if TYPE_CHECKING:
     from tidal.symbolic.json_loader import EquationSystem
-
-# Time-derivative order threshold for dynamical (wave) equations
-_SECOND_ORDER = 2
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +112,7 @@ class StateLayout:
             kind = "constraint" if order == 0 else "field"
 
             d_idx = None
-            if order >= _SECOND_ORDER:
+            if order >= SECOND_ORDER:
                 d_idx = dyn_idx
                 dynamical_fields.append(name)
                 dyn_idx += 1
@@ -129,7 +128,7 @@ class StateLayout:
                 )
             )
 
-            if order >= _SECOND_ORDER:
+            if order >= SECOND_ORDER:
                 vel_name = f"v_{name}"
                 velocity_slot_map[name] = len(slots)
                 slots.append(

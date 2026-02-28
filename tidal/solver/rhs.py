@@ -54,6 +54,7 @@ class RHSEvaluator:
         self._eq_map: dict[str, int] = {
             eq.field_name: i for i, eq in enumerate(spec.equations)
         }
+        self._result_buffer = np.zeros(grid.shape)
 
     def begin_timestep(self, t: float) -> None:
         """Notify the coefficient evaluator of a new timestep."""
@@ -79,10 +80,13 @@ class RHSEvaluator:
         Returns
         -------
         np.ndarray
-            Grid-shaped result array.
+            Grid-shaped result array.  **Warning:** the returned array is
+            an internal buffer and may be overwritten by the next call to
+            ``evaluate()``.  Callers must copy if they need to persist it.
         """
         eq = self._spec.equations[eq_idx]
-        result = np.zeros(self._grid.shape)
+        result = self._result_buffer
+        result.fill(0.0)
         for term_idx, term in enumerate(eq.rhs_terms):
             result += self._evaluate_term(
                 term, fields, t, eq_idx=eq_idx, term_idx=term_idx

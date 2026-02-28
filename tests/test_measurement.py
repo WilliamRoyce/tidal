@@ -1781,12 +1781,12 @@ class TestGroupConversion:
 class TestApplySpatialOperator:
     """Test _apply_spatial_operator dispatch."""
 
-    def test_identity_returns_copy(self) -> None:
-        """Identity operator returns a copy, not the same array."""
+    def test_identity_returns_view(self) -> None:
+        """Identity operator returns the input array directly (no copy)."""
         field = np.array([1.0, 2.0, 3.0])
         result = _apply_spatial_operator("identity", field, (0.1,), (True,))
         np.testing.assert_array_equal(result, field)
-        assert result is not field  # copy, not alias
+        assert result is field  # same array, no copy
 
     def test_gradient_x_linear(self) -> None:
         """Gradient of a linear field f(x) = 2x gives constant 2."""

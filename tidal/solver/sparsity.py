@@ -19,6 +19,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from tidal.solver._defaults import SECOND_ORDER
 from tidal.solver._scipy_types import SparseMatrix, coo_matrix, csc_matrix
 
 if TYPE_CHECKING:
@@ -26,9 +27,6 @@ if TYPE_CHECKING:
     from tidal.solver.operators import BCSpec
     from tidal.solver.state import StateLayout
     from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
-
-# Second-order threshold (same constant as ida.py / leapfrog.py)
-_SECOND_ORDER = 2
 
 # ---------------------------------------------------------------------------
 # Operator -> stencil offsets
@@ -445,7 +443,7 @@ def build_jacobian_sparsity(
             builder.handle_constraint(slot_idx, eq_idx)
         elif slot.kind == "velocity":
             builder.handle_velocity(slot_idx, eq_idx)
-        elif slot.time_order >= _SECOND_ORDER and slot.kind == "field":
+        elif slot.time_order >= SECOND_ORDER and slot.kind == "field":
             builder.handle_dynamical_field(slot_idx, slot.field_name)
         elif slot.time_order == 1:
             builder.handle_first_order(slot_idx, eq_idx)

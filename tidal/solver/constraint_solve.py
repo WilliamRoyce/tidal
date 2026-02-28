@@ -47,13 +47,13 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from tidal.solver._defaults import SECOND_ORDER
 from tidal.solver._scipy_types import SparseMatrix, lil_matrix, sparse_solve
 from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 
 # Numerical tolerance thresholds
 _SINGULAR_TOL = 1e-14  # Below this, a Fourier multiplier is treated as singular
 _COMPAT_TOL = 1e-10  # Source projection tolerance for compatibility check
-_SECOND_ORDER = 2  # time_derivative_order threshold for momentum equations
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -238,7 +238,7 @@ def _build_name_map(spec: EquationSystem) -> dict[str, str]:
         # Field names map to themselves
         name_map[eq.field_name] = eq.field_name
         # Velocity references: canonical v_field_name
-        if eq.time_derivative_order >= _SECOND_ORDER:
+        if eq.time_derivative_order >= SECOND_ORDER:
             vel_slot = f"v_{eq.field_name}"
             name_map[vel_slot] = vel_slot
     return name_map
