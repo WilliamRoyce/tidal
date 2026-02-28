@@ -1,112 +1,202 @@
 #!/usr/bin/env bash
-# Coupled Scalar Scattering 2+1D — Full derive → inspect → simulate → measure pipeline
+# Coupled Scalar Scattering — Plane-wave Reduced 1+1D Pipeline
 #
-# Physics: Two coupled scalar fields (phi, chi) in 2+1D Minkowski spacetime,
-# coupled through a spatially localized Gaussian background field:
-#   G(x,y) = g0 * exp(-(x^2 + y^2) / (2 R^2))
+# Physics: Two coupled scalar fields in 3+1D Minkowski spacetime, reduced
+# to 1+1D via plane-wave ansatz (d/dx = d/dy = 0, propagation along z).
+# Coupling is a localized Gaussian background: G(z) = g0 * exp(-z^2/(2R^2))
 #
-# The coupling is non-zero only near the origin. An incident phi wave packet
-# scatters off the coupling region, partially converting to chi radiation.
-# This demonstrates parametric mode conversion — directly analogous to the
-# Gertsenshtein effect (phi=photon, chi=graviton, G=background B-field).
+#   d2t(phi) = d2z(phi) - mPhi2 phi - G(z) chi
+#   d2t(chi) = d2z(chi) - mChi2 chi - G(z) phi
+#
+# Analogy: phi=photon, chi=graviton, G(z)=background magnetic field.
+# An incident phi plane wave enters the coupling region and partially
+# converts to chi radiation (Gertsenshtein-effect analogue).
+#
+# The 1D reduction eliminates geometric spreading and 2D interference,
+# giving clean conversion signals and unambiguous heatmaps.
 #
 # Stability condition: mPhi2 * mChi2 > g0^2 (positive-definite mass matrix).
-# With defaults (mPhi2=1, mChi2=5, g0=1): det = 5-1 = 4 > 0. STABLE.
-# If you lower mChi2 below g0^2/mPhi2 = 1.0 the simulation will blow up.
-# tidal simulate warns automatically; use --require-stable to abort instead.
-#
 #
 # Running this script:
 #   cd examples/coupled_scattering && bash run.sh
-#
-# Or run each step manually to learn the tidal CLI:
-#
-#   # Step 1: Derive equations from the Lagrangian (requires wolframscript)
-#   uv run tidal derive theory.toml
-#
-#   # Step 2: Inspect the generated equation system
-#   uv run tidal inspect ../data/coupled_scattering.json
-#
-#   # Step 3: Simulate — phi wave packet hits coupling region, converts to chi
-#   uv run tidal simulate ../data/coupled_scattering.json \
-#     --param mPhi2=1.0 --param mChi2=4.0 --param g0=1.0 --param R=8.0 \
-#     --grid-shape 64 --bounds=-50:50,-50:50 --periodic \
-#     --ic gaussian --ic-component phi_0 --ic-center=-25.0,0.0 --ic-width 4.0 \
-#     --ic-amplitude 1.0 \
-#     --t-end 200.0 --output ../data/coupled_scattering_output
-#
-#   # Step 4: Measure conversion probability and mixing length
-#   uv run tidal measure ../data/coupled_scattering_output \
-#     --what conversion,mixing --source phi_0 --target chi_0
-#
-#   # Step 5: Spectral conversion P(k,t)
-#   uv run tidal measure ../data/coupled_scattering_output \
-#     --what spectral_conversion --source phi_0 --target chi_0
-#
-#   # Step 6: Dispersion relation omega(k)
-#   uv run tidal measure ../data/coupled_scattering_output \
-#     --what dispersion --source phi_0
-#
-#   # Step 7: Combined measurement plot
-#   uv run tidal measure ../data/coupled_scattering_output \
-#     --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
-#     --source phi_0 --target chi_0 \
-#     --output ../data/coupled_scattering_output/measurement.png
 
 set -euo pipefail
 cd "$(dirname "$0")"
 
-# Step 1: Derive equations from Lagrangian (requires wolframscript)
-tidal derive theory.toml
+# Derive equations from Lagrangian (requires wolframscript)
+# tidal derive theory.toml
 
-# Step 2: Inspect the equation system (2 fields: phi_0, chi_0)
+# Inspect the equation system (1+1D reduced, 2 dynamical fields)
 tidal inspect ../data/coupled_scattering.json
 
-# Step 3: Run simulation
-# Gaussian pulse in phi at x=-25; disperses into coupling region at origin.
-# Chi starts at zero. Coupling G(x,y) is Gaussian, radius R=8.
-tidal simulate ../data/coupled_scattering.json \
-  --param mPhi2=1.0 --param mChi2=5.0 --param g0=1.0 --param R=8.0 \
-  --grid-shape 64 \
-  --bounds=-50:50,-50:50 \
-  --periodic \
-  --ic gaussian \
-  --ic-component phi_0 \
-  --ic-center=-25.0,0.0 \
-  --ic-width 4.0 \
-  --ic-amplitude 1.0 \
-  --t-end 200.0 \
-  --output ../data/coupled_scattering_output
+# ============================================================================
+# Run 1: Resonant conversion (mPhi2 = mChi2 = 1.0)
+# ============================================================================
+# Equal masses give maximum mode conversion. A phi plane wave (k=3) enters
+# the coupling region at the origin and progressively converts to chi.
+# Group velocity: v_g = k/sqrt(k^2 + m^2) ~ 0.95 for k=3, m^2=1.
 
-# Step 4: Measure conversion probability and characteristic mixing length
-# P(t) = E_chi(t) / E_phi(0) tracks what fraction of phi's energy went to chi
-tidal measure ../data/coupled_scattering_output \
+OUT1=../data/coupled_scattering_resonant
+
+tidal simulate ../data/coupled_scattering.json \
+  --param mPhi2=1.0 --param mChi2=1.0 --param g0=0.5 --param R=5.0 \
+  --grid-shape 512 \
+  --bounds=-40:40 \
+  --periodic \
+  --ic plane-wave --ic-component phi_0 --ic-wavevector 3 \
+  --t-end 80.0 \
+  --output "$OUT1"
+
+# --- Resonant plots ---
+
+# Spacetime heatmaps: phi_0 and chi_0 side by side
+# phi_0 shows the incident plane wave; chi_0 shows the generated wave
+tidal plot "$OUT1" --type heatmap --field phi_0 \
+  --title "phi (incident wave, resonant)" \
+  --output "$OUT1/heatmap_phi_0.png"
+
+tidal plot "$OUT1" --type heatmap --field chi_0 \
+  --title "chi (generated wave, resonant)" \
+  --output "$OUT1/heatmap_chi_0.png"
+
+# Peak amplitude vs time: shows energy flowing from phi to chi
+tidal plot "$OUT1" --type amplitude --fields phi_0,chi_0 \
+  --title "Amplitude evolution (resonant, mPhi2=mChi2=1)" \
+  --output "$OUT1/amplitude.png"
+
+# Profile snapshots showing wave structure at key times
+tidal plot "$OUT1" --type profile --field phi_0 \
+  --time-indices 0,25,50,75,100 \
+  --title "phi profile evolution (resonant)" \
+  --output "$OUT1/profile_phi_0.png"
+
+tidal plot "$OUT1" --type profile --field chi_0 \
+  --time-indices 0,25,50,75,100 \
+  --title "chi profile evolution (resonant)" \
+  --output "$OUT1/profile_chi_0.png"
+
+# Hamiltonian energy decomposition (kinetic + gradient + mass + coupling)
+tidal plot "$OUT1" --type hamiltonian --fields phi_0,chi_0 \
+  --title "Hamiltonian energy (resonant)" \
+  --output "$OUT1/hamiltonian.png"
+
+# Energy conservation (should be tight — tests position-dependent Hamiltonian)
+tidal plot "$OUT1" --type conservation \
+  --title "Energy conservation (resonant)" \
+  --output "$OUT1/conservation.png"
+
+# Initial vs final profile comparison
+tidal plot "$OUT1" --type compare --fields phi_0,chi_0 \
+  --title "Initial vs final (resonant)" \
+  --output "$OUT1/compare.png"
+
+# Conversion probability: P(t) = E_chi(t) / E_phi(0)
+tidal measure "$OUT1" \
   --what conversion,mixing \
   --source phi_0 --target chi_0
 
-# Step 5: Spectral conversion P(k,t)
-# Shows which Fourier modes participate in the energy conversion over time
-tidal measure ../data/coupled_scattering_output \
-  --what spectral_conversion \
+echo ""
+echo "=== Run 1 (resonant) complete. Plots: $OUT1/ ==="
+
+# ============================================================================
+# Run 2: Non-degenerate (mChi2 = 4.0, mass mismatch)
+# ============================================================================
+# Unequal masses reduce conversion efficiency and introduce oscillatory
+# (Rabi-like) energy exchange. The chi wave is dispersive with slower
+# group velocity: v_g(chi) = k/sqrt(k^2+4) ~ 0.83 for k=3.
+
+OUT2=../data/coupled_scattering_nondegenerate
+
+tidal simulate ../data/coupled_scattering.json \
+  --param mPhi2=1.0 --param mChi2=4.0 --param g0=0.5 --param R=5.0 \
+  --grid-shape 512 \
+  --bounds=-40:40 \
+  --periodic \
+  --ic plane-wave --ic-component phi_0 --ic-wavevector 3 \
+  --t-end 80.0 \
+  --output "$OUT2"
+
+# --- Non-degenerate plots ---
+
+tidal plot "$OUT2" --type heatmap --field phi_0 \
+  --title "phi (incident, non-degenerate)" \
+  --output "$OUT2/heatmap_phi_0.png"
+
+tidal plot "$OUT2" --type heatmap --field chi_0 \
+  --title "chi (generated, non-degenerate mChi2=4)" \
+  --output "$OUT2/heatmap_chi_0.png"
+
+tidal plot "$OUT2" --type amplitude --fields phi_0,chi_0 \
+  --title "Amplitude evolution (non-degenerate, mChi2=4)" \
+  --output "$OUT2/amplitude.png"
+
+tidal plot "$OUT2" --type conservation \
+  --title "Energy conservation (non-degenerate)" \
+  --output "$OUT2/conservation.png"
+
+tidal measure "$OUT2" \
+  --what conversion,mixing \
   --source phi_0 --target chi_0
 
-# Step 6: Dispersion relation omega(k)
-# Extracts wave frequency vs wavenumber via spacetime FFT
-tidal measure ../data/coupled_scattering_output \
-  --what dispersion \
-  --source phi_0
+echo ""
+echo "=== Run 2 (non-degenerate) complete. Plots: $OUT2/ ==="
 
-# Step 7: Combined measurement plot (all panels in one figure)
-tidal measure ../data/coupled_scattering_output \
-  --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
-  --source phi_0 --target chi_0 \
-  --output ../data/coupled_scattering_output/measurement.png
+# ============================================================================
+# Run 3: Gaussian IC — pulse splitting through coupling region
+# ============================================================================
+# A stationary Gaussian centered at the origin (inside the coupling region)
+# splits into left/right movers. Conversion begins immediately as the
+# pulse overlaps with G(x). Shows transient behavior vs the steady-state
+# plane-wave case above.
 
-# Step 8: Individual plots (saved into the simulation output directory)
-tidal plot ../data/coupled_scattering_output --type amplitude --quiet
-tidal plot ../data/coupled_scattering_output --type snapshot --field chi_0 --time-index -1 --quiet
+OUT3=../data/coupled_scattering_gaussian
 
-# NOTE: Energy diagnostics (virial) will raise ValueError for this example
-# because the coupling G(x,y) is position-dependent. The simulation and
-# conversion measurements work correctly — only virial energy is unsupported.
-echo "Pipeline complete."
+tidal simulate ../data/coupled_scattering.json \
+  --param mPhi2=1.0 --param mChi2=1.0 --param g0=0.5 --param R=5.0 \
+  --grid-shape 512 \
+  --bounds=-40:40 \
+  --periodic \
+  --ic gaussian --ic-center 0.0 --ic-width 3.0 \
+  --t-end 40.0 \
+  --output "$OUT3"
+
+# --- Gaussian plots ---
+
+tidal plot "$OUT3" --type heatmap --field phi_0 \
+  --title "phi (Gaussian IC, splits L/R)" \
+  --output "$OUT3/heatmap_phi_0.png"
+
+tidal plot "$OUT3" --type heatmap --field chi_0 \
+  --title "chi (generated from Gaussian)" \
+  --output "$OUT3/heatmap_chi_0.png"
+
+tidal plot "$OUT3" --type amplitude --fields phi_0,chi_0 \
+  --title "Amplitude evolution (Gaussian IC)" \
+  --output "$OUT3/amplitude.png"
+
+tidal plot "$OUT3" --type profile --field phi_0 \
+  --time-indices 0,20,40,60,80 \
+  --title "phi pulse splitting" \
+  --output "$OUT3/profile_phi_0.png"
+
+tidal plot "$OUT3" --type profile --field chi_0 \
+  --time-indices 0,20,40,60,80 \
+  --title "chi generation from pulse" \
+  --output "$OUT3/profile_chi_0.png"
+
+tidal plot "$OUT3" --type conservation \
+  --title "Energy conservation (Gaussian)" \
+  --output "$OUT3/conservation.png"
+
+tidal measure "$OUT3" \
+  --what conversion,mixing \
+  --source phi_0 --target chi_0
+
+echo ""
+echo "=== Run 3 (Gaussian) complete. Plots: $OUT3/ ==="
+
+echo ""
+echo "All runs complete."
+echo "  Resonant:        $OUT1/"
+echo "  Non-degenerate:  $OUT2/"
+echo "  Gaussian:        $OUT3/"
