@@ -14,6 +14,7 @@ from tidal.solver.constraint_solve import (
     _matrix_solve,
     _probe_operator_matrix,
     _select_method,
+    ensure_consistent_ic,
     pre_solve_constraints,
 )
 from tidal.solver.grid import GridInfo
@@ -1247,7 +1248,11 @@ class TestNoSelfTermConstraints:
         x = grid.coord_arrays()[0]
         y0[h1_slot * n : (h1_slot + 1) * n] = np.exp(-((x - 5) ** 2) / 2).ravel()
 
-        with pytest.warns(UserWarning, match="no self-referencing"):
+        # allow_inconsistent_ic=True so constraint violation is a warning, not error
+        import warnings as _warnings
+
+        with _warnings.catch_warnings(record=True):
+            _warnings.simplefilter("always")
             result = solve_ida(
                 spec,
                 grid,
@@ -1255,6 +1260,7 @@ class TestNoSelfTermConstraints:
                 (0.0, 0.5),
                 bc="periodic",
                 num_snapshots=3,
+                allow_inconsistent_ic=True,
             )
 
         assert result["success"], result["message"]
@@ -1313,8 +1319,8 @@ class TestNoSelfTermConstraints:
             )
 
     @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
-    def test_ida_ic_consistency_warns_when_violated(self) -> None:
-        """IDA emits UserWarning when IC violates a no-self-term constraint."""
+    def test_ida_ic_consistency_errors_when_violated(self) -> None:
+        """IDA raises ValueError when IC violates a no-self-term constraint (strict mode)."""
         from tidal.solver.ida import solve_ida
 
         spec = _make_no_self_term_spec()
@@ -1324,12 +1330,12 @@ class TestNoSelfTermConstraints:
 
         y0 = np.zeros(layout.total_size)
         # Set h_1 to a Gaussian — h_0's equation (gradient_x of h_1)
-        # will have nonzero residual → IC consistency warning
+        # will have nonzero residual → IC consistency error
         h1_slot = layout.field_slot_map["h_1"]
         x = grid.coord_arrays()[0]
         y0[h1_slot * n : (h1_slot + 1) * n] = np.exp(-((x - 5) ** 2) / 2).ravel()
 
-        with pytest.warns(UserWarning, match="does not satisfy subsidiary"):
+        with pytest.raises(ValueError, match="does not satisfy constraint"):
             solve_ida(
                 spec,
                 grid,
@@ -1337,6 +1343,32 @@ class TestNoSelfTermConstraints:
                 (0.0, 0.5),
                 bc="periodic",
                 num_snapshots=3,
+            )
+
+    @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
+    def test_ida_ic_consistency_warns_when_lenient(self) -> None:
+        """IDA emits UserWarning with allow_inconsistent_ic=True."""
+        from tidal.solver.ida import solve_ida
+
+        spec = _make_no_self_term_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        h1_slot = layout.field_slot_map["h_1"]
+        x = grid.coord_arrays()[0]
+        y0[h1_slot * n : (h1_slot + 1) * n] = np.exp(-((x - 5) ** 2) / 2).ravel()
+
+        with pytest.warns(UserWarning, match="does not satisfy constraint"):
+            solve_ida(
+                spec,
+                grid,
+                y0,
+                (0.0, 0.5),
+                bc="periodic",
+                num_snapshots=3,
+                allow_inconsistent_ic=True,
             )
 
     @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
@@ -1364,17 +1396,17 @@ class TestNoSelfTermConstraints:
             )
 
         ic_warns = [
-            w for w in caught if "does not satisfy subsidiary" in str(w.message)
+            w for w in caught if "does not satisfy constraint" in str(w.message)
         ]
         assert len(ic_warns) == 0, "Should not warn when IC satisfies constraint"
 
     @pytest.mark.skipif(not _has_sundials(), reason="sksundae not available")
     def test_ida_multi_constraint_joint_ic_check(self) -> None:
-        """Multiple no-self-term constraints: single warning lists all violations.
+        """Multiple no-self-term constraints: ValueError lists all violations.
 
         Two constraint fields (c_0, c_1) each impose gradient conditions
-        on h_0.  A Gaussian IC on h_0 violates both — the warning should
-        mention both c_0 and c_1 in a single message.
+        on h_0.  A Gaussian IC on h_0 violates both — the error should
+        mention both c_0 and c_1 in the message.
         """
         from tidal.solver.ida import solve_ida
 
@@ -1393,10 +1425,7 @@ class TestNoSelfTermConstraints:
             -((x_arr - 5) ** 2 + (y_arr - 5) ** 2) / 2
         ).ravel()
 
-        import warnings as _warnings
-
-        with _warnings.catch_warnings(record=True) as caught:
-            _warnings.simplefilter("always")
+        with pytest.raises(ValueError, match="does not satisfy constraint") as exc_info:
             solve_ida(
                 spec,
                 grid,
@@ -1406,11 +1435,1092 @@ class TestNoSelfTermConstraints:
                 num_snapshots=3,
             )
 
-        # Should get exactly ONE summary warning mentioning both constraints
-        ic_warns = [
-            w for w in caught if "does not satisfy subsidiary" in str(w.message)
-        ]
-        assert len(ic_warns) == 1, f"Expected 1 summary warning, got {len(ic_warns)}"
-        msg = str(ic_warns[0].message)
-        assert "c_0" in msg, "Warning should mention c_0"
-        assert "c_1" in msg, "Warning should mention c_1"
+        msg = str(exc_info.value)
+        assert "c_0" in msg, "Error should mention c_0"
+        assert "c_1" in msg, "Error should mention c_1"
+
+
+# ---------------------------------------------------------------------------
+# Helper: GW-like spec for subsidiary constraint cascade tests
+# ---------------------------------------------------------------------------
+
+
+def _make_gw_like_spec() -> EquationSystem:
+    """Simplified GW-like spec with subsidiary constraint cascade.
+
+    Models the TT gauge constraint structure:
+    - h_a: dynamical wave equation (d2_t = laplacian)
+    - h_b: subsidiary constraint: 0 = -gradient_x(h_a) - gradient_x(h_b)
+      → when h_a = Gaussian, h_b = -Gaussian
+    - h_c: traceless constraint: 0 = identity(h_a) + identity(h_b) + identity(h_c)
+      → after h_b determined, h_c = -(h_a + h_b) = 0
+    """
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 2, "signature": [-1, 1]},
+        "fields": [
+            {"name": "h_a", "index": 0},
+            {"name": "h_b", "index": 1},
+            {"name": "h_c", "index": 2},
+        ],
+        "equations": [
+            # h_a: dynamical wave equation
+            {
+                "field": "h_a",
+                "lhs": {
+                    "expression": "d2_t(h_a)",
+                    "order": {"time": 2},
+                },
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian",
+                            "field": "h_a",
+                        },
+                    ],
+                },
+            },
+            # h_b: subsidiary transverse constraint
+            # 0 = -gradient_x(h_a) - gradient_x(h_b)
+            {
+                "field": "h_b",
+                "lhs": {"expression": "h_b", "order": {"time": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_x",
+                            "field": "h_a",
+                        },
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_x",
+                            "field": "h_b",
+                        },
+                    ],
+                },
+            },
+            # h_c: traceless constraint
+            # 0 = identity(h_a) + identity(h_b) + identity(h_c)
+            {
+                "field": "h_c",
+                "lhs": {"expression": "h_c", "order": {"time": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": 1.0,
+                            "operator": "identity",
+                            "field": "h_a",
+                        },
+                        {
+                            "coefficient": 1.0,
+                            "operator": "identity",
+                            "field": "h_b",
+                        },
+                        {
+                            "coefficient": 1.0,
+                            "operator": "identity",
+                            "field": "h_c",
+                        },
+                    ],
+                },
+            },
+        ],
+        "canonical": {
+            "hamiltonian_terms": [],
+        },
+    }
+    return EquationSystem.from_dict(data)
+
+
+def _make_velocity_constraint_spec() -> EquationSystem:
+    """Spec with a constraint referencing only velocities.
+
+    When velocities are zero (default), constraint is trivially satisfied.
+    """
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 2, "signature": [-1, 1]},
+        "fields": [
+            {"name": "h_0", "index": 0},
+            {"name": "h_1", "index": 1},
+        ],
+        "equations": [
+            # h_0: velocity constraint (0 = gradient_x(v_h_1))
+            {
+                "field": "h_0",
+                "lhs": {"expression": "h_0", "order": {"time": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": -0.5,
+                            "operator": "gradient_x",
+                            "field": "v_h_1",
+                        },
+                    ],
+                },
+            },
+            # h_1: dynamical wave equation
+            {
+                "field": "h_1",
+                "lhs": {
+                    "expression": "d2_t(h_1)",
+                    "order": {"time": 2},
+                },
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian",
+                            "field": "h_1",
+                        },
+                    ],
+                },
+            },
+        ],
+        "canonical": {
+            "hamiltonian_terms": [],
+        },
+    }
+    return EquationSystem.from_dict(data)
+
+
+# ---------------------------------------------------------------------------
+# Tests for ensure_consistent_ic — unified constraint IC solver
+# ---------------------------------------------------------------------------
+
+
+class TestEnsureConsistentIC:
+    """Tests for the unified constraint IC solver."""
+
+    def test_no_constraints_passthrough(self) -> None:
+        """No constraint equations → y0 returned unchanged."""
+        spec = _make_kg_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.total_size)
+        x = grid.axes_coords(0)
+        n = grid.num_points
+        gaussian = np.exp(-((x - 5) ** 2) / 2)
+        slot = layout.field_slot_map["phi_0"]
+        y0[slot * n : (slot + 1) * n] = gaussian.ravel()
+
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+        np.testing.assert_array_equal(result, y0)
+
+    def test_standard_constraint_em(self) -> None:
+        """EM-like standard constraint (enabled=True) → same as pre_solve."""
+        spec = _make_em_2d_spec()
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+        y0 = np.zeros(layout.total_size)
+
+        # Set v_A_1 to a Gaussian (source for A_0 constraint)
+        va1_slot = layout.velocity_slot_map["A_1"]
+        x_arr, _ = grid.coord_arrays()
+        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(
+            -((x_arr - 5) ** 2) / 2
+        ).ravel()
+
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # A_0 should be non-zero (solved from source)
+        a0_slot = layout.field_slot_map["A_0"]
+        a0_data = result[a0_slot * n : (a0_slot + 1) * n].reshape(grid.shape)
+        assert float(np.max(np.abs(a0_data))) > 1e-5, (
+            "A_0 should be non-zero after constraint solve"
+        )
+
+    def test_subsidiary_gradient_solve(self) -> None:
+        """Subsidiary constraint: gradient_x(h_a) + gradient_x(h_b) = 0.
+
+        When h_a = Gaussian, h_b should be determined as -Gaussian.
+        """
+        spec = _make_gw_like_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(64,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        # Set h_a to Gaussian
+        ha_slot = layout.field_slot_map["h_a"]
+        x = grid.axes_coords(0)
+        gaussian = np.exp(-((x - 5) ** 2) / 2)
+        y0[ha_slot * n : (ha_slot + 1) * n] = gaussian.ravel()
+
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # h_b should be approximately -h_a (up to FFT zero-mode)
+        hb_slot = layout.field_slot_map["h_b"]
+        hb_data = result[hb_slot * n : (hb_slot + 1) * n]
+        ha_data = result[ha_slot * n : (ha_slot + 1) * n]
+
+        # Check that gradient_x(h_a) + gradient_x(h_b) ≈ 0
+        from tidal.solver.operators import gradient
+
+        grad_ha = gradient(ha_data.reshape(grid.shape), 0, grid, "periodic")
+        grad_hb = gradient(hb_data.reshape(grid.shape), 0, grid, "periodic")
+        residual = grad_ha + grad_hb
+        assert float(np.max(np.abs(residual))) < 1e-10, (
+            f"Subsidiary constraint residual too large: {np.max(np.abs(residual)):.2e}"
+        )
+
+    def test_cascade_two_step(self) -> None:
+        """Cascade: h_b determined from h_a, then h_c from h_a + h_b.
+
+        h_b's transverse constraint: gradient_x(h_a) + gradient_x(h_b) = 0
+        h_c's traceless constraint: identity(h_a) + identity(h_b) + identity(h_c) = 0
+
+        First iteration determines h_b, second determines h_c.
+        """
+        spec = _make_gw_like_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(64,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        # Set h_a to Gaussian
+        ha_slot = layout.field_slot_map["h_a"]
+        x = grid.axes_coords(0)
+        gaussian = np.exp(-((x - 5) ** 2) / 2)
+        y0[ha_slot * n : (ha_slot + 1) * n] = gaussian.ravel()
+
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # After cascade, h_c = -(h_a + h_b)
+        hc_slot = layout.field_slot_map["h_c"]
+        ha_data = result[ha_slot * n : (ha_slot + 1) * n]
+        hb_slot = layout.field_slot_map["h_b"]
+        hb_data = result[hb_slot * n : (hb_slot + 1) * n]
+        hc_data = result[hc_slot * n : (hc_slot + 1) * n]
+
+        # h_c should satisfy: h_a + h_b + h_c = 0
+        trace_residual = ha_data + hb_data + hc_data
+        assert float(np.max(np.abs(trace_residual))) < 1e-10, (
+            f"Traceless constraint residual: {np.max(np.abs(trace_residual)):.2e}"
+        )
+
+    def test_all_satisfied_noop(self) -> None:
+        """All constraints already satisfied → y0 unchanged."""
+        spec = _make_gw_like_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.total_size)
+        # All zeros → all constraints trivially satisfied
+
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+        np.testing.assert_array_equal(result, y0)
+
+    def test_violated_strict_raises(self) -> None:
+        """Constraint violated with no free fields → ValueError in strict mode."""
+        spec = _make_no_self_term_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        # h_1 is determined (Gaussian) but constraint 0 = gradient_x(h_1) violated
+        h1_slot = layout.field_slot_map["h_1"]
+        x = grid.axes_coords(0)
+        y0[h1_slot * n : (h1_slot + 1) * n] = np.exp(-((x - 5) ** 2) / 2).ravel()
+
+        with pytest.raises(ValueError, match="does not satisfy constraint"):
+            ensure_consistent_ic(spec, grid, y0, bc="periodic", strict=True)
+
+    def test_violated_lenient_warns(self) -> None:
+        """Constraint violated with strict=False → UserWarning, no error."""
+        spec = _make_no_self_term_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        h1_slot = layout.field_slot_map["h_1"]
+        x = grid.axes_coords(0)
+        y0[h1_slot * n : (h1_slot + 1) * n] = np.exp(-((x - 5) ** 2) / 2).ravel()
+
+        with pytest.warns(UserWarning, match="does not satisfy constraint"):
+            result = ensure_consistent_ic(
+                spec, grid, y0, bc="periodic", strict=False,
+            )
+
+        # Should return y0 unchanged (no field could be solved)
+        np.testing.assert_array_equal(result, y0)
+
+    def test_velocity_refs_auto_satisfied(self) -> None:
+        """Velocity-referencing constraint: auto-satisfied when velocities are zero."""
+        spec = _make_velocity_constraint_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        # Set h_1 to Gaussian (only field IC, not velocity)
+        h1_slot = layout.field_slot_map["h_1"]
+        x = grid.axes_coords(0)
+        y0[h1_slot * n : (h1_slot + 1) * n] = np.exp(-((x - 5) ** 2) / 2).ravel()
+
+        # Should not raise — velocity constraint is trivially satisfied
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+        # h_1 should be unchanged
+        h1_out = result[h1_slot * n : (h1_slot + 1) * n]
+        h1_in = y0[h1_slot * n : (h1_slot + 1) * n]
+        np.testing.assert_array_equal(h1_out, h1_in)
+
+    def test_em_backward_compatible(self) -> None:
+        """EM spec: ensure_consistent_ic produces same result as pre_solve_constraints."""
+        spec = _make_em_2d_spec()
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+        y0 = np.zeros(layout.total_size)
+
+        # Set v_A_1 = Gaussian as source
+        va1_slot = layout.velocity_slot_map["A_1"]
+        x_arr, _ = grid.coord_arrays()
+        source = np.exp(-((x_arr - 5) ** 2) / 2)
+        y0[va1_slot * n : (va1_slot + 1) * n] = source.ravel()
+
+        # pre_solve_constraints (existing function)
+        y0_old = pre_solve_constraints(spec, grid, y0.copy(), bc="periodic")
+
+        # ensure_consistent_ic (new unified function)
+        y0_new = ensure_consistent_ic(spec, grid, y0.copy(), bc="periodic")
+
+        # Both should produce the same A_0 solution
+        a0_slot = layout.field_slot_map["A_0"]
+        a0_old = y0_old[a0_slot * n : (a0_slot + 1) * n]
+        a0_new = y0_new[a0_slot * n : (a0_slot + 1) * n]
+        np.testing.assert_allclose(a0_new, a0_old, atol=1e-12)
+
+    def test_cs_backward_compatible(self) -> None:
+        """Chern-Simons: ensure_consistent_ic matches pre_solve_constraints."""
+        spec = _make_chern_simons_spec()
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+        y0 = np.zeros(layout.total_size)
+
+        # Set v_A_1 and A_2 as sources (CS has both velocity and field sources)
+        va1_slot = layout.velocity_slot_map["A_1"]
+        x_arr, _ = grid.coord_arrays()
+        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(
+            -((x_arr - 5) ** 2) / 2
+        ).ravel()
+
+        y0_old = pre_solve_constraints(
+            spec, grid, y0.copy(), bc="periodic",
+            parameters={"kappa": 0.5},
+        )
+        y0_new = ensure_consistent_ic(
+            spec, grid, y0.copy(), bc="periodic",
+            parameters={"kappa": 0.5},
+        )
+
+        a0_slot = layout.field_slot_map["A_0"]
+        a0_old = y0_old[a0_slot * n : (a0_slot + 1) * n]
+        a0_new = y0_new[a0_slot * n : (a0_slot + 1) * n]
+        np.testing.assert_allclose(a0_new, a0_old, atol=1e-12)
+
+    def test_helmholtz_constraint(self) -> None:
+        """Helmholtz (laplacian - m²): non-singular constraint solve.
+
+        Unlike Poisson (singular at k=0), Helmholtz has no zero-mode issue.
+        Ensures the non-singular path works in ensure_consistent_ic.
+        """
+        spec = _make_helmholtz_spec()
+        grid = GridInfo(
+            bounds=((0, 2 * np.pi), (0, 2 * np.pi)),
+            shape=(32, 32),
+            periodic=(True, True),
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+        x_arr, y_arr = grid.coord_arrays()
+
+        y0 = np.zeros(layout.total_size)
+        # Set rho_0 = cos(x)*cos(y) as source
+        rho_slot = layout.field_slot_map["rho_0"]
+        y0[rho_slot * n : (rho_slot + 1) * n] = (
+            np.cos(x_arr) * np.cos(y_arr)
+        ).ravel()
+
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # phi_0 should be non-zero (solved from rho_0)
+        phi_slot = layout.field_slot_map["phi_0"]
+        phi_data = result[phi_slot * n : (phi_slot + 1) * n].reshape(grid.shape)
+        assert float(np.max(np.abs(phi_data))) > 1e-5
+
+        # Verify discrete residual: (laplacian - 1)phi_0 + rho_0 ≈ 0
+        from tidal.solver.operators import laplacian as lap_op
+
+        lap_phi = lap_op(phi_data, grid, "periodic")
+        rho_data = y0[rho_slot * n : (rho_slot + 1) * n].reshape(grid.shape)
+        residual = lap_phi - phi_data + rho_data
+        assert float(np.max(np.abs(residual))) < 1e-10, (
+            f"Helmholtz residual: {np.max(np.abs(residual)):.2e}"
+        )
+
+    def test_neumann_bc_matrix_path(self) -> None:
+        """Non-periodic BCs force the matrix solver path.
+
+        Helmholtz with Neumann BCs — cannot use FFT, must use matrix probe.
+        """
+        spec = _make_helmholtz_spec()
+        grid = GridInfo(
+            bounds=((0, 2 * np.pi), (0, 2 * np.pi)),
+            shape=(16, 16),
+            periodic=(False, False),
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+        x_arr, y_arr = grid.coord_arrays()
+
+        y0 = np.zeros(layout.total_size)
+        rho_slot = layout.field_slot_map["rho_0"]
+        # Source compatible with Neumann BCs (zero normal derivative at boundary)
+        y0[rho_slot * n : (rho_slot + 1) * n] = (
+            np.cos(x_arr) * np.cos(y_arr)
+        ).ravel()
+
+        bc = ("neumann", "neumann")
+        result = ensure_consistent_ic(spec, grid, y0, bc=bc)
+
+        # phi_0 should be solved (non-zero)
+        phi_slot = layout.field_slot_map["phi_0"]
+        phi_data = result[phi_slot * n : (phi_slot + 1) * n].reshape(grid.shape)
+        assert float(np.max(np.abs(phi_data))) > 1e-5
+
+    def test_identity_only_self_term(self) -> None:
+        """Identity-only self-term: direct algebraic solve.
+
+        Constraint: 0 = identity(h_a) + identity(h_b) + identity(h_c)
+        When h_a and h_b are known, h_c = -(h_a + h_b) — solved directly
+        via identity operator (trivial inversion).
+        """
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [
+                {"name": "h_a", "index": 0},
+                {"name": "h_b", "index": 1},
+                {"name": "h_c", "index": 2},
+            ],
+            "equations": [
+                {
+                    "field": "h_a",
+                    "lhs": {"expression": "d2_t(h_a)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_a"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_b",
+                    "lhs": {"expression": "d2_t(h_b)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_b"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_c",
+                    "lhs": {"expression": "h_c", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "identity", "field": "h_a"},
+                            {"coefficient": 1.0, "operator": "identity", "field": "h_b"},
+                            {"coefficient": 1.0, "operator": "identity", "field": "h_c"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        x = grid.axes_coords(0)
+        gaussian = np.exp(-((x - 5) ** 2) / 2)
+
+        # Set h_a and h_b to different Gaussians
+        ha_slot = layout.field_slot_map["h_a"]
+        hb_slot = layout.field_slot_map["h_b"]
+        y0[ha_slot * n : (ha_slot + 1) * n] = gaussian.ravel()
+        y0[hb_slot * n : (hb_slot + 1) * n] = (0.5 * gaussian).ravel()
+
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # h_c should be -(h_a + h_b)
+        hc_slot = layout.field_slot_map["h_c"]
+        ha_data = result[ha_slot * n : (ha_slot + 1) * n]
+        hb_data = result[hb_slot * n : (hb_slot + 1) * n]
+        hc_data = result[hc_slot * n : (hc_slot + 1) * n]
+        expected = -(ha_data + hb_data)
+        np.testing.assert_allclose(hc_data, expected, atol=1e-12)
+
+    def test_disabled_self_term_constraint(self) -> None:
+        """Disabled constraint with self-terms: Phase 2 still solves it.
+
+        Even when constraint_solver.enabled=False, Phase 2 of
+        ensure_consistent_ic can solve for the constraint field if it
+        has self-terms and is the only free field.
+        """
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [
+                {"name": "phi_0", "index": 0},
+                {"name": "psi_0", "index": 1},
+            ],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "phi_0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "identity", "field": "phi_0"},
+                            {"coefficient": 1.0, "operator": "identity", "field": "psi_0"},
+                        ],
+                    },
+                    "constraint_solver": {"enabled": False},
+                },
+                {
+                    "field": "psi_0",
+                    "lhs": {"expression": "d2_t(psi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "psi_0"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        x = grid.axes_coords(0)
+        psi_slot = layout.field_slot_map["psi_0"]
+        y0[psi_slot * n : (psi_slot + 1) * n] = np.exp(
+            -((x - 5) ** 2) / 2
+        ).ravel()
+
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # phi_0 should be -psi_0 (from identity(phi_0) + identity(psi_0) = 0)
+        phi_slot = layout.field_slot_map["phi_0"]
+        phi_data = result[phi_slot * n : (phi_slot + 1) * n]
+        psi_data = result[psi_slot * n : (psi_slot + 1) * n]
+        np.testing.assert_allclose(phi_data, -psi_data, atol=1e-12)
+
+    def test_underdetermined_graceful_skip(self) -> None:
+        """Underdetermined constraint (2+ free fields): skipped gracefully.
+
+        When a constraint references two free (zero) fields and there's no
+        way to determine either one, the solver should skip it without error.
+        """
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [
+                {"name": "c_0", "index": 0},
+                {"name": "h_a", "index": 1},
+                {"name": "h_b", "index": 2},
+            ],
+            "equations": [
+                # Both h_a and h_b are free → underdetermined
+                {
+                    "field": "c_0",
+                    "lhs": {"expression": "c_0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "gradient_x", "field": "h_a"},
+                            {"coefficient": 1.0, "operator": "gradient_x", "field": "h_b"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_a",
+                    "lhs": {"expression": "d2_t(h_a)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_a"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_b",
+                    "lhs": {"expression": "d2_t(h_b)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_b"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.total_size)
+
+        # Both h_a and h_b are zero → constraint is trivially satisfied
+        # but underdetermined (can't solve for either individually)
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+        np.testing.assert_array_equal(result, y0)
+
+    def test_multi_independent_subsidiary(self) -> None:
+        """Two independent subsidiary constraints, each solving for a different field.
+
+        Constraint 1: gradient_x(h_a) + gradient_x(h_b) = 0  → solve h_b
+        Constraint 2: gradient_x(h_a) + gradient_x(h_c) = 0  → solve h_c
+
+        Both determined independently from h_a in a single iteration.
+        """
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [
+                {"name": "h_a", "index": 0},
+                {"name": "h_b", "index": 1},
+                {"name": "h_c", "index": 2},
+                {"name": "c_0", "index": 3},
+                {"name": "c_1", "index": 4},
+            ],
+            "equations": [
+                {
+                    "field": "h_a",
+                    "lhs": {"expression": "d2_t(h_a)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_a"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_b",
+                    "lhs": {"expression": "d2_t(h_b)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_b"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_c",
+                    "lhs": {"expression": "d2_t(h_c)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_c"},
+                        ],
+                    },
+                },
+                # Subsidiary constraint: gradient_x(h_a) + gradient_x(h_b) = 0
+                {
+                    "field": "c_0",
+                    "lhs": {"expression": "c_0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": -1.0, "operator": "gradient_x", "field": "h_a"},
+                            {"coefficient": -1.0, "operator": "gradient_x", "field": "h_b"},
+                        ],
+                    },
+                },
+                # Subsidiary constraint: gradient_x(h_a) + gradient_x(h_c) = 0
+                {
+                    "field": "c_1",
+                    "lhs": {"expression": "c_1", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": -1.0, "operator": "gradient_x", "field": "h_a"},
+                            {"coefficient": -1.0, "operator": "gradient_x", "field": "h_c"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(64,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        x = grid.axes_coords(0)
+        gaussian = np.exp(-((x - 5) ** 2) / 2)
+        ha_slot = layout.field_slot_map["h_a"]
+        y0[ha_slot * n : (ha_slot + 1) * n] = gaussian.ravel()
+
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # Both h_b and h_c should satisfy gradient constraints
+        from tidal.solver.operators import gradient
+
+        ha_data = result[ha_slot * n : (ha_slot + 1) * n].reshape(grid.shape)
+        hb_slot = layout.field_slot_map["h_b"]
+        hb_data = result[hb_slot * n : (hb_slot + 1) * n].reshape(grid.shape)
+        hc_slot = layout.field_slot_map["h_c"]
+        hc_data = result[hc_slot * n : (hc_slot + 1) * n].reshape(grid.shape)
+
+        grad_ha = gradient(ha_data, 0, grid, "periodic")
+        grad_hb = gradient(hb_data, 0, grid, "periodic")
+        grad_hc = gradient(hc_data, 0, grid, "periodic")
+
+        # gradient(h_a) + gradient(h_b) ≈ 0
+        res_b = grad_ha + grad_hb
+        assert float(np.max(np.abs(res_b))) < 1e-10, (
+            f"c_0 residual: {np.max(np.abs(res_b)):.2e}"
+        )
+        # gradient(h_a) + gradient(h_c) ≈ 0
+        res_c = grad_ha + grad_hc
+        assert float(np.max(np.abs(res_c))) < 1e-10, (
+            f"c_1 residual: {np.max(np.abs(res_c)):.2e}"
+        )
+
+    def test_coupled_constraint_enabled(self) -> None:
+        """Two coupled constraints (enabled=True) with mutual references.
+
+        Models coupled Proca: A_0 and B_0 each reference each other.
+        """
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [
+                {"name": "A_0", "index": 0},
+                {"name": "B_0", "index": 1},
+                {"name": "A_1", "index": 2},
+                {"name": "B_1", "index": 3},
+            ],
+            "equations": [
+                # A_0 constraint: laplacian(A_0) - A_0 + 0.5*B_0 = source_A
+                {
+                    "field": "A_0",
+                    "lhs": {"expression": "A_0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
+                            {"coefficient": -1.0, "operator": "identity", "field": "A_0"},
+                            {"coefficient": 0.5, "operator": "identity", "field": "B_0"},
+                            {"coefficient": -1.0, "operator": "gradient_x", "field": "v_A_1"},
+                        ],
+                    },
+                    "constraint_solver": {
+                        "enabled": True,
+                        "method": "auto",
+                        "boundary_conditions": {"x": {"type": "periodic"}},
+                    },
+                },
+                # B_0 constraint: laplacian(B_0) - B_0 + 0.5*A_0 = source_B
+                {
+                    "field": "B_0",
+                    "lhs": {"expression": "B_0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "B_0"},
+                            {"coefficient": -1.0, "operator": "identity", "field": "B_0"},
+                            {"coefficient": 0.5, "operator": "identity", "field": "A_0"},
+                            {"coefficient": -1.0, "operator": "gradient_x", "field": "v_B_1"},
+                        ],
+                    },
+                    "constraint_solver": {
+                        "enabled": True,
+                        "method": "auto",
+                        "boundary_conditions": {"x": {"type": "periodic"}},
+                    },
+                },
+                {
+                    "field": "A_1",
+                    "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "A_1"},
+                        ],
+                    },
+                },
+                {
+                    "field": "B_1",
+                    "lhs": {"expression": "d2_t(B_1)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "B_1"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        x = grid.axes_coords(0)
+        # Set v_A_1 source (for A_0)
+        va1_slot = layout.velocity_slot_map["A_1"]
+        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(
+            -((x - 5) ** 2) / 2
+        ).ravel()
+
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # Both A_0 and B_0 should be solved (non-zero due to coupling)
+        a0_slot = layout.field_slot_map["A_0"]
+        a0_data = result[a0_slot * n : (a0_slot + 1) * n]
+        assert float(np.max(np.abs(a0_data))) > 1e-6, "A_0 should be non-zero"
+
+        b0_slot = layout.field_slot_map["B_0"]
+        b0_data = result[b0_slot * n : (b0_slot + 1) * n]
+        # B_0 is coupled to A_0 — should also be non-zero
+        assert float(np.max(np.abs(b0_data))) > 1e-6, (
+            "B_0 should be non-zero from coupling to A_0"
+        )
+
+    def test_does_not_mutate_input(self) -> None:
+        """ensure_consistent_ic does not modify the input y0 array."""
+        spec = _make_gw_like_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        ha_slot = layout.field_slot_map["h_a"]
+        x = grid.axes_coords(0)
+        y0[ha_slot * n : (ha_slot + 1) * n] = np.exp(
+            -((x - 5) ** 2) / 2
+        ).ravel()
+
+        y0_orig = y0.copy()
+        _ = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+        np.testing.assert_array_equal(y0, y0_orig)
+
+    def test_multiple_violations_all_reported(self) -> None:
+        """When multiple constraints are violated, all are listed in the error."""
+        spec = _make_multi_no_self_term_spec()
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        h0_slot = layout.field_slot_map["h_0"]
+        x_arr, y_arr = grid.coord_arrays()
+        y0[h0_slot * n : (h0_slot + 1) * n] = np.exp(
+            -((x_arr - 5) ** 2 + (y_arr - 5) ** 2) / 2
+        ).ravel()
+
+        with pytest.raises(ValueError, match="does not satisfy constraint") as exc_info:
+            ensure_consistent_ic(spec, grid, y0, bc="periodic", strict=True)
+
+        # Both c_0 and c_1 should be mentioned
+        msg = str(exc_info.value)
+        assert "c_0" in msg, "Error should mention c_0"
+        assert "c_1" in msg, "Error should mention c_1"
+
+
+# ---------------------------------------------------------------------------
+# Integration test: real GW plane-wave JSON
+# ---------------------------------------------------------------------------
+
+
+class TestEnsureConsistentICRealJSON:
+    """Integration tests using real derived JSON specifications."""
+
+    def test_gw_plane_wave_cascade(self) -> None:
+        """Full GW 1D (12 fields): set h_4 → cascade solves h_7 and h_9.
+
+        This is the primary use case that motivated the unified solver.
+        The TT gauge constraints automatically determine:
+          h_transverse_z: gradient_x(h_4) + gradient_x(h_7) = 0 → h_7 = -h_4
+          h_9: identity(h_4) + identity(h_7) + identity(h_9) = 0 → h_9 = 0
+        Velocity constraints are trivially satisfied (all v=0 initially).
+        """
+        import json
+        from pathlib import Path
+
+        json_path = Path("examples/data/gw_plane_wave_1d.json")
+        if not json_path.exists():
+            pytest.skip("GW plane-wave JSON not available")
+
+        with json_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+        spec = EquationSystem.from_dict(data)
+
+        grid = GridInfo(bounds=((0, 10),), shape=(64,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        # Set h_4 (one of the GW polarizations) to a Gaussian
+        h4_slot = layout.field_slot_map["h_4"]
+        x = grid.axes_coords(0)
+        gaussian = np.exp(-((x - 5) ** 2) / 2)
+        y0[h4_slot * n : (h4_slot + 1) * n] = gaussian.ravel()
+
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # h_7 should be determined by transverse_z constraint: h_7 ≈ -h_4
+        h7_slot = layout.field_slot_map["h_7"]
+        h4_data = result[h4_slot * n : (h4_slot + 1) * n].reshape(grid.shape)
+        h7_data = result[h7_slot * n : (h7_slot + 1) * n].reshape(grid.shape)
+
+        # Check the constraint residual directly
+        from tidal.solver.operators import gradient
+
+        grad_h4 = gradient(h4_data, 0, grid, "periodic")
+        grad_h7 = gradient(h7_data, 0, grid, "periodic")
+        transverse_res = grad_h4 + grad_h7
+        assert float(np.max(np.abs(transverse_res))) < 1e-10, (
+            f"Transverse constraint residual: {np.max(np.abs(transverse_res)):.2e}"
+        )
+
+        # h_9 should be determined by traceless constraint: h_4 + h_7 + h_9 = 0
+        h9_slot = layout.field_slot_map["h_9"]
+        h9_data = result[h9_slot * n : (h9_slot + 1) * n]
+        trace_res = h4_data.ravel() + h7_data.ravel() + h9_data
+        assert float(np.max(np.abs(trace_res))) < 1e-10, (
+            f"Traceless constraint residual: {np.max(np.abs(trace_res)):.2e}"
+        )
+
+        # Velocity constraints should all be satisfied (velocities are zero)
+        for eq in spec.equations:
+            if eq.time_derivative_order != 0:
+                continue
+            # All constraint residuals should be zero
+            rhs = np.zeros(grid.shape)
+            for term in eq.rhs_terms:
+                field_data = result[
+                    layout.field_slot_map.get(
+                        term.field,
+                        layout.velocity_slot_map.get(
+                            term.field.removeprefix("v_"), -1
+                        ),
+                    )
+                    * n
+                    : (
+                        layout.field_slot_map.get(
+                            term.field,
+                            layout.velocity_slot_map.get(
+                                term.field.removeprefix("v_"), -1
+                            ),
+                        )
+                        + 1
+                    )
+                    * n
+                ].reshape(grid.shape)
+                from tidal.solver.operators import apply_operator as aop
+
+                operated = aop(term.operator, field_data, grid, "periodic")
+                rhs += term.coefficient * operated
+
+            max_res = float(np.max(np.abs(rhs)))
+            assert max_res < 1e-9, (
+                f"Constraint {eq.field_name} residual = {max_res:.2e}"
+            )
+
+    def test_gw_plane_wave_h5_polarization(self) -> None:
+        """GW: setting h_5 (cross polarization) instead of h_4.
+
+        h_5 is the other physical DOF. Setting h_5 should NOT trigger
+        h_7 resolution (h_transverse_z only involves h_4 and h_7, not h_5).
+        """
+        import json
+        from pathlib import Path
+
+        json_path = Path("examples/data/gw_plane_wave_1d.json")
+        if not json_path.exists():
+            pytest.skip("GW plane-wave JSON not available")
+
+        with json_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+        spec = EquationSystem.from_dict(data)
+
+        grid = GridInfo(bounds=((0, 10),), shape=(64,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        h5_slot = layout.field_slot_map["h_5"]
+        x = grid.axes_coords(0)
+        y0[h5_slot * n : (h5_slot + 1) * n] = np.exp(
+            -((x - 5) ** 2) / 2
+        ).ravel()
+
+        # Should not raise — h_5 doesn't violate any constraint
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # h_7 should remain zero (h_5 is independent of h_transverse_z)
+        h7_slot = layout.field_slot_map["h_7"]
+        h7_data = result[h7_slot * n : (h7_slot + 1) * n]
+        assert np.allclose(h7_data, 0.0, atol=1e-12), (
+            "h_7 should remain zero when only h_5 is set"
+        )
+
+    def test_em_json_constraint(self) -> None:
+        """EM JSON: standard Gauss's law constraint solve from real spec."""
+        import json
+        from pathlib import Path
+
+        json_path = Path("examples/data/em_3d.json")
+        if not json_path.exists():
+            pytest.skip("EM JSON not available")
+
+        with json_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+        spec = EquationSystem.from_dict(data)
+
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10)), shape=(16, 16), periodic=(True, True)
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        # Set v_A_1 as source
+        va1_slot = layout.velocity_slot_map["A_1"]
+        x_arr, _ = grid.coord_arrays()
+        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(
+            -((x_arr - 5) ** 2) / 2
+        ).ravel()
+
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # A_0 should be solved (non-zero)
+        a0_slot = layout.field_slot_map["A_0"]
+        a0_data = result[a0_slot * n : (a0_slot + 1) * n]
+        assert float(np.max(np.abs(a0_data))) > 1e-5

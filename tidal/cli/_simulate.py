@@ -1018,6 +1018,7 @@ def _constraint_mode(  # noqa: PLR0913, PLR0917
         bc=bc,
         parameters=params,
         num_snapshots=2,
+        allow_inconsistent_ic=getattr(args, "allow_inconsistent_ic", False),
     )
 
     if not result["success"]:
@@ -1250,6 +1251,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
             rtol=args.rtol,
             atol=args.atol,
             snapshot_callback=snapshot_cb,
+            allow_inconsistent_ic=getattr(args, "allow_inconsistent_ic", False),
         )
     elif scheme == "cvode":
         from tidal.solver.cvode import solve_cvode

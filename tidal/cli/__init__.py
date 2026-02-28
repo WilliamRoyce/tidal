@@ -301,6 +301,16 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "mass matrix (negative eigenvalue). Default: warn only."
         ),
     )
+    sim_parser.add_argument(
+        "--allow-inconsistent-ic",
+        action="store_true",
+        default=False,
+        help=(
+            "Allow inconsistent initial conditions for constraint equations. "
+            "When set, constraint violations produce warnings instead of errors. "
+            "Default: error if constraint ICs cannot be made consistent."
+        ),
+    )
 
     # --- list ---
     list_parser = sub.add_parser(

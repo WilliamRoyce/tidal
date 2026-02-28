@@ -118,9 +118,27 @@ For dynamical fields:
 F_i = yp_i - RHS_i(state)   (differential: yp = dy/dt)
 ```
 
-**Constraint pre-solve** (`tidal/solver/constraint_solve.py`): Three-tier
-solver runs before IDA to find constraint field values consistent with the
-initial dynamical field state:
+**Unified constraint IC solver** (`ensure_consistent_ic()` in
+`tidal/solver/constraint_solve.py`): A single entry point that handles
+all constraint equation types — standard, subsidiary, and self-term — in
+a unified iterative framework:
+
+1. **Phase 1 — Standard constraints** (`constraint_solver.enabled=True`):
+   Solves for the constraint field using the three-tier solver (FFT → sparse
+   matrix → auto-select). Handles coupled constraints (e.g., coupled Proca
+   `A_0 ↔ B_0`). This is the same behavior as the previous `pre_solve_constraints()`.
+
+2. **Phase 2 — Iterative propagation** (remaining constraints):
+   For each constraint equation `0 = Σ c_i · op_i(field_i)`, identifies
+   which fields are "determined" (non-zero IC or already solved) vs "free"
+   (zero). When exactly one free field remains, solves for it. Iterates until
+   no more progress (cascade resolution).
+
+3. **Phase 3 — Verification**: Evaluates all constraint residuals. In strict
+   mode (default), raises `ValueError` if any constraint is violated. With
+   `--allow-inconsistent-ic`, issues a warning instead.
+
+**Solver tiers** (used in both phases 1 and 2):
 1. **Tier 1 (FFT)** — periodic BCs, constant coefficients (O(N log N))
 2. **Tier 2 (Sparse probe)** — non-periodic BCs or variable coefficients (O(N²) build, O(N) solve)
 3. **Automatic selection** — `_select_method()` chooses the fastest applicable tier
@@ -129,6 +147,32 @@ initial dynamical field state:
 Fourier mode is pinned (`u_hat[0,...,0] = 0`) to fix the gauge freedom.
 This is numerical regularisation, not physics gauge fixing — observables
 depend on derivatives of the constraint field, not its absolute value.
+
+### Subsidiary Constraint Propagation
+
+Some constraint equations involve dynamical fields but not the constraint
+field itself (no self-term). These arise from gauge conditions:
+
+| Constraint type            | Example        | Equation form                                          |
+| -------------------------- | -------------- | ------------------------------------------------------ |
+| Standard (self-term)       | EM `A_0`       | `laplacian(A_0) + source = 0`                          |
+| Subsidiary (no self-term)  | GW transverse  | `gradient_x(h_4) + gradient_x(h_7) = 0`               |
+| Self-term algebraic        | GW traceless   | `identity(h_4) + identity(h_7) + identity(h_9) = 0`   |
+
+The unified solver handles all three cases:
+
+- **Standard**: target = constraint field (e.g., `A_0`), solve `L[A_0] = -source`
+- **Subsidiary**: target = the one free dynamical field (e.g., `h_7`),
+  solve `L[h_7] = -source` where source comes from determined fields
+- **Self-term algebraic**: target = constraint field with self-terms (e.g., `h_9`),
+  solve `identity(h_9) = -(h_4 + h_7)`
+
+Cascade example (GW TT gauge, `--ic-component h_4`):
+
+1. User sets `h_4 = Gaussian`
+2. Transverse constraint determines `h_7 = -Gaussian`
+3. Traceless constraint determines `h_9 = 0`
+4. Velocity constraints auto-satisfied (all velocities start at zero)
 
 ---
 
