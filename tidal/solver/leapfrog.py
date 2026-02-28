@@ -23,6 +23,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from tidal.solver._defaults import SECOND_ORDER
+from tidal.solver._setup import build_rhs_evaluator
 from tidal.solver.fields import FieldSet
 from tidal.solver.operators import BCSpec, apply_operator
 from tidal.solver.state import StateLayout
@@ -34,9 +36,6 @@ if TYPE_CHECKING:
     from tidal.solver.grid import GridInfo
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem
-
-# Time-derivative order threshold for dynamical (wave) equations
-_SECOND_ORDER = 2
 
 
 def compute_force(  # noqa: PLR0913, PLR0917
@@ -90,7 +89,7 @@ def compute_velocity(
     velocity = np.zeros(layout.total_size)
 
     for slot_idx, slot in enumerate(layout.slots):
-        if not (slot.kind == "field" and slot.time_order >= _SECOND_ORDER):
+        if not (slot.kind == "field" and slot.time_order >= SECOND_ORDER):
             continue
         s = slice(slot_idx * n, (slot_idx + 1) * n)
         vel_slot = layout.velocity_slot_map[slot.field_name]
@@ -122,12 +121,12 @@ def _drift(
 ) -> None:
     """Apply drift: q += dt v, in-place."""
     for slot_idx, slot in enumerate(layout.slots):
-        if slot.kind == "field" and slot.time_order >= _SECOND_ORDER:
+        if slot.kind == "field" and slot.time_order >= SECOND_ORDER:
             s = slice(slot_idx * n, (slot_idx + 1) * n)
             y[s] += dt * velocity[s]
 
 
-def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
+def solve_leapfrog(  # noqa: C901, PLR0913
     spec: EquationSystem,
     grid: GridInfo,
     y0: np.ndarray,
@@ -211,11 +210,7 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
     # Build RHSEvaluator if parameters provided
     rhs_eval: RHSEvaluator | None = None
     if parameters is not None:
-        from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
-        from tidal.solver.rhs import RHSEvaluator as _RHSEvaluator  # noqa: PLC0415
-
-        coeff_eval = CoefficientEvaluator(spec, grid, parameters)
-        rhs_eval = _RHSEvaluator(spec, grid, coeff_eval, bc=bc)
+        rhs_eval = build_rhs_evaluator(spec, grid, parameters, bc)
 
     # Initialize state
     y = y0.copy()

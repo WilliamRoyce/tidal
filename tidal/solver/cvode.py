@@ -19,14 +19,17 @@ scikit-sundae: NREL, BSD-3 license.
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
+from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL, SECOND_ORDER
+from tidal.solver._setup import (
+    build_rhs_evaluator,
+    configure_linear_solver,
+    warn_frozen_constraints,
+)
 from tidal.solver._sksundae import SundialsResult, call_cvode
-from tidal.solver._types import DENSE_THRESHOLD, SPARSE_THRESHOLD, SolverResult
 from tidal.solver.fields import FieldSet
 from tidal.solver.leapfrog import compute_force, compute_velocity
 from tidal.solver.state import StateLayout
@@ -34,13 +37,11 @@ from tidal.solver.state import StateLayout
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem
-
-# Time-derivative order threshold for dynamical (wave) equations
-_SECOND_ORDER = 2
 
 
 def _build_rhsfn(
@@ -63,7 +64,7 @@ def _build_rhsfn(
             s = slice(slot_idx * n, (slot_idx + 1) * n)
             if slot.kind == "velocity":
                 yp[s] = force[s]
-            elif slot.kind == "field" and slot.time_order >= _SECOND_ORDER:
+            elif slot.kind == "field" and slot.time_order >= SECOND_ORDER:
                 yp[s] = velocity[s]
             elif slot.kind == "field" and slot.time_order == 1:
                 eq_idx = eq_map.get(slot.field_name)
@@ -136,23 +137,8 @@ def solve_cvode(  # noqa: PLR0913
     """
     layout = StateLayout.from_spec(spec, grid.num_points)
 
-    # Warn about constraint fields (frozen at IC)
-    constraint_fields = [
-        s.field_name for s in layout.slots if s.kind == "field" and s.time_order == 0
-    ]
-    if constraint_fields:
-        warnings.warn(
-            f"CVODE: constraint fields {constraint_fields} frozen at initial "
-            f"values (not evolved). Use --scheme ida for constraint systems.",
-            stacklevel=2,
-        )
-
-    # Build RHSEvaluator for coefficient resolution
-    from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
-    from tidal.solver.rhs import RHSEvaluator  # noqa: PLC0415
-
-    coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
-    rhs_eval = RHSEvaluator(spec, grid, coeff_eval, bc=bc)
+    warn_frozen_constraints(layout, "CVODE")
+    rhs_eval = build_rhs_evaluator(spec, grid, parameters, bc)
 
     # Build RHS closure
     rhsfn = _build_rhsfn(spec, layout, grid, bc, rhs_eval)
@@ -167,18 +153,7 @@ def solve_cvode(  # noqa: PLR0913
     if max_step > 0:
         options["max_step"] = max_step
 
-    # Choose linear solver based on system size (same thresholds as IDA)
-    n_state = layout.total_size
-    if n_state <= DENSE_THRESHOLD:
-        options["linsolver"] = "dense"
-    elif n_state <= SPARSE_THRESHOLD:
-        from tidal.solver.sparsity import build_jacobian_sparsity  # noqa: PLC0415
-
-        pattern = build_jacobian_sparsity(spec, layout, grid, bc)
-        options["linsolver"] = "sparse"
-        options["sparsity"] = pattern
-    else:
-        options["linsolver"] = "gmres"
+    configure_linear_solver(options, layout, spec, grid, bc)
 
     # Build time evaluation points
     t_eval = np.linspace(t_span[0], t_span[1], num_snapshots)

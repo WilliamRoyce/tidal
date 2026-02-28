@@ -13,13 +13,13 @@ J. Comp. Appl. Math. 6, 1980.
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
 
-from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
+from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL, SECOND_ORDER
 from tidal.solver._scipy_types import IVPResult, call_solve_ivp
+from tidal.solver._setup import build_rhs_evaluator, warn_frozen_constraints
 from tidal.solver.fields import FieldSet
 from tidal.solver.leapfrog import compute_force, compute_velocity
 from tidal.solver.state import StateLayout
@@ -32,9 +32,6 @@ if TYPE_CHECKING:
     from tidal.solver.operators import BCSpec
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem
-
-# Time-derivative order threshold for dynamical (wave) equations
-_SECOND_ORDER = 2
 
 # Implicit methods that benefit from Jacobian sparsity
 _IMPLICIT_METHODS = {"Radau", "BDF"}
@@ -62,7 +59,7 @@ def _build_rhs_fn(
             s = slice(slot_idx * n, (slot_idx + 1) * n)
             if slot.kind == "velocity":
                 dydt[s] = force[s]
-            elif slot.kind == "field" and slot.time_order >= _SECOND_ORDER:
+            elif slot.kind == "field" and slot.time_order >= SECOND_ORDER:
                 dydt[s] = velocity[s]
             elif slot.kind == "field" and slot.time_order == 1:
                 eq_idx = eq_map.get(slot.field_name)
@@ -131,23 +128,8 @@ def solve_scipy(  # noqa: PLR0913
     """
     layout = StateLayout.from_spec(spec, grid.num_points)
 
-    # Warn about constraint fields (frozen at IC)
-    constraint_fields = [
-        s.field_name for s in layout.slots if s.kind == "field" and s.time_order == 0
-    ]
-    if constraint_fields:
-        warnings.warn(
-            f"scipy: constraint fields {constraint_fields} frozen at initial "
-            f"values (not evolved). Use --scheme ida for constraint systems.",
-            stacklevel=2,
-        )
-
-    # Build RHSEvaluator for coefficient resolution
-    from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
-    from tidal.solver.rhs import RHSEvaluator  # noqa: PLC0415
-
-    coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
-    rhs_eval = RHSEvaluator(spec, grid, coeff_eval, bc=bc)
+    warn_frozen_constraints(layout, "scipy")
+    rhs_eval = build_rhs_evaluator(spec, grid, parameters, bc)
 
     # Build RHS closure
     rhs_fn = _build_rhs_fn(spec, layout, grid, bc, rhs_eval)

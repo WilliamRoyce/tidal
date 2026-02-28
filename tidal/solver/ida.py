@@ -22,9 +22,9 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
+from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL, SECOND_ORDER
+from tidal.solver._setup import configure_linear_solver
 from tidal.solver._sksundae import SundialsResult, call_ida
-from tidal.solver._types import DENSE_THRESHOLD, SPARSE_THRESHOLD, SolverResult
 from tidal.solver.fields import FieldSet
 from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 from tidal.solver.state import StateLayout
@@ -32,6 +32,7 @@ from tidal.solver.state import StateLayout
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.rhs import RHSEvaluator
     from tidal.solver.state import SlotInfo
@@ -39,9 +40,6 @@ if TYPE_CHECKING:
         ComponentEquation,
         EquationSystem,
     )
-
-# Time-derivative order threshold for dynamical (wave) equations
-_SECOND_ORDER = 2
 
 
 class _ResidualCtx:
@@ -398,7 +396,7 @@ def build_residual_fn(
                 ctx.handle_constraint(slot_idx, slot)
             elif slot.kind == "velocity":
                 ctx.handle_velocity(slot_idx, slot)
-            elif slot.time_order >= _SECOND_ORDER and slot.kind == "field":
+            elif slot.time_order >= SECOND_ORDER and slot.kind == "field":
                 ctx.handle_dynamical_field(slot_idx, slot)
             elif slot.time_order == 1:
                 ctx.handle_first_order(slot_idx, slot)
@@ -515,21 +513,7 @@ def solve_ida(  # noqa: PLR0913
     options["calc_initcond"] = calc_initcond or "yp0"
     options["calc_init_dt"] = float(t_eval[1] - t_eval[0])
 
-    # Choose linear solver based on system size:
-    # - Dense (LU): fast for small systems, O(N^3) / O(N^2) memory
-    # - Sparse (SuperLU_MT): analytical sparsity pattern, O(nnz) memory
-    # - GMRES: matrix-free, O(krylov_dim * N) memory, no preconditioner
-    n_state = layout.total_size
-    if n_state <= DENSE_THRESHOLD:
-        options["linsolver"] = "dense"
-    elif n_state <= SPARSE_THRESHOLD:
-        from tidal.solver.sparsity import build_jacobian_sparsity  # noqa: PLC0415
-
-        pattern = build_jacobian_sparsity(spec, layout, grid, bc)
-        options["linsolver"] = "sparse"
-        options["sparsity"] = pattern
-    else:
-        options["linsolver"] = "gmres"
+    configure_linear_solver(options, layout, spec, grid, bc)
 
     result: SundialsResult = call_ida(resfn, t_eval, y0, yp0, **options)
 
