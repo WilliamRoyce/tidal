@@ -207,7 +207,7 @@ def _build_sim_args(
     return sim_args
 
 
-def _run_single(  # noqa: C901, PLR0913, PLR0914, PLR0915, PLR0917
+def _run_single(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     base_args: Namespace,
     spec_path: Path,
     param_overrides: dict[str, float],
@@ -223,9 +223,11 @@ def _run_single(  # noqa: C901, PLR0913, PLR0914, PLR0915, PLR0917
     Returns a dict of scalar metrics for one row of the results table.
     """
     from tidal.cli._measure import (
+        _run_asymptotic,  # pyright: ignore[reportPrivateUsage]
         _run_conservation,  # pyright: ignore[reportPrivateUsage]
         _run_conversion,  # pyright: ignore[reportPrivateUsage]
         _run_dispersion,  # pyright: ignore[reportPrivateUsage]
+        _run_effective_mass,  # pyright: ignore[reportPrivateUsage]
         _run_energy,  # pyright: ignore[reportPrivateUsage]
         _run_mixing,  # pyright: ignore[reportPrivateUsage]
     )
@@ -313,6 +315,37 @@ def _run_single(  # noqa: C901, PLR0913, PLR0914, PLR0915, PLR0917
                 metrics["m2_eff"] = float(np.median(m2_vals))
         except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
             metrics["dispersion_error"] = str(exc)
+
+    if "effective_mass" in measurements:
+        try:
+            dyn = list(data.dynamical_fields)
+            em = _run_effective_mass(data, dyn)
+            metrics["m2_eff"] = em["m2_eff"]
+            metrics["m2_eff_std"] = em["m2_eff_std"]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["effective_mass_error"] = str(exc)
+
+    if "asymptotic" in measurements:
+        try:
+            asym = _run_asymptotic(data, source, target)
+            metrics["P_asymptotic"] = asym["P_final"]
+            metrics["P_forward"] = asym["P_forward"]
+            metrics["P_reflected"] = asym["P_reflected"]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["asymptotic_error"] = str(exc)
+
+    if "peak_conversion" in measurements:
+        try:
+            from tidal.cli._measure import (
+                _run_peak_conversion,  # pyright: ignore[reportPrivateUsage]
+            )
+
+            pc = _run_peak_conversion(data, source, target)
+            metrics["P_max"] = pc["P_max"]
+            metrics["P_max_time"] = pc["P_max_time"]
+            metrics["P_final"] = pc["P_final"]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["peak_conversion_error"] = str(exc)
 
     metrics["wall_time_s"] = round(wall_time, 2)
     return metrics

@@ -48,6 +48,9 @@ _VALID_MEASUREMENTS = frozenset(
         "spectral_conversion",
         "dispersion",
         "conservation",
+        "effective_mass",
+        "asymptotic",
+        "peak_conversion",
     }
 )
 
@@ -369,6 +372,87 @@ def _run_dispersion(
     }
 
 
+def _run_effective_mass(
+    data: SimulationData,
+    field_names: list[str],
+) -> dict[str, Any]:
+    """Compute effective mass from dispersion relation.
+
+    The effective mass is the Lorentz-invariant 4-momentum norm:
+    ``m²_eff = ω² - k²`` at the dominant frequency per k-bin.
+    """
+    from tidal.measurement import compute_effective_mass
+
+    result = compute_effective_mass(data, field_names)
+    return {
+        "field": result.field_name,
+        "m2_eff": result.m2_eff,
+        "m2_eff_std": result.m2_eff_std,
+        "n_active_modes": result.n_active_modes,
+        "_result_obj": result,
+    }
+
+
+def _run_asymptotic(
+    data: SimulationData,
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+) -> dict[str, Any]:
+    """Compute asymptotic scattering observables.
+
+    Forward/reflected split is defined by the source field's initial
+    propagation direction (spectral centroid), making it independent
+    of coordinate axis choice.
+
+    Raises
+    ------
+    ValueError
+        If source is not specified and cannot be auto-detected.
+    """
+    from tidal.measurement import compute_asymptotic_conversion
+
+    dyn = data.dynamical_fields
+    if source is None:
+        if len(dyn) < 2:  # noqa: PLR2004
+            msg = "asymptotic requires at least 2 dynamical fields for auto-detection"
+            raise ValueError(msg)
+        source = (dyn[0],)
+    if target is None:
+        target = tuple(f for f in dyn if f not in source)
+
+    result = compute_asymptotic_conversion(data, list(source), list(target))
+    return {
+        "source": list(source),
+        "target": list(target),
+        "P_final": result.P_final,
+        "P_forward": result.P_forward,
+        "P_reflected": result.P_reflected,
+        "source_wavevector": list(result.source_wavevector),
+        "_result_obj": result,
+    }
+
+
+def _run_peak_conversion(
+    data: SimulationData,
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+) -> dict[str, Any]:
+    """Extract scalar conversion summary: P_max, t_peak, P_final.
+
+    Reuses :func:`_run_conversion` and distills to sweep-friendly scalars.
+    """
+    conv = _run_conversion(data, source, target)
+    result_obj: ConversionResult = conv["_result_obj"]
+    peak_idx = int(np.argmax(result_obj.probability))
+    return {
+        "source": conv["source"],
+        "target": conv["target"],
+        "P_max": float(result_obj.probability[peak_idx]),
+        "P_max_time": float(result_obj.times[peak_idx]),
+        "P_final": float(result_obj.probability[-1]),
+    }
+
+
 def _run_summary(
     data: SimulationData,
     threshold: float,
@@ -557,7 +641,67 @@ def _format_text_section_dispersion(
     lines.append("")
 
 
-def _format_text(results: dict[str, Any], data: SimulationData) -> str:
+def _format_text_section_effective_mass(
+    lines: list[str],
+    em: dict[str, Any],
+) -> None:
+    """Append effective mass section to *lines*."""
+    if "error" in em:
+        lines.append(f"Effective Mass: ERROR ({em['error']})")
+    else:
+        lines.extend(
+            [
+                f"Effective Mass ({em['field']}):",
+                f"  m²_eff  = {em['m2_eff']:.6f} +/- {em['m2_eff_std']:.6f}",
+                f"  Active modes: {em['n_active_modes']}",
+            ]
+        )
+    lines.append("")
+
+
+def _format_text_section_asymptotic(
+    lines: list[str],
+    asym: dict[str, Any],
+) -> None:
+    """Append asymptotic conversion section to *lines*."""
+    if "error" in asym:
+        lines.append(f"Asymptotic Conversion: ERROR ({asym['error']})")
+    else:
+        src = ", ".join(asym["source"])
+        tgt = ", ".join(asym["target"])
+        lines.extend(
+            [
+                f"Asymptotic Conversion ({src} -> {tgt}):",
+                f"  P_final     = {asym['P_final']:.6f}",
+                f"  P_forward   = {asym['P_forward']:.6f}",
+                f"  P_reflected = {asym['P_reflected']:.6f}",
+                f"  Source k    = ({', '.join(f'{k:.3f}' for k in asym['source_wavevector'])})",
+            ]
+        )
+    lines.append("")
+
+
+def _format_text_section_peak_conversion(
+    lines: list[str],
+    pc: dict[str, Any],
+) -> None:
+    """Append peak conversion section to *lines*."""
+    if "error" in pc:
+        lines.append(f"Peak Conversion: ERROR ({pc['error']})")
+    else:
+        src = ", ".join(pc["source"])
+        tgt = ", ".join(pc["target"])
+        lines.extend(
+            [
+                f"Peak Conversion ({src} -> {tgt}):",
+                f"  P_max   = {pc['P_max']:.6f}  at t = {pc['P_max_time']:.2f}",
+                f"  P_final = {pc['P_final']:.6f}",
+            ]
+        )
+    lines.append("")
+
+
+def _format_text(results: dict[str, Any], data: SimulationData) -> str:  # noqa: C901
     """Produce human-readable aligned text output."""
     lines: list[str] = []
     sep = "=" * 64
@@ -593,6 +737,12 @@ def _format_text(results: dict[str, Any], data: SimulationData) -> str:
         _format_text_section_spectral_conversion(lines, results["spectral_conversion"])
     if "dispersion" in results:
         _format_text_section_dispersion(lines, results["dispersion"])
+    if "effective_mass" in results:
+        _format_text_section_effective_mass(lines, results["effective_mass"])
+    if "asymptotic" in results:
+        _format_text_section_asymptotic(lines, results["asymptotic"])
+    if "peak_conversion" in results:
+        _format_text_section_peak_conversion(lines, results["peak_conversion"])
 
     lines.append(sep)
     return "\n".join(lines)
@@ -709,6 +859,55 @@ def _run_individual_measurements(  # noqa: C901, PLR0912, PLR0915
             results["dispersion"] = _run_dispersion(data, dyn_in_source)
         except ValueError as e:
             results["dispersion"] = {"error": str(e)}
+
+    if "effective_mass" in measurements:
+        source = _parse_field_list(getattr(args, "source", None))
+        dyn_set = set(data.dynamical_fields)
+        if source is not None:
+            dyn_in_source = [f for f in source if f in dyn_set]
+            if not dyn_in_source:
+                dyn_in_source = list(data.dynamical_fields)
+        else:
+            dyn_in_source = list(data.dynamical_fields)
+
+        try:
+            results["effective_mass"] = _run_effective_mass(data, dyn_in_source)
+        except ValueError as e:
+            results["effective_mass"] = {"error": str(e)}
+
+    if "asymptotic" in measurements:
+        source = _parse_field_list(getattr(args, "source", None))
+        target = _parse_field_list(getattr(args, "target", None))
+
+        if source is None:
+            print(
+                "Error: --source required for --what=asymptotic "
+                "(or use --what=summary for auto-detection)",
+                file=sys.stderr,
+            )
+            return 1
+
+        try:
+            results["asymptotic"] = _run_asymptotic(data, source, target)
+        except ValueError as e:
+            results["asymptotic"] = {"error": str(e)}
+
+    if "peak_conversion" in measurements:
+        source = _parse_field_list(getattr(args, "source", None))
+        target = _parse_field_list(getattr(args, "target", None))
+
+        if source is None:
+            print(
+                "Error: --source required for --what=peak_conversion "
+                "(or use --what=summary for auto-detection)",
+                file=sys.stderr,
+            )
+            return 1
+
+        try:
+            results["peak_conversion"] = _run_peak_conversion(data, source, target)
+        except ValueError as e:
+            results["peak_conversion"] = {"error": str(e)}
 
     return results
 

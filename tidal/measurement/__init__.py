@@ -19,6 +19,12 @@ Typical usage::
 
 from __future__ import annotations
 
+from tidal.measurement._asymptotic import (
+    AsymptoticConversionResult as AsymptoticConversionResult,
+)
+from tidal.measurement._asymptotic import (
+    compute_asymptotic_conversion as compute_asymptotic_conversion,
+)
 from tidal.measurement._conversion import (
     ConversionResult as ConversionResult,
 )
@@ -42,6 +48,12 @@ from tidal.measurement._dispersion import (
 )
 from tidal.measurement._dispersion import (
     compute_dispersion as compute_dispersion,
+)
+from tidal.measurement._effective_mass import (
+    EffectiveMassResult as EffectiveMassResult,
+)
+from tidal.measurement._effective_mass import (
+    compute_effective_mass as compute_effective_mass,
 )
 from tidal.measurement._energy import (
     FieldEnergy as FieldEnergy,
@@ -106,8 +118,10 @@ from tidal.measurement._writer import (
 )
 
 __all__ = [
+    "AsymptoticConversionResult",
     "ConversionResult",
     "DispersionResult",
+    "EffectiveMassResult",
     "EnergyDiagnostics",
     "FieldEnergy",
     "MixingResult",
@@ -119,8 +133,10 @@ __all__ = [
     "SpectralSnapshot",
     "SystemEnergy",
     "check_energy_conservation",
+    "compute_asymptotic_conversion",
     "compute_conversion_probability",
     "compute_dispersion",
+    "compute_effective_mass",
     "compute_energy_timeseries",
     "compute_field_energy",
     "compute_group_conversion",
