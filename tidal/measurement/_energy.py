@@ -426,6 +426,262 @@ def _is_velocity_field(field_name: str) -> bool:
     return field_name.startswith("v_") and len(field_name) > len("v_")
 
 
+# ------------------------------------------------------------------
+# Mixed time-space operator support
+# ------------------------------------------------------------------
+#
+# Mixed operators arise from Lagrangians containing second-order time
+# derivatives (e.g. linearized Einstein-Hilbert: L^(2) ~ h * d²_t h).
+# The Legendre transform doesn't eliminate these, so the Hamiltonian
+# retains operators like mixed_1_0_0_1 (d_t d_z) or mixed_2_0_0_0 (d²_t).
+#
+# Strategy: decompose into time part (velocity/EOM) + spatial part.
+
+
+def _parse_mixed_operator(operator: str) -> tuple[int, tuple[int, ...]]:
+    """Parse ``mixed_T_S1_S2_...`` → ``(time_order, spatial_orders)``.
+
+    Examples
+    --------
+    >>> _parse_mixed_operator("mixed_1_0_0_1")
+    (1, (0, 0, 1))
+    >>> _parse_mixed_operator("mixed_2_0_0")
+    (2, (0, 0))
+    """
+    parts = operator.split("_")[1:]  # strip "mixed" prefix
+    return int(parts[0]), tuple(int(p) for p in parts[1:])
+
+
+def _compute_acceleration_from_eom(
+    data: SimulationData,
+    field: str,
+    t_idx: int,
+    params: dict[str, float],
+) -> NDArray[np.float64] | None:
+    """Compute d²_t(field) by evaluating the E-L equation RHS.
+
+    For dynamical fields whose equation has the form ``d²_t f = Σ c_k op_k(g_k)``,
+    evaluates the RHS using stored field/velocity snapshots and spatial operators.
+    Returns ``None`` if no matching dynamical equation exists.
+    """
+    for eq in data.spec.equations:
+        if eq.field_name != field or eq.time_derivative_order != 2:  # noqa: PLR2004
+            continue
+
+        shape = next(iter(data.fields.values()))[t_idx].shape
+        result: NDArray[np.float64] = np.zeros(shape)
+
+        for term in eq.rhs_terms:
+            if term.operator == "first_derivative_t":
+                vel = data.velocities.get(term.field)
+                if vel is None:
+                    continue
+                operated: NDArray[np.float64] = vel[t_idx]
+            else:
+                target = _resolve_term_target(data, term.field, t_idx)
+                if target is None:
+                    continue
+                operated = _apply_spatial_operator(
+                    term.operator,
+                    target,
+                    data.grid_spacing,
+                    data.periodic,
+                    bc_types=data.bc_types,
+                )
+
+            coeff = _resolve_term_coefficient(term, params)
+            result += coeff * operated
+
+        return result
+
+    return None
+
+
+def _differentiate_constraint(
+    data: SimulationData,
+    field: str,
+    t_idx: int,
+    params: dict[str, float],
+) -> NDArray[np.float64] | None:
+    """Compute d_t of a constraint field by differentiating its equation.
+
+    For a constraint ``f = Σ c_k op_k(source_k)``, the time derivative is
+    ``d_t(f) = Σ c_k op_k(d_t(source_k))`` where ``d_t(source)`` is the
+    velocity (for field sources) or acceleration from EOM (for velocity sources).
+    """
+    for eq in data.spec.equations:
+        if eq.field_name != field or eq.time_derivative_order != 0:
+            continue
+
+        shape = next(iter(data.fields.values()))[t_idx].shape
+        result: NDArray[np.float64] = np.zeros(shape)
+
+        for term in eq.rhs_terms:
+            # Skip self-referential terms (e.g. trace constraint h_9 = h_4 + h_7 + h_9)
+            if term.field == field:
+                continue
+
+            if _is_velocity_field(term.field):
+                # Source is velocity v_X → d_t(v_X) = acceleration from EOM
+                base_field = term.field[2:]  # strip "v_" prefix
+                dt_source = _compute_acceleration_from_eom(
+                    data, base_field, t_idx, params
+                )
+            else:
+                # Source is field X → d_t(X) = velocity
+                vel = data.velocities.get(term.field)
+                dt_source = vel[t_idx] if vel is not None else None
+
+            if dt_source is None:
+                continue
+
+            operated: NDArray[np.float64] = _apply_spatial_operator(
+                term.operator,
+                dt_source,
+                data.grid_spacing,
+                data.periodic,
+                bc_types=data.bc_types,
+            )
+
+            coeff = _resolve_term_coefficient(term, params)
+            result += coeff * operated
+
+        return result
+
+    return None
+
+
+def _differentiate_constraint_twice(
+    data: SimulationData,
+    field: str,
+    t_idx: int,
+    params: dict[str, float],
+) -> NDArray[np.float64] | None:
+    """Compute d²_t of a constraint field.
+
+    Handles constraints whose sources are plain fields (not velocities):
+    ``d²_t(field_source) = acceleration`` from EOM.  Constraints with
+    velocity sources would need the jerk (d³_t), which is not supported.
+    """
+    for eq in data.spec.equations:
+        if eq.field_name != field or eq.time_derivative_order != 0:
+            continue
+
+        shape = next(iter(data.fields.values()))[t_idx].shape
+        result: NDArray[np.float64] = np.zeros(shape)
+
+        for term in eq.rhs_terms:
+            if term.field == field:
+                continue
+
+            if _is_velocity_field(term.field):
+                # d²_t(velocity) = jerk — not supported
+                return None
+
+            accel = _compute_acceleration_from_eom(data, term.field, t_idx, params)
+            if accel is None:
+                return None
+
+            operated: NDArray[np.float64] = _apply_spatial_operator(
+                term.operator,
+                accel,
+                data.grid_spacing,
+                data.periodic,
+                bc_types=data.bc_types,
+            )
+
+            coeff = _resolve_term_coefficient(term, params)
+            result += coeff * operated
+
+        return result
+
+    return None
+
+
+def _resolve_time_derivative(
+    data: SimulationData,
+    field: str,
+    t_idx: int,
+    time_order: int,
+    params: dict[str, float],
+) -> NDArray[np.float64] | None:
+    """Resolve the Nth time derivative of a field from stored data + EOM.
+
+    ========== ===============================================================
+    time_order Resolution
+    ========== ===============================================================
+    0          Field value (identity)
+    1          Velocity (stored), or differentiated constraint equation
+    2          Acceleration from EOM RHS, or double-differentiated constraint
+    ≥ 3        Not supported (returns None)
+    ========== ===============================================================
+    """
+    if time_order == 0:
+        return _resolve_term_target(data, field, t_idx)
+
+    if time_order == 1:
+        vel = data.velocities.get(field)
+        if vel is not None:
+            return vel[t_idx]
+        return _differentiate_constraint(data, field, t_idx, params)
+
+    if time_order == 2:  # noqa: PLR2004
+        accel = _compute_acceleration_from_eom(data, field, t_idx, params)
+        if accel is not None:
+            return accel
+        return _differentiate_constraint_twice(data, field, t_idx, params)
+
+    # time_order >= 3: not currently supported
+    return None
+
+
+_SPATIAL_AXIS_LETTERS: tuple[str, ...] = ("x", "y", "z")
+
+
+def _evaluate_mixed_factor(
+    factor_field: str,
+    factor_operator: str,
+    data: SimulationData,
+    t_idx: int,
+    params: dict[str, float],
+) -> NDArray[np.float64] | None:
+    """Evaluate a ``mixed_T_S1_S2_...`` operator on a field.
+
+    Decomposition: apply T time derivatives (velocity/EOM), then apply
+    spatial derivatives sequentially.
+    """
+    time_order, spatial_orders = _parse_mixed_operator(factor_operator)
+
+    # Time part
+    base = _resolve_time_derivative(data, factor_field, t_idx, time_order, params)
+    if base is None:
+        return None
+
+    # Spatial part: apply gradient operators for each nonzero spatial order.
+    # Handle dimension mismatch from plane-wave reduction: when the mixed
+    # operator has more spatial indices than grid dimensions, collapse all
+    # derivative orders onto the available axes (axis 0 for 1D).
+    n_spatial = len(data.grid_spacing)
+    if len(spatial_orders) > n_spatial:
+        total_order = sum(spatial_orders)
+        effective_orders: tuple[int, ...] = (total_order,) + (0,) * (n_spatial - 1)
+    else:
+        effective_orders = spatial_orders
+
+    for ax_idx, order in enumerate(effective_orders):
+        for _ in range(order):
+            ax_letter = _SPATIAL_AXIS_LETTERS[ax_idx]
+            base = _apply_spatial_operator(
+                f"gradient_{ax_letter}",
+                base,
+                data.grid_spacing,
+                data.periodic,
+                bc_types=data.bc_types,
+            )
+
+    return base
+
+
 def _resolve_term_coefficient(
     term: OperatorTerm,
     parameters: dict[str, float],
@@ -905,6 +1161,9 @@ def _evaluate_hamiltonian_factor(
     For ``time_derivative`` operator, reads the velocity directly from
     ``data.velocities`` (which stores velocities v = dq/dt in the E-L form).
 
+    For ``mixed_*`` operators (time-space cross derivatives), decomposes into
+    time derivative resolution (velocity/EOM) + spatial operator application.
+
     For spatial operators, applies the operator to the field data.
     For ``identity``, returns the field data directly.
 
@@ -916,6 +1175,13 @@ def _evaluate_hamiltonian_factor(
         if vel is not None:
             return vel[t_idx]
         return None
+
+    # Mixed time-space operators (e.g. mixed_1_0_0_1 = d_t d_z)
+    if factor_operator.startswith("mixed_"):
+        params = _merge_parameters(data)
+        return _evaluate_mixed_factor(
+            factor_field, factor_operator, data, t_idx, params
+        )
 
     # Get the field data
     field_arr = _resolve_term_target(data, factor_field, t_idx)

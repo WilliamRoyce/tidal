@@ -74,15 +74,19 @@ def is_known_operator(name: str) -> bool:
 
     Accepts static operators (identity, laplacian, gradient_x, ...),
     user-registered custom operators (via ``register_operator``),
-    and dynamic patterns for generic Nth-order derivatives
-    (derivative_3_x, derivative_5_y, derivative_2x_1y, ...).
+    dynamic patterns for generic Nth-order derivatives
+    (derivative_3_x, derivative_5_y, derivative_2x_1y, ...),
+    and mixed time-space derivative operators (mixed_T_S1_S2_...).
     """
-    return (
-        name in _STATIC_OPERATORS
-        or name in _CUSTOM_OPERATORS
-        or bool(_GENERIC_SINGLE_AXIS_RE.match(name))
-        or bool(_GENERIC_MULTI_AXIS_RE.match(name))
-    )
+    if name in _STATIC_OPERATORS or name in _CUSTOM_OPERATORS:
+        return True
+    if _GENERIC_SINGLE_AXIS_RE.match(name) or _GENERIC_MULTI_AXIS_RE.match(name):
+        return True
+    # Mixed time-space operators: mixed_T_S1_S2_... (all parts are digits)
+    if name.startswith("mixed_"):
+        parts = name.split("_")[1:]
+        return len(parts) >= 2 and all(p.isdigit() for p in parts)  # noqa: PLR2004
+    return False
 
 
 @dataclass(frozen=True)
