@@ -22,8 +22,10 @@ from __future__ import annotations
 
 import copy
 import re
-from collections.abc import Mapping
-from typing import Any, cast
+from typing import TYPE_CHECKING, Any, cast
+
+if TYPE_CHECKING:
+    from collections.abc import Mapping
 
 # Coordinate reference pattern in Wolfram expressions: x[], y[], z[]
 _COORD_REF_RE = re.compile(r"\b([xyzwvut])\s*\[\s*\]")
