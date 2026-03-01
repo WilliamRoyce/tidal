@@ -7,10 +7,10 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - `tidal/wolfram/` -- Wolfram pipeline modules (EulerLagrange.wl, ComponentDecompose.wl, ExportJSON.wl, CommonUtilities.wl, GaugeFix.wl)
 - `tidal/solver/` -- PDE solver backends (ida.py, cvode.py, leapfrog.py, fields.py, operators.py, grid.py, coefficients.py, rhs.py, state.py, constraint_solve.py)
 - `tidal/symbolic/` -- Python symbolic pipeline (_derive.py, json_loader.py)
-- `tidal/cli/` -- CLI entry points (8 subcommands: derive, simulate, measure, inspect, list, validate, plot, sweep)
+- `tidal/cli/` -- CLI entry points (9 subcommands: derive, simulate, measure, inspect, list, validate, plot, sweep, analyze)
 - `tidal/measurement/` -- Physics measurements (energy, conversion, mixing, spectra)
 - `examples/` -- 22 physics examples (1+1D through 3+1D), each with theory.toml + .wls + data/*.json
-- `tests/` -- ~945 Python tests + ~115 Wolfram tests
+- `tests/` -- ~1242 Python tests + ~115 Wolfram tests
 - `docs/` -- Architecture docs (MEMORY.md is the main reference)
 
 ## Key Commands

@@ -1623,15 +1623,17 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     resume_state: ResumeState | None = None
     t_start = 0.0
 
-    if args.resume is not None:
+    resume_path = getattr(args, "resume", None)
+    # Distinguish from sweep's boolean --resume (which means "resume sweep")
+    if isinstance(resume_path, str):
         resume_state = _load_resume_state(
-            Path(args.resume), spec, args.snapshot
+            Path(resume_path), spec, getattr(args, "snapshot", None)
         )
         _validate_resume_grid(resume_state, grid_info)
         y0 = resume_state.y0
         t_start = resume_state.t_start
         log(
-            f"  IC: resume from {args.resume} "
+            f"  IC: resume from {resume_path} "
             f"(snapshot {resume_state.snapshot_index}, t={t_start:.4f})"
         )
     else:
@@ -1643,7 +1645,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         log(ic_desc)
 
     # Handle --t-additional (only with --resume)
-    if args.t_additional is not None:
+    if getattr(args, "t_additional", None) is not None:
         if resume_state is None:
             print(
                 "Warning: --t-additional without --resume; ignored",
