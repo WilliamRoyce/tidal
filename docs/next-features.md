@@ -1,8 +1,8 @@
 # Next Features: Parameter Sweeps & Measurements
 
 **Created:** March 2026
-**Branch:** `feature/parameter-sweep` (commit `3133f49`, 1201 tests passing)
-**Status:** Phase A and Phase B complete
+**Branch:** `feature/parameter-sweep` (commit `6150ec6`, 1242 tests passing)
+**Status:** All phases (A–D) complete
 
 This document tracks proposed features for TIDAL's parameter sweep framework and measurement modules. Each feature includes scope, generality analysis, implementation details, and acceptance criteria.
 
@@ -41,7 +41,7 @@ The `tidal sweep` command is fully operational with:
 | File                                        | Purpose                                        |
 | ------------------------------------------- | ---------------------------------------------- |
 | `tidal/cli/_sweep.py`                       | Core sweep orchestration (~1350 lines)         |
-| `tidal/cli/_sweep_panels.py`                | Sweep plot renderers (355 lines)               |
+| `tidal/cli/_sweep_panels.py`                | Sweep plot renderers (~550 lines)              |
 | `tidal/measurement/_sweep_results.py`       | SweepResults dataclass (~570 lines)            |
 | `tidal/cli/_measure.py`                     | Measurement CLI dispatcher                     |
 | `tidal/measurement/_energy.py`              | Energy computation (~1700 lines, most general) |
@@ -55,7 +55,10 @@ The `tidal sweep` command is fully operational with:
 | `tidal/cli/_sweep_config.py`                | TOML sweep config parser (~475 lines)          |
 | `tests/test_sweep.py`                       | Sweep tests (~1200 lines)                      |
 | `tests/test_sweep_config.py`                | TOML config tests (~300 lines)                 |
+| `tidal/measurement/_sensitivity.py`         | Sobol/Morris sensitivity analysis              |
+| `tidal/cli/_analyze.py`                     | `tidal analyze` CLI handler                    |
 | `tests/test_new_measurements.py`            | Measurement tests (~391 lines)                 |
+| `tests/test_sensitivity_viz.py`             | Sensitivity + visualization tests (23 tests)   |
 
 ---
 
@@ -526,7 +529,7 @@ def compute_resonance_analysis(
 
 **Priority:** 4
 **Generality:** [GENERAL] — operates on sweep result scalars, no field data assumptions
-**Status:** Not started
+**Status:** Complete (Phase D, commit `6150ec6`)
 **Depends on:** F2b (requires specific sampling designs like Saltelli)
 
 ### Motivation
@@ -604,11 +607,11 @@ def compute_morris_screening(
 
 ### Acceptance Criteria
 
-- [ ] `tidal analyze sweep_output/ --sensitivity sobol --metric P_max` produces index table
-- [ ] Clear error if SALib not installed
-- [ ] Sobol S1 + interactions = ST (within confidence intervals)
-- [ ] Morris screening ranks parameters by importance
-- [ ] Works with any SweepResults (any theory, any metric)
+- [x] `tidal analyze sweep_output/ --sensitivity sobol --metric P_max` produces index table
+- [x] Clear error if SALib not installed
+- [x] Sobol S1 + interactions = ST (within confidence intervals)
+- [x] Morris screening ranks parameters by importance
+- [x] Works with any SweepResults (any theory, any metric)
 
 ---
 
@@ -811,7 +814,7 @@ except Exception as exc:
 
 **Priority:** 8 (stretch)
 **Generality:** [GENERAL] — operates on sweep result data
-**Status:** Not started
+**Status:** Complete (Phase D, commit `6150ec6`)
 **Depends on:** F5 (SweepResults query methods useful for data preparation)
 
 ### Motivation
@@ -846,11 +849,11 @@ tidal plot sweep_output/ --type sweep-scatter --metric P_max
 
 ### Acceptance Criteria
 
-- [ ] `--type sweep-parallel` produces readable parallel coordinates plot
-- [ ] `--type sweep-tornado` shows parameter importance ranking
-- [ ] `--type sweep-scatter` shows pairwise relationships
-- [ ] All three work with 2+ swept parameters
-- [ ] Color mapping is clear and includes colorbar
+- [x] `--type sweep-parallel` produces readable parallel coordinates plot
+- [x] `--type sweep-tornado` shows parameter importance ranking
+- [x] `--type sweep-scatter` shows pairwise relationships
+- [x] All three work with 2+ swept parameters
+- [x] Color mapping is clear and includes colorbar
 
 ---
 
@@ -875,11 +878,11 @@ Most features are independent. The main dependency chain is F1 -> F2 -> F4 (TOML
 
 ## Implementation Phases
 
-| Phase    | Features      | Est. Scope | Branch                       | Status      |
-| -------- | ------------- | ---------- | ---------------------------- | ----------- |
-| A        | F1 + F2a      | Medium     | `feature/parameter-sweep`    | Complete    |
-| B        | F2b + F5 + F7 | Medium     | `feature/parameter-sweep`    | Complete    |
-| C        | F3 + F6       | Medium     | `feature/parameter-sweep`    | Complete    |
-| D (next) | F4 + F8       | Medium     | `feature/sensitivity-viz`    | Not started |
+| Phase | Features      | Est. Scope | Branch                    | Status   |
+| ----- | ------------- | ---------- | ------------------------- | -------- |
+| A     | F1 + F2a      | Medium     | `feature/parameter-sweep` | Complete |
+| B     | F2b + F5 + F7 | Medium     | `feature/parameter-sweep` | Complete |
+| C     | F3 + F6       | Medium     | `feature/parameter-sweep` | Complete |
+| D     | F4 + F8       | Medium     | `feature/parameter-sweep` | Complete |
 
-Phase D is the next step: Sobol sensitivity analysis + advanced visualization.
+All 8 features are implemented. 1242 tests passing, lint clean.
