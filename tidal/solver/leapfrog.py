@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from tidal.solver._setup import build_rhs_evaluator
 from tidal.solver.fields import FieldSet
 from tidal.solver.operators import BCSpec, apply_operator
 from tidal.solver.state import StateLayout
@@ -35,9 +36,6 @@ if TYPE_CHECKING:
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem
 
-# Time-derivative order threshold for dynamical (wave) equations
-_SECOND_ORDER = 2
-
 
 def compute_force(  # noqa: PLR0913, PLR0917
     spec: EquationSystem,
@@ -47,20 +45,36 @@ def compute_force(  # noqa: PLR0913, PLR0917
     y: np.ndarray,
     t: float = 0.0,
     rhs_eval: RHSEvaluator | None = None,
+    out: np.ndarray | None = None,
+    fieldset: FieldSet | None = None,
 ) -> np.ndarray:
-    """Compute dv/dt = E-L RHS for all velocity slots."""
-    n = grid.num_points
+    """Compute dv/dt = E-L RHS for all velocity slots.
+
+    Parameters
+    ----------
+    out : np.ndarray, optional
+        Pre-allocated output buffer of length ``layout.total_size``.
+        If provided, filled in-place (avoids allocation). If ``None``,
+        a fresh array is allocated.
+    fieldset : FieldSet, optional
+        Reusable FieldSet.  If provided, rebound to *y* in-place
+        (avoids per-call object allocation).
+    """
     shape = grid.shape
 
-    fieldset = FieldSet.from_flat(layout, shape, y)
-    eq_map = {eq.field_name: i for i, eq in enumerate(spec.equations)}
+    if fieldset is not None:
+        fieldset.rebind(y)
+    else:
+        fieldset = FieldSet.from_flat(layout, shape, y)
+    eq_map = spec.equation_map
 
-    force = np.zeros(layout.total_size)
-    for slot_idx, slot in enumerate(layout.slots):
-        if slot.kind != "velocity":
-            continue
-        s = slice(slot_idx * n, (slot_idx + 1) * n)
-        eq_idx = eq_map.get(slot.field_name)
+    if out is not None:
+        force = out
+        force.fill(0.0)
+    else:
+        force = np.zeros(layout.total_size)
+    for _slot_idx, s, field_name in layout.velocity_slot_groups:
+        eq_idx = eq_map.get(field_name)
         if eq_idx is None:
             continue
 
@@ -84,17 +98,23 @@ def compute_force(  # noqa: PLR0913, PLR0917
 def compute_velocity(
     layout: StateLayout,
     y: np.ndarray,
+    out: np.ndarray | None = None,
 ) -> np.ndarray:
-    """Read dq/dt = v directly from velocity slots in the state vector."""
-    n = layout.num_points
-    velocity = np.zeros(layout.total_size)
+    """Read dq/dt = v directly from velocity slots in the state vector.
 
-    for slot_idx, slot in enumerate(layout.slots):
-        if not (slot.kind == "field" and slot.time_order >= _SECOND_ORDER):
-            continue
-        s = slice(slot_idx * n, (slot_idx + 1) * n)
-        vel_slot = layout.velocity_slot_map[slot.field_name]
-        velocity[s] = y[vel_slot * n : (vel_slot + 1) * n]
+    Parameters
+    ----------
+    out : np.ndarray, optional
+        Pre-allocated output buffer. If provided, filled in-place.
+    """
+    if out is not None:
+        velocity = out
+        velocity.fill(0.0)
+    else:
+        velocity = np.zeros(layout.total_size)
+
+    for _slot_idx, s, vel_slot in layout.dynamical_field_slot_groups:
+        velocity[s] = y[layout.slot_slice(vel_slot)]
 
     return velocity
 
@@ -104,13 +124,10 @@ def _half_kick(
     force: np.ndarray,
     dt: float,
     layout: StateLayout,
-    n: int,
 ) -> None:
     """Apply half-kick: v += (dt/2) F(q), in-place."""
-    for slot_idx, slot in enumerate(layout.slots):
-        if slot.kind == "velocity":
-            s = slice(slot_idx * n, (slot_idx + 1) * n)
-            y[s] += 0.5 * dt * force[s]
+    for _slot_idx, s, _field_name in layout.velocity_slot_groups:
+        y[s] += 0.5 * dt * force[s]
 
 
 def _drift(
@@ -118,13 +135,10 @@ def _drift(
     velocity: np.ndarray,
     dt: float,
     layout: StateLayout,
-    n: int,
 ) -> None:
     """Apply drift: q += dt v, in-place."""
-    for slot_idx, slot in enumerate(layout.slots):
-        if slot.kind == "field" and slot.time_order >= _SECOND_ORDER:
-            s = slice(slot_idx * n, (slot_idx + 1) * n)
-            y[s] += dt * velocity[s]
+    for _slot_idx, s, _vel_slot in layout.dynamical_field_slot_groups:
+        y[s] += dt * velocity[s]
 
 
 def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
@@ -183,7 +197,6 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
         at initial values.
     """
     layout = StateLayout.from_spec(spec, grid.num_points)
-    n = grid.num_points
 
     # Validate: leapfrog supports second-order (wave) + frozen constraints.
     # First-order (diffusion/transport) equations require IDA.
@@ -211,11 +224,7 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
     # Build RHSEvaluator if parameters provided
     rhs_eval: RHSEvaluator | None = None
     if parameters is not None:
-        from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
-        from tidal.solver.rhs import RHSEvaluator as _RHSEvaluator  # noqa: PLC0415
-
-        coeff_eval = CoefficientEvaluator(spec, grid, parameters)
-        rhs_eval = _RHSEvaluator(spec, grid, coeff_eval, bc=bc)
+        rhs_eval = build_rhs_evaluator(spec, grid, parameters, bc)
 
     # Initialize state
     y = y0.copy()
@@ -245,18 +254,27 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
     # overshoot t_end.  The -1e-10 handles exact division (10.0/0.1 = 100.0)
     # without adding an unnecessary extra step.
     n_steps = max(1, math.ceil((t_end - t) / dt - 1e-10))
+    force_buf = np.zeros(layout.total_size)
+    vel_buf = np.zeros(layout.total_size)
+    fieldset_buf = FieldSet.zeros(layout, grid.shape)
     for _step in range(n_steps):
         # Half-kick
-        force = compute_force(spec, layout, grid, bc, y, t, rhs_eval)
-        _half_kick(y, force, dt, layout, n)
+        force = compute_force(
+            spec, layout, grid, bc, y, t, rhs_eval, out=force_buf,
+            fieldset=fieldset_buf,
+        )
+        _half_kick(y, force, dt, layout)
 
         # Drift
-        velocity = compute_velocity(layout, y)
-        _drift(y, velocity, dt, layout, n)
+        velocity = compute_velocity(layout, y, out=vel_buf)
+        _drift(y, velocity, dt, layout)
 
         # Half-kick
-        force = compute_force(spec, layout, grid, bc, y, t, rhs_eval)
-        _half_kick(y, force, dt, layout, n)
+        force = compute_force(
+            spec, layout, grid, bc, y, t, rhs_eval, out=force_buf,
+            fieldset=fieldset_buf,
+        )
+        _half_kick(y, force, dt, layout)
 
         t += dt
 

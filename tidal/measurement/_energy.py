@@ -28,6 +28,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from numpy.typing import NDArray
 
     from tidal.measurement._io import SimulationData
@@ -353,7 +355,7 @@ def _apply_spatial_operator(
         If the operator is unknown.
     """
     if operator == "identity":
-        return field.copy()
+        return field
 
     # gradient_{x,y,z}
     if operator.startswith("gradient_"):
@@ -422,6 +424,262 @@ def _apply_spatial_operator(
 def _is_velocity_field(field_name: str) -> bool:
     """Check if a field name is a velocity reference (v_field_name, e.g. v_A_1)."""
     return field_name.startswith("v_") and len(field_name) > len("v_")
+
+
+# ------------------------------------------------------------------
+# Mixed time-space operator support
+# ------------------------------------------------------------------
+#
+# Mixed operators arise from Lagrangians containing second-order time
+# derivatives (e.g. linearized Einstein-Hilbert: L^(2) ~ h * d²_t h).
+# The Legendre transform doesn't eliminate these, so the Hamiltonian
+# retains operators like mixed_1_0_0_1 (d_t d_z) or mixed_2_0_0_0 (d²_t).
+#
+# Strategy: decompose into time part (velocity/EOM) + spatial part.
+
+
+def _parse_mixed_operator(operator: str) -> tuple[int, tuple[int, ...]]:
+    """Parse ``mixed_T_S1_S2_...`` → ``(time_order, spatial_orders)``.
+
+    Examples
+    --------
+    >>> _parse_mixed_operator("mixed_1_0_0_1")
+    (1, (0, 0, 1))
+    >>> _parse_mixed_operator("mixed_2_0_0")
+    (2, (0, 0))
+    """
+    parts = operator.split("_")[1:]  # strip "mixed" prefix
+    return int(parts[0]), tuple(int(p) for p in parts[1:])
+
+
+def _compute_acceleration_from_eom(
+    data: SimulationData,
+    field: str,
+    t_idx: int,
+    params: dict[str, float],
+) -> NDArray[np.float64] | None:
+    """Compute d²_t(field) by evaluating the E-L equation RHS.
+
+    For dynamical fields whose equation has the form ``d²_t f = Σ c_k op_k(g_k)``,
+    evaluates the RHS using stored field/velocity snapshots and spatial operators.
+    Returns ``None`` if no matching dynamical equation exists.
+    """
+    for eq in data.spec.equations:
+        if eq.field_name != field or eq.time_derivative_order != 2:  # noqa: PLR2004
+            continue
+
+        shape: tuple[int, ...] = next(iter(data.fields.values()))[t_idx].shape
+        result: NDArray[np.float64] = np.zeros(shape)
+
+        for term in eq.rhs_terms:
+            if term.operator == "first_derivative_t":
+                vel = data.velocities.get(term.field)
+                if vel is None:
+                    continue
+                operated: NDArray[np.float64] = vel[t_idx]
+            else:
+                target = _resolve_term_target(data, term.field, t_idx)
+                if target is None:
+                    continue
+                operated = _apply_spatial_operator(
+                    term.operator,
+                    target,
+                    data.grid_spacing,
+                    data.periodic,
+                    bc_types=data.bc_types,
+                )
+
+            coeff = _resolve_term_coefficient(term, params)
+            result += coeff * operated
+
+        return result
+
+    return None
+
+
+def _differentiate_constraint(
+    data: SimulationData,
+    field: str,
+    t_idx: int,
+    params: dict[str, float],
+) -> NDArray[np.float64] | None:
+    """Compute d_t of a constraint field by differentiating its equation.
+
+    For a constraint ``f = Σ c_k op_k(source_k)``, the time derivative is
+    ``d_t(f) = Σ c_k op_k(d_t(source_k))`` where ``d_t(source)`` is the
+    velocity (for field sources) or acceleration from EOM (for velocity sources).
+    """
+    for eq in data.spec.equations:
+        if eq.field_name != field or eq.time_derivative_order != 0:
+            continue
+
+        shape: tuple[int, ...] = next(iter(data.fields.values()))[t_idx].shape
+        result: NDArray[np.float64] = np.zeros(shape)
+
+        for term in eq.rhs_terms:
+            # Skip self-referential terms (e.g. trace constraint h_9 = h_4 + h_7 + h_9)
+            if term.field == field:
+                continue
+
+            if _is_velocity_field(term.field):
+                # Source is velocity v_X → d_t(v_X) = acceleration from EOM
+                base_field = term.field[2:]  # strip "v_" prefix
+                dt_source = _compute_acceleration_from_eom(
+                    data, base_field, t_idx, params
+                )
+            else:
+                # Source is field X → d_t(X) = velocity
+                vel = data.velocities.get(term.field)
+                dt_source = vel[t_idx] if vel is not None else None
+
+            if dt_source is None:
+                continue
+
+            operated: NDArray[np.float64] = _apply_spatial_operator(
+                term.operator,
+                dt_source,
+                data.grid_spacing,
+                data.periodic,
+                bc_types=data.bc_types,
+            )
+
+            coeff = _resolve_term_coefficient(term, params)
+            result += coeff * operated
+
+        return result
+
+    return None
+
+
+def _differentiate_constraint_twice(
+    data: SimulationData,
+    field: str,
+    t_idx: int,
+    params: dict[str, float],
+) -> NDArray[np.float64] | None:
+    """Compute d²_t of a constraint field.
+
+    Handles constraints whose sources are plain fields (not velocities):
+    ``d²_t(field_source) = acceleration`` from EOM.  Constraints with
+    velocity sources would need the jerk (d³_t), which is not supported.
+    """
+    for eq in data.spec.equations:
+        if eq.field_name != field or eq.time_derivative_order != 0:
+            continue
+
+        shape: tuple[int, ...] = next(iter(data.fields.values()))[t_idx].shape
+        result: NDArray[np.float64] = np.zeros(shape)
+
+        for term in eq.rhs_terms:
+            if term.field == field:
+                continue
+
+            if _is_velocity_field(term.field):
+                # d²_t(velocity) = jerk — not supported
+                return None
+
+            accel = _compute_acceleration_from_eom(data, term.field, t_idx, params)
+            if accel is None:
+                return None
+
+            operated: NDArray[np.float64] = _apply_spatial_operator(
+                term.operator,
+                accel,
+                data.grid_spacing,
+                data.periodic,
+                bc_types=data.bc_types,
+            )
+
+            coeff = _resolve_term_coefficient(term, params)
+            result += coeff * operated
+
+        return result
+
+    return None
+
+
+def _resolve_time_derivative(
+    data: SimulationData,
+    field: str,
+    t_idx: int,
+    time_order: int,
+    params: dict[str, float],
+) -> NDArray[np.float64] | None:
+    """Resolve the Nth time derivative of a field from stored data + EOM.
+
+    ========== ===============================================================
+    time_order Resolution
+    ========== ===============================================================
+    0          Field value (identity)
+    1          Velocity (stored), or differentiated constraint equation
+    2          Acceleration from EOM RHS, or double-differentiated constraint
+    ≥ 3        Not supported (returns None)
+    ========== ===============================================================
+    """
+    if time_order == 0:
+        return _resolve_term_target(data, field, t_idx)
+
+    if time_order == 1:
+        vel = data.velocities.get(field)
+        if vel is not None:
+            return vel[t_idx]
+        return _differentiate_constraint(data, field, t_idx, params)
+
+    if time_order == 2:  # noqa: PLR2004
+        accel = _compute_acceleration_from_eom(data, field, t_idx, params)
+        if accel is not None:
+            return accel
+        return _differentiate_constraint_twice(data, field, t_idx, params)
+
+    # time_order >= 3: not currently supported
+    return None
+
+
+_SPATIAL_AXIS_LETTERS: tuple[str, ...] = ("x", "y", "z")
+
+
+def _evaluate_mixed_factor(
+    factor_field: str,
+    factor_operator: str,
+    data: SimulationData,
+    t_idx: int,
+    params: dict[str, float],
+) -> NDArray[np.float64] | None:
+    """Evaluate a ``mixed_T_S1_S2_...`` operator on a field.
+
+    Decomposition: apply T time derivatives (velocity/EOM), then apply
+    spatial derivatives sequentially.
+    """
+    time_order, spatial_orders = _parse_mixed_operator(factor_operator)
+
+    # Time part
+    base = _resolve_time_derivative(data, factor_field, t_idx, time_order, params)
+    if base is None:
+        return None
+
+    # Spatial part: apply gradient operators for each nonzero spatial order.
+    # Handle dimension mismatch from plane-wave reduction: when the mixed
+    # operator has more spatial indices than grid dimensions, collapse all
+    # derivative orders onto the available axes (axis 0 for 1D).
+    n_spatial = len(data.grid_spacing)
+    if len(spatial_orders) > n_spatial:
+        total_order = sum(spatial_orders)
+        effective_orders: tuple[int, ...] = (total_order,) + (0,) * (n_spatial - 1)
+    else:
+        effective_orders = spatial_orders
+
+    for ax_idx, order in enumerate(effective_orders):
+        for _ in range(order):
+            ax_letter = _SPATIAL_AXIS_LETTERS[ax_idx]
+            base = _apply_spatial_operator(
+                f"gradient_{ax_letter}",
+                base,
+                data.grid_spacing,
+                data.periodic,
+                bc_types=data.bc_types,
+            )
+
+    return base
 
 
 def _resolve_term_coefficient(
@@ -903,6 +1161,9 @@ def _evaluate_hamiltonian_factor(
     For ``time_derivative`` operator, reads the velocity directly from
     ``data.velocities`` (which stores velocities v = dq/dt in the E-L form).
 
+    For ``mixed_*`` operators (time-space cross derivatives), decomposes into
+    time derivative resolution (velocity/EOM) + spatial operator application.
+
     For spatial operators, applies the operator to the field data.
     For ``identity``, returns the field data directly.
 
@@ -914,6 +1175,13 @@ def _evaluate_hamiltonian_factor(
         if vel is not None:
             return vel[t_idx]
         return None
+
+    # Mixed time-space operators (e.g. mixed_1_0_0_1 = d_t d_z)
+    if factor_operator.startswith("mixed_"):
+        params = _merge_parameters(data)
+        return _evaluate_mixed_factor(
+            factor_field, factor_operator, data, t_idx, params
+        )
 
     # Get the field data
     field_arr = _resolve_term_target(data, factor_field, t_idx)
@@ -969,8 +1237,9 @@ def _gradient_product_density(  # noqa: PLR0913, PLR0917
 
     For **non-periodic** axes: uses direct central-difference
         ``density = ∂_a(f) · ∂_b(g)``
-    because discrete IBP has boundary contributions
-    (cf. :func:`_gradient_energy_density`).
+    because discrete IBP requires a constant integration weight and breaks
+    down when the energy integral includes a position-dependent volume
+    element (e.g. ``r²`` in spherical coordinates).
 
     This is the **single source of truth** for gradient-product evaluation.
     Both the standalone gradient x gradient Hamiltonian path and the kinetic
@@ -1029,9 +1298,88 @@ def _merge_parameters(data: SimulationData) -> dict[str, float]:
     return params
 
 
-def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
+@dataclass
+class _HamiltonianContext:
+    """Pre-computed snapshot-invariant data for Hamiltonian evaluation.
+
+    Hoisting these computations out of the per-snapshot loop avoids
+    redundant parameter merging, coordinate array construction, volume
+    element evaluation, and per-term coefficient resolution.
+    """
+
+    params: dict[str, float]
+    coord_arrays: dict[str, NDArray[np.float64]] | None
+    volume_weight: float | NDArray[np.float64]
+    term_coeffs: list[float | NDArray[np.float64]]
+    resolve_symbolic: Callable[..., float | None]
+
+
+def _prepare_hamiltonian_context(data: SimulationData) -> _HamiltonianContext:
+    """Build a reusable context for repeated Hamiltonian evaluations."""
+    canonical = data.spec.canonical
+    assert canonical is not None
+
+    from tidal.symbolic.json_loader import (  # noqa: PLC0415
+        _resolve_symbolic_coeff,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    params = _merge_parameters(data)
+    coord_arrays: dict[str, NDArray[np.float64]] | None = None
+
+    # Volume element
+    volume_weight: float | NDArray[np.float64] = 1.0
+    if canonical.volume_element is not None:
+        coord_arrays = _build_coord_arrays(data)
+        from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+        volume_weight = evaluate_coefficient(
+            canonical.volume_element,
+            params,
+            data.spec.effective_coordinates,
+            coord_arrays=coord_arrays,
+            t=0.0,
+        )
+
+    # Pre-resolve all term coefficients
+    term_coeffs: list[float | NDArray[np.float64]] = []
+    for term in canonical.hamiltonian_terms:
+        if term.position_dependent:
+            if coord_arrays is None:
+                coord_arrays = _build_coord_arrays(data)
+            from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
+
+            assert term.coefficient_symbolic is not None
+            coeff: float | NDArray[np.float64] = evaluate_coefficient(
+                term.coefficient_symbolic,
+                params,
+                data.spec.effective_coordinates,
+                coord_arrays=coord_arrays,
+                t=0.0,
+            )
+        else:
+            coeff = float(term.coefficient)
+            if term.coefficient_symbolic is not None and params:
+                resolved = _resolve_symbolic_coeff(
+                    term.coefficient_symbolic,
+                    params,
+                )
+                if resolved is not None:
+                    coeff = float(resolved)
+        term_coeffs.append(coeff)
+
+    return _HamiltonianContext(
+        params=params,
+        coord_arrays=coord_arrays,
+        volume_weight=volume_weight,
+        term_coeffs=term_coeffs,
+        resolve_symbolic=_resolve_symbolic_coeff,
+    )
+
+
+def _compute_hamiltonian_from_canonical(  # noqa: PLR0914
     data: SimulationData,
     t_idx: int,
+    ctx: _HamiltonianContext | None = None,
 ) -> float:
     """Evaluate the symbolic Hamiltonian from canonical structure.
 
@@ -1071,58 +1419,16 @@ def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
         msg = "_compute_hamiltonian_from_canonical called without canonical structure"
         raise ValueError(msg)
 
-    from tidal.symbolic.json_loader import (  # noqa: PLC0415
-        _resolve_symbolic_coeff,  # pyright: ignore[reportPrivateUsage]
-    )
+    # Use pre-computed context when available (timeseries path),
+    # otherwise compute inline (single-snapshot callers).
+    if ctx is None:
+        ctx = _prepare_hamiltonian_context(data)
 
-    params = _merge_parameters(data)
-    coord_arrays: dict[str, NDArray[np.float64]] | None = None  # lazy-initialized
-
-    # Volume element: sqrt|g_spatial| for curved coordinates.
-    # None -> flat spacetime, volume_weight stays 1.0 (no grid allocation).
-    volume_weight: float | NDArray[np.float64] = 1.0
-    if canonical.volume_element is not None:
-        if coord_arrays is None:
-            coord_arrays = _build_coord_arrays(data)
-        from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
-
-        volume_weight = evaluate_coefficient(
-            canonical.volume_element,
-            params,
-            data.spec.effective_coordinates,
-            coord_arrays=coord_arrays,
-            t=0.0,
-        )
+    volume_weight = ctx.volume_weight
 
     total = 0.0
-    for term in canonical.hamiltonian_terms:
-        # --- Coefficient resolution ---
-        # Position-dependent coefficients (e.g. Gaussian coupling, Csc[y]/x² in
-        # spherical coordinates) must be evaluated on the spatial grid.  The scalar
-        # path via _resolve_symbolic_coeff() cannot handle expressions that contain
-        # coordinate calls like x[] or y[].
-        if term.position_dependent:
-            if coord_arrays is None:
-                coord_arrays = _build_coord_arrays(data)
-            from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
-
-            assert term.coefficient_symbolic is not None  # guaranteed when position_dependent
-            coeff: float | NDArray[np.float64] = evaluate_coefficient(
-                term.coefficient_symbolic,
-                params,
-                data.spec.effective_coordinates,
-                coord_arrays=coord_arrays,
-                t=0.0,
-            )
-        else:
-            coeff = float(term.coefficient)
-            if term.coefficient_symbolic is not None and params:
-                resolved = _resolve_symbolic_coeff(
-                    term.coefficient_symbolic,
-                    params,
-                )
-                if resolved is not None:
-                    coeff = float(resolved)
+    for term_idx, term in enumerate(canonical.hamiltonian_terms):
+        coeff: float | NDArray[np.float64] = ctx.term_coeffs[term_idx]
 
         op_a = term.factor_a.operator
         op_b = term.factor_b.operator
@@ -1186,6 +1492,7 @@ def _compute_hamiltonian_from_canonical(  # noqa: C901, PLR0912, PLR0914
 def compute_system_energy(  # noqa: PLR0914
     data: SimulationData,
     t_idx: int,
+    _ctx: _HamiltonianContext | None = None,
 ) -> SystemEnergy:
     """Compute Hamiltonian energy density at snapshot *t_idx*.
 
@@ -1275,7 +1582,7 @@ def compute_system_energy(  # noqa: PLR0914
 
     # Use canonical Hamiltonian when available (Phase K: Legendre transform)
     if data.spec.canonical is not None:
-        total = _compute_hamiltonian_from_canonical(data, t_idx)
+        total = _compute_hamiltonian_from_canonical(data, t_idx, ctx=_ctx)
         self_sum = sum(fe.total for fe in per_field.values())
         interaction = total - self_sum
         return SystemEnergy(per_field=per_field, interaction=interaction, total=total)
@@ -1312,27 +1619,41 @@ def compute_energy_timeseries(
     total : ndarray, shape ``(n_snapshots,)``
     """
     n = data.n_snapshots
-    per_field_arrays: dict[str, list[float]] = {}
-    interaction_list: list[float] = []
-    total_list: list[float] = []
 
-    for t_idx in range(n):
-        se = compute_system_energy(data, t_idx)
-        for name, fe in se.per_field.items():
-            per_field_arrays.setdefault(name, []).append(fe.total)
-        interaction_list.append(se.interaction)
-        total_list.append(se.total)
+    # Pre-compute Hamiltonian context once (avoids re-merging parameters,
+    # rebuilding coord arrays, and re-resolving coefficients per snapshot).
+    ctx: _HamiltonianContext | None = None
+    if data.spec.canonical is not None:
+        ctx = _prepare_hamiltonian_context(data)
 
+    # Compute first snapshot to discover field names, then pre-allocate.
+    se0 = compute_system_energy(data, 0, _ctx=ctx)
+    field_names = list(se0.per_field.keys())
     per_field_np: dict[str, NDArray[np.float64]] = {
-        name: np.array(vals, dtype=np.float64)
-        for name, vals in per_field_arrays.items()
+        name: np.empty(n, dtype=np.float64) for name in field_names
     }
+    interaction = np.empty(n, dtype=np.float64)
+    total = np.empty(n, dtype=np.float64)
+
+    # Fill snapshot 0
+    for name, fe in se0.per_field.items():
+        per_field_np[name][0] = fe.total
+    interaction[0] = se0.interaction
+    total[0] = se0.total
+
+    # Fill remaining snapshots
+    for t_idx in range(1, n):
+        se = compute_system_energy(data, t_idx, _ctx=ctx)
+        for name, fe in se.per_field.items():
+            per_field_np[name][t_idx] = fe.total
+        interaction[t_idx] = se.interaction
+        total[t_idx] = se.total
 
     return (
         data.times.copy(),
         per_field_np,
-        np.array(interaction_list, dtype=np.float64),
-        np.array(total_list, dtype=np.float64),
+        interaction,
+        total,
     )
 
 

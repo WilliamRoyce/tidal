@@ -7,9 +7,11 @@ This directory contains examples demonstrating the **complete symbolic-to-numeri
 The pipeline has two stages:
 
 ### Stage 1: Symbolic Derivation (Mathematica/xAct)
+
 Lagrangian → Euler-Lagrange equations → Component PDEs → JSON export
 
 ### Stage 2: Numerical Simulation (Python/py-pde)
+
 JSON → Dynamic PDE construction → Simulation → Visualization
 
 **Key Point**: No physics is hardcoded in Python. All equation structure comes from the JSON files that were symbolically derived from Lagrangians.
@@ -46,18 +48,22 @@ Each example also has a `run.sh` script demonstrating the equivalent CLI workflo
 **Lagrangian**: `L = -1/4 F_μν F^μν`
 
 **Stage 1 - Derivation**:
+
 ```bash
 tidal derive examples/electromagnetic/theory.toml
 ```
+
 - Derives Maxwell equations from Lagrangian
 - Applies Lorenz gauge: `∂_μ A^μ = 0`
 - Decomposes to wave equations: `∂²A_μ/∂t² = ∂²A_μ/∂x²`
 - Exports to: `examples/data/em_1d.json`
 
 **Stage 2 - Simulation**:
+
 ```bash
 cd examples/electromagnetic && bash run.sh
 ```
+
 - Loads equation specification from JSON
 - Builds PDE dynamically (no hardcoded wave equation)
 - Simulates Gaussian pulse in A₁ component
@@ -72,17 +78,21 @@ cd examples/electromagnetic && bash run.sh
 **Lagrangian**: `L = -1/2 (∂φ)² - 1/2 m²φ²`
 
 **Stage 1 - Derivation**:
+
 ```bash
 tidal derive examples/scalar_field/theory.toml
 ```
+
 - Derives Klein-Gordon equation from Lagrangian
 - Decomposes to: `∂²φ/∂t² = ∂²φ/∂x² - m²φ` (with m² = 1)
 - Exports to: `examples/data/klein_gordon_1d.json`
 
 **Stage 2 - Simulation**:
+
 ```bash
 cd examples/scalar_field && bash run.sh
 ```
+
 - Loads equation specification from JSON
 - Builds PDE with both Laplacian and mass terms
 - Simulates Gaussian pulse with dispersion
@@ -119,6 +129,7 @@ pde = build_pde_from_json("examples/data/em_1d.json")
 ### Proof of Dynamic Construction
 
 Compare the two examples:
+
 - **EM**: JSON has `{"operator": "laplacian", "coefficient": 1.0}` only
 - **KG**: JSON has `{"operator": "laplacian", "coefficient": 1.0}` AND `{"operator": "identity", "coefficient": -1.0}`
 
@@ -129,6 +140,7 @@ The Python code doesn't "know" about mass terms - it reads them from JSON and ap
 ## Running Full Pipeline End-to-End
 
 ### EM Example
+
 ```bash
 # Stage 1: Derive from Lagrangian
 tidal derive examples/electromagnetic/theory.toml
@@ -141,6 +153,7 @@ cd examples/electromagnetic && bash run.sh
 ```
 
 ### Klein-Gordon Example
+
 ```bash
 # Stage 1: Derive from Lagrangian
 tidal derive examples/scalar_field/theory.toml
@@ -156,14 +169,14 @@ cd examples/scalar_field && bash run.sh
 
 ## Comparison: EM vs Klein-Gordon
 
-| Aspect | EM (Vector) | Klein-Gordon (Scalar) |
-|--------|-------------|----------------------|
-| **Lagrangian** | `-1/4 F_μν F^μν` | `-1/2 (∂φ)² - 1/2 m²φ²` |
-| **Field Components** | 2 (A₀, A₁) | 1 (φ) |
-| **Operators in JSON** | Laplacian only | Laplacian + Identity (mass) |
-| **Wave Speed** | c = 1 (massless) | Dispersive (massive) |
-| **Amplitude** | Conserved | Decreases (spreading) |
-| **Gauge** | Lorenz gauge | N/A |
+| Aspect                | EM (Vector)      | Klein-Gordon (Scalar)       |
+| --------------------- | ---------------- | --------------------------- |
+| **Lagrangian**        | `-1/4 F_μν F^μν` | `-1/2 (∂φ)² - 1/2 m²φ²`     |
+| **Field Components**  | 2 (A₀, A₁)       | 1 (φ)                       |
+| **Operators in JSON** | Laplacian only   | Laplacian + Identity (mass) |
+| **Wave Speed**        | c = 1 (massless) | Dispersive (massive)        |
+| **Amplitude**         | Conserved        | Decreases (spreading)       |
+| **Gauge**             | Lorenz gauge     | N/A                         |
 
 Both examples demonstrate that **different Lagrangians produce different field equations**, and the Python simulation correctly implements the symbolically-derived physics **without manual intervention**.
 
@@ -218,17 +231,21 @@ cd examples/cylindrical_kg && bash run.sh
 **Spacetime**: 3+1D flat Minkowski, signature (-,+,+,+), coordinates (t,x,y,z)
 
 **Stage 1 - Derivation**:
+
 ```bash
 tidal derive examples/scalar_field_3d/theory.toml
 ```
+
 - Derives Klein-Gordon equation in full 4D spacetime
 - Decomposes to: `∂²φ/∂t² = ∂²φ/∂x² + ∂²φ/∂y² + ∂²φ/∂z² - m²φ`
 - Exports to: `examples/data/klein_gordon_3d.json`
 
 **Stage 2 - Simulation**:
+
 ```bash
 cd examples/scalar_field_3d && bash run.sh
 ```
+
 - Loads equation specification from JSON
 - 32³ = 32,768 cell 3D grid with periodic boundary conditions
 - 3D Gaussian pulse at rest (momentum = 0)
@@ -236,6 +253,7 @@ cd examples/scalar_field_3d && bash run.sh
 - Output: 4-panel visualization (z-profile, xy-slices, amplitude)
 
 **Visualization**:
+
 - Panel 1: φ(z) profile at x=y=center (initial vs final)
 - Panel 2: x-y slice of initial field at z=center
 - Panel 3: x-y slice of final field at z=center
@@ -428,38 +446,39 @@ cd examples/scalar_potential_well && bash run.sh
 
 All examples use `theory.toml` + `run.sh` for the full derive → simulate → plot pipeline. No standalone Python scripts are needed.
 
-| Example | `theory.toml` | `run.sh` |
-|---------|:---:|:---:|
-| scalar_field | Y | Y |
-| electromagnetic | Y | Y |
-| proca | Y | Y |
-| coupled_scalars | Y | Y |
-| chern_simons | Y | Y |
-| elasticity | Y | Y |
-| curved_spacetime | * | Y |
-| sphere_kg | Y | Y |
-| polar_kg | Y | Y |
-| electrostatics | Y | Y |
-| scalar_vector_coupling | Y | Y |
-| scalar_field_3d | Y | Y |
-| spherical_kg | Y | Y |
-| cylindrical_kg | Y | Y |
-| gravitational_waves | Y | Y |
-| massive_3form | Y | Y |
-| massive_gravity | Y | Y |
-| coupled_proca | Y | Y |
-| coupled_scattering | Y | Y |
-| scalar_potential_well | Y | Y |
-| proca_background | Y | Y |
-| vector_background | Y | Y |
+| Example                | `theory.toml` | `run.sh` |
+| ---------------------- | :-----------: | :------: |
+| scalar_field           |       Y       |    Y     |
+| electromagnetic        |       Y       |    Y     |
+| proca                  |       Y       |    Y     |
+| coupled_scalars        |       Y       |    Y     |
+| chern_simons           |       Y       |    Y     |
+| elasticity             |       Y       |    Y     |
+| curved_spacetime       |      \*       |    Y     |
+| sphere_kg              |       Y       |    Y     |
+| polar_kg               |       Y       |    Y     |
+| electrostatics         |       Y       |    Y     |
+| scalar_vector_coupling |       Y       |    Y     |
+| scalar_field_3d        |       Y       |    Y     |
+| spherical_kg           |       Y       |    Y     |
+| cylindrical_kg         |       Y       |    Y     |
+| gravitational_waves    |       Y       |    Y     |
+| massive_3form          |       Y       |    Y     |
+| massive_gravity        |       Y       |    Y     |
+| coupled_proca          |       Y       |    Y     |
+| coupled_scattering     |       Y       |    Y     |
+| scalar_potential_well  |       Y       |    Y     |
+| proca_background       |       Y       |    Y     |
+| vector_background      |       Y       |    Y     |
 
-*Note: `curved_spacetime` uses two separate TOML files (`de_sitter.toml`, `conformal_static.toml`) instead of a single `theory.toml`.*
+_Note: `curved_spacetime` uses two separate TOML files (`de_sitter.toml`, `conformal_static.toml`) instead of a single `theory.toml`._
 
 ---
 
 ## Validation
 
 Run the full validation suite:
+
 ```bash
 cd /workspaces/torsion-gertsenshtein
 
@@ -469,6 +488,7 @@ tidal validate examples/data/klein_gordon_1d.json
 ```
 
 This verifies:
+
 - JSON loading and parsing
 - Dynamic PDE construction from specifications
 - Simulation produces physically correct results
@@ -537,6 +557,7 @@ For cases requiring custom Wolfram logic (gauge fixing, xPert linearization):
    - Call `BuildMultiFieldJSONStructure` and export
 
 2. **Create `run.sh`** to simulate and plot:
+
    ```bash
    tidal simulate ../data/new_field.json --param m2=1.0 --ic gaussian --output ../data/new_field_output
    tidal plot ../data/new_field_output --type heatmap --output ../data/new_field_heatmap.png --quiet
@@ -601,10 +622,12 @@ examples/
 ## Dependencies
 
 **Mathematica/xAct** (Stage 1):
+
 - Wolfram Engine 14.3+
 - xAct 1.3.0 (xTensor, xCoba, xPert)
 
 **Python** (Stage 2):
+
 - py-pde ≥ 0.38
 - numpy, matplotlib
 - tidal package
@@ -621,6 +644,7 @@ The separation into two stages is **intentional and beneficial**:
 The JSON format serves as a **well-defined interface** between the symbolic and numerical worlds, allowing each tool to do what it does best.
 
 This design means:
+
 - ✅ No hardcoded physics in Python
 - ✅ Equations verified symbolically before simulation
 - ✅ Easy to add new field theories (just write new Lagrangian)

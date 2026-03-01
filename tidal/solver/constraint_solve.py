@@ -47,13 +47,13 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from tidal.solver._defaults import SECOND_ORDER
 from tidal.solver._scipy_types import SparseMatrix, lil_matrix, sparse_solve
 from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 
 # Numerical tolerance thresholds
 _SINGULAR_TOL = 1e-14  # Below this, a Fourier multiplier is treated as singular
 _COMPAT_TOL = 1e-10  # Source projection tolerance for compatibility check
-_SECOND_ORDER = 2  # time_derivative_order threshold for momentum equations
 
 if TYPE_CHECKING:
     from numpy.typing import NDArray
@@ -238,7 +238,7 @@ def _build_name_map(spec: EquationSystem) -> dict[str, str]:
         # Field names map to themselves
         name_map[eq.field_name] = eq.field_name
         # Velocity references: canonical v_field_name
-        if eq.time_derivative_order >= _SECOND_ORDER:
+        if eq.time_derivative_order >= SECOND_ORDER:
             vel_slot = f"v_{eq.field_name}"
             name_map[vel_slot] = vel_slot
     return name_map
@@ -689,3 +689,326 @@ def _solve_coupled(  # noqa: PLR0913, PLR0917, C901
 
             if max_change < tol:
                 break
+
+
+# ---------------------------------------------------------------------------
+# Unified constraint IC solver
+# ---------------------------------------------------------------------------
+
+# Tolerance for considering a field "zero" (uninitialized)
+_FIELD_ZERO_TOL = 1e-30
+
+# Tolerance for constraint verification residual
+_IC_RESIDUAL_TOL = 1e-10
+
+# Maximum number of propagation iterations
+_MAX_PROPAGATION_ITERATIONS = 20
+
+
+def _is_field_zero(data: np.ndarray) -> bool:
+    """Check if a field array is effectively zero (uninitialized)."""
+    return float(np.max(np.abs(data))) < _FIELD_ZERO_TOL
+
+
+def _solve_for_target(
+    terms: _ConstraintTerms,
+    grid: GridInfo,
+    bc: BCSpec | None,
+    source_rhs: np.ndarray,
+) -> np.ndarray:
+    """Solve L[target] = -source for a single target field.
+
+    Reuses the existing FFT/matrix solver infrastructure.
+    """
+    method = _select_method(terms, grid, bc)
+    if method == "fft":
+        return _fft_solve_single(terms, grid, source_rhs)
+    op_mat = _probe_operator_matrix(terms.self_terms, grid, bc)
+    return _matrix_solve(op_mat, source_rhs, grid.shape)
+
+
+def _find_target_field(  # noqa: PLR0913, PLR0917
+    eq_idx: int,
+    rhs_terms: tuple[OperatorTerm, ...],
+    eq_field_name: str,  # noqa: ARG001 — kept for caller consistency
+    determined: set[str],
+    coeff_eval: CoefficientEvaluator,
+    t: float,
+    config: ConstraintSolverConfig,
+) -> tuple[str | None, _ConstraintTerms | None]:
+    """Identify which field to solve for in a constraint equation.
+
+    Returns ``(target_field_name, classified_terms)`` or ``(None, None)``
+    if the constraint cannot be solved in this iteration.
+
+    Strategy: find exactly ONE free (undetermined) field among all
+    referenced fields.  That field becomes the target.  If the target
+    has self-referencing operator terms, it can be solved.
+
+    - 0 free fields → all determined, verification only (return None).
+    - 1 free field → solvable (the free field is the target).
+    - 2+ free fields → underdetermined, skip this iteration.
+
+    The single-free-field check naturally handles both:
+
+    - **Standard constraints** (constraint field is the free one):
+      e.g., ``laplacian(A_0) + source = 0`` when A_0 is free.
+    - **Subsidiary constraints** (dynamical field is the free one):
+      e.g., ``gradient(h_4) + gradient(h_7) = 0`` when only h_7 is free.
+    - **Cascade ordering**: ``identity(h_4) + identity(h_7) + identity(h_9) = 0``
+      waits until h_7 is determined before solving for h_9.
+    """
+    # Collect all field names referenced by this equation
+    all_referenced: set[str] = {term.field for term in rhs_terms}
+
+    # Find free (undetermined) fields
+    free_fields: list[str] = [
+        f for f in all_referenced if f not in determined
+    ]
+
+    if len(free_fields) != 1:
+        return None, None
+
+    target = free_fields[0]
+    terms = _classify_terms(
+        eq_idx, rhs_terms, target, coeff_eval, t, config,
+    )
+    if terms.self_terms:
+        return target, terms
+
+    return None, None
+
+
+def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
+    spec: EquationSystem,
+    grid: GridInfo,
+    y0: NDArray[np.float64],
+    *,
+    bc: BCSpec | None = None,
+    parameters: dict[str, float] | None = None,
+    t: float = 0.0,
+    strict: bool = True,
+) -> NDArray[np.float64]:
+    """Unified constraint IC solver.
+
+    Given user-supplied initial conditions, iteratively solves ALL
+    constraint equations (``time_derivative_order == 0``) to produce
+    consistent initial data.  Handles three cases uniformly:
+
+    1. **Standard constraints** (field has self-terms): solve for the
+       constraint field.  Applies to all constraint equations, not just
+       ``constraint_solver.enabled=True``.
+
+    2. **Subsidiary constraints** (no self-terms, one free source field):
+       solve for the free dynamical field.  E.g., transverse gauge
+       constraint ``gradient_x(h_4) + gradient_x(h_7) = 0`` determines
+       ``h_7 = -h_4`` when ``h_4`` is user-initialized.
+
+    3. **Verification** (all referenced fields determined): check that
+       the constraint is satisfied; error or warn if not.
+
+    The algorithm iterates until no more fields can be determined.
+    Each iteration may unlock new solvable constraints (cascade).
+
+    Parameters
+    ----------
+    spec : EquationSystem
+        Parsed JSON equation specification.
+    grid : GridInfo
+        Spatial grid.
+    y0 : NDArray[np.float64]
+        Initial state vector (flat, from StateLayout).
+    bc : str or tuple of str, optional
+        Boundary conditions for spatial operators.
+    parameters : dict[str, float], optional
+        Runtime parameter overrides for symbolic coefficients.
+    t : float
+        Time at which to evaluate coefficients.
+    strict : bool
+        If True (default), raise ``ValueError`` when a constraint is
+        violated and cannot be solved.  If False, issue a warning.
+
+    Returns
+    -------
+    NDArray[np.float64]
+        Updated y0 with all solvable constraint fields determined.
+
+    Raises
+    ------
+    ValueError
+        If ``strict=True`` and any constraint is violated after solving.
+    """
+    from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+    from tidal.solver.fields import FieldSet  # noqa: PLC0415
+    from tidal.solver.state import StateLayout  # noqa: PLC0415
+
+    # Collect ALL constraint equations
+    constraint_eqs = [
+        (i, eq)
+        for i, eq in enumerate(spec.equations)
+        if eq.time_derivative_order == 0
+    ]
+
+    if not constraint_eqs:
+        return y0
+
+    layout = StateLayout.from_spec(spec, grid.num_points)
+    coeff_eval = CoefficientEvaluator(spec, grid, parameters)
+    coeff_eval.begin_timestep(t)
+    n = grid.num_points
+
+    y0_out = y0.copy()
+    fields = FieldSet.from_flat(layout, grid.shape, y0_out)
+    name_map = _build_name_map(spec)
+
+    # Track which fields are "determined" (non-zero in y0).
+    determined: set[str] = set()
+    for name, slot_idx in layout.field_slot_map.items():
+        data = y0_out[slot_idx * n : (slot_idx + 1) * n]
+        if not _is_field_zero(data):
+            determined.add(name)
+    for name, slot_idx in layout.velocity_slot_map.items():
+        data = y0_out[slot_idx * n : (slot_idx + 1) * n]
+        if not _is_field_zero(data):
+            determined.add(f"v_{name}")
+
+    # Phase 1: Handle enabled constraints with coupled detection
+    # (preserves existing coupled-constraint behavior for EM, Chern-Simons)
+    enabled_eqs = [
+        (i, eq) for i, eq in constraint_eqs if eq.constraint_solver.enabled
+    ]
+    if enabled_eqs:
+        enabled_groups: list[_ConstraintTerms] = []
+        for eq_idx, eq in enabled_eqs:
+            terms = _classify_terms(
+                eq_idx, eq.rhs_terms, eq.field_name,
+                coeff_eval, t, eq.constraint_solver,
+            )
+            if not terms.self_terms:
+                msg = (
+                    f"Constraint equation for '{eq.field_name}' has "
+                    f"constraint_solver.enabled=True but no self-referencing "
+                    f"terms — cannot solve for the field."
+                )
+                raise ValueError(msg)
+            enabled_groups.append(terms)
+
+        # Detect coupled constraints among enabled group
+        enabled_names = {g.field_name for g in enabled_groups}
+        is_coupled = any(
+            any(
+                f in enabled_names or name_map.get(f, f) in enabled_names
+                for _, _, f in g.source_terms
+            )
+            for g in enabled_groups
+        )
+
+        if is_coupled:
+            _solve_coupled(
+                enabled_groups, grid, bc, fields, layout, y0_out, name_map,
+            )
+        else:
+            _solve_independent(
+                enabled_groups, grid, bc, fields, layout, y0_out, name_map,
+            )
+
+        determined.update(g.field_name for g in enabled_groups)
+
+    # Phase 2: Iterative propagation for remaining constraints
+    remaining_eqs = [
+        (i, eq) for i, eq in constraint_eqs
+        if not eq.constraint_solver.enabled
+    ]
+
+    for _iteration in range(_MAX_PROPAGATION_ITERATIONS):
+        progress = False
+
+        for eq_idx, eq in remaining_eqs:
+            target, terms = _find_target_field(
+                eq_idx, eq.rhs_terms, eq.field_name,
+                determined, coeff_eval, t, eq.constraint_solver,
+            )
+
+            if target is None or terms is None:
+                continue
+
+            source = _evaluate_source(
+                terms.source_terms, fields, grid, bc, name_map,
+            )
+
+            solution = _solve_for_target(terms, grid, bc, source)
+
+            # Write solution into y0 and FieldSet
+            if target in layout.field_slot_map:
+                slot_idx = layout.field_slot_map[target]
+                y0_out[slot_idx * n : (slot_idx + 1) * n] = solution.ravel()
+                fields[target] = solution
+            elif target.startswith("v_"):
+                vel_field = target.removeprefix("v_")
+                if vel_field in layout.velocity_slot_map:
+                    slot_idx = layout.velocity_slot_map[vel_field]
+                    y0_out[slot_idx * n : (slot_idx + 1) * n] = (
+                        solution.ravel()
+                    )
+                    fields[target] = solution
+
+            determined.add(target)
+            progress = True
+
+            eq_desc = eq.field_name
+            if target != eq.field_name:
+                eq_desc = f"{eq.field_name} (subsidiary)"
+            warnings.warn(
+                f"Constraint IC propagation: solved '{target}' "
+                f"from {eq_desc} constraint equation.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+        if not progress:
+            break
+
+    # Phase 3: Final verification of ALL constraint equations
+    violations: list[tuple[str, float, list[str]]] = []
+    for eq_idx, eq in constraint_eqs:
+        rhs = np.zeros(grid.shape)
+        for term_idx, term in enumerate(eq.rhs_terms):
+            coeff = coeff_eval.resolve(
+                term, t, eq_idx=eq_idx, term_idx=term_idx,
+            )
+            field_ref = term.field
+            if name_map and field_ref in name_map:
+                field_ref = name_map[field_ref]
+            data = (
+                fields[field_ref]
+                if field_ref in fields
+                else np.zeros(grid.shape)
+            )
+            operated = apply_operator(term.operator, data, grid, bc)
+            rhs += coeff * operated
+
+        max_res = float(np.max(np.abs(rhs)))
+        if max_res > _IC_RESIDUAL_TOL:
+            involved = sorted({term.field for term in eq.rhs_terms})
+            violations.append((eq.field_name, max_res, involved))
+
+    if violations:
+        lines = [
+            "Initial data does not satisfy constraint equation(s):"
+        ]
+        for field_name, max_res, involved in violations:
+            lines.append(
+                f"  {field_name}: max|residual| = {max_res:.2e} "
+                f"(involves [{', '.join(involved)}])"
+            )
+        lines.append(
+            "For physical consistency, choose initial conditions that "
+            "jointly satisfy all constraint equations, or use "
+            "--allow-inconsistent-ic to proceed with a warning."
+        )
+        msg = "\n".join(lines)
+        if strict:
+            raise ValueError(msg)
+        warnings.warn(msg, UserWarning, stacklevel=2)
+
+    return y0_out

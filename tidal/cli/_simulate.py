@@ -495,27 +495,75 @@ def _validate_formula_ast(expr: str, allowed_names: set[str]) -> None:
 
 
 # --- Initial condition helpers ---
+#
+# Architecture: Each IC type has a builder function that returns
+# ``dict[str, np.ndarray]`` (slot_data) mapping slot names to arrays.
+# ``_build_initial_y0()`` orchestrates the pipeline:
+#   1. Validate component name
+#   2. Call the type-specific builder → slot_data dict
+#   3. Apply ``--ic-field`` per-field formula overrides
+#   4. Pack via ``FieldSet.from_dict()`` → flat state vector
+#
+# The constraint IC solver (``ensure_consistent_ic``) runs later inside
+# the solver functions, so constraint fields may be overwritten there.
 
 
-def _gaussian_y0(
+def _eval_formula_expr(
+    expr: str,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+) -> np.ndarray:
+    """Evaluate a formula expression against spatial coordinates.
+
+    Validates the expression via AST analysis, then evaluates it in a
+    sandboxed namespace containing ``FORMULA_NAMESPACE`` + spatial coords.
+    """
+    namespace = dict(FORMULA_NAMESPACE)
+    for i, name in enumerate(spec.spatial_coordinates):
+        namespace[name] = grid_info.cell_coords[..., i]
+
+    allowed_names = set(namespace.keys())
+    _validate_formula_ast(expr, allowed_names)
+
+    result = eval(expr, {"__builtins__": {}}, namespace)  # noqa: S307
+    result = np.asarray(result, dtype=float)
+
+    if result.shape == ():
+        result = np.full(grid_info.shape, float(result))
+
+    return result
+
+
+def _has_velocity_slot(
+    layout: object,
+    component: str,
+) -> bool:
+    """Check whether a field has a velocity slot in the state layout."""
+    from tidal.solver.state import StateLayout
+
+    assert isinstance(layout, StateLayout)
+    return component in layout.velocity_slot_map
+
+
+def _gaussian_slots(  # noqa: PLR0913, PLR0917
     args: Namespace,
     spec: EquationSystem,
     grid_info: GridInfo,
     bounds: list[tuple[float, float]],
     component: str,
-) -> np.ndarray:
-    """Compute Gaussian IC as flat state vector (native path).
+    layout: object,
+) -> dict[str, np.ndarray]:
+    """Compute Gaussian IC as slot_data dict.
+
+    When ``--ic-wavevector`` is provided, creates a travelling wave packet:
+    a Gaussian envelope modulated by a carrier wave, with matching velocity
+    for unidirectional propagation.  Positive wavevector gives a right-mover.
 
     Raises
     ------
     ValueError
         If ``--ic-center`` dimension count doesn't match spatial dimension.
     """
-    from tidal.solver.fields import FieldSet
-    from tidal.solver.state import StateLayout
-
-    layout = StateLayout.from_spec(spec, grid_info.num_points)
-
     if args.ic_center is not None:
         center = tuple(float(c) for c in args.ic_center.split(","))
         if len(center) != spec.spatial_dimension:
@@ -537,25 +585,38 @@ def _gaussian_y0(
         if dim < len(center):
             dist_sq += (coords[..., dim] - center[dim]) ** 2
 
-    field_arr = args.ic_amplitude * np.exp(-dist_sq / (2 * width**2))
-    return FieldSet.from_dict(
-        layout, grid_info.shape, {component: field_arr}
-    ).flat.copy()
+    envelope = args.ic_amplitude * np.exp(-dist_sq / (2 * width**2))
+
+    slot_data: dict[str, np.ndarray] = {}
+
+    if args.ic_wavevector is not None:
+        kvec = tuple(float(k) for k in args.ic_wavevector.split(","))
+        k_dot_x = np.zeros(grid_info.shape, dtype=np.float64)
+        for dim in range(min(grid_info.ndim, len(kvec))):
+            k_dot_x += kvec[dim] * coords[..., dim]
+        k_mag = float(np.sqrt(sum(k**2 for k in kvec)))
+        slot_data[component] = envelope * np.cos(k_dot_x)
+        if _has_velocity_slot(layout, component):
+            slot_data[f"v_{component}"] = envelope * k_mag * np.sin(k_dot_x)
+    else:
+        slot_data[component] = envelope
+
+    return slot_data
 
 
-def _plane_wave_y0(
+def _plane_wave_slots(  # noqa: PLR0913, PLR0917
     args: Namespace,
     spec: EquationSystem,
     grid_info: GridInfo,
     bounds: list[tuple[float, float]],
     component: str,
-) -> np.ndarray:
-    """Compute plane-wave IC as flat state vector (native path)."""
-    from tidal.solver.fields import FieldSet
-    from tidal.solver.state import StateLayout
+    layout: object,
+) -> dict[str, np.ndarray]:
+    """Compute plane-wave IC as slot_data dict.
 
-    layout = StateLayout.from_spec(spec, grid_info.num_points)
-
+    Uses ``cos(k·x)`` for field and ``+|k|·sin(k·x)`` for velocity
+    (right-mover for positive k).
+    """
     if args.ic_wavevector is not None:
         kvec = tuple(float(k) for k in args.ic_wavevector.split(","))
     else:
@@ -572,55 +633,234 @@ def _plane_wave_y0(
     k_mag = float(np.sqrt(sum(k**2 for k in kvec)))
     amplitude = args.ic_amplitude
 
-    field_arr = amplitude * np.cos(k_dot_x)
-    momentum_arr = -amplitude * k_mag * np.sin(k_dot_x)
+    slot_data: dict[str, np.ndarray] = {
+        component: amplitude * np.cos(k_dot_x),
+    }
+    if _has_velocity_slot(layout, component):
+        slot_data[f"v_{component}"] = amplitude * k_mag * np.sin(k_dot_x)
 
-    slot_data: dict[str, np.ndarray] = {component: field_arr}
-    mom_name = f"v_{component}"
-    if mom_name in FieldSet(layout, grid_info.shape):
-        slot_data[mom_name] = momentum_arr
-
-    return FieldSet.from_dict(layout, grid_info.shape, slot_data).flat.copy()
+    return slot_data
 
 
-def _formula_y0(
+def _formula_slots(
     args: Namespace,
     spec: EquationSystem,
     grid_info: GridInfo,
     component: str,
-) -> np.ndarray:
-    """Compute formula-based IC as flat state vector (native path).
+    layout: object,
+) -> dict[str, np.ndarray]:
+    """Compute formula-based IC as slot_data dict.
+
+    Supports optional ``--ic-formula-velocity`` for setting the velocity
+    slot alongside the field, enabling custom travelling wave ICs.
 
     Raises
     ------
     ValueError
-        If ``--ic-formula`` is not provided or contains unsafe constructs.
+        If ``--ic-formula`` is not provided.
     """
-    from tidal.solver.fields import FieldSet
-    from tidal.solver.state import StateLayout
-
-    layout = StateLayout.from_spec(spec, grid_info.num_points)
-
     if args.ic_formula is None:
         msg = "--ic=formula requires --ic-formula=EXPR"
         raise ValueError(msg)
 
-    namespace = dict(FORMULA_NAMESPACE)
-    for i, name in enumerate(spec.spatial_coordinates):
-        namespace[name] = grid_info.cell_coords[..., i]
+    slot_data: dict[str, np.ndarray] = {
+        component: _eval_formula_expr(args.ic_formula, spec, grid_info),
+    }
 
-    allowed_names = set(namespace.keys())
-    _validate_formula_ast(args.ic_formula, allowed_names)
+    vel_expr = getattr(args, "ic_formula_velocity", None)
+    if vel_expr is not None:
+        if _has_velocity_slot(layout, component):
+            slot_data[f"v_{component}"] = _eval_formula_expr(vel_expr, spec, grid_info)
+        else:
+            print(
+                f"  Warning: --ic-formula-velocity ignored for '{component}' "
+                f"(no velocity slot — first-order or constraint field)",
+                file=sys.stderr,
+            )
 
-    field_arr = eval(args.ic_formula, {"__builtins__": {}}, namespace)  # noqa: S307
-    field_arr = np.asarray(field_arr, dtype=float)
+    return slot_data
 
-    if field_arr.shape == ():
-        field_arr = np.full(grid_info.shape, float(field_arr))
 
-    return FieldSet.from_dict(
-        layout, grid_info.shape, {component: field_arr}
-    ).flat.copy()
+def _file_slots_npy(
+    ic_path: Path,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+) -> dict[str, np.ndarray]:
+    """Load flat state vector from .npy and unpack into slot_data.
+
+    Raises
+    ------
+    ValueError
+        If .npy size doesn't match state vector layout.
+    """
+    from tidal.solver.state import StateLayout
+
+    layout = StateLayout.from_spec(spec, grid_info.num_points)
+    flat = np.load(ic_path)
+    if flat.shape != (layout.total_size,):
+        msg = (
+            f"IC .npy has {flat.size} elements but state vector needs "
+            f"{layout.total_size} (fields={len(spec.equations)}, "
+            f"grid={grid_info.shape})"
+        )
+        raise ValueError(msg)
+
+    slot_data: dict[str, np.ndarray] = {}
+    for slot in layout.slots:
+        idx = layout.field_slot_map.get(slot.name)
+        if idx is None and slot.kind == "velocity":
+            idx = layout.velocity_slot_map.get(slot.field_name)
+        if idx is not None:
+            start = idx * layout.num_points
+            end = start + layout.num_points
+            slot_data[slot.name] = flat[start:end].reshape(grid_info.shape).copy()
+    return slot_data
+
+
+def _file_slots_dir(
+    ic_path: Path,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+) -> dict[str, np.ndarray]:
+    """Load final snapshot from simulation output directory.
+
+    Raises
+    ------
+    ValueError
+        If saved grid shape doesn't match current grid.
+    """
+    import json
+
+    from tidal.solver.state import StateLayout
+
+    layout = StateLayout.from_spec(spec, grid_info.num_points)
+
+    meta_path = ic_path / "metadata.json"
+    if meta_path.exists():
+        with meta_path.open(encoding="utf-8") as f:
+            meta = json.load(f)
+        saved_shape = tuple(meta.get("grid_shape", []))
+        if saved_shape and saved_shape != grid_info.shape:
+            msg = (
+                f"Grid shape mismatch: saved {saved_shape} vs current {grid_info.shape}"
+            )
+            raise ValueError(msg)
+
+    slot_data: dict[str, np.ndarray] = {}
+    for slot in layout.slots:
+        npy_file = ic_path / f"{slot.name}.npy"
+        if npy_file.exists():
+            arr = np.load(npy_file)
+            # Take final snapshot if multi-snapshot (n_snapshots, *grid_shape)
+            if arr.ndim > len(grid_info.shape):
+                arr = arr[-1]
+            slot_data[slot.name] = arr
+    return slot_data
+
+
+def _file_slots(
+    args: Namespace,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+) -> dict[str, np.ndarray]:
+    """Load IC from a .npy file or simulation output directory.
+
+    Raises
+    ------
+    ValueError
+        If ``--ic-file`` is not provided, path doesn't exist, or format unknown.
+    """
+    ic_path_str = getattr(args, "ic_file", None)
+    if ic_path_str is None:
+        msg = "--ic=file requires --ic-file=PATH"
+        raise ValueError(msg)
+
+    ic_path = Path(ic_path_str)
+    if not ic_path.exists():
+        msg = f"IC file not found: {ic_path}"
+        raise ValueError(msg)
+
+    if ic_path.suffix == ".npy":
+        return _file_slots_npy(ic_path, spec, grid_info)
+
+    if ic_path.is_dir():
+        return _file_slots_dir(ic_path, spec, grid_info)
+
+    msg = f"IC path must be a .npy file or directory, got: {ic_path}"
+    raise ValueError(msg)
+
+
+def _noise_slots(
+    args: Namespace,
+    grid_info: GridInfo,
+    component: str,
+) -> dict[str, np.ndarray]:
+    """Generate white Gaussian noise IC on a single field.
+
+    Reproducible with ``--ic-noise-seed``. Velocity is zero.
+    """
+    seed = getattr(args, "ic_noise_seed", None)
+    rng = np.random.default_rng(seed)
+
+    return {
+        component: args.ic_amplitude * rng.standard_normal(grid_info.shape),
+    }
+
+
+def _apply_ic_field_overrides(
+    slot_data: dict[str, np.ndarray],
+    ic_field_args: list[str],
+    spec: EquationSystem,
+    grid_info: GridInfo,
+    layout: object,
+) -> None:
+    """Apply ``--ic-field`` per-field formula overrides to slot_data.
+
+    Each entry has the format ``FIELD:EXPR`` (sets field slot) or
+    ``FIELD:velocity:EXPR`` (sets velocity slot). Modifies slot_data
+    in-place.
+
+    Raises
+    ------
+    ValueError
+        If field name is unknown or format is invalid.
+    """
+    for entry in ic_field_args:
+        parts = entry.split(":", maxsplit=2)
+
+        if len(parts) == 2:  # noqa: PLR2004
+            field_name, expr = parts
+            is_velocity = False
+        elif len(parts) == 3 and parts[1] == "velocity":  # noqa: PLR2004
+            field_name, _, expr = parts
+            is_velocity = True
+        else:
+            msg = (
+                f"Invalid --ic-field format: '{entry}'. "
+                f"Expected FIELD:EXPR or FIELD:velocity:EXPR"
+            )
+            raise ValueError(msg)
+
+        if field_name not in spec.component_names:
+            msg = (
+                f"Unknown field '{field_name}' in --ic-field. "
+                f"Available: {', '.join(spec.component_names)}"
+            )
+            raise ValueError(msg)
+
+        arr = _eval_formula_expr(expr, spec, grid_info)
+
+        if is_velocity:
+            if _has_velocity_slot(layout, field_name):
+                slot_data[f"v_{field_name}"] = arr
+            else:
+                print(
+                    f"  Warning: velocity override for '{field_name}' ignored "
+                    f"(no velocity slot)",
+                    file=sys.stderr,
+                )
+        else:
+            slot_data[field_name] = arr
 
 
 def _build_initial_y0(
@@ -629,11 +869,16 @@ def _build_initial_y0(
     grid_info: GridInfo,
     bounds: list[tuple[float, float]],
 ) -> np.ndarray:
-    """Build initial state as flat numpy vector (native path, no py-pde).
+    """Build initial state as flat numpy vector.
 
-    This is the native-path equivalent of ``_build_initial_state()``.
-    Uses ``GridInfo.cell_coords`` for coordinate arrays and packs results
-    via ``FieldSet.from_dict`` + ``StateLayout``.
+    Pipeline:
+      1. Validate ``--ic-component``
+      2. Dispatch to type-specific builder → ``slot_data`` dict
+      3. Apply ``--ic-field`` per-field formula overrides
+      4. Pack via ``FieldSet.from_dict()`` → flat state vector
+
+    The constraint IC solver (``ensure_consistent_ic``) runs later inside
+    the solver, so constraint fields set here may be adjusted for consistency.
 
     Returns
     -------
@@ -648,6 +893,7 @@ def _build_initial_y0(
     from tidal.solver.fields import FieldSet
     from tidal.solver.state import StateLayout
 
+    layout = StateLayout.from_spec(spec, grid_info.num_points)
     ic_type = args.ic
     component = args.ic_component or spec.component_names[0]
 
@@ -658,25 +904,40 @@ def _build_initial_y0(
         )
         raise ValueError(msg)
 
+    # Step 1: Build base IC as slot_data dict
     if ic_type == "zero":
         if args.ic_component is not None:
             print(
                 f"  Note: --ic-component '{args.ic_component}' is ignored for zero IC"
             )
-        layout = StateLayout.from_spec(spec, grid_info.num_points)
-        return FieldSet.zeros(layout, grid_info.shape).flat.copy()
+        slot_data: dict[str, np.ndarray] = {}
 
-    if ic_type == "gaussian":
-        return _gaussian_y0(args, spec, grid_info, bounds, component)
+    elif ic_type == "gaussian":
+        slot_data = _gaussian_slots(args, spec, grid_info, bounds, component, layout)
 
-    if ic_type == "plane-wave":
-        return _plane_wave_y0(args, spec, grid_info, bounds, component)
+    elif ic_type == "plane-wave":
+        slot_data = _plane_wave_slots(args, spec, grid_info, bounds, component, layout)
 
-    if ic_type == "formula":
-        return _formula_y0(args, spec, grid_info, component)
+    elif ic_type == "formula":
+        slot_data = _formula_slots(args, spec, grid_info, component, layout)
 
-    msg = f"Unknown IC type: {ic_type}"
-    raise ValueError(msg)
+    elif ic_type == "file":
+        slot_data = _file_slots(args, spec, grid_info)
+
+    elif ic_type == "noise":
+        slot_data = _noise_slots(args, grid_info, component)
+
+    else:
+        msg = f"Unknown IC type: {ic_type}"
+        raise ValueError(msg)
+
+    # Step 2: Apply per-field formula overrides
+    ic_field_list: list[str] = getattr(args, "ic_field", None) or []
+    if ic_field_list:
+        _apply_ic_field_overrides(slot_data, ic_field_list, spec, grid_info, layout)
+
+    # Step 3: Pack into flat state vector
+    return FieldSet.from_dict(layout, grid_info.shape, slot_data).flat.copy()
 
 
 # --- Native output pipeline (no py-pde) ---
@@ -1018,6 +1279,7 @@ def _constraint_mode(  # noqa: PLR0913, PLR0917
         bc=bc,
         parameters=params,
         num_snapshots=2,
+        allow_inconsistent_ic=getattr(args, "allow_inconsistent_ic", False),
     )
 
     if not result["success"]:
@@ -1177,7 +1439,11 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     # 3. Initial conditions
     y0 = _build_initial_y0(args, spec, grid_info, bounds)
-    log(f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}")
+    ic_desc = f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}"
+    ic_field_list: list[str] = getattr(args, "ic_field", None) or []
+    if ic_field_list:
+        ic_desc += f" + {len(ic_field_list)} field override(s)"
+    log(ic_desc)
 
     # 4. Diagnostics
     _validate_solver_params(args)
@@ -1250,6 +1516,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
             rtol=args.rtol,
             atol=args.atol,
             snapshot_callback=snapshot_cb,
+            allow_inconsistent_ic=getattr(args, "allow_inconsistent_ic", False),
         )
     elif scheme == "cvode":
         from tidal.solver.cvode import solve_cvode

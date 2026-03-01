@@ -361,8 +361,8 @@ def laplacian(
     bc: BCSpec | None = None,
 ) -> np.ndarray:
     """Full Laplacian ∇²f = Σ_i ∂²f/∂x_i²."""
-    result = np.zeros_like(data)
-    for ax in range(grid.ndim):
+    result = directional_laplacian(data, 0, grid, bc)
+    for ax in range(1, grid.ndim):
         result += directional_laplacian(data, ax, grid, bc)
     return result
 
@@ -376,8 +376,25 @@ def cross_derivative(
 ) -> np.ndarray:
     """Mixed second derivative ∂²f/(∂x_i ∂x_j).
 
-    Applied as gradient along axis2 first, then gradient along axis1.
+    For periodic BCs, uses a fused 4-point stencil avoiding intermediate
+    allocation.  For non-periodic BCs, falls back to two gradient passes.
     """
+    bcs = _normalize_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
+    bc1 = _resolve_axis_bc(bcs[axis1])
+    bc2 = _resolve_axis_bc(bcs[axis2])
+
+    if bc1.periodic and bc2.periodic:
+        # Fused 4-point stencil:
+        # (f[i+1,j+1] - f[i+1,j-1] - f[i-1,j+1] + f[i-1,j-1]) / (4·dx·dy)
+        dx = grid.dx[axis1]
+        dy = grid.dx[axis2]
+        fpp = np.roll(np.roll(data, -1, axis=axis1), -1, axis=axis2)
+        fpm = np.roll(np.roll(data, -1, axis=axis1), 1, axis=axis2)
+        fmp = np.roll(np.roll(data, 1, axis=axis1), -1, axis=axis2)
+        fmm = np.roll(np.roll(data, 1, axis=axis1), 1, axis=axis2)
+        return (fpp - fpm - fmp + fmm) / (4.0 * dx * dy)
+
+    # Non-periodic fallback: two gradient passes
     d1 = gradient(data, axis2, grid, bc)
     return gradient(d1, axis1, grid, bc)
 

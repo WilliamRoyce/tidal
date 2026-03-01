@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -185,7 +186,7 @@ class GridInfo:
         d = (hi - lo) / n
         return np.linspace(lo + d / 2, hi - d / 2, n)
 
-    @property
+    @cached_property
     def cell_coords(self) -> np.ndarray:
         """Cell-centre coordinates, shape ``(*shape, ndim)``.
 
@@ -195,6 +196,8 @@ class GridInfo:
         Unlike py-pde's ``CartesianGrid.cell_coords`` (which returns a list
         of arrays with inconsistent shapes), this always returns a single
         ndarray with the coordinate dimension as the last axis.
+
+        Cached on first access (GridInfo is immutable).
         """
         grids = np.meshgrid(
             *(self.axes_coords(i) for i in range(self.ndim)),
@@ -207,14 +210,18 @@ class GridInfo:
 
         Returns ``ndim`` arrays, each of shape ``self.shape``, containing the
         coordinate value along that axis at every grid point.  Equivalent to
-        ``np.meshgrid(*1d_axes, indexing="ij")`` but cached-friendly.
+        ``np.meshgrid(*1d_axes, indexing="ij")``.
 
-        This is the most efficient way to evaluate position-dependent
-        coefficients that depend on a single coordinate (e.g. ``f(x)``).
+        Cached on first access (GridInfo is immutable).
         """
-        return tuple(
-            np.meshgrid(
-                *(self.axes_coords(i) for i in range(self.ndim)),
-                indexing="ij",
+        try:
+            return self._cached_coord_arrays  # type: ignore[attr-defined]
+        except AttributeError:
+            result = tuple(
+                np.meshgrid(
+                    *(self.axes_coords(i) for i in range(self.ndim)),
+                    indexing="ij",
+                )
             )
-        )
+            object.__setattr__(self, "_cached_coord_arrays", result)  # noqa: PLC2801
+            return result

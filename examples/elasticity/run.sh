@@ -43,3 +43,41 @@ tidal plot ../data/elasticity_output --type snapshot --field uy_0 --time-index -
 tidal plot ../data/elasticity_output --type amplitude --quiet
 tidal plot ../data/elasticity_output --type hamiltonian --quiet
 tidal plot ../data/elasticity_output --type conservation --quiet
+
+echo ""
+echo "=== Run 1 (compression wave in ux) complete ==="
+
+# ============================================================================
+# Run 2: Shear wave excitation (using --ic-field for velocity)
+# ============================================================================
+# Run 1 excites longitudinal compression (displacement in ux). Elasticity's
+# interesting physics is the coupling between longitudinal and shear modes.
+# Using --ic-field with a velocity formula on uy_0, we launch a transverse
+# (shear) wave — zero displacement, nonzero velocity — producing a
+# qualitatively different wave pattern.
+
+tidal simulate ../data/navier_cauchy_2d.json \
+  --grid-shape 128 \
+  --bounds 0:10 \
+  --periodic \
+  --scheme leapfrog \
+  --ic zero \
+  --ic-field 'uy_0:velocity:exp(-(x - 5)**2 / 0.5) * cos(4 * y)' \
+  --t-end 3.0 \
+  --output ../data/elasticity_shear
+
+# Compare compression (Run 1) vs shear (Run 2) patterns
+tidal plot ../data/elasticity_shear --type snapshot --field ux_0 --time-index -1 \
+  --title "ux (shear excitation)" --quiet
+tidal plot ../data/elasticity_shear --type snapshot --field uy_0 --time-index -1 \
+  --title "uy (shear excitation)" --quiet
+tidal plot ../data/elasticity_shear --type amplitude \
+  --title "Shear wave amplitudes" --quiet
+tidal plot ../data/elasticity_shear --type conservation --quiet
+
+echo ""
+echo "=== Run 2 (shear wave) complete ==="
+echo ""
+echo "Compare compression vs shear wave patterns:"
+echo "  Compression (ux pulse):  ../data/elasticity_output/"
+echo "  Shear (uy velocity):     ../data/elasticity_shear/"

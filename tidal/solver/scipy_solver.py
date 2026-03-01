@@ -13,12 +13,13 @@ J. Comp. Appl. Math. 6, 1980.
 
 from __future__ import annotations
 
-import warnings
 from typing import TYPE_CHECKING
 
 import numpy as np
 
+from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
 from tidal.solver._scipy_types import IVPResult, call_solve_ivp
+from tidal.solver._setup import build_rhs_evaluator, warn_frozen_constraints
 from tidal.solver.fields import FieldSet
 from tidal.solver.leapfrog import compute_force, compute_velocity
 from tidal.solver.state import StateLayout
@@ -32,9 +33,6 @@ if TYPE_CHECKING:
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem
 
-# Time-derivative order threshold for dynamical (wave) equations
-_SECOND_ORDER = 2
-
 # Implicit methods that benefit from Jacobian sparsity
 _IMPLICIT_METHODS = {"Radau", "BDF"}
 
@@ -47,27 +45,24 @@ def _build_rhs_fn(
     rhs_eval: RHSEvaluator,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
     """Build the scipy RHS closure: ``rhs_fn(t, y) -> dydt``."""
-    n = grid.num_points
-    eq_map = {eq.field_name: i for i, eq in enumerate(spec.equations)}
+    eq_map = spec.equation_map
+    fs = FieldSet.zeros(layout, grid.shape)
 
     def rhs_fn(t: float, y: np.ndarray) -> np.ndarray:
         dydt = np.zeros_like(y)
 
-        force = compute_force(spec, layout, grid, bc, y, t, rhs_eval)
+        force = compute_force(spec, layout, grid, bc, y, t, rhs_eval, fieldset=fs)
         velocity = compute_velocity(layout, y)
-        fieldset = FieldSet.from_flat(layout, grid.shape, y)
 
-        for slot_idx, slot in enumerate(layout.slots):
-            s = slice(slot_idx * n, (slot_idx + 1) * n)
-            if slot.kind == "velocity":
-                dydt[s] = force[s]
-            elif slot.kind == "field" and slot.time_order >= _SECOND_ORDER:
-                dydt[s] = velocity[s]
-            elif slot.kind == "field" and slot.time_order == 1:
-                eq_idx = eq_map.get(slot.field_name)
-                if eq_idx is not None:
-                    result = rhs_eval.evaluate(eq_idx, fieldset, t)
-                    dydt[s] = result.ravel()
+        for _si, s, _fn in layout.velocity_slot_groups:
+            dydt[s] = force[s]
+        for _si, s, _vs in layout.dynamical_field_slot_groups:
+            dydt[s] = velocity[s]
+        for _si, s, field_name in layout.first_order_slot_groups:
+            eq_idx = eq_map.get(field_name)
+            if eq_idx is not None:
+                result = rhs_eval.evaluate(eq_idx, fs, t)
+                dydt[s] = result.ravel()
 
         return dydt
 
@@ -83,8 +78,8 @@ def solve_scipy(  # noqa: PLR0913
     bc: BCSpec | None = None,
     parameters: dict[str, float] | None = None,
     method: str = "DOP853",
-    rtol: float = 1e-8,
-    atol: float = 1e-10,
+    rtol: float = DEFAULT_RTOL,
+    atol: float = DEFAULT_ATOL,
     max_step: float = np.inf,
     num_snapshots: int = 101,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
@@ -130,23 +125,8 @@ def solve_scipy(  # noqa: PLR0913
     """
     layout = StateLayout.from_spec(spec, grid.num_points)
 
-    # Warn about constraint fields (frozen at IC)
-    constraint_fields = [
-        s.field_name for s in layout.slots if s.kind == "field" and s.time_order == 0
-    ]
-    if constraint_fields:
-        warnings.warn(
-            f"scipy: constraint fields {constraint_fields} frozen at initial "
-            f"values (not evolved). Use --scheme ida for constraint systems.",
-            stacklevel=2,
-        )
-
-    # Build RHSEvaluator for coefficient resolution
-    from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
-    from tidal.solver.rhs import RHSEvaluator  # noqa: PLC0415
-
-    coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
-    rhs_eval = RHSEvaluator(spec, grid, coeff_eval, bc=bc)
+    warn_frozen_constraints(layout, "scipy")
+    rhs_eval = build_rhs_evaluator(spec, grid, parameters, bc)
 
     # Build RHS closure
     rhs_fn = _build_rhs_fn(spec, layout, grid, bc, rhs_eval)

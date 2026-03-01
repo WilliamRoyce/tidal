@@ -22,8 +22,9 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
+from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
+from tidal.solver._setup import configure_linear_solver
 from tidal.solver._sksundae import SundialsResult, call_ida
-from tidal.solver._types import DENSE_THRESHOLD, SPARSE_THRESHOLD, SolverResult
 from tidal.solver.fields import FieldSet
 from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 from tidal.solver.state import StateLayout
@@ -31,6 +32,7 @@ from tidal.solver.state import StateLayout
 if TYPE_CHECKING:
     from collections.abc import Callable
 
+    from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.rhs import RHSEvaluator
     from tidal.solver.state import SlotInfo
@@ -38,9 +40,6 @@ if TYPE_CHECKING:
         ComponentEquation,
         EquationSystem,
     )
-
-# Time-derivative order threshold for dynamical (wave) equations
-_SECOND_ORDER = 2
 
 
 class _ResidualCtx:
@@ -65,9 +64,7 @@ class _ResidualCtx:
         self.n = grid.num_points
         self.shape = grid.shape
         self.rhs_eval = rhs_eval
-        self.eq_map: dict[str, int] = {
-            eq.field_name: i for i, eq in enumerate(spec.equations)
-        }
+        self.eq_map: dict[str, int] = spec.equation_map
         # Detect constraints with no self-referencing terms — the field
         # doesn't appear in its own equation (e.g. momentum constraints
         # from gauge DOF).  These are frozen at zero.
@@ -80,9 +77,10 @@ class _ResidualCtx:
         self.y: np.ndarray = np.empty(0)
         self.yp: np.ndarray = np.empty(0)
         self.res: np.ndarray = np.empty(0)
+        self._reusable_fieldset = FieldSet.zeros(layout, grid.shape)
         self.fieldset: FieldSet | None = None
-        # Dict for legacy constant-coefficient path in compute_rhs
-        self.fields: dict[str, np.ndarray] = {}
+        # Dict for legacy constant-coefficient path in compute_rhs (lazy)
+        self.fields: dict[str, np.ndarray] | None = None
 
     def set_arrays(
         self,
@@ -96,7 +94,8 @@ class _ResidualCtx:
         self.y = y
         self.yp = yp
         self.res = res
-        self.fieldset = FieldSet.from_flat(self.layout, self.shape, y)
+        self._reusable_fieldset.rebind(y)
+        self.fieldset = self._reusable_fieldset
 
         # Inject constraint velocities from yp so that velocity-dependent
         # operators (first_derivative_t, gradient_x of velocity slots)
@@ -108,7 +107,7 @@ class _ResidualCtx:
                 vel = yp[start : start + self.n].reshape(self.shape)
                 self.fieldset.set_aux(f"v_{eq.field_name}", vel)
 
-        self.fields = self.fieldset.as_dict()
+        self.fields = None  # Reset lazy cache
 
         # Notify coefficient evaluator of new timestep
         if self.rhs_eval is not None:
@@ -120,6 +119,9 @@ class _ResidualCtx:
             return self.rhs_eval.evaluate(eq_idx, self.fieldset, self.t)
 
         # Legacy path: constant coefficients only
+        if self.fields is None:
+            assert self.fieldset is not None
+            self.fields = self.fieldset.as_dict()
         eq = self.spec.equations[eq_idx]
         result = np.zeros(self.shape)
         for term in eq.rhs_terms:
@@ -392,100 +394,16 @@ def build_residual_fn(
         """IDA residual: F(t, y, y') = 0."""
         ctx.set_arrays(t, y, yp, res)
 
-        for slot_idx, slot in enumerate(layout.slots):
-            if slot.time_order == 0:
-                ctx.handle_constraint(slot_idx, slot)
-            elif slot.kind == "velocity":
-                ctx.handle_velocity(slot_idx, slot)
-            elif slot.time_order >= _SECOND_ORDER and slot.kind == "field":
-                ctx.handle_dynamical_field(slot_idx, slot)
-            elif slot.time_order == 1:
-                ctx.handle_first_order(slot_idx, slot)
+        for slot_idx, _s, _fn in layout.constraint_slot_groups:
+            ctx.handle_constraint(slot_idx, layout.slots[slot_idx])
+        for slot_idx, _s, _fn in layout.velocity_slot_groups:
+            ctx.handle_velocity(slot_idx, layout.slots[slot_idx])
+        for slot_idx, _s, _vs in layout.dynamical_field_slot_groups:
+            ctx.handle_dynamical_field(slot_idx, layout.slots[slot_idx])
+        for slot_idx, _s, _fn in layout.first_order_slot_groups:
+            ctx.handle_first_order(slot_idx, layout.slots[slot_idx])
 
     return residual
-
-
-_IC_RESIDUAL_TOL = 1e-10
-"""Tolerance for initial-data subsidiary constraint residual check."""
-
-
-def _check_no_self_term_ic(
-    spec: EquationSystem,
-    layout: StateLayout,
-    grid: GridInfo,
-    y0: np.ndarray,
-    bc: BCSpec | None,
-) -> None:
-    """Verify initial data satisfies no-self-term constraint equations.
-
-    For each constraint equation where the field has no self-referencing
-    terms (frozen at zero by IDA), evaluates the original constraint RHS
-    at t=0 and warns if the residual is non-negligible.
-
-    These equations are subsidiary conditions (e.g. momentum constraints,
-    transversality) that must be **jointly** satisfied by the initial data
-    for physical consistency.  When multiple constraints are violated, a
-    single summary warning lists all of them so the user can see the full
-    set of conditions that need to be met.
-    """
-    n = grid.num_points
-
-    # Build field dict from y0
-    fields: dict[str, np.ndarray] = {}
-    for name, slot_idx in layout.field_slot_map.items():
-        fields[name] = y0[slot_idx * n : (slot_idx + 1) * n].reshape(grid.shape)
-    for name, slot_idx in layout.velocity_slot_map.items():
-        fields[f"v_{name}"] = y0[slot_idx * n : (slot_idx + 1) * n].reshape(grid.shape)
-
-    violations: list[tuple[str, float, list[str]]] = []
-    for eq in spec.equations:
-        if eq.time_derivative_order != 0:
-            continue
-        if eq.constraint_solver.enabled:
-            continue
-        has_self = any(t.field == eq.field_name for t in eq.rhs_terms)
-        if has_self:
-            continue
-
-        rhs = _eval_constraint_rhs(eq, fields, grid, bc)
-        max_res = float(np.max(np.abs(rhs)))
-        if max_res > _IC_RESIDUAL_TOL:
-            other_fields = sorted({t.field for t in eq.rhs_terms})
-            violations.append((eq.field_name, max_res, other_fields))
-
-    if not violations:
-        return
-
-    # Build a comprehensive summary of all violated subsidiary constraints
-    lines = [
-        "Initial data does not satisfy subsidiary constraint(s) "
-        "(not enforced at runtime — frozen fields):"
-    ]
-    for field_name, max_res, involved in violations:
-        lines.append(
-            f"  {field_name}: max|residual| = {max_res:.2e} "
-            f"(involves [{', '.join(involved)}])"
-        )
-    lines.append(
-        "For physical consistency, choose initial conditions that "
-        "jointly satisfy all subsidiary constraints."
-    )
-    warnings.warn("\n".join(lines), UserWarning, stacklevel=2)
-
-
-def _eval_constraint_rhs(
-    eq: ComponentEquation,
-    fields: dict[str, np.ndarray],
-    grid: GridInfo,
-    bc: BCSpec | None,
-) -> np.ndarray:
-    """Evaluate a constraint equation's RHS using constant coefficients."""
-    rhs = np.zeros(grid.shape)
-    for term in eq.rhs_terms:
-        target = fields.get(term.field, np.zeros(grid.shape))
-        operated = apply_operator(term.operator, target, grid, bc)
-        rhs += term.coefficient * operated
-    return rhs
 
 
 def solve_ida(  # noqa: PLR0913
@@ -497,11 +415,12 @@ def solve_ida(  # noqa: PLR0913
     bc: BCSpec | None = None,
     parameters: dict[str, float] | None = None,
     num_snapshots: int = 101,
-    rtol: float = 1e-8,
-    atol: float = 1e-10,
+    rtol: float = DEFAULT_RTOL,
+    atol: float = DEFAULT_ATOL,
     max_steps: int = 50000,
     snapshot_callback: Callable[..., None] | None = None,
     calc_initcond: str | None = None,
+    allow_inconsistent_ic: bool = False,
 ) -> SolverResult:
     """Solve a TIDAL equation system using SUNDIALS/IDA.
 
@@ -532,6 +451,9 @@ def solve_ida(  # noqa: PLR0913
         DAE) corrects derivatives given y0. ``"y0"`` corrects algebraic
         variables given yp0 — use this for constraint solving where the
         algebraic field values are unknown.
+    allow_inconsistent_ic : bool
+        If False (default), raise ValueError when constraint equations are
+        violated and cannot be solved. If True, issue a warning instead.
 
     Returns
     -------
@@ -550,24 +472,20 @@ def solve_ida(  # noqa: PLR0913
     """
     layout = StateLayout.from_spec(spec, grid.num_points)
 
-    # Pre-solve constraints to produce consistent y0.
-    # Without this, IDA fails on systems like Chern-Simons where
-    # the constraint has a nontrivial source at t=0.
-    has_enabled_constraints = any(
-        eq.time_derivative_order == 0 and eq.constraint_solver.enabled
-        for eq in spec.equations
+    # Unified constraint IC solver: handles both standard constraints
+    # (enabled=True, solve for constraint field) and subsidiary constraints
+    # (no-self-term equations, solve for free dynamical fields).
+    has_constraints = any(
+        eq.time_derivative_order == 0 for eq in spec.equations
     )
-    if has_enabled_constraints:
-        from tidal.solver.constraint_solve import pre_solve_constraints  # noqa: PLC0415
+    if has_constraints:
+        from tidal.solver.constraint_solve import ensure_consistent_ic  # noqa: PLC0415
 
-        y0 = pre_solve_constraints(
-            spec, grid, y0, bc=bc, parameters=parameters, t=t_span[0]
+        y0 = ensure_consistent_ic(
+            spec, grid, y0,
+            bc=bc, parameters=parameters, t=t_span[0],
+            strict=not allow_inconsistent_ic,
         )
-
-    # Check that IC satisfies subsidiary constraints (no-self-term equations).
-    # These are frozen at zero by IDA, so the original equation becomes a
-    # consistency condition on the initial data.
-    _check_no_self_term_ic(spec, layout, grid, y0, bc)
 
     resfn = build_residual_fn(spec, layout, grid, bc, parameters=parameters)
 
@@ -597,21 +515,7 @@ def solve_ida(  # noqa: PLR0913
     options["calc_initcond"] = calc_initcond or "yp0"
     options["calc_init_dt"] = float(t_eval[1] - t_eval[0])
 
-    # Choose linear solver based on system size:
-    # - Dense (LU): fast for small systems, O(N^3) / O(N^2) memory
-    # - Sparse (SuperLU_MT): analytical sparsity pattern, O(nnz) memory
-    # - GMRES: matrix-free, O(krylov_dim * N) memory, no preconditioner
-    n_state = layout.total_size
-    if n_state <= DENSE_THRESHOLD:
-        options["linsolver"] = "dense"
-    elif n_state <= SPARSE_THRESHOLD:
-        from tidal.solver.sparsity import build_jacobian_sparsity  # noqa: PLC0415
-
-        pattern = build_jacobian_sparsity(spec, layout, grid, bc)
-        options["linsolver"] = "sparse"
-        options["sparsity"] = pattern
-    else:
-        options["linsolver"] = "gmres"
+    configure_linear_solver(options, layout, spec, grid, bc)
 
     result: SundialsResult = call_ida(resfn, t_eval, y0, yp0, **options)
 

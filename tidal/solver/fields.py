@@ -58,10 +58,8 @@ class FieldSet:  # noqa: PLR0904
         else:
             self._data = np.zeros(layout.total_size)
 
-        # Build unified name → slot index mapping
-        self._name_to_idx: dict[str, int] = {}
-        for i, slot in enumerate(layout.slots):
-            self._name_to_idx[slot.name] = i
+        # Reuse the cached name → slot index mapping from StateLayout
+        self._name_to_idx = layout.slot_name_to_idx
 
         # Auxiliary fields not backed by the flat state array (e.g.
         # constraint velocities injected from IDA's yp vector).
@@ -220,6 +218,15 @@ class FieldSet:  # noqa: PLR0904
         elsewhere.
         """
         return cls(layout, grid_shape, flat)
+
+    def rebind(self, flat: np.ndarray) -> None:
+        """Replace the underlying flat array reference (zero-copy, zero-alloc).
+
+        Used by solver loops to reuse a single FieldSet instead of
+        allocating a new one each timestep.  Auxiliary fields are cleared.
+        """
+        self._data = flat
+        self._aux.clear()
 
     @classmethod
     def from_dict(

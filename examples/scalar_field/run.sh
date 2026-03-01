@@ -55,3 +55,31 @@ tidal plot ../data/scalar_field_output --type snapshot --time-index -1 --quiet
 tidal plot ../data/scalar_field_output --type profile --quiet
 tidal plot ../data/scalar_field_output --type hamiltonian --quiet
 tidal plot ../data/scalar_field_output --type conservation --quiet
+
+# ============================================================================
+# Run 2: Travelling wave packet (right-mover with carrier frequency)
+# ============================================================================
+# The static Gaussian above disperses symmetrically in both directions.
+# Using --ic-formula-velocity, we lock the field and velocity together so
+# the packet travels cleanly rightward — the bread-and-butter IC for
+# wave physics simulations.
+#
+# For a right-mover cos(kx - wt): field = envelope*cos(kx),
+# velocity = df/dt|_0 = +w*envelope*sin(kx) where w = |k| (massless limit).
+
+tidal simulate ../data/klein_gordon_1d.json \
+  --param m2=1.0 \
+  --grid-shape 256 \
+  --bounds 0:100 \
+  --periodic \
+  --ic formula \
+  --ic-formula 'exp(-(x - 25)**2 / 50) * cos(2 * x)' \
+  --ic-formula-velocity '2 * exp(-(x - 25)**2 / 50) * sin(2 * x)' \
+  --t-end 30.0 \
+  --output ../data/scalar_field_travelling
+
+# Compare: static (symmetric spreading) vs travelling (rightward propagation)
+tidal plot ../data/scalar_field_travelling --type heatmap \
+  --title "Travelling wave packet (right-mover)" --quiet
+tidal plot ../data/scalar_field_travelling --type profile --quiet
+tidal plot ../data/scalar_field_travelling --type conservation --quiet

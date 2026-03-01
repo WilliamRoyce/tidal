@@ -10,15 +10,15 @@ IDA and leapfrog operate on flat numpy arrays.  This module provides:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from functools import cached_property
 from typing import TYPE_CHECKING
 
 import numpy as np
 
+from tidal.solver._defaults import SECOND_ORDER
+
 if TYPE_CHECKING:
     from tidal.symbolic.json_loader import EquationSystem
-
-# Time-derivative order threshold for dynamical (wave) equations
-_SECOND_ORDER = 2
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ class StateLayout:
             kind = "constraint" if order == 0 else "field"
 
             d_idx = None
-            if order >= _SECOND_ORDER:
+            if order >= SECOND_ORDER:
                 d_idx = dyn_idx
                 dynamical_fields.append(name)
                 dyn_idx += 1
@@ -129,7 +129,7 @@ class StateLayout:
                 )
             )
 
-            if order >= _SECOND_ORDER:
+            if order >= SECOND_ORDER:
                 vel_name = f"v_{name}"
                 velocity_slot_map[name] = len(slots)
                 slots.append(
@@ -150,6 +150,11 @@ class StateLayout:
             dynamical_fields=tuple(dynamical_fields),
         )
 
+    @cached_property
+    def slot_name_to_idx(self) -> dict[str, int]:
+        """Map from slot name to slot index. Cached on frozen dataclass."""
+        return {slot.name: i for i, slot in enumerate(self.slots)}
+
     @property
     def total_size(self) -> int:
         """Total flat vector length (num_slots * num_points)."""
@@ -159,6 +164,49 @@ class StateLayout:
     def num_slots(self) -> int:
         """Number of slots in the state vector."""
         return len(self.slots)
+
+    def slot_slice(self, slot_idx: int) -> slice:
+        """Return the flat-array slice for a given slot index."""
+        n = self.num_points
+        return slice(slot_idx * n, (slot_idx + 1) * n)
+
+    # ---- Pre-computed slot groups (branch-free hot-path iteration) ----
+
+    @cached_property
+    def velocity_slot_groups(self) -> tuple[tuple[int, slice, str], ...]:
+        """Pre-computed ``(slot_idx, flat_slice, field_name)`` for velocity slots."""
+        return tuple(
+            (i, self.slot_slice(i), s.field_name)
+            for i, s in enumerate(self.slots)
+            if s.kind == "velocity"
+        )
+
+    @cached_property
+    def dynamical_field_slot_groups(self) -> tuple[tuple[int, slice, int], ...]:
+        """Pre-computed ``(slot_idx, flat_slice, vel_slot_idx)`` for 2nd-order fields."""
+        return tuple(
+            (i, self.slot_slice(i), self.velocity_slot_map[s.field_name])
+            for i, s in enumerate(self.slots)
+            if s.kind == "field" and s.time_order >= SECOND_ORDER
+        )
+
+    @cached_property
+    def first_order_slot_groups(self) -> tuple[tuple[int, slice, str], ...]:
+        """Pre-computed ``(slot_idx, flat_slice, field_name)`` for 1st-order fields."""
+        return tuple(
+            (i, self.slot_slice(i), s.field_name)
+            for i, s in enumerate(self.slots)
+            if s.kind == "field" and s.time_order == 1
+        )
+
+    @cached_property
+    def constraint_slot_groups(self) -> tuple[tuple[int, slice, str], ...]:
+        """Pre-computed ``(slot_idx, flat_slice, field_name)`` for constraint slots."""
+        return tuple(
+            (i, self.slot_slice(i), s.field_name)
+            for i, s in enumerate(self.slots)
+            if s.time_order == 0
+        )
 
     @property
     def algebraic_indices(self) -> list[int]:

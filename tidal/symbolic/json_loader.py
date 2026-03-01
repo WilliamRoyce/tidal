@@ -12,6 +12,7 @@ import math
 import re
 from dataclasses import dataclass
 from dataclasses import field as dataclass_field
+from functools import cached_property
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -73,15 +74,19 @@ def is_known_operator(name: str) -> bool:
 
     Accepts static operators (identity, laplacian, gradient_x, ...),
     user-registered custom operators (via ``register_operator``),
-    and dynamic patterns for generic Nth-order derivatives
-    (derivative_3_x, derivative_5_y, derivative_2x_1y, ...).
+    dynamic patterns for generic Nth-order derivatives
+    (derivative_3_x, derivative_5_y, derivative_2x_1y, ...),
+    and mixed time-space derivative operators (mixed_T_S1_S2_...).
     """
-    return (
-        name in _STATIC_OPERATORS
-        or name in _CUSTOM_OPERATORS
-        or bool(_GENERIC_SINGLE_AXIS_RE.match(name))
-        or bool(_GENERIC_MULTI_AXIS_RE.match(name))
-    )
+    if name in _STATIC_OPERATORS or name in _CUSTOM_OPERATORS:
+        return True
+    if _GENERIC_SINGLE_AXIS_RE.match(name) or _GENERIC_MULTI_AXIS_RE.match(name):
+        return True
+    # Mixed time-space operators: mixed_T_S1_S2_... (all parts are digits)
+    if name.startswith("mixed_"):
+        parts = name.split("_")[1:]
+        return len(parts) >= 2 and all(p.isdigit() for p in parts)  # noqa: PLR2004
+    return False
 
 
 @dataclass(frozen=True)
@@ -981,6 +986,11 @@ class EquationSystem:
     def spatial_coordinates(self) -> tuple[str, ...]:
         """Spatial coordinate names (all except first, which is time)."""
         return self.effective_coordinates[1:]
+
+    @cached_property
+    def equation_map(self) -> dict[str, int]:
+        """Map from field name to equation index. Cached on frozen dataclass."""
+        return {eq.field_name: i for i, eq in enumerate(self.equations)}
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914

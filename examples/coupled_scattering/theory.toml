@@ -1,30 +1,37 @@
-# Coupled Scalar Scattering — Localized Interaction Region
+# Coupled Scalar Scattering — Plane-wave Reduced 1+1D
 #
 # Physics: Two scalar fields phi and chi coupled through a spatially
-# localized background field G(x,y) = g0 * exp(-r^2 / (2*R^2)).
+# localized background field G(z) = g0 * exp(-z^2 / (2*R^2)).
+# The coupling depends ONLY on the propagation axis z, enabling
+# plane-wave dimensional reduction from 3+1D to 1+1D.
 #
-#   L = -1/2 (d phi)^2 - 1/2 (d chi)^2 - mPhi2/2 phi^2
-#       - mChi2/2 chi^2 - G(x,y) phi chi
+#   L = -1/2 (d phi)^2 - mPhi2/2 phi^2
+#       -1/2 (d chi)^2 - mChi2/2 chi^2 - G(z) phi chi
 #
-# The coupling G is localized near the origin.  An incident phi wave
-# packet scatters off the coupling region, partially converting to chi
-# radiation.  The chi field starts as a localized blob at the origin.
+# After reduction (d/dx = d/dy = 0), the 1+1D system is:
+#   d2t(phi) = d2z(phi) - mPhi2 phi - G(z) chi
+#   d2t(chi) = d2z(chi) - mChi2 chi - G(z) phi
 #
 # Analogy to Gertsenshtein effect:
-#   phi  <-> photon           (light, fast)
-#   chi  <-> graviton         (heavy, slow)
-#   G(x,y) <-> background B_0(x,y)  (localized coupling region)
+#   phi  <-> photon           (incident wave)
+#   chi  <-> graviton         (generated wave)
+#   G(z) <-> background B(z)  (localized coupling region)
+#
+# The 1+1D reduction gives clean mode conversion without geometric
+# spreading or 2D interference patterns that obscure the signal
+# in the unreduced 2+1D case.
 #
 # Demonstrates:
+#   - Plane-wave dimensional reduction (3+1D -> 1+1D)
 #   - Position-dependent cross-field coupling via [[background_fields]]
-#   - Multi-field 2+1D scattering with energy transfer
-#   - Exp[...] coefficient evaluation in the Python pipeline
+#   - Clean parametric mode conversion (Gertsenshtein-effect analogue)
+#   - Multi-field energy transfer and conservation
 
 [theory]
-name = "Coupled Scalar Scattering"
+name = "Coupled Scalar Scattering (plane-wave reduction)"
 
 [spacetime]
-dimension = 3
+dimension = 4
 metric = "minkowski"
 
 [[fields]]
@@ -41,7 +48,7 @@ names = ["mPhi2", "mChi2", "g0", "R"]
 [[background_fields]]
 name = "G"
 type = "scalar"
-components = ["g0 * Exp[-(x[]^2 + y[]^2) / (2 * R^2)]"]
+components = ["g0 * Exp[-z[]^2 / (2 * R^2)]"]
 
 [lagrangian]
 expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - 1/2 CD[-a][chi[]] eta[a, b] CD[-b][chi[]] - mPhi2/2 * phi[]^2 - mChi2/2 * chi[]^2 - G[] * phi[] * chi[]"
@@ -49,14 +56,16 @@ expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - 1/2 CD[-a][chi[]] eta
 # Stability requirement: all eigenvalues of the pointwise mass matrix must be
 # positive.  For this example the condition is mPhi2 * mChi2 > g0^2 (from
 # det(M) > 0 at the coupling peak where G = g0).
-# With these defaults: det = 1*4 - 1^2 = 3 > 0.  Minimum stable mChi2 = g0^2/mPhi2 = 1.0.
-# Using mChi2 < 1.0 (with g0=1, mPhi2=1) causes exponential blow-up.
-# tidal simulate will warn automatically if parameters violate this condition.
+# With these defaults: det = 1*1 - 0.5^2 = 0.75 > 0.  Minimum stable g0 = sqrt(mPhi2*mChi2) = 1.0.
 [parameters]
 mPhi2 = 1.0
-mChi2 = 4.0
-g0 = 1.0
-R = 8.0
+mChi2 = 1.0
+g0 = 0.5
+R = 5.0
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
 
 [output]
 path = "../data/coupled_scattering.json"

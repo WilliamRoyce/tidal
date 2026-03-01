@@ -1,0 +1,43 @@
+# Gravitational Waves: Plane-wave along z in TT Gauge
+#
+# Lagrangian: L = R (Ricci scalar of the Einstein-Hilbert action)
+# Linearizes to quadratic order L^(2) = Perturbation[R, 2] / 2 via xPert,
+# then derives linearized Einstein equations G^(1)_ab[h] = 0 via VarD.
+#
+# TT gauge eliminates lapse, shift, trace, and longitudinal modes.
+# Plane-wave reduction (d/dx = d/dy = 0) further eliminates all fields
+# except h_+ (h_xx = -h_yy) and h_x (h_xy).
+#
+# Result: Two uncoupled 1D wave equations
+#   d2t(h_+) = d2z(h_+)
+#   d2t(h_x) = d2z(h_x)
+
+[theory]
+name = "Gravitational Waves (TT + z-propagation)"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[lagrangian]
+expression = "RicciScalarCD[]"
+
+[linearization]
+perturbation_field = "h"
+
+[[gauge]]
+field = "h"
+type = "tt"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[output]
+path = "../data/gw_plane_wave_1d.json"

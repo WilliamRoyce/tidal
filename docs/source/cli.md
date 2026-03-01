@@ -59,11 +59,19 @@ tidal simulate examples/data/chern_simons.json --mode constraint
 | `--t-end FLOAT` | Simulation end time | 10.0 |
 | `--dt FLOAT` | Time step | 0.01 |
 | `--grid-shape INT` | Grid points per axis | 128 |
-| `--ic {gaussian,plane-wave,zero,formula}` | Initial condition preset | gaussian |
+| `--ic {gaussian,plane-wave,zero,formula,file,noise}` | Initial condition preset | gaussian |
 | `--ic-width FLOAT` | Gaussian pulse width | 5.0 |
-| `--ic-formula EXPR` | Custom IC formula (Python expression) | — |
+| `--ic-component FIELD` | Field component for IC (multi-field systems) | (first field) |
+| `--ic-center X[,Y,Z]` | Gaussian center position | (domain center) |
+| `--ic-amplitude FLOAT` | Gaussian amplitude | 1.0 |
+| `--ic-wavevector K[,K,K]` | Wavevector for travelling wave packets | — |
+| `--ic-formula EXPR` | Custom IC formula (Python expression with x, y, z, np) | — |
+| `--ic-formula-velocity EXPR` | Velocity formula for `--ic formula` (enables travelling waves) | — |
+| `--ic-field FIELD:EXPR` | Per-field IC override formula (repeatable; `FIELD:velocity:EXPR` for velocity) | — |
+| `--ic-file PATH` | Load IC from `.npy` file or simulation output directory | — |
+| `--ic-noise-seed N` | Random seed for reproducible `--ic noise` | — |
 | `--bc TYPES` | Boundary conditions (comma-separated per axis) | periodic |
-| `--scheme {scipy,runge-kutta}` | Solver scheme | runge-kutta |
+| `--scheme {ida,leapfrog,cvode,scipy,auto}` | Solver scheme | auto |
 | `--mode {evolve,constraint}` | Simulation mode | evolve |
 | `--plot` / `--no-plot` | Enable/disable plotting | --plot |
 | `--output PATH` | Output path (directory for snapshot data; image extension for plot-only) | — |
@@ -245,8 +253,11 @@ done
 
 ### Solver schemes
 
-- `--scheme runge-kutta`: py-pde `ExplicitSolver` — fixed-step, predictable timing
-- `--scheme scipy`: py-pde `ScipySolver` — adaptive step, better for stiff systems
+- `--scheme auto` (default): auto-selects best solver based on equation structure
+- `--scheme cvode`: SUNDIALS/CVODE — adaptive BDF/Adams for wave systems
+- `--scheme ida`: SUNDIALS/IDA — handles all equation types including algebraic constraints
+- `--scheme leapfrog`: symplectic Störmer-Verlet — fixed dt, zero energy drift
+- `--scheme scipy`: scipy.integrate.solve_ivp — DOP853/RK45/Radau/BDF
 
 ### Boundary conditions
 

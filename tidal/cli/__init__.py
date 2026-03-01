@@ -16,6 +16,8 @@ from __future__ import annotations
 import argparse
 import sys
 
+from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
+
 __all__ = ["main"]
 
 
@@ -153,7 +155,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # Initial conditions
     sim_parser.add_argument(
         "--ic",
-        choices=["gaussian", "plane-wave", "zero", "formula"],
+        choices=["gaussian", "plane-wave", "zero", "formula", "file", "noise"],
         default="gaussian",
         help="Initial condition type (default: gaussian)",
     )
@@ -193,7 +195,37 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--ic-wavevector",
         default=None,
         metavar="K[,K,K]",
-        help="Wavevector for plane-wave IC (e.g. 0.1,0.0,0.0)",
+        help="Wavevector for plane-wave or gaussian IC (e.g. 3 or 0.1,0.0,0.0). "
+        "With gaussian: creates a travelling wave packet (positive k = right-mover)",
+    )
+    sim_parser.add_argument(
+        "--ic-formula-velocity",
+        default=None,
+        metavar="EXPR",
+        help="Velocity (time derivative) expression for --ic=formula. "
+        "Same namespace as --ic-formula (x, y, z, sin, cos, exp, ...).",
+    )
+    sim_parser.add_argument(
+        "--ic-field",
+        action="append",
+        default=[],
+        metavar="FIELD:EXPR",
+        help="Per-field IC formula override (repeatable). "
+        "Format: FIELD:EXPR or FIELD:velocity:EXPR. "
+        "Applied after --ic. Example: --ic-field 'chi_0:0.1*sin(x)'",
+    )
+    sim_parser.add_argument(
+        "--ic-file",
+        default=None,
+        metavar="PATH",
+        help="Path to .npy file or simulation output directory for --ic=file.",
+    )
+    sim_parser.add_argument(
+        "--ic-noise-seed",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Random seed for --ic=noise (reproducible noise).",
     )
     # Mode
     sim_parser.add_argument(
@@ -232,14 +264,14 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     sim_parser.add_argument(
         "--rtol",
         type=float,
-        default=1e-8,
-        help="Relative tolerance for adaptive solvers (default: 1e-8)",
+        default=DEFAULT_RTOL,
+        help=f"Relative tolerance for adaptive solvers (default: {DEFAULT_RTOL})",
     )
     sim_parser.add_argument(
         "--atol",
         type=float,
-        default=1e-10,
-        help="Absolute tolerance for adaptive solvers (default: 1e-10)",
+        default=DEFAULT_ATOL,
+        help=f"Absolute tolerance for adaptive solvers (default: {DEFAULT_ATOL})",
     )
     sim_parser.add_argument(
         "--method",
@@ -299,6 +331,16 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help=(
             "Abort if the pre-simulation stability check detects an unstable "
             "mass matrix (negative eigenvalue). Default: warn only."
+        ),
+    )
+    sim_parser.add_argument(
+        "--allow-inconsistent-ic",
+        action="store_true",
+        default=False,
+        help=(
+            "Allow inconsistent initial conditions for constraint equations. "
+            "When set, constraint violations produce warnings instead of errors. "
+            "Default: error if constraint ICs cannot be made consistent."
         ),
     )
 
