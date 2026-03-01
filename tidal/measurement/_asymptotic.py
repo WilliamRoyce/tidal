@@ -99,12 +99,13 @@ def _group_energy_at_snapshot(
     t_idx: int,
 ) -> float:
     """Compute total energy for a group of fields at snapshot *t_idx*."""
+    names = [eq.field_name for eq in data.spec.equations]
     total = 0.0
     for fname in field_names:
         field_arr = data.fields[fname][t_idx]
         vel_all = data.velocities.get(fname)
         vel_arr = vel_all[t_idx] if vel_all is not None else None
-        m2 = _resolve_mass_squared(data, fname)
+        m2 = _resolve_mass_squared(data, names.index(fname))
         fe = compute_field_energy(
             field_arr,
             vel_arr,
@@ -138,36 +139,52 @@ def _source_wavevector(
     data: SimulationData,
     source_fields: list[str],
 ) -> NDArray[np.float64]:
-    """Compute the spectral centroid wavevector of the source at t=0.
+    """Compute the propagation direction of the source at t=0.
 
-    The spectral centroid is the energy-weighted average wavevector:
+    Uses the **energy flux** (momentum density) in Fourier space to determine
+    the net propagation direction.  For real fields, the power spectrum
+    ``|φ̂(k)|²`` is symmetric (``|φ̂(k)| = |φ̂(-k)|``), so a power-weighted
+    centroid is always zero.  The energy flux breaks this symmetry:
 
-        ⟨k⟩ = Σ_k (k · |φ̂(k)|²) / Σ_k |φ̂(k)|²
+        ⟨k⟩_flux = Σ_k k · Im[v̂*(k) · φ̂(k)]
 
-    summed over all source fields (group-covariant).  This defines the
-    propagation direction of the initial wave packet.
+    This is proportional to the momentum density ``T^{0i} = -v · ∂_i φ`` and
+    correctly identifies the propagation direction for travelling waves while
+    returning zero for standing waves.
 
-    For a plane wave with wavevector k₀, this returns k₀ exactly.
-    For a wave packet, it returns the central wavevector.
+    Summed over all source fields for group covariance.
+
+    For a plane wave with wavevector k₀, this returns a vector parallel to k₀.
+    The magnitude is proportional to energy flux, not |k₀| itself.
     """
     ndim = len(data.grid_spacing)
-    k_centroid = np.zeros(ndim)
-    total_power = 0.0
+    k_flux = np.zeros(ndim)
+    total_flux = 0.0
 
     for fname in source_fields:
         field_0 = np.asarray(data.fields[fname][0], dtype=np.float64)
         fhat = np.fft.fftn(field_0)
-        power = np.abs(fhat) ** 2
+
+        vel_all = data.velocities.get(fname)
+        if vel_all is None:
+            continue
+        vel_0 = np.asarray(vel_all[0], dtype=np.float64)
+        vhat = np.fft.fftn(vel_0)
+
+        # Cross-spectrum: Im[v̂*(k) · φ̂(k)] gives directional weight
+        cross = np.imag(np.conj(vhat) * fhat)
 
         k_grids = _build_k_grids(field_0.shape, data.grid_spacing)
         for ax in range(ndim):
-            k_centroid[ax] += float(np.sum(k_grids[ax] * power))
-        total_power += float(np.sum(power))
+            flux_ax = float(np.sum(k_grids[ax] * cross))
+            k_flux[ax] += flux_ax
+        total_flux += float(np.sum(np.abs(cross)))
 
-    if total_power > 0:
-        k_centroid /= total_power
+    # Normalize to get a unit-like direction vector scaled by net flux
+    if total_flux > 0:
+        k_flux /= total_flux
 
-    return k_centroid
+    return k_flux
 
 
 def _field_spectral_energy(
