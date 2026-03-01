@@ -14,6 +14,8 @@ import numpy as np
 import pytest
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     from tidal.symbolic.json_loader import EquationSystem
 
 from tidal.cli._simulate import (
@@ -971,6 +973,10 @@ def _make_ic_args(**kwargs: object) -> Namespace:
         "ic_amplitude": 1.0,
         "ic_wavevector": None,
         "ic_formula": None,
+        "ic_formula_velocity": None,
+        "ic_field": [],
+        "ic_file": None,
+        "ic_noise_seed": None,
     }
     defaults.update(kwargs)
     return Namespace(**defaults)
@@ -1081,6 +1087,306 @@ class TestBuildInitialY0:
         args = _make_ic_args(ic="gaussian")
         y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
         assert y0.shape == (layout.total_size,)
+
+    def test_plane_wave_right_mover(self) -> None:
+        """Plane-wave with k>0 produces positive velocity where sin(kx)>0."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(64,), periodic=(True,))
+        args = _make_ic_args(ic="plane-wave", ic_amplitude=1.0, ic_wavevector="3")
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+        velocity = y0[64:]
+        x = gi.axes_coords(0)
+        # At x where sin(3x) > 0, velocity should be positive (right-mover)
+        mask = np.sin(3.0 * x) > 0.5
+        assert np.all(velocity[mask] > 0)
+
+    def test_formula_velocity_sets_both_slots(self) -> None:
+        """--ic-formula-velocity sets the velocity slot alongside the field."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(
+            ic="formula",
+            ic_formula="cos(x)",
+            ic_formula_velocity="sin(x)",
+        )
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+        field = y0[:32]
+        velocity = y0[32:]
+        x = gi.axes_coords(0)
+        np.testing.assert_allclose(field, np.cos(x), atol=1e-12)
+        np.testing.assert_allclose(velocity, np.sin(x), atol=1e-12)
+
+    def test_formula_velocity_constant(self) -> None:
+        """Constant velocity expression broadcasts to grid shape."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(
+            ic="formula",
+            ic_formula="0.0",
+            ic_formula_velocity="2.5",
+        )
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+        velocity = y0[32:]
+        np.testing.assert_allclose(velocity, 2.5, atol=1e-12)
+
+    def test_formula_velocity_without_formula_ignored(self) -> None:
+        """--ic-formula-velocity with non-formula IC doesn't crash."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(
+            ic="gaussian",
+            ic_formula_velocity="sin(x)",
+        )
+        # Should not raise — formula-velocity is only used with --ic=formula
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+        assert y0.shape == (64,)
+
+    def test_noise_ic_deterministic(self) -> None:
+        """Same seed produces identical noise IC."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(64,), periodic=(False,))
+        args1 = _make_ic_args(ic="noise", ic_noise_seed=42)
+        args2 = _make_ic_args(ic="noise", ic_noise_seed=42)
+        y1 = _build_initial_y0(args1, spec, gi, [(0.0, 10.0)])
+        y2 = _build_initial_y0(args2, spec, gi, [(0.0, 10.0)])
+        np.testing.assert_array_equal(y1, y2)
+
+    def test_noise_ic_amplitude_scales(self) -> None:
+        """Noise amplitude scales with --ic-amplitude."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(256,), periodic=(False,))
+        args1 = _make_ic_args(ic="noise", ic_noise_seed=7, ic_amplitude=1.0)
+        args2 = _make_ic_args(ic="noise", ic_noise_seed=7, ic_amplitude=3.0)
+        y1 = _build_initial_y0(args1, spec, gi, [(0.0, 10.0)])
+        y2 = _build_initial_y0(args2, spec, gi, [(0.0, 10.0)])
+        # Field values should scale by 3x (velocity stays zero)
+        np.testing.assert_allclose(y2[:256], 3.0 * y1[:256], atol=1e-12)
+
+    def test_noise_ic_velocity_zero(self) -> None:
+        """Noise IC has zero velocity."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(ic="noise", ic_noise_seed=1)
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+        assert np.all(y0[32:] == 0.0)
+
+    def test_file_ic_npy_roundtrip(self, tmp_path: Path) -> None:
+        """Round-trip: build y0, save as .npy, reload with --ic=file."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args_orig = _make_ic_args(ic="gaussian", ic_amplitude=2.0)
+        y0_orig = _build_initial_y0(args_orig, spec, gi, [(0.0, 10.0)])
+
+        npy_path = tmp_path / "state.npy"
+        np.save(npy_path, y0_orig)
+
+        args_file = _make_ic_args(ic="file", ic_file=str(npy_path))
+        y0_loaded = _build_initial_y0(args_file, spec, gi, [(0.0, 10.0)])
+        np.testing.assert_array_equal(y0_orig, y0_loaded)
+
+    def test_file_ic_directory(self, tmp_path: Path) -> None:
+        """Load final snapshot from simulation output directory."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(16,), periodic=(False,))
+
+        # Create mock output directory with field snapshots
+        phi = np.random.default_rng(0).standard_normal((5, 16))
+        v_phi = np.random.default_rng(1).standard_normal((5, 16))
+        np.save(tmp_path / "phi_0.npy", phi)
+        np.save(tmp_path / "v_phi_0.npy", v_phi)
+
+        args = _make_ic_args(ic="file", ic_file=str(tmp_path))
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+        # Should load final snapshot (index -1)
+        np.testing.assert_allclose(y0[:16], phi[-1], atol=1e-12)
+        np.testing.assert_allclose(y0[16:], v_phi[-1], atol=1e-12)
+
+    def test_file_ic_missing_file_raises(self) -> None:
+        """--ic=file without --ic-file raises ValueError."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(ic="file")
+        with pytest.raises(ValueError, match="--ic=file requires --ic-file"):
+            _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+    def test_file_ic_wrong_size_raises(self, tmp_path: Path) -> None:
+        """.npy with wrong length raises ValueError."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        npy_path = tmp_path / "wrong.npy"
+        np.save(npy_path, np.zeros(10))
+
+        args = _make_ic_args(ic="file", ic_file=str(npy_path))
+        with pytest.raises(ValueError, match="elements but state vector needs"):
+            _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+
+def _make_coupled_spec() -> EquationSystem:
+    """Two coupled KG fields (phi_0, chi_0) for multi-field IC tests."""
+    from tidal.symbolic.json_loader import EquationSystem
+
+    data: dict[str, object] = {
+        "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+        "fields": [
+            {"name": "phi_0", "index": 0},
+            {"name": "chi_0", "index": 1},
+        ],
+        "equations": [
+            {
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_x",
+                            "field": "phi_0",
+                        },
+                        {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
+                    ],
+                },
+            },
+            {
+                "field": "chi_0",
+                "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_x",
+                            "field": "chi_0",
+                        },
+                        {"coefficient": -1.0, "operator": "identity", "field": "chi_0"},
+                    ],
+                },
+            },
+        ],
+    }
+    return EquationSystem.from_dict(data)
+
+
+class TestICFieldOverrides:
+    """Tests for --ic-field per-field formula overrides."""
+
+    def test_ic_field_sets_second_field(self) -> None:
+        """--ic-field sets a different field from the primary IC."""
+        spec = _make_coupled_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(
+            ic="gaussian",
+            ic_component="phi_0",
+            ic_field=["chi_0:0.5*sin(x)"],
+        )
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+        from tidal.solver.fields import FieldSet
+        from tidal.solver.state import StateLayout
+
+        layout = StateLayout.from_spec(spec, gi.num_points)
+        fs = FieldSet(layout, gi.shape, y0)
+
+        # phi_0 should have Gaussian profile
+        assert float(np.max(fs["phi_0"])) > 0.5
+
+        # chi_0 should have 0.5*sin(x)
+        x = gi.axes_coords(0)
+        np.testing.assert_allclose(fs["chi_0"], 0.5 * np.sin(x), atol=1e-12)
+
+    def test_ic_field_velocity_slot(self) -> None:
+        """FIELD:velocity:EXPR sets the velocity slot."""
+        spec = _make_coupled_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(
+            ic="zero",
+            ic_field=["chi_0:cos(x)", "chi_0:velocity:0.3*sin(x)"],
+        )
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+        from tidal.solver.fields import FieldSet
+        from tidal.solver.state import StateLayout
+
+        layout = StateLayout.from_spec(spec, gi.num_points)
+        fs = FieldSet(layout, gi.shape, y0)
+
+        x = gi.axes_coords(0)
+        np.testing.assert_allclose(fs["chi_0"], np.cos(x), atol=1e-12)
+        np.testing.assert_allclose(fs["v_chi_0"], 0.3 * np.sin(x), atol=1e-12)
+
+    def test_ic_field_bad_name_raises(self) -> None:
+        """Unknown field name in --ic-field raises ValueError."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(
+            ic="zero",
+            ic_field=["nonexistent:sin(x)"],
+        )
+        with pytest.raises(ValueError, match="Unknown field 'nonexistent'"):
+            _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+    def test_ic_field_bad_expr_raises(self) -> None:
+        """Unsafe expression in --ic-field raises error."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(
+            ic="zero",
+            ic_field=["phi_0:__import__('os').system('ls')"],
+        )
+        with pytest.raises((ValueError, TypeError)):
+            _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+    def test_ic_field_overwrites_primary(self) -> None:
+        """--ic-field on the same field as --ic overwrites the base IC."""
+        spec = _make_kg_spec()
+        from tidal.solver.grid import GridInfo
+
+        gi = GridInfo(bounds=((0.0, 10.0),), shape=(32,), periodic=(False,))
+        args = _make_ic_args(
+            ic="gaussian",
+            ic_amplitude=2.0,
+            ic_field=["phi_0:0.1*x"],
+        )
+        y0 = _build_initial_y0(args, spec, gi, [(0.0, 10.0)])
+
+        field = y0[:32]
+        x = gi.axes_coords(0)
+        # Should be overwritten by 0.1*x, not Gaussian
+        np.testing.assert_allclose(field, 0.1 * x, atol=1e-12)
 
 
 # ==================== _resolve_scheme ====================

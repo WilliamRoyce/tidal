@@ -155,7 +155,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # Initial conditions
     sim_parser.add_argument(
         "--ic",
-        choices=["gaussian", "plane-wave", "zero", "formula"],
+        choices=["gaussian", "plane-wave", "zero", "formula", "file", "noise"],
         default="gaussian",
         help="Initial condition type (default: gaussian)",
     )
@@ -197,6 +197,35 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="K[,K,K]",
         help="Wavevector for plane-wave or gaussian IC (e.g. 3 or 0.1,0.0,0.0). "
         "With gaussian: creates a travelling wave packet (positive k = right-mover)",
+    )
+    sim_parser.add_argument(
+        "--ic-formula-velocity",
+        default=None,
+        metavar="EXPR",
+        help="Velocity (time derivative) expression for --ic=formula. "
+        "Same namespace as --ic-formula (x, y, z, sin, cos, exp, ...).",
+    )
+    sim_parser.add_argument(
+        "--ic-field",
+        action="append",
+        default=[],
+        metavar="FIELD:EXPR",
+        help="Per-field IC formula override (repeatable). "
+        "Format: FIELD:EXPR or FIELD:velocity:EXPR. "
+        "Applied after --ic. Example: --ic-field 'chi_0:0.1*sin(x)'",
+    )
+    sim_parser.add_argument(
+        "--ic-file",
+        default=None,
+        metavar="PATH",
+        help="Path to .npy file or simulation output directory for --ic=file.",
+    )
+    sim_parser.add_argument(
+        "--ic-noise-seed",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Random seed for --ic=noise (reproducible noise).",
     )
     # Mode
     sim_parser.add_argument(
