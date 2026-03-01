@@ -15,6 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from tidal.measurement._dispersion import DispersionResult, compute_dispersion
+from tidal.measurement._mode_utils import find_shared_modes
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -112,17 +113,12 @@ def _find_shared_modes(
     active_src = disp_src.peak_frequencies > 0.0
     active_tgt = disp_tgt.peak_frequencies > 0.0
 
-    idx_src: list[int] = []
-    idx_tgt: list[int] = []
-    for i, k_s in enumerate(disp_src.wavenumbers):
-        if not active_src[i]:
-            continue
-        matches = np.where(
-            np.isclose(disp_tgt.wavenumbers, k_s, rtol=1e-6) & active_tgt
-        )[0]
-        if len(matches) > 0:
-            idx_src.append(i)
-            idx_tgt.append(matches[0])
+    idx_src, idx_tgt = find_shared_modes(
+        disp_src.wavenumbers,
+        disp_tgt.wavenumbers,
+        active_src,
+        active_tgt,
+    )
 
     if not idx_src:
         msg = "No shared active wavenumber modes between source and target fields"

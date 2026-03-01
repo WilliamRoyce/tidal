@@ -36,6 +36,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from tidal.measurement._energy import (
+    _ENERGY_FLOOR,  # pyright: ignore[reportPrivateUsage]
     _resolve_mass_squared,  # pyright: ignore[reportPrivateUsage]
     compute_field_energy,
 )
@@ -50,8 +51,6 @@ if TYPE_CHECKING:
 
     from tidal.measurement._io import SimulationData
 
-# Floor for energy comparisons (avoid division by zero)
-_ENERGY_FLOOR = 1e-30
 # Floor for wavevector magnitude (detect standing waves)
 _WAVEVECTOR_FLOOR = 1e-12
 
@@ -128,8 +127,7 @@ def _build_k_grids(
         k_ax = np.fft.fftfreq(n, d=grid_spacing[ax]) * (2.0 * np.pi)
         k_arrays.append(k_ax)
     return [
-        np.asarray(g, dtype=np.float64)
-        for g in np.meshgrid(*k_arrays, indexing="ij")
+        np.asarray(g, dtype=np.float64) for g in np.meshgrid(*k_arrays, indexing="ij")
     ]
 
 
@@ -226,6 +224,10 @@ def _directional_split(  # noqa: PLR0914
     total_reflected = 0.0
     total_zero = 0.0
 
+    # Build k-grids once (invariant across fields — depends only on grid geometry)
+    first_field = np.asarray(data.fields[target_fields[0]][t_idx], dtype=np.float64)
+    k_grids = _build_k_grids(first_field.shape, data.grid_spacing)
+
     for fname in target_fields:
         field_arr = np.asarray(data.fields[fname][t_idx], dtype=np.float64)
         fhat = np.fft.fftn(field_arr)
@@ -238,15 +240,16 @@ def _directional_split(  # noqa: PLR0914
             spectral_energy += np.abs(vhat) ** 2
 
             # Directional flux: (k · k̂_source) · Im[v̂*(k) · φ̂(k)]
-            k_grids = _build_k_grids(field_arr.shape, data.grid_spacing)
             k_dot_source = sum(
                 k_grids[ax] * k_hat[ax] for ax in range(len(data.grid_spacing))
             )
             cross = np.imag(np.conj(vhat) * fhat)
             flux = k_dot_source * cross
 
-            fwd_mask = flux > 0
-            ref_mask = flux < 0
+            flux_scale = np.max(np.abs(flux))
+            eps = 1e-12 * flux_scale if flux_scale > 0 else 0.0
+            fwd_mask = flux > eps
+            ref_mask = flux < -eps
             zero_mask = ~fwd_mask & ~ref_mask
 
             total_forward += float(np.sum(spectral_energy[fwd_mask]))

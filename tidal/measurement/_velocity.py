@@ -18,6 +18,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from tidal.measurement._dispersion import compute_dispersion
+from tidal.measurement._mode_utils import find_shared_modes
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
@@ -143,7 +144,7 @@ def compute_velocities(
         if power_active.sum() > 0
         else np.ones_like(power_active) / len(power_active)
     )
-    vg_mean = float(np.dot(np.abs(group_vel), weights))
+    vg_mean = float(np.dot(group_vel, weights))
     vp_mean = float(np.dot(phase_vel, weights))
 
     return VelocityResult(
@@ -218,26 +219,14 @@ def compute_velocity_mismatch(
     vel_tgt = compute_velocities(data, target_field, min_amplitude=min_amplitude)
 
     # Find shared wavenumber bins (matching by value with tolerance)
-    shared_k = []
-    shared_vg_src = []
-    shared_vg_tgt = []
-    for i, k_s in enumerate(vel_src.wavenumbers):
-        matches = np.where(np.isclose(vel_tgt.wavenumbers, k_s, rtol=1e-6))[0]
-        if len(matches) > 0:
-            j = matches[0]
-            shared_k.append(k_s)
-            shared_vg_src.append(vel_src.group_velocity[i])
-            shared_vg_tgt.append(vel_tgt.group_velocity[j])
+    idx_src, idx_tgt = find_shared_modes(vel_src.wavenumbers, vel_tgt.wavenumbers)
 
-    if not shared_k:
+    if not idx_src:
         msg = "No shared active wavenumber modes between source and target fields"
         raise ValueError(msg)
 
-    shared_k_arr = np.array(shared_k, dtype=np.float64)
-    mismatch = np.abs(
-        np.array(shared_vg_src, dtype=np.float64)
-        - np.array(shared_vg_tgt, dtype=np.float64)
-    )
+    shared_k_arr = vel_src.wavenumbers[idx_src]
+    mismatch = np.abs(vel_src.group_velocity[idx_src] - vel_tgt.group_velocity[idx_tgt])
 
     return VelocityMismatchResult(
         source_velocity=vel_src,

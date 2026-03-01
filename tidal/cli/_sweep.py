@@ -545,6 +545,40 @@ def _run_single(  # noqa: PLR0913, PLR0917
     return metrics
 
 
+def _measure_existing(  # noqa: PLR0913, PLR0917
+    run_dir: Path,
+    spec_path: Path,
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    threshold: float,
+) -> dict[str, Any]:
+    """Measure an existing run directory with error handling.
+
+    Used by resume logic in sequential, parallel, and adaptive execution
+    paths. Wraps ``_measure_run()`` with status tracking and error capture.
+
+    Returns metrics dict with ``run_status``, ``error_message``, and
+    ``solver_exit_code`` always set.
+    """
+    try:
+        metrics = _measure_run(
+            run_dir, spec_path, measurements, source, target, threshold
+        )
+    except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        return {
+            "error": f"resume_measure_failed: {exc}",
+            "run_status": "measurement_error",
+            "error_message": str(exc)[:200],
+            "solver_exit_code": 0,
+        }
+    else:
+        metrics.setdefault("run_status", "success")
+        metrics.setdefault("error_message", None)
+        metrics.setdefault("solver_exit_code", 0)
+        return metrics
+
+
 # ------------------------------------------------------------------
 # Main sweep orchestration
 # ------------------------------------------------------------------
@@ -638,22 +672,13 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
                 end="",
                 flush=True,
             )
-            try:
-                metrics = _measure_run(
-                    run_dir, spec_path, measurements, source, target, threshold
-                )
-                metrics.setdefault("run_status", "success")
-                metrics.setdefault("error_message", None)
-                metrics.setdefault("solver_exit_code", 0)
+            metrics = _measure_existing(
+                run_dir, spec_path, measurements, source, target, threshold
+            )
+            if metrics.get("run_status") == "measurement_error":
+                print(f" measure error: {metrics.get('error_message', '')}")
+            else:
                 print(" ok")
-            except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
-                print(f" measure error: {exc}")
-                metrics = {
-                    "error": f"resume_measure_failed: {exc}",
-                    "run_status": "measurement_error",
-                    "error_message": str(exc)[:200],
-                    "solver_exit_code": 0,
-                }
             rows.append(
                 _build_row(
                     swept_vals, fixed_params, sim_settings, metrics, grid_override
@@ -772,22 +797,13 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
                 end="",
                 flush=True,
             )
-            try:
-                metrics = _measure_run(
-                    run_dir, spec_path, measurements, source, target, threshold
-                )
-                metrics.setdefault("run_status", "success")
-                metrics.setdefault("error_message", None)
-                metrics.setdefault("solver_exit_code", 0)
+            metrics = _measure_existing(
+                run_dir, spec_path, measurements, source, target, threshold
+            )
+            if metrics.get("run_status") == "measurement_error":
+                print(f" measure error: {metrics.get('error_message', '')}")
+            else:
                 print(" ok")
-            except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
-                print(f" measure error: {exc}")
-                metrics = {
-                    "error": f"resume_measure_failed: {exc}",
-                    "run_status": "measurement_error",
-                    "error_message": str(exc)[:200],
-                    "solver_exit_code": 0,
-                }
             rows[i] = _build_row(
                 rp["swept_vals"],
                 fixed_params,
@@ -907,27 +923,13 @@ def _adaptive_run_point(  # noqa: PLR0913, PLR0917
 
     if resume and (run_dir / "metadata.json").exists():
         print(f"  [adaptive] {subdir} — measuring existing...", end="", flush=True)
-        try:
-            metrics = _measure_run(
-                run_dir,
-                spec_path,
-                measurements,
-                source,
-                target,
-                energy_threshold,
-            )
-            metrics.setdefault("run_status", "success")
-            metrics.setdefault("error_message", None)
-            metrics.setdefault("solver_exit_code", 0)
+        metrics = _measure_existing(
+            run_dir, spec_path, measurements, source, target, energy_threshold
+        )
+        if metrics.get("run_status") == "measurement_error":
+            print(f" measure error: {metrics.get('error_message', '')}")
+        else:
             print(" ok")
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
-            print(f" measure error: {exc}")
-            metrics = {
-                "error": f"resume_measure_failed: {exc}",
-                "run_status": "measurement_error",
-                "error_message": str(exc)[:200],
-                "solver_exit_code": 0,
-            }
     else:
         print(f"  [adaptive] {subdir}...", end="", flush=True)
         try:
@@ -956,7 +958,9 @@ def _adaptive_run_point(  # noqa: PLR0913, PLR0917
 
 def _detect_adaptive_metric(rows: list[dict[str, Any]]) -> str | None:
     """Auto-detect a suitable metric key from the first row."""
-    for candidate in ["P_max", "max_energy_error", "L_mix", "E_total_final"]:
+    from tidal.measurement._sweep_results import DEFAULT_METRIC_CANDIDATES
+
+    for candidate in DEFAULT_METRIC_CANDIDATES:
         if candidate in rows[0]:
             return candidate
     return None
@@ -1235,7 +1239,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         param_values = [swept_params[n] for n in param_names]
         for combo in itertools.product(*param_values):
             run = {}
-            for name, val in zip(param_names, combo, strict=False):
+            for name, val in zip(param_names, combo, strict=True):
                 run[name] = val
             runs.append(run)
 
@@ -1492,7 +1496,7 @@ def _report_convergence(  # noqa: C901
         avg_order = np.mean(orders)
         print(f"\nConvergence ({metric_key}):")
         print(f"  Estimated order: {avg_order:.2f}")
-        for size, val in zip(sizes, vals, strict=False):
+        for size, val in zip(sizes, vals, strict=True):
             print(f"  N={size}: {metric_key}={val:.6e}")
 
 

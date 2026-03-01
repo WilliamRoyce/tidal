@@ -99,7 +99,11 @@ def _extract_data(
 
     for i, row in enumerate(results.rows):
         for j, name in enumerate(param_names):
-            x[i, j] = float(row.get(name, 0.0))
+            val = row.get(name)
+            if val is None:
+                msg = f"Swept parameter '{name}' missing from row {i}"
+                raise ValueError(msg)
+            x[i, j] = float(val)
         val = row.get(metric)
         y[i] = float(val) if val is not None else np.nan
 

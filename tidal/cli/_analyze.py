@@ -17,7 +17,9 @@ if TYPE_CHECKING:
 
 def _auto_detect_metric(results: SweepResults) -> str | None:
     """Return the first recognized metric found in results rows."""
-    for candidate in ("P_max", "max_energy_error", "L_mix"):
+    from tidal.measurement._sweep_results import DEFAULT_METRIC_CANDIDATES
+
+    for candidate in DEFAULT_METRIC_CANDIDATES:
         if results.rows and candidate in results.rows[0]:
             return candidate
     return None

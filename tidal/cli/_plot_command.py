@@ -380,7 +380,9 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
         "sweep-scatter",
     }:
         # Try to auto-detect a sensible metric
-        for candidate in ["P_max", "max_energy_error", "L_mix", "E_total_final"]:
+        from tidal.measurement._sweep_results import DEFAULT_METRIC_CANDIDATES
+
+        for candidate in DEFAULT_METRIC_CANDIDATES:
             if results.rows and candidate in results.rows[0]:
                 raw_metric = candidate
                 break
@@ -424,22 +426,41 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
             render_sweep_compare(ax, results, measurement, spec_path=spec_override)
 
         elif plot_type == "convergence":
-            assert raw_metric is not None
+            if raw_metric is None:
+                print(
+                    "Error: --metric is required for convergence plots", file=sys.stderr
+                )
+                return 1
             fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
             render_convergence(ax, results, raw_metric)
 
         elif plot_type == "sweep-parallel":
-            assert raw_metric is not None
+            if raw_metric is None:
+                print(
+                    "Error: --metric is required for sweep-parallel plots",
+                    file=sys.stderr,
+                )
+                return 1
             fig, ax = plt.subplots(1, 1, figsize=figsize or (10, 6))
             render_sweep_parallel(ax, results, raw_metric)
 
         elif plot_type == "sweep-tornado":
-            assert raw_metric is not None
+            if raw_metric is None:
+                print(
+                    "Error: --metric is required for sweep-tornado plots",
+                    file=sys.stderr,
+                )
+                return 1
             fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
             render_sweep_tornado(ax, results, raw_metric)
 
         elif plot_type == "sweep-scatter":
-            assert raw_metric is not None
+            if raw_metric is None:
+                print(
+                    "Error: --metric is required for sweep-scatter plots",
+                    file=sys.stderr,
+                )
+                return 1
             n_params = len(results.swept_params)
             fig = plt.figure(figsize=figsize or (3 * n_params, 3 * n_params))
             render_sweep_scatter(fig, results, raw_metric)

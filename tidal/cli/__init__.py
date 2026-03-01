@@ -344,6 +344,34 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Default: error if constraint ICs cannot be made consistent."
         ),
     )
+    # Resume from checkpoint
+    sim_parser.add_argument(
+        "--resume",
+        default=None,
+        metavar="DIR",
+        help=(
+            "Resume simulation from a snapshot directory. "
+            "Inherits grid, parameters, and BC from saved metadata. "
+            "Loads final snapshot by default (use --snapshot N to pick)."
+        ),
+    )
+    sim_parser.add_argument(
+        "--snapshot",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Snapshot index to resume from (default: last). Requires --resume.",
+    )
+    sim_parser.add_argument(
+        "--t-additional",
+        type=float,
+        default=None,
+        metavar="T",
+        help=(
+            "Additional simulation time beyond the checkpoint "
+            "(alternative to --t-end when using --resume)."
+        ),
+    )
 
     # --- list ---
     list_parser = sub.add_parser(

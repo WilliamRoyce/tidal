@@ -139,10 +139,10 @@ def render_sweep_2d(
         raise ValueError(msg)
 
     p1_name, p2_name = param_names
-    p1_vals = np.array(results.swept_params[p1_name])
-    p2_vals = np.array(results.swept_params[p2_name])
+    p1_vals = np.sort(results.swept_params[p1_name])
+    p2_vals = np.sort(results.swept_params[p2_name])
 
-    # Build 2D grid from results rows
+    # Build 2D grid from results rows (O(n log n) via searchsorted)
     n1, n2 = len(p1_vals), len(p2_vals)
     grid = np.full((n2, n1), np.nan)
 
@@ -152,9 +152,8 @@ def render_sweep_2d(
         val = row.get(metric)
         if v1 is None or v2 is None or val is None:
             continue
-        # Find nearest indices
-        i1 = int(np.argmin(np.abs(p1_vals - float(v1))))
-        i2 = int(np.argmin(np.abs(p2_vals - float(v2))))
+        i1 = min(int(np.searchsorted(p1_vals, float(v1))), n1 - 1)
+        i2 = min(int(np.searchsorted(p2_vals, float(v2))), n2 - 1)
         grid[i2, i1] = float(val)
 
     im = ax.pcolormesh(
@@ -478,7 +477,7 @@ def render_sweep_tornado(
 
     ax.barh(
         y_pos,
-        [hi - lo for lo, hi in zip(lows, highs, strict=False)],
+        [hi - lo for lo, hi in zip(lows, highs, strict=True)],
         left=lows,
         color="tab:blue",
         alpha=0.7,

@@ -23,6 +23,14 @@ import numpy as np
 
 __all__ = ["SweepResults"]
 
+# Default metric candidates for auto-detection (shared across CLI modules)
+DEFAULT_METRIC_CANDIDATES: tuple[str, ...] = (
+    "P_max",
+    "max_energy_error",
+    "L_mix",
+    "E_total_final",
+)
+
 
 @dataclass
 class SweepResults:
@@ -103,6 +111,30 @@ class SweepResults:
         return self.converge_sizes is not None
 
     # ------------------------------------------------------------------
+    # Construction helpers
+    # ------------------------------------------------------------------
+
+    def _with_rows(
+        self,
+        rows: list[dict[str, Any]],
+        run_dirs: list[Path] | None = None,
+    ) -> SweepResults:
+        """Create a new SweepResults sharing metadata but with different rows."""
+        return SweepResults(
+            swept_params=self.swept_params,
+            fixed_params=self.fixed_params,
+            sim_settings=self.sim_settings,
+            rows=rows,
+            run_dirs=run_dirs if run_dirs is not None else [],
+            spec_path=self.spec_path,
+            measurements=self.measurements,
+            source_fields=self.source_fields,
+            target_fields=self.target_fields,
+            metadata=self.metadata,
+            converge_sizes=self.converge_sizes,
+        )
+
+    # ------------------------------------------------------------------
     # Column access
     # ------------------------------------------------------------------
 
@@ -157,19 +189,7 @@ class SweepResults:
                 filtered_rows.append(row)
                 if i < len(self.run_dirs):
                     filtered_dirs.append(self.run_dirs[i])
-        return SweepResults(
-            swept_params=self.swept_params,
-            fixed_params=self.fixed_params,
-            sim_settings=self.sim_settings,
-            rows=filtered_rows,
-            run_dirs=filtered_dirs,
-            spec_path=self.spec_path,
-            measurements=self.measurements,
-            source_fields=self.source_fields,
-            target_fields=self.target_fields,
-            metadata=self.metadata,
-            converge_sizes=self.converge_sizes,
-        )
+        return self._with_rows(filtered_rows, filtered_dirs)
 
     # ------------------------------------------------------------------
     # Query methods
@@ -197,19 +217,7 @@ class SweepResults:
                 filtered_rows.append(row)
                 if i < len(self.run_dirs):
                     filtered_dirs.append(self.run_dirs[i])
-        return SweepResults(
-            swept_params=self.swept_params,
-            fixed_params=self.fixed_params,
-            sim_settings=self.sim_settings,
-            rows=filtered_rows,
-            run_dirs=filtered_dirs,
-            spec_path=self.spec_path,
-            measurements=self.measurements,
-            source_fields=self.source_fields,
-            target_fields=self.target_fields,
-            metadata=self.metadata,
-            converge_sizes=self.converge_sizes,
-        )
+        return self._with_rows(filtered_rows, filtered_dirs)
 
     def group_by(self, param: str) -> dict[float, SweepResults]:
         """Group results by distinct values of a parameter.
@@ -234,18 +242,9 @@ class SweepResults:
 
         result: dict[float, SweepResults] = {}
         for val, indices in groups.items():
-            result[val] = SweepResults(
-                swept_params=self.swept_params,
-                fixed_params=self.fixed_params,
-                sim_settings=self.sim_settings,
-                rows=[self.rows[i] for i in indices],
-                run_dirs=[self.run_dirs[i] for i in indices if i < len(self.run_dirs)],
-                spec_path=self.spec_path,
-                measurements=self.measurements,
-                source_fields=self.source_fields,
-                target_fields=self.target_fields,
-                metadata=self.metadata,
-                converge_sizes=self.converge_sizes,
+            result[val] = self._with_rows(
+                [self.rows[i] for i in indices],
+                [self.run_dirs[i] for i in indices if i < len(self.run_dirs)],
             )
         return result
 
@@ -346,20 +345,10 @@ class SweepResults:
     def _csv_columns(self) -> list[str]:
         """Ordered list of CSV column names."""
         cols: list[str] = []
-        # Swept params first
         cols.extend(self.swept_params.keys())
-        # Fixed params
         cols.extend(self.fixed_params.keys())
-        # Simulation settings
         cols.extend(self.sim_settings.keys())
-        # Metrics (union of all rows, preserving insertion order)
-        if self.rows:
-            seen = set(cols)
-            for row in self.rows:
-                for k in row:
-                    if k not in seen:
-                        cols.append(k)
-                        seen.add(k)
+        cols.extend(self.metric_names)
         return cols
 
     def to_csv(self, path: Path | None = None) -> str:

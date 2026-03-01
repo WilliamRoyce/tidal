@@ -136,6 +136,78 @@ def _parse_field_list(raw: str | None) -> tuple[str, ...] | None:
     return tuple(s.strip() for s in raw.split(",") if s.strip())
 
 
+def _resolve_source_target(
+    data: SimulationData,
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    *,
+    require_both: bool = False,
+    measurement_name: str = "measurement",
+) -> tuple[tuple[str, ...], tuple[str, ...]]:
+    """Resolve source/target fields with optional auto-detection.
+
+    When *require_both* is ``False`` (default), auto-detects missing fields
+    from dynamical field list: source defaults to the first dynamical field,
+    target defaults to the remaining dynamical fields.
+
+    When *require_both* is ``True``, raises ``ValueError`` if either is None
+    (used for velocity mismatch and resonance where auto-detection is
+    ambiguous).
+
+    Raises
+    ------
+    ValueError
+        If auto-detection fails (no dynamical fields, or all fields in source
+        set) or if *require_both* and a field is missing.
+    """
+    if require_both:
+        if source is None:
+            msg = f"--source required for {measurement_name}"
+            raise ValueError(msg)
+        if target is None:
+            msg = f"--target required for {measurement_name}"
+            raise ValueError(msg)
+        return source, target
+
+    dyn = data.dynamical_fields
+    if not dyn:
+        msg = (
+            f"No dynamical fields found — {measurement_name} requires at least 2 fields"
+        )
+        raise ValueError(msg)
+
+    if source is None:
+        source = (dyn[0],)
+    if target is None:
+        remaining = tuple(f for f in dyn if f not in source)
+        if not remaining:
+            msg = (
+                f"Cannot auto-detect target: all dynamical fields "
+                f"({', '.join(dyn)}) are in the source set. "
+                f"Use --target explicitly."
+            )
+            raise ValueError(msg)
+        target = remaining
+
+    return source, target
+
+
+def _run_measurement_safe(
+    func: Any,  # noqa: ANN401
+    *args: Any,  # noqa: ANN401
+    **kwargs: Any,  # noqa: ANN401
+) -> dict[str, Any]:
+    """Run a measurement function with ValueError error handling.
+
+    Returns the function result on success, or ``{"error": str(exc)}``
+    if a ``ValueError`` is raised.
+    """
+    try:
+        return func(*args, **kwargs)  # type: ignore[no-any-return]
+    except ValueError as e:
+        return {"error": str(e)}
+
+
 def _load_data(
     data_path: Path,
     spec_path: Path,
@@ -206,34 +278,15 @@ def _run_conversion(
 
     The internal ``_result_obj`` key stores the ConversionResult for
     downstream mixing computation; it is stripped before serialization.
-
-    Raises
-    ------
-    ValueError
-        If no dynamical fields or auto-detection fails.
     """
     from tidal.measurement import (
         compute_conversion_probability,
         compute_group_conversion,
     )
 
-    dyn = data.dynamical_fields
-    if not dyn:
-        msg = "No dynamical fields found — conversion requires at least 2 fields"
-        raise ValueError(msg)
-
-    # Auto-detect source/target
-    if source is None:
-        source = (dyn[0],)
-    if target is None:
-        remaining = tuple(f for f in dyn if f not in source)
-        if not remaining:
-            msg = (
-                f"Cannot auto-detect target: all dynamical fields ({', '.join(dyn)}) "
-                f"are in the source set. Use --target explicitly."
-            )
-            raise ValueError(msg)
-        target = remaining
+    source, target = _resolve_source_target(
+        data, source, target, measurement_name="conversion"
+    )
 
     # Single-field or group conversion
     if len(source) == 1 and len(target) == 1:
@@ -300,35 +353,15 @@ def _run_spectral_conversion(
     source: tuple[str, ...] | None,
     target: tuple[str, ...] | None,
 ) -> dict[str, Any]:
-    """Compute per-mode spectral conversion P(k,t).
-
-    Raises
-    ------
-    ValueError
-        If no dynamical fields, or auto-detection fails.
-    """
+    """Compute per-mode spectral conversion P(k,t)."""
     from tidal.measurement import (
         compute_group_spectral_conversion,
         compute_spectral_conversion,
     )
 
-    dyn = data.dynamical_fields
-    if not dyn:
-        msg = (
-            "No dynamical fields found — spectral conversion requires at least 2 fields"
-        )
-        raise ValueError(msg)
-    if source is None:
-        source = (dyn[0],)
-    if target is None:
-        remaining = tuple(f for f in dyn if f not in source)
-        if not remaining:
-            msg = (
-                f"Cannot auto-detect target: all dynamical fields ({', '.join(dyn)}) "
-                f"are in the source set. Use --target explicitly."
-            )
-            raise ValueError(msg)
-        target = remaining
+    source, target = _resolve_source_target(
+        data, source, target, measurement_name="spectral conversion"
+    )
 
     if len(source) == 1 and len(target) == 1:
         result = compute_spectral_conversion(data, source[0], target[0])
@@ -405,22 +438,12 @@ def _run_asymptotic(
     Forward/reflected split is defined by the source field's initial
     propagation direction (spectral centroid), making it independent
     of coordinate axis choice.
-
-    Raises
-    ------
-    ValueError
-        If source is not specified and cannot be auto-detected.
     """
     from tidal.measurement import compute_asymptotic_conversion
 
-    dyn = data.dynamical_fields
-    if source is None:
-        if len(dyn) < 2:  # noqa: PLR2004
-            msg = "asymptotic requires at least 2 dynamical fields for auto-detection"
-            raise ValueError(msg)
-        source = (dyn[0],)
-    if target is None:
-        target = tuple(f for f in dyn if f not in source)
+    source, target = _resolve_source_target(
+        data, source, target, measurement_name="asymptotic"
+    )
 
     result = compute_asymptotic_conversion(data, list(source), list(target))
     return {
@@ -477,21 +500,12 @@ def _run_velocity_mismatch(
     source: tuple[str, ...] | None,
     target: tuple[str, ...] | None,
 ) -> dict[str, Any]:
-    """Compute velocity mismatch between source and target field groups.
-
-    Raises
-    ------
-    ValueError
-        If source or target not provided.
-    """
+    """Compute velocity mismatch between source and target field groups."""
     from tidal.measurement import compute_velocity_mismatch
 
-    if source is None:
-        msg = "--source required for velocity measurement"
-        raise ValueError(msg)
-    if target is None:
-        msg = "--target required for velocity measurement"
-        raise ValueError(msg)
+    source, target = _resolve_source_target(
+        data, source, target, require_both=True, measurement_name="velocity mismatch"
+    )
 
     result = compute_velocity_mismatch(data, list(source), list(target))
     return {
@@ -510,21 +524,12 @@ def _run_resonance(
     source: tuple[str, ...] | None,
     target: tuple[str, ...] | None,
 ) -> dict[str, Any]:
-    """Compute resonance analysis between source and target fields.
-
-    Raises
-    ------
-    ValueError
-        If source or target not provided.
-    """
+    """Compute resonance analysis between source and target fields."""
     from tidal.measurement import compute_resonance_analysis
 
-    if source is None:
-        msg = "--source required for resonance measurement"
-        raise ValueError(msg)
-    if target is None:
-        msg = "--target required for resonance measurement"
-        raise ValueError(msg)
+    source, target = _resolve_source_target(
+        data, source, target, require_both=True, measurement_name="resonance"
+    )
 
     result = compute_resonance_analysis(data, list(source), list(target))
     return {
@@ -850,16 +855,12 @@ def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
     results: dict[str, Any] = {}
 
     if "energy" in measurements:
-        try:
-            results["energy"] = _run_energy(data)
-        except ValueError as e:
-            results["energy"] = {"error": str(e)}
+        results["energy"] = _run_measurement_safe(_run_energy, data)
 
     if "conservation" in measurements:
-        try:
-            results["conservation"] = _run_conservation(data, threshold)
-        except ValueError as e:
-            results["conservation"] = {"error": str(e)}
+        results["conservation"] = _run_measurement_safe(
+            _run_conservation, data, threshold
+        )
 
     if "conversion" in measurements or "mixing" in measurements:
         source = _parse_field_list(getattr(args, "source", None))
@@ -879,20 +880,14 @@ def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
 
             if "mixing" in measurements:
                 conv_result: ConversionResult = conv["_result_obj"]
-                try:
-                    results["mixing"] = _run_mixing(conv_result)
-                except ValueError as e:
-                    results["mixing"] = {"error": str(e)}
+                results["mixing"] = _run_measurement_safe(_run_mixing, conv_result)
         except ValueError as e:
             results["conversion"] = {"error": str(e)}
             if "mixing" in measurements:
                 results["mixing"] = {"error": f"conversion failed: {e}"}
 
     if "spectrum" in measurements:
-        try:
-            results["spectrum"] = _run_spectrum(data)
-        except ValueError as e:
-            results["spectrum"] = {"error": str(e)}
+        results["spectrum"] = _run_measurement_safe(_run_spectrum, data)
 
     if "spectral_conversion" in measurements:
         source = _parse_field_list(getattr(args, "source", None))
@@ -906,14 +901,9 @@ def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
             )
             return 1
 
-        try:
-            results["spectral_conversion"] = _run_spectral_conversion(
-                data,
-                source,
-                target,
-            )
-        except ValueError as e:
-            results["spectral_conversion"] = {"error": str(e)}
+        results["spectral_conversion"] = _run_measurement_safe(
+            _run_spectral_conversion, data, source, target
+        )
 
     if "dispersion" in measurements:
         source = _parse_field_list(getattr(args, "source", None))
@@ -939,10 +929,9 @@ def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
             print("Error: no dynamical fields for dispersion", file=sys.stderr)
             return 1
 
-        try:
-            results["dispersion"] = _run_dispersion(data, dyn_in_source)
-        except ValueError as e:
-            results["dispersion"] = {"error": str(e)}
+        results["dispersion"] = _run_measurement_safe(
+            _run_dispersion, data, dyn_in_source
+        )
 
     if "effective_mass" in measurements:
         source = _parse_field_list(getattr(args, "source", None))
@@ -954,10 +943,9 @@ def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
         else:
             dyn_in_source = list(data.dynamical_fields)
 
-        try:
-            results["effective_mass"] = _run_effective_mass(data, dyn_in_source)
-        except ValueError as e:
-            results["effective_mass"] = {"error": str(e)}
+        results["effective_mass"] = _run_measurement_safe(
+            _run_effective_mass, data, dyn_in_source
+        )
 
     if "asymptotic" in measurements:
         source = _parse_field_list(getattr(args, "source", None))
@@ -971,10 +959,9 @@ def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
             )
             return 1
 
-        try:
-            results["asymptotic"] = _run_asymptotic(data, source, target)
-        except ValueError as e:
-            results["asymptotic"] = {"error": str(e)}
+        results["asymptotic"] = _run_measurement_safe(
+            _run_asymptotic, data, source, target
+        )
 
     if "peak_conversion" in measurements:
         source = _parse_field_list(getattr(args, "source", None))
@@ -988,10 +975,9 @@ def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
             )
             return 1
 
-        try:
-            results["peak_conversion"] = _run_peak_conversion(data, source, target)
-        except ValueError as e:
-            results["peak_conversion"] = {"error": str(e)}
+        results["peak_conversion"] = _run_measurement_safe(
+            _run_peak_conversion, data, source, target
+        )
 
     if "velocity" in measurements:
         source = _parse_field_list(getattr(args, "source", None))
@@ -1003,16 +989,14 @@ def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
         else:
             dyn_in_source = list(data.dynamical_fields)
 
-        try:
-            results["velocity"] = _run_velocity(data, dyn_in_source)
-            # If both source and target provided, also compute mismatch
+        results["velocity"] = _run_measurement_safe(_run_velocity, data, dyn_in_source)
+        # If both source and target provided, also compute mismatch
+        if "error" not in results["velocity"]:
             target = _parse_field_list(getattr(args, "target", None))
             if target is not None:
-                results["velocity_mismatch"] = _run_velocity_mismatch(
-                    data, tuple(dyn_in_source), target
+                results["velocity_mismatch"] = _run_measurement_safe(
+                    _run_velocity_mismatch, data, tuple(dyn_in_source), target
                 )
-        except ValueError as e:
-            results["velocity"] = {"error": str(e)}
 
     if "resonance" in measurements:
         source = _parse_field_list(getattr(args, "source", None))
@@ -1025,10 +1009,9 @@ def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
             )
             return 1
 
-        try:
-            results["resonance"] = _run_resonance(data, source, target)
-        except ValueError as e:
-            results["resonance"] = {"error": str(e)}
+        results["resonance"] = _run_measurement_safe(
+            _run_resonance, data, source, target
+        )
 
     return results
 
