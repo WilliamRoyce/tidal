@@ -790,41 +790,19 @@ def _file_slots(
     raise ValueError(msg)
 
 
-class ResumeState:
-    """Checkpoint state loaded from a snapshot directory for simulation resume.
-
-    Attributes
-    ----------
-    y0 : np.ndarray
-        Flat state vector at the checkpoint snapshot.
-    t_start : float
-        Simulation time of the checkpoint snapshot.
-    parameters : dict[str, float]
-        Parameter values from the saved metadata.
-    grid_shape : tuple[int, ...]
-        Spatial grid shape from saved metadata.
-    grid_bounds : tuple[tuple[float, float], ...]
-        Domain bounds per axis from saved metadata.
-    periodic : tuple[bool, ...]
-        Per-axis periodicity flags from saved metadata.
-    bc_types : tuple[str, ...] | None
-        Per-axis boundary condition types (None if not saved).
-    dt : float | None
-        Solver time-step from saved metadata (None if not saved).
-    snapshot_index : int
-        Which snapshot index was loaded.
-    """
+class ResumeState:  # noqa: B903
+    """Checkpoint state loaded from a snapshot directory for simulation resume."""
 
     __slots__ = (
-        "y0",
-        "t_start",
-        "parameters",
-        "grid_shape",
-        "grid_bounds",
-        "periodic",
         "bc_types",
         "dt",
+        "grid_bounds",
+        "grid_shape",
+        "parameters",
+        "periodic",
         "snapshot_index",
+        "t_start",
+        "y0",
     )
 
     def __init__(  # noqa: PLR0913
@@ -851,7 +829,7 @@ class ResumeState:
         self.snapshot_index = snapshot_index
 
 
-def _load_resume_state(
+def _load_resume_state(  # noqa: PLR0914
     resume_dir: Path,
     spec: EquationSystem,
     snapshot_index: int | None = None,
@@ -896,7 +874,6 @@ def _load_resume_state(
         meta = json.load(f)
 
     saved_fields: list[str] = meta.get("fields", [])
-    saved_velocities: list[str] = meta.get("velocities", [])
     grid_shape = tuple(meta.get("grid_shape", []))
     grid_bounds = tuple(
         tuple(b) for b in meta.get("grid_bounds", [])
@@ -982,10 +959,11 @@ def _validate_resume_grid(resume: ResumeState, grid_info: GridInfo) -> None:
         )
         raise ValueError(msg)
     # Compare bounds with tolerance for float rounding
+    bounds_tol = 1e-10
     for i, (saved, current) in enumerate(
         zip(resume.grid_bounds, grid_info.bounds, strict=True)
     ):
-        if abs(saved[0] - current[0]) > 1e-10 or abs(saved[1] - current[1]) > 1e-10:
+        if abs(saved[0] - current[0]) > bounds_tol or abs(saved[1] - current[1]) > bounds_tol:
             msg = (
                 f"Grid bounds mismatch on axis {i}: "
                 f"checkpoint has {saved} but current grid is {current}"
@@ -1336,6 +1314,7 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     params: dict[str, float],
     snapshot_interval: float,
     dt: float | None = None,
+    num_snapshots: int | None = None,
 ) -> tuple[SnapshotWriter, Callable[..., None]]:
     """Set up disk-backed SnapshotWriter using StateLayout (no py-pde).
 
@@ -1348,7 +1327,7 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
 
     layout = StateLayout.from_spec(spec, grid_info.num_points)
     output_dir = Path(args.output) if args.output else Path("output")
-    n_snaps = compute_snapshot_count(args.t_end, snapshot_interval)
+    n_snaps = num_snapshots or compute_snapshot_count(args.t_end, snapshot_interval)
 
     field_names = [s.name for s in layout.slots if s.kind != "velocity"]
     velocity_names = [s.field_name for s in layout.slots if s.kind == "velocity"]
@@ -1733,6 +1712,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
             params,
             snapshot_interval,
             dt=dt,
+            num_snapshots=num_snapshots,
         )
 
     # 8. Solve
@@ -1882,7 +1862,7 @@ def _validate_solver_params(args: Namespace) -> None:
         raise ValueError(msg)
 
 
-def simulate_command(args: Namespace) -> int:
+def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
     """Execute the simulate command.
 
     Parameters
