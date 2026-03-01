@@ -89,5 +89,55 @@ tidal plot "$OUT" --type compare \
 # tidal plot "$OUT" --type hamiltonian --fields h_4,h_5,h_7
 
 echo ""
-echo "Analysis complete. Plots saved to: $OUT/"
-ls -la "$OUT"/*.png 2>/dev/null || echo "  (no plots generated)"
+echo "=== Run 1 (static Gaussian) complete. Plots: $OUT/ ==="
+
+# ============================================================================
+# Run 2: Unidirectional GW pulse (right-mover via formula + velocity)
+# ============================================================================
+# The static Gaussian above splits into left+right movers. Using
+# --ic-formula-velocity, we lock field and velocity together to create
+# a clean unidirectional GW burst — the physically correct way to
+# initialize a gravitational wave pulse.
+#
+# For a right-mover: h_+ = envelope*cos(kx), dh_+/dt = +k*envelope*sin(kx)
+# The constraint solver automatically sets h_7 = -h_4 (traceless partner).
+
+OUT2=../data/gw_plane_wave_1d_travelling
+
+tidal simulate ../data/gw_plane_wave_1d.json \
+  --grid-shape 256 \
+  --bounds=-10:10 \
+  --periodic \
+  --ic formula \
+  --ic-formula 'exp(-x**2 / 2) * cos(3 * x)' \
+  --ic-formula-velocity '3 * exp(-x**2 / 2) * sin(3 * x)' \
+  --ic-component h_4 \
+  --t-end 8.0 \
+  --output "$OUT2"
+
+# Heatmap: clean rightward propagation (compare vs symmetric Run 1)
+tidal plot "$OUT2" --type heatmap --field h_4 \
+  --title "GW h_+ travelling pulse (right-mover)" \
+  --output "$OUT2/heatmap_h_4.png"
+
+tidal plot "$OUT2" --type heatmap --field h_7 \
+  --title "GW h_7 = -h_+ travelling (traceless partner)" \
+  --output "$OUT2/heatmap_h_7.png"
+
+tidal plot "$OUT2" --type profile --field h_4 \
+  --time-indices 0,25,50,75,100 \
+  --title "h_+ travelling profile evolution" \
+  --output "$OUT2/profile_h_4.png"
+
+tidal plot "$OUT2" --type amplitude \
+  --fields h_4,h_5,h_7 \
+  --title "GW amplitudes (travelling pulse)" \
+  --output "$OUT2/amplitude.png"
+
+echo ""
+echo "=== Run 2 (travelling pulse) complete. Plots: $OUT2/ ==="
+echo ""
+echo "All runs complete."
+echo "  Static Gaussian:   $OUT/"
+echo "  Travelling pulse:  $OUT2/"
+ls -la "$OUT"/*.png "$OUT2"/*.png 2>/dev/null || echo "  (no plots generated)"

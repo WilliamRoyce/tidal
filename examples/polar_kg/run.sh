@@ -42,3 +42,42 @@ tidal simulate ../data/polar_kg.json \
 tidal plot ../data/polar_kg_output --type snapshot --time-index 0 --quiet
 tidal plot ../data/polar_kg_output --type snapshot --time-index -1 --quiet
 tidal plot ../data/polar_kg_output --type amplitude --quiet
+
+echo ""
+echo "=== Run 1 (static ring) complete ==="
+
+# ============================================================================
+# Run 2: Expanding ring (outward radial velocity)
+# ============================================================================
+# Run 1 creates a static Gaussian ring at r=3 which collapses inward and
+# expands outward simultaneously. Using --ic-formula-velocity with a positive
+# radial velocity, we create a purely expanding ring — a more physically
+# natural IC on curved manifolds.
+#
+# In polar coords, x=r and positive velocity means outward expansion.
+
+tidal simulate ../data/polar_kg.json \
+  --param polm2=0.5 \
+  --grid-shape 128 \
+  --bounds 0.5:10,0:6.283185 \
+  --bc neumann,periodic \
+  --ic formula \
+  --ic-formula 'exp(-(x - 3.0)**2 / 0.5)' \
+  --ic-formula-velocity '0.5 * exp(-(x - 3.0)**2 / 0.5)' \
+  --t-end 8.0 \
+  --output ../data/polar_kg_expanding
+
+# Compare: static (symmetric collapse+expansion) vs expanding (outward only)
+tidal plot ../data/polar_kg_expanding --type snapshot --time-index 0 \
+  --title "Expanding ring t=0" --quiet
+tidal plot ../data/polar_kg_expanding --type snapshot --time-index -1 \
+  --title "Expanding ring t=final" --quiet
+tidal plot ../data/polar_kg_expanding --type amplitude \
+  --title "Expanding ring amplitude" --quiet
+
+echo ""
+echo "=== Run 2 (expanding ring) complete ==="
+echo ""
+echo "Compare static vs expanding ring:"
+echo "  Static (no velocity):    ../data/polar_kg_output/"
+echo "  Expanding (v = +0.5):    ../data/polar_kg_expanding/"
