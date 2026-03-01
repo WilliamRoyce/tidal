@@ -91,6 +91,59 @@ cd examples/scalar_vector_coupling && bash run.sh
 | proca_background | Yes | Yes | Yes |
 | vector_background | Yes | Yes | Yes |
 
+## Parameter Sweeps
+
+TIDAL includes example scripts demonstrating the `tidal sweep` framework for automated parameter studies, convergence analysis, and sensitivity analysis.
+
+### Sweep Examples
+
+| Script | Example | Features Demonstrated |
+|--------|---------|----------------------|
+| `coupled_scattering/sweep.sh` | 1D coupling sweep | Basic CLI sweep (F1) |
+| `coupled_scattering/sweep_2d.sh` | 2D coupling × mass | Cartesian product sweep (F1) |
+| `coupled_scattering/convergence.sh` | Grid convergence | `--converge` flag |
+| `coupled_scattering/sweep_adaptive.sh` | Adaptive sampling | `--adaptive-metric` (F2a) |
+| `coupled_scattering/sweep_advanced.toml` | Full TOML config | Adaptive + resume + parallel (F1+F2a+F7) |
+| `coupled_scattering/sweep_scattering.sh` | Asymptotic observables | asymptotic + peak_conversion measurements |
+| `coupled_scalars/sweep_coupling.sh` | 1D coupling sweep | Basic CLI sweep (F1) |
+| `coupled_scalars/sweep_mass_ratio.sh` | Mass ratio resonance | velocity + resonance measurements (F3) |
+| `coupled_scalars/sweep_2d_sensitivity.toml` | Latin Hypercube 2D | LHS sampling (F2b) |
+| `coupled_scalars/sweep_2d_sensitivity.sh` | Sensitivity analysis | Sobol/Morris + advanced viz (F4+F8) |
+| `scalar_field/sweep_convergence.sh` | Single-field convergence | Conservation convergence study |
+
+### Running Sweep Examples
+
+```bash
+# Run from the example directory
+cd examples/coupled_scattering && bash sweep_adaptive.sh
+
+# Or use a TOML config directly
+tidal sweep --config examples/coupled_scattering/sweep_advanced.toml
+
+# Visualize results
+tidal plot sweeps/output/ --type sweep --metric P_max
+```
+
+### Measurement Suitability by Example Type
+
+| Category | Examples | Suitable Measurements |
+|----------|---------|----------------------|
+| Coupled (flat, homogeneous) | `coupled_scalars`, `coupled_proca`, `scalar_vector_coupling` | All 13 types |
+| Scattering (flat, background) | `coupled_scattering`, `proca_background`, `vector_background` | energy, conversion, mixing, asymptotic, peak_conversion, conservation |
+| Single-field / curved | `scalar_field`, `proca`, `polar_kg`, etc. | energy, conservation, spectrum, dispersion |
+
+### Feature Coverage
+
+| Feature | Description | Example |
+|---------|-------------|---------|
+| F1 | CLI + TOML sweep configs | `sweep_coupling.toml`, `sweep_advanced.toml` |
+| F2a | Adaptive sampling | `sweep_adaptive.sh` |
+| F2b | Latin Hypercube sampling | `sweep_2d_sensitivity.toml` |
+| F3 | Velocity + resonance analysis | `sweep_mass_ratio.sh` |
+| F4 | Sobol/Morris sensitivity | `sweep_2d_sensitivity.sh` |
+| F7 | Run status tracking + resume | `sweep_advanced.toml` |
+| F8 | Advanced visualization | `sweep_2d_sensitivity.sh` |
+
 ## JSON Specification Files
 
 All generated JSON files live in `examples/data/`:
