@@ -26,8 +26,13 @@ _VALID_TYPES = frozenset(
         "compare",
         "hamiltonian",
         "conservation",
+        "sweep",
+        "sweep-compare",
+        "convergence",
     }
 )
+
+_SWEEP_TYPES = frozenset({"sweep", "sweep-compare", "convergence"})
 
 DPI_DEFAULT = 150
 
@@ -200,6 +205,10 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
         )
         return 1
 
+    # Sweep plot types: dispatch to sweep-specific handler
+    if plot_type in _SWEEP_TYPES:
+        return _sweep_plot(args, data_path, plot_type)
+
     # Parse options
     try:
         fields_list = _parse_fields(args.fields)
@@ -297,6 +306,128 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
 
     plt.tight_layout()
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(str(output_path), dpi=dpi, bbox_inches="tight")
+    plt.close(fig)
+
+    if not args.quiet:
+        print(f"Saved: {output_path.resolve()}")
+
+    return 0
+
+
+# ------------------------------------------------------------------
+# Sweep plot dispatch
+# ------------------------------------------------------------------
+
+
+def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
+    """Handle sweep-specific plot types.
+
+    Loads ``SweepResults`` from *data_path* and dispatches to the
+    appropriate render function in ``_sweep_panels``.
+    """
+    import matplotlib as mpl
+
+    mpl.use("Agg")
+    import matplotlib.pyplot as plt
+
+    from tidal.cli._sweep_panels import (
+        render_convergence,
+        render_sweep_1d,
+        render_sweep_1d_multi,
+        render_sweep_2d,
+        render_sweep_compare,
+    )
+    from tidal.measurement._sweep_results import SweepResults
+
+    # Load sweep data
+    sweep_json = data_path / "sweep.json"
+    if not sweep_json.exists():
+        print(
+            f"Error: '{data_path}' is not a sweep directory (no sweep.json)",
+            file=sys.stderr,
+        )
+        return 1
+
+    try:
+        results = SweepResults.from_directory(data_path)
+    except (FileNotFoundError, ValueError) as exc:
+        print(f"Error loading sweep data: {exc}", file=sys.stderr)
+        return 1
+
+    # Parse metric(s)
+    raw_metric: str | None = getattr(args, "metric", None)
+    if raw_metric is None and plot_type in {"sweep", "convergence"}:
+        # Try to auto-detect a sensible metric
+        for candidate in ["P_max", "max_energy_error", "L_mix", "E_total_final"]:
+            if results.rows and candidate in results.rows[0]:
+                raw_metric = candidate
+                break
+        if raw_metric is None:
+            print(
+                "Error: --metric is required for sweep plots. "
+                f"Available: {', '.join(results.metric_names)}",
+                file=sys.stderr,
+            )
+            return 1
+
+    figsize = _parse_figsize(getattr(args, "figsize", None))
+    dpi = getattr(args, "dpi", None) or DPI_DEFAULT
+
+    try:
+        if plot_type == "sweep":
+            metrics = [s.strip() for s in raw_metric.split(",")]  # type: ignore[union-attr]
+            n_swept = len(results.swept_params)
+
+            if n_swept == 1:
+                if len(metrics) == 1:
+                    fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
+                    render_sweep_1d(ax, results, metrics[0])
+                else:
+                    fig = plt.figure(figsize=figsize or (8, 3 * len(metrics)))
+                    render_sweep_1d_multi(fig, results, metrics)
+            elif n_swept == 2:  # noqa: PLR2004
+                fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 6))
+                render_sweep_2d(ax, results, metrics[0])
+            else:
+                print(
+                    f"Error: sweep plot supports 1 or 2 swept parameters, got {n_swept}",
+                    file=sys.stderr,
+                )
+                return 1
+
+        elif plot_type == "sweep-compare":
+            measurement = raw_metric or "conversion"
+            fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
+            spec_override = getattr(args, "spec", None)
+            render_sweep_compare(ax, results, measurement, spec_path=spec_override)
+
+        elif plot_type == "convergence":
+            assert raw_metric is not None
+            fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
+            render_convergence(ax, results, raw_metric)
+
+        else:
+            print(f"Error: unknown sweep plot type '{plot_type}'", file=sys.stderr)
+            return 1
+
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    # Apply custom title
+    if args.title:
+        fig.suptitle(args.title)
+
+    # Output path
+    output_path = (
+        Path(args.output)
+        if args.output
+        else data_path / f"{plot_type}.png"
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    plt.tight_layout()
     fig.savefig(str(output_path), dpi=dpi, bbox_inches="tight")
     plt.close(fig)
 
