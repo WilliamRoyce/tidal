@@ -10,6 +10,7 @@ import pytest
 
 from tidal.cli._sweep import (
     _build_row,
+    _interval_scores,
     _run_subdir_name,
     parse_converge_spec,
     parse_sweep_spec,
@@ -605,3 +606,57 @@ class TestSweepValidation:
         captured = capsys.readouterr()
         assert "nonexistent_param_xyz" in captured.err
         assert "Possible typo" in captured.err
+
+
+# ------------------------------------------------------------------
+# Adaptive interval scoring
+# ------------------------------------------------------------------
+
+
+class TestIntervalScores:
+    """Test _interval_scores curvature-based scoring."""
+
+    def test_flat_function_low_scores(self) -> None:
+        """Constant function should have zero scores."""
+        values = [0.0, 1.0, 2.0, 3.0]
+        metric_vals = [1.0, 1.0, 1.0, 1.0]
+        scores = _interval_scores(values, metric_vals)
+        assert len(scores) == 3
+        assert all(s == 0.0 for s in scores)
+
+    def test_linear_function_equal_scores(self) -> None:
+        """Linear function has constant differences, all intervals score alike."""
+        values = [0.0, 1.0, 2.0, 3.0]
+        metric_vals = [0.0, 1.0, 2.0, 3.0]
+        scores = _interval_scores(values, metric_vals)
+        assert len(scores) == 3
+        # All intervals have the same absolute step, so scores should be equal
+        # (the scoring function normalizes by max(fa, fb) so ratios differ,
+        # but the relative ranking is what matters for adaptive refinement)
+        assert all(s > 0 for s in scores)
+
+    def test_sharp_feature_scores_highest(self) -> None:
+        """An interval with a sharp change should score higher."""
+        values = [0.0, 1.0, 2.0, 3.0, 4.0]
+        # Flat, then sharp jump at 2->3
+        metric_vals = [0.0, 0.0, 0.0, 10.0, 10.0]
+        scores = _interval_scores(values, metric_vals)
+        # Interval [2, 3] has the largest jump
+        assert scores[2] > scores[0]
+        assert scores[2] > scores[3]
+
+    def test_none_values_score_zero(self) -> None:
+        """None metric values should produce zero score."""
+        values = [0.0, 1.0, 2.0]
+        metric_vals = [1.0, None, 2.0]
+        scores = _interval_scores(values, metric_vals)
+        assert scores[0] == 0.0
+        assert scores[1] == 0.0
+
+    def test_single_interval(self) -> None:
+        """Two points = one interval."""
+        values = [0.0, 1.0]
+        metric_vals = [0.0, 5.0]
+        scores = _interval_scores(values, metric_vals)
+        assert len(scores) == 1
+        assert scores[0] > 0

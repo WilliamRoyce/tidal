@@ -28,10 +28,19 @@ if TYPE_CHECKING:
     from argparse import Namespace
 
 # Measurement types supported by sweep (subset of tidal measure)
-_SWEEP_MEASUREMENTS = frozenset({
-    "summary", "energy", "conversion", "mixing", "dispersion",
-    "conservation", "effective_mass", "asymptotic", "peak_conversion",
-})
+_SWEEP_MEASUREMENTS = frozenset(
+    {
+        "summary",
+        "energy",
+        "conversion",
+        "mixing",
+        "dispersion",
+        "conservation",
+        "effective_mass",
+        "asymptotic",
+        "peak_conversion",
+    }
+)
 
 # Safety limits for sweep grid size
 _WARN_SWEEP_SIZE = 1_000
@@ -68,8 +77,7 @@ def parse_sweep_spec(raw: str) -> tuple[str, list[float]]:  # noqa: C901
     """
     if "=" not in raw:
         msg = (
-            f"Invalid sweep spec: '{raw}'. "
-            f"Expected NAME=START:STOP:N or NAME=V1,V2,..."
+            f"Invalid sweep spec: '{raw}'. Expected NAME=START:STOP:N or NAME=V1,V2,..."
         )
         raise ValueError(msg)
 
@@ -297,7 +305,9 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             metrics["P_max"] = None
             metrics["conversion_error"] = str(exc)
 
-    if ("mixing" in measurements or "summary" in measurements) and conv_result is not None:
+    if (
+        "mixing" in measurements or "summary" in measurements
+    ) and conv_result is not None:
         try:
             mix = _run_mixing(conv_result)
             metrics["L_mix"] = mix["mixing_length"]
@@ -446,7 +456,9 @@ def _collect_sim_settings(args: Namespace) -> dict[str, Any]:
     settings["dt"] = getattr(args, "dt", None) or "auto"
     settings["scheme"] = getattr(args, "scheme", "auto")
     bc = getattr(args, "bc", None)
-    settings["bc"] = bc or ("periodic" if getattr(args, "periodic", True) else "neumann")
+    settings["bc"] = bc or (
+        "periodic" if getattr(args, "periodic", True) else "neumann"
+    )
     return settings
 
 
@@ -482,7 +494,11 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
 
         # Resume check: re-measure existing output instead of re-simulating
         if resume and (run_dir / "metadata.json").exists():
-            print(f"  [{i + 1}/{total_runs}] {subdir} — measuring existing...", end="", flush=True)
+            print(
+                f"  [{i + 1}/{total_runs}] {subdir} — measuring existing...",
+                end="",
+                flush=True,
+            )
             try:
                 metrics = _measure_run(
                     run_dir, spec_path, measurements, source, target, threshold
@@ -491,35 +507,75 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
             except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
                 print(f" measure error: {exc}")
                 metrics = {"error": f"resume_measure_failed: {exc}"}
-            rows.append(_build_row(swept_vals, fixed_params, sim_settings, metrics, grid_override))
-            _save_incremental(output_dir, rows, run_dirs, swept_params,
-                              fixed_params, sim_settings, measurements,
-                              source, target, spec_path, converge_sizes)
+            rows.append(
+                _build_row(
+                    swept_vals, fixed_params, sim_settings, metrics, grid_override
+                )
+            )
+            _save_incremental(
+                output_dir,
+                rows,
+                run_dirs,
+                swept_params,
+                fixed_params,
+                sim_settings,
+                measurements,
+                source,
+                target,
+                spec_path,
+                converge_sizes,
+            )
             continue
 
         print(f"  [{i + 1}/{total_runs}] {subdir}...", end="", flush=True)
 
         try:
             metrics = _run_single(
-                args, spec_path, param_overrides, run_dir,
-                measurements, source, target, threshold,
+                args,
+                spec_path,
+                param_overrides,
+                run_dir,
+                measurements,
+                source,
+                target,
+                threshold,
                 grid_shape_override=grid_override,
             )
-            rows.append(_build_row(swept_vals, fixed_params, sim_settings, metrics, grid_override))
+            rows.append(
+                _build_row(
+                    swept_vals, fixed_params, sim_settings, metrics, grid_override
+                )
+            )
             _print_status(metrics)
         except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
             print(f" ERROR: {exc}")
-            rows.append(_build_row(
-                swept_vals, fixed_params, sim_settings, {"error": str(exc)}, grid_override,
-            ))
+            rows.append(
+                _build_row(
+                    swept_vals,
+                    fixed_params,
+                    sim_settings,
+                    {"error": str(exc)},
+                    grid_override,
+                )
+            )
 
         # ETA
         _print_eta(len(rows), total_runs, sweep_start)
 
         # Incremental save after each run (crash recovery)
-        _save_incremental(output_dir, rows, run_dirs, swept_params,
-                          fixed_params, sim_settings, measurements,
-                          source, target, spec_path, converge_sizes)
+        _save_incremental(
+            output_dir,
+            rows,
+            run_dirs,
+            swept_params,
+            fixed_params,
+            sim_settings,
+            measurements,
+            source,
+            target,
+            spec_path,
+            converge_sizes,
+        )
 
     return rows
 
@@ -559,7 +615,11 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
 
         if resume and (run_dir / "metadata.json").exists():
             # Resume runs measured sequentially (fast — no simulation)
-            print(f"  [{i + 1}/{total_runs}] {rp['subdir']} — measuring existing...", end="", flush=True)
+            print(
+                f"  [{i + 1}/{total_runs}] {rp['subdir']} — measuring existing...",
+                end="",
+                flush=True,
+            )
             try:
                 metrics = _measure_run(
                     run_dir, spec_path, measurements, source, target, threshold
@@ -569,25 +629,31 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
                 print(f" measure error: {exc}")
                 metrics = {"error": f"resume_measure_failed: {exc}"}
             rows[i] = _build_row(
-                rp["swept_vals"], fixed_params, sim_settings, metrics, rp["grid_override"]
+                rp["swept_vals"],
+                fixed_params,
+                sim_settings,
+                metrics,
+                rp["grid_override"],
             )
             completed.add(i)
             continue
 
-        tasks.append({
-            "index": i,
-            "base_args": args,
-            "spec_path": str(spec_path),
-            "param_overrides": rp["param_overrides"],
-            "output_dir": str(rp["run_dir"]),
-            "measurements": measurements,
-            "source": source,
-            "target": target,
-            "threshold": threshold,
-            "grid_override": rp["grid_override"],
-            "swept_vals": rp["swept_vals"],
-            "subdir": rp["subdir"],
-        })
+        tasks.append(
+            {
+                "index": i,
+                "base_args": args,
+                "spec_path": str(spec_path),
+                "param_overrides": rp["param_overrides"],
+                "output_dir": str(rp["run_dir"]),
+                "measurements": measurements,
+                "source": source,
+                "target": target,
+                "threshold": threshold,
+                "grid_override": rp["grid_override"],
+                "swept_vals": rp["swept_vals"],
+                "subdir": rp["subdir"],
+            }
+        )
 
     if tasks:
         print(f"  Running {len(tasks)} simulations with {n_workers} workers...")
@@ -605,11 +671,238 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
                 _print_status(metrics)
                 _print_eta(len(completed), total_runs, sweep_start)
                 # Incremental save after each parallel completion
-                _save_incremental(output_dir, list(rows), run_dirs, swept_params,
-                                  fixed_params, sim_settings, measurements,
-                                  source, target, spec_path, converge_sizes)
+                _save_incremental(
+                    output_dir,
+                    list(rows),
+                    run_dirs,
+                    swept_params,
+                    fixed_params,
+                    sim_settings,
+                    measurements,
+                    source,
+                    target,
+                    spec_path,
+                    converge_sizes,
+                )
 
     return list(rows)
+
+
+# ------------------------------------------------------------------
+# Adaptive interval refinement (1D)
+# ------------------------------------------------------------------
+
+
+def _interval_scores(
+    values: list[float],
+    metric_vals: list[float | None],
+) -> list[float]:
+    """Compute curvature-based interest score for each interval.
+
+    For interval [a, b] with midpoint m, the score is:
+        |f(a) - 2*f(m) + f(b)| / (|f(b) - f(a)| + eps)
+
+    This approximates the second derivative normalized by the first,
+    identifying intervals with sharp features worth resolving.
+    """
+    scores: list[float] = []
+    eps = 1e-12
+    for i in range(len(values) - 1):
+        fa = metric_vals[i]
+        fb = metric_vals[i + 1]
+        if fa is None or fb is None:
+            scores.append(0.0)
+            continue
+        # Curvature estimate from endpoints only (no midpoint yet)
+        # Use abs difference as proxy for interest
+        scores.append(abs(fb - fa) / (abs(max(fa, fb)) + eps))
+    return scores
+
+
+def _adaptive_run_point(  # noqa: PLR0913, PLR0917
+    val: float,
+    param_name: str,
+    args: Namespace,
+    spec_path: Path,
+    all_params: dict[str, float],
+    fixed_params: dict[str, float],
+    sim_settings: dict[str, Any],
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    energy_threshold: float,
+    output_dir: Path,
+    run_dirs: list[Path],
+    *,
+    resume: bool,
+) -> dict[str, Any]:
+    """Run a single adaptive point and return the results row."""
+    swept_vals = {param_name: val}
+    subdir = _run_subdir_name(swept_vals, None)
+    run_dir = output_dir / subdir
+    run_dirs.append(run_dir)
+
+    param_overrides = dict(all_params)
+    param_overrides[param_name] = val
+
+    if resume and (run_dir / "metadata.json").exists():
+        print(f"  [adaptive] {subdir} — measuring existing...", end="", flush=True)
+        try:
+            metrics = _measure_run(
+                run_dir,
+                spec_path,
+                measurements,
+                source,
+                target,
+                energy_threshold,
+            )
+            print(" ok")
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            print(f" measure error: {exc}")
+            metrics = {"error": f"resume_measure_failed: {exc}"}
+    else:
+        print(f"  [adaptive] {subdir}...", end="", flush=True)
+        try:
+            metrics = _run_single(
+                args,
+                spec_path,
+                param_overrides,
+                run_dir,
+                measurements,
+                source,
+                target,
+                energy_threshold,
+            )
+            _print_status(metrics)
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            print(f" ERROR: {exc}")
+            metrics = {"error": str(exc)}
+
+    return _build_row(swept_vals, fixed_params, sim_settings, metrics, None)
+
+
+def _detect_adaptive_metric(rows: list[dict[str, Any]]) -> str | None:
+    """Auto-detect a suitable metric key from the first row."""
+    for candidate in ["P_max", "max_energy_error", "L_mix", "E_total_final"]:
+        if candidate in rows[0]:
+            return candidate
+    return None
+
+
+def _execute_adaptive(  # noqa: PLR0913, PLR0917
+    args: Namespace,
+    spec_path: Path,
+    param_name: str,
+    initial_values: list[float],
+    max_count: int,
+    metric_key: str | None,
+    threshold: float,
+    all_params: dict[str, float],
+    fixed_params: dict[str, float],
+    sim_settings: dict[str, Any],
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    energy_threshold: float,
+    output_dir: Path,
+    *,
+    resume: bool,
+) -> tuple[list[dict[str, Any]], list[Path], dict[str, list[float]]]:
+    """Execute adaptive refinement sweep for a single parameter.
+
+    Returns
+    -------
+    tuple[list[dict], list[Path], dict[str, list[float]]]
+        (rows sorted by parameter value, run_dirs, updated swept_params)
+    """
+    sweep_start = time.monotonic()
+    points = sorted(initial_values)
+    rows: list[dict[str, Any]] = []
+    run_dirs: list[Path] = []
+
+    run_kw = {
+        "param_name": param_name,
+        "args": args,
+        "spec_path": spec_path,
+        "all_params": all_params,
+        "fixed_params": fixed_params,
+        "sim_settings": sim_settings,
+        "measurements": measurements,
+        "source": source,
+        "target": target,
+        "energy_threshold": energy_threshold,
+        "output_dir": output_dir,
+        "run_dirs": run_dirs,
+        "resume": resume,
+    }
+
+    # Phase 1: Run initial grid
+    print(f"  Adaptive: initial grid ({len(points)} points)")
+    for val in points:
+        rows.append(_adaptive_run_point(val, **run_kw))  # noqa: PERF401 — side effects
+
+    swept_snapshot = {param_name: list(points)}
+    _save_incremental(
+        output_dir,
+        rows,
+        run_dirs,
+        swept_snapshot,
+        fixed_params,
+        sim_settings,
+        measurements,
+        source,
+        target,
+        spec_path,
+        None,
+    )
+
+    # Phase 2: Iterative refinement
+    if metric_key is None:
+        metric_key = _detect_adaptive_metric(rows)
+    if metric_key is None:
+        print(
+            "  Warning: no metric found for adaptive refinement, skipping refinement phase"
+        )
+        return rows, run_dirs, swept_snapshot
+
+    print(f"  Adaptive: refining on '{metric_key}' (budget: {max_count} total)")
+
+    iteration = 0
+    while len(points) < max_count:
+        iteration += 1
+        scores = _interval_scores(points, [r.get(metric_key) for r in rows])
+
+        if not scores or max(scores) < threshold:
+            print(
+                f"  Adaptive: converged after {iteration} iterations (max score < {threshold})"
+            )
+            break
+
+        idx = int(np.argmax(scores))
+        midpoint = (points[idx] + points[idx + 1]) / 2.0
+
+        row = _adaptive_run_point(midpoint, **run_kw)
+        points.insert(idx + 1, midpoint)
+        rows.insert(idx + 1, row)
+
+        _print_eta(len(points), max_count, sweep_start)
+        swept_snapshot = {param_name: list(points)}
+        _save_incremental(
+            output_dir,
+            rows,
+            run_dirs,
+            swept_snapshot,
+            fixed_params,
+            sim_settings,
+            measurements,
+            source,
+            target,
+            spec_path,
+            None,
+        )
+
+    print(f"  Adaptive: {len(points)} points total")
+    return rows, run_dirs, {param_name: list(points)}
 
 
 def _print_status(metrics: dict[str, Any]) -> None:
@@ -629,7 +922,10 @@ def _get_provenance() -> dict[str, str]:
     import platform
     import subprocess  # noqa: S404
 
-    meta: dict[str, str] = {"hostname": platform.node(), "platform": platform.platform()}
+    meta: dict[str, str] = {
+        "hostname": platform.node(),
+        "platform": platform.platform(),
+    }
     try:
         from importlib.metadata import version
 
@@ -637,11 +933,15 @@ def _get_provenance() -> dict[str, str]:
     except Exception:  # noqa: BLE001
         meta["tidal_version"] = "unknown"
     try:
-        git_hash = subprocess.check_output(
-            ["git", "rev-parse", "--short", "HEAD"],  # noqa: S607
-            stderr=subprocess.DEVNULL,
-            timeout=5,
-        ).decode().strip()
+        git_hash = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"],  # noqa: S607
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+            )
+            .decode()
+            .strip()
+        )
         meta["git_hash"] = git_hash
     except (subprocess.SubprocessError, FileNotFoundError):
         pass
@@ -765,13 +1065,18 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         )
         return 1
     if total_runs > _WARN_SWEEP_SIZE:
-        print(f"  Warning: {total_runs} runs scheduled. This may take a long time.", file=sys.stderr)
+        print(
+            f"  Warning: {total_runs} runs scheduled. This may take a long time.",
+            file=sys.stderr,
+        )
 
     resume = getattr(args, "resume", False)
 
     parallel = getattr(args, "parallel", None)
     mode_label = f"parallel={parallel}" if parallel and parallel > 1 else "sequential"
-    print(f"Sweep: {total_runs} runs ({mode_label}), measurements: {', '.join(sorted(measurements))}")
+    print(
+        f"Sweep: {total_runs} runs ({mode_label}), measurements: {', '.join(sorted(measurements))}"
+    )
     print(f"Output: {output_dir.resolve()}")
 
     # Pre-compute run metadata (subdirs, overrides, etc.)
@@ -779,20 +1084,20 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     for i, run_spec in enumerate(runs):
         grid_override = run_spec.pop("_grid_override", None)
         param_overrides = dict(all_params)
-        param_overrides.update(
-            {k: v for k, v in run_spec.items() if k in swept_params}
-        )
+        param_overrides.update({k: v for k, v in run_spec.items() if k in swept_params})
         swept_vals = {k: run_spec[k] for k in swept_params if k in run_spec}
         subdir = _run_subdir_name(swept_vals, grid_override)
         run_dir = output_dir / subdir
-        run_plans.append({
-            "index": i,
-            "param_overrides": param_overrides,
-            "swept_vals": swept_vals,
-            "subdir": subdir,
-            "run_dir": run_dir,
-            "grid_override": grid_override,
-        })
+        run_plans.append(
+            {
+                "index": i,
+                "param_overrides": param_overrides,
+                "swept_vals": swept_vals,
+                "subdir": subdir,
+                "run_dir": run_dir,
+                "grid_override": grid_override,
+            }
+        )
 
     # Dry-run: print plan and exit
     if getattr(args, "dry_run", False):
@@ -806,22 +1111,89 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
             print(f"    ... and {total_runs - len(preview)} more")
         return 0
 
+    # Check for adaptive mode (from TOML --config)
+    adaptive_config = getattr(args, "_adaptive_config", None) or {}
+    adaptive_param = None
+    if adaptive_config and len(swept_params) == 1:
+        adaptive_param = next(iter(swept_params))
+        if adaptive_param in adaptive_config:
+            ac = adaptive_config[adaptive_param]
+            adaptive_metric = getattr(args, "adaptive_metric", None) or ac.get("metric")
+            adaptive_budget = getattr(args, "adaptive_budget", None) or ac.get(
+                "max_count", 20
+            )
+            adaptive_threshold = getattr(args, "adaptive_threshold", None) or ac.get(
+                "threshold", 0.01
+            )
+        else:
+            adaptive_param = None
+
+    # Also check CLI-only adaptive (--sweep "g0=0.01:1.0:adaptive")
+    if (
+        adaptive_param is None
+        and getattr(args, "adaptive_metric", None)
+        and len(swept_params) == 1
+    ):
+        adaptive_param = next(iter(swept_params))
+        adaptive_metric = args.adaptive_metric
+        adaptive_budget = getattr(args, "adaptive_budget", 20)
+        adaptive_threshold = getattr(args, "adaptive_threshold", 0.01)
+
     # Execute runs
     rows: list[dict[str, Any]] = []
     run_dirs: list[Path] = [rp["run_dir"] for rp in run_plans]
 
-    if parallel and parallel > 1:
+    if adaptive_param is not None:
+        initial_values = swept_params[adaptive_param]
+        rows, run_dirs, swept_params = _execute_adaptive(
+            args,
+            spec_path,
+            adaptive_param,
+            initial_values,
+            adaptive_budget,
+            adaptive_metric,
+            adaptive_threshold,
+            all_params,
+            fixed_params,
+            sim_settings,
+            measurements,
+            source,
+            target,
+            threshold,
+            output_dir,
+            resume=resume,
+        )
+    elif parallel and parallel > 1:
         rows = _execute_parallel(
-            args, spec_path, run_plans, swept_params, fixed_params,
-            sim_settings, measurements, source, target, threshold,
-            converge_sizes, output_dir,
-            resume=resume, n_workers=parallel,
+            args,
+            spec_path,
+            run_plans,
+            swept_params,
+            fixed_params,
+            sim_settings,
+            measurements,
+            source,
+            target,
+            threshold,
+            converge_sizes,
+            output_dir,
+            resume=resume,
+            n_workers=parallel,
         )
     else:
         rows = _execute_sequential(
-            args, spec_path, run_plans, swept_params, fixed_params,
-            sim_settings, measurements, source, target, threshold,
-            converge_sizes, output_dir,
+            args,
+            spec_path,
+            run_plans,
+            swept_params,
+            fixed_params,
+            sim_settings,
+            measurements,
+            source,
+            target,
+            threshold,
+            converge_sizes,
+            output_dir,
             resume=resume,
         )
 
@@ -838,7 +1210,8 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         target_fields=list(target) if target else None,
         metadata={
             "timestamp": datetime.now(tz=UTC).isoformat(),
-            "total_runs": total_runs,
+            "total_runs": len(rows),
+            "sampling_strategy": "adaptive" if adaptive_param else "grid",
             **_get_provenance(),
         },
         converge_sizes=converge_sizes,
@@ -968,7 +1341,7 @@ def _run_single_wrapper(task: dict[str, Any]) -> dict[str, Any]:
 # ------------------------------------------------------------------
 
 
-def sweep_command(args: Namespace) -> int:  # noqa: PLR0911
+def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
     """Execute the sweep command.
 
     Parameters
@@ -981,45 +1354,63 @@ def sweep_command(args: Namespace) -> int:  # noqa: PLR0911
     int
         Exit code.
     """
-    spec_path = Path(args.json_path)
+    # --config: load TOML and merge into args
+    config_path = getattr(args, "config", None)
+    config_swept: dict[str, list[float]] = {}
+    config_converge: list[int] | None = None
+    if config_path:
+        try:
+            from tidal.cli._sweep_config import apply_config_to_args, load_sweep_config
+
+            config = load_sweep_config(Path(config_path))
+            config_swept, config_converge = apply_config_to_args(config, args)
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+
+    spec_path = Path(args.json_path) if getattr(args, "json_path", None) else None
+    if spec_path is None:
+        print(
+            "Error: json_path is required (via positional arg or TOML spec)",
+            file=sys.stderr,
+        )
+        return 1
     if not spec_path.exists():
         print(f"Error: file not found: {spec_path}", file=sys.stderr)
         return 1
 
-    if not args.output:
+    if not getattr(args, "output", None):
         print("Error: --output is required for sweep", file=sys.stderr)
         return 1
 
-    # Parse sweep specs
-    swept_params: dict[str, list[float]] = {}
-    converge_sizes: list[int] | None = None
+    # Parse sweep specs from CLI (these override/extend TOML)
+    swept_params: dict[str, list[float]] = dict(config_swept)
+    converge_sizes: list[int] | None = config_converge
 
     sweep_specs: list[str] = getattr(args, "sweep", None) or []
     converge_spec: str | None = getattr(args, "converge", None)
 
-    if converge_spec and sweep_specs:
+    if converge_spec and (sweep_specs or swept_params):
         print("Error: --sweep and --converge are mutually exclusive", file=sys.stderr)
-        return 1
-
-    if not converge_spec and not sweep_specs:
-        print("Error: provide --sweep or --converge", file=sys.stderr)
         return 1
 
     try:
         if converge_spec:
             converge_sizes = parse_converge_spec(converge_spec)
-        else:
+            swept_params = {}  # converge overrides TOML sweeps
+        elif sweep_specs:
             for raw in sweep_specs:
                 name, values = parse_sweep_spec(raw)
-                if name in swept_params:
-                    print(
-                        f"Error: duplicate sweep parameter '{name}'",
-                        file=sys.stderr,
-                    )
-                    return 1
-                swept_params[name] = values
+                swept_params[name] = values  # CLI overrides TOML for same param
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    if not swept_params and converge_sizes is None:
+        print(
+            "Error: provide --sweep, --converge, or --config with [sweep.*] sections",
+            file=sys.stderr,
+        )
         return 1
 
     return _run_sweep(args, swept_params, converge_sizes)

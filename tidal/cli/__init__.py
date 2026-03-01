@@ -632,7 +632,9 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sweep_parser.add_argument(
         "json_path",
-        help="Path to JSON equation specification",
+        nargs="?",
+        default=None,
+        help="Path to JSON equation specification (optional if --config provides spec)",
     )
     # Sweep specification
     sweep_parser.add_argument(
@@ -880,6 +882,33 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--dry-run",
         action="store_true",
         help="Print sweep plan (grid size, parameter combos) without running",
+    )
+    sweep_parser.add_argument(
+        "--config",
+        default=None,
+        metavar="TOML",
+        help="Load sweep configuration from TOML file (CLI flags override TOML values)",
+    )
+    # Adaptive sampling (F2a)
+    sweep_parser.add_argument(
+        "--adaptive-metric",
+        default=None,
+        metavar="METRIC",
+        help="Metric to drive adaptive refinement (e.g. P_max)",
+    )
+    sweep_parser.add_argument(
+        "--adaptive-budget",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Maximum total points for adaptive refinement (default: 20)",
+    )
+    sweep_parser.add_argument(
+        "--adaptive-threshold",
+        type=float,
+        default=None,
+        metavar="T",
+        help="Stop adaptive refinement when max interval score < T (default: 0.01)",
     )
 
     return parser

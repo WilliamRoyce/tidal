@@ -1,0 +1,45 @@
+# Coupled Scattering — Sweep coupling strength g0
+#
+# Gertsenshtein-effect analogue: sweeps the coupling constant from weak
+# to strong coupling and measures conversion probability P(t), mixing
+# length, and energy conservation at each point.
+#
+# Usage:
+#   tidal sweep --config examples/coupled_scattering/sweep_coupling.toml
+#
+# Requires: pre-derived JSON spec at examples/data/coupled_scattering.json
+#   (run `tidal derive examples/coupled_scattering/theory.toml` first)
+
+spec = "../data/coupled_scattering.json"
+
+[parameters]
+mPhi2 = 1.0
+mChi2 = 1.0
+R = 5.0
+
+[sweep.g0]
+start = 0.01
+stop = 0.9
+count = 10
+scale = "log"
+
+[simulation]
+grid_shape = 128
+bounds = [0, 100]
+periodic = true
+ic = "gaussian"
+ic_component = "phi_0"
+ic_center = 25.0
+ic_width = 5.0
+t_end = 20.0
+
+[measurement]
+types = ["conversion", "mixing", "conservation", "asymptotic"]
+source = "phi_0"
+target = "chi_0"
+
+[output]
+path = "../data/sweep_coupling_toml"
+
+[execution]
+parallel = 4
