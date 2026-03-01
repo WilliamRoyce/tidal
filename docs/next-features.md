@@ -1,8 +1,8 @@
 # Next Features: Parameter Sweeps & Measurements
 
 **Created:** March 2026
-**Branch:** `feature/parameter-sweep` (commit `4860162`, 1142 tests passing)
-**Status:** Planning complete, implementation not started
+**Branch:** `feature/parameter-sweep` (commit `3133f49`, 1201 tests passing)
+**Status:** Phase A and Phase B complete
 
 This document tracks proposed features for TIDAL's parameter sweep framework and measurement modules. Each feature includes scope, generality analysis, implementation details, and acceptance criteria.
 
@@ -40,9 +40,9 @@ The `tidal sweep` command is fully operational with:
 
 | File                                        | Purpose                                        |
 | ------------------------------------------- | ---------------------------------------------- |
-| `tidal/cli/_sweep.py`                       | Core sweep orchestration (~950 lines)          |
+| `tidal/cli/_sweep.py`                       | Core sweep orchestration (~1350 lines)         |
 | `tidal/cli/_sweep_panels.py`                | Sweep plot renderers (355 lines)               |
-| `tidal/measurement/_sweep_results.py`       | SweepResults dataclass (350 lines)             |
+| `tidal/measurement/_sweep_results.py`       | SweepResults dataclass (~570 lines)            |
 | `tidal/cli/_measure.py`                     | Measurement CLI dispatcher                     |
 | `tidal/measurement/_energy.py`              | Energy computation (~1700 lines, most general) |
 | `tidal/measurement/_conversion.py`          | Conversion probability P(t)                    |
@@ -52,7 +52,9 @@ The `tidal sweep` command is fully operational with:
 | `tidal/measurement/_effective_mass.py`      | Effective mass m2_eff                          |
 | `tidal/measurement/_spectral.py`            | Spatial power spectrum                         |
 | `tidal/measurement/_spectral_conversion.py` | Per-mode spectral conversion P(k,t)            |
-| `tests/test_sweep.py`                       | Sweep tests (~608 lines)                       |
+| `tidal/cli/_sweep_config.py`                | TOML sweep config parser (~475 lines)          |
+| `tests/test_sweep.py`                       | Sweep tests (~1200 lines)                      |
+| `tests/test_sweep_config.py`                | TOML config tests (~300 lines)                 |
 | `tests/test_new_measurements.py`            | Measurement tests (~391 lines)                 |
 
 ---
@@ -100,7 +102,7 @@ When a feature is FLAT+HOMOGENEOUS, the specification notes what a general alter
 
 **Priority:** 1 (immediate)
 **Generality:** [GENERAL] — infrastructure feature, theory-agnostic
-**Status:** Not started
+**Status:** Complete (Phase A, commit `5b4019c`)
 **Depends on:** Nothing
 
 ### Motivation
@@ -228,16 +230,16 @@ def load_sweep_config(path: Path) -> SweepConfig:
 
 ### Acceptance Criteria
 
-- [ ] `tidal sweep --config sweep.toml` runs sweep from TOML
-- [ ] `tidal sweep --config sweep.toml --param g0=0.3` overrides TOML parameter
-- [ ] `tidal sweep --config sweep.toml --dry-run` shows correct plan
-- [ ] Path resolution works relative to TOML file location
-- [ ] Unknown TOML keys warn but don't error
-- [ ] Missing `spec` key produces clear error
-- [ ] Both range mode and explicit values mode work in TOML
-- [ ] Convergence mode (`[convergence]`) works in TOML
-- [ ] Tests pass: parsing, validation, override, path resolution
-- [ ] Lint clean (`ruff check`)
+- [x] `tidal sweep --config sweep.toml` runs sweep from TOML
+- [x] `tidal sweep --config sweep.toml --param g0=0.3` overrides TOML parameter
+- [x] `tidal sweep --config sweep.toml --dry-run` shows correct plan
+- [x] Path resolution works relative to TOML file location
+- [x] Unknown TOML keys warn but don't error
+- [x] Missing `spec` key produces clear error
+- [x] Both range mode and explicit values mode work in TOML
+- [x] Convergence mode (`[convergence]`) works in TOML
+- [x] Tests pass: parsing, validation, override, path resolution
+- [x] Lint clean (`ruff check`)
 
 ---
 
@@ -245,7 +247,7 @@ def load_sweep_config(path: Path) -> SweepConfig:
 
 **Priority:** 2 (immediate, after F1)
 **Generality:** [GENERAL] — infrastructure feature, theory-agnostic
-**Status:** Not started
+**Status:** Complete (F2a in Phase A commit `5b4019c`, F2b in Phase B commit `3133f49`)
 **Depends on:** F1 (TOML config provides the natural interface for adaptive settings)
 
 ### Motivation
@@ -371,16 +373,16 @@ stop = 20.0
 
 ### Acceptance Criteria
 
-- [ ] `--sweep "g0=0.01:1.0:adaptive"` runs adaptive refinement
-- [ ] Adaptive concentrates points around sharp features (verifiable on coupled_scattering P(g0) curve)
-- [ ] Budget limit enforced (never exceeds `--adaptive-budget`)
-- [ ] Threshold stopping works (stops early if all intervals smooth)
-- [ ] Results sorted by parameter value in output CSV
-- [ ] Incremental save works during adaptive refinement
-- [ ] `strategy = "latin_hypercube"` generates space-filling samples
-- [ ] `strategy = "sobol"` generates low-discrepancy sequences
-- [ ] `SweepResults.sampling_strategy` records which strategy was used
-- [ ] Tests pass for parsing, refinement, budget, LHS, Sobol
+- [x] `--sweep "g0=0.01:1.0:adaptive"` runs adaptive refinement
+- [x] Adaptive concentrates points around sharp features (verifiable on coupled_scattering P(g0) curve)
+- [x] Budget limit enforced (never exceeds `--adaptive-budget`)
+- [x] Threshold stopping works (stops early if all intervals smooth)
+- [x] Results sorted by parameter value in output CSV
+- [x] Incremental save works during adaptive refinement
+- [x] `strategy = "latin_hypercube"` generates space-filling samples
+- [x] `strategy = "sobol"` generates low-discrepancy sequences
+- [x] `SweepResults.sampling_strategy` records which strategy was used
+- [x] Tests pass for parsing, refinement, budget, LHS, Sobol
 
 ---
 
@@ -614,7 +616,7 @@ def compute_morris_screening(
 
 **Priority:** 5
 **Generality:** [GENERAL] — data structure feature
-**Status:** Not started
+**Status:** Complete (Phase B, commit `3133f49`)
 **Depends on:** Nothing
 
 ### Motivation
@@ -666,13 +668,13 @@ def summary(self) -> str:
 
 ### Acceptance Criteria
 
-- [ ] `results.filter(mChi2=1.0)` returns correct subset
-- [ ] `results.group_by("g0")` returns dict with correct grouping
-- [ ] `results.best("P_max")` returns row with highest P_max
-- [ ] `results.best("max_energy_error", maximize=False)` returns row with lowest error
-- [ ] `results.summary()` produces readable output
-- [ ] Filter preserves metadata (swept_params, fixed_params, etc.)
-- [ ] Empty filter result doesn't crash
+- [x] `results.filter(mChi2=1.0)` returns correct subset
+- [x] `results.group_by("g0")` returns dict with correct grouping
+- [x] `results.best("P_max")` returns row with highest P_max
+- [x] `results.best("max_energy_error", maximize=False)` returns row with lowest error
+- [x] `results.summary()` produces readable output
+- [x] Filter preserves metadata (swept_params, fixed_params, etc.)
+- [x] Empty filter result doesn't crash
 
 ---
 
@@ -740,7 +742,7 @@ else:
 
 **Priority:** 7
 **Generality:** [GENERAL] — infrastructure feature
-**Status:** Not started
+**Status:** Complete (Phase B, commit `3133f49`)
 **Depends on:** Nothing
 
 ### Motivation
@@ -796,12 +798,12 @@ except Exception as exc:
 
 ### Acceptance Criteria
 
-- [ ] Successful runs have `run_status = "success"` in CSV
-- [ ] Failed runs have appropriate status and error message
-- [ ] `results.failure_rate` returns correct fraction
-- [ ] `results.successful_rows()` filters correctly
-- [ ] `results.failed_rows()` returns failed runs for debugging
-- [ ] Partial sweep results preserved (failed runs don't block saving)
+- [x] Successful runs have `run_status = "success"` in CSV
+- [x] Failed runs have appropriate status and error message
+- [x] `results.failure_rate` returns correct fraction
+- [x] `results.successful_rows()` filters correctly
+- [x] `results.failed_rows()` returns failed runs for debugging
+- [x] Partial sweep results preserved (failed runs don't block saving)
 
 ---
 
@@ -873,11 +875,11 @@ Most features are independent. The main dependency chain is F1 -> F2 -> F4 (TOML
 
 ## Implementation Phases
 
-| Phase       | Features      | Est. Scope | Branch                           |
-| ----------- | ------------- | ---------- | -------------------------------- |
-| A (next PR) | F1 + F2a      | Medium     | `feature/sweep-toml-adaptive`    |
-| B           | F2b + F5 + F7 | Medium     | `feature/sweep-sampling-queries` |
-| C           | F3 + F6       | Medium     | `feature/velocity-resonance`     |
-| D           | F4 + F8       | Medium     | `feature/sensitivity-viz`        |
+| Phase    | Features      | Est. Scope | Branch                       | Status      |
+| -------- | ------------- | ---------- | ---------------------------- | ----------- |
+| A        | F1 + F2a      | Medium     | `feature/parameter-sweep`    | Complete    |
+| B        | F2b + F5 + F7 | Medium     | `feature/parameter-sweep`    | Complete    |
+| C (next) | F3 + F6       | Medium     | `feature/velocity-resonance` | Not started |
+| D        | F4 + F8       | Medium     | `feature/sensitivity-viz`    | Not started |
 
-Phase A is the immediate next step: TOML config + 1D adaptive refinement.
+Phase C is the next step: velocity/resonance analysis + spectrum scalar aggregation.
