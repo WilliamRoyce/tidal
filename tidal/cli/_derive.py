@@ -1696,7 +1696,7 @@ def _wls_plane_wave_reduction_equations(ctx: _WlsContext) -> list[str]:
     This function applies the reduction after component decomposition,
     when equations are in explicit ``Derivative[ords__][f_][args__]`` form.
 
-    Also used as a fallback/defence-in-depth for the non-linearization path.
+    Also used as a fallback/defense-in-depth for the non-linearization path.
     """
     if ctx.reduction is None:
         return []
@@ -2590,7 +2590,7 @@ def generate_wls(
 
     # Plane-wave reduction: zero transverse derivatives in fieldEquations
     # (essential for linearization path where abstract L uses CD, not Derivative;
-    #  defence-in-depth for non-linearization path where Lagrangian was already reduced)
+    #  defense-in-depth for non-linearization path where Lagrangian was already reduced)
     if ctx.reduction is not None:
         lines.extend(_wls_plane_wave_reduction_equations(ctx))
         lines.extend(_wls_plane_wave_field_elimination(ctx))
