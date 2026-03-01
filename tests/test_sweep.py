@@ -215,6 +215,24 @@ class TestSweepResults:
         assert "g0" not in metrics
         assert "t_end" not in metrics
 
+    def test_metric_names_union_across_rows(self) -> None:
+        """metric_names should include keys from ALL rows, not just rows[0]."""
+        r = SweepResults(
+            swept_params={"g0": [0.1, 0.5]},
+            fixed_params={},
+            sim_settings={},
+            rows=[
+                {"g0": 0.1, "P_max": 0.01},
+                {"g0": 0.5, "P_max": 0.05, "conversion_error": "some error"},
+            ],
+            run_dirs=[],
+            spec_path="",
+            measurements=[],
+        )
+        metrics = r.metric_names
+        assert "P_max" in metrics
+        assert "conversion_error" in metrics
+
     def test_column(self, sample_results: SweepResults) -> None:
         p_max = sample_results.column("P_max")
         assert len(p_max) == 3
@@ -254,8 +272,15 @@ class TestSweepResults:
         assert data["swept_parameters"] == {"g0": [0.1, 0.3, 0.5]}
         assert data["completed_runs"] == 3
 
+    def test_save_sweep_json_includes_run_dirs(self, sample_results: SweepResults, tmp_path: Path) -> None:
+        sweep_file = tmp_path / "sweep.json"
+        sample_results.save_sweep_json(sweep_file)
+        data = json.loads(sweep_file.read_text())
+        assert "run_dirs" in data
+        assert len(data["run_dirs"]) == 3
+
     def test_roundtrip(self, sample_results: SweepResults, tmp_path: Path) -> None:
-        """Save to directory and reload."""
+        """Save to directory and reload — run_dirs should survive roundtrip."""
         sample_results.save_sweep_json(tmp_path / "sweep.json")
         sample_results.to_json(tmp_path / "results.json")
 
@@ -263,6 +288,8 @@ class TestSweepResults:
         assert loaded.n_runs == 3
         assert loaded.swept_params == {"g0": [0.1, 0.3, 0.5]}
         assert loaded.spec_path == "examples/data/coupled_scattering.json"
+        assert len(loaded.run_dirs) == 3
+        assert str(loaded.run_dirs[0]) == "/tmp/g0_0.1"
 
     def test_from_directory_missing_sweep_json(self, tmp_path: Path) -> None:
         with pytest.raises(FileNotFoundError, match=r"sweep\.json"):
@@ -508,3 +535,73 @@ class TestSweepPlot:
             "--metric", "P_max",
         ])
         assert code == 1
+
+
+# ------------------------------------------------------------------
+# Validation tests
+# ------------------------------------------------------------------
+
+
+class TestSweepValidation:
+    """Tests for parameter and measurement validation."""
+
+    def test_dry_run(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """--dry-run should print plan without creating output."""
+        from tidal.cli import main
+
+        output = tmp_path / "dry_run_out"
+        code = main([
+            "sweep", "examples/data/coupled_scattering.json",
+            "--sweep", "g0=0.1,0.3,0.5",
+            "--measure", "conservation",
+            "--output", str(output),
+            "--dry-run",
+        ])
+        assert code == 0
+        # Should NOT create any run directories
+        assert not (output / "results.csv").exists()
+        captured = capsys.readouterr()
+        assert "3 runs planned" in captured.out
+
+    def test_unknown_measurement_type(self, tmp_path: Path) -> None:
+        """Unknown --measure value should error with exit code 1."""
+        from tidal.cli import main
+
+        code = main([
+            "sweep", "examples/data/coupled_scattering.json",
+            "--sweep", "g0=0.1,0.5",
+            "--measure", "foobar",
+            "--output", str(tmp_path / "out"),
+        ])
+        assert code == 1
+
+    def test_unknown_measurement_mixed(self, tmp_path: Path) -> None:
+        """Mix of valid and invalid --measure types should error."""
+        from tidal.cli import main
+
+        code = main([
+            "sweep", "examples/data/coupled_scattering.json",
+            "--sweep", "g0=0.1,0.5",
+            "--measure", "conservation,nonexistent",
+            "--output", str(tmp_path / "out"),
+        ])
+        assert code == 1
+
+    def test_unknown_swept_param_warns(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+        """Swept param not in spec should warn but not error."""
+        from tidal.cli import main
+
+        # This will run (and likely fail on simulation), but the validation
+        # warning should appear in stderr before any simulation attempt.
+        main([
+            "sweep", "examples/data/coupled_scattering.json",
+            "--sweep", "nonexistent_param_xyz=0.1,0.5",
+            "--measure", "conservation",
+            "--grid-shape", "8",
+            "--bounds=-5:5",
+            "--t-end", "0.1",
+            "--output", str(tmp_path / "out"),
+        ])
+        captured = capsys.readouterr()
+        assert "nonexistent_param_xyz" in captured.err
+        assert "Possible typo" in captured.err
