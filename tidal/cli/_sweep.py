@@ -39,6 +39,10 @@ _SWEEP_MEASUREMENTS = frozenset(
         "effective_mass",
         "asymptotic",
         "peak_conversion",
+        "velocity",
+        "resonance",
+        "spectrum",
+        "spectral_conversion",
     }
 )
 
@@ -335,6 +339,10 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         _run_energy,  # pyright: ignore[reportPrivateUsage]
         _run_mixing,  # pyright: ignore[reportPrivateUsage]
         _run_peak_conversion,  # pyright: ignore[reportPrivateUsage]
+        _run_resonance,  # pyright: ignore[reportPrivateUsage]
+        _run_spectral_conversion,  # pyright: ignore[reportPrivateUsage]
+        _run_spectrum,  # pyright: ignore[reportPrivateUsage]
+        _run_velocity,  # pyright: ignore[reportPrivateUsage]
     )
     from tidal.measurement._io import SimulationData
     from tidal.symbolic import load_equation_system
@@ -431,6 +439,67 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
                 metrics["P_final"] = pc["P_final"]
         except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
             metrics["peak_conversion_error"] = str(exc)
+
+    if "velocity" in measurements:
+        try:
+            dyn = list(data.dynamical_fields)
+            vel = _run_velocity(data, dyn)
+            metrics["v_group_mean"] = vel["v_group_mean"]
+            metrics["v_phase_mean"] = vel["v_phase_mean"]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["velocity_error"] = str(exc)
+
+    if "resonance" in measurements:
+        try:
+            res = _run_resonance(data, source, target)
+            metrics["n_resonant_modes"] = res["n_resonant_modes"]
+            metrics["conversion_bandwidth"] = res["conversion_bandwidth"]
+            metrics["peak_conversion_k"] = res["peak_conversion_k"]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["resonance_error"] = str(exc)
+
+    if "spectrum" in measurements:
+        try:
+            spec_results = _run_spectrum(data)
+            # Aggregate scalars from spectrum of each field
+            for fname, field_spec in spec_results.items():
+                if isinstance(field_spec, dict) and "final" in field_spec:
+                    power = np.array(field_spec["final"]["power"])
+                    wn = np.array(field_spec["final"]["wavenumbers"])
+                    if power.max() > 0:
+                        metrics[f"peak_k_{fname}"] = float(wn[np.argmax(power)])
+                        metrics[f"peak_power_{fname}"] = float(power.max())
+                        threshold_val = 0.01 * power.max()
+                        metrics[f"n_active_modes_{fname}"] = int(
+                            np.sum(power > threshold_val)
+                        )
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["spectrum_error"] = str(exc)
+
+    if "spectral_conversion" in measurements:
+        try:
+            sc = _run_spectral_conversion(data, source, target)
+            result_obj = sc["_result_obj"]
+            final_p_k = result_obj.probability[-1]
+            if len(final_p_k) > 0 and np.any(final_p_k > 0):
+                metrics["P_k_max"] = float(final_p_k.max())
+                peak_idx = int(np.argmax(final_p_k))
+                metrics["k_max_conversion"] = float(result_obj.wavenumbers[peak_idx])
+                half_max = final_p_k.max() / 2.0
+                above_half = final_p_k > half_max
+                if np.any(above_half):
+                    k_range = result_obj.wavenumbers[above_half]
+                    metrics["spectral_conversion_bandwidth"] = float(
+                        k_range[-1] - k_range[0]
+                    )
+                else:
+                    metrics["spectral_conversion_bandwidth"] = 0.0
+            else:
+                metrics["P_k_max"] = 0.0
+                metrics["k_max_conversion"] = 0.0
+                metrics["spectral_conversion_bandwidth"] = 0.0
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["spectral_conversion_error"] = str(exc)
 
     return metrics
 

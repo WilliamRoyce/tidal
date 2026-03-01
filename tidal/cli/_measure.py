@@ -51,6 +51,8 @@ _VALID_MEASUREMENTS = frozenset(
         "effective_mass",
         "asymptotic",
         "peak_conversion",
+        "velocity",
+        "resonance",
     }
 )
 
@@ -453,6 +455,88 @@ def _run_peak_conversion(
     }
 
 
+def _run_velocity(
+    data: SimulationData,
+    field_names: list[str],
+) -> dict[str, Any]:
+    """Compute group and phase velocities from dispersion relation."""
+    from tidal.measurement import compute_velocities
+
+    result = compute_velocities(data, field_names)
+    return {
+        "field": result.field_name,
+        "n_active_modes": result.n_active_modes,
+        "v_group_mean": result.group_velocity_mean,
+        "v_phase_mean": result.phase_velocity_mean,
+        "_result_obj": result,
+    }
+
+
+def _run_velocity_mismatch(
+    data: SimulationData,
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+) -> dict[str, Any]:
+    """Compute velocity mismatch between source and target field groups.
+
+    Raises
+    ------
+    ValueError
+        If source or target not provided.
+    """
+    from tidal.measurement import compute_velocity_mismatch
+
+    if source is None:
+        msg = "--source required for velocity measurement"
+        raise ValueError(msg)
+    if target is None:
+        msg = "--target required for velocity measurement"
+        raise ValueError(msg)
+
+    result = compute_velocity_mismatch(data, list(source), list(target))
+    return {
+        "source": list(source),
+        "target": list(target),
+        "v_group_mean_source": result.source_velocity.group_velocity_mean,
+        "v_group_mean_target": result.target_velocity.group_velocity_mean,
+        "v_mismatch_max": result.max_mismatch,
+        "v_mismatch_mean": result.mean_mismatch,
+        "_result_obj": result,
+    }
+
+
+def _run_resonance(
+    data: SimulationData,
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+) -> dict[str, Any]:
+    """Compute resonance analysis between source and target fields.
+
+    Raises
+    ------
+    ValueError
+        If source or target not provided.
+    """
+    from tidal.measurement import compute_resonance_analysis
+
+    if source is None:
+        msg = "--source required for resonance measurement"
+        raise ValueError(msg)
+    if target is None:
+        msg = "--target required for resonance measurement"
+        raise ValueError(msg)
+
+    result = compute_resonance_analysis(data, list(source), list(target))
+    return {
+        "source": result.source_field,
+        "target": result.target_field,
+        "n_resonant_modes": result.n_resonant_modes,
+        "conversion_bandwidth": result.conversion_bandwidth,
+        "peak_conversion_k": result.peak_conversion_k,
+        "_result_obj": result,
+    }
+
+
 def _run_summary(
     data: SimulationData,
     threshold: float,
@@ -753,7 +837,7 @@ def _format_text(results: dict[str, Any], data: SimulationData) -> str:  # noqa:
 # ------------------------------------------------------------------
 
 
-def _run_individual_measurements(  # noqa: C901, PLR0912, PLR0915
+def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
     measurements: set[str],
     data: SimulationData,
     args: Namespace,
@@ -908,6 +992,43 @@ def _run_individual_measurements(  # noqa: C901, PLR0912, PLR0915
             results["peak_conversion"] = _run_peak_conversion(data, source, target)
         except ValueError as e:
             results["peak_conversion"] = {"error": str(e)}
+
+    if "velocity" in measurements:
+        source = _parse_field_list(getattr(args, "source", None))
+        dyn_set = set(data.dynamical_fields)
+        if source is not None:
+            dyn_in_source = [f for f in source if f in dyn_set]
+            if not dyn_in_source:
+                dyn_in_source = list(data.dynamical_fields)
+        else:
+            dyn_in_source = list(data.dynamical_fields)
+
+        try:
+            results["velocity"] = _run_velocity(data, dyn_in_source)
+            # If both source and target provided, also compute mismatch
+            target = _parse_field_list(getattr(args, "target", None))
+            if target is not None:
+                results["velocity_mismatch"] = _run_velocity_mismatch(
+                    data, tuple(dyn_in_source), target
+                )
+        except ValueError as e:
+            results["velocity"] = {"error": str(e)}
+
+    if "resonance" in measurements:
+        source = _parse_field_list(getattr(args, "source", None))
+        target = _parse_field_list(getattr(args, "target", None))
+
+        if source is None:
+            print(
+                "Error: --source required for --what=resonance",
+                file=sys.stderr,
+            )
+            return 1
+
+        try:
+            results["resonance"] = _run_resonance(data, source, target)
+        except ValueError as e:
+            results["resonance"] = {"error": str(e)}
 
     return results
 
