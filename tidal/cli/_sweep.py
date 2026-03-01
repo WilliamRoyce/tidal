@@ -207,40 +207,20 @@ def _build_sim_args(
     return sim_args
 
 
-def _run_single(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
+def _simulate_run(
     base_args: Namespace,
     spec_path: Path,
     param_overrides: dict[str, float],
     output_dir: Path,
-    measurements: set[str],
-    source: tuple[str, ...] | None,
-    target: tuple[str, ...] | None,
-    threshold: float,
     grid_shape_override: int | None = None,
-) -> dict[str, Any]:
-    """Execute one simulate + measure cycle.
-
-    Returns a dict of scalar metrics for one row of the results table.
-    """
-    from tidal.cli._measure import (
-        _run_asymptotic,  # pyright: ignore[reportPrivateUsage]
-        _run_conservation,  # pyright: ignore[reportPrivateUsage]
-        _run_conversion,  # pyright: ignore[reportPrivateUsage]
-        _run_dispersion,  # pyright: ignore[reportPrivateUsage]
-        _run_effective_mass,  # pyright: ignore[reportPrivateUsage]
-        _run_energy,  # pyright: ignore[reportPrivateUsage]
-        _run_mixing,  # pyright: ignore[reportPrivateUsage]
-    )
+) -> tuple[int, float]:
+    """Execute a single simulation and return (exit_code, wall_time_s)."""
     from tidal.cli._simulate import (
         _parse_params,  # pyright: ignore[reportPrivateUsage]
         _simulate,  # pyright: ignore[reportPrivateUsage]
     )
-    from tidal.measurement._io import SimulationData
     from tidal.symbolic import load_equation_system
 
-    metrics: dict[str, Any] = {}
-
-    # 1. Simulate
     sim_args = _build_sim_args(
         base_args, param_overrides, output_dir, grid_shape_override
     )
@@ -250,16 +230,41 @@ def _run_single(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     t0 = time.monotonic()
     exit_code = _simulate(sim_args, spec, params)
     wall_time = time.monotonic() - t0
+    return exit_code, wall_time
 
-    if exit_code != 0:
-        metrics["wall_time_s"] = round(wall_time, 2)
-        metrics["error"] = "simulation_failed"
-        return metrics
 
-    # 2. Load simulation data for measurement
-    data = SimulationData.load(output_dir, spec)
+def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
+    run_dir: Path,
+    spec_path: Path,
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    threshold: float,
+) -> dict[str, Any]:
+    """Run all requested measurements on an existing simulation output.
 
-    # 3. Run requested measurements and extract scalar metrics
+    This is the single source of truth for measurement extraction in sweeps.
+    Called both after a fresh simulation and when resuming a completed run.
+
+    Returns a dict of scalar metrics.
+    """
+    from tidal.cli._measure import (
+        _run_asymptotic,  # pyright: ignore[reportPrivateUsage]
+        _run_conservation,  # pyright: ignore[reportPrivateUsage]
+        _run_conversion,  # pyright: ignore[reportPrivateUsage]
+        _run_dispersion,  # pyright: ignore[reportPrivateUsage]
+        _run_effective_mass,  # pyright: ignore[reportPrivateUsage]
+        _run_energy,  # pyright: ignore[reportPrivateUsage]
+        _run_mixing,  # pyright: ignore[reportPrivateUsage]
+        _run_peak_conversion,  # pyright: ignore[reportPrivateUsage]
+    )
+    from tidal.measurement._io import SimulationData
+    from tidal.symbolic import load_equation_system
+
+    spec = load_equation_system(spec_path)
+    data = SimulationData.load(run_dir, spec)
+    metrics: dict[str, Any] = {}
+
     if "conservation" in measurements or "summary" in measurements:
         try:
             cons = _run_conservation(data, threshold)
@@ -275,7 +280,6 @@ def _run_single(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             conv = _run_conversion(data, source, target)
             metrics["P_max"] = conv["peak_probability"]
             metrics["P_max_time"] = conv["peak_time"]
-            # Final conversion
             result_obj = conv["_result_obj"]
             metrics["P_final"] = float(result_obj.probability[-1])
             conv_result = result_obj
@@ -295,7 +299,6 @@ def _run_single(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     if "energy" in measurements:
         try:
             eng = _run_energy(data)
-            # Total energy at final snapshot
             metrics["E_total_final"] = eng["total"][-1]
             metrics["E_total_initial"] = eng["total"][0]
         except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
@@ -306,7 +309,6 @@ def _run_single(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             dyn = list(data.dynamical_fields)
             disp = _run_dispersion(data, dyn)
             result_obj = disp["_result_obj"]
-            # Effective mass: m² = ω² - k² at peak
             wn = result_obj.wavenumbers
             freq = result_obj.peak_frequencies
             active = freq > 0.0
@@ -329,17 +331,13 @@ def _run_single(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         try:
             asym = _run_asymptotic(data, source, target)
             metrics["P_asymptotic"] = asym["P_final"]
-            metrics["P_forward"] = asym["P_forward"]
+            metrics["P_transmitted"] = asym["P_transmitted"]
             metrics["P_reflected"] = asym["P_reflected"]
         except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
             metrics["asymptotic_error"] = str(exc)
 
     if "peak_conversion" in measurements:
         try:
-            from tidal.cli._measure import (
-                _run_peak_conversion,  # pyright: ignore[reportPrivateUsage]
-            )
-
             pc = _run_peak_conversion(data, source, target)
             metrics["P_max"] = pc["P_max"]
             metrics["P_max_time"] = pc["P_max_time"]
@@ -347,6 +345,36 @@ def _run_single(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
             metrics["peak_conversion_error"] = str(exc)
 
+    return metrics
+
+
+def _run_single(  # noqa: PLR0913, PLR0917
+    base_args: Namespace,
+    spec_path: Path,
+    param_overrides: dict[str, float],
+    output_dir: Path,
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    threshold: float,
+    grid_shape_override: int | None = None,
+) -> dict[str, Any]:
+    """Execute one simulate + measure cycle.
+
+    Returns a dict of scalar metrics for one row of the results table.
+    """
+    # 1. Simulate
+    exit_code, wall_time = _simulate_run(
+        base_args, spec_path, param_overrides, output_dir, grid_shape_override
+    )
+
+    if exit_code != 0:
+        return {"wall_time_s": round(wall_time, 2), "error": "simulation_failed"}
+
+    # 2. Measure
+    metrics = _measure_run(
+        output_dir, spec_path, measurements, source, target, threshold
+    )
     metrics["wall_time_s"] = round(wall_time, 2)
     return metrics
 
@@ -354,6 +382,43 @@ def _run_single(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
 # ------------------------------------------------------------------
 # Main sweep orchestration
 # ------------------------------------------------------------------
+
+
+def _save_incremental(  # noqa: PLR0913, PLR0917
+    output_dir: Path,
+    rows: list[dict[str, Any]],
+    run_dirs: list[Path],
+    swept_params: dict[str, list[float]],
+    fixed_params: dict[str, float],
+    sim_settings: dict[str, Any],
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    spec_path: Path,
+    converge_sizes: list[int] | None,
+) -> None:
+    """Save partial results after each completed run (crash recovery)."""
+    from tidal.measurement._sweep_results import SweepResults
+
+    partial = SweepResults(
+        swept_params=swept_params,
+        fixed_params=fixed_params,
+        sim_settings=sim_settings,
+        rows=rows,
+        run_dirs=run_dirs,
+        spec_path=str(spec_path),
+        measurements=sorted(measurements),
+        source_fields=list(source) if source else None,
+        target_fields=list(target) if target else None,
+        metadata={
+            "timestamp": datetime.now(tz=UTC).isoformat(),
+            "total_runs": len(rows),
+            "partial": True,
+        },
+        converge_sizes=converge_sizes,
+    )
+    partial.to_csv(output_dir / "results.csv")
+    partial.to_json(output_dir / "results.json")
 
 
 def _collect_sim_settings(args: Namespace) -> dict[str, Any]:
@@ -368,7 +433,176 @@ def _collect_sim_settings(args: Namespace) -> dict[str, Any]:
     return settings
 
 
-def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _execute_sequential(  # noqa: PLR0913, PLR0917
+    args: Namespace,
+    spec_path: Path,
+    run_plans: list[dict[str, Any]],
+    swept_params: dict[str, list[float]],
+    fixed_params: dict[str, float],
+    sim_settings: dict[str, Any],
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    threshold: float,
+    converge_sizes: list[int] | None,
+    output_dir: Path,
+    *,
+    resume: bool,
+) -> list[dict[str, Any]]:
+    """Execute sweep runs sequentially with incremental saving."""
+    total_runs = len(run_plans)
+    rows: list[dict[str, Any]] = []
+    run_dirs: list[Path] = [rp["run_dir"] for rp in run_plans]
+
+    for rp in run_plans:
+        i = rp["index"]
+        run_dir: Path = rp["run_dir"]
+        subdir: str = rp["subdir"]
+        swept_vals: dict[str, float] = rp["swept_vals"]
+        grid_override: int | None = rp["grid_override"]
+        param_overrides: dict[str, float] = rp["param_overrides"]
+
+        # Resume check: re-measure existing output instead of re-simulating
+        if resume and (run_dir / "metadata.json").exists():
+            print(f"  [{i + 1}/{total_runs}] {subdir} — measuring existing...", end="", flush=True)
+            try:
+                metrics = _measure_run(
+                    run_dir, spec_path, measurements, source, target, threshold
+                )
+                print(" ok")
+            except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+                print(f" measure error: {exc}")
+                metrics = {"error": f"resume_measure_failed: {exc}"}
+            rows.append(_build_row(swept_vals, fixed_params, sim_settings, metrics, grid_override))
+            _save_incremental(output_dir, rows, run_dirs, swept_params,
+                              fixed_params, sim_settings, measurements,
+                              source, target, spec_path, converge_sizes)
+            continue
+
+        print(f"  [{i + 1}/{total_runs}] {subdir}...", end="", flush=True)
+
+        try:
+            metrics = _run_single(
+                args, spec_path, param_overrides, run_dir,
+                measurements, source, target, threshold,
+                grid_shape_override=grid_override,
+            )
+            rows.append(_build_row(swept_vals, fixed_params, sim_settings, metrics, grid_override))
+            _print_status(metrics)
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            print(f" ERROR: {exc}")
+            rows.append(_build_row(
+                swept_vals, fixed_params, sim_settings, {"error": str(exc)}, grid_override,
+            ))
+
+        # Incremental save after each run (crash recovery)
+        _save_incremental(output_dir, rows, run_dirs, swept_params,
+                          fixed_params, sim_settings, measurements,
+                          source, target, spec_path, converge_sizes)
+
+    return rows
+
+
+def _execute_parallel(  # noqa: PLR0913, PLR0917
+    args: Namespace,
+    spec_path: Path,
+    run_plans: list[dict[str, Any]],
+    swept_params: dict[str, list[float]],
+    fixed_params: dict[str, float],
+    sim_settings: dict[str, Any],
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    threshold: float,
+    converge_sizes: list[int] | None,
+    output_dir: Path,
+    *,
+    resume: bool,
+    n_workers: int,
+) -> list[dict[str, Any]]:
+    """Execute sweep runs in parallel using multiprocessing.Pool."""
+    from multiprocessing import Pool
+
+    total_runs = len(run_plans)
+    run_dirs = [rp["run_dir"] for rp in run_plans]
+
+    # Build tasks for Pool, handling resume first (sequentially)
+    tasks: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = [{}] * total_runs  # placeholder
+    completed: set[int] = set()
+
+    for rp in run_plans:
+        i = rp["index"]
+        run_dir: Path = rp["run_dir"]
+
+        if resume and (run_dir / "metadata.json").exists():
+            # Resume runs measured sequentially (fast — no simulation)
+            print(f"  [{i + 1}/{total_runs}] {rp['subdir']} — measuring existing...", end="", flush=True)
+            try:
+                metrics = _measure_run(
+                    run_dir, spec_path, measurements, source, target, threshold
+                )
+                print(" ok")
+            except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+                print(f" measure error: {exc}")
+                metrics = {"error": f"resume_measure_failed: {exc}"}
+            rows[i] = _build_row(
+                rp["swept_vals"], fixed_params, sim_settings, metrics, rp["grid_override"]
+            )
+            completed.add(i)
+            continue
+
+        tasks.append({
+            "index": i,
+            "base_args": args,
+            "spec_path": str(spec_path),
+            "param_overrides": rp["param_overrides"],
+            "output_dir": str(rp["run_dir"]),
+            "measurements": measurements,
+            "source": source,
+            "target": target,
+            "threshold": threshold,
+            "grid_override": rp["grid_override"],
+            "swept_vals": rp["swept_vals"],
+            "subdir": rp["subdir"],
+        })
+
+    if tasks:
+        print(f"  Running {len(tasks)} simulations with {n_workers} workers...")
+        with Pool(processes=n_workers) as pool:
+            for result in pool.imap_unordered(_run_single_wrapper, tasks):
+                idx = result["index"]
+                metrics = result["metrics"]
+                swept_vals = result["swept_vals"]
+                grid_override = result["grid_override"]
+                rows[idx] = _build_row(
+                    swept_vals, fixed_params, sim_settings, metrics, grid_override
+                )
+                completed.add(idx)
+                print(f"  [{len(completed)}/{total_runs}] {result['subdir']}", end="")
+                _print_status(metrics)
+
+    # Save incremental after parallel batch
+    final_rows = list(rows)
+    _save_incremental(output_dir, final_rows, run_dirs, swept_params,
+                      fixed_params, sim_settings, measurements,
+                      source, target, spec_path, converge_sizes)
+    return final_rows
+
+
+def _print_status(metrics: dict[str, Any]) -> None:
+    """Print brief metric status for a completed run."""
+    status_parts: list[str] = []
+    if "P_max" in metrics and metrics["P_max"] is not None:
+        status_parts.append(f"P_max={metrics['P_max']:.4f}")
+    if "max_energy_error" in metrics and metrics["max_energy_error"] is not None:
+        status_parts.append(f"|dE/E|={metrics['max_energy_error']:.2e}")
+    if "wall_time_s" in metrics:
+        status_parts.append(f"{metrics['wall_time_s']:.1f}s")
+    print(f" {', '.join(status_parts)}")
+
+
+def _run_sweep(  # noqa: PLR0914, PLR0915
     args: Namespace,
     swept_params: dict[str, list[float]],
     converge_sizes: list[int] | None,
@@ -435,74 +669,49 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     total_runs = len(runs)
     resume = getattr(args, "resume", False)
 
-    print(f"Sweep: {total_runs} runs, measurements: {', '.join(sorted(measurements))}")
+    parallel = getattr(args, "parallel", None)
+    mode_label = f"parallel={parallel}" if parallel and parallel > 1 else "sequential"
+    print(f"Sweep: {total_runs} runs ({mode_label}), measurements: {', '.join(sorted(measurements))}")
     print(f"Output: {output_dir.resolve()}")
 
-    # Execute runs
-    rows: list[dict[str, Any]] = []
-    run_dirs: list[Path] = []
-
+    # Pre-compute run metadata (subdirs, overrides, etc.)
+    run_plans: list[dict[str, Any]] = []
     for i, run_spec in enumerate(runs):
         grid_override = run_spec.pop("_grid_override", None)
-
-        # Build parameter overrides for this run
         param_overrides = dict(all_params)
         param_overrides.update(
             {k: v for k, v in run_spec.items() if k in swept_params}
         )
-
-        # Determine subdirectory name
         swept_vals = {k: run_spec[k] for k in swept_params if k in run_spec}
         subdir = _run_subdir_name(swept_vals, grid_override)
         run_dir = output_dir / subdir
-        run_dirs.append(run_dir)
+        run_plans.append({
+            "index": i,
+            "param_overrides": param_overrides,
+            "swept_vals": swept_vals,
+            "subdir": subdir,
+            "run_dir": run_dir,
+            "grid_override": grid_override,
+        })
 
-        # Resume check: skip if metadata.json exists
-        if resume and (run_dir / "metadata.json").exists():
-            print(f"  [{i + 1}/{total_runs}] {subdir} — skipped (resume)")
-            # Load existing metrics from results if available
-            row = _build_row(
-                swept_vals, fixed_params, sim_settings, {}, grid_override
-            )
-            rows.append(row)
-            continue
+    # Execute runs
+    rows: list[dict[str, Any]] = []
+    run_dirs: list[Path] = [rp["run_dir"] for rp in run_plans]
 
-        print(f"  [{i + 1}/{total_runs}] {subdir}...", end="", flush=True)
-
-        try:
-            metrics = _run_single(
-                args,
-                spec_path,
-                param_overrides,
-                run_dir,
-                measurements,
-                source,
-                target,
-                threshold,
-                grid_shape_override=grid_override,
-            )
-            row = _build_row(
-                swept_vals, fixed_params, sim_settings, metrics, grid_override
-            )
-            rows.append(row)
-
-            # Brief status
-            status_parts: list[str] = []
-            if "P_max" in metrics and metrics["P_max"] is not None:
-                status_parts.append(f"P_max={metrics['P_max']:.4f}")
-            if "max_energy_error" in metrics and metrics["max_energy_error"] is not None:
-                status_parts.append(f"|dE/E|={metrics['max_energy_error']:.2e}")
-            if "wall_time_s" in metrics:
-                status_parts.append(f"{metrics['wall_time_s']:.1f}s")
-            print(f" {', '.join(status_parts)}")
-
-        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
-            print(f" ERROR: {exc}")
-            row = _build_row(
-                swept_vals, fixed_params, sim_settings,
-                {"error": str(exc)}, grid_override,
-            )
-            rows.append(row)
+    if parallel and parallel > 1:
+        rows = _execute_parallel(
+            args, spec_path, run_plans, swept_params, fixed_params,
+            sim_settings, measurements, source, target, threshold,
+            converge_sizes, output_dir,
+            resume=resume, n_workers=parallel,
+        )
+    else:
+        rows = _execute_sequential(
+            args, spec_path, run_plans, swept_params, fixed_params,
+            sim_settings, measurements, source, target, threshold,
+            converge_sizes, output_dir,
+            resume=resume,
+        )
 
     # Build SweepResults and save
     results = SweepResults(
@@ -615,7 +824,10 @@ def _report_convergence(  # noqa: C901
 
 
 def _run_single_wrapper(task: dict[str, Any]) -> dict[str, Any]:
-    """Wrap _run_single for multiprocessing Pool.map dispatch."""
+    """Wrap _run_single for multiprocessing Pool.map dispatch.
+
+    Must be a module-level function (picklable) for Pool.map.
+    """
     from pathlib import Path
 
     metrics = _run_single(
@@ -632,6 +844,7 @@ def _run_single_wrapper(task: dict[str, Any]) -> dict[str, Any]:
     return {
         "index": task["index"],
         "swept_vals": task["swept_vals"],
+        "subdir": task["subdir"],
         "metrics": metrics,
         "grid_override": task.get("grid_override"),
     }

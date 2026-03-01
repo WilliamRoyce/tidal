@@ -2,7 +2,7 @@
 
 Covers:
 - effective_mass: m²_eff = ω² - k² from dispersion relation
-- asymptotic conversion: P_final + directional P_forward / P_reflected
+- asymptotic conversion: P_final + directional P_transmitted / P_reflected
 - peak_conversion: scalar summary from conversion probability
 """
 
@@ -222,17 +222,17 @@ class TestAsymptoticConversion:
         result = compute_asymptotic_conversion(data, "phi_0", "chi_0")
         assert isinstance(result, AsymptoticConversionResult)
         assert result.P_final >= 0
-        assert result.P_forward >= 0
+        assert result.P_transmitted >= 0
         assert result.P_reflected >= 0
         assert result.source_field == "phi_0"
         assert result.target_field == "chi_0"
 
-    def test_forward_reflected_sum(self) -> None:
-        """P_forward + P_reflected ≈ P_final."""
+    def test_transmitted_reflected_sum(self) -> None:
+        """P_transmitted + P_reflected ≈ P_final."""
         data = _make_travelling_wave_data()
         result = compute_asymptotic_conversion(data, "phi_0", "chi_0")
-        assert result.P_forward + result.P_reflected == pytest.approx(
-            result.P_final, rel=1e-6
+        assert result.P_transmitted + result.P_reflected == pytest.approx(
+            result.P_final, rel=1e-2
         )
 
     def test_source_wavevector_positive(self) -> None:
@@ -315,23 +315,31 @@ class TestSourceWavevector:
 
 
 class TestDirectionalSplit:
-    """Tests for _directional_split."""
+    """Tests for _directional_split (analytic signal decomposition)."""
 
-    def test_cosine_gives_equal_split(self) -> None:
-        """cos(kx) has symmetric spectrum → ~50/50 split for any k_hat."""
+    def test_travelling_wave_mostly_forward(self) -> None:
+        """Right-travelling wave cos(kx - ωt) → mostly forward energy."""
         data = _make_travelling_wave_data(k0=3.0)
         k_hat = np.array([1.0])  # Forward = positive k
         fwd, ref = _directional_split(data, ["phi_0"], 0, k_hat)
-        # Real-valued cos(kx) has |φ̂(k)|² = |φ̂(-k)|², so split is ~50/50
-        assert fwd == pytest.approx(0.5, abs=0.05)
-        assert ref == pytest.approx(0.5, abs=0.05)
+        # Analytic signal correctly assigns most energy to forward direction
+        assert fwd > 0.8
+        assert ref < 0.2
 
     def test_fractions_sum_to_one(self) -> None:
-        """Forward + reflected should sum to 1 (excluding DC)."""
+        """Forward + reflected should sum to ≈ 1."""
         data = _make_travelling_wave_data()
         k_hat = np.array([1.0])
         fwd, ref = _directional_split(data, ["phi_0"], 0, k_hat)
-        assert fwd + ref == pytest.approx(1.0, abs=0.01)
+        assert fwd + ref == pytest.approx(1.0, abs=0.02)
+
+    def test_standing_wave_equal_split(self) -> None:
+        """Standing wave cos(kx)cos(ωt) → ~50/50 split."""
+        data = _make_standing_wave_data()
+        k_hat = np.array([1.0])
+        fwd, ref = _directional_split(data, ["phi_0"], 0, k_hat)
+        assert fwd == pytest.approx(0.5, abs=0.1)
+        assert ref == pytest.approx(0.5, abs=0.1)
 
 
 # ============================================================

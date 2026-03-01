@@ -425,7 +425,7 @@ def _run_asymptotic(
         "source": list(source),
         "target": list(target),
         "P_final": result.P_final,
-        "P_forward": result.P_forward,
+        "P_transmitted": result.P_transmitted,
         "P_reflected": result.P_reflected,
         "source_wavevector": list(result.source_wavevector),
         "_result_obj": result,
@@ -673,7 +673,7 @@ def _format_text_section_asymptotic(
             [
                 f"Asymptotic Conversion ({src} -> {tgt}):",
                 f"  P_final     = {asym['P_final']:.6f}",
-                f"  P_forward   = {asym['P_forward']:.6f}",
+                f"  P_transmitted = {asym['P_transmitted']:.6f}",
                 f"  P_reflected = {asym['P_reflected']:.6f}",
                 f"  Source k    = ({', '.join(f'{k:.3f}' for k in asym['source_wavevector'])})",
             ]

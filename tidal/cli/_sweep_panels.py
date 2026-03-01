@@ -203,7 +203,6 @@ def render_sweep_compare(
 
     param_name = param_names[0]
     param_vals = results.column(param_name)
-    len(param_vals)
 
     # Color scale
     norm = _safe_normalize(param_vals)

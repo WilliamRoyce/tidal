@@ -6,24 +6,22 @@ Computes:
   of simulation.  Uses field-group energies (summed over all components),
   making this a Lorentz scalar for any field type.
 
-- **P_forward / P_reflected**: Directional decomposition of the target-field
-  energy at the final snapshot.  The forward/backward split is defined by
-  the **source field's initial propagation direction** — the spectral centroid
-  wavevector ``⟨k⟩`` of the source at ``t=0``.
+- **P_transmitted / P_reflected**: Directional decomposition of the
+  target-field energy using **flux-based mode classification**.  For each
+  Fourier mode k, the directional flux
+  ``(k · k̂_source) · Im[v̂*(k) · φ̂(k)]`` determines propagation direction.
+  The mode's spectral energy is attributed accordingly.
 
-  - Forward (transmitted): target modes with ``k · k̂_source > 0``
-  - Reflected: target modes with ``k · k̂_source < 0``
+  This correctly handles real-valued fields where |φ̂(k)|² = |φ̂(-k)|²:
+  the cross-spectrum ``Im[v̂* · φ̂]`` is antisymmetric, so for a rightward
+  wave both the +k₀ and -k₀ modes have positive directional flux and are
+  both attributed to forward.
 
-  This definition is:
-  - **Coordinate-independent**: the reference direction comes from the physics
-    (the initial wave), not from the choice of spatial axes.
-  - **Dimension-independent**: uses the full wavevector dot product, working
-    identically in 1+1D, 2+1D, and 3+1D.
+  Properties:
+  - **Coordinate-independent**: reference direction from source physics.
+  - **Dimension-independent**: full wavevector dot product, works in 1-3D.
   - **Rotation-invariant**: ``k · k̂`` is a scalar under spatial rotations.
-
-  It is NOT Lorentz-invariant (wavevectors transform under boosts), but for
-  simulations on a fixed spatial grid, the grid frame is the natural frame
-  and the definition is unambiguous.
+  - **Correctly handles real fields**: flux breaks the power-spectrum symmetry.
 
 For scalar fields, φ² is a Lorentz scalar so P_final is automatically
 frame-independent.  For vector fields, the group sum over all components
@@ -68,7 +66,7 @@ class AsymptoticConversionResult:
         Total conversion at final snapshot: ``E_target(t_final) / E_source(0)``.
     P_reflected : float
         Fraction of total conversion in backward-propagating target modes.
-    P_forward : float
+    P_transmitted : float
         Fraction of total conversion in forward-propagating target modes.
     E_source_initial : float
         Source group energy at ``t=0``.
@@ -85,7 +83,7 @@ class AsymptoticConversionResult:
 
     P_final: float
     P_reflected: float
-    P_forward: float
+    P_transmitted: float
     E_source_initial: float
     E_target_final: float
     source_field: str
@@ -187,33 +185,26 @@ def _source_wavevector(
     return k_flux
 
 
-def _field_spectral_energy(
-    data: SimulationData,
-    fname: str,
-    t_idx: int,
-) -> NDArray[np.float64]:
-    """Spectral energy density for one field: |φ̂(k)|² + |v̂(k)|²."""
-    field_arr = np.asarray(data.fields[fname][t_idx], dtype=np.float64)
-    power = np.abs(np.fft.fftn(field_arr)) ** 2
-
-    vel_all = data.velocities.get(fname)
-    if vel_all is not None:
-        vel_arr = np.asarray(vel_all[t_idx], dtype=np.float64)
-        power += np.abs(np.fft.fftn(vel_arr)) ** 2
-
-    return power
-
-
-def _directional_split(
+def _directional_split(  # noqa: PLR0914
     data: SimulationData,
     target_fields: list[str],
     t_idx: int,
     k_hat: NDArray[np.float64],
 ) -> tuple[float, float]:
-    """Split target field spectral energy into forward and reflected fractions.
+    """Split target field energy into forward (transmitted) and reflected.
 
-    Forward = modes where ``k · k̂_source > 0``.
-    Reflected = modes where ``k · k̂_source < 0``.
+    Uses **flux-based mode classification**: for each Fourier mode k, the
+    directional energy flux ``(k · k̂_source) · Im[v̂*(k) · φ̂(k)]``
+    determines whether the mode propagates forward or backward.  The mode's
+    spectral energy ``|φ̂(k)|² + |v̂(k)|²`` is then attributed to the
+    corresponding direction.
+
+    For real-valued fields, a naive spectral power split by sign of k always
+    gives ~50/50 because |φ̂(k)|² = |φ̂(-k)|².  The flux-based approach
+    correctly handles real fields because the directional flux uses the
+    cross-spectrum ``Im[v̂* · φ̂]`` which is antisymmetric: for a rightward
+    travelling wave, both the +k and -k modes have positive directional
+    flux and are both attributed to the forward direction.
 
     Parameters
     ----------
@@ -229,24 +220,45 @@ def _directional_split(
     Returns
     -------
     forward_frac, reflected_frac : float
-        Fractions of total spectral energy (each in [0, 1], sum ≤ 1).
+        Fractions of total spectral energy (each in [0, 1], sum ≈ 1).
     """
-    field_shape = data.fields[target_fields[0]][t_idx].shape
-    k_grids = _build_k_grids(field_shape, data.grid_spacing)
-
-    # k_dot = k · k̂_source — scalar field on the k-grid
-    k_dot = sum(k_grids[ax] * k_hat[ax] for ax in range(len(data.grid_spacing)))
-
-    forward_mask = k_dot > 0
-    reflected_mask = k_dot < 0
-
     total_forward = 0.0
     total_reflected = 0.0
+    total_zero = 0.0
 
     for fname in target_fields:
-        spectral_energy = _field_spectral_energy(data, fname, t_idx)
-        total_forward += float(np.sum(spectral_energy[forward_mask]))
-        total_reflected += float(np.sum(spectral_energy[reflected_mask]))
+        field_arr = np.asarray(data.fields[fname][t_idx], dtype=np.float64)
+        fhat = np.fft.fftn(field_arr)
+        spectral_energy = np.abs(fhat) ** 2
+
+        vel_all = data.velocities.get(fname)
+        if vel_all is not None:
+            vel_arr = np.asarray(vel_all[t_idx], dtype=np.float64)
+            vhat = np.fft.fftn(vel_arr)
+            spectral_energy += np.abs(vhat) ** 2
+
+            # Directional flux: (k · k̂_source) · Im[v̂*(k) · φ̂(k)]
+            k_grids = _build_k_grids(field_arr.shape, data.grid_spacing)
+            k_dot_source = sum(
+                k_grids[ax] * k_hat[ax] for ax in range(len(data.grid_spacing))
+            )
+            cross = np.imag(np.conj(vhat) * fhat)
+            flux = k_dot_source * cross
+
+            fwd_mask = flux > 0
+            ref_mask = flux < 0
+            zero_mask = ~fwd_mask & ~ref_mask
+
+            total_forward += float(np.sum(spectral_energy[fwd_mask]))
+            total_reflected += float(np.sum(spectral_energy[ref_mask]))
+            total_zero += float(np.sum(spectral_energy[zero_mask]))
+        else:
+            # No velocity → cannot determine direction; split equally
+            total_zero += float(np.sum(spectral_energy))
+
+    # Split zero-flux modes equally between forward and reflected
+    total_forward += total_zero / 2.0
+    total_reflected += total_zero / 2.0
 
     total = total_forward + total_reflected
     if total < _ENERGY_FLOOR:
@@ -316,18 +328,18 @@ def compute_asymptotic_conversion(
     if k_mag < _WAVEVECTOR_FLOOR:
         # Source has no net propagation direction (e.g., standing wave).
         # Directional decomposition is undefined — report equal split.
-        p_forward = p_final / 2.0
+        p_transmitted = p_final / 2.0
         p_reflected = p_final / 2.0
     else:
         k_hat = k_source / k_mag
         fwd_frac, ref_frac = _directional_split(data, target_list, -1, k_hat)
-        p_forward = p_final * fwd_frac
+        p_transmitted = p_final * fwd_frac
         p_reflected = p_final * ref_frac
 
     return AsymptoticConversionResult(
         P_final=p_final,
         P_reflected=p_reflected,
-        P_forward=p_forward,
+        P_transmitted=p_transmitted,
         E_source_initial=e_source_0,
         E_target_final=e_target_final,
         source_field=",".join(source_list),
