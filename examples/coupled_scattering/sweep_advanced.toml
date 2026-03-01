@@ -1,0 +1,56 @@
+# Coupled Scattering — Full-Featured Sweep Configuration
+#
+# Demonstrates the complete sweep TOML syntax including:
+#   - Adaptive parameter refinement (scale = "adaptive")
+#   - Multiple measurement types (conversion, mixing, asymptotic, ...)
+#   - Parallel execution
+#   - Resume capability
+#
+# Usage:
+#   tidal sweep --config examples/coupled_scattering/sweep_advanced.toml
+#
+# After running, analyze results with:
+#   tidal plot <output_path>/ --type sweep --metric P_max
+#   tidal plot <output_path>/ --type sweep --metric P_transmitted,P_reflected
+#
+# Requires: pre-derived JSON spec at examples/data/coupled_scattering.json
+#   (run `tidal derive examples/coupled_scattering/theory.toml` first)
+
+spec = "../data/coupled_scattering.json"
+
+[parameters]
+mPhi2 = 1.0
+mChi2 = 1.0
+R = 5.0
+
+[sweep.g0]
+start = 0.01
+stop = 0.9
+scale = "adaptive"
+initial_count = 5
+max_count = 25
+metric = "P_max"
+threshold = 0.01
+
+[simulation]
+grid_shape = 256
+bounds = [-40, 40]
+periodic = true
+ic = "gaussian"
+ic_component = "phi_0"
+ic_center = -20.0
+ic_width = 3.0
+ic_wavevector = 3
+t_end = 60.0
+
+[measurement]
+types = ["conversion", "mixing", "conservation", "asymptotic", "peak_conversion"]
+source = "phi_0"
+target = "chi_0"
+
+[output]
+path = "../data/sweep_advanced_toml"
+
+[execution]
+parallel = 4
+resume = true
