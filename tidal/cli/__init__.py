@@ -911,6 +911,22 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Stop adaptive refinement when max interval score < T (default: 0.01)",
     )
 
+    # Multi-D sampling
+    sweep_parser.add_argument(
+        "--sweep-strategy",
+        type=str,
+        default=None,
+        choices=["grid", "latin_hypercube", "sobol"],
+        help="Sampling strategy for multi-parameter sweeps (default: grid = Cartesian product)",
+    )
+    sweep_parser.add_argument(
+        "--n-samples",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Number of samples for latin_hypercube/sobol strategies",
+    )
+
     return parser
 
 

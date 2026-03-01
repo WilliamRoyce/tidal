@@ -38,6 +38,8 @@ class SweepConfig:
     force_large_sweep: bool
     dry_run: bool
     adaptive_config: dict[str, dict[str, Any]] = field(default_factory=dict)
+    sweep_strategy: str | None = None
+    n_samples: int | None = None
 
 
 _KNOWN_SECTIONS = frozenset(
@@ -187,22 +189,39 @@ def _parse_range(
     raise ValueError(msg)
 
 
+_SWEEP_META_KEYS = frozenset({"strategy", "n_samples"})
+
+
 def _parse_sweeps(
     data: dict[str, Any],
-) -> tuple[dict[str, list[float]], dict[str, dict[str, Any]]]:
-    """Parse all [sweep.*] sections."""
+) -> tuple[dict[str, list[float]], dict[str, dict[str, Any]], str | None, int | None]:
+    """Parse all ``[sweep.*]`` sections plus sweep-level metadata.
+
+    Returns
+    -------
+    tuple
+        (swept_params, adaptive_config, strategy, n_samples)
+    """
     swept: dict[str, list[float]] = {}
     adaptive: dict[str, dict[str, Any]] = {}
+    strategy: str | None = None
+    n_samples: int | None = None
     raw = data.get("sweep")
     if raw and isinstance(raw, dict):
+        strategy = raw.get("strategy")
+        n_samples_raw = raw.get("n_samples")
+        if n_samples_raw is not None:
+            n_samples = int(n_samples_raw)
         for name, section in raw.items():
+            if name in _SWEEP_META_KEYS:
+                continue
             if not isinstance(section, dict):
                 continue
             values, ac = _parse_sweep_section(name, section)
             swept[name] = values
             if ac:
                 adaptive[name] = ac
-    return swept, adaptive
+    return swept, adaptive, strategy, n_samples
 
 
 def _parse_convergence(
@@ -286,7 +305,7 @@ def _parse_sim_settings(data: dict[str, Any], filename: str) -> dict[str, Any]:
     return sim_settings
 
 
-def load_sweep_config(path: Path) -> SweepConfig:
+def load_sweep_config(path: Path) -> SweepConfig:  # noqa: PLR0914
     """Load and validate a sweep TOML configuration file.
 
     Parameters
@@ -326,7 +345,7 @@ def load_sweep_config(path: Path) -> SweepConfig:
         msg = f"Missing required key 'spec' in {path.name}"
         raise ValueError(msg)
 
-    swept_params, adaptive_config = _parse_sweeps(data)
+    swept_params, adaptive_config, strategy, n_samples = _parse_sweeps(data)
     converge_sizes = _parse_convergence(data, has_sweeps=bool(swept_params))
 
     if not swept_params and converge_sizes is None:
@@ -352,6 +371,8 @@ def load_sweep_config(path: Path) -> SweepConfig:
         force_large_sweep=force_large,
         dry_run=dry_run,
         adaptive_config=adaptive_config,
+        sweep_strategy=strategy,
+        n_samples=n_samples,
     )
 
 
@@ -397,6 +418,10 @@ def _apply_execution_settings(config: SweepConfig, args: Namespace) -> None:
         args.dry_run = True
     if config.adaptive_config:
         args._adaptive_config = config.adaptive_config  # noqa: SLF001
+    if getattr(args, "sweep_strategy", None) is None and config.sweep_strategy:
+        args.sweep_strategy = config.sweep_strategy
+    if getattr(args, "n_samples", None) is None and config.n_samples is not None:
+        args.n_samples = config.n_samples
 
 
 def apply_config_to_args(

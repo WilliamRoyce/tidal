@@ -123,6 +123,223 @@ class SweepResults:
         return np.array(values, dtype=np.float64)
 
     # ------------------------------------------------------------------
+    # Status tracking
+    # ------------------------------------------------------------------
+
+    @property
+    def failure_rate(self) -> float:
+        """Fraction of runs that failed (``run_status != 'success'``).
+
+        Returns 0.0 if there are no rows or no ``run_status`` column.
+        """
+        if not self.rows:
+            return 0.0
+        n_failed = sum(
+            1 for r in self.rows if r.get("run_status", "success") != "success"
+        )
+        return n_failed / len(self.rows)
+
+    def successful_rows(self) -> SweepResults:
+        """Return only rows with ``run_status == 'success'``."""
+        return self._filter_by_status("success", invert=False)
+
+    def failed_rows(self) -> SweepResults:
+        """Return only rows with ``run_status != 'success'``."""
+        return self._filter_by_status("success", invert=True)
+
+    def _filter_by_status(self, status: str, *, invert: bool) -> SweepResults:
+        """Filter rows by run_status value."""
+        filtered_rows: list[dict[str, Any]] = []
+        filtered_dirs: list[Path] = []
+        for i, row in enumerate(self.rows):
+            matches = row.get("run_status", "success") == status
+            if matches != invert:
+                filtered_rows.append(row)
+                if i < len(self.run_dirs):
+                    filtered_dirs.append(self.run_dirs[i])
+        return SweepResults(
+            swept_params=self.swept_params,
+            fixed_params=self.fixed_params,
+            sim_settings=self.sim_settings,
+            rows=filtered_rows,
+            run_dirs=filtered_dirs,
+            spec_path=self.spec_path,
+            measurements=self.measurements,
+            source_fields=self.source_fields,
+            target_fields=self.target_fields,
+            metadata=self.metadata,
+            converge_sizes=self.converge_sizes,
+        )
+
+    # ------------------------------------------------------------------
+    # Query methods
+    # ------------------------------------------------------------------
+
+    def filter(self, **kwargs: float) -> SweepResults:
+        """Return a new SweepResults with only rows matching parameter values.
+
+        Uses ``numpy.isclose`` for float comparison.
+
+        Parameters
+        ----------
+        **kwargs : float
+            Parameter name/value pairs to filter on.
+
+        Returns
+        -------
+        SweepResults
+            Filtered results (preserves all metadata).
+        """
+        filtered_rows: list[dict[str, Any]] = []
+        filtered_dirs: list[Path] = []
+        for i, row in enumerate(self.rows):
+            if all(np.isclose(row.get(k, float("nan")), v) for k, v in kwargs.items()):
+                filtered_rows.append(row)
+                if i < len(self.run_dirs):
+                    filtered_dirs.append(self.run_dirs[i])
+        return SweepResults(
+            swept_params=self.swept_params,
+            fixed_params=self.fixed_params,
+            sim_settings=self.sim_settings,
+            rows=filtered_rows,
+            run_dirs=filtered_dirs,
+            spec_path=self.spec_path,
+            measurements=self.measurements,
+            source_fields=self.source_fields,
+            target_fields=self.target_fields,
+            metadata=self.metadata,
+            converge_sizes=self.converge_sizes,
+        )
+
+    def group_by(self, param: str) -> dict[float, SweepResults]:
+        """Group results by distinct values of a parameter.
+
+        Parameters
+        ----------
+        param : str
+            Parameter name to group on.
+
+        Returns
+        -------
+        dict[float, SweepResults]
+            Mapping from parameter value to filtered results.
+        """
+        groups: dict[float, list[int]] = {}
+        for i, row in enumerate(self.rows):
+            val = row.get(param)
+            if val is None:
+                continue
+            key = float(val)
+            groups.setdefault(key, []).append(i)
+
+        result: dict[float, SweepResults] = {}
+        for val, indices in groups.items():
+            result[val] = SweepResults(
+                swept_params=self.swept_params,
+                fixed_params=self.fixed_params,
+                sim_settings=self.sim_settings,
+                rows=[self.rows[i] for i in indices],
+                run_dirs=[self.run_dirs[i] for i in indices if i < len(self.run_dirs)],
+                spec_path=self.spec_path,
+                measurements=self.measurements,
+                source_fields=self.source_fields,
+                target_fields=self.target_fields,
+                metadata=self.metadata,
+                converge_sizes=self.converge_sizes,
+            )
+        return result
+
+    def best(self, metric: str, *, maximize: bool = True) -> dict[str, Any]:
+        """Return the row with the best (max or min) metric value.
+
+        Parameters
+        ----------
+        metric : str
+            Metric column name.
+        maximize : bool
+            If True, return the row with the highest value; otherwise lowest.
+
+        Returns
+        -------
+        dict[str, Any]
+            The best row.
+
+        Raises
+        ------
+        KeyError
+            If *metric* is not found in any row.
+        ValueError
+            If all metric values are None.
+        """
+        best_val: float | None = None
+        best_row: dict[str, Any] | None = None
+        found_key = False
+        for row in self.rows:
+            if metric not in row:
+                continue
+            found_key = True
+            val = row[metric]
+            if val is None:
+                continue
+            fval = float(val)
+            if (
+                best_val is None
+                or (maximize and fval > best_val)
+                or (not maximize and fval < best_val)
+            ):
+                best_val = fval
+                best_row = row
+        if not found_key:
+            msg = f"Metric '{metric}' not found in any row"
+            raise KeyError(msg)
+        if best_row is None:
+            msg = f"All values for metric '{metric}' are None"
+            raise ValueError(msg)
+        return best_row
+
+    def summary(self) -> str:
+        """Return a human-readable summary of the sweep results.
+
+        Returns
+        -------
+        str
+            Formatted multi-line summary.
+        """
+        header = f"SweepResults summary ({self.n_runs} runs)"
+        lines: list[str] = [header, "=" * len(header)]
+
+        if self.swept_params:
+            lines.append("\nSwept parameters:")
+            for name, vals in self.swept_params.items():
+                lines.append(
+                    f"  {name}: {min(vals):.6g} to {max(vals):.6g} ({len(vals)} values)"
+                )
+
+        if self.fixed_params:
+            lines.append("\nFixed parameters:")
+            for name, val in self.fixed_params.items():
+                lines.append(f"  {name}: {val:.6g}")
+
+        metrics = self.metric_names
+        if metrics and self.rows:
+            lines.append("\nMetrics:")
+            for m in metrics:
+                vals = [row.get(m) for row in self.rows if row.get(m) is not None]
+                if not vals:
+                    lines.append(f"  {m}: no data")
+                    continue
+                arr = np.array(vals, dtype=np.float64)
+                if len(arr) == 1:
+                    lines.append(f"  {m}: {arr[0]:.6g} (1 value)")
+                else:
+                    lines.append(
+                        f"  {m}: mean={np.mean(arr):.6g} \u00b1 {np.std(arr):.6g}, "
+                        f"min={np.min(arr):.6g}, max={np.max(arr):.6g}"
+                    )
+
+        return "\n".join(lines)
+
+    # ------------------------------------------------------------------
     # Serialization
     # ------------------------------------------------------------------
 
@@ -218,7 +435,9 @@ class SweepResults:
         data["completed_runs"] = self.n_runs
         data["total_runs"] = self.metadata.get("total_runs", self.n_runs)
 
-        path.write_text(json.dumps(data, indent=2, default=_json_default), encoding="utf-8")
+        path.write_text(
+            json.dumps(data, indent=2, default=_json_default), encoding="utf-8"
+        )
 
     # ------------------------------------------------------------------
     # Loading

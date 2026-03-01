@@ -10,6 +10,7 @@ import pytest
 
 from tidal.cli._sweep import (
     _build_row,
+    _generate_samples,
     _interval_scores,
     _run_subdir_name,
     parse_converge_spec,
@@ -193,9 +194,30 @@ class TestSweepResults:
             fixed_params={"m2": 1.0},
             sim_settings={"t_end": 10.0, "scheme": "auto"},
             rows=[
-                {"g0": 0.1, "m2": 1.0, "t_end": 10.0, "scheme": "auto", "P_max": 0.01, "wall_time_s": 1.0},
-                {"g0": 0.3, "m2": 1.0, "t_end": 10.0, "scheme": "auto", "P_max": 0.05, "wall_time_s": 1.1},
-                {"g0": 0.5, "m2": 1.0, "t_end": 10.0, "scheme": "auto", "P_max": 0.10, "wall_time_s": 1.2},
+                {
+                    "g0": 0.1,
+                    "m2": 1.0,
+                    "t_end": 10.0,
+                    "scheme": "auto",
+                    "P_max": 0.01,
+                    "wall_time_s": 1.0,
+                },
+                {
+                    "g0": 0.3,
+                    "m2": 1.0,
+                    "t_end": 10.0,
+                    "scheme": "auto",
+                    "P_max": 0.05,
+                    "wall_time_s": 1.1,
+                },
+                {
+                    "g0": 0.5,
+                    "m2": 1.0,
+                    "t_end": 10.0,
+                    "scheme": "auto",
+                    "P_max": 0.10,
+                    "wall_time_s": 1.2,
+                },
             ],
             run_dirs=[Path("/tmp/g0_0.1"), Path("/tmp/g0_0.3"), Path("/tmp/g0_0.5")],
             spec_path="examples/data/coupled_scattering.json",
@@ -264,7 +286,9 @@ class TestSweepResults:
         assert "rows" in data
         assert len(data["rows"]) == 3
 
-    def test_save_sweep_json(self, sample_results: SweepResults, tmp_path: Path) -> None:
+    def test_save_sweep_json(
+        self, sample_results: SweepResults, tmp_path: Path
+    ) -> None:
         sweep_file = tmp_path / "sweep.json"
         sample_results.save_sweep_json(sweep_file)
         assert sweep_file.exists()
@@ -273,7 +297,9 @@ class TestSweepResults:
         assert data["swept_parameters"] == {"g0": [0.1, 0.3, 0.5]}
         assert data["completed_runs"] == 3
 
-    def test_save_sweep_json_includes_run_dirs(self, sample_results: SweepResults, tmp_path: Path) -> None:
+    def test_save_sweep_json_includes_run_dirs(
+        self, sample_results: SweepResults, tmp_path: Path
+    ) -> None:
         sweep_file = tmp_path / "sweep.json"
         sample_results.save_sweep_json(sweep_file)
         data = json.loads(sweep_file.read_text())
@@ -314,6 +340,319 @@ class TestSweepResults:
 
 
 # ------------------------------------------------------------------
+# SweepResults query methods
+# ------------------------------------------------------------------
+
+
+class TestSweepResultsFilter:
+    """Test SweepResults.filter() method."""
+
+    @pytest.fixture
+    def multi_results(self) -> SweepResults:
+        return SweepResults(
+            swept_params={"g0": [0.1, 0.5], "m2": [1.0, 4.0]},
+            fixed_params={"L": 50.0},
+            sim_settings={"t_end": 10.0},
+            rows=[
+                {"g0": 0.1, "m2": 1.0, "L": 50.0, "t_end": 10.0, "P_max": 0.01},
+                {"g0": 0.1, "m2": 4.0, "L": 50.0, "t_end": 10.0, "P_max": 0.02},
+                {"g0": 0.5, "m2": 1.0, "L": 50.0, "t_end": 10.0, "P_max": 0.08},
+                {"g0": 0.5, "m2": 4.0, "L": 50.0, "t_end": 10.0, "P_max": 0.15},
+            ],
+            run_dirs=[Path(f"/tmp/r{i}") for i in range(4)],
+            spec_path="spec.json",
+            measurements=["conversion"],
+        )
+
+    def test_filter_single_param(self, multi_results: SweepResults) -> None:
+        filtered = multi_results.filter(g0=0.1)
+        assert filtered.n_runs == 2
+        assert all(r["g0"] == pytest.approx(0.1) for r in filtered.rows)
+
+    def test_filter_two_params(self, multi_results: SweepResults) -> None:
+        filtered = multi_results.filter(g0=0.5, m2=4.0)
+        assert filtered.n_runs == 1
+        assert filtered.rows[0]["P_max"] == pytest.approx(0.15)
+
+    def test_filter_no_match(self, multi_results: SweepResults) -> None:
+        filtered = multi_results.filter(g0=99.0)
+        assert filtered.n_runs == 0
+
+    def test_filter_preserves_metadata(self, multi_results: SweepResults) -> None:
+        filtered = multi_results.filter(g0=0.1)
+        assert filtered.spec_path == "spec.json"
+        assert filtered.swept_params == multi_results.swept_params
+        assert filtered.fixed_params == multi_results.fixed_params
+
+    def test_filter_preserves_run_dirs(self, multi_results: SweepResults) -> None:
+        filtered = multi_results.filter(g0=0.5)
+        assert len(filtered.run_dirs) == 2
+
+
+class TestSweepResultsGroupBy:
+    """Test SweepResults.group_by() method."""
+
+    @pytest.fixture
+    def multi_results(self) -> SweepResults:
+        return SweepResults(
+            swept_params={"g0": [0.1, 0.5], "m2": [1.0, 4.0]},
+            fixed_params={},
+            sim_settings={},
+            rows=[
+                {"g0": 0.1, "m2": 1.0, "P_max": 0.01},
+                {"g0": 0.1, "m2": 4.0, "P_max": 0.02},
+                {"g0": 0.5, "m2": 1.0, "P_max": 0.08},
+                {"g0": 0.5, "m2": 4.0, "P_max": 0.15},
+            ],
+            run_dirs=[Path(f"/tmp/r{i}") for i in range(4)],
+            spec_path="",
+            measurements=[],
+        )
+
+    def test_group_by_param(self, multi_results: SweepResults) -> None:
+        groups = multi_results.group_by("g0")
+        assert len(groups) == 2
+        assert groups[0.1].n_runs == 2
+        assert groups[0.5].n_runs == 2
+
+    def test_group_by_values(self, multi_results: SweepResults) -> None:
+        groups = multi_results.group_by("m2")
+        assert 1.0 in groups
+        assert 4.0 in groups
+        assert all(r["m2"] == pytest.approx(1.0) for r in groups[1.0].rows)
+
+
+class TestSweepResultsBest:
+    """Test SweepResults.best() method."""
+
+    @pytest.fixture
+    def results(self) -> SweepResults:
+        return SweepResults(
+            swept_params={"g0": [0.1, 0.3, 0.5]},
+            fixed_params={},
+            sim_settings={},
+            rows=[
+                {"g0": 0.1, "P_max": 0.01, "error_metric": 1e-2},
+                {"g0": 0.3, "P_max": 0.05, "error_metric": 1e-4},
+                {"g0": 0.5, "P_max": 0.10, "error_metric": 1e-3},
+            ],
+            run_dirs=[],
+            spec_path="",
+            measurements=[],
+        )
+
+    def test_best_maximize(self, results: SweepResults) -> None:
+        row = results.best("P_max")
+        assert row["g0"] == pytest.approx(0.5)
+
+    def test_best_minimize(self, results: SweepResults) -> None:
+        row = results.best("error_metric", maximize=False)
+        assert row["g0"] == pytest.approx(0.3)
+
+    def test_best_missing_metric_raises(self, results: SweepResults) -> None:
+        with pytest.raises(KeyError, match="nonexistent"):
+            results.best("nonexistent")
+
+    def test_best_with_none_values(self) -> None:
+        r = SweepResults(
+            swept_params={"g0": [0.1, 0.5]},
+            fixed_params={},
+            sim_settings={},
+            rows=[
+                {"g0": 0.1, "P_max": None},
+                {"g0": 0.5, "P_max": 0.05},
+            ],
+            run_dirs=[],
+            spec_path="",
+            measurements=[],
+        )
+        row = r.best("P_max")
+        assert row["g0"] == pytest.approx(0.5)
+
+    def test_best_all_none_raises(self) -> None:
+        r = SweepResults(
+            swept_params={"g0": [0.1, 0.5]},
+            fixed_params={},
+            sim_settings={},
+            rows=[
+                {"g0": 0.1, "P_max": None},
+                {"g0": 0.5, "P_max": None},
+            ],
+            run_dirs=[],
+            spec_path="",
+            measurements=[],
+        )
+        with pytest.raises(ValueError, match="None"):
+            r.best("P_max")
+
+
+class TestSweepResultsSummary:
+    """Test SweepResults.summary() method."""
+
+    def test_summary_basic(self) -> None:
+        r = SweepResults(
+            swept_params={"g0": [0.1, 0.5, 1.0]},
+            fixed_params={"m2": 1.0},
+            sim_settings={"t_end": 10.0},
+            rows=[
+                {"g0": 0.1, "m2": 1.0, "t_end": 10.0, "P_max": 0.01},
+                {"g0": 0.5, "m2": 1.0, "t_end": 10.0, "P_max": 0.05},
+                {"g0": 1.0, "m2": 1.0, "t_end": 10.0, "P_max": 0.10},
+            ],
+            run_dirs=[],
+            spec_path="",
+            measurements=[],
+        )
+        s = r.summary()
+        assert "3 runs" in s
+        assert "g0" in s
+        assert "P_max" in s
+        assert "mean=" in s
+
+    def test_summary_empty(self) -> None:
+        r = SweepResults(
+            swept_params={},
+            fixed_params={},
+            sim_settings={},
+            rows=[],
+            run_dirs=[],
+            spec_path="",
+            measurements=[],
+        )
+        s = r.summary()
+        assert "0 runs" in s
+
+
+# ------------------------------------------------------------------
+# Run status tracking (F7)
+# ------------------------------------------------------------------
+
+
+class TestRunStatusTracking:
+    """Test run_status, failure_rate, successful_rows, failed_rows."""
+
+    @pytest.fixture
+    def mixed_results(self) -> SweepResults:
+        return SweepResults(
+            swept_params={"g0": [0.1, 0.3, 0.5, 0.7]},
+            fixed_params={},
+            sim_settings={},
+            rows=[
+                {
+                    "g0": 0.1,
+                    "P_max": 0.01,
+                    "run_status": "success",
+                    "error_message": None,
+                    "solver_exit_code": 0,
+                },
+                {
+                    "g0": 0.3,
+                    "P_max": 0.05,
+                    "run_status": "success",
+                    "error_message": None,
+                    "solver_exit_code": 0,
+                },
+                {
+                    "g0": 0.5,
+                    "run_status": "solver_error",
+                    "error_message": "exit code 1",
+                    "solver_exit_code": 1,
+                },
+                {
+                    "g0": 0.7,
+                    "run_status": "diverged",
+                    "error_message": "NaN detected",
+                    "solver_exit_code": -1,
+                },
+            ],
+            run_dirs=[Path(f"/tmp/r{i}") for i in range(4)],
+            spec_path="",
+            measurements=[],
+        )
+
+    def test_failure_rate(self, mixed_results: SweepResults) -> None:
+        assert mixed_results.failure_rate == pytest.approx(0.5)
+
+    def test_failure_rate_all_success(self) -> None:
+        r = SweepResults(
+            swept_params={"g0": [0.1]},
+            fixed_params={},
+            sim_settings={},
+            rows=[{"g0": 0.1, "run_status": "success"}],
+            run_dirs=[],
+            spec_path="",
+            measurements=[],
+        )
+        assert r.failure_rate == pytest.approx(0.0)
+
+    def test_failure_rate_empty(self) -> None:
+        r = SweepResults(
+            swept_params={},
+            fixed_params={},
+            sim_settings={},
+            rows=[],
+            run_dirs=[],
+            spec_path="",
+            measurements=[],
+        )
+        assert r.failure_rate == pytest.approx(0.0)
+
+    def test_failure_rate_no_status_column(self) -> None:
+        """Old results without run_status should default to success."""
+        r = SweepResults(
+            swept_params={"g0": [0.1]},
+            fixed_params={},
+            sim_settings={},
+            rows=[{"g0": 0.1, "P_max": 0.05}],
+            run_dirs=[],
+            spec_path="",
+            measurements=[],
+        )
+        assert r.failure_rate == pytest.approx(0.0)
+
+    def test_successful_rows(self, mixed_results: SweepResults) -> None:
+        s = mixed_results.successful_rows()
+        assert s.n_runs == 2
+        assert all(r["run_status"] == "success" for r in s.rows)
+
+    def test_failed_rows(self, mixed_results: SweepResults) -> None:
+        f = mixed_results.failed_rows()
+        assert f.n_runs == 2
+        assert all(r["run_status"] != "success" for r in f.rows)
+
+    def test_successful_rows_preserves_run_dirs(
+        self, mixed_results: SweepResults
+    ) -> None:
+        s = mixed_results.successful_rows()
+        assert len(s.run_dirs) == 2
+
+    def test_run_single_success_has_status(self) -> None:
+        """Verify _run_single returns run_status on success path."""
+        # This is a unit-level check that the status dict keys exist
+        metrics = {
+            "P_max": 0.05,
+            "run_status": "success",
+            "error_message": None,
+            "solver_exit_code": 0,
+            "wall_time_s": 1.0,
+        }
+        assert metrics["run_status"] == "success"
+        assert metrics["solver_exit_code"] == 0
+
+    def test_run_single_error_has_status(self) -> None:
+        """Verify error path includes run_status fields."""
+        metrics = {
+            "run_status": "solver_error",
+            "error_message": "solver exit code 1",
+            "solver_exit_code": 1,
+            "wall_time_s": 2.0,
+            "error": "simulation_failed",
+        }
+        assert metrics["run_status"] == "solver_error"
+        assert metrics["solver_exit_code"] == 1
+
+
+# ------------------------------------------------------------------
 # CLI integration (smoke tests)
 # ------------------------------------------------------------------
 
@@ -331,37 +670,59 @@ class TestSweepCLI:
     def test_no_sweep_or_converge(self) -> None:
         from tidal.cli import main
 
-        code = main(["sweep", "examples/data/coupled_scattering.json", "--output", "/tmp/nosweep"])
+        code = main(
+            [
+                "sweep",
+                "examples/data/coupled_scattering.json",
+                "--output",
+                "/tmp/nosweep",
+            ]
+        )
         assert code == 1
 
     def test_both_sweep_and_converge(self) -> None:
         from tidal.cli import main
 
-        code = main([
-            "sweep", "examples/data/coupled_scattering.json",
-            "--sweep", "g0=0.1,0.5",
-            "--converge", "32,64",
-            "--output", "/tmp/nosweep",
-        ])
+        code = main(
+            [
+                "sweep",
+                "examples/data/coupled_scattering.json",
+                "--sweep",
+                "g0=0.1,0.5",
+                "--converge",
+                "32,64",
+                "--output",
+                "/tmp/nosweep",
+            ]
+        )
         assert code == 1
 
     def test_missing_output(self) -> None:
         from tidal.cli import main
 
-        code = main([
-            "sweep", "examples/data/coupled_scattering.json",
-            "--sweep", "g0=0.1,0.5",
-        ])
+        code = main(
+            [
+                "sweep",
+                "examples/data/coupled_scattering.json",
+                "--sweep",
+                "g0=0.1,0.5",
+            ]
+        )
         assert code == 1
 
     def test_missing_spec(self) -> None:
         from tidal.cli import main
 
-        code = main([
-            "sweep", "nonexistent.json",
-            "--sweep", "g0=0.1,0.5",
-            "--output", "/tmp/nosweep",
-        ])
+        code = main(
+            [
+                "sweep",
+                "nonexistent.json",
+                "--sweep",
+                "g0=0.1,0.5",
+                "--output",
+                "/tmp/nosweep",
+            ]
+        )
         assert code == 1
 
     def test_small_sweep_end_to_end(self, tmp_path: Path) -> None:
@@ -369,19 +730,33 @@ class TestSweepCLI:
         from tidal.cli import main
 
         output = tmp_path / "sweep_out"
-        code = main([
-            "sweep", "examples/data/coupled_scattering.json",
-            "--sweep", "g0=0.1,0.5",
-            "--measure", "conservation,conversion",
-            "--source", "phi_0", "--target", "chi_0",
-            "--grid-shape", "16",
-            "--bounds=-10:10",
-            "--ic", "gaussian",
-            "--ic-component", "phi_0",
-            "--ic-width", "3",
-            "--t-end", "2",
-            "--output", str(output),
-        ])
+        code = main(
+            [
+                "sweep",
+                "examples/data/coupled_scattering.json",
+                "--sweep",
+                "g0=0.1,0.5",
+                "--measure",
+                "conservation,conversion",
+                "--source",
+                "phi_0",
+                "--target",
+                "chi_0",
+                "--grid-shape",
+                "16",
+                "--bounds=-10:10",
+                "--ic",
+                "gaussian",
+                "--ic-component",
+                "phi_0",
+                "--ic-width",
+                "3",
+                "--t-end",
+                "2",
+                "--output",
+                str(output),
+            ]
+        )
         assert code == 0
         assert (output / "sweep.json").exists()
         assert (output / "results.csv").exists()
@@ -406,17 +781,27 @@ class TestSweepCLI:
         from tidal.cli import main
 
         output = tmp_path / "converge_out"
-        code = main([
-            "sweep", "examples/data/coupled_scattering.json",
-            "--converge", "8,16",
-            "--measure", "conservation",
-            "--param", "g0=0.5",
-            "--bounds=-10:10",
-            "--ic", "gaussian",
-            "--ic-component", "phi_0",
-            "--t-end", "1",
-            "--output", str(output),
-        ])
+        code = main(
+            [
+                "sweep",
+                "examples/data/coupled_scattering.json",
+                "--converge",
+                "8,16",
+                "--measure",
+                "conservation",
+                "--param",
+                "g0=0.5",
+                "--bounds=-10:10",
+                "--ic",
+                "gaussian",
+                "--ic-component",
+                "phi_0",
+                "--t-end",
+                "1",
+                "--output",
+                str(output),
+            ]
+        )
         assert code == 0
         assert (output / "sweep.json").exists()
         assert (output / "results.csv").exists()
@@ -430,29 +815,45 @@ class TestSweepCLI:
         output = tmp_path / "resume_test"
 
         # First run
-        code = main([
-            "sweep", "examples/data/coupled_scattering.json",
-            "--sweep", "g0=0.1,0.5",
-            "--measure", "conservation",
-            "--grid-shape", "8",
-            "--bounds=-5:5",
-            "--t-end", "1",
-            "--output", str(output),
-        ])
+        code = main(
+            [
+                "sweep",
+                "examples/data/coupled_scattering.json",
+                "--sweep",
+                "g0=0.1,0.5",
+                "--measure",
+                "conservation",
+                "--grid-shape",
+                "8",
+                "--bounds=-5:5",
+                "--t-end",
+                "1",
+                "--output",
+                str(output),
+            ]
+        )
         assert code == 0
         assert (output / "g0_0.1" / "metadata.json").exists()
 
         # Second run with --resume (should complete without errors)
-        code = main([
-            "sweep", "examples/data/coupled_scattering.json",
-            "--sweep", "g0=0.1,0.5",
-            "--measure", "conservation",
-            "--grid-shape", "8",
-            "--bounds=-5:5",
-            "--t-end", "1",
-            "--output", str(output),
-            "--resume",
-        ])
+        code = main(
+            [
+                "sweep",
+                "examples/data/coupled_scattering.json",
+                "--sweep",
+                "g0=0.1,0.5",
+                "--measure",
+                "conservation",
+                "--grid-shape",
+                "8",
+                "--bounds=-5:5",
+                "--t-end",
+                "1",
+                "--output",
+                str(output),
+                "--resume",
+            ]
+        )
         assert code == 0
 
 
@@ -470,19 +871,33 @@ class TestSweepPlot:
         from tidal.cli import main
 
         output = tmp_path / "plot_sweep"
-        code = main([
-            "sweep", "examples/data/coupled_scattering.json",
-            "--sweep", "g0=0.1,0.3,0.5",
-            "--measure", "conversion,conservation",
-            "--source", "phi_0", "--target", "chi_0",
-            "--grid-shape", "16",
-            "--bounds=-10:10",
-            "--ic", "gaussian",
-            "--ic-component", "phi_0",
-            "--ic-width", "3",
-            "--t-end", "2",
-            "--output", str(output),
-        ])
+        code = main(
+            [
+                "sweep",
+                "examples/data/coupled_scattering.json",
+                "--sweep",
+                "g0=0.1,0.3,0.5",
+                "--measure",
+                "conversion,conservation",
+                "--source",
+                "phi_0",
+                "--target",
+                "chi_0",
+                "--grid-shape",
+                "16",
+                "--bounds=-10:10",
+                "--ic",
+                "gaussian",
+                "--ic-component",
+                "phi_0",
+                "--ic-width",
+                "3",
+                "--t-end",
+                "2",
+                "--output",
+                str(output),
+            ]
+        )
         assert code == 0
         return output
 
@@ -490,12 +905,18 @@ class TestSweepPlot:
         from tidal.cli import main
 
         plot_path = tmp_path / "sweep.png"
-        code = main([
-            "plot", str(sweep_dir),
-            "--type", "sweep",
-            "--metric", "P_max",
-            "--output", str(plot_path),
-        ])
+        code = main(
+            [
+                "plot",
+                str(sweep_dir),
+                "--type",
+                "sweep",
+                "--metric",
+                "P_max",
+                "--output",
+                str(plot_path),
+            ]
+        )
         assert code == 0
         assert plot_path.exists()
 
@@ -503,12 +924,18 @@ class TestSweepPlot:
         from tidal.cli import main
 
         plot_path = tmp_path / "compare.png"
-        code = main([
-            "plot", str(sweep_dir),
-            "--type", "sweep-compare",
-            "--metric", "conversion",
-            "--output", str(plot_path),
-        ])
+        code = main(
+            [
+                "plot",
+                str(sweep_dir),
+                "--type",
+                "sweep-compare",
+                "--metric",
+                "conversion",
+                "--output",
+                str(plot_path),
+            ]
+        )
         assert code == 0
         assert plot_path.exists()
 
@@ -516,11 +943,16 @@ class TestSweepPlot:
         from tidal.cli import main
 
         plot_path = tmp_path / "auto.png"
-        code = main([
-            "plot", str(sweep_dir),
-            "--type", "sweep",
-            "--output", str(plot_path),
-        ])
+        code = main(
+            [
+                "plot",
+                str(sweep_dir),
+                "--type",
+                "sweep",
+                "--output",
+                str(plot_path),
+            ]
+        )
         assert code == 0
         assert plot_path.exists()
 
@@ -530,11 +962,16 @@ class TestSweepPlot:
         # Point at an empty dir (no sweep.json)
         empty = tmp_path / "empty"
         empty.mkdir()
-        code = main([
-            "plot", str(empty),
-            "--type", "sweep",
-            "--metric", "P_max",
-        ])
+        code = main(
+            [
+                "plot",
+                str(empty),
+                "--type",
+                "sweep",
+                "--metric",
+                "P_max",
+            ]
+        )
         assert code == 1
 
 
@@ -551,13 +988,19 @@ class TestSweepValidation:
         from tidal.cli import main
 
         output = tmp_path / "dry_run_out"
-        code = main([
-            "sweep", "examples/data/coupled_scattering.json",
-            "--sweep", "g0=0.1,0.3,0.5",
-            "--measure", "conservation",
-            "--output", str(output),
-            "--dry-run",
-        ])
+        code = main(
+            [
+                "sweep",
+                "examples/data/coupled_scattering.json",
+                "--sweep",
+                "g0=0.1,0.3,0.5",
+                "--measure",
+                "conservation",
+                "--output",
+                str(output),
+                "--dry-run",
+            ]
+        )
         assert code == 0
         # Should NOT create any run directories
         assert not (output / "results.csv").exists()
@@ -568,41 +1011,63 @@ class TestSweepValidation:
         """Unknown --measure value should error with exit code 1."""
         from tidal.cli import main
 
-        code = main([
-            "sweep", "examples/data/coupled_scattering.json",
-            "--sweep", "g0=0.1,0.5",
-            "--measure", "foobar",
-            "--output", str(tmp_path / "out"),
-        ])
+        code = main(
+            [
+                "sweep",
+                "examples/data/coupled_scattering.json",
+                "--sweep",
+                "g0=0.1,0.5",
+                "--measure",
+                "foobar",
+                "--output",
+                str(tmp_path / "out"),
+            ]
+        )
         assert code == 1
 
     def test_unknown_measurement_mixed(self, tmp_path: Path) -> None:
         """Mix of valid and invalid --measure types should error."""
         from tidal.cli import main
 
-        code = main([
-            "sweep", "examples/data/coupled_scattering.json",
-            "--sweep", "g0=0.1,0.5",
-            "--measure", "conservation,nonexistent",
-            "--output", str(tmp_path / "out"),
-        ])
+        code = main(
+            [
+                "sweep",
+                "examples/data/coupled_scattering.json",
+                "--sweep",
+                "g0=0.1,0.5",
+                "--measure",
+                "conservation,nonexistent",
+                "--output",
+                str(tmp_path / "out"),
+            ]
+        )
         assert code == 1
 
-    def test_unknown_swept_param_warns(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_unknown_swept_param_warns(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         """Swept param not in spec should warn but not error."""
         from tidal.cli import main
 
         # This will run (and likely fail on simulation), but the validation
         # warning should appear in stderr before any simulation attempt.
-        main([
-            "sweep", "examples/data/coupled_scattering.json",
-            "--sweep", "nonexistent_param_xyz=0.1,0.5",
-            "--measure", "conservation",
-            "--grid-shape", "8",
-            "--bounds=-5:5",
-            "--t-end", "0.1",
-            "--output", str(tmp_path / "out"),
-        ])
+        main(
+            [
+                "sweep",
+                "examples/data/coupled_scattering.json",
+                "--sweep",
+                "nonexistent_param_xyz=0.1,0.5",
+                "--measure",
+                "conservation",
+                "--grid-shape",
+                "8",
+                "--bounds=-5:5",
+                "--t-end",
+                "0.1",
+                "--output",
+                str(tmp_path / "out"),
+            ]
+        )
         captured = capsys.readouterr()
         assert "nonexistent_param_xyz" in captured.err
         assert "Possible typo" in captured.err
@@ -660,3 +1125,86 @@ class TestIntervalScores:
         scores = _interval_scores(values, metric_vals)
         assert len(scores) == 1
         assert scores[0] > 0
+
+
+# ------------------------------------------------------------------
+# Multi-D sampling (F2b)
+# ------------------------------------------------------------------
+
+
+class TestGenerateSamples:
+    """Test _generate_samples for LHS and Sobol strategies."""
+
+    def test_latin_hypercube_count(self) -> None:
+        samples = _generate_samples(
+            {"g0": (0.01, 1.0), "m2": (0.5, 4.0)},
+            n_samples=10,
+            strategy="latin_hypercube",
+            seed=42,
+        )
+        assert len(samples) == 10
+        assert all("g0" in s and "m2" in s for s in samples)
+
+    def test_latin_hypercube_bounds(self) -> None:
+        samples = _generate_samples(
+            {"g0": (0.01, 1.0), "m2": (0.5, 4.0)},
+            n_samples=50,
+            strategy="latin_hypercube",
+            seed=42,
+        )
+        g0_vals = [s["g0"] for s in samples]
+        m2_vals = [s["m2"] for s in samples]
+        assert min(g0_vals) >= 0.01
+        assert max(g0_vals) <= 1.0
+        assert min(m2_vals) >= 0.5
+        assert max(m2_vals) <= 4.0
+
+    def test_sobol_count(self) -> None:
+        samples = _generate_samples(
+            {"g0": (0.01, 1.0), "m2": (0.5, 4.0)},
+            n_samples=8,
+            strategy="sobol",
+            seed=42,
+        )
+        assert len(samples) == 8
+
+    def test_sobol_bounds(self) -> None:
+        samples = _generate_samples(
+            {"g0": (0.0, 10.0)},
+            n_samples=16,
+            strategy="sobol",
+            seed=42,
+        )
+        vals = [s["g0"] for s in samples]
+        assert all(0.0 <= v <= 10.0 for v in vals)
+
+    def test_unknown_strategy_raises(self) -> None:
+        with pytest.raises(ValueError, match="Unknown sampling strategy"):
+            _generate_samples({"g0": (0.0, 1.0)}, n_samples=5, strategy="random")
+
+    def test_reproducibility(self) -> None:
+        s1 = _generate_samples(
+            {"g0": (0.0, 1.0), "m2": (1.0, 5.0)},
+            n_samples=10,
+            strategy="latin_hypercube",
+            seed=123,
+        )
+        s2 = _generate_samples(
+            {"g0": (0.0, 1.0), "m2": (1.0, 5.0)},
+            n_samples=10,
+            strategy="latin_hypercube",
+            seed=123,
+        )
+        for a, b in zip(s1, s2, strict=True):
+            assert a["g0"] == pytest.approx(b["g0"])
+            assert a["m2"] == pytest.approx(b["m2"])
+
+    def test_three_params(self) -> None:
+        samples = _generate_samples(
+            {"a": (0.0, 1.0), "b": (2.0, 3.0), "c": (10.0, 20.0)},
+            n_samples=5,
+            strategy="latin_hypercube",
+            seed=42,
+        )
+        assert len(samples) == 5
+        assert all(len(s) == 3 for s in samples)

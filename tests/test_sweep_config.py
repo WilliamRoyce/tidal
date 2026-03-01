@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
@@ -14,6 +14,8 @@ from tidal.cli._sweep_config import (
     load_sweep_config,
 )
 
+if TYPE_CHECKING:
+    from pathlib import Path
 
 # ------------------------------------------------------------------
 # _parse_sweep_section
@@ -24,7 +26,9 @@ class TestParseSweepSection:
     """Test individual [sweep.PARAM] section parsing."""
 
     def test_linear_range(self) -> None:
-        values, adaptive = _parse_sweep_section("g0", {"start": 0.1, "stop": 1.0, "count": 5})
+        values, adaptive = _parse_sweep_section(
+            "g0", {"start": 0.1, "stop": 1.0, "count": 5}
+        )
         assert len(values) == 5
         assert values[0] == pytest.approx(0.1)
         assert values[-1] == pytest.approx(1.0)
@@ -32,7 +36,8 @@ class TestParseSweepSection:
 
     def test_log_range(self) -> None:
         values, adaptive = _parse_sweep_section(
-            "m2", {"start": 0.01, "stop": 100.0, "count": 5, "scale": "log"},
+            "m2",
+            {"start": 0.01, "stop": 100.0, "count": 5, "scale": "log"},
         )
         assert len(values) == 5
         assert values[0] == pytest.approx(0.01)
@@ -74,11 +79,15 @@ class TestParseSweepSection:
 
     def test_log_negative_bounds(self) -> None:
         with pytest.raises(ValueError, match="positive bounds"):
-            _parse_sweep_section("g0", {"start": -1.0, "stop": 1.0, "count": 5, "scale": "log"})
+            _parse_sweep_section(
+                "g0", {"start": -1.0, "stop": 1.0, "count": 5, "scale": "log"}
+            )
 
     def test_unknown_scale(self) -> None:
         with pytest.raises(ValueError, match="unknown scale"):
-            _parse_sweep_section("g0", {"start": 0.0, "stop": 1.0, "count": 5, "scale": "cubic"})
+            _parse_sweep_section(
+                "g0", {"start": 0.0, "stop": 1.0, "count": 5, "scale": "cubic"}
+            )
 
     def test_explicit_values_too_few(self) -> None:
         with pytest.raises(ValueError, match="must be a list with >= 2"):
@@ -99,11 +108,7 @@ class TestLoadSweepConfig:
         spec = tmp_path / "spec.json"
         spec.write_text("{}")
         toml.write_text(
-            'spec = "spec.json"\n'
-            "[sweep.g0]\n"
-            "start = 0.1\n"
-            "stop = 1.0\n"
-            "count = 5\n"
+            'spec = "spec.json"\n[sweep.g0]\nstart = 0.1\nstop = 1.0\ncount = 5\n'
         )
         config = load_sweep_config(toml)
         assert config.spec_path == spec
@@ -131,8 +136,8 @@ class TestLoadSweepConfig:
             "grid_shape = 128\n"
             "bounds = [0, 100]\n"
             "periodic = true\n"
-            't_end = 20.0\n'
-            '\n'
+            "t_end = 20.0\n"
+            "\n"
             "[measurement]\n"
             'types = ["conversion", "mixing"]\n'
             'source = "phi_0"\n'
@@ -162,9 +167,7 @@ class TestLoadSweepConfig:
         spec = tmp_path / "spec.json"
         spec.write_text("{}")
         toml.write_text(
-            'spec = "spec.json"\n'
-            "[convergence]\n"
-            "grid_sizes = [32, 64, 128, 256]\n"
+            'spec = "spec.json"\n[convergence]\ngrid_sizes = [32, 64, 128, 256]\n'
         )
         config = load_sweep_config(toml)
         assert config.converge_sizes == [32, 64, 128, 256]
@@ -172,12 +175,7 @@ class TestLoadSweepConfig:
 
     def test_missing_spec_errors(self, tmp_path: Path) -> None:
         toml = tmp_path / "sweep.toml"
-        toml.write_text(
-            "[sweep.g0]\n"
-            "start = 0.1\n"
-            "stop = 1.0\n"
-            "count = 5\n"
-        )
+        toml.write_text("[sweep.g0]\nstart = 0.1\nstop = 1.0\ncount = 5\n")
         with pytest.raises(ValueError, match="Missing required key 'spec'"):
             load_sweep_config(toml)
 
@@ -186,7 +184,7 @@ class TestLoadSweepConfig:
         spec = tmp_path / "spec.json"
         spec.write_text("{}")
         toml.write_text('spec = "spec.json"\n')
-        with pytest.raises(ValueError, match="No .sweep"):
+        with pytest.raises(ValueError, match=r"No .sweep"):
             load_sweep_config(toml)
 
     def test_sweep_and_converge_mutually_exclusive(self, tmp_path: Path) -> None:
@@ -224,7 +222,9 @@ class TestLoadSweepConfig:
         assert config.spec_path == subdir / ".." / "spec.json"
         assert config.output == subdir / ".." / "results"
 
-    def test_unknown_sections_warn(self, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    def test_unknown_sections_warn(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
         toml = tmp_path / "sweep.toml"
         spec = tmp_path / "spec.json"
         spec.write_text("{}")
@@ -251,11 +251,7 @@ class TestLoadSweepConfig:
         toml = tmp_path / "sweep.toml"
         spec = tmp_path / "spec.json"
         spec.write_text("{}")
-        toml.write_text(
-            'spec = "spec.json"\n'
-            "[sweep.g0]\n"
-            "values = [0.1, 0.5, 0.9]\n"
-        )
+        toml.write_text('spec = "spec.json"\n[sweep.g0]\nvalues = [0.1, 0.5, 0.9]\n')
         config = load_sweep_config(toml)
         assert config.swept_params["g0"] == [0.1, 0.5, 0.9]
 
@@ -278,6 +274,29 @@ class TestLoadSweepConfig:
         assert len(config.swept_params) == 2
         assert len(config.swept_params["g0"]) == 3
         assert len(config.swept_params["mChi2"]) == 4
+
+    def test_sweep_strategy_parsed(self, tmp_path: Path) -> None:
+        toml = tmp_path / "sweep.toml"
+        spec = tmp_path / "spec.json"
+        spec.write_text("{}")
+        toml.write_text(
+            'spec = "spec.json"\n'
+            "[sweep]\n"
+            'strategy = "latin_hypercube"\n'
+            "n_samples = 50\n"
+            "[sweep.g0]\n"
+            "start = 0.1\n"
+            "stop = 1.0\n"
+            "count = 3\n"
+            "[sweep.mChi2]\n"
+            "start = 0.5\n"
+            "stop = 4.0\n"
+            "count = 4\n"
+        )
+        config = load_sweep_config(toml)
+        assert config.sweep_strategy == "latin_hypercube"
+        assert config.n_samples == 50
+        assert len(config.swept_params) == 2
 
 
 # ------------------------------------------------------------------

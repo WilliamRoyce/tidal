@@ -160,6 +160,66 @@ def parse_converge_spec(raw: str) -> list[int]:
 
 
 # ------------------------------------------------------------------
+# Multi-D sampling strategies
+# ------------------------------------------------------------------
+
+
+def _generate_samples(
+    param_bounds: dict[str, tuple[float, float]],
+    n_samples: int,
+    strategy: str,
+    *,
+    seed: int | None = None,
+) -> list[dict[str, float]]:
+    """Generate parameter samples using space-filling designs.
+
+    Parameters
+    ----------
+    param_bounds : dict[str, tuple[float, float]]
+        Parameter name -> (lower, upper) bounds.
+    n_samples : int
+        Number of samples to generate.
+    strategy : str
+        ``"latin_hypercube"`` or ``"sobol"``.
+    seed : int or None
+        Random seed for reproducibility.
+
+    Returns
+    -------
+    list[dict[str, float]]
+        Each dict maps parameter names to sampled values.
+
+    Raises
+    ------
+    ValueError
+        If *strategy* is unknown or *n_samples* < 1.
+    """
+    from scipy.stats.qmc import LatinHypercube, Sobol
+
+    names = list(param_bounds.keys())
+    d = len(names)
+    lower = np.array([param_bounds[n][0] for n in names])
+    upper = np.array([param_bounds[n][1] for n in names])
+
+    if strategy == "latin_hypercube":
+        sampler = LatinHypercube(d=d, seed=seed)
+        unit_samples = sampler.random(n=n_samples)
+    elif strategy == "sobol":
+        sampler = Sobol(d=d, seed=seed)
+        unit_samples = sampler.random(n=n_samples)
+    else:
+        msg = (
+            f"Unknown sampling strategy '{strategy}' (expected: latin_hypercube, sobol)"
+        )
+        raise ValueError(msg)
+
+    # Scale from [0, 1]^d to parameter bounds
+    scaled = lower + unit_samples * (upper - lower)
+
+    return [dict(zip(names, row, strict=True)) for row in scaled]
+
+
+# ------------------------------------------------------------------
 # Subdirectory naming
 # ------------------------------------------------------------------
 
@@ -389,6 +449,7 @@ def _run_single(  # noqa: PLR0913, PLR0917
     """Execute one simulate + measure cycle.
 
     Returns a dict of scalar metrics for one row of the results table.
+    Always includes ``run_status``, ``error_message``, and ``solver_exit_code``.
     """
     # 1. Simulate
     exit_code, wall_time = _simulate_run(
@@ -396,13 +457,22 @@ def _run_single(  # noqa: PLR0913, PLR0917
     )
 
     if exit_code != 0:
-        return {"wall_time_s": round(wall_time, 2), "error": "simulation_failed"}
+        return {
+            "run_status": "solver_error",
+            "error_message": f"solver exit code {exit_code}",
+            "solver_exit_code": exit_code,
+            "wall_time_s": round(wall_time, 2),
+            "error": "simulation_failed",
+        }
 
     # 2. Measure
     metrics = _measure_run(
         output_dir, spec_path, measurements, source, target, threshold
     )
     metrics["wall_time_s"] = round(wall_time, 2)
+    metrics["run_status"] = "success"
+    metrics["error_message"] = None
+    metrics["solver_exit_code"] = 0
     return metrics
 
 
@@ -503,10 +573,18 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
                 metrics = _measure_run(
                     run_dir, spec_path, measurements, source, target, threshold
                 )
+                metrics.setdefault("run_status", "success")
+                metrics.setdefault("error_message", None)
+                metrics.setdefault("solver_exit_code", 0)
                 print(" ok")
             except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
                 print(f" measure error: {exc}")
-                metrics = {"error": f"resume_measure_failed: {exc}"}
+                metrics = {
+                    "error": f"resume_measure_failed: {exc}",
+                    "run_status": "measurement_error",
+                    "error_message": str(exc)[:200],
+                    "solver_exit_code": 0,
+                }
             rows.append(
                 _build_row(
                     swept_vals, fixed_params, sim_settings, metrics, grid_override
@@ -554,7 +632,12 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
                     swept_vals,
                     fixed_params,
                     sim_settings,
-                    {"error": str(exc)},
+                    {
+                        "error": str(exc),
+                        "run_status": "diverged",
+                        "error_message": str(exc)[:200],
+                        "solver_exit_code": -1,
+                    },
                     grid_override,
                 )
             )
@@ -624,10 +707,18 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
                 metrics = _measure_run(
                     run_dir, spec_path, measurements, source, target, threshold
                 )
+                metrics.setdefault("run_status", "success")
+                metrics.setdefault("error_message", None)
+                metrics.setdefault("solver_exit_code", 0)
                 print(" ok")
             except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
                 print(f" measure error: {exc}")
-                metrics = {"error": f"resume_measure_failed: {exc}"}
+                metrics = {
+                    "error": f"resume_measure_failed: {exc}",
+                    "run_status": "measurement_error",
+                    "error_message": str(exc)[:200],
+                    "solver_exit_code": 0,
+                }
             rows[i] = _build_row(
                 rp["swept_vals"],
                 fixed_params,
@@ -756,10 +847,18 @@ def _adaptive_run_point(  # noqa: PLR0913, PLR0917
                 target,
                 energy_threshold,
             )
+            metrics.setdefault("run_status", "success")
+            metrics.setdefault("error_message", None)
+            metrics.setdefault("solver_exit_code", 0)
             print(" ok")
         except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
             print(f" measure error: {exc}")
-            metrics = {"error": f"resume_measure_failed: {exc}"}
+            metrics = {
+                "error": f"resume_measure_failed: {exc}",
+                "run_status": "measurement_error",
+                "error_message": str(exc)[:200],
+                "solver_exit_code": 0,
+            }
     else:
         print(f"  [adaptive] {subdir}...", end="", flush=True)
         try:
@@ -776,7 +875,12 @@ def _adaptive_run_point(  # noqa: PLR0913, PLR0917
             _print_status(metrics)
         except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
             print(f" ERROR: {exc}")
-            metrics = {"error": str(exc)}
+            metrics = {
+                "error": str(exc),
+                "run_status": "diverged",
+                "error_message": str(exc)[:200],
+                "solver_exit_code": -1,
+            }
 
     return _build_row(swept_vals, fixed_params, sim_settings, metrics, None)
 
@@ -1037,12 +1141,25 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     sim_settings = _collect_sim_settings(args)
 
     # Build list of runs
+    sweep_strategy = getattr(args, "sweep_strategy", None) or "grid"
+    n_samples = getattr(args, "n_samples", None)
     runs: list[dict[str, Any]] = []
     if converge_sizes is not None:
         for size in converge_sizes:
             run: dict[str, Any] = {"_grid_override": size}
             run.update(all_params)
             runs.append(run)
+    elif (
+        sweep_strategy in {"latin_hypercube", "sobol"}
+        and n_samples
+        and len(swept_params) >= 1
+    ):
+        # Space-filling design (LHS or Sobol)
+        param_bounds = {
+            name: (min(vals), max(vals)) for name, vals in swept_params.items()
+        }
+        samples = _generate_samples(param_bounds, n_samples, sweep_strategy)
+        runs.extend(dict(sample) for sample in samples)
     else:
         # Cartesian product of swept parameters
         param_names = list(swept_params.keys())
@@ -1211,7 +1328,13 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         metadata={
             "timestamp": datetime.now(tz=UTC).isoformat(),
             "total_runs": len(rows),
-            "sampling_strategy": "adaptive" if adaptive_param else "grid",
+            "sampling_strategy": (
+                "adaptive"
+                if adaptive_param
+                else sweep_strategy
+                if sweep_strategy != "grid"
+                else "grid"
+            ),
             **_get_provenance(),
         },
         converge_sizes=converge_sizes,
