@@ -932,7 +932,7 @@ def _build_initial_y0(
         raise ValueError(msg)
 
     # Step 2: Apply per-field formula overrides
-    ic_field_list = getattr(args, "ic_field", None) or []
+    ic_field_list: list[str] = getattr(args, "ic_field", None) or []
     if ic_field_list:
         _apply_ic_field_overrides(slot_data, ic_field_list, spec, grid_info, layout)
 
@@ -1440,7 +1440,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # 3. Initial conditions
     y0 = _build_initial_y0(args, spec, grid_info, bounds)
     ic_desc = f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}"
-    ic_field_list = getattr(args, "ic_field", None) or []
+    ic_field_list: list[str] = getattr(args, "ic_field", None) or []
     if ic_field_list:
         ic_desc += f" + {len(ic_field_list)} field override(s)"
     log(ic_desc)

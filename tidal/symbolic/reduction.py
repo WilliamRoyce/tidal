@@ -22,6 +22,7 @@ from __future__ import annotations
 
 import copy
 import re
+from collections.abc import Mapping
 from typing import Any, cast
 
 # Coordinate reference pattern in Wolfram expressions: x[], y[], z[]
@@ -144,7 +145,7 @@ def _check_killed_coord_refs(
             raise ValueError(msg)
 
 
-def _remap_operator(op: str, remap: dict[str, str | None]) -> str | None:
+def _remap_operator(op: str, remap: Mapping[str, str | None]) -> str | None:
     """Look up an operator in the remap table.
 
     Returns the new name, ``None`` (remove term), or the original name

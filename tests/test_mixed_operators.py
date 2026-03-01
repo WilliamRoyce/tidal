@@ -6,6 +6,8 @@ and full mixed_* factor evaluation for Hamiltonian energy computation.
 
 from __future__ import annotations
 
+from typing import Any
+
 import numpy as np
 import pytest
 
@@ -36,7 +38,7 @@ def _make_wave_spec() -> EquationSystem:
       - c_0: constraint, c_0 = 0.5*gradient_x(v_f_0) + 0.5*gradient_x(v_f_1)
       - c_1: constraint (trace), c_1 = identity(f_0) + identity(f_1)
     """
-    data: dict = {
+    data: dict[str, Any] = {
         "spacetime": {
             "dimension": 2,
             "metric": "minkowski",

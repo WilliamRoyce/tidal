@@ -468,7 +468,7 @@ def _compute_acceleration_from_eom(
         if eq.field_name != field or eq.time_derivative_order != 2:  # noqa: PLR2004
             continue
 
-        shape = next(iter(data.fields.values()))[t_idx].shape
+        shape: tuple[int, ...] = next(iter(data.fields.values()))[t_idx].shape
         result: NDArray[np.float64] = np.zeros(shape)
 
         for term in eq.rhs_terms:
@@ -513,7 +513,7 @@ def _differentiate_constraint(
         if eq.field_name != field or eq.time_derivative_order != 0:
             continue
 
-        shape = next(iter(data.fields.values()))[t_idx].shape
+        shape: tuple[int, ...] = next(iter(data.fields.values()))[t_idx].shape
         result: NDArray[np.float64] = np.zeros(shape)
 
         for term in eq.rhs_terms:
@@ -567,7 +567,7 @@ def _differentiate_constraint_twice(
         if eq.field_name != field or eq.time_derivative_order != 0:
             continue
 
-        shape = next(iter(data.fields.values()))[t_idx].shape
+        shape: tuple[int, ...] = next(iter(data.fields.values()))[t_idx].shape
         result: NDArray[np.float64] = np.zeros(shape)
 
         for term in eq.rhs_terms:

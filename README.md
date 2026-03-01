@@ -283,7 +283,7 @@ See [`scripts/README.md`](scripts/README.md) for detailed documentation of utili
 
 The repo builds Sphinx docs and deploys to GitHub Pages via Actions.
 
-### Local Build:
+### Local Build
 
 ```bash
 # auto-generate API docs
