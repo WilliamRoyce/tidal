@@ -390,7 +390,7 @@ stop = 20.0
 
 **Priority:** 3 (after F1-F2)
 **Generality:** [FLAT+HOMOGENEOUS] — FFT-based, inherits dispersion constraints
-**Status:** Not started
+**Status:** Complete (Phase C, commit `2a6f04e`)
 **Depends on:** Nothing (uses existing `_dispersion.py`)
 
 ### Motivation
@@ -511,14 +511,14 @@ def compute_resonance_analysis(
 
 ### Acceptance Criteria
 
-- [ ] `tidal measure output/ --what velocity --source phi_0` extracts group and phase velocity
-- [ ] `tidal measure output/ --what resonance --source phi_0 --target chi_0` identifies resonant modes
-- [ ] Group velocity matches analytic dw/dk for free Klein-Gordon (v_g = k/sqrt(k^2 + m^2))
-- [ ] Resonance correctly identifies k-modes where omega_source ~ omega_target
-- [ ] Conversion bandwidth narrows as mass difference increases (physical expectation)
-- [ ] Adiabaticity parameter computed when coupling_length provided
-- [ ] Both measurements wire into sweep with scalar summaries
-- [ ] Clear error message for curved-spacetime systems (position-dependent terms)
+- [x] `tidal measure output/ --what velocity --source phi_0` extracts group and phase velocity
+- [x] `tidal measure output/ --what resonance --source phi_0 --target chi_0` identifies resonant modes
+- [x] Group velocity matches analytic dw/dk for free Klein-Gordon (v_g = k/sqrt(k^2 + m^2))
+- [x] Resonance correctly identifies k-modes where omega_source ~ omega_target
+- [x] Conversion bandwidth narrows as mass difference increases (physical expectation)
+- [ ] Adiabaticity parameter computed when coupling_length provided (deferred)
+- [x] Both measurements wire into sweep with scalar summaries
+- [x] Clear error message for curved-spacetime systems (position-dependent terms)
 
 ---
 
@@ -682,7 +682,7 @@ def summary(self) -> str:
 
 **Priority:** 6
 **Generality:** [FLAT+HOMOGENEOUS] — inherits FFT constraints from `_spectral.py` and `_spectral_conversion.py`
-**Status:** Not started
+**Status:** Complete (Phase C, commit `2a6f04e`)
 **Depends on:** Nothing
 
 ### Motivation
@@ -731,10 +731,10 @@ else:
 
 ### Acceptance Criteria
 
-- [ ] `--measure spectrum` in sweep produces `n_active_modes`, `peak_k`, `peak_power` columns
-- [ ] `--measure spectral_conversion` produces `P_k_max`, `k_max_conversion`, `conversion_bandwidth`
-- [ ] Clear error for curved-spacetime systems (inherits from `_check_no_position_dependent_terms()`)
-- [ ] CLI help text updated to list all 11 measurement types
+- [x] `--measure spectrum` in sweep produces `n_active_modes`, `peak_k`, `peak_power` columns
+- [x] `--measure spectral_conversion` produces `P_k_max`, `k_max_conversion`, `spectral_conversion_bandwidth`
+- [x] Clear error for curved-spacetime systems (inherits from `_check_no_position_dependent_terms()`)
+- [x] 13 measurement types now supported in sweeps (was 9, now includes velocity, resonance, spectrum, spectral_conversion)
 
 ---
 
@@ -879,7 +879,7 @@ Most features are independent. The main dependency chain is F1 -> F2 -> F4 (TOML
 | -------- | ------------- | ---------- | ---------------------------- | ----------- |
 | A        | F1 + F2a      | Medium     | `feature/parameter-sweep`    | Complete    |
 | B        | F2b + F5 + F7 | Medium     | `feature/parameter-sweep`    | Complete    |
-| C (next) | F3 + F6       | Medium     | `feature/velocity-resonance` | Not started |
-| D        | F4 + F8       | Medium     | `feature/sensitivity-viz`    | Not started |
+| C        | F3 + F6       | Medium     | `feature/parameter-sweep`    | Complete    |
+| D (next) | F4 + F8       | Medium     | `feature/sensitivity-viz`    | Not started |
 
-Phase C is the next step: velocity/resonance analysis + spectrum scalar aggregation.
+Phase D is the next step: Sobol sensitivity analysis + advanced visualization.
