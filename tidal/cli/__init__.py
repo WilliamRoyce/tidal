@@ -659,7 +659,8 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="TYPE[,TYPE,...]",
         help=(
             "Measurements to run per simulation (comma-separated). "
-            "Options: summary, energy, conversion, mixing, dispersion, conservation. "
+            "Options: summary, energy, conversion, mixing, dispersion, "
+            "conservation, effective_mass, asymptotic, peak_conversion. "
             "Default: summary"
         ),
     )
@@ -869,6 +870,16 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=None,
         metavar="N",
         help="Number of parallel workers (default: sequential)",
+    )
+    sweep_parser.add_argument(
+        "--force-large-sweep",
+        action="store_true",
+        help="Allow sweeps with more than 10,000 runs (overrides safety limit)",
+    )
+    sweep_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print sweep plan (grid size, parameter combos) without running",
     )
 
     return parser

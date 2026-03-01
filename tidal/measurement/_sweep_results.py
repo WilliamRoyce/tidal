@@ -83,16 +83,19 @@ class SweepResults:
 
     @property
     def metric_names(self) -> list[str]:
-        """Metric column names (all keys in rows that aren't parameters or settings)."""
+        """Metric column names (union of all rows, excluding params and settings)."""
         if not self.rows:
             return []
         param_keys = set(self.swept_params.keys()) | set(self.fixed_params.keys())
         setting_keys = set(self.sim_settings.keys())
-        return [
-            k
-            for k in self.rows[0]
-            if k not in param_keys and k not in setting_keys
-        ]
+        seen: set[str] = set()
+        result: list[str] = []
+        for row in self.rows:
+            for k in row:
+                if k not in param_keys and k not in setting_keys and k not in seen:
+                    result.append(k)
+                    seen.add(k)
+        return result
 
     @property
     def is_convergence(self) -> bool:
@@ -132,13 +135,14 @@ class SweepResults:
         cols.extend(self.fixed_params.keys())
         # Simulation settings
         cols.extend(self.sim_settings.keys())
-        # Metrics (everything else in row order)
+        # Metrics (union of all rows, preserving insertion order)
         if self.rows:
             seen = set(cols)
-            for k in self.rows[0]:
-                if k not in seen:
-                    cols.append(k)
-                    seen.add(k)
+            for row in self.rows:
+                for k in row:
+                    if k not in seen:
+                        cols.append(k)
+                        seen.add(k)
         return cols
 
     def to_csv(self, path: Path | None = None) -> str:
@@ -209,6 +213,7 @@ class SweepResults:
             data["target"] = self.target_fields
         if self.converge_sizes is not None:
             data["converge_sizes"] = self.converge_sizes
+        data["run_dirs"] = [str(d) for d in self.run_dirs]
         data.update(self.metadata)
         data["completed_runs"] = self.n_runs
         data["total_runs"] = self.metadata.get("total_runs", self.n_runs)
@@ -253,12 +258,15 @@ class SweepResults:
         sweep_data = json.loads(sweep_file.read_text())
         results_data = json.loads(results_file.read_text())
 
-        # Reconstruct run_dirs from subdirectories
+        # Use stored run_dirs if available, else infer (backward compat)
+        stored_dirs = sweep_data.get("run_dirs")
         run_dirs: list[Path] = []
-        for row in results_data.get("rows", []):
-            # Try to find the run directory from swept param values
-            run_dir = _infer_run_dir(dirp, sweep_data, row)
-            run_dirs.append(run_dir)
+        if stored_dirs:
+            run_dirs = [Path(d) for d in stored_dirs]
+        else:
+            for row in results_data.get("rows", []):
+                run_dir = _infer_run_dir(dirp, sweep_data, row)
+                run_dirs.append(run_dir)
 
         return cls(
             swept_params=sweep_data.get("swept_parameters", {}),
@@ -286,6 +294,7 @@ class SweepResults:
                     "converge_sizes",
                     "completed_runs",
                     "total_runs",
+                    "run_dirs",
                 }
             },
             converge_sizes=sweep_data.get("converge_sizes"),

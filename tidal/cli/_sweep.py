@@ -27,6 +27,16 @@ import numpy as np
 if TYPE_CHECKING:
     from argparse import Namespace
 
+# Measurement types supported by sweep (subset of tidal measure)
+_SWEEP_MEASUREMENTS = frozenset({
+    "summary", "energy", "conversion", "mixing", "dispersion",
+    "conservation", "effective_mass", "asymptotic", "peak_conversion",
+})
+
+# Safety limits for sweep grid size
+_WARN_SWEEP_SIZE = 1_000
+_MAX_SWEEP_SIZE = 10_000
+
 # ------------------------------------------------------------------
 # Parameter parsing
 # ------------------------------------------------------------------
@@ -338,10 +348,17 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
 
     if "peak_conversion" in measurements:
         try:
-            pc = _run_peak_conversion(data, source, target)
-            metrics["P_max"] = pc["P_max"]
-            metrics["P_max_time"] = pc["P_max_time"]
-            metrics["P_final"] = pc["P_final"]
+            if conv_result is not None:
+                # Reuse conversion result already computed above
+                peak_idx = int(np.argmax(conv_result.probability))
+                metrics["P_max"] = float(conv_result.probability[peak_idx])
+                metrics["P_max_time"] = float(conv_result.times[peak_idx])
+                metrics["P_final"] = float(conv_result.probability[-1])
+            else:
+                pc = _run_peak_conversion(data, source, target)
+                metrics["P_max"] = pc["P_max"]
+                metrics["P_max_time"] = pc["P_max_time"]
+                metrics["P_final"] = pc["P_final"]
         except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
             metrics["peak_conversion_error"] = str(exc)
 
@@ -453,6 +470,7 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
     total_runs = len(run_plans)
     rows: list[dict[str, Any]] = []
     run_dirs: list[Path] = [rp["run_dir"] for rp in run_plans]
+    sweep_start = time.monotonic()
 
     for rp in run_plans:
         i = rp["index"]
@@ -495,6 +513,9 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
                 swept_vals, fixed_params, sim_settings, {"error": str(exc)}, grid_override,
             ))
 
+        # ETA
+        _print_eta(len(rows), total_runs, sweep_start)
+
         # Incremental save after each run (crash recovery)
         _save_incremental(output_dir, rows, run_dirs, swept_params,
                           fixed_params, sim_settings, measurements,
@@ -528,8 +549,9 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
 
     # Build tasks for Pool, handling resume first (sequentially)
     tasks: list[dict[str, Any]] = []
-    rows: list[dict[str, Any]] = [{}] * total_runs  # placeholder
+    rows: list[dict[str, Any]] = [{} for _ in range(total_runs)]
     completed: set[int] = set()
+    sweep_start = time.monotonic()
 
     for rp in run_plans:
         i = rp["index"]
@@ -581,13 +603,13 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
                 completed.add(idx)
                 print(f"  [{len(completed)}/{total_runs}] {result['subdir']}", end="")
                 _print_status(metrics)
+                _print_eta(len(completed), total_runs, sweep_start)
+                # Incremental save after each parallel completion
+                _save_incremental(output_dir, list(rows), run_dirs, swept_params,
+                                  fixed_params, sim_settings, measurements,
+                                  source, target, spec_path, converge_sizes)
 
-    # Save incremental after parallel batch
-    final_rows = list(rows)
-    _save_incremental(output_dir, final_rows, run_dirs, swept_params,
-                      fixed_params, sim_settings, measurements,
-                      source, target, spec_path, converge_sizes)
-    return final_rows
+    return list(rows)
 
 
 def _print_status(metrics: dict[str, Any]) -> None:
@@ -602,7 +624,45 @@ def _print_status(metrics: dict[str, Any]) -> None:
     print(f" {', '.join(status_parts)}")
 
 
-def _run_sweep(  # noqa: PLR0914, PLR0915
+def _get_provenance() -> dict[str, str]:
+    """Collect provenance metadata for sweep.json."""
+    import platform
+    import subprocess  # noqa: S404
+
+    meta: dict[str, str] = {"hostname": platform.node(), "platform": platform.platform()}
+    try:
+        from importlib.metadata import version
+
+        meta["tidal_version"] = version("tidal")
+    except Exception:  # noqa: BLE001
+        meta["tidal_version"] = "unknown"
+    try:
+        git_hash = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"],  # noqa: S607
+            stderr=subprocess.DEVNULL,
+            timeout=5,
+        ).decode().strip()
+        meta["git_hash"] = git_hash
+    except (subprocess.SubprocessError, FileNotFoundError):
+        pass
+    return meta
+
+
+def _print_eta(completed: int, total: int, start_time: float) -> None:
+    """Print ETA if there are remaining runs."""
+    remaining = total - completed
+    if remaining <= 0 or completed <= 0:
+        return
+    elapsed = time.monotonic() - start_time
+    avg_per_run = elapsed / completed
+    eta_s = remaining * avg_per_run
+    if eta_s < 120:  # noqa: PLR2004
+        print(f"    ETA: ~{eta_s:.0f}s remaining")
+    else:
+        print(f"    ETA: ~{eta_s / 60:.1f}min remaining")
+
+
+def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     args: Namespace,
     swept_params: dict[str, list[float]],
     converge_sizes: list[int] | None,
@@ -636,10 +696,37 @@ def _run_sweep(  # noqa: PLR0914, PLR0915
     all_params = _parse_params(getattr(args, "param", []) or [], spec)
     fixed_params = {k: v for k, v in all_params.items() if k not in swept_params}
 
+    # Validate swept parameter names against spec
+    if swept_params:
+        from tidal.cli._inspect import (
+            discover_parameters,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        try:
+            known_params: set[str] = set(discover_parameters(spec).keys())
+        except TypeError:
+            known_params = set()
+        meta_params = spec.metadata.get("parameters", {})
+        if isinstance(meta_params, dict):
+            known_params |= set(meta_params.keys())
+        for name in sorted(set(swept_params.keys()) - known_params):
+            print(
+                f"  Warning: swept parameter '{name}' not found in equation spec. Possible typo?",
+                file=sys.stderr,
+            )
+
     measurements = set()
     raw_measure = getattr(args, "measure", None)
     if raw_measure:
         measurements = {s.strip() for s in raw_measure.split(",")}
+        unknown = measurements - _SWEEP_MEASUREMENTS
+        if unknown:
+            print(
+                f"Error: unknown measurement(s): {', '.join(sorted(unknown))}. "
+                f"Valid: {', '.join(sorted(_SWEEP_MEASUREMENTS))}",
+                file=sys.stderr,
+            )
+            return 1
     if not measurements:
         measurements = {"summary"}
 
@@ -667,6 +754,19 @@ def _run_sweep(  # noqa: PLR0914, PLR0915
             runs.append(run)
 
     total_runs = len(runs)
+
+    # Safety limit for large sweeps
+    force_large = getattr(args, "force_large_sweep", False)
+    if total_runs > _MAX_SWEEP_SIZE and not force_large:
+        print(
+            f"Error: sweep has {total_runs} runs (limit: {_MAX_SWEEP_SIZE}). "
+            f"Use --force-large-sweep to override.",
+            file=sys.stderr,
+        )
+        return 1
+    if total_runs > _WARN_SWEEP_SIZE:
+        print(f"  Warning: {total_runs} runs scheduled. This may take a long time.", file=sys.stderr)
+
     resume = getattr(args, "resume", False)
 
     parallel = getattr(args, "parallel", None)
@@ -693,6 +793,18 @@ def _run_sweep(  # noqa: PLR0914, PLR0915
             "run_dir": run_dir,
             "grid_override": grid_override,
         })
+
+    # Dry-run: print plan and exit
+    if getattr(args, "dry_run", False):
+        print(f"\nDry run: {total_runs} runs planned")
+        print(f"  Swept: {list(swept_params.keys())}")
+        print(f"  Measurements: {', '.join(sorted(measurements))}")
+        preview = run_plans[:10]
+        for rp in preview:
+            print(f"    {rp['subdir']}: {rp['swept_vals']}")
+        if total_runs > len(preview):
+            print(f"    ... and {total_runs - len(preview)} more")
+        return 0
 
     # Execute runs
     rows: list[dict[str, Any]] = []
@@ -727,6 +839,7 @@ def _run_sweep(  # noqa: PLR0914, PLR0915
         metadata={
             "timestamp": datetime.now(tz=UTC).isoformat(),
             "total_runs": total_runs,
+            **_get_provenance(),
         },
         converge_sizes=converge_sizes,
     )
