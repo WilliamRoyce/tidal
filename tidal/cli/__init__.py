@@ -501,6 +501,9 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "conservation",
             "sweep",
             "sweep-compare",
+            "sweep-parallel",
+            "sweep-tornado",
+            "sweep-scatter",
             "convergence",
         ],
         help="Plot type to generate",
@@ -927,6 +930,32 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Number of samples for latin_hypercube/sobol strategies",
     )
 
+    # --- analyze ---
+    analyze_parser = sub.add_parser(
+        "analyze",
+        help="Post-hoc analysis of sweep results (sensitivity analysis)",
+    )
+    analyze_parser.add_argument(
+        "data_path",
+        help="Path to sweep output directory",
+    )
+    analyze_parser.add_argument(
+        "--sensitivity",
+        choices=["sobol", "morris"],
+        default="sobol",
+        help="Sensitivity analysis method (default: sobol)",
+    )
+    analyze_parser.add_argument(
+        "--metric",
+        help="Metric to analyze (e.g. P_max, max_energy_error)",
+    )
+    analyze_parser.add_argument(
+        "--bootstrap",
+        type=int,
+        default=100,
+        help="Bootstrap resamples for Sobol confidence intervals (default: 100)",
+    )
+
     return parser
 
 
@@ -990,6 +1019,10 @@ def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911
         from tidal.cli._sweep import sweep_command
 
         return sweep_command(args)
+    if args.command == "analyze":
+        from tidal.cli._analyze import analyze_command
+
+        return analyze_command(args)
     msg = f"Unknown command: {args.command}"
     raise ValueError(msg)
 

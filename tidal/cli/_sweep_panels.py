@@ -198,7 +198,9 @@ def render_sweep_compare(
 
     param_names = list(results.swept_params.keys())
     if len(param_names) != 1:
-        msg = f"sweep-compare requires exactly 1 swept parameter, got {len(param_names)}"
+        msg = (
+            f"sweep-compare requires exactly 1 swept parameter, got {len(param_names)}"
+        )
         raise ValueError(msg)
 
     param_name = param_names[0]
@@ -313,14 +315,18 @@ def render_convergence(
     # Filter valid points
     mask = np.isfinite(values) & (values > 0)
     if not np.any(mask):
-        ax.text(0.5, 0.5, f"No valid data for {metric}", transform=ax.transAxes, ha="center")
+        ax.text(
+            0.5, 0.5, f"No valid data for {metric}", transform=ax.transAxes, ha="center"
+        )
         return
 
     h = 1.0 / sizes[mask]
     y = values[mask]
     n = sizes[mask]
 
-    ax.loglog(n, y, "o-", color="tab:blue", linewidth=1.5, markersize=6, label="measured")
+    ax.loglog(
+        n, y, "o-", color="tab:blue", linewidth=1.5, markersize=6, label="measured"
+    )
 
     # Fit convergence order
     if len(h) >= 2:  # noqa: PLR2004
@@ -352,3 +358,207 @@ def _safe_normalize(values: NDArray[np.float64]) -> NDArray[np.float64]:
     if vmax == vmin:
         return np.full_like(values, 0.5)
     return (values - vmin) / (vmax - vmin)
+
+
+# -- Advanced visualization (F8) ---------------------------------------------
+
+
+def render_sweep_parallel(
+    ax: Axes,
+    results: SweepResults,
+    metric: str,
+) -> None:
+    """Parallel coordinates: each axis is a parameter, color = metric.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes.
+    results : SweepResults
+        Sweep data with 2+ swept parameters.
+    metric : str
+        Metric for coloring the polylines.
+
+    Raises
+    ------
+    ValueError
+        If fewer than 2 swept parameters.
+    """
+    import matplotlib.pyplot as plt
+
+    param_names = list(results.swept_params.keys())
+    if len(param_names) < 2:  # noqa: PLR2004
+        msg = f"sweep-parallel requires 2+ swept parameters, got {len(param_names)}"
+        raise ValueError(msg)
+
+    metric_vals = np.array(results.column(metric), dtype=np.float64)
+    norm = _safe_normalize(metric_vals)
+    cmap = plt.cm.viridis  # type: ignore[attr-defined]
+
+    # Normalize each parameter axis to [0, 1]
+    n_axes = len(param_names)
+    param_data = {}
+    for name in param_names:
+        raw = np.array(results.column(name), dtype=np.float64)
+        param_data[name] = _safe_normalize(raw)
+
+    # Draw polylines
+    for i in range(len(results.rows)):
+        coords = [param_data[name][i] for name in param_names]
+        color = cmap(norm[i])
+        ax.plot(range(n_axes), coords, color=color, alpha=0.4, linewidth=0.8)
+
+    ax.set_xticks(range(n_axes))
+    ax.set_xticklabels(param_names, rotation=30, ha="right")
+    ax.set_ylabel("Normalized value")
+    ax.set_title(f"Parallel Coordinates (color = {metric})")
+
+    sm = plt.cm.ScalarMappable(  # type: ignore[attr-defined]
+        cmap=cmap,
+        norm=plt.Normalize(vmin=metric_vals.min(), vmax=metric_vals.max()),
+    )
+    sm.set_array(metric_vals)
+    ax.figure.colorbar(sm, ax=ax, label=metric)  # type: ignore[union-attr]
+
+
+def render_sweep_tornado(
+    ax: Axes,
+    results: SweepResults,
+    metric: str,
+) -> None:
+    """Tornado chart: horizontal bars showing parameter impact on metric.
+
+    For each parameter, varies that parameter while holding others at their
+    median value. Shows the min-to-max metric range as a horizontal bar.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes.
+    results : SweepResults
+        Sweep data.
+    metric : str
+        Metric to analyze.
+
+    Raises
+    ------
+    ValueError
+        If no swept parameters found.
+    """
+    param_names = list(results.swept_params.keys())
+    if not param_names:
+        msg = "sweep-tornado requires at least 1 swept parameter"
+        raise ValueError(msg)
+
+    metric_vals = np.array(results.column(metric), dtype=np.float64)
+    global_median = float(np.median(metric_vals))
+
+    impacts: list[tuple[str, float, float]] = []
+    for name in param_names:
+        param_vals = np.array(results.column(name), dtype=np.float64)
+        unique_vals = np.unique(param_vals)
+        if len(unique_vals) < 2:  # noqa: PLR2004
+            impacts.append((name, global_median, global_median))
+            continue
+
+        # For each unique parameter value, compute median metric
+        medians = []
+        for v in unique_vals:
+            mask = np.isclose(param_vals, v)
+            medians.append(float(np.median(metric_vals[mask])))
+        impacts.append((name, min(medians), max(medians)))
+
+    # Sort by impact range (largest first)
+    impacts.sort(key=lambda t: t[2] - t[1], reverse=True)
+
+    names = [t[0] for t in impacts]
+    lows = [t[1] for t in impacts]
+    highs = [t[2] for t in impacts]
+    y_pos = np.arange(len(names))
+
+    ax.barh(
+        y_pos,
+        [hi - lo for lo, hi in zip(lows, highs, strict=False)],
+        left=lows,
+        color="tab:blue",
+        alpha=0.7,
+        height=0.6,
+    )
+    ax.axvline(global_median, color="gray", linestyle="--", linewidth=0.8)
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(names)
+    ax.set_xlabel(metric)
+    ax.set_title(f"Parameter Impact on {metric}")
+    ax.invert_yaxis()
+
+
+def render_sweep_scatter(
+    fig: Figure,
+    results: SweepResults,
+    metric: str,
+) -> None:
+    """Pairwise scatter matrix: parameter pairs as 2D scatter, color = metric.
+
+    Parameters
+    ----------
+    fig : Figure
+        Matplotlib figure.
+    results : SweepResults
+        Sweep data with 2+ swept parameters.
+    metric : str
+        Metric for coloring.
+
+    Raises
+    ------
+    ValueError
+        If fewer than 2 swept parameters.
+    """
+    import matplotlib.pyplot as plt
+
+    param_names = list(results.swept_params.keys())
+    n = len(param_names)
+    if n < 2:  # noqa: PLR2004
+        msg = f"sweep-scatter requires 2+ swept parameters, got {n}"
+        raise ValueError(msg)
+
+    metric_vals = np.array(results.column(metric), dtype=np.float64)
+    cmap = plt.cm.viridis  # type: ignore[attr-defined]
+
+    axes = fig.subplots(n, n, squeeze=False)
+
+    for i in range(n):
+        for j in range(n):
+            ax = axes[i][j]
+            if i == j:
+                # Show histogram on diagonal cell
+                vals = np.array(results.column(param_names[i]), dtype=np.float64)
+                ax.hist(
+                    vals,
+                    bins=min(20, len(np.unique(vals))),
+                    color="tab:blue",
+                    alpha=0.7,
+                )
+            else:
+                # Off-diagonal: scatter
+                x = np.array(results.column(param_names[j]), dtype=np.float64)
+                y = np.array(results.column(param_names[i]), dtype=np.float64)
+                ax.scatter(x, y, c=metric_vals, cmap=cmap, s=10, alpha=0.7)
+
+            if i == n - 1:
+                ax.set_xlabel(param_names[j], fontsize=8)
+            else:
+                ax.set_xticklabels([])
+            if j == 0:
+                ax.set_ylabel(param_names[i], fontsize=8)
+            else:
+                ax.set_yticklabels([])
+
+    fig.suptitle(f"Scatter Matrix (color = {metric})", fontsize=12)
+
+    # Add shared colorbar
+    sm = plt.cm.ScalarMappable(  # type: ignore[attr-defined]
+        cmap=cmap,
+        norm=plt.Normalize(vmin=metric_vals.min(), vmax=metric_vals.max()),
+    )
+    sm.set_array(metric_vals)
+    fig.colorbar(sm, ax=axes.ravel().tolist(), label=metric, shrink=0.6)

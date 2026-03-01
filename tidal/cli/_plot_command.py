@@ -28,11 +28,23 @@ _VALID_TYPES = frozenset(
         "conservation",
         "sweep",
         "sweep-compare",
+        "sweep-parallel",
+        "sweep-tornado",
+        "sweep-scatter",
         "convergence",
     }
 )
 
-_SWEEP_TYPES = frozenset({"sweep", "sweep-compare", "convergence"})
+_SWEEP_TYPES = frozenset(
+    {
+        "sweep",
+        "sweep-compare",
+        "sweep-parallel",
+        "sweep-tornado",
+        "sweep-scatter",
+        "convergence",
+    }
+)
 
 DPI_DEFAULT = 150
 
@@ -337,6 +349,9 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
         render_sweep_1d_multi,
         render_sweep_2d,
         render_sweep_compare,
+        render_sweep_parallel,
+        render_sweep_scatter,
+        render_sweep_tornado,
     )
     from tidal.measurement._sweep_results import SweepResults
 
@@ -357,7 +372,13 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
 
     # Parse metric(s)
     raw_metric: str | None = getattr(args, "metric", None)
-    if raw_metric is None and plot_type in {"sweep", "convergence"}:
+    if raw_metric is None and plot_type in {
+        "sweep",
+        "convergence",
+        "sweep-parallel",
+        "sweep-tornado",
+        "sweep-scatter",
+    }:
         # Try to auto-detect a sensible metric
         for candidate in ["P_max", "max_energy_error", "L_mix", "E_total_final"]:
             if results.rows and candidate in results.rows[0]:
@@ -407,6 +428,22 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
             fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
             render_convergence(ax, results, raw_metric)
 
+        elif plot_type == "sweep-parallel":
+            assert raw_metric is not None
+            fig, ax = plt.subplots(1, 1, figsize=figsize or (10, 6))
+            render_sweep_parallel(ax, results, raw_metric)
+
+        elif plot_type == "sweep-tornado":
+            assert raw_metric is not None
+            fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
+            render_sweep_tornado(ax, results, raw_metric)
+
+        elif plot_type == "sweep-scatter":
+            assert raw_metric is not None
+            n_params = len(results.swept_params)
+            fig = plt.figure(figsize=figsize or (3 * n_params, 3 * n_params))
+            render_sweep_scatter(fig, results, raw_metric)
+
         else:
             print(f"Error: unknown sweep plot type '{plot_type}'", file=sys.stderr)
             return 1
@@ -420,11 +457,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
         fig.suptitle(args.title)
 
     # Output path
-    output_path = (
-        Path(args.output)
-        if args.output
-        else data_path / f"{plot_type}.png"
-    )
+    output_path = Path(args.output) if args.output else data_path / f"{plot_type}.png"
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
     plt.tight_layout()
