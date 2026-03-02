@@ -165,10 +165,16 @@ def check_pointwise_mass_stability(  # noqa: PLR0914
 ) -> StabilityResult:
     """Check eigenvalues of the pointwise mass/coupling matrix M[i,j](x,y).
 
-    Builds M[i,j](x,y) from all identity-operator EOM terms (constant and
-    position-dependent), then verifies that all eigenvalues are positive at
-    every grid point.  A negative eigenvalue indicates an exponentially
-    growing (tachyonic) mode.
+    Builds M[i,j](x,y) from identity-operator terms in **dynamical**
+    equations (``time_derivative_order > 0``), then verifies that all
+    eigenvalues are positive at every grid point.  A negative eigenvalue
+    indicates an exponentially growing (tachyonic) mode.
+
+    Constraint equations (``time_derivative_order == 0``) are excluded
+    because their algebraic form ``0 = +m²φ + ...`` produces mass signs
+    opposite to the dynamical form ``d²t φ = -m²φ + ...``.  Including
+    both in one matrix creates a block-indefinite matrix with spurious
+    negative eigenvalues (false positives for vector field systems).
 
     This check runs once pre-simulation using the pre-computed spatial cache
     in CoefficientEvaluator — zero runtime cost during the actual simulation.
@@ -188,22 +194,34 @@ def check_pointwise_mass_stability(  # noqa: PLR0914
     import numpy as np  # noqa: PLC0415
 
     result = StabilityResult()
-    n = len(spec.component_names)
     grid_shape = grid.shape
+
+    # Only include dynamical equations (time_derivative_order > 0).
+    # Constraint equations (time_derivative_order == 0) have algebraically
+    # inverted mass signs that produce false-positive instability signals.
+    dyn_eqs = [
+        (eq_idx, eq)
+        for eq_idx, eq in enumerate(spec.equations)
+        if eq.time_derivative_order > 0
+    ]
+    dyn_names = [eq.field_name for _, eq in dyn_eqs]
+    if not dyn_names:
+        return result  # No dynamical fields → nothing to check
+
+    n = len(dyn_names)
 
     # Build pot[i,j](x,y) as ndarray of shape (n, n, *grid_shape).
     # Convention: pot[i,j] = -(coefficient of identity(field_j) in equation_i)
     pot = np.zeros((n, n, *grid_shape))
 
-    for eq_idx, eq in enumerate(spec.equations):
-        i = spec.component_names.index(eq.field_name)  # field index for matrix row
+    for eq_idx, eq in dyn_eqs:
+        i = dyn_names.index(eq.field_name)
         for term_idx, term in enumerate(eq.rhs_terms):
             if term.operator != "identity":
                 continue
-            try:
-                j = spec.component_names.index(term.field)
-            except ValueError:
-                continue  # Momentum or unknown field — skip
+            if term.field not in dyn_names:
+                continue  # Skip references to constraint fields
+            j = dyn_names.index(term.field)
             coeff = coeff_eval.resolve(term, t=0.0, eq_idx=eq_idx, term_idx=term_idx)
             if isinstance(coeff, np.ndarray):
                 pot[i, j] -= coeff  # position-dependent: subtract broadcast array
