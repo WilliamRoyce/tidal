@@ -36,6 +36,7 @@ if TYPE_CHECKING:
 lil_matrix: Any = _sparse.lil_matrix  # pyright: ignore[reportUnknownMemberType]
 csc_matrix: Any = _sparse.csc_matrix  # pyright: ignore[reportUnknownMemberType]
 coo_matrix: Any = _sparse.coo_matrix  # pyright: ignore[reportUnknownMemberType]
+speye: Any = _sparse.eye  # pyright: ignore[reportUnknownMemberType,reportUnknownVariableType]
 
 # Type alias for scipy sparse matrices.  Opaque to pyright (= Any) but
 # communicates intent in function signatures.

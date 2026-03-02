@@ -658,6 +658,307 @@ class TestTryAnalyticalJacobian:
 # ---------------------------------------------------------------------------
 
 
+class TestConstraintSubCases:
+    """Tests for constraint sub-cases: no-self-term, gauge-fix, first-order."""
+
+    def test_no_self_term_constraint(self) -> None:
+        """Constraint with no self-referencing terms: res = y[field] → dF/dy = I."""
+        # A_0 is a subsidiary constraint whose equation only references phi_0
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [
+                {"name": "phi_0", "index": 0},
+                {"name": "A_0", "index": 1},
+            ],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                        ],
+                    },
+                },
+                {
+                    "field": "A_0",
+                    "lhs": {"expression": "A_0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            # Only references phi_0, NOT A_0 itself
+                            {"coefficient": 1.0, "operator": "gradient_x", "field": "phi_0"},
+                        ],
+                    },
+                    # constraint_solver not enabled (default) → no-self-term path
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+
+        n = grid.num_points  # 8
+        # Slots: phi_0 (0), v_phi_0 (1), A_0 (2)
+        A0_slot = 2
+        A0_rows = slice(A0_slot * n, (A0_slot + 1) * n)
+        field_slot = layout.field_slot_map["A_0"]
+        A0_cols = slice(field_slot * n, (field_slot + 1) * n)
+
+        # dF/dy at (A_0, A_0) should be identity
+        dy_block = dF_dy[A0_rows, A0_cols].toarray()
+        np.testing.assert_array_equal(dy_block, np.eye(n))
+
+        # dF/dyp at (A_0, :) should be all zeros (no yp dependence)
+        dyp_row = dF_dyp[A0_rows, :].toarray()
+        np.testing.assert_array_equal(dyp_row, 0.0)
+
+    def test_gauge_fix_constraint(self) -> None:
+        """Pure Laplacian + periodic BC → row 0 zeroed + pinning entry."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [
+                {"name": "phi_0", "index": 0},
+                {"name": "A_0", "index": 1},
+            ],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                        ],
+                    },
+                },
+                {
+                    "field": "A_0",
+                    "lhs": {"expression": "A_0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            # Pure Laplacian self-term → triggers gauge fix
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
+                            {"coefficient": 0.5, "operator": "gradient_x", "field": "phi_0"},
+                        ],
+                    },
+                    "constraint_solver": {"enabled": True},
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+
+        n = grid.num_points  # 8
+        # Slots: phi_0 (0), v_phi_0 (1), A_0 (2)
+        A0_slot_idx = 2
+        global_row0 = A0_slot_idx * n  # first row of A_0 block
+
+        # Row 0 of A_0 block in dF/dy: entire row should be zero except pinning
+        row_dy = dF_dy[global_row0, :].toarray().ravel()
+        field_slot = layout.field_slot_map["A_0"]
+        pinning_col = field_slot * n  # first column of A_0 field block
+        assert row_dy[pinning_col] == 1.0, "Pinning entry should be 1.0"
+        # All other entries in this row should be zero
+        mask = np.ones(len(row_dy), dtype=bool)
+        mask[pinning_col] = False
+        np.testing.assert_array_equal(row_dy[mask], 0.0)
+
+        # Row 0 of A_0 block in dF/dyp: entire row should be zero
+        row_dyp = dF_dyp[global_row0, :].toarray().ravel()
+        np.testing.assert_array_equal(row_dyp, 0.0)
+
+        # Other rows in A_0 block should have Laplacian entries (not all zero)
+        other_rows = dF_dy[global_row0 + 1 : (A0_slot_idx + 1) * n, :].toarray()
+        assert np.any(other_rows != 0), "Non-pinned rows should have Laplacian entries"
+
+    def test_first_order_equation(self) -> None:
+        """First-order equation (time_order=1): dF/dyp = I, negated RHS."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "psi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "psi_0",
+                    "lhs": {"expression": "d_t(psi_0)", "order": {"time": 1}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "psi_0"},
+                            {"coefficient": -0.5, "operator": "identity", "field": "psi_0"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+
+        n = grid.num_points  # 8
+        # Single slot: psi_0 (0), time_order=1
+
+        # dF/dyp should be identity (res = yp - RHS)
+        np.testing.assert_array_equal(dF_dyp.toarray(), np.eye(n))
+
+        # dF/dy should be negated RHS: -(1.0 * Lap + -0.5 * I)
+        from tidal.solver.operators import apply_operator
+
+        lap_mat = np.zeros((n, n))
+        for j in range(n):
+            e_j = np.zeros((n,))
+            e_j[j] = 1.0
+            lap_mat[:, j] = apply_operator("laplacian_x", e_j, grid, "periodic")
+        expected = -(1.0 * lap_mat + (-0.5) * np.eye(n))
+        np.testing.assert_allclose(dF_dy.toarray(), expected, atol=1e-12)
+
+    def test_first_order_matches_fd(self) -> None:
+        """First-order analytical Jacobian matches finite-difference."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "psi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "psi_0",
+                    "lhs": {"expression": "d_t(psi_0)", "order": {"time": 1}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "psi_0"},
+                            {"coefficient": -0.5, "operator": "identity", "field": "psi_0"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(16,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+
+        from tidal.solver.ida import build_residual_fn
+
+        resfn = build_residual_fn(spec, layout, grid, "periodic", parameters={})
+
+        n_total = layout.total_size
+        rng = np.random.default_rng(55)
+        y0 = rng.standard_normal(n_total)
+        yp0 = rng.standard_normal(n_total)
+
+        res0 = np.zeros(n_total)
+        resfn(0.0, y0, yp0, res0)
+
+        eps = 1e-7
+        fd_dy = np.zeros((n_total, n_total))
+        for j in range(n_total):
+            y_plus = y0.copy()
+            y_plus[j] += eps
+            res_plus = np.zeros(n_total)
+            resfn(0.0, y_plus, yp0, res_plus)
+            fd_dy[:, j] = (res_plus - res0) / eps
+
+        fd_dyp = np.zeros((n_total, n_total))
+        for j in range(n_total):
+            yp_plus = yp0.copy()
+            yp_plus[j] += eps
+            res_plus = np.zeros(n_total)
+            resfn(0.0, y0, yp_plus, res_plus)
+            fd_dyp[:, j] = (res_plus - res0) / eps
+
+        np.testing.assert_allclose(
+            dF_dy.toarray(), fd_dy, atol=1e-5,
+            err_msg="dF/dy mismatch for first-order equation",
+        )
+        np.testing.assert_allclose(
+            dF_dyp.toarray(), fd_dyp, atol=1e-5,
+            err_msg="dF/dyp mismatch for first-order equation",
+        )
+
+
+# ---------------------------------------------------------------------------
+# CVODE delivery tests
+# ---------------------------------------------------------------------------
+
+
+class TestCVODEDelivery:
+    def test_cvode_dense_jacfn(self) -> None:
+        """CVODE dense jacfn should produce JJ = -dF_dy."""
+        from tidal.solver.analytical_jacobian import _create_cvode_jacfn
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, _dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        jacfn = _create_cvode_jacfn(dF_dy)
+
+        n_total = layout.total_size
+        JJ = np.zeros((n_total, n_total))
+        jacfn(0.0, np.zeros(n_total), np.zeros(n_total), JJ)
+
+        expected = (-dF_dy).toarray()
+        np.testing.assert_allclose(JJ, expected, atol=1e-12)
+
+    def test_cvode_gmres_jactimes(self) -> None:
+        """CVODE GMRES jactimes should compute Jv = -dF_dy @ v."""
+        from tidal.solver.analytical_jacobian import _create_cvode_jactimes
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, _dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        jactimes = _create_cvode_jactimes(dF_dy)
+
+        n_total = layout.total_size
+        rng = np.random.default_rng(46)
+        v = rng.standard_normal(n_total)
+        Jv = np.zeros(n_total)
+
+        jactimes.solvefn(
+            0.0, np.zeros(n_total), np.zeros(n_total), v, Jv,
+        )
+
+        expected = (-dF_dy) @ v
+        np.testing.assert_allclose(Jv, expected, atol=1e-12)
+
+    def test_try_analytical_cvode(self) -> None:
+        """try_analytical_jacobian with solver='cvode' configures CVODE jacfn."""
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        options: dict[str, Any] = {}
+        result = try_analytical_jacobian(
+            options, spec, layout, grid, "periodic", {}, solver="cvode",
+        )
+
+        assert result is True
+        assert options["linsolver"] == "dense"
+        assert "jacfn" in options
+        assert callable(options["jacfn"])
+
+        # Verify the jacfn has CVODE signature (4 args, no cj/res)
+        n_total = layout.total_size
+        JJ = np.zeros((n_total, n_total))
+        options["jacfn"](0.0, np.zeros(n_total), np.zeros(n_total), JJ)
+        assert np.any(JJ != 0), "CVODE jacfn should fill JJ"
+
+
 class TestIDAIntegration:
     def test_kg_analytical_matches_fd(self) -> None:
         """IDA with analytical jacfn should match standard FD solve."""

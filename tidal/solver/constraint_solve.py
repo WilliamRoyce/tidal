@@ -442,16 +442,22 @@ def _probe_operator_matrix(
 ) -> SparseMatrix:
     """Build sparse matrix by probing apply_operator() with unit vectors.
 
-    Each column j is computed by applying the self-operator (with resolved
-    coefficients) to a one-hot array e_j.  For position-dependent coefficients,
-    the element-wise multiply ``coeff_array * apply_operator(op, e_j, grid, bc)``
-    produces correct spatially-varying matrix entries.
-
-    This is the universal fallback — it handles:
-    - Position-dependent coefficients (coeff is NDArray)
-    - Any BC type (periodic, neumann, dirichlet)
-    - Any operator in OPERATOR_REGISTRY (existing or future)
+    For single constant-coefficient terms, delegates to the shared
+    ``build_operator_matrix()`` utility.  For multiple or position-dependent
+    terms, builds the matrix by probing the combined operator.
     """
+    # Fast path: single term with constant coefficient
+    if len(self_terms) == 1:
+        coeff, op_name = self_terms[0]
+        if np.ndim(coeff) == 0:
+            from tidal.solver.analytical_jacobian import (  # noqa: PLC0415
+                build_operator_matrix,
+            )
+
+            mat = build_operator_matrix(op_name, grid, bc)
+            return float(coeff) * mat if float(coeff) != 1.0 else mat
+
+    # General path: multiple terms and/or position-dependent coefficients
     n = grid.num_points
     mat = lil_matrix((n, n))
 

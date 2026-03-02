@@ -24,11 +24,8 @@ import logging
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
-from scipy.sparse import (  # pyright: ignore[reportMissingTypeStubs]
-    eye as speye,  # pyright: ignore[reportUnknownVariableType]
-)
 
-from tidal.solver._scipy_types import SparseMatrix, lil_matrix
+from tidal.solver._scipy_types import SparseMatrix, lil_matrix, speye
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -73,16 +70,16 @@ def _is_system_constant_coefficient(
 # ---------------------------------------------------------------------------
 
 
-def _build_operator_matrix(
+def build_operator_matrix(
     operator: str,
     grid: GridInfo,
     bc: BCSpec | None,
 ) -> SparseMatrix:
-    """Build the N x N sparse matrix for a spatial operator by probing.
+    """Build the N x N sparse matrix for a single spatial operator by probing.
 
     Probes ``apply_operator(op, e_j)`` with unit vectors to construct the
-    matrix column-by-column.  This is the same approach used by
-    ``constraint_solve._probe_operator_matrix``.
+    matrix column-by-column.  Used by both the analytical Jacobian builder
+    and the constraint IC solver.
     """
     from tidal.solver.operators import apply_operator  # noqa: PLC0415
 
@@ -114,7 +111,7 @@ class _OperatorCache:
     def get_identity(self) -> SparseMatrix:
         """Return the identity matrix (cached)."""
         if self._identity is None:
-            self._identity = speye(self._grid.num_points, format="csc")  # pyright: ignore[reportUnknownMemberType]
+            self._identity = speye(self._grid.num_points, format="csc")
         return self._identity
 
     def get(self, operator: str) -> SparseMatrix:
@@ -122,7 +119,7 @@ class _OperatorCache:
         if operator == "identity":
             return self.get_identity()
         if operator not in self._cache:
-            self._cache[operator] = _build_operator_matrix(
+            self._cache[operator] = build_operator_matrix(
                 operator, self._grid, self._bc
             )
         return self._cache[operator]
@@ -485,6 +482,7 @@ def _create_jacfn(
     """
     jac_y = dF_dy.toarray()
     jac_yp = dF_dyp.toarray()
+    jac_yp_scaled = np.empty_like(jac_yp)
 
     def jacfn(  # noqa: PLR0913, PLR0917
         t: float,  # noqa: ARG001
@@ -494,7 +492,8 @@ def _create_jacfn(
         cj: float,
         JJ: NDArray[np.float64],  # noqa: N803
     ) -> None:
-        np.add(jac_y, cj * jac_yp, out=JJ)
+        np.multiply(jac_yp, cj, out=jac_yp_scaled)
+        np.add(jac_y, jac_yp_scaled, out=JJ)
 
     return jacfn
 
@@ -512,6 +511,8 @@ def _create_jactimes(
         IDAJacTimes,
     )
 
+    buf = np.empty(dF_dy.shape[0])
+
     def jv_solve(  # noqa: PLR0913, PLR0917
         t: float,  # noqa: ARG001
         y: NDArray[np.float64],  # noqa: ARG001
@@ -521,9 +522,65 @@ def _create_jactimes(
         Jv: NDArray[np.float64],  # noqa: N803
         cj: float,
     ) -> None:
-        Jv[:] = dF_dy @ v + cj * (dF_dyp @ v)
+        # Jv = dF_dy @ v + cj * (dF_dyp @ v), zero-allocation inner loop
+        Jv[:] = dF_dy @ v
+        buf[:] = dF_dyp @ v
+        np.multiply(buf, cj, out=buf)
+        Jv += buf  # noqa: N806
 
     return IDAJacTimes(setupfn=None, solvefn=jv_solve)  # pyright: ignore[reportUnknownVariableType]
+
+
+# ---------------------------------------------------------------------------
+# CVODE-specific delivery (ODE Jacobian df/dy = -dF_dy)
+# ---------------------------------------------------------------------------
+
+
+def _create_cvode_jacfn(
+    dF_dy: SparseMatrix,  # noqa: N803
+) -> Callable[..., None]:
+    """Create a dense ``jacfn`` callback for CVODE.
+
+    Signature: ``jacfn(t, y, yp, JJ)`` — fills ``JJ`` with the ODE
+    Jacobian ``df/dy = -dF_dy`` (negated because ``dF_dy`` stores the
+    IDA residual derivatives where ``F = yp - RHS``).
+    """
+    ode_jac = (-dF_dy).toarray()
+
+    def jacfn(
+        t: float,  # noqa: ARG001
+        y: NDArray[np.float64],  # noqa: ARG001
+        yp: NDArray[np.float64],  # noqa: ARG001
+        JJ: NDArray[np.float64],  # noqa: N803
+    ) -> None:
+        JJ[:] = ode_jac
+
+    return jacfn
+
+
+def _create_cvode_jactimes(
+    dF_dy: SparseMatrix,  # noqa: N803
+) -> object:
+    """Create a ``CVODEJacTimes`` wrapper for CVODE GMRES.
+
+    The ``solvefn`` computes ``Jv[:] = (-dF_dy) @ v`` = ``df/dy @ v``.
+    """
+    from sksundae.cvode import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
+        CVODEJacTimes,
+    )
+
+    neg_dF_dy = -dF_dy  # noqa: N806
+
+    def jv_solve(
+        t: float,  # noqa: ARG001
+        y: NDArray[np.float64],  # noqa: ARG001
+        yp: NDArray[np.float64],  # noqa: ARG001
+        v: NDArray[np.float64],
+        Jv: NDArray[np.float64],  # noqa: N803
+    ) -> None:
+        Jv[:] = neg_dF_dy @ v
+
+    return CVODEJacTimes(setupfn=None, solvefn=jv_solve)  # pyright: ignore[reportUnknownVariableType]
 
 
 # ---------------------------------------------------------------------------
@@ -538,12 +595,19 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
     grid: GridInfo,
     bc: BCSpec | None,
     parameters: dict[str, float],
+    *,
+    solver: str = "ida",
 ) -> bool:
     """Try to configure analytical Jacobian for constant-coefficient systems.
 
     Mutates *options* in-place if successful.  Returns True on success,
     False if the system is not constant-coefficient (caller should fall
     back to the existing tier system).
+
+    Parameters
+    ----------
+    solver : str
+        ``"ida"`` or ``"cvode"``.  Controls the Jacobian callback signature.
 
     For the dense tier (N <= DENSE_THRESHOLD), sets ``jacfn``.
     For larger systems, sets ``linsolver='gmres'`` + ``jactimes``.
@@ -558,17 +622,24 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
 
     if n_state <= DENSE_THRESHOLD:
         options["linsolver"] = "dense"
-        options["jacfn"] = _create_jacfn(jac_y, jac_yp)
+        if solver == "cvode":
+            options["jacfn"] = _create_cvode_jacfn(jac_y)
+        else:
+            options["jacfn"] = _create_jacfn(jac_y, jac_yp)
         logger.info(
-            "Analytical Jacobian (dense jacfn) for %d-state system", n_state,
+            "Analytical Jacobian (dense %s jacfn) for %d-state system",
+            solver, n_state,
         )
     else:
         options["linsolver"] = "gmres"
-        options["jactimes"] = _create_jactimes(jac_y, jac_yp)
+        if solver == "cvode":
+            options["jactimes"] = _create_cvode_jactimes(jac_y)
+        else:
+            options["jactimes"] = _create_jactimes(jac_y, jac_yp)
         logger.info(
-            "Analytical Jacobian (GMRES jactimes) for %d-state system "
+            "Analytical Jacobian (GMRES %s jactimes) for %d-state system "
             "(nnz_dy=%d, nnz_dyp=%d)",
-            n_state, jac_y.nnz, jac_yp.nnz,
+            solver, n_state, jac_y.nnz, jac_yp.nnz,
         )
 
     return True

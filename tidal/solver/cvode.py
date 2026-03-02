@@ -152,7 +152,9 @@ def solve_cvode(  # noqa: PLR0913
     if max_step > 0:
         options["max_step"] = max_step
 
-    configure_linear_solver(options, layout, spec, grid, bc)
+    configure_linear_solver(
+        options, layout, spec, grid, bc, parameters=parameters, solver="cvode",
+    )
 
     # Build time evaluation points
     t_eval = np.linspace(t_span[0], t_span[1], num_snapshots)
