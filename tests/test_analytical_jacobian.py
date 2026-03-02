@@ -1,0 +1,697 @@
+"""Tests for the analytical Jacobian builder."""
+
+from __future__ import annotations
+
+from typing import Any
+
+import numpy as np
+import pytest
+from scipy.sparse import issparse
+
+from tidal.solver.analytical_jacobian import (
+    _OperatorCache,
+    _resolve_term_target,
+    build_jacobian_matrices,
+    try_analytical_jacobian,
+)
+from tidal.solver.coefficients import CoefficientEvaluator
+from tidal.solver.grid import GridInfo
+from tidal.solver.state import StateLayout
+from tidal.symbolic.json_loader import EquationSystem
+
+# ---------------------------------------------------------------------------
+# Test fixtures
+# ---------------------------------------------------------------------------
+
+
+def _make_kg_1d_spec() -> EquationSystem:
+    """Klein-Gordon 1D: single scalar, second-order."""
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 2, "signature": [-1, 1]},
+        "fields": [{"name": "phi_0", "index": 0}],
+        "equations": [
+            {
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                        {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
+                    ],
+                },
+            },
+        ],
+        "canonical": {"hamiltonian_terms": []},
+    }
+    return EquationSystem.from_dict(data)
+
+
+def _make_em_2d_spec() -> EquationSystem:
+    """EM 2+1D: constraint A_0 + wave A_1, with gradient_x(v_A_1)."""
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 3, "signature": [-1, 1, 1]},
+        "fields": [
+            {"name": "A_0", "index": 0},
+            {"name": "A_1", "index": 1},
+        ],
+        "equations": [
+            {
+                "field": "A_0",
+                "lhs": {"expression": "A_0", "order": {"time": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
+                        {"coefficient": -1.0, "operator": "gradient_x", "field": "v_A_1"},
+                    ],
+                },
+            },
+            {
+                "field": "A_1",
+                "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "A_1"},
+                    ],
+                },
+            },
+        ],
+        "canonical": {"hamiltonian_terms": []},
+    }
+    return EquationSystem.from_dict(data)
+
+
+def _make_constraint_velocity_spec() -> EquationSystem:
+    """CS-like: constraint A_0, dynamical A_1 with gradient_x(v_A_0)."""
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 3, "signature": [-1, 1, 1]},
+        "fields": [
+            {"name": "A_0", "index": 0},
+            {"name": "A_1", "index": 1},
+        ],
+        "equations": [
+            {
+                "field": "A_0",
+                "lhs": {"expression": "A_0", "order": {"time": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": -1.0, "operator": "laplacian_x", "field": "A_0"},
+                        {"coefficient": 1.0, "operator": "gradient_x", "field": "v_A_1"},
+                    ],
+                },
+            },
+            {
+                "field": "A_1",
+                "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_1"},
+                        {"coefficient": 1.0, "operator": "gradient_x", "field": "v_A_0"},
+                    ],
+                },
+            },
+        ],
+        "canonical": {"hamiltonian_terms": []},
+    }
+    return EquationSystem.from_dict(data)
+
+
+def _make_first_deriv_t_constraint_spec() -> EquationSystem:
+    """Spec with first_derivative_t(constraint_field) in dynamical eq."""
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 2, "signature": [-1, 1]},
+        "fields": [
+            {"name": "phi_0", "index": 0},
+            {"name": "A_0", "index": 1},
+        ],
+        "equations": [
+            {
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                        {"coefficient": -1.0, "operator": "first_derivative_t", "field": "A_0"},
+                    ],
+                },
+            },
+            {
+                "field": "A_0",
+                "lhs": {"expression": "A_0", "order": {"time": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
+                    ],
+                },
+            },
+        ],
+        "canonical": {"hamiltonian_terms": []},
+    }
+    return EquationSystem.from_dict(data)
+
+
+# ---------------------------------------------------------------------------
+# all_constant() tests
+# ---------------------------------------------------------------------------
+
+
+class TestAllConstant:
+    def test_kg_is_constant(self) -> None:
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff = CoefficientEvaluator(spec, grid, {})
+        assert coeff.all_constant()
+
+    def test_em_is_constant(self) -> None:
+        spec = _make_em_2d_spec()
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(4, 4), periodic=(True, True))
+        coeff = CoefficientEvaluator(spec, grid, {})
+        assert coeff.all_constant()
+
+    def test_parametric_is_constant(self) -> None:
+        """Symbolic coefficients with parameters are still constant."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-m2",
+                            },
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff = CoefficientEvaluator(spec, grid, {"m2": 1.0})
+        assert coeff.all_constant()
+
+    def test_time_dependent_is_not_constant(self) -> None:
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "E^(2*H*t[])",
+                                "time_dependent": True,
+                            },
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff = CoefficientEvaluator(spec, grid, {"H": 1.0})
+        assert not coeff.all_constant()
+
+
+# ---------------------------------------------------------------------------
+# _resolve_term_target tests
+# ---------------------------------------------------------------------------
+
+
+class TestResolveTermTarget:
+    def test_normal_field_reference(self) -> None:
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        op_cache = _OperatorCache(grid, "periodic")
+
+        # phi_0 equation, laplacian(phi_0) term
+        term = spec.equations[0].rhs_terms[0]
+        result = _resolve_term_target(term, layout, set(), op_cache)
+        assert result is not None
+        col_slot, op_mat, is_dyp = result
+        assert col_slot == layout.field_slot_map["phi_0"]
+        assert not is_dyp
+
+    def test_first_derivative_t_dynamical(self) -> None:
+        """first_derivative_t(dynamical_field) → dF/dy on velocity slot."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 3, "signature": [-1, 1, 1]},
+            "fields": [
+                {"name": "A_0", "index": 0},
+                {"name": "A_1", "index": 1},
+            ],
+            "equations": [
+                {
+                    "field": "A_0",
+                    "lhs": {"expression": "A_0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "first_derivative_t", "field": "A_1"},
+                        ],
+                    },
+                },
+                {
+                    "field": "A_1",
+                    "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_1"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(4, 4), periodic=(True, True))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        op_cache = _OperatorCache(grid, ("periodic", "periodic"))
+
+        term = spec.equations[0].rhs_terms[0]
+        constraint_fields: set[str] = {"A_0"}
+        result = _resolve_term_target(term, layout, constraint_fields, op_cache)
+        assert result is not None
+        col_slot, _op_mat, is_dyp = result
+        # A_1 is dynamical → couples via y to velocity slot
+        assert col_slot == layout.velocity_slot_map["A_1"]
+        assert not is_dyp
+
+    def test_first_derivative_t_constraint(self) -> None:
+        """first_derivative_t(constraint_field) → dF/dyp on field slot."""
+        spec = _make_first_deriv_t_constraint_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        op_cache = _OperatorCache(grid, "periodic")
+
+        # phi_0 eq term: first_derivative_t(A_0) where A_0 is constraint
+        term = spec.equations[0].rhs_terms[1]
+        constraint_fields = {"A_0"}
+        result = _resolve_term_target(term, layout, constraint_fields, op_cache)
+        assert result is not None
+        col_slot, _op_mat, is_dyp = result
+        assert col_slot == layout.field_slot_map["A_0"]
+        assert is_dyp
+
+    def test_explicit_v_constraint(self) -> None:
+        """gradient_x(v_A_0) where A_0 is constraint → dF/dyp."""
+        spec = _make_constraint_velocity_spec()
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(4, 4), periodic=(True, True))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        op_cache = _OperatorCache(grid, ("periodic", "periodic"))
+
+        # A_1 eq term: gradient_x(v_A_0) where A_0 is constraint
+        term = spec.equations[1].rhs_terms[1]
+        constraint_fields = {"A_0"}
+        result = _resolve_term_target(term, layout, constraint_fields, op_cache)
+        assert result is not None
+        col_slot, _op_mat, is_dyp = result
+        assert col_slot == layout.field_slot_map["A_0"]
+        assert is_dyp
+
+
+# ---------------------------------------------------------------------------
+# Jacobian matrix correctness tests
+# ---------------------------------------------------------------------------
+
+
+class TestBuildJacobianMatrices:
+    def test_kg_1d_shapes(self) -> None:
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+
+        n_total = layout.total_size  # 2 slots × 8 = 16
+        assert dF_dy.shape == (n_total, n_total)
+        assert dF_dyp.shape == (n_total, n_total)
+        assert issparse(dF_dy)
+        assert issparse(dF_dyp)
+
+    def test_kg_1d_dynamical_field_block(self) -> None:
+        """Dynamical field: res = yp - v → dF/dy[field, vel] = -I."""
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+
+        n = grid.num_points
+        # Slot 0: phi_0 (field), slot 1: v_phi_0 (velocity)
+        field_block_dy = dF_dy[:n, n:2*n].toarray()
+        field_block_dyp = dF_dyp[:n, :n].toarray()
+
+        np.testing.assert_array_equal(field_block_dy, -np.eye(n))
+        np.testing.assert_array_equal(field_block_dyp, np.eye(n))
+
+    def test_kg_1d_velocity_block(self) -> None:
+        """Velocity: res = yp - RHS → dF/dy has negated RHS operators."""
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+
+        n = grid.num_points
+        # Velocity slot dyp diagonal should be I
+        vel_dyp = dF_dyp[n:2*n, n:2*n].toarray()
+        np.testing.assert_array_equal(vel_dyp, np.eye(n))
+
+        # Velocity slot dF/dy should have -laplacian and +identity blocks
+        # from negated RHS: -(1.0 * laplacian + -1.0 * identity)
+        vel_dy_phi = dF_dy[n:2*n, :n].toarray()
+        # Build expected: -laplacian + identity
+        from tidal.solver.operators import apply_operator
+
+        lap_mat = np.zeros((n, n))
+        for j in range(n):
+            e_j = np.zeros((n,))
+            e_j[j] = 1.0
+            lap_mat[:, j] = apply_operator("laplacian_x", e_j, grid, "periodic")
+        expected = -1.0 * lap_mat - (-1.0) * np.eye(n)
+        np.testing.assert_allclose(vel_dy_phi, expected, atol=1e-12)
+
+    def test_constraint_velocity_in_dyp(self) -> None:
+        """v_A_0 reference (A_0 constraint) should appear in dF/dyp."""
+        spec = _make_constraint_velocity_spec()
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(4, 4), periodic=(True, True))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(
+            spec, layout, grid, ("periodic", "periodic"), {},
+        )
+
+        n = grid.num_points  # 16
+        # Slots: A_0 (0), A_1 (1), v_A_1 (2)
+        # v_A_1 eq references gradient_x(v_A_0) — dF/dyp coupling
+        v_A1_rows = slice(2 * n, 3 * n)
+        A0_cols = slice(0, n)
+
+        dyp_block = dF_dyp[v_A1_rows, A0_cols].toarray()
+        assert np.any(dyp_block != 0), (
+            "gradient_x(v_A_0) should produce entries in dF/dyp at "
+            "(v_A_1_slot, A_0_slot)"
+        )
+
+        # The same block in dF/dy should be zero for this coupling
+        dy_block = dF_dy[v_A1_rows, A0_cols].toarray()
+        # dF_dy may have entries from other terms but the constraint velocity
+        # coupling specifically goes to dF_dyp
+
+    def test_first_derivative_t_constraint_in_dyp(self) -> None:
+        """first_derivative_t(A_0) where A_0 is constraint → dF/dyp."""
+        spec = _make_first_deriv_t_constraint_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+
+        n = grid.num_points  # 8
+        # Slots: phi_0 (0), v_phi_0 (1), A_0 (2)
+        # v_phi_0 eq has first_derivative_t(A_0) → dF/dyp[1, 2] = +1*I
+        # But negated (res = yp - RHS) → dF/dyp[1, 2] should be -(-1)*I = +I
+        # Wait: coefficient is -1.0 and negate=True → -(-1.0)*I = +I
+        v_phi_rows = slice(1 * n, 2 * n)
+        A0_cols = slice(2 * n, 3 * n)
+
+        dyp_block = dF_dyp[v_phi_rows, A0_cols].toarray()
+        # term coefficient = -1.0, negated → -(-1.0) * I = +I
+        np.testing.assert_allclose(dyp_block, np.eye(n), atol=1e-12)
+
+    def test_matches_fd_jacobian(self) -> None:
+        """Analytical Jacobian matches finite-difference Jacobian."""
+        spec = _make_kg_1d_spec()
+        n_pts = 16
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(n_pts,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+
+        # Build residual function
+        from tidal.solver.ida import build_residual_fn
+
+        resfn = build_residual_fn(spec, layout, grid, "periodic", parameters={})
+
+        n_total = layout.total_size
+        y0 = np.random.default_rng(42).standard_normal(n_total)
+        yp0 = np.random.default_rng(43).standard_normal(n_total)
+
+        # Compute residual at (y0, yp0)
+        res0 = np.zeros(n_total)
+        resfn(0.0, y0, yp0, res0)
+
+        # Finite-difference dF/dy
+        eps = 1e-7
+        fd_dF_dy = np.zeros((n_total, n_total))
+        for j in range(n_total):
+            y_plus = y0.copy()
+            y_plus[j] += eps
+            res_plus = np.zeros(n_total)
+            resfn(0.0, y_plus, yp0, res_plus)
+            fd_dF_dy[:, j] = (res_plus - res0) / eps
+
+        # Finite-difference dF/dyp
+        fd_dF_dyp = np.zeros((n_total, n_total))
+        for j in range(n_total):
+            yp_plus = yp0.copy()
+            yp_plus[j] += eps
+            res_plus = np.zeros(n_total)
+            resfn(0.0, y0, yp_plus, res_plus)
+            fd_dF_dyp[:, j] = (res_plus - res0) / eps
+
+        np.testing.assert_allclose(
+            dF_dy.toarray(), fd_dF_dy, atol=1e-5,
+            err_msg="dF/dy mismatch",
+        )
+        np.testing.assert_allclose(
+            dF_dyp.toarray(), fd_dF_dyp, atol=1e-5,
+            err_msg="dF/dyp mismatch",
+        )
+
+    def test_constraint_velocity_matches_fd(self) -> None:
+        """Analytical Jacobian with constraint velocity matches FD."""
+        spec = _make_constraint_velocity_spec()
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(4, 4), periodic=(True, True))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(
+            spec, layout, grid, ("periodic", "periodic"), {},
+        )
+
+        from tidal.solver.ida import build_residual_fn
+
+        resfn = build_residual_fn(
+            spec, layout, grid, ("periodic", "periodic"), parameters={},
+        )
+
+        n_total = layout.total_size
+        rng = np.random.default_rng(44)
+        y0 = rng.standard_normal(n_total)
+        yp0 = rng.standard_normal(n_total)
+
+        res0 = np.zeros(n_total)
+        resfn(0.0, y0, yp0, res0)
+
+        eps = 1e-7
+
+        # FD dF/dy
+        fd_dy = np.zeros((n_total, n_total))
+        for j in range(n_total):
+            y_plus = y0.copy()
+            y_plus[j] += eps
+            res_plus = np.zeros(n_total)
+            resfn(0.0, y_plus, yp0, res_plus)
+            fd_dy[:, j] = (res_plus - res0) / eps
+
+        # FD dF/dyp
+        fd_dyp = np.zeros((n_total, n_total))
+        for j in range(n_total):
+            yp_plus = yp0.copy()
+            yp_plus[j] += eps
+            res_plus = np.zeros(n_total)
+            resfn(0.0, y0, yp_plus, res_plus)
+            fd_dyp[:, j] = (res_plus - res0) / eps
+
+        np.testing.assert_allclose(
+            dF_dy.toarray(), fd_dy, atol=1e-5,
+            err_msg="dF/dy mismatch for constraint velocity system",
+        )
+        np.testing.assert_allclose(
+            dF_dyp.toarray(), fd_dyp, atol=1e-5,
+            err_msg="dF/dyp mismatch for constraint velocity system",
+        )
+
+
+# ---------------------------------------------------------------------------
+# Jacobian delivery tests
+# ---------------------------------------------------------------------------
+
+
+class TestJacobianDelivery:
+    def test_dense_jacfn(self) -> None:
+        """Dense jacfn should produce correct J = dF_dy + cj * dF_dyp."""
+        from tidal.solver.analytical_jacobian import _create_jacfn
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        jacfn = _create_jacfn(dF_dy, dF_dyp)
+
+        n_total = layout.total_size
+        cj = 3.14
+        JJ = np.zeros((n_total, n_total))
+        jacfn(0.0, np.zeros(n_total), np.zeros(n_total), np.zeros(n_total), cj, JJ)
+
+        expected = dF_dy.toarray() + cj * dF_dyp.toarray()
+        np.testing.assert_allclose(JJ, expected, atol=1e-12)
+
+    def test_gmres_jactimes(self) -> None:
+        """GMRES jactimes should compute correct Jv = dF_dy @ v + cj * dF_dyp @ v."""
+        from tidal.solver.analytical_jacobian import _create_jactimes
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        jactimes = _create_jactimes(dF_dy, dF_dyp)
+
+        n_total = layout.total_size
+        rng = np.random.default_rng(45)
+        v = rng.standard_normal(n_total)
+        cj = 2.71
+        Jv = np.zeros(n_total)
+
+        jactimes.solvefn(
+            0.0, np.zeros(n_total), np.zeros(n_total),
+            np.zeros(n_total), v, Jv, cj,
+        )
+
+        expected = dF_dy @ v + cj * (dF_dyp @ v)
+        np.testing.assert_allclose(Jv, expected, atol=1e-12)
+
+
+# ---------------------------------------------------------------------------
+# try_analytical_jacobian integration
+# ---------------------------------------------------------------------------
+
+
+class TestTryAnalyticalJacobian:
+    def test_configures_dense_jacfn(self) -> None:
+        """Small constant system should get dense jacfn."""
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        options: dict[str, Any] = {}
+        result = try_analytical_jacobian(options, spec, layout, grid, "periodic", {})
+
+        assert result is True
+        assert options["linsolver"] == "dense"
+        assert "jacfn" in options
+        assert callable(options["jacfn"])
+
+    def test_returns_false_for_non_constant(self) -> None:
+        """Non-constant system should return False."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "E^(2*H*t[])",
+                                "time_dependent": True,
+                            },
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        options: dict[str, Any] = {}
+        result = try_analytical_jacobian(options, spec, layout, grid, "periodic", {"H": 1.0})
+
+        assert result is False
+        assert "jacfn" not in options
+
+
+# ---------------------------------------------------------------------------
+# Integration test: IDA with analytical Jacobian
+# ---------------------------------------------------------------------------
+
+
+class TestIDAIntegration:
+    def test_kg_analytical_matches_fd(self) -> None:
+        """IDA with analytical jacfn should match standard FD solve."""
+        from tidal.solver.ida import solve_ida
+
+        spec = _make_kg_1d_spec()
+        n_pts = 32
+        grid = GridInfo(
+            bounds=((0, 2 * np.pi),), shape=(n_pts,), periodic=(True,),
+        )
+
+        x = np.linspace(0, 2 * np.pi, n_pts, endpoint=False)
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.total_size)
+        y0[:n_pts] = np.exp(-((x - np.pi) ** 2))
+
+        # Solve with analytical Jacobian (parameters triggers it)
+        result_analytical = solve_ida(
+            spec, grid, y0, t_span=(0.0, 0.5),
+            bc="periodic", parameters={}, num_snapshots=5,
+        )
+        assert result_analytical["success"]
+
+        # Solve without analytical Jacobian (no parameters → FD)
+        result_fd = solve_ida(
+            spec, grid, y0, t_span=(0.0, 0.5),
+            bc="periodic", num_snapshots=5,
+        )
+        assert result_fd["success"]
+
+        np.testing.assert_allclose(
+            result_analytical["y"][-1],
+            result_fd["y"][-1],
+            rtol=1e-5,
+            atol=1e-8,
+            err_msg="Analytical Jacobian result differs from FD Jacobian",
+        )

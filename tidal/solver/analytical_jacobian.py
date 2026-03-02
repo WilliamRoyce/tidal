@@ -1,0 +1,574 @@
+"""Analytical Jacobian for constant-coefficient linear systems.
+
+For constant-coefficient linear systems (25/26 TIDAL examples), the IDA
+Jacobian ``J = dF/dy + cj * dF/dyp`` consists of two constant sparse
+matrices.  Instead of finite-difference approximation (which requires
+O(n_colors) residual evaluations per Newton step), we precompute ``dF/dy``
+and ``dF/dyp`` once and supply them analytically.
+
+Two delivery mechanisms depending on system size:
+
+- **Dense tier** (N <= DENSE_THRESHOLD): ``jacfn`` fills the 2D Jacobian
+  array directly.  No sksundae bug here because ``_setup_memory`` only
+  runs when ``sparsity`` is provided.
+
+- **GMRES tier** (N > DENSE_THRESHOLD): ``IDAJacTimes`` supplies a
+  matrix-free ``Jv = dF_dy @ v + cj * dF_dyp @ v`` product via GMRES.
+  Uses sksundae's clean iterative solver path which is unaffected by
+  the sparse+jacfn bug in ``_cy_ida.pyx:460``.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import TYPE_CHECKING, Any
+
+import numpy as np
+from scipy.sparse import (  # pyright: ignore[reportMissingTypeStubs]
+    eye as speye,  # pyright: ignore[reportUnknownVariableType]
+)
+
+from tidal.solver._scipy_types import SparseMatrix, lil_matrix
+
+if TYPE_CHECKING:
+    from collections.abc import Callable
+
+    from numpy.typing import NDArray
+
+    from tidal.solver.coefficients import CoefficientEvaluator
+    from tidal.solver.grid import GridInfo
+    from tidal.solver.operators import BCSpec
+    from tidal.solver.state import SlotInfo, StateLayout
+    from tidal.symbolic.json_loader import (
+        ComponentEquation,
+        EquationSystem,
+        OperatorTerm,
+    )
+
+logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Constant-coefficient detection
+# ---------------------------------------------------------------------------
+
+
+def _is_system_constant_coefficient(
+    spec: EquationSystem,
+    grid: GridInfo,
+    parameters: dict[str, float],
+) -> bool:
+    """Check if all equation coefficients are constant.
+
+    Returns True when ``CoefficientEvaluator.all_constant()`` holds,
+    meaning no term has time-dependent or position-dependent coefficients.
+    """
+    from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+
+    coeff_eval = CoefficientEvaluator(spec, grid, parameters)
+    return coeff_eval.all_constant()
+
+
+# ---------------------------------------------------------------------------
+# Operator matrix construction
+# ---------------------------------------------------------------------------
+
+
+def _build_operator_matrix(
+    operator: str,
+    grid: GridInfo,
+    bc: BCSpec | None,
+) -> SparseMatrix:
+    """Build the N x N sparse matrix for a spatial operator by probing.
+
+    Probes ``apply_operator(op, e_j)`` with unit vectors to construct the
+    matrix column-by-column.  This is the same approach used by
+    ``constraint_solve._probe_operator_matrix``.
+    """
+    from tidal.solver.operators import apply_operator  # noqa: PLC0415
+
+    n = grid.num_points
+    mat = lil_matrix((n, n))
+    e_j: NDArray[np.float64] = np.zeros(grid.shape)
+
+    for j in range(n):
+        e_j.flat[:] = 0.0
+        e_j.flat[j] = 1.0
+        col = apply_operator(operator, e_j, grid, bc)
+        col_flat = col.ravel()
+        nz = np.nonzero(col_flat)[0]
+        for row in nz:
+            mat[row, j] = col_flat[row]
+
+    return mat.tocsc()
+
+
+class _OperatorCache:
+    """Caches operator matrices for a fixed (grid, bc) pair."""
+
+    def __init__(self, grid: GridInfo, bc: BCSpec | None) -> None:
+        self._grid = grid
+        self._bc = bc
+        self._cache: dict[str, SparseMatrix] = {}
+        self._identity: SparseMatrix | None = None
+
+    def get_identity(self) -> SparseMatrix:
+        """Return the identity matrix (cached)."""
+        if self._identity is None:
+            self._identity = speye(self._grid.num_points, format="csc")  # pyright: ignore[reportUnknownMemberType]
+        return self._identity
+
+    def get(self, operator: str) -> SparseMatrix:
+        """Return operator matrix, building on first access."""
+        if operator == "identity":
+            return self.get_identity()
+        if operator not in self._cache:
+            self._cache[operator] = _build_operator_matrix(
+                operator, self._grid, self._bc
+            )
+        return self._cache[operator]
+
+
+# ---------------------------------------------------------------------------
+# Term target resolution
+# ---------------------------------------------------------------------------
+
+
+def _resolve_term_target(  # noqa: PLR0911
+    term: OperatorTerm,
+    layout: StateLayout,
+    constraint_fields: set[str],
+    op_cache: _OperatorCache,
+) -> tuple[int, SparseMatrix, bool] | None:
+    """Determine where an RHS term couples in the Jacobian.
+
+    Returns ``(col_slot_idx, operator_matrix, is_dyp)`` or ``None`` if the
+    term's field reference cannot be resolved to a state slot.
+
+    ``is_dyp=True`` means the coupling enters ``dF/dyp`` (the term depends
+    on ``yp`` via constraint velocity injection); ``False`` means ``dF/dy``.
+    """
+    I_mat = op_cache.get_identity()  # noqa: N806
+
+    # Mechanism A: first_derivative_t(X) resolves to velocity of X
+    if term.operator == "first_derivative_t":
+        if term.field in constraint_fields:
+            # Constraint velocity: v_X = yp[X_field_slot]
+            return (layout.field_slot_map[term.field], I_mat, True)
+        # Dynamical velocity: v_X = y[velocity_slot]
+        vel_slot = layout.velocity_slot_map.get(term.field)
+        if vel_slot is not None:
+            return (vel_slot, I_mat, False)
+        return None
+
+    # Mechanism B: explicit v_X field reference (e.g. gradient_x(v_A_0))
+    if term.field.startswith("v_"):
+        base_field = term.field[2:]
+        if base_field in constraint_fields:
+            # Constraint velocity: v_X = yp[X_field_slot]
+            op_mat = op_cache.get(term.operator)
+            return (layout.field_slot_map[base_field], op_mat, True)
+        # Dynamical velocity: v_X = y[velocity_slot]
+        vel_slot = layout.velocity_slot_map.get(base_field)
+        if vel_slot is not None:
+            op_mat = op_cache.get(term.operator)
+            return (vel_slot, op_mat, False)
+        # Fall through: field might literally be named "v_something"
+
+    # Normal field reference
+    field_slot = layout.field_slot_map.get(term.field)
+    if field_slot is None:
+        return None
+    op_mat = op_cache.get(term.operator)
+    return (field_slot, op_mat, False)
+
+
+# ---------------------------------------------------------------------------
+# Jacobian matrix builder
+# ---------------------------------------------------------------------------
+
+# Reuse the same detection logic as ida.py for gauge/no-self-term cases.
+LAPLACIAN_OPS = frozenset({
+    "laplacian", "laplacian_x", "laplacian_y", "laplacian_z",
+})
+
+
+def _is_pure_laplacian(eq: ComponentEquation) -> bool:
+    """Check if equation has Laplacian self-terms but no identity/mass."""
+    has_lap = False
+    for term in eq.rhs_terms:
+        if term.field != eq.field_name:
+            continue
+        if term.operator in LAPLACIAN_OPS:
+            has_lap = True
+        elif term.operator == "identity":
+            return False
+    return has_lap
+
+
+def _detect_no_self_term_fields(spec: EquationSystem) -> set[str]:
+    """Fields whose constraint equations have no self-referencing terms."""
+    result: set[str] = set()
+    for eq in spec.equations:
+        if eq.time_derivative_order != 0:
+            continue
+        if eq.constraint_solver.enabled:
+            continue
+        has_self = any(t.field == eq.field_name for t in eq.rhs_terms)
+        if not has_self:
+            result.add(eq.field_name)
+    return result
+
+
+def _detect_gauge_fix_fields(
+    spec: EquationSystem,
+    grid: GridInfo,
+    bc: BCSpec | None,
+) -> set[str]:
+    """Fields needing gauge regularisation (pure Laplacian + periodic BCs)."""
+    from tidal.solver.operators import is_periodic_bc  # noqa: PLC0415
+
+    # Check all-periodic
+    if bc is not None:
+        bcs = (bc,) * grid.ndim if isinstance(bc, str) else tuple(bc)
+        all_periodic = all(is_periodic_bc(b) for b in bcs)
+    else:
+        all_periodic = all(grid.periodic)
+    if not all_periodic:
+        return set()
+
+    return {
+        eq.field_name
+        for eq in spec.equations
+        if eq.time_derivative_order == 0
+        and eq.constraint_solver.enabled
+        and _is_pure_laplacian(eq)
+    }
+
+
+def build_jacobian_matrices(
+    spec: EquationSystem,
+    layout: StateLayout,
+    grid: GridInfo,
+    bc: BCSpec | None,
+    parameters: dict[str, float],
+) -> tuple[SparseMatrix, SparseMatrix]:
+    """Build the analytical dF/dy and dF/dyp sparse matrices.
+
+    Mirrors the residual handler structure in ``ida.py`` exactly:
+    constraint (3 sub-cases), velocity, dynamical_field, first_order.
+
+    Parameters
+    ----------
+    spec : EquationSystem
+        Parsed equation specification.
+    layout : StateLayout
+        State vector layout.
+    grid : GridInfo
+        Spatial grid.
+    bc : BCSpec or None
+        Boundary conditions.
+    parameters : dict[str, float]
+        Resolved parameter values.
+
+    Returns
+    -------
+    (dF_dy, dF_dyp) : tuple[SparseMatrix, SparseMatrix]
+        Sparse Jacobian component matrices.
+    """
+    from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
+
+    n = grid.num_points
+    n_total = layout.total_size
+    eq_map: dict[str, int] = spec.equation_map
+
+    coeff_eval = CoefficientEvaluator(spec, grid, parameters)
+    op_cache = _OperatorCache(grid, bc)
+    I_mat = op_cache.get_identity()  # noqa: N806
+
+    constraint_fields = {
+        eq.field_name
+        for eq in spec.equations
+        if eq.time_derivative_order == 0
+    }
+    no_self_term_fields = _detect_no_self_term_fields(spec)
+    gauge_fix_fields = _detect_gauge_fix_fields(spec, grid, bc)
+
+    # Build in LIL format for efficient incremental construction
+    dF_dy = lil_matrix((n_total, n_total))  # noqa: N806
+    dF_dyp = lil_matrix((n_total, n_total))  # noqa: N806
+
+    for slot_idx, slot in enumerate(layout.slots):
+        if slot.time_order == 0:
+            _build_constraint_block(
+                slot_idx, slot, layout, spec, eq_map,
+                coeff_eval, op_cache, constraint_fields,
+                no_self_term_fields, gauge_fix_fields,
+                n, dF_dy, dF_dyp,
+            )
+
+        elif slot.kind == "velocity":
+            # res = yp - RHS → dF/dyp[slot, slot] = I
+            _set_diagonal_identity(dF_dyp, slot_idx, n, I_mat)
+            eq_idx = eq_map.get(slot.field_name)
+            if eq_idx is not None:
+                _add_rhs_terms(
+                    slot_idx, eq_idx, spec, layout, coeff_eval,
+                    op_cache, constraint_fields, n, dF_dy, dF_dyp,
+                    negate=True,
+                )
+
+        elif slot.time_order >= 2 and slot.kind == "field":  # noqa: PLR2004
+            # res = yp - v → dF/dyp[slot, slot] = I, dF/dy[slot, vel] = -I
+            _set_diagonal_identity(dF_dyp, slot_idx, n, I_mat)
+            vel_slot = layout.velocity_slot_map.get(slot.field_name)
+            if vel_slot is not None:
+                _set_block(dF_dy, slot_idx, vel_slot, n, -I_mat)
+
+        elif slot.time_order == 1:
+            # res = yp - RHS → dF/dyp[slot, slot] = I
+            _set_diagonal_identity(dF_dyp, slot_idx, n, I_mat)
+            eq_idx = eq_map.get(slot.field_name)
+            if eq_idx is not None:
+                _add_rhs_terms(
+                    slot_idx, eq_idx, spec, layout, coeff_eval,
+                    op_cache, constraint_fields, n, dF_dy, dF_dyp,
+                    negate=True,
+                )
+
+    return dF_dy.tocsc(), dF_dyp.tocsc()
+
+
+# ---------------------------------------------------------------------------
+# Block-assembly helpers
+# ---------------------------------------------------------------------------
+
+
+def _set_diagonal_identity(
+    mat: SparseMatrix,
+    slot_idx: int,
+    n: int,
+    I_mat: SparseMatrix,  # noqa: N803
+) -> None:
+    """Set diagonal block mat[slot, slot] = I."""
+    s = slice(slot_idx * n, (slot_idx + 1) * n)
+    mat[s, s] = I_mat
+
+
+def _set_block(
+    mat: SparseMatrix,
+    row_slot: int,
+    col_slot: int,
+    n: int,
+    block: SparseMatrix,
+) -> None:
+    """Set block mat[row_slot, col_slot] = block."""
+    rs = slice(row_slot * n, (row_slot + 1) * n)
+    cs = slice(col_slot * n, (col_slot + 1) * n)
+    mat[rs, cs] = block
+
+
+def _add_block(
+    mat: SparseMatrix,
+    row_slot: int,
+    col_slot: int,
+    n: int,
+    block: SparseMatrix,
+) -> None:
+    """Add block: mat[row_slot, col_slot] += block."""
+    rs = slice(row_slot * n, (row_slot + 1) * n)
+    cs = slice(col_slot * n, (col_slot + 1) * n)
+    mat[rs, cs] += block
+
+
+def _add_rhs_terms(  # noqa: PLR0913, PLR0917
+    row_slot: int,
+    eq_idx: int,
+    spec: EquationSystem,
+    layout: StateLayout,
+    coeff_eval: CoefficientEvaluator,
+    op_cache: _OperatorCache,
+    constraint_fields: set[str],
+    n: int,
+    dF_dy: SparseMatrix,  # noqa: N803
+    dF_dyp: SparseMatrix,  # noqa: N803
+    *,
+    negate: bool,
+) -> None:
+    """Add all RHS term contributions for an equation.
+
+    When ``negate=True``, contributions are negated (for ``res = yp - RHS``).
+    When ``negate=False``, contributions are added as-is (for ``res = RHS``).
+    """
+    eq = spec.equations[eq_idx]
+    sign = -1.0 if negate else 1.0
+
+    for term_idx, term in enumerate(eq.rhs_terms):
+        resolved = _resolve_term_target(
+            term, layout, constraint_fields, op_cache,
+        )
+        if resolved is None:
+            continue
+
+        col_slot, op_mat, is_dyp = resolved
+        coeff = coeff_eval.resolve(term, 0.0, eq_idx=eq_idx, term_idx=term_idx)
+        scaled = sign * float(coeff) * op_mat
+
+        target_mat = dF_dyp if is_dyp else dF_dy
+        _add_block(target_mat, row_slot, col_slot, n, scaled)
+
+
+def _build_constraint_block(  # noqa: PLR0913, PLR0917
+    slot_idx: int,
+    slot: SlotInfo,
+    layout: StateLayout,
+    spec: EquationSystem,
+    eq_map: dict[str, int],
+    coeff_eval: CoefficientEvaluator,
+    op_cache: _OperatorCache,
+    constraint_fields: set[str],
+    no_self_term_fields: set[str],
+    gauge_fix_fields: set[str],
+    n: int,
+    dF_dy: SparseMatrix,  # noqa: N803
+    dF_dyp: SparseMatrix,  # noqa: N803
+) -> None:
+    """Build Jacobian blocks for a constraint slot (time_order=0).
+
+    Three sub-cases matching ida.py handle_constraint():
+    1. No-self-term: res = y[field] → dF/dy = I
+    2. Gauge-fix: normal RHS, then pin row 0 in both matrices
+    3. Normal: res = RHS
+    """
+    eq_idx = eq_map.get(slot.field_name)
+    if eq_idx is None:
+        return
+
+    # Case 1: no self-terms — field frozen at zero, res = y[field]
+    if slot.field_name in no_self_term_fields:
+        field_slot = layout.field_slot_map[slot.field_name]
+        I_mat = op_cache.get_identity()  # noqa: N806
+        _set_block(dF_dy, slot_idx, field_slot, n, I_mat)
+        return
+
+    # Case 3 (and setup for case 2): normal RHS
+    # res = RHS → dF/dy += coeff * op_mat (no negation)
+    _add_rhs_terms(
+        slot_idx, eq_idx, spec, layout, coeff_eval,
+        op_cache, constraint_fields, n, dF_dy, dF_dyp,
+        negate=False,
+    )
+
+    # Case 2: gauge-fix — overwrite row 0 with y[field_slot*n] = 0
+    if slot.field_name in gauge_fix_fields:
+        field_slot = layout.field_slot_map[slot.field_name]
+        global_row = slot_idx * n
+        # Zero out entire row in both matrices
+        dF_dy[global_row, :] = 0
+        dF_dyp[global_row, :] = 0
+        # Set pinning entry: dF/dy[row, field_col] = 1
+        dF_dy[global_row, field_slot * n] = 1.0
+
+
+# ---------------------------------------------------------------------------
+# Jacobian delivery: dense jacfn and GMRES jactimes
+# ---------------------------------------------------------------------------
+
+
+def _create_jacfn(
+    dF_dy: SparseMatrix,  # noqa: N803
+    dF_dyp: SparseMatrix,  # noqa: N803
+) -> Callable[..., None]:
+    """Create a dense ``jacfn`` callback for IDA.
+
+    Signature: ``jacfn(t, y, yp, res, cj, JJ)`` — fills the pre-allocated
+    2D numpy array ``JJ`` with ``dF_dy + cj * dF_dyp``.
+    """
+    jac_y = dF_dy.toarray()
+    jac_yp = dF_dyp.toarray()
+
+    def jacfn(  # noqa: PLR0913, PLR0917
+        t: float,  # noqa: ARG001
+        y: NDArray[np.float64],  # noqa: ARG001
+        yp: NDArray[np.float64],  # noqa: ARG001
+        res: NDArray[np.float64],  # noqa: ARG001
+        cj: float,
+        JJ: NDArray[np.float64],  # noqa: N803
+    ) -> None:
+        np.add(jac_y, cj * jac_yp, out=JJ)
+
+    return jacfn
+
+
+def _create_jactimes(
+    dF_dy: SparseMatrix,  # noqa: N803
+    dF_dyp: SparseMatrix,  # noqa: N803
+) -> object:
+    """Create an ``IDAJacTimes`` wrapper for GMRES.
+
+    The ``solvefn`` computes ``Jv[:] = dF_dy @ v + cj * (dF_dyp @ v)``
+    in O(nnz) per GMRES iteration.
+    """
+    from sksundae.ida import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
+        IDAJacTimes,
+    )
+
+    def jv_solve(  # noqa: PLR0913, PLR0917
+        t: float,  # noqa: ARG001
+        y: NDArray[np.float64],  # noqa: ARG001
+        yp: NDArray[np.float64],  # noqa: ARG001
+        res: NDArray[np.float64],  # noqa: ARG001
+        v: NDArray[np.float64],
+        Jv: NDArray[np.float64],  # noqa: N803
+        cj: float,
+    ) -> None:
+        Jv[:] = dF_dy @ v + cj * (dF_dyp @ v)
+
+    return IDAJacTimes(setupfn=None, solvefn=jv_solve)  # pyright: ignore[reportUnknownVariableType]
+
+
+# ---------------------------------------------------------------------------
+# Public API: integration into configure_linear_solver
+# ---------------------------------------------------------------------------
+
+
+def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
+    options: dict[str, Any],
+    spec: EquationSystem,
+    layout: StateLayout,
+    grid: GridInfo,
+    bc: BCSpec | None,
+    parameters: dict[str, float],
+) -> bool:
+    """Try to configure analytical Jacobian for constant-coefficient systems.
+
+    Mutates *options* in-place if successful.  Returns True on success,
+    False if the system is not constant-coefficient (caller should fall
+    back to the existing tier system).
+
+    For the dense tier (N <= DENSE_THRESHOLD), sets ``jacfn``.
+    For larger systems, sets ``linsolver='gmres'`` + ``jactimes``.
+    """
+    from tidal.solver._types import DENSE_THRESHOLD  # noqa: PLC0415
+
+    if not _is_system_constant_coefficient(spec, grid, parameters):
+        return False
+
+    jac_y, jac_yp = build_jacobian_matrices(spec, layout, grid, bc, parameters)
+    n_state = layout.total_size
+
+    if n_state <= DENSE_THRESHOLD:
+        options["linsolver"] = "dense"
+        options["jacfn"] = _create_jacfn(jac_y, jac_yp)
+        logger.info(
+            "Analytical Jacobian (dense jacfn) for %d-state system", n_state,
+        )
+    else:
+        options["linsolver"] = "gmres"
+        options["jactimes"] = _create_jactimes(jac_y, jac_yp)
+        logger.info(
+            "Analytical Jacobian (GMRES jactimes) for %d-state system "
+            "(nnz_dy=%d, nnz_dyp=%d)",
+            n_state, jac_y.nnz, jac_yp.nnz,
+        )
+
+    return True

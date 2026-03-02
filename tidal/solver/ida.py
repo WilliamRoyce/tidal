@@ -517,7 +517,7 @@ def solve_ida(  # noqa: PLR0913
     options["calc_initcond"] = calc_initcond or "yp0"
     options["calc_init_dt"] = float(t_eval[1] - t_eval[0])
 
-    configure_linear_solver(options, layout, spec, grid, bc)
+    configure_linear_solver(options, layout, spec, grid, bc, parameters=parameters)
 
     if progress is not None:
         # Step-by-step mode: progress updates between solver steps (zero overhead)

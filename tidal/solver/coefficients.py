@@ -165,6 +165,19 @@ class CoefficientEvaluator:
         """
         self._timestep_cache.clear()
 
+    def all_constant(self) -> bool:
+        """Check if every RHS term has a constant (scalar) coefficient.
+
+        Returns True when all coefficients are pre-resolved at L0 (no
+        position or time dependence).  This enables the analytical
+        Jacobian optimisation for constant-coefficient linear systems.
+        """
+        for eq_idx, eq in enumerate(self._spec.equations):
+            for term_idx, _term in enumerate(eq.rhs_terms):
+                if (eq_idx, term_idx) not in self._constants:
+                    return False
+        return True
+
     # ---- Internal helpers ----
 
     def _is_constant(self, term: OperatorTerm) -> bool:

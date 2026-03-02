@@ -107,7 +107,8 @@ def call_ida(
     **options:
         Forwarded to ``IDA.__init__``.  Recognized keys: ``rtol``,
         ``atol``, ``max_num_steps``, ``algebraic_idx``,
-        ``calc_initcond``, ``calc_init_dt``, ``linsolver``, ``sparsity``.
+        ``calc_initcond``, ``calc_init_dt``, ``linsolver``, ``sparsity``,
+        ``jacfn``, ``jactimes``.
 
     Returns
     -------
