@@ -107,7 +107,11 @@ def _classify_terms(  # noqa: PLR0913, PLR0917
 
     for term_idx, term in enumerate(rhs_terms):
         coeff = coeff_eval.resolve(term, t, eq_idx=eq_idx, term_idx=term_idx)
-        if term.field == constraint_field:
+        # first_derivative_t(X) = dX/dt = velocity of X.
+        # Resolve to identity(v_X) since this is not a spatial operator.
+        if term.operator == "first_derivative_t":
+            source_terms.append((coeff, "identity", f"v_{term.field}"))
+        elif term.field == constraint_field:
             self_terms.append((coeff, term.operator))
             if isinstance(coeff, np.ndarray):
                 has_pos_dep = True
@@ -982,7 +986,12 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
             coeff = coeff_eval.resolve(
                 term, t, eq_idx=eq_idx, term_idx=term_idx,
             )
+            # first_derivative_t(X) → identity(v_X)
+            op_name = term.operator
             field_ref = term.field
+            if op_name == "first_derivative_t":
+                op_name = "identity"
+                field_ref = f"v_{field_ref}"
             if name_map and field_ref in name_map:
                 field_ref = name_map[field_ref]
             data = (
@@ -990,7 +999,7 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
                 if field_ref in fields
                 else np.zeros(grid.shape)
             )
-            operated = apply_operator(term.operator, data, grid, bc)
+            operated = apply_operator(op_name, data, grid, bc)
             rhs += coeff * operated
 
         max_res = float(np.max(np.abs(rhs)))
