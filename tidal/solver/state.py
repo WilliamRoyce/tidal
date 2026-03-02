@@ -208,7 +208,7 @@ class StateLayout:
             if s.time_order == 0
         )
 
-    @property
+    @cached_property
     def algebraic_indices(self) -> list[int]:
         """Flat indices of algebraic (constraint) variables for IDA.
 

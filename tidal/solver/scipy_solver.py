@@ -49,6 +49,8 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
     """Build the scipy RHS closure: ``rhs_fn(t, y) -> dydt``."""
     eq_map = spec.equation_map
     fs = FieldSet.zeros(layout, grid.shape)
+    force_buf = np.zeros(layout.total_size)
+    vel_buf = np.zeros(layout.total_size)
 
     def rhs_fn(t: float, y: np.ndarray) -> np.ndarray:
         if progress is not None:
@@ -56,8 +58,10 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
 
         dydt = np.zeros_like(y)
 
-        force = compute_force(spec, layout, grid, bc, y, t, rhs_eval, fieldset=fs)
-        velocity = compute_velocity(layout, y)
+        force = compute_force(
+            spec, layout, grid, bc, y, t, rhs_eval, out=force_buf, fieldset=fs,
+        )
+        velocity = compute_velocity(layout, y, out=vel_buf)
 
         for _si, s, _fn in layout.velocity_slot_groups:
             dydt[s] = force[s]

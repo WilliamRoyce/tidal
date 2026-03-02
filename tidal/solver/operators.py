@@ -388,10 +388,12 @@ def cross_derivative(
         # (f[i+1,j+1] - f[i+1,j-1] - f[i-1,j+1] + f[i-1,j-1]) / (4·dx·dy)
         dx = grid.dx[axis1]
         dy = grid.dx[axis2]
-        fpp = np.roll(np.roll(data, -1, axis=axis1), -1, axis=axis2)
-        fpm = np.roll(np.roll(data, -1, axis=axis1), 1, axis=axis2)
-        fmp = np.roll(np.roll(data, 1, axis=axis1), -1, axis=axis2)
-        fmm = np.roll(np.roll(data, 1, axis=axis1), 1, axis=axis2)
+        data_m1 = np.roll(data, -1, axis=axis1)
+        data_p1 = np.roll(data, 1, axis=axis1)
+        fpp = np.roll(data_m1, -1, axis=axis2)
+        fpm = np.roll(data_m1, 1, axis=axis2)
+        fmp = np.roll(data_p1, -1, axis=axis2)
+        fmm = np.roll(data_p1, 1, axis=axis2)
         return (fpp - fpm - fmp + fmm) / (4.0 * dx * dy)
 
     # Non-periodic fallback: two gradient passes

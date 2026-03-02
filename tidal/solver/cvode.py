@@ -55,10 +55,14 @@ def _build_rhsfn(
     """Build the CVODE RHS closure: ``rhsfn(t, y, yp)``."""
     eq_map = spec.equation_map
     fs = FieldSet.zeros(layout, grid.shape)
+    force_buf = np.zeros(layout.total_size)
+    vel_buf = np.zeros(layout.total_size)
 
     def rhsfn(t: float, y: np.ndarray, yp: np.ndarray) -> None:
-        force = compute_force(spec, layout, grid, bc, y, t, rhs_eval, fieldset=fs)
-        velocity = compute_velocity(layout, y)
+        force = compute_force(
+            spec, layout, grid, bc, y, t, rhs_eval, out=force_buf, fieldset=fs,
+        )
+        velocity = compute_velocity(layout, y, out=vel_buf)
 
         for _si, s, _fn in layout.velocity_slot_groups:
             yp[s] = force[s]

@@ -82,6 +82,12 @@ class _ResidualCtx:
         self.fieldset: FieldSet | None = None
         # Dict for legacy constant-coefficient path in compute_rhs (lazy)
         self.fields: dict[str, np.ndarray] | None = None
+        # Pre-compute constraint velocity injection info (loop-invariant)
+        self._constraint_vel_info = [
+            (layout.field_slot_map[eq.field_name] * self.n, f"v_{eq.field_name}")
+            for eq in spec.equations
+            if eq.time_derivative_order == 0
+        ]
 
     def set_arrays(
         self,
@@ -101,12 +107,9 @@ class _ResidualCtx:
         # Inject constraint velocities from yp so that velocity-dependent
         # operators (first_derivative_t, gradient_x of velocity slots)
         # resolve correctly in the RHSEvaluator.
-        for eq in self.spec.equations:
-            if eq.time_derivative_order == 0:
-                slot_idx = self.layout.field_slot_map[eq.field_name]
-                start = slot_idx * self.n
-                vel = yp[start : start + self.n].reshape(self.shape)
-                self.fieldset.set_aux(f"v_{eq.field_name}", vel)
+        for start, vel_key in self._constraint_vel_info:
+            vel = yp[start : start + self.n].reshape(self.shape)
+            self.fieldset.set_aux(vel_key, vel)
 
         self.fields = None  # Reset lazy cache
 

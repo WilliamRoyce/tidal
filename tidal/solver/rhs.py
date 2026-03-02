@@ -85,15 +85,27 @@ class RHSEvaluator:
         """
         eq = self._spec.equations[eq_idx]
         result = self._result_buffer
-        result.fill(0.0)
         temp = self._term_buffer
-        for term_idx, term in enumerate(eq.rhs_terms):
+        terms = eq.rhs_terms
+        if not terms:
+            result.fill(0.0)
+            return result
+
+        # First term: write directly to result (eliminates fill(0))
+        operated = self._apply_operator(terms[0], fields)
+        coeff = self._coeff_eval.resolve(terms[0], t, eq_idx=eq_idx, term_idx=0)
+        np.multiply(coeff, operated, out=result)
+
+        # Remaining terms: accumulate
+        for term_idx in range(1, len(terms)):
+            term = terms[term_idx]
             operated = self._apply_operator(term, fields)
             coeff = self._coeff_eval.resolve(
                 term, t, eq_idx=eq_idx, term_idx=term_idx
             )
             np.multiply(coeff, operated, out=temp)
             result += temp
+
         return result
 
     def evaluate_by_field(
