@@ -571,8 +571,8 @@ class TestJacobianDelivery:
         expected = dF_dy.toarray() + cj * dF_dyp.toarray()
         np.testing.assert_allclose(JJ, expected, atol=1e-12)
 
-    def test_returns_false_above_dense_threshold(self) -> None:
-        """Systems above DENSE_THRESHOLD should not get analytical Jacobian."""
+    def test_sparse_tier_falls_through(self) -> None:
+        """Systems in sparse tier (DENSE < N <= SPARSE) fall through to FD."""
         from unittest.mock import patch
 
         spec = _make_kg_1d_spec()
@@ -580,12 +580,14 @@ class TestJacobianDelivery:
         layout = StateLayout.from_spec(spec, grid.num_points)
 
         options: dict[str, Any] = {}
-        # Temporarily lower threshold so our small system exceeds it
+        # Lower DENSE_THRESHOLD so system is in sparse tier
         with patch("tidal.solver._types.DENSE_THRESHOLD", 1):
             result = try_analytical_jacobian(options, spec, layout, grid, "periodic", {})
 
+        # Sparse tier falls through to FD (returns False)
         assert result is False
         assert "jacfn" not in options
+        assert "jactimes" not in options
 
 
 # ---------------------------------------------------------------------------
@@ -642,6 +644,250 @@ class TestTryAnalyticalJacobian:
 
         assert result is False
         assert "jacfn" not in options
+
+    def test_position_dependent_gets_analytical_jacobian(self) -> None:
+        """Position-dependent (but time-independent) system should succeed."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-V0*UnitStep[x[]-3]*UnitStep[7-x[]]",
+                                "coordinate_dependent": ["x"],
+                            },
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(16,), periodic=(False,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        options: dict[str, Any] = {}
+        result = try_analytical_jacobian(
+            options, spec, layout, grid, "neumann", {"V0": 2.0},
+        )
+
+        assert result is True
+        assert options["linsolver"] == "dense"
+        assert "jacfn" in options
+
+
+# ---------------------------------------------------------------------------
+# Sparse tier tests
+# ---------------------------------------------------------------------------
+
+
+class TestSparseTier:
+    """Tests for sparse tier analytical Jacobian (1D jacfn)."""
+
+    def test_prepare_sparse_data_union_pattern(self) -> None:
+        """_prepare_sparse_data returns aligned data with union sparsity."""
+        from tidal.solver.analytical_jacobian import _prepare_sparse_data
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        dy_data, dyp_data, pattern = _prepare_sparse_data(dF_dy, dF_dyp)
+
+        # Pattern nnz should be >= max of individual nnz
+        assert pattern.nnz >= dF_dy.nnz
+        assert pattern.nnz >= dF_dyp.nnz
+        assert len(dy_data) == pattern.nnz
+        assert len(dyp_data) == pattern.nnz
+
+    def test_sparse_jacfn_matches_dense(self) -> None:
+        """Sparse jacfn should produce same J as dense for any cj."""
+        from tidal.solver.analytical_jacobian import (
+            _create_sparse_jacfn,
+            _prepare_sparse_data,
+        )
+        from tidal.solver._scipy_types import csc_matrix
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        dy_data, dyp_data, pattern = _prepare_sparse_data(dF_dy, dF_dyp)
+
+        cj = 3.7
+        # Dense reference
+        expected = (dF_dy + cj * dF_dyp).toarray()
+
+        # Sparse jacfn fills 1D array
+        jacfn = _create_sparse_jacfn(dy_data, dyp_data)
+        JJ_1d = np.zeros(pattern.nnz)
+        n = layout.total_size
+        jacfn(0.0, np.zeros(n), np.zeros(n), np.zeros(n), cj, JJ_1d)
+
+        # Reconstruct dense from 1D CSC data
+        reconstructed = csc_matrix(
+            (JJ_1d, pattern.indices.copy(), pattern.indptr.copy()),
+            shape=pattern.shape,
+        ).toarray()
+        np.testing.assert_allclose(reconstructed, expected, atol=1e-12)
+
+    def test_gmres_tier_via_try_analytical(self) -> None:
+        """try_analytical_jacobian selects GMRES tier above SPARSE_THRESHOLD."""
+        from unittest.mock import patch
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        options: dict[str, Any] = {}
+        # Lower both thresholds so system is in GMRES tier
+        with patch("tidal.solver._types.DENSE_THRESHOLD", 1), \
+             patch("tidal.solver._types.SPARSE_THRESHOLD", 1):
+            result = try_analytical_jacobian(
+                options, spec, layout, grid, "periodic", {},
+            )
+
+        assert result is True
+        assert options["linsolver"] == "gmres"
+        assert "jactimes" in options
+
+
+# ---------------------------------------------------------------------------
+# Position-dependent coefficient tests
+# ---------------------------------------------------------------------------
+
+
+class TestPositionDependentJacobian:
+    """Tests for position-dependent (time-independent) analytical Jacobian."""
+
+    def test_position_dependent_jacobian_builds(self) -> None:
+        """build_jacobian_matrices handles ndarray coefficients."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "Sin[x[]]",
+                                "coordinate_dependent": ["x"],
+                            },
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, np.pi),), shape=(8,), periodic=(False,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        # Should not raise (previously would fail with float(ndarray))
+        dF_dy, dF_dyp = build_jacobian_matrices(
+            spec, layout, grid, "neumann", {},
+        )
+
+        assert issparse(dF_dy)
+        assert issparse(dF_dyp)
+
+        # The velocity slot identity term should be diagonal (from sin(x))
+        n = grid.num_points
+        vel_slot = layout.velocity_slot_map["phi_0"]
+        vel_rows = slice(vel_slot * n, (vel_slot + 1) * n)
+        field_slot = layout.field_slot_map["phi_0"]
+        field_cols = slice(field_slot * n, (field_slot + 1) * n)
+
+        # The identity block in dF/dy[vel, field] should have position-
+        # dependent diagonal entries from -sign * coeff * I = +sin(x_i)
+        block = dF_dy[vel_rows, field_cols].toarray()
+        diag_vals = np.diag(block)
+        # sin(x) evaluated at grid cell centres should vary
+        assert not np.allclose(diag_vals, diag_vals[0])
+
+    def test_all_time_independent_method(self) -> None:
+        """CoefficientEvaluator.all_time_independent() detects correctly."""
+        # Time-independent system
+        spec_const = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff = CoefficientEvaluator(spec_const, grid, {})
+        assert coeff.all_time_independent() is True
+        assert coeff.all_constant() is True
+
+        # Position-dependent but time-independent
+        data_pos: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "Sin[x[]]",
+                                "coordinate_dependent": ["x"],
+                            },
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec_pos = EquationSystem.from_dict(data_pos)
+        coeff_pos = CoefficientEvaluator(spec_pos, grid, {})
+        assert coeff_pos.all_time_independent() is True
+        assert coeff_pos.all_constant() is False
+
+        # Time-dependent system
+        data_time: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "E^(2*H*t[])",
+                                "time_dependent": True,
+                            },
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec_time = EquationSystem.from_dict(data_time)
+        coeff_time = CoefficientEvaluator(spec_time, grid, {"H": 1.0})
+        assert coeff_time.all_time_independent() is False
 
 
 # ---------------------------------------------------------------------------

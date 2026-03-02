@@ -1,19 +1,32 @@
-"""Analytical Jacobian for constant-coefficient linear systems.
+"""Analytical Jacobian for time-independent linear systems.
 
-For constant-coefficient linear systems (25/26 TIDAL examples), the IDA
+For time-independent linear systems (most TIDAL examples), the IDA
 Jacobian ``J = dF/dy + cj * dF/dyp`` consists of two constant sparse
 matrices.  Instead of finite-difference approximation (which requires
 O(n_colors) residual evaluations per Newton step), we precompute ``dF/dy``
 and ``dF/dyp`` once and supply them analytically.
 
-Only used for the **dense tier** (N <= DENSE_THRESHOLD): ``jacfn`` fills
-the 2D Jacobian array directly.  For larger systems, the standard tier
-system (sparse direct or GMRES) is more robust — particularly for
-IDACalcIC on coupled constraint systems.
+Two delivery modes depending on system size:
 
-Note: a sksundae bug (``_cy_ida.pyx:460``) prevents combining sparse
-direct with ``jacfn``, so analytical Jacobian cannot be used with the
-sparse tier.
+- **Dense tier** (N <= DENSE_THRESHOLD):  ``jacfn`` fills a 2D numpy
+  array with ``dF_dy + cj * dF_dyp``.
+- **GMRES tier** (N > SPARSE_THRESHOLD):  ``jactimes`` provides an
+  analytical Jacobian-vector product ``Jv = dF_dy @ v + cj * dF_dyp @ v``
+  using sparse matrix-vector products, eliminating finite-difference
+  residual evaluations per GMRES iteration.
+
+For the sparse tier (DENSE_THRESHOLD < N <= SPARSE_THRESHOLD), the system
+falls through to the normal FD-based ``configure_linear_solver`` path.
+Colored finite-differences with SuperLU_MT direct factorisation outperform
+unpreconditioned GMRES at these sizes.  A sparse analytical ``jacfn`` (1D
+CSC data) is implemented here (``_create_sparse_jacfn``), but disabled
+because sksundae v1.1.1 has a bug where ``_setup_memory()``
+unconditionally overwrites ``aux.jacfn`` when a sparsity pattern is
+provided (``_cy_ida.pyx:720``), preventing user-supplied ``jacfn`` from
+being called.
+
+Position-dependent (but time-independent) coefficients are supported:
+the spatial grid is fixed, so the Jacobian is still constant.
 """
 
 from __future__ import annotations
@@ -23,7 +36,7 @@ from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from tidal.solver._scipy_types import SparseMatrix, lil_matrix, speye
+from tidal.solver._scipy_types import SparseMatrix, diags, lil_matrix, speye
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -43,24 +56,26 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
-# Constant-coefficient detection
+# Time-independence detection
 # ---------------------------------------------------------------------------
 
 
-def _is_system_constant_coefficient(
+def _is_system_time_independent(
     spec: EquationSystem,
     grid: GridInfo,
     parameters: dict[str, float],
 ) -> bool:
-    """Check if all equation coefficients are constant.
+    """Check if the system Jacobian is constant (time-independent).
 
-    Returns True when ``CoefficientEvaluator.all_constant()`` holds,
-    meaning no term has time-dependent or position-dependent coefficients.
+    Returns True when ``CoefficientEvaluator.all_time_independent()``
+    holds.  This includes both fully constant coefficients AND position-
+    dependent (but time-independent) coefficients, since the spatial grid
+    is fixed and so the Jacobian doesn't vary over time.
     """
     from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
 
     coeff_eval = CoefficientEvaluator(spec, grid, parameters)
-    return coeff_eval.all_constant()
+    return coeff_eval.all_time_independent()
 
 
 # ---------------------------------------------------------------------------
@@ -406,7 +421,11 @@ def _add_rhs_terms(  # noqa: PLR0913, PLR0917
 
         col_slot, op_mat, is_dyp = resolved
         coeff = coeff_eval.resolve(term, 0.0, eq_idx=eq_idx, term_idx=term_idx)
-        scaled = sign * float(coeff) * op_mat
+        if isinstance(coeff, np.ndarray):
+            # Position-dependent coefficient: diag(c(x)) @ Op
+            scaled = sign * diags(coeff.ravel()) @ op_mat
+        else:
+            scaled = sign * float(coeff) * op_mat
 
         target_mat = dF_dyp if is_dyp else dF_dy
         _add_block(target_mat, row_slot, col_slot, n, scaled)
@@ -524,6 +543,167 @@ def _create_cvode_jacfn(
 
 
 # ---------------------------------------------------------------------------
+# Sparse tier delivery: 1D jacfn (CSC data order)
+# ---------------------------------------------------------------------------
+
+
+def _prepare_sparse_data(
+    dF_dy: SparseMatrix,  # noqa: N803
+    dF_dyp: SparseMatrix,  # noqa: N803
+) -> tuple[NDArray[np.float64], NDArray[np.float64], SparseMatrix]:
+    """Align two CSC matrices to their union sparsity pattern.
+
+    Returns ``(dy_data, dyp_data, pattern)`` where ``pattern`` is a CSC
+    matrix encoding the union sparsity, and ``dy_data``/``dyp_data`` are
+    1D arrays aligned to ``pattern``'s CSC data ordering.
+
+    The sparse ``jacfn`` then computes ``JJ[:] = dy_data + cj * dyp_data``
+    — a single O(nnz) vectorised operation with zero allocation.
+    """
+    # Build union sparsity via structural OR.
+    # Replace data with ones to get structural patterns, then add.
+    ones_dy = dF_dy.copy()
+    ones_dy.data[:] = 1.0
+    ones_dyp = dF_dyp.copy()
+    ones_dyp.data[:] = 1.0
+    pattern = (ones_dy + ones_dyp).tocsc()
+    pattern.sort_indices()
+    pattern.data[:] = 1.0  # Normalise to binary
+
+    nnz = pattern.nnz
+    dy_data = np.zeros(nnz, dtype=np.float64)
+    dyp_data = np.zeros(nnz, dtype=np.float64)
+
+    dy_csc = dF_dy.tocsc()
+    dy_csc.sort_indices()
+    dyp_csc = dF_dyp.tocsc()
+    dyp_csc.sort_indices()
+
+    n_cols = pattern.shape[1]
+    for col in range(n_cols):
+        p_start = pattern.indptr[col]
+        p_rows = pattern.indices[p_start:pattern.indptr[col + 1]]
+
+        # Project dF_dy values onto union pattern for this column
+        d_start = dy_csc.indptr[col]
+        d_end = dy_csc.indptr[col + 1]
+        if d_start < d_end:
+            d_rows = dy_csc.indices[d_start:d_end]
+            idxs = np.searchsorted(p_rows, d_rows)
+            dy_data[p_start + idxs] = dy_csc.data[d_start:d_end]
+
+        # Project dF_dyp values onto union pattern for this column
+        d_start = dyp_csc.indptr[col]
+        d_end = dyp_csc.indptr[col + 1]
+        if d_start < d_end:
+            d_rows = dyp_csc.indices[d_start:d_end]
+            idxs = np.searchsorted(p_rows, d_rows)
+            dyp_data[p_start + idxs] = dyp_csc.data[d_start:d_end]
+
+    return dy_data, dyp_data, pattern
+
+
+def _create_sparse_jacfn(
+    dy_data: NDArray[np.float64],
+    dyp_data: NDArray[np.float64],
+) -> Callable[..., None]:
+    """Create a sparse ``jacfn`` callback for IDA.
+
+    Signature: ``jacfn(t, y, yp, res, cj, JJ)`` where ``JJ`` is a 1D
+    numpy array of size ``nnz`` in CSC data order.  sksundae's
+    ``np2smat_sparse1D`` transfers this directly to SUNDIALS.
+    """
+    def jacfn(  # noqa: PLR0913, PLR0917
+        t: float,  # noqa: ARG001
+        y: NDArray[np.float64],  # noqa: ARG001
+        yp: NDArray[np.float64],  # noqa: ARG001
+        res: NDArray[np.float64],  # noqa: ARG001
+        cj: float,
+        JJ: NDArray[np.float64],  # noqa: N803
+    ) -> None:
+        np.multiply(dyp_data, cj, out=JJ)
+        np.add(dy_data, JJ, out=JJ)
+
+    return jacfn
+
+
+def _create_cvode_sparse_jacfn(
+    neg_dy_data: NDArray[np.float64],
+) -> Callable[..., None]:
+    """Create a sparse ``jacfn`` callback for CVODE.
+
+    Signature: ``jacfn(t, y, yp, JJ)`` where ``JJ`` is 1D (CSC data).
+    ODE Jacobian is ``-dF_dy`` (negation of DAE residual derivative).
+    """
+    def jacfn(
+        t: float,  # noqa: ARG001
+        y: NDArray[np.float64],  # noqa: ARG001
+        yp: NDArray[np.float64],  # noqa: ARG001
+        JJ: NDArray[np.float64],  # noqa: N803
+    ) -> None:
+        JJ[:] = neg_dy_data
+
+    return jacfn
+
+
+# ---------------------------------------------------------------------------
+# GMRES tier delivery: Jacobian-vector product (jactimes)
+# ---------------------------------------------------------------------------
+
+
+def _create_ida_jactimes(
+    dF_dy: SparseMatrix,  # noqa: N803
+    dF_dyp: SparseMatrix,  # noqa: N803
+) -> Callable[..., None]:
+    """Create a ``jactimes.solvefn`` callback for IDA GMRES.
+
+    Signature: ``solvefn(t, y, yp, res, v, Jv, cj)`` — fills ``Jv``
+    with ``(dF_dy + cj * dF_dyp) @ v`` using two sparse mat-vec products.
+
+    Avoids finite-difference residual evaluations per GMRES iteration.
+    """
+    dy_csc = dF_dy.tocsc()
+    dyp_csc = dF_dyp.tocsc()
+
+    def solvefn(  # noqa: PLR0913, PLR0917
+        t: float,  # noqa: ARG001
+        y: NDArray[np.float64],  # noqa: ARG001
+        yp: NDArray[np.float64],  # noqa: ARG001
+        res: NDArray[np.float64],  # noqa: ARG001
+        v: NDArray[np.float64],
+        jv: NDArray[np.float64],
+        cj: float,
+    ) -> None:
+        # Two sparse mat-vec products: Jv = dF_dy @ v + cj * dF_dyp @ v
+        jv[:] = dy_csc @ v
+        jv += cj * (dyp_csc @ v)
+
+    return solvefn
+
+
+def _create_cvode_jactimes(
+    dF_dy: SparseMatrix,  # noqa: N803
+) -> Callable[..., None]:
+    """Create a ``jactimes.solvefn`` callback for CVODE GMRES.
+
+    Signature: ``solvefn(t, y, yp, v, Jv)`` — fills ``Jv`` with
+    ``(-dF_dy) @ v`` (the ODE Jacobian-vector product).
+    """
+    neg_dy_csc = (-dF_dy).tocsc()
+
+    def solvefn(
+        t: float,  # noqa: ARG001
+        y: NDArray[np.float64],  # noqa: ARG001
+        yp: NDArray[np.float64],  # noqa: ARG001
+        v: NDArray[np.float64],
+        jv: NDArray[np.float64],
+    ) -> None:
+        jv[:] = neg_dy_csc @ v
+
+    return solvefn
+
+
+# ---------------------------------------------------------------------------
 # Public API: integration into configure_linear_solver
 # ---------------------------------------------------------------------------
 
@@ -538,39 +718,87 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
     *,
     solver: str = "ida",
 ) -> bool:
-    """Try to configure analytical Jacobian for constant-coefficient systems.
+    """Try to configure analytical Jacobian for time-independent systems.
 
     Mutates *options* in-place if successful.  Returns True on success,
-    False if the system is not constant-coefficient or too large for the
-    dense tier (caller should fall back to the existing tier system).
+    False if the system has time-dependent coefficients (caller should
+    fall back to the finite-difference tier system).
+
+    Two delivery modes by system size:
+
+    - **Dense** (N <= DENSE_THRESHOLD): 2D ``jacfn`` fills dense array.
+    - **GMRES** (N > SPARSE_THRESHOLD): ``jactimes`` provides analytical
+      Jacobian-vector product for iterative GMRES.
+
+    Systems in the sparse tier (DENSE_THRESHOLD < N <= SPARSE_THRESHOLD)
+    return False, falling through to FD sparse (colored FD + SuperLU_MT)
+    which outperforms unpreconditioned GMRES at these sizes.
 
     Parameters
     ----------
     solver : str
-        ``"ida"`` or ``"cvode"``.  Controls the Jacobian callback signature.
-
-    Only applies to the dense tier (N <= DENSE_THRESHOLD).  For larger
-    systems, returns False so the caller uses sparse direct or GMRES —
-    both more robust for IDACalcIC on coupled constraint systems.
+        ``"ida"`` or ``"cvode"``.  Controls the callback signature.
     """
-    from tidal.solver._types import DENSE_THRESHOLD  # noqa: PLC0415
+    from tidal.solver._types import (  # noqa: PLC0415
+        DENSE_THRESHOLD,
+        SPARSE_THRESHOLD,
+    )
 
     n_state = layout.total_size
-    if n_state > DENSE_THRESHOLD:
+
+    if not _is_system_time_independent(spec, grid, parameters):
         return False
 
-    if not _is_system_constant_coefficient(spec, grid, parameters):
+    # Sparse tier: fall through to FD colored-Jacobian + SuperLU_MT.
+    # This outperforms unpreconditioned GMRES with analytical jactimes
+    # at moderate sizes.  A sparse analytical jacfn is implemented
+    # (_create_sparse_jacfn) but disabled because sksundae v1.1.1 has
+    # a bug where _setup_memory() overwrites aux.jacfn when sparsity
+    # is provided (_cy_ida.pyx:720).
+    if DENSE_THRESHOLD < n_state <= SPARSE_THRESHOLD:
         return False
 
-    jac_y, jac_yp = build_jacobian_matrices(spec, layout, grid, bc, parameters)
+    if n_state <= DENSE_THRESHOLD:
+        # Dense tier: 2D jacfn
+        jac_y, jac_yp = build_jacobian_matrices(
+            spec, layout, grid, bc, parameters,
+        )
+        options["linsolver"] = "dense"
+        if solver == "cvode":
+            options["jacfn"] = _create_cvode_jacfn(jac_y)
+        else:
+            options["jacfn"] = _create_jacfn(jac_y, jac_yp)
+        logger.info(
+            "Analytical Jacobian (dense %s jacfn) for %d-state system",
+            solver, n_state,
+        )
 
-    options["linsolver"] = "dense"
-    if solver == "cvode":
-        options["jacfn"] = _create_cvode_jacfn(jac_y)
     else:
-        options["jacfn"] = _create_jacfn(jac_y, jac_yp)
-    logger.info(
-        "Analytical Jacobian (dense %s jacfn) for %d-state system",
-        solver, n_state,
-    )
+        # GMRES tier (N > SPARSE_THRESHOLD): analytical Jacobian-vector
+        # product.  Eliminates O(n_colors) residual evaluations per GMRES
+        # iteration compared to the FD GMRES path.
+        jac_y, jac_yp = build_jacobian_matrices(
+            spec, layout, grid, bc, parameters,
+        )
+        if solver == "cvode":
+            from sksundae.cvode import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
+                CVODEJacTimes,  # pyright: ignore[reportUnknownVariableType]
+            )
+
+            solvefn = _create_cvode_jactimes(jac_y)
+            options["linsolver"] = "gmres"
+            options["jactimes"] = CVODEJacTimes(setupfn=None, solvefn=solvefn)  # pyright: ignore[reportUnknownArgumentType]
+        else:
+            from sksundae.ida import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
+                IDAJacTimes,  # pyright: ignore[reportUnknownVariableType]
+            )
+
+            solvefn = _create_ida_jactimes(jac_y, jac_yp)
+            options["linsolver"] = "gmres"
+            options["jactimes"] = IDAJacTimes(setupfn=None, solvefn=solvefn)  # pyright: ignore[reportUnknownArgumentType]
+        logger.info(
+            "Analytical Jacobian (GMRES %s jactimes) for %d-state system",
+            solver, n_state,
+        )
+
     return True

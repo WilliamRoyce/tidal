@@ -178,6 +178,20 @@ class CoefficientEvaluator:
                     return False
         return True
 
+    def all_time_independent(self) -> bool:
+        """Check if every RHS term has a time-independent coefficient.
+
+        Returns True when no term has ``time_dependent=True``.  Position-
+        dependent (but time-independent) coefficients still produce a
+        constant Jacobian because the spatial grid is fixed, so the
+        analytical Jacobian optimisation applies.
+        """
+        for eq in self._spec.equations:
+            for term in eq.rhs_terms:
+                if term.time_dependent:
+                    return False
+        return True
+
     # ---- Internal helpers ----
 
     def _is_constant(self, term: OperatorTerm) -> bool:
