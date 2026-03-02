@@ -276,6 +276,67 @@ class TestLoadResumeState:
         state = _load_resume_state(snap_dir, spec)
         assert state.bc_types == ("neumann",)
 
+    def test_load_snapshot_zero(self, tmp_path: Path, kg_spec: Path) -> None:
+        """Loading snapshot index 0 returns t=0 and first snapshot data."""
+        from tidal.symbolic import load_equation_system
+
+        snap_dir = _make_snapshot_dir(tmp_path, n_snapshots=5, t_end=4.0)
+        spec = load_equation_system(kg_spec)
+
+        state = _load_resume_state(snap_dir, spec, snapshot_index=0)
+
+        assert state.snapshot_index == 0
+        assert state.t_start == pytest.approx(0.0)
+
+        raw = np.load(snap_dir / "phi_0.npy")
+        expected = raw[0]
+        actual = state.y0[: np.prod(state.grid_shape)]
+        np.testing.assert_array_equal(actual, expected.ravel())
+
+    def test_negative_snapshot_index_raises(
+        self, tmp_path: Path, kg_spec: Path
+    ) -> None:
+        """Negative snapshot indices raise ValueError."""
+        from tidal.symbolic import load_equation_system
+
+        snap_dir = _make_snapshot_dir(tmp_path, n_snapshots=5)
+        spec = load_equation_system(kg_spec)
+
+        with pytest.raises(ValueError, match="out of range"):
+            _load_resume_state(snap_dir, spec, snapshot_index=-1)
+
+    def test_single_snapshot_directory(
+        self, tmp_path: Path, kg_spec: Path
+    ) -> None:
+        """Resume from a directory with exactly 1 snapshot."""
+        from tidal.symbolic import load_equation_system
+
+        snap_dir = _make_snapshot_dir(tmp_path, n_snapshots=1, t_end=0.0)
+        spec = load_equation_system(kg_spec)
+
+        state = _load_resume_state(snap_dir, spec)
+
+        assert state.snapshot_index == 0
+        assert state.t_start == pytest.approx(0.0)
+        assert state.y0.shape[0] > 0
+
+    def test_missing_npy_warns(self, tmp_path: Path, kg_spec: Path) -> None:
+        """Missing field .npy files produce a warning."""
+        from tidal.symbolic import load_equation_system
+
+        snap_dir = _make_snapshot_dir(tmp_path)
+        # Delete the velocity file
+        (snap_dir / "v_phi_0.npy").unlink()
+        spec = load_equation_system(kg_spec)
+
+        with pytest.warns(UserWarning, match="v_phi_0"):
+            state = _load_resume_state(snap_dir, spec)
+
+        # Velocity should be zero (default from FieldSet.from_dict)
+        n_pts = np.prod(state.grid_shape)
+        velocity_part = state.y0[n_pts : 2 * n_pts]
+        np.testing.assert_array_equal(velocity_part, 0.0)
+
 
 # ==================== Unit tests: _validate_resume_grid ====================
 
@@ -392,14 +453,18 @@ class TestSimulateResume:
 
         # Step 3: Verify the resumed simulation starts at t=5
         resumed_times = np.load(resume_dir / "times.npy")
-        assert resumed_times[0] == pytest.approx(5.0, abs=0.1)
-        assert resumed_times[-1] == pytest.approx(10.0, abs=0.1)
+        assert resumed_times[0] == pytest.approx(5.0, abs=0.01)
+        assert resumed_times[-1] == pytest.approx(10.0, abs=0.01)
 
-        # Step 4: Verify field continuity — last snapshot of checkpoint
-        # matches first snapshot of resumed run
+        # Step 4: Verify field + velocity continuity — last snapshot of
+        # checkpoint matches first snapshot of resumed run (exact disk I/O)
         ckpt_field = np.load(ckpt_dir / "phi_0.npy")[-1]
         resumed_field = np.load(resume_dir / "phi_0.npy")[0]
         np.testing.assert_allclose(ckpt_field, resumed_field, atol=1e-10)
+
+        ckpt_vel = np.load(ckpt_dir / "v_phi_0.npy")[-1]
+        resumed_vel = np.load(resume_dir / "v_phi_0.npy")[0]
+        np.testing.assert_allclose(ckpt_vel, resumed_vel, atol=1e-10)
 
     def test_resume_specific_snapshot(
         self, inline_kg_1d_json: Path, tmp_path: Path

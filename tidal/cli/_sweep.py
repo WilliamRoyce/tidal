@@ -265,6 +265,13 @@ def _build_sim_args(
 
     sim_args = copy.copy(base_args)
 
+    # Clear simulate-specific resume flags — sweep has its own boolean
+    # --resume (resume interrupted sweep), which must not leak into
+    # _simulate() where --resume expects a directory path string.
+    sim_args.resume = None
+    sim_args.snapshot = None
+    sim_args.t_additional = None
+
     # Override parameters: merge base --param list with sweep overrides
     base_params: list[str] = list(getattr(base_args, "param", []) or [])
     for k, v in param_overrides.items():

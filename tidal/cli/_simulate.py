@@ -927,6 +927,14 @@ def _load_resume_state(  # noqa: PLR0914
             if arr.ndim > len(grid_shape):
                 arr = arr[snapshot_index]
             slot_data[slot.name] = arr
+        elif slot.kind in {"field", "velocity"}:
+            import warnings
+
+            warnings.warn(
+                f"Resume: '{slot.name}' not found in checkpoint "
+                f"({resume_dir}) — defaulting to zero",
+                stacklevel=2,
+            )
 
     # 5. Pack into flat state vector
     y0 = FieldSet.from_dict(layout, grid_shape, slot_data).flat.copy()
@@ -1899,6 +1907,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
 
     # Step 2: Validate resume args and inherit config from checkpoint
     resume_dir: Path | None = None
+    resume_meta: dict[str, object] | None = None
     if args.resume is not None:
         import json as _json
 
@@ -1907,28 +1916,30 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
             print(f"Error: resume directory not found: {resume_dir}", file=sys.stderr)
             return 1
 
-        # --resume and --ic are mutually exclusive
-        if args.ic != "gaussian":  # non-default means user explicitly set --ic
+        # --resume and --ic are mutually exclusive.  argparse default is
+        # "gaussian", so a non-gaussian value means the user explicitly set --ic.
+        if args.ic != "gaussian":
             print(
                 "Error: --resume and --ic cannot be used together", file=sys.stderr
             )
             return 1
 
-        # --snapshot without --resume is caught here (args.resume is set)
         meta_path = resume_dir / "metadata.json"
         if meta_path.exists():
             with meta_path.open(encoding="utf-8") as f:
-                meta = _json.load(f)
+                resume_meta = _json.load(f)
 
             # Inherit grid config if not explicitly provided
             if args.grid_shape is None:
-                args.grid_shape = ",".join(str(s) for s in meta["grid_shape"])
+                args.grid_shape = ",".join(
+                    str(s) for s in resume_meta["grid_shape"]
+                )
             if args.bounds is None:
                 args.bounds = ",".join(
-                    f"{b[0]}:{b[1]}" for b in meta["grid_bounds"]
+                    f"{b[0]}:{b[1]}" for b in resume_meta["grid_bounds"]
                 )
-            if args.bc is None and "bc_types" in meta:
-                args.bc = ",".join(meta["bc_types"])
+            if args.bc is None and "bc_types" in resume_meta:
+                args.bc = ",".join(resume_meta["bc_types"])
             log(f"  Resuming from: {resume_dir}")
 
     if args.snapshot is not None and args.resume is None:
@@ -1937,15 +1948,10 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
 
     # Step 3: Parse parameters (merge with checkpoint metadata if resuming)
     params = _parse_params(args.param, spec)
-    if resume_dir is not None:
-        meta_path = resume_dir / "metadata.json"
-        if meta_path.exists():
-            import json as _json
-
-            with meta_path.open(encoding="utf-8") as f:
-                saved_params: dict[str, float] = _json.load(f).get("parameters", {})
-            # Saved params as defaults, CLI --param overrides
-            params = {**saved_params, **params}
+    if resume_meta is not None:
+        saved_params: dict[str, float] = resume_meta.get("parameters", {})  # type: ignore[assignment]
+        # Saved params as defaults, CLI --param overrides
+        params = {**saved_params, **params}
     if params:
         log(f"  Parameters: {params}")
 
