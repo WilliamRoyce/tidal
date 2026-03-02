@@ -6,16 +6,14 @@ matrices.  Instead of finite-difference approximation (which requires
 O(n_colors) residual evaluations per Newton step), we precompute ``dF/dy``
 and ``dF/dyp`` once and supply them analytically.
 
-Two delivery mechanisms depending on system size:
+Only used for the **dense tier** (N <= DENSE_THRESHOLD): ``jacfn`` fills
+the 2D Jacobian array directly.  For larger systems, the standard tier
+system (sparse direct or GMRES) is more robust — particularly for
+IDACalcIC on coupled constraint systems.
 
-- **Dense tier** (N <= DENSE_THRESHOLD): ``jacfn`` fills the 2D Jacobian
-  array directly.  No sksundae bug here because ``_setup_memory`` only
-  runs when ``sparsity`` is provided.
-
-- **GMRES tier** (N > DENSE_THRESHOLD): ``IDAJacTimes`` supplies a
-  matrix-free ``Jv = dF_dy @ v + cj * dF_dyp @ v`` product via GMRES.
-  Uses sksundae's clean iterative solver path which is unaffected by
-  the sparse+jacfn bug in ``_cy_ida.pyx:460``.
+Note: a sksundae bug (``_cy_ida.pyx:460``) prevents combining sparse
+direct with ``jacfn``, so analytical Jacobian cannot be used with the
+sparse tier.
 """
 
 from __future__ import annotations
@@ -467,7 +465,7 @@ def _build_constraint_block(  # noqa: PLR0913, PLR0917
 
 
 # ---------------------------------------------------------------------------
-# Jacobian delivery: dense jacfn and GMRES jactimes
+# Jacobian delivery: dense jacfn
 # ---------------------------------------------------------------------------
 
 
@@ -498,39 +496,6 @@ def _create_jacfn(
     return jacfn
 
 
-def _create_jactimes(
-    dF_dy: SparseMatrix,  # noqa: N803
-    dF_dyp: SparseMatrix,  # noqa: N803
-) -> object:
-    """Create an ``IDAJacTimes`` wrapper for GMRES.
-
-    The ``solvefn`` computes ``Jv[:] = dF_dy @ v + cj * (dF_dyp @ v)``
-    in O(nnz) per GMRES iteration.
-    """
-    from sksundae.ida import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
-        IDAJacTimes,
-    )
-
-    buf = np.empty(dF_dy.shape[0])
-
-    def jv_solve(  # noqa: PLR0913, PLR0917
-        t: float,  # noqa: ARG001
-        y: NDArray[np.float64],  # noqa: ARG001
-        yp: NDArray[np.float64],  # noqa: ARG001
-        res: NDArray[np.float64],  # noqa: ARG001
-        v: NDArray[np.float64],
-        Jv: NDArray[np.float64],  # noqa: N803
-        cj: float,
-    ) -> None:
-        # Jv = dF_dy @ v + cj * (dF_dyp @ v), zero-allocation inner loop
-        Jv[:] = dF_dy @ v
-        buf[:] = dF_dyp @ v
-        np.multiply(buf, cj, out=buf)
-        Jv += buf  # noqa: N806
-
-    return IDAJacTimes(setupfn=None, solvefn=jv_solve)  # pyright: ignore[reportUnknownVariableType]
-
-
 # ---------------------------------------------------------------------------
 # CVODE-specific delivery (ODE Jacobian df/dy = -dF_dy)
 # ---------------------------------------------------------------------------
@@ -558,31 +523,6 @@ def _create_cvode_jacfn(
     return jacfn
 
 
-def _create_cvode_jactimes(
-    dF_dy: SparseMatrix,  # noqa: N803
-) -> object:
-    """Create a ``CVODEJacTimes`` wrapper for CVODE GMRES.
-
-    The ``solvefn`` computes ``Jv[:] = (-dF_dy) @ v`` = ``df/dy @ v``.
-    """
-    from sksundae.cvode import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
-        CVODEJacTimes,
-    )
-
-    neg_dF_dy = -dF_dy  # noqa: N806
-
-    def jv_solve(
-        t: float,  # noqa: ARG001
-        y: NDArray[np.float64],  # noqa: ARG001
-        yp: NDArray[np.float64],  # noqa: ARG001
-        v: NDArray[np.float64],
-        Jv: NDArray[np.float64],  # noqa: N803
-    ) -> None:
-        Jv[:] = neg_dF_dy @ v
-
-    return CVODEJacTimes(setupfn=None, solvefn=jv_solve)  # pyright: ignore[reportUnknownVariableType]
-
-
 # ---------------------------------------------------------------------------
 # Public API: integration into configure_linear_solver
 # ---------------------------------------------------------------------------
@@ -601,45 +541,36 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
     """Try to configure analytical Jacobian for constant-coefficient systems.
 
     Mutates *options* in-place if successful.  Returns True on success,
-    False if the system is not constant-coefficient (caller should fall
-    back to the existing tier system).
+    False if the system is not constant-coefficient or too large for the
+    dense tier (caller should fall back to the existing tier system).
 
     Parameters
     ----------
     solver : str
         ``"ida"`` or ``"cvode"``.  Controls the Jacobian callback signature.
 
-    For the dense tier (N <= DENSE_THRESHOLD), sets ``jacfn``.
-    For larger systems, sets ``linsolver='gmres'`` + ``jactimes``.
+    Only applies to the dense tier (N <= DENSE_THRESHOLD).  For larger
+    systems, returns False so the caller uses sparse direct or GMRES —
+    both more robust for IDACalcIC on coupled constraint systems.
     """
     from tidal.solver._types import DENSE_THRESHOLD  # noqa: PLC0415
+
+    n_state = layout.total_size
+    if n_state > DENSE_THRESHOLD:
+        return False
 
     if not _is_system_constant_coefficient(spec, grid, parameters):
         return False
 
     jac_y, jac_yp = build_jacobian_matrices(spec, layout, grid, bc, parameters)
-    n_state = layout.total_size
 
-    if n_state <= DENSE_THRESHOLD:
-        options["linsolver"] = "dense"
-        if solver == "cvode":
-            options["jacfn"] = _create_cvode_jacfn(jac_y)
-        else:
-            options["jacfn"] = _create_jacfn(jac_y, jac_yp)
-        logger.info(
-            "Analytical Jacobian (dense %s jacfn) for %d-state system",
-            solver, n_state,
-        )
+    options["linsolver"] = "dense"
+    if solver == "cvode":
+        options["jacfn"] = _create_cvode_jacfn(jac_y)
     else:
-        options["linsolver"] = "gmres"
-        if solver == "cvode":
-            options["jactimes"] = _create_cvode_jactimes(jac_y)
-        else:
-            options["jactimes"] = _create_jactimes(jac_y, jac_yp)
-        logger.info(
-            "Analytical Jacobian (GMRES %s jactimes) for %d-state system "
-            "(nnz_dy=%d, nnz_dyp=%d)",
-            solver, n_state, jac_y.nnz, jac_yp.nnz,
-        )
-
+        options["jacfn"] = _create_jacfn(jac_y, jac_yp)
+    logger.info(
+        "Analytical Jacobian (dense %s jacfn) for %d-state system",
+        solver, n_state,
+    )
     return True

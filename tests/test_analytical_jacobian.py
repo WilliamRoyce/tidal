@@ -571,30 +571,21 @@ class TestJacobianDelivery:
         expected = dF_dy.toarray() + cj * dF_dyp.toarray()
         np.testing.assert_allclose(JJ, expected, atol=1e-12)
 
-    def test_gmres_jactimes(self) -> None:
-        """GMRES jactimes should compute correct Jv = dF_dy @ v + cj * dF_dyp @ v."""
-        from tidal.solver.analytical_jacobian import _create_jactimes
+    def test_returns_false_above_dense_threshold(self) -> None:
+        """Systems above DENSE_THRESHOLD should not get analytical Jacobian."""
+        from unittest.mock import patch
 
         spec = _make_kg_1d_spec()
         grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
         layout = StateLayout.from_spec(spec, grid.num_points)
 
-        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
-        jactimes = _create_jactimes(dF_dy, dF_dyp)
+        options: dict[str, Any] = {}
+        # Temporarily lower threshold so our small system exceeds it
+        with patch("tidal.solver._types.DENSE_THRESHOLD", 1):
+            result = try_analytical_jacobian(options, spec, layout, grid, "periodic", {})
 
-        n_total = layout.total_size
-        rng = np.random.default_rng(45)
-        v = rng.standard_normal(n_total)
-        cj = 2.71
-        Jv = np.zeros(n_total)
-
-        jactimes.solvefn(
-            0.0, np.zeros(n_total), np.zeros(n_total),
-            np.zeros(n_total), v, Jv, cj,
-        )
-
-        expected = dF_dy @ v + cj * (dF_dyp @ v)
-        np.testing.assert_allclose(Jv, expected, atol=1e-12)
+        assert result is False
+        assert "jacfn" not in options
 
 
 # ---------------------------------------------------------------------------
@@ -912,29 +903,6 @@ class TestCVODEDelivery:
 
         expected = (-dF_dy).toarray()
         np.testing.assert_allclose(JJ, expected, atol=1e-12)
-
-    def test_cvode_gmres_jactimes(self) -> None:
-        """CVODE GMRES jactimes should compute Jv = -dF_dy @ v."""
-        from tidal.solver.analytical_jacobian import _create_cvode_jactimes
-
-        spec = _make_kg_1d_spec()
-        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
-        layout = StateLayout.from_spec(spec, grid.num_points)
-
-        dF_dy, _dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
-        jactimes = _create_cvode_jactimes(dF_dy)
-
-        n_total = layout.total_size
-        rng = np.random.default_rng(46)
-        v = rng.standard_normal(n_total)
-        Jv = np.zeros(n_total)
-
-        jactimes.solvefn(
-            0.0, np.zeros(n_total), np.zeros(n_total), v, Jv,
-        )
-
-        expected = (-dF_dy) @ v
-        np.testing.assert_allclose(Jv, expected, atol=1e-12)
 
     def test_try_analytical_cvode(self) -> None:
         """try_analytical_jacobian with solver='cvode' configures CVODE jacfn."""
