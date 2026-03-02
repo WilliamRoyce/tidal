@@ -154,14 +154,15 @@ scale = "log"          # "linear" (default) | "log" | "adaptive" (see F2)
 
 # Simulation settings (same flags as `tidal simulate`)
 [simulation]
-grid_shape = 128
-bounds = [0, 100]
+grid_shape = 256
+bounds = [-40, 40]
 periodic = true
 ic = "gaussian"
 ic_component = "phi_0"
-ic_center = 25.0
-ic_width = 5.0
-t_end = 20.0
+ic_center = -20.0
+ic_width = 3.0
+ic_wavevector = 3
+t_end = 60.0
 # snapshots = 0.5   # optional snapshot interval
 
 # Measurement configuration
