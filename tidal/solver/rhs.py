@@ -14,9 +14,11 @@ import numpy as np
 
 from tidal.solver.operators import (
     OPERATOR_REGISTRY,
+    AxisBCSpec,
     BCSpec,
     _bc_from_grid,
     _normalize_bc,
+    _resolve_axis_bc,
     apply_operator,
 )
 
@@ -66,6 +68,12 @@ class RHSEvaluator:
             self._normalized_bc: BCSpec = _normalize_bc(bc, grid)
         else:
             self._normalized_bc = _bc_from_grid(grid)
+
+        # Pre-resolve per-axis BCs to AxisBCSpec (avoids isinstance +
+        # _str_to_axis_bc object creation per operator call in hot path)
+        self._resolved_bcs: tuple[AxisBCSpec, ...] = tuple(
+            _resolve_axis_bc(bc_entry) for bc_entry in self._normalized_bc
+        )
 
         # Pre-resolve operator functions (avoids dict lookup per call)
         self._resolved_ops: list[list[tuple[Any, str]]] = []
@@ -188,7 +196,7 @@ class RHSEvaluator:
                 raise ValueError(msg)
             return fields[vel_name]
         target = self._get_field_data(field_name, fields)
-        return op_fn(target, self._grid, self._normalized_bc)
+        return op_fn(target, self._grid, self._resolved_bcs)
 
     def _apply_operator(
         self,
