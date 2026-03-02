@@ -57,6 +57,8 @@ tidal inspect ../data/coupled_scalars.json
 # ============================================================================
 # Off-center Gaussian in phi only; coupling transfers energy to chi over time
 tidal simulate ../data/coupled_scalars.json \
+  --rtol 1e-6 \
+  --atol 1e-8 \
   --param mPhi2=1.0 --param mChi2=4.0 --param gCpl=0.5 \
   --grid-shape 256 \
   --bounds 0:100 \
