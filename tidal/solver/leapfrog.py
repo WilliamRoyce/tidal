@@ -33,6 +33,7 @@ if TYPE_CHECKING:
 
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
+    from tidal.solver.progress import SimulationProgress
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem
 
@@ -152,6 +153,7 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
     parameters: dict[str, float] | None = None,
     snapshot_interval: float | None = None,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
+    progress: SimulationProgress | None = None,
 ) -> SolverResult:
     """Solve a TIDAL Hamiltonian system using Stormer-Verlet (leapfrog).
 
@@ -278,6 +280,9 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
 
         t += dt
 
+        if progress is not None:
+            progress.update(t)
+
         # Snapshot check (integer-based to avoid FP accumulation)
         if t >= (snapshot_idx + 1) * snapshot_interval - dt * 0.01:
             _save(t)
@@ -286,6 +291,9 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
     # Ensure final state is saved
     if not times or abs(times[-1] - t) > dt * 0.01:
         _save(t)
+
+    if progress is not None:
+        progress.finish()
 
     return {
         "t": np.asarray(times, dtype=np.float64),

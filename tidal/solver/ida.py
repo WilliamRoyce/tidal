@@ -24,7 +24,7 @@ import numpy as np
 
 from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
 from tidal.solver._setup import configure_linear_solver
-from tidal.solver._sksundae import SundialsResult, call_ida
+from tidal.solver._sksundae import SundialsResult, call_ida, call_ida_stepwise
 from tidal.solver.fields import FieldSet
 from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 from tidal.solver.state import StateLayout
@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
+    from tidal.solver.progress import SimulationProgress
     from tidal.solver.rhs import RHSEvaluator
     from tidal.solver.state import SlotInfo
     from tidal.symbolic.json_loader import (
@@ -421,6 +422,7 @@ def solve_ida(  # noqa: PLR0913
     snapshot_callback: Callable[..., None] | None = None,
     calc_initcond: str | None = None,
     allow_inconsistent_ic: bool = False,
+    progress: SimulationProgress | None = None,
 ) -> SolverResult:
     """Solve a TIDAL equation system using SUNDIALS/IDA.
 
@@ -517,17 +519,24 @@ def solve_ida(  # noqa: PLR0913
 
     configure_linear_solver(options, layout, spec, grid, bc)
 
-    result: SundialsResult = call_ida(resfn, t_eval, y0, yp0, **options)
+    if progress is not None:
+        # Step-by-step mode: progress updates between solver steps (zero overhead)
+        result: SundialsResult = call_ida_stepwise(
+            resfn, t_eval, y0, yp0, progress,
+            snapshot_callback=snapshot_callback, **options,
+        )
+    else:
+        result = call_ida(resfn, t_eval, y0, yp0, **options)
 
-    # Call snapshot callback at each output time.
-    # IDA provides yp (time-derivative vector) which includes constraint
-    # velocities — passed to callback for disk storage.
-    if snapshot_callback is not None and result.success:
-        yp = result.yp
-        for i in range(len(result.t)):
-            snapshot_callback(
-                result.t[i], result.y[i], yp[i] if yp is not None else None
-            )
+        # Call snapshot callback at each output time.
+        # IDA provides yp (time-derivative vector) which includes constraint
+        # velocities — passed to callback for disk storage.
+        if snapshot_callback is not None and result.success:
+            yp = result.yp
+            for i in range(len(result.t)):
+                snapshot_callback(
+                    result.t[i], result.y[i], yp[i] if yp is not None else None
+                )
 
     return {
         "t": result.t,

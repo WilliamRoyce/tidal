@@ -41,6 +41,7 @@ dependencies = [
     "numpy>=1.22,<3.0",
     "scipy>=1.10,<2.0",
     "scikit-sundae>=1.0,<2.0",
+    "tqdm>=4.60",
 ]
 
 [project.optional-dependencies]

@@ -1725,7 +1725,21 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
             num_snapshots=num_snapshots,
         )
 
-    # 8. Solve
+    # 8. Progress bar (suppressed by --quiet and non-TTY stderr)
+    from tidal.solver.progress import SimulationProgress
+
+    progress: SimulationProgress | None = None
+    if not args.quiet:
+        solver_labels = {
+            "ida": "IDA", "cvode": "CVODE",
+            "scipy": "scipy", "leapfrog": "leapfrog",
+        }
+        progress = SimulationProgress(
+            t_start, args.t_end,
+            solver_name=solver_labels.get(scheme, scheme),
+        )
+
+    # 9. Solve
     if scheme == "ida":
         from tidal.solver.ida import solve_ida
 
@@ -1749,6 +1763,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
             atol=args.atol,
             snapshot_callback=snapshot_cb,
             allow_inconsistent_ic=allow_inconsistent,
+            progress=progress,
         )
     elif scheme == "cvode":
         from tidal.solver.cvode import solve_cvode
@@ -1772,6 +1787,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
             max_step=max_step,
             num_snapshots=num_snapshots,
             snapshot_callback=snapshot_cb,
+            progress=progress,
         )
     elif scheme == "scipy":
         from tidal.solver.scipy_solver import solve_scipy
@@ -1796,6 +1812,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
             max_step=max_step,
             num_snapshots=num_snapshots,
             snapshot_callback=snapshot_cb,
+            progress=progress,
         )
     else:  # leapfrog
         from tidal.solver.leapfrog import solve_leapfrog
@@ -1812,6 +1829,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
             parameters=params,
             snapshot_interval=snapshot_interval,
             snapshot_callback=snapshot_cb,
+            progress=progress,
         )
 
     if not result["success"]:

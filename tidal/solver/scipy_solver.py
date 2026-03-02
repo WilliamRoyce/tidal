@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
+    from tidal.solver.progress import SimulationProgress
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem
 
@@ -37,18 +38,22 @@ if TYPE_CHECKING:
 _IMPLICIT_METHODS = {"Radau", "BDF"}
 
 
-def _build_rhs_fn(
+def _build_rhs_fn(  # noqa: PLR0913, PLR0917
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
     bc: BCSpec | None,
     rhs_eval: RHSEvaluator,
+    progress: SimulationProgress | None = None,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
     """Build the scipy RHS closure: ``rhs_fn(t, y) -> dydt``."""
     eq_map = spec.equation_map
     fs = FieldSet.zeros(layout, grid.shape)
 
     def rhs_fn(t: float, y: np.ndarray) -> np.ndarray:
+        if progress is not None:
+            progress.update(t)
+
         dydt = np.zeros_like(y)
 
         force = compute_force(spec, layout, grid, bc, y, t, rhs_eval, fieldset=fs)
@@ -83,6 +88,7 @@ def solve_scipy(  # noqa: PLR0913
     max_step: float = np.inf,
     num_snapshots: int = 101,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
+    progress: SimulationProgress | None = None,
 ) -> SolverResult:
     """Solve a TIDAL equation system using scipy.integrate.solve_ivp.
 
@@ -128,8 +134,8 @@ def solve_scipy(  # noqa: PLR0913
     warn_frozen_constraints(layout, "scipy")
     rhs_eval = build_rhs_evaluator(spec, grid, parameters, bc)
 
-    # Build RHS closure
-    rhs_fn = _build_rhs_fn(spec, layout, grid, bc, rhs_eval)
+    # Build RHS closure (with optional progress tracking)
+    rhs_fn = _build_rhs_fn(spec, layout, grid, bc, rhs_eval, progress=progress)
 
     # Build time evaluation points
     t_eval = np.linspace(t_span[0], t_span[1], num_snapshots)
@@ -152,6 +158,9 @@ def solve_scipy(  # noqa: PLR0913
         max_step=max_step,
         jac_sparsity=jac_sparsity,
     )
+
+    if progress is not None:
+        progress.finish()
 
     # Call snapshot callback at each output time
     if snapshot_callback is not None and result.success:
