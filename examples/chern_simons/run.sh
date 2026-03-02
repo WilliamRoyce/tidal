@@ -29,8 +29,10 @@ tidal inspect ../data/chern_simons_3d.json
 # Run simulation (Gaussian pulse in A_1 component)
 # A_0 is a constraint (time_order=0), A_1 and A_2 are dynamical
 tidal simulate ../data/chern_simons_3d.json \
+  --rtol 1e-3 \
+  --atol 1e-6 \
   --param kappa=0.5 \
-  --grid-shape 64 \
+  --grid-shape 32 \
   --bounds 0:50 \
   --periodic \
   --ic gaussian \
