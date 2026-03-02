@@ -13,10 +13,10 @@
 #   tidal derive theory.toml
 #   tidal inspect ../data/massive_gravity_3d.json
 #   tidal simulate ../data/massive_gravity_3d.json --param m2=1.0 \
-#     --grid-shape 64 --bounds 0:50 --periodic --ic formula \
+#     --grid-shape 16 --bounds 0:50 --periodic --ic formula \
 #     --ic-component h_3 \
 #     --ic-formula "np.exp(-((x-25)**2+(y-25)**2)/50) * np.sin(2*np.pi*x/50)" \
-#     --t-end 5.0 --output ../data/massive_gravity_output
+#     --t-end 2.0 --output ../data/massive_gravity_output
 #   tidal plot ../data/massive_gravity_output --type amplitude --quiet
 
 set -euo pipefail
@@ -35,14 +35,16 @@ tidal inspect ../data/massive_gravity_3d.json
 # the Gaussian center x=L/2, so Gaussian × sin has zero spatial mean by parity.
 # The mass term creates dispersive propagation: omega^2 = k^2 + m^2
 tidal simulate ../data/massive_gravity_3d.json \
+  --atol 1e-4 \
+  --rtol 1e-6 \
   --param m2=1.0 \
-  --grid-shape 64 \
+  --grid-shape 16 \
   --bounds 0:50 \
   --periodic \
   --ic formula \
   --ic-component h_3 \
   --ic-formula "np.exp(-((x - 25)**2 + (y - 25)**2) / 50) * np.sin(2 * np.pi * x / 50)" \
-  --t-end 5.0 \
+  --t-end 2.0 \
   --output ../data/massive_gravity_output
 
 # Visualize results (plots saved into the simulation output directory)

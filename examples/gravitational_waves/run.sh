@@ -40,6 +40,8 @@ tidal inspect ../data/linearized_gravity.json
 # Gauge-unfixed constraints (h_1..h_3, h_transverse_*) have no self-terms
 # — IDA automatically freezes these at zero (temporal gauge).
 tidal simulate ../data/linearized_gravity.json \
+  --rtol 1e-4 \
+  --atol 1e-6 \
   --grid-shape 4,4,32 \
   --bounds 0:4,0:4,0:20 \
   --periodic \
