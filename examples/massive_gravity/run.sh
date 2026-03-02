@@ -15,7 +15,7 @@
 #   tidal simulate ../data/massive_gravity_3d.json --param m2=1.0 \
 #     --grid-shape 64 --bounds 0:50 --periodic --ic formula \
 #     --ic-component h_3 \
-#     --ic-formula "np.exp(-((x-25)**2+(y-25)**2)/50) * np.cos(2*np.pi*x/50)" \
+#     --ic-formula "np.exp(-((x-25)**2+(y-25)**2)/50) * np.sin(2*np.pi*x/50)" \
 #     --t-end 5.0 --output ../data/massive_gravity_output
 #   tidal plot ../data/massive_gravity_output --type amplitude --quiet
 
@@ -28,11 +28,11 @@ tidal derive theory.toml
 # Inspect the equation system (6 components: h_0..h_5)
 tidal inspect ../data/massive_gravity_3d.json
 
-# Simulate with zero-mean cosine-modulated Gaussian in h_3 (h_xx component).
+# Simulate with zero-mean sine-modulated Gaussian in h_3 (h_xx component).
 # The h_0 (lapse) constraint is Poisson-type: on a periodic domain it requires
 # the source to have zero spatial mean (Fredholm compatibility). A plain
-# Gaussian has nonzero mean → incompatible. Multiplying by cos(2πx/L) ensures
-# zero mean while preserving the physical wave-packet profile.
+# Gaussian has nonzero mean → incompatible. sin(2πx/L) is odd-symmetric about
+# the Gaussian center x=L/2, so Gaussian × sin has zero spatial mean by parity.
 # The mass term creates dispersive propagation: omega^2 = k^2 + m^2
 tidal simulate ../data/massive_gravity_3d.json \
   --param m2=1.0 \
@@ -41,7 +41,7 @@ tidal simulate ../data/massive_gravity_3d.json \
   --periodic \
   --ic formula \
   --ic-component h_3 \
-  --ic-formula "np.exp(-((x - 25)**2 + (y - 25)**2) / 50) * np.cos(2 * np.pi * x / 50)" \
+  --ic-formula "np.exp(-((x - 25)**2 + (y - 25)**2) / 50) * np.sin(2 * np.pi * x / 50)" \
   --t-end 5.0 \
   --output ../data/massive_gravity_output
 

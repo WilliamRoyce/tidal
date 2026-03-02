@@ -766,6 +766,26 @@ class TestFindConnectedComponents:
         components = _find_connected_components(groups, name_map)
         assert len(components) == 1  # A→B via alias
 
+    def test_self_loop(self) -> None:
+        """Self-referencing constraint does not create phantom edges."""
+        g = self._make_group("A", source_fields=["A", "x"])
+        components = _find_connected_components([g])
+        assert len(components) == 1
+        assert len(components[0]) == 1
+
+    def test_empty_input(self) -> None:
+        """No groups → empty result."""
+        assert _find_connected_components([]) == []
+
+    def test_shared_non_constraint_field(self) -> None:
+        """Non-constraint field shared by multiple constraints → no coupling."""
+        groups = [
+            self._make_group("A", source_fields=["x", "y"]),
+            self._make_group("B", source_fields=["x", "z"]),
+        ]
+        components = _find_connected_components(groups)
+        assert len(components) == 2
+
 
 # ---------------------------------------------------------------------------
 # Integration tests: pre_solve_constraints
@@ -2194,6 +2214,57 @@ class TestEnsureConsistentIC:
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
         np.testing.assert_array_equal(result, y0)
 
+    def test_phase2_stall_emits_warning(self) -> None:
+        """Phase 2 stall emits actionable warning about undetermined fields."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [
+                {"name": "c_0", "index": 0},
+                {"name": "h_a", "index": 1},
+                {"name": "h_b", "index": 2},
+            ],
+            "equations": [
+                {
+                    "field": "c_0",
+                    "lhs": {"expression": "c_0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "gradient_x", "field": "h_a"},
+                            {"coefficient": 1.0, "operator": "gradient_x", "field": "h_b"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_a",
+                    "lhs": {"expression": "d2_t(h_a)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_a"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_b",
+                    "lhs": {"expression": "d2_t(h_b)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_b"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        y0 = np.zeros(StateLayout.from_spec(spec, grid.num_points).total_size)
+
+        with pytest.warns(UserWarning, match="Constraint propagation stalled"):
+            ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
     def test_multi_independent_subsidiary(self) -> None:
         """Two independent subsidiary constraints, each solving for a different field.
 
@@ -2671,6 +2742,53 @@ class TestEnsureConsistentICRealJSON:
             "h_0 should be non-zero (Poisson solve from h_3 source)"
         )
 
+    def test_massive_gravity_gaussian_sin_ic(self) -> None:
+        """Massive gravity with Gaussian × sin IC (mirrors run.sh).
+
+        The h_0 constraint is Poisson-type (no identity self-term).
+        sin(2πx/L) is odd-symmetric about the Gaussian center x=L/2,
+        so Gaussian × sin has zero spatial mean by parity — satisfying
+        Fredholm compatibility.  This test catches the cos→sin issue:
+        Gaussian × cos has NONZERO mean and would fail the Poisson
+        compatibility check.
+        """
+        import json
+        from pathlib import Path
+
+        json_path = Path("examples/data/massive_gravity_3d.json")
+        if not json_path.exists():
+            pytest.skip("Massive gravity JSON not available")
+
+        with json_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+        spec = EquationSystem.from_dict(data)
+
+        grid = GridInfo(
+            bounds=((0, 50), (0, 50)),
+            shape=(32, 32),
+            periodic=(True, True),
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        x_arr, y_arr = grid.coord_arrays()
+        h3_slot = layout.field_slot_map["h_3"]
+        y0[h3_slot * n : (h3_slot + 1) * n] = (
+            np.exp(-((x_arr - 25) ** 2 + (y_arr - 25) ** 2) / 50)
+            * np.sin(2 * np.pi * x_arr / 50)
+        ).ravel()
+
+        result = ensure_consistent_ic(
+            spec, grid, y0, bc="periodic", parameters={"m2": 1.0},
+        )
+
+        h0_slot = layout.field_slot_map["h_0"]
+        h0_data = result[h0_slot * n : (h0_slot + 1) * n]
+        assert float(np.max(np.abs(h0_data))) > 1e-6, (
+            "h_0 should be non-zero (Poisson solve from Gaussian × sin source)"
+        )
+
     def test_gw_3d_with_complete_tt_ic(self) -> None:
         """GW 3+1D: complete TT gauge IC (h_4 + h_7 = -h_4) passes all constraints.
 
@@ -2712,6 +2830,12 @@ class TestEnsureConsistentICRealJSON:
 
         # Should succeed: h_9 = -(h_4 + h_7) = 0, transverse trivially OK
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # h_4 and h_7 should be preserved exactly (user-provided IC)
+        h4_data = result[h4_slot * n : (h4_slot + 1) * n]
+        np.testing.assert_allclose(h4_data, wave.ravel(), atol=1e-14)
+        h7_data = result[h7_slot * n : (h7_slot + 1) * n]
+        np.testing.assert_allclose(h7_data, (-wave).ravel(), atol=1e-14)
 
         # h_9 should be solved to ≈ 0 (traceless: h_4 + h_7 + h_9 = 0)
         h9_slot = layout.field_slot_map["h_9"]
