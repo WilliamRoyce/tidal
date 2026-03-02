@@ -174,6 +174,9 @@ def _normalize_bc(bc: BCSpec, grid: GridInfo) -> tuple[str | AxisBCSpec, ...]:
     Returns a tuple of either strings or ``AxisBCSpec`` objects (never mixed
     within one call — the type depends on what was passed in).
 
+    Pre-normalized tuples (from a previous ``_normalize_bc`` call) pass
+    through with only a fast length check, avoiding per-element validation.
+
     Raises
     ------
     ValueError
@@ -182,6 +185,10 @@ def _normalize_bc(bc: BCSpec, grid: GridInfo) -> tuple[str | AxisBCSpec, ...]:
     TypeError
         If a BC entry is neither a string nor an ``AxisBCSpec``.
     """
+    # Fast path: already a tuple of correct length (pre-normalized)
+    if isinstance(bc, tuple) and len(bc) == grid.ndim:
+        return bc
+
     if isinstance(bc, str):
         bcs: tuple[str | AxisBCSpec, ...] = (bc,) * grid.ndim
     else:
@@ -306,12 +313,10 @@ def gradient(
     dx = grid.dx[axis]
     bc_axis = bcs[axis]
 
-    # Fast path for periodic: np.roll avoids ghost-cell allocation
+    # Unified ghost-cell path for all BC types (periodic + non-periodic).
+    # Ghost-cell padding with slice views is faster than np.roll for periodic
+    # because np.roll has significant Python-level overhead (normalize_axis_tuple).
     axis_bc = _resolve_axis_bc(bc_axis)
-    if axis_bc.periodic:
-        return (np.roll(data, -1, axis=axis) - np.roll(data, 1, axis=axis)) / (2.0 * dx)
-
-    # Ghost-cell path for non-periodic BCs
     padded = _pad_axis(data, axis, axis_bc, dx)
     slc_left = [slice(None)] * data.ndim
     slc_right = [slice(None)] * data.ndim
@@ -320,27 +325,24 @@ def gradient(
     return (padded[tuple(slc_right)] - padded[tuple(slc_left)]) / (2.0 * dx)
 
 
-def directional_laplacian(
+def _directional_laplacian_raw(
     data: np.ndarray,
     axis: int,
     grid: GridInfo,
-    bc: BCSpec | None = None,
+    bc_axis: str | AxisBCSpec,
 ) -> np.ndarray:
-    """3-point second derivative ∂²f/∂x_i².
+    """Core 3-point second derivative with pre-resolved per-axis BC.
 
-    Stencil: ``(f[i+1] - 2·f[i] + f[i-1]) / dx²``
+    Used by ``directional_laplacian`` and ``laplacian`` to avoid
+    redundant BC normalization when computing multiple axes.
+
+    Uses ghost-cell padding for all BC types (periodic and non-periodic)
+    — ghost-cell + slice views is faster than ``np.roll`` for periodic.
     """
-    bcs = _normalize_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
     dx = grid.dx[axis]
     inv_dx2 = 1.0 / (dx * dx)
-    bc_axis = bcs[axis]
 
     axis_bc = _resolve_axis_bc(bc_axis)
-    if axis_bc.periodic:
-        return (
-            np.roll(data, -1, axis=axis) - 2.0 * data + np.roll(data, 1, axis=axis)
-        ) * inv_dx2
-
     padded = _pad_axis(data, axis, axis_bc, dx)
     slc_left = [slice(None)] * data.ndim
     slc_center = [slice(None)] * data.ndim
@@ -355,15 +357,34 @@ def directional_laplacian(
     ) * inv_dx2
 
 
+def directional_laplacian(
+    data: np.ndarray,
+    axis: int,
+    grid: GridInfo,
+    bc: BCSpec | None = None,
+) -> np.ndarray:
+    """3-point second derivative ∂²f/∂x_i².
+
+    Stencil: ``(f[i+1] - 2·f[i] + f[i-1]) / dx²``
+    """
+    bcs = _normalize_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
+    return _directional_laplacian_raw(data, axis, grid, bcs[axis])
+
+
 def laplacian(
     data: np.ndarray,
     grid: GridInfo,
     bc: BCSpec | None = None,
 ) -> np.ndarray:
-    """Full Laplacian ∇²f = Σ_i ∂²f/∂x_i²."""
-    result = directional_laplacian(data, 0, grid, bc)
+    """Full Laplacian ∇²f = Σ_i ∂²f/∂x_i².
+
+    Normalizes BCs once and fuses per-axis directional Laplacians
+    to avoid redundant BC validation and resolution.
+    """
+    bcs = _normalize_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
+    result = _directional_laplacian_raw(data, 0, grid, bcs[0])
     for ax in range(1, grid.ndim):
-        result += directional_laplacian(data, ax, grid, bc)
+        result += _directional_laplacian_raw(data, ax, grid, bcs[ax])
     return result
 
 
@@ -383,22 +404,31 @@ def cross_derivative(
     bc1 = _resolve_axis_bc(bcs[axis1])
     bc2 = _resolve_axis_bc(bcs[axis2])
 
-    if bc1.periodic and bc2.periodic:
-        # Fused 4-point stencil:
-        # (f[i+1,j+1] - f[i+1,j-1] - f[i-1,j+1] + f[i-1,j-1]) / (4·dx·dy)
-        dx = grid.dx[axis1]
-        dy = grid.dx[axis2]
-        data_m1 = np.roll(data, -1, axis=axis1)
-        data_p1 = np.roll(data, 1, axis=axis1)
-        fpp = np.roll(data_m1, -1, axis=axis2)
-        fpm = np.roll(data_m1, 1, axis=axis2)
-        fmp = np.roll(data_p1, -1, axis=axis2)
-        fmm = np.roll(data_p1, 1, axis=axis2)
-        return (fpp - fpm - fmp + fmm) / (4.0 * dx * dy)
+    # Fused 4-point stencil using ghost-cell padding (all BC types).
+    # f[i+1,j+1] - f[i+1,j-1] - f[i-1,j+1] + f[i-1,j-1]) / (4·dx·dy)
+    # Ghost-cell padding with slice views avoids np.roll overhead.
+    dx = grid.dx[axis1]
+    dy = grid.dx[axis2]
 
-    # Non-periodic fallback: two gradient passes
-    d1 = gradient(data, axis2, grid, bc)
-    return gradient(d1, axis1, grid, bc)
+    # Pad along axis1, then axis2 on the padded result
+    padded1 = _pad_axis(data, axis1, bc1, dx)
+    padded = _pad_axis(padded1, axis2, bc2, dy)
+
+    # Build 4-corner slices: f[i±1, j±1] on the doubly-padded array.
+    # Helper to build a tuple-of-slices with two axes set.
+    def _corner(a1_slc: slice, a2_slc: slice) -> tuple[slice, ...]:
+        s = [slice(None)] * data.ndim
+        s[axis1] = a1_slc
+        s[axis2] = a2_slc
+        return tuple(s)
+
+    hi = slice(2, None)   # +1 in padded frame
+    lo = slice(0, -2)     # -1 in padded frame
+
+    return (
+        padded[_corner(hi, hi)] - padded[_corner(hi, lo)]
+        - padded[_corner(lo, hi)] + padded[_corner(lo, lo)]
+    ) / (4.0 * dx * dy)
 
 
 def biharmonic(

@@ -8,11 +8,17 @@ Depends on ``FieldSet`` (Phase 1) and ``CoefficientEvaluator`` (Phase 2).
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import numpy as np
 
-from tidal.solver.operators import BCSpec, apply_operator
+from tidal.solver.operators import (
+    OPERATOR_REGISTRY,
+    BCSpec,
+    _bc_from_grid,
+    _normalize_bc,
+    apply_operator,
+)
 
 if TYPE_CHECKING:
     from tidal.solver.coefficients import CoefficientEvaluator
@@ -55,6 +61,30 @@ class RHSEvaluator:
         self._result_buffer = np.zeros(grid.shape)
         self._term_buffer = np.zeros(grid.shape)
 
+        # Pre-normalize BCs once (avoids per-call validation in operators)
+        if bc is not None:
+            self._normalized_bc: BCSpec = _normalize_bc(bc, grid)
+        else:
+            self._normalized_bc = _bc_from_grid(grid)
+
+        # Pre-resolve operator functions (avoids dict lookup per call)
+        self._resolved_ops: list[list[tuple[Any, str]]] = []
+        for eq in spec.equations:
+            ops: list[tuple[Any, str]] = []
+            for term in eq.rhs_terms:
+                if term.operator == "first_derivative_t":
+                    ops.append((None, term.field))
+                else:
+                    fn = OPERATOR_REGISTRY.get(term.operator)
+                    if fn is None:
+                        msg = (
+                            f"Unknown operator {term.operator!r}; "
+                            f"known: {sorted(OPERATOR_REGISTRY)}"
+                        )
+                        raise ValueError(msg)
+                    ops.append((fn, term.field))
+            self._resolved_ops.append(ops)
+
     def begin_timestep(self, t: float) -> None:
         """Notify the coefficient evaluator of a new timestep."""
         self._coeff_eval.begin_timestep(t)
@@ -91,17 +121,18 @@ class RHSEvaluator:
             result.fill(0.0)
             return result
 
+        resolved = self._resolved_ops[eq_idx]
+
         # First term: write directly to result (eliminates fill(0))
-        operated = self._apply_operator(terms[0], fields)
+        operated = self._apply_resolved(resolved[0], fields)
         coeff = self._coeff_eval.resolve(terms[0], t, eq_idx=eq_idx, term_idx=0)
         np.multiply(coeff, operated, out=result)
 
         # Remaining terms: accumulate
         for term_idx in range(1, len(terms)):
-            term = terms[term_idx]
-            operated = self._apply_operator(term, fields)
+            operated = self._apply_resolved(resolved[term_idx], fields)
             coeff = self._coeff_eval.resolve(
-                term, t, eq_idx=eq_idx, term_idx=term_idx
+                terms[term_idx], t, eq_idx=eq_idx, term_idx=term_idx
             )
             np.multiply(coeff, operated, out=temp)
             result += temp
@@ -128,6 +159,36 @@ class RHSEvaluator:
         return self.evaluate(eq_idx, fields, t)
 
     # ---- Internal ----
+
+    def _apply_resolved(
+        self,
+        resolved: tuple[Any, str],
+        fields: FieldSet,
+    ) -> np.ndarray:
+        """Apply a pre-resolved operator, returning the operated data.
+
+        Uses pre-resolved function pointer and pre-normalized BCs to
+        avoid per-call dict lookup and BC validation overhead.
+
+        Raises
+        ------
+        ValueError
+            If a ``first_derivative_t`` term references a field whose
+            velocity slot is not present in the state.
+        """
+        op_fn, field_name = resolved
+        if op_fn is None:  # first_derivative_t
+            vel_name = f"v_{field_name}"
+            if vel_name not in fields:
+                msg = (
+                    f"Cannot resolve first_derivative_t({field_name}): "
+                    f"velocity slot '{vel_name}' not found. "
+                    f"Available: {sorted(fields.slot_names)}"
+                )
+                raise ValueError(msg)
+            return fields[vel_name]
+        target = self._get_field_data(field_name, fields)
+        return op_fn(target, self._grid, self._normalized_bc)
 
     def _apply_operator(
         self,

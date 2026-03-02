@@ -52,11 +52,13 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
     force_buf = np.zeros(layout.total_size)
     vel_buf = np.zeros(layout.total_size)
 
+    dydt_buf = np.zeros(layout.total_size)
+
     def rhs_fn(t: float, y: np.ndarray) -> np.ndarray:
         if progress is not None:
             progress.update(t)
 
-        dydt = np.zeros_like(y)
+        dydt_buf.fill(0.0)
 
         force = compute_force(
             spec, layout, grid, bc, y, t, rhs_eval, out=force_buf, fieldset=fs,
@@ -64,16 +66,16 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
         velocity = compute_velocity(layout, y, out=vel_buf)
 
         for _si, s, _fn in layout.velocity_slot_groups:
-            dydt[s] = force[s]
+            dydt_buf[s] = force[s]
         for _si, s, _vs in layout.dynamical_field_slot_groups:
-            dydt[s] = velocity[s]
+            dydt_buf[s] = velocity[s]
         for _si, s, field_name in layout.first_order_slot_groups:
             eq_idx = eq_map.get(field_name)
             if eq_idx is not None:
                 result = rhs_eval.evaluate(eq_idx, fs, t)
-                dydt[s] = result.ravel()
+                dydt_buf[s] = result.ravel()
 
-        return dydt
+        return dydt_buf
 
     return rhs_fn
 

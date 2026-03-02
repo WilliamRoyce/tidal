@@ -636,7 +636,7 @@ def _solve_independent(  # noqa: PLR0913, PLR0917
         fields[terms.field_name] = solution
 
 
-def _solve_coupled(  # noqa: PLR0913, PLR0917, C901
+def _solve_coupled(  # noqa: PLR0912, PLR0913, PLR0914, PLR0917, C901
     groups: list[_ConstraintTerms],
     grid: GridInfo,
     bc: BCSpec | None,
@@ -671,18 +671,29 @@ def _solve_coupled(  # noqa: PLR0913, PLR0917, C901
         max_iter = max(g.config.max_iterations for g in groups)
         tol = min(g.config.tolerance for g in groups)
 
+        # Pre-compute operator matrices and methods (loop-invariant)
+        methods: dict[str, str] = {}
+        op_matrices: dict[str, np.ndarray] = {}
+        for terms in groups:
+            method = _select_method(terms, grid, bc)
+            methods[terms.field_name] = method
+            if method != "fft":
+                op_matrices[terms.field_name] = _probe_operator_matrix(
+                    terms.self_terms, grid, bc
+                )
+
         for _iteration in range(max_iter):
             max_change = 0.0
             for terms in groups:
                 source = _evaluate_source(
                     terms.source_terms, fields, grid, bc, name_map
                 )
-                method = _select_method(terms, grid, bc)
+                method = methods[terms.field_name]
 
                 if method == "fft":
                     solution = _fft_solve_single(terms, grid, source)
                 else:
-                    op_mat = _probe_operator_matrix(terms.self_terms, grid, bc)
+                    op_mat = op_matrices[terms.field_name]
                     solution = _matrix_solve(op_mat, source, grid.shape)
 
                 old = (
