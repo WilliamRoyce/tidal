@@ -262,6 +262,125 @@ class TestBuildJacobianSparsity:
         pattern = build_jacobian_sparsity(spec, layout, grid, "periodic")
         assert isinstance(pattern, sparse.csc_matrix)
 
+    def test_constraint_velocity_coupling_in_pattern(self) -> None:
+        """Sparsity pattern should include constraint velocity couplings.
+
+        When a dynamical equation references ``v_X`` where X is a constraint
+        field (time_order=0), the coupling goes through ``yp[X_field_slot]``.
+        The sparsity pattern must include entries at the constraint field's
+        column positions for the FD Jacobian to capture these.
+        """
+        # Build a CS-like spec: A_0 constraint, A_1 dynamical with
+        # gradient_x(v_A_0) term.
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 3, "signature": [-1, 1, 1]},
+            "fields": [
+                {"name": "A_0", "index": 0},
+                {"name": "A_1", "index": 1},
+            ],
+            "equations": [
+                {
+                    "field": "A_0",
+                    "lhs": {"expression": "A_0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
+                        ],
+                    },
+                },
+                {
+                    "field": "A_1",
+                    "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_1"},
+                            {"coefficient": 1.0, "operator": "gradient_x", "field": "v_A_0"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        pattern = build_jacobian_sparsity(spec, layout, grid, ("periodic", "periodic"))
+        dense: Any = pattern.toarray()
+
+        n = grid.num_points  # 64
+        # Slot layout: A_0 (slot 0), A_1 (slot 1), v_A_1 (slot 2)
+        # v_A_1 equation references gradient_x(v_A_0).
+        # v_A_0 = yp[A_0_slot=0], so coupling column = slot 0.
+        # v_A_1 row block = slot 2 * n : slot 3 * n
+        v_A_1_rows = slice(2 * n, 3 * n)
+        A_0_cols = slice(0, n)
+
+        # There should be nonzero entries in v_A_1 rows × A_0 cols
+        block = dense[v_A_1_rows, A_0_cols]
+        assert block.any(), (
+            "Missing constraint velocity coupling: v_A_1 equation references "
+            "gradient_x(v_A_0) but no entries in sparsity pattern at "
+            "(v_A_1_slot, A_0_slot)"
+        )
+
+    def test_first_derivative_t_constraint_in_pattern(self) -> None:
+        """first_derivative_t(constraint_field) should couple to field slot."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [
+                {"name": "phi_0", "index": 0},
+                {"name": "A_0", "index": 1},
+            ],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {"coefficient": -1.0, "operator": "first_derivative_t", "field": "A_0"},
+                        ],
+                    },
+                },
+                {
+                    "field": "A_0",
+                    "lhs": {"expression": "A_0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(16,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        pattern = build_jacobian_sparsity(spec, layout, grid, "periodic")
+        dense: Any = pattern.toarray()
+
+        n = grid.num_points  # 16
+        # Slots: phi_0 (0), v_phi_0 (1), A_0 (2)
+        # v_phi_0 equation references first_derivative_t(A_0).
+        # A_0 is constraint → v_A_0 = yp[A_0_field_slot=2]
+        # Coupling should be at (v_phi_0 rows, A_0 cols) = (slot 1, slot 2)
+        v_phi_rows = slice(1 * n, 2 * n)
+        A_0_cols = slice(2 * n, 3 * n)
+
+        block = dense[v_phi_rows, A_0_cols]
+        assert block.any(), (
+            "Missing first_derivative_t(constraint) coupling: v_phi_0 "
+            "equation has first_derivative_t(A_0) but no entries at "
+            "(v_phi_0_slot, A_0_slot)"
+        )
+
     def test_ida_with_sparse_matches_dense(self) -> None:
         """IDA with sparse solver should give same result as dense."""
         from tidal.solver.ida import solve_ida

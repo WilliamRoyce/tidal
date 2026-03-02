@@ -282,20 +282,40 @@ def _rhs_couplings(
 
     For ``first_derivative_t(field)``, the coupling target is the velocity
     slot ``v_{field}`` with identity stencil.
+
+    Constraint velocity references (``v_X`` where ``X`` has time_order=0)
+    couple through ``yp[X_field_slot]``.  In the combined Jacobian
+    ``J = dF/dy + cj * dF/dyp``, these contribute to the column of
+    ``X``'s field slot with the operator's stencil.
     """
     couplings: list[tuple[int, list[tuple[int, ...]]]] = []
     for term in terms:
         if term.operator == "first_derivative_t":
-            # Couples to velocity of the referenced field
+            # Couples to velocity of the referenced field.
+            # For constraint fields (time_order=0), the velocity is
+            # injected from yp[field_slot] — couple to the field slot.
             vel_name = f"v_{term.field}"
             col_slot = _find_slot_for_field(layout, vel_name)
             if col_slot is not None:
                 couplings.append((col_slot, [((0,) * ndim)]))
+            else:
+                # Constraint field: no velocity slot, couples via yp
+                field_slot = layout.field_slot_map.get(term.field)
+                if field_slot is not None:
+                    couplings.append((field_slot, [((0,) * ndim)]))
         else:
             col_slot = _find_slot_for_field(layout, term.field)
             if col_slot is not None:
                 offsets = operator_stencil_offsets(term.operator, ndim)
                 couplings.append((col_slot, offsets))
+            elif term.field.startswith("v_"):
+                # Constraint velocity v_X: X has time_order=0, no
+                # velocity slot.  Coupling goes through yp[X_field_slot].
+                base_field = term.field[2:]
+                field_slot = layout.field_slot_map.get(base_field)
+                if field_slot is not None:
+                    offsets = operator_stencil_offsets(term.operator, ndim)
+                    couplings.append((field_slot, offsets))
     return couplings
 
 
