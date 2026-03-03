@@ -802,6 +802,23 @@ class TestSingleFieldSelection:
         result = single_field(_MockData(), None)  # type: ignore[arg-type]
         assert result == "h_0"
 
+    def test_picks_largest_amplitude_among_dynamical(self) -> None:
+        """When multiple dynamical fields exist, pick the one with largest amplitude."""
+        import numpy as np
+
+        from tidal.cli._panels import single_field
+
+        class _MockData:
+            fields = {  # noqa: RUF012
+                "A_0": np.zeros((10, 32, 32)),       # constraint
+                "A_1": np.ones((10, 32, 32)) * 1e-13, # near-zero (longitudinal)
+                "A_2": np.ones((10, 32, 32)) * 0.5,   # actual wave
+            }
+            dynamical_fields = ("A_1", "A_2")
+
+        result = single_field(_MockData(), None)  # type: ignore[arg-type]
+        assert result == "A_2"
+
 
 # ============================================================
 # Output options

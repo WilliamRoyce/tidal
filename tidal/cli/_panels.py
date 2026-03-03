@@ -72,14 +72,21 @@ def single_field(data: SimulationData, requested: str | None) -> str:
     """
     all_names = list(data.fields.keys())
     if requested is None:
-        # Prefer first dynamical field (time_derivative_order >= 2)
-        # over constraint fields. Uses spec-based check since IDA
-        # writes constraint velocities too (via yp extraction).
-        dyn = set(data.dynamical_fields)
-        for name in all_names:
-            if name in dyn:
-                return name
-        return all_names[0]
+        # Prefer dynamical fields over constraints.  When multiple
+        # dynamical fields exist, pick the one with the largest peak
+        # amplitude so the overview shows the most interesting field
+        # (e.g. A_2 in EM instead of zero-amplitude A_1).
+        dyn = [n for n in all_names if n in set(data.dynamical_fields)]
+        if not dyn:
+            return all_names[0]
+        if len(dyn) == 1:
+            return dyn[0]
+        best, best_amp = dyn[0], 0.0
+        for name in dyn:
+            amp = float(np.max(np.abs(data.fields[name])))
+            if amp > best_amp:
+                best, best_amp = name, amp
+        return best
     if requested not in data.fields:
         msg = f"Unknown field '{requested}'. Available: {', '.join(all_names)}"
         raise ValueError(msg)
