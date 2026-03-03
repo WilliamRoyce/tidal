@@ -304,14 +304,32 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
      DIFFERENT field than the one it's nominally assigned to. For example, in
      Fierz-Pauli massive gravity the xx-component equation has d²_t(h_yy) and
      the yy-component equation has d²_t(h_xx). Detect this and reassign so each
-     field gets the equation that actually evolves it. *)
+     field gets the equation that actually evolves it.
+
+     Key subtlety: Phantom d²_t terms may persist even after Expand[Simplify[...]]
+     in ComponentDecompose.wl. For example, the tt component of G^{(1)}_ab has
+     +½d²_t(h_3) and -½d²_t(h_3) that may not cancel. We detect phantoms by
+     extracting d²_t COEFFICIENTS per field and checking if their sum is zero. *)
   Module[{evolvedFieldIndex, assignmentMap, needsSwap = False, newEqs},
-    (* For each equation, find which field's d²_t it contains *)
+    (* For each equation, find which field it truly evolves (net non-zero d²_t).
+       Uses coefficient extraction rather than mere presence detection to correctly
+       handle phantom d²_t terms that should cancel. *)
     evolvedFieldIndex = Table[
-      Module[{result = 0},
+      Module[{result = 0, terms, d2tTerms, coeffSum},
+        terms = If[Head[workingEqs[[i, 2]]] === Plus,
+                   List @@ workingEqs[[i, 2]],
+                   {workingEqs[[i, 2]]}];
         Do[
-          If[DetectLHSTimeOrder[workingEqs[[i, 2]], allFieldNames[[j]]] >= 2,
-            result = j; Break[]],
+          d2tTerms = Select[terms,
+            ContainsOwnTimeDerivative[#, allFieldNames[[j]], 2] &];
+          If[Length[d2tTerms] > 0,
+            (* Sum the coefficients of d²_t(field_j) across all matching terms.
+               If the sum is zero, these are phantom terms that cancel. *)
+            coeffSum = Simplify[Total[ExtractLHSCoefficient /@ d2tTerms]];
+            If[coeffSum =!= 0,
+              result = j; Break[]
+            ]
+          ],
           {j, nFields}];
         result],
       {i, nFields}];
@@ -320,7 +338,6 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
     assignmentMap = Table[j, {j, nFields}];  (* identity by default *)
     Do[
       If[evolvedFieldIndex[[i]] > 0 && evolvedFieldIndex[[i]] != i,
-        (* Check for conflicts: another equation already assigned to this field *)
         If[assignmentMap[[evolvedFieldIndex[[i]]]] != evolvedFieldIndex[[i]],
           Print["WARNING: Multiple equations claim to evolve field " <>
                 allFieldNames[[evolvedFieldIndex[[i]]]] <>
@@ -442,16 +459,16 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
     rhs = Total[Select[terms, !ContainsOwnTimeDerivative[#, fieldName, lhsTimeOrder] &]];
   ];
 
-  (* Safety net: if own-field d²_t terms sum to zero under Simplify,
-     reclassify as constraint. This catches edge cases where component-level
-     Simplify didn't fully cancel phantom time derivatives — e.g., ±½ d²_t(h)
-     terms from R^{(1)} and -½ η R^{(1)} in the linearized Einstein tensor. *)
+  (* Safety net: if own-field time-derivative COEFFICIENTS sum to zero,
+     reclassify as constraint. Uses coefficient extraction rather than full-term
+     Simplify, which is more robust for complex xAct expressions where
+     Expand[Simplify[...]] may not fully cancel phantom d²_t terms. *)
   If[lhsTimeOrder > 0 && Length[timeDerivTerm] > 0,
-    Module[{totalLHS},
-      totalLHS = Simplify[Total[timeDerivTerm]];
-      If[totalLHS === 0,
+    Module[{coeffSum},
+      coeffSum = Simplify[Total[ExtractLHSCoefficient /@ timeDerivTerm]];
+      If[coeffSum === 0,
         Print["  NOTE: d" <> ToString[lhsTimeOrder] <> "_t(" <> fieldName <>
-              ") terms cancel (sum=0). Reclassifying as constraint."];
+              ") coefficients cancel (sum=0). Reclassifying as constraint."];
         lhsTimeOrder = 0;
         timeDerivTerm = {};
         rhs = componentEq;
