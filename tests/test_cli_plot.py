@@ -775,7 +775,19 @@ class TestSingleFieldSelection:
 
         class _MockData:
             fields = {"h_0": None, "h_1": None, "h_4": None}  # noqa: RUF012
-            velocities = {"h_4": None}  # noqa: RUF012
+            dynamical_fields = ("h_4",)
+
+        result = single_field(_MockData(), None)  # type: ignore[arg-type]
+        assert result == "h_4"
+
+    def test_prefers_dynamical_even_with_constraint_velocities(self) -> None:
+        """IDA writes constraint velocities — single_field should still pick dynamical."""
+        from tidal.cli._panels import single_field
+
+        class _MockData:
+            fields = {"h_0": None, "h_1": None, "h_4": None}  # noqa: RUF012
+            dynamical_fields = ("h_4",)
+            velocities = {"h_0": None, "h_1": None, "h_4": None}  # noqa: RUF012
 
         result = single_field(_MockData(), None)  # type: ignore[arg-type]
         assert result == "h_4"
@@ -785,7 +797,7 @@ class TestSingleFieldSelection:
 
         class _MockData:
             fields = {"h_0": None, "h_1": None}  # noqa: RUF012
-            velocities: dict[str, None] = {}  # noqa: RUF012
+            dynamical_fields = ()
 
         result = single_field(_MockData(), None)  # type: ignore[arg-type]
         assert result == "h_0"

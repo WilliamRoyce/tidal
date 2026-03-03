@@ -1168,6 +1168,11 @@ def _generate_output(
     if fmt in {"summary", "directory"}:
         if sim_data.n_snapshots > 0:
             _print_summary(sim_data)
+        if fmt == "directory" and args.output:
+            from tidal.cli._plot import save_plot
+
+            overview = Path(args.output) / "overview.png"
+            save_plot(overview, sim_data, grid_info)
         return
 
     _print_summary(sim_data)

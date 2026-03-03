@@ -72,9 +72,12 @@ def single_field(data: SimulationData, requested: str | None) -> str:
     """
     all_names = list(data.fields.keys())
     if requested is None:
-        # Prefer first dynamical field (has velocity) over constraint fields
+        # Prefer first dynamical field (time_derivative_order >= 2)
+        # over constraint fields. Uses spec-based check since IDA
+        # writes constraint velocities too (via yp extraction).
+        dyn = set(data.dynamical_fields)
         for name in all_names:
-            if name in data.velocities:
+            if name in dyn:
                 return name
         return all_names[0]
     if requested not in data.fields:
