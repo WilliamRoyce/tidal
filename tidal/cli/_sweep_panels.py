@@ -114,7 +114,11 @@ def render_sweep_2d(
     results: SweepResults,
     metric: str,
 ) -> None:
-    """Plot a scalar metric as a 2D heatmap over two swept parameters.
+    """Plot a scalar metric over two swept parameters.
+
+    For grid-aligned data (Cartesian sweeps), renders a pcolormesh heatmap.
+    For scattered data (LHS/Sobol), renders a colored scatter plot with
+    optional interpolation background.
 
     Parameters
     ----------
@@ -139,10 +143,76 @@ def render_sweep_2d(
         raise ValueError(msg)
 
     p1_name, p2_name = param_names
+
+    if _is_scattered_data(results):
+        _render_2d_scattered(ax, results, p1_name, p2_name, metric)
+    else:
+        _render_2d_grid(ax, results, p1_name, p2_name, metric)
+
+
+def _render_2d_scattered(
+    ax: Axes,
+    results: SweepResults,
+    p1_name: str,
+    p2_name: str,
+    metric: str,
+) -> None:
+    """Render 2D sweep as scatter + interpolation background."""
+    p1 = np.array(results.column(p1_name), dtype=np.float64)
+    p2 = np.array(results.column(p2_name), dtype=np.float64)
+    metric_vals = np.array(results.column(metric), dtype=np.float64)
+
+    valid = np.isfinite(metric_vals)
+    p1, p2, metric_vals = p1[valid], p2[valid], metric_vals[valid]
+
+    if len(metric_vals) == 0:
+        ax.text(0.5, 0.5, f"No valid data for {metric}",
+                transform=ax.transAxes, ha="center")
+        return
+
+    vmin, vmax = float(metric_vals.min()), float(metric_vals.max())
+
+    # Interpolation background (if enough points)
+    if len(metric_vals) >= 10:  # noqa: PLR2004
+        try:
+            from scipy.interpolate import griddata
+
+            n_grid = 100
+            p1g = np.linspace(float(p1.min()), float(p1.max()), n_grid)
+            p2g = np.linspace(float(p2.min()), float(p2.max()), n_grid)
+            p1m, p2m = np.meshgrid(p1g, p2g)
+            z = griddata(
+                np.column_stack([p1, p2]), metric_vals,
+                (p1m, p2m), method="cubic",
+            )
+            ax.pcolormesh(
+                p1g, p2g, z, shading="auto", cmap="viridis",
+                alpha=0.3, vmin=vmin, vmax=vmax,
+            )
+        except (ValueError, ImportError):
+            pass  # Fall back to scatter-only
+
+    sc = ax.scatter(
+        p1, p2, c=metric_vals, cmap="viridis", s=60,
+        edgecolors="k", linewidths=0.5, vmin=vmin, vmax=vmax, zorder=5,
+    )
+    ax.set_xlabel(p1_name)
+    ax.set_ylabel(p2_name)
+    ax.set_title(metric)
+    ax.figure.colorbar(sc, ax=ax, label=metric)  # type: ignore[union-attr]
+
+
+def _render_2d_grid(
+    ax: Axes,
+    results: SweepResults,
+    p1_name: str,
+    p2_name: str,
+    metric: str,
+) -> None:
+    """Render 2D sweep as pcolormesh heatmap (for grid-aligned data)."""
     p1_vals = np.sort(results.swept_params[p1_name])
     p2_vals = np.sort(results.swept_params[p2_name])
 
-    # Build 2D grid from results rows (O(n log n) via searchsorted)
     n1, n2 = len(p1_vals), len(p2_vals)
     grid = np.full((n2, n1), np.nan)
 
@@ -157,15 +227,11 @@ def render_sweep_2d(
         grid[i2, i1] = float(val)
 
     im = ax.pcolormesh(
-        p1_vals,
-        p2_vals,
-        grid,
-        shading="nearest",
-        cmap="viridis",
+        p1_vals, p2_vals, grid, shading="nearest", cmap="viridis",
     )
     ax.set_xlabel(p1_name)
     ax.set_ylabel(p2_name)
-    ax.set_title(f"{metric}")
+    ax.set_title(metric)
     ax.figure.colorbar(im, ax=ax, label=metric)  # type: ignore[union-attr]
 
 
@@ -359,6 +425,25 @@ def _safe_normalize(values: NDArray[np.float64]) -> NDArray[np.float64]:
     return (values - vmin) / (vmax - vmin)
 
 
+def _is_scattered_data(results: SweepResults) -> bool:
+    """Detect whether sweep data is scattered (LHS/Sobol) vs grid-aligned."""
+    strategy = results.metadata.get("sampling_strategy", "")
+    if strategy in {"latin_hypercube", "sobol"}:
+        return True
+    if strategy == "grid":
+        return False
+    # Heuristic fallback for old data without metadata
+    n = results.n_runs
+    if n < 2:  # noqa: PLR2004
+        return False
+    for name in results.swept_params:
+        vals = np.array(results.column(name), dtype=np.float64)
+        n_unique = len(np.unique(vals[np.isfinite(vals)]))
+        if n_unique < n * 0.8:
+            return False
+    return True
+
+
 # -- Advanced visualization (F8) ---------------------------------------------
 
 
@@ -367,7 +452,11 @@ def render_sweep_parallel(
     results: SweepResults,
     metric: str,
 ) -> None:
-    """Parallel coordinates: each axis is a parameter, color = metric.
+    """Parallel coordinates: each axis is a parameter + metric, color = metric.
+
+    Lines are sorted by metric value (low-to-high) so high-metric runs
+    draw on top.  Alpha and linewidth scale with distance from median to
+    emphasize extreme (most interesting) values.
 
     Parameters
     ----------
@@ -394,21 +483,26 @@ def render_sweep_parallel(
     norm = _safe_normalize(metric_vals)
     cmap = plt.cm.viridis  # type: ignore[attr-defined]
 
-    # Normalize each parameter axis to [0, 1]
-    n_axes = len(param_names)
-    param_data = {}
-    for name in param_names:
+    # Include metric as the final axis
+    axis_names = [*param_names, metric]
+
+    # Normalize each axis to [0, 1]
+    axis_data: list[NDArray[np.float64]] = []
+    for name in axis_names:
         raw = np.array(results.column(name), dtype=np.float64)
-        param_data[name] = _safe_normalize(raw)
+        axis_data.append(_safe_normalize(raw))
 
-    # Draw polylines
-    for i in range(len(results.rows)):
-        coords = [param_data[name][i] for name in param_names]
-        color = cmap(norm[i])
-        ax.plot(range(n_axes), coords, color=color, alpha=0.4, linewidth=0.8)
+    # Sort by metric: draw low values first, high values on top
+    for idx in np.argsort(metric_vals):
+        coords = [axis_data[a][idx] for a in range(len(axis_names))]
+        emphasis = abs(float(norm[idx]) - 0.5) * 2  # 0 at median, 1 at extremes
+        ax.plot(
+            range(len(axis_names)), coords, color=cmap(norm[idx]),
+            alpha=0.15 + 0.6 * emphasis, linewidth=0.8 + 0.8 * emphasis,
+        )
 
-    ax.set_xticks(range(n_axes))
-    ax.set_xticklabels(param_names, rotation=30, ha="right")
+    ax.set_xticks(range(len(axis_names)))
+    ax.set_xticklabels(axis_names, rotation=30, ha="right")
     ax.set_ylabel("Normalized value")
     ax.set_title(f"Parallel Coordinates (color = {metric})")
 
@@ -427,8 +521,8 @@ def render_sweep_tornado(
 ) -> None:
     """Tornado chart: horizontal bars showing parameter impact on metric.
 
-    For each parameter, varies that parameter while holding others at their
-    median value. Shows the min-to-max metric range as a horizontal bar.
+    For scattered data (LHS/Sobol), shows Spearman rank correlation.
+    For grid-aligned data, shows min-to-max metric range per parameter.
 
     Parameters
     ----------
@@ -450,6 +544,77 @@ def render_sweep_tornado(
         raise ValueError(msg)
 
     metric_vals = np.array(results.column(metric), dtype=np.float64)
+
+    if _is_scattered_data(results):
+        _render_tornado_correlation(ax, results, param_names, metric_vals, metric)
+    else:
+        _render_tornado_range(ax, results, param_names, metric_vals, metric)
+
+
+def _render_tornado_correlation(
+    ax: Axes,
+    results: SweepResults,
+    param_names: list[str],
+    metric_vals: NDArray[np.float64],
+    metric: str,
+) -> None:
+    """Tornado chart using Spearman rank correlation (for scattered data)."""
+    from scipy.stats import spearmanr
+
+    impacts: list[tuple[str, float, float]] = []  # (name, |corr|, sign)
+    for name in param_names:
+        param_vals = np.array(results.column(name), dtype=np.float64)
+        valid = np.isfinite(param_vals) & np.isfinite(metric_vals)
+        if valid.sum() < 3:  # noqa: PLR2004
+            impacts.append((name, 0.0, 0.0))
+            continue
+        corr, _ = spearmanr(param_vals[valid], metric_vals[valid])
+        impacts.append((name, float(abs(corr)), float(np.sign(corr))))
+
+    impacts.sort(key=lambda t: t[1], reverse=True)  # noqa: FURB118
+
+    names = [t[0] for t in impacts]
+    abs_corrs = [t[1] for t in impacts]
+    signs = [t[2] for t in impacts]
+    y_pos = np.arange(len(names))
+
+    colors = ["tab:blue" if s >= 0 else "tab:red" for s in signs]
+    bars = ax.barh(y_pos, abs_corrs, color=colors, alpha=0.7, height=0.6)
+
+    for bar, corr, sign in zip(bars, abs_corrs, signs, strict=True):
+        label = f"{corr * sign:+.2f}"
+        ax.text(
+            bar.get_width() + 0.02, bar.get_y() + bar.get_height() / 2,
+            label, va="center", fontsize=8,
+        )
+
+    ax.set_yticks(y_pos)
+    ax.set_yticklabels(names)
+    ax.set_xlabel(f"|Spearman r| with {metric}")
+    ax.set_xlim(0, 1.15)
+    ax.set_title(f"Parameter Sensitivity ({metric})")
+    ax.invert_yaxis()
+
+    from matplotlib.patches import Patch
+
+    ax.legend(
+        handles=[
+            Patch(facecolor="tab:blue", alpha=0.7, label="positive"),
+            Patch(facecolor="tab:red", alpha=0.7, label="negative"),
+        ],
+        loc="lower right",
+        fontsize=8,
+    )
+
+
+def _render_tornado_range(
+    ax: Axes,
+    results: SweepResults,
+    param_names: list[str],
+    metric_vals: NDArray[np.float64],
+    metric: str,
+) -> None:
+    """Tornado chart using median-of-unique-values (for grid-aligned data)."""
     global_median = float(np.median(metric_vals))
 
     impacts: list[tuple[str, float, float]] = []
@@ -459,15 +624,12 @@ def render_sweep_tornado(
         if len(unique_vals) < 2:  # noqa: PLR2004
             impacts.append((name, global_median, global_median))
             continue
-
-        # For each unique parameter value, compute median metric
         medians = []
         for v in unique_vals:
             mask = np.isclose(param_vals, v)
             medians.append(float(np.median(metric_vals[mask])))
         impacts.append((name, min(medians), max(medians)))
 
-    # Sort by impact range (largest first)
     impacts.sort(key=lambda t: t[2] - t[1], reverse=True)
 
     names = [t[0] for t in impacts]
@@ -479,9 +641,7 @@ def render_sweep_tornado(
         y_pos,
         [hi - lo for lo, hi in zip(lows, highs, strict=True)],
         left=lows,
-        color="tab:blue",
-        alpha=0.7,
-        height=0.6,
+        color="tab:blue", alpha=0.7, height=0.6,
     )
     ax.axvline(global_median, color="gray", linestyle="--", linewidth=0.8)
     ax.set_yticks(y_pos)
@@ -496,7 +656,10 @@ def render_sweep_scatter(
     results: SweepResults,
     metric: str,
 ) -> None:
-    """Pairwise scatter matrix: parameter pairs as 2D scatter, color = metric.
+    """Pairwise scatter matrix with marginal param-vs-metric on diagonal.
+
+    Diagonal cells show each parameter vs the metric (marginal relationship).
+    Off-diagonal cells show pairwise parameter scatter, colored by metric.
 
     Parameters
     ----------
@@ -522,6 +685,7 @@ def render_sweep_scatter(
 
     metric_vals = np.array(results.column(metric), dtype=np.float64)
     cmap = plt.cm.viridis  # type: ignore[attr-defined]
+    vmin, vmax = float(np.nanmin(metric_vals)), float(np.nanmax(metric_vals))
 
     axes = fig.subplots(n, n, squeeze=False)
 
@@ -529,35 +693,38 @@ def render_sweep_scatter(
         for j in range(n):
             ax = axes[i][j]
             if i == j:
-                # Show histogram on diagonal cell
+                # Diagonal: marginal scatter (param vs metric)
                 vals = np.array(results.column(param_names[i]), dtype=np.float64)
-                ax.hist(
-                    vals,
-                    bins=min(20, len(np.unique(vals))),
-                    color="tab:blue",
-                    alpha=0.7,
+                ax.scatter(
+                    vals, metric_vals,
+                    c=metric_vals, cmap=cmap, s=12, alpha=0.7,
+                    vmin=vmin, vmax=vmax,
                 )
+                ax.set_ylabel(metric, fontsize=7)
             else:
-                # Off-diagonal: scatter
+                # Off-diagonal: pairwise parameter scatter
                 x = np.array(results.column(param_names[j]), dtype=np.float64)
                 y = np.array(results.column(param_names[i]), dtype=np.float64)
-                ax.scatter(x, y, c=metric_vals, cmap=cmap, s=10, alpha=0.7)
+                ax.scatter(
+                    x, y, c=metric_vals, cmap=cmap, s=10, alpha=0.7,
+                    vmin=vmin, vmax=vmax,
+                )
 
             if i == n - 1:
                 ax.set_xlabel(param_names[j], fontsize=8)
             else:
                 ax.set_xticklabels([])
-            if j == 0:
+            if j == 0 and i != j:
                 ax.set_ylabel(param_names[i], fontsize=8)
-            else:
+            elif j != 0:
                 ax.set_yticklabels([])
 
     fig.suptitle(f"Scatter Matrix (color = {metric})", fontsize=12)
 
-    # Add shared colorbar
+    # Colorbar beside rightmost column only (avoids overlap)
     sm = plt.cm.ScalarMappable(  # type: ignore[attr-defined]
         cmap=cmap,
-        norm=plt.Normalize(vmin=metric_vals.min(), vmax=metric_vals.max()),
+        norm=plt.Normalize(vmin=vmin, vmax=vmax),
     )
     sm.set_array(metric_vals)
-    fig.colorbar(sm, ax=axes.ravel().tolist(), label=metric, shrink=0.6)
+    fig.colorbar(sm, ax=axes[:, -1].ravel().tolist(), label=metric, shrink=0.8)

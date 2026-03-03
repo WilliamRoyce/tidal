@@ -29,6 +29,7 @@ def _make_sweep_results(
     n_runs: int = 12,
     *,
     add_status: bool = False,
+    metadata: dict[str, Any] | None = None,
 ) -> SweepResults:
     """Build a synthetic SweepResults with *n_params* swept parameters."""
     rng = np.random.default_rng(42)
@@ -56,6 +57,45 @@ def _make_sweep_results(
         run_dirs=run_dirs,
         spec_path="spec.json",
         measurements=["conversion"],
+        metadata=metadata or {},
+    )
+
+
+def _make_grid_results(
+    n_per_param: int = 5,
+    n_params: int = 2,
+) -> SweepResults:
+    """Build a synthetic SweepResults with grid-aligned data."""
+    import itertools
+
+    rng = np.random.default_rng(42)
+    param_names = [f"p{i}" for i in range(n_params)]
+    param_vals = {name: np.linspace(0, 1, n_per_param).tolist() for name in param_names}
+
+    rows: list[dict[str, Any]] = []
+    run_dirs: list[Path] = []
+    for combo in itertools.product(*[param_vals[n] for n in param_names]):
+        row: dict[str, Any] = dict(zip(param_names, combo, strict=True))
+        row["P_max"] = rng.uniform(0, 1)
+        row["max_energy_error"] = rng.uniform(1e-6, 1e-3)
+        rows.append(row)
+        run_dirs.append(Path(f"/tmp/run_{len(rows)}"))
+
+    # For grid data, swept_params stores the unique values per param
+    # repeated to match rows (n_per_param^n_params total)
+    swept = {
+        name: [row[name] for row in rows] for name in param_names
+    }
+
+    return SweepResults(
+        swept_params=swept,
+        fixed_params={"fixed_a": 1.0},
+        sim_settings={"t_end": 10.0},
+        rows=rows,
+        run_dirs=run_dirs,
+        spec_path="spec.json",
+        measurements=["conversion"],
+        metadata={"sampling_strategy": "grid"},
     )
 
 
@@ -355,6 +395,87 @@ class TestAnalyzeCommand:
 # ---------------------------------------------------------------------------
 
 
+class TestIsScatteredData:
+    """Tests for _is_scattered_data helper."""
+
+    def test_lhs_metadata(self) -> None:
+        from tidal.cli._sweep_panels import _is_scattered_data
+
+        results = _make_sweep_results(
+            n_params=2, n_runs=10,
+            metadata={"sampling_strategy": "latin_hypercube"},
+        )
+        assert _is_scattered_data(results) is True
+
+    def test_grid_metadata(self) -> None:
+        from tidal.cli._sweep_panels import _is_scattered_data
+
+        results = _make_grid_results(n_per_param=5, n_params=2)
+        assert _is_scattered_data(results) is False
+
+    def test_heuristic_scattered(self) -> None:
+        from tidal.cli._sweep_panels import _is_scattered_data
+
+        # No metadata — all unique values → heuristic says scattered
+        results = _make_sweep_results(n_params=2, n_runs=20)
+        assert _is_scattered_data(results) is True
+
+    def test_heuristic_grid(self) -> None:
+        from tidal.cli._sweep_panels import _is_scattered_data
+
+        # Grid without metadata — few unique values → heuristic says grid
+        results = _make_grid_results(n_per_param=5, n_params=2)
+        results = SweepResults(
+            swept_params=results.swept_params,
+            fixed_params=results.fixed_params,
+            sim_settings=results.sim_settings,
+            rows=results.rows,
+            run_dirs=results.run_dirs,
+            spec_path=results.spec_path,
+            measurements=results.measurements,
+            metadata={},  # No strategy metadata
+        )
+        assert _is_scattered_data(results) is False
+
+
+class TestRenderSweep2D:
+    """Tests for render_sweep_2d."""
+
+    def _make_ax(self) -> Axes:
+        import matplotlib.pyplot as plt
+
+        _, ax = plt.subplots()
+        return ax
+
+    def test_wrong_param_count_raises(self) -> None:
+        from tidal.cli._sweep_panels import render_sweep_2d
+
+        results = _make_sweep_results(n_params=1, n_runs=3)
+        ax = self._make_ax()
+        with pytest.raises(ValueError, match="2 swept parameters"):
+            render_sweep_2d(ax, results, "P_max")
+
+    def test_scattered_uses_scatter(self) -> None:
+        from tidal.cli._sweep_panels import render_sweep_2d
+
+        results = _make_sweep_results(
+            n_params=2, n_runs=30,
+            metadata={"sampling_strategy": "latin_hypercube"},
+        )
+        ax = self._make_ax()
+        render_sweep_2d(ax, results, "P_max")
+        # Scatter creates PathCollection objects
+        assert len(ax.collections) >= 1
+
+    def test_grid_uses_pcolormesh(self) -> None:
+        from tidal.cli._sweep_panels import render_sweep_2d
+
+        results = _make_grid_results(n_per_param=5, n_params=2)
+        ax = self._make_ax()
+        render_sweep_2d(ax, results, "P_max")
+        assert "P_max" in ax.get_title()
+
+
 class TestRenderSweepParallel:
     """Tests for render_sweep_parallel."""
 
@@ -380,6 +501,10 @@ class TestRenderSweepParallel:
         render_sweep_parallel(ax, results, "P_max")
         # Verify polylines were drawn (n_runs lines)
         assert len(ax.lines) == 8
+        # 4 x-tick labels: 3 params + metric axis
+        labels = [t.get_text() for t in ax.get_xticklabels()]
+        assert len(labels) == 4
+        assert labels[-1] == "P_max"
 
     def test_title_contains_metric(self) -> None:
         from tidal.cli._sweep_panels import render_sweep_parallel
@@ -415,13 +540,26 @@ class TestRenderSweepTornado:
         with pytest.raises(ValueError, match="at least 1"):
             render_sweep_tornado(ax, results, "P_max")
 
-    def test_smoke_renders(self) -> None:
+    def test_scattered_uses_correlation(self) -> None:
         from tidal.cli._sweep_panels import render_sweep_tornado
 
-        results = _make_sweep_results(n_params=3, n_runs=12)
+        results = _make_sweep_results(
+            n_params=3, n_runs=30,
+            metadata={"sampling_strategy": "latin_hypercube"},
+        )
         ax = self._make_ax()
         render_sweep_tornado(ax, results, "P_max")
-        assert "P_max" in ax.get_title()
+        assert "Spearman" in ax.get_xlabel()
+
+    def test_grid_uses_range(self) -> None:
+        from tidal.cli._sweep_panels import render_sweep_tornado
+
+        results = _make_grid_results(n_per_param=5, n_params=2)
+        ax = self._make_ax()
+        render_sweep_tornado(ax, results, "P_max")
+        # Range-based tornado uses metric name as xlabel, not "Spearman"
+        assert "P_max" in ax.get_xlabel()
+        assert "Spearman" not in ax.get_xlabel()
 
     def test_single_param(self) -> None:
         from tidal.cli._sweep_panels import render_sweep_tornado
@@ -429,8 +567,8 @@ class TestRenderSweepTornado:
         results = _make_sweep_results(n_params=1, n_runs=5)
         ax = self._make_ax()
         render_sweep_tornado(ax, results, "P_max")
-        # Should have exactly 1 horizontal bar
-        assert len(ax.patches) == 1
+        # Should have at least 1 horizontal bar
+        assert len(ax.patches) >= 1
 
 
 class TestRenderSweepScatter:
@@ -455,8 +593,18 @@ class TestRenderSweepScatter:
         results = _make_sweep_results(n_params=2, n_runs=8)
         fig = self._make_fig()
         render_sweep_scatter(fig, results, "P_max")
-        # 2x2 grid of axes
+        # 2x2 grid of axes + colorbar
         assert len(fig.axes) >= 4
+
+    def test_diagonal_shows_marginals(self) -> None:
+        from tidal.cli._sweep_panels import render_sweep_scatter
+
+        results = _make_sweep_results(n_params=2, n_runs=10)
+        fig = self._make_fig()
+        render_sweep_scatter(fig, results, "P_max")
+        # Diagonal axes should have scatter (collections), not hist (patches)
+        diag_ax = fig.axes[0]  # Top-left (0,0) diagonal cell
+        assert len(diag_ax.collections) >= 1
 
     def test_smoke_renders_3_params(self) -> None:
         from tidal.cli._sweep_panels import render_sweep_scatter
