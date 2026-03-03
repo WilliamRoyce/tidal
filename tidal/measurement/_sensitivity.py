@@ -33,7 +33,7 @@ def _require_salib() -> None:
     except ImportError:
         msg = (
             "SALib is required for sensitivity analysis. "
-            "Install it with: pip install SALib"
+            "Install it with: pip install tidal[sensitivity]"
         )
         raise ImportError(msg) from None
 

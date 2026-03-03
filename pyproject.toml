@@ -46,6 +46,7 @@ dependencies = [
 
 [project.optional-dependencies]
 wolfram = ["wolframclient>=1.4.0,<2.0"]
+sensitivity = ["SALib>=1.4"]
 
 [project.scripts]
 tidal = "tidal.cli:main"
