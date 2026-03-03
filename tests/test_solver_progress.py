@@ -106,6 +106,20 @@ class TestSimulationProgress:
         p.update(5.0)
         p.finish()
 
+    def test_set_phase(self) -> None:
+        """set_phase updates the progress bar description."""
+        p = SimulationProgress(0.0, 10.0, solver_name="CVODE", disable=True)
+        p.set_phase("CVODE init")
+        p.set_phase("CVODE")
+        p.update(5.0)
+        p.finish()
+
+    def test_set_phase_disabled(self) -> None:
+        """set_phase is a no-op when disabled."""
+        p = SimulationProgress(0.0, 10.0, disable=True)
+        p.set_phase("init")
+        p.finish()
+
 
 class TestProgressIntegration:
     """Integration tests: progress bar with actual solver calls."""

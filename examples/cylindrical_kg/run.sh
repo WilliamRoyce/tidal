@@ -14,7 +14,7 @@
 #   tidal derive theory.toml
 #   tidal inspect ../data/cylindrical_kg.json
 #   tidal simulate ../data/cylindrical_kg.json --param cylm2=0.5 \
-#     --grid-shape 48 --bounds 0.5:8,0:6.283185,-5:5 \
+#     --grid-shape 16 --bounds 0.5:8,0:6.283185,-5:5 \
 #     --bc neumann,periodic,neumann \
 #     --ic formula --ic-formula "np.exp(-((x - 3.0)**2 / 0.72) - (z**2 / 1.28))" \
 #     --t-end 4.0
@@ -31,8 +31,10 @@ tidal inspect ../data/cylindrical_kg.json
 # Run simulation (Gaussian ring in r-z plane, Neumann in r and z, periodic in theta)
 # Coordinates: x=r, y=theta, z=z
 tidal simulate ../data/cylindrical_kg.json \
+  --rtol 1e-4 \
+  --atol 1e-6 \
   --param cylm2=0.5 \
-  --grid-shape 48 \
+  --grid-shape 16 \
   --bounds 0.5:8,0:6.283185,-5:5 \
   --bc neumann,periodic,neumann \
   --ic formula \

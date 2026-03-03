@@ -63,6 +63,15 @@ class SimulationProgress:
             leave=True,
         )
 
+    def set_phase(self, phase: str) -> None:
+        """Update the progress bar description to show current phase.
+
+        Useful for indicating solver initialization before the step loop
+        begins, so users know the solver hasn't hung on large systems.
+        """
+        self._pbar.set_description(f"  {phase}")
+        self._pbar.refresh()
+
     def update(self, t: float) -> None:
         """Report current simulation time.
 

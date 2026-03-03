@@ -149,7 +149,9 @@ def call_cvode_stepwise(
     )
 
     solver = CVODE(rhsfn, **options)
+    progress.set_phase("CVODE init")
     solver.init_step(float(t_eval[0]), y0)  # pyright: ignore[reportUnknownMemberType]
+    progress.set_phase("CVODE")
 
     t_list: list[float] = [float(t_eval[0])]
     y_list: list[NDArray[np.float64]] = [y0.copy()]
@@ -203,7 +205,9 @@ def call_ida_stepwise(  # noqa: PLR0913, PLR0917
     )
 
     solver = IDA(resfn, **options)
+    progress.set_phase("IDA init")
     solver.init_step(float(t_eval[0]), y0, yp0)  # pyright: ignore[reportUnknownMemberType]
+    progress.set_phase("IDA")
 
     t_list: list[float] = [float(t_eval[0])]
     y_list: list[NDArray[np.float64]] = [y0.copy()]
