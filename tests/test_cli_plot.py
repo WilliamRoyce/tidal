@@ -580,6 +580,218 @@ class TestSnapshot2D:
 
 
 # ============================================================
+# 3D plot types
+# ============================================================
+
+
+@pytest.fixture(scope="session")
+def inline_3d_spec(tmp_path_factory: pytest.TempPathFactory) -> Path:
+    """Write an inline 3+1D Klein-Gordon JSON spec."""
+    import json
+
+    spec: dict[str, Any] = {
+        "metadata": {
+            "source": "inline-test-3d",
+            "lagrangian_expr": "-1/2 (d phi)^2",
+            "derived_from": "Euler-Lagrange",
+            "gauge": "none",
+            "linearized": False,
+            "parameters": {},
+        },
+        "spacetime": {
+            "dimension": 4,
+            "signature": [-1, 1, 1, 1],
+            "coordinates": ["t", "x", "y", "z"],
+        },
+        "fields": [
+            {"name": "phi_0", "index": 0, "is_dynamical": True},
+        ],
+        "equations": [
+            {
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                    ],
+                },
+            },
+        ],
+        "coupling": {},
+    }
+    d = tmp_path_factory.getbasetemp() / "inline_specs"
+    d.mkdir(exist_ok=True)
+    p = d / "kg_3d.json"
+    if not p.exists():
+        p.write_text(json.dumps(spec, indent=2))
+    return p
+
+
+@pytest.fixture(scope="session")
+def three_d_sim_dir(
+    inline_3d_spec: Path,
+    tmp_path_factory: pytest.TempPathFactory,
+) -> Path:
+    """Run a short 3D simulation for 3D plot tests."""
+    output = tmp_path_factory.mktemp("plot3d") / "sim_out"
+    ret = main(
+        [
+            "simulate",
+            str(inline_3d_spec),
+            "--t-end",
+            "1.0",
+            "--grid-shape",
+            "4,4,8",
+            "--bounds",
+            "0:4,0:4,0:8",
+            "--output",
+            str(output),
+            "--quiet",
+        ]
+    )
+    assert ret == 0, "3D simulation failed"
+    assert output.is_dir()
+    return output
+
+
+class TestSnapshot3D:
+    def test_snapshot_3d_initial(
+        self,
+        three_d_sim_dir: Path,
+        tmp_path: Path,
+    ) -> None:
+        output = tmp_path / "snap3d_0.png"
+        ret = main(
+            [
+                "plot",
+                str(three_d_sim_dir),
+                "--type",
+                "snapshot",
+                "--time-index",
+                "0",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
+        assert ret == 0
+        assert output.exists()
+
+    def test_snapshot_3d_final(
+        self,
+        three_d_sim_dir: Path,
+        tmp_path: Path,
+    ) -> None:
+        output = tmp_path / "snap3d_last.png"
+        ret = main(
+            [
+                "plot",
+                str(three_d_sim_dir),
+                "--type",
+                "snapshot",
+                "--time-index",
+                "-1",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
+        assert ret == 0
+        assert output.exists()
+
+    def test_snapshot_3d_specific_field(
+        self,
+        three_d_sim_dir: Path,
+        tmp_path: Path,
+    ) -> None:
+        output = tmp_path / "snap3d_phi.png"
+        ret = main(
+            [
+                "plot",
+                str(three_d_sim_dir),
+                "--type",
+                "snapshot",
+                "--field",
+                "phi_0",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
+        assert ret == 0
+        assert output.exists()
+
+
+class TestProfile3D:
+    def test_profile_3d(
+        self,
+        three_d_sim_dir: Path,
+        tmp_path: Path,
+    ) -> None:
+        output = tmp_path / "profile3d.png"
+        ret = main(
+            [
+                "plot",
+                str(three_d_sim_dir),
+                "--type",
+                "profile",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
+        assert ret == 0
+        assert output.exists()
+
+
+class TestCompare3D:
+    def test_compare_3d(
+        self,
+        three_d_sim_dir: Path,
+        tmp_path: Path,
+    ) -> None:
+        output = tmp_path / "compare3d.png"
+        ret = main(
+            [
+                "plot",
+                str(three_d_sim_dir),
+                "--type",
+                "compare",
+                "--output",
+                str(output),
+                "--quiet",
+            ]
+        )
+        assert ret == 0
+        assert output.exists()
+
+
+class TestSingleFieldSelection:
+    """Test that single_field() prefers dynamical fields over constraints."""
+
+    def test_prefers_dynamical_field(self) -> None:
+        from tidal.cli._panels import single_field
+
+        class _MockData:
+            fields = {"h_0": None, "h_1": None, "h_4": None}  # noqa: RUF012
+            velocities = {"h_4": None}  # noqa: RUF012
+
+        result = single_field(_MockData(), None)  # type: ignore[arg-type]
+        assert result == "h_4"
+
+    def test_falls_back_to_first_if_all_constraints(self) -> None:
+        from tidal.cli._panels import single_field
+
+        class _MockData:
+            fields = {"h_0": None, "h_1": None}  # noqa: RUF012
+            velocities: dict[str, None] = {}  # noqa: RUF012
+
+        result = single_field(_MockData(), None)  # type: ignore[arg-type]
+        assert result == "h_0"
+
+
+# ============================================================
 # Output options
 # ============================================================
 

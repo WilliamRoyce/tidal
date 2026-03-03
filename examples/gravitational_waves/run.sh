@@ -11,7 +11,6 @@
 #   For + polarization (z-propagating): set h_4 (h_xx), h_7 = -h_4 (h_yy),
 #   all other spatial components zero.
 #
-# NOTE: 3D data — tidal plot is for 1D/2D only.
 #
 # Running this script:
 #   cd examples/gravitational_waves && bash run.sh
@@ -24,7 +23,7 @@
 #     --ic formula --ic-component h_4 \
 #     --ic-formula "np.exp(-(z - 10.0)**2 / 4.5) * np.cos(0.6283 * (z - 10.0))" \
 #     --ic-field "h_7:-(np.exp(-(z - 10.0)**2 / 4.5) * np.cos(0.6283 * (z - 10.0)))" \
-#     --t-end 5.0
+#     --t-end 5.0 --output ../data/linearized_gravity_output
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -49,4 +48,9 @@ tidal simulate ../data/linearized_gravity.json \
   --ic-formula "np.exp(-(z - 10.0)**2 / 4.5) * np.cos(0.6283 * (z - 10.0))" \
   --ic-component h_4 \
   --ic-field "h_7:-(np.exp(-(z - 10.0)**2 / 4.5) * np.cos(0.6283 * (z - 10.0)))" \
-  --t-end 5.0
+  --t-end 5.0 \
+  --output ../data/linearized_gravity_output
+
+# Visualize results (plots saved into the simulation output directory)
+tidal plot ../data/linearized_gravity_output --type snapshot --field h_4 --time-index 0 --quiet
+tidal plot ../data/linearized_gravity_output --type snapshot --field h_4 --time-index -1 --quiet

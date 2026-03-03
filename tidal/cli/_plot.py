@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from tidal.cli._panels import single_field
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -46,7 +48,7 @@ def _plot_1d(path: Path, sd: SimulationData, gi: GridInfo) -> None:
     import matplotlib.pyplot as plt
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    name = sd.spec.component_names[0]
+    name = single_field(sd, None)
     field_hist = sd.fields[name]  # (n_snapshots, n_x)
     x = gi.axes_coords(0)
     times = sd.times
@@ -86,7 +88,7 @@ def _plot_2d(path: Path, sd: SimulationData, gi: GridInfo) -> None:
     import matplotlib.pyplot as plt
 
     fig, axes = plt.subplots(1, 3, figsize=(16, 5))
-    name = sd.spec.component_names[0]
+    name = single_field(sd, None)
     field_hist = sd.fields[name]  # (n_snapshots, nx, ny)
     times = sd.times
     bounds = gi.bounds
@@ -170,7 +172,7 @@ def _plot_3d(path: Path, sd: SimulationData, gi: GridInfo) -> None:
     """3D: z-profile + x-y slice + amplitude decay + component check."""
     import matplotlib.pyplot as plt
 
-    name = sd.spec.component_names[0]
+    name = single_field(sd, None)
     field_hist = sd.fields[name]  # (n_snapshots, nx, ny, nz)
     times = sd.times
     bounds = gi.bounds
