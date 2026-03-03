@@ -2,18 +2,20 @@
 #
 # Demonstrates space-filling sampling (Latin Hypercube) over the
 # coupling strength × target mass parameter plane, followed by
-# Sobol sensitivity analysis and advanced visualization.
+# Morris sensitivity screening and advanced visualization.
+#
+# Note: Morris screening works with any sampling strategy (grid, LHS, etc.).
+# Sobol sensitivity analysis requires Saltelli-structured sampling.
 #
 # Features demonstrated:
 #   - F2b: Latin Hypercube sampling (space-filling design)
-#   - F4:  Sobol sensitivity analysis (via `tidal analyze`)
+#   - F4:  Morris sensitivity screening (via `tidal analyze`)
 #   - F8:  Advanced visualization (parallel coords, tornado, scatter)
 #
 # Usage:
 #   tidal sweep --config examples/coupled_scalars/sweep_2d_sensitivity.toml
 #
 # After running, analyze sensitivity:
-#   tidal analyze <output_path>/ --sensitivity sobol --metric P_max
 #   tidal analyze <output_path>/ --sensitivity morris --metric P_max
 #
 # Visualization:

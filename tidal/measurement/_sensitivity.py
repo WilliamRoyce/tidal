@@ -120,9 +120,10 @@ def compute_sobol_indices(
 ) -> SensitivityResult:
     """Compute Sobol sensitivity indices from sweep results.
 
-    Uses SALib's analyze module with Saltelli-style computation.
-    The sweep data should ideally come from a Sobol or Latin Hypercube
-    sampling strategy (F2b) for reliable estimates.
+    Uses SALib's analyze module. Requires Saltelli-structured sampling
+    where the number of samples is ``N * (D + 2)`` for D parameters.
+    Arbitrary Latin Hypercube or Sobol QMC samples are NOT compatible;
+    use :func:`compute_morris_screening` for those.
 
     Parameters
     ----------
@@ -149,11 +150,18 @@ def compute_sobol_indices(
 
     param_names, x, y = _extract_data(results, metric)
 
-    if len(y) < 2 * (len(param_names) + 1):
+    d = len(param_names)
+    # SALib Sobol requires Saltelli-structured samples: N * (D + 2) for
+    # calc_second_order=False.  Arbitrary LHS/QMC samples won't work.
+    saltelli_divisor = d + 2
+    if len(y) < saltelli_divisor or len(y) % saltelli_divisor != 0:
         msg = (
-            f"Sobol analysis needs at least {2 * (len(param_names) + 1)} samples "
-            f"for {len(param_names)} parameters, got {len(y)}. "
-            f"Use --sweep-strategy sobol --n-samples N for proper sampling."
+            f"Sobol analysis requires Saltelli-structured sampling where the "
+            f"number of samples is N * (D + 2) = N * {saltelli_divisor} for "
+            f"{d} parameters (got {len(y)}). "
+            f"Latin Hypercube or Sobol QMC samples are not compatible. "
+            f"Use Morris screening (--sensitivity morris) instead, which "
+            f"works with any sampling strategy."
         )
         raise ValueError(msg)
 
@@ -167,9 +175,18 @@ def compute_sobol_indices(
         "bounds": bounds,
     }
 
-    si = sobol_analyze.analyze(
-        problem, y, calc_second_order=False, num_resamples=n_bootstrap
-    )
+    try:
+        si = sobol_analyze.analyze(
+            problem, y, calc_second_order=False, num_resamples=n_bootstrap
+        )
+    except RuntimeError as exc:
+        msg = (
+            f"SALib Sobol analysis failed: {exc}. "
+            f"This usually means the sweep data was not generated with "
+            f"Saltelli sampling. Use Morris screening (--sensitivity morris) "
+            f"instead, which works with any sampling strategy."
+        )
+        raise ValueError(msg) from exc
 
     return SensitivityResult(
         method="sobol",

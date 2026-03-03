@@ -131,7 +131,7 @@ class TestSobolIndices:
         from tidal.measurement._sensitivity import compute_sobol_indices
 
         results = _make_sweep_results(n_params=3, n_runs=4)
-        # Need at least 2*(3+1)=8 samples but only providing 4
+        # Need N*(D+2) = N*5 samples; 4 is not a multiple of 5
         mock_sobol = MagicMock()
         with (
             patch("tidal.measurement._sensitivity._require_salib"),
@@ -143,7 +143,27 @@ class TestSobolIndices:
                     "SALib": MagicMock(),
                 },
             ),
-            pytest.raises(ValueError, match="Sobol analysis needs at least"),
+            pytest.raises(ValueError, match="Saltelli-structured sampling"),
+        ):
+            compute_sobol_indices(results, "P_max")
+
+    def test_non_saltelli_count_raises(self) -> None:
+        from tidal.measurement._sensitivity import compute_sobol_indices
+
+        # 2 params → need N*(2+2)=4k samples; 7 is not a multiple of 4
+        results = _make_sweep_results(n_params=2, n_runs=7)
+        mock_sobol = MagicMock()
+        with (
+            patch("tidal.measurement._sensitivity._require_salib"),
+            patch.dict(
+                "sys.modules",
+                {
+                    "SALib.analyze.sobol": mock_sobol,
+                    "SALib.analyze": MagicMock(),
+                    "SALib": MagicMock(),
+                },
+            ),
+            pytest.raises(ValueError, match="Morris screening"),
         ):
             compute_sobol_indices(results, "P_max")
 
