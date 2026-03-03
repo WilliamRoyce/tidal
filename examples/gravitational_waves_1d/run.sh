@@ -52,36 +52,36 @@ tidal simulate ../data/gw_plane_wave_1d.json \
 # Spacetime heatmap: h_4 (plus polarization) evolution
 tidal plot "$OUT" --type heatmap --field h_4 \
   --title "GW h_+ polarization (x-t)" \
-  --output "$OUT/heatmap_h_4.png"
+  --output "$OUT/heatmap_h_4.png" --quiet
 
 # Spacetime heatmap: h_7 (traceless partner, should be -h_4)
 tidal plot "$OUT" --type heatmap --field h_7 \
   --title "GW h_7 = -h_+ (traceless partner)" \
-  --output "$OUT/heatmap_h_7.png"
+  --output "$OUT/heatmap_h_7.png" --quiet
 
 # Profile evolution: h_4 at multiple time snapshots
 tidal plot "$OUT" --type profile --field h_4 \
   --time-indices 0,25,50,75,100 \
   --title "h_+ profile evolution" \
-  --output "$OUT/profile_h_4.png"
+  --output "$OUT/profile_h_4.png" --quiet
 
 # Profile evolution: h_7 at multiple time snapshots
 tidal plot "$OUT" --type profile --field h_7 \
   --time-indices 0,25,50,75,100 \
   --title "h_7 profile evolution" \
-  --output "$OUT/profile_h_7.png"
+  --output "$OUT/profile_h_7.png" --quiet
 
 # Multi-field peak amplitude
 tidal plot "$OUT" --type amplitude \
   --fields h_4,h_5,h_7 \
   --title "GW field amplitudes" \
-  --output "$OUT/amplitude_dynamical.png"
+  --output "$OUT/amplitude_dynamical.png" --quiet
 
 # Compare h_4 initial/final vs h_7
 tidal plot "$OUT" --type compare \
   --fields h_4,h_7 \
   --title "h_4 vs h_7 (TT constraint: h_7 = -h_4)" \
-  --output "$OUT/compare_h4_h7.png"
+  --output "$OUT/compare_h4_h7.png" --quiet
 
 # Energy conservation measurement (currently blocked by unsupported
 # mixed_* Hamiltonian operators — see .github-issues-pending.md)
@@ -118,26 +118,29 @@ tidal simulate ../data/gw_plane_wave_1d.json \
 # Heatmap: clean rightward propagation (compare vs symmetric Run 1)
 tidal plot "$OUT2" --type heatmap --field h_4 \
   --title "GW h_+ travelling pulse (right-mover)" \
-  --output "$OUT2/heatmap_h_4.png"
+  --output "$OUT2/heatmap_h_4.png" --quiet
 
 tidal plot "$OUT2" --type heatmap --field h_7 \
   --title "GW h_7 = -h_+ travelling (traceless partner)" \
-  --output "$OUT2/heatmap_h_7.png"
+  --output "$OUT2/heatmap_h_7.png" --quiet
 
 tidal plot "$OUT2" --type profile --field h_4 \
   --time-indices 0,25,50,75,100 \
   --title "h_+ travelling profile evolution" \
-  --output "$OUT2/profile_h_4.png"
+  --output "$OUT2/profile_h_4.png" --quiet
 
 tidal plot "$OUT2" --type amplitude \
   --fields h_4,h_5,h_7 \
   --title "GW amplitudes (travelling pulse)" \
-  --output "$OUT2/amplitude.png"
+  --output "$OUT2/amplitude.png" --quiet
 
 echo ""
-echo "=== Run 2 (travelling pulse) complete. Plots: $OUT2/ ==="
+echo "=== Run 2 (travelling pulse) complete ==="
 echo ""
-echo "All runs complete."
-echo "  Static Gaussian:   $OUT/"
-echo "  Travelling pulse:  $OUT2/"
-ls -la "$OUT"/*.png "$OUT2"/*.png 2>/dev/null || echo "  (no plots generated)"
+echo "All runs complete. Generated plots:"
+echo ""
+echo "  Static Gaussian ($OUT/):"
+ls "$OUT"/*.png 2>/dev/null | sed 's|.*/|    |'
+echo ""
+echo "  Travelling pulse ($OUT2/):"
+ls "$OUT2"/*.png 2>/dev/null | sed 's|.*/|    |'
