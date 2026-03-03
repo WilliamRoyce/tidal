@@ -92,6 +92,8 @@ _LIST_TO_COMMA_KEYS = frozenset({"grid_shape", "ic_center", "ic_wavevector"})
 def _parse_sweep_section(
     name: str,
     section: dict[str, Any],
+    *,
+    strategy: str | None = None,
 ) -> tuple[list[float], dict[str, Any]]:
     """Parse a ``[sweep.NAME]`` TOML section into values + adaptive config.
 
@@ -123,6 +125,11 @@ def _parse_sweep_section(
 
     if scale == "adaptive":
         return _parse_adaptive(name, section, start, stop)
+
+    # Space-filling strategies (LHS, Sobol) only need bounds — count
+    # comes from n_samples at the sweep level.
+    if strategy in {"latin_hypercube", "sobol"} and "count" not in section:
+        return [start, stop], {}
 
     return _parse_range(name, section, start, stop, scale)
 
@@ -217,7 +224,7 @@ def _parse_sweeps(
                 continue
             if not isinstance(section, dict):
                 continue
-            values, ac = _parse_sweep_section(name, section)
+            values, ac = _parse_sweep_section(name, section, strategy=strategy)
             swept[name] = values
             if ac:
                 adaptive[name] = ac
