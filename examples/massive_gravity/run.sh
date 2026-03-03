@@ -29,11 +29,12 @@ tidal derive theory.toml
 tidal inspect ../data/massive_gravity_3d.json
 
 # Simulate with zero-mean sine-modulated Gaussian in h_3 (h_xx component).
+# After pipeline equation reassignment (xx eqn evolves h_5, yy eqn evolves h_3),
+# h_3 is dynamical with dispersion omega^2 = k^2 + 2*m^2.
 # The h_0 (lapse) constraint is Poisson-type: on a periodic domain it requires
 # the source to have zero spatial mean (Fredholm compatibility). A plain
 # Gaussian has nonzero mean → incompatible. sin(2πx/L) is odd-symmetric about
 # the Gaussian center x=L/2, so Gaussian × sin has zero spatial mean by parity.
-# The mass term creates dispersive propagation: omega^2 = k^2 + m^2
 tidal simulate ../data/massive_gravity_3d.json \
   --atol 1e-4 \
   --rtol 1e-6 \

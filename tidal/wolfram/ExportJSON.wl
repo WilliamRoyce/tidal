@@ -291,16 +291,62 @@ ExtractMassCouplingFromEquations[equations_List, allFieldNames_List] := Module[
 (* === Multi-Field JSON Structure Building === *)
 
 BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Module[
-  {json, fields, equations, allFieldNames, nFields, autoMatrices, couplingSection},
+  {json, fields, equations, allFieldNames, nFields, autoMatrices, couplingSection,
+   workingEqs},
 
   (* fieldEquations format: {{"phi_0", eqPhi}, {"chi_0", eqChi}, ...} *)
-  allFieldNames = fieldEquations[[All, 1]];
-  nFields = Length[fieldEquations];
+  workingEqs = fieldEquations;
+  allFieldNames = workingEqs[[All, 1]];
+  nFields = Length[workingEqs];
+
+  (* === Cross-field d²_t equation reassignment ===
+     In multi-field tensor systems, a component equation may contain d²_t of a
+     DIFFERENT field than the one it's nominally assigned to. For example, in
+     Fierz-Pauli massive gravity the xx-component equation has d²_t(h_yy) and
+     the yy-component equation has d²_t(h_xx). Detect this and reassign so each
+     field gets the equation that actually evolves it. *)
+  Module[{evolvedFieldIndex, assignmentMap, needsSwap = False, newEqs},
+    (* For each equation, find which field's d²_t it contains *)
+    evolvedFieldIndex = Table[
+      Module[{result = 0},
+        Do[
+          If[DetectLHSTimeOrder[workingEqs[[i, 2]], allFieldNames[[j]]] >= 2,
+            result = j; Break[]],
+          {j, nFields}];
+        result],
+      {i, nFields}];
+
+    (* Build reverse map: field_j -> equation_i that evolves it *)
+    assignmentMap = Table[j, {j, nFields}];  (* identity by default *)
+    Do[
+      If[evolvedFieldIndex[[i]] > 0 && evolvedFieldIndex[[i]] != i,
+        (* Check for conflicts: another equation already assigned to this field *)
+        If[assignmentMap[[evolvedFieldIndex[[i]]]] != evolvedFieldIndex[[i]],
+          Print["WARNING: Multiple equations claim to evolve field " <>
+                allFieldNames[[evolvedFieldIndex[[i]]]] <>
+                ". Keeping first assignment."],
+          assignmentMap[[evolvedFieldIndex[[i]]]] = i;
+          needsSwap = True
+        ]],
+      {i, nFields}];
+
+    If[needsSwap,
+      newEqs = Table[
+        {allFieldNames[[j]], workingEqs[[assignmentMap[[j]], 2]]},
+        {j, nFields}];
+      Do[
+        If[assignmentMap[[j]] != j,
+          Print["  SWAP: Field " <> allFieldNames[[j]] <> " gets equation from " <>
+                allFieldNames[[assignmentMap[[j]]]] <>
+                " (contains d2_t(" <> allFieldNames[[j]] <> "))"]],
+        {j, nFields}];
+      workingEqs = newEqs]
+  ];
 
   (* Build fields list *)
   fields = Table[
     <|
-      "name" -> fieldEquations[[i, 1]],
+      "name" -> workingEqs[[i, 1]],
       "index" -> i - 1,
       "is_dynamical" -> True
     |>,
@@ -311,8 +357,8 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
   (* Pass allFieldNames so cross-field references can be detected *)
   equations = Table[
     EquationToJSONMultiField[
-      fieldEquations[[i, 2]],
-      fieldEquations[[i, 1]],
+      workingEqs[[i, 2]],
+      workingEqs[[i, 1]],
       i - 1,
       allFieldNames,
       metadata
@@ -394,6 +440,23 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
     (* Mixed time-space derivatives ARE included - they get converted to momentum gradients *)
     (* by IdentifyMultiFieldTerm (e.g., d_t d_x A -> gradient_x(pi)) *)
     rhs = Total[Select[terms, !ContainsOwnTimeDerivative[#, fieldName, lhsTimeOrder] &]];
+  ];
+
+  (* Safety net: if own-field d²_t terms sum to zero under Simplify,
+     reclassify as constraint. This catches edge cases where component-level
+     Simplify didn't fully cancel phantom time derivatives — e.g., ±½ d²_t(h)
+     terms from R^{(1)} and -½ η R^{(1)} in the linearized Einstein tensor. *)
+  If[lhsTimeOrder > 0 && Length[timeDerivTerm] > 0,
+    Module[{totalLHS},
+      totalLHS = Simplify[Total[timeDerivTerm]];
+      If[totalLHS === 0,
+        Print["  NOTE: d" <> ToString[lhsTimeOrder] <> "_t(" <> fieldName <>
+              ") terms cancel (sum=0). Reclassifying as constraint."];
+        lhsTimeOrder = 0;
+        timeDerivTerm = {};
+        rhs = componentEq;
+      ]
+    ]
   ];
 
   (* LHS normalization: extract time-derivative coefficient and normalize RHS *)

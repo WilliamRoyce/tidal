@@ -38,7 +38,7 @@ The chosen example `G^(1)_ab[h] - m^2 h_ab = 0` obtained by linearizing `Einstei
 4. **Non-zero mass matrix** -- The identity operator terms from `m2 * h_ab` produce a non-zero diagonal mass matrix in the JSON, exercising the mass matrix auto-computation path
 5. **Runtime parameters** -- `--param m2=1.0` enables parameter sweeps without re-derivation
 6. **Dispersive propagation** -- omega^2 = k^2 + m^2 gives subluminal, spreading waves (testable physics)
-7. **Mixed LHS types** -- constraint (h_0), first-order (h_1, h_2), and second-order (h_3-h_5) equations
+7. **Mixed LHS types** -- constraint (h_0, h_1, h_2) and second-order evolution (h_3, h_4, h_5) with cross-field d²_t reassignment
 
 ## 2. Key Physics Considerations
 
@@ -71,7 +71,7 @@ In 3D (2+1D) spacetime, pure General Relativity has **no local propagating degre
 
 - Massless linearized gravity (the GW example in 2+1D) would produce ONLY constraint equations -- no time evolution. This is physically correct but not useful for simulation testing.
 - Adding a mass term creates a propagating mode (the massive graviton). This makes the simulation physically interesting: you can see dispersive wave propagation.
-- The constraint/evolution split (h_0 = constraint, h_1/h_2 = first-order, h_3-h_5 = second-order) is distinct from 4D and tests the pipeline's handling of mixed equation types in a different configuration.
+- The constraint/evolution split (h_0, h_1, h_2 = constraints; h_3, h_4, h_5 = evolution with xx↔yy reassignment) is distinct from 4D and tests the pipeline's handling of cross-field d²_t and equation reassignment.
 
 ### Dispersion Relation
 
@@ -130,29 +130,34 @@ The expected JSON output has:
 
 ### Simulation Design
 
-The simulation places a Gaussian pulse in h_4 (h_xy), the only evolution equation:
-- 2D spatial grid (64x64, periodic BCs)
-- RK4 time integration, ~3.5 oscillation periods
-- Physics validation: center-point oscillation matches analytic `A*cos(sqrt(2*m^2)*t)`
-- 2x3 plot layout: heatmap snapshots at t=0/T/4/T/2, center oscillation, cross-sections, amplitude envelope
+The simulation places a Gaussian pulse in h_3 (h_xx), one of three evolution fields:
+- 2D spatial grid (16x16, periodic BCs)
+- IDA (DAE) solver with algebraic constraints
+- Physics validation: dispersive propagation with omega^2 = k^2 + 2*m^2
+- Amplitude and snapshot plots saved to output directory
 
-### Constraint Handling and Helmholtz Resonance
+### Constraint Structure and Equation Reassignment
 
-The gauge-unfixed massive gravity equations produce 5 constraint equations and 1 evolution equation (h_4). The constraints have diverse mathematical forms:
+The gauge-unfixed massive gravity equations produce 3 constraint equations and 3 evolution equations:
 
-| Constraint | Type | Self-terms |
-|-----------|------|------------|
-| h_0 (Hamiltonian) | Helmholtz | identity + laplacian_x + laplacian_y |
-| h_1, h_2 (momentum) | Partial Helmholtz | identity + one-axis laplacian |
-| h_3, h_5 (spatial) | Algebraic | identity only (no self-laplacian) |
+| Field | Type | Notes |
+|-------|------|-------|
+| h_0 (tt) | Constraint | Helmholtz-type: identity + laplacian_x + laplacian_y |
+| h_1 (tx) | Constraint | Partial Helmholtz: identity + one-axis laplacian |
+| h_2 (ty) | Constraint | Partial Helmholtz: identity + one-axis laplacian |
+| h_3 (xx) | Evolution | Gets yy equation via reassignment (d²_t(h_3) appears in yy eqn) |
+| h_4 (xy) | Evolution | Standard assignment (d²_t(h_4) in xy eqn) |
+| h_5 (yy) | Evolution | Gets xx equation via reassignment (d²_t(h_5) appears in xx eqn) |
 
-The unified constraint solver handles all of these via coupled FFT block solve:
-- **Cluster {h_0, h_3, h_5}**: mutually coupled via Laplacian cross-terms, solved as a 3×3 system at each wavenumber
+**Cross-field d²_t and equation reassignment**: In the linearized Einstein tensor G^{(1)}\_{ab}, the xx component has d²\_t(h\_yy) (not d²\_t(h\_xx)) and vice versa. This is because G^{(1)}\_{xx} = R^{(1)}\_{xx} - ½ R^{(1)} and the scalar curvature R^{(1)} contributes a d²\_t(h\_xx) term that exactly cancels the one from R^{(1)}\_{xx}, leaving only d²\_t(h\_yy). The pipeline detects this cross-field structure and reassigns equations so that each field's evolution equation contains its own d²\_t on the LHS.
+
+The constraint solver handles the 3 constraints:
+- **Cluster {h_0}** or **{h_0, ...}**: Helmholtz constraint, solved via FFT
 - **Cluster {h_1, h_2}**: coupled via cross_derivative_xy, solved as a 2×2 system
 
-**Helmholtz resonance**: The h_0 constraint has self-operator `-(m² + ∇²_x + ∇²_y)`, whose Fourier-space eigenvalue is `-m² + sin²(k_x·dx)/dx² + sin²(k_y·dy)/dy²`. This crosses zero at wavenumbers where the discrete Laplacian magnitude equals m², creating a near-singular mode. Without regularization, noise at this wavenumber is amplified ~100×, feeding back into h_4's evolution via `cross_derivative_xy(h_0)` and producing exponential blowup.
+**Helmholtz resonance**: The h_0 constraint has self-operator `-(m² + ∇²_x + ∇²_y)`, whose Fourier-space eigenvalue is `-m² + sin²(k_x·dx)/dx² + sin²(k_y·dy)/dy²`. This crosses zero at wavenumbers where the discrete Laplacian magnitude equals m², creating a near-singular mode.
 
-**SVD Tikhonov regularization**: The coupled FFT solver uses batched SVD with Tikhonov regularization to handle near-singular modes smoothly: `S_reg_inv = S / (S² + α²)` where `α = rcond × max(S)`. This attenuates rather than amplifies near-singular modes, preventing the constraint-evolution feedback instability while leaving well-conditioned modes essentially unchanged (< 0.01% error). The default `rcond = 0.01` stabilizes the massive gravity simulation with h_4 oscillating cleanly at `ω = √(2m²)`.
+**SVD Tikhonov regularization**: The coupled FFT solver uses batched SVD with Tikhonov regularization to handle near-singular modes smoothly: `S_reg_inv = S / (S² + α²)` where `α = rcond × max(S)`. This attenuates rather than amplifies near-singular modes.
 
 ## 4. What This Example Validates End-to-End
 
@@ -192,7 +197,7 @@ The unified constraint solver handles all of these via coupled FFT block solve:
 | **Mass matrix** | Zero (massless) | Non-zero diagonal (massive) |
 | **Metric in expr** | No | Yes (`eta[-a,-b]`) |
 | **Physics** | Massless wave propagation | Dispersive massive propagation |
-| **Constraint count** | 4 constraints, 6 evolution | 5 constraints, 1 evolution (h_4) |
+| **Constraint count** | 4 constraints, 6 evolution | 3 constraints, 3 evolution (h_3, h_4, h_5) |
 | **Gauge variants** | Gauge-unfixed + de Donder + TT | Gauge-unfixed only |
-| **Simulation focus** | TT-gauge polarizations h+, hx | Massive oscillation of h_xy |
+| **Simulation focus** | TT-gauge polarizations h+, hx | Massive dispersive propagation of h_3, h_4, h_5 |
 | **Analogous to** | Massless photon (Maxwell) | Massive photon (Proca) |
