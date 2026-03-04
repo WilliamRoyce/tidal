@@ -583,12 +583,6 @@ def pre_solve_constraints(  # noqa: PLR0913
     NDArray[np.float64]
         Updated y0 with constraint fields solved.
 
-    Raises
-    ------
-    ValueError
-        If a constraint is incompatible (singular operator with nonzero
-        projection in null space), or has no self-terms.
-
     Warns
     -----
     UserWarning
@@ -636,15 +630,15 @@ def pre_solve_constraints(  # noqa: PLR0913
             eq.constraint_solver,
         )
         if not terms.self_terms:
-            msg = (
-                f"Constraint equation for '{eq.field_name}' has no "
-                f"self-referencing terms — cannot solve for the field."
-            )
-            raise ValueError(msg)
+            # The labeled field doesn't appear in this equation at all.
+            # This is a compatibility constraint on *other* fields (e.g.,
+            # the Fierz-Pauli Hamiltonian constraint constrains h_3/h_5
+            # but doesn't involve h_0).  Skip — nothing to solve here.
+            continue
         groups.append(terms)
 
     # Decompose into connected components to avoid false coupling
-    # (e.g., massive_gravity: h_0 is independent of h_1↔h_2)
+    # (e.g., massive_gravity: h_1↔h_2 coupled, h_0 skipped)
     components = _find_connected_components(groups, name_map)
     for component in components:
         if len(component) == 1:
@@ -952,12 +946,12 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
                 coeff_eval, t, eq.constraint_solver,
             )
             if not terms.self_terms:
-                msg = (
-                    f"Constraint equation for '{eq.field_name}' has "
-                    f"constraint_solver.enabled=True but no self-referencing "
-                    f"terms — cannot solve for the field."
-                )
-                raise ValueError(msg)
+                # The labeled field doesn't appear in this equation.
+                # This is a compatibility constraint on other fields
+                # (e.g., Fierz-Pauli Hamiltonian constraint).  Skip —
+                # nothing to solve.  Phase 3 verification will check
+                # whether the constraint is satisfied by the IC.
+                continue
             enabled_groups.append(terms)
 
         # Decompose into connected components to avoid false coupling

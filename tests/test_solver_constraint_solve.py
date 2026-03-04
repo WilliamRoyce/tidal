@@ -2695,13 +2695,17 @@ class TestEnsureConsistentICRealJSON:
         assert float(np.max(np.abs(a0_data))) > 1e-5
 
     def test_massive_gravity_connected_components(self) -> None:
-        """Massive gravity: h_0 (Poisson) solved independently of h_1↔h_2.
+        """Massive gravity: h_0 skipped (no self-terms), h_1↔h_2 coupled.
 
-        h_0's constraint has only laplacian self-terms (no identity) →
-        Poisson-type.  h_1 and h_2 are truly coupled via cross_derivative_xy.
-        Connected component decomposition separates {h_0} from {h_1, h_2},
-        allowing h_0 to use the single-field FFT solver with proper
-        zero-mode handling.
+        With the correct linearized Einstein tensor (from √|g|·L
+        perturbation), the tt equation (h_0) doesn't involve h_0 — it's
+        a compatibility constraint on spatial components h_3/h_4/h_5.
+        The solver skips h_0 (no self-terms) and solves h_1↔h_2 as a
+        coupled screened-Poisson system.
+
+        IC: traceless spatial perturbation h_3 = -h_5 = cos(k*x)*cos(k*y)
+        with k_x = k_y satisfies the h_0 constraint exactly (the
+        -m2*(h_3+h_5) term vanishes and the mixed Laplacians cancel).
         """
         import json
         from pathlib import Path
@@ -2723,34 +2727,34 @@ class TestEnsureConsistentICRealJSON:
         n = grid.num_points
 
         y0 = np.zeros(layout.total_size)
-        # Set h_3 to zero-mean cosine (compatible with h_0 Poisson constraint)
-        h3_slot = layout.field_slot_map["h_3"]
-        x_arr, _ = grid.coord_arrays()
-        y0[h3_slot * n : (h3_slot + 1) * n] = (
-            0.5 * np.cos(2 * np.pi * x_arr / 10)
-        ).ravel()
+        x_arr, y_arr = grid.coord_arrays()
+        k = 2 * np.pi / 10  # k_x = k_y = 2π/L
+        wave = 0.5 * np.cos(k * x_arr) * np.cos(k * y_arr)
 
-        # Should succeed without "singular at zero wavenumber" error
+        # Traceless spatial IC: h_3 (h_xx) = -h_5 (h_yy)
+        h3_slot = layout.field_slot_map["h_3"]
+        h5_slot = layout.field_slot_map["h_5"]
+        y0[h3_slot * n : (h3_slot + 1) * n] = wave.ravel()
+        y0[h5_slot * n : (h5_slot + 1) * n] = (-wave).ravel()
+
         result = ensure_consistent_ic(
             spec, grid, y0, bc="periodic", parameters={"m2": 1.0},
         )
 
-        # h_0 should be solved (non-zero: determined by h_3 source)
+        # h_0 remains at zero (not constrained by its own equation)
         h0_slot = layout.field_slot_map["h_0"]
         h0_data = result[h0_slot * n : (h0_slot + 1) * n]
-        assert float(np.max(np.abs(h0_data))) > 1e-6, (
-            "h_0 should be non-zero (Poisson solve from h_3 source)"
+        assert float(np.max(np.abs(h0_data))) < 1e-10, (
+            "h_0 should remain zero (equation has no self-terms)"
         )
 
-    def test_massive_gravity_gaussian_sin_ic(self) -> None:
-        """Massive gravity with Gaussian × sin IC (mirrors run.sh).
+    def test_massive_gravity_inconsistent_ic(self) -> None:
+        """Massive gravity: IC that violates the h_0 compatibility constraint.
 
-        The h_0 constraint is Poisson-type (no identity self-term).
-        sin(2πx/L) is odd-symmetric about the Gaussian center x=L/2,
-        so Gaussian × sin has zero spatial mean by parity — satisfying
-        Fredholm compatibility.  This test catches the cos→sin issue:
-        Gaussian × cos has NONZERO mean and would fail the Poisson
-        compatibility check.
+        Setting only h_3 (with h_4 = h_5 = 0) violates the constraint
+        0 = -m2*(h_3+h_5) + 0.5*∇²_x(h_5) + 0.5*∇²_y(h_3) - ∂²_xy(h_4).
+        With strict=True this raises ValueError; with strict=False it
+        warns but proceeds.
         """
         import json
         from pathlib import Path
@@ -2779,15 +2783,24 @@ class TestEnsureConsistentICRealJSON:
             * np.sin(2 * np.pi * x_arr / 50)
         ).ravel()
 
-        result = ensure_consistent_ic(
-            spec, grid, y0, bc="periodic", parameters={"m2": 1.0},
-        )
+        # strict=True should raise for the violated h_0 constraint
+        with pytest.raises(ValueError, match="does not satisfy"):
+            ensure_consistent_ic(
+                spec, grid, y0, bc="periodic", parameters={"m2": 1.0},
+                strict=True,
+            )
 
+        # strict=False should warn but succeed
+        with pytest.warns(UserWarning, match="does not satisfy"):
+            result = ensure_consistent_ic(
+                spec, grid, y0, bc="periodic", parameters={"m2": 1.0},
+                strict=False,
+            )
+
+        # h_0 should remain at zero (equation doesn't involve h_0)
         h0_slot = layout.field_slot_map["h_0"]
         h0_data = result[h0_slot * n : (h0_slot + 1) * n]
-        assert float(np.max(np.abs(h0_data))) > 1e-6, (
-            "h_0 should be non-zero (Poisson solve from Gaussian × sin source)"
-        )
+        assert float(np.max(np.abs(h0_data))) < 1e-10
 
     def test_gw_3d_with_complete_tt_ic(self) -> None:
         """GW 3+1D: complete TT gauge IC (h_4 + h_7 = -h_4) passes all constraints.

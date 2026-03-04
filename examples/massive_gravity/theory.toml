@@ -15,9 +15,11 @@
 # In pure 2+1D gravity there are no local degrees of freedom;
 # the mass term creates propagating massive modes.
 #
-# Component structure:
-#   h_0 (h_tt): constraint (no d2_t), driven by h_3, h_5
-#   h_1, h_2 (h_tx, h_ty): first-order in time
+# Component structure (with correct √|g|·L linearization):
+#   h_0 (h_tt): unconstrained by own equation (compatibility constraint
+#     on h_3/h_4/h_5 — the Hamiltonian constraint G^(1)_00 = m²(h_3+h_5)
+#     doesn't involve h_00 because h_00 cancels in the trace combination)
+#   h_1, h_2 (h_tx, h_ty): screened Poisson constraints (identity + laplacian)
 #   h_3, h_4, h_5 (h_xx, h_xy, h_yy): second-order evolution
 #
 # Dispersion: omega^2 = k^2 + m^2 (massive, subluminal)

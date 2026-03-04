@@ -88,6 +88,10 @@ class _ResidualCtx:
             for eq in spec.equations
             if eq.time_derivative_order == 0
         ]
+        # Dedup begin_timestep: IDA calls residual multiple times per step
+        # at the same t (Newton iterations).  Skip L3 cache clear when t
+        # hasn't changed.
+        self._last_t: float = float("nan")
 
     def set_arrays(
         self,
@@ -113,9 +117,11 @@ class _ResidualCtx:
 
         self.fields = None  # Reset lazy cache
 
-        # Notify coefficient evaluator of new timestep
-        if self.rhs_eval is not None:
+        # Notify coefficient evaluator of new timestep (skip if t unchanged
+        # to avoid redundant L3 cache clears during Newton iterations)
+        if self.rhs_eval is not None and t != self._last_t:
             self.rhs_eval.begin_timestep(t)
+            self._last_t = t
 
     def compute_rhs(self, eq_idx: int) -> np.ndarray:
         """Sum operator terms for a single equation."""
@@ -148,11 +154,7 @@ class _ResidualCtx:
         The original equation becomes an initial-data consistency condition
         that should be verified by ``check_no_self_term_ic``.
 
-        **Extensibility:** Fields with ``constraint_solver.enabled = True``
-        are excluded — the constraint pre-solve path handles them (and
-        raises ``ValueError`` if they truly have no self-terms, which is
-        the correct fail-fast for gauge-fixed specs that *should* have
-        self-terms).  When Phase B gauge-fixing adds self-terms to these
+        **Extensibility:** When gauge-fixing adds self-terms to these
         equations, they will naturally exit this set.
 
         Emits ``UserWarning`` for each detected field.
@@ -161,13 +163,15 @@ class _ResidualCtx:
         for eq in self.spec.equations:
             if eq.time_derivative_order != 0:
                 continue
-            # Skip fields with constraint_solver enabled — they go through
-            # the pre_solve path which has its own validation.
-            if eq.constraint_solver.enabled:
-                continue
             has_self = any(t.field == eq.field_name for t in eq.rhs_terms)
-            if not has_self:
-                result.add(eq.field_name)
+            if has_self:
+                continue  # Pre-solve or IDA residual handles this.
+            # No self-terms → field absent from its own equation.  The
+            # constraint pre-solve skips these (nothing to solve), and the
+            # IDA Jacobian would be singular (∂F/∂field = 0).  Freeze at
+            # zero so Newton converges; the original equation becomes an
+            # IC consistency condition.
+            result.add(eq.field_name)
 
         # Describe what each frozen equation originally constrains
         for name in sorted(result):
