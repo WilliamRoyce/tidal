@@ -87,8 +87,8 @@ K = [[1, 0, -1/2, ...],
 
 ### Current State
 
-All 24 example JSON specs load, build PDE systems, and evolve correctly.
-915 Python tests pass, 0 failures, 0 xfails. The `_NON_EVOLVABLE_SPECS` set
+All 25 example JSON specs load, build PDE systems, and evolve correctly.
+1,343 Python tests pass, 0 failures, 0 xfails. The `_NON_EVOLVABLE_SPECS` set
 in `test_example_jsons.py` is now empty.
 
 ### References

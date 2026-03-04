@@ -1,7 +1,7 @@
 # Next Features: Parameter Sweeps & Measurements
 
 **Created:** March 2026
-**Branch:** `feature/parameter-sweep` (commit `6150ec6`, 1242 tests passing)
+**Branch:** `feature/parameter-sweep` (1,343 tests passing)
 **Status:** All phases (A–D) complete
 
 This document tracks proposed features for TIDAL's parameter sweep framework and measurement modules. Each feature includes scope, generality analysis, implementation details, and acceptance criteria.
@@ -29,7 +29,7 @@ This document tracks proposed features for TIDAL's parameter sweep framework and
 
 The `tidal sweep` command is fully operational with:
 
-- **9 measurement types**: summary, energy, conversion, mixing, dispersion, conservation, effective_mass, asymptotic, peak_conversion
+- **13 measurement types**: summary, energy, conversion, mixing, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, spectrum, spectral_conversion
 - **Sampling**: linspace, logspace, explicit values, Cartesian product of multiple parameters
 - **Execution**: sequential, parallel (`multiprocessing.Pool`), resume from interruption
 - **Output**: `results.csv`, `results.json`, `sweep.json` (provenance)
@@ -68,7 +68,7 @@ TIDAL supports theories from flat 1+1D scalars to curved 3+1D tensor fields. Mea
 
 ### Tier 1: General (any spacetime, any theory)
 
-These modules use the volume-element-aware energy computation and operate on scalar timeseries. They work for all 22 examples including curved spacetimes (polar_kg, sphere_kg, spherical_kg), background fields, and constraint systems.
+These modules use the volume-element-aware energy computation and operate on scalar timeseries. They work for all 25 examples including curved spacetimes (polar_kg, sphere_kg, spherical_kg), background fields, and constraint systems.
 
 | Module            | Why General                                                                                              |
 | ----------------- | -------------------------------------------------------------------------------------------------------- |
@@ -691,7 +691,7 @@ def summary(self) -> str:
 
 ### Motivation
 
-`spectrum` and `spectral_conversion` are the two measurement types available in `tidal measure` but not in `tidal sweep` (9 out of 11 types are supported). They produce 2D arrays, which don't fit sweep's scalar-row format. But useful scalar summaries can be extracted.
+`spectrum` and `spectral_conversion` are the two measurement types available in `tidal measure` but not in `tidal sweep` (11 out of 13 types are supported). They produce 2D arrays, which don't fit sweep's scalar-row format. But useful scalar summaries can be extracted.
 
 ### Specification
 
@@ -730,7 +730,7 @@ else:
 | File                    | Change                                                                                                          |
 | ----------------------- | --------------------------------------------------------------------------------------------------------------- |
 | `tidal/cli/_sweep.py`   | Add `"spectrum"` and `"spectral_conversion"` to `_SWEEP_MEASUREMENTS`, add extraction logic to `_measure_run()` |
-| `tidal/cli/__init__.py` | Update help text to list 11 measurement types                                                                   |
+| `tidal/cli/__init__.py` | Update help text to list 13 measurement types                                                                   |
 | `tests/test_sweep.py`   | Test spectrum/spectral_conversion scalar extraction                                                             |
 
 ### Acceptance Criteria
@@ -886,4 +886,4 @@ Most features are independent. The main dependency chain is F1 -> F2 -> F4 (TOML
 | C     | F3 + F6       | Medium     | `feature/parameter-sweep` | Complete |
 | D     | F4 + F8       | Medium     | `feature/parameter-sweep` | Complete |
 
-All 8 features are implemented. 1242 tests passing, lint clean.
+All 8 features are implemented. 1,343 tests passing, lint clean.

@@ -1,13 +1,13 @@
 # Next Major Implementation Phases for TIDAL
 
 **Created:** February 2026
-**Last Updated:** February 2026
-**Status:** Phases A, B, F, J complete; Phases C–E, G–I planned
-**Version:** 0.4.0 | **Tests:** 915 collected | **Examples:** 22 working (1+1D to 3+1D)
+**Last Updated:** March 2026
+**Status:** Phases A, B, C, F, J complete; Phases D–E, G–I planned
+**Version:** 0.5.0 | **Tests:** 1,343 collected | **Examples:** 25 working (1+1D to 3+1D)
 
 ## Context
 
-TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) → measurement/analysis. With 22 working examples spanning 1+1D to 3+1D, a full CLI (`tidal derive|simulate|measure|inspect|list|validate|plot`), and a comprehensive measurement module (energy, conversion P(t), dispersion, mixing, spectral), the project is mature and ready for its next major advances.
+TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) → measurement/analysis. With 25 working examples spanning 1+1D to 3+1D, a full CLI with 9 subcommands (`tidal derive|simulate|measure|inspect|list|validate|plot|sweep|analyze`), a comprehensive measurement module (13 types: energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary), and a complete parameter sweep framework with sensitivity analysis, the project is mature and ready for its next major advances.
 
 The project's core research motivation is the **Gertsenshtein effect** (electromagnetic ↔ gravitational wave conversion in external magnetic fields). The project operates exclusively in the **linearised regime** — all Lagrangians are quadratic, producing linear PDEs. The phases below are ordered by their impact toward enabling realistic Gertsenshtein simulations, while also broadening TIDAL's general utility as a linearised field theory simulation framework.
 
@@ -128,44 +128,47 @@ New presets are trivially added: write a `Build*GaugeTerm` function in `GaugeFix
 
 ---
 
-## Phase C: Parameter Sweep & Convergence Analysis
+## Phase C: Parameter Sweep & Convergence Analysis ✓
 
 **Priority: HIGH — essential for systematic physics studies and publication-quality results**
-**Status:** Planned
+**Status:** Complete
 
-### What and Why
+### What Was Delivered
 
-Currently each simulation is a single run with one parameter set and one grid resolution. There is no way to sweep coupling constants to map out P(g), or to verify numerical convergence by running at multiple resolutions. Reviewers expect convergence analysis in any computational physics paper.
+A comprehensive parameter sweep framework implemented as two CLI commands (`tidal sweep` and `tidal analyze`) with 8 feature areas (F1–F8). See [`docs/next-features.md`](next-features.md) for the full feature specification.
 
-Standard V&V methodology (Roache 1998; NASA GRC grid convergence tutorial; AIAA G-077-1998) requires demonstrating that numerical solutions converge to the continuum limit at the expected order. This phase implements those requirements as automated CLI commands.
+**CLI Commands:**
 
-### What It Enables
+- `tidal sweep spec.json --sweep "g=0.1:1.0:10" --measure conversion` — unified command for parameter sweeps AND convergence studies (via `--converge "32,64,128,256"` flag)
+- `tidal analyze sweep_dir/ --sensitivity sobol --metric P_max` — post-hoc Sobol/Morris sensitivity analysis
 
-- **Parameter sweeps**: Conversion probability vs. coupling strength curves P_max(g), L_mix(g)
-- **Richardson extrapolation**: Estimate the grid-independent solution from runs at 2–3 resolutions
-- **Grid Convergence Index (GCI)**: Quantify numerical uncertainty per Roache's formulation
-- **Method of Manufactured Solutions (MMS)**: Inject known analytic solutions to verify operator discretisation accuracy
-- **Resolution-independence validation** for all measurement quantities
-- **Automated multi-run workflows** with collected results
+**Features delivered:**
 
-### Implementation Details
+- **F1: TOML sweep configuration** — `--config sweep.toml` for reproducible, version-controlled sweep definitions
+- **F2a: Adaptive sampling** — `--adaptive-metric`, `--adaptive-budget`, `--adaptive-threshold` for automatic refinement in interesting parameter regions
+- **F2b: Latin Hypercube / Sobol sampling** — `--sweep-strategy latin_hypercube|sobol`, `--n-samples N` for multi-dimensional parameter spaces
+- **F3: Velocity + resonance analysis** — group/phase velocity mismatch and resonance condition detection
+- **F4: Sobol/Morris sensitivity analysis** — first-order, total-order, and interaction indices via SALib
+- **F5: SweepResults query methods** — programmatic access to sweep data with filtering and aggregation
+- **F6: Spectrum scalar aggregation** — all 13 measurement types supported in sweeps (including spectrum and spectral_conversion via scalar summaries)
+- **F7: Run status tracking + resume** — `--resume` for interrupted sweeps, failure classification
+- **F8: Advanced visualization** — 6 plot types: sweep (auto 1D/2D/multi), sweep-compare, convergence, sweep-parallel, sweep-tornado, sweep-scatter
+- **Convergence mode** — Richardson extrapolation for convergence order estimation
 
-1. **CLI**: `tidal sweep spec.json --param "g=0.1:1.0:10"` and `tidal converge spec.json --grids "32,64,128,256"`
-2. **New module** `tidal/cli/_sweep.py`: Orchestrates multiple simulation runs
-3. **Post-processing**: Automatically calls measurement module on each run, collects scalar results into summary JSON
-4. **Convergence**: Computes ‖u*h − u*{h/2}‖ norms, estimates convergence order p, computes GCI
-5. **MMS module**: `tidal/verification/mms.py` — generates source terms from a prescribed analytic solution
-6. **Output**: JSON summary + optional multi-panel plots (P vs. parameter, error vs. resolution)
+**13 measurement types in sweeps:** summary, energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance
+
+**7 working example scripts** in `coupled_scattering/`, `coupled_scalars/`, `scalar_field/`
+
+**Key files:** `tidal/cli/_sweep.py` (~1350 lines), `tidal/cli/_analyze.py`, `tidal/cli/_sweep_panels.py`, `tidal/cli/_sweep_config.py`, `tidal/measurement/_velocity.py`, `tidal/measurement/_resonance.py`, `tidal/measurement/_sensitivity.py`
+
+**Not implemented (deferred):** Grid Convergence Index (GCI) per Roache's formulation, Method of Manufactured Solutions (`tidal/verification/mms.py` — planned but not built), explicit ‖u_h − u_{h/2}‖ error norms.
 
 ### References
 
 - Roache (1998), _Verification and Validation in Computational Science and Engineering_
-- NASA GRC, "Examining Spatial (Grid) Convergence"
-- AIAA G-077-1998, _Guide for V&V of CFD Simulations_
+- SALib (Herman & Usher), Sensitivity Analysis Library for Sobol/Morris methods
 
-### Scope: Medium (~5–7 days)
-
-### Dependencies: None (can be developed in parallel with other phases)
+### Dependencies: None
 
 ---
 
@@ -422,26 +425,25 @@ When a DAE system has algebraic constraints (time_order=0 fields like A_0 in ele
 ```
 Phase A (Background Fields)      ─── COMPLETE
 Phase B (Gauge Fixing, optional) ─── COMPLETE
+Phase C (Sweep & Convergence)    ─── COMPLETE
 Phase F (Adaptive Time-Stepping) ─── COMPLETE
 Phase J (Constraint Pre-Solve)   ─── COMPLETE
 Phase D (Gertsenshtein Example)  ─── Requires A; B optional for cleaner equations
-Phase C (Sweep & Convergence)    ─── Independent, high priority
 Phase G (Absorbing Boundaries)   ─── Independent, uses Phase A infrastructure
 Phase H (HDF5/XDMF Output)      ─── Independent, interoperability
 Phase I (Eigenvalue/Dispersion)  ─── Independent, analysis capability
 Phase E (Spectral Methods)       ─── Independent, large scope
 ```
 
-**Critical path to Gertsenshtein:** A (done), B (done), F (done) → D (~3–5 days)
+**Critical path to Gertsenshtein:** A (done), B (done), C (done), F (done) → D (~3–5 days)
 
 **Recommended order for maximum impact:**
 
-1. **D** (Gertsenshtein Example) — the project's raison d'être, unblocked by A+B+F
-2. **C** (Sweep & Convergence) — required for publication-quality validation of D
-3. **G** (Absorbing Boundaries) — extends D to realistic finite-magnet geometries
-4. **I** (Eigenvalue/Dispersion) — analysis tool for parameter exploration
-5. **H** (HDF5/XDMF Output) — interoperability with standard tools
-6. **E** (Spectral Methods) — large scope, significant accuracy payoff
+1. **D** (Gertsenshtein Example) — the project's raison d'être, unblocked by A+B+C+F
+2. **G** (Absorbing Boundaries) — extends D to realistic finite-magnet geometries
+3. **I** (Eigenvalue/Dispersion) — analysis tool for parameter exploration
+4. **H** (HDF5/XDMF Output) — interoperability with standard tools
+5. **E** (Spectral Methods) — large scope, significant accuracy payoff
 
 ---
 

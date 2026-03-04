@@ -1,6 +1,6 @@
 # Examples
 
-TIDAL includes 22 pipeline examples spanning 1+1D through 3+1D spacetimes with scalar, vector, and tensor fields.
+TIDAL includes 25 pipeline examples spanning 1+1D through 3+1D spacetimes with scalar, vector, and tensor fields.
 
 ## Pipeline Examples
 
@@ -28,6 +28,9 @@ All pipeline examples follow the same pattern: `tidal derive theory.toml` derive
 | `coupled_proca/` | 2+1D | A_i, B_i | Two massive vectors, coupled Helmholtz constraints, periodic BCs |
 | `coupled_scattering/` | 2+1D | phi_0, chi_0 | Position-dependent Gaussian coupling, background fields, wave scattering |
 | `scalar_potential_well/` | 1+1D | phi_0 | Background potential well, `[[background_fields]]`, bound states |
+| `cylindrical_kg_1d/` | 1+1D | phi_0 | Cylindrical coordinates, plane-wave 1D reduction |
+| `gravitational_waves_1d/` | 1+1D | h_ij | Linearized gravity, plane-wave 1D reduction |
+| `spherical_kg_1d/` | 1+1D | phi_0 | Spherical coordinates, plane-wave 1D reduction |
 | `proca_background/` | 2+1D | A_i, B_i | Lorentzian scalar background, two Proca vectors, constraint+BG integration |
 | `vector_background/` | 2+1D | phi_0, A_i | Tanh domain wall vector background, ComponentValue mechanism, sign-changing coupling |
 
@@ -66,30 +69,33 @@ cd examples/scalar_vector_coupling && bash run.sh
 
 ## Example Completeness
 
-| Example | theory.toml | run.sh | simulation.py |
-|---------|:-----------:|:------:|:-------------:|
-| scalar_field | Yes | Yes | Yes |
-| electromagnetic | Yes | Yes | Yes |
-| proca | Yes | Yes | Yes |
-| coupled_scalars | Yes | Yes | Yes |
-| chern_simons | Yes | Yes | Yes |
-| elasticity | Yes | Yes | Yes |
-| curved_spacetime | Yes | Yes | Yes |
-| sphere_kg | Yes | Yes | — |
-| polar_kg | Yes | Yes | — |
-| electrostatics | Yes | Yes | — |
-| scalar_vector_coupling | Yes | Yes | Yes |
-| scalar_field_3d | Yes | Yes | — |
-| spherical_kg | Yes | Yes | — |
-| cylindrical_kg | Yes | Yes | — |
-| massive_gravity | Yes | Yes | Yes |
-| gravitational_waves | Yes | Yes | — |
-| massive_3form | Yes | Yes | Yes |
-| coupled_proca | Yes | Yes | Yes |
-| coupled_scattering | Yes | Yes | Yes |
-| scalar_potential_well | Yes | Yes | Yes |
-| proca_background | Yes | Yes | Yes |
-| vector_background | Yes | Yes | Yes |
+| Example | theory.toml | run.sh |
+|---------|:-----------:|:------:|
+| scalar_field | Yes | Yes |
+| electromagnetic | Yes | Yes |
+| proca | Yes | Yes |
+| coupled_scalars | Yes | Yes |
+| chern_simons | Yes | Yes |
+| elasticity | Yes | Yes |
+| curved_spacetime | Yes | Yes |
+| sphere_kg | Yes | Yes |
+| polar_kg | Yes | Yes |
+| electrostatics | Yes | Yes |
+| scalar_vector_coupling | Yes | Yes |
+| scalar_field_3d | Yes | Yes |
+| spherical_kg | Yes | Yes |
+| cylindrical_kg | Yes | Yes |
+| massive_gravity | Yes | Yes |
+| gravitational_waves | Yes | Yes |
+| massive_3form | Yes | Yes |
+| coupled_proca | Yes | Yes |
+| coupled_scattering | Yes | Yes |
+| scalar_potential_well | Yes | Yes |
+| proca_background | Yes | Yes |
+| vector_background | Yes | Yes |
+| cylindrical_kg_1d | Yes | Yes |
+| gravitational_waves_1d | Yes | Yes |
+| spherical_kg_1d | Yes | Yes |
 
 ## Parameter Sweeps
 

@@ -204,6 +204,9 @@ tidal validate examples/data/klein_gordon_1d.json      # validate JSON spec stru
 | `coupled_proca/`          | 2+1D | Two massive vectors, coupled Helmholtz constraints, periodic BCs                     |
 | `coupled_scattering/`     | 2+1D | Position-dependent Gaussian coupling, background fields, wave scattering             |
 | `scalar_potential_well/`  | 1+1D | Background potential well, `[[background_fields]]`, bound states                     |
+| `cylindrical_kg_1d/`      | 1+1D | Cylindrical coordinates, plane-wave dimensional reduction                            |
+| `gravitational_waves_1d/` | 1+1D | Linearized gravity, plane-wave 1D reduction                                          |
+| `spherical_kg_1d/`        | 1+1D | Spherical coordinates, plane-wave dimensional reduction                              |
 | `proca_background/`       | 2+1D | Lorentzian scalar background, two Proca vectors, constraint+BG integration           |
 | `vector_background/`      | 2+1D | Tanh domain wall vector background, ComponentValue mechanism, sign-changing coupling |
 
@@ -222,9 +225,9 @@ If `ffmpeg` is unavailable, the example falls back to a GIF via Pillow.
 
 ## Tests
 
-The project includes a comprehensive test suite with **915 Python tests + ~115 Wolfram tests**.
+The project includes a comprehensive test suite with **1,343 Python tests + ~115 Wolfram tests**.
 
-### Python Tests (915 tests)
+### Python Tests (1,343 tests)
 
 ```bash
 # Run all Python tests with pytest
@@ -275,6 +278,8 @@ wolframscript -file tests/wolfram/test_export_json.wls
 - PDE construction and operator identification
 - Initial conditions and boundary conditions
 - Multi-field coupling and energy transfer
+- Parameter sweep and convergence analysis
+- 13 measurement types (energy, conversion, spectrum, sensitivity analysis, etc.)
 - Edge cases (empty grids, invalid bounds, division by zero)
 - Path traversal protection and validation
 
@@ -373,7 +378,7 @@ See [`scripts/README.md`](scripts/README.md) for detailed setup instructions.
 ## Contributing
 
 - Open an issue or submit a PR.
-- **Test requirements**: All changes must maintain 100% test pass rate (915 Python + ~115 Wolfram tests). New features require corresponding unit tests in both Python and Wolfram layers where applicable.
+- **Test requirements**: All changes must maintain 100% test pass rate (1,343 Python + ~115 Wolfram tests). New features require corresponding unit tests in both Python and Wolfram layers where applicable.
 - Run `./scripts/full_test.sh` before submitting PRs to verify all tests pass.
 - Follow the project's type-checking and linting conventions (keyword-only booleans, explicit type annotations, no print in library code).
 
