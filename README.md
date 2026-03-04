@@ -103,7 +103,7 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 
 - **Gertsenshtein example (Phase D)**: Coupled EM-gravity simulation — the project's primary research target, now unblocked by Phases A (background fields), B (gauge fixing), and C (parameter sweeps).
 - **Continuous Integration**: GitHub Actions workflow for automated Wolfram test execution on pull requests.
-- **Spectral spatial discretisation (Phase E)**: FFT-based operators for exponential convergence on periodic domains (following Dedalus architecture).
+- **Spectral spatial discretization (Phase E)**: FFT-based operators for exponential convergence on periodic domains (following Dedalus architecture).
 - **Absorbing boundaries (Phase G)**: Sponge layers and PML (Bérenger 1994) for finite-magnet interaction regions.
 - **Extended physics examples**: Coupled EM/torsion systems for Poincaré gauge theory research.
 
