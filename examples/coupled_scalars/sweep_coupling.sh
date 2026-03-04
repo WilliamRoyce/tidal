@@ -23,6 +23,12 @@
 #   - Mixing length L_mix decreases with coupling (faster oscillations)
 #   - Energy conservation tight: max |dE/E| < 1e-3
 #
+# Stability bound:
+#   The coupled mass matrix M² = [[m1², g], [g, m2²]] becomes indefinite
+#   (tachyonic mode) when g > √(m1² · m2²) = √(1·4) = 2.0.
+#   Sweep is capped at gCpl = 1.8 to stay safely below this threshold.
+#   (Sweeps default to --require-stable, which aborts unstable runs.)
+#
 # Running this script:
 #   cd examples/coupled_scalars && bash sweep_coupling.sh
 
@@ -31,13 +37,13 @@ cd "$(dirname "$0")"
 
 OUT=../data/coupled_scalars_sweep
 
-echo "=== Coupled Scalars Coupling Sweep: gCpl = 0.05 to 3.0 (20 points, log scale) ==="
-echo "    mPhi2 = 1.0, mChi2 = 4.0  (mass gap Δm² = 3.0)"
+echo "=== Coupled Scalars Coupling Sweep: gCpl = 0.05 to 1.8 (20 points, log scale) ==="
+echo "    mPhi2 = 1.0, mChi2 = 4.0  (mass gap Δm² = 3.0, g_crit = 2.0)"
 echo "    Standing Gaussian on phi_0, domain [0,80], N=128, t_end=60"
 echo ""
 
 tidal sweep ../data/coupled_scalars.json \
-  --sweep "gCpl=0.05:3.0:20:log" \
+  --sweep "gCpl=0.05:1.8:20:log" \
   --param mPhi2=1.0 --param mChi2=4.0 \
   --measure conversion,peak_conversion,mixing,asymptotic,effective_mass,conservation \
   --source phi_0 --target chi_0 \
@@ -54,6 +60,6 @@ echo ""
 echo "Visualize the results:"
 echo "  tidal plot $OUT/ --type sweep --metric P_max"
 echo "  tidal plot $OUT/ --type sweep --metric P_max,mixing_length"
-echo "  tidal plot $OUT/ --type sweep-compare --measurement conversion"
+echo "  tidal plot $OUT/ --type sweep-compare --metric conversion"
 echo "  tidal plot $OUT/ --type sweep --metric P_final,P_transmitted,P_reflected"
 echo "  tidal plot $OUT/ --type sweep --metric m2_eff"

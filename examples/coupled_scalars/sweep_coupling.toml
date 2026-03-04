@@ -10,6 +10,9 @@
 # saturation curves. At strong coupling, normal mode splitting
 # modifies dispersion and may cause non-monotonic P_max.
 #
+# Stability bound: g_crit = sqrt(mPhi2 * mChi2) = 2.0.
+# Sweep capped at 1.8 to stay below tachyonic threshold.
+#
 # Usage:
 #   tidal sweep --config examples/coupled_scalars/sweep_coupling.toml
 #
@@ -24,7 +27,7 @@ mChi2 = 4.0
 
 [sweep.gCpl]
 start = 0.05
-stop = 3.0
+stop = 1.8
 count = 20
 scale = "log"
 
