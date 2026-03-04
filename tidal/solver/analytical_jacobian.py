@@ -234,7 +234,7 @@ def _detect_gauge_fix_fields(
     grid: GridInfo,
     bc: BCSpec | None,
 ) -> set[str]:
-    """Fields needing gauge regularisation (pure Laplacian + periodic BCs)."""
+    """Fields needing gauge regularization (pure Laplacian + periodic BCs)."""
     from tidal.solver.operators import is_periodic_bc  # noqa: PLC0415
 
     # Check all-periodic
@@ -558,7 +558,7 @@ def _prepare_sparse_data(  # pyright: ignore[reportUnusedFunction]  # reserved f
     1D arrays aligned to ``pattern``'s CSC data ordering.
 
     The sparse ``jacfn`` then computes ``JJ[:] = dy_data + cj * dyp_data``
-    — a single O(nnz) vectorised operation with zero allocation.
+    — a single O(nnz) vectorized operation with zero allocation.
     """
     # Build union sparsity via structural OR.
     # Replace data with ones to get structural patterns, then add.
@@ -568,7 +568,7 @@ def _prepare_sparse_data(  # pyright: ignore[reportUnusedFunction]  # reserved f
     ones_dyp.data[:] = 1.0
     pattern = (ones_dy + ones_dyp).tocsc()
     pattern.sort_indices()
-    pattern.data[:] = 1.0  # Normalise to binary
+    pattern.data[:] = 1.0  # Normalize to binary
 
     nnz = pattern.nnz
     dy_data = np.zeros(nnz, dtype=np.float64)

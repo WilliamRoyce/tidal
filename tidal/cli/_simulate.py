@@ -850,7 +850,7 @@ def _load_resume_state(  # noqa: PLR0914
     Returns
     -------
     ResumeState
-        Checkpoint state ready for solver initialisation.
+        Checkpoint state ready for solver initialization.
 
     Raises
     ------

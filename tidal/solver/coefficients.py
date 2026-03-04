@@ -176,7 +176,7 @@ class CoefficientEvaluator:
 
         Returns True when all coefficients are pre-resolved at L0 (no
         position or time dependence).  This enables the analytical
-        Jacobian optimisation for constant-coefficient linear systems.
+        Jacobian optimization for constant-coefficient linear systems.
         """
         for eq_idx, eq in enumerate(self._spec.equations):
             for term_idx, _term in enumerate(eq.rhs_terms):
@@ -190,7 +190,7 @@ class CoefficientEvaluator:
         Returns True when no term has ``time_dependent=True``.  Position-
         dependent (but time-independent) coefficients still produce a
         constant Jacobian because the spatial grid is fixed, so the
-        analytical Jacobian optimisation applies.
+        analytical Jacobian optimization applies.
         """
         for eq in self._spec.equations:
             for term in eq.rhs_terms:
