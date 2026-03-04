@@ -376,22 +376,6 @@ def _validate_linearization(
         msg = f"[linearization].perturbation_field '{pf}' not found in [[fields]]"
         raise ValueError(msg)
 
-    # Volume element correction in _wls_linearize_from_lagrangian assumes
-    # flat Minkowski in Cartesian coordinates (sqrt|g0| = 1).  For curved
-    # or curvilinear metrics the correction needs a sqrt|g0| prefactor
-    # and possibly a delta^2(sqrt|g|) * L0 term — not yet implemented.
-    metric_type = config.get("spacetime", {}).get("metric", "minkowski")
-    if has_lagrangian and metric_type != "minkowski":
-        import warnings
-
-        warnings.warn(
-            f"[linearization] with [lagrangian]: metric = '{metric_type}' is not "
-            f"Minkowski. The volume element correction assumes sqrt|g0| = 1 and "
-            f"L0 = 0 (flat Cartesian background). Equations may be incorrect for "
-            f"curved or curvilinear backgrounds.",
-            stacklevel=2,
-        )
-
 
 def _validate_gauge_entry_preset(
     i: int,
@@ -1219,17 +1203,13 @@ def _wls_linearize_from_lagrangian(
 
     Single-path approach using xPert's 2nd-order perturbation:
 
-    1. Compute ``δ²(√|g| L)`` on flat Minkowski background:
+    1. Multiply Lagrangian by ``√(-g)`` to form the action density, then
+       perturb to second order: ``δ²(√|g| L)``.  xPert natively handles
+       ``Perturbation[Sqrt[-Detg[]], n]`` via the metric determinant symbol
+       created by ``DefMetric``.  After expansion, divide out the background
+       ``√|g₀|`` (covariantly constant for Levi-Civita connection).
 
-       ``δ²(√|g| L) = δ²L + h · δL``
-
-       where ``h = η^{ab} h_{ab}`` is the trace of the metric perturbation.
-       The cross term ``h · δL`` arises because ``δ(√|g|) = ½h`` even on
-       flat Minkowski where ``√|g₀| = 1``.  Without it, ``VarD`` produces
-       ``R^{(1)}_{ab}`` instead of the linearized Einstein tensor
-       ``G^{(1)}_{ab} = R^{(1)}_{ab} - ½η_{ab} R^{(1)}``.
-
-    2. ``L^(2) = δ²(√|g| L) / 2`` → quadratic Lagrangian.
+    2. ``L^(2) = δ²(√|g| L) / (2 √|g₀|)`` → quadratic Lagrangian.
 
     3. Expand ``Scalar[x]^n`` → ``∏ Scalar[RenameDummies[x]]`` so that VarD
        can vary through each copy independently (fixes the index-collision
@@ -1239,8 +1219,9 @@ def _wls_linearize_from_lagrangian(
 
     5. Same L^(2) serves the canonical pipeline (momenta π, Hamiltonian H).
 
-    Valid for flat Minkowski background where ``√(-g₀) = 1`` and ``L₀ = 0``
-    (Brizuela, Martín-García, Mena Marugán 2009; Carroll 2004, Ch. 7).
+    Works for any background metric.  For flat Minkowski ``√|g₀| = 1`` and
+    the volume element factor is trivial.  For curved backgrounds, xPert
+    correctly captures all ``δ(√|g|)`` contributions.
 
     Raises
     ------
@@ -1263,15 +1244,16 @@ def _wls_linearize_from_lagrangian(
     ricci_scalar_sym = f"RicciScalar{ctx.cd}"
 
     p = ctx.prefix
+    det_sym = f"Det{ctx.metric}"
 
     # ------------------------------------------------------------------
-    # Step 1: L^(2) = Perturbation[L, 2] / 2 via xPert
+    # Step 1: L^(2) = δ²(√|g| L) / (2 √|g₀|) via xPert
     # ------------------------------------------------------------------
     lines: list[str] = [
         "",
         "(* ============================================================ *)",
         "(* Lagrangian-first linearization (single-path via L^(2))       *)",
-        "(* L^(2) = d^2(sqrt|g| L) / 2  via xPert 2nd-order            *)",
+        "(* L^(2) = d^2(sqrt|g| L) / (2 sqrt|g0|)  via xPert           *)",
         "(* Then: VarD[H, CD][L^(2)] -> linearized EOM                   *)",
         "(* Same L^(2) feeds canonical pipeline (pi, H)                  *)",
         "(* ============================================================ *)",
@@ -1283,31 +1265,28 @@ def _wls_linearize_from_lagrangian(
         f"{pert_sym}Tensor = SetupMetricPerturbation[{ctx.metric}, {pert_sym}, {eps_sym}];",
         f'Print["Perturbation: {ctx.metric} -> {ctx.metric} + {eps_sym} * {pert_field_name}"];',
         "",
-        "(* 2nd-order perturbation of Lagrangian *)",
-        "l2Raw = Perturbation[lOriginal, 2];",
+        "(* Include sqrt(-g) volume element: S = int sqrt(-g) L d^n x      *)",
+        "(* xPert natively perturbs Sqrt[-Detg[]], handling all orders.     *)",
+        f"lDensity = Sqrt[-{det_sym}[]] * lOriginal;",
+        "",
+        "(* 2nd-order perturbation of the full Lagrangian density *)",
+        "l2Raw = Perturbation[lDensity, 2];",
         "l2Raw = ExpandPerturbation[l2Raw];",
-        'Print["L^(2) raw (expanded): ", Short[l2Raw, 3]];',
+        'Print["L^(2) density (expanded): ", Short[l2Raw, 3]];',
         "",
         "(* Validate that xPert fully expanded *)",
         "If[!FreeQ[l2Raw, Perturbation],",
         '  Throw["Linearization: ExpandPerturbation did not fully expand L^(2)."]',
         "];",
         "",
-        "(* Volume element correction for metric perturbation theory.          *)",
-        "(* The action is S = int sqrt|g| L d^n x.  On flat Minkowski         *)",
-        "(* (sqrt|g0|=1, L0=0):                                               *)",
-        "(*   d^2(sqrt|g| L) = d^2 L + h * d L                               *)",
-        "(* where h = eta^{ab} h_{ab} is the perturbation trace.              *)",
-        "(* Without this, VarD gives R^(1)_{ab} instead of G^(1)_{ab}.        *)",
-        "l1Raw = Perturbation[lOriginal, 1];",
-        "l1Raw = ExpandPerturbation[l1Raw];",
-        "If[l1Raw =!= 0,",
-        f"  Module[{{traceH = Scalar[{ctx.metric}[a, b] {pert_sym}[LI[1], -a, -b]]}},",
-        "    l2Raw = l2Raw + traceH * l1Raw;",
-        '    Print["Volume element correction: added h * dL (trace x first-order perturbation)"]',
-        "  ],",
-        '  Print["Volume element correction: skipped (dL = 0)"]',
-        "];",
+        "(* Divide out background volume element sqrt(-g0)                   *)",
+        "(* (covariantly constant for Levi-Civita, passes through VarD).     *)",
+        f"l2Raw = l2Raw / Sqrt[-{det_sym}[]];",
+        "",
+        "(* Replace background metric determinant with evaluated value       *)",
+        f"l2Raw = l2Raw /. {det_sym}[] -> Det[{p}MetricMatrix];",
+        "l2Raw = Simplify[l2Raw];",
+        'Print["L^(2) (volume element resolved): ", Short[l2Raw, 3]];',
         "",
         "(* Drop 2nd-order metric perturbation h^(2) -- keep h^(1)*h^(1) only *)",
         f"l2Raw = l2Raw /. {pert_sym}[LI[2], idx__] :> 0;",
@@ -1339,7 +1318,7 @@ def _wls_linearize_from_lagrangian(
             "l2Raw = ToCanonical[l2Raw];",
             f"l2Raw = ContractMetric[l2Raw, {ctx.metric}];",
             "",
-            "(* L^(2) = delta^2 L / 2 *)",
+            "(* L^(2) = delta^2(sqrt|g| L) / (2 sqrt|g0|) *)",
             f"{p}Lagrangian = l2Raw / 2;",
             f'Print["L^(2) set: ", Short[{p}Lagrangian, 5]];',
             "",
