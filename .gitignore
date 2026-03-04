@@ -13,6 +13,7 @@ wolfram_test_output.txt
 .coverage
 /examples/data/**/*.npy
 /examples/data/**/*.json
+/examples/data/**/*.csv
 
 .claude-memory-backup/
 .claude-session-context/

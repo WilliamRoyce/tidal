@@ -13,6 +13,7 @@ A Klein-Gordon scalar field on conformally flat spacetime with **constant** conf
 Metric: `ds^2 = Omega^2 * (-dt^2 + dx^2)` where `Omega = 2` (constant)
 
 For constant `Omega`:
+
 - Christoffel symbols = 0 (derivatives of constant metric vanish)
 - Effective mass: `m_eff^2 = m^2 * Omega^2 = 1 * 4 = 4`
 - Wave equation: `d2_t phi = d2_x phi - m_eff^2 phi`
@@ -44,6 +45,7 @@ A Klein-Gordon scalar field on de Sitter spacetime with **time-dependent** confo
 Metric: `ds^2 = Omega(t)^2 * (-dt^2 + dx^2)` where `Omega(t) = e^{Ht}`
 
 For time-dependent `Omega(t) = e^{Ht}`:
+
 - Christoffel symbols are non-zero (derivatives of metric != 0)
 - Hubble friction term: `-n*H * d_t phi` where n = number of spatial dimensions
 - For 1+1D (n=1): `-H * d_t phi`
@@ -51,6 +53,7 @@ For time-dependent `Omega(t) = e^{Ht}`:
 - Wave equation (1+1D): `d2_t phi = d2_x phi - H * d_t phi - m^2 * e^{2Ht} * phi`
 
 The Hubble friction term causes wave damping during expansion:
+
 - Amplitude decays as `exp(-H*t/2)` for 1+1D
 - Energy decays as `exp(-H*t)` for 1+1D
 
