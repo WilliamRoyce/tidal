@@ -48,7 +48,7 @@ tidal simulate ../data/linearized_gravity.json \
   --ic-formula "np.exp(-(z - 10.0)**2 / 4.5) * np.cos(0.6283 * (z - 10.0))" \
   --ic-component h_4 \
   --ic-field "h_7:-(np.exp(-(z - 10.0)**2 / 4.5) * np.cos(0.6283 * (z - 10.0)))" \
-  --t-end 5.0 \
+  --t-end 10.0 \
   --output ../data/linearized_gravity_output
 
 # Visualize results (plots saved into the simulation output directory)

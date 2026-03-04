@@ -28,6 +28,8 @@ tidal inspect ../data/massive_3form.json
 
 # Run simulation (Gaussian pulse in C_0, other components start at zero)
 tidal simulate ../data/massive_3form.json \
+  --rtol 1e-4 \
+  --atol 1e-6 \
   --param m2=1.0 \
   --grid-shape 16 \
   --bounds 0:10 \
