@@ -18,7 +18,7 @@ View the `tidal` package documentation [here](https://williamroyce.github.io/tor
 
 A research codebase for exploring **electromagnetic ↔ gravitational wave conversion** ([Gertsenshtein effect](https://arxiv.org/abs/2301.02072); Gertsenshtein 1962, Domcke & Garcia-Cely 2023) and potential **amplification mechanisms** in gravity theories with **torsion** (Poincaré gauge theory; parity-even quadratic invariants). The repository includes:
 
-- **A native PDE solver framework** (SUNDIALS IDA/CVODE + leapfrog + scipy, with numpy spatial operators) for time-domain simulations with **915 Python tests + ~115 Wolfram tests**.
+- **A native PDE solver framework** (SUNDIALS IDA/CVODE + leapfrog + scipy, with numpy spatial operators) for time-domain simulations with **1,343 Python tests + ~115 Wolfram tests**.
 - A symbolic pipeline (Mathematica + xAct) for **deriving linearized field equations** and exporting them to Python-friendly JSON specifications.
 - Documentation and experiments for **mixing mechanisms** and **hyperbolicity/causality checks** relevant to the effect.
 
@@ -39,12 +39,12 @@ For more, visit the [Documentation](https://williamroyce.github.io/torsion-gerts
 
 ## Current Status (usable today)
 
-- **Lagrangian-to-PDE pipeline (`tidal.symbolic`, `tidal.wolfram`)**: complete symbolic-to-numerical pipeline for deriving field equations from Lagrangian densities. Uses Mathematica/xAct for symbolic derivation (Euler-Lagrange equations, linearization via xPert, component decomposition) → JSON export → native Python solvers for PDE construction and time integration. **Zero hardcoded physics** in the numerical layer — all equations derived symbolically. Includes **22 working examples** spanning 1+1D through 3+1D: scalars, vectors, tensors (rank 3+), coupled multi-field systems, curvilinear coordinates, curved spacetimes, and background-field scattering. See [examples/README.md](examples/README.md) for complete documentation.
+- **Lagrangian-to-PDE pipeline (`tidal.symbolic`, `tidal.wolfram`)**: complete symbolic-to-numerical pipeline for deriving field equations from Lagrangian densities. Uses Mathematica/xAct for symbolic derivation (Euler-Lagrange equations, linearization via xPert, component decomposition) → JSON export → native Python solvers for PDE construction and time integration. **Zero hardcoded physics** in the numerical layer — all equations derived symbolically. Includes **25 working examples** spanning 1+1D through 3+1D: scalars, vectors, tensors (rank 3+), coupled multi-field systems, curvilinear coordinates, curved spacetimes, and background-field scattering. See [examples/README.md](examples/README.md) for complete documentation.
 - **Solver architecture (`tidal.solver`)**: four time-integration backends — **IDA** (SUNDIALS DAE solver for systems with algebraic constraints; Hindmarsh et al. 2005), **CVODE** (SUNDIALS BDF adaptive ODE with tolerance control), **leapfrog** (Störmer-Verlet symplectic integrator; Hairer et al. 2006), and **scipy** (`solve_ivp` with DOP853/Radau/BDF). Automatic solver selection based on equation structure: systems with constraints route to IDA, pure wave equations to CVODE or leapfrog. Pure numpy spatial operators (`tidal/solver/operators.py`) with 2nd-order finite-difference stencils. Three-tier constraint pre-solve (FFT → sparse matrix → automatic selection) with gauge regularization for singular Poisson problems.
-- **CLI (`tidal` command)**: unified command-line interface with 7 subcommands — `tidal derive` (Lagrangian → JSON via TOML config), `tidal simulate` (JSON → PDE simulation with plotting), `tidal measure` (post-hoc measurement extraction from snapshot directories: energy, conversion, mixing length, spectra), `tidal inspect` (equation system info), `tidal list` (discover available specs), `tidal validate` (JSON spec validation), `tidal plot` (standalone plotting from simulation output). Supports `theory.toml` configs with `[[derived_fields]]`, `[[background_fields]]`, and optional `[[gauge]]` sections. Zero new dependencies (stdlib argparse + tomllib).
-- **Measurement module (`tidal.measurement`)**: post-hoc analysis of simulation output — Hamiltonian energy density, field conversion probability P(t), spectral conversion P(k,t), dispersion relation omega(k), mixing length, and diagnostics. Disk-backed snapshot storage for long simulations via `SnapshotWriter`.
+- **CLI (`tidal` command)**: unified command-line interface with 9 subcommands — `tidal derive` (Lagrangian → JSON via TOML config), `tidal simulate` (JSON → PDE simulation with plotting), `tidal measure` (post-hoc measurement extraction from snapshot directories), `tidal inspect` (equation system info), `tidal list` (discover available specs), `tidal validate` (JSON spec validation), `tidal plot` (standalone plotting from simulation output), `tidal sweep` (automated parameter sweeps with adaptive sampling, convergence analysis, and sensitivity analysis), `tidal analyze` (post-hoc Sobol/Morris sensitivity analysis of sweep results). Supports `theory.toml` configs with `[[derived_fields]]`, `[[background_fields]]`, and optional `[[gauge]]` sections. Zero new dependencies (stdlib argparse + tomllib).
+- **Measurement module (`tidal.measurement`)**: 13 post-hoc analysis types — summary, energy, conversion P(t), mixing length, spectrum, spectral conversion P(k,t), dispersion omega(k), conservation diagnostics, effective mass, asymptotic scattering, peak conversion, group/phase velocity, and resonance analysis. Disk-backed snapshot storage for long simulations via `SnapshotWriter`.
 - **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), Wolfram Engine 14.3 with xAct tensor framework, optional ffmpeg; Sphinx docs skeleton; type-checked codebase with pytest test suite.
-- **Professional development infrastructure**: 915 Python tests + ~115 Wolfram tests, 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution. 0 ruff violations, 0 pyright errors (strict mode).
+- **Professional development infrastructure**: 1,343 Python tests + ~115 Wolfram tests, 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution. 0 ruff violations, 0 pyright errors (strict mode).
 
 This README describes the current capabilities, how to run the examples, and planned improvements.
 
@@ -95,14 +95,15 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 ## Recent Improvements
 
 - **Solver migration to SUNDIALS (February 2026)**: Replaced py-pde with a native solver architecture: SUNDIALS IDA for DAE systems (algebraic constraints), CVODE for adaptive BDF time-stepping with tolerance control, Störmer-Verlet leapfrog for symplectic integration, and scipy `solve_ivp` for general-purpose adaptive ODE. Pure numpy spatial operators. Automatic solver selection based on equation structure. Three-tier constraint pre-solve (FFT, sparse matrix, automatic). See [docs/solver_migration.md](docs/solver_migration.md) and [docs/adaptive_timestepping.md](docs/adaptive_timestepping.md).
-- **Phase 4-13+ Pipeline Evolution (February 2026)**: All critical implementation complete. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **CLI**: Full `tidal` command with 7 subcommands. **Background fields**: `[[background_fields]]` TOML for non-dynamical tensors with position-dependent coefficients and 4-level caching. **Gauge fixing**: Optional per-field `[[gauge]]` TOML (Lorenz, de Donder, Coulomb, temporal, axial). **915 Python tests + ~115 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
+- **Parameter Sweep Framework (March 2026)**: Complete `tidal sweep` and `tidal analyze` commands with 13 measurement types, TOML sweep configuration, adaptive + Latin Hypercube + Sobol sampling, Sobol/Morris sensitivity analysis, run status tracking, and advanced visualization (parallel coordinates, tornado, scatter plots). See [docs/next-features.md](docs/next-features.md).
+- **Phase 4-13+ Pipeline Evolution (February 2026)**: All critical implementation complete. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **CLI**: Full `tidal` command with 9 subcommands. **Background fields**: `[[background_fields]]` TOML for non-dynamical tensors with position-dependent coefficients and 4-level caching. **Gauge fixing**: Optional per-field `[[gauge]]` TOML (Lorenz, de Donder, Coulomb, temporal, axial). **1,343 Python tests + ~115 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
 - **Lagrangian-to-PDE pipeline (February 2026)**: Complete symbolic derivation pipeline: Mathematica/xAct → JSON → native Python solvers. Canonical momentum pipeline with symbolic K^{-1} inversion for non-diagonal kinetic matrices. Lagrangian-first linearization via xPert (`Perturbation[L, 2]`). See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Future Development
 
+- **Gertsenshtein example (Phase D)**: Coupled EM-gravity simulation — the project's primary research target, now unblocked by Phases A (background fields), B (gauge fixing), and C (parameter sweeps).
 - **Continuous Integration**: GitHub Actions workflow for automated Wolfram test execution on pull requests.
-- **Gertsenshtein example (Phase D)**: Coupled EM-gravity simulation — the project's primary research target, now unblocked by Phases A (background fields) and B (gauge fixing).
-- **Parameter sweeps & convergence analysis (Phase C)**: Richardson extrapolation, Grid Convergence Index, Method of Manufactured Solutions for publication-quality V&V (Roache 1998).
+- **Spectral spatial discretisation (Phase E)**: FFT-based operators for exponential convergence on periodic domains (following Dedalus architecture).
 - **Absorbing boundaries (Phase G)**: Sponge layers and PML (Bérenger 1994) for finite-magnet interaction regions.
 - **Extended physics examples**: Coupled EM/torsion systems for Poincaré gauge theory research.
 
@@ -144,7 +145,7 @@ Common CLI tools pre-installed in the container: `git`, `node`, `npm`, `eslint`,
 
 ### Lagrangian-to-PDE Pipeline Examples
 
-The repository includes a complete symbolic-to-numerical pipeline for deriving field equations from Lagrangians and simulating them numerically. **22 examples** cover scalars, vectors, rank-3 tensors, coupled multi-field systems, curvilinear coordinates, curved spacetimes, and background-field scattering.
+The repository includes a complete symbolic-to-numerical pipeline for deriving field equations from Lagrangians and simulating them numerically. **25 examples** cover scalars, vectors, rank-3 tensors, coupled multi-field systems, curvilinear coordinates, curved spacetimes, and background-field scattering.
 
 ```bash
 # Each example has a run.sh showing the full derive → inspect → simulate workflow:
@@ -170,6 +171,8 @@ tidal validate examples/data/klein_gordon_1d.json      # validate JSON spec stru
 | `tidal list`                | Discover all available JSON specs in `examples/data/`                          |
 | `tidal validate spec.json`  | Validate JSON equation specification structure                                 |
 | `tidal plot result_dir/`    | Standalone plotting from simulation output directories                         |
+| `tidal sweep spec.json`     | Parameter sweeps, convergence studies, and adaptive sampling                   |
+| `tidal analyze sweep_dir/`  | Post-hoc sensitivity analysis (Sobol/Morris) of sweep results                  |
 
 **TOML Configuration** (`theory.toml`):
 
