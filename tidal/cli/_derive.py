@@ -377,16 +377,20 @@ def _validate_linearization(
         raise ValueError(msg)
 
     # Volume element correction in _wls_linearize_from_lagrangian assumes
-    # flat Minkowski in Cartesian coordinates (sqrt|g0| = 1).  Reject
-    # non-Minkowski metrics to prevent silently wrong equations.
+    # flat Minkowski in Cartesian coordinates (sqrt|g0| = 1).  For curved
+    # or curvilinear metrics the correction needs a sqrt|g0| prefactor
+    # and possibly a delta^2(sqrt|g|) * L0 term — not yet implemented.
     metric_type = config.get("spacetime", {}).get("metric", "minkowski")
     if has_lagrangian and metric_type != "minkowski":
-        msg = (
-            f"[linearization] with [lagrangian] requires metric = 'minkowski', "
-            f"got '{metric_type}'. Metric perturbation theory in curvilinear "
-            f"coordinates is not yet supported."
+        import warnings
+
+        warnings.warn(
+            f"[linearization] with [lagrangian]: metric = '{metric_type}' is not "
+            f"Minkowski. The volume element correction assumes sqrt|g0| = 1 and "
+            f"L0 = 0 (flat Cartesian background). Equations may be incorrect for "
+            f"curved or curvilinear backgrounds.",
+            stacklevel=2,
         )
-        raise ValueError(msg)
 
 
 def _validate_gauge_entry_preset(
