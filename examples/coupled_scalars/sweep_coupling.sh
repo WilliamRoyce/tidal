@@ -37,21 +37,21 @@ cd "$(dirname "$0")"
 
 OUT=../data/coupled_scalars_sweep
 
-echo "=== Coupled Scalars Coupling Sweep: gCpl = 0.05 to 1.8 (20 points, log scale) ==="
+echo "=== Coupled Scalars Coupling Sweep: gCpl = 0.05 to 1.99 (50 points, linear scale) ==="
 echo "    mPhi2 = 1.0, mChi2 = 4.0  (mass gap Δm² = 3.0, g_crit = 2.0)"
-echo "    Standing Gaussian on phi_0, domain [0,80], N=128, t_end=60"
+echo "    Standing Gaussian on phi_0, domain [0,160], N=256, t_end=120"
 echo ""
 
 tidal sweep ../data/coupled_scalars.json \
-  --sweep "gCpl=0.05:1.8:20:log" \
+  --sweep "gCpl=0.05:1.99:50" \
   --param mPhi2=1.0 --param mChi2=4.0 \
   --measure conversion,peak_conversion,mixing,asymptotic,effective_mass,conservation \
   --source phi_0 --target chi_0 \
-  --grid-shape 128 \
-  --bounds 0:80 \
+  --grid-shape 256 \
+  --bounds 0:160 \
   --periodic \
   --ic gaussian --ic-component phi_0 --ic-center 20.0 --ic-width 3.0 \
-  --t-end 60.0 \
+  --t-end 120.0 \
   --output "$OUT"
 
 echo ""
