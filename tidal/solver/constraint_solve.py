@@ -1024,8 +1024,8 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
 
     # Phase 2 stall diagnostics: when propagation stalls with unsatisfied
     # constraints, identify which fields are undetermined to guide the user.
-    _stall_free_fields: dict[str, set[str]] = {}
-    for eq_idx, eq in remaining_eqs:
+    stall_free_fields: dict[str, set[str]] = {}
+    for _eq_idx, eq in remaining_eqs:
         mapped_refs: set[str] = set()
         for term in eq.rhs_terms:
             ref = term.field
@@ -1035,19 +1035,19 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
                 ref = name_map[ref]
             mapped_refs.add(ref)
         free = sorted(f for f in mapped_refs if f not in determined)
-        if len(free) >= 2:
-            _stall_free_fields[eq.field_name] = set(free)
+        if len(free) >= 2:  # noqa: PLR2004
+            stall_free_fields[eq.field_name] = set(free)
 
-    if _stall_free_fields:
+    if stall_free_fields:
         # Count how often each free field appears across stuck constraints
         field_counts: dict[str, int] = {}
-        for free_set in _stall_free_fields.values():
+        for free_set in stall_free_fields.values():
             for f in free_set:
                 field_counts[f] = field_counts.get(f, 0) + 1
 
         lines = ["Constraint propagation stalled — these constraints have "
                  "multiple undetermined fields:"]
-        for eq_name, free_set in sorted(_stall_free_fields.items()):
+        for eq_name, free_set in sorted(stall_free_fields.items()):
             lines.append(
                 f"  {eq_name}: {len(free_set)} undetermined "
                 f"[{', '.join(sorted(free_set))}]"
@@ -1098,8 +1098,8 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
         ]
         for field_name, max_res, involved in violations:
             free_info = ""
-            if field_name in _stall_free_fields:
-                free = sorted(_stall_free_fields[field_name])
+            if field_name in stall_free_fields:
+                free = sorted(stall_free_fields[field_name])
                 free_info = f" — undetermined: [{', '.join(free)}]"
             lines.append(
                 f"  {field_name}: max|residual| = {max_res:.2e} "

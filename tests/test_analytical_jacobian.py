@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from typing import Any
 
 import numpy as np
-import pytest
 from scipy.sparse import issparse
 
 from tidal.solver.analytical_jacobian import (
@@ -250,7 +250,7 @@ class TestResolveTermTarget:
         term = spec.equations[0].rhs_terms[0]
         result = _resolve_term_target(term, layout, set(), op_cache)
         assert result is not None
-        col_slot, op_mat, is_dyp = result
+        col_slot, _op_mat, is_dyp = result
         assert col_slot == layout.field_slot_map["phi_0"]
         assert not is_dyp
 
@@ -362,7 +362,7 @@ class TestBuildJacobianMatrices:
 
         n = grid.num_points
         # Slot 0: phi_0 (field), slot 1: v_phi_0 (velocity)
-        field_block_dy = dF_dy[:n, n:2*n].toarray()
+        field_block_dy = dF_dy[:n, n:2 * n].toarray()
         field_block_dyp = dF_dyp[:n, :n].toarray()
 
         np.testing.assert_array_equal(field_block_dy, -np.eye(n))
@@ -378,12 +378,12 @@ class TestBuildJacobianMatrices:
 
         n = grid.num_points
         # Velocity slot dyp diagonal should be I
-        vel_dyp = dF_dyp[n:2*n, n:2*n].toarray()
+        vel_dyp = dF_dyp[n:2 * n, n:2 * n].toarray()
         np.testing.assert_array_equal(vel_dyp, np.eye(n))
 
         # Velocity slot dF/dy should have -laplacian and +identity blocks
         # from negated RHS: -(1.0 * laplacian + -1.0 * identity)
-        vel_dy_phi = dF_dy[n:2*n, :n].toarray()
+        vel_dy_phi = dF_dy[n:2 * n, :n].toarray()
         # Build expected: -laplacian + identity
         from tidal.solver.operators import apply_operator
 
@@ -418,7 +418,7 @@ class TestBuildJacobianMatrices:
         )
 
         # The same block in dF/dy should be zero for this coupling
-        dy_block = dF_dy[v_A1_rows, A0_cols].toarray()
+        dF_dy[v_A1_rows, A0_cols].toarray()
         # dF_dy may have entries from other terms but the constraint velocity
         # coupling specifically goes to dF_dyp
 
@@ -428,7 +428,7 @@ class TestBuildJacobianMatrices:
         grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
         layout = StateLayout.from_spec(spec, grid.num_points)
 
-        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        _dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
 
         n = grid.num_points  # 8
         # Slots: phi_0 (0), v_phi_0 (1), A_0 (2)
@@ -564,7 +564,7 @@ class TestJacobianDelivery:
         jacfn = _create_jacfn(dF_dy, dF_dyp)
 
         n_total = layout.total_size
-        cj = 3.14
+        cj = math.pi
         JJ = np.zeros((n_total, n_total))
         jacfn(0.0, np.zeros(n_total), np.zeros(n_total), np.zeros(n_total), cj, JJ)
 
@@ -712,11 +712,11 @@ class TestSparseTier:
 
     def test_sparse_jacfn_matches_dense(self) -> None:
         """Sparse jacfn should produce same J as dense for any cj."""
+        from tidal.solver._scipy_types import csc_matrix
         from tidal.solver.analytical_jacobian import (
             _create_sparse_jacfn,
             _prepare_sparse_data,
         )
-        from tidal.solver._scipy_types import csc_matrix
 
         spec = _make_kg_1d_spec()
         grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
