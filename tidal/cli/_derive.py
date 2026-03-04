@@ -376,6 +376,18 @@ def _validate_linearization(
         msg = f"[linearization].perturbation_field '{pf}' not found in [[fields]]"
         raise ValueError(msg)
 
+    # Volume element correction in _wls_linearize_from_lagrangian assumes
+    # flat Minkowski in Cartesian coordinates (sqrt|g0| = 1).  Reject
+    # non-Minkowski metrics to prevent silently wrong equations.
+    metric_type = config.get("spacetime", {}).get("metric", "minkowski")
+    if has_lagrangian and metric_type != "minkowski":
+        msg = (
+            f"[linearization] with [lagrangian] requires metric = 'minkowski', "
+            f"got '{metric_type}'. Metric perturbation theory in curvilinear "
+            f"coordinates is not yet supported."
+        )
+        raise ValueError(msg)
+
 
 def _validate_gauge_entry_preset(
     i: int,
@@ -1203,19 +1215,25 @@ def _wls_linearize_from_lagrangian(
 
     Single-path approach using xPert's 2nd-order perturbation:
 
-    1. ``Perturbation[L, 2] / 2`` → L^(2) (quadratic Lagrangian).
-       xPert correctly perturbs all metric-dependent objects (Christoffels,
-       Ricci tensor, etc.) *before* evaluating on the flat background, so
-       L^(2) retains the full linearized Einstein tensor contribution even
-       though R₀ = 0 on Minkowski.
+    1. Compute ``δ²(√|g| L)`` on flat Minkowski background:
 
-    2. Expand ``Scalar[x]^n`` → ``∏ Scalar[RenameDummies[x]]`` so that VarD
+       ``δ²(√|g| L) = δ²L + h · δL``
+
+       where ``h = η^{ab} h_{ab}`` is the trace of the metric perturbation.
+       The cross term ``h · δL`` arises because ``δ(√|g|) = ½h`` even on
+       flat Minkowski where ``√|g₀| = 1``.  Without it, ``VarD`` produces
+       ``R^{(1)}_{ab}`` instead of the linearized Einstein tensor
+       ``G^{(1)}_{ab} = R^{(1)}_{ab} - ½η_{ab} R^{(1)}``.
+
+    2. ``L^(2) = δ²(√|g| L) / 2`` → quadratic Lagrangian.
+
+    3. Expand ``Scalar[x]^n`` → ``∏ Scalar[RenameDummies[x]]`` so that VarD
        can vary through each copy independently (fixes the index-collision
        problem from Fierz-Pauli trace-squared terms).
 
-    3. ``VarD[H[-a,-b], CD][L^(2)]`` → correct linearized EOM.
+    4. ``VarD[H[-a,-b], CD][L^(2)]`` → correct linearized EOM.
 
-    4. Same L^(2) serves the canonical pipeline (momenta π, Hamiltonian H).
+    5. Same L^(2) serves the canonical pipeline (momenta π, Hamiltonian H).
 
     Valid for flat Minkowski background where ``√(-g₀) = 1`` and ``L₀ = 0``
     (Brizuela, Martín-García, Mena Marugán 2009; Carroll 2004, Ch. 7).
@@ -1249,7 +1267,7 @@ def _wls_linearize_from_lagrangian(
         "",
         "(* ============================================================ *)",
         "(* Lagrangian-first linearization (single-path via L^(2))       *)",
-        "(* L -> L^(2) = Perturbation[L, 2] / 2  (xPert 2nd-order)     *)",
+        "(* L^(2) = d^2(sqrt|g| L) / 2  via xPert 2nd-order            *)",
         "(* Then: VarD[H, CD][L^(2)] -> linearized EOM                   *)",
         "(* Same L^(2) feeds canonical pipeline (pi, H)                  *)",
         "(* ============================================================ *)",
@@ -1262,8 +1280,6 @@ def _wls_linearize_from_lagrangian(
         f'Print["Perturbation: {ctx.metric} -> {ctx.metric} + {eps_sym} * {pert_field_name}"];',
         "",
         "(* 2nd-order perturbation of Lagrangian *)",
-        "(* xPert perturbs curvature tensors symbolically BEFORE evaluating *)",
-        "(* on flat background, so L^(2) retains linearized Einstein tensor *)",
         "l2Raw = Perturbation[lOriginal, 2];",
         "l2Raw = ExpandPerturbation[l2Raw];",
         'Print["L^(2) raw (expanded): ", Short[l2Raw, 3]];',
@@ -1271,6 +1287,22 @@ def _wls_linearize_from_lagrangian(
         "(* Validate that xPert fully expanded *)",
         "If[!FreeQ[l2Raw, Perturbation],",
         '  Throw["Linearization: ExpandPerturbation did not fully expand L^(2)."]',
+        "];",
+        "",
+        "(* Volume element correction for metric perturbation theory.          *)",
+        "(* The action is S = int sqrt|g| L d^n x.  On flat Minkowski         *)",
+        "(* (sqrt|g0|=1, L0=0):                                               *)",
+        "(*   d^2(sqrt|g| L) = d^2 L + h * d L                               *)",
+        "(* where h = eta^{ab} h_{ab} is the perturbation trace.              *)",
+        "(* Without this, VarD gives R^(1)_{ab} instead of G^(1)_{ab}.        *)",
+        "l1Raw = Perturbation[lOriginal, 1];",
+        "l1Raw = ExpandPerturbation[l1Raw];",
+        "If[l1Raw =!= 0,",
+        f"  Module[{{traceH = Scalar[{ctx.metric}[a, b] {pert_sym}[LI[1], -a, -b]]}},",
+        "    l2Raw = l2Raw + traceH * l1Raw;",
+        '    Print["Volume element correction: added h * dL (trace x first-order perturbation)"]',
+        "  ],",
+        '  Print["Volume element correction: skipped (dL = 0)"]',
         "];",
         "",
         "(* Drop 2nd-order metric perturbation h^(2) -- keep h^(1)*h^(1) only *)",
@@ -1671,7 +1703,7 @@ def _wls_plane_wave_reduction_lagrangian(ctx: _WlsContext) -> list[str]:
         "",
         "(* ============================================================ *)",
         "(* Plane-wave reduction: zero transverse derivatives            *)",
-        f'(* Propagation axis: {prop_axis}, killed axes: {", ".join(killed):<20s}*)',
+        f"(* Propagation axis: {prop_axis}, killed axes: {', '.join(killed):<20s}*)",
         "(* Applied BEFORE E-L derivation for efficiency                  *)",
         "(* ============================================================ *)",
         "",
@@ -2707,8 +2739,8 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:
                 f"{spec_data['spacetime']['dimension']}D → "
                 f"{reduced['spacetime']['dimension']}D"
             )
-            eliminated = reduced["metadata"].get("reduction", {}).get(
-                "eliminated_fields", []
+            eliminated = (
+                reduced["metadata"].get("reduction", {}).get("eliminated_fields", [])
             )
             if eliminated:
                 print(f"Eliminated fields: {', '.join(eliminated)}")

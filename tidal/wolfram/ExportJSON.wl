@@ -306,16 +306,12 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
      the yy-component equation has d²_t(h_xx). Detect this and reassign so each
      field gets the equation that actually evolves it.
 
-     Key subtlety: Phantom d²_t terms may persist even after Expand[Simplify[...]]
-     in ComponentDecompose.wl. For example, the tt component of G^{(1)}_ab has
-     +½d²_t(h_3) and -½d²_t(h_3) that may not cancel. We detect phantoms by
-     extracting d²_t COEFFICIENTS per field and checking if their sum is zero. *)
+     Uses coefficient-sum detection: d²_t COEFFICIENTS are summed per field.
+     If the sum is zero, the d²_t terms are phantom (cancel under simplification)
+     and the field is not truly evolved by that equation. *)
   Module[{evolvedFieldIndex, assignmentMap, needsSwap = False, newEqs},
-    (* For each equation, find which field it truly evolves (net non-zero d²_t).
-       Uses coefficient extraction rather than mere presence detection to correctly
-       handle phantom d²_t terms that should cancel. *)
     evolvedFieldIndex = Table[
-      Module[{result = 0, terms, d2tTerms, coeffSum},
+      Module[{result = 0, terms, d2tTerms, coeffSum, coeffList},
         terms = If[Head[workingEqs[[i, 2]]] === Plus,
                    List @@ workingEqs[[i, 2]],
                    {workingEqs[[i, 2]]}];
@@ -323,11 +319,20 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
           d2tTerms = Select[terms,
             ContainsOwnTimeDerivative[#, allFieldNames[[j]], 2] &];
           If[Length[d2tTerms] > 0,
-            (* Sum the coefficients of d²_t(field_j) across all matching terms.
-               If the sum is zero, these are phantom terms that cancel. *)
-            coeffSum = Simplify[Total[ExtractLHSCoefficient /@ d2tTerms]];
-            If[coeffSum =!= 0,
-              result = j; Break[]
+            coeffList = ExtractLHSCoefficient /@ d2tTerms;
+            coeffSum = FullSimplify[Total[coeffList]];
+            Module[{isPhantom},
+              isPhantom = (coeffSum === 0) || PossibleZeroQ[coeffSum];
+              If[!isPhantom,
+                Module[{syms, numVal},
+                  syms = DeleteDuplicates[Cases[coeffSum, _Symbol, {0, Infinity}]];
+                  numVal = Quiet[N[coeffSum /. Thread[syms -> Table[Prime[k]*E/7, {k, Length[syms]}]]]];
+                  If[NumericQ[numVal] && Abs[numVal] < 1e-10, isPhantom = True]
+                ]
+              ];
+              If[!isPhantom,
+                result = j; Break[]
+              ]
             ]
           ],
           {j, nFields}];
@@ -460,13 +465,21 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   ];
 
   (* Safety net: if own-field time-derivative COEFFICIENTS sum to zero,
-     reclassify as constraint. Uses coefficient extraction rather than full-term
-     Simplify, which is more robust for complex xAct expressions where
-     Expand[Simplify[...]] may not fully cancel phantom d²_t terms. *)
+     reclassify as constraint. Catches edge cases where Simplify didn't
+     fully cancel phantom d²_t terms in ComponentDecompose. *)
   If[lhsTimeOrder > 0 && Length[timeDerivTerm] > 0,
-    Module[{coeffSum},
-      coeffSum = Simplify[Total[ExtractLHSCoefficient /@ timeDerivTerm]];
-      If[coeffSum === 0,
+    Module[{coeffSum, coeffList, isPhantom},
+      coeffList = ExtractLHSCoefficient /@ timeDerivTerm;
+      coeffSum = FullSimplify[Total[coeffList]];
+      isPhantom = (coeffSum === 0) || PossibleZeroQ[coeffSum];
+      If[!isPhantom,
+        Module[{syms, numVal},
+          syms = DeleteDuplicates[Cases[coeffSum, _Symbol, {0, Infinity}]];
+          numVal = Quiet[N[coeffSum /. Thread[syms -> Table[Prime[k]*E/7, {k, Length[syms]}]]]];
+          If[NumericQ[numVal] && Abs[numVal] < 1e-10, isPhantom = True]
+        ]
+      ];
+      If[isPhantom,
         Print["  NOTE: d" <> ToString[lhsTimeOrder] <> "_t(" <> fieldName <>
               ") coefficients cancel (sum=0). Reclassifying as constraint."];
         lhsTimeOrder = 0;
