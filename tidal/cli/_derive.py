@@ -330,6 +330,95 @@ def _validate_background_fields(config: dict[str, Any]) -> None:
                 raise TypeError(msg)
 
 
+def _validate_matter_perturbations(
+    config: dict[str, Any],
+    matter_perts: list[dict[str, Any]],
+    *,
+    has_lagrangian: bool = False,
+) -> None:
+    """Validate ``[[linearization.matter_perturbations]]`` entries.
+
+    Each entry defines a field split: field = background + ε·perturbation.
+    Requires ``field`` (in ``[[fields]]``), ``perturbation_name`` (unique),
+    and ``background`` (in ``[[background_fields]]``).
+
+    Raises
+    ------
+    ValueError
+        If entries are invalid, reference non-existent fields/backgrounds,
+        or have duplicate names.
+    """
+    if not has_lagrangian:
+        msg = (
+            "[[linearization.matter_perturbations]] requires [lagrangian] "
+            "(Lagrangian-first linearization path)"
+        )
+        raise ValueError(msg)
+
+    field_names = {f["name"] for f in config.get("fields", [])}
+    bg_names = {f["name"] for f in config.get("background_fields", [])}
+    seen_fields: set[str] = set()
+    seen_pnames: set[str] = set()
+
+    for i, mp in enumerate(matter_perts):
+        _validate_single_matter_perturbation(
+            i, mp, field_names, bg_names, (seen_fields, seen_pnames),
+        )
+
+
+def _validate_single_matter_perturbation(
+    i: int,
+    mp: dict[str, Any],
+    field_names: set[str],
+    bg_names: set[str],
+    seen: tuple[set[str], set[str]],
+) -> None:
+    """Validate a single ``[[linearization.matter_perturbations]]`` entry.
+
+    Raises
+    ------
+    ValueError
+        If the entry is missing required keys or references invalid names.
+    """
+    seen_fields, seen_pnames = seen
+    tag = f"[[linearization.matter_perturbations]] entry {i}"
+
+    # Require 'field'
+    mf = mp.get("field")
+    if not mf or not isinstance(mf, str):
+        msg = f"{tag}: 'field' is required"
+        raise ValueError(msg)
+    if mf not in field_names:
+        msg = f"{tag}: field '{mf}' not found in [[fields]]"
+        raise ValueError(msg)
+    if mf in seen_fields:
+        msg = f"{tag}: field '{mf}' already has a perturbation defined"
+        raise ValueError(msg)
+    seen_fields.add(mf)
+
+    # Require 'perturbation_name'
+    pname = mp.get("perturbation_name")
+    if not pname or not isinstance(pname, str):
+        msg = f"{tag}: 'perturbation_name' is required"
+        raise ValueError(msg)
+    if pname in seen_pnames:
+        msg = f"{tag}: perturbation_name '{pname}' already used"
+        raise ValueError(msg)
+    seen_pnames.add(pname)
+
+    # Require 'background'
+    bg = mp.get("background")
+    if not bg or not isinstance(bg, str):
+        msg = (
+            f"{tag}: 'background' is required "
+            f"(name of matching [[background_fields]] entry)"
+        )
+        raise ValueError(msg)
+    if bg not in bg_names:
+        msg = f"{tag}: background '{bg}' not found in [[background_fields]]"
+        raise ValueError(msg)
+
+
 def _validate_linearization(
     config: dict[str, Any],
     *,
@@ -368,13 +457,21 @@ def _validate_linearization(
             raise ValueError(msg)
 
     pf = lin.get("perturbation_field")
-    if not pf or not isinstance(pf, str):
+    matter_perts: list[dict[str, Any]] = lin.get("matter_perturbations", [])
+
+    # perturbation_field is required unless matter_perturbations are present
+    # (matter-only perturbation without metric perturbation)
+    if not matter_perts and (not pf or not isinstance(pf, str)):
         msg = "[linearization].perturbation_field is required"
         raise ValueError(msg)
-    field_names = {f["name"] for f in config.get("fields", [])}
-    if pf not in field_names:
-        msg = f"[linearization].perturbation_field '{pf}' not found in [[fields]]"
-        raise ValueError(msg)
+    if pf is not None and isinstance(pf, str):
+        field_names = {f["name"] for f in config.get("fields", [])}
+        if pf not in field_names:
+            msg = f"[linearization].perturbation_field '{pf}' not found in [[fields]]"
+            raise ValueError(msg)
+
+    if matter_perts:
+        _validate_matter_perturbations(config, matter_perts, has_lagrangian=has_lagrangian)
 
 
 def _validate_gauge_entry_preset(
@@ -500,6 +597,19 @@ def _validate_gauge(config: dict[str, Any]) -> None:
         raise TypeError(msg)
 
     field_map = {f["name"]: f for f in config.get("fields", [])}
+
+    # Also include matter perturbation names as valid gauge targets.
+    # When [[linearization.matter_perturbations]] splits A → Ā + εa,
+    # the gauge references the perturbation name "a" (the dynamical variable),
+    # with the same type/rank/symmetry as the original field.
+    lin = config.get("linearization", {})
+    for mp in lin.get("matter_perturbations", []) if isinstance(lin, dict) else []:
+        pname = mp.get("perturbation_name", "")
+        mf_name = mp.get("field", "")
+        if pname and mf_name and mf_name in field_map:
+            # Perturbation inherits type/rank/symmetry from the original field
+            field_map[pname] = dict(field_map[mf_name], name=pname)
+
     seen_fields: set[str] = set()
 
     for i, entry in enumerate(gauge_list):
@@ -1194,7 +1304,164 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
     return lines
 
 
-def _wls_linearize_from_lagrangian(
+def _xpert_index_pattern(
+    pert_sym: str, full_head: str, field: dict[str, Any],
+) -> tuple[str, str]:
+    """Return (pert_idx, full_idx) for DefTensorPerturbation."""
+    ftype = field["type"]
+    if ftype == "scalar":
+        return f"{pert_sym}[LI[order]]", f"{full_head}[]"
+    if ftype == "vector":
+        return f"{pert_sym}[LI[order], -a]", f"{full_head}[-a]"
+    rank = field.get("rank", 2)
+    idx_str = ", ".join(f"-{_INDEX_LETTERS[i]}" for i in range(rank))
+    return f"{pert_sym}[LI[order], {idx_str}]", f"{full_head}[{idx_str}]"
+
+
+def _pert_field_dict(pert_name: str, source_field: dict[str, Any]) -> dict[str, Any]:
+    """Build a field dict for a perturbation field (inherits type/rank/symmetry)."""
+    d: dict[str, Any] = {"name": pert_name, "type": source_field["type"]}
+    if source_field["type"] not in {"scalar", "vector"}:
+        d["rank"] = source_field.get("rank", 2)
+        d["symmetry"] = source_field.get("symmetry", "none")
+    return d
+
+
+def _wls_matter_perturbation_setup(
+    ctx: _WlsContext,
+    matter_perts: list[dict[str, Any]],
+    eps_sym: str,
+) -> tuple[list[dict[str, str]], list[str]]:
+    """Generate DefTensorPerturbation + DefTensor for each matter perturbation.
+
+    Returns (matter_pert_info, wls_lines) where matter_pert_info contains
+    the symbol mapping for each perturbation field.
+    """
+    p = ctx.prefix
+    info: list[dict[str, str]] = []
+    lines: list[str] = []
+
+    for mp in matter_perts:
+        mf_name = mp["field"]
+        mp_name = mp["perturbation_name"]
+        mf = next(f for f in ctx.fields if f["name"] == mf_name)
+        mf_type = mf["type"]
+
+        mp_sym = f"{p}{mp_name}Pert"
+        mf_head = f"{p}{mf_name.capitalize()}"
+        mp_head = f"{p}{mp_name.capitalize()}"
+
+        # Build DefTensorPerturbation arguments + perturbation field DefTensor
+        pert_idx, full_idx = _xpert_index_pattern(mp_sym, mf_head, mf)
+        mp_def = _generate_field_def(
+            _pert_field_dict(mp_name, mf), ctx.prefix, ctx.manifold,
+        )
+
+        lines.extend(
+            [
+                f"(* Matter perturbation: {mf_name} = {mp['background']} + {eps_sym} * {mp_name} *)",
+                f"(* Define perturbation field tensor {mp_name} *)",
+                mp_def,
+                "",
+                f"DefTensorPerturbation[{pert_idx}, {full_idx}, {ctx.manifold}];",
+                f'Print["Matter perturbation: {mf_name} -> background + {eps_sym} * {mp_name}"];',
+                "",
+            ]
+        )
+
+        info.append(
+            {
+                "field_name": mf_name,
+                "pert_name": mp_name,
+                "pert_sym": mp_sym,
+                "field_head": mf_head,
+                "pert_head": mp_head,
+                "field_type": mf_type,
+                "field_rank": str(mf.get("rank", 2)),
+            }
+        )
+
+    return info, lines
+
+
+def _wls_multi_field_eom(
+    ctx: _WlsContext,
+    dyn_fields: list[dict[str, Any]],
+) -> list[str]:
+    """Generate VarD + DecomposeToComponents + fieldEquations for multiple fields."""
+    p = ctx.prefix
+    lines: list[str] = []
+
+    # VarD for each dynamical field
+    for df in dyn_fields:
+        eom_var = f"eom{df['name'].capitalize()}"
+        lines.extend(
+            [
+                f"(* Vary L^(2) w.r.t. {df['name']} *)",
+                f"{eom_var} = VarD[{df['vard_expr']}, {ctx.cd}][l2ForVarD];",
+                f"{eom_var} = ToCanonical[{eom_var}];",
+                f"{eom_var} = ContractMetric[{eom_var}, {ctx.metric}];",
+                f'Print["EOM({df["name"]}): ", Short[{eom_var}, 5]];',
+                "",
+            ]
+        )
+
+    # Decompose each field, listing others as additionalFields
+    for i, df in enumerate(dyn_fields):
+        eom_var = f"eom{df['name'].capitalize()}"
+        comp_var = f"comp{df['name'].capitalize()}"
+        others_str = ", ".join(
+            d["fexpr"] for j, d in enumerate(dyn_fields) if j != i
+        )
+        lines.extend(
+            [
+                f"(* Decompose {df['name']} EOM to components *)",
+                f'{comp_var} = DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix];',
+                f'Print["{df["name"]} components: ", Length[{comp_var}]];',
+            ]
+        )
+        lines.extend(_wls_vector_background_substitution(ctx, comp_var))
+        lines.extend(_wls_validate_backgrounds_after_decompose(ctx, comp_var))
+        lines.append("")
+
+    # Build combined fieldEquations
+    lines.extend(
+        [
+            "(* Build combined fieldEquations from all dynamical fields *)",
+            "fieldEquations = Flatten[{",
+        ]
+    )
+    for i, df in enumerate(dyn_fields):
+        comp_var = f"comp{df['name'].capitalize()}"
+        comma = "," if i < len(dyn_fields) - 1 else ""
+        lines.append(
+            f'  Table[{{"{df["name"]}_" <> ToString[{comp_var}[[k, 1]]], {comp_var}[[k, 2]]}}, {{k, Length[{comp_var}]}}]{comma}'
+        )
+    lines.extend(("}, 1];", ""))
+
+    return lines
+
+
+def _wls_matter_pert_truncation(mpi: dict[str, str]) -> list[str]:
+    """Generate LI[2] drop + LI[1] replacement rules for a matter perturbation."""
+    mp_sym, mp_head = mpi["pert_sym"], mpi["pert_head"]
+    pname = mpi["pert_name"]
+    if mpi["field_type"] == "scalar":
+        return [
+            f"(* Drop 2nd-order matter perturbation {pname}^(2) *)",
+            f"l2Raw = l2Raw /. {mp_sym}[LI[2]] :> 0;",
+            f"(* Replace xPert notation -> perturbation field {pname} *)",
+            f"l2Raw = l2Raw /. {mp_sym}[LI[1]] :> {mp_head}[];",
+        ]
+    return [
+        f"(* Drop 2nd-order matter perturbation {pname}^(2) *)",
+        f"l2Raw = l2Raw /. {mp_sym}[LI[2], idx__] :> 0;",
+        f"(* Replace xPert notation -> perturbation field {pname} *)",
+        f"l2Raw = l2Raw /. {mp_sym}[LI[1], idx__] :> {mp_head}[idx];",
+    ]
+
+
+def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     ctx: _WlsContext,
     *,
     include_bg: bool = False,
@@ -1215,9 +1482,16 @@ def _wls_linearize_from_lagrangian(
        can vary through each copy independently (fixes the index-collision
        problem from Fierz-Pauli trace-squared terms).
 
-    4. ``VarD[H[-a,-b], CD][L^(2)]`` → correct linearized EOM.
+    4. ``VarD[H[-a,-b], CD][L^(2)]`` → correct linearized EOM for each
+       dynamical field.
 
     5. Same L^(2) serves the canonical pipeline (momenta π, Hamiltonian H).
+
+    Supports multi-field perturbation via ``[[linearization.matter_perturbations]]``:
+    when present, each matter field is split via ``DefTensorPerturbation`` into
+    background + perturbation, and ``VarD`` is called for each dynamical field.
+    Cross-coupling terms (e.g., graviton-photon via background F̄) emerge
+    automatically from the algebra.
 
     Works for any background metric.  For flat Minkowski ``√|g₀| = 1`` and
     the volume element factor is trivial.  For curved backgrounds, xPert
@@ -1232,13 +1506,18 @@ def _wls_linearize_from_lagrangian(
         msg = "_wls_linearize_from_lagrangian called without linearization config"
         raise ValueError(msg)
     lin = ctx.linearization
-    pert_field_name = lin["perturbation_field"]
-    pert_field = next(f for f in ctx.fields if f["name"] == pert_field_name)
-    fexpr = _field_expression(pert_field, ctx.prefix)
+    pert_field_name = lin.get("perturbation_field")  # May be None for matter-only
+    matter_perts: list[dict[str, Any]] = lin.get("matter_perturbations", [])
+
+    # Resolve the metric perturbation field (if any)
+    has_metric_pert = pert_field_name is not None
+    if has_metric_pert:
+        pert_field = next(f for f in ctx.fields if f["name"] == pert_field_name)
+        fexpr = _field_expression(pert_field, ctx.prefix)
 
     pert_sym = f"{ctx.prefix}hpert"
     eps_sym = f"{ctx.prefix}Epsilon"
-    field_head = f"{ctx.prefix}{pert_field_name.capitalize()}"
+    field_head = f"{ctx.prefix}{pert_field_name.capitalize()}" if has_metric_pert else None
     bg_name = f"{ctx.prefix}Bg"
     ricci_sym = f"Ricci{ctx.cd}"
     ricci_scalar_sym = f"RicciScalar{ctx.cd}"
@@ -1254,46 +1533,77 @@ def _wls_linearize_from_lagrangian(
         "(* ============================================================ *)",
         "(* Lagrangian-first linearization (single-path via L^(2))       *)",
         "(* L^(2) = d^2(sqrt|g| L) / (2 sqrt|g0|)  via xPert           *)",
-        "(* Then: VarD[H, CD][L^(2)] -> linearized EOM                   *)",
+        "(* Then: VarD[field, CD][L^(2)] -> linearized EOM              *)",
         "(* Same L^(2) feeds canonical pipeline (pi, H)                  *)",
         "(* ============================================================ *)",
         "",
         "(* Save original nonlinear Lagrangian *)",
         f"lOriginal = {p}Lagrangian;",
         "",
-        "(* Set up metric perturbation: g = eta + epsilon * h  via xPert *)",
-        f"{pert_sym}Tensor = SetupMetricPerturbation[{ctx.metric}, {pert_sym}, {eps_sym}];",
-        f'Print["Perturbation: {ctx.metric} -> {ctx.metric} + {eps_sym} * {pert_field_name}"];',
-        "",
-        "(* Include sqrt(-g) volume element: S = int sqrt(-g) L d^n x      *)",
-        "(* xPert natively perturbs Sqrt[-Detg[]], handling all orders.     *)",
-        f"lDensity = Sqrt[-{det_sym}[]] * lOriginal;",
-        "",
-        "(* 2nd-order perturbation of the full Lagrangian density *)",
-        "l2Raw = Perturbation[lDensity, 2];",
-        "l2Raw = ExpandPerturbation[l2Raw];",
-        'Print["L^(2) density (expanded): ", Short[l2Raw, 3]];',
-        "",
-        "(* Validate that xPert fully expanded *)",
-        "If[!FreeQ[l2Raw, Perturbation],",
-        '  Throw["Linearization: ExpandPerturbation did not fully expand L^(2)."]',
-        "];",
-        "",
-        "(* Divide out background volume element sqrt(-g0)                   *)",
-        "(* (covariantly constant for Levi-Civita, passes through VarD).     *)",
-        f"l2Raw = l2Raw / Sqrt[-{det_sym}[]];",
-        "",
-        "(* Replace background metric determinant with evaluated value       *)",
-        f"l2Raw = l2Raw /. {det_sym}[] -> Det[{p}MetricMatrix];",
-        "l2Raw = Simplify[l2Raw];",
-        'Print["L^(2) (volume element resolved): ", Short[l2Raw, 3]];',
-        "",
-        "(* Drop 2nd-order metric perturbation h^(2) -- keep h^(1)*h^(1) only *)",
-        f"l2Raw = l2Raw /. {pert_sym}[LI[2], idx__] :> 0;",
-        "",
-        "(* Replace xPert notation with declared field tensor *)",
-        f"l2Raw = l2Raw /. {pert_sym}[LI[1], idx__] :> {field_head}[idx];",
     ]
+
+    # --- Metric perturbation setup ---
+    if has_metric_pert:
+        lines.extend(
+            [
+                "(* Set up metric perturbation: g = eta + epsilon * h  via xPert *)",
+                f"{pert_sym}Tensor = SetupMetricPerturbation[{ctx.metric}, {pert_sym}, {eps_sym}];",
+                f'Print["Perturbation: {ctx.metric} -> {ctx.metric} + {eps_sym} * {pert_field_name}"];',
+                "",
+            ]
+        )
+
+    # --- Matter field perturbation setup (multi-field xPert) ---
+    matter_pert_info, mp_lines = _wls_matter_perturbation_setup(
+        ctx, matter_perts, eps_sym,
+    )
+    lines.extend(mp_lines)
+
+    lines.extend(
+        [
+            "(* Include sqrt(-g) volume element: S = int sqrt(-g) L d^n x      *)",
+            "(* xPert natively perturbs Sqrt[-Detg[]], handling all orders.     *)",
+            f"lDensity = Sqrt[-{det_sym}[]] * lOriginal;",
+            "",
+            "(* 2nd-order perturbation of the full Lagrangian density *)",
+            "l2Raw = Perturbation[lDensity, 2];",
+            "l2Raw = ExpandPerturbation[l2Raw];",
+            'Print["L^(2) density (expanded): ", Short[l2Raw, 3]];',
+            "",
+            "(* Validate that xPert fully expanded *)",
+            "If[!FreeQ[l2Raw, Perturbation],",
+            '  Throw["Linearization: ExpandPerturbation did not fully expand L^(2)."]',
+            "];",
+            "",
+            "(* Divide out background volume element sqrt(-g0)                   *)",
+            "(* (covariantly constant for Levi-Civita, passes through VarD).     *)",
+            f"l2Raw = l2Raw / Sqrt[-{det_sym}[]];",
+            "",
+            "(* Replace background metric determinant with evaluated value       *)",
+            f"l2Raw = l2Raw /. {det_sym}[] -> Det[{p}MetricMatrix];",
+            "l2Raw = Simplify[l2Raw];",
+            'Print["L^(2) (volume element resolved): ", Short[l2Raw, 3]];',
+            "",
+        ]
+    )
+
+    # --- Drop LI[2] and replace LI[1] for ALL perturbation fields ---
+    # Dropping LI[2] truncates the perturbation expansion at 1st order for each field.
+    # This is correct for linearized theory: field = background + ε·perturbation^(1).
+    # Products of 1st-order perturbations (quadratic action terms) are preserved.
+    if has_metric_pert:
+        lines.extend(
+            [
+                "(* Drop 2nd-order metric perturbation h^(2) -- keep h^(1)*h^(1) only *)",
+                f"l2Raw = l2Raw /. {pert_sym}[LI[2], idx__] :> 0;",
+                "",
+                "(* Replace xPert metric notation with declared field tensor *)",
+                f"l2Raw = l2Raw /. {pert_sym}[LI[1], idx__] :> {field_head}[idx];",
+            ]
+        )
+
+    for mpi in matter_pert_info:
+        lines.extend(_wls_matter_pert_truncation(mpi))
 
     # Replace bg → metric if bg tensor is used
     if include_bg:
@@ -1337,12 +1647,12 @@ def _wls_linearize_from_lagrangian(
         lines.extend(_wls_gauge_fixing_type_a(ctx))
 
     # ------------------------------------------------------------------
-    # Step 2: EOM via VarD[H[-a,-b], CD][L^(2)]
+    # Step 2: EOM via VarD for each dynamical field
     # ------------------------------------------------------------------
     lines.extend(
         [
             "(* ------------------------------------------------------------ *)",
-            "(* EOM: VarD[H[-a,-b], CD][L^(2)]                              *)",
+            "(* EOM: VarD[field, CD][L^(2)] for each dynamical field         *)",
             "(* ------------------------------------------------------------ *)",
             "",
             "(* Expand Scalar[x]^n into products with renamed dummies.       *)",
@@ -1353,36 +1663,79 @@ def _wls_linearize_from_lagrangian(
             "  Times @@ Table[Scalar[RenameDummies[x]], {n}];",
             'Print["L^(2) for VarD (Scalar expanded): ", Short[l2ForVarD, 5]];',
             "",
-            "(* Vary L^(2) with respect to perturbation field H *)",
-            f"eomLin = VarD[{field_head}[-a, -b], {ctx.cd}][l2ForVarD];",
-            "eomLin = ToCanonical[eomLin];",
-            f"eomLin = ContractMetric[eomLin, {ctx.metric}];",
-            'Print["Linearized EOM: ", Short[eomLin, 5]];',
-            "",
         ]
     )
 
-    lines.extend(
-        [
-            "(* Decompose to components *)",
-            f'componentEqs = DecomposeToComponents[eomLin, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {p}MetricMatrix];',
-            'Print["Components: ", Length[componentEqs]];',
-        ]
-    )
-    lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
-    lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
+    if not matter_pert_info:
+        # --- Single-field linearization (metric only, original path) ---
+        assert has_metric_pert
+        lines.extend(
+            [
+                "(* Vary L^(2) with respect to perturbation field H *)",
+                f"eomLin = VarD[{field_head}[-a, -b], {ctx.cd}][l2ForVarD];",
+                "eomLin = ToCanonical[eomLin];",
+                f"eomLin = ContractMetric[eomLin, {ctx.metric}];",
+                'Print["Linearized EOM: ", Short[eomLin, 5]];',
+                "",
+            ]
+        )
 
-    # Build fieldEquations table
-    lines.extend(
-        [
-            "",
-            "fieldEquations = Table[",
-            f'  {{"{pert_field_name}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
-            "  {k, Length[componentEqs]}",
-            "];",
-            "",
-        ]
-    )
+        lines.extend(
+            [
+                "(* Decompose to components *)",
+                f'componentEqs = DecomposeToComponents[eomLin, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {p}MetricMatrix];',
+                'Print["Components: ", Length[componentEqs]];',
+            ]
+        )
+        lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
+        lines.extend(
+            _wls_validate_backgrounds_after_decompose(ctx, "componentEqs")
+        )
+
+        # Build fieldEquations table
+        lines.extend(
+            [
+                "",
+                "fieldEquations = Table[",
+                f'  {{"{pert_field_name}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
+                "  {k, Length[componentEqs]}",
+                "];",
+                "",
+            ]
+        )
+    else:
+        # --- Multi-field linearization (metric + matter perturbations) ---
+        # Build list of all dynamical fields and their VarD expressions
+        dyn_fields: list[dict[str, Any]] = []
+        if has_metric_pert:
+            dyn_fields.append(
+                {
+                    "name": pert_field_name,
+                    "field": pert_field,
+                    "head": field_head,
+                    "fexpr": fexpr,
+                    "vard_expr": f"{field_head}[-a, -b]",
+                }
+            )
+        for mpi in matter_pert_info:
+            mp_field_dict: dict[str, Any] = {
+                "name": mpi["pert_name"],
+                "type": mpi["field_type"],
+            }
+            if mpi["field_type"] not in {"scalar", "vector"}:
+                mp_field_dict["rank"] = int(mpi["field_rank"])
+            mp_fexpr = _field_expression(mp_field_dict, ctx.prefix)
+            dyn_fields.append(
+                {
+                    "name": mpi["pert_name"],
+                    "field": mp_field_dict,
+                    "head": mpi["pert_head"],
+                    "fexpr": mp_fexpr,
+                    "vard_expr": mp_fexpr,
+                }
+            )
+
+        lines.extend(_wls_multi_field_eom(ctx, dyn_fields))
 
     # ------------------------------------------------------------------
     # Step 3: Type B gauge fixing (if any) — constraints on fieldEquations

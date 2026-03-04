@@ -3716,3 +3716,331 @@ path = "output.json"
 """)
         ret = main(["derive", str(config), "--dry-run"])
         assert ret == 1
+
+
+class TestMatterPerturbations:
+    """Tests for [[linearization.matter_perturbations]] multi-field support."""
+
+    def test_matter_perturbation_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Einstein-Maxwell config with matter perturbation generates correct WLS."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Einstein-Maxwell"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-mu][A[-nu]] - CD[-nu][A[-mu]]"
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-B0 * z[]", "0"]
+
+[constants]
+names = ["kappa", "B0"]
+
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[[gauge]]
+field = "h"
+type = "tt"
+
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[parameters]
+kappa = 1.0
+B0 = 0.3
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+        wls = capsys.readouterr().out
+        # Should contain DefTensorPerturbation for matter field
+        assert "DefTensorPerturbation" in wls
+        # Should contain metric perturbation setup
+        assert "SetupMetricPerturbation" in wls
+        # Should have VarD for at least two fields
+        assert wls.count("VarD[") >= 2
+        # Should have DecomposeToComponents
+        assert "DecomposeToComponents" in wls
+        # Should have MakeRule for derived field F
+        assert "MakeRule" in wls
+        # Background ComponentValue for A
+        assert "ComponentValue" in wls
+        assert "-B0" in wls
+
+    def test_matter_perturbation_missing_field(self, tmp_path: Path) -> None:
+        """Matter perturbation referencing non-existent field fails validation."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "0", "0"]
+
+[lagrangian]
+expression = "RicciScalarCD[]"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "NoSuchField"
+perturbation_name = "a"
+background = "Abar"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_matter_perturbation_missing_background(self, tmp_path: Path) -> None:
+        """Matter perturbation referencing non-existent background fails."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[lagrangian]
+expression = "RicciScalarCD[]"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "NoSuchBg"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_matter_perturbation_without_lagrangian(self, tmp_path: Path) -> None:
+        """Matter perturbations require a Lagrangian section."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "0", "0"]
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_matter_perturbation_duplicate_field(self, tmp_path: Path) -> None:
+        """Same field listed twice in matter_perturbations fails."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Bad"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "0", "0"]
+
+[lagrangian]
+expression = "RicciScalarCD[]"
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "b"
+background = "Abar"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 1
+
+    def test_matter_perturbation_gauge_on_perturbation_name(
+        self, tmp_path: Path
+    ) -> None:
+        """Gauge can target a perturbation_name (not just a [[fields]] name)."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Gauge on pert"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-mu][A[-nu]] - CD[-nu][A[-mu]]"
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "0", "0"]
+
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]"
+
+[constants]
+names = ["kappa"]
+
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[parameters]
+kappa = 1.0
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
