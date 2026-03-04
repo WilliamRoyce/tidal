@@ -856,6 +856,18 @@ def _substitute_field_names(
     """Replace user field names with prefixed xAct names in the Lagrangian."""
     result = expression
 
+    # Substitute built-in names (eta, CD, bg) FIRST — before field names —
+    # to prevent short field names (e.g., "a") from corrupting built-in
+    # identifiers (e.g., "eta[" contains "a[", which would become "etgeA[").
+    result = result.replace("eta[", f"{prefix}Eta[")
+    result = result.replace("bg[", f"{prefix}Bg[")
+    result = result.replace("CD[", f"{prefix}CD[")
+    result = result.replace("CD]", f"{prefix}CD]")
+    result = result.replace("CD ]", f"{prefix}CD ]")
+    # Substitute chart placeholder for component-derivative notation
+    # e.g., CD[{0, -chart}][ux[]] → {prefix}CD[{0, -{prefix}Cart}][...]
+    result = result.replace("-chart}", f"-{prefix}Cart}}")
+
     # Merge fundamental, derived, and background fields for substitution
     all_fields = list(fields)
     if derived_fields:
@@ -868,23 +880,23 @@ def _substitute_field_names(
 
     for field in sorted_fields:
         name = field["name"]
-        prefixed = f"{prefix}{name.capitalize()}"
-        # Replace field name references (e.g., phi → {prefix}Phi, but not inside other words)
-        # Handle: CD[-a][phi[]] → CD[-a][{prefix}Phi[]]
-        # Handle: phi[] → {prefix}Phi[]
-        # Handle: C[-a, -b, -c] → {prefix}C[-a, -b, -c]
-        result = result.replace(f"{name}[", f"{prefixed}[")
-        result = result.replace(f"{name} ", f"{prefixed} ")
+        prefixed_name = f"{prefix}{name.capitalize()}"
+        # Replace field name references using word-boundary-aware regex.
+        # Field names appear after non-alphanumeric chars or at start of string.
+        # Must match "name[" or "name " but NOT "eta[" matching "a[" inside it.
+        # Lookbehind: (?<![a-zA-Z]) ensures we don't match inside longer identifiers.
+        result = re.sub(
+            rf"(?<![a-zA-Z]){re.escape(name)}\[",
+            f"{prefixed_name}[",
+            result,
+        )
+        result = re.sub(
+            rf"(?<![a-zA-Z]){re.escape(name)} ",
+            f"{prefixed_name} ",
+            result,
+        )
 
-    # Also substitute eta, CD, and bg (background/reference metric) with prefixed versions
-    result = result.replace("eta[", f"{prefix}Eta[")
-    result = result.replace("bg[", f"{prefix}Bg[")
-    result = result.replace("CD[", f"{prefix}CD[")
-    result = result.replace("CD]", f"{prefix}CD]")
-    result = result.replace("CD ]", f"{prefix}CD ]")
-    # Substitute chart placeholder for component-derivative notation
-    # e.g., CD[{0, -chart}][ux[]] → {prefix}CD[{0, -{prefix}Cart}][...]
-    return result.replace("-chart}", f"-{prefix}Cart}}")
+    return result
 
 
 # --- WLS script generation ---

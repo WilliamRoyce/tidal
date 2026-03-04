@@ -55,7 +55,7 @@ name = "F"
 type = "tensor"
 rank = 2
 symmetry = "antisymmetric"
-definition = "CD[-mu][A[-nu]] - CD[-nu][A[-mu]]"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
 
 # Background EM 4-potential: Abar_y = -B0*z generates B_x = B0
 # (Coulomb gauge, uniform magnetic field along x-axis)

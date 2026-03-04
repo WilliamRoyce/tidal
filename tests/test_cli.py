@@ -3753,7 +3753,7 @@ name = "F"
 type = "tensor"
 rank = 2
 symmetry = "antisymmetric"
-definition = "CD[-mu][A[-nu]] - CD[-nu][A[-mu]]"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
 
 [[background_fields]]
 name = "Abar"
@@ -3809,6 +3809,11 @@ path = "output.json"
         # Background ComponentValue for A
         assert "ComponentValue" in wls
         assert "-B0" in wls
+        # Regression: field name "a" must not corrupt "eta[" substitution
+        assert "Eta[" in wls, "eta[ should be substituted to {prefix}Eta["
+        # The prefixed Eta should not be further corrupted by field "a" replacement
+        assert "EttidalA[" not in wls, "field name 'a' corrupted Eta substitution"
+        assert "ettidalA" not in wls, "field name 'a' corrupted eta substitution"
 
     def test_matter_perturbation_missing_field(self, tmp_path: Path) -> None:
         """Matter perturbation referencing non-existent field fails validation."""
@@ -4007,7 +4012,7 @@ name = "F"
 type = "tensor"
 rank = 2
 symmetry = "antisymmetric"
-definition = "CD[-mu][A[-nu]] - CD[-nu][A[-mu]]"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
 
 [[background_fields]]
 name = "Abar"
