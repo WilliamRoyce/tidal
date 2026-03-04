@@ -933,6 +933,25 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
         if not _is_field_zero(data):
             determined.add(f"v_{name}")
 
+    # Warn when constraint equations lack explicit constraint_solver config.
+    # Without it, the constraint field won't be solved via Phase 1 (FFT /
+    # Gauss-Seidel) and may stall in Phase 2 iterative propagation.
+    unconfigured = [
+        eq.field_name for _i, eq in constraint_eqs
+        if not eq.constraint_solver.enabled
+        and any(term.field == eq.field_name for term in eq.rhs_terms)
+    ]
+    if unconfigured:
+        warnings.warn(
+            f"Constraint equation(s) {unconfigured} have self-terms but no "
+            f"constraint_solver config (enabled=false). These will NOT be "
+            f"solved via Phase 1 (FFT/direct). Add [constraint_solver] to "
+            f"theory.toml and re-derive, or manually add "
+            f'"constraint_solver": {{"enabled": true}} to the JSON.',
+            UserWarning,
+            stacklevel=2,
+        )
+
     # Phase 1: Handle enabled constraints with coupled detection
     # (preserves existing coupled-constraint behavior for EM, Chern-Simons)
     enabled_eqs = [
