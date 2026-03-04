@@ -36,6 +36,10 @@ This is the fundamental operation: any gauge-fixing term is simply added to L \
 before Euler-Lagrange derivation.";
 
 (* === Preset Builders === *)
+(* These functions use bare abstract indices (a, b, c, ...) that must resolve *)
+(* to xAct indices defined by DefManifold in the caller's context.            *)
+(* They MUST be defined outside Begin["`Private`"] to avoid Wolfram's package *)
+(* scoping from contextualizing them to GaugeFix`Private`a, etc.             *)
 
 BuildLorenzGaugeTerm::usage =
   "BuildLorenzGaugeTerm[field, metric, covd, xi] returns the Lorenz gauge-fixing \
@@ -49,14 +53,6 @@ gauge-fixing term -(1/(2*xi))*metric^{be}*(D_b)(D_e) where \
 D_b = metric^{ac} covd_a field_{cb} - (1/2) covd_b (metric^{cd} field_{cd}). \
 For linearized gravity with xi=1, this reduces Einstein equations to \
 uncoupled wave equations.  Example: BuildDeDonderGaugeTerm[h, eta, CD, 1]";
-
-Begin["`Private`"];
-
-(* ================================================================ *)
-(* === Core Primitive                                            === *)
-(* ================================================================ *)
-
-AddGaugeFixingTerm[lagrangian_, gaugeTerm_] := lagrangian + gaugeTerm;
 
 (* ================================================================ *)
 (* === Lorenz Gauge: -(1/2xi)(div A)^2                          === *)
@@ -107,6 +103,14 @@ BuildDeDonderGaugeTerm[field_, metric_, covd_, xi_:1] := Module[
 
   gaugeTerm
 ];
+
+(* ================================================================ *)
+(* === Private implementations                                   === *)
+(* ================================================================ *)
+
+Begin["`Private`"];
+
+AddGaugeFixingTerm[lagrangian_, gaugeTerm_] := lagrangian + gaugeTerm;
 
 End[];
 EndPackage[];
