@@ -195,22 +195,28 @@ For the Gertsenshtein effect, the coupling coefficients contain the background f
 
 For uniform B₀, the coupling coefficients are constants (proportional to B₀). For localized B₀(z), they become position-dependent coefficients — already supported by the solver's coordinate-dependent coefficient system (`IsCoordinateDependentCoefficient` → `_mathematica_to_python()` → grid evaluation → L2 cache).
 
-## Files Modified
+## Files Modified (Implemented)
 
-| File | Change |
-| ---- | ------ |
-| `tidal/cli/_derive.py` | Extend `_validate_linearization` for `matter_perturbations`; new `_wls_matter_perturbation_setup()` helper; extend `_wls_linearize_from_lagrangian` for multi-field LI[2] drop + LI[1] replacement + multi-field VarD |
-| `tidal/cli/_derive.py` | Modify `_wls_metadata_and_export` to handle multi-field EOM |
-| `tidal/wolfram/ComponentDecompose.wl` | May need extension for multi-primary-field decomposition (verify `additionalFields` suffices) |
-| `tests/test_cli.py` | New tests for TOML validation and WLS generation |
+| File | Change | Status |
+| ---- | ------ | ------ |
+| `tidal/cli/_derive.py` | `_validate_matter_perturbations()`, `_validate_single_matter_perturbation()` — TOML validation | Done |
+| `tidal/cli/_derive.py` | `_wls_matter_perturbation_setup()` — DefTensorPerturbation + DefTensor generation | Done |
+| `tidal/cli/_derive.py` | `_wls_multi_field_eom()` — multi-field VarD + DecomposeToComponents | Done |
+| `tidal/cli/_derive.py` | `_wls_matter_pert_truncation()` — LI[2] drop + LI[1] replacement | Done |
+| `tidal/cli/_derive.py` | `_xpert_index_pattern()`, `_pert_field_dict()` — helper functions | Done |
+| `tidal/cli/_derive.py` | Extended `_validate_gauge()` for perturbation name targets | Done |
+| `tidal/cli/_derive.py` | Extended `_wls_linearize_from_lagrangian()` for multi-field path | Done |
+| `tests/test_cli.py` | `TestMatterPerturbations` class (6 tests) | Done |
+| `examples/gertsenshtein/` | `theory.toml`, `run.sh`, `sweep_coupling.sh` | Done |
+| `tidal/wolfram/ComponentDecompose.wl` | No changes needed — `additionalFields` mechanism already sufficient | Verified |
 
 ## Validation
 
-1. **Regression**: All 1343+ existing tests pass; all 25 examples derive/simulate correctly
-2. **TOML validation**: `matter_perturbations` accepted/rejected correctly
-3. **WLS generation**: `--dry-run` produces correct `DefTensorPerturbation` + multi-field `VarD`
-4. **End-to-end**: Einstein-Maxwell derives to correct JSON with h-a coupling terms
-5. **Physics**: Conversion probability matches analytical formula to within 1%
+1. **Regression**: All 1349 tests pass (1343 existing + 6 new); 25 examples unaffected
+2. **TOML validation**: `matter_perturbations` accepted/rejected correctly (5 error-case tests)
+3. **WLS generation**: `--dry-run` produces correct `DefTensorPerturbation` + multi-field `VarD` (verified)
+4. **End-to-end**: Einstein-Maxwell `--dry-run` generates correct WLS with coupling terms
+5. **Physics**: Conversion probability validation pending (requires wolframscript execution)
 
 ## Design Principles
 
