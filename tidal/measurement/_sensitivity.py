@@ -29,7 +29,7 @@ def _require_salib() -> None:
         With installation instructions.
     """
     try:
-        import SALib  # noqa: F401, PLC0415
+        import SALib  # noqa: F401, PLC0415  # type: ignore[import-untyped]
     except ImportError:
         msg = (
             "SALib is required for sensitivity analysis. "
@@ -144,8 +144,8 @@ def compute_sobol_indices(
         If insufficient data for analysis.
     """
     _require_salib()
-    from SALib.analyze import (  # noqa: PLC0415
-        sobol as sobol_analyze,  # type: ignore[import-untyped]
+    from SALib.analyze import (  # noqa: PLC0415  # type: ignore[import-untyped]
+        sobol as sobol_analyze,
     )
 
     param_names, x, y = _extract_data(results, metric)
@@ -228,8 +228,8 @@ def compute_morris_screening(
         If insufficient data.
     """
     _require_salib()
-    from SALib.analyze import (  # noqa: PLC0415
-        morris as morris_analyze,  # type: ignore[import-untyped]
+    from SALib.analyze import (  # noqa: PLC0415  # type: ignore[import-untyped]
+        morris as morris_analyze,
     )
 
     param_names, x, y = _extract_data(results, metric)
@@ -250,7 +250,7 @@ def compute_morris_screening(
         "bounds": bounds,
     }
 
-    si = morris_analyze.analyze(problem, x, y)
+    si = morris_analyze.analyze(problem, x, y)  # pyright: ignore[reportUnknownVariableType]
 
     return SensitivityResult(
         method="morris",

@@ -92,7 +92,7 @@ class AsymptoticConversionResult:
 
 def _group_energy_at_snapshot(
     data: SimulationData,
-    field_names: list[str],
+    field_names: Sequence[str],
     t_idx: int,
 ) -> float:
     """Compute total energy for a group of fields at snapshot *t_idx*."""
@@ -124,7 +124,9 @@ def _build_k_grids(
     k_arrays: list[NDArray[np.float64]] = []
     for ax in range(ndim):
         n = field_shape[ax]
-        k_ax = np.fft.fftfreq(n, d=grid_spacing[ax]) * (2.0 * np.pi)
+        k_ax: NDArray[np.float64] = np.asarray(
+            np.fft.fftfreq(n, d=grid_spacing[ax]) * (2.0 * np.pi), dtype=np.float64
+        )
         k_arrays.append(k_ax)
     return [
         np.asarray(g, dtype=np.float64) for g in np.meshgrid(*k_arrays, indexing="ij")
@@ -133,7 +135,7 @@ def _build_k_grids(
 
 def _source_wavevector(
     data: SimulationData,
-    source_fields: list[str],
+    source_fields: Sequence[str],
 ) -> NDArray[np.float64]:
     """Compute the propagation direction of the source at t=0.
 
@@ -185,7 +187,7 @@ def _source_wavevector(
 
 def _directional_split(  # noqa: PLR0914
     data: SimulationData,
-    target_fields: list[str],
+    target_fields: Sequence[str],
     t_idx: int,
     k_hat: NDArray[np.float64],
 ) -> tuple[float, float]:

@@ -131,7 +131,7 @@ def _half_kick(
         y[s] += 0.5 * dt * force[s]
 
 
-def _drift(
+def _drift(  # pyright: ignore[reportUnusedFunction]  # kept for fallback reference
     y: np.ndarray,
     velocity: np.ndarray,
     dt: float,

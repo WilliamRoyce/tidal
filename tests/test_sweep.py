@@ -1084,7 +1084,7 @@ class TestIntervalScores:
     def test_flat_function_low_scores(self) -> None:
         """Constant function should have zero scores."""
         values = [0.0, 1.0, 2.0, 3.0]
-        metric_vals = [1.0, 1.0, 1.0, 1.0]
+        metric_vals: list[float | None] = [1.0, 1.0, 1.0, 1.0]
         scores = _interval_scores(values, metric_vals)
         assert len(scores) == 3
         assert all(s == 0.0 for s in scores)
@@ -1092,7 +1092,7 @@ class TestIntervalScores:
     def test_linear_function_equal_scores(self) -> None:
         """Linear function has constant differences, all intervals score alike."""
         values = [0.0, 1.0, 2.0, 3.0]
-        metric_vals = [0.0, 1.0, 2.0, 3.0]
+        metric_vals: list[float | None] = [0.0, 1.0, 2.0, 3.0]
         scores = _interval_scores(values, metric_vals)
         assert len(scores) == 3
         # All intervals have the same absolute step, so scores should be equal
@@ -1104,7 +1104,7 @@ class TestIntervalScores:
         """An interval with a sharp change should score higher."""
         values = [0.0, 1.0, 2.0, 3.0, 4.0]
         # Flat, then sharp jump at 2->3
-        metric_vals = [0.0, 0.0, 0.0, 10.0, 10.0]
+        metric_vals: list[float | None] = [0.0, 0.0, 0.0, 10.0, 10.0]
         scores = _interval_scores(values, metric_vals)
         # Interval [2, 3] has the largest jump
         assert scores[2] > scores[0]
@@ -1121,7 +1121,7 @@ class TestIntervalScores:
     def test_single_interval(self) -> None:
         """Two points = one interval."""
         values = [0.0, 1.0]
-        metric_vals = [0.0, 5.0]
+        metric_vals: list[float | None] = [0.0, 5.0]
         scores = _interval_scores(values, metric_vals)
         assert len(scores) == 1
         assert scores[0] > 0

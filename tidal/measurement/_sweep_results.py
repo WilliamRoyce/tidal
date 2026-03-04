@@ -72,7 +72,7 @@ class SweepResults:
     measurements: list[str]
     source_fields: list[str] | None = None
     target_fields: list[str] | None = None
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: dict[str, Any] = field(default_factory=dict[str, Any])
     converge_sizes: list[int] | None = None
 
     # ------------------------------------------------------------------
@@ -213,7 +213,10 @@ class SweepResults:
         filtered_rows: list[dict[str, Any]] = []
         filtered_dirs: list[Path] = []
         for i, row in enumerate(self.rows):
-            if all(np.isclose(row.get(k, float("nan")), v) for k, v in kwargs.items()):
+            if all(
+                bool(np.isclose(row.get(k, float("nan")), v))  # pyright: ignore[reportUnknownArgumentType]
+                for k, v in kwargs.items()
+            ):
                 filtered_rows.append(row)
                 if i < len(self.run_dirs):
                     filtered_dirs.append(self.run_dirs[i])
@@ -523,9 +526,9 @@ def _json_default(obj: object) -> object:
         If *obj* is not a recognized serializable type.
     """
     if isinstance(obj, np.integer):
-        return int(obj)
+        return int(obj)  # type: ignore[call-overload]  # numpy integer subtype
     if isinstance(obj, np.floating):
-        return float(obj)
+        return float(obj)  # type: ignore[call-overload]  # numpy floating subtype
     if isinstance(obj, np.ndarray):
         return obj.tolist()
     if isinstance(obj, Path):

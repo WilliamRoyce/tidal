@@ -547,7 +547,7 @@ def _create_cvode_jacfn(
 # ---------------------------------------------------------------------------
 
 
-def _prepare_sparse_data(
+def _prepare_sparse_data(  # pyright: ignore[reportUnusedFunction]  # reserved for sparse tier
     dF_dy: SparseMatrix,  # noqa: N803
     dF_dyp: SparseMatrix,  # noqa: N803
 ) -> tuple[NDArray[np.float64], NDArray[np.float64], SparseMatrix]:
@@ -589,7 +589,7 @@ def _prepare_sparse_data(
         d_end = dy_csc.indptr[col + 1]
         if d_start < d_end:
             d_rows = dy_csc.indices[d_start:d_end]
-            idxs = np.searchsorted(p_rows, d_rows)
+            idxs = np.searchsorted(p_rows, d_rows)  # pyright: ignore[reportUnknownVariableType]
             dy_data[p_start + idxs] = dy_csc.data[d_start:d_end]
 
         # Project dF_dyp values onto union pattern for this column
@@ -597,13 +597,13 @@ def _prepare_sparse_data(
         d_end = dyp_csc.indptr[col + 1]
         if d_start < d_end:
             d_rows = dyp_csc.indices[d_start:d_end]
-            idxs = np.searchsorted(p_rows, d_rows)
+            idxs = np.searchsorted(p_rows, d_rows)  # pyright: ignore[reportUnknownVariableType]
             dyp_data[p_start + idxs] = dyp_csc.data[d_start:d_end]
 
     return dy_data, dyp_data, pattern
 
 
-def _create_sparse_jacfn(
+def _create_sparse_jacfn(  # pyright: ignore[reportUnusedFunction]  # reserved for sparse tier
     dy_data: NDArray[np.float64],
     dyp_data: NDArray[np.float64],
 ) -> Callable[..., None]:
@@ -627,7 +627,7 @@ def _create_sparse_jacfn(
     return jacfn
 
 
-def _create_cvode_sparse_jacfn(
+def _create_cvode_sparse_jacfn(  # pyright: ignore[reportUnusedFunction]  # reserved for sparse tier
     neg_dy_data: NDArray[np.float64],
 ) -> Callable[..., None]:
     """Create a sparse ``jacfn`` callback for CVODE.

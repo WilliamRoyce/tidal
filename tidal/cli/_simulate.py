@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -1930,7 +1930,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
 
     # Step 2: Validate resume args and inherit config from checkpoint
     resume_dir: Path | None = None
-    resume_meta: dict[str, object] | None = None
+    resume_meta: dict[str, Any] | None = None
     if args.resume is not None:
         import json as _json
 
@@ -1953,16 +1953,18 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
                 resume_meta = _json.load(f)
 
             # Inherit grid config if not explicitly provided
+            meta: dict[str, Any] = resume_meta  # type: ignore[assignment]
             if args.grid_shape is None:
-                args.grid_shape = ",".join(
-                    str(s) for s in resume_meta["grid_shape"]
-                )
+                grid_shape = cast("list[int]", meta["grid_shape"])
+                args.grid_shape = ",".join(str(s) for s in grid_shape)
             if args.bounds is None:
+                grid_bounds = cast("list[list[float]]", meta["grid_bounds"])
                 args.bounds = ",".join(
-                    f"{b[0]}:{b[1]}" for b in resume_meta["grid_bounds"]
+                    f"{b[0]}:{b[1]}" for b in grid_bounds
                 )
-            if args.bc is None and "bc_types" in resume_meta:
-                args.bc = ",".join(resume_meta["bc_types"])
+            if args.bc is None and "bc_types" in meta:
+                bc_types = cast("list[str]", meta["bc_types"])
+                args.bc = ",".join(bc_types)
             log(f"  Resuming from: {resume_dir}")
 
     if args.snapshot is not None and args.resume is None:

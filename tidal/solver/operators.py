@@ -228,7 +228,7 @@ def _bc_from_grid(grid: GridInfo) -> tuple[str, ...]:
     return tuple("periodic" if p else "neumann" for p in grid.periodic)
 
 
-def _resolve_axis_bc(bc_entry: str | AxisBCSpec) -> AxisBCSpec:
+def _resolve_axis_bc(bc_entry: str | AxisBCSpec) -> AxisBCSpec:  # pyright: ignore[reportUnusedFunction]  # used by rhs.py
     """Convert a per-axis BC entry to an ``AxisBCSpec``.
 
     Strings are converted via ``_str_to_axis_bc``.  ``AxisBCSpec`` objects

@@ -16,9 +16,9 @@ from tidal.solver.operators import (
     OPERATOR_REGISTRY,
     AxisBCSpec,
     BCSpec,
-    _bc_from_grid,
-    _normalize_bc,
-    _resolve_axis_bc,
+    _bc_from_grid,  # pyright: ignore[reportPrivateUsage]
+    _normalize_bc,  # pyright: ignore[reportPrivateUsage]
+    _resolve_axis_bc,  # pyright: ignore[reportPrivateUsage]
     apply_operator,
 )
 
@@ -65,7 +65,7 @@ class RHSEvaluator:
 
         # Pre-normalize BCs once (avoids per-call validation in operators)
         if bc is not None:
-            self._normalized_bc: BCSpec = _normalize_bc(bc, grid)
+            self._normalized_bc: tuple[str | AxisBCSpec, ...] = _normalize_bc(bc, grid)
         else:
             self._normalized_bc = _bc_from_grid(grid)
 

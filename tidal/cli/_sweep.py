@@ -20,7 +20,7 @@ import sys
 import time
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -103,7 +103,7 @@ def parse_sweep_spec(raw: str) -> tuple[str, list[float]]:  # noqa: C901
             if n < 2:  # noqa: PLR2004
                 msg = f"Sweep count must be >= 2, got {n}"
                 raise ValueError(msg)
-            values = np.linspace(float(start), float(stop), n).tolist()
+            values: list[float] = cast("list[float]", np.linspace(float(start), float(stop), n).tolist())
         elif len(parts) == 4:  # noqa: PLR2004
             # START:STOP:N:log
             start, stop, n_str, scale = parts
@@ -118,7 +118,7 @@ def parse_sweep_spec(raw: str) -> tuple[str, list[float]]:  # noqa: C901
             if s <= 0 or e <= 0:
                 msg = f"Log-scale requires positive bounds, got {s}:{e}"
                 raise ValueError(msg)
-            values = np.logspace(np.log10(s), np.log10(e), n).tolist()
+            values = cast("list[float]", np.logspace(np.log10(s), np.log10(e), n).tolist())
         else:
             msg = (
                 f"Invalid range spec: '{rhs}'. "
@@ -198,7 +198,7 @@ def _generate_samples(
     ValueError
         If *strategy* is unknown or *n_samples* < 1.
     """
-    from scipy.stats.qmc import LatinHypercube, Sobol
+    from scipy.stats.qmc import LatinHypercube, Sobol  # type: ignore[import-untyped]
 
     names = list(param_bounds.keys())
     d = len(names)
@@ -206,10 +206,10 @@ def _generate_samples(
     upper = np.array([param_bounds[n][1] for n in names])
 
     if strategy == "latin_hypercube":
-        sampler = LatinHypercube(d=d, seed=seed)
+        sampler = LatinHypercube(d=d, seed=seed)  # pyright: ignore[reportCallIssue]
         unit_samples = sampler.random(n=n_samples)
     elif strategy == "sobol":
-        sampler = Sobol(d=d, seed=seed)
+        sampler = Sobol(d=d, seed=seed)  # pyright: ignore[reportCallIssue]
         unit_samples = sampler.random(n=n_samples)
     else:
         msg = (
@@ -404,11 +404,11 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             dyn = list(data.dynamical_fields)
             disp = _run_dispersion(data, dyn)
             result_obj = disp["_result_obj"]
-            wn = result_obj.wavenumbers
-            freq = result_obj.peak_frequencies
+            wn: np.ndarray[Any, np.dtype[np.floating[Any]]] = result_obj.wavenumbers
+            freq: np.ndarray[Any, np.dtype[np.floating[Any]]] = result_obj.peak_frequencies
             active = freq > 0.0
             if np.any(active):
-                m2_vals = freq[active] ** 2 - wn[active] ** 2
+                m2_vals: np.ndarray[Any, np.dtype[np.floating[Any]]] = freq[active] ** 2 - wn[active] ** 2
                 metrics["m2_eff"] = float(np.median(m2_vals))
         except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
             metrics["dispersion_error"] = str(exc)
@@ -471,10 +471,13 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             # Aggregate scalars from spectrum of each field
             for fname, field_spec in spec_results.items():
                 if isinstance(field_spec, dict) and "final" in field_spec:
-                    power = np.array(field_spec["final"]["power"])
-                    wn = np.array(field_spec["final"]["wavenumbers"])
+                    final = cast("dict[str, Any]", field_spec["final"])
+                    power_data: list[float] = final["power"]
+                    wn_data: list[float] = final["wavenumbers"]
+                    power = np.array(power_data)
+                    wn_arr = np.array(wn_data)
                     if power.max() > 0:
-                        metrics[f"peak_k_{fname}"] = float(wn[np.argmax(power)])
+                        metrics[f"peak_k_{fname}"] = float(wn_arr[np.argmax(power)])
                         metrics[f"peak_power_{fname}"] = float(power.max())
                         threshold_val = 0.01 * power.max()
                         metrics[f"n_active_modes_{fname}"] = int(
@@ -1004,26 +1007,27 @@ def _execute_adaptive(  # noqa: PLR0913, PLR0917
     rows: list[dict[str, Any]] = []
     run_dirs: list[Path] = []
 
-    run_kw = {
-        "param_name": param_name,
-        "args": args,
-        "spec_path": spec_path,
-        "all_params": all_params,
-        "fixed_params": fixed_params,
-        "sim_settings": sim_settings,
-        "measurements": measurements,
-        "source": source,
-        "target": target,
-        "energy_threshold": energy_threshold,
-        "output_dir": output_dir,
-        "run_dirs": run_dirs,
-        "resume": resume,
-    }
-
     # Phase 1: Run initial grid
     print(f"  Adaptive: initial grid ({len(points)} points)")
     for val in points:
-        rows.append(_adaptive_run_point(val, **run_kw))  # noqa: PERF401 — side effects
+        rows.append(  # noqa: PERF401 — side effects
+            _adaptive_run_point(
+                val,
+                param_name=param_name,
+                args=args,
+                spec_path=spec_path,
+                all_params=all_params,
+                fixed_params=fixed_params,
+                sim_settings=sim_settings,
+                measurements=measurements,
+                source=source,
+                target=target,
+                energy_threshold=energy_threshold,
+                output_dir=output_dir,
+                run_dirs=run_dirs,
+                resume=resume,
+            )
+        )
 
     swept_snapshot = {param_name: list(points)}
     _save_incremental(
@@ -1065,7 +1069,22 @@ def _execute_adaptive(  # noqa: PLR0913, PLR0917
         idx = int(np.argmax(scores))
         midpoint = (points[idx] + points[idx + 1]) / 2.0
 
-        row = _adaptive_run_point(midpoint, **run_kw)
+        row = _adaptive_run_point(
+            midpoint,
+            param_name=param_name,
+            args=args,
+            spec_path=spec_path,
+            all_params=all_params,
+            fixed_params=fixed_params,
+            sim_settings=sim_settings,
+            measurements=measurements,
+            source=source,
+            target=target,
+            energy_threshold=energy_threshold,
+            output_dir=output_dir,
+            run_dirs=run_dirs,
+            resume=resume,
+        )
         points.insert(idx + 1, midpoint)
         rows.insert(idx + 1, row)
 
@@ -1190,16 +1209,16 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
             known_params: set[str] = set(discover_parameters(spec).keys())
         except TypeError:
             known_params = set()
-        meta_params = spec.metadata.get("parameters", {})
-        if isinstance(meta_params, dict):
-            known_params |= set(meta_params.keys())
+        meta_params_raw = spec.metadata.get("parameters", {})
+        if isinstance(meta_params_raw, dict):
+            known_params |= set(cast("dict[str, Any]", meta_params_raw).keys())
         for name in sorted(set(swept_params.keys()) - known_params):
             print(
                 f"  Warning: swept parameter '{name}' not found in equation spec. Possible typo?",
                 file=sys.stderr,
             )
 
-    measurements = set()
+    measurements: set[str] = set()
     raw_measure = getattr(args, "measure", None)
     if raw_measure:
         measurements = {s.strip() for s in raw_measure.split(",")}
@@ -1309,12 +1328,15 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         return 0
 
     # Check for adaptive mode (from TOML --config)
-    adaptive_config = getattr(args, "_adaptive_config", None) or {}
-    adaptive_param = None
+    adaptive_config: dict[str, Any] = getattr(args, "_adaptive_config", None) or {}
+    adaptive_param: str | None = None
+    adaptive_metric: str | None = None
+    adaptive_budget: int = 20
+    adaptive_threshold: float = 0.01
     if adaptive_config and len(swept_params) == 1:
         adaptive_param = next(iter(swept_params))
         if adaptive_param in adaptive_config:
-            ac = adaptive_config[adaptive_param]
+            ac: dict[str, Any] = adaptive_config[adaptive_param]
             adaptive_metric = getattr(args, "adaptive_metric", None) or ac.get("metric")
             adaptive_budget = getattr(args, "adaptive_budget", None) or ac.get(
                 "max_count", 20

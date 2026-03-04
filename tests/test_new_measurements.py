@@ -71,10 +71,10 @@ def _make_travelling_wave_data(
     sigma = 2.0
     envelope = np.exp(-((x - domain / 4) ** 2) / (2 * sigma**2))
 
-    phi_fields = []
-    v_phi_fields = []
-    chi_fields = []
-    v_chi_fields = []
+    phi_fields: list[np.ndarray] = []
+    v_phi_fields: list[np.ndarray] = []
+    chi_fields: list[np.ndarray] = []
+    v_chi_fields: list[np.ndarray] = []
 
     for t in times:
         phi = envelope * np.cos(k0 * x - omega * t)
@@ -127,10 +127,10 @@ def _make_standing_wave_data(
     omega = np.sqrt(k0**2 + m2_phi)
     times = np.linspace(0, 3.0, n_snapshots)
 
-    phi_fields = []
-    v_phi_fields = []
-    chi_fields = []
-    v_chi_fields = []
+    phi_fields: list[np.ndarray] = []
+    v_phi_fields: list[np.ndarray] = []
+    chi_fields: list[np.ndarray] = []
+    v_chi_fields: list[np.ndarray] = []
 
     for t in times:
         # Standing wave = cos(kx)cos(ωt) — no net propagation

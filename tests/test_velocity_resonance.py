@@ -63,10 +63,10 @@ def _make_two_field_wave_data(
     omega_phi = np.sqrt(k0**2 + m2_phi)
     omega_chi = np.sqrt(k0**2 + m2_chi)
 
-    phi_fields = []
-    v_phi_fields = []
-    chi_fields = []
-    v_chi_fields = []
+    phi_fields: list[np.ndarray] = []
+    v_phi_fields: list[np.ndarray] = []
+    chi_fields: list[np.ndarray] = []
+    v_chi_fields: list[np.ndarray] = []
 
     for t in times:
         phi = np.cos(k0 * x - omega_phi * t)

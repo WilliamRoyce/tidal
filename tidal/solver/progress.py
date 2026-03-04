@@ -49,7 +49,7 @@ class SimulationProgress:
     ) -> None:
         self._t_start = t_start
         self._max_t = t_start
-        self._pbar: TqdmType[None] = tqdm(
+        self._pbar: TqdmType[None] = tqdm(  # type: ignore[assignment]  # tqdm stub overload
             total=t_end - t_start,
             desc=f"  {solver_name}" if solver_name else "  Simulating",
             unit="t",

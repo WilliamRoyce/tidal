@@ -622,4 +622,4 @@ class TestRenderSweepScatter:
         fig = self._make_fig()
         render_sweep_scatter(fig, results, "max_energy_error")
         # suptitle is on fig, not on individual axes
-        assert "max_energy_error" in fig._suptitle.get_text()
+        assert "max_energy_error" in fig._suptitle.get_text()  # type: ignore[attr-defined]

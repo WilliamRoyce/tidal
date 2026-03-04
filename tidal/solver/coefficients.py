@@ -19,7 +19,7 @@ reimplementation of Mathematica→Python conversion or eval() logic.
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -137,7 +137,7 @@ class CoefficientEvaluator:
         # L0: Pre-resolved constant (single dict.get avoids two-op in+[])
         c = self._constants.get(key, _MISSING)
         if c is not _MISSING:
-            return c
+            return cast("float | NDArray[np.float64]", c)
 
         # No symbolic → return numeric coefficient directly
         if term.coefficient_symbolic is None:
@@ -146,13 +146,13 @@ class CoefficientEvaluator:
         # Spatial-only cache (position-dependent, not time-dependent)
         c = self._spatial_cache.get(key, _MISSING)
         if c is not _MISSING:
-            return c
+            return cast("NDArray[np.float64]", c)
 
         # L3: Per-timestep cache
         ts_key = (eq_idx, term_idx, t)
         c = self._timestep_cache.get(ts_key, _MISSING)
         if c is not _MISSING:
-            return c
+            return cast("float | NDArray[np.float64]", c)
 
         # Full evaluation
         result = self._evaluate_symbolic(term, t)

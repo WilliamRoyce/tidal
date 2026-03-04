@@ -6,7 +6,7 @@ import math
 from typing import Any
 
 import numpy as np
-from scipy.sparse import issparse
+from scipy.sparse import issparse  # type: ignore[import-untyped]
 
 from tidal.solver.analytical_jacobian import (
     _OperatorCache,

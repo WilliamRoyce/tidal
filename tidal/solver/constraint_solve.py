@@ -41,9 +41,9 @@ References
 from __future__ import annotations
 
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -86,7 +86,7 @@ class _ConstraintTerms:
 
     field_name: str
     self_terms: list[tuple[float | NDArray[np.float64], str]]
-    source_terms: list[tuple[float | NDArray[np.float64], str, str]]
+    source_terms: Sequence[tuple[float | NDArray[np.float64], str, str]]
     eq_idx: int
     has_position_dependent_self: bool
     config: ConstraintSolverConfig
@@ -306,7 +306,7 @@ def _find_connected_components(
 
 
 def _evaluate_source(
-    source_terms: list[tuple[float | NDArray[np.float64], str, str]],
+    source_terms: Sequence[tuple[float | NDArray[np.float64], str, str]],
     fields: FieldSet,
     grid: GridInfo,
     bc: BCSpec | None,
@@ -1055,7 +1055,10 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
         # Highlight high-impact fields (appear in multiple constraints)
         shared = {f: c for f, c in field_counts.items() if c > 1}
         if shared:
-            top = sorted(shared, key=shared.get, reverse=True)  # type: ignore[arg-type]
+            top = cast(
+                "list[str]",
+                sorted(shared, key=shared.get, reverse=True),  # type: ignore[arg-type]
+            )
             hints = [f"{f} (in {shared[f]} constraints)" for f in top[:3]]
             lines.append(
                 f"Setting IC for: {', '.join(hints)} may resolve "

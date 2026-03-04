@@ -11,7 +11,7 @@ import sys
 import tomllib
 from dataclasses import dataclass, field
 from pathlib import Path  # noqa: TC003 — used at runtime
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -37,7 +37,9 @@ class SweepConfig:
     converge_sizes: list[int] | None
     force_large_sweep: bool
     dry_run: bool
-    adaptive_config: dict[str, dict[str, Any]] = field(default_factory=dict)
+    adaptive_config: dict[str, dict[str, Any]] = field(
+        default_factory=lambda: cast("dict[str, dict[str, Any]]", {})
+    )
     sweep_strategy: str | None = None
     n_samples: int | None = None
 
@@ -108,8 +110,8 @@ def _parse_sweep_section(
         If the section is malformed.
     """
     if "values" in section:
-        vals = section["values"]
-        if not isinstance(vals, list) or len(vals) < 2:  # noqa: PLR2004
+        vals = cast("list[Any]", section["values"])
+        if not isinstance(vals, list) or len(vals) < 2:  # noqa: PLR2004  # type: ignore[reportUnnecessaryIsInstance]
             msg = f"[sweep.{name}].values must be a list with >= 2 entries"
             raise ValueError(msg)
         return [float(v) for v in vals], {}
@@ -191,7 +193,7 @@ def _parse_range(
                 f"[sweep.{name}] log scale requires positive bounds, got {start}:{stop}"
             )
             raise ValueError(msg)
-        return np.logspace(np.log10(start), np.log10(stop), count).tolist(), {}
+        return cast("list[float]", np.logspace(np.log10(start), np.log10(stop), count).tolist()), {}
     msg = f"[sweep.{name}] unknown scale '{scale}' (expected: linear, log, adaptive)"
     raise ValueError(msg)
 
@@ -215,16 +217,19 @@ def _parse_sweeps(
     n_samples: int | None = None
     raw = data.get("sweep")
     if raw and isinstance(raw, dict):
-        strategy = raw.get("strategy")
-        n_samples_raw = raw.get("n_samples")
+        raw_dict = cast("dict[str, Any]", raw)
+        strategy = cast("str | None", raw_dict.get("strategy"))
+        n_samples_raw = raw_dict.get("n_samples")
         if n_samples_raw is not None:
             n_samples = int(n_samples_raw)
-        for name, section in raw.items():
+        for name, section in raw_dict.items():
             if name in _SWEEP_META_KEYS:
                 continue
             if not isinstance(section, dict):
                 continue
-            values, ac = _parse_sweep_section(name, section, strategy=strategy)
+            values, ac = _parse_sweep_section(
+                name, cast("dict[str, Any]", section), strategy=strategy
+            )
             swept[name] = values
             if ac:
                 adaptive[name] = ac
@@ -281,7 +286,7 @@ def _parse_output(data: dict[str, Any], toml_dir: Path) -> Path:
     if isinstance(out, str):
         return toml_dir / out
     if isinstance(out, dict) and "path" in out:
-        return toml_dir / out["path"]
+        return toml_dir / str(cast("dict[str, Any]", out)["path"])
     return toml_dir / "sweep_output"
 
 
@@ -386,10 +391,10 @@ def load_sweep_config(path: Path) -> SweepConfig:  # noqa: PLR0914
 def _convert_toml_val(toml_key: str, toml_val: Any) -> Any:  # noqa: ANN401
     """Convert TOML types to CLI-compatible types."""
     if toml_key in _LIST_TO_COLON_KEYS and isinstance(toml_val, list):
-        return ":".join(str(x) for x in toml_val)
+        return ":".join(str(x) for x in cast("list[Any]", toml_val))
     if toml_key in _LIST_TO_COMMA_KEYS:
         if isinstance(toml_val, (list, tuple)):
-            return ",".join(str(x) for x in toml_val)
+            return ",".join(str(x) for x in cast("list[Any]", toml_val))
         return str(toml_val)
     return toml_val
 
@@ -402,7 +407,7 @@ def _apply_sim_settings(config: SweepConfig, args: Namespace) -> None:
         toml_val = config.sim_settings[toml_key]
 
         if toml_key == "ic_field" and isinstance(toml_val, list):
-            current = getattr(args, "ic_field", None) or []
+            current: list[Any] = getattr(args, "ic_field", None) or []
             if not current:
                 args.ic_field = toml_val
             continue
@@ -458,8 +463,8 @@ def apply_config_to_args(
         args.output = str(config.output)
 
     # Fixed parameters: merge (CLI --param overrides TOML)
-    existing_params = getattr(args, "param", None) or []
-    cli_param_names = {p.split("=", 1)[0].strip() for p in existing_params if "=" in p}
+    existing_params: list[str] = getattr(args, "param", None) or []
+    cli_param_names: set[str] = {p.split("=", 1)[0].strip() for p in existing_params if "=" in p}
     for name, val in config.fixed_params.items():
         if name not in cli_param_names:
             existing_params.append(f"{name}={val}")
