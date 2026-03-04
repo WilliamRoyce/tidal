@@ -175,15 +175,18 @@ def _render_2d_scattered(
     # Interpolation background (if enough points)
     if len(metric_vals) >= 10:  # noqa: PLR2004
         try:
-            from scipy.interpolate import griddata
+            from scipy.interpolate import griddata  # type: ignore[import-untyped]
 
             n_grid = 100
             p1g = np.linspace(float(p1.min()), float(p1.max()), n_grid)
             p2g = np.linspace(float(p2.min()), float(p2.max()), n_grid)
             p1m, p2m = np.meshgrid(p1g, p2g)
-            z = griddata(
-                np.column_stack([p1, p2]), metric_vals,
-                (p1m, p2m), method="cubic",
+            z = np.asarray(
+                griddata(
+                    np.column_stack([p1, p2]), metric_vals,
+                    (p1m, p2m), method="cubic",
+                ),
+                dtype=np.float64,
             )
             ax.pcolormesh(
                 p1g, p2g, z, shading="auto", cmap="viridis",
@@ -259,7 +262,7 @@ def render_sweep_compare(
     ValueError
         If not exactly 1 swept parameter or unsupported measurement.
     """
-    from matplotlib import cm
+    import matplotlib.pyplot as plt
 
     param_names = list(results.swept_params.keys())
     if len(param_names) != 1:
@@ -273,7 +276,7 @@ def render_sweep_compare(
 
     # Color scale
     norm = _safe_normalize(param_vals)
-    cmap = cm.viridis
+    cmap = plt.colormaps["viridis"]
 
     resolved_spec = spec_path or results.spec_path
     if not resolved_spec:
@@ -295,13 +298,13 @@ def render_sweep_compare(
         except (FileNotFoundError, ValueError, OSError):
             continue
 
-        color = cmap(norm[i])
+        color: tuple[float, ...] = cmap(norm[i])  # type: ignore[assignment]
         label = f"{param_name}={param_vals[i]:.3g}"
 
         if measurement == "conversion":
-            _overlay_conversion(ax, data, results, color, label)
+            _overlay_conversion(ax, data, results, color, label)  # type: ignore[arg-type]
         elif measurement == "conservation":
-            _overlay_conservation(ax, data, color, label)
+            _overlay_conservation(ax, data, color, label)  # type: ignore[arg-type]
         else:
             msg = f"Unsupported measurement for compare: {measurement}"
             raise ValueError(msg)
@@ -345,7 +348,7 @@ def _overlay_conservation(
         diag = check_energy_conservation(data)
         ax.plot(
             data.times,
-            np.abs(diag.relative_energy_error),
+            np.abs(diag.relative_error),
             color=color,
             label=label,
             linewidth=1,
@@ -481,7 +484,7 @@ def render_sweep_parallel(
 
     metric_vals = np.array(results.column(metric), dtype=np.float64)
     norm = _safe_normalize(metric_vals)
-    cmap = plt.cm.viridis  # type: ignore[attr-defined]
+    cmap = plt.colormaps["viridis"]
 
     # Include metric as the final axis
     axis_names = [*param_names, metric]
@@ -506,9 +509,12 @@ def render_sweep_parallel(
     ax.set_ylabel("Normalized value")
     ax.set_title(f"Parallel Coordinates (color = {metric})")
 
-    sm = plt.cm.ScalarMappable(  # type: ignore[attr-defined]
+    from matplotlib.cm import ScalarMappable
+    from matplotlib.colors import Normalize
+
+    sm = ScalarMappable(
         cmap=cmap,
-        norm=plt.Normalize(vmin=metric_vals.min(), vmax=metric_vals.max()),
+        norm=Normalize(vmin=float(metric_vals.min()), vmax=float(metric_vals.max())),
     )
     sm.set_array(metric_vals)
     ax.figure.colorbar(sm, ax=ax, label=metric)  # type: ignore[union-attr]
@@ -559,7 +565,7 @@ def _render_tornado_correlation(
     metric: str,
 ) -> None:
     """Tornado chart using Spearman rank correlation (for scattered data)."""
-    from scipy.stats import spearmanr
+    from scipy.stats import spearmanr  # type: ignore[import-untyped]
 
     impacts: list[tuple[str, float, float]] = []  # (name, |corr|, sign)
     for name in param_names:
@@ -568,8 +574,9 @@ def _render_tornado_correlation(
         if valid.sum() < 3:  # noqa: PLR2004
             impacts.append((name, 0.0, 0.0))
             continue
-        corr, _ = spearmanr(param_vals[valid], metric_vals[valid])
-        impacts.append((name, float(abs(corr)), float(np.sign(corr))))
+        result = spearmanr(param_vals[valid], metric_vals[valid])
+        corr = float(result.statistic)  # type: ignore[union-attr]
+        impacts.append((name, abs(corr), float(np.sign(corr))))
 
     impacts.sort(key=lambda t: t[1], reverse=True)  # noqa: FURB118
 
@@ -579,12 +586,13 @@ def _render_tornado_correlation(
     y_pos = np.arange(len(names))
 
     colors = ["tab:blue" if s >= 0 else "tab:red" for s in signs]
-    bars = ax.barh(y_pos, abs_corrs, color=colors, alpha=0.7, height=0.6)
+    bar_container = ax.barh(y_pos, abs_corrs, color=colors, alpha=0.7, height=0.6)
 
-    for bar, corr, sign in zip(bars, abs_corrs, signs, strict=True):
+    for rect, corr, sign in zip(bar_container.patches, abs_corrs, signs, strict=True):
         label = f"{corr * sign:+.2f}"
         ax.text(
-            bar.get_width() + 0.02, bar.get_y() + bar.get_height() / 2,
+            float(rect.get_width()) + 0.02,
+            float(rect.get_y()) + float(rect.get_height()) / 2,
             label, va="center", fontsize=8,
         )
 
@@ -624,7 +632,7 @@ def _render_tornado_range(
         if len(unique_vals) < 2:  # noqa: PLR2004
             impacts.append((name, global_median, global_median))
             continue
-        medians = []
+        medians: list[float] = []
         for v in unique_vals:
             mask = np.isclose(param_vals, v)
             medians.append(float(np.median(metric_vals[mask])))
@@ -684,7 +692,7 @@ def render_sweep_scatter(
         raise ValueError(msg)
 
     metric_vals = np.array(results.column(metric), dtype=np.float64)
-    cmap = plt.cm.viridis  # type: ignore[attr-defined]
+    cmap = plt.colormaps["viridis"]
     vmin, vmax = float(np.nanmin(metric_vals)), float(np.nanmax(metric_vals))
 
     axes = fig.subplots(n, n, squeeze=False)
@@ -722,9 +730,12 @@ def render_sweep_scatter(
     fig.suptitle(f"Scatter Matrix (color = {metric})", fontsize=12)
 
     # Colorbar beside rightmost column only (avoids overlap)
-    sm = plt.cm.ScalarMappable(  # type: ignore[attr-defined]
+    from matplotlib.cm import ScalarMappable
+    from matplotlib.colors import Normalize
+
+    sm = ScalarMappable(
         cmap=cmap,
-        norm=plt.Normalize(vmin=vmin, vmax=vmax),
+        norm=Normalize(vmin=vmin, vmax=vmax),
     )
     sm.set_array(metric_vals)
     fig.colorbar(sm, ax=axes[:, -1].ravel().tolist(), label=metric, shrink=0.8)
