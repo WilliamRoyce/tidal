@@ -1,0 +1,41 @@
+# Coupled Scalars — Sweep coupling strength gCpl
+#
+# Two coupled Klein-Gordon fields: sweeps the coupling constant from
+# weak to strong coupling and measures conversion probability P(t)
+# and energy conservation.
+#
+# Usage:
+#   tidal sweep --config examples/coupled_scalars/sweep_coupling.toml
+#
+# Requires: pre-derived JSON spec at examples/data/coupled_scalars.json
+#   (run `tidal derive examples/coupled_scalars/theory.toml` first)
+
+spec = "../data/coupled_scalars.json"
+
+[parameters]
+mPhi2 = 1.0
+mChi2 = 4.0
+
+[sweep.gCpl]
+start = 0.01
+stop = 1.0
+count = 8
+scale = "log"
+
+[simulation]
+grid_shape = 64
+bounds = [0, 50]
+periodic = true
+ic = "gaussian"
+ic_component = "phi_0"
+ic_center = 15.0
+ic_width = 3.0
+t_end = 10.0
+
+[measurement]
+types = ["conversion", "conservation"]
+source = "phi_0"
+target = "chi_0"
+
+[output]
+path = "../data/coupled_scalars_sweep_toml"

@@ -19,6 +19,12 @@ Typical usage::
 
 from __future__ import annotations
 
+from tidal.measurement._asymptotic import (
+    AsymptoticConversionResult as AsymptoticConversionResult,
+)
+from tidal.measurement._asymptotic import (
+    compute_asymptotic_conversion as compute_asymptotic_conversion,
+)
 from tidal.measurement._conversion import (
     ConversionResult as ConversionResult,
 )
@@ -42,6 +48,12 @@ from tidal.measurement._dispersion import (
 )
 from tidal.measurement._dispersion import (
     compute_dispersion as compute_dispersion,
+)
+from tidal.measurement._effective_mass import (
+    EffectiveMassResult as EffectiveMassResult,
+)
+from tidal.measurement._effective_mass import (
+    compute_effective_mass as compute_effective_mass,
 )
 from tidal.measurement._energy import (
     FieldEnergy as FieldEnergy,
@@ -74,6 +86,12 @@ from tidal.measurement._mixing import (
 from tidal.measurement._mixing import (
     compute_mixing_spectrum as compute_mixing_spectrum,
 )
+from tidal.measurement._resonance import (
+    ResonanceResult as ResonanceResult,
+)
+from tidal.measurement._resonance import (
+    compute_resonance_analysis as compute_resonance_analysis,
+)
 from tidal.measurement._spectral import (
     SpectralSnapshot as SpectralSnapshot,
 )
@@ -95,6 +113,18 @@ from tidal.measurement._spectral_conversion import (
 from tidal.measurement._spectral_conversion import (
     compute_spectral_conversion as compute_spectral_conversion,
 )
+from tidal.measurement._velocity import (
+    VelocityMismatchResult as VelocityMismatchResult,
+)
+from tidal.measurement._velocity import (
+    VelocityResult as VelocityResult,
+)
+from tidal.measurement._velocity import (
+    compute_velocities as compute_velocities,
+)
+from tidal.measurement._velocity import (
+    compute_velocity_mismatch as compute_velocity_mismatch,
+)
 from tidal.measurement._writer import (
     SnapshotWriter as SnapshotWriter,
 )
@@ -106,21 +136,28 @@ from tidal.measurement._writer import (
 )
 
 __all__ = [
+    "AsymptoticConversionResult",
     "ConversionResult",
     "DispersionResult",
+    "EffectiveMassResult",
     "EnergyDiagnostics",
     "FieldEnergy",
     "MixingResult",
     "MixingSpectrum",
+    "ResonanceResult",
     "SimulationData",
     "SnapshotWriter",
     "SpectralConversion",
     "SpectralPeak",
     "SpectralSnapshot",
     "SystemEnergy",
+    "VelocityMismatchResult",
+    "VelocityResult",
     "check_energy_conservation",
+    "compute_asymptotic_conversion",
     "compute_conversion_probability",
     "compute_dispersion",
+    "compute_effective_mass",
     "compute_energy_timeseries",
     "compute_field_energy",
     "compute_group_conversion",
@@ -128,11 +165,14 @@ __all__ = [
     "compute_mixing_length",
     "compute_mixing_spectrum",
     "compute_mode_amplitudes",
+    "compute_resonance_analysis",
     "compute_snapshot_count",
     "compute_spectral_conversion",
     "compute_spectral_energy",
     "compute_spectrum",
     "compute_system_energy",
+    "compute_velocities",
+    "compute_velocity_mismatch",
     "create_snapshot_callback",
     "summarize",
 ]

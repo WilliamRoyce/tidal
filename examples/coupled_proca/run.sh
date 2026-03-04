@@ -62,10 +62,12 @@ tidal inspect ../data/coupled_proca_3d.json
 # Step 3: Run simulation
 # Gaussian IC with periodic BCs; constraint solver auto-detects A_0, B_0
 tidal simulate ../data/coupled_proca_3d.json \
+  --rtol 1e-6 \
+  --atol 1e-8 \
   --param mA2=1.0 --param mB2=2.0 --param gcoup=0.5 \
   --ic gaussian --ic-component A_1 --ic-amplitude 0.5 --ic-width 0.5 \
   --ic-center 1.5708,1.5708 \
-  --grid-shape 20 --bounds 0:3.14159,0:3.14159 --t-end 20.0 \
+  --grid-shape 20 --bounds 0:3.14159,0:3.14159 --t-end 50.0 \
   --bc periodic,periodic \
   --output ../data/coupled_proca_output
 

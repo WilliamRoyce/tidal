@@ -31,7 +31,7 @@ tidal simulate ../data/cylindrical_kg_1d.json \
   --periodic \
   --ic gaussian \
   --ic-width 0.5 \
-  --t-end 4.0 \
+  --t-end 10.0 \
   --output "$OUT"
 
 # --- Analysis plots ---

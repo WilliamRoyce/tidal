@@ -1,0 +1,1641 @@
+"""``tidal sweep`` — Run parameter sweeps across simulations.
+
+Orchestrates ``simulate`` + ``measure`` across a parameter grid
+and aggregates scalar metrics into portable CSV/JSON output.
+
+Supports:
+- Linear sweeps: ``--sweep "g0=0.1:1.0:10"``
+- Log-scale sweeps: ``--sweep "g0=0.01:10.0:10:log"``
+- Explicit values: ``--sweep "g0=0.1,0.5,1.0"``
+- Multi-parameter cartesian products: multiple ``--sweep`` flags
+- Grid convergence studies: ``--converge "32,64,128,256"``
+- Resume interrupted sweeps: ``--resume``
+- Parallel execution: ``--parallel N``
+"""
+
+from __future__ import annotations
+
+import itertools
+import sys
+import time
+from datetime import UTC, datetime
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, cast
+
+import numpy as np
+
+if TYPE_CHECKING:
+    from argparse import Namespace
+
+# Measurement types supported by sweep (subset of tidal measure)
+_SWEEP_MEASUREMENTS = frozenset(
+    {
+        "summary",
+        "energy",
+        "conversion",
+        "mixing",
+        "dispersion",
+        "conservation",
+        "effective_mass",
+        "asymptotic",
+        "peak_conversion",
+        "velocity",
+        "resonance",
+        "spectrum",
+        "spectral_conversion",
+    }
+)
+
+# Safety limits for sweep grid size
+_WARN_SWEEP_SIZE = 1_000
+_MAX_SWEEP_SIZE = 10_000
+
+# ------------------------------------------------------------------
+# Parameter parsing
+# ------------------------------------------------------------------
+
+
+def parse_sweep_spec(raw: str) -> tuple[str, list[float]]:  # noqa: C901
+    """Parse a ``--sweep`` argument into ``(param_name, values)``.
+
+    Supported formats:
+
+    - ``NAME=START:STOP:N``       — N linearly-spaced points
+    - ``NAME=START:STOP:N:log``   — N log-spaced points
+    - ``NAME=V1,V2,V3,...``       — explicit values
+
+    Parameters
+    ----------
+    raw : str
+        Raw sweep specification string.
+
+    Returns
+    -------
+    tuple[str, list[float]]
+        Parameter name and list of values.
+
+    Raises
+    ------
+    ValueError
+        If the format is invalid.
+    """
+    if "=" not in raw:
+        msg = (
+            f"Invalid sweep spec: '{raw}'. Expected NAME=START:STOP:N or NAME=V1,V2,..."
+        )
+        raise ValueError(msg)
+
+    name, rhs = raw.split("=", 1)
+    name = name.strip()
+    rhs = rhs.strip()
+
+    if not name:
+        msg = f"Empty parameter name in sweep spec: '{raw}'"
+        raise ValueError(msg)
+
+    # Check if this is a range spec (contains colons)
+    if ":" in rhs:
+        parts = rhs.split(":")
+        if len(parts) == 3:  # noqa: PLR2004
+            # START:STOP:N (linear)
+            start, stop, n_str = parts
+            n = int(n_str)
+            if n < 2:  # noqa: PLR2004
+                msg = f"Sweep count must be >= 2, got {n}"
+                raise ValueError(msg)
+            values: list[float] = cast("list[float]", np.linspace(float(start), float(stop), n).tolist())
+        elif len(parts) == 4:  # noqa: PLR2004
+            # START:STOP:N:log
+            start, stop, n_str, scale = parts
+            n = int(n_str)
+            if n < 2:  # noqa: PLR2004
+                msg = f"Sweep count must be >= 2, got {n}"
+                raise ValueError(msg)
+            if scale.lower() != "log":
+                msg = f"Unknown scale '{scale}' (expected 'log')"
+                raise ValueError(msg)
+            s, e = float(start), float(stop)
+            if s <= 0 or e <= 0:
+                msg = f"Log-scale requires positive bounds, got {s}:{e}"
+                raise ValueError(msg)
+            values = cast("list[float]", np.logspace(np.log10(s), np.log10(e), n).tolist())
+        else:
+            msg = (
+                f"Invalid range spec: '{rhs}'. "
+                f"Expected START:STOP:N or START:STOP:N:log"
+            )
+            raise ValueError(msg)
+    else:
+        # Explicit values: V1,V2,V3,...
+        values = [float(v.strip()) for v in rhs.split(",")]
+        if len(values) < 2:  # noqa: PLR2004
+            msg = f"Sweep needs at least 2 values, got {len(values)}"
+            raise ValueError(msg)
+
+    return name, values
+
+
+def parse_converge_spec(raw: str) -> list[int]:
+    """Parse a ``--converge`` argument into grid sizes.
+
+    Parameters
+    ----------
+    raw : str
+        Comma-separated grid sizes (e.g. ``"32,64,128,256"``).
+
+    Returns
+    -------
+    list[int]
+        Grid sizes in ascending order.
+
+    Raises
+    ------
+    ValueError
+        If fewer than 2 sizes or non-positive values.
+    """
+    sizes = [int(s.strip()) for s in raw.split(",")]
+    if len(sizes) < 2:  # noqa: PLR2004
+        msg = f"Convergence study needs at least 2 grid sizes, got {len(sizes)}"
+        raise ValueError(msg)
+    if any(s <= 0 for s in sizes):
+        msg = f"Grid sizes must be positive, got {sizes}"
+        raise ValueError(msg)
+    return sorted(sizes)
+
+
+# ------------------------------------------------------------------
+# Multi-D sampling strategies
+# ------------------------------------------------------------------
+
+
+def _generate_samples(
+    param_bounds: dict[str, tuple[float, float]],
+    n_samples: int,
+    strategy: str,
+    *,
+    seed: int | None = None,
+) -> list[dict[str, float]]:
+    """Generate parameter samples using space-filling designs.
+
+    Parameters
+    ----------
+    param_bounds : dict[str, tuple[float, float]]
+        Parameter name -> (lower, upper) bounds.
+    n_samples : int
+        Number of samples to generate.
+    strategy : str
+        ``"latin_hypercube"`` or ``"sobol"``.
+    seed : int or None
+        Random seed for reproducibility.
+
+    Returns
+    -------
+    list[dict[str, float]]
+        Each dict maps parameter names to sampled values.
+
+    Raises
+    ------
+    ValueError
+        If *strategy* is unknown or *n_samples* < 1.
+    """
+    from scipy.stats.qmc import LatinHypercube, Sobol  # type: ignore[import-untyped]
+
+    names = list(param_bounds.keys())
+    d = len(names)
+    lower = np.array([param_bounds[n][0] for n in names])
+    upper = np.array([param_bounds[n][1] for n in names])
+
+    if strategy == "latin_hypercube":
+        sampler = LatinHypercube(d=d, seed=seed)  # pyright: ignore[reportCallIssue]
+        unit_samples = sampler.random(n=n_samples)
+    elif strategy == "sobol":
+        sampler = Sobol(d=d, seed=seed)  # pyright: ignore[reportCallIssue]
+        unit_samples = sampler.random(n=n_samples)
+    else:
+        msg = (
+            f"Unknown sampling strategy '{strategy}' (expected: latin_hypercube, sobol)"
+        )
+        raise ValueError(msg)
+
+    # Scale from [0, 1]^d to parameter bounds
+    scaled = lower + unit_samples * (upper - lower)
+
+    return [dict(zip(names, row, strict=True)) for row in scaled]
+
+
+# ------------------------------------------------------------------
+# Subdirectory naming
+# ------------------------------------------------------------------
+
+
+def _run_subdir_name(
+    swept_params: dict[str, float],
+    converge_size: int | None = None,
+) -> str:
+    """Generate a subdirectory name for one sweep run."""
+    if converge_size is not None:
+        return f"N_{converge_size}"
+    parts: list[str] = []
+    for name, val in swept_params.items():
+        # Format: short float, avoid trailing zeros
+        if val == int(val):
+            parts.append(f"{name}_{int(val)}")
+        else:
+            parts.append(f"{name}_{val:.6g}")
+    return "_".join(parts) if parts else "run_0"
+
+
+# ------------------------------------------------------------------
+# Single run execution
+# ------------------------------------------------------------------
+
+
+def _build_sim_args(
+    base_args: Namespace,
+    param_overrides: dict[str, float],
+    output_dir: Path,
+    grid_shape_override: int | None = None,
+) -> Namespace:
+    """Build a simulate-compatible Namespace for one run.
+
+    Copies all simulation flags from *base_args* and overrides
+    parameters and output path.
+    """
+    import copy
+
+    sim_args = copy.copy(base_args)
+
+    # Clear simulate-specific resume flags — sweep has its own boolean
+    # --resume (resume interrupted sweep), which must not leak into
+    # _simulate() where --resume expects a directory path string.
+    sim_args.resume = None
+    sim_args.snapshot = None
+    sim_args.t_additional = None
+
+    # Override parameters: merge base --param list with sweep overrides
+    base_params: list[str] = list(getattr(base_args, "param", []) or [])
+    for k, v in param_overrides.items():
+        # Remove any existing override for this key
+        base_params = [p for p in base_params if not p.startswith(f"{k}=")]
+        base_params.append(f"{k}={v}")
+    sim_args.param = base_params
+
+    # Output to subdirectory (force directory format for disk-backed streaming)
+    # Note: no_plot must be False because _infer_output_format checks it first
+    # and would return "summary" (skipping disk write). Instead, set
+    # output_format="directory" which gets checked after no_plot.
+    sim_args.output = str(output_dir)
+    sim_args.output_format = "directory"
+    sim_args.no_plot = False
+    sim_args.quiet = True
+
+    # Grid shape override for convergence mode
+    if grid_shape_override is not None:
+        sim_args.grid_shape = str(grid_shape_override)
+
+    return sim_args
+
+
+def _simulate_run(
+    base_args: Namespace,
+    spec_path: Path,
+    param_overrides: dict[str, float],
+    output_dir: Path,
+    grid_shape_override: int | None = None,
+) -> tuple[int, float]:
+    """Execute a single simulation and return (exit_code, wall_time_s)."""
+    from tidal.cli._simulate import (
+        _parse_params,  # pyright: ignore[reportPrivateUsage]
+        _simulate,  # pyright: ignore[reportPrivateUsage]
+    )
+    from tidal.symbolic import load_equation_system
+
+    sim_args = _build_sim_args(
+        base_args, param_overrides, output_dir, grid_shape_override
+    )
+    spec = load_equation_system(spec_path)
+    params = _parse_params(sim_args.param, spec)
+
+    t0 = time.monotonic()
+    exit_code = _simulate(sim_args, spec, params)
+    wall_time = time.monotonic() - t0
+    return exit_code, wall_time
+
+
+def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
+    run_dir: Path,
+    spec_path: Path,
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    threshold: float,
+) -> dict[str, Any]:
+    """Run all requested measurements on an existing simulation output.
+
+    This is the single source of truth for measurement extraction in sweeps.
+    Called both after a fresh simulation and when resuming a completed run.
+
+    Returns a dict of scalar metrics.
+    """
+    from tidal.cli._measure import (
+        _run_asymptotic,  # pyright: ignore[reportPrivateUsage]
+        _run_conservation,  # pyright: ignore[reportPrivateUsage]
+        _run_conversion,  # pyright: ignore[reportPrivateUsage]
+        _run_dispersion,  # pyright: ignore[reportPrivateUsage]
+        _run_effective_mass,  # pyright: ignore[reportPrivateUsage]
+        _run_energy,  # pyright: ignore[reportPrivateUsage]
+        _run_mixing,  # pyright: ignore[reportPrivateUsage]
+        _run_peak_conversion,  # pyright: ignore[reportPrivateUsage]
+        _run_resonance,  # pyright: ignore[reportPrivateUsage]
+        _run_spectral_conversion,  # pyright: ignore[reportPrivateUsage]
+        _run_spectrum,  # pyright: ignore[reportPrivateUsage]
+        _run_velocity,  # pyright: ignore[reportPrivateUsage]
+    )
+    from tidal.measurement._io import SimulationData
+    from tidal.symbolic import load_equation_system
+
+    spec = load_equation_system(spec_path)
+    data = SimulationData.load(run_dir, spec)
+    metrics: dict[str, Any] = {}
+
+    if "conservation" in measurements or "summary" in measurements:
+        try:
+            cons = _run_conservation(data, threshold)
+            metrics["max_energy_error"] = cons["max_relative_error"]
+            metrics["energy_conserved"] = cons["is_conserved"]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["max_energy_error"] = None
+            metrics["conservation_error"] = str(exc)
+
+    conv_result = None
+    if "conversion" in measurements or "summary" in measurements:
+        try:
+            conv = _run_conversion(data, source, target)
+            metrics["P_max"] = conv["peak_probability"]
+            metrics["P_max_time"] = conv["peak_time"]
+            result_obj = conv["_result_obj"]
+            metrics["P_final"] = float(result_obj.probability[-1])
+            conv_result = result_obj
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["P_max"] = None
+            metrics["conversion_error"] = str(exc)
+
+    if (
+        "mixing" in measurements or "summary" in measurements
+    ) and conv_result is not None:
+        try:
+            mix = _run_mixing(conv_result)
+            metrics["L_mix"] = mix["mixing_length"]
+            metrics["L_mix_uncertainty"] = mix["mixing_length_uncertainty"]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["L_mix"] = None
+            metrics["mixing_error"] = str(exc)
+
+    if "energy" in measurements:
+        try:
+            eng = _run_energy(data)
+            metrics["E_total_final"] = eng["total"][-1]
+            metrics["E_total_initial"] = eng["total"][0]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["energy_error"] = str(exc)
+
+    if "dispersion" in measurements:
+        try:
+            dyn = list(data.dynamical_fields)
+            disp = _run_dispersion(data, dyn)
+            result_obj = disp["_result_obj"]
+            wn: np.ndarray[Any, np.dtype[np.floating[Any]]] = result_obj.wavenumbers
+            freq: np.ndarray[Any, np.dtype[np.floating[Any]]] = result_obj.peak_frequencies
+            active = freq > 0.0
+            if np.any(active):
+                m2_vals: np.ndarray[Any, np.dtype[np.floating[Any]]] = freq[active] ** 2 - wn[active] ** 2
+                metrics["m2_eff"] = float(np.median(m2_vals))
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["dispersion_error"] = str(exc)
+
+    if "effective_mass" in measurements:
+        try:
+            dyn = list(data.dynamical_fields)
+            em = _run_effective_mass(data, dyn)
+            metrics["m2_eff"] = em["m2_eff"]
+            metrics["m2_eff_std"] = em["m2_eff_std"]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["effective_mass_error"] = str(exc)
+
+    if "asymptotic" in measurements:
+        try:
+            asym = _run_asymptotic(data, source, target)
+            metrics["P_asymptotic"] = asym["P_final"]
+            metrics["P_transmitted"] = asym["P_transmitted"]
+            metrics["P_reflected"] = asym["P_reflected"]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["asymptotic_error"] = str(exc)
+
+    if "peak_conversion" in measurements:
+        try:
+            if conv_result is not None:
+                # Reuse conversion result already computed above
+                peak_idx = int(np.argmax(conv_result.probability))
+                metrics["P_max"] = float(conv_result.probability[peak_idx])
+                metrics["P_max_time"] = float(conv_result.times[peak_idx])
+                metrics["P_final"] = float(conv_result.probability[-1])
+            else:
+                pc = _run_peak_conversion(data, source, target)
+                metrics["P_max"] = pc["P_max"]
+                metrics["P_max_time"] = pc["P_max_time"]
+                metrics["P_final"] = pc["P_final"]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["peak_conversion_error"] = str(exc)
+
+    if "velocity" in measurements:
+        try:
+            dyn = list(data.dynamical_fields)
+            vel = _run_velocity(data, dyn)
+            metrics["v_group_mean"] = vel["v_group_mean"]
+            metrics["v_phase_mean"] = vel["v_phase_mean"]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["velocity_error"] = str(exc)
+
+    if "resonance" in measurements:
+        try:
+            res = _run_resonance(data, source, target)
+            metrics["n_resonant_modes"] = res["n_resonant_modes"]
+            metrics["conversion_bandwidth"] = res["conversion_bandwidth"]
+            metrics["peak_conversion_k"] = res["peak_conversion_k"]
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["resonance_error"] = str(exc)
+
+    if "spectrum" in measurements:
+        try:
+            spec_results = _run_spectrum(data)
+            # Aggregate scalars from spectrum of each field
+            for fname, field_spec in spec_results.items():
+                if isinstance(field_spec, dict) and "final" in field_spec:
+                    final = cast("dict[str, Any]", field_spec["final"])
+                    power_data: list[float] = final["power"]
+                    wn_data: list[float] = final["wavenumbers"]
+                    power = np.array(power_data)
+                    wn_arr = np.array(wn_data)
+                    if power.max() > 0:
+                        metrics[f"peak_k_{fname}"] = float(wn_arr[np.argmax(power)])
+                        metrics[f"peak_power_{fname}"] = float(power.max())
+                        threshold_val = 0.01 * power.max()
+                        metrics[f"n_active_modes_{fname}"] = int(
+                            np.sum(power > threshold_val)
+                        )
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["spectrum_error"] = str(exc)
+
+    if "spectral_conversion" in measurements:
+        try:
+            sc = _run_spectral_conversion(data, source, target)
+            result_obj = sc["_result_obj"]
+            final_p_k = result_obj.probability[-1]
+            if len(final_p_k) > 0 and np.any(final_p_k > 0):
+                metrics["P_k_max"] = float(final_p_k.max())
+                peak_idx = int(np.argmax(final_p_k))
+                metrics["k_max_conversion"] = float(result_obj.wavenumbers[peak_idx])
+                half_max = final_p_k.max() / 2.0
+                above_half = final_p_k > half_max
+                if np.any(above_half):
+                    k_range = result_obj.wavenumbers[above_half]
+                    metrics["spectral_conversion_bandwidth"] = float(
+                        k_range[-1] - k_range[0]
+                    )
+                else:
+                    metrics["spectral_conversion_bandwidth"] = 0.0
+            else:
+                metrics["P_k_max"] = 0.0
+                metrics["k_max_conversion"] = 0.0
+                metrics["spectral_conversion_bandwidth"] = 0.0
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            metrics["spectral_conversion_error"] = str(exc)
+
+    return metrics
+
+
+def _run_single(  # noqa: PLR0913, PLR0917
+    base_args: Namespace,
+    spec_path: Path,
+    param_overrides: dict[str, float],
+    output_dir: Path,
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    threshold: float,
+    grid_shape_override: int | None = None,
+) -> dict[str, Any]:
+    """Execute one simulate + measure cycle.
+
+    Returns a dict of scalar metrics for one row of the results table.
+    Always includes ``run_status``, ``error_message``, and ``solver_exit_code``.
+    """
+    # 1. Simulate
+    exit_code, wall_time = _simulate_run(
+        base_args, spec_path, param_overrides, output_dir, grid_shape_override
+    )
+
+    if exit_code != 0:
+        return {
+            "run_status": "solver_error",
+            "error_message": f"solver exit code {exit_code}",
+            "solver_exit_code": exit_code,
+            "wall_time_s": round(wall_time, 2),
+            "error": "simulation_failed",
+        }
+
+    # 2. Measure
+    metrics = _measure_run(
+        output_dir, spec_path, measurements, source, target, threshold
+    )
+    metrics["wall_time_s"] = round(wall_time, 2)
+    metrics["run_status"] = "success"
+    metrics["error_message"] = None
+    metrics["solver_exit_code"] = 0
+    return metrics
+
+
+def _measure_existing(  # noqa: PLR0913, PLR0917
+    run_dir: Path,
+    spec_path: Path,
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    threshold: float,
+) -> dict[str, Any]:
+    """Measure an existing run directory with error handling.
+
+    Used by resume logic in sequential, parallel, and adaptive execution
+    paths. Wraps ``_measure_run()`` with status tracking and error capture.
+
+    Returns metrics dict with ``run_status``, ``error_message``, and
+    ``solver_exit_code`` always set.
+    """
+    try:
+        metrics = _measure_run(
+            run_dir, spec_path, measurements, source, target, threshold
+        )
+    except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+        return {
+            "error": f"resume_measure_failed: {exc}",
+            "run_status": "measurement_error",
+            "error_message": str(exc)[:200],
+            "solver_exit_code": 0,
+        }
+    else:
+        metrics.setdefault("run_status", "success")
+        metrics.setdefault("error_message", None)
+        metrics.setdefault("solver_exit_code", 0)
+        return metrics
+
+
+# ------------------------------------------------------------------
+# Main sweep orchestration
+# ------------------------------------------------------------------
+
+
+def _save_incremental(  # noqa: PLR0913, PLR0917
+    output_dir: Path,
+    rows: list[dict[str, Any]],
+    run_dirs: list[Path],
+    swept_params: dict[str, list[float]],
+    fixed_params: dict[str, float],
+    sim_settings: dict[str, Any],
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    spec_path: Path,
+    converge_sizes: list[int] | None,
+) -> None:
+    """Save partial results after each completed run (crash recovery)."""
+    from tidal.measurement._sweep_results import SweepResults
+
+    partial = SweepResults(
+        swept_params=swept_params,
+        fixed_params=fixed_params,
+        sim_settings=sim_settings,
+        rows=rows,
+        run_dirs=run_dirs,
+        spec_path=str(spec_path),
+        measurements=sorted(measurements),
+        source_fields=list(source) if source else None,
+        target_fields=list(target) if target else None,
+        metadata={
+            "timestamp": datetime.now(tz=UTC).isoformat(),
+            "total_runs": len(rows),
+            "partial": True,
+        },
+        converge_sizes=converge_sizes,
+    )
+    partial.to_csv(output_dir / "results.csv")
+    partial.to_json(output_dir / "results.json")
+
+
+def _collect_sim_settings(args: Namespace) -> dict[str, Any]:
+    """Extract simulation settings from CLI args for CSV columns."""
+    settings: dict[str, Any] = {}
+    settings["grid_shape"] = getattr(args, "grid_shape", None) or "auto"
+    settings["t_end"] = getattr(args, "t_end", 10.0)
+    settings["dt"] = getattr(args, "dt", None) or "auto"
+    settings["scheme"] = getattr(args, "scheme", "auto")
+    bc = getattr(args, "bc", None)
+    settings["bc"] = bc or (
+        "periodic" if getattr(args, "periodic", True) else "neumann"
+    )
+    return settings
+
+
+def _execute_sequential(  # noqa: PLR0913, PLR0917
+    args: Namespace,
+    spec_path: Path,
+    run_plans: list[dict[str, Any]],
+    swept_params: dict[str, list[float]],
+    fixed_params: dict[str, float],
+    sim_settings: dict[str, Any],
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    threshold: float,
+    converge_sizes: list[int] | None,
+    output_dir: Path,
+    *,
+    resume: bool,
+) -> list[dict[str, Any]]:
+    """Execute sweep runs sequentially with incremental saving."""
+    total_runs = len(run_plans)
+    rows: list[dict[str, Any]] = []
+    run_dirs: list[Path] = [rp["run_dir"] for rp in run_plans]
+    sweep_start = time.monotonic()
+
+    for rp in run_plans:
+        i = rp["index"]
+        run_dir: Path = rp["run_dir"]
+        subdir: str = rp["subdir"]
+        swept_vals: dict[str, float] = rp["swept_vals"]
+        grid_override: int | None = rp["grid_override"]
+        param_overrides: dict[str, float] = rp["param_overrides"]
+
+        # Resume check: re-measure existing output instead of re-simulating
+        if resume and (run_dir / "metadata.json").exists():
+            print(
+                f"  [{i + 1}/{total_runs}] {subdir} — measuring existing...",
+                end="",
+                flush=True,
+            )
+            metrics = _measure_existing(
+                run_dir, spec_path, measurements, source, target, threshold
+            )
+            if metrics.get("run_status") == "measurement_error":
+                print(f" measure error: {metrics.get('error_message', '')}")
+            else:
+                print(" ok")
+            rows.append(
+                _build_row(
+                    swept_vals, fixed_params, sim_settings, metrics, grid_override
+                )
+            )
+            _save_incremental(
+                output_dir,
+                rows,
+                run_dirs,
+                swept_params,
+                fixed_params,
+                sim_settings,
+                measurements,
+                source,
+                target,
+                spec_path,
+                converge_sizes,
+            )
+            continue
+
+        print(f"  [{i + 1}/{total_runs}] {subdir}...", end="", flush=True)
+
+        try:
+            metrics = _run_single(
+                args,
+                spec_path,
+                param_overrides,
+                run_dir,
+                measurements,
+                source,
+                target,
+                threshold,
+                grid_shape_override=grid_override,
+            )
+            rows.append(
+                _build_row(
+                    swept_vals, fixed_params, sim_settings, metrics, grid_override
+                )
+            )
+            _print_status(metrics)
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            print(f" ERROR: {exc}")
+            rows.append(
+                _build_row(
+                    swept_vals,
+                    fixed_params,
+                    sim_settings,
+                    {
+                        "error": str(exc),
+                        "run_status": "diverged",
+                        "error_message": str(exc)[:200],
+                        "solver_exit_code": -1,
+                    },
+                    grid_override,
+                )
+            )
+
+        # ETA
+        _print_eta(len(rows), total_runs, sweep_start)
+
+        # Incremental save after each run (crash recovery)
+        _save_incremental(
+            output_dir,
+            rows,
+            run_dirs,
+            swept_params,
+            fixed_params,
+            sim_settings,
+            measurements,
+            source,
+            target,
+            spec_path,
+            converge_sizes,
+        )
+
+    return rows
+
+
+def _execute_parallel(  # noqa: PLR0913, PLR0917
+    args: Namespace,
+    spec_path: Path,
+    run_plans: list[dict[str, Any]],
+    swept_params: dict[str, list[float]],
+    fixed_params: dict[str, float],
+    sim_settings: dict[str, Any],
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    threshold: float,
+    converge_sizes: list[int] | None,
+    output_dir: Path,
+    *,
+    resume: bool,
+    n_workers: int,
+) -> list[dict[str, Any]]:
+    """Execute sweep runs in parallel using multiprocessing.Pool."""
+    from multiprocessing import Pool
+
+    total_runs = len(run_plans)
+    run_dirs = [rp["run_dir"] for rp in run_plans]
+
+    # Build tasks for Pool, handling resume first (sequentially)
+    tasks: list[dict[str, Any]] = []
+    rows: list[dict[str, Any]] = [{} for _ in range(total_runs)]
+    completed: set[int] = set()
+    sweep_start = time.monotonic()
+
+    for rp in run_plans:
+        i = rp["index"]
+        run_dir: Path = rp["run_dir"]
+
+        if resume and (run_dir / "metadata.json").exists():
+            # Resume runs measured sequentially (fast — no simulation)
+            print(
+                f"  [{i + 1}/{total_runs}] {rp['subdir']} — measuring existing...",
+                end="",
+                flush=True,
+            )
+            metrics = _measure_existing(
+                run_dir, spec_path, measurements, source, target, threshold
+            )
+            if metrics.get("run_status") == "measurement_error":
+                print(f" measure error: {metrics.get('error_message', '')}")
+            else:
+                print(" ok")
+            rows[i] = _build_row(
+                rp["swept_vals"],
+                fixed_params,
+                sim_settings,
+                metrics,
+                rp["grid_override"],
+            )
+            completed.add(i)
+            continue
+
+        tasks.append(
+            {
+                "index": i,
+                "base_args": args,
+                "spec_path": str(spec_path),
+                "param_overrides": rp["param_overrides"],
+                "output_dir": str(rp["run_dir"]),
+                "measurements": measurements,
+                "source": source,
+                "target": target,
+                "threshold": threshold,
+                "grid_override": rp["grid_override"],
+                "swept_vals": rp["swept_vals"],
+                "subdir": rp["subdir"],
+            }
+        )
+
+    if tasks:
+        print(f"  Running {len(tasks)} simulations with {n_workers} workers...")
+        with Pool(processes=n_workers) as pool:
+            for result in pool.imap_unordered(_run_single_wrapper, tasks):
+                idx = result["index"]
+                metrics = result["metrics"]
+                swept_vals = result["swept_vals"]
+                grid_override = result["grid_override"]
+                rows[idx] = _build_row(
+                    swept_vals, fixed_params, sim_settings, metrics, grid_override
+                )
+                completed.add(idx)
+                print(f"  [{len(completed)}/{total_runs}] {result['subdir']}", end="")
+                _print_status(metrics)
+                _print_eta(len(completed), total_runs, sweep_start)
+                # Incremental save after each parallel completion
+                _save_incremental(
+                    output_dir,
+                    list(rows),
+                    run_dirs,
+                    swept_params,
+                    fixed_params,
+                    sim_settings,
+                    measurements,
+                    source,
+                    target,
+                    spec_path,
+                    converge_sizes,
+                )
+
+    return list(rows)
+
+
+# ------------------------------------------------------------------
+# Adaptive interval refinement (1D)
+# ------------------------------------------------------------------
+
+
+def _interval_scores(
+    values: list[float],
+    metric_vals: list[float | None],
+) -> list[float]:
+    """Compute curvature-based interest score for each interval.
+
+    For interval [a, b] with midpoint m, the score is:
+        |f(a) - 2*f(m) + f(b)| / (|f(b) - f(a)| + eps)
+
+    This approximates the second derivative normalized by the first,
+    identifying intervals with sharp features worth resolving.
+    """
+    scores: list[float] = []
+    eps = 1e-12
+    for i in range(len(values) - 1):
+        fa = metric_vals[i]
+        fb = metric_vals[i + 1]
+        if fa is None or fb is None:
+            scores.append(0.0)
+            continue
+        # Curvature estimate from endpoints only (no midpoint yet)
+        # Use abs difference as proxy for interest
+        scores.append(abs(fb - fa) / (abs(max(fa, fb)) + eps))
+    return scores
+
+
+def _adaptive_run_point(  # noqa: PLR0913, PLR0917
+    val: float,
+    param_name: str,
+    args: Namespace,
+    spec_path: Path,
+    all_params: dict[str, float],
+    fixed_params: dict[str, float],
+    sim_settings: dict[str, Any],
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    energy_threshold: float,
+    output_dir: Path,
+    run_dirs: list[Path],
+    *,
+    resume: bool,
+) -> dict[str, Any]:
+    """Run a single adaptive point and return the results row."""
+    swept_vals = {param_name: val}
+    subdir = _run_subdir_name(swept_vals, None)
+    run_dir = output_dir / subdir
+    run_dirs.append(run_dir)
+
+    param_overrides = dict(all_params)
+    param_overrides[param_name] = val
+
+    if resume and (run_dir / "metadata.json").exists():
+        print(f"  [adaptive] {subdir} — measuring existing...", end="", flush=True)
+        metrics = _measure_existing(
+            run_dir, spec_path, measurements, source, target, energy_threshold
+        )
+        if metrics.get("run_status") == "measurement_error":
+            print(f" measure error: {metrics.get('error_message', '')}")
+        else:
+            print(" ok")
+    else:
+        print(f"  [adaptive] {subdir}...", end="", flush=True)
+        try:
+            metrics = _run_single(
+                args,
+                spec_path,
+                param_overrides,
+                run_dir,
+                measurements,
+                source,
+                target,
+                energy_threshold,
+            )
+            _print_status(metrics)
+        except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
+            print(f" ERROR: {exc}")
+            metrics = {
+                "error": str(exc),
+                "run_status": "diverged",
+                "error_message": str(exc)[:200],
+                "solver_exit_code": -1,
+            }
+
+    return _build_row(swept_vals, fixed_params, sim_settings, metrics, None)
+
+
+def _detect_adaptive_metric(rows: list[dict[str, Any]]) -> str | None:
+    """Auto-detect a suitable metric key from the first row."""
+    from tidal.measurement._sweep_results import DEFAULT_METRIC_CANDIDATES
+
+    for candidate in DEFAULT_METRIC_CANDIDATES:
+        if candidate in rows[0]:
+            return candidate
+    return None
+
+
+def _execute_adaptive(  # noqa: PLR0913, PLR0917
+    args: Namespace,
+    spec_path: Path,
+    param_name: str,
+    initial_values: list[float],
+    max_count: int,
+    metric_key: str | None,
+    threshold: float,
+    all_params: dict[str, float],
+    fixed_params: dict[str, float],
+    sim_settings: dict[str, Any],
+    measurements: set[str],
+    source: tuple[str, ...] | None,
+    target: tuple[str, ...] | None,
+    energy_threshold: float,
+    output_dir: Path,
+    *,
+    resume: bool,
+) -> tuple[list[dict[str, Any]], list[Path], dict[str, list[float]]]:
+    """Execute adaptive refinement sweep for a single parameter.
+
+    Returns
+    -------
+    tuple[list[dict], list[Path], dict[str, list[float]]]
+        (rows sorted by parameter value, run_dirs, updated swept_params)
+    """
+    sweep_start = time.monotonic()
+    points = sorted(initial_values)
+    rows: list[dict[str, Any]] = []
+    run_dirs: list[Path] = []
+
+    # Phase 1: Run initial grid
+    print(f"  Adaptive: initial grid ({len(points)} points)")
+    for val in points:
+        rows.append(  # noqa: PERF401 — side effects
+            _adaptive_run_point(
+                val,
+                param_name=param_name,
+                args=args,
+                spec_path=spec_path,
+                all_params=all_params,
+                fixed_params=fixed_params,
+                sim_settings=sim_settings,
+                measurements=measurements,
+                source=source,
+                target=target,
+                energy_threshold=energy_threshold,
+                output_dir=output_dir,
+                run_dirs=run_dirs,
+                resume=resume,
+            )
+        )
+
+    swept_snapshot = {param_name: list(points)}
+    _save_incremental(
+        output_dir,
+        rows,
+        run_dirs,
+        swept_snapshot,
+        fixed_params,
+        sim_settings,
+        measurements,
+        source,
+        target,
+        spec_path,
+        None,
+    )
+
+    # Phase 2: Iterative refinement
+    if metric_key is None:
+        metric_key = _detect_adaptive_metric(rows)
+    if metric_key is None:
+        print(
+            "  Warning: no metric found for adaptive refinement, skipping refinement phase"
+        )
+        return rows, run_dirs, swept_snapshot
+
+    print(f"  Adaptive: refining on '{metric_key}' (budget: {max_count} total)")
+
+    iteration = 0
+    while len(points) < max_count:
+        iteration += 1
+        scores = _interval_scores(points, [r.get(metric_key) for r in rows])
+
+        if not scores or max(scores) < threshold:
+            print(
+                f"  Adaptive: converged after {iteration} iterations (max score < {threshold})"
+            )
+            break
+
+        idx = int(np.argmax(scores))
+        midpoint = (points[idx] + points[idx + 1]) / 2.0
+
+        row = _adaptive_run_point(
+            midpoint,
+            param_name=param_name,
+            args=args,
+            spec_path=spec_path,
+            all_params=all_params,
+            fixed_params=fixed_params,
+            sim_settings=sim_settings,
+            measurements=measurements,
+            source=source,
+            target=target,
+            energy_threshold=energy_threshold,
+            output_dir=output_dir,
+            run_dirs=run_dirs,
+            resume=resume,
+        )
+        points.insert(idx + 1, midpoint)
+        rows.insert(idx + 1, row)
+
+        _print_eta(len(points), max_count, sweep_start)
+        swept_snapshot = {param_name: list(points)}
+        _save_incremental(
+            output_dir,
+            rows,
+            run_dirs,
+            swept_snapshot,
+            fixed_params,
+            sim_settings,
+            measurements,
+            source,
+            target,
+            spec_path,
+            None,
+        )
+
+    print(f"  Adaptive: {len(points)} points total")
+    return rows, run_dirs, {param_name: list(points)}
+
+
+def _print_status(metrics: dict[str, Any]) -> None:
+    """Print brief metric status for a completed run."""
+    status_parts: list[str] = []
+    if "P_max" in metrics and metrics["P_max"] is not None:
+        status_parts.append(f"P_max={metrics['P_max']:.4f}")
+    if "max_energy_error" in metrics and metrics["max_energy_error"] is not None:
+        status_parts.append(f"|dE/E|={metrics['max_energy_error']:.2e}")
+    if "wall_time_s" in metrics:
+        status_parts.append(f"{metrics['wall_time_s']:.1f}s")
+    print(f" {', '.join(status_parts)}")
+
+
+def _get_provenance() -> dict[str, str]:
+    """Collect provenance metadata for sweep.json."""
+    import platform
+    import subprocess  # noqa: S404
+
+    meta: dict[str, str] = {
+        "hostname": platform.node(),
+        "platform": platform.platform(),
+    }
+    try:
+        from importlib.metadata import version
+
+        meta["tidal_version"] = version("tidal")
+    except Exception:  # noqa: BLE001
+        meta["tidal_version"] = "unknown"
+    try:
+        git_hash = (
+            subprocess.check_output(
+                ["git", "rev-parse", "--short", "HEAD"],  # noqa: S607
+                stderr=subprocess.DEVNULL,
+                timeout=5,
+            )
+            .decode()
+            .strip()
+        )
+        meta["git_hash"] = git_hash
+    except (subprocess.SubprocessError, FileNotFoundError):
+        pass
+    return meta
+
+
+def _print_eta(completed: int, total: int, start_time: float) -> None:
+    """Print ETA if there are remaining runs."""
+    remaining = total - completed
+    if remaining <= 0 or completed <= 0:
+        return
+    elapsed = time.monotonic() - start_time
+    avg_per_run = elapsed / completed
+    eta_s = remaining * avg_per_run
+    if eta_s < 120:  # noqa: PLR2004
+        print(f"    ETA: ~{eta_s:.0f}s remaining")
+    else:
+        print(f"    ETA: ~{eta_s / 60:.1f}min remaining")
+
+
+def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
+    args: Namespace,
+    swept_params: dict[str, list[float]],
+    converge_sizes: list[int] | None,
+) -> int:
+    """Execute the parameter sweep or convergence study.
+
+    Parameters
+    ----------
+    args : Namespace
+        Parsed CLI arguments.
+    swept_params : dict[str, list[float]]
+        Swept parameter names and values.
+    converge_sizes : list[int] or None
+        Grid sizes for convergence mode, or None for parameter sweep.
+
+    Returns
+    -------
+    int
+        Exit code.
+    """
+    from tidal.cli._simulate import _parse_params  # pyright: ignore[reportPrivateUsage]
+    from tidal.measurement._sweep_results import SweepResults
+    from tidal.symbolic import load_equation_system
+
+    spec_path = Path(args.json_path)
+    output_dir = Path(args.output)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Parse fixed parameters and measurement config
+    spec = load_equation_system(spec_path)
+    all_params = _parse_params(getattr(args, "param", []) or [], spec)
+    fixed_params = {k: v for k, v in all_params.items() if k not in swept_params}
+
+    # Validate swept parameter names against spec
+    if swept_params:
+        from tidal.cli._inspect import (
+            discover_parameters,  # pyright: ignore[reportPrivateUsage]
+        )
+
+        try:
+            known_params: set[str] = set(discover_parameters(spec).keys())
+        except TypeError:
+            known_params = set()
+        meta_params_raw = spec.metadata.get("parameters", {})
+        if isinstance(meta_params_raw, dict):
+            known_params |= set(cast("dict[str, Any]", meta_params_raw).keys())
+        for name in sorted(set(swept_params.keys()) - known_params):
+            print(
+                f"  Warning: swept parameter '{name}' not found in equation spec. Possible typo?",
+                file=sys.stderr,
+            )
+
+    measurements: set[str] = set()
+    raw_measure = getattr(args, "measure", None)
+    if raw_measure:
+        measurements = {s.strip() for s in raw_measure.split(",")}
+        unknown = measurements - _SWEEP_MEASUREMENTS
+        if unknown:
+            print(
+                f"Error: unknown measurement(s): {', '.join(sorted(unknown))}. "
+                f"Valid: {', '.join(sorted(_SWEEP_MEASUREMENTS))}",
+                file=sys.stderr,
+            )
+            return 1
+    if not measurements:
+        measurements = {"summary"}
+
+    source = _parse_field_list(getattr(args, "source", None))
+    target = _parse_field_list(getattr(args, "target", None))
+    threshold = getattr(args, "energy_threshold", 1e-3)
+
+    sim_settings = _collect_sim_settings(args)
+
+    # Build list of runs
+    sweep_strategy = getattr(args, "sweep_strategy", None) or "grid"
+    n_samples = getattr(args, "n_samples", None)
+    runs: list[dict[str, Any]] = []
+    if converge_sizes is not None:
+        for size in converge_sizes:
+            run: dict[str, Any] = {"_grid_override": size}
+            run.update(all_params)
+            runs.append(run)
+    elif (
+        sweep_strategy in {"latin_hypercube", "sobol"}
+        and n_samples
+        and len(swept_params) >= 1
+    ):
+        # Space-filling design (LHS or Sobol)
+        param_bounds = {
+            name: (min(vals), max(vals)) for name, vals in swept_params.items()
+        }
+        samples = _generate_samples(param_bounds, n_samples, sweep_strategy)
+        runs.extend(dict(sample) for sample in samples)
+    else:
+        # Cartesian product of swept parameters
+        param_names = list(swept_params.keys())
+        param_values = [swept_params[n] for n in param_names]
+        for combo in itertools.product(*param_values):
+            run = {}
+            for name, val in zip(param_names, combo, strict=True):
+                run[name] = val
+            runs.append(run)
+
+    total_runs = len(runs)
+
+    # Safety limit for large sweeps
+    force_large = getattr(args, "force_large_sweep", False)
+    if total_runs > _MAX_SWEEP_SIZE and not force_large:
+        print(
+            f"Error: sweep has {total_runs} runs (limit: {_MAX_SWEEP_SIZE}). "
+            f"Use --force-large-sweep to override.",
+            file=sys.stderr,
+        )
+        return 1
+    if total_runs > _WARN_SWEEP_SIZE:
+        print(
+            f"  Warning: {total_runs} runs scheduled. This may take a long time.",
+            file=sys.stderr,
+        )
+
+    resume = getattr(args, "resume", False)
+
+    parallel = getattr(args, "parallel", None)
+    mode_label = f"parallel={parallel}" if parallel and parallel > 1 else "sequential"
+    print(
+        f"Sweep: {total_runs} runs ({mode_label}), measurements: {', '.join(sorted(measurements))}"
+    )
+    print(f"Output: {output_dir.resolve()}")
+
+    # Pre-compute run metadata (subdirs, overrides, etc.)
+    run_plans: list[dict[str, Any]] = []
+    for i, run_spec in enumerate(runs):
+        grid_override = run_spec.pop("_grid_override", None)
+        param_overrides = dict(all_params)
+        param_overrides.update({k: v for k, v in run_spec.items() if k in swept_params})
+        swept_vals = {k: run_spec[k] for k in swept_params if k in run_spec}
+        subdir = _run_subdir_name(swept_vals, grid_override)
+        run_dir = output_dir / subdir
+        run_plans.append(
+            {
+                "index": i,
+                "param_overrides": param_overrides,
+                "swept_vals": swept_vals,
+                "subdir": subdir,
+                "run_dir": run_dir,
+                "grid_override": grid_override,
+            }
+        )
+
+    # Dry-run: print plan and exit
+    if getattr(args, "dry_run", False):
+        print(f"\nDry run: {total_runs} runs planned")
+        print(f"  Swept: {list(swept_params.keys())}")
+        print(f"  Measurements: {', '.join(sorted(measurements))}")
+        preview = run_plans[:10]
+        for rp in preview:
+            print(f"    {rp['subdir']}: {rp['swept_vals']}")
+        if total_runs > len(preview):
+            print(f"    ... and {total_runs - len(preview)} more")
+        return 0
+
+    # Check for adaptive mode (from TOML --config)
+    adaptive_config: dict[str, Any] = getattr(args, "_adaptive_config", None) or {}
+    adaptive_param: str | None = None
+    adaptive_metric: str | None = None
+    adaptive_budget: int = 20
+    adaptive_threshold: float = 0.01
+    if adaptive_config and len(swept_params) == 1:
+        adaptive_param = next(iter(swept_params))
+        if adaptive_param in adaptive_config:
+            ac: dict[str, Any] = adaptive_config[adaptive_param]
+            adaptive_metric = getattr(args, "adaptive_metric", None) or ac.get("metric")
+            adaptive_budget = getattr(args, "adaptive_budget", None) or ac.get(
+                "max_count", 20
+            )
+            adaptive_threshold = getattr(args, "adaptive_threshold", None) or ac.get(
+                "threshold", 0.01
+            )
+        else:
+            adaptive_param = None
+
+    # Also check CLI-only adaptive (--sweep "g0=0.01:1.0:adaptive")
+    if (
+        adaptive_param is None
+        and getattr(args, "adaptive_metric", None)
+        and len(swept_params) == 1
+    ):
+        adaptive_param = next(iter(swept_params))
+        adaptive_metric = args.adaptive_metric
+        adaptive_budget = getattr(args, "adaptive_budget", 20)
+        adaptive_threshold = getattr(args, "adaptive_threshold", 0.01)
+
+    # Execute runs
+    rows: list[dict[str, Any]] = []
+    run_dirs: list[Path] = [rp["run_dir"] for rp in run_plans]
+
+    if adaptive_param is not None:
+        initial_values = swept_params[adaptive_param]
+        rows, run_dirs, swept_params = _execute_adaptive(
+            args,
+            spec_path,
+            adaptive_param,
+            initial_values,
+            adaptive_budget,
+            adaptive_metric,
+            adaptive_threshold,
+            all_params,
+            fixed_params,
+            sim_settings,
+            measurements,
+            source,
+            target,
+            threshold,
+            output_dir,
+            resume=resume,
+        )
+    elif parallel and parallel > 1:
+        rows = _execute_parallel(
+            args,
+            spec_path,
+            run_plans,
+            swept_params,
+            fixed_params,
+            sim_settings,
+            measurements,
+            source,
+            target,
+            threshold,
+            converge_sizes,
+            output_dir,
+            resume=resume,
+            n_workers=parallel,
+        )
+    else:
+        rows = _execute_sequential(
+            args,
+            spec_path,
+            run_plans,
+            swept_params,
+            fixed_params,
+            sim_settings,
+            measurements,
+            source,
+            target,
+            threshold,
+            converge_sizes,
+            output_dir,
+            resume=resume,
+        )
+
+    # Build SweepResults and save
+    results = SweepResults(
+        swept_params=swept_params,
+        fixed_params=fixed_params,
+        sim_settings=sim_settings,
+        rows=rows,
+        run_dirs=run_dirs,
+        spec_path=str(spec_path),
+        measurements=sorted(measurements),
+        source_fields=list(source) if source else None,
+        target_fields=list(target) if target else None,
+        metadata={
+            "timestamp": datetime.now(tz=UTC).isoformat(),
+            "total_runs": len(rows),
+            "sampling_strategy": (
+                "adaptive"
+                if adaptive_param
+                else sweep_strategy
+                if sweep_strategy != "grid"
+                else "grid"
+            ),
+            **_get_provenance(),
+        },
+        converge_sizes=converge_sizes,
+    )
+
+    results.save_sweep_json(output_dir / "sweep.json")
+    results.to_csv(output_dir / "results.csv")
+    results.to_json(output_dir / "results.json")
+
+    print(f"\nSweep complete: {results.n_runs} runs")
+    print(f"  results.csv:  {(output_dir / 'results.csv').resolve()}")
+    print(f"  results.json: {(output_dir / 'results.json').resolve()}")
+    print(f"  sweep.json:   {(output_dir / 'sweep.json').resolve()}")
+
+    # Convergence order estimation
+    if converge_sizes is not None and len(rows) >= 3:  # noqa: PLR2004
+        _report_convergence(rows, converge_sizes)
+
+    return 0
+
+
+def _build_row(
+    swept_vals: dict[str, float],
+    fixed_params: dict[str, float],
+    sim_settings: dict[str, Any],
+    metrics: dict[str, Any],
+    grid_override: int | None,
+) -> dict[str, Any]:
+    """Build a single results row with all columns."""
+    row: dict[str, Any] = {}
+    row.update(swept_vals)
+    row.update(fixed_params)
+    if grid_override is not None:
+        sim_settings = dict(sim_settings)
+        sim_settings["grid_shape"] = grid_override
+    row.update(sim_settings)
+    # Filter out internal keys
+    row.update({k: v for k, v in metrics.items() if not k.startswith("_")})
+    return row
+
+
+def _parse_field_list(raw: str | None) -> tuple[str, ...] | None:
+    """Parse comma-separated field names into a tuple, or None."""
+    if raw is None:
+        return None
+    return tuple(s.strip() for s in raw.split(",") if s.strip())
+
+
+def _report_convergence(  # noqa: C901
+    rows: list[dict[str, Any]],
+    sizes: list[int],
+) -> None:
+    """Estimate and print convergence order from sweep results."""
+    # Try to find a numerical metric to check convergence
+    metric_key = None
+    for key in ["max_energy_error", "P_max", "E_total_final"]:
+        if key in rows[0] and rows[0][key] is not None:
+            metric_key = key
+            break
+
+    if metric_key is None:
+        return
+
+    values = [row.get(metric_key) for row in rows]
+    if any(v is None for v in values):
+        return
+
+    vals = np.array(values, dtype=np.float64)
+    h = 1.0 / np.array(sizes, dtype=np.float64)
+
+    # Richardson extrapolation: estimate order p from consecutive triples
+    orders: list[float] = []
+    for i in range(len(vals) - 2):
+        f1, f2, f3 = vals[i], vals[i + 1], vals[i + 2]
+        h1, h2, _h3 = h[i], h[i + 1], h[i + 2]
+        if f2 not in {f1, f3} and h1 != h2:
+            # For uniform refinement ratio r = h_coarse/h_fine
+            ratio = (f1 - f2) / (f2 - f3) if (f2 - f3) != 0 else float("inf")
+            if ratio > 1:
+                r = h1 / h2
+                p = np.log(ratio) / np.log(r)
+                if 0 < p < 10:  # noqa: PLR2004
+                    orders.append(float(p))
+
+    if orders:
+        avg_order = np.mean(orders)
+        print(f"\nConvergence ({metric_key}):")
+        print(f"  Estimated order: {avg_order:.2f}")
+        for size, val in zip(sizes, vals, strict=True):
+            print(f"  N={size}: {metric_key}={val:.6e}")
+
+
+# ------------------------------------------------------------------
+# Parallel execution
+# ------------------------------------------------------------------
+
+
+def _run_single_wrapper(task: dict[str, Any]) -> dict[str, Any]:
+    """Wrap _run_single for multiprocessing Pool.map dispatch.
+
+    Must be a module-level function (picklable) for Pool.map.
+    """
+    from pathlib import Path
+
+    metrics = _run_single(
+        task["base_args"],
+        Path(task["spec_path"]),
+        task["param_overrides"],
+        Path(task["output_dir"]),
+        task["measurements"],
+        task["source"],
+        task["target"],
+        task["threshold"],
+        grid_shape_override=task.get("grid_override"),
+    )
+    return {
+        "index": task["index"],
+        "swept_vals": task["swept_vals"],
+        "subdir": task["subdir"],
+        "metrics": metrics,
+        "grid_override": task.get("grid_override"),
+    }
+
+
+# ------------------------------------------------------------------
+# CLI entry point
+# ------------------------------------------------------------------
+
+
+def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
+    """Execute the sweep command.
+
+    Parameters
+    ----------
+    args : Namespace
+        Parsed CLI arguments.
+
+    Returns
+    -------
+    int
+        Exit code.
+    """
+    # --config: load TOML and merge into args
+    config_path = getattr(args, "config", None)
+    config_swept: dict[str, list[float]] = {}
+    config_converge: list[int] | None = None
+    if config_path:
+        try:
+            from tidal.cli._sweep_config import apply_config_to_args, load_sweep_config
+
+            config = load_sweep_config(Path(config_path))
+            config_swept, config_converge = apply_config_to_args(config, args)
+        except (FileNotFoundError, ValueError) as exc:
+            print(f"Error: {exc}", file=sys.stderr)
+            return 1
+
+    spec_path = Path(args.json_path) if getattr(args, "json_path", None) else None
+    if spec_path is None:
+        print(
+            "Error: json_path is required (via positional arg or TOML spec)",
+            file=sys.stderr,
+        )
+        return 1
+    if not spec_path.exists():
+        print(f"Error: file not found: {spec_path}", file=sys.stderr)
+        return 1
+
+    if not getattr(args, "output", None):
+        print("Error: --output is required for sweep", file=sys.stderr)
+        return 1
+
+    # Parse sweep specs from CLI (these override/extend TOML)
+    swept_params: dict[str, list[float]] = dict(config_swept)
+    converge_sizes: list[int] | None = config_converge
+
+    sweep_specs: list[str] = getattr(args, "sweep", None) or []
+    converge_spec: str | None = getattr(args, "converge", None)
+
+    if converge_spec and (sweep_specs or swept_params):
+        print("Error: --sweep and --converge are mutually exclusive", file=sys.stderr)
+        return 1
+
+    try:
+        if converge_spec:
+            converge_sizes = parse_converge_spec(converge_spec)
+            swept_params = {}  # converge overrides TOML sweeps
+        elif sweep_specs:
+            for raw in sweep_specs:
+                name, values = parse_sweep_spec(raw)
+                swept_params[name] = values  # CLI overrides TOML for same param
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 1
+
+    if not swept_params and converge_sizes is None:
+        print(
+            "Error: provide --sweep, --converge, or --config with [sweep.*] sections",
+            file=sys.stderr,
+        )
+        return 1
+
+    return _run_sweep(args, swept_params, converge_sizes)

@@ -29,7 +29,7 @@ from tidal.solver._setup import (
     configure_linear_solver,
     warn_frozen_constraints,
 )
-from tidal.solver._sksundae import SundialsResult, call_cvode
+from tidal.solver._sksundae import SundialsResult, call_cvode, call_cvode_stepwise
 from tidal.solver.fields import FieldSet
 from tidal.solver.leapfrog import compute_force, compute_velocity
 from tidal.solver.state import StateLayout
@@ -40,6 +40,7 @@ if TYPE_CHECKING:
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
+    from tidal.solver.progress import SimulationProgress
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem
 
@@ -54,10 +55,14 @@ def _build_rhsfn(
     """Build the CVODE RHS closure: ``rhsfn(t, y, yp)``."""
     eq_map = spec.equation_map
     fs = FieldSet.zeros(layout, grid.shape)
+    force_buf = np.zeros(layout.total_size)
+    vel_buf = np.zeros(layout.total_size)
 
     def rhsfn(t: float, y: np.ndarray, yp: np.ndarray) -> None:
-        force = compute_force(spec, layout, grid, bc, y, t, rhs_eval, fieldset=fs)
-        velocity = compute_velocity(layout, y)
+        force = compute_force(
+            spec, layout, grid, bc, y, t, rhs_eval, out=force_buf, fieldset=fs,
+        )
+        velocity = compute_velocity(layout, y, out=vel_buf)
 
         for _si, s, _fn in layout.velocity_slot_groups:
             yp[s] = force[s]
@@ -91,6 +96,7 @@ def solve_cvode(  # noqa: PLR0913
     max_num_steps: int = 50000,
     num_snapshots: int = 101,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
+    progress: SimulationProgress | None = None,
 ) -> SolverResult:
     """Solve a TIDAL equation system using SUNDIALS/CVODE.
 
@@ -150,17 +156,26 @@ def solve_cvode(  # noqa: PLR0913
     if max_step > 0:
         options["max_step"] = max_step
 
-    configure_linear_solver(options, layout, spec, grid, bc)
+    configure_linear_solver(
+        options, layout, spec, grid, bc, parameters=parameters, solver="cvode",
+    )
 
     # Build time evaluation points
     t_eval = np.linspace(t_span[0], t_span[1], num_snapshots)
 
-    result: SundialsResult = call_cvode(rhsfn, t_eval, y0, **options)
+    if progress is not None:
+        # Step-by-step mode: progress updates between solver steps (zero overhead)
+        result: SundialsResult = call_cvode_stepwise(
+            rhsfn, t_eval, y0, progress,
+            snapshot_callback=snapshot_callback, **options,
+        )
+    else:
+        result = call_cvode(rhsfn, t_eval, y0, **options)
 
-    # Call snapshot callback at each output time
-    if snapshot_callback is not None and result.success:
-        for i in range(len(result.t)):
-            snapshot_callback(result.t[i], result.y[i])
+        # Call snapshot callback at each output time
+        if snapshot_callback is not None and result.success:
+            for i in range(len(result.t)):
+                snapshot_callback(result.t[i], result.y[i])
 
     return {
         "t": result.t,

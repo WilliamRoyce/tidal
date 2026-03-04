@@ -1,6 +1,6 @@
 # CLI Reference
 
-TIDAL provides the `tidal` command-line tool with six subcommands for the full derive-to-measure workflow.
+TIDAL provides the `tidal` command-line tool with seven subcommands for the full derive-to-measure workflow.
 **Zero additional dependencies** — uses only `argparse` and `tomllib` from the Python standard library.
 
 ## Installation
@@ -141,7 +141,158 @@ The JSON spec can be auto-discovered from `metadata.json` in the snapshot direct
 | `--json` | JSON output instead of text | — |
 | `--quiet` | Suppress progress messages | — |
 
-**Available measurement types:** `summary`, `energy`, `conversion`, `mixing`, `spectrum`, `spectral_conversion`, `dispersion`, `conservation`.
+**Available measurement types:** `summary`, `energy`, `conversion`, `mixing`, `spectrum`, `spectral_conversion`, `dispersion`, `conservation`, `effective_mass`, `asymptotic`, `peak_conversion`, `velocity`, `resonance`.
+
+### `tidal sweep` — Run parameter sweeps and convergence studies
+
+Automates running `simulate` + `measure` across a parameter grid, collecting scalar metrics into a portable CSV/JSON results table.
+
+```bash
+# 1D sweep: coupling strength
+tidal sweep examples/data/coupled_scattering.json \
+  --sweep "g0=0.1:0.9:10" \
+  --measure conversion,mixing --source phi_0 --target chi_0 \
+  --grid-shape 256 --bounds=-40:40 --periodic \
+  --ic gaussian --ic-component phi_0 --ic-center=-20 --ic-width 3 --ic-wavevector 3 \
+  --t-end 60 --output sweeps/coupling_scan
+
+# 2D sweep: coupling x mass (cartesian product)
+tidal sweep examples/data/coupled_scattering.json \
+  --sweep "g0=0.1:0.9:5" --sweep "mChi2=0.5:4.0:5" \
+  --measure conversion --source phi_0 --target chi_0 \
+  --output sweeps/mass_coupling_2d
+
+# Grid convergence study
+tidal sweep examples/data/coupled_scattering.json \
+  --converge "32,64,128,256,512" \
+  --measure conservation \
+  --output sweeps/convergence
+```
+
+**Sweep specification syntax:**
+
+| Format | Description | Example |
+| ------ | ----------- | ------- |
+| `PARAM=START:STOP:N` | N linearly-spaced values | `g0=0.1:1.0:10` |
+| `PARAM=START:STOP:N:log` | N log-spaced values | `m2=0.01:100:20:log` |
+| `PARAM=V1,V2,...` | Explicit values | `g0=0.1,0.5,0.9` |
+
+Multiple `--sweep` flags produce a cartesian product grid.
+
+**Output structure:**
+
+```text
+sweeps/coupling_scan/
+├── sweep.json          # Sweep definition + provenance
+├── results.csv         # Self-contained metrics table
+├── results.json        # Same data in JSON
+├── g0_0.100/           # Individual run output
+│   ├── metadata.json
+│   ├── times.npy
+│   ├── phi_0.npy, v_phi_0.npy, ...
+├── g0_0.200/
+│   └── ...
+```
+
+The CSV is **self-contained and portable**: every row includes all parameters (swept + fixed), simulation settings, and measured metrics so the data can be analyzed outside TIDAL.
+
+**Options:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--sweep SPEC` | Parameter sweep specification (repeatable) | — |
+| `--converge SIZES` | Grid sizes for convergence study | — |
+| `--config PATH` | TOML sweep configuration file | — |
+| `--measure TYPES` | Measurement types (comma-separated) | summary |
+| `--source FIELDS` | Source field(s) for conversion measurements | — |
+| `--target FIELDS` | Target field(s) for conversion measurements | — |
+| `--resume` | Skip completed runs (checks for metadata.json) | — |
+| `--parallel N` | Number of parallel workers | 1 |
+| `--adaptive-metric M` | Metric driving adaptive refinement | — |
+| `--adaptive-budget N` | Max total points for adaptive sampling | 20 |
+| `--adaptive-initial N` | Initial coarse grid points | 5 |
+| `--adaptive-threshold T` | Stop when max interval score < T | 0.01 |
+| `--dry-run` | Print sweep plan without executing | — |
+| `--force-large-sweep` | Allow sweeps with > 10,000 runs | — |
+
+All `tidal simulate` flags (`--param`, `--grid-shape`, `--bounds`, `--ic`, etc.) are passed through unchanged.
+
+**TOML configuration** — use `--config` for reproducible, version-controlled sweep definitions:
+
+```bash
+tidal sweep --config examples/coupled_scattering/sweep_coupling.toml
+```
+
+CLI flags override TOML values, so `--config sweep.toml --param g0=0.3` uses TOML for everything except g0. See `examples/coupled_scattering/sweep_advanced.toml` for the full TOML schema.
+
+**Adaptive sampling** — automatically refines near sharp features:
+
+```bash
+tidal sweep spec.json --sweep "g0=0.01:0.9:5" \
+  --adaptive-metric P_max --adaptive-budget 20 --adaptive-threshold 0.01 \
+  --measure conversion --source phi_0 --target chi_0
+```
+
+Or via TOML:
+
+```toml
+[sweep.g0]
+start = 0.01
+stop = 0.9
+scale = "adaptive"
+initial_count = 5
+max_count = 20
+metric = "P_max"
+threshold = 0.01
+```
+
+**Visualizing sweep results** — use `tidal plot`:
+
+```bash
+# 1D sweep → line plot
+tidal plot sweeps/coupling_scan/ --type sweep --metric P_max
+
+# 2D sweep → heatmap
+tidal plot sweeps/mass_coupling_2d/ --type sweep --metric P_max
+
+# Multi-metric subplots
+tidal plot sweeps/coupling_scan/ --type sweep --metric P_max,L_mix
+
+# Overlay timeseries from each run
+tidal plot sweeps/coupling_scan/ --type sweep-compare --metric conversion
+
+# Convergence → log-log with fitted order
+tidal plot sweeps/convergence/ --type convergence --metric max_energy_error
+
+# Parallel coordinates (multi-parameter exploration)
+tidal plot sweeps/output/ --type sweep-parallel --metric P_max
+
+# Tornado chart (parameter importance ranking)
+tidal plot sweeps/output/ --type sweep-tornado --metric P_max
+
+# Scatter matrix (pairwise parameter relationships)
+tidal plot sweeps/output/ --type sweep-scatter --metric P_max
+```
+
+### `tidal analyze` — Sensitivity analysis on sweep results
+
+Post-hoc sensitivity analysis on completed parameter sweeps. Determines which parameters most influence a given metric.
+
+```bash
+# Sobol global sensitivity indices (requires SALib package)
+tidal analyze sweeps/output/ --sensitivity sobol --metric P_max --bootstrap 100
+
+# Morris screening (simpler, no extra dependencies)
+tidal analyze sweeps/output/ --sensitivity morris --metric P_max
+```
+
+**Options:**
+
+| Flag | Description | Default |
+|------|-------------|---------|
+| `--sensitivity METHOD` | Analysis method: `sobol` or `morris` | — |
+| `--metric METRIC` | Which metric to analyze | (auto-detect) |
+| `--bootstrap N` | Bootstrap samples for Sobol confidence intervals | 100 |
 
 ## TOML Configuration (`theory.toml`)
 
@@ -241,13 +392,19 @@ tidal inspect examples/data/klein_gordon_1d.json
 tidal simulate examples/data/klein_gordon_1d.json --t-end 20 --ic gaussian
 ```
 
-### Parameter sweep without re-deriving
+### Parameter sweep
 
 ```bash
-# Same JSON, different parameters
+# Automated sweep (recommended)
+tidal sweep examples/data/coupled_scalars.json \
+    --sweep "mPhi2=0.5:4.0:8" \
+    --measure conversion --source phi_0 --target chi_0 \
+    --output sweeps/mass_scan
+
+# Or manually with a shell loop
 for m2 in 0.5 1.0 2.0 4.0; do
     tidal simulate examples/data/coupled_scalars.json \
-        --param m_phi2=$m2 --output "sweep_m2_${m2}.png"
+        --param mPhi2=$m2 --output "sweep_m2_${m2}.png"
 done
 ```
 

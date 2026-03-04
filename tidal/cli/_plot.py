@@ -6,6 +6,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from tidal.cli._panels import single_field
+
 if TYPE_CHECKING:
     from pathlib import Path
 
@@ -46,7 +48,7 @@ def _plot_1d(path: Path, sd: SimulationData, gi: GridInfo) -> None:
     import matplotlib.pyplot as plt
 
     fig, axes = plt.subplots(1, 2, figsize=(12, 5))
-    name = sd.spec.component_names[0]
+    name = single_field(sd, None)
     field_hist = sd.fields[name]  # (n_snapshots, n_x)
     x = gi.axes_coords(0)
     times = sd.times
@@ -86,7 +88,7 @@ def _plot_2d(path: Path, sd: SimulationData, gi: GridInfo) -> None:
     import matplotlib.pyplot as plt
 
     fig, axes = plt.subplots(1, 3, figsize=(16, 5))
-    name = sd.spec.component_names[0]
+    name = single_field(sd, None)
     field_hist = sd.fields[name]  # (n_snapshots, nx, ny)
     times = sd.times
     bounds = gi.bounds
@@ -170,7 +172,7 @@ def _plot_3d(path: Path, sd: SimulationData, gi: GridInfo) -> None:
     """3D: z-profile + x-y slice + amplitude decay + component check."""
     import matplotlib.pyplot as plt
 
-    name = sd.spec.component_names[0]
+    name = single_field(sd, None)
     field_hist = sd.fields[name]  # (n_snapshots, nx, ny, nz)
     times = sd.times
     bounds = gi.bounds
@@ -196,21 +198,22 @@ def _plot_3d(path: Path, sd: SimulationData, gi: GridInfo) -> None:
     ax.legend(fontsize=8)
     ax.grid(visible=True, alpha=0.3)
 
-    # Panel 2: x-y slice at z=center (initial)
+    # Panel 2: z-t spacetime heatmap at x=y=center
     ax = axes[1]
-    init_slice = field_hist[0, :, :, ic]
-    vmax = max(float(np.max(np.abs(init_slice))), VMAX_FLOOR)
+    zt_slice = field_hist[:, ic, ic, :]  # (n_snapshots, nz)
+    vmax = max(float(np.max(np.abs(zt_slice))), VMAX_FLOOR)
     ax.imshow(
-        init_slice.T,
+        zt_slice.T,
+        aspect="auto",
         origin="lower",
-        extent=(bounds[0][0], bounds[0][1], bounds[1][0], bounds[1][1]),
+        extent=(float(times[0]), float(times[-1]), bounds[2][0], bounds[2][1]),
         cmap="RdBu_r",
         vmin=-vmax,
         vmax=vmax,
     )
-    ax.set_title(f"{name} x-y (t=0, z=center)")
-    ax.set_xlabel("x")
-    ax.set_ylabel("y")
+    ax.set_title(f"{name} z-t (x=y=center)")
+    ax.set_xlabel("Time")
+    ax.set_ylabel("z")
 
     # Panel 3: vectorized amplitude decay
     ax = axes[2]

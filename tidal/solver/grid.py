@@ -159,7 +159,7 @@ class GridInfo:
             return self.bc
         return tuple("periodic" if p else "neumann" for p in self.periodic)
 
-    @property
+    @cached_property
     def dx(self) -> tuple[float, ...]:
         """Grid spacing per axis (cell-centred: dx = (hi - lo) / N)."""
         return tuple(

@@ -1,0 +1,54 @@
+# Coupled Scattering — Sweep coupling strength g0
+#
+# Gertsenshtein-effect analogue: sweeps the coupling constant from weak
+# to strong coupling.  A phi wave packet (Gaussian envelope, carrier k=3)
+# starts at z=-20 and scatters through the localized coupling
+# G(z) = g0 * exp(-z^2/(2R^2)) centered at the origin.  Measures conversion
+# probability, mixing length, conservation, and directional scattering
+# (asymptotic) at each point.
+#
+# Expected physics:
+#   - P_max increases monotonically with g0
+#   - P_transmitted (forward conversion) dominates over P_reflected
+#   - Stability limit: g0 < sqrt(mPhi2 * mChi2) = 1.0
+#
+# Usage:
+#   tidal sweep --config examples/coupled_scattering/sweep_coupling.toml
+#
+# Requires: pre-derived JSON spec at examples/data/coupled_scattering.json
+#   (run `tidal derive examples/coupled_scattering/theory.toml` first)
+
+spec = "../data/coupled_scattering.json"
+
+[parameters]
+mPhi2 = 1.0
+mChi2 = 1.0
+R = 5.0
+
+[sweep.g0]
+start = 0.01
+stop = 0.9
+count = 10
+scale = "log"
+
+[simulation]
+grid_shape = 256
+bounds = [-40, 40]
+periodic = true
+ic = "gaussian"
+ic_component = "phi_0"
+ic_center = -20.0
+ic_width = 3.0
+ic_wavevector = 3
+t_end = 60.0
+
+[measurement]
+types = ["conversion", "mixing", "conservation", "asymptotic"]
+source = "phi_0"
+target = "chi_0"
+
+[output]
+path = "../data/sweep_coupling_toml"
+
+[execution]
+parallel = 4

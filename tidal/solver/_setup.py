@@ -54,20 +54,43 @@ def build_rhs_evaluator(
     return _RHSEvaluator(spec, grid, coeff_eval, bc=bc)
 
 
-def configure_linear_solver(
+def configure_linear_solver(  # noqa: PLR0913
     options: dict[str, Any],
     layout: StateLayout,
     spec: EquationSystem,
     grid: GridInfo,
     bc: BCSpec | None,
+    *,
+    parameters: dict[str, float] | None = None,
+    solver: str = "ida",
 ) -> None:
     """Choose and configure the linear solver based on system size.
 
     Mutates *options* in-place, adding ``linsolver`` (and ``sparsity``
-    for the sparse tier).
+    for the sparse tier, or ``jacfn``/``jactimes`` for constant-coefficient
+    systems with an analytical Jacobian).
+
+    Parameters
+    ----------
+    parameters : dict[str, float] or None
+        Runtime parameter overrides.  Passes ``{}`` when ``None`` to allow
+        constant-coefficient detection without explicit overrides.
+    solver : str
+        ``"ida"`` or ``"cvode"``.  Controls the analytical Jacobian callback
+        signature (IDA uses 6-arg ``jacfn`` with ``cj``; CVODE uses 4-arg).
     """
     from tidal.solver._types import DENSE_THRESHOLD, SPARSE_THRESHOLD  # noqa: PLC0415
+    from tidal.solver.analytical_jacobian import (  # noqa: PLC0415
+        try_analytical_jacobian,
+    )
 
+    # Analytical Jacobian for constant-coefficient systems
+    if try_analytical_jacobian(
+        options, spec, layout, grid, bc, parameters or {}, solver=solver,
+    ):
+        return
+
+    # Existing tier system for non-constant systems
     n_state = layout.total_size
     if n_state <= DENSE_THRESHOLD:
         options["linsolver"] = "dense"

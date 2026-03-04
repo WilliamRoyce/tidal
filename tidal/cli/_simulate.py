@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -790,6 +790,195 @@ def _file_slots(
     raise ValueError(msg)
 
 
+class ResumeState:  # noqa: B903
+    """Checkpoint state loaded from a snapshot directory for simulation resume."""
+
+    __slots__ = (
+        "bc_types",
+        "dt",
+        "grid_bounds",
+        "grid_shape",
+        "parameters",
+        "periodic",
+        "snapshot_index",
+        "t_start",
+        "y0",
+    )
+
+    def __init__(  # noqa: PLR0913
+        self,
+        *,
+        y0: np.ndarray,
+        t_start: float,
+        parameters: dict[str, float],
+        grid_shape: tuple[int, ...],
+        grid_bounds: tuple[tuple[float, float], ...],
+        periodic: tuple[bool, ...],
+        bc_types: tuple[str, ...] | None,
+        dt: float | None,
+        snapshot_index: int,
+    ) -> None:
+        self.y0 = y0
+        self.t_start = t_start
+        self.parameters = parameters
+        self.grid_shape = grid_shape
+        self.grid_bounds = grid_bounds
+        self.periodic = periodic
+        self.bc_types = bc_types
+        self.dt = dt
+        self.snapshot_index = snapshot_index
+
+
+def _load_resume_state(  # noqa: PLR0914
+    resume_dir: Path,
+    spec: EquationSystem,
+    snapshot_index: int | None = None,
+) -> ResumeState:
+    """Load checkpoint state from a snapshot directory for resume.
+
+    Parameters
+    ----------
+    resume_dir : Path
+        Path to a simulation output directory (containing metadata.json,
+        times.npy, and per-field .npy files).
+    spec : EquationSystem
+        Equation system specification (used to build StateLayout and
+        validate field compatibility).
+    snapshot_index : int | None
+        Which snapshot to load (0-based). ``None`` loads the last snapshot.
+
+    Returns
+    -------
+    ResumeState
+        Checkpoint state ready for solver initialization.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the resume directory or required files are missing.
+    ValueError
+        If field names don't match or snapshot index is out of range.
+    """
+    import json
+
+    from tidal.solver.fields import FieldSet
+    from tidal.solver.state import StateLayout
+
+    # 1. Load metadata
+    meta_path = resume_dir / "metadata.json"
+    if not meta_path.exists():
+        msg = f"Resume directory missing metadata.json: {resume_dir}"
+        raise FileNotFoundError(msg)
+
+    with meta_path.open(encoding="utf-8") as f:
+        meta = json.load(f)
+
+    saved_fields: list[str] = meta.get("fields", [])
+    grid_shape = tuple(meta.get("grid_shape", []))
+    grid_bounds = tuple(
+        tuple(b) for b in meta.get("grid_bounds", [])
+    )
+    periodic = tuple(meta.get("periodic", []))
+    bc_types_raw = meta.get("bc_types")
+    bc_types = tuple(bc_types_raw) if bc_types_raw is not None else None
+    parameters: dict[str, float] = meta.get("parameters", {})
+    dt = meta.get("dt")
+
+    # 2. Validate field compatibility
+    spec_fields = set(spec.component_names)
+    saved_field_set = set(saved_fields)
+    missing = spec_fields - saved_field_set
+    if missing:
+        msg = (
+            f"Checkpoint missing fields required by spec: {sorted(missing)}. "
+            f"Saved fields: {sorted(saved_field_set)}"
+        )
+        raise ValueError(msg)
+
+    # 3. Load times and determine snapshot index
+    times_path = resume_dir / "times.npy"
+    if not times_path.exists():
+        msg = f"Resume directory missing times.npy: {resume_dir}"
+        raise FileNotFoundError(msg)
+
+    times = np.load(times_path)
+    n_snapshots = len(times)
+
+    if snapshot_index is None:
+        snapshot_index = n_snapshots - 1
+    elif snapshot_index < 0 or snapshot_index >= n_snapshots:
+        msg = (
+            f"Snapshot index {snapshot_index} out of range "
+            f"(0..{n_snapshots - 1})"
+        )
+        raise ValueError(msg)
+
+    t_start = float(times[snapshot_index])
+
+    # 4. Load field and velocity data at the chosen snapshot
+    layout = StateLayout.from_spec(spec, int(np.prod(grid_shape)))
+    slot_data: dict[str, np.ndarray] = {}
+
+    for slot in layout.slots:
+        npy_file = resume_dir / f"{slot.name}.npy"
+        if npy_file.exists():
+            arr = np.load(npy_file)
+            # Extract specific snapshot if multi-snapshot
+            if arr.ndim > len(grid_shape):
+                arr = arr[snapshot_index]
+            slot_data[slot.name] = arr
+        elif slot.kind in {"field", "velocity"}:
+            import warnings
+
+            warnings.warn(
+                f"Resume: '{slot.name}' not found in checkpoint "
+                f"({resume_dir}) — defaulting to zero",
+                stacklevel=2,
+            )
+
+    # 5. Pack into flat state vector
+    y0 = FieldSet.from_dict(layout, grid_shape, slot_data).flat.copy()
+
+    return ResumeState(
+        y0=y0,
+        t_start=t_start,
+        parameters=parameters,
+        grid_shape=grid_shape,
+        grid_bounds=grid_bounds,
+        periodic=periodic,
+        bc_types=bc_types,
+        dt=dt,
+        snapshot_index=snapshot_index,
+    )
+
+
+def _validate_resume_grid(resume: ResumeState, grid_info: GridInfo) -> None:
+    """Validate that the resume checkpoint is compatible with the current grid.
+
+    Raises
+    ------
+    ValueError
+        If grid shape or bounds don't match.
+    """
+    if resume.grid_shape != grid_info.shape:
+        msg = (
+            f"Grid shape mismatch: checkpoint has {resume.grid_shape} "
+            f"but current grid is {grid_info.shape}"
+        )
+        raise ValueError(msg)
+    # Compare bounds with tolerance for float rounding
+    bounds_tol = 1e-10
+    for i, (saved, current) in enumerate(
+        zip(resume.grid_bounds, grid_info.bounds, strict=True)
+    ):
+        if abs(saved[0] - current[0]) > bounds_tol or abs(saved[1] - current[1]) > bounds_tol:
+            msg = (
+                f"Grid bounds mismatch on axis {i}: "
+                f"checkpoint has {saved} but current grid is {current}"
+            )
+            raise ValueError(msg)
+
+
 def _noise_slots(
     args: Namespace,
     grid_info: GridInfo,
@@ -979,6 +1168,11 @@ def _generate_output(
     if fmt in {"summary", "directory"}:
         if sim_data.n_snapshots > 0:
             _print_summary(sim_data)
+        if fmt == "directory" and args.output:
+            from tidal.cli._plot import save_plot
+
+            overview = Path(args.output) / "overview.png"
+            save_plot(overview, sim_data, grid_info)
         return
 
     _print_summary(sim_data)
@@ -1133,6 +1327,7 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
     params: dict[str, float],
     snapshot_interval: float,
     dt: float | None = None,
+    num_snapshots: int | None = None,
 ) -> tuple[SnapshotWriter, Callable[..., None]]:
     """Set up disk-backed SnapshotWriter using StateLayout (no py-pde).
 
@@ -1145,7 +1340,7 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
 
     layout = StateLayout.from_spec(spec, grid_info.num_points)
     output_dir = Path(args.output) if args.output else Path("output")
-    n_snaps = compute_snapshot_count(args.t_end, snapshot_interval)
+    n_snaps = num_snapshots or compute_snapshot_count(args.t_end, snapshot_interval)
 
     field_names = [s.name for s in layout.slots if s.kind != "velocity"]
     velocity_names = [s.field_name for s in layout.slots if s.kind == "velocity"]
@@ -1437,13 +1632,49 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # 2. BC (stored in GridInfo, derive tuple for solver calls)
     bc = grid_info.effective_bc
 
-    # 3. Initial conditions
-    y0 = _build_initial_y0(args, spec, grid_info, bounds)
-    ic_desc = f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}"
-    ic_field_list: list[str] = getattr(args, "ic_field", None) or []
-    if ic_field_list:
-        ic_desc += f" + {len(ic_field_list)} field override(s)"
-    log(ic_desc)
+    # 3. Initial conditions (or resume from checkpoint)
+    resume_state: ResumeState | None = None
+    t_start = 0.0
+
+    resume_path = getattr(args, "resume", None)
+    # Distinguish from sweep's boolean --resume (which means "resume sweep")
+    if isinstance(resume_path, str):
+        resume_state = _load_resume_state(
+            Path(resume_path), spec, getattr(args, "snapshot", None)
+        )
+        _validate_resume_grid(resume_state, grid_info)
+        y0 = resume_state.y0
+        t_start = resume_state.t_start
+        log(
+            f"  IC: resume from {resume_path} "
+            f"(snapshot {resume_state.snapshot_index}, t={t_start:.4f})"
+        )
+    else:
+        y0 = _build_initial_y0(args, spec, grid_info, bounds)
+        ic_desc = f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}"
+        ic_field_list: list[str] = getattr(args, "ic_field", None) or []
+        if ic_field_list:
+            ic_desc += f" + {len(ic_field_list)} field override(s)"
+        log(ic_desc)
+
+    # Handle --t-additional (only with --resume)
+    if getattr(args, "t_additional", None) is not None:
+        if resume_state is None:
+            print(
+                "Warning: --t-additional without --resume; ignored",
+                file=sys.stderr,
+            )
+        else:
+            args.t_end = t_start + args.t_additional
+
+    # Validate t_end > t_start for resumed simulations
+    if resume_state is not None and args.t_end <= t_start:
+        print(
+            f"Error: --t-end ({args.t_end}) must be greater than "
+            f"checkpoint time ({t_start})",
+            file=sys.stderr,
+        )
+        return 1
 
     # 4. Diagnostics
     _validate_solver_params(args)
@@ -1470,8 +1701,9 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     # 6. Snapshot configuration — clamp interval to dt for leapfrog,
     # since the solver can't save more often than once per timestep.
+    duration = args.t_end - t_start
     snapshot_interval = (
-        args.snapshots if args.snapshots is not None else args.t_end / 100.0
+        args.snapshots if args.snapshots is not None else duration / 100.0
     )
     if dt is not None and snapshot_interval < dt:
         log(
@@ -1480,7 +1712,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         )
         snapshot_interval = dt
 
-    num_snapshots = max(int(args.t_end / snapshot_interval) + 1, 2)
+    num_snapshots = max(int(duration / snapshot_interval) + 1, 2)
 
     # 7. Disk writer (if directory output)
     fmt = _infer_output_format(args)
@@ -1495,28 +1727,48 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
             params,
             snapshot_interval,
             dt=dt,
+            num_snapshots=num_snapshots,
         )
 
-    # 8. Solve
+    # 8. Progress bar (suppressed by --quiet and non-TTY stderr)
+    from tidal.solver.progress import SimulationProgress
+
+    progress: SimulationProgress | None = None
+    if not args.quiet:
+        solver_labels = {
+            "ida": "IDA", "cvode": "CVODE",
+            "scipy": "scipy", "leapfrog": "leapfrog",
+        }
+        progress = SimulationProgress(
+            t_start, args.t_end,
+            solver_name=solver_labels.get(scheme, scheme),
+        )
+
+    # 9. Solve
     if scheme == "ida":
         from tidal.solver.ida import solve_ida
 
         log(
-            f"Running IDA solver (t=0 → {args.t_end}, {num_snapshots} snapshots, "
+            f"Running IDA solver (t={t_start} → {args.t_end}, {num_snapshots} snapshots, "
             f"rtol={args.rtol:.0e}, atol={args.atol:.0e})..."
         )
+        # Skip constraint IC solving when resuming (state already consistent)
+        allow_inconsistent = getattr(args, "allow_inconsistent_ic", False)
+        if resume_state is not None:
+            allow_inconsistent = True
         result = solve_ida(
             spec,
             grid_info,
             y0,
-            t_span=(0.0, args.t_end),
+            t_span=(t_start, args.t_end),
             bc=bc,
             parameters=params,
             num_snapshots=num_snapshots,
             rtol=args.rtol,
             atol=args.atol,
             snapshot_callback=snapshot_cb,
-            allow_inconsistent_ic=getattr(args, "allow_inconsistent_ic", False),
+            allow_inconsistent_ic=allow_inconsistent,
+            progress=progress,
         )
     elif scheme == "cvode":
         from tidal.solver.cvode import solve_cvode
@@ -1524,14 +1776,14 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         method = args.method or "BDF"
         max_step = args.max_step or 0.0
         log(
-            f"Running CVODE solver ({method}, t=0 → {args.t_end}, "
+            f"Running CVODE solver ({method}, t={t_start} → {args.t_end}, "
             f"rtol={args.rtol:.0e}, atol={args.atol:.0e})..."
         )
         result = solve_cvode(
             spec,
             grid_info,
             y0,
-            t_span=(0.0, args.t_end),
+            t_span=(t_start, args.t_end),
             bc=bc,
             parameters=params,
             method=method,
@@ -1540,6 +1792,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
             max_step=max_step,
             num_snapshots=num_snapshots,
             snapshot_callback=snapshot_cb,
+            progress=progress,
         )
     elif scheme == "scipy":
         from tidal.solver.scipy_solver import solve_scipy
@@ -1548,14 +1801,14 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         cfl_dt = _compute_cfl_dt(spec, grid_info, params)
         max_step = args.max_step if args.max_step is not None else cfl_dt
         log(
-            f"Running scipy solver ({method}, t=0 → {args.t_end}, "
+            f"Running scipy solver ({method}, t={t_start} → {args.t_end}, "
             f"rtol={args.rtol:.0e}, atol={args.atol:.0e})..."
         )
         result = solve_scipy(
             spec,
             grid_info,
             y0,
-            t_span=(0.0, args.t_end),
+            t_span=(t_start, args.t_end),
             bc=bc,
             parameters=params,
             method=method,
@@ -1564,22 +1817,24 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
             max_step=max_step,
             num_snapshots=num_snapshots,
             snapshot_callback=snapshot_cb,
+            progress=progress,
         )
     else:  # leapfrog
         from tidal.solver.leapfrog import solve_leapfrog
 
         assert dt is not None  # computed in step 5
-        log(f"Running leapfrog solver (t=0 → {args.t_end}, dt={dt:.4f})...")
+        log(f"Running leapfrog solver (t={t_start} → {args.t_end}, dt={dt:.4f})...")
         result = solve_leapfrog(
             spec,
             grid_info,
             y0,
-            t_span=(0.0, args.t_end),
+            t_span=(t_start, args.t_end),
             dt=dt,
             bc=bc,
             parameters=params,
             snapshot_interval=snapshot_interval,
             snapshot_callback=snapshot_cb,
+            progress=progress,
         )
 
     if not result["success"]:
@@ -1640,7 +1895,7 @@ def _validate_solver_params(args: Namespace) -> None:
         raise ValueError(msg)
 
 
-def simulate_command(args: Namespace) -> int:
+def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
     """Execute the simulate command.
 
     Parameters
@@ -1673,8 +1928,55 @@ def simulate_command(args: Namespace) -> int:
         f"  {spec.n_components} component(s), {spec.dimension}D ({spec.spatial_dimension}+1D)"
     )
 
-    # Step 2: Parse parameters
+    # Step 2: Validate resume args and inherit config from checkpoint
+    resume_dir: Path | None = None
+    resume_meta: dict[str, Any] | None = None
+    if args.resume is not None:
+        import json as _json
+
+        resume_dir = Path(args.resume)
+        if not resume_dir.is_dir():
+            print(f"Error: resume directory not found: {resume_dir}", file=sys.stderr)
+            return 1
+
+        # --resume and --ic are mutually exclusive.  argparse default is
+        # "gaussian", so a non-gaussian value means the user explicitly set --ic.
+        if args.ic != "gaussian":
+            print(
+                "Error: --resume and --ic cannot be used together", file=sys.stderr
+            )
+            return 1
+
+        meta_path = resume_dir / "metadata.json"
+        if meta_path.exists():
+            with meta_path.open(encoding="utf-8") as f:
+                resume_meta = _json.load(f)
+
+            # Inherit grid config if not explicitly provided
+            meta: dict[str, Any] = resume_meta  # type: ignore[assignment]
+            if args.grid_shape is None:
+                grid_shape = cast("list[int]", meta["grid_shape"])
+                args.grid_shape = ",".join(str(s) for s in grid_shape)
+            if args.bounds is None:
+                grid_bounds = cast("list[list[float]]", meta["grid_bounds"])
+                args.bounds = ",".join(
+                    f"{b[0]}:{b[1]}" for b in grid_bounds
+                )
+            if args.bc is None and "bc_types" in meta:
+                bc_types = cast("list[str]", meta["bc_types"])
+                args.bc = ",".join(bc_types)
+            log(f"  Resuming from: {resume_dir}")
+
+    if args.snapshot is not None and args.resume is None:
+        print("Error: --snapshot requires --resume", file=sys.stderr)
+        return 1
+
+    # Step 3: Parse parameters (merge with checkpoint metadata if resuming)
     params = _parse_params(args.param, spec)
+    if resume_meta is not None:
+        saved_params: dict[str, float] = resume_meta.get("parameters", {})  # type: ignore[assignment]
+        # Saved params as defaults, CLI --param overrides
+        params = {**saved_params, **params}
     if params:
         log(f"  Parameters: {params}")
 

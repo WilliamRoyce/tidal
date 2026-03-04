@@ -17,7 +17,7 @@
 #   tidal derive theory.toml
 #   tidal inspect ../data/em_3d.json
 #   tidal simulate ../data/em_3d.json --ic plane-wave --ic-component A_2 \
-#     --grid-shape 64 --bounds 0:50 --periodic --t-end 25.0 \
+#     --grid-shape 32 --bounds 0:50 --periodic --t-end 25.0 \
 #     --output ../data/em_output
 #   tidal plot ../data/em_output --type snapshot --field A_2 --time-index -1 --quiet
 #   tidal plot ../data/em_output --type amplitude --quiet
@@ -34,7 +34,7 @@ tidal inspect ../data/em_3d.json
 # Run simulation (plane wave in A_2 — transverse polarization for x-propagation)
 # A_0 is a constraint (time_order=0), A_1 and A_2 are dynamical
 tidal simulate ../data/em_3d.json \
-  --grid-shape 64 \
+  --grid-shape 32 \
   --bounds 0:50 \
   --periodic \
   --ic plane-wave \

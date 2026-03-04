@@ -439,7 +439,12 @@ class TestPointwiseMassStability:
         assert result.errors == []
 
     def test_constraint_equation_no_false_positive(self) -> None:
-        """Constraint field (time_order=0) should not cause spurious warnings."""
+        """Constraint with positive identity coeff should not trigger warning.
+
+        Reproduces the coupled_proca pattern: constraint A_0 has mass term
+        with positive coefficient (+mA2), which would produce a negative
+        eigenvalue if included in the stability matrix.
+        """
         data: dict[str, Any] = {
             "spacetime": {"dimension": 3, "signature": [-1, 1, 1]},
             "fields": [
@@ -453,6 +458,11 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "A_0",
+                            },
                             {
                                 "coefficient": 1.0,
                                 "operator": "laplacian",
@@ -485,8 +495,128 @@ class TestPointwiseMassStability:
         )
         coeff_eval = CoefficientEvaluator(spec, grid, {})
         result = check_pointwise_mass_stability(coeff_eval, spec, grid)
-        # A_0 has no identity term; A_1 has positive mass. Should pass.
         assert result.errors == []
+
+    def test_coupled_vector_constraint_no_false_positive(self) -> None:
+        """Coupled Proca pattern: 6 fields, 2 constraints, should be stable.
+
+        The 6x6 full mass matrix has negative eigenvalues from the constraint
+        block, but the dynamical 4x4 submatrix is positive-definite.
+        """
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 3, "signature": [-1, 1, 1]},
+            "fields": [
+                {"name": "A_0", "index": 0},
+                {"name": "A_1", "index": 1},
+                {"name": "A_2", "index": 2},
+                {"name": "B_0", "index": 3},
+                {"name": "B_1", "index": 4},
+                {"name": "B_2", "index": 5},
+            ],
+            "equations": [
+                {
+                    "field": "A_0",
+                    "lhs": {"expression": "0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "identity", "field": "A_0"},
+                            {"coefficient": -0.5, "operator": "identity", "field": "B_0"},
+                        ],
+                    },
+                },
+                {
+                    "field": "A_1",
+                    "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": -1.0, "operator": "identity", "field": "A_1"},
+                            {"coefficient": 0.5, "operator": "identity", "field": "B_1"},
+                        ],
+                    },
+                },
+                {
+                    "field": "A_2",
+                    "lhs": {"expression": "d2_t(A_2)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": -1.0, "operator": "identity", "field": "A_2"},
+                            {"coefficient": 0.5, "operator": "identity", "field": "B_2"},
+                        ],
+                    },
+                },
+                {
+                    "field": "B_0",
+                    "lhs": {"expression": "0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": -0.5, "operator": "identity", "field": "A_0"},
+                            {"coefficient": 2.0, "operator": "identity", "field": "B_0"},
+                        ],
+                    },
+                },
+                {
+                    "field": "B_1",
+                    "lhs": {"expression": "d2_t(B_1)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 0.5, "operator": "identity", "field": "A_1"},
+                            {"coefficient": -2.0, "operator": "identity", "field": "B_1"},
+                        ],
+                    },
+                },
+                {
+                    "field": "B_2",
+                    "lhs": {"expression": "d2_t(B_2)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 0.5, "operator": "identity", "field": "A_2"},
+                            {"coefficient": -2.0, "operator": "identity", "field": "B_2"},
+                        ],
+                    },
+                },
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10)),
+            shape=(4, 4),
+            periodic=(True, True),
+        )
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        # Dynamical 4x4 block eigenvalues: 0.793, 0.793, 2.207, 2.207
+        assert result.errors == []
+
+    def test_all_constraints_returns_early(self) -> None:
+        """Spec with only constraint equations should return empty result."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "A_0", "index": 0}],
+            "equations": [
+                {
+                    "field": "A_0",
+                    "lhs": {"expression": "0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "identity", "field": "A_0"},
+                        ],
+                    },
+                },
+            ],
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {})
+        result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+        assert result.errors == []
+        assert result.notes == []
 
     def test_asymmetric_stable_no_instability_error(self) -> None:
         """Asymmetric but stable coupling: note emitted, no error."""

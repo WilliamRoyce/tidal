@@ -28,15 +28,17 @@ tidal inspect ../data/chern_simons_3d.json
 
 # Run simulation (Gaussian pulse in A_1 component)
 # A_0 is a constraint (time_order=0), A_1 and A_2 are dynamical
+# Grid 16×16 = 1,280 unknowns (dense tier with analytical Jacobian)
 tidal simulate ../data/chern_simons_3d.json \
   --param kappa=0.5 \
-  --grid-shape 64 \
+  --grid-shape 16 \
   --bounds 0:50 \
   --periodic \
   --ic gaussian \
   --ic-component A_1 \
   --ic-width 5.0 \
-  --t-end 10.0 \
+  --t-end 5.0 \
+  --snapshots 0.5 \
   --output ../data/chern_simons_output
 
 # Visualize results — initial and final snapshots for each field

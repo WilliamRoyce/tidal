@@ -1203,22 +1203,25 @@ def _wls_linearize_from_lagrangian(
 
     Single-path approach using xPert's 2nd-order perturbation:
 
-    1. ``Perturbation[L, 2] / 2`` → L^(2) (quadratic Lagrangian).
-       xPert correctly perturbs all metric-dependent objects (Christoffels,
-       Ricci tensor, etc.) *before* evaluating on the flat background, so
-       L^(2) retains the full linearized Einstein tensor contribution even
-       though R₀ = 0 on Minkowski.
+    1. Multiply Lagrangian by ``√(-g)`` to form the action density, then
+       perturb to second order: ``δ²(√|g| L)``.  xPert natively handles
+       ``Perturbation[Sqrt[-Detg[]], n]`` via the metric determinant symbol
+       created by ``DefMetric``.  After expansion, divide out the background
+       ``√|g₀|`` (covariantly constant for Levi-Civita connection).
 
-    2. Expand ``Scalar[x]^n`` → ``∏ Scalar[RenameDummies[x]]`` so that VarD
+    2. ``L^(2) = δ²(√|g| L) / (2 √|g₀|)`` → quadratic Lagrangian.
+
+    3. Expand ``Scalar[x]^n`` → ``∏ Scalar[RenameDummies[x]]`` so that VarD
        can vary through each copy independently (fixes the index-collision
        problem from Fierz-Pauli trace-squared terms).
 
-    3. ``VarD[H[-a,-b], CD][L^(2)]`` → correct linearized EOM.
+    4. ``VarD[H[-a,-b], CD][L^(2)]`` → correct linearized EOM.
 
-    4. Same L^(2) serves the canonical pipeline (momenta π, Hamiltonian H).
+    5. Same L^(2) serves the canonical pipeline (momenta π, Hamiltonian H).
 
-    Valid for flat Minkowski background where ``√(-g₀) = 1`` and ``L₀ = 0``
-    (Brizuela, Martín-García, Mena Marugán 2009; Carroll 2004, Ch. 7).
+    Works for any background metric.  For flat Minkowski ``√|g₀| = 1`` and
+    the volume element factor is trivial.  For curved backgrounds, xPert
+    correctly captures all ``δ(√|g|)`` contributions.
 
     Raises
     ------
@@ -1241,15 +1244,16 @@ def _wls_linearize_from_lagrangian(
     ricci_scalar_sym = f"RicciScalar{ctx.cd}"
 
     p = ctx.prefix
+    det_sym = f"Det{ctx.metric}"
 
     # ------------------------------------------------------------------
-    # Step 1: L^(2) = Perturbation[L, 2] / 2 via xPert
+    # Step 1: L^(2) = δ²(√|g| L) / (2 √|g₀|) via xPert
     # ------------------------------------------------------------------
     lines: list[str] = [
         "",
         "(* ============================================================ *)",
         "(* Lagrangian-first linearization (single-path via L^(2))       *)",
-        "(* L -> L^(2) = Perturbation[L, 2] / 2  (xPert 2nd-order)     *)",
+        "(* L^(2) = d^2(sqrt|g| L) / (2 sqrt|g0|)  via xPert           *)",
         "(* Then: VarD[H, CD][L^(2)] -> linearized EOM                   *)",
         "(* Same L^(2) feeds canonical pipeline (pi, H)                  *)",
         "(* ============================================================ *)",
@@ -1261,17 +1265,28 @@ def _wls_linearize_from_lagrangian(
         f"{pert_sym}Tensor = SetupMetricPerturbation[{ctx.metric}, {pert_sym}, {eps_sym}];",
         f'Print["Perturbation: {ctx.metric} -> {ctx.metric} + {eps_sym} * {pert_field_name}"];',
         "",
-        "(* 2nd-order perturbation of Lagrangian *)",
-        "(* xPert perturbs curvature tensors symbolically BEFORE evaluating *)",
-        "(* on flat background, so L^(2) retains linearized Einstein tensor *)",
-        "l2Raw = Perturbation[lOriginal, 2];",
+        "(* Include sqrt(-g) volume element: S = int sqrt(-g) L d^n x      *)",
+        "(* xPert natively perturbs Sqrt[-Detg[]], handling all orders.     *)",
+        f"lDensity = Sqrt[-{det_sym}[]] * lOriginal;",
+        "",
+        "(* 2nd-order perturbation of the full Lagrangian density *)",
+        "l2Raw = Perturbation[lDensity, 2];",
         "l2Raw = ExpandPerturbation[l2Raw];",
-        'Print["L^(2) raw (expanded): ", Short[l2Raw, 3]];',
+        'Print["L^(2) density (expanded): ", Short[l2Raw, 3]];',
         "",
         "(* Validate that xPert fully expanded *)",
         "If[!FreeQ[l2Raw, Perturbation],",
         '  Throw["Linearization: ExpandPerturbation did not fully expand L^(2)."]',
         "];",
+        "",
+        "(* Divide out background volume element sqrt(-g0)                   *)",
+        "(* (covariantly constant for Levi-Civita, passes through VarD).     *)",
+        f"l2Raw = l2Raw / Sqrt[-{det_sym}[]];",
+        "",
+        "(* Replace background metric determinant with evaluated value       *)",
+        f"l2Raw = l2Raw /. {det_sym}[] -> Det[{p}MetricMatrix];",
+        "l2Raw = Simplify[l2Raw];",
+        'Print["L^(2) (volume element resolved): ", Short[l2Raw, 3]];',
         "",
         "(* Drop 2nd-order metric perturbation h^(2) -- keep h^(1)*h^(1) only *)",
         f"l2Raw = l2Raw /. {pert_sym}[LI[2], idx__] :> 0;",
@@ -1303,7 +1318,7 @@ def _wls_linearize_from_lagrangian(
             "l2Raw = ToCanonical[l2Raw];",
             f"l2Raw = ContractMetric[l2Raw, {ctx.metric}];",
             "",
-            "(* L^(2) = delta^2 L / 2 *)",
+            "(* L^(2) = delta^2(sqrt|g| L) / (2 sqrt|g0|) *)",
             f"{p}Lagrangian = l2Raw / 2;",
             f'Print["L^(2) set: ", Short[{p}Lagrangian, 5]];',
             "",
@@ -1671,7 +1686,7 @@ def _wls_plane_wave_reduction_lagrangian(ctx: _WlsContext) -> list[str]:
         "",
         "(* ============================================================ *)",
         "(* Plane-wave reduction: zero transverse derivatives            *)",
-        f'(* Propagation axis: {prop_axis}, killed axes: {", ".join(killed):<20s}*)',
+        f"(* Propagation axis: {prop_axis}, killed axes: {', '.join(killed):<20s}*)",
         "(* Applied BEFORE E-L derivation for efficiency                  *)",
         "(* ============================================================ *)",
         "",
@@ -2707,8 +2722,8 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:
                 f"{spec_data['spacetime']['dimension']}D → "
                 f"{reduced['spacetime']['dimension']}D"
             )
-            eliminated = reduced["metadata"].get("reduction", {}).get(
-                "eliminated_fields", []
+            eliminated = (
+                reduced["metadata"].get("reduction", {}).get("eliminated_fields", [])
             )
             if eliminated:
                 print(f"Eliminated fields: {', '.join(eliminated)}")

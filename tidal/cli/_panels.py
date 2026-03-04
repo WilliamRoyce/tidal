@@ -72,11 +72,21 @@ def single_field(data: SimulationData, requested: str | None) -> str:
     """
     all_names = list(data.fields.keys())
     if requested is None:
-        # Prefer first dynamical field (has velocity) over constraint fields
-        for name in all_names:
-            if name in data.velocities:
-                return name
-        return all_names[0]
+        # Prefer dynamical fields over constraints.  When multiple
+        # dynamical fields exist, pick the one with the largest peak
+        # amplitude so the overview shows the most interesting field
+        # (e.g. A_2 in EM instead of zero-amplitude A_1).
+        dyn = [n for n in all_names if n in set(data.dynamical_fields)]
+        if not dyn:
+            return all_names[0]
+        if len(dyn) == 1:
+            return dyn[0]
+        best, best_amp = dyn[0], 0.0
+        for name in dyn:
+            amp = float(np.max(np.abs(data.fields[name])))
+            if amp > best_amp:
+                best, best_amp = name, amp
+        return best
     if requested not in data.fields:
         msg = f"Unknown field '{requested}'. Available: {', '.join(all_names)}"
         raise ValueError(msg)
@@ -87,6 +97,24 @@ def _spatial_dim(data: SimulationData) -> int:
     """Return the number of spatial dimensions (1, 2, or 3)."""
     first = next(iter(data.fields.values()))
     return first.ndim - 1  # (n_snapshots, *spatial_shape)
+
+
+def _z_profile_1d(
+    snap: np.ndarray, data: SimulationData
+) -> tuple[np.ndarray, np.ndarray]:
+    """Extract z-profile at the centre of x, y for a 3D snapshot.
+
+    Returns ``(z_coords, profile)`` where *z_coords* are cell centres
+    along the last spatial axis and *profile* is ``snap[ix, iy, :]``.
+    """
+    ix = snap.shape[0] // 2
+    iy = snap.shape[1] // 2
+    z_min, z_max = data.grid_bounds[2]
+    n_z = snap.shape[2]
+    z = np.linspace(
+        z_min + data.grid_spacing[2] / 2, z_max - data.grid_spacing[2] / 2, n_z
+    )
+    return z, snap[ix, iy, :]
 
 
 def resolve_time_indices(
@@ -240,10 +268,9 @@ def render_snapshot(
     ValueError
         If time_index is out of range or dimension is unsupported.
     """
-    n = data.n_snapshots
-    idx = time_index if time_index >= 0 else n + time_index
-    if idx < 0 or idx >= n:
-        msg = f"Time index {time_index} out of range [0, {n - 1}]"
+    idx = time_index if time_index >= 0 else data.n_snapshots + time_index
+    if idx < 0 or idx >= data.n_snapshots:
+        msg = f"Time index {time_index} out of range [0, {data.n_snapshots - 1}]"
         raise ValueError(msg)
 
     snap = data.fields[field][idx]
@@ -252,9 +279,8 @@ def render_snapshot(
 
     if dim == 1:
         x_min, x_max = data.grid_bounds[0]
-        n_x = snap.shape[0]
         x = np.linspace(
-            x_min + data.grid_spacing[0] / 2, x_max - data.grid_spacing[0] / 2, n_x
+            x_min + data.grid_spacing[0] / 2, x_max - data.grid_spacing[0] / 2, snap.shape[0]
         )
         ax.plot(x, snap, "b-", linewidth=1.5)
         ax.set_xlabel("x")
@@ -273,6 +299,11 @@ def render_snapshot(
         ax.set_xlabel("x")
         ax.set_ylabel("y")
         ax.figure.colorbar(im, ax=ax, label=field)  # type: ignore[union-attr]
+    elif dim == 3:  # noqa: PLR2004
+        z, z_profile = _z_profile_1d(snap, data)
+        ax.plot(z, z_profile, "b-", linewidth=1.5)
+        ax.set_xlabel("z")
+        ax.set_ylabel(field)
     else:
         msg = f"Snapshot not yet supported for {dim}D data"
         raise ValueError(msg)
@@ -409,14 +440,29 @@ def render_profile(
                 label=f"t={t_val:.1f}",
                 alpha=0.8,
             )
+        elif dim == 3:  # noqa: PLR2004
+            z, z_profile = _z_profile_1d(snap, data)
+            ax.plot(
+                z,
+                z_profile,
+                color=colors[i],
+                linewidth=1.2,
+                label=f"t={t_val:.1f}",
+                alpha=0.8,
+            )
         else:
             msg = (
-                "Profile requires 1D data or 2D data with --cross-section. "
+                "Profile requires 1D, 2D (with --cross-section), or 3D data. "
                 f"Got {dim}D data."
             )
             raise ValueError(msg)
 
-    ax.set_xlabel("x" if cross_section is None or cross_section[0] == "y" else "y")
+    if dim == 3:  # noqa: PLR2004
+        ax.set_xlabel("z")
+    elif cross_section is None or cross_section[0] == "y":
+        ax.set_xlabel("x")
+    else:
+        ax.set_xlabel("y")
     ax.set_ylabel(field)
     ax.set_title(f"{field} profile")
     ax.legend(fontsize=7)
@@ -446,9 +492,8 @@ def render_compare(
 
         if dim == 1:
             x_min, x_max = data.grid_bounds[0]
-            n_x = initial.shape[0]
             x = np.linspace(
-                x_min + data.grid_spacing[0] / 2, x_max - data.grid_spacing[0] / 2, n_x
+                x_min + data.grid_spacing[0] / 2, x_max - data.grid_spacing[0] / 2, initial.shape[0]
             )
             ax.plot(x, initial, color=color, linewidth=1.5, label=f"{name} (t=0)")
             ax.plot(
@@ -474,11 +519,28 @@ def render_compare(
         elif dim == 2:  # noqa: PLR2004
             msg = "Compare for 2D data requires --cross-section for line overlay"
             raise ValueError(msg)
+        elif dim == 3:  # noqa: PLR2004
+            z, init_profile = _z_profile_1d(initial, data)
+            ax.plot(z, init_profile, color=color, linewidth=1.5,
+                    label=f"{name} (t=0)")
+            ax.plot(
+                z,
+                _z_profile_1d(final, data)[1],
+                color=color,
+                linewidth=1.5,
+                linestyle="--",
+                label=f"{name} (t={float(data.times[-1]):.1f})",
+            )
         else:
             msg = f"Compare not supported for {dim}D data"
             raise ValueError(msg)
 
-    ax.set_xlabel("x" if cross_section is None or cross_section[0] == "y" else "y")
+    if dim == 3:  # noqa: PLR2004
+        ax.set_xlabel("z")
+    elif cross_section is None or cross_section[0] == "y":
+        ax.set_xlabel("x")
+    else:
+        ax.set_xlabel("y")
     ax.set_ylabel("field value")
     ax.set_title("Initial vs Final")
     ax.legend(fontsize=7)

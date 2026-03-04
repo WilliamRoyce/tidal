@@ -4,6 +4,10 @@ All sksundae imports are isolated here so that ``# pyright: ignore``
 suppressions for ``reportMissingTypeStubs`` are confined to this module.
 The rest of the codebase imports ``call_cvode`` / ``call_ida`` and receives
 fully typed :class:`SundialsResult` objects.
+
+Stepwise variants (``call_cvode_stepwise``, ``call_ida_stepwise``) use
+the ``init_step()`` + ``step(t)`` API for progress reporting with zero
+overhead on the solver's internal computation.
 """
 
 from __future__ import annotations
@@ -14,7 +18,11 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     from numpy.typing import NDArray
+
+    from tidal.solver.progress import SimulationProgress
 
 
 @dataclass(frozen=True)
@@ -99,7 +107,8 @@ def call_ida(
     **options:
         Forwarded to ``IDA.__init__``.  Recognized keys: ``rtol``,
         ``atol``, ``max_num_steps``, ``algebraic_idx``,
-        ``calc_initcond``, ``calc_init_dt``, ``linsolver``, ``sparsity``.
+        ``calc_initcond``, ``calc_init_dt``, ``linsolver``, ``sparsity``,
+        ``jacfn``, ``jactimes``.
 
     Returns
     -------
@@ -118,4 +127,119 @@ def call_ida(
         success=bool(raw.success),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
         message=str(raw.message),  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
         yp=np.asarray(raw.yp, dtype=np.float64),  # pyright: ignore[reportUnknownArgumentType,reportUnknownMemberType]
+    )
+
+
+def call_cvode_stepwise(
+    rhsfn: Any,  # noqa: ANN401
+    t_eval: NDArray[np.float64],
+    y0: NDArray[np.float64],
+    progress: SimulationProgress,
+    snapshot_callback: Callable[..., None] | None = None,
+    **options: Any,  # noqa: ANN401
+) -> SundialsResult:
+    """CVODE step-by-step integration with progress reporting.
+
+    Uses ``init_step()`` + ``step(t)`` instead of ``solve()`` so that
+    progress can be reported between solver steps with zero overhead on
+    the solver's internal computation.
+    """
+    from sksundae.cvode import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
+        CVODE,
+    )
+
+    solver = CVODE(rhsfn, **options)
+    progress.set_phase("CVODE init")
+    solver.init_step(float(t_eval[0]), y0)  # pyright: ignore[reportUnknownMemberType]
+    progress.set_phase("CVODE")
+
+    t_list: list[float] = [float(t_eval[0])]
+    y_list: list[NDArray[np.float64]] = [y0.copy()]
+
+    if snapshot_callback is not None:
+        snapshot_callback(t_list[0], y_list[0])
+
+    success = True
+    message = "CVODE stepwise integration completed"
+
+    for t_next in t_eval[1:]:
+        raw = solver.step(float(t_next))  # pyright: ignore[reportUnknownMemberType]
+        t_val = float(raw.t)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        y_val = np.asarray(raw.y, dtype=np.float64)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        t_list.append(t_val)
+        y_list.append(y_val)
+        progress.update(t_val)
+        if snapshot_callback is not None:
+            snapshot_callback(t_val, y_val)
+        if not raw.success:  # pyright: ignore[reportUnknownMemberType]
+            success = False
+            message = str(raw.message)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            break
+
+    progress.finish()
+    return SundialsResult(
+        t=np.array(t_list, dtype=np.float64),
+        y=np.array(y_list, dtype=np.float64),
+        success=success,
+        message=message,
+    )
+
+
+def call_ida_stepwise(  # noqa: PLR0913, PLR0917
+    resfn: Any,  # noqa: ANN401
+    t_eval: NDArray[np.float64],
+    y0: NDArray[np.float64],
+    yp0: NDArray[np.float64],
+    progress: SimulationProgress,
+    snapshot_callback: Callable[..., None] | None = None,
+    **options: Any,  # noqa: ANN401
+) -> SundialsResult:
+    """IDA step-by-step integration with progress reporting.
+
+    Uses ``init_step()`` + ``step(t)`` instead of ``solve()`` so that
+    progress can be reported between solver steps with zero overhead on
+    the solver's internal computation.
+    """
+    from sksundae.ida import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
+        IDA,
+    )
+
+    solver = IDA(resfn, **options)
+    progress.set_phase("IDA init")
+    solver.init_step(float(t_eval[0]), y0, yp0)  # pyright: ignore[reportUnknownMemberType]
+    progress.set_phase("IDA")
+
+    t_list: list[float] = [float(t_eval[0])]
+    y_list: list[NDArray[np.float64]] = [y0.copy()]
+    yp_list: list[NDArray[np.float64]] = [yp0.copy()]
+
+    if snapshot_callback is not None:
+        snapshot_callback(t_list[0], y_list[0], yp_list[0])
+
+    success = True
+    message = "IDA stepwise integration completed"
+
+    for t_next in t_eval[1:]:
+        raw = solver.step(float(t_next))  # pyright: ignore[reportUnknownMemberType]
+        t_val = float(raw.t)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        y_val = np.asarray(raw.y, dtype=np.float64)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        yp_val = np.asarray(raw.yp, dtype=np.float64)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+        t_list.append(t_val)
+        y_list.append(y_val)
+        yp_list.append(yp_val)
+        progress.update(t_val)
+        if snapshot_callback is not None:
+            snapshot_callback(t_val, y_val, yp_val)
+        if not raw.success:  # pyright: ignore[reportUnknownMemberType]
+            success = False
+            message = str(raw.message)  # pyright: ignore[reportUnknownMemberType,reportUnknownArgumentType]
+            break
+
+    progress.finish()
+    return SundialsResult(
+        t=np.array(t_list, dtype=np.float64),
+        y=np.array(y_list, dtype=np.float64),
+        success=success,
+        message=message,
+        yp=np.array(yp_list, dtype=np.float64),
     )

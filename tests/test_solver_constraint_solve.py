@@ -11,6 +11,7 @@ from tidal.solver.constraint_solve import (
     _classify_terms,
     _ConstraintTerms,
     _fft_solve_single,
+    _find_connected_components,
     _matrix_solve,
     _probe_operator_matrix,
     _select_method,
@@ -667,6 +668,123 @@ class TestProbeMatrix:
         result = apply_operator("laplacian", u, grid, "neumann") - u
         residual = result + source_rhs
         assert float(np.max(np.abs(residual))) < 1e-10
+
+
+# ---------------------------------------------------------------------------
+# Unit tests: _find_connected_components
+# ---------------------------------------------------------------------------
+
+
+class TestFindConnectedComponents:
+    """Unit tests for connected component decomposition of constraint groups."""
+
+    @staticmethod
+    def _make_group(
+        name: str,
+        source_fields: list[str] | None = None,
+    ) -> _ConstraintTerms:
+        """Create a minimal _ConstraintTerms for component testing."""
+        config = ConstraintSolverConfig(enabled=True, method="auto")
+        source_terms = [
+            (1.0, "identity", f) for f in (source_fields or [])
+        ]
+        return _ConstraintTerms(
+            field_name=name,
+            self_terms=[(1.0, "identity")],
+            source_terms=source_terms,
+            eq_idx=0,
+            has_position_dependent_self=False,
+            config=config,
+        )
+
+    def test_single_independent(self) -> None:
+        """One constraint with no cross-refs → 1 component of size 1."""
+        g = self._make_group("A", source_fields=["x", "y"])
+        components = _find_connected_components([g])
+        assert len(components) == 1
+        assert len(components[0]) == 1
+        assert components[0][0].field_name == "A"
+
+    def test_all_independent(self) -> None:
+        """Three constraints with no mutual refs → 3 components."""
+        groups = [
+            self._make_group("A", source_fields=["x"]),
+            self._make_group("B", source_fields=["y"]),
+            self._make_group("C", source_fields=["z"]),
+        ]
+        components = _find_connected_components(groups)
+        assert len(components) == 3
+
+    def test_all_coupled(self) -> None:
+        """Three constraints, A→B, B→C → 1 component of size 3."""
+        groups = [
+            self._make_group("A", source_fields=["B"]),
+            self._make_group("B", source_fields=["C"]),
+            self._make_group("C", source_fields=["x"]),
+        ]
+        components = _find_connected_components(groups)
+        assert len(components) == 1
+        assert len(components[0]) == 3
+
+    def test_two_components(self) -> None:
+        """A↔B coupled, C independent → 2 components."""
+        groups = [
+            self._make_group("A", source_fields=["B", "x"]),
+            self._make_group("B", source_fields=["A", "y"]),
+            self._make_group("C", source_fields=["z"]),
+        ]
+        components = _find_connected_components(groups)
+        assert len(components) == 2
+        names = [{g.field_name for g in c} for c in components]
+        assert {"A", "B"} in names
+        assert {"C"} in names
+
+    def test_massive_gravity_pattern(self) -> None:
+        """Mimics massive_gravity: h_0 independent, h_1↔h_2 coupled.
+
+        h_0 references only non-constraint fields (h_3, h_5).
+        h_1 references h_2 (constraint). h_2 references h_1 (constraint).
+        """
+        groups = [
+            self._make_group("h_0", source_fields=["h_3", "h_5"]),
+            self._make_group("h_1", source_fields=["h_2", "v_h_0"]),
+            self._make_group("h_2", source_fields=["h_1", "v_h_0"]),
+        ]
+        components = _find_connected_components(groups)
+        assert len(components) == 2
+        names = [{g.field_name for g in c} for c in components]
+        assert {"h_0"} in names
+        assert {"h_1", "h_2"} in names
+
+    def test_name_map_resolves(self) -> None:
+        """Cross-constraint ref via name_map is detected."""
+        groups = [
+            self._make_group("A", source_fields=["alias_B"]),
+            self._make_group("B", source_fields=["x"]),
+        ]
+        name_map = {"alias_B": "B"}
+        components = _find_connected_components(groups, name_map)
+        assert len(components) == 1  # A→B via alias
+
+    def test_self_loop(self) -> None:
+        """Self-referencing constraint does not create phantom edges."""
+        g = self._make_group("A", source_fields=["A", "x"])
+        components = _find_connected_components([g])
+        assert len(components) == 1
+        assert len(components[0]) == 1
+
+    def test_empty_input(self) -> None:
+        """No groups → empty result."""
+        assert _find_connected_components([]) == []
+
+    def test_shared_non_constraint_field(self) -> None:
+        """Non-constraint field shared by multiple constraints → no coupling."""
+        groups = [
+            self._make_group("A", source_fields=["x", "y"]),
+            self._make_group("B", source_fields=["x", "z"]),
+        ]
+        components = _find_connected_components(groups)
+        assert len(components) == 2
 
 
 # ---------------------------------------------------------------------------
@@ -2096,6 +2214,57 @@ class TestEnsureConsistentIC:
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
         np.testing.assert_array_equal(result, y0)
 
+    def test_phase2_stall_emits_warning(self) -> None:
+        """Phase 2 stall emits actionable warning about undetermined fields."""
+        data: dict[str, Any] = {
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [
+                {"name": "c_0", "index": 0},
+                {"name": "h_a", "index": 1},
+                {"name": "h_b", "index": 2},
+            ],
+            "equations": [
+                {
+                    "field": "c_0",
+                    "lhs": {"expression": "c_0", "order": {"time": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "gradient_x", "field": "h_a"},
+                            {"coefficient": 1.0, "operator": "gradient_x", "field": "h_b"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_a",
+                    "lhs": {"expression": "d2_t(h_a)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_a"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_b",
+                    "lhs": {"expression": "d2_t(h_b)", "order": {"time": 2}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_b"},
+                        ],
+                    },
+                },
+            ],
+            "canonical": {"hamiltonian_terms": []},
+        }
+        spec = EquationSystem.from_dict(data)
+        grid = GridInfo(bounds=((0, 10),), shape=(32,), periodic=(True,))
+        y0 = np.zeros(StateLayout.from_spec(spec, grid.num_points).total_size)
+
+        with pytest.warns(UserWarning, match="Constraint propagation stalled"):
+            ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
     def test_multi_independent_subsidiary(self) -> None:
         """Two independent subsidiary constraints, each solving for a different field.
 
@@ -2524,3 +2693,166 @@ class TestEnsureConsistentICRealJSON:
         a0_slot = layout.field_slot_map["A_0"]
         a0_data = result[a0_slot * n : (a0_slot + 1) * n]
         assert float(np.max(np.abs(a0_data))) > 1e-5
+
+    def test_massive_gravity_connected_components(self) -> None:
+        """Massive gravity: h_0 skipped (no self-terms), h_1↔h_2 coupled.
+
+        With the correct linearized Einstein tensor (from √|g|·L
+        perturbation), the tt equation (h_0) doesn't involve h_0 — it's
+        a compatibility constraint on spatial components h_3/h_4/h_5.
+        The solver skips h_0 (no self-terms) and solves h_1↔h_2 as a
+        coupled screened-Poisson system.
+
+        IC: traceless spatial perturbation h_3 = -h_5 = cos(k*x)*cos(k*y)
+        with k_x = k_y satisfies the h_0 constraint exactly (the
+        -m2*(h_3+h_5) term vanishes and the mixed Laplacians cancel).
+        """
+        import json
+        from pathlib import Path
+
+        json_path = Path("examples/data/massive_gravity_3d.json")
+        if not json_path.exists():
+            pytest.skip("Massive gravity JSON not available")
+
+        with json_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+        spec = EquationSystem.from_dict(data)
+
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10)),
+            shape=(16, 16),
+            periodic=(True, True),
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        x_arr, y_arr = grid.coord_arrays()
+        k = 2 * np.pi / 10  # k_x = k_y = 2π/L
+        wave = 0.5 * np.cos(k * x_arr) * np.cos(k * y_arr)
+
+        # Traceless spatial IC: h_3 (h_xx) = -h_5 (h_yy)
+        h3_slot = layout.field_slot_map["h_3"]
+        h5_slot = layout.field_slot_map["h_5"]
+        y0[h3_slot * n : (h3_slot + 1) * n] = wave.ravel()
+        y0[h5_slot * n : (h5_slot + 1) * n] = (-wave).ravel()
+
+        result = ensure_consistent_ic(
+            spec, grid, y0, bc="periodic", parameters={"m2": 1.0},
+        )
+
+        # h_0 remains at zero (not constrained by its own equation)
+        h0_slot = layout.field_slot_map["h_0"]
+        h0_data = result[h0_slot * n : (h0_slot + 1) * n]
+        assert float(np.max(np.abs(h0_data))) < 1e-10, (
+            "h_0 should remain zero (equation has no self-terms)"
+        )
+
+    def test_massive_gravity_inconsistent_ic(self) -> None:
+        """Massive gravity: IC that violates the h_0 compatibility constraint.
+
+        Setting only h_3 (with h_4 = h_5 = 0) violates the constraint
+        0 = -m2*(h_3+h_5) + 0.5*∇²_x(h_5) + 0.5*∇²_y(h_3) - ∂²_xy(h_4).
+        With strict=True this raises ValueError; with strict=False it
+        warns but proceeds.
+        """
+        import json
+        from pathlib import Path
+
+        json_path = Path("examples/data/massive_gravity_3d.json")
+        if not json_path.exists():
+            pytest.skip("Massive gravity JSON not available")
+
+        with json_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+        spec = EquationSystem.from_dict(data)
+
+        grid = GridInfo(
+            bounds=((0, 50), (0, 50)),
+            shape=(32, 32),
+            periodic=(True, True),
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        x_arr, y_arr = grid.coord_arrays()
+        h3_slot = layout.field_slot_map["h_3"]
+        y0[h3_slot * n : (h3_slot + 1) * n] = (
+            np.exp(-((x_arr - 25) ** 2 + (y_arr - 25) ** 2) / 50)
+            * np.sin(2 * np.pi * x_arr / 50)
+        ).ravel()
+
+        # strict=True should raise for the violated h_0 constraint
+        with pytest.raises(ValueError, match="does not satisfy"):
+            ensure_consistent_ic(
+                spec, grid, y0, bc="periodic", parameters={"m2": 1.0},
+                strict=True,
+            )
+
+        # strict=False should warn but succeed
+        with pytest.warns(UserWarning, match="does not satisfy"):
+            result = ensure_consistent_ic(
+                spec, grid, y0, bc="periodic", parameters={"m2": 1.0},
+                strict=False,
+            )
+
+        # h_0 should remain at zero (equation doesn't involve h_0)
+        h0_slot = layout.field_slot_map["h_0"]
+        h0_data = result[h0_slot * n : (h0_slot + 1) * n]
+        assert float(np.max(np.abs(h0_data))) < 1e-10
+
+    def test_gw_3d_with_complete_tt_ic(self) -> None:
+        """GW 3+1D: complete TT gauge IC (h_4 + h_7 = -h_4) passes all constraints.
+
+        Setting both h_4 (h_xx) and h_7 (h_yy) = -h_4 for z-propagating
+        + polarization satisfies the traceless constraint and allows the
+        cascade to determine h_9 = 0. Transverse constraints are trivially
+        satisfied since h_4/h_7 depend only on z.
+        """
+        import json
+        from pathlib import Path
+
+        json_path = Path("examples/data/linearized_gravity.json")
+        if not json_path.exists():
+            pytest.skip("Linearized gravity JSON not available")
+
+        with json_path.open(encoding="utf-8") as f:
+            data = json.load(f)
+        spec = EquationSystem.from_dict(data)
+
+        grid = GridInfo(
+            bounds=((0, 4), (0, 4), (0, 10)),
+            shape=(4, 4, 16),
+            periodic=(True, True, True),
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        n = grid.num_points
+
+        y0 = np.zeros(layout.total_size)
+        # z-dependent wave packet for h_4 (h_xx)
+        _, _, z_arr = grid.coord_arrays()
+        wave = np.exp(-((z_arr - 5) ** 2) / 2) * np.cos(0.63 * (z_arr - 5))
+
+        h4_slot = layout.field_slot_map["h_4"]
+        y0[h4_slot * n : (h4_slot + 1) * n] = wave.ravel()
+
+        # TT gauge: h_7 (h_yy) = -h_4 (traceless for z-propagation)
+        h7_slot = layout.field_slot_map["h_7"]
+        y0[h7_slot * n : (h7_slot + 1) * n] = (-wave).ravel()
+
+        # Should succeed: h_9 = -(h_4 + h_7) = 0, transverse trivially OK
+        result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
+
+        # h_4 and h_7 should be preserved exactly (user-provided IC)
+        h4_data = result[h4_slot * n : (h4_slot + 1) * n]
+        np.testing.assert_allclose(h4_data, wave.ravel(), atol=1e-14)
+        h7_data = result[h7_slot * n : (h7_slot + 1) * n]
+        np.testing.assert_allclose(h7_data, (-wave).ravel(), atol=1e-14)
+
+        # h_9 should be solved to ≈ 0 (traceless: h_4 + h_7 + h_9 = 0)
+        h9_slot = layout.field_slot_map["h_9"]
+        h9_data = result[h9_slot * n : (h9_slot + 1) * n]
+        assert np.allclose(h9_data, 0.0, atol=1e-10), (
+            f"h_9 should be ≈ 0 for TT gauge, got max={np.max(np.abs(h9_data)):.2e}"
+        )

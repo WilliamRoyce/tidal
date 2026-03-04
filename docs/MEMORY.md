@@ -136,7 +136,7 @@ See `docs/gauge_fixing.md` for tutorial and developer guide.
 
 ## CLI (`tidal` Command)
 
-The `tidal` CLI provides 7 subcommands with zero new dependencies (stdlib argparse + tomllib):
+The `tidal` CLI provides 9 subcommands with zero new dependencies (stdlib argparse + tomllib):
 
 | Command                     | Description                                                           |
 | --------------------------- | --------------------------------------------------------------------- |
@@ -147,6 +147,11 @@ The `tidal` CLI provides 7 subcommands with zero new dependencies (stdlib argpar
 | `tidal list`                | Discover available JSON specs in `examples/data/`                     |
 | `tidal validate spec.json`  | Validate JSON equation specification structure                        |
 | `tidal plot result_dir/`    | Standalone plotting from simulation output directories                |
+| `tidal sweep spec.json`     | Automated parameter sweep with parallel execution and measurement     |
+| `tidal analyze sweep_dir/`  | Sobol/Morris sensitivity analysis on completed sweep results          |
+
+**Simulation resume:** `tidal simulate spec.json --resume output_dir/ [--snapshot N] [--t-additional T] --t-end T`
+Continues from any saved snapshot. Inherits grid/params/BC from metadata. Output goes to new directory.
 
 **TOML Configuration:**
 
@@ -154,7 +159,7 @@ The `tidal` CLI provides 7 subcommands with zero new dependencies (stdlib argpar
 - `[[derived_fields]]` for intermediate tensors (e.g., field strength F_ab)
 - `[[background_fields]]` for non-dynamical tensors (e.g., external B-field)
 - `[[gauge]]` for optional per-field gauge fixing (Lorenz, de Donder, etc.)
-- IC presets: `gaussian`, `plane-wave`, `zero`, `formula`
+- IC presets: `gaussian`, `plane-wave`, `zero`, `formula`, `file`, `noise`
 - Per-axis boundary conditions via `--bc neumann,periodic`
 - Solver selection via `--scheme cvode|ida|scipy|leapfrog`
 - Tolerance control via `--rtol`, `--atol`
@@ -186,9 +191,9 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 
 ## Python Operators
 
-`identity`, `laplacian`, `laplacian_{x,y,z}`, `gradient_{x,y,z}`, `cross_derivative_{xy,xz,yz}`, `first_derivative_t`, `biharmonic`
+`identity`, `laplacian`, `laplacian_{x,y,z}`, `gradient_{x,y,z}`, `cross_derivative_{xy,xz,yz}`, `first_derivative_t`, `biharmonic`, `mixed_T_S1_S2_...`
 
-- All support cross-field application and velocity (`v_i`) references. `first_derivative_t` resolves to velocity slot at runtime.
+- All support cross-field application and velocity (`v_i`) references. `first_derivative_t` resolves to velocity slot at runtime. `mixed_*` operators decompose into time derivatives (velocity/EOM RHS) + spatial gradients.
 
 ## Example Implementations
 
@@ -216,14 +221,12 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 | `cylindrical_kg/`         | 3+1D | Cylindrical, mixed curved/flat                                     |
 | `gravitational_waves/`    | 3+1D | xPert linearization, TT gauge, constraints                         |
 | `massive_3form/`          | 3+1D | Rank-3 antisymmetric, symmetry reduction 64→4                      |
-| `gravitational_waves/`    | 3+1D | xPert linearization, TT gauge, constraints                         |
-| `massive_3form/`          | 3+1D | Rank-3 antisymmetric, symmetry reduction 64→4                      |
 
 ## Testing Guidelines
 
 ### Test Counts
 
-- **945 Python tests** + **~115 Wolfram tests** passing
+- **~1242 Python tests** + **~115 Wolfram tests** passing
 - Run: `uv run pytest tests/` and `./scripts/full_test.sh`
 
 ### Verification Pattern

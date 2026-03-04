@@ -389,7 +389,10 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   (* Step 9: Convert coordinate derivatives to Derivative form *)
   componentEq = ConvertCDToDerivatives[componentEq, chart];
 
-  Expand[componentEq]
+  (* Final simplification: Simplify then Expand to ensure cancellations
+     (e.g., trace terms in linearized Einstein tensor) while preserving
+     the Plus structure that EquationToJSONMultiField expects. *)
+  Expand[Simplify[componentEq]]
 ];
 
 (* === Symmetry Reduction Helpers === *)

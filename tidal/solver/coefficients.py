@@ -19,7 +19,7 @@ reimplementation of Mathematica→Python conversion or eval() logic.
 from __future__ import annotations
 
 import warnings
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 import numpy as np
 
@@ -34,6 +34,9 @@ if TYPE_CHECKING:
 
     from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
+
+
+_MISSING = object()  # sentinel for dict.get() fast path
 
 
 class CoefficientEvaluator:
@@ -131,22 +134,25 @@ class CoefficientEvaluator:
         """
         key = (eq_idx, term_idx)
 
-        # L0: Pre-resolved constant
-        if key in self._constants:
-            return self._constants[key]
+        # L0: Pre-resolved constant (single dict.get avoids two-op in+[])
+        c = self._constants.get(key, _MISSING)
+        if c is not _MISSING:
+            return cast("float | NDArray[np.float64]", c)
 
         # No symbolic → return numeric coefficient directly
         if term.coefficient_symbolic is None:
             return term.coefficient
 
         # Spatial-only cache (position-dependent, not time-dependent)
-        if key in self._spatial_cache:
-            return self._spatial_cache[key]
+        c = self._spatial_cache.get(key, _MISSING)
+        if c is not _MISSING:
+            return cast("NDArray[np.float64]", c)
 
         # L3: Per-timestep cache
         ts_key = (eq_idx, term_idx, t)
-        if ts_key in self._timestep_cache:
-            return self._timestep_cache[ts_key]
+        c = self._timestep_cache.get(ts_key, _MISSING)
+        if c is not _MISSING:
+            return cast("float | NDArray[np.float64]", c)
 
         # Full evaluation
         result = self._evaluate_symbolic(term, t)
@@ -164,6 +170,33 @@ class CoefficientEvaluator:
         coefficients are re-evaluated.
         """
         self._timestep_cache.clear()
+
+    def all_constant(self) -> bool:
+        """Check if every RHS term has a constant (scalar) coefficient.
+
+        Returns True when all coefficients are pre-resolved at L0 (no
+        position or time dependence).  This enables the analytical
+        Jacobian optimization for constant-coefficient linear systems.
+        """
+        for eq_idx, eq in enumerate(self._spec.equations):
+            for term_idx, _term in enumerate(eq.rhs_terms):
+                if (eq_idx, term_idx) not in self._constants:
+                    return False
+        return True
+
+    def all_time_independent(self) -> bool:
+        """Check if every RHS term has a time-independent coefficient.
+
+        Returns True when no term has ``time_dependent=True``.  Position-
+        dependent (but time-independent) coefficients still produce a
+        constant Jacobian because the spatial grid is fixed, so the
+        analytical Jacobian optimization applies.
+        """
+        for eq in self._spec.equations:
+            for term in eq.rhs_terms:
+                if term.time_dependent:
+                    return False
+        return True
 
     # ---- Internal helpers ----
 

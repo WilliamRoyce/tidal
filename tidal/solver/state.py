@@ -191,6 +191,19 @@ class StateLayout:
         )
 
     @cached_property
+    def drift_slot_pairs(self) -> tuple[tuple[slice, slice], ...]:
+        """Pre-computed ``(field_slice, vel_slice)`` for zero-copy drift.
+
+        Allows ``y[field_slice] += dt * y[vel_slice]`` without copying
+        velocity data into a separate buffer.
+        """
+        return tuple(
+            (self.slot_slice(i), self.slot_slice(self.velocity_slot_map[s.field_name]))
+            for i, s in enumerate(self.slots)
+            if s.kind == "field" and s.time_order >= SECOND_ORDER
+        )
+
+    @cached_property
     def first_order_slot_groups(self) -> tuple[tuple[int, slice, str], ...]:
         """Pre-computed ``(slot_idx, flat_slice, field_name)`` for 1st-order fields."""
         return tuple(
@@ -208,7 +221,7 @@ class StateLayout:
             if s.time_order == 0
         )
 
-    @property
+    @cached_property
     def algebraic_indices(self) -> list[int]:
         """Flat indices of algebraic (constraint) variables for IDA.
 

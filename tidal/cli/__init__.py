@@ -7,6 +7,7 @@ Entry point: ``tidal`` command with subcommands:
 - ``tidal simulate`` — Run PDE simulation from JSON specification
 - ``tidal measure``  — Extract physics measurements from simulation output
 - ``tidal plot``     — Generate individual plots from simulation output
+- ``tidal sweep``    — Run parameter sweeps and convergence studies
 - ``tidal list``     — List available JSON specifications
 - ``tidal validate`` — Validate a JSON equation specification
 """
@@ -25,7 +26,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     """Build the top-level argument parser with subcommands."""
     parser = argparse.ArgumentParser(
         prog="tidal",
-        description="Lagrangian-to-PDE pipeline: derive, inspect, simulate, measure, plot, list.",
+        description="Lagrangian-to-PDE pipeline: derive, inspect, simulate, measure, plot, sweep, list.",
     )
     parser.add_argument(
         "--version",
@@ -343,6 +344,34 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Default: error if constraint ICs cannot be made consistent."
         ),
     )
+    # Resume from checkpoint
+    sim_parser.add_argument(
+        "--resume",
+        default=None,
+        metavar="DIR",
+        help=(
+            "Resume simulation from a snapshot directory. "
+            "Inherits grid, parameters, and BC from saved metadata. "
+            "Loads final snapshot by default (use --snapshot N to pick)."
+        ),
+    )
+    sim_parser.add_argument(
+        "--snapshot",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Snapshot index to resume from (default: last). Requires --resume.",
+    )
+    sim_parser.add_argument(
+        "--t-additional",
+        type=float,
+        default=None,
+        metavar="T",
+        help=(
+            "Additional simulation time beyond the checkpoint "
+            "(alternative to --t-end when using --resume)."
+        ),
+    )
 
     # --- list ---
     list_parser = sub.add_parser(
@@ -498,6 +527,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "compare",
             "hamiltonian",
             "conservation",
+            "sweep",
+            "sweep-compare",
+            "sweep-parallel",
+            "sweep-tornado",
+            "sweep-scatter",
+            "convergence",
         ],
         help="Plot type to generate",
     )
@@ -576,6 +611,13 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="NAME",
         help="Colormap for heatmap/snapshot (default: RdBu_r)",
     )
+    # Sweep-specific options
+    plot_parser.add_argument(
+        "--metric",
+        default=None,
+        metavar="NAME[,NAME,...]",
+        help="Metric column(s) for sweep plots (e.g. P_max, L_mix, max_energy_error)",
+    )
     plot_parser.add_argument(
         "--title",
         default=None,
@@ -600,6 +642,346 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "-q",
         action="store_true",
         help="Suppress progress messages",
+    )
+
+    # --- sweep ---
+    sweep_parser = sub.add_parser(
+        "sweep",
+        help="Run parameter sweeps and convergence studies",
+        description=(
+            "Run simulate + measure across a parameter grid and aggregate "
+            "scalar metrics into portable CSV/JSON output."
+        ),
+        epilog=(
+            "Examples:\n"
+            "  tidal sweep spec.json --sweep 'g0=0.1:1.0:10' --measure conversion\n"
+            "  tidal sweep spec.json --sweep 'g0=0.1:1.0:5' --sweep 'mChi2=0.5:4.0:8'\n"
+            "  tidal sweep spec.json --converge '32,64,128,256' --measure conservation\n"
+            "  tidal sweep spec.json --sweep 'g0=0.1,0.5,1.0' --resume --output sweep_out/"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sweep_parser.add_argument(
+        "json_path",
+        nargs="?",
+        default=None,
+        help="Path to JSON equation specification (optional if --config provides spec)",
+    )
+    # Sweep specification
+    sweep_parser.add_argument(
+        "--sweep",
+        action="append",
+        default=[],
+        metavar="PARAM=SPEC",
+        help=(
+            "Parameter sweep spec (repeatable). "
+            "Formats: NAME=START:STOP:N (linear), NAME=START:STOP:N:log, "
+            "NAME=V1,V2,V3,..."
+        ),
+    )
+    sweep_parser.add_argument(
+        "--converge",
+        default=None,
+        metavar="N1,N2,...",
+        help="Grid convergence study (comma-separated grid sizes). Mutually exclusive with --sweep.",
+    )
+    # Measurement config
+    sweep_parser.add_argument(
+        "--measure",
+        default=None,
+        metavar="TYPE[,TYPE,...]",
+        help=(
+            "Measurements to run per simulation (comma-separated). "
+            "Options: summary, energy, conversion, mixing, dispersion, "
+            "conservation, effective_mass, asymptotic, peak_conversion. "
+            "Default: summary"
+        ),
+    )
+    sweep_parser.add_argument(
+        "--source",
+        default=None,
+        metavar="FIELD[,FIELD,...]",
+        help="Source field(s) for conversion measurement (comma-separated)",
+    )
+    sweep_parser.add_argument(
+        "--target",
+        default=None,
+        metavar="FIELD[,FIELD,...]",
+        help="Target field(s) for conversion measurement (comma-separated)",
+    )
+    sweep_parser.add_argument(
+        "--energy-threshold",
+        type=float,
+        default=1e-3,
+        metavar="T",
+        help="Energy conservation threshold (default: 1e-3)",
+    )
+    # Simulation passthrough flags (same as simulate)
+    sweep_parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="KEY=VAL",
+        help="Set fixed parameter (repeatable, e.g. --param m2=1.0)",
+    )
+    sweep_parser.add_argument(
+        "--grid-shape",
+        default=None,
+        metavar="N[,N,N]",
+        help="Grid points per axis (default: auto)",
+    )
+    sweep_parser.add_argument(
+        "--bounds",
+        default=None,
+        metavar="LO:HI[,...]",
+        help="Domain bounds per axis (e.g. 0:20 or -50:50)",
+    )
+    sweep_parser.add_argument(
+        "--periodic",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help="Use periodic boundary conditions (default: True)",
+    )
+    sweep_parser.add_argument(
+        "--bc",
+        default=None,
+        metavar="BC[,BC,BC]",
+        help="Per-axis boundary conditions (periodic, neumann). Overrides --periodic.",
+    )
+    sweep_parser.add_argument(
+        "--ic",
+        choices=["gaussian", "plane-wave", "zero", "formula", "file", "noise"],
+        default="gaussian",
+        help="Initial condition type (default: gaussian)",
+    )
+    sweep_parser.add_argument(
+        "--ic-formula",
+        default=None,
+        metavar="EXPR",
+        help="IC formula expression (for --ic=formula)",
+    )
+    sweep_parser.add_argument(
+        "--ic-center",
+        default=None,
+        metavar="X[,X,X]",
+        help="Gaussian center position (default: domain midpoint)",
+    )
+    sweep_parser.add_argument(
+        "--ic-width",
+        type=float,
+        default=None,
+        metavar="W",
+        help="Gaussian width (default: domain_size/10)",
+    )
+    sweep_parser.add_argument(
+        "--ic-amplitude",
+        type=float,
+        default=1.0,
+        metavar="A",
+        help="IC amplitude (default: 1.0)",
+    )
+    sweep_parser.add_argument(
+        "--ic-component",
+        default=None,
+        metavar="NAME",
+        help="Field component for IC (default: first field)",
+    )
+    sweep_parser.add_argument(
+        "--ic-wavevector",
+        default=None,
+        metavar="K[,K,K]",
+        help="Wavevector for plane-wave or gaussian IC",
+    )
+    sweep_parser.add_argument(
+        "--ic-formula-velocity",
+        default=None,
+        metavar="EXPR",
+        help="Velocity formula for --ic=formula",
+    )
+    sweep_parser.add_argument(
+        "--ic-field",
+        action="append",
+        default=[],
+        metavar="FIELD:EXPR",
+        help="Per-field IC formula override (repeatable)",
+    )
+    sweep_parser.add_argument(
+        "--ic-file",
+        default=None,
+        metavar="PATH",
+        help="IC file path (for --ic=file)",
+    )
+    sweep_parser.add_argument(
+        "--ic-noise-seed",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Random seed for --ic=noise",
+    )
+    sweep_parser.add_argument(
+        "--t-end",
+        type=float,
+        default=10.0,
+        help="Simulation duration (default: 10.0)",
+    )
+    sweep_parser.add_argument(
+        "--dt",
+        type=float,
+        default=None,
+        help="Time step (default: auto from CFL)",
+    )
+    sweep_parser.add_argument(
+        "--scheme",
+        choices=["ida", "leapfrog", "cvode", "scipy", "auto"],
+        default="auto",
+        help="Solver scheme (default: auto)",
+    )
+    sweep_parser.add_argument(
+        "--rtol",
+        type=float,
+        default=DEFAULT_RTOL,
+        help=f"Relative tolerance (default: {DEFAULT_RTOL})",
+    )
+    sweep_parser.add_argument(
+        "--atol",
+        type=float,
+        default=DEFAULT_ATOL,
+        help=f"Absolute tolerance (default: {DEFAULT_ATOL})",
+    )
+    sweep_parser.add_argument(
+        "--method",
+        type=str,
+        default=None,
+        help="Integration method (default: auto)",
+    )
+    sweep_parser.add_argument(
+        "--max-step",
+        type=float,
+        default=None,
+        help="Maximum step size for adaptive solvers",
+    )
+    sweep_parser.add_argument(
+        "--snapshots",
+        type=float,
+        default=None,
+        metavar="DT",
+        help="Snapshot interval (default: t_end/100)",
+    )
+    sweep_parser.add_argument(
+        "--mode",
+        choices=["evolve", "constraint"],
+        default="evolve",
+        help="Simulation mode (default: evolve)",
+    )
+    sweep_parser.add_argument(
+        "--require-stable",
+        action="store_true",
+        default=False,
+        help="Abort if stability check detects unstable mass matrix",
+    )
+    sweep_parser.add_argument(
+        "--allow-inconsistent-ic",
+        action="store_true",
+        default=False,
+        help="Allow inconsistent ICs for constraint equations",
+    )
+    # Sweep execution
+    sweep_parser.add_argument(
+        "--output",
+        default=None,
+        metavar="DIR",
+        help="Output directory for sweep results (required)",
+    )
+    sweep_parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Skip runs with existing metadata.json (resume interrupted sweep)",
+    )
+    sweep_parser.add_argument(
+        "--parallel",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Number of parallel workers (default: sequential)",
+    )
+    sweep_parser.add_argument(
+        "--force-large-sweep",
+        action="store_true",
+        help="Allow sweeps with more than 10,000 runs (overrides safety limit)",
+    )
+    sweep_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print sweep plan (grid size, parameter combos) without running",
+    )
+    sweep_parser.add_argument(
+        "--config",
+        default=None,
+        metavar="TOML",
+        help="Load sweep configuration from TOML file (CLI flags override TOML values)",
+    )
+    # Adaptive sampling (F2a)
+    sweep_parser.add_argument(
+        "--adaptive-metric",
+        default=None,
+        metavar="METRIC",
+        help="Metric to drive adaptive refinement (e.g. P_max)",
+    )
+    sweep_parser.add_argument(
+        "--adaptive-budget",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Maximum total points for adaptive refinement (default: 20)",
+    )
+    sweep_parser.add_argument(
+        "--adaptive-threshold",
+        type=float,
+        default=None,
+        metavar="T",
+        help="Stop adaptive refinement when max interval score < T (default: 0.01)",
+    )
+
+    # Multi-D sampling
+    sweep_parser.add_argument(
+        "--sweep-strategy",
+        type=str,
+        default=None,
+        choices=["grid", "latin_hypercube", "sobol"],
+        help="Sampling strategy for multi-parameter sweeps (default: grid = Cartesian product)",
+    )
+    sweep_parser.add_argument(
+        "--n-samples",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Number of samples for latin_hypercube/sobol strategies",
+    )
+
+    # --- analyze ---
+    analyze_parser = sub.add_parser(
+        "analyze",
+        help="Post-hoc analysis of sweep results (sensitivity analysis)",
+    )
+    analyze_parser.add_argument(
+        "data_path",
+        help="Path to sweep output directory",
+    )
+    analyze_parser.add_argument(
+        "--sensitivity",
+        choices=["sobol", "morris"],
+        default="sobol",
+        help="Sensitivity analysis method (default: sobol)",
+    )
+    analyze_parser.add_argument(
+        "--metric",
+        help="Metric to analyze (e.g. P_max, max_energy_error)",
+    )
+    analyze_parser.add_argument(
+        "--bootstrap",
+        type=int,
+        default=100,
+        help="Bootstrap resamples for Sobol confidence intervals (default: 100)",
     )
 
     return parser
@@ -661,6 +1043,14 @@ def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911
         from tidal.cli._plot_command import plot_command
 
         return plot_command(args)
+    if args.command == "sweep":
+        from tidal.cli._sweep import sweep_command
+
+        return sweep_command(args)
+    if args.command == "analyze":
+        from tidal.cli._analyze import analyze_command
+
+        return analyze_command(args)
     msg = f"Unknown command: {args.command}"
     raise ValueError(msg)
 

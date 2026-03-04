@@ -41,9 +41,9 @@ References
 from __future__ import annotations
 
 import warnings
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
@@ -86,7 +86,7 @@ class _ConstraintTerms:
 
     field_name: str
     self_terms: list[tuple[float | NDArray[np.float64], str]]
-    source_terms: list[tuple[float | NDArray[np.float64], str, str]]
+    source_terms: Sequence[tuple[float | NDArray[np.float64], str, str]]
     eq_idx: int
     has_position_dependent_self: bool
     config: ConstraintSolverConfig
@@ -107,7 +107,11 @@ def _classify_terms(  # noqa: PLR0913, PLR0917
 
     for term_idx, term in enumerate(rhs_terms):
         coeff = coeff_eval.resolve(term, t, eq_idx=eq_idx, term_idx=term_idx)
-        if term.field == constraint_field:
+        # first_derivative_t(X) = dX/dt = velocity of X.
+        # Resolve to identity(v_X) since this is not a spatial operator.
+        if term.operator == "first_derivative_t":
+            source_terms.append((coeff, "identity", f"v_{term.field}"))
+        elif term.field == constraint_field:
             self_terms.append((coeff, term.operator))
             if isinstance(coeff, np.ndarray):
                 has_pos_dep = True
@@ -245,12 +249,64 @@ def _build_name_map(spec: EquationSystem) -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
+# Connected component decomposition
+# ---------------------------------------------------------------------------
+
+
+def _find_connected_components(
+    groups: list[_ConstraintTerms],
+    name_map: dict[str, str] | None = None,
+) -> list[list[_ConstraintTerms]]:
+    """Decompose constraint groups into connected components.
+
+    Builds an undirected graph where constraint fields are nodes and
+    cross-constraint source references are edges.  Returns a list of
+    connected components, each being a list of ``_ConstraintTerms``.
+
+    This prevents false coupling: e.g., if h_0 is independent of
+    h_1 ↔ h_2, they are solved as separate systems rather than one
+    singular block.
+    """
+    constraint_names = {g.field_name for g in groups}
+
+    # Union-Find
+    parent: dict[str, str] = {g.field_name: g.field_name for g in groups}
+
+    def find(x: str) -> str:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]
+            x = parent[x]
+        return x
+
+    def union(a: str, b: str) -> None:
+        ra, rb = find(a), find(b)
+        if ra != rb:
+            parent[ra] = rb
+
+    for g in groups:
+        for _, _, field_name in g.source_terms:
+            resolved = field_name
+            if name_map:
+                resolved = name_map.get(field_name, field_name)
+            if resolved in constraint_names:
+                union(g.field_name, resolved)
+
+    # Collect components (preserve insertion order)
+    components: dict[str, list[_ConstraintTerms]] = {}
+    for g in groups:
+        root = find(g.field_name)
+        components.setdefault(root, []).append(g)
+
+    return list(components.values())
+
+
+# ---------------------------------------------------------------------------
 # Source evaluation
 # ---------------------------------------------------------------------------
 
 
 def _evaluate_source(
-    source_terms: list[tuple[float | NDArray[np.float64], str, str]],
+    source_terms: Sequence[tuple[float | NDArray[np.float64], str, str]],
     fields: FieldSet,
     grid: GridInfo,
     bc: BCSpec | None,
@@ -442,16 +498,22 @@ def _probe_operator_matrix(
 ) -> SparseMatrix:
     """Build sparse matrix by probing apply_operator() with unit vectors.
 
-    Each column j is computed by applying the self-operator (with resolved
-    coefficients) to a one-hot array e_j.  For position-dependent coefficients,
-    the element-wise multiply ``coeff_array * apply_operator(op, e_j, grid, bc)``
-    produces correct spatially-varying matrix entries.
-
-    This is the universal fallback — it handles:
-    - Position-dependent coefficients (coeff is NDArray)
-    - Any BC type (periodic, neumann, dirichlet)
-    - Any operator in OPERATOR_REGISTRY (existing or future)
+    For single constant-coefficient terms, delegates to the shared
+    ``build_operator_matrix()`` utility.  For multiple or position-dependent
+    terms, builds the matrix by probing the combined operator.
     """
+    # Fast path: single term with constant coefficient
+    if len(self_terms) == 1:
+        coeff, op_name = self_terms[0]
+        if np.ndim(coeff) == 0:
+            from tidal.solver.analytical_jacobian import (  # noqa: PLC0415
+                build_operator_matrix,
+            )
+
+            mat = build_operator_matrix(op_name, grid, bc)
+            return float(coeff) * mat if float(coeff) != 1.0 else mat
+
+    # General path: multiple terms and/or position-dependent coefficients
     n = grid.num_points
     mat = lil_matrix((n, n))
 
@@ -521,12 +583,6 @@ def pre_solve_constraints(  # noqa: PLR0913
     NDArray[np.float64]
         Updated y0 with constraint fields solved.
 
-    Raises
-    ------
-    ValueError
-        If a constraint is incompatible (singular operator with nonzero
-        projection in null space), or has no self-terms.
-
     Warns
     -----
     UserWarning
@@ -574,27 +630,21 @@ def pre_solve_constraints(  # noqa: PLR0913
             eq.constraint_solver,
         )
         if not terms.self_terms:
-            msg = (
-                f"Constraint equation for '{eq.field_name}' has no "
-                f"self-referencing terms — cannot solve for the field."
-            )
-            raise ValueError(msg)
+            # The labeled field doesn't appear in this equation at all.
+            # This is a compatibility constraint on *other* fields (e.g.,
+            # the Fierz-Pauli Hamiltonian constraint constrains h_3/h_5
+            # but doesn't involve h_0).  Skip — nothing to solve here.
+            continue
         groups.append(terms)
 
-    # Detect coupled constraints (check both original and resolved names)
-    constraint_names = {g.field_name for g in groups}
-    is_coupled = any(
-        any(
-            f in constraint_names or name_map.get(f, f) in constraint_names
-            for _, _, f in g.source_terms
-        )
-        for g in groups
-    )
-
-    if is_coupled:
-        _solve_coupled(groups, grid, bc, fields, layout, y0_out, name_map)
-    else:
-        _solve_independent(groups, grid, bc, fields, layout, y0_out, name_map)
+    # Decompose into connected components to avoid false coupling
+    # (e.g., massive_gravity: h_1↔h_2 coupled, h_0 skipped)
+    components = _find_connected_components(groups, name_map)
+    for component in components:
+        if len(component) == 1:
+            _solve_independent(component, grid, bc, fields, layout, y0_out, name_map)
+        else:
+            _solve_coupled(component, grid, bc, fields, layout, y0_out, name_map)
 
     return y0_out
 
@@ -626,7 +676,7 @@ def _solve_independent(  # noqa: PLR0913, PLR0917
         fields[terms.field_name] = solution
 
 
-def _solve_coupled(  # noqa: PLR0913, PLR0917, C901
+def _solve_coupled(  # noqa: PLR0912, PLR0913, PLR0914, PLR0917, C901
     groups: list[_ConstraintTerms],
     grid: GridInfo,
     bc: BCSpec | None,
@@ -661,18 +711,29 @@ def _solve_coupled(  # noqa: PLR0913, PLR0917, C901
         max_iter = max(g.config.max_iterations for g in groups)
         tol = min(g.config.tolerance for g in groups)
 
+        # Pre-compute operator matrices and methods (loop-invariant)
+        methods: dict[str, str] = {}
+        op_matrices: dict[str, np.ndarray] = {}
+        for terms in groups:
+            method = _select_method(terms, grid, bc)
+            methods[terms.field_name] = method
+            if method != "fft":
+                op_matrices[terms.field_name] = _probe_operator_matrix(
+                    terms.self_terms, grid, bc
+                )
+
         for _iteration in range(max_iter):
             max_change = 0.0
             for terms in groups:
                 source = _evaluate_source(
                     terms.source_terms, fields, grid, bc, name_map
                 )
-                method = _select_method(terms, grid, bc)
+                method = methods[terms.field_name]
 
                 if method == "fft":
                     solution = _fft_solve_single(terms, grid, source)
                 else:
-                    op_mat = _probe_operator_matrix(terms.self_terms, grid, bc)
+                    op_mat = op_matrices[terms.field_name]
                     solution = _matrix_solve(op_mat, source, grid.shape)
 
                 old = (
@@ -885,32 +946,25 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
                 coeff_eval, t, eq.constraint_solver,
             )
             if not terms.self_terms:
-                msg = (
-                    f"Constraint equation for '{eq.field_name}' has "
-                    f"constraint_solver.enabled=True but no self-referencing "
-                    f"terms — cannot solve for the field."
-                )
-                raise ValueError(msg)
+                # The labeled field doesn't appear in this equation.
+                # This is a compatibility constraint on other fields
+                # (e.g., Fierz-Pauli Hamiltonian constraint).  Skip —
+                # nothing to solve.  Phase 3 verification will check
+                # whether the constraint is satisfied by the IC.
+                continue
             enabled_groups.append(terms)
 
-        # Detect coupled constraints among enabled group
-        enabled_names = {g.field_name for g in enabled_groups}
-        is_coupled = any(
-            any(
-                f in enabled_names or name_map.get(f, f) in enabled_names
-                for _, _, f in g.source_terms
-            )
-            for g in enabled_groups
-        )
-
-        if is_coupled:
-            _solve_coupled(
-                enabled_groups, grid, bc, fields, layout, y0_out, name_map,
-            )
-        else:
-            _solve_independent(
-                enabled_groups, grid, bc, fields, layout, y0_out, name_map,
-            )
+        # Decompose into connected components to avoid false coupling
+        components = _find_connected_components(enabled_groups, name_map)
+        for component in components:
+            if len(component) == 1:
+                _solve_independent(
+                    component, grid, bc, fields, layout, y0_out, name_map,
+                )
+            else:
+                _solve_coupled(
+                    component, grid, bc, fields, layout, y0_out, name_map,
+                )
 
         determined.update(g.field_name for g in enabled_groups)
 
@@ -968,6 +1022,50 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
         if not progress:
             break
 
+    # Phase 2 stall diagnostics: when propagation stalls with unsatisfied
+    # constraints, identify which fields are undetermined to guide the user.
+    stall_free_fields: dict[str, set[str]] = {}
+    for _eq_idx, eq in remaining_eqs:
+        mapped_refs: set[str] = set()
+        for term in eq.rhs_terms:
+            ref = term.field
+            if term.operator == "first_derivative_t":
+                ref = f"v_{ref}"
+            if name_map and ref in name_map:
+                ref = name_map[ref]
+            mapped_refs.add(ref)
+        free = sorted(f for f in mapped_refs if f not in determined)
+        if len(free) >= 2:  # noqa: PLR2004
+            stall_free_fields[eq.field_name] = set(free)
+
+    if stall_free_fields:
+        # Count how often each free field appears across stuck constraints
+        field_counts: dict[str, int] = {}
+        for free_set in stall_free_fields.values():
+            for f in free_set:
+                field_counts[f] = field_counts.get(f, 0) + 1
+
+        lines = ["Constraint propagation stalled — these constraints have "
+                 "multiple undetermined fields:"]
+        for eq_name, free_set in sorted(stall_free_fields.items()):
+            lines.append(
+                f"  {eq_name}: {len(free_set)} undetermined "
+                f"[{', '.join(sorted(free_set))}]"
+            )
+        # Highlight high-impact fields (appear in multiple constraints)
+        shared = {f: c for f, c in field_counts.items() if c > 1}
+        if shared:
+            top = cast(
+                "list[str]",
+                sorted(shared, key=shared.get, reverse=True),  # type: ignore[arg-type]
+            )
+            hints = [f"{f} (in {shared[f]} constraints)" for f in top[:3]]
+            lines.append(
+                f"Setting IC for: {', '.join(hints)} may resolve "
+                f"multiple constraints."
+            )
+        warnings.warn("\n".join(lines), UserWarning, stacklevel=2)
+
     # Phase 3: Final verification of ALL constraint equations
     violations: list[tuple[str, float, list[str]]] = []
     for eq_idx, eq in constraint_eqs:
@@ -976,7 +1074,12 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
             coeff = coeff_eval.resolve(
                 term, t, eq_idx=eq_idx, term_idx=term_idx,
             )
+            # first_derivative_t(X) → identity(v_X)
+            op_name = term.operator
             field_ref = term.field
+            if op_name == "first_derivative_t":
+                op_name = "identity"
+                field_ref = f"v_{field_ref}"
             if name_map and field_ref in name_map:
                 field_ref = name_map[field_ref]
             data = (
@@ -984,7 +1087,7 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
                 if field_ref in fields
                 else np.zeros(grid.shape)
             )
-            operated = apply_operator(term.operator, data, grid, bc)
+            operated = apply_operator(op_name, data, grid, bc)
             rhs += coeff * operated
 
         max_res = float(np.max(np.abs(rhs)))
@@ -997,9 +1100,13 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
             "Initial data does not satisfy constraint equation(s):"
         ]
         for field_name, max_res, involved in violations:
+            free_info = ""
+            if field_name in stall_free_fields:
+                free = sorted(stall_free_fields[field_name])
+                free_info = f" — undetermined: [{', '.join(free)}]"
             lines.append(
                 f"  {field_name}: max|residual| = {max_res:.2e} "
-                f"(involves [{', '.join(involved)}])"
+                f"(involves [{', '.join(involved)}]){free_info}"
             )
         lines.append(
             "For physical consistency, choose initial conditions that "

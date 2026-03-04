@@ -24,7 +24,7 @@ import numpy as np
 
 from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
 from tidal.solver._setup import configure_linear_solver
-from tidal.solver._sksundae import SundialsResult, call_ida
+from tidal.solver._sksundae import SundialsResult, call_ida, call_ida_stepwise
 from tidal.solver.fields import FieldSet
 from tidal.solver.operators import BCSpec, apply_operator, is_periodic_bc
 from tidal.solver.state import StateLayout
@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
+    from tidal.solver.progress import SimulationProgress
     from tidal.solver.rhs import RHSEvaluator
     from tidal.solver.state import SlotInfo
     from tidal.symbolic.json_loader import (
@@ -81,6 +82,16 @@ class _ResidualCtx:
         self.fieldset: FieldSet | None = None
         # Dict for legacy constant-coefficient path in compute_rhs (lazy)
         self.fields: dict[str, np.ndarray] | None = None
+        # Pre-compute constraint velocity injection info (loop-invariant)
+        self._constraint_vel_info = [
+            (layout.field_slot_map[eq.field_name] * self.n, f"v_{eq.field_name}")
+            for eq in spec.equations
+            if eq.time_derivative_order == 0
+        ]
+        # Dedup begin_timestep: IDA calls residual multiple times per step
+        # at the same t (Newton iterations).  Skip L3 cache clear when t
+        # hasn't changed.
+        self._last_t: float = float("nan")
 
     def set_arrays(
         self,
@@ -100,18 +111,17 @@ class _ResidualCtx:
         # Inject constraint velocities from yp so that velocity-dependent
         # operators (first_derivative_t, gradient_x of velocity slots)
         # resolve correctly in the RHSEvaluator.
-        for eq in self.spec.equations:
-            if eq.time_derivative_order == 0:
-                slot_idx = self.layout.field_slot_map[eq.field_name]
-                start = slot_idx * self.n
-                vel = yp[start : start + self.n].reshape(self.shape)
-                self.fieldset.set_aux(f"v_{eq.field_name}", vel)
+        for start, vel_key in self._constraint_vel_info:
+            vel = yp[start : start + self.n].reshape(self.shape)
+            self.fieldset.set_aux(vel_key, vel)
 
         self.fields = None  # Reset lazy cache
 
-        # Notify coefficient evaluator of new timestep
-        if self.rhs_eval is not None:
+        # Notify coefficient evaluator of new timestep (skip if t unchanged
+        # to avoid redundant L3 cache clears during Newton iterations)
+        if self.rhs_eval is not None and t != self._last_t:
             self.rhs_eval.begin_timestep(t)
+            self._last_t = t
 
     def compute_rhs(self, eq_idx: int) -> np.ndarray:
         """Sum operator terms for a single equation."""
@@ -144,11 +154,7 @@ class _ResidualCtx:
         The original equation becomes an initial-data consistency condition
         that should be verified by ``check_no_self_term_ic``.
 
-        **Extensibility:** Fields with ``constraint_solver.enabled = True``
-        are excluded — the constraint pre-solve path handles them (and
-        raises ``ValueError`` if they truly have no self-terms, which is
-        the correct fail-fast for gauge-fixed specs that *should* have
-        self-terms).  When Phase B gauge-fixing adds self-terms to these
+        **Extensibility:** When gauge-fixing adds self-terms to these
         equations, they will naturally exit this set.
 
         Emits ``UserWarning`` for each detected field.
@@ -157,13 +163,15 @@ class _ResidualCtx:
         for eq in self.spec.equations:
             if eq.time_derivative_order != 0:
                 continue
-            # Skip fields with constraint_solver enabled — they go through
-            # the pre_solve path which has its own validation.
-            if eq.constraint_solver.enabled:
-                continue
             has_self = any(t.field == eq.field_name for t in eq.rhs_terms)
-            if not has_self:
-                result.add(eq.field_name)
+            if has_self:
+                continue  # Pre-solve or IDA residual handles this.
+            # No self-terms → field absent from its own equation.  The
+            # constraint pre-solve skips these (nothing to solve), and the
+            # IDA Jacobian would be singular (∂F/∂field = 0).  Freeze at
+            # zero so Newton converges; the original equation becomes an
+            # IC consistency condition.
+            result.add(eq.field_name)
 
         # Describe what each frozen equation originally constrains
         for name in sorted(result):
@@ -421,6 +429,7 @@ def solve_ida(  # noqa: PLR0913
     snapshot_callback: Callable[..., None] | None = None,
     calc_initcond: str | None = None,
     allow_inconsistent_ic: bool = False,
+    progress: SimulationProgress | None = None,
 ) -> SolverResult:
     """Solve a TIDAL equation system using SUNDIALS/IDA.
 
@@ -515,19 +524,26 @@ def solve_ida(  # noqa: PLR0913
     options["calc_initcond"] = calc_initcond or "yp0"
     options["calc_init_dt"] = float(t_eval[1] - t_eval[0])
 
-    configure_linear_solver(options, layout, spec, grid, bc)
+    configure_linear_solver(options, layout, spec, grid, bc, parameters=parameters)
 
-    result: SundialsResult = call_ida(resfn, t_eval, y0, yp0, **options)
+    if progress is not None:
+        # Step-by-step mode: progress updates between solver steps (zero overhead)
+        result: SundialsResult = call_ida_stepwise(
+            resfn, t_eval, y0, yp0, progress,
+            snapshot_callback=snapshot_callback, **options,
+        )
+    else:
+        result = call_ida(resfn, t_eval, y0, yp0, **options)
 
-    # Call snapshot callback at each output time.
-    # IDA provides yp (time-derivative vector) which includes constraint
-    # velocities — passed to callback for disk storage.
-    if snapshot_callback is not None and result.success:
-        yp = result.yp
-        for i in range(len(result.t)):
-            snapshot_callback(
-                result.t[i], result.y[i], yp[i] if yp is not None else None
-            )
+        # Call snapshot callback at each output time.
+        # IDA provides yp (time-derivative vector) which includes constraint
+        # velocities — passed to callback for disk storage.
+        if snapshot_callback is not None and result.success:
+            yp = result.yp
+            for i in range(len(result.t)):
+                snapshot_callback(
+                    result.t[i], result.y[i], yp[i] if yp is not None else None
+                )
 
     return {
         "t": result.t,

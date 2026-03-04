@@ -21,7 +21,7 @@ from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
 from tidal.solver._scipy_types import IVPResult, call_solve_ivp
 from tidal.solver._setup import build_rhs_evaluator, warn_frozen_constraints
 from tidal.solver.fields import FieldSet
-from tidal.solver.leapfrog import compute_force, compute_velocity
+from tidal.solver.leapfrog import compute_force
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from tidal.solver._types import SolverResult
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
+    from tidal.solver.progress import SimulationProgress
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem
 
@@ -37,34 +38,44 @@ if TYPE_CHECKING:
 _IMPLICIT_METHODS = {"Radau", "BDF"}
 
 
-def _build_rhs_fn(
+def _build_rhs_fn(  # noqa: PLR0913, PLR0917
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
     bc: BCSpec | None,
     rhs_eval: RHSEvaluator,
+    progress: SimulationProgress | None = None,
 ) -> Callable[[float, np.ndarray], np.ndarray]:
     """Build the scipy RHS closure: ``rhs_fn(t, y) -> dydt``."""
     eq_map = spec.equation_map
     fs = FieldSet.zeros(layout, grid.shape)
+    force_buf = np.zeros(layout.total_size)
+
+    dydt_buf = np.zeros(layout.total_size)
+    drift_pairs = layout.drift_slot_pairs
 
     def rhs_fn(t: float, y: np.ndarray) -> np.ndarray:
-        dydt = np.zeros_like(y)
+        if progress is not None:
+            progress.update(t)
 
-        force = compute_force(spec, layout, grid, bc, y, t, rhs_eval, fieldset=fs)
-        velocity = compute_velocity(layout, y)
+        dydt_buf.fill(0.0)
+
+        compute_force(
+            spec, layout, grid, bc, y, t, rhs_eval, out=force_buf, fieldset=fs,
+        )
 
         for _si, s, _fn in layout.velocity_slot_groups:
-            dydt[s] = force[s]
-        for _si, s, _vs in layout.dynamical_field_slot_groups:
-            dydt[s] = velocity[s]
+            dydt_buf[s] = force_buf[s]
+        # Zero-copy velocity: read directly from y's velocity slots
+        for field_slice, vel_slice in drift_pairs:
+            dydt_buf[field_slice] = y[vel_slice]
         for _si, s, field_name in layout.first_order_slot_groups:
             eq_idx = eq_map.get(field_name)
             if eq_idx is not None:
                 result = rhs_eval.evaluate(eq_idx, fs, t)
-                dydt[s] = result.ravel()
+                dydt_buf[s] = result.ravel()
 
-        return dydt
+        return dydt_buf
 
     return rhs_fn
 
@@ -83,6 +94,7 @@ def solve_scipy(  # noqa: PLR0913
     max_step: float = np.inf,
     num_snapshots: int = 101,
     snapshot_callback: Callable[[float, np.ndarray], None] | None = None,
+    progress: SimulationProgress | None = None,
 ) -> SolverResult:
     """Solve a TIDAL equation system using scipy.integrate.solve_ivp.
 
@@ -128,8 +140,8 @@ def solve_scipy(  # noqa: PLR0913
     warn_frozen_constraints(layout, "scipy")
     rhs_eval = build_rhs_evaluator(spec, grid, parameters, bc)
 
-    # Build RHS closure
-    rhs_fn = _build_rhs_fn(spec, layout, grid, bc, rhs_eval)
+    # Build RHS closure (with optional progress tracking)
+    rhs_fn = _build_rhs_fn(spec, layout, grid, bc, rhs_eval, progress=progress)
 
     # Build time evaluation points
     t_eval = np.linspace(t_span[0], t_span[1], num_snapshots)
@@ -152,6 +164,9 @@ def solve_scipy(  # noqa: PLR0913
         max_step=max_step,
         jac_sparsity=jac_sparsity,
     )
+
+    if progress is not None:
+        progress.finish()
 
     # Call snapshot callback at each output time
     if snapshot_callback is not None and result.success:
