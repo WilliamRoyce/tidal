@@ -61,6 +61,8 @@ tidal inspect ../data/scalar_vector_coupling.json
 # Step 3: Run simulation
 # Gaussian IC for phi; periodic BCs ensure energy conservation
 tidal simulate ../data/scalar_vector_coupling.json \
+  --atol 1e-4 \
+  --rtol 1e-6 \
   --param phim2=1.0 --param Am2=0.5 --param kCS=0.3 --param gSV=0.2 \
   --grid-shape 64 \
   --bounds 0:50,0:50 \
