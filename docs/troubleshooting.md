@@ -189,197 +189,56 @@ Print["Result: ", result];  (* Should be a number, not symbolic *)
 
 **Workaround:** For now, the extra terms don't break simulation but may cause numerical artifacts
 
-## Common Python/py-pde Issues
+## Common Python Solver Issues
 
-### py-pde Type Annotation Patterns
-
-**Symptoms:** pyright/mypy errors on py-pde method returns (`gradient()`, `laplace()`, arithmetic operators)
-
-**Cause:** py-pde's type stubs don't fully describe runtime return types. Field arithmetic and gradient operations return generic base types, not `ScalarField`.
-
-**Solutions:**
-
-1. Use `TYPE_CHECKING` imports for py-pde types to avoid runtime overhead:
-
-   ```python
-   from typing import TYPE_CHECKING, cast
-   if TYPE_CHECKING:
-       from pde import CartesianGrid, FieldCollection, ScalarField
-   ```
-
-2. Cast after arithmetic and gradient operations:
-
-   ```python
-   result = phi - psi
-   result = cast("ScalarField", result)  # py-pde returns DataFieldBase at type level
-
-   grad = phi.gradient(bc=cast("Any", bc))
-   grad = cast("FieldCollection", grad)  # gradient returns VectorField at runtime
-   ```
-
-3. Always add runtime `isinstance` checks before casts — fail-fast on type mismatches:
-   ```python
-   if not isinstance(dpi_dt, ScalarField):
-       msg = "dpi_dt computed non-ScalarField result"
-       raise TypeError(msg)
-   ```
-
-**Don't:** Suppress type errors with `# type: ignore` — use casts so the type checker still validates downstream usage.
-
-### Boundary Condition Gotcha: Gradient Chaining
-
-**Symptoms:** `gradient().gradient()` (for directional second derivatives) gives wrong results or silent numerical drift on periodic grids
-
-**Cause:** py-pde requires explicit `"auto_periodic_neumann"` boundary condition string for gradient chaining. Passing `None` for periodic grids silently breaks the computation.
-
-**Solutions:**
-
-1. For periodic grids, always use:
-
-   ```python
-   bc = "auto_periodic_neumann"
-   d2_phi_dx2 = phi.gradient(bc)[0].gradient(bc)[0]  # correct ∂²φ/∂x²
-   ```
-
-2. For non-periodic grids, use `"derivative"` (Neumann, zero flux):
-
-   ```python
-   bc = "derivative"
-   ```
-
-3. For mixed periodic/non-periodic (per-axis), check `grid.periodic`:
-   ```python
-   periodic = getattr(grid, "periodic", None)
-   if isinstance(periodic, Sequence):
-       bc = "auto_periodic_neumann" if any(periodic) else "derivative"
-   ```
-
-See `infer_bc_from_grid()` in `tidal/utils.py` which encapsulates this logic.
-
-### Grid Coordinate Version Compatibility
-
-**Symptoms:** `IndexError` or wrong-shaped arrays when accessing `grid.cell_coords`
-
-**Cause:** Different py-pde versions return cell coordinates in different formats:
-
-- Grid-shaped: `(*grid.shape, dim)` — newer versions
-- Flattened: `(N_cells, dim)` — older versions
-
-**Solution:** Always normalize before use:
-
-```python
-coords = cast("np.ndarray", grid.cell_coords)
-if coords.ndim == grid.dim + 1:  # grid-shaped
-    coords = coords.reshape(-1, grid.dim)  # flatten
-# Now coords is always (N_cells, dim)
-```
-
-### Numba Backend Fallback
-
-**Symptoms:** `NotImplementedError` when solving with `backend="numba"`
-
-**Cause:** Not all PDE classes implement `_make_pde_rhs_numba`. Custom PDEs using `evolution_rate()` override instead of expression-based definitions can't auto-compile to Numba.
-
-**Solutions:**
-
-1. Check before attempting: `hasattr(pde, "_make_pde_rhs_numba")`
-2. Fallback pattern:
-   ```python
-   try:
-       result = pde.solve(state, ..., backend="numba")
-   except NotImplementedError:
-       result = pde.solve(state, ..., backend="numpy")
-   ```
-
-### Spatial Coefficient Freezing for Numba JIT
-
-**Symptoms:** Numba JIT functions see stale or corrupted spatial coefficient data
-
-**Cause:** Numba closures capture references, not copies. If the original array is modified, the JIT function sees the new data.
-
-**Solution:** Copy spatial data before creating the JIT closure:
-
-```python
-m2_data = self.m2_field.data.copy()  # freeze before JIT
-laplace = state.grid.make_operator("laplace", bc)  # create operator outside JIT
-
-@jit
-def pde_rhs(state_data, t):
-    return laplace(state_data) - m2_data * state_data  # uses frozen copy
-```
-
-### Solver Return Type Polymorphism
-
-**Symptoms:** `TypeError` or `AttributeError` accessing solve result
-
-**Cause:** `pde.solve()` can return either `FieldCollection` directly or `tuple[FieldCollection | None, dict]`.
-
-**Solution:** Use `normalize_solve_result()` from `tidal/utils.py`:
-
-```python
-from tidal.utils import normalize_solve_result
-raw = pde.solve(state, t_range=t_end, ...)
-result = normalize_solve_result(raw)  # always FieldCollection, raises if None
-```
+> **Note:** TIDAL's solver layer uses SUNDIALS IDA/CVODE + native numpy operators (see `tidal/solver/`). The former py-pde-based architecture was replaced in February 2026.
 
 ### "Unknown operator: X"
 
-**Symptoms:** `ValueError` when building PDE
+**Symptoms:** `ValueError` when loading or running a simulation
 
-**Cause:** JSON references operator not implemented in `pde_builder.py`
+**Cause:** JSON spec references an operator not in `OPERATOR_REGISTRY` (`tidal/solver/operators.py`)
 
-**Available operators:**
+**Available operators:** `identity`, `laplacian`, `laplacian_x`, `laplacian_y`, `laplacian_z`, `gradient_x`, `gradient_y`, `gradient_z`, `cross_derivative_xy`, `cross_derivative_xz`, `cross_derivative_yz`, `biharmonic`, `first_derivative_t`, `mixed_T_S1_S2_...`
 
-- `identity`, `laplacian`
-- `gradient_x`, `gradient_y`, `gradient_z`
-
-**Fix:** Add operator to `_get_operator` method in `pde_builder.py`
+**Fix:** Check `OPERATOR_REGISTRY` in `tidal/solver/operators.py`. If the operator is valid but missing, add it there.
 
 ### Grid Dimension Mismatch
 
 **Symptoms:** Error about field dimensions vs grid dimensions
 
-**Cause:** Using 1D grid for 2D spatial problem (or vice versa)
+**Cause:** Using `--grid-shape` with wrong number of dimensions for the JSON spec's spatial dimension
 
-**Check:**
+**Check:** Match grid shape to the JSON spec's `spacetime.dimension - 1` spatial dimensions:
 
-- 1+1D: `CartesianGrid(bounds=[(0,100)], shape=[256])` # 1 spatial dimension
-- 2+1D: `CartesianGrid(bounds=[(0,50),(0,50)], shape=[64,64])` # 2 spatial dimensions
+- 1+1D specs: `--grid-shape 256` (1 spatial dimension)
+- 2+1D specs: `--grid-shape 64,64` (2 spatial dimensions)
+- 3+1D specs: `--grid-shape 32,32,32` (3 spatial dimensions)
 
 ### State Size Mismatch
 
-**Symptoms:** `AssertionError` about state size
+**Symptoms:** Error about unexpected state vector size
 
-**Cause:** State has wrong number of fields
+**Cause:** State has wrong number of slots for the equation system
 
-**Correct sizes:**
+**How slot counts work** (via `StateLayout` in `tidal/solver/state.py`):
 
-- N components: 2N fields (N fields + N momenta)
-- Example: 3 vector components → 6 total fields
+- 2nd-order fields: 2 slots each (field + velocity, e.g., `phi_0` + `v_phi_0`)
+- 1st-order fields: 1 slot each (field only)
+- Constraint fields: 1 slot each (solved algebraically)
+- Example: 3 vector components (2nd order) → 6 total slots
 
-**Fix:**
+### Constraint Solver Failures
 
-```python
-# For 3 components
-state = FieldCollection([A_0, pi_0, A_1, pi_1, A_2, pi_2])
-assert len(state) == 6
-```
+**Symptoms:** IDA fails to converge, or constraint fields have NaN values
 
-### Storage Tracker Error
+**Cause:** Algebraic constraint equations may have singular operators (e.g., Laplacian with periodic BCs has a null space for constant functions)
 
-**Symptoms:** `TypeError: unexpected keyword argument 'interval'`
+**Solutions:**
 
-**Cause:** py-pde API uses positional argument, not keyword
-
-**Fix:**
-
-```python
-# BAD
-tracker=storage.tracker(interval=0.5)
-
-# GOOD
-tracker=storage.tracker(0.5)
-```
+1. The three-tier constraint pre-solve (`tidal/solver/constraint_solve.py`) handles most cases automatically
+2. For periodic BCs with pure-Laplacian constraints, gauge regularisation pins the zero mode
+3. Check `--ic` settings — constraint ICs must be consistent with dynamical field ICs
 
 ## Debugging Techniques
 

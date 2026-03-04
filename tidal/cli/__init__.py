@@ -875,9 +875,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sweep_parser.add_argument(
         "--require-stable",
-        action="store_true",
-        default=False,
-        help="Abort if stability check detects unstable mass matrix",
+        action=argparse.BooleanOptionalAction,
+        default=True,
+        help=(
+            "Abort unstable runs whose mass matrix has a negative eigenvalue "
+            "(default: True for sweeps; use --no-require-stable to override)"
+        ),
     )
     sweep_parser.add_argument(
         "--allow-inconsistent-ic",

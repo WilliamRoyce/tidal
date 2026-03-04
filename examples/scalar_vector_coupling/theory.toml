@@ -34,5 +34,17 @@ Am2 = 0.5
 kCS = 0.3
 gSV = 0.2
 
+[constraint_solver]
+enabled = true
+method = "auto"
+max_iterations = 30
+tolerance = 1e-10
+
+[constraint_solver.boundary_conditions.x]
+type = "periodic"
+
+[constraint_solver.boundary_conditions.y]
+type = "periodic"
+
 [output]
 path = "../data/scalar_vector_coupling.json"

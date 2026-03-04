@@ -2,8 +2,8 @@
 
 This document outlines the planned improvements and features for the TIDAL symbolic physics pipeline project.
 
-**Last Updated:** February 2026
-**Project Status:** Phase 13+ Complete, CLI + measurement + solver migration done (915 Python tests + ~115 Wolfram tests)
+**Last Updated:** March 2026
+**Project Status:** Phase 13+ Complete, CLI + measurement + solver migration + parameter sweeps done (1,343 Python tests + ~115 Wolfram tests)
 
 ## Overview
 
@@ -114,7 +114,7 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 | Issue                                                      | Priority | Type          | Status    |
 | ---------------------------------------------------------- | -------- | ------------- | --------- |
 | [#85] Refactor derivative classification                   | 🟢 Low   | Refactoring   | ✅ Done   |
-| [#TBD] Add Parameter Sweep Examples                        | 🟢 Low   | Documentation | Remaining |
+| [#TBD] Add Parameter Sweep Examples                        | 🟢 Low   | Documentation | ✅ Done   |
 | [#TBD] Add Python 3.12+ Testing to CI Matrix               | 🟢 Low   | CI/CD         | Remaining |
 | [#TBD] Support Elliptic PDE Solving (Constraint Equations) | 🟢 Low   | Feature       | ✅ Done   |
 
@@ -125,7 +125,6 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 **Remaining:**
 
-- Parameter sweep examples
 - Python 3.12 CI matrix
 
 ---
@@ -134,8 +133,9 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 
 | Feature                                                                                     | Status      |
 | ------------------------------------------------------------------------------------------- | ----------- |
-| CLI (`tidal` command) — 7 subcommands (derive, inspect, simulate, measure, list, validate, plot) | ✅ Complete |
-| Measurement module — energy, conversion P(t), mixing, spectral, dispersion, disk-backed I/O | ✅ Complete |
+| CLI (`tidal` command) — 9 subcommands (derive, inspect, simulate, measure, list, validate, plot, sweep, analyze) | ✅ Complete |
+| Measurement module — 13 types: energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary | ✅ Complete |
+| Parameter Sweep Framework (Phase C) — `tidal sweep` + `tidal analyze`, TOML config, adaptive/LHS/Sobol sampling, sensitivity analysis, convergence mode, 6 plot types, parallel execution | ✅ Complete |
 | `theory.toml` configuration with `[[derived_fields]]`                                       | ✅ Complete |
 | Scalar-vector coupling stress test (mixed-rank cross-field)                                 | ✅ Complete |
 | Massive 3-form example (rank-3 antisymmetric tensor)                                        | ✅ Complete |
@@ -195,7 +195,7 @@ Issues should be tagged with appropriate labels:
 
 ## Current Focus
 
-**As of v0.4.0:**
+**As of v0.5.0:**
 
 - ✅ Phase 13+ completed: All core pipeline features implemented
 - ✅ Solver migration: SUNDIALS IDA/CVODE + leapfrog + scipy replaces py-pde
@@ -203,13 +203,14 @@ Issues should be tagged with appropriate labels:
 - ✅ Background fields: position-dependent coefficients (Phase A)
 - ✅ Gauge fixing: optional per-field Lorenz/de Donder/Coulomb/temporal/axial (Phase B)
 - ✅ Constraint pre-solve: FFT/sparse three-tier solver (Phase J)
-- ✅ CLI (`tidal` command) implemented: 7 subcommands, zero new dependencies
-- ✅ Measurement module: energy, conversion P(t), mixing, spectral, dispersion, disk-backed I/O
-- ✅ 22 working examples spanning 1+1D through 3+1D
-- ✅ 915 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
-- ✅ 19 of 25 original issues resolved (76%)
+- ✅ Parameter sweep framework (Phase C): `tidal sweep` + `tidal analyze`, 13 measurement types, adaptive/LHS/Sobol sampling, Sobol/Morris sensitivity, convergence mode, 6 plot types
+- ✅ CLI (`tidal` command) implemented: 9 subcommands, zero new dependencies
+- ✅ Measurement module: 13 types (energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary)
+- ✅ 25 working examples spanning 1+1D through 3+1D
+- ✅ 1,343 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
+- ✅ 21 of 25 original issues resolved (84%)
 - 🔄 **Primary remaining focus:** Phase D (Gertsenshtein example — the project's raison d'être)
-- 🔄 **Secondary:** Phase C (parameter sweeps & convergence), Phase 2 (Wolfram CI)
+- 🔄 **Secondary:** Phase 2 (Wolfram CI)
 
 ---
 
@@ -268,9 +269,9 @@ This project follows [Semantic Versioning](https://semver.org/):
 - **MINOR** (0.X.0): New features (3+1D examples, JSON schema extensions)
 - **PATCH** (0.0.X): Bug fixes, documentation improvements
 
-**Current Version:** 0.4.0
-**Previous Milestones:** 0.3.0 delivered Phase 3 + CLI + rename to TIDAL; 0.4.0 delivered solver migration + gauge fixing + background fields + adaptive timestepping + constraint pre-solve
-**Next Major Release (1.0.0):** Phase D (Gertsenshtein example) + Phase C (convergence analysis) + Wolfram CI
+**Current Version:** 0.5.0
+**Previous Milestones:** 0.3.0 delivered Phase 3 + CLI + rename to TIDAL; 0.4.0 delivered solver migration + gauge fixing + background fields + adaptive timestepping + constraint pre-solve; 0.5.0 delivered parameter sweep framework (Phase C) with 13 measurements, sensitivity analysis, and advanced visualization
+**Next Major Release (1.0.0):** Phase D (Gertsenshtein example) + Wolfram CI
 
 ---
 

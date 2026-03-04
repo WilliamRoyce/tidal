@@ -63,7 +63,7 @@ uv run pre-commit install
 ### 3. Verify Setup
 
 ```bash
-# Run tests (915 Python tests)
+# Run tests (1,343 Python tests)
 uv run pytest
 
 # Run linter
@@ -454,7 +454,7 @@ tidal/                   # TIDAL project root
 │   │   ├── state.py         # StateLayout (field→slice mapping)
 │   │   ├── validation.py    # SpecValidator (CFL, mass sign, dimensions)
 │   │   └── constraint_solve.py  # Three-tier constraint pre-solve
-│   ├── cli/                  # CLI (`tidal` command, 7 subcommands)
+│   ├── cli/                  # CLI (`tidal` command, 9 subcommands)
 │   │   ├── __init__.py      # Entry point + argument parsing
 │   │   ├── _derive.py       # tidal derive: TOML → .wls → wolframscript
 │   │   ├── _simulate.py     # tidal simulate: JSON → PDE → solve → plot
@@ -463,7 +463,9 @@ tidal/                   # TIDAL project root
 │   │   ├── _list.py         # tidal list: discover available JSON specs
 │   │   ├── _validate.py     # tidal validate: JSON spec validation
 │   │   ├── _plot.py         # Plotting utilities for simulate
-│   │   └── _plot_command.py # tidal plot: standalone plotting
+│   │   ├── _plot_command.py # tidal plot: standalone plotting
+│   │   ├── _sweep.py        # tidal sweep: parameter sweeps
+│   │   └── _analyze.py      # tidal analyze: sensitivity analysis
 │   ├── wolfram/              # Mathematica/xAct pipeline modules
 │   │   ├── EulerLagrange.wl
 │   │   ├── ComponentDecompose.wl
@@ -472,13 +474,13 @@ tidal/                   # TIDAL project root
 │   │   ├── CommonUtilities.wl
 │   │   └── ...
 │   └── measurement/          # Post-hoc analysis (energy, conversion, spectra)
-├── tests/                    # Test suite (915 Python tests)
+├── tests/                    # Test suite (1,343 Python tests)
 │   ├── conftest.py          # Shared fixtures
 │   ├── test_cli.py          # CLI integration tests
 │   ├── test_solver_ida.py   # IDA solver tests
 │   ├── test_solver_leapfrog.py  # Leapfrog tests
 │   └── test_*.py            # Other test modules
-├── examples/                 # 22 pipeline examples
+├── examples/                 # 25 pipeline examples
 │   ├── data/                # Generated JSON specifications (24 files)
 │   └── {example}/           # Each has theory.toml, run.sh
 ├── docs/                     # Documentation
