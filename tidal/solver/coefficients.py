@@ -36,6 +36,9 @@ if TYPE_CHECKING:
     from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
 
 
+_MISSING = object()  # sentinel for dict.get() fast path
+
+
 class CoefficientEvaluator:
     """Resolve operator term coefficients with multi-level caching.
 
@@ -131,22 +134,25 @@ class CoefficientEvaluator:
         """
         key = (eq_idx, term_idx)
 
-        # L0: Pre-resolved constant
-        if key in self._constants:
-            return self._constants[key]
+        # L0: Pre-resolved constant (single dict.get avoids two-op in+[])
+        c = self._constants.get(key, _MISSING)
+        if c is not _MISSING:
+            return c
 
         # No symbolic → return numeric coefficient directly
         if term.coefficient_symbolic is None:
             return term.coefficient
 
         # Spatial-only cache (position-dependent, not time-dependent)
-        if key in self._spatial_cache:
-            return self._spatial_cache[key]
+        c = self._spatial_cache.get(key, _MISSING)
+        if c is not _MISSING:
+            return c
 
         # L3: Per-timestep cache
         ts_key = (eq_idx, term_idx, t)
-        if ts_key in self._timestep_cache:
-            return self._timestep_cache[ts_key]
+        c = self._timestep_cache.get(ts_key, _MISSING)
+        if c is not _MISSING:
+            return c
 
         # Full evaluation
         result = self._evaluate_symbolic(term, t)

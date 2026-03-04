@@ -35,7 +35,10 @@ class FieldSet:  # noqa: PLR0904
         If ``None``, initializes to zeros.
     """
 
-    __slots__ = ("_aux", "_data", "_grid_shape", "_layout", "_n", "_name_to_idx")
+    __slots__ = (
+        "_aux", "_data", "_grid_shape", "_layout", "_n",
+        "_name_to_idx", "_name_to_range",
+    )
 
     def __init__(
         self,
@@ -61,6 +64,13 @@ class FieldSet:  # noqa: PLR0904
         # Reuse the cached name → slot index mapping from StateLayout
         self._name_to_idx = layout.slot_name_to_idx
 
+        # Pre-computed (start, end) byte offsets for zero-multiply field access
+        n = layout.num_points
+        self._name_to_range: dict[str, tuple[int, int]] = {
+            name: (idx * n, (idx + 1) * n)
+            for name, idx in layout.slot_name_to_idx.items()
+        }
+
         # Auxiliary fields not backed by the flat state array (e.g.
         # constraint velocities injected from IDA's yp vector).
         self._aux: dict[str, np.ndarray] = {}
@@ -75,10 +85,9 @@ class FieldSet:  # noqa: PLR0904
         KeyError
             If *name* is not a valid slot or auxiliary name.
         """
-        idx = self._name_to_idx.get(name)
-        if idx is not None:
-            start = idx * self._n
-            return self._data[start : start + self._n].reshape(self._grid_shape)
+        r = self._name_to_range.get(name)
+        if r is not None:
+            return self._data[r[0] : r[1]].reshape(self._grid_shape)
         if name in self._aux:
             return self._aux[name]
         valid = sorted(set(self._name_to_idx) | set(self._aux))
@@ -93,12 +102,11 @@ class FieldSet:  # noqa: PLR0904
         KeyError
             If *name* is not a valid slot name.
         """
-        idx = self._name_to_idx.get(name)
-        if idx is None:
+        r = self._name_to_range.get(name)
+        if r is None:
             msg = f"Unknown slot '{name}'. Valid slots: {sorted(self._name_to_idx)}"
             raise KeyError(msg)
-        start = idx * self._n
-        self._data[start : start + self._n] = np.asarray(value).ravel()
+        self._data[r[0] : r[1]] = np.asarray(value).ravel()
 
     def __contains__(self, name: object) -> bool:
         """Check if *name* is a valid slot or auxiliary name."""

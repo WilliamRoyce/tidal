@@ -21,7 +21,7 @@ from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
 from tidal.solver._scipy_types import IVPResult, call_solve_ivp
 from tidal.solver._setup import build_rhs_evaluator, warn_frozen_constraints
 from tidal.solver.fields import FieldSet
-from tidal.solver.leapfrog import compute_force, compute_velocity
+from tidal.solver.leapfrog import compute_force
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
@@ -50,9 +50,9 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
     eq_map = spec.equation_map
     fs = FieldSet.zeros(layout, grid.shape)
     force_buf = np.zeros(layout.total_size)
-    vel_buf = np.zeros(layout.total_size)
 
     dydt_buf = np.zeros(layout.total_size)
+    drift_pairs = layout.drift_slot_pairs
 
     def rhs_fn(t: float, y: np.ndarray) -> np.ndarray:
         if progress is not None:
@@ -60,15 +60,15 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
 
         dydt_buf.fill(0.0)
 
-        force = compute_force(
+        compute_force(
             spec, layout, grid, bc, y, t, rhs_eval, out=force_buf, fieldset=fs,
         )
-        velocity = compute_velocity(layout, y, out=vel_buf)
 
         for _si, s, _fn in layout.velocity_slot_groups:
-            dydt_buf[s] = force[s]
-        for _si, s, _vs in layout.dynamical_field_slot_groups:
-            dydt_buf[s] = velocity[s]
+            dydt_buf[s] = force_buf[s]
+        # Zero-copy velocity: read directly from y's velocity slots
+        for field_slice, vel_slice in drift_pairs:
+            dydt_buf[field_slice] = y[vel_slice]
         for _si, s, field_name in layout.first_order_slot_groups:
             eq_idx = eq_map.get(field_name)
             if eq_idx is not None:

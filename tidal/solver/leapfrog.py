@@ -142,7 +142,7 @@ def _drift(
         y[s] += dt * velocity[s]
 
 
-def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
+def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913
     spec: EquationSystem,
     grid: GridInfo,
     y0: np.ndarray,
@@ -257,26 +257,34 @@ def solve_leapfrog(  # noqa: C901, PLR0913, PLR0914
     # without adding an unnecessary extra step.
     n_steps = max(1, math.ceil((t_end - t) / dt - 1e-10))
     force_buf = np.zeros(layout.total_size)
-    vel_buf = np.zeros(layout.total_size)
     fieldset_buf = FieldSet.zeros(layout, grid.shape)
+    drift_pairs = layout.drift_slot_pairs
+
+    # KDK force caching: compute F(q_0) once before the loop.  Between
+    # steps only velocity changes (half-kicks), but force depends only on
+    # position, so F(q_{n+1}) from step n is reused at the start of step
+    # n+1.  This halves force evaluations (2N → N+1).
+    compute_force(
+        spec, layout, grid, bc, y, t, rhs_eval, out=force_buf,
+        fieldset=fieldset_buf,
+    )
+
     for _step in range(n_steps):
-        # Half-kick
-        force = compute_force(
-            spec, layout, grid, bc, y, t, rhs_eval, out=force_buf,
+        # Half-kick with cached F(q_n)
+        _half_kick(y, force_buf, dt, layout)
+
+        # Drift: q += dt * v (zero-copy, reads velocity directly from y)
+        for field_slice, vel_slice in drift_pairs:
+            y[field_slice] += dt * y[vel_slice]
+
+        # Force at new position F(q_{n+1}) — cached for next step
+        compute_force(
+            spec, layout, grid, bc, y, t + dt, rhs_eval, out=force_buf,
             fieldset=fieldset_buf,
         )
-        _half_kick(y, force, dt, layout)
 
-        # Drift
-        velocity = compute_velocity(layout, y, out=vel_buf)
-        _drift(y, velocity, dt, layout)
-
-        # Half-kick
-        force = compute_force(
-            spec, layout, grid, bc, y, t, rhs_eval, out=force_buf,
-            fieldset=fieldset_buf,
-        )
-        _half_kick(y, force, dt, layout)
+        # Half-kick with F(q_{n+1})
+        _half_kick(y, force_buf, dt, layout)
 
         t += dt
 
