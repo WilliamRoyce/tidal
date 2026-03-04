@@ -84,12 +84,24 @@ field = "A"
 perturbation_name = "a"
 background = "Abar"
 
+# Gauge choices follow Palessandro & Rothman (2023) [arXiv:2301.02072], Sec. II:
+#
 # TT gauge for graviton (transverse-traceless: h_0mu = 0, h^i_i = 0, d^i h_ij = 0)
+# Eliminates 6 of 10 metric perturbation components, leaving 2 physical polarizations
+# (h_+ and h_x). Standard choice for linearized gravity in flat background.
+# Ref: Flanagan & Hughes (2005), §2; Maggiore (2008), §1.3
 [[gauge]]
 field = "h"
 type = "tt"
 
-# Lorenz gauge for photon (d_mu a^mu = 0)
+# Lorenz gauge for photon perturbation (d_mu a^mu = 0)
+# Decouples the EM equations into wave equations for each component, enabling
+# clean identification of the Gertsenshtein coupling terms. This is the standard
+# gauge for the Gertsenshtein effect in the literature:
+#   - Palessandro & Rothman (2023) [arXiv:2301.02072], Eq. 9-10
+#   - Raffelt & Stodolsky (1988) [PRD 37:1237], Sec. II
+#   - Gertsenshtein (1962) [JETP 14:84]
+# With both TT + Lorenz gauges, the coupled system reduces to h_+ and a_y only.
 [[gauge]]
 field = "a"
 type = "lorenz"

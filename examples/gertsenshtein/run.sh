@@ -5,6 +5,11 @@
 # The Einstein-Maxwell Lagrangian is linearized around flat spacetime + B0,
 # producing coupled wave equations for h_+ (graviton) and a_y (photon).
 #
+# Gauge choices (following Palessandro & Rothman 2023, arXiv:2301.02072):
+#   h: TT gauge (transverse-traceless) — standard for linearized gravity
+#   a: Lorenz gauge (d_mu a^mu = 0) — decouples EM into wave equations
+# Together these reduce the full tensor+vector system to just h_+ and a_y.
+#
 # Initial condition: Gaussian wave packet on the graviton (h_+) field,
 # observe conversion to photon (a_y) via the Gertsenshtein effect.
 #

@@ -6,6 +6,7 @@
 #   P(graviton -> photon) = sin^2(kappa * B0 * D / (4*sqrt(pi)))
 #
 # Ref: Palessandro & Rothman (2023), arXiv:2301.02072, Eq. 26
+# Gauge: TT (graviton) + Lorenz (photon), as in the reference above
 #
 # Running:
 #   cd examples/gertsenshtein && bash sweep_coupling.sh
