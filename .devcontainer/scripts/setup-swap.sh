@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Create swap file for large Wolfram derivations (e.g. Einstein-Maxwell).
-# Requires --cap-add=SYS_ADMIN in devcontainer.json runArgs.
+# NOTE: swapon does NOT work inside Docker containers on WSL2 (kernel returns
+# EINVAL). For Docker/WSL2, increase Docker Desktop memory instead:
+#   Docker Desktop → Settings → Resources → Memory → 16 GB+
+# This script is kept for non-Docker environments (native Linux, etc.).
 set -e
 
 SWAP_SIZE="${SWAP_SIZE:-4G}"

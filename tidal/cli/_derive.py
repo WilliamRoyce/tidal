@@ -3132,7 +3132,7 @@ def _run_wolframscript(script_path: Path) -> int:
         ["pkill", "-f", "WolframKernel"], capture_output=True, check=False
     )
 
-    # Warn if no swap — large derivations crash without it
+    # Warn if no swap — large derivations may crash without sufficient memory
     try:
         with open("/proc/swaps") as f:
             if len(f.readlines()) <= 1:  # header only
@@ -3141,8 +3141,7 @@ def _run_wolframscript(script_path: Path) -> int:
                     file=sys.stderr,
                 )
                 print(
-                    "  Fix: sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile"
-                    " && sudo mkswap /swapfile && sudo swapon /swapfile",
+                    "  Docker Desktop: Settings → Resources → Memory → 16 GB+",
                     file=sys.stderr,
                 )
                 print(file=sys.stderr)
