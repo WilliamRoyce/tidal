@@ -929,6 +929,12 @@ class _WlsContext:
     reduction: dict[str, Any] | None
 
 
+def _wls_mem_print(label: str) -> str:
+    """Generate a Print statement that includes current Wolfram memory usage."""
+    safe_label = label.replace('"', '\\"')
+    return f'Print["[", Round[MemoryInUse[]/1024.^2], " MB] {safe_label}"];'
+
+
 def _wls_header(ctx: _WlsContext) -> list[str]:
     """Generate script header lines."""
     return [
@@ -1416,7 +1422,7 @@ def _wls_multi_field_eom(
                 f"{eom_var} = VarD[{df['vard_expr']}, {ctx.cd}][l2ForVarD];",
                 f"{eom_var} = ToCanonical[{eom_var}];",
                 f"{eom_var} = ContractMetric[{eom_var}, {ctx.metric}];",
-                f'Print["EOM({df["name"]}): ", Short[{eom_var}, 5]];',
+                _wls_mem_print(f"EOM({df['name']}) computed"),
                 "",
             ]
         )
@@ -1443,9 +1449,10 @@ def _wls_multi_field_eom(
             skip_opt = f', "SkipTuples" -> {{{skip_tuples}}}'
         lines.extend(
             [
+                _wls_mem_print(f"Before DecomposeToComponents({df['name']})"),
                 f"(* Decompose {df['name']} EOM to components *)",
                 f'{comp_var} = DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}];',
-                f'Print["{df["name"]} components: ", Length[{comp_var}]];',
+                f'Print["[", Round[MemoryInUse[]/1024.^2], " MB] {df["name"]} decomposed: ", Length[{comp_var}], " components"];',
             ]
         )
         lines.extend(_wls_vector_background_substitution(ctx, comp_var))
@@ -1475,6 +1482,7 @@ def _wls_multi_field_eom(
             "(* Memory cleanup: free abstract EOMs and component arrays *)",
             f"Clear[{eom_vars}, {comp_vars}, l2ForVarD];",
             "Share[];",
+            _wls_mem_print("After EOM/component cleanup"),
             "",
         ]
     )
@@ -1608,7 +1616,7 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "(* 2nd-order perturbation of the full Lagrangian density *)",
             "l2Raw = Perturbation[lDensity, 2];",
             "l2Raw = ExpandPerturbation[l2Raw];",
-            'Print["L^(2) density (expanded): ", Short[l2Raw, 3]];',
+            _wls_mem_print("L^(2) density expanded"),
             "",
             "(* Validate that xPert fully expanded *)",
             "If[!FreeQ[l2Raw, Perturbation],",
@@ -1675,6 +1683,7 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "(* Memory cleanup: free perturbation intermediates *)",
             "Clear[l2Raw, lOriginal, lDensity];",
             "Share[];",
+            _wls_mem_print("After perturbation cleanup"),
             "",
         ]
     )
@@ -3122,6 +3131,23 @@ def _run_wolframscript(script_path: Path) -> int:
     subprocess.run(
         ["pkill", "-f", "WolframKernel"], capture_output=True, check=False
     )
+
+    # Warn if no swap — large derivations crash without it
+    try:
+        with open("/proc/swaps") as f:
+            if len(f.readlines()) <= 1:  # header only
+                print(
+                    "Warning: No swap space available. Large derivations may crash.",
+                    file=sys.stderr,
+                )
+                print(
+                    "  Fix: sudo fallocate -l 4G /swapfile && sudo chmod 600 /swapfile"
+                    " && sudo mkswap /swapfile && sudo swapon /swapfile",
+                    file=sys.stderr,
+                )
+                print(file=sys.stderr)
+    except OSError:
+        pass
 
     print(f"Running: wolframscript -file {script_path}")
     print()
