@@ -1467,6 +1467,18 @@ def _wls_multi_field_eom(
         )
     lines.extend(("}, 1];", ""))
 
+    # Memory cleanup: free EOM and component arrays now merged into fieldEquations
+    eom_vars = ", ".join(f"eom{df['name'].capitalize()}" for df in dyn_fields)
+    comp_vars = ", ".join(f"comp{df['name'].capitalize()}" for df in dyn_fields)
+    lines.extend(
+        [
+            "(* Memory cleanup: free abstract EOMs and component arrays *)",
+            f"Clear[{eom_vars}, {comp_vars}, l2ForVarD];",
+            "Share[];",
+            "",
+        ]
+    )
+
     return lines
 
 
@@ -1660,6 +1672,10 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             f"{p}Lagrangian = l2Raw / 2;",
             f'Print["L^(2) set: ", Short[{p}Lagrangian, 5]];',
             "",
+            "(* Memory cleanup: free perturbation intermediates *)",
+            "Clear[l2Raw, lOriginal, lDensity];",
+            "Share[];",
+            "",
         ]
     )
 
@@ -1742,6 +1758,10 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 f'  {{"{pert_field_name}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
                 "  {k, Length[componentEqs]}",
                 "];",
+                "",
+                "(* Memory cleanup: free abstract EOM and component array *)",
+                "Clear[eomLin, componentEqs, l2ForVarD];",
+                "Share[];",
                 "",
             ]
         )
@@ -2779,7 +2799,14 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
     already exist in the WLS script context (set by EL/linearization steps).
     """
     raw_count = _total_raw_component_count(ctx)
-    if raw_count > _LAGRANGIAN_DECOMPOSE_THRESHOLD:
+    # Multi-field perturbation systems (Einstein-Maxwell, etc.): always use
+    # the fast path to avoid a redundant second Lagrangian decomposition that
+    # doubles peak memory.  The EOM-based path produces empty hamiltonian_terms,
+    # which is valid for E-L velocity form.
+    has_matter_perts = bool(
+        ctx.linearization and ctx.linearization.get("matter_perturbations")
+    )
+    if raw_count > _LAGRANGIAN_DECOMPOSE_THRESHOLD or has_matter_perts:
         return _wls_canonical_from_eom(ctx)
 
     _, all_heads_str = _canonical_field_heads(ctx)
