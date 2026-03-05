@@ -132,16 +132,17 @@ SeparateFieldMetrics[expr_, chart_] := Module[
 (* Options for DecomposeToComponents *)
 Options[DecomposeToComponents] = {
   "ComputeChristoffels" -> Automatic,  (* Automatic (default), True, or False *)
-  "MetricMatrix" -> None  (* Explicit metric matrix for curved spacetime evaluation *)
+  "MetricMatrix" -> None,  (* Explicit metric matrix for curved spacetime evaluation *)
+  "SkipTuples" -> {}  (* Component index tuples to skip (e.g. TT-zeroed {0,mu}) *)
 };
 
 (* 3-arg signature: eom, field, chart (no additional fields, default options) *)
 DecomposeToComponents[eom_, field_, chart_] :=
-  DecomposeToComponents[eom, field, chart, {}, "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None];
+  DecomposeToComponents[eom, field, chart, {}, "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None, "SkipTuples" -> {}];
 
 (* 4-arg signature: eom, field, chart, additionalFields (default options) *)
 DecomposeToComponents[eom_, field_, chart_, additionalFields_List] :=
-  DecomposeToComponents[eom, field, chart, additionalFields, "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None];
+  DecomposeToComponents[eom, field, chart, additionalFields, "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None, "SkipTuples" -> {}];
 
 (* Full signature with options *)
 DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsPattern[]] := Module[
@@ -269,11 +270,21 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
 
   (* For any tensor field of rank >= 1, use the unified pipeline *)
   If[fieldRank >= 1,
-    Module[{componentTuples},
-      componentTuples = EnumerateComponentTuples[fieldHead, dim];
+    Module[{allTuples, componentTuples, skipTuples, flatIdxMap},
+      allTuples = EnumerateComponentTuples[fieldHead, dim];
+      (* Build flat index map: tuple -> original 0-based position *)
+      flatIdxMap = Association[Table[allTuples[[i]] -> i - 1, {i, Length[allTuples]}]];
+      (* Filter out tuples known to be zero (e.g. TT gauge h_{0,mu}) *)
+      skipTuples = OptionValue["SkipTuples"];
+      componentTuples = allTuples;
+      If[skipTuples =!= {},
+        componentTuples = Complement[allTuples, skipTuples];
+        Print["SkipTuples: skipping ", Length[allTuples] - Length[componentTuples],
+              " components, ", Length[componentTuples], " remaining"]
+      ];
       result = Table[
         {
-          idx - 1,
+          flatIdxMap[componentTuples[[idx]]],
           ExtractTensorComponent[eom, field, chart,
             componentTuples[[idx]], additionalFields, computeChristoffels, metricMatrix]
         },
