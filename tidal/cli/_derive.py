@@ -1420,19 +1420,37 @@ def _wls_multi_field_eom(
             [
                 f"(* Vary L^(2) w.r.t. {df['name']} *)",
                 f"{eom_var} = VarD[{df['vard_expr']}, {ctx.cd}][l2ForVarD];",
-                f"{eom_var} = ToCanonical[{eom_var}];",
+                # Apply ToCanonical term-by-term to avoid xperm segfault on
+                # large sums (xPerm external binary crashes when canonicalizing
+                # 80+ term VarD output as a single expression).
+                f"If[Head[{eom_var}] === Plus,",
+                f"  {eom_var} = Total[ToCanonical /@ List @@ {eom_var}],",
+                f"  {eom_var} = ToCanonical[{eom_var}]",
+                "];",
                 f"{eom_var} = ContractMetric[{eom_var}, {ctx.metric}];",
                 _wls_mem_print(f"EOM({df['name']}) computed"),
                 "",
             ]
         )
 
+    # Free the Lagrangian — both VarDs are done, l2ForVarD is dead
+    lines.extend(
+        [
+            "(* Free Lagrangian — no longer needed after VarD *)",
+            "Clear[l2ForVarD]; Share[];",
+            _wls_mem_print("After clearing l2ForVarD"),
+            "",
+        ]
+    )
+
     # Build set of TT-gauged field names for SkipTuples optimization
     tt_fields = {
         entry["field"] for entry in ctx.gauge if entry["type"] == "tt"
     }
 
-    # Decompose each field, listing others as additionalFields
+    # Decompose each field incrementally, freeing EOM/components between fields
+    # to reduce peak memory (cross-field coupling can blow up DecomposeToComponents).
+    lines.append("fieldEquations = {};")
     for i, df in enumerate(dyn_fields):
         eom_var = f"eom{df['name'].capitalize()}"
         comp_var = f"comp{df['name'].capitalize()}"
@@ -1457,35 +1475,16 @@ def _wls_multi_field_eom(
         )
         lines.extend(_wls_vector_background_substitution(ctx, comp_var))
         lines.extend(_wls_validate_backgrounds_after_decompose(ctx, comp_var))
-        lines.append("")
 
-    # Build combined fieldEquations
-    lines.extend(
-        [
-            "(* Build combined fieldEquations from all dynamical fields *)",
-            "fieldEquations = Flatten[{",
-        ]
-    )
-    for i, df in enumerate(dyn_fields):
-        comp_var = f"comp{df['name'].capitalize()}"
-        comma = "," if i < len(dyn_fields) - 1 else ""
-        lines.append(
-            f'  Table[{{"{df["name"]}_" <> ToString[{comp_var}[[k, 1]]], {comp_var}[[k, 2]]}}, {{k, Length[{comp_var}]}}]{comma}'
+        # Merge into fieldEquations immediately, then free EOM + components
+        lines.extend(
+            [
+                f'fieldEquations = Join[fieldEquations, Table[{{"{df["name"]}_" <> ToString[{comp_var}[[k, 1]]], {comp_var}[[k, 2]]}}, {{k, Length[{comp_var}]}}]];',
+                f"Clear[{eom_var}, {comp_var}]; Share[];",
+                _wls_mem_print(f"After merging+clearing {df['name']}"),
+                "",
+            ]
         )
-    lines.extend(("}, 1];", ""))
-
-    # Memory cleanup: free EOM and component arrays now merged into fieldEquations
-    eom_vars = ", ".join(f"eom{df['name'].capitalize()}" for df in dyn_fields)
-    comp_vars = ", ".join(f"comp{df['name'].capitalize()}" for df in dyn_fields)
-    lines.extend(
-        [
-            "(* Memory cleanup: free abstract EOMs and component arrays *)",
-            f"Clear[{eom_vars}, {comp_vars}, l2ForVarD];",
-            "Share[];",
-            _wls_mem_print("After EOM/component cleanup"),
-            "",
-        ]
-    )
 
     return lines
 
@@ -1711,9 +1710,52 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "(* Expand Scalar[x]^n into products with renamed dummies.       *)",
             "(* This fixes VarD index collision from Fierz-Pauli (tr h)^2:   *)",
             "(*   Scalar[eta^ab H_ab]^2 -> Scalar[eta^ab H_ab]*Scalar[eta^cd H_cd] *)",
+            "(* NOTE: Use /. (single pass) NOT //. — RenameDummies may return    *)",
+            "(* the same canonical form for symmetric tensors (e.g. eta[a,b]),    *)",
+            "(* causing //. to loop 65536 times before hitting $IterationLimit.   *)",
             f"l2ForVarD = {p}Lagrangian;",
-            "l2ForVarD = l2ForVarD //. Scalar[x_]^n_Integer?Positive :>",
-            "  Times @@ Table[Scalar[RenameDummies[x]], {n}];",
+            "",
+        ]
+    )
+
+    # ------------------------------------------------------------------
+    # For TT-gauged fields, impose tracelessness (η^{ab} h_{ab} = 0)
+    # in L^(2) before VarD.  This eliminates Scalar[H[a,-a]]^2 trace
+    # terms that cause ReplaceRepeated loops and memory blowup during
+    # ToBasis decomposition.  Physically correct: TT gauge ⇒ tr h = 0.
+    #
+    # IMPORTANT: Must run BEFORE the Scalar[x]^n expansion below,
+    # because that expansion wraps contents in RenameDummies[] which
+    # prevents the pattern Scalar[H[a_,-a_]] from matching.
+    # ------------------------------------------------------------------
+    tt_fields = {entry["field"] for entry in ctx.gauge if entry["type"] == "tt"}
+    for field in ctx.fields:
+        if field["name"] in tt_fields and field.get("symmetry") == "symmetric":
+            head = f"{p}{field['name'].capitalize()}"
+            lines.extend(
+                [
+                    f"(* TT traceless: set tr({field['name']}) = 0 in L^(2) before VarD *)",
+                    f"l2ForVarD = l2ForVarD //. Scalar[{head}[a_, -a_]] :> 0;",
+                    f'Print["Imposed tr({field["name"]}) = 0: ", Short[l2ForVarD, 5]];',
+                    "",
+                ]
+            )
+
+    lines.extend(
+        [
+            "(* Expand Scalar[x]^n into products with renamed dummies.       *)",
+            "(* This fixes VarD index collision from Fierz-Pauli (tr h)^2:   *)",
+            "(*   Scalar[eta^ab H_ab]^2 -> Scalar[eta^ab H_ab]*Scalar[eta^cd H_cd] *)",
+            "(* NOTE: Use /. (single pass) NOT //. — RenameDummies may return    *)",
+            "(* the same canonical form for symmetric tensors (e.g. eta[a,b]),    *)",
+            "(* causing //. to loop 65536 times before hitting $IterationLimit.   *)",
+            f"(* Evaluate Scalar[metric] → dimension (constant, no dummies to rename) *)",
+            f"l2ForVarD = l2ForVarD /. Scalar[{ctx.metric}[a_, b_]] :> {ctx.dim};",
+            "l2ForVarD = l2ForVarD /. Scalar[x_]^n_Integer?Positive :>",
+            "  Times @@ Table[With[{rd = RenameDummies[x]}, Scalar[rd]], {n}];",
+            "(* Strip unevaluated RenameDummies wrappers — VarD can't vary through them. *)",
+            "(* Safe: if RenameDummies evaluated, there's no wrapper to match.            *)",
+            "l2ForVarD = l2ForVarD /. RenameDummies[y_] :> y;",
             'Print["L^(2) for VarD (Scalar expanded): ", Short[l2ForVarD, 5]];',
             "",
         ]
@@ -1726,7 +1768,11 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             [
                 "(* Vary L^(2) with respect to perturbation field H *)",
                 f"eomLin = VarD[{field_head}[-a, -b], {ctx.cd}][l2ForVarD];",
-                "eomLin = ToCanonical[eomLin];",
+                # Term-by-term ToCanonical: xperm segfaults on large VarD sums
+                "If[Head[eomLin] === Plus,",
+                "  eomLin = Total[ToCanonical /@ List @@ eomLin],",
+                "  eomLin = ToCanonical[eomLin]",
+                "];",
                 f"eomLin = ContractMetric[eomLin, {ctx.metric}];",
                 'Print["Linearized EOM: ", Short[eomLin, 5]];',
                 "",
@@ -2927,7 +2973,11 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
     # Build JSON — always use multi-field builder since fieldEquations
     # is constructed with proper labels by both single and multi-field paths
     lines.extend(
-        ("jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];", "")
+        (
+            "jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];",
+            "Clear[fieldEquations]; Share[];",
+            "",
+        )
     )
 
     # Inject runtime parameter defaults into JSON metadata

@@ -43,7 +43,7 @@ See also: `docs/troubleshooting.md`, `docs/background_fields.md`, `docs/constrai
 
 ## Memory Backup
 
-Claude auto-memory files are backed up to `.claude-memory-backup/` (git-ignored). On container rebuild, memory is auto-restored from this backup if the volume is empty. Manual sync: `bash .devcontainer/scripts/sync-claude-memory.sh backup|restore|status`.
+Claude auto-memory files, plans, and project settings are backed up to `.claude-memory-backup/`, `.claude-plans-backup/`, and `.claude-project-backup/` (all git-ignored). On container rebuild, all are auto-restored from backup if the volume is empty. Manual sync: `bash .devcontainer/scripts/sync-claude-memory.sh backup|restore|status`.
 
 ## Session Persistence Workaround
 

@@ -66,8 +66,10 @@ BuildLorenzGaugeTerm[field_, metric_, covd_, xi_:1] := Module[
     Throw["BuildLorenzGaugeTerm: xi must be a positive number, got " <> ToString[xi]]
   ];
 
-  (* div A = metric^{ab} covd_a field_b *)
+  (* div A = metric^{ab} covd_a field_b, contracted before squaring *)
+  (* so that (div A)^2 keeps the contraction inside each Scalar[] copy *)
   divA = metric[a, b] covd[-a][field[-b]];
+  divA = ContractMetric[divA, metric];
 
   (* Gauge-fixing term: -(1/2xi)(div A)^2 *)
   gaugeTerm = -(1/(2 xi)) divA^2;

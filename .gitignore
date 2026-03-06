@@ -16,6 +16,8 @@ wolfram_test_output.txt
 /examples/data/**/*.csv
 
 .claude-memory-backup/
+.claude-plans-backup/
+.claude-project-backup/
 .claude-session-context/
 
 # Build artifacts
