@@ -798,11 +798,17 @@ def _generate_metric_code(config: dict[str, Any], prefix: str) -> str:
     raise ValueError(msg)
 
 
-def _generate_field_def(field: dict[str, Any], prefix: str, manifold: str) -> str:
+def _generate_field_def(
+    field: dict[str, Any],
+    prefix: str,
+    manifold: str,
+    *,
+    head_override: str | None = None,
+) -> str:
     """Generate DefTensor code for a field."""
     name = field["name"]
     ftype = field["type"]
-    prefixed = f"{prefix}{name.capitalize()}"
+    prefixed = head_override or f"{prefix}{name.capitalize()}"
 
     if ftype == "scalar":
         return f"If[!xTensorQ[{prefixed}],\n  DefTensor[{prefixed}[], {manifold}]\n];"
@@ -830,11 +836,16 @@ def _generate_field_def(field: dict[str, Any], prefix: str, manifold: str) -> st
     )
 
 
-def _field_expression(field: dict[str, Any], prefix: str) -> str:
+def _field_expression(
+    field: dict[str, Any],
+    prefix: str,
+    *,
+    head_override: str | None = None,
+) -> str:
     """Return the xAct expression for a field reference (e.g., 'phi[]' or 'C[-a,-b,-c]')."""
     name = field["name"]
     ftype = field["type"]
-    prefixed = f"{prefix}{name.capitalize()}"
+    prefixed = head_override or f"{prefix}{name.capitalize()}"
 
     if ftype == "scalar":
         return f"{prefixed}[]"
@@ -1018,6 +1029,7 @@ def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
         "",
         _generate_metric_code(config, ctx.prefix),
         f"MetricInBasis[{ctx.metric}, -{ctx.chart}, {ctx.prefix}MetricMatrix];",
+        f"SetMetricDownValues[{ctx.metric}, {ctx.chart}, {ctx.prefix}MetricMatrix];",
         "",
     ]
 
@@ -1370,12 +1382,19 @@ def _wls_matter_perturbation_setup(
 
         mp_sym = f"{p}{mp_name}Pert"
         mf_head = f"{p}{mf_name.capitalize()}"
-        mp_head = f"{p}{mp_name.capitalize()}"
+        # Avoid collision: if capitalize(perturbation_name) == capitalize(field_name),
+        # use the perturbation name as-is (Mathematica is case-sensitive).
+        # E.g., field "A" → geA, perturbation "a" → gea (not geA).
+        mp_head_candidate = f"{p}{mp_name.capitalize()}"
+        mp_head = (
+            f"{p}{mp_name}" if mp_head_candidate == mf_head else mp_head_candidate
+        )
 
         # Build DefTensorPerturbation arguments + perturbation field DefTensor
         pert_idx, full_idx = _xpert_index_pattern(mp_sym, mf_head, mf)
         mp_def = _generate_field_def(
             _pert_field_dict(mp_name, mf), ctx.prefix, ctx.manifold,
+            head_override=mp_head,
         )
 
         lines.extend(
@@ -1390,6 +1409,8 @@ def _wls_matter_perturbation_setup(
             ]
         )
 
+        bg_name = mp.get("background", "")
+        bg_head = f"{p}{bg_name.capitalize()}" if bg_name else ""
         info.append(
             {
                 "field_name": mf_name,
@@ -1397,6 +1418,7 @@ def _wls_matter_perturbation_setup(
                 "pert_sym": mp_sym,
                 "field_head": mf_head,
                 "pert_head": mp_head,
+                "bg_head": bg_head,
                 "field_type": mf_type,
                 "field_rank": str(mf.get("rank", 2)),
             }
@@ -1490,22 +1512,42 @@ def _wls_multi_field_eom(
 
 
 def _wls_matter_pert_truncation(mpi: dict[str, str]) -> list[str]:
-    """Generate LI[2] drop + LI[1] replacement rules for a matter perturbation."""
+    """Generate LI[2] drop + LI[1] replacement + background substitution.
+
+    After xPert perturbation, L^(2) contains:
+    - ``pertSym[LI[2], ...]``: 2nd-order perturbation (dropped)
+    - ``pertSym[LI[1], ...]``: 1st-order perturbation (→ perturbation field)
+    - Original field symbol (e.g., ``geA``): zeroth-order = background
+
+    The original field symbol must be replaced with the background field
+    so that ComponentValues from ``[[background_fields]]`` apply during
+    component decomposition.
+    """
     mp_sym, mp_head = mpi["pert_sym"], mpi["pert_head"]
+    field_head, bg_head = mpi["field_head"], mpi.get("bg_head", "")
     pname = mpi["pert_name"]
+    lines: list[str] = []
     if mpi["field_type"] == "scalar":
-        return [
+        lines.extend([
             f"(* Drop 2nd-order matter perturbation {pname}^(2) *)",
             f"l2Raw = l2Raw /. {mp_sym}[LI[2]] :> 0;",
             f"(* Replace xPert notation -> perturbation field {pname} *)",
             f"l2Raw = l2Raw /. {mp_sym}[LI[1]] :> {mp_head}[];",
-        ]
-    return [
-        f"(* Drop 2nd-order matter perturbation {pname}^(2) *)",
-        f"l2Raw = l2Raw /. {mp_sym}[LI[2], idx__] :> 0;",
-        f"(* Replace xPert notation -> perturbation field {pname} *)",
-        f"l2Raw = l2Raw /. {mp_sym}[LI[1], idx__] :> {mp_head}[idx];",
-    ]
+        ])
+    else:
+        lines.extend([
+            f"(* Drop 2nd-order matter perturbation {pname}^(2) *)",
+            f"l2Raw = l2Raw /. {mp_sym}[LI[2], idx__] :> 0;",
+            f"(* Replace xPert notation -> perturbation field {pname} *)",
+            f"l2Raw = l2Raw /. {mp_sym}[LI[1], idx__] :> {mp_head}[idx];",
+        ])
+    # Replace original field -> background so ComponentValues evaluate
+    if bg_head and bg_head != field_head:
+        lines.extend([
+            f"(* Replace zeroth-order field {field_head} -> background {bg_head} *)",
+            f"l2Raw = l2Raw /. {field_head} -> {bg_head};",
+        ])
+    return lines
 
 
 def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
@@ -1841,7 +1883,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             }
             if mpi["field_type"] not in {"scalar", "vector"}:
                 mp_field_dict["rank"] = int(mpi["field_rank"])
-            mp_fexpr = _field_expression(mp_field_dict, ctx.prefix)
+            mp_fexpr = _field_expression(
+                mp_field_dict, ctx.prefix, head_override=mpi["pert_head"],
+            )
             dyn_fields.append(
                 {
                     "name": mpi["pert_name"],
@@ -1884,13 +1928,30 @@ def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
     function in ``GaugeFix.wl``.  For custom expressions, emits the user's
     Wolfram expression directly (after field-name substitution).
     """
+    # Build perturbation head lookup for matter perturbation fields
+    # to avoid name collision (e.g., perturbation "a" → "gea", not "geA")
+    pert_head_map: dict[str, str] = {}
+    lin = ctx.linearization or {}
+    for mp in lin.get("matter_perturbations", []):
+        mp_name = mp["perturbation_name"]
+        mf_name = mp["field"]
+        candidate = f"{ctx.prefix}{mp_name.capitalize()}"
+        mf_head = f"{ctx.prefix}{mf_name.capitalize()}"
+        if candidate == mf_head:
+            pert_head_map[mp_name] = f"{ctx.prefix}{mp_name}"
+        else:
+            pert_head_map[mp_name] = candidate
+
     lines: list[str] = ["(* Gauge fixing: Lagrangian terms *)"]
     for entry in ctx.gauge:
         if _resolve_gauge_mechanism(entry) != "lagrangian_term":
             continue
         field_name: str = entry["field"]
         xi = entry.get("xi", 1)
-        pfx_field = f"{ctx.prefix}{field_name.capitalize()}"
+        # Use perturbation head if this field is a perturbation with name collision
+        pfx_field = pert_head_map.get(
+            field_name, f"{ctx.prefix}{field_name.capitalize()}"
+        )
 
         if entry["type"] == "custom":
             expr = _substitute_field_names(
