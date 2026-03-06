@@ -360,14 +360,23 @@ BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_
     batch = inputTerms[[batchStart ;; Min[batchStart + batchSize - 1, nTerms]]];
     (* TraceBasisDummy: sum dummy basis indices for this batch *)
     traced = Total[TraceBasisDummy /@ batch];
-    (* Expand: propagate ComponentValue zeros *)
+    tracedLen = If[Head[traced]===Plus, Length[traced], 1];
+    (* Expand: propagate ComponentValue zeros (MetricInBasis + TT + background) *)
     traced = Expand[traced];
+    expandLen = If[Head[traced]===Plus, Length[traced], 1];
     (* Early metric evaluation: collapse off-diagonal zeros immediately *)
     If[metricMatrix =!= None,
       traced = EvaluateMetricComponents[traced, chart, metricMatrix],
       traced = EvaluateMinkowskiMetric[traced, chart]
     ];
-    result += Expand[traced];
+    traced = Expand[traced];
+    evalLen = If[Head[traced]===Plus, Length[traced], 1];
+    (* Diagnostic: show term reduction at each stage (first batch only) *)
+    If[batchStart == 1,
+      Print["    batch-diag: TraceBasisDummy=", tracedLen,
+            " -> Expand=", expandLen, " -> MetricEval=", evalLen]
+    ];
+    result += traced;
     (* Release batch memory *)
     batch =.; traced =.;,
     {batchStart, 1, nTerms, batchSize}

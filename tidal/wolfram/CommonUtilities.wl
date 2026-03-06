@@ -163,6 +163,13 @@ using the default Minkowski signature (-,+,+,...): -1 for time (idx=0), +1 for s
 indices (idx>0). MinkowskiMetricFactor[idx, signature] uses the explicit signature list, \
 e.g. {-1,1,1} for mostly plus or {1,-1,-1} for mostly minus.";
 
+SetMetricDownValues::usage =
+  "SetMetricDownValues[metric, chart, metricMatrix] sets direct Mathematica DownValues \
+for all metric components (covariant + contravariant). Unlike MetricInBasis/AllComponentValues \
+(xCoba internal rules that do NOT auto-evaluate), these DownValues cause \
+metric[{i,basis},{j,basis}] to immediately evaluate to numeric values. This makes Expand[] \
+auto-collapse terms with zero off-diagonal metric during TraceBasisDummy processing.";
+
 Begin["`Private`"];
 
 (* === xAct Introspection Helpers === *)
@@ -399,6 +406,35 @@ EvaluateMetricComponents[expr_, chart_, metricMatrix_] := Module[
     ]
   }];
   expr /. rules
+];
+
+(* === Pre-Define Metric DownValues for Auto-Evaluation === *)
+(* Sets direct Mathematica DownValues for all metric components (covariant + contravariant).
+   Unlike MetricInBasis/AllComponentValues (which use xCoba's internal rule system and do NOT
+   auto-evaluate), these DownValues cause metric[{i, basis}, {j, basis}] to immediately
+   evaluate to the numeric value. This makes Expand[] auto-collapse terms with zero off-diagonal
+   metric components during TraceBasisDummy processing, reducing intermediate term count.
+   For a diagonal 4x4 metric: 12/16 off-diagonal zeros per index type = 75% term reduction.
+   Ref: empirical test in tests/wolfram/test_metric_component_values.wls *)
+SetMetricDownValues[metric_, chart_, metricMatrix_] := Module[
+  {dim, invMatrix, nSet = 0},
+  dim = Length[metricMatrix];
+  invMatrix = Simplify[Inverse[metricMatrix]];
+  Do[
+    With[{covVal = metricMatrix[[ii + 1, jj + 1]],
+          contVal = invMatrix[[ii + 1, jj + 1]]},
+      (* Covariant g_{ij} *)
+      metric[{ii, -chart}, {jj, -chart}] = covVal;
+      If[ii =!= jj, metric[{jj, -chart}, {ii, -chart}] = covVal];
+      (* Contravariant g^{ij} *)
+      metric[{ii, chart}, {jj, chart}] = contVal;
+      If[ii =!= jj, metric[{jj, chart}, {ii, chart}] = contVal];
+    ];
+    nSet += If[ii === jj, 2, 4],
+    {ii, 0, dim - 1}, {jj, ii, dim - 1}
+  ];
+  Print["SetMetricDownValues: Set ", nSet, " Mathematica DownValues for ", metric,
+        " (", dim, "x", dim, " cov+contrav)"];
 ];
 
 (* === Partial Derivative of Metric Evaluation === *)
