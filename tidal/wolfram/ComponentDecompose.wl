@@ -106,6 +106,15 @@ ValidateNoUnresolvedBackgrounds::usage =
   "ValidateNoUnresolvedBackgrounds[expr, bgHeads] checks that no abstract background \
 field symbols remain unresolved in the component expression.";
 
+BatchedTraceBasisDummyWithMetric::usage =
+  "BatchedTraceBasisDummyWithMetric[componentEq, chart, metricMatrix, batchSize, \
+backgroundFieldRules] performs TraceBasisDummy in batches to prevent O(dim^{2n}) \
+term blowup during Expand. Each batch of ~batchSize terms is traced, expanded, \
+and metric-evaluated before accumulating, keeping peak memory bounded. Without \
+batching, Einstein-Maxwell cross-coupling exceeds 7 GB; with batching, <1 GB. \
+Optional backgroundFieldRules evaluates background field DownValues during the \
+fused loop for further memory reduction.";
+
 (* Error messages *)
 DecomposeToComponents::badopt =
   "Invalid value for option \"ComputeChristoffels\": `1`. Expected Automatic, True, or False.";

@@ -4,7 +4,7 @@
    PURPOSE: Convert component equations to multi-field JSON format for Python pipeline
 
    DEPENDENCIES:
-     - TorsionGertsenshtein`CommonUtilities` (coefficient extraction, field parsing)
+     - None (standalone — uses only built-in Mathematica)
 
    DATA FLOW:
      ComponentEquations (from ComponentDecompose)
@@ -33,8 +33,7 @@
    Part of the TIDAL Lagrangian-to-PDE pipeline
 *)
 
-BeginPackage["TorsionGertsenshtein`ExportJSON`",
-  {"TorsionGertsenshtein`CommonUtilities`"}];
+BeginPackage["TorsionGertsenshtein`ExportJSON`"];
 
 (* Public symbols *)
 BuildJSONStructure::usage =
@@ -546,6 +545,8 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
     result
   ]
 ];
+
+(* === RHS Term Parsing === *)
 
 (* Parse RHS with cross-field reference detection *)
 ParseMultiFieldRHS[eq_, currentFieldName_, allFieldNames_] := Module[
