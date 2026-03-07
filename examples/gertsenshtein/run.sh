@@ -37,8 +37,9 @@ echo ""
 
 # Step 3: Simulate — graviton wave packet propagating through B0 region
 # The plane-wave reduction gives 1+1D system along z.
-# IC: Gaussian on h_+ (graviton), zero on a_y (photon).
-# Expect gradual conversion h_+ -> a_y over the propagation distance.
+# After constraint elimination, h_7 = -h_xx is the plus polarization.
+# IC: Gaussian on h_7 (graviton h_+), zero on a_2 (photon A_y).
+# Expect gradual conversion h_7 -> a_2 over the propagation distance.
 echo "--- Step 3: Simulate ---"
 tidal simulate ../data/gertsenshtein.json \
   --grid-shape 256 \
@@ -48,16 +49,17 @@ tidal simulate ../data/gertsenshtein.json \
   --ic-amplitude 0.1 \
   --ic-width 3.0 \
   --ic-center 20.0 \
+  --ic-component h_7 \
   --t-end 40.0 \
-  --param kappa=1.0 B0=0.3 \
+  --param kappa=1.0 --param B0=0.3 \
   --output ../data/gertsenshtein_output
 
 echo ""
 
 # Step 4: Measure energy conservation and conversion
 echo "--- Step 4: Measure ---"
-tidal measure ../data/gertsenshtein_output --what conservation --param kappa=1.0 B0=0.3
-tidal measure ../data/gertsenshtein_output --what energy --param kappa=1.0 B0=0.3
+tidal measure ../data/gertsenshtein_output --what conservation --param kappa=1.0 --param B0=0.3
+tidal measure ../data/gertsenshtein_output --what energy --param kappa=1.0 --param B0=0.3
 echo ""
 
 echo "=== Done ==="
