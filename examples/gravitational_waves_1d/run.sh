@@ -29,7 +29,7 @@ cd "$(dirname "$0")"
 OUT=../data/gw_plane_wave_1d_output
 
 # Derive equations from Lagrangian (requires wolframscript)
-# tidal derive theory.toml
+tidal derive theory.toml
 
 # Inspect the equation system (should show 1+1D, 6 fields after elimination)
 tidal inspect ../data/gw_plane_wave_1d.json
