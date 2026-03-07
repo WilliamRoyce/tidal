@@ -2287,7 +2287,12 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
     has_matter_perts = bool(
         ctx.linearization and ctx.linearization.get("matter_perturbations")
     )
-    if raw_count > _LAGRANGIAN_DECOMPOSE_THRESHOLD or has_matter_perts:
+    # Plane-wave reduction changes the surviving field set (adds transverse
+    # constraints, eliminates zero-equation fields) which breaks the 4D
+    # Hamiltonian parsing in ParseHamiltonianExpression.  Use the fast path
+    # (empty hamiltonian_terms) — energy is computed from equations instead.
+    has_plane_wave = ctx.reduction is not None
+    if raw_count > _LAGRANGIAN_DECOMPOSE_THRESHOLD or has_matter_perts or has_plane_wave:
         return _wls_canonical_from_eom(ctx)
 
     _, all_heads_str = _canonical_field_heads(ctx)
