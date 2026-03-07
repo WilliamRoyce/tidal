@@ -12,7 +12,7 @@ Primary public entry point:
 
 - ``evaluate_coefficient(expr, parameters, coordinates, ...)`` — full eval
 
-Building blocks (also used directly by ``pde_builder.PDEFromSpec``):
+Building blocks (also used directly by ``coefficients.CoefficientEvaluator``):
 
 - ``mathematica_to_python(expr, coordinates)`` — string-level conversion
 - ``build_eval_namespace(parameters)`` — static evaluation namespace
