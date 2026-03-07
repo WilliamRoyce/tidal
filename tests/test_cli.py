@@ -3871,9 +3871,10 @@ path = "output.json"
         ret = main(["derive", str(config), "--dry-run"])
         assert ret == 0
         wls = capsys.readouterr().out
-        # Matter-only perturbation (no metric perturbation)
+        # Matter-only perturbation (metric pert registered but h terms dropped)
         assert "DefTensorPerturbation" in wls
-        assert "SetupMetricPerturbation" not in wls
+        assert "SetupMetricPerturbation" in wls
+        assert "Matter-only: drop all metric perturbation orders" in wls
         # Background field evaluation pipeline
         assert "SetBackgroundFieldDownValues" in wls
         assert '"BackgroundFieldRules"' in wls

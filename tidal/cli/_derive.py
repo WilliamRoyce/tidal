@@ -1651,15 +1651,24 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     ]
 
     # --- Metric perturbation setup ---
+    # xPert requires SetupMetricPerturbation to register the global perturbation
+    # parameter, even for matter-only perturbation. Without it, Perturbation[]
+    # and ExpandPerturbation[] cannot expand Det[g] or matter fields.
+    lines.extend(
+        [
+            "(* Set up metric perturbation parameter via xPert *)",
+            f"{pert_sym}Tensor = SetupMetricPerturbation[{ctx.metric}, {pert_sym}, {eps_sym}];",
+        ]
+    )
     if has_metric_pert:
-        lines.extend(
-            [
-                "(* Set up metric perturbation: g = eta + epsilon * h  via xPert *)",
-                f"{pert_sym}Tensor = SetupMetricPerturbation[{ctx.metric}, {pert_sym}, {eps_sym}];",
-                f'Print["Perturbation: {ctx.metric} -> {ctx.metric} + {eps_sym} * {pert_field_name}"];',
-                "",
-            ]
+        lines.append(
+            f'Print["Perturbation: {ctx.metric} -> {ctx.metric} + {eps_sym} * {pert_field_name}"];',
         )
+    else:
+        lines.append(
+            f'Print["Metric perturbation parameter registered (matter-only; h terms will be dropped)"];',
+        )
+    lines.append("")
 
     # --- Matter field perturbation setup (multi-field xPert) ---
     matter_pert_info, mp_lines = _wls_matter_perturbation_setup(
@@ -1707,6 +1716,17 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
                 "",
                 "(* Replace xPert metric notation with declared field tensor *)",
                 f"l2Raw = l2Raw /. {pert_sym}[LI[1], idx__] :> {field_head}[idx];",
+            ]
+        )
+    else:
+        # Matter-only: SetupMetricPerturbation was called to register the
+        # perturbation parameter, but we don't want any metric perturbation
+        # terms. Drop ALL orders of h.
+        lines.extend(
+            [
+                "(* Matter-only: drop all metric perturbation orders *)",
+                f"l2Raw = l2Raw /. {pert_sym}[LI[_], idx___] :> 0;",
+                "l2Raw = Expand[l2Raw];",
             ]
         )
 
