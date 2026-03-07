@@ -2531,13 +2531,15 @@ class TestEnsureConsistentICRealJSON:
     """Integration tests using real derived JSON specifications."""
 
     def test_gw_plane_wave_cascade(self) -> None:
-        """Full GW 1D (12 fields): set h_4 → cascade solves h_7 and h_9.
+        """GW 1D (6 fields after constraint elimination): set h_7 and verify.
 
-        This is the primary use case that motivated the unified solver.
-        The TT gauge constraints automatically determine:
-          h_transverse_z: gradient_x(h_4) + gradient_x(h_7) = 0 → h_7 = -h_4
-          h_9: identity(h_4) + identity(h_7) + identity(h_9) = 0 → h_9 = 0
-        Velocity constraints are trivially satisfied (all v=0 initially).
+        After derive-time constraint elimination of degenerate traceless pair
+        (h_4, h_9 removed), the surviving fields are:
+          h_5, h_7: dynamical (plus/cross polarizations, free wave equations)
+          h_6, h_8: dynamical (constrained to zero by transverse conditions)
+          h_transverse_x, h_transverse_y: algebraic constraints
+        Setting h_7 (plus polarization) should work cleanly. The transverse
+        constraints should be trivially satisfied (h_6=h_8=0).
         """
         import json
         from pathlib import Path
@@ -2555,42 +2557,30 @@ class TestEnsureConsistentICRealJSON:
         n = grid.num_points
 
         y0 = np.zeros(layout.total_size)
-        # Set h_4 (one of the GW polarizations) to a Gaussian
-        h4_slot = layout.field_slot_map["h_4"]
+        # Set h_7 (plus polarization) to a Gaussian
+        h7_slot = layout.field_slot_map["h_7"]
         x = grid.axes_coords(0)
         gaussian = np.exp(-((x - 5) ** 2) / 2)
-        y0[h4_slot * n : (h4_slot + 1) * n] = gaussian.ravel()
+        y0[h7_slot * n : (h7_slot + 1) * n] = gaussian.ravel()
 
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
 
-        # h_7 should be determined by transverse_z constraint: h_7 ≈ -h_4
-        h7_slot = layout.field_slot_map["h_7"]
-        h4_data = result[h4_slot * n : (h4_slot + 1) * n].reshape(grid.shape)
-        h7_data = result[h7_slot * n : (h7_slot + 1) * n].reshape(grid.shape)
+        # h_7 should retain the Gaussian IC
+        h7_data = result[h7_slot * n : (h7_slot + 1) * n]
+        np.testing.assert_allclose(h7_data, gaussian.ravel(), atol=1e-12)
 
-        # Check the constraint residual directly
-        from tidal.solver.operators import gradient
+        # h_6, h_8 should remain zero (not coupled to h_7)
+        for fname in ("h_6", "h_8"):
+            slot = layout.field_slot_map[fname]
+            data_f = result[slot * n : (slot + 1) * n]
+            assert np.allclose(data_f, 0.0, atol=1e-12), (
+                f"{fname} should remain zero when only h_7 is set"
+            )
 
-        grad_h4 = gradient(h4_data, 0, grid, "periodic")
-        grad_h7 = gradient(h7_data, 0, grid, "periodic")
-        transverse_res = grad_h4 + grad_h7
-        assert float(np.max(np.abs(transverse_res))) < 1e-10, (
-            f"Transverse constraint residual: {np.max(np.abs(transverse_res)):.2e}"
-        )
-
-        # h_9 should be determined by traceless constraint: h_4 + h_7 + h_9 = 0
-        h9_slot = layout.field_slot_map["h_9"]
-        h9_data = result[h9_slot * n : (h9_slot + 1) * n]
-        trace_res = h4_data.ravel() + h7_data.ravel() + h9_data
-        assert float(np.max(np.abs(trace_res))) < 1e-10, (
-            f"Traceless constraint residual: {np.max(np.abs(trace_res)):.2e}"
-        )
-
-        # Velocity constraints should all be satisfied (velocities are zero)
+        # All constraint residuals should be zero
         for eq in spec.equations:
             if eq.time_derivative_order != 0:
                 continue
-            # All constraint residuals should be zero
             rhs = np.zeros(grid.shape)
             for term in eq.rhs_terms:
                 field_data = result[
@@ -2623,10 +2613,10 @@ class TestEnsureConsistentICRealJSON:
             )
 
     def test_gw_plane_wave_h5_polarization(self) -> None:
-        """GW: setting h_5 (cross polarization) instead of h_4.
+        """GW: setting h_5 (cross polarization) instead of h_7.
 
-        h_5 is the other physical DOF. Setting h_5 should NOT trigger
-        h_7 resolution (h_transverse_z only involves h_4 and h_7, not h_5).
+        h_5 is the other physical DOF (cross polarization). Setting h_5
+        should not affect h_7 — they are independent wave equations.
         """
         import json
         from pathlib import Path
