@@ -3814,6 +3814,72 @@ path = "output.json"
         # The prefixed Eta should not be further corrupted by field "a" replacement
         assert "EttidalA[" not in wls, "field name 'a' corrupted Eta substitution"
         assert "ettidalA" not in wls, "field name 'a' corrupted eta substitution"
+        # Background field DownValues + derivative evaluation in pipeline
+        assert "SetBackgroundFieldDownValues" in wls
+        assert '"BackgroundFieldRules"' in wls
+
+    def test_matter_perturbation_vector_2d_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """2D vector matter perturbation with position-dependent background."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Maxwell Perturbation 2D"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "-B0 * x[]"]
+
+[constants]
+names = ["m2", "B0"]
+
+[lagrangian]
+expression = "-1/4 (CD[-a][A[-b]] - CD[-b][A[-a]]) eta[a,c] eta[b,d] (CD[-c][A[-d]] - CD[-d][A[-c]]) - m2/2 A[-a] eta[a,b] A[-b]"
+
+[linearization]
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[parameters]
+m2 = 1.0
+B0 = 0.5
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+        wls = capsys.readouterr().out
+        # Matter-only perturbation (no metric perturbation)
+        assert "DefTensorPerturbation" in wls
+        assert "SetupMetricPerturbation" not in wls
+        # Background field evaluation pipeline
+        assert "SetBackgroundFieldDownValues" in wls
+        assert '"BackgroundFieldRules"' in wls
+        assert "-B0 * x[]" in wls
+        # Lorenz gauge on perturbation
+        assert "BuildLorenzGaugeTerm" in wls
 
     def test_matter_perturbation_missing_field(self, tmp_path: Path) -> None:
         """Matter perturbation referencing non-existent field fails validation."""

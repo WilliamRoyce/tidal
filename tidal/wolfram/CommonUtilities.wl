@@ -170,6 +170,19 @@ for all metric components (covariant + contravariant). Unlike MetricInBasis/AllC
 metric[{i,basis},{j,basis}] to immediately evaluate to numeric values. This makes Expand[] \
 auto-collapse terms with zero off-diagonal metric during TraceBasisDummy processing.";
 
+SetBackgroundFieldDownValues::usage =
+  "SetBackgroundFieldDownValues[field, chart, componentValues] sets direct Mathematica \
+DownValues for background field components. Like SetMetricDownValues but for rank-1 tensors. \
+Makes field[{mu,-chart}] auto-evaluate to the component value during Expand[], enabling \
+auto-collapse of zero-component terms during TraceBasisDummy processing.";
+
+EvaluatePDBackgroundField::usage =
+  "EvaluatePDBackgroundField[expr, chart, fieldHead, componentValues] evaluates partial \
+derivatives of background field components via ReplaceAll. Analogous to EvaluatePDMetric but \
+for background fields. Handles PD[{n,-chart}][field[{mu,-chart}]] -> D[value, coord] and \
+also substitutes bare field[{mu,-chart}] -> value. Also handles post-ConvertCDToDerivatives \
+Derivative[orders__][field][{mu,-chart}] residuals.";
+
 Begin["`Private`"];
 
 (* === xAct Introspection Helpers === *)
@@ -453,6 +466,73 @@ EvaluatePDMetric[expr_, chart_, metricMatrix_] := Module[
       IsCovDOperator[pd] || StringMatchQ[ToString[pd], "PD*"] :>
       Simplify[D[metricMatrix[[Abs[j] + 1, Abs[k] + 1]], coords[[i + 1]]]]
   }
+];
+
+(* === Pre-Define Background Field DownValues for Auto-Evaluation === *)
+(* Like SetMetricDownValues but for rank-1 background fields.
+   Sets direct Mathematica DownValues so field[{mu,-chart}] auto-evaluates
+   to the component value during Expand[]. This auto-collapses zero components
+   (e.g., Abar = (0,0,-B0*z,0) has 3 zero components out of 4). *)
+SetBackgroundFieldDownValues[field_, chart_, componentValues_List] := Module[
+  {dim, nSet = 0},
+  dim = Length[componentValues];
+  Do[
+    field[{mu, -chart}] = componentValues[[mu + 1]];
+    nSet++,
+    {mu, 0, dim - 1}
+  ];
+  Print["SetBackgroundFieldDownValues: Set ", nSet, " DownValues for ", field];
+];
+
+(* === Evaluate Partial Derivatives of Background Field Components === *)
+(* Analogous to EvaluatePDMetric but for background fields (rank-1 tensors).
+   Handles three forms:
+   1. PD[{n,-chart}][field[{mu,-chart}]] → D[value, coord]  (pre-ConvertCDToDerivatives)
+   2. field[{mu,-chart}] → value  (bare component access)
+   3. Derivative[orders__][field][{mu,-chart}] → multi-derivative of value  (post-ConvertCDToDerivatives)
+   The third form catches any residuals that survived ConvertCDToDerivatives. *)
+EvaluatePDBackgroundField[expr_, chart_, fieldHead_, componentValues_List] := Module[
+  {dim, coords, rules, result},
+  dim = Length[componentValues];
+  coords = GetCoordinateSymbols[chart];
+
+  (* Rule 1: PD derivatives — PD[{n,-chart}][field[{mu,-chart}]] → D[value, coord_n] *)
+  rules = Flatten[Table[
+    With[{deriv = Simplify[D[componentValues[[mu + 1]], coords[[n + 1]]]]},
+      pd_[{n, -chart}][fieldHead[{mu, -chart}]] /;
+        (IsCovDOperator[pd] || StringMatchQ[ToString[pd], "PD*"]) :> deriv
+    ],
+    {mu, 0, dim - 1}, {n, 0, dim - 1}
+  ]];
+
+  (* Rule 2: Bare component values — field[{mu,-chart}] → value *)
+  rules = Join[rules, Table[
+    With[{val = componentValues[[mu + 1]]},
+      fieldHead[{mu, -chart}] :> val
+    ],
+    {mu, 0, dim - 1}
+  ]];
+
+  result = expr /. rules;
+
+  (* Rule 3: Post-ConvertCDToDerivatives residuals —
+     Derivative[n1,n2,...][field][{mu,-chart}] → iterated D[value, coords] *)
+  result = result /. {
+    Derivative[orders__][fieldHead][{mu_Integer, -chart}] :>
+      Module[{val, cs, orderList, diffs},
+        val = componentValues[[mu + 1]];
+        cs = coords;
+        orderList = {orders};
+        (* Build list of differentiation variables: order_i copies of coord_i *)
+        diffs = Flatten[MapIndexed[
+          Table[cs[[First[#2]]], {#1}] &,
+          orderList
+        ]];
+        Simplify[Fold[D, val, diffs]]
+      ]
+  };
+
+  result
 ];
 
 (* === Christoffel Expansion via xAct === *)

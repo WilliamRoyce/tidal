@@ -1235,11 +1235,18 @@ def _wls_fields(ctx: _WlsContext, *, include_bg: bool = False) -> list[str]:
         for field in ctx.background_fields:
             lines.extend((_generate_field_def(field, ctx.prefix, ctx.manifold), ""))
             # Set component values via xCoba's ComponentValue mechanism.
-            # After ToBasis in ComponentDecompose, xCoba replaces the tensor
-            # with these values — no pipeline changes needed.
             lines.extend(
                 _wls_background_component_values(field, ctx.prefix, ctx.chart, ctx.dim)
             )
+            # Also set direct Mathematica DownValues for auto-collapse during
+            # TraceBasisDummy (xCoba ComponentValues don't auto-evaluate).
+            bg_prefixed = f"{ctx.prefix}{field['name'].capitalize()}"
+            bg_comps = field.get("components", [])
+            if field["type"] == "vector" and bg_comps:
+                comps_str = ", ".join(str(c) for c in bg_comps)
+                lines.append(
+                    f"SetBackgroundFieldDownValues[{bg_prefixed}, {ctx.chart}, {{{comps_str}}}];"
+                )
             lines.append("")
         lines.append("")
 
@@ -1470,6 +1477,18 @@ def _wls_multi_field_eom(
         entry["field"] for entry in ctx.gauge if entry["type"] == "tt"
     }
 
+    # Build BackgroundFieldRules for non-scalar background fields
+    bg_rules_entries: list[str] = []
+    for bf in ctx.background_fields:
+        if bf["type"] != "scalar" and bf.get("components"):
+            bg_head = f"{p}{bf['name'].capitalize()}"
+            comps_str = ", ".join(str(c) for c in bf["components"])
+            bg_rules_entries.append(f"{{{bg_head}, {{{comps_str}}}}}")
+    bg_rules_opt = ""
+    if bg_rules_entries:
+        bg_rules_str = ", ".join(bg_rules_entries)
+        bg_rules_opt = f', "BackgroundFieldRules" -> {{{bg_rules_str}}}'
+
     # Decompose each field incrementally, freeing EOM/components between fields
     # to reduce peak memory (cross-field coupling can blow up DecomposeToComponents).
     lines.append("fieldEquations = {};")
@@ -1491,7 +1510,7 @@ def _wls_multi_field_eom(
             [
                 _wls_mem_print(f"Before DecomposeToComponents({df['name']})"),
                 f"(* Decompose {df['name']} EOM to components *)",
-                f'{comp_var} = DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}];',
+                f'{comp_var} = DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}{bg_rules_opt}];',
                 f'Print["[", Round[MemoryInUse[]/1024.^2], " MB] {df["name"]} decomposed: ", Length[{comp_var}], " components"];',
             ]
         )
