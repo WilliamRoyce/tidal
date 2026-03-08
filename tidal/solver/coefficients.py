@@ -35,6 +35,10 @@ if TYPE_CHECKING:
     from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
 
 
+# ---------------------------------------------------------------------------
+# CoefficientEvaluator
+# ---------------------------------------------------------------------------
+
 _MISSING = object()  # sentinel for dict.get() fast path
 
 

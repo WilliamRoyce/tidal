@@ -19,6 +19,11 @@ if TYPE_CHECKING:
     from tidal.symbolic.json_loader import EquationSystem
 
 
+# ---------------------------------------------------------------------------
+# Dimension checks
+# ---------------------------------------------------------------------------
+
+
 def validate_operator_dimensions(spec: EquationSystem) -> None:
     """Check that all operators are compatible with the spec's spatial dimension.
 
@@ -45,6 +50,11 @@ def validate_operator_dimensions(spec: EquationSystem) -> None:
                 raise ValueError(msg)
 
 
+# ---------------------------------------------------------------------------
+# Field reference checks
+# ---------------------------------------------------------------------------
+
+
 def validate_field_references(spec: EquationSystem) -> None:
     """Check that all term field references point to valid fields.
 
@@ -66,6 +76,11 @@ def validate_field_references(spec: EquationSystem) -> None:
                     f"Valid fields: {sorted(valid_fields)}."
                 )
                 raise ValueError(msg)
+
+
+# ---------------------------------------------------------------------------
+# CFL / mass diagnostics
+# ---------------------------------------------------------------------------
 
 
 def check_cfl_stability(
@@ -142,6 +157,11 @@ def check_mass_sign(
                     f"max={float(result.max()):.4g})."
                 )
     return warnings
+
+
+# ---------------------------------------------------------------------------
+# Stability analysis
+# ---------------------------------------------------------------------------
 
 
 class StabilityResult:

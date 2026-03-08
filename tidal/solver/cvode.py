@@ -45,6 +45,11 @@ if TYPE_CHECKING:
     from tidal.symbolic.json_loader import EquationSystem
 
 
+# ---------------------------------------------------------------------------
+# RHS builder
+# ---------------------------------------------------------------------------
+
+
 def _build_rhsfn(
     spec: EquationSystem,
     layout: StateLayout,
@@ -60,7 +65,15 @@ def _build_rhsfn(
 
     def rhsfn(t: float, y: np.ndarray, yp: np.ndarray) -> None:
         force = compute_force(
-            spec, layout, grid, bc, y, t, rhs_eval, out=force_buf, fieldset=fs,
+            spec,
+            layout,
+            grid,
+            bc,
+            y,
+            t,
+            rhs_eval,
+            out=force_buf,
+            fieldset=fs,
         )
         velocity = compute_velocity(layout, y, out=vel_buf)
 
@@ -79,6 +92,11 @@ def _build_rhsfn(
             yp[s] = 0.0
 
     return rhsfn
+
+
+# ---------------------------------------------------------------------------
+# Solver entry point
+# ---------------------------------------------------------------------------
 
 
 def solve_cvode(  # noqa: PLR0913
@@ -157,7 +175,13 @@ def solve_cvode(  # noqa: PLR0913
         options["max_step"] = max_step
 
     configure_linear_solver(
-        options, layout, spec, grid, bc, parameters=parameters, solver="cvode",
+        options,
+        layout,
+        spec,
+        grid,
+        bc,
+        parameters=parameters,
+        solver="cvode",
     )
 
     # Build time evaluation points
@@ -166,8 +190,12 @@ def solve_cvode(  # noqa: PLR0913
     if progress is not None:
         # Step-by-step mode: progress updates between solver steps (zero overhead)
         result: SundialsResult = call_cvode_stepwise(
-            rhsfn, t_eval, y0, progress,
-            snapshot_callback=snapshot_callback, **options,
+            rhsfn,
+            t_eval,
+            y0,
+            progress,
+            snapshot_callback=snapshot_callback,
+            **options,
         )
     else:
         result = call_cvode(rhsfn, t_eval, y0, **options)

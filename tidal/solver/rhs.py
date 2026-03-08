@@ -28,6 +28,11 @@ if TYPE_CHECKING:
     from tidal.symbolic.json_loader import EquationSystem
 
 
+# ---------------------------------------------------------------------------
+# RHSEvaluator
+# ---------------------------------------------------------------------------
+
+
 class RHSEvaluator:
     """Evaluate RHS of field equations with resolved coefficients.
 
@@ -165,7 +170,7 @@ class RHSEvaluator:
             raise KeyError(msg)
         return self.evaluate(eq_idx, fields, t)
 
-    # ---- Internal ----
+    # ---- Internal helpers ----
 
     def _apply_resolved(
         self,

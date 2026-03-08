@@ -38,6 +38,11 @@ if TYPE_CHECKING:
     from tidal.symbolic.json_loader import EquationSystem
 
 
+# ---------------------------------------------------------------------------
+# Force / velocity kernels (shared with CVODE and scipy)
+# ---------------------------------------------------------------------------
+
+
 def compute_force(  # noqa: PLR0913, PLR0917
     spec: EquationSystem,
     layout: StateLayout,
@@ -120,6 +125,11 @@ def compute_velocity(
     return velocity
 
 
+# ---------------------------------------------------------------------------
+# KDK integration primitives
+# ---------------------------------------------------------------------------
+
+
 def _half_kick(
     y: np.ndarray,
     force: np.ndarray,
@@ -129,6 +139,11 @@ def _half_kick(
     """Apply half-kick: v += (dt/2) F(q), in-place."""
     for _slot_idx, s, _field_name in layout.velocity_slot_groups:
         y[s] += 0.5 * dt * force[s]
+
+
+# ---------------------------------------------------------------------------
+# Solver entry point
+# ---------------------------------------------------------------------------
 
 
 def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913
