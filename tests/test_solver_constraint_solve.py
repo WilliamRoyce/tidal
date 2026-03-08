@@ -2531,15 +2531,12 @@ class TestEnsureConsistentICRealJSON:
     """Integration tests using real derived JSON specifications."""
 
     def test_gw_plane_wave_cascade(self) -> None:
-        """GW 1D (6 fields after constraint elimination): set h_7 and verify.
+        """GW 1D (2 fields after full constraint elimination): set h_7 and verify.
 
-        After derive-time constraint elimination of degenerate traceless pair
-        (h_4, h_9 removed), the surviving fields are:
-          h_5, h_7: dynamical (plus/cross polarizations, free wave equations)
-          h_6, h_8: dynamical (constrained to zero by transverse conditions)
-          h_transverse_x, h_transverse_y: algebraic constraints
-        Setting h_7 (plus polarization) should work cleanly. The transverse
-        constraints should be trivially satisfied (h_6=h_8=0).
+        After derive-time constraint elimination:
+          - Traceless: h_9 eliminated, h_4 = -h_7 (degenerate pair)
+          - Transverse: h_6, h_8 eliminated (gradient_z = 0 → field = 0)
+        Only h_5 (cross) and h_7 (plus) survive — both free wave equations.
         """
         import json
         from pathlib import Path
@@ -2551,6 +2548,12 @@ class TestEnsureConsistentICRealJSON:
         with json_path.open(encoding="utf-8") as f:
             data = json.load(f)
         spec = EquationSystem.from_dict(data)
+
+        # Should have exactly 2 fields after full elimination
+        field_names = {eq.field_name for eq in spec.equations}
+        assert field_names == {"h_5", "h_7"}, (
+            f"Expected 2-field system (h_5, h_7) but got {field_names}"
+        )
 
         grid = GridInfo(bounds=((0, 10),), shape=(64,), periodic=(True,))
         layout = StateLayout.from_spec(spec, grid.num_points)
@@ -2565,52 +2568,9 @@ class TestEnsureConsistentICRealJSON:
 
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
 
-        # h_7 should retain the Gaussian IC
+        # h_7 should retain the Gaussian IC (no constraints to modify it)
         h7_data = result[h7_slot * n : (h7_slot + 1) * n]
         np.testing.assert_allclose(h7_data, gaussian.ravel(), atol=1e-12)
-
-        # h_6, h_8 should remain zero (not coupled to h_7)
-        for fname in ("h_6", "h_8"):
-            slot = layout.field_slot_map[fname]
-            data_f = result[slot * n : (slot + 1) * n]
-            assert np.allclose(data_f, 0.0, atol=1e-12), (
-                f"{fname} should remain zero when only h_7 is set"
-            )
-
-        # All constraint residuals should be zero
-        for eq in spec.equations:
-            if eq.time_derivative_order != 0:
-                continue
-            rhs = np.zeros(grid.shape)
-            for term in eq.rhs_terms:
-                field_data = result[
-                    layout.field_slot_map.get(
-                        term.field,
-                        layout.velocity_slot_map.get(
-                            term.field.removeprefix("v_"), -1
-                        ),
-                    )
-                    * n
-                    : (
-                        layout.field_slot_map.get(
-                            term.field,
-                            layout.velocity_slot_map.get(
-                                term.field.removeprefix("v_"), -1
-                            ),
-                        )
-                        + 1
-                    )
-                    * n
-                ].reshape(grid.shape)
-                from tidal.solver.operators import apply_operator as aop
-
-                operated = aop(term.operator, field_data, grid, "periodic")
-                rhs += term.coefficient * operated
-
-            max_res = float(np.max(np.abs(rhs)))
-            assert max_res < 1e-9, (
-                f"Constraint {eq.field_name} residual = {max_res:.2e}"
-            )
 
     def test_gw_plane_wave_h5_polarization(self) -> None:
         """GW: setting h_5 (cross polarization) instead of h_7.
@@ -2640,10 +2600,10 @@ class TestEnsureConsistentICRealJSON:
             -((x - 5) ** 2) / 2
         ).ravel()
 
-        # Should not raise — h_5 doesn't violate any constraint
+        # Should not raise — no constraints in 2-field system
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
 
-        # h_7 should remain zero (h_5 is independent of h_transverse_z)
+        # h_7 should remain zero (independent wave equation)
         h7_slot = layout.field_slot_map["h_7"]
         h7_data = result[h7_slot * n : (h7_slot + 1) * n]
         assert np.allclose(h7_data, 0.0, atol=1e-12), (

@@ -563,6 +563,63 @@ def _find_degenerate_constraint(  # noqa: C901
     return None
 
 
+#: Spatial derivative operators whose null space (with periodic BCs) is
+#: the constant function.  ``op(f) = 0`` with periodic BCs → ``f = const``.
+#: With zero-mean initial data this gives ``f = 0``.
+_DERIVATIVE_ZERO_OPS: frozenset[str] = frozenset(
+    {
+        "gradient_x",
+        "gradient_y",
+        "gradient_z",
+        "laplacian",
+        "laplacian_x",
+        "laplacian_y",
+        "laplacian_z",
+    }
+)
+
+
+def _find_gradient_zero_constraint(
+    equations: list[dict[str, Any]],
+) -> str | None:
+    """Find a field constrained to zero by a derivative self-constraint.
+
+    Detects algebraic equations of the form ``op(f) = 0`` where ``op`` is a
+    spatial derivative operator and ``f`` is the equation's own field.  With
+    periodic BCs and zero-mean initial data, ``gradient(f) = 0`` or
+    ``laplacian(f) = 0`` implies ``f = 0``.
+
+    These arise from TT gauge transverse constraints after plane-wave
+    reduction simplifies multi-field divergence conditions to single-term
+    self-referencing derivative equations.
+
+    Returns the field name, or ``None`` if no such constraint exists.
+    """
+    for eq in equations:
+        lhs = eq.get("lhs", {})
+        order = lhs.get("order", {})
+
+        # Must be algebraic (time=0, space=0)
+        if order.get("time", 0) != 0 or order.get("space", 0) != 0:
+            continue
+
+        terms = eq.get("rhs", {}).get("terms", [])
+
+        # Single self-referencing derivative term
+        if len(terms) != 1:
+            continue
+        term = terms[0]
+        if term["field"] != eq["field"]:
+            continue
+        if term.get("operator") not in _DERIVATIVE_ZERO_OPS:
+            continue
+
+        # op(field) = 0 with periodic BCs → field = 0
+        return eq["field"]
+
+    return None
+
+
 def _negate_symbolic(expr: str) -> str:
     """Negate a symbolic coefficient expression: ``expr`` → ``-(expr)``."""
     stripped = expr.strip()
@@ -659,7 +716,7 @@ def _substitute_in_terms(  # noqa: C901
     return [t for t in merged.values() if abs(t["coefficient"]) > _ZERO_TOL]
 
 
-def eliminate_degenerate_constraints(  # noqa: C901, PLR0912, PLR0914
+def eliminate_degenerate_constraints(  # noqa: C901, PLR0912, PLR0914, PLR0915
     spec_data: dict[str, Any],
 ) -> dict[str, Any]:
     """Eliminate fields determined by degenerate algebraic constraints.
@@ -734,6 +791,39 @@ def eliminate_degenerate_constraints(  # noqa: C901, PLR0912, PLR0914
             eq["field"] for eq in equations
         }:
             eliminated.append(constraint_eq_field)
+
+    # --- Gradient-zero elimination ---
+    # After degenerate pairs are gone, detect derivative self-constraints
+    # like ``gradient_z(h_6) = 0`` that imply ``h_6 = 0`` with periodic BCs.
+    # Eliminating such fields may expose further degenerate constraints or
+    # trivial (0=0) equations, so we iterate.
+    while True:
+        zero_field = _find_gradient_zero_constraint(equations)
+        if zero_field is None:
+            break
+
+        # Remove the zero-field's equation and substitute zero everywhere
+        new_equations = []
+        for eq in equations:
+            if eq["field"] == zero_field:
+                continue
+
+            terms = eq.get("rhs", {}).get("terms", [])
+            new_terms = _substitute_in_terms(terms, zero_field, {})
+            # Also substitute the velocity form
+            new_terms = _substitute_in_terms(
+                new_terms, f"v_{zero_field}", {}
+            )
+
+            if not new_terms:
+                # Equation became 0=0 → remove
+                continue
+
+            eq["rhs"]["terms"] = new_terms
+            new_equations.append(eq)
+
+        equations = new_equations
+        eliminated.append(zero_field)
 
     if not eliminated:
         return spec_data  # No changes

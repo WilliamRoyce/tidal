@@ -13,12 +13,10 @@
 # propagation along a single spatial axis at dramatically lower cost
 # than a full 3D simulation.
 #
-# Note: The derived JSON contains 6 fields (4 dynamical + 2 constraints)
-# after automatic constraint elimination of degenerate traceless pair
-# (h_4, h_9 eliminated). The physical DOFs are:
+# Note: The derived JSON contains 2 fields after automatic constraint
+# elimination (traceless, degenerate pair, and gradient-zero transverse):
 #   h_7 (h_+ = -h_xx = h_yy, plus polarization): d2t = d2z
 #   h_5 (h_x = h_xy, cross polarization):        d2t = d2z
-# h_6, h_8 are constrained to zero by transverse conditions.
 #
 # Running this script:
 #   cd examples/gravitational_waves_1d && bash run.sh
@@ -31,7 +29,7 @@ OUT=../data/gw_plane_wave_1d_output
 # Derive equations from Lagrangian (requires wolframscript)
 tidal derive theory.toml
 
-# Inspect the equation system (should show 1+1D, 6 fields after elimination)
+# Inspect the equation system (should show 1+1D, 2 fields after elimination)
 tidal inspect ../data/gw_plane_wave_1d.json
 
 # Run 1D simulation (Gaussian pulse on h_+ polarization, periodic BCs)

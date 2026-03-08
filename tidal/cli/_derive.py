@@ -1402,10 +1402,24 @@ def _tt_transverse_constraints(
     field_name: str,
     coord_args: str,
 ) -> list[str]:
-    """Generate WLS for TT transverse constraints: d^i h_{i,j} = 0 per spatial j."""
+    """Generate WLS for TT transverse constraints: d^i h_{i,j} = 0 per spatial j.
+
+    Instead of creating auxiliary fields (h_transverse_*), replaces the dynamical
+    equation of one existing component per constraint.  For each spatial j, the
+    constrained component is ``h_{dim-1, j}`` — the off-diagonal mixing with
+    the last spatial direction (e.g. h_{xz} for j=x in 4D).
+
+    The constraint for j = dim-1 is redundant with the traceless condition
+    (which already eliminates ``h_{dim-1, dim-1}``), so it is skipped.
+
+    After plane-wave reduction (only last-axis derivatives survive), each
+    constraint simplifies to ``∂_z(h_{z,j}) = 0``, enabling the Python
+    constraint eliminator to remove these fields entirely.
+    """
     coords = _COORDS[dim]
     lines: list[str] = []
-    for j in range(1, dim):
+    # Skip j = dim-1: that constraint is redundant with tracelessness
+    for j in range(1, dim - 1):
         deriv_terms: list[str] = []
         for i in range(1, dim):
             flat_idx = _sym_flat_index(i, j, dim)
@@ -1415,12 +1429,26 @@ def _tt_transverse_constraints(
 
         constraint_expr = " + ".join(deriv_terms)
         coord_label = coords[j] if j < len(coords) else str(j)
-        constraint_name = f"{field_name}_transverse_{coord_label}"
+
+        # Replace h_{dim-1, j}'s dynamical equation with the transverse constraint.
+        # fieldEquations uses "h_N" names (field_name + "_" + flat_index),
+        # NOT Wolfram symbol names (comp_pfx + flat_index).
+        constrained_idx = _sym_flat_index(dim - 1, j, dim)
+        constrained_field = f"{field_name}_{constrained_idx}"
+
         lines.extend(
             [
-                f"(* TT transverse: d^i h_{{i,{j}}} = 0 *)",
-                f'AppendTo[fieldEquations, {{"{constraint_name}", {constraint_expr}}}];',
-                f'Print["Added TT transverse constraint: d^i h_{{i,{j}}} = 0"];',
+                f"(* TT transverse: d^i h_{{i,{j}}} = 0"
+                f" — replaces EOM of {constrained_field} *)",
+                "fieldEquations = Table[",
+                f'  If[fieldEquations[[k, 1]] === "{constrained_field}",',
+                f'    {{"{constrained_field}", {constraint_expr}}},',
+                "    fieldEquations[[k]]",
+                "  ],",
+                "  {k, Length[fieldEquations]}",
+                "];",
+                f'Print["TT transverse: d^i h_{{i,{coord_label}}} = 0'
+                f' -> replaced {constrained_field} EOM"];',
                 "",
             ]
         )

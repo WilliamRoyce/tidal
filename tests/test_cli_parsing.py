@@ -548,9 +548,9 @@ class TestGaugeToml:
         # Temporal zeroing: h_0, h_1, h_2 = 0 (dim=3, first 3 components)
         assert "TT-temporal" in wls
         assert ":> 0" in wls
-        # Transverse constraints (must come BEFORE traceless so substitution catches them)
+        # Transverse constraints: replace existing field EOM (not new aux fields)
         assert "TT transverse" in wls
-        assert "AppendTo[fieldEquations" in wls
+        assert "replaces EOM" in wls
         # Traceless substitution + Expand + constraint replacement
         assert "TT traceless" in wls
         assert "Expand[fieldEquations" in wls

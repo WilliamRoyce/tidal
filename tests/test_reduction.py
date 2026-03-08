@@ -12,6 +12,7 @@ from tidal.symbolic.reduction import (
     _build_operator_remap,
     _check_killed_coord_refs,
     _find_degenerate_constraint,
+    _find_gradient_zero_constraint,
     _remap_coord_string,
     _remap_operator,
     _substitute_in_terms,
@@ -1174,3 +1175,292 @@ class TestEliminateDegenerateConstraints:
                         f"Cross-Laplacian found: {eq['field']} has "
                         f"laplacian_x({term['field']})"
                     )
+
+
+# ---------------------------------------------------------------------------
+# Gradient-zero constraint elimination
+# ---------------------------------------------------------------------------
+
+
+class TestFindGradientZeroConstraint:
+    """Tests for _find_gradient_zero_constraint()."""
+
+    def test_detects_gradient_self_constraint(self) -> None:
+        """Single gradient_z self-term → field constrained to zero."""
+        equations = [
+            {
+                "field": "h_6",
+                "lhs": {"expression": "h_6", "order": {"time": 0, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "gradient_z", "field": "h_6"},
+                    ],
+                },
+            },
+        ]
+        assert _find_gradient_zero_constraint(equations) == "h_6"
+
+    def test_detects_laplacian_self_constraint(self) -> None:
+        """Single laplacian self-term → field constrained to zero."""
+        equations = [
+            {
+                "field": "phi",
+                "lhs": {"expression": "phi", "order": {"time": 0, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "laplacian", "field": "phi"},
+                    ],
+                },
+            },
+        ]
+        assert _find_gradient_zero_constraint(equations) == "phi"
+
+    def test_ignores_identity_constraint(self) -> None:
+        """Identity self-term is NOT a gradient-zero constraint."""
+        equations = [
+            {
+                "field": "h_9",
+                "lhs": {"expression": "h_9", "order": {"time": 0, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "identity", "field": "h_9"},
+                    ],
+                },
+            },
+        ]
+        assert _find_gradient_zero_constraint(equations) is None
+
+    def test_ignores_dynamical_equations(self) -> None:
+        """time_order > 0 equations are not constraints."""
+        equations = [
+            {
+                "field": "h_6",
+                "lhs": {"expression": "d2_t(h_6)", "order": {"time": 2, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "gradient_z", "field": "h_6"},
+                    ],
+                },
+            },
+        ]
+        assert _find_gradient_zero_constraint(equations) is None
+
+    def test_ignores_multi_term_constraints(self) -> None:
+        """Multi-field divergence constraint is NOT a single-term gradient-zero."""
+        equations = [
+            {
+                "field": "h_6",
+                "lhs": {"expression": "h_6", "order": {"time": 0, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "gradient_x", "field": "h_4"},
+                        {"coefficient": 1.0, "operator": "gradient_z", "field": "h_6"},
+                    ],
+                },
+            },
+        ]
+        assert _find_gradient_zero_constraint(equations) is None
+
+    def test_ignores_cross_field_gradient(self) -> None:
+        """Gradient of a DIFFERENT field is not a self-constraint."""
+        equations = [
+            {
+                "field": "h_t",
+                "lhs": {"expression": "h_t", "order": {"time": 0, "space": 0}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {"coefficient": 1.0, "operator": "gradient_z", "field": "h_6"},
+                    ],
+                },
+            },
+        ]
+        assert _find_gradient_zero_constraint(equations) is None
+
+
+class TestGradientZeroElimination:
+    """Integration tests for gradient-zero elimination in eliminate_degenerate_constraints."""
+
+    def test_gradient_zero_elimination(self) -> None:
+        """Field with gradient_z(f)=0 constraint is eliminated and substituted with zero."""
+        spec = {
+            "metadata": {},
+            "fields": [
+                {"name": "h_5", "index": 0, "is_dynamical": True},
+                {"name": "h_6", "index": 1, "is_dynamical": True},
+                {"name": "h_7", "index": 2, "is_dynamical": True},
+            ],
+            "equations": [
+                {
+                    "field": "h_5",
+                    "lhs": {"expression": "d2_t(h_5)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "h_5"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_6",
+                    "lhs": {"expression": "h_6", "order": {"time": 0, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "gradient_z", "field": "h_6"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_7",
+                    "lhs": {"expression": "d2_t(h_7)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "h_7"},
+                        ],
+                    },
+                },
+            ],
+            "coupling": {},
+            "canonical": {"hamiltonian_terms": []},
+        }
+
+        result = eliminate_degenerate_constraints(spec)
+
+        field_names = {f["name"] for f in result["fields"]}
+        assert field_names == {"h_5", "h_7"}, f"Expected h_5, h_7 but got {field_names}"
+        assert "h_6" in result["metadata"]["constraint_elimination"]["eliminated_fields"]
+
+    def test_gradient_zero_removes_decoupled_terms(self) -> None:
+        """Zero-field references are removed from other equations."""
+        spec = {
+            "metadata": {},
+            "fields": [
+                {"name": "h_5", "index": 0, "is_dynamical": True},
+                {"name": "h_6", "index": 1, "is_dynamical": True},
+            ],
+            "equations": [
+                {
+                    "field": "h_5",
+                    "lhs": {"expression": "d2_t(h_5)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "h_5"},
+                            {"coefficient": 0.5, "operator": "identity", "field": "h_6"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_6",
+                    "lhs": {"expression": "h_6", "order": {"time": 0, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "gradient_z", "field": "h_6"},
+                        ],
+                    },
+                },
+            ],
+            "coupling": {},
+            "canonical": {"hamiltonian_terms": []},
+        }
+
+        result = eliminate_degenerate_constraints(spec)
+
+        # h_6 eliminated, h_5 survives without the h_6 coupling term
+        field_names = {f["name"] for f in result["fields"]}
+        assert field_names == {"h_5"}
+        eq = result["equations"][0]
+        assert len(eq["rhs"]["terms"]) == 1
+        assert eq["rhs"]["terms"][0]["field"] == "h_5"
+
+    def test_cascade_degenerate_then_gradient_zero(self) -> None:
+        """Degenerate elimination first, then gradient-zero cleans up remaining.
+
+        Mimics GW 1D structure: traceless constraint h_9 = h_4 + h_7 + h_9
+        (3-field, eliminates h_4 as h_4 = -h_7), then gradient-zero eliminates h_6.
+        """
+        spec = {
+            "metadata": {},
+            "fields": [
+                {"name": "h_4", "index": 0, "is_dynamical": True},
+                {"name": "h_5", "index": 1, "is_dynamical": True},
+                {"name": "h_6", "index": 2, "is_dynamical": True},
+                {"name": "h_7", "index": 3, "is_dynamical": True},
+                {"name": "h_9", "index": 4, "is_dynamical": True},
+            ],
+            "equations": [
+                {
+                    "field": "h_4",
+                    "lhs": {"expression": "d2_t(h_4)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "h_4"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_5",
+                    "lhs": {"expression": "d2_t(h_5)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "h_5"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_6",
+                    "lhs": {"expression": "h_6", "order": {"time": 0, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "gradient_z", "field": "h_6"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_7",
+                    "lhs": {"expression": "d2_t(h_7)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "h_7"},
+                        ],
+                    },
+                },
+                {
+                    "field": "h_9",
+                    "lhs": {"expression": "h_9", "order": {"time": 0, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": 1.0, "operator": "identity", "field": "h_4"},
+                            {"coefficient": 1.0, "operator": "identity", "field": "h_7"},
+                            {"coefficient": 1.0, "operator": "identity", "field": "h_9"},
+                        ],
+                    },
+                },
+            ],
+            "coupling": {},
+            "canonical": {"hamiltonian_terms": []},
+        }
+
+        result = eliminate_degenerate_constraints(spec)
+
+        # h_4 eliminated by degenerate (h_4 = -h_7 from traceless)
+        # h_6 eliminated by gradient-zero
+        # h_9 eliminated (constraint equation field)
+        field_names = {f["name"] for f in result["fields"]}
+        assert field_names == {"h_5", "h_7"}, f"Expected h_5, h_7 but got {field_names}"
+        elim = result["metadata"]["constraint_elimination"]["eliminated_fields"]
+        assert "h_4" in elim
+        assert "h_6" in elim
