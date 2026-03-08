@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-# Gertsenshtein Coupling Sweep — B0 parameter scan
+# Gertsenshtein Coupling Sweep — B0 parameter scan (quick version)
 #
-# Sweeps B0 (background magnetic field strength) and measures conversion
-# probability at each value. Compares against the analytical formula:
-#   P(graviton -> photon) = sin^2(kappa * B0 * D / (4*sqrt(pi)))
+# Quick sweep with fewer points and shorter integration time.
+# For the full validation sweep, use sweep_B0.sh instead.
 #
-# Ref: Palessandro & Rothman (2023), arXiv:2301.02072, Eq. 26
-# Gauge: TT (graviton) + Lorenz (photon), as in the reference above
+# Sweeps B0 and measures conversion probability P(graviton -> photon).
+# Uses plane-wave IC for direct comparison with analytical formula:
+#   P = sin^2(kappa * B0 * D / 2)
+#
+# Ref: Gertsenshtein (1962), JETP 14:84
 #
 # Running:
 #   cd examples/gertsenshtein && bash sweep_coupling.sh
@@ -14,26 +16,25 @@
 set -euo pipefail
 cd "$(dirname "$0")"
 
-echo "=== Gertsenshtein B0 Coupling Sweep ==="
+echo "=== Gertsenshtein B0 Coupling Sweep (quick) ==="
 echo ""
 
-# Sweep B0 from weak to strong coupling
-# In natural units (kappa=1), P = sin^2(B0 * D / (4*sqrt(pi)))
-# With D ~ 50 (half domain for round-trip), B0 from 0.01 to 1.0
+# Quick sweep: 10 points, t_end=100 (D=100, ~1 oscillation cycle)
 tidal sweep ../data/gertsenshtein.json \
-  --sweep "B0=0.01:0.5:10" \
+  --sweep "B0=0.01:0.25:10" \
   --measure conversion \
-  --grid-shape 256 \
+  --source h_7 --target a_2 \
+  --grid-shape 512 \
   --bounds 0:100 \
   --periodic \
-  --ic gaussian \
+  --ic plane-wave \
+  --ic-wavevector 2.0106 \
   --ic-amplitude 0.1 \
-  --ic-width 3.0 \
-  --ic-center 20.0 \
-  --t-end 40.0 \
+  --ic-component h_7 \
+  --t-end 100.0 \
   --param kappa=1.0 \
-  --output ../data/gertsenshtein_sweep_B0
+  --output ../data/gertsenshtein_sweep_quick
 
 echo ""
 echo "=== Sweep complete ==="
-echo "Results in: examples/data/gertsenshtein_sweep_B0/"
+echo "Results in: examples/data/gertsenshtein_sweep_quick/"
