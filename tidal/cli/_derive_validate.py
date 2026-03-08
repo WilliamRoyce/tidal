@@ -14,6 +14,10 @@ from __future__ import annotations
 import re
 from typing import Any
 
+# ---------------------------------------------------------------------------
+# Constants and presets
+# ---------------------------------------------------------------------------
+
 _VALID_FIELD_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9]*$")
 
 _MIN_DIM = 2
@@ -65,7 +69,9 @@ _SPATIAL_COORDS: dict[int, list[str]] = {
 _INDEX_LETTERS = list("abcdefghijklmnop")  # 16 letters, enough for dim 7 + 4 = 11
 
 
-# --- Validation ---
+# ---------------------------------------------------------------------------
+# Section validators
+# ---------------------------------------------------------------------------
 
 
 def _validate_spacetime(config: dict[str, Any]) -> None:
@@ -351,7 +357,11 @@ def _validate_matter_perturbations(
 
     for i, mp in enumerate(matter_perts):
         _validate_single_matter_perturbation(
-            i, mp, field_names, bg_names, (seen_fields, seen_pnames),
+            i,
+            mp,
+            field_names,
+            bg_names,
+            (seen_fields, seen_pnames),
         )
 
 
@@ -460,7 +470,9 @@ def _validate_linearization(
             raise ValueError(msg)
 
     if matter_perts:
-        _validate_matter_perturbations(config, matter_perts, has_lagrangian=has_lagrangian)
+        _validate_matter_perturbations(
+            config, matter_perts, has_lagrangian=has_lagrangian
+        )
 
 
 def _validate_gauge_entry_preset(
@@ -669,6 +681,11 @@ def _validate_reduction(config: dict[str, Any]) -> None:
             f"Valid axes: {spatial}"
         )
         raise ValueError(msg)
+
+
+# ---------------------------------------------------------------------------
+# Orchestrator
+# ---------------------------------------------------------------------------
 
 
 def _validate_config(config: dict[str, Any]) -> None:

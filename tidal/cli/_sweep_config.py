@@ -19,6 +19,11 @@ if TYPE_CHECKING:
     from argparse import Namespace
 
 
+# ---------------------------------------------------------------------------
+# Configuration data model
+# ---------------------------------------------------------------------------
+
+
 @dataclass
 class SweepConfig:
     """Parsed sweep configuration from TOML."""
@@ -85,6 +90,10 @@ _SIM_KEY_MAP: dict[str, str] = {
     "require_stable": "require_stable",
     "allow_inconsistent_ic": "allow_inconsistent_ic",
 }
+
+# ---------------------------------------------------------------------------
+# TOML section parsers
+# ---------------------------------------------------------------------------
 
 # Keys that should be converted from TOML list to CLI-style string
 _LIST_TO_COLON_KEYS = frozenset({"bounds"})
@@ -193,7 +202,9 @@ def _parse_range(
                 f"[sweep.{name}] log scale requires positive bounds, got {start}:{stop}"
             )
             raise ValueError(msg)
-        return cast("list[float]", np.logspace(np.log10(start), np.log10(stop), count).tolist()), {}
+        return cast(
+            "list[float]", np.logspace(np.log10(start), np.log10(stop), count).tolist()
+        ), {}
     msg = f"[sweep.{name}] unknown scale '{scale}' (expected: linear, log, adaptive)"
     raise ValueError(msg)
 
@@ -315,6 +326,11 @@ def _parse_sim_settings(data: dict[str, Any], filename: str) -> dict[str, Any]:
                 file=sys.stderr,
             )
     return sim_settings
+
+
+# ---------------------------------------------------------------------------
+# Loader and CLI integration
+# ---------------------------------------------------------------------------
 
 
 def load_sweep_config(path: Path) -> SweepConfig:  # noqa: PLR0914
@@ -464,7 +480,9 @@ def apply_config_to_args(
 
     # Fixed parameters: merge (CLI --param overrides TOML)
     existing_params: list[str] = getattr(args, "param", None) or []
-    cli_param_names: set[str] = {p.split("=", 1)[0].strip() for p in existing_params if "=" in p}
+    cli_param_names: set[str] = {
+        p.split("=", 1)[0].strip() for p in existing_params if "=" in p
+    }
     for name, val in config.fixed_params.items():
         if name not in cli_param_names:
             existing_params.append(f"{name}={val}")

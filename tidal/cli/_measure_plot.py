@@ -22,6 +22,10 @@ if TYPE_CHECKING:
 
     from tidal.measurement._io import SimulationData
 
+# ---------------------------------------------------------------------------
+# Panel renderers
+# ---------------------------------------------------------------------------
+
 _ENERGY_FLOOR = 1e-30
 
 
@@ -350,6 +354,11 @@ def _plot_summary_text(ax: Axes, data: SimulationData, results: dict[str, Any]) 
         fontfamily="monospace",
     )
     ax.axis("off")
+
+
+# ---------------------------------------------------------------------------
+# Entry point
+# ---------------------------------------------------------------------------
 
 
 def save_measurement_plot(

@@ -990,6 +990,11 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     return parser
 
 
+# ---------------------------------------------------------------------------
+# Dispatch and entry point
+# ---------------------------------------------------------------------------
+
+
 def _get_version() -> str:
     """Return the package version string from installed metadata."""
     from importlib.metadata import PackageNotFoundError, version
