@@ -53,6 +53,7 @@ echo ""
 
 # Plot sweep results: P(B0) vs analytical
 tidal plot ../data/gertsenshtein_sweep_B0 --type sweep \
+  --metric P_final \
   --title "Gertsenshtein P(B0) — graviton-photon conversion" \
   --output ../data/gertsenshtein_sweep_B0/sweep.png --quiet
 
