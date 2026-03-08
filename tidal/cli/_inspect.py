@@ -11,6 +11,92 @@ from typing import TYPE_CHECKING, Any
 if TYPE_CHECKING:
     from argparse import Namespace
 
+# Known math functions/constants to exclude from parameter discovery
+# (Mathematica + Python names)
+_MATH_NAMES = {
+    # Constants
+    "E",
+    "Pi",
+    "I",
+    "Infinity",
+    # Basic trig (Mathematica)
+    "Sin",
+    "Cos",
+    "Tan",
+    "Cot",
+    "Sec",
+    "Csc",
+    # Inverse trig (Mathematica)
+    "ArcSin",
+    "ArcCos",
+    "ArcTan",
+    "ArcCot",
+    "ArcSec",
+    "ArcCsc",
+    # Hyperbolic
+    "Sinh",
+    "Cosh",
+    "Tanh",
+    "Coth",
+    "Sech",
+    "Csch",
+    "ArcSinh",
+    "ArcCosh",
+    "ArcTanh",
+    # Exponential / logarithm
+    "Exp",
+    "Log",
+    "Log2",
+    "Log10",
+    # Algebraic
+    "Sqrt",
+    "Power",
+    "Abs",
+    "Sign",
+    "Re",
+    "Im",
+    "Conjugate",
+    # Rounding / integer
+    "Floor",
+    "Ceiling",
+    "Round",
+    "Mod",
+    "Quotient",
+    "IntegerPart",
+    "FractionalPart",
+    # Calculus / special
+    "Derivative",
+    "D",
+    "Integrate",
+    "Sum",
+    "Product",
+    "Max",
+    "Min",
+    # Python names for the same
+    "sin",
+    "cos",
+    "tan",
+    "cot",
+    "sec",
+    "csc",
+    "exp",
+    "log",
+    "sqrt",
+    "abs",
+    "np",
+    # Coordinate variable names
+    "t",
+    "x",
+    "y",
+    "z",
+    "w",
+    "v",
+    "u",
+    "r",
+    "theta",
+    "phi",
+}
+
 
 def discover_parameters(spec: object) -> dict[str, list[str]]:
     """Scan all terms for symbolic coefficients and map parameter → field names.
@@ -34,91 +120,6 @@ def discover_parameters(spec: object) -> dict[str, list[str]]:
     # Match bare identifiers (possibly preceded by '-'), ignoring math functions/operators
     ident_re = re.compile(r"[A-Za-z_]\w*")
 
-    # Known math functions/constants to exclude (Mathematica + Python names)
-    math_names = {
-        # Constants
-        "E",
-        "Pi",
-        "I",
-        "Infinity",
-        # Basic trig (Mathematica)
-        "Sin",
-        "Cos",
-        "Tan",
-        "Cot",
-        "Sec",
-        "Csc",
-        # Inverse trig (Mathematica)
-        "ArcSin",
-        "ArcCos",
-        "ArcTan",
-        "ArcCot",
-        "ArcSec",
-        "ArcCsc",
-        # Hyperbolic (Mathematica)  # noqa: ERA001
-        "Sinh",
-        "Cosh",
-        "Tanh",
-        "Coth",
-        "Sech",
-        "Csch",
-        "ArcSinh",
-        "ArcCosh",
-        "ArcTanh",
-        # Exponential / logarithm
-        "Exp",
-        "Log",
-        "Log2",
-        "Log10",
-        # Algebraic
-        "Sqrt",
-        "Power",
-        "Abs",
-        "Sign",
-        "Re",
-        "Im",
-        "Conjugate",
-        # Rounding / integer
-        "Floor",
-        "Ceiling",
-        "Round",
-        "Mod",
-        "Quotient",
-        "IntegerPart",
-        "FractionalPart",
-        # Calculus / special
-        "Derivative",
-        "D",
-        "Integrate",
-        "Sum",
-        "Product",
-        "Max",
-        "Min",
-        # Python names for the same
-        "sin",
-        "cos",
-        "tan",
-        "cot",
-        "sec",
-        "csc",
-        "exp",
-        "log",
-        "sqrt",
-        "abs",
-        "np",
-        # Coordinate variable names
-        "t",
-        "x",
-        "y",
-        "z",
-        "w",
-        "v",
-        "u",
-        "r",
-        "theta",
-        "phi",
-    }
-
     for eq in spec.equations:
         for term in eq.rhs_terms:
             sym = term.coefficient_symbolic
@@ -126,7 +127,7 @@ def discover_parameters(spec: object) -> dict[str, list[str]]:
                 continue
             # Extract identifiers from the symbolic expression
             for match in ident_re.findall(sym):
-                if match in math_names:
+                if match in _MATH_NAMES:
                     continue
                 # Skip field names (they appear in field references, not as params)
                 if match in spec.component_names:
