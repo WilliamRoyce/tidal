@@ -691,56 +691,7 @@ class TestTryAnalyticalJacobian:
 
 
 class TestSparseTier:
-    """Tests for sparse tier analytical Jacobian (1D jacfn)."""
-
-    def test_prepare_sparse_data_union_pattern(self) -> None:
-        """_prepare_sparse_data returns aligned data with union sparsity."""
-        from tidal.solver.analytical_jacobian import _prepare_sparse_data
-
-        spec = _make_kg_1d_spec()
-        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
-        layout = StateLayout.from_spec(spec, grid.num_points)
-
-        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
-        dy_data, dyp_data, pattern = _prepare_sparse_data(dF_dy, dF_dyp)
-
-        # Pattern nnz should be >= max of individual nnz
-        assert pattern.nnz >= dF_dy.nnz
-        assert pattern.nnz >= dF_dyp.nnz
-        assert len(dy_data) == pattern.nnz
-        assert len(dyp_data) == pattern.nnz
-
-    def test_sparse_jacfn_matches_dense(self) -> None:
-        """Sparse jacfn should produce same J as dense for any cj."""
-        from tidal.solver._scipy_types import csc_matrix
-        from tidal.solver.analytical_jacobian import (
-            _create_sparse_jacfn,
-            _prepare_sparse_data,
-        )
-
-        spec = _make_kg_1d_spec()
-        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
-        layout = StateLayout.from_spec(spec, grid.num_points)
-
-        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
-        dy_data, dyp_data, pattern = _prepare_sparse_data(dF_dy, dF_dyp)
-
-        cj = 3.7
-        # Dense reference
-        expected = (dF_dy + cj * dF_dyp).toarray()
-
-        # Sparse jacfn fills 1D array
-        jacfn = _create_sparse_jacfn(dy_data, dyp_data)
-        JJ_1d = np.zeros(pattern.nnz)
-        n = layout.total_size
-        jacfn(0.0, np.zeros(n), np.zeros(n), np.zeros(n), cj, JJ_1d)
-
-        # Reconstruct dense from 1D CSC data
-        reconstructed = csc_matrix(
-            (JJ_1d, pattern.indices.copy(), pattern.indptr.copy()),
-            shape=pattern.shape,
-        ).toarray()
-        np.testing.assert_allclose(reconstructed, expected, atol=1e-12)
+    """Tests for sparse/GMRES tier analytical Jacobian."""
 
     def test_gmres_tier_via_try_analytical(self) -> None:
         """try_analytical_jacobian selects GMRES tier above SPARSE_THRESHOLD."""

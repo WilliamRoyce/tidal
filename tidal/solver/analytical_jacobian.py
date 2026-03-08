@@ -18,12 +18,11 @@ Two delivery modes depending on system size:
 For the sparse tier (DENSE_THRESHOLD < N <= SPARSE_THRESHOLD), the system
 falls through to the normal FD-based ``configure_linear_solver`` path.
 Colored finite-differences with SuperLU_MT direct factorisation outperform
-unpreconditioned GMRES at these sizes.  A sparse analytical ``jacfn`` (1D
-CSC data) is implemented here (``_create_sparse_jacfn``), but disabled
-because sksundae v1.1.1 has a bug where ``_setup_memory()``
-unconditionally overwrites ``aux.jacfn`` when a sparsity pattern is
-provided (``_cy_ida.pyx:720``), preventing user-supplied ``jacfn`` from
-being called.
+unpreconditioned GMRES at these sizes.  A sparse analytical ``jacfn``
+is not implemented because sksundae v1.1.1 has a bug where
+``_setup_memory()`` unconditionally overwrites ``aux.jacfn`` when a
+sparsity pattern is provided (``_cy_ida.pyx:720``), preventing
+user-supplied ``jacfn`` from being called.
 
 Position-dependent (but time-independent) coefficients are supported:
 the spatial grid is fixed, so the Jacobian is still constant.
@@ -197,9 +196,14 @@ def _resolve_term_target(  # noqa: PLR0911
 # ---------------------------------------------------------------------------
 
 # Reuse the same detection logic as ida.py for gauge/no-self-term cases.
-LAPLACIAN_OPS = frozenset({
-    "laplacian", "laplacian_x", "laplacian_y", "laplacian_z",
-})
+LAPLACIAN_OPS = frozenset(
+    {
+        "laplacian",
+        "laplacian_x",
+        "laplacian_y",
+        "laplacian_z",
+    }
+)
 
 
 def _is_pure_laplacian(eq: ComponentEquation) -> bool:
@@ -296,9 +300,7 @@ def build_jacobian_matrices(
     I_mat = op_cache.get_identity()  # noqa: N806
 
     constraint_fields = {
-        eq.field_name
-        for eq in spec.equations
-        if eq.time_derivative_order == 0
+        eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
     }
     no_self_term_fields = _detect_no_self_term_fields(spec)
     gauge_fix_fields = _detect_gauge_fix_fields(spec, grid, bc)
@@ -310,10 +312,19 @@ def build_jacobian_matrices(
     for slot_idx, slot in enumerate(layout.slots):
         if slot.time_order == 0:
             _build_constraint_block(
-                slot_idx, slot, layout, spec, eq_map,
-                coeff_eval, op_cache, constraint_fields,
-                no_self_term_fields, gauge_fix_fields,
-                n, dF_dy, dF_dyp,
+                slot_idx,
+                slot,
+                layout,
+                spec,
+                eq_map,
+                coeff_eval,
+                op_cache,
+                constraint_fields,
+                no_self_term_fields,
+                gauge_fix_fields,
+                n,
+                dF_dy,
+                dF_dyp,
             )
 
         elif slot.kind == "velocity":
@@ -322,8 +333,16 @@ def build_jacobian_matrices(
             eq_idx = eq_map.get(slot.field_name)
             if eq_idx is not None:
                 _add_rhs_terms(
-                    slot_idx, eq_idx, spec, layout, coeff_eval,
-                    op_cache, constraint_fields, n, dF_dy, dF_dyp,
+                    slot_idx,
+                    eq_idx,
+                    spec,
+                    layout,
+                    coeff_eval,
+                    op_cache,
+                    constraint_fields,
+                    n,
+                    dF_dy,
+                    dF_dyp,
                     negate=True,
                 )
 
@@ -340,8 +359,16 @@ def build_jacobian_matrices(
             eq_idx = eq_map.get(slot.field_name)
             if eq_idx is not None:
                 _add_rhs_terms(
-                    slot_idx, eq_idx, spec, layout, coeff_eval,
-                    op_cache, constraint_fields, n, dF_dy, dF_dyp,
+                    slot_idx,
+                    eq_idx,
+                    spec,
+                    layout,
+                    coeff_eval,
+                    op_cache,
+                    constraint_fields,
+                    n,
+                    dF_dy,
+                    dF_dyp,
                     negate=True,
                 )
 
@@ -414,7 +441,10 @@ def _add_rhs_terms(  # noqa: PLR0913, PLR0917
 
     for term_idx, term in enumerate(eq.rhs_terms):
         resolved = _resolve_term_target(
-            term, layout, constraint_fields, op_cache,
+            term,
+            layout,
+            constraint_fields,
+            op_cache,
         )
         if resolved is None:
             continue
@@ -467,8 +497,16 @@ def _build_constraint_block(  # noqa: PLR0913, PLR0917
     # Case 3 (and setup for case 2): normal RHS
     # res = RHS → dF/dy += coeff * op_mat (no negation)
     _add_rhs_terms(
-        slot_idx, eq_idx, spec, layout, coeff_eval,
-        op_cache, constraint_fields, n, dF_dy, dF_dyp,
+        slot_idx,
+        eq_idx,
+        spec,
+        layout,
+        coeff_eval,
+        op_cache,
+        constraint_fields,
+        n,
+        dF_dy,
+        dF_dyp,
         negate=False,
     )
 
@@ -538,110 +576,6 @@ def _create_cvode_jacfn(
         JJ: NDArray[np.float64],  # noqa: N803
     ) -> None:
         JJ[:] = ode_jac
-
-    return jacfn
-
-
-# ---------------------------------------------------------------------------
-# Sparse tier delivery: 1D jacfn (CSC data order)
-# ---------------------------------------------------------------------------
-
-
-def _prepare_sparse_data(  # pyright: ignore[reportUnusedFunction]  # reserved for sparse tier
-    dF_dy: SparseMatrix,  # noqa: N803
-    dF_dyp: SparseMatrix,  # noqa: N803
-) -> tuple[NDArray[np.float64], NDArray[np.float64], SparseMatrix]:
-    """Align two CSC matrices to their union sparsity pattern.
-
-    Returns ``(dy_data, dyp_data, pattern)`` where ``pattern`` is a CSC
-    matrix encoding the union sparsity, and ``dy_data``/``dyp_data`` are
-    1D arrays aligned to ``pattern``'s CSC data ordering.
-
-    The sparse ``jacfn`` then computes ``JJ[:] = dy_data + cj * dyp_data``
-    — a single O(nnz) vectorized operation with zero allocation.
-    """
-    # Build union sparsity via structural OR.
-    # Replace data with ones to get structural patterns, then add.
-    ones_dy = dF_dy.copy()
-    ones_dy.data[:] = 1.0
-    ones_dyp = dF_dyp.copy()
-    ones_dyp.data[:] = 1.0
-    pattern = (ones_dy + ones_dyp).tocsc()
-    pattern.sort_indices()
-    pattern.data[:] = 1.0  # Normalize to binary
-
-    nnz = pattern.nnz
-    dy_data = np.zeros(nnz, dtype=np.float64)
-    dyp_data = np.zeros(nnz, dtype=np.float64)
-
-    dy_csc = dF_dy.tocsc()
-    dy_csc.sort_indices()
-    dyp_csc = dF_dyp.tocsc()
-    dyp_csc.sort_indices()
-
-    n_cols = pattern.shape[1]
-    for col in range(n_cols):
-        p_start = pattern.indptr[col]
-        p_rows = pattern.indices[p_start:pattern.indptr[col + 1]]
-
-        # Project dF_dy values onto union pattern for this column
-        d_start = dy_csc.indptr[col]
-        d_end = dy_csc.indptr[col + 1]
-        if d_start < d_end:
-            d_rows = dy_csc.indices[d_start:d_end]
-            idxs = np.searchsorted(p_rows, d_rows)  # pyright: ignore[reportUnknownVariableType]
-            dy_data[p_start + idxs] = dy_csc.data[d_start:d_end]
-
-        # Project dF_dyp values onto union pattern for this column
-        d_start = dyp_csc.indptr[col]
-        d_end = dyp_csc.indptr[col + 1]
-        if d_start < d_end:
-            d_rows = dyp_csc.indices[d_start:d_end]
-            idxs = np.searchsorted(p_rows, d_rows)  # pyright: ignore[reportUnknownVariableType]
-            dyp_data[p_start + idxs] = dyp_csc.data[d_start:d_end]
-
-    return dy_data, dyp_data, pattern
-
-
-def _create_sparse_jacfn(  # pyright: ignore[reportUnusedFunction]  # reserved for sparse tier
-    dy_data: NDArray[np.float64],
-    dyp_data: NDArray[np.float64],
-) -> Callable[..., None]:
-    """Create a sparse ``jacfn`` callback for IDA.
-
-    Signature: ``jacfn(t, y, yp, res, cj, JJ)`` where ``JJ`` is a 1D
-    numpy array of size ``nnz`` in CSC data order.  sksundae's
-    ``np2smat_sparse1D`` transfers this directly to SUNDIALS.
-    """
-    def jacfn(  # noqa: PLR0913, PLR0917
-        t: float,  # noqa: ARG001
-        y: NDArray[np.float64],  # noqa: ARG001
-        yp: NDArray[np.float64],  # noqa: ARG001
-        res: NDArray[np.float64],  # noqa: ARG001
-        cj: float,
-        JJ: NDArray[np.float64],  # noqa: N803
-    ) -> None:
-        np.multiply(dyp_data, cj, out=JJ)
-        np.add(dy_data, JJ, out=JJ)
-
-    return jacfn
-
-
-def _create_cvode_sparse_jacfn(  # pyright: ignore[reportUnusedFunction]  # reserved for sparse tier
-    neg_dy_data: NDArray[np.float64],
-) -> Callable[..., None]:
-    """Create a sparse ``jacfn`` callback for CVODE.
-
-    Signature: ``jacfn(t, y, yp, JJ)`` where ``JJ`` is 1D (CSC data).
-    ODE Jacobian is ``-dF_dy`` (negation of DAE residual derivative).
-    """
-    def jacfn(
-        t: float,  # noqa: ARG001
-        y: NDArray[np.float64],  # noqa: ARG001
-        yp: NDArray[np.float64],  # noqa: ARG001
-        JJ: NDArray[np.float64],  # noqa: N803
-    ) -> None:
-        JJ[:] = neg_dy_data
 
     return jacfn
 
@@ -751,17 +685,20 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
 
     # Sparse tier: fall through to FD colored-Jacobian + SuperLU_MT.
     # This outperforms unpreconditioned GMRES with analytical jactimes
-    # at moderate sizes.  A sparse analytical jacfn is implemented
-    # (_create_sparse_jacfn) but disabled because sksundae v1.1.1 has
-    # a bug where _setup_memory() overwrites aux.jacfn when sparsity
-    # is provided (_cy_ida.pyx:720).
+    # at moderate sizes.  A sparse analytical jacfn is not feasible
+    # because sksundae v1.1.1 overwrites aux.jacfn when sparsity is
+    # provided (_cy_ida.pyx:720).
     if DENSE_THRESHOLD < n_state <= SPARSE_THRESHOLD:
         return False
 
     if n_state <= DENSE_THRESHOLD:
         # Dense tier: 2D jacfn
         jac_y, jac_yp = build_jacobian_matrices(
-            spec, layout, grid, bc, parameters,
+            spec,
+            layout,
+            grid,
+            bc,
+            parameters,
         )
         options["linsolver"] = "dense"
         if solver == "cvode":
@@ -770,7 +707,8 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
             options["jacfn"] = _create_jacfn(jac_y, jac_yp)
         logger.info(
             "Analytical Jacobian (dense %s jacfn) for %d-state system",
-            solver, n_state,
+            solver,
+            n_state,
         )
 
     else:
@@ -778,7 +716,11 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
         # product.  Eliminates O(n_colors) residual evaluations per GMRES
         # iteration compared to the FD GMRES path.
         jac_y, jac_yp = build_jacobian_matrices(
-            spec, layout, grid, bc, parameters,
+            spec,
+            layout,
+            grid,
+            bc,
+            parameters,
         )
         if solver == "cvode":
             from sksundae.cvode import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
@@ -798,7 +740,8 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
             options["jactimes"] = IDAJacTimes(setupfn=None, solvefn=solvefn)  # pyright: ignore[reportUnknownArgumentType]
         logger.info(
             "Analytical Jacobian (GMRES %s jactimes) for %d-state system",
-            solver, n_state,
+            solver,
+            n_state,
         )
 
     return True

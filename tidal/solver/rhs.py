@@ -19,14 +19,13 @@ from tidal.solver.operators import (
     _bc_from_grid,  # pyright: ignore[reportPrivateUsage]
     _normalize_bc,  # pyright: ignore[reportPrivateUsage]
     _resolve_axis_bc,  # pyright: ignore[reportPrivateUsage]
-    apply_operator,
 )
 
 if TYPE_CHECKING:
     from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.fields import FieldSet
     from tidal.solver.grid import GridInfo
-    from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
+    from tidal.symbolic.json_loader import EquationSystem
 
 
 class RHSEvaluator:
@@ -197,52 +196,6 @@ class RHSEvaluator:
             return fields[vel_name]
         target = self._get_field_data(field_name, fields)
         return op_fn(target, self._grid, self._resolved_bcs)
-
-    def _apply_operator(
-        self,
-        term: OperatorTerm,
-        fields: FieldSet,
-    ) -> np.ndarray:
-        """Apply the spatial operator for a term, returning the operated data.
-
-        For ``first_derivative_t``, resolves to the velocity slot.
-
-        Raises
-        ------
-        ValueError
-            If a ``first_derivative_t`` term references a field whose
-            velocity slot is not present in the state.
-        """
-        if term.operator == "first_derivative_t":
-            vel_name = f"v_{term.field}"
-            if vel_name not in fields:
-                msg = (
-                    f"Cannot resolve first_derivative_t({term.field}): "
-                    f"velocity slot '{vel_name}' not found. "
-                    f"Available: {sorted(fields.slot_names)}"
-                )
-                raise ValueError(msg)
-            return fields[vel_name]
-        target = self._get_field_data(term.field, fields)
-        return apply_operator(term.operator, target, self._grid, self._bc)
-
-    def _evaluate_term(
-        self,
-        term: OperatorTerm,
-        fields: FieldSet,
-        t: float,
-        *,
-        eq_idx: int,
-        term_idx: int,
-    ) -> np.ndarray:
-        """Evaluate a single operator term (allocating variant).
-
-        Delegates to ``_apply_operator`` for the spatial operator, then
-        multiplies by the resolved coefficient.  Returns a new array.
-        """
-        operated = self._apply_operator(term, fields)
-        coeff = self._coeff_eval.resolve(term, t, eq_idx=eq_idx, term_idx=term_idx)
-        return coeff * operated
 
     @staticmethod
     def _get_field_data(field_name: str, fields: FieldSet) -> np.ndarray:
