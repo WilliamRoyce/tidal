@@ -1,0 +1,66 @@
+# Maxwell/Proca Matter Perturbation — Lightweight CI Test
+#
+# 2D (1+1D) Proca field A perturbed around a position-dependent background:
+#   A = Abar + epsilon * a
+# where Abar = (0, -B0*x) generates a constant "field strength" dAbar_1/dx = -B0.
+#
+# This is a minimal example to exercise the matter perturbation pipeline
+# (DefTensorPerturbation, background field derivative evaluation) without
+# metric perturbation, plane-wave reduction, or derived fields. Derives in
+# seconds — suitable for CI testing.
+#
+# Expected result: coupled wave equations for a_0, a_1 with B0-proportional
+# coupling coefficients from the background field strength.
+
+[theory]
+name = "Maxwell Matter Perturbation (CI Test)"
+description = "Proca vector perturbation in 1+1D with position-dependent background"
+
+[spacetime]
+dimension = 2
+metric = "minkowski"
+
+# A: full vector field (fundamental, to be perturbed)
+# a: perturbation (dynamical variable after linearization)
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+# Background: Abar_0 = 0, Abar_1 = -B0*x (position-dependent)
+# dAbar_1/dx = -B0 is the "field strength" that couples to the perturbation
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "-B0 * x[]"]
+
+[constants]
+names = ["m2", "B0"]
+
+# Proca Lagrangian: -1/4 F_{ab} F^{ab} - m2/2 A_a A^a
+# where F_{ab} = d_a A_b - d_b A_a (expanded directly, no derived field needed)
+[lagrangian]
+expression = "-1/4 (CD[-a][A[-b]] - CD[-b][A[-a]]) eta[a,c] eta[b,d] (CD[-c][A[-d]] - CD[-d][A[-c]]) - m2/2 A[-a] eta[a,b] A[-b]"
+
+# Matter-only perturbation: A = Abar + epsilon*a (no metric perturbation)
+[linearization]
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# Lorenz gauge on the perturbation: d_mu a^mu = 0
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+[parameters]
+m2 = 1.0
+B0 = 0.5
+
+[output]
+path = "../data/maxwell_perturbation.json"

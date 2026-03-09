@@ -38,6 +38,11 @@ if TYPE_CHECKING:
     from tidal.symbolic.json_loader import EquationSystem
 
 
+# ---------------------------------------------------------------------------
+# Force / velocity kernels (shared with CVODE and scipy)
+# ---------------------------------------------------------------------------
+
+
 def compute_force(  # noqa: PLR0913, PLR0917
     spec: EquationSystem,
     layout: StateLayout,
@@ -120,6 +125,11 @@ def compute_velocity(
     return velocity
 
 
+# ---------------------------------------------------------------------------
+# KDK integration primitives
+# ---------------------------------------------------------------------------
+
+
 def _half_kick(
     y: np.ndarray,
     force: np.ndarray,
@@ -131,15 +141,9 @@ def _half_kick(
         y[s] += 0.5 * dt * force[s]
 
 
-def _drift(  # pyright: ignore[reportUnusedFunction]  # kept for fallback reference
-    y: np.ndarray,
-    velocity: np.ndarray,
-    dt: float,
-    layout: StateLayout,
-) -> None:
-    """Apply drift: q += dt v, in-place."""
-    for _slot_idx, s, _vel_slot in layout.dynamical_field_slot_groups:
-        y[s] += dt * velocity[s]
+# ---------------------------------------------------------------------------
+# Solver entry point
+# ---------------------------------------------------------------------------
 
 
 def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913
@@ -265,7 +269,14 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913
     # position, so F(q_{n+1}) from step n is reused at the start of step
     # n+1.  This halves force evaluations (2N → N+1).
     compute_force(
-        spec, layout, grid, bc, y, t, rhs_eval, out=force_buf,
+        spec,
+        layout,
+        grid,
+        bc,
+        y,
+        t,
+        rhs_eval,
+        out=force_buf,
         fieldset=fieldset_buf,
     )
 
@@ -279,7 +290,14 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913
 
         # Force at new position F(q_{n+1}) — cached for next step
         compute_force(
-            spec, layout, grid, bc, y, t + dt, rhs_eval, out=force_buf,
+            spec,
+            layout,
+            grid,
+            bc,
+            y,
+            t + dt,
+            rhs_eval,
+            out=force_buf,
             fieldset=fieldset_buf,
         )
 

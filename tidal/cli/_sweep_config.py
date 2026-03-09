@@ -19,6 +19,11 @@ if TYPE_CHECKING:
     from argparse import Namespace
 
 
+# ---------------------------------------------------------------------------
+# Configuration data model
+# ---------------------------------------------------------------------------
+
+
 @dataclass
 class SweepConfig:
     """Parsed sweep configuration from TOML."""
@@ -42,6 +47,10 @@ class SweepConfig:
     )
     sweep_strategy: str | None = None
     n_samples: int | None = None
+    n_replicates: int = 1
+    base_seed: int = 42
+    ic_perturbation: float | None = None
+    param_noise: dict[str, float] | None = None
 
 
 _KNOWN_SECTIONS = frozenset(
@@ -54,6 +63,7 @@ _KNOWN_SECTIONS = frozenset(
         "output",
         "execution",
         "convergence",
+        "ensemble",
     }
 )
 
@@ -85,6 +95,10 @@ _SIM_KEY_MAP: dict[str, str] = {
     "require_stable": "require_stable",
     "allow_inconsistent_ic": "allow_inconsistent_ic",
 }
+
+# ---------------------------------------------------------------------------
+# TOML section parsers
+# ---------------------------------------------------------------------------
 
 # Keys that should be converted from TOML list to CLI-style string
 _LIST_TO_COLON_KEYS = frozenset({"bounds"})
@@ -193,7 +207,9 @@ def _parse_range(
                 f"[sweep.{name}] log scale requires positive bounds, got {start}:{stop}"
             )
             raise ValueError(msg)
-        return cast("list[float]", np.logspace(np.log10(start), np.log10(stop), count).tolist()), {}
+        return cast(
+            "list[float]", np.logspace(np.log10(start), np.log10(stop), count).tolist()
+        ), {}
     msg = f"[sweep.{name}] unknown scale '{scale}' (expected: linear, log, adaptive)"
     raise ValueError(msg)
 
@@ -290,17 +306,44 @@ def _parse_output(data: dict[str, Any], toml_dir: Path) -> Path:
     return toml_dir / "sweep_output"
 
 
-def _parse_execution(data: dict[str, Any]) -> tuple[int | None, bool, bool, bool]:
-    """Parse [execution] section. Returns (parallel, resume, force_large, dry_run)."""
+def _parse_execution(
+    data: dict[str, Any],
+) -> tuple[int | None, bool, bool, bool, int, int]:
+    """Parse [execution] section.
+
+    Returns (parallel, resume, force_large, dry_run, n_replicates, base_seed).
+    """
     if "execution" not in data:
-        return None, False, False, False
+        return None, False, False, False, 1, 42
     exe = data["execution"]
     return (
         exe.get("parallel"),
         bool(exe.get("resume", False)),
         bool(exe.get("force_large_sweep", False)),
         bool(exe.get("dry_run", False)),
+        int(exe.get("n_replicates", 1)),
+        int(exe.get("base_seed", 42)),
     )
+
+
+def _parse_ensemble(
+    data: dict[str, Any],
+) -> tuple[float | None, dict[str, float] | None]:
+    """Parse [ensemble] section for IC perturbation and parameter noise.
+
+    Returns (ic_perturbation, param_noise).
+    """
+    if "ensemble" not in data:
+        return None, None
+    ens = data["ensemble"]
+    ic_pert = ens.get("ic_perturbation")
+    if ic_pert is not None:
+        ic_pert = float(ic_pert)
+    param_noise: dict[str, float] | None = None
+    raw_pn = ens.get("param_noise")
+    if raw_pn and isinstance(raw_pn, dict):
+        param_noise = {str(k): float(v) for k, v in raw_pn.items()}  # type: ignore[reportUnknownVariableType, reportUnknownArgumentType]
+    return ic_pert, param_noise
 
 
 def _parse_sim_settings(data: dict[str, Any], filename: str) -> dict[str, Any]:
@@ -315,6 +358,11 @@ def _parse_sim_settings(data: dict[str, Any], filename: str) -> dict[str, Any]:
                 file=sys.stderr,
             )
     return sim_settings
+
+
+# ---------------------------------------------------------------------------
+# Loader and CLI integration
+# ---------------------------------------------------------------------------
 
 
 def load_sweep_config(path: Path) -> SweepConfig:  # noqa: PLR0914
@@ -365,7 +413,10 @@ def load_sweep_config(path: Path) -> SweepConfig:  # noqa: PLR0914
         raise ValueError(msg)
 
     meas, source, target, energy_threshold = _parse_measurement(data)
-    parallel, resume, force_large, dry_run = _parse_execution(data)
+    parallel, resume, force_large, dry_run, n_replicates, base_seed = _parse_execution(
+        data
+    )
+    ic_perturbation, param_noise = _parse_ensemble(data)
 
     return SweepConfig(
         spec_path=toml_dir / data["spec"],
@@ -385,6 +436,10 @@ def load_sweep_config(path: Path) -> SweepConfig:  # noqa: PLR0914
         adaptive_config=adaptive_config,
         sweep_strategy=strategy,
         n_samples=n_samples,
+        n_replicates=n_replicates,
+        base_seed=base_seed,
+        ic_perturbation=ic_perturbation,
+        param_noise=param_noise,
     )
 
 
@@ -418,7 +473,7 @@ def _apply_sim_settings(config: SweepConfig, args: Namespace) -> None:
             setattr(args, cli_attr, toml_val)
 
 
-def _apply_execution_settings(config: SweepConfig, args: Namespace) -> None:
+def _apply_execution_settings(config: SweepConfig, args: Namespace) -> None:  # noqa: C901
     """Fill execution settings from config into args (CLI wins)."""
     if getattr(args, "parallel", None) is None and config.parallel is not None:
         args.parallel = config.parallel
@@ -434,6 +489,19 @@ def _apply_execution_settings(config: SweepConfig, args: Namespace) -> None:
         args.sweep_strategy = config.sweep_strategy
     if getattr(args, "n_samples", None) is None and config.n_samples is not None:
         args.n_samples = config.n_samples
+    # Ensemble / replicate settings (CLI wins)
+    if getattr(args, "n_replicates", None) is None and config.n_replicates > 1:
+        args.n_replicates = config.n_replicates
+    if getattr(args, "base_seed", None) is None and config.base_seed != 42:  # noqa: PLR2004
+        args.base_seed = config.base_seed
+    if (
+        getattr(args, "ic_perturbation", None) is None
+        and config.ic_perturbation is not None
+    ):
+        args.ic_perturbation = config.ic_perturbation
+    if getattr(args, "param_noise", None) is None and config.param_noise:
+        # Convert dict to CLI-style list: ["B0=0.01", "m2=0.05"]
+        args.param_noise = [f"{k}={v}" for k, v in config.param_noise.items()]
 
 
 def apply_config_to_args(
@@ -464,7 +532,9 @@ def apply_config_to_args(
 
     # Fixed parameters: merge (CLI --param overrides TOML)
     existing_params: list[str] = getattr(args, "param", None) or []
-    cli_param_names: set[str] = {p.split("=", 1)[0].strip() for p in existing_params if "=" in p}
+    cli_param_names: set[str] = {
+        p.split("=", 1)[0].strip() for p in existing_params if "=" in p
+    }
     for name, val in config.fixed_params.items():
         if name not in cli_param_names:
             existing_params.append(f"{name}={val}")

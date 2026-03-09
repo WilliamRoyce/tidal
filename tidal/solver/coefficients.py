@@ -26,7 +26,6 @@ import numpy as np
 from tidal.symbolic._eval_utils import (
     build_eval_namespace,
     evaluate_coefficient,
-    mathematica_to_python,
 )
 
 if TYPE_CHECKING:
@@ -35,6 +34,10 @@ if TYPE_CHECKING:
     from tidal.solver.grid import GridInfo
     from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
 
+
+# ---------------------------------------------------------------------------
+# CoefficientEvaluator
+# ---------------------------------------------------------------------------
 
 _MISSING = object()  # sentinel for dict.get() fast path
 
@@ -69,9 +72,6 @@ class CoefficientEvaluator:
         self._parameters = parameters or {}
         self._coordinates = spec.effective_coordinates
         self._spatial_coords = spec.spatial_coordinates
-
-        # L1: Mathematica → Python expression string cache
-        self._expr_cache: dict[str, str] = {}
 
         # Static eval namespace (math funcs + parameters)
         self._namespace = build_eval_namespace(self._parameters)
@@ -300,14 +300,6 @@ class CoefficientEvaluator:
         return evaluate_coefficient(
             sym, self._parameters, self._coordinates, coord_arrays, t
         )
-
-    def _get_python_expr(self, symbolic_expr: str) -> str:
-        """Convert Mathematica → Python with L1 caching."""
-        if symbolic_expr not in self._expr_cache:
-            self._expr_cache[symbolic_expr] = mathematica_to_python(
-                symbolic_expr, self._coordinates
-            )
-        return self._expr_cache[symbolic_expr]
 
     def _check_mass_sign(self) -> None:
         """Warn if position-dependent mass-like terms change sign on grid."""

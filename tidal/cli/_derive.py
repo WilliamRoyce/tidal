@@ -12,14 +12,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
-_VALID_FIELD_NAME = re.compile(r"^[A-Za-z][A-Za-z0-9]*$")
-
-_MIN_DIM = 2
-_MAX_DIM = 7
-_MIN_PREFIX_LEN = 2
-
 if TYPE_CHECKING:
     from argparse import Namespace
+
+# Re-export validation API (moved to _derive_validate.py for readability)
+from tidal.cli._derive_validate import (  # noqa: F401
+    _GAUGE_PRESETS,  # type: ignore[reportPrivateUsage]
+    _validate_config,  # type: ignore[reportPrivateUsage]
+    _validate_reduction,  # type: ignore[reportPrivateUsage, reportUnusedImport]
+)
 
 # Coordinates per spacetime dimension
 _COORDS: dict[int, list[str]] = {
@@ -41,593 +42,7 @@ _MINKOWSKI_SIGNATURES: dict[int, list[int]] = {
 }
 
 
-# Gauge-fixing preset registry.  Each entry maps a preset name to its
-# mechanism ("lagrangian_term" or "constraint"), and the required field type.
-# Type A (lagrangian_term) presets also have a "builder" key naming the
-# Wolfram function in GaugeFix.wl.  Type B (constraint) presets are
-# implemented at the component level in Python (_wls_gauge_fixing_type_b).
-_GAUGE_PRESETS: dict[str, dict[str, str]] = {
-    "lorenz": {
-        "mechanism": "lagrangian_term",
-        "builder": "BuildLorenzGaugeTerm",
-        "requires": "vector",
-    },
-    "de_donder": {
-        "mechanism": "lagrangian_term",
-        "builder": "BuildDeDonderGaugeTerm",
-        "requires": "tensor",
-    },
-    "temporal": {
-        "mechanism": "constraint",
-        "requires": "vector",
-    },
-    "coulomb": {
-        "mechanism": "constraint",
-        "requires": "vector",
-    },
-    "axial": {
-        "mechanism": "constraint",
-        "requires": "vector",
-    },
-    "tt": {
-        "mechanism": "constraint",
-        "requires": "tensor",
-    },
-}
-
-
-# --- Validation ---
-
-
-def _validate_spacetime(config: dict[str, Any]) -> None:
-    """Validate [spacetime] section of TOML config.
-
-    Raises
-    ------
-    ValueError
-        If dimension is missing, non-integer, or out of range.
-    """
-    dim = config["spacetime"].get("dimension")
-    if dim is None:
-        msg = "[spacetime] must specify 'dimension'"
-        raise ValueError(msg)
-    if not isinstance(dim, int) or dim < _MIN_DIM or dim > _MAX_DIM:
-        msg = f"[spacetime].dimension must be integer {_MIN_DIM}-{_MAX_DIM}, got: {dim}"
-        raise ValueError(msg)
-
-
-def _validate_single_field(field: dict[str, Any], index: int, dim: int) -> None:
-    """Validate a single [[fields]] entry.
-
-    Raises
-    ------
-    ValueError
-        If field definition is missing required keys or has invalid values.
-    """
-    if "name" not in field:
-        msg = f"[[fields]] entry {index} missing 'name'"
-        raise ValueError(msg)
-    fname = field["name"]
-    if not _VALID_FIELD_NAME.match(fname):
-        msg = f"Field name '{fname}' must be alphanumeric starting with a letter"
-        raise ValueError(msg)
-    if "type" not in field:
-        msg = f"[[fields]] entry {index} ('{fname}') missing 'type'"
-        raise ValueError(msg)
-    ftype = field["type"]
-    if ftype not in {"scalar", "vector", "tensor"}:
-        msg = f"Unknown field type '{ftype}' for '{fname}'. Use: scalar, vector, tensor"
-        raise ValueError(msg)
-    if ftype == "tensor":
-        if "rank" not in field:
-            msg = f"Tensor field '{fname}' must specify 'rank'"
-            raise ValueError(msg)
-        if "symmetry" not in field:
-            msg = f"Tensor field '{fname}' must specify 'symmetry' (e.g. 'antisymmetric', 'symmetric', 'none')"
-            raise ValueError(msg)
-        if field["rank"] > dim:
-            msg = f"Tensor field '{fname}' rank {field['rank']} exceeds spacetime dimension {dim}"
-            raise ValueError(msg)
-        max_rank = len(_INDEX_LETTERS)
-        if field["rank"] > max_rank:
-            msg = f"Tensor field '{fname}' rank {field['rank']} exceeds maximum supported rank {max_rank}"
-            raise ValueError(msg)
-
-
-def _validate_fields(config: dict[str, Any]) -> None:
-    """Validate [[fields]] entries of TOML config.
-
-    Raises
-    ------
-    ValueError
-        If fields are missing, empty, or have invalid entries.
-    """
-    if "fields" not in config or not config["fields"]:
-        msg = "Must define at least one [[fields]] entry"
-        raise ValueError(msg)
-
-    dim = config["spacetime"]["dimension"]
-    for i, field in enumerate(config["fields"]):
-        _validate_single_field(field, i, dim)
-
-
-def _validate_lagrangian(config: dict[str, Any]) -> None:
-    """Validate [lagrangian] section of TOML config.
-
-    Raises
-    ------
-    ValueError
-        If expression is missing, empty, or contains covariant derivatives
-        of background fields (which are not supported).
-    """
-    expr = config["lagrangian"].get("expression")
-    if not expr or not expr.strip():
-        msg = "[lagrangian].expression must be a non-empty string"
-        raise ValueError(msg)
-
-    # Check for covariant derivatives of background fields.
-    # CD[-a][G[]] or CD[a][G[-b]] etc. would silently produce wrong results
-    # because the scalar ReplaceAll substitution doesn't handle derivatives.
-    bg_names = [f["name"] for f in config.get("background_fields", [])]
-    for bg_name in bg_names:
-        # Match CD[...][<bg_name>[...]] — any index pattern around the BG field
-        pattern = rf"CD\[[^\]]*\]\s*\[\s*{re.escape(bg_name)}\b"
-        if re.search(pattern, expr):
-            msg = (
-                f"Lagrangian contains a covariant derivative of background "
-                f"field '{bg_name}' (e.g., CD[-a][{bg_name}[...]]). "
-                f"Derivatives of background fields are not yet supported — "
-                f"they would produce incorrect equations of motion. "
-                f"Use the background field directly (without derivatives) "
-                f"in the coupling term."
-            )
-            raise ValueError(msg)
-
-
-def _validate_parameters(config: dict[str, Any]) -> None:
-    """Validate optional [parameters] section of TOML config.
-
-    Raises
-    ------
-    TypeError
-        If parameters is not a dict or contains non-numeric values.
-    ValueError
-        If keys aren't declared constants.
-    """
-    params: dict[str, object] | None = config.get("parameters")
-    if params is None:
-        return
-    if not isinstance(params, dict):  # pyright: ignore[reportUnnecessaryIsInstance]
-        msg = "[parameters] must be a table of key = value pairs"
-        raise TypeError(msg)
-    const_names = set(config.get("constants", {}).get("names", []))
-    for key, val in params.items():
-        if not isinstance(val, (int, float)):
-            msg = f"[parameters].{key} must be numeric, got {type(val).__name__}"
-            raise TypeError(msg)
-        if const_names and key not in const_names:
-            msg = f"[parameters].{key} is not declared in [constants].names"
-            raise ValueError(msg)
-
-
-def _validate_derived_fields(config: dict[str, Any]) -> None:
-    """Validate optional [[derived_fields]] entries.
-
-    Raises
-    ------
-    ValueError
-        If a derived field has invalid type/rank/symmetry, missing definition,
-        or name collision with a fundamental field.
-    """
-    derived = config.get("derived_fields", [])
-    if not derived:
-        return
-
-    dim = config["spacetime"]["dimension"]
-    fundamental_names = {f["name"] for f in config.get("fields", [])}
-
-    for i, field in enumerate(derived):
-        _validate_single_field(field, i, dim)
-
-        # Require definition
-        defn = field.get("definition")
-        if not defn or not isinstance(defn, str) or not defn.strip():
-            msg = f"[[derived_fields]] entry {i} ('{field.get('name', '?')}') must have a non-empty 'definition'"
-            raise ValueError(msg)
-
-        # Name collision check
-        if field["name"] in fundamental_names:
-            msg = f"Derived field '{field['name']}' conflicts with a fundamental [[fields]] entry"
-            raise ValueError(msg)
-
-
-def _expected_component_count(field: dict[str, Any], dim: int) -> int:
-    """Return the expected number of components for a field given spacetime dimension."""
-    ftype = field["type"]
-    if ftype == "scalar":
-        return 1
-    if ftype == "vector":
-        return dim
-    # Tensor: dim^rank (full, no symmetry reduction for component values)
-    rank = field.get("rank", 2)
-    return dim**rank
-
-
-def _validate_background_fields(config: dict[str, Any]) -> None:
-    """Validate optional ``[[background_fields]]`` entries.
-
-    Background fields are non-dynamical tensors that appear in the Lagrangian
-    but are NOT varied in the Euler-Lagrange derivation.  They survive as
-    (possibly position-dependent) coefficients in the equations of motion.
-
-    Each entry must have a ``components`` key specifying component values:
-    - scalar: ``components = ["B0val"]`` (1 element)
-    - vector: ``components = [0, 0, "B0val"]`` (dim elements)
-
-    Component values can be numbers (0, 1.0) or symbolic Wolfram expressions
-    (``"B0val"``, ``"B0val * Sin[2*Pi*x[]/L]"``).  Constants used in
-    expressions must be declared in ``[constants]``.
-
-    Raises
-    ------
-    ValueError
-        If a background field has invalid type/rank/symmetry, missing
-        components, wrong component count, or name collision.
-    TypeError
-        If ``components`` is not a list or contains non-numeric/non-string values.
-    """
-    bg_fields = config.get("background_fields", [])
-    if not bg_fields:
-        return
-
-    dim = config["spacetime"]["dimension"]
-    dynamical_names = {f["name"] for f in config.get("fields", [])}
-    derived_names = {f["name"] for f in config.get("derived_fields", [])}
-
-    for i, field in enumerate(bg_fields):
-        _validate_single_field(field, i, dim)
-
-        fname = field["name"]
-
-        # Name collision check
-        if fname in dynamical_names:
-            msg = f"Background field '{fname}' conflicts with a dynamical [[fields]] entry"
-            raise ValueError(msg)
-        if fname in derived_names:
-            msg = (
-                f"Background field '{fname}' conflicts with a [[derived_fields]] entry"
-            )
-            raise ValueError(msg)
-
-        # Require components
-        comps: list[int | float | str] | None = field.get("components")
-        if comps is None:
-            msg = (
-                f"[[background_fields]] entry {i} ('{fname}') must have "
-                f"'components' specifying component values"
-            )
-            raise ValueError(msg)
-        if not isinstance(comps, list):  # pyright: ignore[reportUnnecessaryIsInstance]
-            msg = f"[[background_fields]] entry {i} ('{fname}'): 'components' must be a list"
-            raise TypeError(msg)
-
-        expected = _expected_component_count(field, dim)
-        if len(comps) != expected:
-            msg = (
-                f"[[background_fields]] entry {i} ('{fname}'): expected "
-                f"{expected} components for {field['type']} in {dim}D, got {len(comps)}"
-            )
-            raise ValueError(msg)
-
-        # Validate component types (numbers or strings)
-        for j, comp in enumerate(comps):
-            if not isinstance(comp, (int, float, str)):  # pyright: ignore[reportUnnecessaryIsInstance]
-                msg = (
-                    f"[[background_fields]] entry {i} ('{fname}'): "
-                    f"component {j} must be a number or string expression, "
-                    f"got {type(comp).__name__}"
-                )
-                raise TypeError(msg)
-
-
-def _validate_linearization(
-    config: dict[str, Any],
-    *,
-    has_lagrangian: bool = False,
-) -> None:
-    """Validate optional ``[linearization]`` section.
-
-    Parameters
-    ----------
-    config : dict
-        Full TOML config.
-    has_lagrangian : bool
-        Whether ``[lagrangian]`` is also present.  When *True*,
-        ``[linearization].expression`` is not required (the Lagrangian
-        provides the expression to linearize).
-
-    Raises
-    ------
-    TypeError
-        If the section is not a table.
-    ValueError
-        If required keys are missing or ``perturbation_field`` is not declared.
-    """
-    if "linearization" not in config:
-        return
-    lin: dict[str, Any] = config["linearization"]
-    if not isinstance(lin, dict):  # pyright: ignore[reportUnnecessaryIsInstance]
-        msg = "[linearization] must be a table"
-        raise TypeError(msg)
-
-    # expression is required only for legacy path (no [lagrangian])
-    if not has_lagrangian:
-        expr = lin.get("expression")
-        if not expr or not isinstance(expr, str) or not expr.strip():
-            msg = "[linearization].expression must be a non-empty string"
-            raise ValueError(msg)
-
-    pf = lin.get("perturbation_field")
-    if not pf or not isinstance(pf, str):
-        msg = "[linearization].perturbation_field is required"
-        raise ValueError(msg)
-    field_names = {f["name"] for f in config.get("fields", [])}
-    if pf not in field_names:
-        msg = f"[linearization].perturbation_field '{pf}' not found in [[fields]]"
-        raise ValueError(msg)
-
-
-def _validate_gauge_entry_preset(
-    i: int,
-    entry: dict[str, Any],
-    field_info: dict[str, Any],
-) -> None:
-    """Validate a named gauge preset against the target field type.
-
-    Raises
-    ------
-    ValueError
-        If the field type is incompatible with the preset.
-    """
-    gauge_type = entry["type"]
-    preset = _GAUGE_PRESETS[gauge_type]
-    required_type = preset["requires"]
-    if field_info["type"] == "scalar":
-        msg = f"[[gauge]] entry {i}: scalars have no gauge freedom"
-        raise ValueError(msg)
-    if required_type == "vector" and field_info["type"] != "vector":
-        msg = f"[[gauge]] entry {i}: '{gauge_type}' requires a vector field, got '{field_info['type']}'"
-        raise ValueError(msg)
-    if required_type == "tensor" and field_info["type"] != "tensor":
-        msg = f"[[gauge]] entry {i}: '{gauge_type}' requires a tensor field, got '{field_info['type']}'"
-        raise ValueError(msg)
-    if gauge_type == "tt" and field_info.get("symmetry") != "symmetric":
-        msg = f"[[gauge]] entry {i}: 'tt' gauge requires a symmetric tensor, got symmetry='{field_info.get('symmetry', 'none')}'"
-        raise ValueError(msg)
-
-
-def _validate_gauge_entry_custom(i: int, entry: dict[str, Any]) -> None:
-    """Validate a custom gauge entry has ``mechanism`` and ``expression``.
-
-    Raises
-    ------
-    ValueError
-        If ``mechanism`` or ``expression`` is missing or invalid.
-    """
-    mechanism = entry.get("mechanism")
-    if mechanism not in {"lagrangian_term", "constraint"}:
-        msg = (
-            f"[[gauge]] entry {i}: custom gauge requires "
-            f"'mechanism' = 'lagrangian_term' or 'constraint'"
-        )
-        raise ValueError(msg)
-    if mechanism == "constraint":
-        msg = (
-            f"[[gauge]] entry {i}: custom constraint gauges not yet supported; "
-            f"use a named preset (temporal, coulomb, axial) or mechanism='lagrangian_term'"
-        )
-        raise ValueError(msg)
-    expr = entry.get("expression")
-    if not expr or not isinstance(expr, str) or not expr.strip():
-        msg = f"[[gauge]] entry {i}: custom gauge requires non-empty 'expression'"
-        raise ValueError(msg)
-
-
-def _validate_gauge_entry_common(
-    i: int,
-    entry: dict[str, Any],
-    field_map: dict[str, dict[str, Any]],
-    seen_fields: set[str],
-) -> tuple[str, str]:
-    """Validate keys common to all ``[[gauge]]`` entries.
-
-    Returns the ``(field_name, gauge_type)`` pair on success.
-
-    Raises
-    ------
-    ValueError
-        If required keys are missing, field is undeclared or duplicated,
-        or ``xi`` is not a positive number.
-    """
-    if "field" not in entry or not isinstance(entry.get("field"), str):
-        msg = f"[[gauge]] entry {i}: missing or invalid 'field'"
-        raise ValueError(msg)
-    if "type" not in entry or not isinstance(entry.get("type"), str):
-        msg = f"[[gauge]] entry {i}: missing or invalid 'type'"
-        raise ValueError(msg)
-
-    field_name: str = entry["field"]
-    gauge_type: str = entry["type"]
-
-    if field_name not in field_map:
-        msg = f"[[gauge]] entry {i}: field '{field_name}' not in [[fields]]"
-        raise ValueError(msg)
-    if field_name in seen_fields:
-        msg = f"[[gauge]] entry {i}: duplicate gauge for field '{field_name}'"
-        raise ValueError(msg)
-    seen_fields.add(field_name)
-
-    if "xi" in entry:
-        xi = entry["xi"]
-        if not isinstance(xi, (int, float)) or xi <= 0:
-            msg = f"[[gauge]] entry {i}: 'xi' must be a positive number"
-            raise ValueError(msg)
-
-    return field_name, gauge_type
-
-
-def _validate_gauge(config: dict[str, Any]) -> None:
-    """Validate optional ``[[gauge]]`` entries.
-
-    Each entry specifies a per-field gauge-fixing choice.  Named presets
-    (``lorenz``, ``de_donder``, etc.) are validated against field type;
-    ``type = "custom"`` requires ``mechanism`` and ``expression``.
-
-    Raises
-    ------
-    TypeError
-        If ``[[gauge]]`` is not a list.
-    ValueError
-        If a gauge entry references a non-existent field, uses an unknown
-        type, targets a scalar (no gauge freedom), duplicates a field, or
-        is missing required keys for custom gauges.
-    """
-    gauge_list: list[dict[str, Any]] = config.get("gauge", [])
-    if not gauge_list:
-        return
-    if not isinstance(gauge_list, list):  # pyright: ignore[reportUnnecessaryIsInstance]
-        msg = "[[gauge]] must be an array of tables"
-        raise TypeError(msg)
-
-    field_map = {f["name"]: f for f in config.get("fields", [])}
-    seen_fields: set[str] = set()
-
-    for i, entry in enumerate(gauge_list):
-        field_name, gauge_type = _validate_gauge_entry_common(
-            i,
-            entry,
-            field_map,
-            seen_fields,
-        )
-
-        if gauge_type in _GAUGE_PRESETS:
-            _validate_gauge_entry_preset(i, entry, field_map[field_name])
-        elif gauge_type == "custom":
-            _validate_gauge_entry_custom(i, entry)
-        else:
-            known = ", ".join([*_GAUGE_PRESETS, "custom"])
-            msg = f"[[gauge]] entry {i}: unknown gauge type '{gauge_type}' (known: {known})"
-            raise ValueError(msg)
-
-
-# --- Spatial coordinates per dimension (excluding time) ---
-_SPATIAL_COORDS: dict[int, list[str]] = {
-    2: ["x"],
-    3: ["x", "y"],
-    4: ["x", "y", "z"],
-}
-
-
-def _validate_reduction(config: dict[str, Any]) -> None:
-    """Validate optional ``[reduction]`` section.
-
-    The plane-wave reduction zeroes all transverse spatial derivatives,
-    reducing the spacetime dimension to 1+1D (or 2+1D for partial
-    reductions in future).
-
-    Raises
-    ------
-    ValueError
-        If reduction config is invalid (bad type, axis, or dimension).
-    """
-    reduction = config.get("reduction")
-    if reduction is None:
-        return
-
-    rtype = reduction.get("type")
-    if rtype != "plane_wave":
-        msg = (
-            f"[reduction] type must be 'plane_wave', got '{rtype}'. "
-            "Other reduction types may be added in future."
-        )
-        raise ValueError(msg)
-
-    dim: int = config["spacetime"]["dimension"]
-    min_reducible_dim = 3  # need at least 2 spatial dimensions
-    if dim < min_reducible_dim:
-        msg = (
-            f"[reduction] cannot reduce a {dim - 1}+1D theory further. "
-            "Plane-wave reduction requires at least 2 spatial dimensions."
-        )
-        raise ValueError(msg)
-
-    prop_axis = reduction.get("propagation_axis")
-    if not prop_axis:
-        msg = "[reduction] requires 'propagation_axis' (e.g., 'x', 'y', or 'z')"
-        raise ValueError(msg)
-
-    spatial = _SPATIAL_COORDS.get(dim)
-    if spatial is None:
-        msg = f"[reduction] unsupported dimension {dim}"
-        raise ValueError(msg)
-
-    if prop_axis not in spatial:
-        msg = (
-            f"[reduction] propagation_axis '{prop_axis}' is not a valid "
-            f"spatial coordinate for dimension {dim}. "
-            f"Valid axes: {spatial}"
-        )
-        raise ValueError(msg)
-
-
-def _validate_config(config: dict[str, Any]) -> None:
-    """Validate TOML config structure.
-
-    Raises
-    ------
-    ValueError
-        If any required section or field is missing or invalid.
-    """
-    if "spacetime" not in config:
-        msg = "Missing required section: [spacetime]"
-        raise ValueError(msg)
-
-    has_lagrangian = "lagrangian" in config
-    has_linearization = "linearization" in config
-
-    if not has_lagrangian and not has_linearization:
-        msg = "Config must have either [lagrangian] or [linearization]"
-        raise ValueError(msg)
-    if has_linearization and not has_lagrangian:
-        import warnings
-
-        warnings.warn(
-            "[linearization] without [lagrangian] is deprecated. "
-            "Provide the Lagrangian in [lagrangian] and use "
-            "[linearization] as a modifier.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-    if has_linearization and not has_lagrangian and config.get("gauge"):
-        msg = (
-            "[[gauge]] with [linearization] requires [lagrangian] "
-            "(Lagrangian-first linearization path). "
-            "Add a [lagrangian] section or remove [[gauge]]."
-        )
-        raise ValueError(msg)
-
-    _validate_spacetime(config)
-    _validate_fields(config)
-    _validate_derived_fields(config)
-    _validate_background_fields(config)
-    if has_lagrangian:
-        _validate_lagrangian(config)
-    if has_linearization:
-        _validate_linearization(config, has_lagrangian=has_lagrangian)
-    _validate_gauge(config)
-    _validate_reduction(config)
-    _validate_parameters(config)
-
+_MIN_PREFIX_LEN = 2
 
 # --- Code generation helpers ---
 
@@ -688,11 +103,17 @@ def _generate_metric_code(config: dict[str, Any], prefix: str) -> str:
     raise ValueError(msg)
 
 
-def _generate_field_def(field: dict[str, Any], prefix: str, manifold: str) -> str:
+def _generate_field_def(
+    field: dict[str, Any],
+    prefix: str,
+    manifold: str,
+    *,
+    head_override: str | None = None,
+) -> str:
     """Generate DefTensor code for a field."""
     name = field["name"]
     ftype = field["type"]
-    prefixed = f"{prefix}{name.capitalize()}"
+    prefixed = head_override or f"{prefix}{name.capitalize()}"
 
     if ftype == "scalar":
         return f"If[!xTensorQ[{prefixed}],\n  DefTensor[{prefixed}[], {manifold}]\n];"
@@ -720,11 +141,16 @@ def _generate_field_def(field: dict[str, Any], prefix: str, manifold: str) -> st
     )
 
 
-def _field_expression(field: dict[str, Any], prefix: str) -> str:
+def _field_expression(
+    field: dict[str, Any],
+    prefix: str,
+    *,
+    head_override: str | None = None,
+) -> str:
     """Return the xAct expression for a field reference (e.g., 'phi[]' or 'C[-a,-b,-c]')."""
     name = field["name"]
     ftype = field["type"]
-    prefixed = f"{prefix}{name.capitalize()}"
+    prefixed = head_override or f"{prefix}{name.capitalize()}"
 
     if ftype == "scalar":
         return f"{prefixed}[]"
@@ -746,6 +172,18 @@ def _substitute_field_names(
     """Replace user field names with prefixed xAct names in the Lagrangian."""
     result = expression
 
+    # Substitute built-in names (eta, CD, bg) FIRST — before field names —
+    # to prevent short field names (e.g., "a") from corrupting built-in
+    # identifiers (e.g., "eta[" contains "a[", which would become "etgeA[").
+    result = result.replace("eta[", f"{prefix}Eta[")
+    result = result.replace("bg[", f"{prefix}Bg[")
+    result = result.replace("CD[", f"{prefix}CD[")
+    result = result.replace("CD]", f"{prefix}CD]")
+    result = result.replace("CD ]", f"{prefix}CD ]")
+    # Substitute chart placeholder for component-derivative notation
+    # e.g., CD[{0, -chart}][ux[]] → {prefix}CD[{0, -{prefix}Cart}][...]
+    result = result.replace("-chart}", f"-{prefix}Cart}}")
+
     # Merge fundamental, derived, and background fields for substitution
     all_fields = list(fields)
     if derived_fields:
@@ -758,26 +196,26 @@ def _substitute_field_names(
 
     for field in sorted_fields:
         name = field["name"]
-        prefixed = f"{prefix}{name.capitalize()}"
-        # Replace field name references (e.g., phi → {prefix}Phi, but not inside other words)
-        # Handle: CD[-a][phi[]] → CD[-a][{prefix}Phi[]]
-        # Handle: phi[] → {prefix}Phi[]
-        # Handle: C[-a, -b, -c] → {prefix}C[-a, -b, -c]
-        result = result.replace(f"{name}[", f"{prefixed}[")
-        result = result.replace(f"{name} ", f"{prefixed} ")
+        prefixed_name = f"{prefix}{name.capitalize()}"
+        # Replace field name references using word-boundary-aware regex.
+        # Field names appear after non-alphanumeric chars or at start of string.
+        # Must match "name[" or "name " but NOT "eta[" matching "a[" inside it.
+        # Lookbehind: (?<![a-zA-Z]) ensures we don't match inside longer identifiers.
+        result = re.sub(
+            rf"(?<![a-zA-Z]){re.escape(name)}\[",
+            f"{prefixed_name}[",
+            result,
+        )
+        result = re.sub(
+            rf"(?<![a-zA-Z]){re.escape(name)} ",
+            f"{prefixed_name} ",
+            result,
+        )
 
-    # Also substitute eta, CD, and bg (background/reference metric) with prefixed versions
-    result = result.replace("eta[", f"{prefix}Eta[")
-    result = result.replace("bg[", f"{prefix}Bg[")
-    result = result.replace("CD[", f"{prefix}CD[")
-    result = result.replace("CD]", f"{prefix}CD]")
-    result = result.replace("CD ]", f"{prefix}CD ]")
-    # Substitute chart placeholder for component-derivative notation
-    # e.g., CD[{0, -chart}][ux[]] → {prefix}CD[{0, -{prefix}Cart}][...]
-    return result.replace("-chart}", f"-{prefix}Cart}}")
+    return result
 
 
-# --- WLS script generation ---
+# --- WLS: Context & header ---
 
 
 @dataclass(frozen=True)
@@ -807,11 +245,20 @@ class _WlsContext:
     reduction: dict[str, Any] | None
 
 
+def _wls_mem_print(label: str) -> str:
+    """Generate a Print statement that includes current Wolfram memory usage."""
+    safe_label = label.replace('"', '\\"')
+    return f'Print["[", Round[MemoryInUse[]/1024.^2], " MB] {safe_label}"];'
+
+
 def _wls_header(ctx: _WlsContext) -> list[str]:
     """Generate script header lines."""
     return [
         "#!/usr/bin/env wolframscript",
         f"(* Auto-generated by tidal derive: {ctx.theory_name} *)",
+        "",
+        "(* Prevent Wolfram from caching all In/Out expressions — reduces memory *)",
+        "$HistoryLength = 0;",
         "",
         f'Print["=== {ctx.theory_name} ==="];',
         'Print[""];',
@@ -863,8 +310,11 @@ def _wls_packages(
     return lines
 
 
+# --- WLS: Spacetime, fields & Lagrangian ---
+
+
 def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
-    """Generate spacetime definition lines (manifold, metric, chart)."""
+    """Emit spacetime manifold, metric, chart, and coordinate definitions."""
     coord_funcs = ", ".join(f"{c}[]" for c in ctx.coords)
     indices = ", ".join(str(i) for i in range(ctx.dim))
     idx_str = ", ".join(_INDEX_LETTERS[: min(ctx.dim + 4, 8)])
@@ -887,6 +337,7 @@ def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
         "",
         _generate_metric_code(config, ctx.prefix),
         f"MetricInBasis[{ctx.metric}, -{ctx.chart}, {ctx.prefix}MetricMatrix];",
+        f"SetMetricDownValues[{ctx.metric}, {ctx.chart}, {ctx.prefix}MetricMatrix];",
         "",
     ]
 
@@ -907,13 +358,16 @@ def _needs_bg_tensor(config: dict[str, Any]) -> bool:
     return any("bg[" in expr for expr in exprs)
 
 
+# --- WLS: Background field setup ---
+
+
 def _wls_background_component_values(
     field: dict[str, Any],
     prefix: str,
     chart: str,
     dim: int,
 ) -> list[str]:
-    """Generate ``ComponentValue`` lines for a single background field."""
+    """Emit xCoba ComponentValue declarations for background field components."""
     comps: list[int | float | str] = field.get("components", [])
     prefixed = f"{prefix}{field['name'].capitalize()}"
     ftype = field["type"]
@@ -1092,11 +546,18 @@ def _wls_fields(ctx: _WlsContext, *, include_bg: bool = False) -> list[str]:
         for field in ctx.background_fields:
             lines.extend((_generate_field_def(field, ctx.prefix, ctx.manifold), ""))
             # Set component values via xCoba's ComponentValue mechanism.
-            # After ToBasis in ComponentDecompose, xCoba replaces the tensor
-            # with these values — no pipeline changes needed.
             lines.extend(
                 _wls_background_component_values(field, ctx.prefix, ctx.chart, ctx.dim)
             )
+            # Also set direct Mathematica DownValues for auto-collapse during
+            # TraceBasisDummy (xCoba ComponentValues don't auto-evaluate).
+            bg_prefixed = f"{ctx.prefix}{field['name'].capitalize()}"
+            bg_comps = field.get("components", [])
+            if field["type"] == "vector" and bg_comps:
+                comps_str = ", ".join(str(c) for c in bg_comps)
+                lines.append(
+                    f"SetBackgroundFieldDownValues[{bg_prefixed}, {ctx.chart}, {{{comps_str}}}];"
+                )
             lines.append("")
         lines.append("")
 
@@ -1194,7 +655,235 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
     return lines
 
 
-def _wls_linearize_from_lagrangian(
+def _xpert_index_pattern(
+    pert_sym: str, full_head: str, field: dict[str, Any],
+) -> tuple[str, str]:
+    """Return (pert_idx, full_idx) for DefTensorPerturbation."""
+    ftype = field["type"]
+    if ftype == "scalar":
+        return f"{pert_sym}[LI[order]]", f"{full_head}[]"
+    if ftype == "vector":
+        return f"{pert_sym}[LI[order], -a]", f"{full_head}[-a]"
+    rank = field.get("rank", 2)
+    idx_str = ", ".join(f"-{_INDEX_LETTERS[i]}" for i in range(rank))
+    return f"{pert_sym}[LI[order], {idx_str}]", f"{full_head}[{idx_str}]"
+
+
+def _pert_field_dict(pert_name: str, source_field: dict[str, Any]) -> dict[str, Any]:
+    """Build a field dict for a perturbation field (inherits type/rank/symmetry)."""
+    d: dict[str, Any] = {"name": pert_name, "type": source_field["type"]}
+    if source_field["type"] not in {"scalar", "vector"}:
+        d["rank"] = source_field.get("rank", 2)
+        d["symmetry"] = source_field.get("symmetry", "none")
+    return d
+
+
+# --- WLS: Linearization (xPert) ---
+
+
+def _wls_matter_perturbation_setup(  # noqa: PLR0914
+    ctx: _WlsContext,
+    matter_perts: list[dict[str, Any]],
+    eps_sym: str,
+) -> tuple[list[dict[str, str]], list[str]]:
+    """Generate DefTensorPerturbation + DefTensor for each matter perturbation.
+
+    Returns (matter_pert_info, wls_lines) where matter_pert_info contains
+    the symbol mapping for each perturbation field.
+    """
+    p = ctx.prefix
+    info: list[dict[str, str]] = []
+    lines: list[str] = []
+
+    for mp in matter_perts:
+        mf_name = mp["field"]
+        mp_name = mp["perturbation_name"]
+        mf = next(f for f in ctx.fields if f["name"] == mf_name)
+        mf_type = mf["type"]
+
+        mp_sym = f"{p}{mp_name}Pert"
+        mf_head = f"{p}{mf_name.capitalize()}"
+        # Avoid collision: if capitalize(perturbation_name) == capitalize(field_name),
+        # use the perturbation name as-is (Mathematica is case-sensitive).
+        # E.g., field "A" → geA, perturbation "a" → gea (not geA).
+        mp_head_candidate = f"{p}{mp_name.capitalize()}"
+        mp_head = (
+            f"{p}{mp_name}" if mp_head_candidate == mf_head else mp_head_candidate
+        )
+
+        # Build DefTensorPerturbation arguments + perturbation field DefTensor
+        pert_idx, full_idx = _xpert_index_pattern(mp_sym, mf_head, mf)
+        mp_def = _generate_field_def(
+            _pert_field_dict(mp_name, mf), ctx.prefix, ctx.manifold,
+            head_override=mp_head,
+        )
+
+        lines.extend(
+            [
+                f"(* Matter perturbation: {mf_name} = {mp['background']} + {eps_sym} * {mp_name} *)",
+                f"(* Define perturbation field tensor {mp_name} *)",
+                mp_def,
+                "",
+                f"DefTensorPerturbation[{pert_idx}, {full_idx}, {ctx.manifold}];",
+                f'Print["Matter perturbation: {mf_name} -> background + {eps_sym} * {mp_name}"];',
+                "",
+            ]
+        )
+
+        bg_name = mp.get("background", "")
+        bg_head = f"{p}{bg_name.capitalize()}" if bg_name else ""
+        info.append(
+            {
+                "field_name": mf_name,
+                "pert_name": mp_name,
+                "pert_sym": mp_sym,
+                "field_head": mf_head,
+                "pert_head": mp_head,
+                "bg_head": bg_head,
+                "field_type": mf_type,
+                "field_rank": str(mf.get("rank", 2)),
+            }
+        )
+
+    return info, lines
+
+
+def _wls_multi_field_eom(
+    ctx: _WlsContext,
+    dyn_fields: list[dict[str, Any]],
+) -> list[str]:
+    """Generate VarD + DecomposeToComponents + fieldEquations for multiple fields."""
+    p = ctx.prefix
+    lines: list[str] = []
+
+    # VarD for each dynamical field
+    for df in dyn_fields:
+        eom_var = f"eom{df['name'].capitalize()}"
+        lines.extend(
+            [
+                f"(* Vary L^(2) w.r.t. {df['name']} *)",
+                f"{eom_var} = VarD[{df['vard_expr']}, {ctx.cd}][l2ForVarD];",
+                # Apply ToCanonical term-by-term to avoid xperm segfault on
+                # large sums (xPerm external binary crashes when canonicalizing
+                # 80+ term VarD output as a single expression).
+                f"If[Head[{eom_var}] === Plus,",
+                f"  {eom_var} = Total[ToCanonical /@ List @@ {eom_var}],",
+                f"  {eom_var} = ToCanonical[{eom_var}]",
+                "];",
+                f"{eom_var} = ContractMetric[{eom_var}, {ctx.metric}];",
+                _wls_mem_print(f"EOM({df['name']}) computed"),
+                "",
+            ]
+        )
+
+    # Free the Lagrangian — both VarDs are done, l2ForVarD is dead
+    lines.extend(
+        [
+            "(* Free Lagrangian — no longer needed after VarD *)",
+            "Clear[l2ForVarD]; Share[];",
+            _wls_mem_print("After clearing l2ForVarD"),
+            "",
+        ]
+    )
+
+    # Build set of TT-gauged field names for SkipTuples optimization
+    tt_fields = {
+        entry["field"] for entry in ctx.gauge if entry["type"] == "tt"
+    }
+
+    # Build BackgroundFieldRules for non-scalar background fields
+    bg_rules_entries: list[str] = []
+    for bf in ctx.background_fields:
+        if bf["type"] != "scalar" and bf.get("components"):
+            bg_head = f"{p}{bf['name'].capitalize()}"
+            comps_str = ", ".join(str(c) for c in bf["components"])
+            bg_rules_entries.append(f"{{{bg_head}, {{{comps_str}}}}}")
+    bg_rules_opt = ""
+    if bg_rules_entries:
+        bg_rules_str = ", ".join(bg_rules_entries)
+        bg_rules_opt = f', "BackgroundFieldRules" -> {{{bg_rules_str}}}'
+
+    # Decompose each field incrementally, freeing EOM/components between fields
+    # to reduce peak memory (cross-field coupling can blow up DecomposeToComponents).
+    lines.append("fieldEquations = {};")
+    for i, df in enumerate(dyn_fields):
+        eom_var = f"eom{df['name'].capitalize()}"
+        comp_var = f"comp{df['name'].capitalize()}"
+        others_str = ", ".join(
+            d["fexpr"] for j, d in enumerate(dyn_fields) if j != i
+        )
+        # For TT-gauged symmetric rank-2 fields, skip temporal components
+        # {0,0}, {0,1}, ..., {0,dim-1} — they are zero by gauge choice
+        skip_opt = ""
+        if df["name"] in tt_fields:
+            skip_tuples = ", ".join(
+                f"{{{0},{mu}}}" for mu in range(ctx.dim)
+            )
+            skip_opt = f', "SkipTuples" -> {{{skip_tuples}}}'
+        lines.extend(
+            [
+                _wls_mem_print(f"Before DecomposeToComponents({df['name']})"),
+                f"(* Decompose {df['name']} EOM to components *)",
+                f'{comp_var} = DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}{bg_rules_opt}];',
+                f'Print["[", Round[MemoryInUse[]/1024.^2], " MB] {df["name"]} decomposed: ", Length[{comp_var}], " components"];',
+            ]
+        )
+        lines.extend(_wls_vector_background_substitution(ctx, comp_var))
+        lines.extend(_wls_validate_backgrounds_after_decompose(ctx, comp_var))
+
+        # Merge into fieldEquations immediately, then free EOM + components
+        lines.extend(
+            [
+                f'fieldEquations = Join[fieldEquations, Table[{{"{df["name"]}_" <> ToString[{comp_var}[[k, 1]]], {comp_var}[[k, 2]]}}, {{k, Length[{comp_var}]}}]];',
+                f"Clear[{eom_var}, {comp_var}]; Share[];",
+                _wls_mem_print(f"After merging+clearing {df['name']}"),
+                "",
+            ]
+        )
+
+    return lines
+
+
+def _wls_matter_pert_truncation(mpi: dict[str, str]) -> list[str]:
+    """Generate LI[2] drop + LI[1] replacement + background substitution.
+
+    After xPert perturbation, L^(2) contains:
+    - ``pertSym[LI[2], ...]``: 2nd-order perturbation (dropped)
+    - ``pertSym[LI[1], ...]``: 1st-order perturbation (→ perturbation field)
+    - Original field symbol (e.g., ``geA``): zeroth-order = background
+
+    The original field symbol must be replaced with the background field
+    so that ComponentValues from ``[[background_fields]]`` apply during
+    component decomposition.
+    """
+    mp_sym, mp_head = mpi["pert_sym"], mpi["pert_head"]
+    field_head, bg_head = mpi["field_head"], mpi.get("bg_head", "")
+    pname = mpi["pert_name"]
+    lines: list[str] = []
+    if mpi["field_type"] == "scalar":
+        lines.extend([
+            f"(* Drop 2nd-order matter perturbation {pname}^(2) *)",
+            f"l2Raw = l2Raw /. {mp_sym}[LI[2]] :> 0;",
+            f"(* Replace xPert notation -> perturbation field {pname} *)",
+            f"l2Raw = l2Raw /. {mp_sym}[LI[1]] :> {mp_head}[];",
+        ])
+    else:
+        lines.extend([
+            f"(* Drop 2nd-order matter perturbation {pname}^(2) *)",
+            f"l2Raw = l2Raw /. {mp_sym}[LI[2], idx__] :> 0;",
+            f"(* Replace xPert notation -> perturbation field {pname} *)",
+            f"l2Raw = l2Raw /. {mp_sym}[LI[1], idx__] :> {mp_head}[idx];",
+        ])
+    # Replace original field -> background so ComponentValues evaluate
+    if bg_head and bg_head != field_head:
+        lines.extend([
+            f"(* Replace zeroth-order field {field_head} -> background {bg_head} *)",
+            f"l2Raw = l2Raw /. {field_head} -> {bg_head};",
+        ])
+    return lines
+
+
+def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     ctx: _WlsContext,
     *,
     include_bg: bool = False,
@@ -1215,9 +904,16 @@ def _wls_linearize_from_lagrangian(
        can vary through each copy independently (fixes the index-collision
        problem from Fierz-Pauli trace-squared terms).
 
-    4. ``VarD[H[-a,-b], CD][L^(2)]`` → correct linearized EOM.
+    4. ``VarD[H[-a,-b], CD][L^(2)]`` → correct linearized EOM for each
+       dynamical field.
 
     5. Same L^(2) serves the canonical pipeline (momenta π, Hamiltonian H).
+
+    Supports multi-field perturbation via ``[[linearization.matter_perturbations]]``:
+    when present, each matter field is split via ``DefTensorPerturbation`` into
+    background + perturbation, and ``VarD`` is called for each dynamical field.
+    Cross-coupling terms (e.g., graviton-photon via background F̄) emerge
+    automatically from the algebra.
 
     Works for any background metric.  For flat Minkowski ``√|g₀| = 1`` and
     the volume element factor is trivial.  For curved backgrounds, xPert
@@ -1232,13 +928,20 @@ def _wls_linearize_from_lagrangian(
         msg = "_wls_linearize_from_lagrangian called without linearization config"
         raise ValueError(msg)
     lin = ctx.linearization
-    pert_field_name = lin["perturbation_field"]
-    pert_field = next(f for f in ctx.fields if f["name"] == pert_field_name)
-    fexpr = _field_expression(pert_field, ctx.prefix)
+    pert_field_name = lin.get("perturbation_field")  # May be None for matter-only
+    matter_perts: list[dict[str, Any]] = lin.get("matter_perturbations", [])
+
+    # Resolve the metric perturbation field (if any)
+    has_metric_pert = pert_field_name is not None
+    pert_field: dict[str, Any] = {}
+    fexpr: str = ""
+    if has_metric_pert:
+        pert_field = next(f for f in ctx.fields if f["name"] == pert_field_name)
+        fexpr = _field_expression(pert_field, ctx.prefix)
 
     pert_sym = f"{ctx.prefix}hpert"
     eps_sym = f"{ctx.prefix}Epsilon"
-    field_head = f"{ctx.prefix}{pert_field_name.capitalize()}"
+    field_head = f"{ctx.prefix}{pert_field_name.capitalize()}" if has_metric_pert else None
     bg_name = f"{ctx.prefix}Bg"
     ricci_sym = f"Ricci{ctx.cd}"
     ricci_scalar_sym = f"RicciScalar{ctx.cd}"
@@ -1254,46 +957,97 @@ def _wls_linearize_from_lagrangian(
         "(* ============================================================ *)",
         "(* Lagrangian-first linearization (single-path via L^(2))       *)",
         "(* L^(2) = d^2(sqrt|g| L) / (2 sqrt|g0|)  via xPert           *)",
-        "(* Then: VarD[H, CD][L^(2)] -> linearized EOM                   *)",
+        "(* Then: VarD[field, CD][L^(2)] -> linearized EOM              *)",
         "(* Same L^(2) feeds canonical pipeline (pi, H)                  *)",
         "(* ============================================================ *)",
         "",
         "(* Save original nonlinear Lagrangian *)",
         f"lOriginal = {p}Lagrangian;",
         "",
-        "(* Set up metric perturbation: g = eta + epsilon * h  via xPert *)",
-        f"{pert_sym}Tensor = SetupMetricPerturbation[{ctx.metric}, {pert_sym}, {eps_sym}];",
-        f'Print["Perturbation: {ctx.metric} -> {ctx.metric} + {eps_sym} * {pert_field_name}"];',
-        "",
-        "(* Include sqrt(-g) volume element: S = int sqrt(-g) L d^n x      *)",
-        "(* xPert natively perturbs Sqrt[-Detg[]], handling all orders.     *)",
-        f"lDensity = Sqrt[-{det_sym}[]] * lOriginal;",
-        "",
-        "(* 2nd-order perturbation of the full Lagrangian density *)",
-        "l2Raw = Perturbation[lDensity, 2];",
-        "l2Raw = ExpandPerturbation[l2Raw];",
-        'Print["L^(2) density (expanded): ", Short[l2Raw, 3]];',
-        "",
-        "(* Validate that xPert fully expanded *)",
-        "If[!FreeQ[l2Raw, Perturbation],",
-        '  Throw["Linearization: ExpandPerturbation did not fully expand L^(2)."]',
-        "];",
-        "",
-        "(* Divide out background volume element sqrt(-g0)                   *)",
-        "(* (covariantly constant for Levi-Civita, passes through VarD).     *)",
-        f"l2Raw = l2Raw / Sqrt[-{det_sym}[]];",
-        "",
-        "(* Replace background metric determinant with evaluated value       *)",
-        f"l2Raw = l2Raw /. {det_sym}[] -> Det[{p}MetricMatrix];",
-        "l2Raw = Simplify[l2Raw];",
-        'Print["L^(2) (volume element resolved): ", Short[l2Raw, 3]];',
-        "",
-        "(* Drop 2nd-order metric perturbation h^(2) -- keep h^(1)*h^(1) only *)",
-        f"l2Raw = l2Raw /. {pert_sym}[LI[2], idx__] :> 0;",
-        "",
-        "(* Replace xPert notation with declared field tensor *)",
-        f"l2Raw = l2Raw /. {pert_sym}[LI[1], idx__] :> {field_head}[idx];",
     ]
+
+    # --- Metric perturbation setup ---
+    # xPert requires SetupMetricPerturbation to register the global perturbation
+    # parameter, even for matter-only perturbation. Without it, Perturbation[]
+    # and ExpandPerturbation[] cannot expand Det[g] or matter fields.
+    lines.extend(
+        [
+            "(* Set up metric perturbation parameter via xPert *)",
+            f"{pert_sym}Tensor = SetupMetricPerturbation[{ctx.metric}, {pert_sym}, {eps_sym}];",
+        ]
+    )
+    if has_metric_pert:
+        lines.append(
+            f'Print["Perturbation: {ctx.metric} -> {ctx.metric} + {eps_sym} * {pert_field_name}"];',
+        )
+    else:
+        lines.append(
+            'Print["Metric perturbation parameter registered (matter-only; h terms will be dropped)"];',
+        )
+    lines.append("")
+
+    # --- Matter field perturbation setup (multi-field xPert) ---
+    matter_pert_info, mp_lines = _wls_matter_perturbation_setup(
+        ctx, matter_perts, eps_sym,
+    )
+    lines.extend(mp_lines)
+
+    lines.extend(
+        [
+            "(* Include sqrt(-g) volume element: S = int sqrt(-g) L d^n x      *)",
+            "(* xPert natively perturbs Sqrt[-Detg[]], handling all orders.     *)",
+            f"lDensity = Sqrt[-{det_sym}[]] * lOriginal;",
+            "",
+            "(* 2nd-order perturbation of the full Lagrangian density *)",
+            "l2Raw = Perturbation[lDensity, 2];",
+            "l2Raw = ExpandPerturbation[l2Raw];",
+            _wls_mem_print("L^(2) density expanded"),
+            "",
+            "(* Validate that xPert fully expanded *)",
+            "If[!FreeQ[l2Raw, Perturbation],",
+            '  Throw["Linearization: ExpandPerturbation did not fully expand L^(2)."]',
+            "];",
+            "",
+            "(* Divide out background volume element sqrt(-g0)                   *)",
+            "(* (covariantly constant for Levi-Civita, passes through VarD).     *)",
+            f"l2Raw = l2Raw / Sqrt[-{det_sym}[]];",
+            "",
+            "(* Replace background metric determinant with evaluated value       *)",
+            f"l2Raw = l2Raw /. {det_sym}[] -> Det[{p}MetricMatrix];",
+            "l2Raw = Simplify[l2Raw];",
+            'Print["L^(2) (volume element resolved): ", Short[l2Raw, 3]];',
+            "",
+        ]
+    )
+
+    # --- Drop LI[2] and replace LI[1] for ALL perturbation fields ---
+    # Dropping LI[2] truncates the perturbation expansion at 1st order for each field.
+    # This is correct for linearized theory: field = background + ε·perturbation^(1).
+    # Products of 1st-order perturbations (quadratic action terms) are preserved.
+    if has_metric_pert:
+        lines.extend(
+            [
+                "(* Drop 2nd-order metric perturbation h^(2) -- keep h^(1)*h^(1) only *)",
+                f"l2Raw = l2Raw /. {pert_sym}[LI[2], idx__] :> 0;",
+                "",
+                "(* Replace xPert metric notation with declared field tensor *)",
+                f"l2Raw = l2Raw /. {pert_sym}[LI[1], idx__] :> {field_head}[idx];",
+            ]
+        )
+    else:
+        # Matter-only: SetupMetricPerturbation was called to register the
+        # perturbation parameter, but we don't want any metric perturbation
+        # terms. Drop ALL orders of h.
+        lines.extend(
+            [
+                "(* Matter-only: drop all metric perturbation orders *)",
+                f"l2Raw = l2Raw /. {pert_sym}[LI[_], idx___] :> 0;",
+                "l2Raw = Expand[l2Raw];",
+            ]
+        )
+
+    for mpi in matter_pert_info:
+        lines.extend(_wls_matter_pert_truncation(mpi))
 
     # Replace bg → metric if bg tensor is used
     if include_bg:
@@ -1322,6 +1076,11 @@ def _wls_linearize_from_lagrangian(
             f"{p}Lagrangian = l2Raw / 2;",
             f'Print["L^(2) set: ", Short[{p}Lagrangian, 5]];',
             "",
+            "(* Memory cleanup: free perturbation intermediates *)",
+            "Clear[l2Raw, lOriginal, lDensity];",
+            "Share[];",
+            _wls_mem_print("After perturbation cleanup"),
+            "",
         ]
     )
 
@@ -1337,52 +1096,167 @@ def _wls_linearize_from_lagrangian(
         lines.extend(_wls_gauge_fixing_type_a(ctx))
 
     # ------------------------------------------------------------------
-    # Step 2: EOM via VarD[H[-a,-b], CD][L^(2)]
+    # Step 2: EOM via VarD for each dynamical field
     # ------------------------------------------------------------------
     lines.extend(
         [
             "(* ------------------------------------------------------------ *)",
-            "(* EOM: VarD[H[-a,-b], CD][L^(2)]                              *)",
+            "(* EOM: VarD[field, CD][L^(2)] for each dynamical field         *)",
             "(* ------------------------------------------------------------ *)",
             "",
             "(* Expand Scalar[x]^n into products with renamed dummies.       *)",
             "(* This fixes VarD index collision from Fierz-Pauli (tr h)^2:   *)",
             "(*   Scalar[eta^ab H_ab]^2 -> Scalar[eta^ab H_ab]*Scalar[eta^cd H_cd] *)",
+            "(* NOTE: Use /. (single pass) NOT //. — RenameDummies may return    *)",
+            "(* the same canonical form for symmetric tensors (e.g. eta[a,b]),    *)",
+            "(* causing //. to loop 65536 times before hitting $IterationLimit.   *)",
             f"l2ForVarD = {p}Lagrangian;",
-            "l2ForVarD = l2ForVarD //. Scalar[x_]^n_Integer?Positive :>",
-            "  Times @@ Table[Scalar[RenameDummies[x]], {n}];",
+            "",
+        ]
+    )
+
+    # ------------------------------------------------------------------
+    # For TT-gauged fields, impose tracelessness (η^{ab} h_{ab} = 0)
+    # in L^(2) before VarD.  This eliminates Scalar[H[a,-a]]^2 trace
+    # terms that cause ReplaceRepeated loops and memory blowup during
+    # ToBasis decomposition.  Physically correct: TT gauge ⇒ tr h = 0.
+    #
+    # IMPORTANT: Must run BEFORE the Scalar[x]^n expansion below,
+    # because that expansion wraps contents in RenameDummies[] which
+    # prevents the pattern Scalar[H[a_,-a_]] from matching.
+    # ------------------------------------------------------------------
+    tt_fields = {entry["field"] for entry in ctx.gauge if entry["type"] == "tt"}
+    for field in ctx.fields:
+        if field["name"] in tt_fields and field.get("symmetry") == "symmetric":
+            head = f"{p}{field['name'].capitalize()}"
+            lines.extend(
+                [
+                    f"(* TT traceless: set tr({field['name']}) = 0 in L^(2) before VarD *)",
+                    f"l2ForVarD = l2ForVarD //. Scalar[{head}[a_, -a_]] :> 0;",
+                    f'Print["Imposed tr({field["name"]}) = 0: ", Short[l2ForVarD, 5]];',
+                    "",
+                ]
+            )
+
+    lines.extend(
+        [
+            "(* Expand Scalar[x]^n into products with renamed dummies.       *)",
+            "(* This fixes VarD index collision from Fierz-Pauli (tr h)^2:   *)",
+            "(*   Scalar[eta^ab H_ab]^2 -> Scalar[eta^ab H_ab]*Scalar[eta^cd H_cd] *)",
+            "(* NOTE: Use /. (single pass) NOT //. — RenameDummies may return    *)",
+            "(* the same canonical form for symmetric tensors (e.g. eta[a,b]),    *)",
+            "(* causing //. to loop 65536 times before hitting $IterationLimit.   *)",
+            "(* Evaluate Scalar[metric] → dimension (constant, no dummies to rename) *)",
+            f"l2ForVarD = l2ForVarD /. Scalar[{ctx.metric}[a_, b_]] :> {ctx.dim};",
+            "l2ForVarD = l2ForVarD /. Scalar[x_]^n_Integer?Positive :>",
+            "  Times @@ Table[With[{rd = RenameDummies[x]}, Scalar[rd]], {n}];",
+            "(* Strip unevaluated RenameDummies wrappers — VarD can't vary through them. *)",
+            "(* Safe: if RenameDummies evaluated, there's no wrapper to match.            *)",
+            "l2ForVarD = l2ForVarD /. RenameDummies[y_] :> y;",
             'Print["L^(2) for VarD (Scalar expanded): ", Short[l2ForVarD, 5]];',
             "",
-            "(* Vary L^(2) with respect to perturbation field H *)",
-            f"eomLin = VarD[{field_head}[-a, -b], {ctx.cd}][l2ForVarD];",
-            "eomLin = ToCanonical[eomLin];",
-            f"eomLin = ContractMetric[eomLin, {ctx.metric}];",
-            'Print["Linearized EOM: ", Short[eomLin, 5]];',
-            "",
         ]
     )
 
-    lines.extend(
-        [
-            "(* Decompose to components *)",
-            f'componentEqs = DecomposeToComponents[eomLin, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {p}MetricMatrix];',
-            'Print["Components: ", Length[componentEqs]];',
-        ]
-    )
-    lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
-    lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
+    if not matter_pert_info:
+        # --- Single-field linearization (metric only, original path) ---
+        assert has_metric_pert
+        lines.extend(
+            [
+                "(* Vary L^(2) with respect to perturbation field H *)",
+                f"eomLin = VarD[{field_head}[-a, -b], {ctx.cd}][l2ForVarD];",
+                # Term-by-term ToCanonical: xperm segfaults on large VarD sums
+                "If[Head[eomLin] === Plus,",
+                "  eomLin = Total[ToCanonical /@ List @@ eomLin],",
+                "  eomLin = ToCanonical[eomLin]",
+                "];",
+                f"eomLin = ContractMetric[eomLin, {ctx.metric}];",
+                'Print["Linearized EOM: ", Short[eomLin, 5]];',
+                "",
+            ]
+        )
 
-    # Build fieldEquations table
-    lines.extend(
-        [
-            "",
-            "fieldEquations = Table[",
-            f'  {{"{pert_field_name}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
-            "  {k, Length[componentEqs]}",
-            "];",
-            "",
-        ]
-    )
+        # Pre-decomposition TT zeroing for single-field path
+        lines.extend(_wls_pre_decomposition_tt_zeroing(ctx))
+
+        # Build SkipTuples for TT-gauged field
+        skip_opt = ""
+        tt_fields = {
+            entry["field"] for entry in ctx.gauge if entry["type"] == "tt"
+        }
+        if pert_field_name in tt_fields:
+            skip_tuples = ", ".join(
+                f"{{{0},{mu}}}" for mu in range(ctx.dim)
+            )
+            skip_opt = f', "SkipTuples" -> {{{skip_tuples}}}'
+
+        lines.extend(
+            [
+                "(* Decompose to components *)",
+                f'componentEqs = DecomposeToComponents[eomLin, {fexpr}, {ctx.chart}, {{}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}];',
+                'Print["Components: ", Length[componentEqs]];',
+            ]
+        )
+        lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
+        lines.extend(
+            _wls_validate_backgrounds_after_decompose(ctx, "componentEqs")
+        )
+
+        # Build fieldEquations table
+        lines.extend(
+            [
+                "",
+                "fieldEquations = Table[",
+                f'  {{"{pert_field_name}_" <> ToString[componentEqs[[k, 1]]], componentEqs[[k, 2]]}},',
+                "  {k, Length[componentEqs]}",
+                "];",
+                "",
+                "(* Memory cleanup: free abstract EOM and component array *)",
+                "Clear[eomLin, componentEqs, l2ForVarD];",
+                "Share[];",
+                "",
+            ]
+        )
+    else:
+        # --- Multi-field linearization (metric + matter perturbations) ---
+        # Build list of all dynamical fields and their VarD expressions
+        dyn_fields: list[dict[str, Any]] = []
+        if has_metric_pert:
+            dyn_fields.append(
+                {
+                    "name": pert_field_name,
+                    "field": pert_field,
+                    "head": field_head,
+                    "fexpr": fexpr,
+                    "vard_expr": f"{field_head}[-a, -b]",
+                }
+            )
+        for mpi in matter_pert_info:
+            mp_field_dict: dict[str, Any] = {
+                "name": mpi["pert_name"],
+                "type": mpi["field_type"],
+            }
+            if mpi["field_type"] not in {"scalar", "vector"}:
+                mp_field_dict["rank"] = int(mpi["field_rank"])
+            mp_fexpr = _field_expression(
+                mp_field_dict, ctx.prefix, head_override=mpi["pert_head"],
+            )
+            dyn_fields.append(
+                {
+                    "name": mpi["pert_name"],
+                    "field": mp_field_dict,
+                    "head": mpi["pert_head"],
+                    "fexpr": mp_fexpr,
+                    "vard_expr": mp_fexpr,
+                }
+            )
+
+        # Pre-decomposition TT zeroing: set ComponentValue = 0 for h_{0,mu}
+        # before DecomposeToComponents so ToBasis substitutes zeros during
+        # expansion, reducing peak memory.
+        lines.extend(_wls_pre_decomposition_tt_zeroing(ctx))
+
+        lines.extend(_wls_multi_field_eom(ctx, dyn_fields))
 
     # ------------------------------------------------------------------
     # Step 3: Type B gauge fixing (if any) — constraints on fieldEquations
@@ -1402,6 +1276,9 @@ def _resolve_gauge_mechanism(entry: dict[str, Any]) -> str:
     return _GAUGE_PRESETS[entry["type"]]["mechanism"]
 
 
+# --- WLS: Gauge fixing ---
+
+
 def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
     """Generate Type A gauge-fixing terms (added to Lagrangian before EL).
 
@@ -1409,13 +1286,30 @@ def _wls_gauge_fixing_type_a(ctx: _WlsContext) -> list[str]:
     function in ``GaugeFix.wl``.  For custom expressions, emits the user's
     Wolfram expression directly (after field-name substitution).
     """
+    # Build perturbation head lookup for matter perturbation fields
+    # to avoid name collision (e.g., perturbation "a" → "gea", not "geA")
+    pert_head_map: dict[str, str] = {}
+    lin = ctx.linearization or {}
+    for mp in lin.get("matter_perturbations", []):
+        mp_name = mp["perturbation_name"]
+        mf_name = mp["field"]
+        candidate = f"{ctx.prefix}{mp_name.capitalize()}"
+        mf_head = f"{ctx.prefix}{mf_name.capitalize()}"
+        if candidate == mf_head:
+            pert_head_map[mp_name] = f"{ctx.prefix}{mp_name}"
+        else:
+            pert_head_map[mp_name] = candidate
+
     lines: list[str] = ["(* Gauge fixing: Lagrangian terms *)"]
     for entry in ctx.gauge:
         if _resolve_gauge_mechanism(entry) != "lagrangian_term":
             continue
         field_name: str = entry["field"]
         xi = entry.get("xi", 1)
-        pfx_field = f"{ctx.prefix}{field_name.capitalize()}"
+        # Use perturbation head if this field is a perturbation with name collision
+        pfx_field = pert_head_map.get(
+            field_name, f"{ctx.prefix}{field_name.capitalize()}"
+        )
 
         if entry["type"] == "custom":
             expr = _substitute_field_names(
@@ -1510,10 +1404,24 @@ def _tt_transverse_constraints(
     field_name: str,
     coord_args: str,
 ) -> list[str]:
-    """Generate WLS for TT transverse constraints: d^i h_{i,j} = 0 per spatial j."""
+    """Generate WLS for TT transverse constraints: d^i h_{i,j} = 0 per spatial j.
+
+    Instead of creating auxiliary fields (h_transverse_*), replaces the dynamical
+    equation of one existing component per constraint.  For each spatial j, the
+    constrained component is ``h_{dim-1, j}`` — the off-diagonal mixing with
+    the last spatial direction (e.g. h_{xz} for j=x in 4D).
+
+    The constraint for j = dim-1 is redundant with the traceless condition
+    (which already eliminates ``h_{dim-1, dim-1}``), so it is skipped.
+
+    After plane-wave reduction (only last-axis derivatives survive), each
+    constraint simplifies to ``∂_z(h_{z,j}) = 0``, enabling the Python
+    constraint eliminator to remove these fields entirely.
+    """
     coords = _COORDS[dim]
     lines: list[str] = []
-    for j in range(1, dim):
+    # Skip j = dim-1: that constraint is redundant with tracelessness
+    for j in range(1, dim - 1):
         deriv_terms: list[str] = []
         for i in range(1, dim):
             flat_idx = _sym_flat_index(i, j, dim)
@@ -1523,12 +1431,26 @@ def _tt_transverse_constraints(
 
         constraint_expr = " + ".join(deriv_terms)
         coord_label = coords[j] if j < len(coords) else str(j)
-        constraint_name = f"{field_name}_transverse_{coord_label}"
+
+        # Replace h_{dim-1, j}'s dynamical equation with the transverse constraint.
+        # fieldEquations uses "h_N" names (field_name + "_" + flat_index),
+        # NOT Wolfram symbol names (comp_pfx + flat_index).
+        constrained_idx = _sym_flat_index(dim - 1, j, dim)
+        constrained_field = f"{field_name}_{constrained_idx}"
+
         lines.extend(
             [
-                f"(* TT transverse: d^i h_{{i,{j}}} = 0 *)",
-                f'AppendTo[fieldEquations, {{"{constraint_name}", {constraint_expr}}}];',
-                f'Print["Added TT transverse constraint: d^i h_{{i,{j}}} = 0"];',
+                f"(* TT transverse: d^i h_{{i,{j}}} = 0"
+                f" — replaces EOM of {constrained_field} *)",
+                "fieldEquations = Table[",
+                f'  If[fieldEquations[[k, 1]] === "{constrained_field}",',
+                f'    {{"{constrained_field}", {constraint_expr}}},',
+                "    fieldEquations[[k]]",
+                "  ],",
+                "  {k, Length[fieldEquations]}",
+                "];",
+                f'Print["TT transverse: d^i h_{{i,{coord_label}}} = 0'
+                f' -> replaced {constrained_field} EOM"];',
                 "",
             ]
         )
@@ -1620,6 +1542,44 @@ def _type_b_tt_gauge(
     return lines
 
 
+def _wls_pre_decomposition_tt_zeroing(ctx: _WlsContext) -> list[str]:
+    """Set ``ComponentValue = 0`` for TT-zeroed components before decomposition.
+
+    When TT gauge is active on a symmetric rank-2 tensor, the temporal
+    components ``h_{0,mu} = 0`` are known a priori.  Setting them as
+    ``ComponentValue`` rules lets xCoba's ``ToBasis`` substitute zeros
+    *during* expansion of ALL equations (including cross-field terms),
+    reducing peak memory and intermediate expression size.
+
+    Must be called *before* ``DecomposeToComponents`` / ``_wls_multi_field_eom``.
+    The post-decomposition Type B gauge (``_type_b_tt_gauge``) remains as
+    defense-in-depth for transverse + traceless constraints.
+    """
+    lines: list[str] = []
+    for entry in ctx.gauge:
+        if entry["type"] != "tt":
+            continue
+        field_name: str = entry["field"]
+        p = ctx.prefix
+        chart = ctx.chart
+        head = f"{p}{field_name.capitalize()}"
+        for mu in range(ctx.dim):
+            lines.append(
+                f"ComponentValue[{head}[{{0, -{chart}}}, {{{mu}, -{chart}}}], 0];"
+            )
+            if mu > 0:  # symmetric: also set (mu, 0)
+                lines.append(
+                    f"ComponentValue[{head}[{{{mu}, -{chart}}}, {{0, -{chart}}}], 0];"
+                )
+    if lines:
+        lines.insert(
+            0,
+            "(* Pre-decomposition TT zeroing: h_{0,mu} = 0 as ComponentValue *)",
+        )
+        lines.append("")
+    return lines
+
+
 def _wls_gauge_fixing_type_b(ctx: _WlsContext) -> list[str]:
     """Generate Type B gauge-fixing code (constraints applied after decomposition).
 
@@ -1652,6 +1612,9 @@ def _wls_gauge_fixing_type_b(ctx: _WlsContext) -> list[str]:
         elif gauge_type == "tt":
             lines.extend(_type_b_tt_gauge(ctx, field_name, comp_pfx))
     return lines
+
+
+# --- WLS: Plane-wave reduction ---
 
 
 def _wls_plane_wave_reduction_lagrangian(ctx: _WlsContext) -> list[str]:
@@ -1811,6 +1774,9 @@ def _wls_plane_wave_field_elimination(ctx: _WlsContext) -> list[str]:
     return lines
 
 
+# --- WLS: Euler-Lagrange & decomposition ---
+
+
 def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
     """Generate Euler-Lagrange, decomposition, and export lines for multi-field."""
     lines: list[str] = ["(* Step 4: Euler-Lagrange equations *)"]
@@ -1837,6 +1803,10 @@ def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
 
     # Step 5: Decompose
     lines.append("(* Step 5: Decompose to components *)")
+    # Build set of TT-gauged field names for SkipTuples optimization
+    tt_fields = {
+        entry["field"] for entry in ctx.gauge if entry["type"] == "tt"
+    }
     for i, field in enumerate(ctx.fields):
         fname = field["name"]
         fexpr = _field_expression(field, ctx.prefix)
@@ -1848,9 +1818,16 @@ def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
         ]
         others_str = ", ".join(other_exprs) if other_exprs else ""
 
+        skip_opt = ""
+        if fname in tt_fields:
+            skip_tuples = ", ".join(
+                f"{{{0},{mu}}}" for mu in range(ctx.dim)
+            )
+            skip_opt = f', "SkipTuples" -> {{{skip_tuples}}}'
+
         lines.extend(
             (
-                f'{comp_var} = DecomposeToComponents[{eom_var}, {fexpr}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix];',
+                f'{comp_var} = DecomposeToComponents[{eom_var}, {fexpr}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {ctx.prefix}MetricMatrix{skip_opt}];',
                 f'Print["{fname} components: ", Length[{comp_var}]];',
             )
         )
@@ -1994,6 +1971,9 @@ def _wls_linearization(ctx: _WlsContext, *, include_bg: bool = False) -> list[st
     )
 
     return lines
+
+
+# --- WLS: Canonical momentum & Hamiltonian ---
 
 
 def _wls_constraint_metadata(
@@ -2330,7 +2310,19 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
     already exist in the WLS script context (set by EL/linearization steps).
     """
     raw_count = _total_raw_component_count(ctx)
-    if raw_count > _LAGRANGIAN_DECOMPOSE_THRESHOLD:
+    # Multi-field perturbation systems (Einstein-Maxwell, etc.): always use
+    # the fast path to avoid a redundant second Lagrangian decomposition that
+    # doubles peak memory.  The EOM-based path produces empty hamiltonian_terms,
+    # which is valid for E-L velocity form.
+    has_matter_perts = bool(
+        ctx.linearization and ctx.linearization.get("matter_perturbations")
+    )
+    # Plane-wave reduction changes the surviving field set (adds transverse
+    # constraints, eliminates zero-equation fields) which breaks the 4D
+    # Hamiltonian parsing in ParseHamiltonianExpression.  Use the fast path
+    # (empty hamiltonian_terms) — energy is computed from equations instead.
+    has_plane_wave = ctx.reduction is not None
+    if raw_count > _LAGRANGIAN_DECOMPOSE_THRESHOLD or has_matter_perts or has_plane_wave:
         return _wls_canonical_from_eom(ctx)
 
     _, all_heads_str = _canonical_field_heads(ctx)
@@ -2365,6 +2357,9 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
     )
 
     return lines
+
+
+# --- WLS: Metadata & JSON export ---
 
 
 def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
@@ -2442,7 +2437,11 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
     # Build JSON — always use multi-field builder since fieldEquations
     # is constructed with proper labels by both single and multi-field paths
     lines.extend(
-        ("jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];", "")
+        (
+            "jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];",
+            "Clear[fieldEquations]; Share[];",
+            "",
+        )
     )
 
     # Inject runtime parameter defaults into JSON metadata
@@ -2483,6 +2482,9 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
     )
 
     return lines
+
+
+# --- WLS assembly & execution ---
 
 
 def generate_wls(
@@ -2595,6 +2597,7 @@ def generate_wls(
         # Type A gauge fixing: modify Lagrangian before EL derivation
         if has_type_a:
             lines.extend(_wls_gauge_fixing_type_a(ctx))
+        lines.extend(_wls_pre_decomposition_tt_zeroing(ctx))
         if ctx.is_multi:
             lines.extend(_wls_euler_lagrange_multi(ctx))
         else:
@@ -2638,6 +2641,30 @@ def _run_wolframscript(script_path: Path) -> int:
         )
         return 1
 
+    # Kill any stale WolframKernel processes to avoid license seat exhaustion.
+    # The Wolfram Engine license limits concurrent sessions; orphaned kernels
+    # from previous crashed/interrupted runs consume seats and cause
+    # "license error" segfaults on subsequent invocations.
+    subprocess.run(
+        ["pkill", "-f", "WolframKernel"], capture_output=True, check=False
+    )
+
+    # Warn if no swap — large derivations may crash without sufficient memory
+    try:
+        with Path("/proc/swaps").open(encoding="ascii") as f:
+            if len(f.readlines()) <= 1:  # header only
+                print(
+                    "Warning: No swap space available. Large derivations may crash.",
+                    file=sys.stderr,
+                )
+                print(
+                    "  Docker Desktop: Settings → Resources → Memory → 16 GB+",
+                    file=sys.stderr,
+                )
+                print(file=sys.stderr)
+    except OSError:
+        pass
+
     print(f"Running: wolframscript -file {script_path}")
     print()
 
@@ -2650,7 +2677,7 @@ def _run_wolframscript(script_path: Path) -> int:
     return result.returncode
 
 
-def _derive_from_toml(config_path: Path, args: Namespace) -> int:
+def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901, PLR0915
     """Run derivation from a TOML config file.
 
     Parameters
@@ -2730,6 +2757,29 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:
         except Exception as exc:  # noqa: BLE001
             print(f"\nError: Plane-wave reduction failed: {exc}", file=sys.stderr)
             ret = 1
+
+    # Post-process: eliminate degenerate algebraic constraints
+    # (e.g., TT gauge traceless conditions where the constraint field cancels)
+    if ret == 0 and resolved.exists():
+        import json as _json_elim
+
+        from tidal.symbolic.reduction import eliminate_degenerate_constraints
+
+        spec_raw = _json_elim.loads(resolved.read_text(encoding="utf-8"))
+        reduced_elim = eliminate_degenerate_constraints(spec_raw)
+        elim_fields = (
+            reduced_elim.get("metadata", {})
+            .get("constraint_elimination", {})
+            .get("eliminated_fields", [])
+        )
+        if elim_fields:
+            resolved.write_text(
+                _json_elim.dumps(reduced_elim, indent="\t"), encoding="utf-8",
+            )
+            print(
+                f"\nConstraint elimination: removed {len(elim_fields)} field(s): "
+                f"{', '.join(elim_fields)}"
+            )
 
     # Post-validate output JSON if wolframscript succeeded
     if ret == 0 and resolved.exists():

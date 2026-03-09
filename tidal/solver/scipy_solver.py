@@ -34,6 +34,10 @@ if TYPE_CHECKING:
     from tidal.solver.rhs import RHSEvaluator
     from tidal.symbolic.json_loader import EquationSystem
 
+# ---------------------------------------------------------------------------
+# RHS builder
+# ---------------------------------------------------------------------------
+
 # Implicit methods that benefit from Jacobian sparsity
 _IMPLICIT_METHODS = {"Radau", "BDF"}
 
@@ -61,7 +65,15 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
         dydt_buf.fill(0.0)
 
         compute_force(
-            spec, layout, grid, bc, y, t, rhs_eval, out=force_buf, fieldset=fs,
+            spec,
+            layout,
+            grid,
+            bc,
+            y,
+            t,
+            rhs_eval,
+            out=force_buf,
+            fieldset=fs,
         )
 
         for _si, s, _fn in layout.velocity_slot_groups:
@@ -78,6 +90,11 @@ def _build_rhs_fn(  # noqa: PLR0913, PLR0917
         return dydt_buf
 
     return rhs_fn
+
+
+# ---------------------------------------------------------------------------
+# Solver entry point
+# ---------------------------------------------------------------------------
 
 
 def solve_scipy(  # noqa: PLR0913

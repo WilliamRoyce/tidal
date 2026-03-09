@@ -50,6 +50,11 @@ _ZERO_RATE_THRESHOLD = 1e-14
 DPI = 150
 VMAX_FLOOR = 0.01
 
+
+def _noop(*_a: object, **_kw: object) -> None:
+    """No-op callback for quiet mode."""
+
+
 # Curated namespace for --ic-formula eval().
 # Includes np for backward compatibility (e.g. np.exp(...) in formulas)
 # plus named math functions for convenience.
@@ -875,9 +880,7 @@ def _load_resume_state(  # noqa: PLR0914
 
     saved_fields: list[str] = meta.get("fields", [])
     grid_shape = tuple(meta.get("grid_shape", []))
-    grid_bounds = tuple(
-        tuple(b) for b in meta.get("grid_bounds", [])
-    )
+    grid_bounds = tuple(tuple(b) for b in meta.get("grid_bounds", []))
     periodic = tuple(meta.get("periodic", []))
     bc_types_raw = meta.get("bc_types")
     bc_types = tuple(bc_types_raw) if bc_types_raw is not None else None
@@ -907,10 +910,7 @@ def _load_resume_state(  # noqa: PLR0914
     if snapshot_index is None:
         snapshot_index = n_snapshots - 1
     elif snapshot_index < 0 or snapshot_index >= n_snapshots:
-        msg = (
-            f"Snapshot index {snapshot_index} out of range "
-            f"(0..{n_snapshots - 1})"
-        )
+        msg = f"Snapshot index {snapshot_index} out of range (0..{n_snapshots - 1})"
         raise ValueError(msg)
 
     t_start = float(times[snapshot_index])
@@ -971,7 +971,10 @@ def _validate_resume_grid(resume: ResumeState, grid_info: GridInfo) -> None:
     for i, (saved, current) in enumerate(
         zip(resume.grid_bounds, grid_info.bounds, strict=True)
     ):
-        if abs(saved[0] - current[0]) > bounds_tol or abs(saved[1] - current[1]) > bounds_tol:
+        if (
+            abs(saved[0] - current[0]) > bounds_tol
+            or abs(saved[1] - current[1]) > bounds_tol
+        ):
             msg = (
                 f"Grid bounds mismatch on axis {i}: "
                 f"checkpoint has {saved} but current grid is {current}"
@@ -994,6 +997,60 @@ def _noise_slots(
     return {
         component: args.ic_amplitude * rng.standard_normal(grid_info.shape),
     }
+
+
+def _apply_ic_perturbation(
+    y0: np.ndarray,
+    args: Namespace,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+) -> np.ndarray:
+    """Add small Gaussian noise to field slots (not velocities) for ensemble variation.
+
+    The perturbation scale is relative to ``--ic-amplitude``:
+    ``perturbation = scale * amplitude * N(0,1)``.
+
+    This is analogous to ensemble weather forecasting where perturbed ICs
+    generate ensemble members for uncertainty estimation.
+
+    References
+    ----------
+    Palmer, T.N. et al. (1993) "Ensemble prediction", ECMWF Tech Memo 188.
+
+    Parameters
+    ----------
+    y0 : ndarray
+        Initial state vector (modified in-place and returned).
+    args : Namespace
+        CLI args; uses ``ic_perturbation`` (scale) and ``ic_perturbation_seed``.
+    spec : EquationSystem
+        Equation system for layout construction.
+    grid_info : GridInfo
+        Grid information for layout construction.
+
+    Returns
+    -------
+    ndarray
+        The perturbed state vector (same object as *y0*).
+    """
+    from tidal.solver.state import StateLayout
+
+    scale = getattr(args, "ic_perturbation", None)
+    if scale is None or scale == 0.0:
+        return y0
+
+    seed = getattr(args, "ic_perturbation_seed", None)
+    rng = np.random.default_rng(seed)
+    amplitude = getattr(args, "ic_amplitude", 1.0) or 1.0
+    layout = StateLayout.from_spec(spec, grid_info.num_points)
+    n = layout.num_points
+
+    for i, slot in enumerate(layout.slots):
+        if slot.kind == "field":
+            start = i * n
+            y0[start : start + n] += scale * amplitude * rng.standard_normal(n)
+
+    return y0
 
 
 def _apply_ic_field_overrides(
@@ -1616,10 +1673,6 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     """
     from tidal.measurement._io import SimulationData
 
-    # Progress printer
-    def _noop(*_a: object, **_kw: object) -> None:
-        pass
-
     log = _noop if args.quiet else print
 
     # 1. Grid
@@ -1651,6 +1704,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         )
     else:
         y0 = _build_initial_y0(args, spec, grid_info, bounds)
+        y0 = _apply_ic_perturbation(y0, args, spec, grid_info)
         ic_desc = f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}"
         ic_field_list: list[str] = getattr(args, "ic_field", None) or []
         if ic_field_list:
@@ -1736,11 +1790,14 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     progress: SimulationProgress | None = None
     if not args.quiet:
         solver_labels = {
-            "ida": "IDA", "cvode": "CVODE",
-            "scipy": "scipy", "leapfrog": "leapfrog",
+            "ida": "IDA",
+            "cvode": "CVODE",
+            "scipy": "scipy",
+            "leapfrog": "leapfrog",
         }
         progress = SimulationProgress(
-            t_start, args.t_end,
+            t_start,
+            args.t_end,
             solver_name=solver_labels.get(scheme, scheme),
         )
 
@@ -1915,10 +1972,6 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
         print(f"Error: file not found: {json_path}", file=sys.stderr)
         return 1
 
-    # Progress printer — suppressed by --quiet
-    def _noop(*_a: object, **_kw: object) -> None:
-        pass
-
     log = _noop if args.quiet else print
 
     # Step 1: Load spec
@@ -1942,9 +1995,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
         # --resume and --ic are mutually exclusive.  argparse default is
         # "gaussian", so a non-gaussian value means the user explicitly set --ic.
         if args.ic != "gaussian":
-            print(
-                "Error: --resume and --ic cannot be used together", file=sys.stderr
-            )
+            print("Error: --resume and --ic cannot be used together", file=sys.stderr)
             return 1
 
         meta_path = resume_dir / "metadata.json"
@@ -1959,9 +2010,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
                 args.grid_shape = ",".join(str(s) for s in grid_shape)
             if args.bounds is None:
                 grid_bounds = cast("list[list[float]]", meta["grid_bounds"])
-                args.bounds = ",".join(
-                    f"{b[0]}:{b[1]}" for b in grid_bounds
-                )
+                args.bounds = ",".join(f"{b[0]}:{b[1]}" for b in grid_bounds)
             if args.bc is None and "bc_types" in meta:
                 bc_types = cast("list[str]", meta["bc_types"])
                 args.bc = ",".join(bc_types)

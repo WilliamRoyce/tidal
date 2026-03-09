@@ -10,12 +10,26 @@
 
    DATA FLOW:
      Tensor EOM (abstract indices: A_a, F_{ab})
+       → SeparateFieldMetrics (undo ContractMetric: V^a → g^{ab} V_{-b})
        → ToBasis (convert to chart basis)
-       → TraceBasisDummy (sum over dummy indices)
-       → EvaluateChristoffelComponents (flat space: Γ = 0, curved: compute from metric)
+       → **Batched** TraceBasisDummy + Expand + metric evaluation
+         (fused to prevent O(dim^{2*rank}) intermediate memory blowup)
+       → EvaluateChristoffelComponents (flat: Γ = 0, curved: compute from metric)
+       → EvaluateCurvatureComponents (constant metric: R = 0, non-constant: compute)
        → EvaluateEpsilonComponents (ε tensors → ±1)
+       → Evaluate remaining metric components (idempotent cleanup)
+       → Replace tensor fields with scalar functions
        → ConvertCDToDerivatives (CD → Derivative)
-       → Extract components (A_0[t,x], A_1[t,x], ...)
+
+   MEMORY OPTIMIZATION (batched TraceBasisDummy + metric fusion):
+     TraceBasisDummy expands dummy index sums, producing O(dim^{2*n_dummy})
+     terms per original term. Most off-diagonal metric components are zero
+     (flat) or sparse (curved). By fusing TraceBasisDummy + Expand + metric
+     evaluation into batches of ~50 input terms, peak memory is bounded by a
+     single batch (~800 terms) rather than the full expansion (~970K terms).
+     For Einstein-Maxwell cross-coupling in 3+1D flat spacetime:
+     568 input terms → 970K expanded → ~200 after metric (99.97% reduction).
+     Without batching, the a-field decomposition peaks at 7.6+ GB and OOMs.
 
    KEY FEATURES:
      - Supports scalar, vector, and rank-2 tensor fields
@@ -92,6 +106,15 @@ ValidateNoUnresolvedBackgrounds::usage =
   "ValidateNoUnresolvedBackgrounds[expr, bgHeads] checks that no abstract background \
 field symbols remain unresolved in the component expression.";
 
+BatchedTraceBasisDummyWithMetric::usage =
+  "BatchedTraceBasisDummyWithMetric[componentEq, chart, metricMatrix, batchSize, \
+backgroundFieldRules] performs TraceBasisDummy in batches to prevent O(dim^{2n}) \
+term blowup during Expand. Each batch of ~batchSize terms is traced, expanded, \
+and metric-evaluated before accumulating, keeping peak memory bounded. Without \
+batching, Einstein-Maxwell cross-coupling exceeds 7 GB; with batching, <1 GB. \
+Optional backgroundFieldRules evaluates background field DownValues during the \
+fused loop for further memory reduction.";
+
 (* Error messages *)
 DecomposeToComponents::badopt =
   "Invalid value for option \"ComputeChristoffels\": `1`. Expected Automatic, True, or False.";
@@ -132,26 +155,29 @@ SeparateFieldMetrics[expr_, chart_] := Module[
 (* Options for DecomposeToComponents *)
 Options[DecomposeToComponents] = {
   "ComputeChristoffels" -> Automatic,  (* Automatic (default), True, or False *)
-  "MetricMatrix" -> None  (* Explicit metric matrix for curved spacetime evaluation *)
+  "MetricMatrix" -> None,  (* Explicit metric matrix for curved spacetime evaluation *)
+  "SkipTuples" -> {},  (* Component index tuples to skip (e.g. TT-zeroed {0,mu}) *)
+  "BackgroundFieldRules" -> {}  (* List of {fieldHead, {comp0, comp1, ...}} for background field eval *)
 };
 
 (* 3-arg signature: eom, field, chart (no additional fields, default options) *)
 DecomposeToComponents[eom_, field_, chart_] :=
-  DecomposeToComponents[eom, field, chart, {}, "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None];
+  DecomposeToComponents[eom, field, chart, {}, "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None, "SkipTuples" -> {}, "BackgroundFieldRules" -> {}];
 
 (* 4-arg signature: eom, field, chart, additionalFields (default options) *)
 DecomposeToComponents[eom_, field_, chart_, additionalFields_List] :=
-  DecomposeToComponents[eom, field, chart, additionalFields, "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None];
+  DecomposeToComponents[eom, field, chart, additionalFields, "ComputeChristoffels" -> Automatic, "MetricMatrix" -> None, "SkipTuples" -> {}, "BackgroundFieldRules" -> {}];
 
 (* Full signature with options *)
 DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsPattern[]] := Module[
   {dim, components, indices, componentEq, result, fieldHead, fieldRank, allFieldHeads,
    computeChristoffels, metricMatrix, computeChristoffelsOption, shouldComputeChristoffels,
-   coords},
+   coords, backgroundFieldRules},
 
   (* Get option values *)
   computeChristoffelsOption = OptionValue["ComputeChristoffels"];
   metricMatrix = OptionValue["MetricMatrix"];
+  backgroundFieldRules = OptionValue["BackgroundFieldRules"];
 
   (* Auto-detect whether Christoffel computation is needed *)
   coords = GetCoordinateSymbols[chart];
@@ -213,8 +239,16 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
     (* Ensures cross-field vector/tensor terms have covariant indices *)
     componentEq = SeparateFieldMetrics[componentEq, chart];
 
-    componentEq = ToBasis[chart][componentEq];
-    componentEq = TraceBasisDummy[componentEq];
+    (* Apply ToBasis term-by-term to avoid xperm segfault on large sums *)
+    If[Head[componentEq] === Plus,
+      componentEq = Total[ToBasis[chart] /@ List @@ componentEq],
+      componentEq = ToBasis[chart][componentEq]
+    ];
+    (* TraceBasisDummy also term-by-term for the same reason *)
+    If[Head[componentEq] === Plus,
+      componentEq = Total[TraceBasisDummy /@ List @@ componentEq],
+      componentEq = TraceBasisDummy[componentEq]
+    ];
 
     (* For flat spacetime: set all Christoffel symbols to 0 *)
     If[computeChristoffels =!= True,
@@ -247,6 +281,15 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
         componentEq = Expand[componentEq]
       ];
 
+      (* Evaluate background field components and their PD derivatives *)
+      If[backgroundFieldRules =!= {},
+        Do[
+          componentEq = EvaluatePDBackgroundField[componentEq, chart, bg[[1]], bg[[2]]],
+          {bg, backgroundFieldRules}
+        ];
+        componentEq = Expand[componentEq]
+      ];
+
       (* Replace ALL fields (any rank) with functions of coordinates *)
       (* This ensures cross-field terms are properly transformed *)
       (* Uses ReplaceTensorFieldComponents which dispatches by rank: *)
@@ -260,6 +303,15 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
 
       (* Convert coordinate derivatives to explicit Derivative form *)
       componentEq = ConvertCDToDerivatives[componentEq, chart];
+
+      (* Post-ConvertCDToDerivatives: catch any residual Derivative[...][bgField][...] forms *)
+      If[backgroundFieldRules =!= {},
+        Do[
+          componentEq = EvaluatePDBackgroundField[componentEq, chart, bg[[1]], bg[[2]]],
+          {bg, backgroundFieldRules}
+        ];
+        componentEq = Expand[componentEq]
+      ];
     ];
 
     (* Expand to get explicit Derivative[...] form *)
@@ -269,14 +321,31 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
 
   (* For any tensor field of rank >= 1, use the unified pipeline *)
   If[fieldRank >= 1,
-    Module[{componentTuples},
-      componentTuples = EnumerateComponentTuples[fieldHead, dim];
-      result = Table[
-        {
-          idx - 1,
-          ExtractTensorComponent[eom, field, chart,
-            componentTuples[[idx]], additionalFields, computeChristoffels, metricMatrix]
-        },
+    Module[{allTuples, componentTuples, skipTuples, flatIdxMap},
+      allTuples = EnumerateComponentTuples[fieldHead, dim];
+      (* Build flat index map: tuple -> original 0-based position *)
+      flatIdxMap = Association[Table[allTuples[[i]] -> i - 1, {i, Length[allTuples]}]];
+      (* Filter out tuples known to be zero (e.g. TT gauge h_{0,mu}) *)
+      skipTuples = OptionValue["SkipTuples"];
+      componentTuples = allTuples;
+      If[skipTuples =!= {},
+        componentTuples = Complement[allTuples, skipTuples];
+        Print["SkipTuples: skipping ", Length[allTuples] - Length[componentTuples],
+              " components, ", Length[componentTuples], " remaining"]
+      ];
+      (* Use Do+AppendTo instead of Table so Share[] can reclaim memory
+         between component extractions — critical for cross-field coupling
+         cases like Einstein-Maxwell where expressions grow large. *)
+      result = {};
+      Do[
+        AppendTo[result,
+          {flatIdxMap[componentTuples[[idx]]],
+           ExtractTensorComponent[eom, field, chart,
+             componentTuples[[idx]], additionalFields, computeChristoffels, metricMatrix, backgroundFieldRules]}
+        ];
+        Share[];
+        Print["  [", Round[MemoryInUse[]/1024.^2], " MB] component ",
+              idx, "/", Length[componentTuples]];,
         {idx, 1, Length[componentTuples]}
       ];
       Return[result]
@@ -284,11 +353,84 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
   ]
 ];
 
+(* === Batched TraceBasisDummy + Metric Evaluation ===
+   Fuses TraceBasisDummy, Expand, and early metric evaluation into a single
+   batched loop to prevent intermediate expression blowup.
+
+   TraceBasisDummy expands dummy basis index sums, producing O(dim^{2*n_dummy})
+   intermediate terms per input term. For cross-field coupling (e.g., rank-2 h
+   coupling to rank-1 a in Einstein-Maxwell), this creates ~970K terms from
+   ~568 input terms. Early metric evaluation eliminates 99.97% by substituting
+   η_{ij}=0 for off-diagonal i≠j. Fusing these steps keeps peak memory bounded
+   by a single batch (~800 terms) rather than the full expansion (~970K).
+
+   Ref: Gertsenshtein a-field OOM fix (7.6+ GB peak → <1 GB with batching). *)
+BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_:50,
+  backgroundFieldRules_List:{}] := Module[
+  {inputTerms, nTerms, result, batch, traced},
+
+  (* Single-term case: no batching needed *)
+  If[Head[componentEq] =!= Plus,
+    traced = TraceBasisDummy[componentEq];
+    traced = Expand[traced];
+    If[metricMatrix =!= None,
+      traced = EvaluateMetricComponents[traced, chart, metricMatrix],
+      traced = EvaluateMinkowskiMetric[traced, chart]
+    ];
+    Print["    step3-FusedTrace: ", Round[MemoryInUse[]/1024.^2], " MB, ",
+          If[Head[Expand[traced]]===Plus, Length[Expand[traced]], 1], " terms (1 input, no batch)"];
+    Return[Expand[traced]]
+  ];
+
+  inputTerms = List @@ componentEq;
+  nTerms = Length[inputTerms];
+  result = 0;
+
+  Do[
+    batch = inputTerms[[batchStart ;; Min[batchStart + batchSize - 1, nTerms]]];
+    (* TraceBasisDummy: sum dummy basis indices for this batch *)
+    traced = Total[TraceBasisDummy /@ batch];
+    tracedLen = If[Head[traced]===Plus, Length[traced], 1];
+    (* Expand: propagate ComponentValue zeros (MetricInBasis + TT + background) *)
+    traced = Expand[traced];
+    expandLen = If[Head[traced]===Plus, Length[traced], 1];
+    (* Early metric evaluation: collapse off-diagonal zeros immediately *)
+    If[metricMatrix =!= None,
+      traced = EvaluateMetricComponents[traced, chart, metricMatrix],
+      traced = EvaluateMinkowskiMetric[traced, chart]
+    ];
+    traced = Expand[traced];
+    evalLen = If[Head[traced]===Plus, Length[traced], 1];
+    (* Early background field evaluation: collapse PD derivatives of background fields *)
+    If[backgroundFieldRules =!= {},
+      Do[traced = EvaluatePDBackgroundField[traced, chart, bg[[1]], bg[[2]]],
+        {bg, backgroundFieldRules}];
+      traced = Expand[traced]
+    ];
+    (* Diagnostic: show term reduction at each stage (first batch only) *)
+    If[batchStart == 1,
+      Print["    batch-diag: TraceBasisDummy=", tracedLen,
+            " -> Expand=", expandLen, " -> MetricEval=", evalLen]
+    ];
+    result += traced;
+    (* Release batch memory *)
+    batch =.; traced =.;,
+    {batchStart, 1, nTerms, batchSize}
+  ];
+
+  result = Expand[result];
+  Print["    step3-FusedTrace: ", Round[MemoryInUse[]/1024.^2], " MB, ",
+        If[Head[result]===Plus, Length[result], 1], " terms",
+        " (", nTerms, " input, batch=", batchSize, ")"];
+  result
+];
+
 (* === Unified Tensor Component Extraction === *)
 (* Single pipeline for any tensor rank. *)
 
 ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
-  additionalFields_List:{}, computeChristoffels_:False, metricMatrix_:None] := Module[
+  additionalFields_List:{}, computeChristoffels_:False, metricMatrix_:None,
+  backgroundFieldRules_List:{}] := Module[
   {componentEq, fieldHead, coordSyms, dim, allFieldHeads, rank},
 
   (*
@@ -341,39 +483,72 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   (* Must happen BEFORE ToBasis so fields have canonical (down) indices in basis *)
   componentEq = SeparateFieldMetrics[componentEq, chart];
 
-  (* Step 2: ToBasis *)
-  componentEq = ToBasis[chart][componentEq];
+  (* Step 2: ToBasis — term-by-term to avoid xperm segfault on large sums *)
+  If[Head[componentEq] === Plus,
+    componentEq = Total[ToBasis[chart] /@ List @@ componentEq],
+    componentEq = ToBasis[chart][componentEq]
+  ];
+  Print["    step2-ToBasis: ", Round[MemoryInUse[]/1024.^2], " MB, ",
+        If[Head[componentEq]===Plus, Length[componentEq], 1], " terms"];
 
-  (* Step 3: TraceBasisDummy *)
-  componentEq = TraceBasisDummy[componentEq];
+  (* Steps 3+3.5+3.6 fused: TraceBasisDummy + Expand + early metric evaluation.
+     Batched to prevent O(dim^{2*n_dummy}) intermediate memory blowup.
+     Each batch: TraceBasisDummy → Expand → metric eval → accumulate.
+     See BatchedTraceBasisDummyWithMetric for details. *)
+  componentEq = BatchedTraceBasisDummyWithMetric[componentEq, chart, metricMatrix, 50, backgroundFieldRules];
 
   (* Step 4: Evaluate Christoffel symbols *)
+  (* For flat spacetime (computeChristoffels=False): Γ=0, removes Christoffel terms.
+     For curved spacetime: evaluates computed Christoffel components.
+     After early metric eval (step 3.6), the expression is already much smaller,
+     so this step operates on far fewer terms. *)
   componentEq = EvaluateChristoffelComponents[componentEq, chart, computeChristoffels];
   componentEq = Expand[componentEq];
+  Print["    step4-Christoffel: ", Round[MemoryInUse[]/1024.^2], " MB, ",
+        If[Head[componentEq]===Plus, Length[componentEq], 1], " terms"];
 
-  (* Step 5: Evaluate background curvature tensors from the metric *)
-  (* For constant metrics this computes R = 0; for non-constant it leaves them *)
+  (* Step 5: Evaluate curvature tensors *)
+  (* For constant metrics (flat or conformally flat): R=0, no-op.
+     For non-constant metrics: substitutes computed Riemann/Ricci components. *)
   componentEq = EvaluateCurvatureComponents[componentEq, chart,
     If[metricMatrix =!= None, metricMatrix, None]];
   componentEq = Expand[componentEq];
+  Print["    step5-Curvature: ", Round[MemoryInUse[]/1024.^2], " MB, ",
+        If[Head[componentEq]===Plus, Length[componentEq], 1], " terms"];
 
   (* Step 6: Evaluate epsilon tensors *)
-  (* Pass metricMatrix for correct volume factor and index raising in curved spacetimes *)
   componentEq = EvaluateEpsilonComponents[componentEq, chart, metricMatrix];
   componentEq = Expand[componentEq];
+  Print["    step6-Epsilon: ", Round[MemoryInUse[]/1024.^2], " MB, ",
+        If[Head[componentEq]===Plus, Length[componentEq], 1], " terms"];
 
-  (* Step 7: Evaluate metric components *)
-  (* EvaluateMetricComponents uses MetricQ condition to only match metric tensors, *)
-  (* preserving field tensors like H[{1,-chart},{1,-chart}] intact. *)
+  (* Step 7: Evaluate remaining metric components (idempotent after step 3.6).
+     For most cases this is a no-op since metrics were already evaluated in
+     step 3.6. However, Christoffel/curvature evaluation (steps 4-5) may
+     introduce NEW metric components for curved spacetimes, so we re-evaluate
+     to catch those. For flat spacetime this is guaranteed to be a no-op. *)
   If[metricMatrix =!= None,
     componentEq = EvaluateMetricComponents[componentEq, chart, metricMatrix],
     componentEq = EvaluateMinkowskiMetric[componentEq, chart]
   ];
   componentEq = Expand[componentEq];
+  Print["    step7-Metric: ", Round[MemoryInUse[]/1024.^2], " MB, ",
+        If[Head[componentEq]===Plus, Length[componentEq], 1], " terms"];
 
   If[metricMatrix =!= None,
     componentEq = EvaluatePDMetric[componentEq, chart, metricMatrix];
     componentEq = Expand[componentEq]
+  ];
+
+  (* Step 7b: Evaluate background field components and PD derivatives *)
+  If[backgroundFieldRules =!= {},
+    Do[
+      componentEq = EvaluatePDBackgroundField[componentEq, chart, bg[[1]], bg[[2]]],
+      {bg, backgroundFieldRules}
+    ];
+    componentEq = Expand[componentEq];
+    Print["    step7b-BackgroundField: ", Round[MemoryInUse[]/1024.^2], " MB, ",
+          If[Head[componentEq]===Plus, Length[componentEq], 1], " terms"]
   ];
 
   (* Step 8: Get coordinate symbols and replace ALL tensor fields with named scalar functions *)
@@ -388,6 +563,16 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
 
   (* Step 9: Convert coordinate derivatives to Derivative form *)
   componentEq = ConvertCDToDerivatives[componentEq, chart];
+
+  (* Step 9b: Catch residual background field Derivative[...][bgField][{mu,-chart}] forms
+     that may survive ConvertCDToDerivatives *)
+  If[backgroundFieldRules =!= {},
+    Do[
+      componentEq = EvaluatePDBackgroundField[componentEq, chart, bg[[1]], bg[[2]]],
+      {bg, backgroundFieldRules}
+    ];
+    componentEq = Expand[componentEq]
+  ];
 
   (* Final simplification: Simplify then Expand to ensure cancellations
      (e.g., trace terms in linearized Einstein tensor) while preserving

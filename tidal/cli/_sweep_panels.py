@@ -6,6 +6,12 @@ Provides:
 - ``render_sweep_2d``   — metric vs two swept parameters (heatmap)
 - ``render_sweep_compare`` — overlay timeseries from multiple runs
 - ``render_convergence`` — log-log error vs resolution
+- ``render_replicate_convergence`` — SEM vs replicate count diagnostic
+
+References
+----------
+Smith, R.C. (2013) *Uncertainty Quantification: Theory, Implementation,
+and Applications*, SIAM. Ch. 3 (sample statistics, SEM, CI).
 """
 
 from __future__ import annotations
@@ -53,14 +59,52 @@ def render_sweep_1d(
         raise ValueError(msg)
 
     param_name = param_names[0]
-    x = results.column(param_name)
-    y = results.column(metric)
 
-    ax.plot(x, y, "o-", color="tab:blue", linewidth=1.5, markersize=5)
+    if results.has_replicates:
+        agg = results.aggregate()
+        x = agg.column(param_name)
+        y_mean = agg.column(f"{metric}_mean")
+        y_std = agg.column(f"{metric}_std")
+        ax.plot(x, y_mean, "o-", color="tab:blue", linewidth=1.5, markersize=5)
+        ax.fill_between(
+            x,
+            y_mean - y_std,
+            y_mean + y_std,
+            alpha=0.2,
+            color="tab:blue",
+            label=r"$\pm 1\sigma$",
+        )
+        ax.legend(fontsize="small")
+    else:
+        x = results.column(param_name)
+        y = results.column(metric)
+        ax.plot(x, y, "o-", color="tab:blue", linewidth=1.5, markersize=5)
+
     ax.set_xlabel(param_name)
     ax.set_ylabel(metric)
     ax.set_title(f"{metric} vs {param_name}")
     ax.grid(visible=True, alpha=0.3)
+
+
+def _plot_1d_metric(
+    ax: Axes,
+    results: SweepResults,
+    param_name: str,
+    metric: str,
+    color: str,
+) -> None:
+    """Plot a single metric on an axis, with error bands if replicates exist."""
+    if results.has_replicates:
+        agg = results.aggregate()
+        x = agg.column(param_name)
+        y_mean = agg.column(f"{metric}_mean")
+        y_std = agg.column(f"{metric}_std")
+        ax.plot(x, y_mean, "o-", color=color, linewidth=1.5, markersize=5)
+        ax.fill_between(x, y_mean - y_std, y_mean + y_std, alpha=0.2, color=color)
+    else:
+        x = results.column(param_name)
+        y = results.column(metric)
+        ax.plot(x, y, "o-", color=color, linewidth=1.5, markersize=5)
 
 
 def render_sweep_1d_multi(
@@ -71,6 +115,7 @@ def render_sweep_1d_multi(
     """Plot multiple metrics vs a single swept parameter.
 
     Uses subplots stacked vertically, sharing the x-axis.
+    When replicates exist, shows mean +/- std error bands.
 
     Parameters
     ----------
@@ -92,7 +137,6 @@ def render_sweep_1d_multi(
         raise ValueError(msg)
 
     param_name = param_names[0]
-    x = results.column(param_name)
     n = len(metrics)
 
     axes = fig.subplots(n, 1, sharex=True, squeeze=False)
@@ -100,8 +144,7 @@ def render_sweep_1d_multi(
 
     for i, metric in enumerate(metrics):
         ax = axes[i, 0]
-        y = results.column(metric)
-        ax.plot(x, y, "o-", color=colors[i % len(colors)], linewidth=1.5, markersize=5)
+        _plot_1d_metric(ax, results, param_name, metric, colors[i % len(colors)])
         ax.set_ylabel(metric)
         ax.grid(visible=True, alpha=0.3)
 
@@ -166,8 +209,9 @@ def _render_2d_scattered(
     p1, p2, metric_vals = p1[valid], p2[valid], metric_vals[valid]
 
     if len(metric_vals) == 0:
-        ax.text(0.5, 0.5, f"No valid data for {metric}",
-                transform=ax.transAxes, ha="center")
+        ax.text(
+            0.5, 0.5, f"No valid data for {metric}", transform=ax.transAxes, ha="center"
+        )
         return
 
     vmin, vmax = float(metric_vals.min()), float(metric_vals.max())
@@ -183,21 +227,37 @@ def _render_2d_scattered(
             p1m, p2m = np.meshgrid(p1g, p2g)
             z = np.asarray(
                 griddata(
-                    np.column_stack([p1, p2]), metric_vals,
-                    (p1m, p2m), method="cubic",
+                    np.column_stack([p1, p2]),
+                    metric_vals,
+                    (p1m, p2m),
+                    method="cubic",
                 ),
                 dtype=np.float64,
             )
             ax.pcolormesh(
-                p1g, p2g, z, shading="auto", cmap="viridis",
-                alpha=0.3, vmin=vmin, vmax=vmax,
+                p1g,
+                p2g,
+                z,
+                shading="auto",
+                cmap="viridis",
+                alpha=0.3,
+                vmin=vmin,
+                vmax=vmax,
             )
         except (ValueError, ImportError):
             pass  # Fall back to scatter-only
 
     sc = ax.scatter(
-        p1, p2, c=metric_vals, cmap="viridis", s=60,
-        edgecolors="k", linewidths=0.5, vmin=vmin, vmax=vmax, zorder=5,
+        p1,
+        p2,
+        c=metric_vals,
+        cmap="viridis",
+        s=60,
+        edgecolors="k",
+        linewidths=0.5,
+        vmin=vmin,
+        vmax=vmax,
+        zorder=5,
     )
     ax.set_xlabel(p1_name)
     ax.set_ylabel(p2_name)
@@ -230,7 +290,11 @@ def _render_2d_grid(
         grid[i2, i1] = float(val)
 
     im = ax.pcolormesh(
-        p1_vals, p2_vals, grid, shading="nearest", cmap="viridis",
+        p1_vals,
+        p2_vals,
+        grid,
+        shading="nearest",
+        cmap="viridis",
     )
     ax.set_xlabel(p1_name)
     ax.set_ylabel(p2_name)
@@ -377,8 +441,15 @@ def render_convergence(
     metric : str
         Column name for the y-axis (e.g. ``"max_energy_error"``).
     """
-    sizes = results.column("grid_shape")
-    values = results.column(metric)
+    if results.has_replicates:
+        agg = results.aggregate()
+        sizes = agg.column("grid_shape")
+        values = agg.column(f"{metric}_mean")
+        y_std = agg.column(f"{metric}_std")
+    else:
+        sizes = results.column("grid_shape")
+        values = results.column(metric)
+        y_std = None
 
     # Filter valid points
     mask = np.isfinite(values) & (values > 0)
@@ -392,9 +463,25 @@ def render_convergence(
     y = values[mask]
     n = sizes[mask]
 
-    ax.loglog(
-        n, y, "o-", color="tab:blue", linewidth=1.5, markersize=6, label="measured"
-    )
+    if y_std is not None:
+        yerr = y_std[mask]
+        ax.errorbar(
+            n,
+            y,
+            yerr=yerr,
+            fmt="o-",
+            color="tab:blue",
+            linewidth=1.5,
+            markersize=6,
+            capsize=3,
+            label="measured",
+        )
+        ax.set_yscale("log")
+        ax.set_xscale("log")
+    else:
+        ax.loglog(
+            n, y, "o-", color="tab:blue", linewidth=1.5, markersize=6, label="measured"
+        )
 
     # Fit convergence order
     if len(h) >= 2:  # noqa: PLR2004
@@ -500,8 +587,11 @@ def render_sweep_parallel(
         coords = [axis_data[a][idx] for a in range(len(axis_names))]
         emphasis = abs(float(norm[idx]) - 0.5) * 2  # 0 at median, 1 at extremes
         ax.plot(
-            range(len(axis_names)), coords, color=cmap(norm[idx]),
-            alpha=0.15 + 0.6 * emphasis, linewidth=0.8 + 0.8 * emphasis,
+            range(len(axis_names)),
+            coords,
+            color=cmap(norm[idx]),
+            alpha=0.15 + 0.6 * emphasis,
+            linewidth=0.8 + 0.8 * emphasis,
         )
 
     ax.set_xticks(range(len(axis_names)))
@@ -593,7 +683,9 @@ def _render_tornado_correlation(
         ax.text(
             float(rect.get_width()) + 0.02,
             float(rect.get_y()) + float(rect.get_height()) / 2,
-            label, va="center", fontsize=8,
+            label,
+            va="center",
+            fontsize=8,
         )
 
     ax.set_yticks(y_pos)
@@ -649,7 +741,9 @@ def _render_tornado_range(
         y_pos,
         [hi - lo for lo, hi in zip(lows, highs, strict=True)],
         left=lows,
-        color="tab:blue", alpha=0.7, height=0.6,
+        color="tab:blue",
+        alpha=0.7,
+        height=0.6,
     )
     ax.axvline(global_median, color="gray", linestyle="--", linewidth=0.8)
     ax.set_yticks(y_pos)
@@ -704,9 +798,14 @@ def render_sweep_scatter(
                 # Diagonal: marginal scatter (param vs metric)
                 vals = np.array(results.column(param_names[i]), dtype=np.float64)
                 ax.scatter(
-                    vals, metric_vals,
-                    c=metric_vals, cmap=cmap, s=12, alpha=0.7,
-                    vmin=vmin, vmax=vmax,
+                    vals,
+                    metric_vals,
+                    c=metric_vals,
+                    cmap=cmap,
+                    s=12,
+                    alpha=0.7,
+                    vmin=vmin,
+                    vmax=vmax,
                 )
                 ax.set_ylabel(metric, fontsize=7)
             else:
@@ -714,8 +813,14 @@ def render_sweep_scatter(
                 x = np.array(results.column(param_names[j]), dtype=np.float64)
                 y = np.array(results.column(param_names[i]), dtype=np.float64)
                 ax.scatter(
-                    x, y, c=metric_vals, cmap=cmap, s=10, alpha=0.7,
-                    vmin=vmin, vmax=vmax,
+                    x,
+                    y,
+                    c=metric_vals,
+                    cmap=cmap,
+                    s=10,
+                    alpha=0.7,
+                    vmin=vmin,
+                    vmax=vmax,
                 )
 
             if i == n - 1:
@@ -739,3 +844,120 @@ def render_sweep_scatter(
     )
     sm.set_array(metric_vals)
     fig.colorbar(sm, ax=axes[:, -1].ravel().tolist(), label=metric, shrink=0.8)
+
+
+# -- Replicate convergence diagnostic ----------------------------------------
+
+
+def render_replicate_convergence(  # noqa: PLR0914
+    ax: Axes,
+    results: SweepResults,
+    metric: str,
+) -> None:
+    """Plot running SEM vs replicate count (convergence diagnostic).
+
+    For each parameter point, computes the running mean and SEM as
+    replicates are added (k = 1, 2, ..., N). The SEM should decrease
+    as 1/sqrt(k). A theoretical reference line is shown for comparison.
+
+    This is the standard "have I run enough replicates?" diagnostic
+    used in Monte Carlo simulation.
+
+    Parameters
+    ----------
+    ax : Axes
+        Matplotlib axes.
+    results : SweepResults
+        Ensemble sweep data (must have replicates).
+    metric : str
+        Metric column to analyze.
+
+    References
+    ----------
+    Smith, R.C. (2013) *Uncertainty Quantification*, SIAM. Ch. 3.2
+    (standard error convergence).
+    """
+    import matplotlib.pyplot as plt
+
+    groups = results.group_by_point()
+    param_names = list(results.swept_params.keys())
+
+    cmap = plt.colormaps["viridis"]
+    n_groups = len(groups)
+
+    for gi, (point_key, rep_rows) in enumerate(groups.items()):
+        # Extract metric values in replicate order
+        sorted_rows = sorted(rep_rows, key=lambda r: r.get("replicate", 0))
+        vals = [
+            r[metric]
+            for r in sorted_rows
+            if r.get(metric) is not None and r.get("run_status") == "success"
+        ]
+        if len(vals) < 2:  # noqa: PLR2004
+            continue
+
+        arr = np.array(vals, dtype=np.float64)
+        n_reps = len(arr)
+        ks = np.arange(2, n_reps + 1)  # SEM undefined for k=1
+
+        # Running SEM: std(first k values) / sqrt(k), for k=2..N
+        running_sem = np.array(
+            [float(np.std(arr[:k], ddof=1) / np.sqrt(k)) for k in ks],
+            dtype=np.float64,
+        )
+
+        # Label from parameter point
+        label_parts = [
+            f"{p}={v:.3g}" for p, v in zip(param_names, point_key, strict=True)
+        ]
+        label = ", ".join(label_parts)
+
+        color = cmap(gi / max(n_groups - 1, 1))
+        ax.plot(
+            ks, running_sem, "o-", color=color, markersize=4, linewidth=1.2, label=label
+        )
+
+    # Reference: 1/sqrt(k) scaled to typical SEM at k=2
+    # (shows expected convergence rate)
+    if groups:
+        all_sems: list[float] = []
+        for rep_rows in groups.values():
+            sorted_rows = sorted(rep_rows, key=lambda r: r.get("replicate", 0))
+            vals = [
+                r[metric]
+                for r in sorted_rows
+                if r.get(metric) is not None and r.get("run_status") == "success"
+            ]
+            if len(vals) >= 2:  # noqa: PLR2004
+                arr = np.array(vals[:2], dtype=np.float64)
+                all_sems.append(float(np.std(arr, ddof=1) / np.sqrt(2)))
+        if all_sems:
+            sem_at_2 = np.median(all_sems)
+            max_k = max(
+                len(
+                    [
+                        r
+                        for r in rr
+                        if r.get(metric) is not None
+                        and r.get("run_status") == "success"
+                    ]
+                )
+                for rr in groups.values()
+            )
+            k_ref = np.arange(2, max_k + 1)
+            sem_ref = sem_at_2 * np.sqrt(2) / np.sqrt(k_ref)
+            ax.plot(
+                k_ref,
+                sem_ref,
+                "--",
+                color="gray",
+                alpha=0.6,
+                linewidth=1.5,
+                label=r"$\propto 1/\sqrt{k}$",
+            )
+
+    ax.set_xlabel("Number of replicates (k)")
+    ax.set_ylabel(f"SEM({metric})")
+    ax.set_title(f"Replicate Convergence — {metric}")
+    ax.legend(fontsize=7, loc="best")
+    ax.grid(visible=True, alpha=0.3)

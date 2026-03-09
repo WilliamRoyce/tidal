@@ -21,6 +21,8 @@ if TYPE_CHECKING:
 
     from tidal.solver.operators import SideBCSpec
 
+# --- Constants & operator validation ---
+
 #: Canonical spatial axis letters, ordered by dimension index.
 #: Supports up to 6 spatial dimensions (sufficient for all foreseeable physics).
 AXIS_LETTERS: tuple[str, ...] = ("x", "y", "z", "w", "v", "u")
@@ -65,7 +67,8 @@ _GENERIC_MULTI_AXIS_RE = re.compile(
 
 
 #: Mutable set of user-registered custom operators.
-#: Populated via ``register_operator()`` in pde_builder.py.
+#: Currently unused; reserved as an extensibility point for future
+#: operator registration by downstream code.
 _CUSTOM_OPERATORS: set[str] = set()
 
 
@@ -87,6 +90,9 @@ def is_known_operator(name: str) -> bool:
         parts = name.split("_")[1:]
         return len(parts) >= 2 and all(p.isdigit() for p in parts)  # noqa: PLR2004
     return False
+
+
+# --- LHS structure ---
 
 
 @dataclass(frozen=True)
@@ -147,6 +153,9 @@ class LHSStructure:
         return cls(
             expression=expression, time_order=time_order, space_order=space_order
         )
+
+
+# --- RHS operator terms ---
 
 
 @dataclass(frozen=True)
@@ -240,6 +249,8 @@ class OperatorTerm:
         )
 
 
+# --- Boundary conditions ---
+
 _VALID_BC_TYPES: frozenset[str] = frozenset(
     {"periodic", "dirichlet", "neumann", "robin"}
 )
@@ -321,6 +332,8 @@ class BoundaryCondition:
             gamma=self.gamma if self.gamma is not None else 0.0,
         )
 
+
+# --- Constraint solver configuration ---
 
 _VALID_CONSTRAINT_METHODS = frozenset({"auto", "fft", "matrix", "poisson"})
 
@@ -567,6 +580,9 @@ class CanonicalStructure:
         return cls(hamiltonian_terms=h_terms, volume_element=vol_elem)
 
 
+# --- Component equations ---
+
+
 @dataclass(frozen=True)
 class ComponentEquation:
     """Equation of motion for a single field component.
@@ -666,6 +682,9 @@ class ComponentEquation:
         )
 
 
+# --- Symbolic coefficient resolution ---
+
+
 def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float | None:
     """Resolve a symbolic coefficient string with parameter values.
 
@@ -697,6 +716,9 @@ def _resolve_symbolic_coeff(sym: str, parameters: Mapping[str, float]) -> float 
     if not math.isfinite(value):
         return None
     return value
+
+
+# --- Equation system ---
 
 
 @dataclass(frozen=True)
@@ -1091,6 +1113,9 @@ class EquationSystem:
         )
 
 
+# --- JSON schema validation ---
+
+
 def _validate_spacetime(spacetime: dict[str, Any]) -> None:
     """Validate spacetime configuration.
 
@@ -1190,6 +1215,9 @@ def validate_json_schema(data: Mapping[str, Any]) -> None:
                 f"not found in fields list: {sorted(field_names)}"
             )
             raise ValueError(msg)
+
+
+# --- Public loader ---
 
 
 def load_equation_system(json_path: Path | str) -> EquationSystem:

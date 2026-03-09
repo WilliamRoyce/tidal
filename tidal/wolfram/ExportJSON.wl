@@ -4,7 +4,7 @@
    PURPOSE: Convert component equations to multi-field JSON format for Python pipeline
 
    DEPENDENCIES:
-     - TorsionGertsenshtein`CommonUtilities` (coefficient extraction, field parsing)
+     - None (standalone — uses only built-in Mathematica)
 
    DATA FLOW:
      ComponentEquations (from ComponentDecompose)
@@ -33,8 +33,7 @@
    Part of the TIDAL Lagrangian-to-PDE pipeline
 *)
 
-BeginPackage["TorsionGertsenshtein`ExportJSON`",
-  {"TorsionGertsenshtein`CommonUtilities`"}];
+BeginPackage["TorsionGertsenshtein`ExportJSON`"];
 
 (* Public symbols *)
 BuildJSONStructure::usage =
@@ -320,7 +319,7 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
             ContainsOwnTimeDerivative[#, allFieldNames[[j]], 2] &];
           If[Length[d2tTerms] > 0,
             coeffList = ExtractLHSCoefficient /@ d2tTerms;
-            coeffSum = FullSimplify[Total[coeffList]];
+            coeffSum = Simplify[Total[coeffList]];
             Module[{isPhantom},
               isPhantom = (coeffSum === 0) || PossibleZeroQ[coeffSum];
               If[!isPhantom,
@@ -377,14 +376,19 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
 
   (* Convert equations to JSON format *)
   (* Pass allFieldNames so cross-field references can be detected *)
-  equations = Table[
-    EquationToJSONMultiField[
-      workingEqs[[i, 2]],
-      workingEqs[[i, 1]],
-      i - 1,
-      allFieldNames,
-      metadata
-    ],
+  equations = {};
+  Do[
+    AppendTo[equations,
+      EquationToJSONMultiField[
+        workingEqs[[i, 2]],
+        workingEqs[[i, 1]],
+        i - 1,
+        allFieldNames,
+        metadata
+      ]
+    ];
+    Share[];
+    ClearSystemCache[];,
     {i, nFields}
   ];
 
@@ -470,7 +474,7 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
   If[lhsTimeOrder > 0 && Length[timeDerivTerm] > 0,
     Module[{coeffSum, coeffList, isPhantom},
       coeffList = ExtractLHSCoefficient /@ timeDerivTerm;
-      coeffSum = FullSimplify[Total[coeffList]];
+      coeffSum = Simplify[Total[coeffList]];
       isPhantom = (coeffSum === 0) || PossibleZeroQ[coeffSum];
       If[!isPhantom,
         Module[{syms, numVal},
@@ -541,6 +545,8 @@ EquationToJSONMultiField[componentEq_, fieldName_, fieldIndex_, allFieldNames_, 
     result
   ]
 ];
+
+(* === RHS Term Parsing === *)
 
 (* Parse RHS with cross-field reference detection *)
 ParseMultiFieldRHS[eq_, currentFieldName_, allFieldNames_] := Module[
@@ -937,7 +943,7 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
     (* Replace field[args] with 1 *)
     f_Symbol[__] /; ToString[f] === fieldHead :> 1
   };
-  rawCoeff = Simplify[rawCoeff];
+  If[!NumericQ[rawCoeff], rawCoeff = Simplify[rawCoeff]];
 
   (* Check for coordinate dependence in coefficient *)
   coordDeps = IsCoordinateDependentCoefficient[rawCoeff];

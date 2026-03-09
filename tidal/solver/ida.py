@@ -43,6 +43,11 @@ if TYPE_CHECKING:
     )
 
 
+# ---------------------------------------------------------------------------
+# Residual context
+# ---------------------------------------------------------------------------
+
+
 class _ResidualCtx:
     """Bundles pre-computed data and per-call arrays for IDA residual evaluation.
 
@@ -336,6 +341,11 @@ class _ResidualCtx:
             self.res[s] = self.yp[s]
 
 
+# ---------------------------------------------------------------------------
+# Residual builder
+# ---------------------------------------------------------------------------
+
+
 def build_residual_fn(
     spec: EquationSystem,
     layout: StateLayout,
@@ -414,6 +424,11 @@ def build_residual_fn(
     return residual
 
 
+# ---------------------------------------------------------------------------
+# Solver entry point
+# ---------------------------------------------------------------------------
+
+
 def solve_ida(  # noqa: PLR0913
     spec: EquationSystem,
     grid: GridInfo,
@@ -484,15 +499,17 @@ def solve_ida(  # noqa: PLR0913
     # Unified constraint IC solver: handles both standard constraints
     # (enabled=True, solve for constraint field) and subsidiary constraints
     # (no-self-term equations, solve for free dynamical fields).
-    has_constraints = any(
-        eq.time_derivative_order == 0 for eq in spec.equations
-    )
+    has_constraints = any(eq.time_derivative_order == 0 for eq in spec.equations)
     if has_constraints:
         from tidal.solver.constraint_solve import ensure_consistent_ic  # noqa: PLC0415
 
         y0 = ensure_consistent_ic(
-            spec, grid, y0,
-            bc=bc, parameters=parameters, t=t_span[0],
+            spec,
+            grid,
+            y0,
+            bc=bc,
+            parameters=parameters,
+            t=t_span[0],
             strict=not allow_inconsistent_ic,
         )
 
@@ -529,8 +546,13 @@ def solve_ida(  # noqa: PLR0913
     if progress is not None:
         # Step-by-step mode: progress updates between solver steps (zero overhead)
         result: SundialsResult = call_ida_stepwise(
-            resfn, t_eval, y0, yp0, progress,
-            snapshot_callback=snapshot_callback, **options,
+            resfn,
+            t_eval,
+            y0,
+            yp0,
+            progress,
+            snapshot_callback=snapshot_callback,
+            **options,
         )
     else:
         result = call_ida(resfn, t_eval, y0, yp0, **options)

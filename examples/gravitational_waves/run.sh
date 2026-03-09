@@ -36,7 +36,7 @@ tidal inspect ../data/linearized_gravity.json
 # Gaussian-modulated cosine wave packet propagating along z.
 # TT gauge requires h_7 (h_yy) = -h_4 (traceless) for the constraint
 # solver to cascade correctly (h_9 = -(h_4 + h_7) = 0).
-# Gauge-unfixed constraints (h_1..h_3, h_transverse_*) have no self-terms
+# Gauge-unfixed constraints (h_1..h_3) have no self-terms
 # — IDA automatically freezes these at zero (temporal gauge).
 tidal simulate ../data/linearized_gravity.json \
   --rtol 1e-4 \
