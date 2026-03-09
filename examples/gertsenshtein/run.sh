@@ -5,7 +5,7 @@
 # The Einstein-Maxwell Lagrangian is linearized around flat spacetime + B0,
 # producing coupled wave equations for h_+ (graviton) and a_y (photon).
 #
-# Gauge choices (following Palessandro & Rothman 2023, arXiv:2301.02072):
+# Gauge choices (standard for linearized Einstein-Maxwell, see e.g. Dandoy et al. 2024):
 #   h: TT gauge (transverse-traceless) — standard for linearized gravity
 #   a: Lorenz gauge (d_mu a^mu = 0) — decouples EM into wave equations
 # Together these reduce the full tensor+vector system to just h_+ and a_y.
@@ -17,8 +17,8 @@
 #   a_0, a_3   (gauge modes — decoupled free waves, stay zero)
 #
 # Initial condition: monochromatic plane wave on h_7 (graviton h_+).
-# Plane-wave IC matches the analytical derivation (Palessandro & Rothman
-# 2023, Eq. 26) and avoids spectral broadening of a Gaussian wave packet.
+# Plane-wave IC matches the analytical derivation and avoids spectral
+# broadening of a Gaussian wave packet.
 # Wavevector k = 2π·32/100 ≈ 2.011 ensures k >> B₀κ (massless limit)
 # and integer wavelengths in the domain (no spectral leakage).
 #

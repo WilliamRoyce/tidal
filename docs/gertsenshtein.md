@@ -153,7 +153,7 @@ All equations are **derived from the Lagrangian** by the TIDAL pipeline — list
 
 ### Target 1: Vacuum Conversion Probability
 
-**Source**: Palessandro & Rothman (2023), Eq. 26.
+**Source**: Eigenmode analysis of coupled h_7/a_2 system; confirmed by Dandoy, Lella et al. (2024).
 
 - Uniform B₀, vacuum (no plasma), massless graviton
 - Plane wave at known wavenumber k propagating along z
