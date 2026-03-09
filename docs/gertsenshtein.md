@@ -197,30 +197,37 @@ the Lagrangian for the plasma sector). See `.github-issues-pending.md` for the t
 
 **Status: IMPLEMENTED** — see `examples/gertsenshtein/theory_localized.toml`
 
-**Setup**: Gaussian B₀(z) = B0_peak × exp(-z²/(2R²)) along x-axis. The gauge potential
-`Ā_y = -B0_peak × R × √(π/2) × Erf(z/(√2·R))` satisfies ∂_z(Ā_y) = -B₀(z). The
+**Setup**: Gaussian B₀(z) = Bpeak × exp(-z²/(2R²)) along x-axis. The gauge potential
+`Ā_y = -Bpeak × R × √(π/2) × Erf(z/(√2·R))` satisfies ∂_z(Ā_y) = -B₀(z). The
 `Erf` function is supported by the TIDAL evaluator (`_eval_utils.py` `_FUNCTION_MAP`).
+Constant named `Bpeak` (not `B0_peak`) — in Wolfram, `X_Y` parses as `Pattern[X, Blank[Y]]`
+(a pattern expression, not a symbol), silently corrupting the symbolic computation.
 
 **Analytical target (Boccaletti 1970, weak-field Gaussian)**:
 ```
-P(graviton → photon) = sin²(κ/2 × ∫B₀(z)dz) = sin²(κ × B0_peak × R × √(π/2))
+P(graviton → photon) = sin²(κ/2 × ∫B₀(z)dz) = sin²(κ × Bpeak × R × √(π/2))
 ```
 
 **Simulation parameters**:
 - Domain: [-100, 100], 1024 points, non-periodic (Neumann BCs) — periodic BCs are
   incorrect since Ā_y is not periodic
-- IC: graviton wavepacket (h_7) at z = -50, k = 2.0, t_end = 250
+- IC: Gaussian wavepacket (h_7) at z = -50, σ=5, k = 2.0, t_end = 120
+  (stops after one pass through B-field, before wavepacket hits right boundary at t≈150)
 - Measurement: `--what conversion --source h_7 --target a_2`
   (NOT `--what energy` — position-dependent coefficients cause known limitation)
+- **Bounds/center require `=` syntax**: `--bounds="-100:100"`, `--ic-center=-50.0`
+  (shell interprets leading `-` as flag otherwise)
 
-**Expected output** (defaults: κ=1, B0_peak=0.1, R=5):
+**Confirmed numerical result** (defaults: κ=1, Bpeak=0.1, R=5):
 ```
-P ≈ sin²(1.0 × 0.1 × 5.0 × √(π/2)) = sin²(0.627) ≈ 0.343
+P_numerical = 0.3436  (at t=80.4, peak of single pass)
+P_Boccaletti = sin²(1.0 × 0.1 × 5.0 × √(π/2)) = sin²(0.627) = 0.3432
+Agreement: 0.04% — excellent
 ```
 
 **Scripts**:
 - `examples/gertsenshtein/run_localized.sh` — single run
-- `examples/gertsenshtein/sweep_profile.sh` — 2D sweep over B0_peak × R
+- `examples/gertsenshtein/sweep_profile.sh` — 2D sweep over Bpeak × R
 
 **Note**: Background B₀(z) is externally imposed — see [background_fields.md](background_fields.md)
 for the validity discussion.
@@ -266,7 +273,7 @@ theory.toml → _derive.py generates .wls with:
 ## Future Extensions
 
 1. **Plasma detuning** (Phase F1): ~~Proca-type mass term~~ — blocked by gauge-potential coupling artifact (see Target 3 above). Requires gauge-invariant mass mechanism for the transverse photon sector.
-2. **Localized B-field scattering** (Phase F2): ✓ Implemented — `theory_localized.toml`, `run_localized.sh`, `sweep_profile.sh`. Validates Boccaletti formula P = sin²(κ × B0_peak × R × √(π/2)).
+2. **Localized B-field scattering** (Phase F2): ✓ Implemented — `theory_localized.toml`, `run_localized.sh`, `sweep_profile.sh`. Validates Boccaletti formula P = sin²(κ × Bpeak × R × √(π/2)).
 3. **Magnetar/FRB application** (Phase F3): Dipolar B(r), 1+1D radial setup, Gertsenshtein-Zel'dovich mechanism
 4. **Non-minimal couplings** (Phase F5): Chern-Simons gravity (parity-violating P_L ≠ P_R), ξRF² curvature-EM coupling. Ref: Kushwaha & Jain (2024, arXiv:2410.07338)
 5. **Axion-photon-graviton mixing** (future): Three-way mixing matrix with `g_{aγγ} a F F̃`. Ref: Dandoy, Lella et al. (2024)

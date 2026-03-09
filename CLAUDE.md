@@ -30,6 +30,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - Always check xAct symbol existence before defining: `If[!xTensorQ[M2], DefManifold[...]]`
 - Parenthesize multiline Lagrangians in .wls files
 - Use `DefConstantSymbol` for mass/coupling constants (not bare Symbol)
+- **Constant names must not contain underscores** — Mathematica parses `X_Y` as `Pattern[X, Blank[Y]]`, corrupting symbolic computation. Use `mPhi2` not `m_phi_2`, `Bpeak` not `B_peak`.
 - Cross-field decomposition requires passing `additionalFields` to `DecomposeToComponents`
 - Background fields declared via `[[background_fields]]` TOML section
 - Gauge fixing via `[[gauge]]` TOML section (presets: Lorenz, de Donder, Coulomb, temporal, axial)

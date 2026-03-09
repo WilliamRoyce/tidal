@@ -3,15 +3,18 @@
 # Lagrangian: L = (1/kappa^2) R - (1/4) F_{ab} F^{ab}
 #   (Einstein-Hilbert gravity + Maxwell electrodynamics)
 #
-# Background: Gaussian B-field profile B_x(z) = B0_peak * exp(-z^2/(2*R^2)) along x-axis.
-# Gauge potential: Abar_y = -B0_peak * R * Sqrt[Pi/2] * Erf[z/(Sqrt[2]*R)]
-# so that d/dz(Abar_y) = -B0_peak * exp(-z^2/(2*R^2)) = -B_x(z). Coulomb gauge.
+# Background: Gaussian B-field profile B_x(z) = Bpeak * exp(-z^2/(2*R^2)) along x-axis.
+# Gauge potential: Abar_y = -Bpeak * R * Sqrt[Pi/2] * Erf[z/(Sqrt[2]*R)]
+# so that d/dz(Abar_y) = -Bpeak * exp(-z^2/(2*R^2)) = -B_x(z). Coulomb gauge.
+#
+# NOTE: constant names must not contain underscores — Mathematica parses "X_Y" as
+# Pattern[X, Blank[Y]], corrupting the symbolic computation. Use "Bpeak" not "B0_peak".
 #
 # An incident graviton wavepacket scatters through the magnetized region (centered at z=0),
 # partially converting to photons. The conversion probability in the weak-field limit is:
 #
 #   P(graviton -> photon) = sin^2(kappa/2 * integral(B_x(z), -inf, +inf))
-#                         = sin^2(kappa * B0_peak * R * sqrt(pi/2))
+#                         = sin^2(kappa * Bpeak * R * sqrt(pi/2))
 #
 # This is the Boccaletti et al. (1970) formula for a finite magnetized region:
 #   Boccaletti et al. (1970, Nuovo Cimento 70B:129)
@@ -56,18 +59,18 @@ rank = 2
 symmetry = "antisymmetric"
 definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
 
-# Gaussian B-field profile: B_x(z) = B0_peak * exp(-z^2 / (2*R^2))
-# Gauge potential: Abar_y = -B0_peak * R * Sqrt[Pi/2] * Erf[z / (Sqrt[2]*R)]
-# Check: d/dz(Abar_y) = -B0_peak * exp(-z^2/(2*R^2)) = -B_x(z) ✓
+# Gaussian B-field profile: B_x(z) = Bpeak * exp(-z^2 / (2*R^2))
+# Gauge potential: Abar_y = -Bpeak * R * Sqrt[Pi/2] * Erf[z / (Sqrt[2]*R)]
+# Check: d/dz(Abar_y) = -Bpeak * exp(-z^2/(2*R^2)) = -B_x(z) ✓
 # (Coulomb gauge, localized magnetic field along x-axis, centered at z=0)
 # Ref: Boccaletti et al. (1970, Nuovo Cimento 70B:129)
 [[background_fields]]
 name = "Abar"
 type = "vector"
-components = ["0", "0", "-B0_peak * R * Sqrt[Pi/2] * Erf[z[]/(Sqrt[2]*R)]", "0"]
+components = ["0", "0", "-Bpeak * R * Sqrt[Pi/2] * Erf[z[]/(Sqrt[2]*R)]", "0"]
 
 [constants]
-names = ["kappa", "B0_peak", "R"]
+names = ["kappa", "Bpeak", "R"]
 
 # Full Einstein-Maxwell Lagrangian
 # (1/kappa^2) R - (1/4) F_ab F^ab
@@ -106,11 +109,11 @@ propagation_axis = "z"
 
 # Default parameters:
 # kappa = 1.0 (natural units; physical value ~ 1.15e-18 GeV^-1)
-# B0_peak = 0.1 (peak magnetic field strength)
-# R = 5.0 (Gaussian half-width; integral = B0_peak * R * sqrt(2*pi))
+# Bpeak = 0.1 (peak magnetic field strength; "B0_peak" not used — underscores are Mathematica patterns)
+# R = 5.0 (Gaussian half-width; integral = Bpeak * R * sqrt(2*pi))
 [parameters]
 kappa = 1.0
-B0_peak = 0.1
+Bpeak = 0.1
 R = 5.0
 
 [output]

@@ -2,15 +2,17 @@
 # Gertsenshtein Effect (Localized B-field) — Derive → Inspect → Simulate → Measure
 #
 # Physics: Graviton-photon conversion in a Gaussian background magnetic field.
-# B_x(z) = B0_peak * exp(-z^2 / (2*R^2)), localized around z=0.
-# Gauge potential: Abar_y = -B0_peak * R * sqrt(pi/2) * erf(z / (sqrt(2)*R))
+# B_x(z) = Bpeak * exp(-z^2 / (2*R^2)), localized around z=0.
+# Gauge potential: Abar_y = -Bpeak * R * sqrt(pi/2) * erf(z / (sqrt(2)*R))
+#
+# NOTE: constant "Bpeak" (not "B0_peak") — underscores are Mathematica pattern syntax.
 #
 # An incident graviton wavepacket (h_7) starts at z=-50, propagates through
 # the magnetized region at z=0, and partially converts to photons (a_2).
 #
 # Validation (Boccaletti 1970, weak-field regime):
-#   P(graviton -> photon) = sin^2(kappa * B0_peak * R * sqrt(pi/2))
-# For defaults (kappa=1, B0_peak=0.1, R=5):
+#   P(graviton -> photon) = sin^2(kappa * Bpeak * R * sqrt(pi/2))
+# For defaults (kappa=1, Bpeak=0.1, R=5):
 #   P ≈ sin^2(0.1 * 5 * sqrt(pi/2)) ≈ sin^2(0.627) ≈ 0.343
 #
 # Ref: Boccaletti et al. (1970, Nuovo Cimento 70B:129)
@@ -41,31 +43,35 @@ echo ""
 #
 # Domain: [-100, 100] (200 units), 1024 grid points (dx ≈ 0.195)
 # Non-periodic (Neumann BCs) — periodic BCs are incorrect here since Abar_y is not periodic
-# Wavepacket centered at z = -50, k = 2.0 (well into dispersion-free regime)
-# t_end = 250: wavepacket travels ~50 units to interaction region + ~100 units exit
+# Gaussian wavepacket centered at z = -50, width σ = 5, k = 2.0 (massless dispersion limit)
+# t_end = 120: wavepacket travels 50 units to B-field center (t≈50), then 30 more units
+#   out of the B-field region before hitting the right boundary (t≈150).
+#   Stopping at 120 ensures exactly one passage through the B-field.
 #
 # Note: --what energy is NOT reliable with position-dependent coefficients (known limitation).
 # Use --what conversion as the primary validation metric.
 echo "--- Step 3: Simulate ---"
 tidal simulate ../data/gertsenshtein_localized.json \
   --grid-shape 1024 \
-  --bounds -100:100 \
-  --ic plane-wave \
+  "--bounds=-100:100" \
+  --ic gaussian \
   --ic-wavevector 2.0 \
   --ic-amplitude 0.1 \
+  --ic-width 5.0 \
+  "--ic-center=-50.0" \
   --ic-component h_7 \
-  --t-end 250.0 \
-  --param kappa=1.0 --param B0_peak=0.1 --param R=5.0 \
+  --t-end 120.0 \
+  --param kappa=1.0 --param Bpeak=0.1 --param R=5.0 \
   --output "$OUT"
 
 echo ""
 
 # Step 4: Measure conversion probability
-# Expected: P = sin^2(kappa * B0_peak * R * sqrt(pi/2))
+# Expected: P = sin^2(kappa * Bpeak * R * sqrt(pi/2))
 #           = sin^2(1.0 * 0.1 * 5.0 * 1.2533) = sin^2(0.6267) ≈ 0.343
 echo "--- Step 4: Measure ---"
 tidal measure "$OUT" --what conversion --source h_7 --target a_2 \
-  --param kappa=1.0 --param B0_peak=0.1 --param R=5.0
+  --param kappa=1.0 --param Bpeak=0.1 --param R=5.0
 echo ""
 
 # Step 5: Plots
