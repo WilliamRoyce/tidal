@@ -2189,60 +2189,6 @@ class TestValidateCommand:
         err = capsys.readouterr().err
         assert "ERROR" in err
 
-    def test_validate_stability_ghost_detection(
-        self,
-        tmp_path: Path,
-        capsys: pytest.CaptureFixture[str],
-    ) -> None:
-        """--stability should detect a ghost mode (wrong-sign kinetic term)."""
-        import json
-
-        spec = {
-            "metadata": {"source": "test", "parameters": {"m2": 1.0}},
-            "spacetime": {
-                "dimension": 2,
-                "signature": [-1, 1],
-                "coordinates": ["t", "x"],
-            },
-            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
-            "equations": [
-                {
-                    "field": "phi_0",
-                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
-                    "rhs": {
-                        "type": "linear_combination",
-                        "terms": [
-                            {
-                                "coefficient": -1.0,
-                                "operator": "identity",
-                                "field": "phi_0",
-                                "coefficient_symbolic": "-m2",
-                            },
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
-                        ],
-                    },
-                }
-            ],
-            "coupling": {"mass_matrix_symbolic": [["-m2"]]},
-            "canonical": {
-                "hamiltonian_terms": [
-                    {
-                        "coefficient": -0.5,   # negative kinetic → ghost
-                        "factor_a": {"field": "phi_0", "operator": "time_derivative"},
-                        "factor_b": {"field": "phi_0", "operator": "time_derivative"},
-                        "coefficient_symbolic": "-1/2",
-                    }
-                ]
-            },
-        }
-        spec_path = tmp_path / "ghost.json"
-        spec_path.write_text(json.dumps(spec), encoding="utf-8")
-        ret = main(["validate", str(spec_path), "--stability"])
-        # Ghost detection is a warning (heuristic), not an error — exit 0
-        assert ret == 0
-        err = capsys.readouterr().err
-        assert "ghost" in err.lower() or "Ghost" in err
-
     def test_validate_stability_param_override_triggers_instability(
         self,
         tmp_path: Path,

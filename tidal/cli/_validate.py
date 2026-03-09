@@ -185,58 +185,21 @@ def _check_tachyons(
     return result.errors, result.notes
 
 
-def _check_ghosts(spec: EquationSystem) -> list[str]:
-    """Check for ghost modes (wrong-sign kinetic terms) from Hamiltonian terms.
-
-    A ghost is a field with a negative coefficient in front of ``(d_t phi)^2``.
-    Detects diagonal kinetic terms (the common case) by scanning
-    ``canonical.hamiltonian_terms`` for ``"time_derivative"`` x ``"time_derivative"``
-    bilinears with negative coefficients.
-
-    Off-diagonal kinetic mixing (e.g. ``d_t phi * d_t chi`` terms) would require the
-    full kinetic matrix K[i,j] to be exported from Wolfram — this is deferred.
-
-    Returns
-    -------
-    list[str]
-        Ghost mode error messages (one per ghost field found).
-    """
-    if spec.canonical is None:
-        return []
-
-    ghosts: list[str] = []
-    for term in spec.canonical.hamiltonian_terms:
-        if (
-            term.factor_a.operator == "time_derivative"
-            and term.factor_b.operator == "time_derivative"
-            and term.factor_a.field == term.factor_b.field
-            and term.coefficient < -_STABILITY_TOLERANCE
-        ):
-            sym = f" ({term.coefficient_symbolic!r})" if term.coefficient_symbolic else ""
-            ghosts.append(
-                f"Ghost mode: field '{term.factor_a.field}' has negative kinetic "
-                f"coefficient {term.coefficient:.6g}{sym}. "
-                f"Wrong-sign kinetic term — the theory has a ghost degree of freedom."
-            )
-    return ghosts
-
-
 def _run_stability_checks(
     spec: EquationSystem,
     raw_params: list[str],
 ) -> tuple[list[str], list[str]]:
-    """Run tachyon and ghost checks, returning (errors, warnings).
+    """Run tachyon check, returning (errors, notes).
 
     Tachyon detection (negative mass-matrix eigenvalue) is reported as an
     **error** — the system will have exponentially growing modes at runtime.
 
-    Ghost detection (wrong-sign kinetic term) is reported as a **warning**
-    because the check is heuristic: in GR and tensor theories with Lorentzian
-    signature, the Hamiltonian kinetic coefficients are naturally negative
-    (e.g. ``H = -½(∂_t h)²`` for metric perturbations, from ``L = -½(∂_t h)²``
-    and ``H = p·v - L`` with ``p = -v``).  False positives are common for fields
-    derived from linearized GR Lagrangians.  True ghost instabilities require
-    a full analysis of the physical kinetic matrix K[i,j] in the TT sector.
+    Ghost detection is not implemented here: determining whether a theory has
+    ghost modes from ``hamiltonian_terms`` alone is unreliable because, in
+    linearised GR and other gauge theories, the naive Hamiltonian kinetic
+    coefficients are negative even in ghost-free theories (gauge-structure
+    artefact).  Use a dedicated tool (e.g. xAct/Mathematica) to verify
+    ghost-freeness for a specific theory.
 
     Parameters
     ----------
@@ -248,9 +211,8 @@ def _run_stability_checks(
     -------
     errors : list[str]
         Tachyon instability errors (fatal — exponentially growing modes).
-    warnings : list[str]
-        Ghost candidate warnings (informational — heuristic, GR false-positives
-        common).
+    notes : list[str]
+        Informational notes from the tachyon check (e.g. asymmetric matrix).
     """
     try:
         params = _parse_validate_params(raw_params, spec)
@@ -258,8 +220,7 @@ def _run_stability_checks(
         return [str(exc)], []
 
     tachyon_errors, notes = _check_tachyons(spec, params)
-    ghost_warnings = _check_ghosts(spec)
-    return tachyon_errors, notes + ghost_warnings
+    return tachyon_errors, notes
 
 
 def validate_command(args: Namespace) -> int:  # noqa: C901
