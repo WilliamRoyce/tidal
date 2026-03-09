@@ -195,15 +195,37 @@ the Lagrangian for the plasma sector). See `.github-issues-pending.md` for the t
 
 ### Target 4: Finite-Region Scattering (Phase F2)
 
-- Localized B₀(z) with Gaussian profile, specified via A_μ(z) background potential
-- Incident graviton wavepacket enters magnetized region, converts, exits
-- Sweep region width R and peak B₀
-- Compare against Boccaletti et al. (1970) integral formula
-- Use large domain + early termination (absorbing BCs not yet available)
-- **Note**: Background B₀(z) is externally imposed — see [background_fields.md](background_fields.md)
-  for the validity discussion. Position-dependent coefficients cause a known limitation
-  in energy measurements; use conversion probability as primary metric.
-- **Reference**: Boccaletti et al. (1970, Nuovo Cimento 70B:129); Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609)
+**Status: IMPLEMENTED** — see `examples/gertsenshtein/theory_localized.toml`
+
+**Setup**: Gaussian B₀(z) = B0_peak × exp(-z²/(2R²)) along x-axis. The gauge potential
+`Ā_y = -B0_peak × R × √(π/2) × Erf(z/(√2·R))` satisfies ∂_z(Ā_y) = -B₀(z). The
+`Erf` function is supported by the TIDAL evaluator (`_eval_utils.py` `_FUNCTION_MAP`).
+
+**Analytical target (Boccaletti 1970, weak-field Gaussian)**:
+```
+P(graviton → photon) = sin²(κ/2 × ∫B₀(z)dz) = sin²(κ × B0_peak × R × √(π/2))
+```
+
+**Simulation parameters**:
+- Domain: [-100, 100], 1024 points, non-periodic (Neumann BCs) — periodic BCs are
+  incorrect since Ā_y is not periodic
+- IC: graviton wavepacket (h_7) at z = -50, k = 2.0, t_end = 250
+- Measurement: `--what conversion --source h_7 --target a_2`
+  (NOT `--what energy` — position-dependent coefficients cause known limitation)
+
+**Expected output** (defaults: κ=1, B0_peak=0.1, R=5):
+```
+P ≈ sin²(1.0 × 0.1 × 5.0 × √(π/2)) = sin²(0.627) ≈ 0.343
+```
+
+**Scripts**:
+- `examples/gertsenshtein/run_localized.sh` — single run
+- `examples/gertsenshtein/sweep_profile.sh` — 2D sweep over B0_peak × R
+
+**Note**: Background B₀(z) is externally imposed — see [background_fields.md](background_fields.md)
+for the validity discussion.
+
+**Reference**: Boccaletti et al. (1970, Nuovo Cimento 70B:129); Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609)
 
 ### Target 5: Magnetar/FRB Application (Phase F3)
 
@@ -244,7 +266,7 @@ theory.toml → _derive.py generates .wls with:
 ## Future Extensions
 
 1. **Plasma detuning** (Phase F1): ~~Proca-type mass term~~ — blocked by gauge-potential coupling artifact (see Target 3 above). Requires gauge-invariant mass mechanism for the transverse photon sector.
-2. **Localized B-field scattering** (Phase F2): Gaussian/top-hat B(z) profiles, wavepacket IC, Boccaletti integral formula
+2. **Localized B-field scattering** (Phase F2): ✓ Implemented — `theory_localized.toml`, `run_localized.sh`, `sweep_profile.sh`. Validates Boccaletti formula P = sin²(κ × B0_peak × R × √(π/2)).
 3. **Magnetar/FRB application** (Phase F3): Dipolar B(r), 1+1D radial setup, Gertsenshtein-Zel'dovich mechanism
 4. **Non-minimal couplings** (Phase F5): Chern-Simons gravity (parity-violating P_L ≠ P_R), ξRF² curvature-EM coupling. Ref: Kushwaha & Jain (2024, arXiv:2410.07338)
 5. **Axion-photon-graviton mixing** (future): Three-way mixing matrix with `g_{aγγ} a F F̃`. Ref: Dandoy, Lella et al. (2024)
