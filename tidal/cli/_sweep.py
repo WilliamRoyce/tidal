@@ -1566,7 +1566,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         known_noise_targets = set(swept_params.keys()) | set(all_params.keys())
         meta_params = spec.metadata.get("parameters", {})
         if isinstance(meta_params, dict):
-            known_noise_targets |= set(meta_params.keys())
+            known_noise_targets |= set(meta_params.keys())  # type: ignore[reportUnknownArgumentType]
         for pn_name in sorted(param_noise.keys()):
             if pn_name not in known_noise_targets:
                 print(

@@ -434,7 +434,9 @@ class SweepResults:
                 if m not in skip and not m.endswith("_nominal")
             ]
 
-        from scipy.stats import t as t_dist  # noqa: PLC0415
+        from scipy.stats import (  # noqa: PLC0415  # type: ignore[reportMissingTypeStubs]
+            t as t_dist,
+        )
 
         param_names = list(self.swept_params.keys())
         groups = self.group_by_point()

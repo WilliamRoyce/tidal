@@ -920,7 +920,7 @@ def render_replicate_convergence(  # noqa: PLR0914
     # Reference: 1/sqrt(k) scaled to typical SEM at k=2
     # (shows expected convergence rate)
     if groups:
-        all_sems = []
+        all_sems: list[float] = []
         for rep_rows in groups.values():
             sorted_rows = sorted(rep_rows, key=lambda r: r.get("replicate", 0))
             vals = [

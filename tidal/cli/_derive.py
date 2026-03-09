@@ -17,9 +17,9 @@ if TYPE_CHECKING:
 
 # Re-export validation API (moved to _derive_validate.py for readability)
 from tidal.cli._derive_validate import (  # noqa: F401
-    _GAUGE_PRESETS,
-    _validate_config,
-    _validate_reduction,
+    _GAUGE_PRESETS,  # type: ignore[reportPrivateUsage]
+    _validate_config,  # type: ignore[reportPrivateUsage]
+    _validate_reduction,  # type: ignore[reportPrivateUsage, reportUnusedImport]
 )
 
 # Coordinates per spacetime dimension
@@ -933,6 +933,8 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     # Resolve the metric perturbation field (if any)
     has_metric_pert = pert_field_name is not None
+    pert_field: dict[str, Any] = {}
+    fexpr: str = ""
     if has_metric_pert:
         pert_field = next(f for f in ctx.fields if f["name"] == pert_field_name)
         fexpr = _field_expression(pert_field, ctx.prefix)

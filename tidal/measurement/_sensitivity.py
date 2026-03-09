@@ -144,8 +144,8 @@ def compute_sobol_indices(
         If insufficient data for analysis.
     """
     _require_salib()
-    from SALib.analyze import (  # noqa: PLC0415  # type: ignore[import-untyped]
-        sobol as sobol_analyze,
+    from SALib.analyze import (  # noqa: PLC0415  # type: ignore[import-untyped, reportUnknownVariableType]
+        sobol as sobol_analyze,  # type: ignore[reportUnknownVariableType]
     )
 
     param_names, x, y = _extract_data(results, metric)
@@ -176,7 +176,7 @@ def compute_sobol_indices(
     }
 
     try:
-        si = sobol_analyze.analyze(
+        si = sobol_analyze.analyze(  # type: ignore[reportUnknownVariableType]
             problem, y, calc_second_order=False, num_resamples=n_bootstrap
         )
     except RuntimeError as exc:
@@ -228,8 +228,8 @@ def compute_morris_screening(
         If insufficient data.
     """
     _require_salib()
-    from SALib.analyze import (  # noqa: PLC0415  # type: ignore[import-untyped]
-        morris as morris_analyze,
+    from SALib.analyze import (  # noqa: PLC0415  # type: ignore[import-untyped, reportUnknownVariableType]
+        morris as morris_analyze,  # type: ignore[reportUnknownVariableType]
     )
 
     param_names, x, y = _extract_data(results, metric)

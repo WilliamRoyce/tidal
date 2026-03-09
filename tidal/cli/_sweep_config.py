@@ -342,7 +342,7 @@ def _parse_ensemble(
     param_noise: dict[str, float] | None = None
     raw_pn = ens.get("param_noise")
     if raw_pn and isinstance(raw_pn, dict):
-        param_noise = {str(k): float(v) for k, v in raw_pn.items()}
+        param_noise = {str(k): float(v) for k, v in raw_pn.items()}  # type: ignore[reportUnknownVariableType, reportUnknownArgumentType]
     return ic_pert, param_noise
 
 

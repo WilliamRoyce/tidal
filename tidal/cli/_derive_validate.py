@@ -604,12 +604,12 @@ def _validate_gauge(config: dict[str, Any]) -> None:
     # the gauge references the perturbation name "a" (the dynamical variable),
     # with the same type/rank/symmetry as the original field.
     lin = config.get("linearization", {})
-    for mp in lin.get("matter_perturbations", []) if isinstance(lin, dict) else []:
-        pname = mp.get("perturbation_name", "")
-        mf_name = mp.get("field", "")
+    for mp in lin.get("matter_perturbations", []) if isinstance(lin, dict) else []:  # type: ignore[reportUnknownVariableType]
+        pname: str = mp.get("perturbation_name", "")  # type: ignore[reportUnknownVariableType]
+        mf_name: str = mp.get("field", "")  # type: ignore[reportUnknownVariableType]
         if pname and mf_name and mf_name in field_map:
             # Perturbation inherits type/rank/symmetry from the original field
-            field_map[pname] = dict(field_map[mf_name], name=pname)
+            field_map[pname] = dict(field_map[mf_name], name=pname)  # type: ignore[reportUnknownArgumentType]
 
     seen_fields: set[str] = set()
 
@@ -688,7 +688,7 @@ def _validate_reduction(config: dict[str, Any]) -> None:
 # ---------------------------------------------------------------------------
 
 
-def _validate_config(config: dict[str, Any]) -> None:
+def _validate_config(config: dict[str, Any]) -> None:  # type: ignore[reportUnusedFunction]
     """Validate TOML config structure.
 
     Raises

@@ -1031,7 +1031,7 @@ class TestEliminateDegenerateConstraints:
 
     def test_no_degenerate_passthrough(self) -> None:
         """Spec without degenerate constraints is returned unchanged."""
-        spec = {
+        spec: dict[str, Any] = {
             "metadata": {},
             "fields": [{"name": "phi", "index": 0, "is_dynamical": True}],
             "equations": [
@@ -1061,7 +1061,7 @@ class TestEliminateDegenerateConstraints:
 
     def test_symbolic_coefficients_preserved(self) -> None:
         """Symbolic coefficients survive substitution and merging."""
-        spec = {
+        spec: dict[str, Any] = {
             "metadata": {},
             "fields": [
                 {"name": "f1", "index": 0, "is_dynamical": True},
@@ -1288,7 +1288,7 @@ class TestGradientZeroElimination:
 
     def test_gradient_zero_elimination(self) -> None:
         """Field with gradient_z(f)=0 constraint is eliminated and substituted with zero."""
-        spec = {
+        spec: dict[str, Any] = {
             "metadata": {},
             "fields": [
                 {"name": "h_5", "index": 0, "is_dynamical": True},
@@ -1339,7 +1339,7 @@ class TestGradientZeroElimination:
 
     def test_gradient_zero_removes_decoupled_terms(self) -> None:
         """Zero-field references are removed from other equations."""
-        spec = {
+        spec: dict[str, Any] = {
             "metadata": {},
             "fields": [
                 {"name": "h_5", "index": 0, "is_dynamical": True},
@@ -1387,7 +1387,7 @@ class TestGradientZeroElimination:
         Mimics GW 1D structure: traceless constraint h_9 = h_4 + h_7 + h_9
         (3-field, eliminates h_4 as h_4 = -h_7), then gradient-zero eliminates h_6.
         """
-        spec = {
+        spec: dict[str, Any] = {
             "metadata": {},
             "fields": [
                 {"name": "h_4", "index": 0, "is_dynamical": True},
