@@ -138,6 +138,7 @@ L_osc = 2π / (κ B₀)
 | Ref | Year | Key Contribution |
 | --- | ---- | ---------------- |
 | [Domcke & Garcia-Cely, JCAP 05:051](https://arxiv.org/abs/2312.17636) | 2024 | Inverse Gertsenshtein as HFGW probe |
+| [**Domcke, Garcia-Cely & Lee, arXiv:2507.16609**](https://arxiv.org/abs/2507.16609) | **2025** | **GW scattering on 3D B-fields; Born approx. = thin-lens Boccaletti; WKB = thick-lens** |
 | [Obukhov et al., arXiv:2410.01355](https://arxiv.org/abs/2410.01355) | 2024 | Photon-torsion wave conversion in Poincaré gauge theory |
 | [arXiv:2507.02362](https://arxiv.org/abs/2507.02362) | 2025 | EM-torsion coupling near black holes |
 
@@ -145,7 +146,7 @@ L_osc = 2π / (κ B₀)
 
 | Ref | Year | Key Contribution |
 | --- | ---- | ---------------- |
-| [Berlin et al., arXiv:2405.08865](https://arxiv.org/abs/2405.08865) | 2024 | Numerical analysis of resonant axion-photon mixing — directly analogous methodology |
+| [Berlin et al., arXiv:2405.08865](https://arxiv.org/abs/2405.08865) | 2024 | Numerical analysis of resonant axion-photon mixing — directly analogous methodology; WKB vs exact regimes |
 
 ## Validation Targets
 
@@ -225,17 +226,22 @@ P_Boccaletti = sin²(1.0 × 0.1 × 5.0 × √(π/2)) = sin²(0.627) = 0.3432
 Agreement: 0.04% — excellent
 ```
 
-**2D sweep (Bpeak × R, 48 points)** — thin-lens vs thick-lens regimes confirmed:
-| R/σ | R range | Mean err | Max err | Regime |
-|-----|---------|----------|---------|--------|
-| ≤1 | R ≤ 5 | <0.001 | 0.001 | Thin-lens — Boccaletti valid |
-| 1.4 | R=7.2 | 0.004 | 0.028 | Transitional |
-| ≥2 | R ≥ 10 | 0.10–0.34 | 0.51–0.90 | Thick-lens — local Rabi formula applies |
+**2D sweep (Bpeak × R, 48 points)** — thin-lens vs thick-lens regimes confirmed (σ=5):
 
-The Boccaletti formula is the **thin-lens approximation**: assumes the B-field region is
-narrower than the probe wavepacket (R ≤ σ). When R >> σ, the wavepacket propagates through
-a quasi-uniform field and conversion accumulates locally — a different regime not captured by
-the integral formula.
+| R/σ | R | Mean err vs Boccaletti | Max err | Regime |
+|-----|---|----------------------|---------|--------|
+| ≤1 | 2–5 | <0.001 | 0.001 | **Thin-lens: Boccaletti exact** |
+| 1.4 | 7.2 | 0.004 | 0.028 | Transitional |
+| ≥2 | 10–15 | 0.10–0.34 | 0.51–0.90 | **Thick-lens: local Rabi formula** |
+
+The Boccaletti formula is the **thin-lens (Born) approximation** (Boccaletti 1970;
+Domcke, Garcia-Cely & Lee 2025, arXiv:2507.16609): the B-field region acts as a point-like
+"phase kick" when R ≪ σ. The amplitude equals the DC Fourier component ∫B₀ dz. For R ≫ σ,
+the wavepacket propagates through a quasi-uniform field and conversion accumulates via local
+Rabi oscillation (WKB / adiabatic regime; Raffelt & Stodolsky 1988).
+
+See [gertsenshtein_localized.md](gertsenshtein_localized.md) for the full physics derivation,
+regime conditions, terminology mapping to literature, and open questions.
 
 **Scripts**:
 - `examples/gertsenshtein/run_localized.sh` — single run
@@ -244,7 +250,8 @@ the integral formula.
 **Note**: Background B₀(z) is externally imposed — see [background_fields.md](background_fields.md)
 for the validity discussion.
 
-**Reference**: Boccaletti et al. (1970, Nuovo Cimento 70B:129); Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609)
+**References**: Boccaletti et al. (1970, Nuovo Cimento 70B:129); Raffelt & Stodolsky (1988,
+PRD 37:1237); Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609)
 
 ### Target 5: Magnetar/FRB Application (Phase F3)
 
