@@ -855,11 +855,11 @@ class TestFindDegenerateConstraint:
         constraint_eq_field, dep_field, substitution = result
         assert constraint_eq_field == "h_9"
         # Should eliminate one of h_4/h_7
-        assert dep_field in ("h_4", "h_7")
-        # Substitution: dep = -1 * other
+        assert dep_field in {"h_4", "h_7"}
+        # The substitution maps the surviving field to -1 times the eliminated one
         assert len(substitution) == 1
         other = next(iter(substitution))
-        assert other in ("h_4", "h_7")
+        assert other in {"h_4", "h_7"}
         assert other != dep_field
         assert substitution[other] == pytest.approx(-1.0)
 
@@ -992,7 +992,7 @@ class TestEliminateDegenerateConstraints:
         # Find the surviving graviton equation
         surviving = next(
             f["name"] for f in result["fields"]
-            if f["name"] in ("h_4", "h_7")
+            if f["name"] in {"h_4", "h_7"}
         )
         eq = next(eq for eq in result["equations"] if eq["field"] == surviving)
 
@@ -1138,7 +1138,7 @@ class TestEliminateDegenerateConstraints:
         # mass terms with symbolic: "-(alpha/2) + (-alpha/2)" = "-alpha"
         surviving = next(
             f["name"] for f in result["fields"]
-            if f["name"] in ("f1", "f2")
+            if f["name"] in {"f1", "f2"}
         )
         eq = next(eq for eq in result["equations"] if eq["field"] == surviving)
         mass_term = next(

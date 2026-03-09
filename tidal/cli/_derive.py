@@ -681,7 +681,7 @@ def _pert_field_dict(pert_name: str, source_field: dict[str, Any]) -> dict[str, 
 # --- WLS: Linearization (xPert) ---
 
 
-def _wls_matter_perturbation_setup(
+def _wls_matter_perturbation_setup(  # noqa: PLR0914
     ctx: _WlsContext,
     matter_perts: list[dict[str, Any]],
     eps_sym: str,
@@ -980,7 +980,7 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         )
     else:
         lines.append(
-            f'Print["Metric perturbation parameter registered (matter-only; h terms will be dropped)"];',
+            'Print["Metric perturbation parameter registered (matter-only; h terms will be dropped)"];',
         )
     lines.append("")
 
@@ -1144,7 +1144,7 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "(* NOTE: Use /. (single pass) NOT //. — RenameDummies may return    *)",
             "(* the same canonical form for symmetric tensors (e.g. eta[a,b]),    *)",
             "(* causing //. to loop 65536 times before hitting $IterationLimit.   *)",
-            f"(* Evaluate Scalar[metric] → dimension (constant, no dummies to rename) *)",
+            "(* Evaluate Scalar[metric] → dimension (constant, no dummies to rename) *)",
             f"l2ForVarD = l2ForVarD /. Scalar[{ctx.metric}[a_, b_]] :> {ctx.dim};",
             "l2ForVarD = l2ForVarD /. Scalar[x_]^n_Integer?Positive :>",
             "  Times @@ Table[With[{rd = RenameDummies[x]}, Scalar[rd]], {n}];",
@@ -2649,7 +2649,7 @@ def _run_wolframscript(script_path: Path) -> int:
 
     # Warn if no swap — large derivations may crash without sufficient memory
     try:
-        with open("/proc/swaps") as f:
+        with Path("/proc/swaps").open(encoding="ascii") as f:
             if len(f.readlines()) <= 1:  # header only
                 print(
                     "Warning: No swap space available. Large derivations may crash.",
@@ -2675,7 +2675,7 @@ def _run_wolframscript(script_path: Path) -> int:
     return result.returncode
 
 
-def _derive_from_toml(config_path: Path, args: Namespace) -> int:
+def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901, PLR0915
     """Run derivation from a TOML config file.
 
     Parameters
