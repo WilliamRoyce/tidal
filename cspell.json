@@ -348,7 +348,16 @@
     "xyzwvut",
     "xytext",
     "yaxis",
-    "zorder"
+    "zorder",
+    "ddof",
+    "etge",
+    "nval",
+    "pkill",
+    "pnames",
+    "rngs",
+    "sems",
+    "xscale",
+    "yerr"
   ],
   "flagWords": [
     "hte",
