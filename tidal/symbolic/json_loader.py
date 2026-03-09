@@ -197,10 +197,21 @@ class OperatorTerm:
     def position_dependent(self) -> bool:
         """Whether the coefficient depends on spatial coordinates.
 
-        A coordinate is spatial if it is not the time coordinate ``"t"``.
-        This works for any coordinate naming convention (Cartesian, spherical, etc.).
+        Returns ``True`` when ``coordinate_dependent`` is non-empty (explicit
+        declaration), or when ``coefficient_symbolic`` contains a spatial
+        coordinate call pattern such as ``x[]`` or ``y[]`` (auto-detection for
+        JSON exports that predate the ``coordinate_dependent`` field).
+        Time-only dependence (``t[]``) returns ``False``.
         """
-        return bool(set(self.coordinate_dependent) - {"t"})
+        if self.coordinate_dependent:
+            return bool(set(self.coordinate_dependent) - {"t"})
+        if self.coefficient_symbolic is not None:
+            # findall returns strings like "x[]", "t[]"; exclude time coord
+            return any(
+                m[0] != "t"
+                for m in _COORD_CALL_RE.findall(self.coefficient_symbolic)
+            )
+        return False
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> OperatorTerm:

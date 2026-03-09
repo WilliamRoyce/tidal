@@ -170,13 +170,27 @@ All equations are **derived from the Lagrangian** by the TIDAL pipeline — list
 
 ### Target 3: Detuned Conversion (Phase F1)
 
-- Add effective plasma mass m_γ = ω_p to EM perturbation via Proca-type mass term
-- Implementation: `- omegaP2/2 * a[-mu] eta[mu, nu] a[-nu]` in Lagrangian
-- Sweep ω_p² at fixed B₀ to map resonance curve
-- Compare with Raffelt-Stodolsky detuned formula:
-  P = (μ/ω_m)² sin²(ω_m D), where μ = κB₀/2, ω_m = √(Δ² + μ²), Δ = m_γ²/(2ω)
-- Test MSW-like resonance when ω_p² = m_g²
-- **Acceptance**: Agreement to within 5%
+**Status: NOT IMPLEMENTED — requires gauge-invariant mass mechanism**
+
+Adding a Proca-type photon mass `- omegaP2/2 * a[-mu] eta[mu, nu] a[-nu]` to the full 4D
+Lagrangian generates position-dependent coefficients `B₀²κ²omegaP2 z²` on the graviton equations.
+These arise from the volume element expansion `(ε/2)Tr(h) × (omegaP2/2)|Ā|²` where `|Ā|² = B₀²z²`
+(since `Ā_y = -B₀z` in the plane-wave gauge). With periodic BCs, z² is discontinuous at the wrap
+point — incorrect for a uniform plasma model.
+
+**Root cause**: xPert correctly evaluates the full second-order action including the metric coupling
+to the background EM energy density. In the plasma context (which is a medium effect, not a
+fundamental Proca field), this coupling is unphysical. No Lagrangian reformulation within the
+current 4D gauge-field framework can avoid this: any gauge representation of a transverse B-field
+has `|Ā|² ∝ z²` in 1D. An effective 1+1D scalar theory (hgw, aem scalars) yields constant
+coefficients but is no different from the existing `coupled_scalars` example.
+
+**What would be needed**: A gauge-invariant effective mass that couples only to the transverse
+photon polarization without coupling to the background gauge potential through the volume element.
+Possible approaches: (a) a Stueckelberg mass in unitary gauge with a carefully chosen gauge field,
+or (b) a medium/refractive-index formulation at the level of the equations of motion (bypassing
+the Lagrangian for the plasma sector). See `.github-issues-pending.md` for the tracking issue.
+
 - **Reference**: Raffelt & Stodolsky (1988, PRD 37:1237); Dandoy, Lella et al. (2024, arXiv:2406.17853)
 
 ### Target 4: Finite-Region Scattering (Phase F2)
@@ -229,7 +243,7 @@ theory.toml → _derive.py generates .wls with:
 
 ## Future Extensions
 
-1. **Plasma detuning** (Phase F1): Effective photon mass from plasma frequency — Proca-type mass term, Raffelt-Stodolsky detuned formula
+1. **Plasma detuning** (Phase F1): ~~Proca-type mass term~~ — blocked by gauge-potential coupling artifact (see Target 3 above). Requires gauge-invariant mass mechanism for the transverse photon sector.
 2. **Localized B-field scattering** (Phase F2): Gaussian/top-hat B(z) profiles, wavepacket IC, Boccaletti integral formula
 3. **Magnetar/FRB application** (Phase F3): Dipolar B(r), 1+1D radial setup, Gertsenshtein-Zel'dovich mechanism
 4. **Non-minimal couplings** (Phase F5): Chern-Simons gravity (parity-violating P_L ≠ P_R), ξRF² curvature-EM coupling. Ref: Kushwaha & Jain (2024, arXiv:2410.07338)
