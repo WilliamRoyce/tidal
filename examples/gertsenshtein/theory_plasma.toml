@@ -102,12 +102,15 @@ propagation_axis = "z"
 
 # Default parameters:
 # kappa = 1.0 (natural units)
-# B0 = 0.1 (moderate coupling for clear detuning effects)
-# omegaP2 = 0.0 (vacuum — recovers base Gertsenshtein)
+# B0 = 0.1 (moderate coupling; mu = kappa*B0/2 = 0.05)
+# omegaP2 = 0.01 (moderate detuning; Delta = omegaP2/(2*omega) ~ 0.0025 ~ mu^2)
+#   At this value the detuning is comparable to the vacuum coupling, showing
+#   clear suppression of conversion relative to the omegaP2=0 case.
+#   Sweep omegaP2 from 0 to 1 in sweep_plasma.sh to map the full detuning curve.
 [parameters]
 kappa = 1.0
 B0 = 0.1
-omegaP2 = 0.0
+omegaP2 = 0.01
 
 [output]
 path = "../data/gertsenshtein_plasma.json"
