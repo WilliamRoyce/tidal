@@ -533,6 +533,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "sweep-tornado",
             "sweep-scatter",
             "convergence",
+            "replicate-convergence",
         ],
         help="Plot type to generate",
     )
@@ -943,6 +944,43 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=None,
         metavar="T",
         help="Stop adaptive refinement when max interval score < T (default: 0.01)",
+    )
+
+    # Ensemble / replicate runs
+    sweep_parser.add_argument(
+        "--n-replicates",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Number of replicate runs per parameter point (default: 1, no replicates)",
+    )
+    sweep_parser.add_argument(
+        "--base-seed",
+        type=int,
+        default=None,
+        metavar="S",
+        help="Base RNG seed for ensemble; replicate i gets seed S+i (default: 42)",
+    )
+    sweep_parser.add_argument(
+        "--ic-perturbation",
+        type=float,
+        default=None,
+        metavar="SCALE",
+        help=(
+            "Additive Gaussian noise (relative to ic-amplitude) on top of "
+            "deterministic ICs. Each replicate uses a different seed."
+        ),
+    )
+    sweep_parser.add_argument(
+        "--param-noise",
+        type=str,
+        action="append",
+        default=None,
+        metavar="PARAM=SCALE",
+        help=(
+            "Per-parameter Gaussian noise for uncertainty quantification. "
+            "Each replicate draws param += N(0, SCALE). Repeatable."
+        ),
     )
 
     # Multi-D sampling

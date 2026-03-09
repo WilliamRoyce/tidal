@@ -1,0 +1,49 @@
+# Coupled Scalars — Ensemble Sweep Configuration
+#
+# TOML config demonstrating all ensemble/replicate options.
+# Equivalent to running sweep_coupling_ensemble.sh + sweep_param_uq.sh
+# features combined.
+#
+# Usage:
+#   tidal sweep --config examples/coupled_scalars/sweep_ensemble.toml
+#
+# References:
+#   Smith, R.C. (2013) Uncertainty Quantification, SIAM. Ch. 3-5.
+#   Palmer, T.N. et al. (1993) "Ensemble prediction", ECMWF Tech Memo 188.
+
+spec = "../data/coupled_scalars.json"
+
+[sweep.gCpl]
+start = 0.1
+stop = 1.8
+count = 8
+
+[measurement]
+types = ["peak_conversion", "conservation"]
+source = "phi_0"
+target = "chi_0"
+
+[simulation]
+grid_shape = 128
+bounds = "0:160"
+bc = "periodic"
+t_end = 60.0
+ic = "gaussian"
+ic_amplitude = 0.1
+ic_width = 3.0
+ic_center = 20.0
+ic_component = "phi_0"
+
+[parameters]
+mPhi2 = 1.0
+mChi2 = 4.0
+
+# Ensemble settings: N replicates per parameter point
+[execution]
+n_replicates = 10
+base_seed = 42
+
+# Variation sources (either or both can be enabled)
+[ensemble]
+ic_perturbation = 0.05              # 5% of ic_amplitude Gaussian noise on ICs
+param_noise = { mChi2 = 0.1 }      # mChi2 ~ N(4.0, 0.1²) per replicate

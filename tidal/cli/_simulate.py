@@ -999,6 +999,60 @@ def _noise_slots(
     }
 
 
+def _apply_ic_perturbation(
+    y0: np.ndarray,
+    args: Namespace,
+    spec: EquationSystem,
+    grid_info: GridInfo,
+) -> np.ndarray:
+    """Add small Gaussian noise to field slots (not velocities) for ensemble variation.
+
+    The perturbation scale is relative to ``--ic-amplitude``:
+    ``perturbation = scale * amplitude * N(0,1)``.
+
+    This is analogous to ensemble weather forecasting where perturbed ICs
+    generate ensemble members for uncertainty estimation.
+
+    References
+    ----------
+    Palmer, T.N. et al. (1993) "Ensemble prediction", ECMWF Tech Memo 188.
+
+    Parameters
+    ----------
+    y0 : ndarray
+        Initial state vector (modified in-place and returned).
+    args : Namespace
+        CLI args; uses ``ic_perturbation`` (scale) and ``ic_perturbation_seed``.
+    spec : EquationSystem
+        Equation system for layout construction.
+    grid_info : GridInfo
+        Grid information for layout construction.
+
+    Returns
+    -------
+    ndarray
+        The perturbed state vector (same object as *y0*).
+    """
+    from tidal.solver.state import StateLayout
+
+    scale = getattr(args, "ic_perturbation", None)
+    if scale is None or scale == 0.0:
+        return y0
+
+    seed = getattr(args, "ic_perturbation_seed", None)
+    rng = np.random.default_rng(seed)
+    amplitude = getattr(args, "ic_amplitude", 1.0) or 1.0
+    layout = StateLayout.from_spec(spec, grid_info.num_points)
+    n = layout.num_points
+
+    for i, slot in enumerate(layout.slots):
+        if slot.kind == "field":
+            start = i * n
+            y0[start : start + n] += scale * amplitude * rng.standard_normal(n)
+
+    return y0
+
+
 def _apply_ic_field_overrides(
     slot_data: dict[str, np.ndarray],
     ic_field_args: list[str],
@@ -1650,6 +1704,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         )
     else:
         y0 = _build_initial_y0(args, spec, grid_info, bounds)
+        y0 = _apply_ic_perturbation(y0, args, spec, grid_info)
         ic_desc = f"  IC: {args.ic} on {args.ic_component or spec.component_names[0]}"
         ic_field_list: list[str] = getattr(args, "ic_field", None) or []
         if ic_field_list:

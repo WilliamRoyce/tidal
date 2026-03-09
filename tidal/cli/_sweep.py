@@ -11,6 +11,20 @@ Supports:
 - Grid convergence studies: ``--converge "32,64,128,256"``
 - Resume interrupted sweeps: ``--resume``
 - Parallel execution: ``--parallel N``
+- Ensemble replicates: ``--n-replicates N --base-seed S``
+- IC perturbation: ``--ic-perturbation SCALE``
+- Parameter noise UQ: ``--param-noise "PARAM=SCALE"``
+
+References
+----------
+Smith, R.C. (2013) *Uncertainty Quantification: Theory, Implementation,
+and Applications*, SIAM. Ch. 3 (sample statistics, SEM, CI).
+
+Palmer, T.N. et al. (1993) "Ensemble prediction", ECMWF Tech Memo 188.
+(IC perturbation as ensemble generation strategy.)
+
+ISO 5725-2:1994 — Accuracy of measurement methods and results.
+(CV threshold for repeatability QC.)
 """
 
 from __future__ import annotations
@@ -49,6 +63,144 @@ _SWEEP_MEASUREMENTS = frozenset(
 # Safety limits for sweep grid size
 _WARN_SWEEP_SIZE = 1_000
 _MAX_SWEEP_SIZE = 10_000
+
+# ------------------------------------------------------------------
+# Ensemble / replicate helpers
+# ------------------------------------------------------------------
+
+# CV threshold for repeatability QC warning.
+# Ref: ISO 5725-2:1994 — Accuracy of measurement methods.
+_CV_THRESHOLD = 0.5
+
+
+def _warn_high_cv(
+    agg: Any,  # noqa: ANN401  # SweepResults (circular import)
+    swept_params: dict[str, Any],
+) -> None:
+    """Emit warnings for metrics with high coefficient of variation.
+
+    CV = std/|mean|. A CV > 0.5 indicates large variability relative
+    to the mean, suggesting more replicates may be needed.
+
+    References
+    ----------
+    ISO 5725-2:1994 — Accuracy of measurement methods (repeatability).
+    """
+    for agg_row in agg.rows:
+        for key in agg_row:
+            if not key.endswith("_mean") or agg_row[key] is None:
+                continue
+            base = key[: -len("_mean")]
+            mean_val = float(agg_row[key])
+            std_val = agg_row.get(f"{base}_std")
+            if std_val is None or abs(mean_val) == 0:
+                continue
+            cv = float(std_val) / abs(mean_val)
+            if cv > _CV_THRESHOLD:
+                param_info = ", ".join(
+                    f"{p}={agg_row.get(p, '?')}" for p in swept_params
+                )
+                print(
+                    f"  Warning: high variability for {base} "
+                    f"(CV={cv:.2f}) at {param_info} "
+                    f"— consider more replicates.",
+                    file=sys.stderr,
+                )
+
+
+def _parse_param_noise(raw_list: list[str] | None) -> dict[str, float]:
+    """Parse ``--param-noise PARAM=SCALE`` entries into ``{name: scale}``.
+
+    Raises
+    ------
+    ValueError
+        If an entry doesn't contain '='.
+    """
+    if not raw_list:
+        return {}
+    result: dict[str, float] = {}
+    for entry in raw_list:
+        if "=" not in entry:
+            msg = f"--param-noise must be PARAM=SCALE, got {entry!r}"
+            raise ValueError(msg)
+        name, val = entry.split("=", 1)
+        result[name.strip()] = float(val.strip())
+    return result
+
+
+def _apply_param_noise_to_plan(
+    rp: dict[str, Any],
+    param_noise: dict[str, float],
+    seed: int,
+) -> None:
+    """Perturb swept_vals and param_overrides in-place for one replicate plan.
+
+    Each parameter gets an independent RNG derived from the replicate seed
+    via ``numpy.random.SeedSequence.spawn()``, so adding/removing a noised
+    parameter does not change the draws for other parameters.
+
+    References
+    ----------
+    numpy.random.SeedSequence — used for reproducible, independent streams.
+    """
+    # Spawn one independent child seed per parameter (sorted for determinism)
+    sorted_params = sorted(param_noise.keys())
+    children = np.random.SeedSequence(seed).spawn(len(sorted_params))
+    param_rngs = {
+        pname: np.random.default_rng(child)
+        for pname, child in zip(sorted_params, children, strict=True)
+    }
+
+    noised_swept = dict(rp["swept_vals"])
+    noised_overrides = dict(rp["param_overrides"])
+    nominal_vals: dict[str, float] = {}
+    for pname, scale in param_noise.items():
+        draw = scale * param_rngs[pname].standard_normal()
+        if pname in noised_swept:
+            nominal_vals[pname] = noised_swept[pname]
+            noised_swept[pname] += draw
+        if pname in noised_overrides:
+            if pname not in nominal_vals:
+                nominal_vals[pname] = noised_overrides[pname]
+            noised_overrides[pname] = noised_swept.get(
+                pname, noised_overrides[pname] + draw
+            )
+    rp["swept_vals"] = noised_swept
+    rp["param_overrides"] = noised_overrides
+    rp["nominal_vals"] = nominal_vals
+
+
+def _expand_replicates(
+    run_plans: list[dict[str, Any]],
+    n_replicates: int,
+    base_seed: int,
+    param_noise: dict[str, float],
+) -> list[dict[str, Any]]:
+    """Expand run plans with replicate dimension.
+
+    Each original plan becomes *n_replicates* plans, each with a unique
+    ``replicate`` index and ``seed``.  If *param_noise* is set, parameter
+    values are perturbed per-replicate.
+
+    Returns a new list of run plans (originals are not mutated).
+    """
+    expanded: list[dict[str, Any]] = []
+    for rp in run_plans:
+        for rep in range(n_replicates):
+            seed = base_seed + rep
+            rep_plan = dict(rp)
+            rep_plan["replicate"] = rep
+            rep_plan["seed"] = seed
+            rep_plan["subdir"] = f"{rp['subdir']}/rep_{rep}"
+            rep_plan["run_dir"] = rp["run_dir"] / f"rep_{rep}"
+            rep_plan["index"] = len(expanded)
+
+            if param_noise:
+                _apply_param_noise_to_plan(rep_plan, param_noise, seed)
+
+            expanded.append(rep_plan)
+    return expanded
+
 
 # ------------------------------------------------------------------
 # Parameter parsing
@@ -103,7 +255,9 @@ def parse_sweep_spec(raw: str) -> tuple[str, list[float]]:  # noqa: C901
             if n < 2:  # noqa: PLR2004
                 msg = f"Sweep count must be >= 2, got {n}"
                 raise ValueError(msg)
-            values: list[float] = cast("list[float]", np.linspace(float(start), float(stop), n).tolist())
+            values: list[float] = cast(
+                "list[float]", np.linspace(float(start), float(stop), n).tolist()
+            )
         elif len(parts) == 4:  # noqa: PLR2004
             # START:STOP:N:log
             start, stop, n_str, scale = parts
@@ -118,7 +272,9 @@ def parse_sweep_spec(raw: str) -> tuple[str, list[float]]:  # noqa: C901
             if s <= 0 or e <= 0:
                 msg = f"Log-scale requires positive bounds, got {s}:{e}"
                 raise ValueError(msg)
-            values = cast("list[float]", np.logspace(np.log10(s), np.log10(e), n).tolist())
+            values = cast(
+                "list[float]", np.logspace(np.log10(s), np.log10(e), n).tolist()
+            )
         else:
             msg = (
                 f"Invalid range spec: '{rhs}'. "
@@ -250,16 +406,27 @@ def _run_subdir_name(
 # ------------------------------------------------------------------
 
 
-def _build_sim_args(
+def _build_sim_args(  # noqa: PLR0913
     base_args: Namespace,
     param_overrides: dict[str, float],
     output_dir: Path,
     grid_shape_override: int | None = None,
+    *,
+    replicate_seed: int | None = None,
+    ic_perturbation: float | None = None,
 ) -> Namespace:
     """Build a simulate-compatible Namespace for one run.
 
     Copies all simulation flags from *base_args* and overrides
     parameters and output path.
+
+    Parameters
+    ----------
+    replicate_seed : int, optional
+        If set, overrides ``ic_noise_seed`` and ``ic_perturbation_seed``
+        for ensemble variation across replicates.
+    ic_perturbation : float, optional
+        If set, enables IC perturbation with this scale.
     """
     import copy
 
@@ -293,15 +460,30 @@ def _build_sim_args(
     if grid_shape_override is not None:
         sim_args.grid_shape = str(grid_shape_override)
 
+    # Ensemble seed injection — each replicate gets independent seeds for
+    # IC noise and IC perturbation via SeedSequence.spawn() to avoid
+    # correlated randomness when both are active simultaneously.
+    if replicate_seed is not None:
+        children = np.random.SeedSequence(replicate_seed).spawn(2)
+        sim_args.ic_noise_seed = int(children[0].generate_state(1)[0])
+        sim_args.ic_perturbation_seed = int(children[1].generate_state(1)[0])
+
+    # IC perturbation scale
+    if ic_perturbation is not None:
+        sim_args.ic_perturbation = ic_perturbation
+
     return sim_args
 
 
-def _simulate_run(
+def _simulate_run(  # noqa: PLR0913
     base_args: Namespace,
     spec_path: Path,
     param_overrides: dict[str, float],
     output_dir: Path,
     grid_shape_override: int | None = None,
+    *,
+    replicate_seed: int | None = None,
+    ic_perturbation: float | None = None,
 ) -> tuple[int, float]:
     """Execute a single simulation and return (exit_code, wall_time_s)."""
     from tidal.cli._simulate import (
@@ -311,7 +493,12 @@ def _simulate_run(
     from tidal.symbolic import load_equation_system
 
     sim_args = _build_sim_args(
-        base_args, param_overrides, output_dir, grid_shape_override
+        base_args,
+        param_overrides,
+        output_dir,
+        grid_shape_override,
+        replicate_seed=replicate_seed,
+        ic_perturbation=ic_perturbation,
     )
     spec = load_equation_system(spec_path)
     params = _parse_params(sim_args.param, spec)
@@ -405,10 +592,14 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
             disp = _run_dispersion(data, dyn)
             result_obj = disp["_result_obj"]
             wn: np.ndarray[Any, np.dtype[np.floating[Any]]] = result_obj.wavenumbers
-            freq: np.ndarray[Any, np.dtype[np.floating[Any]]] = result_obj.peak_frequencies
+            freq: np.ndarray[Any, np.dtype[np.floating[Any]]] = (
+                result_obj.peak_frequencies
+            )
             active = freq > 0.0
             if np.any(active):
-                m2_vals: np.ndarray[Any, np.dtype[np.floating[Any]]] = freq[active] ** 2 - wn[active] ** 2
+                m2_vals: np.ndarray[Any, np.dtype[np.floating[Any]]] = (
+                    freq[active] ** 2 - wn[active] ** 2
+                )
                 metrics["m2_eff"] = float(np.median(m2_vals))
         except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
             metrics["dispersion_error"] = str(exc)
@@ -524,6 +715,9 @@ def _run_single(  # noqa: PLR0913, PLR0917
     target: tuple[str, ...] | None,
     threshold: float,
     grid_shape_override: int | None = None,
+    *,
+    replicate_seed: int | None = None,
+    ic_perturbation: float | None = None,
 ) -> dict[str, Any]:
     """Execute one simulate + measure cycle.
 
@@ -532,7 +726,13 @@ def _run_single(  # noqa: PLR0913, PLR0917
     """
     # 1. Simulate
     exit_code, wall_time = _simulate_run(
-        base_args, spec_path, param_overrides, output_dir, grid_shape_override
+        base_args,
+        spec_path,
+        param_overrides,
+        output_dir,
+        grid_shape_override,
+        replicate_seed=replicate_seed,
+        ic_perturbation=ic_perturbation,
     )
 
     if exit_code != 0:
@@ -674,6 +874,10 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
         swept_vals: dict[str, float] = rp["swept_vals"]
         grid_override: int | None = rp["grid_override"]
         param_overrides: dict[str, float] = rp["param_overrides"]
+        rep = rp.get("replicate")
+        rep_seed = rp.get("seed")
+        rep_ic_pert: float | None = rp.get("ic_perturbation")
+        nominal_vals: dict[str, float] | None = rp.get("nominal_vals")
 
         # Resume check: re-measure existing output instead of re-simulating
         if resume and (run_dir / "metadata.json").exists():
@@ -691,7 +895,14 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
                 print(" ok")
             rows.append(
                 _build_row(
-                    swept_vals, fixed_params, sim_settings, metrics, grid_override
+                    swept_vals,
+                    fixed_params,
+                    sim_settings,
+                    metrics,
+                    grid_override,
+                    replicate=rep,
+                    seed=rep_seed,
+                    nominal_vals=nominal_vals,
                 )
             )
             _save_incremental(
@@ -722,10 +933,19 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
                 target,
                 threshold,
                 grid_shape_override=grid_override,
+                replicate_seed=rep_seed,
+                ic_perturbation=rep_ic_pert,
             )
             rows.append(
                 _build_row(
-                    swept_vals, fixed_params, sim_settings, metrics, grid_override
+                    swept_vals,
+                    fixed_params,
+                    sim_settings,
+                    metrics,
+                    grid_override,
+                    replicate=rep,
+                    seed=rep_seed,
+                    nominal_vals=nominal_vals,
                 )
             )
             _print_status(metrics)
@@ -743,6 +963,9 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
                         "solver_exit_code": -1,
                     },
                     grid_override,
+                    replicate=rep,
+                    seed=rep_seed,
+                    nominal_vals=nominal_vals,
                 )
             )
 
@@ -799,6 +1022,9 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
     for rp in run_plans:
         i = rp["index"]
         run_dir: Path = rp["run_dir"]
+        rep = rp.get("replicate")
+        rep_seed = rp.get("seed")
+        nominal_vals: dict[str, float] | None = rp.get("nominal_vals")
 
         if resume and (run_dir / "metadata.json").exists():
             # Resume runs measured sequentially (fast — no simulation)
@@ -820,6 +1046,9 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
                 sim_settings,
                 metrics,
                 rp["grid_override"],
+                replicate=rep,
+                seed=rep_seed,
+                nominal_vals=nominal_vals,
             )
             completed.add(i)
             continue
@@ -838,6 +1067,10 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
                 "grid_override": rp["grid_override"],
                 "swept_vals": rp["swept_vals"],
                 "subdir": rp["subdir"],
+                "replicate": rep,
+                "seed": rep_seed,
+                "nominal_vals": nominal_vals,
+                "ic_perturbation": rp.get("ic_perturbation"),
             }
         )
 
@@ -850,7 +1083,14 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
                 swept_vals = result["swept_vals"]
                 grid_override = result["grid_override"]
                 rows[idx] = _build_row(
-                    swept_vals, fixed_params, sim_settings, metrics, grid_override
+                    swept_vals,
+                    fixed_params,
+                    sim_settings,
+                    metrics,
+                    grid_override,
+                    replicate=result.get("replicate"),
+                    seed=result.get("seed"),
+                    nominal_vals=result.get("nominal_vals"),
                 )
                 completed.add(idx)
                 print(f"  [{len(completed)}/{total_runs}] {result['subdir']}", end="")
@@ -1315,10 +1555,64 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
             }
         )
 
+    # Ensemble: expand run_plans with replicates
+    n_replicates = getattr(args, "n_replicates", None) or 1
+    base_seed = getattr(args, "base_seed", None) or 42
+    ic_perturbation = getattr(args, "ic_perturbation", None)
+    param_noise = _parse_param_noise(getattr(args, "param_noise", None))
+
+    # Validate param-noise names against known parameters
+    if param_noise:
+        known_noise_targets = set(swept_params.keys()) | set(all_params.keys())
+        meta_params = spec.metadata.get("parameters", {})
+        if isinstance(meta_params, dict):
+            known_noise_targets |= set(meta_params.keys())
+        for pn_name in sorted(param_noise.keys()):
+            if pn_name not in known_noise_targets:
+                print(
+                    f"  Warning: --param-noise parameter '{pn_name}' not found "
+                    f"in spec or swept params. Noise will have no effect.",
+                    file=sys.stderr,
+                )
+
+    if n_replicates > 1:
+        n_points = len(run_plans)
+        run_plans = _expand_replicates(run_plans, n_replicates, base_seed, param_noise)
+        # Thread ic_perturbation into each plan
+        if ic_perturbation is not None:
+            for rp in run_plans:
+                rp["ic_perturbation"] = ic_perturbation
+        total_runs = len(run_plans)
+        run_dirs = [rp["run_dir"] for rp in run_plans]
+        print(
+            f"  Ensemble: {n_points} points x {n_replicates} replicates = {total_runs} runs"
+        )
+
+        # Warn if replicates with no variation source
+        ic_type = getattr(args, "ic", "gaussian")
+        if ic_type != "noise" and ic_perturbation is None and not param_noise:
+            print(
+                "  Warning: --n-replicates > 1 with deterministic ICs and no "
+                "--ic-perturbation or --param-noise — all replicates will be identical.",
+                file=sys.stderr,
+            )
+
+        # Re-check safety limit after expansion
+        force_large = getattr(args, "force_large_sweep", False)
+        if total_runs > _MAX_SWEEP_SIZE and not force_large:
+            print(
+                f"Error: sweep has {total_runs} runs (limit: {_MAX_SWEEP_SIZE}). "
+                f"Use --force-large-sweep to override.",
+                file=sys.stderr,
+            )
+            return 1
+
     # Dry-run: print plan and exit
     if getattr(args, "dry_run", False):
         print(f"\nDry run: {total_runs} runs planned")
         print(f"  Swept: {list(swept_params.keys())}")
+        if n_replicates > 1:
+            print(f"  Replicates: {n_replicates} (base_seed={base_seed})")
         print(f"  Measurements: {', '.join(sorted(measurements))}")
         preview = run_plans[:10]
         for rp in preview:
@@ -1363,6 +1657,12 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     run_dirs: list[Path] = [rp["run_dir"] for rp in run_plans]
 
     if adaptive_param is not None:
+        if n_replicates > 1:
+            print(
+                "  Warning: adaptive refinement does not yet support --n-replicates. "
+                "Running single realization per point.",
+                file=sys.stderr,
+            )
         initial_values = swept_params[adaptive_param]
         rows, run_dirs, swept_params = _execute_adaptive(
             args,
@@ -1417,6 +1717,26 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         )
 
     # Build SweepResults and save
+    meta: dict[str, Any] = {
+        "timestamp": datetime.now(tz=UTC).isoformat(),
+        "total_runs": len(rows),
+        "sampling_strategy": (
+            "adaptive"
+            if adaptive_param
+            else sweep_strategy
+            if sweep_strategy != "grid"
+            else "grid"
+        ),
+        **_get_provenance(),
+    }
+    if n_replicates > 1:
+        meta["n_replicates"] = n_replicates
+        meta["base_seed"] = base_seed
+        if ic_perturbation is not None:
+            meta["ic_perturbation"] = ic_perturbation
+        if param_noise:
+            meta["param_noise"] = param_noise
+
     results = SweepResults(
         swept_params=swept_params,
         fixed_params=fixed_params,
@@ -1427,18 +1747,7 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         measurements=sorted(measurements),
         source_fields=list(source) if source else None,
         target_fields=list(target) if target else None,
-        metadata={
-            "timestamp": datetime.now(tz=UTC).isoformat(),
-            "total_runs": len(rows),
-            "sampling_strategy": (
-                "adaptive"
-                if adaptive_param
-                else sweep_strategy
-                if sweep_strategy != "grid"
-                else "grid"
-            ),
-            **_get_provenance(),
-        },
+        metadata=meta,
         converge_sizes=converge_sizes,
     )
 
@@ -1446,9 +1755,21 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     results.to_csv(output_dir / "results.csv")
     results.to_json(output_dir / "results.json")
 
+    # Save aggregated results if replicates exist
+    if results.has_replicates:
+        agg = results.aggregate()
+        agg.to_csv(output_dir / "results_agg.csv")
+        agg.to_json(output_dir / "results_agg.json")
+
+        # QC: warn on high coefficient of variation
+        # Ref: ISO 5725-2:1994 — repeatability/reproducibility QC thresholds
+        _warn_high_cv(agg, swept_params)
+
     print(f"\nSweep complete: {results.n_runs} runs")
     print(f"  results.csv:  {(output_dir / 'results.csv').resolve()}")
     print(f"  results.json: {(output_dir / 'results.json').resolve()}")
+    if results.has_replicates:
+        print(f"  results_agg.csv: {(output_dir / 'results_agg.csv').resolve()}")
     print(f"  sweep.json:   {(output_dir / 'sweep.json').resolve()}")
 
     # Convergence order estimation
@@ -1458,22 +1779,41 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     return 0
 
 
-def _build_row(
+def _build_row(  # noqa: PLR0913
     swept_vals: dict[str, float],
     fixed_params: dict[str, float],
     sim_settings: dict[str, Any],
     metrics: dict[str, Any],
     grid_override: int | None,
+    *,
+    replicate: int | None = None,
+    seed: int | None = None,
+    nominal_vals: dict[str, float] | None = None,
 ) -> dict[str, Any]:
-    """Build a single results row with all columns."""
+    """Build a single results row with all columns.
+
+    Column order: swept params → nominal vals → replicate/seed →
+    fixed params → sim settings → metrics → status.
+    """
     row: dict[str, Any] = {}
+    # 1. Swept parameter values
     row.update(swept_vals)
+    # 2. Nominal values for param noise (right after swept vals)
+    if nominal_vals:
+        for pname, nval in nominal_vals.items():
+            row[f"{pname}_nominal"] = nval
+    # 3. Replicate metadata (before metrics for readability)
+    if replicate is not None:
+        row["replicate"] = replicate
+    if seed is not None:
+        row["seed"] = seed
+    # 4. Fixed params and sim settings
     row.update(fixed_params)
     if grid_override is not None:
         sim_settings = dict(sim_settings)
         sim_settings["grid_shape"] = grid_override
     row.update(sim_settings)
-    # Filter out internal keys
+    # 5. Metrics (filter out internal keys)
     row.update({k: v for k, v in metrics.items() if not k.startswith("_")})
     return row
 
@@ -1551,6 +1891,8 @@ def _run_single_wrapper(task: dict[str, Any]) -> dict[str, Any]:
         task["target"],
         task["threshold"],
         grid_shape_override=task.get("grid_override"),
+        replicate_seed=task.get("seed"),
+        ic_perturbation=task.get("ic_perturbation"),
     )
     return {
         "index": task["index"],
@@ -1558,6 +1900,9 @@ def _run_single_wrapper(task: dict[str, Any]) -> dict[str, Any]:
         "subdir": task["subdir"],
         "metrics": metrics,
         "grid_override": task.get("grid_override"),
+        "replicate": task.get("replicate"),
+        "seed": task.get("seed"),
+        "nominal_vals": task.get("nominal_vals"),
     }
 
 

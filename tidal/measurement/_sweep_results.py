@@ -8,6 +8,14 @@ from sweep execution.
 The CSV/JSON output is designed to be **self-contained and portable** —
 every row includes all parameters (swept + fixed), simulation settings,
 and measured metrics so the data can be analyzed outside TIDAL.
+
+References
+----------
+Smith, R.C. (2013) *Uncertainty Quantification: Theory, Implementation,
+and Applications*, SIAM. Ch. 3 (sample statistics, SEM, CI).
+
+Efron, B. & Tibshirani, R. (1993) *An Introduction to the Bootstrap*,
+Chapman & Hall. Ch. 12-14 (non-parametric bootstrap confidence intervals).
 """
 
 from __future__ import annotations
@@ -32,7 +40,7 @@ DEFAULT_METRIC_CANDIDATES: tuple[str, ...] = (
 )
 
 
-@dataclass
+@dataclass  # noqa: PLR0904
 class SweepResults:
     """Aggregated results from a parameter sweep.
 
@@ -340,6 +348,255 @@ class SweepResults:
                     )
 
         return "\n".join(lines)
+
+    # ------------------------------------------------------------------
+    # Ensemble / replicate support
+    # ------------------------------------------------------------------
+
+    @property
+    def has_replicates(self) -> bool:
+        """Whether results contain replicate runs."""
+        return any("replicate" in row for row in self.rows)
+
+    @property
+    def n_replicates(self) -> int:
+        """Number of replicates (max replicate index + 1, or 1 if none)."""
+        if not self.has_replicates:
+            return 1
+        max_rep = max(row.get("replicate", 0) for row in self.rows)
+        return int(max_rep) + 1
+
+    def group_by_point(self) -> dict[tuple[float, ...], list[dict[str, Any]]]:
+        """Group rows by parameter-point identity, ignoring replicate/seed.
+
+        Uses ``{param}_nominal`` columns if present (param noise),
+        otherwise the swept parameter values themselves.
+
+        Returns
+        -------
+        dict[tuple[float, ...], list[dict[str, Any]]]
+            Mapping from parameter-point tuple to list of replicate rows.
+        """
+        param_names = list(self.swept_params.keys())
+        groups: dict[tuple[float, ...], list[dict[str, Any]]] = {}
+        for row in self.rows:
+            key_vals: list[float] = []
+            for pname in param_names:
+                # Use nominal value if available (param noise), else realized
+                nominal_key = f"{pname}_nominal"
+                val = row.get(nominal_key, row.get(pname))
+                key_vals.append(float(val) if val is not None else float("nan"))
+            key = tuple(key_vals)
+            groups.setdefault(key, []).append(row)
+        return groups
+
+    def aggregate(
+        self,
+        metrics: list[str] | None = None,
+    ) -> SweepResults:
+        """Aggregate replicate rows into one row per parameter point.
+
+        Computes per-metric statistics: mean, std, sem (std/sqrt(N)),
+        95% CI bounds, median, 25th/75th percentiles, and count.
+
+        The plain ``{metric}`` column holds the mean for backward
+        compatibility with existing plot code.
+
+        Parameters
+        ----------
+        metrics : list[str] or None
+            Metrics to aggregate. If None, uses all metric_names.
+
+        Returns
+        -------
+        SweepResults
+            New instance with one row per parameter point and
+            ``{metric}_mean``, ``{metric}_std``, etc. columns.
+        """
+        if not self.has_replicates:
+            return self
+
+        # Columns that are never aggregated (non-numeric or metadata)
+        skip = {
+            "replicate",
+            "seed",
+            "run_status",
+            "error_message",
+            "solver_exit_code",
+            "error",
+            "energy_conserved",
+            "conservation_error",
+        }
+        if metrics is None:
+            metrics = [
+                m
+                for m in self.metric_names
+                if m not in skip and not m.endswith("_nominal")
+            ]
+
+        from scipy.stats import t as t_dist  # noqa: PLC0415
+
+        param_names = list(self.swept_params.keys())
+        groups = self.group_by_point()
+        agg_rows: list[dict[str, Any]] = []
+
+        for point_key, rep_rows in groups.items():
+            row: dict[str, Any] = dict(zip(param_names, point_key, strict=True))
+
+            # Fixed params and sim settings from first row
+            row.update(self.fixed_params)
+            row.update(
+                {k: rep_rows[0].get(k) for k in self.sim_settings if k in rep_rows[0]}
+            )
+
+            # Aggregate each metric
+            for m in metrics:
+                vals = [
+                    r[m]
+                    for r in rep_rows
+                    if r.get(m) is not None and r.get("run_status") == "success"
+                ]
+                n = len(vals)
+                row[f"{m}_n"] = n
+                if n == 0:
+                    row[m] = None
+                    for suffix in (
+                        "_mean",
+                        "_std",
+                        "_sem",
+                        "_ci95_lo",
+                        "_ci95_hi",
+                        "_median",
+                        "_q25",
+                        "_q75",
+                    ):
+                        row[f"{m}{suffix}"] = None
+                    continue
+
+                arr = np.array(vals, dtype=np.float64)
+                mean = float(np.mean(arr))
+                row[m] = mean  # backward compat
+                row[f"{m}_mean"] = mean
+
+                if n == 1:
+                    row[f"{m}_std"] = 0.0
+                    row[f"{m}_sem"] = 0.0
+                    row[f"{m}_ci95_lo"] = mean
+                    row[f"{m}_ci95_hi"] = mean
+                    row[f"{m}_median"] = mean
+                    row[f"{m}_q25"] = mean
+                    row[f"{m}_q75"] = mean
+                else:
+                    std = float(np.std(arr, ddof=1))
+                    sem = std / np.sqrt(n)
+                    row[f"{m}_std"] = std
+                    row[f"{m}_sem"] = sem
+
+                    # 95% CI via t-distribution
+                    t_crit = float(t_dist.ppf(0.975, df=n - 1))
+                    row[f"{m}_ci95_lo"] = mean - t_crit * sem
+                    row[f"{m}_ci95_hi"] = mean + t_crit * sem
+
+                    row[f"{m}_median"] = float(np.median(arr))
+                    row[f"{m}_q25"] = float(np.percentile(arr, 25))
+                    row[f"{m}_q75"] = float(np.percentile(arr, 75))
+
+            agg_rows.append(row)
+
+        return self._with_rows(agg_rows)
+
+    def bootstrap_ci(
+        self,
+        metric: str,
+        *,
+        n_bootstrap: int = 10_000,
+        alpha: float = 0.05,
+        seed: int = 0,
+    ) -> SweepResults:
+        """Compute non-parametric bootstrap confidence intervals.
+
+        For each parameter point, resamples the replicate metric values
+        with replacement *n_bootstrap* times, computing the mean of each
+        resample. The CI bounds are the alpha/2 and 1-alpha/2 percentiles
+        of the bootstrap distribution.
+
+        More robust than t-distribution CI for non-Gaussian distributions
+        or very small sample sizes.
+
+        Parameters
+        ----------
+        metric : str
+            Metric column to bootstrap.
+        n_bootstrap : int
+            Number of bootstrap resamples (default 10,000).
+        alpha : float
+            Significance level (default 0.05 for 95% CI).
+        seed : int
+            RNG seed for reproducibility.
+
+        Returns
+        -------
+        SweepResults
+            New instance with one row per parameter point, containing
+            ``{metric}_boot_lo`` and ``{metric}_boot_hi`` columns.
+
+        References
+        ----------
+        Efron, B. & Tibshirani, R. (1993) *An Introduction to the
+        Bootstrap*, Chapman & Hall. Ch. 12-14.
+        """
+        if not self.has_replicates:
+            return self
+
+        rng = np.random.default_rng(seed)
+        param_names = list(self.swept_params.keys())
+        groups = self.group_by_point()
+        boot_rows: list[dict[str, Any]] = []
+
+        lo_pct = 100 * alpha / 2
+        hi_pct = 100 * (1 - alpha / 2)
+
+        for point_key, rep_rows in groups.items():
+            row: dict[str, Any] = dict(zip(param_names, point_key, strict=True))
+            row.update(self.fixed_params)
+            row.update(
+                {k: rep_rows[0].get(k) for k in self.sim_settings if k in rep_rows[0]}
+            )
+
+            vals = [
+                r[metric]
+                for r in rep_rows
+                if r.get(metric) is not None and r.get("run_status") == "success"
+            ]
+            n = len(vals)
+            if n == 0:
+                row[f"{metric}_boot_lo"] = None
+                row[f"{metric}_boot_hi"] = None
+            elif n == 1:
+                row[f"{metric}_boot_lo"] = vals[0]
+                row[f"{metric}_boot_hi"] = vals[0]
+            else:
+                arr = np.array(vals, dtype=np.float64)
+                # Bootstrap: resample with replacement, compute mean
+                boot_means = np.array(
+                    [
+                        float(np.mean(rng.choice(arr, size=n, replace=True)))
+                        for _ in range(n_bootstrap)
+                    ],
+                    dtype=np.float64,
+                )
+                row[f"{metric}_boot_lo"] = float(np.percentile(boot_means, lo_pct))
+                row[f"{metric}_boot_hi"] = float(np.percentile(boot_means, hi_pct))
+
+            # Copy the plain metric as mean for convenience
+            if vals:
+                row[metric] = float(np.mean(vals))
+            else:
+                row[metric] = None
+
+            boot_rows.append(row)
+
+        return self._with_rows(boot_rows)
 
     # ------------------------------------------------------------------
     # Serialization

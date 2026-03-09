@@ -32,6 +32,7 @@ _VALID_TYPES = frozenset(
         "sweep-tornado",
         "sweep-scatter",
         "convergence",
+        "replicate-convergence",
     }
 )
 
@@ -43,6 +44,7 @@ _SWEEP_TYPES = frozenset(
         "sweep-tornado",
         "sweep-scatter",
         "convergence",
+        "replicate-convergence",
     }
 )
 
@@ -345,6 +347,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
 
     from tidal.cli._sweep_panels import (
         render_convergence,
+        render_replicate_convergence,
         render_sweep_1d,
         render_sweep_1d_multi,
         render_sweep_2d,
@@ -378,6 +381,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
         "sweep-parallel",
         "sweep-tornado",
         "sweep-scatter",
+        "replicate-convergence",
     }:
         # Try to auto-detect a sensible metric
         from tidal.measurement._sweep_results import DEFAULT_METRIC_CANDIDATES
@@ -464,6 +468,23 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
             n_params = len(results.swept_params)
             fig = plt.figure(figsize=figsize or (3 * n_params, 3 * n_params))
             render_sweep_scatter(fig, results, raw_metric)
+
+        elif plot_type == "replicate-convergence":
+            if raw_metric is None:
+                print(
+                    "Error: --metric is required for replicate-convergence plots",
+                    file=sys.stderr,
+                )
+                return 1
+            if not results.has_replicates:
+                print(
+                    "Error: replicate-convergence requires ensemble data "
+                    "(use --n-replicates in sweep)",
+                    file=sys.stderr,
+                )
+                return 1
+            fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
+            render_replicate_convergence(ax, results, raw_metric)
 
         else:
             print(f"Error: unknown sweep plot type '{plot_type}'", file=sys.stderr)
