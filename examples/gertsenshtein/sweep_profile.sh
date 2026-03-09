@@ -23,8 +23,9 @@
 #
 # Simulation setup:
 #   - Non-periodic domain [-100, 100] (Neumann BCs) — periodic is incorrect for Abar_y
-#   - Graviton wavepacket at z = -50, k = 2.0, t_end = 250
-#   - Conversion measured after wavepacket has fully traversed the interaction region
+#   - Gaussian wavepacket at z = -50, σ=5, k = 2.0, t_end = 120
+#   - t_end=120 ensures exactly one passage through B-field (wavepacket hits right wall at t≈150)
+#   - Conversion measured at peak P(t) during single pass through B-field
 #
 # Note: Use --what conversion (not --what energy) — energy measurement is unreliable
 # with position-dependent coefficients (known limitation of current implementation).

@@ -218,12 +218,24 @@ P(graviton → photon) = sin²(κ/2 × ∫B₀(z)dz) = sin²(κ × Bpeak × R ×
 - **Bounds/center require `=` syntax**: `--bounds="-100:100"`, `--ic-center=-50.0`
   (shell interprets leading `-` as flag otherwise)
 
-**Confirmed numerical result** (defaults: κ=1, Bpeak=0.1, R=5):
+**Confirmed numerical result** (defaults: κ=1, Bpeak=0.1, R=5=σ):
 ```
 P_numerical = 0.3436  (at t=80.4, peak of single pass)
 P_Boccaletti = sin²(1.0 × 0.1 × 5.0 × √(π/2)) = sin²(0.627) = 0.3432
 Agreement: 0.04% — excellent
 ```
+
+**2D sweep (Bpeak × R, 48 points)** — thin-lens vs thick-lens regimes confirmed:
+| R/σ | R range | Mean err | Max err | Regime |
+|-----|---------|----------|---------|--------|
+| ≤1 | R ≤ 5 | <0.001 | 0.001 | Thin-lens — Boccaletti valid |
+| 1.4 | R=7.2 | 0.004 | 0.028 | Transitional |
+| ≥2 | R ≥ 10 | 0.10–0.34 | 0.51–0.90 | Thick-lens — local Rabi formula applies |
+
+The Boccaletti formula is the **thin-lens approximation**: assumes the B-field region is
+narrower than the probe wavepacket (R ≤ σ). When R >> σ, the wavepacket propagates through
+a quasi-uniform field and conversion accumulates locally — a different regime not captured by
+the integral formula.
 
 **Scripts**:
 - `examples/gertsenshtein/run_localized.sh` — single run
