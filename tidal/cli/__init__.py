@@ -400,13 +400,31 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         epilog=(
             "Examples:\n"
             "  tidal validate examples/data/klein_gordon_1d.json\n"
-            "  tidal validate spec.json"
+            "  tidal validate spec.json --stability\n"
+            "  tidal validate spec.json --stability --param m2=1.0"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     validate_parser.add_argument(
         "json_path",
         help="Path to the JSON equation specification to validate",
+    )
+    validate_parser.add_argument(
+        "--stability",
+        action="store_true",
+        default=False,
+        help=(
+            "Run stability checks: tachyon detection (negative mass-matrix eigenvalues) "
+            "and ghost detection (wrong-sign kinetic terms from Hamiltonian). "
+            "Uses a 1-point grid; exact for constant-coefficient systems."
+        ),
+    )
+    validate_parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="KEY=VAL",
+        help="Set symbolic parameter for stability check (repeatable, e.g. --param m2=1.0)",
     )
 
     # --- measure ---

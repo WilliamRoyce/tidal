@@ -2135,6 +2135,174 @@ class TestValidateCommand:
         ret = main(["validate", str(tmp_path)])
         assert ret == 1
 
+    def test_validate_stability_stable_spec(
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--stability on a stable spec should return 0 and say [stable]."""
+        ret = main(["validate", str(inline_kg_1d_json), "--stability", "--param", "m2=1.0"])
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "stable" in out.lower()
+
+    def test_validate_stability_tachyon_detection(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--stability should detect a tachyonic mode (negative mass²)."""
+        import json
+
+        spec = {
+            "metadata": {"source": "test", "parameters": {"m2": -1.0}},
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,   # positive identity → negative eigenvalue
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-m2",
+                            },
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                        ],
+                    },
+                }
+            ],
+            "coupling": {"mass_matrix_symbolic": [["-m2"]]},
+        }
+        spec_path = tmp_path / "tachyon.json"
+        spec_path.write_text(json.dumps(spec), encoding="utf-8")
+        ret = main(["validate", str(spec_path), "--stability"])
+        assert ret == 1
+        err = capsys.readouterr().err
+        assert "ERROR" in err
+
+    def test_validate_stability_ghost_detection(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--stability should detect a ghost mode (wrong-sign kinetic term)."""
+        import json
+
+        spec = {
+            "metadata": {"source": "test", "parameters": {"m2": 1.0}},
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-m2",
+                            },
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                        ],
+                    },
+                }
+            ],
+            "coupling": {"mass_matrix_symbolic": [["-m2"]]},
+            "canonical": {
+                "hamiltonian_terms": [
+                    {
+                        "coefficient": -0.5,   # negative kinetic → ghost
+                        "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                        "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+                        "coefficient_symbolic": "-1/2",
+                    }
+                ]
+            },
+        }
+        spec_path = tmp_path / "ghost.json"
+        spec_path.write_text(json.dumps(spec), encoding="utf-8")
+        ret = main(["validate", str(spec_path), "--stability"])
+        # Ghost detection is a warning (heuristic), not an error — exit 0
+        assert ret == 0
+        err = capsys.readouterr().err
+        assert "ghost" in err.lower() or "Ghost" in err
+
+    def test_validate_stability_param_override_triggers_instability(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--param overrides should affect stability check (large coupling → tachyon)."""
+        import json
+
+        # coupled_scalars: stable when gCpl² < mPhi2 * mChi2 = 1*4 = 4
+        # With gCpl=3.0 it becomes unstable (g² = 9 > 4)
+        spec = {
+            "metadata": {"source": "test", "parameters": {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5}},
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [
+                {"name": "phi_0", "index": 0, "is_dynamical": True},
+                {"name": "chi_0", "index": 1, "is_dynamical": True},
+            ],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": -1.0, "operator": "identity", "field": "phi_0", "coefficient_symbolic": "-mPhi2"},
+                            {"coefficient": -0.5, "operator": "identity", "field": "chi_0", "coefficient_symbolic": "-gCpl"},
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                        ],
+                    },
+                },
+                {
+                    "field": "chi_0",
+                    "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2, "space": 0}},
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {"coefficient": -4.0, "operator": "identity", "field": "chi_0", "coefficient_symbolic": "-mChi2"},
+                            {"coefficient": -0.5, "operator": "identity", "field": "phi_0", "coefficient_symbolic": "-gCpl"},
+                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "chi_0"},
+                        ],
+                    },
+                },
+            ],
+            "coupling": {"mass_matrix_symbolic": [["-mPhi2", None], [None, "-mChi2"]]},
+        }
+        spec_path = tmp_path / "coupled.json"
+        spec_path.write_text(json.dumps(spec), encoding="utf-8")
+
+        # Default params: gCpl=0.5 → stable
+        ret_stable = main(["validate", str(spec_path), "--stability"])
+        assert ret_stable == 0
+
+        # Override: gCpl=3.0 → unstable (g²=9 > mPhi2*mChi2=4)
+        ret_unstable = main(["validate", str(spec_path), "--stability", "--param", "gCpl=3.0"])
+        assert ret_unstable == 1
+
 
 class TestMeasureCommand:
     def test_measure_help(self) -> None:
