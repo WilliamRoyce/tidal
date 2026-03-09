@@ -226,19 +226,26 @@ P_Boccaletti = sin²(1.0 × 0.1 × 5.0 × √(π/2)) = sin²(0.627) = 0.3432
 Agreement: 0.04% — excellent
 ```
 
-**2D sweep (Bpeak × R, 48 points)** — thin-lens vs thick-lens regimes confirmed (σ=5):
+**2D sweep (Bpeak × R, 48 points)** — Boccaletti formula confirmed across all regimes (σ=5):
 
-| R/σ | R | Mean err vs Boccaletti | Max err | Regime |
-|-----|---|----------------------|---------|--------|
-| ≤1 | 2–5 | <0.001 | 0.001 | **Thin-lens: Boccaletti exact** |
-| 1.4 | 7.2 | 0.004 | 0.028 | Transitional |
-| ≥2 | 10–15 | 0.10–0.34 | 0.51–0.90 | **Thick-lens: local Rabi formula** |
+| R/σ | R | Mean err vs Boccaletti | Max err |
+|-----|---|----------------------|---------|
+| 0.40 | 2.0 | 0.00004 | 0.00008 |
+| 0.92 | 4.6 | 0.00029 | 0.00045 |
+| 1.44 | 7.2 | 0.00078 | 0.00172 |
+| 1.96 | 9.8 | 0.00113 | 0.00211 |
+| 2.48 | 12.4 | 0.00091 | 0.00144 |
+| 3.00 | 15.0 | 0.00058 | 0.00160 |
 
-The Boccaletti formula is the **thin-lens (Born) approximation** (Boccaletti 1970;
-Domcke, Garcia-Cely & Lee 2025, arXiv:2507.16609): the B-field region acts as a point-like
-"phase kick" when R ≪ σ. The amplitude equals the DC Fourier component ∫B₀ dz. For R ≫ σ,
-the wavepacket propagates through a quasi-uniform field and conversion accumulates via local
-Rabi oscillation (WKB / adiabatic regime; Raffelt & Stodolsky 1988).
+The Boccaletti formula P = sin²(κ/2 × ∫B₀ dz) is **exact for massless vacuum conversion**
+for any R/σ ratio. For massless graviton-photon conversion (no plasma), both modes travel at
+c with identical dispersion (k_h = k_γ), so Δk = 0 exactly. The conversion amplitude at
+q = Δk = 0 is just the DC component ∫B₀ dz — independent of R/σ (Boccaletti 1970;
+Domcke, Garcia-Cely & Lee 2025, arXiv:2507.16609, Section 4.2).
+
+The thin-lens / thick-lens distinction applies when Δk ≠ 0 (plasma detuning, axion mass),
+creating a coherence length L_coh = 1/|Δk| that limits coherent accumulation. Without plasma,
+L_coh → ∞ and the formula holds for all R (see [gertsenshtein_localized.md](gertsenshtein_localized.md)).
 
 See [gertsenshtein_localized.md](gertsenshtein_localized.md) for the full physics derivation,
 regime conditions, terminology mapping to literature, and open questions.

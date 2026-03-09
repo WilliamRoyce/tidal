@@ -1,30 +1,41 @@
-# Localized B-field Scattering: Thin-Lens vs Thick-Lens Physics
+# Localized B-field Scattering: Boccaletti Formula and Phase Matching
 
 ## Overview
 
 When a graviton wavepacket passes through a spatially localized magnetic field region, the
-conversion probability depends on the **ratio of the field region size R to the probe wavepacket
-width σ**. Two distinct physical regimes emerge:
+conversion probability is given by the **Boccaletti (1970) formula**:
 
-| Regime | Condition | Conversion formula | Analogy |
-|--------|-----------|-------------------|---------|
-| **Thin-lens** | R ≪ σ | P = sin²(κ/2 × ∫B dz) | Boccaletti (1970), Born approx. |
-| **Thick-lens** | R ≫ σ | Local Rabi oscillation | WKB / adiabatic |
-| Transitional | R ≈ σ | Neither formula exact | Numerical required |
+```
+P(graviton → photon) = sin²(κ/2 × ∫_{-∞}^{∞} B₀(z) dz)
+```
 
-TIDAL numerical validation (48-point 2D sweep, kappa=1, k=2, σ=5):
+For a Gaussian profile B₀(z) = Bpeak × exp(-z²/(2R²)), the integral gives
+∫B₀ dz = Bpeak × R × √(2π), so:
 
-| R/σ | R | Mean err vs Boccaletti | Max err | Regime |
-|-----|---|----------------------|---------|--------|
-| ≤1 | 2–5 | < 0.001 | 0.001 | Thin-lens: **Boccaletti exact** |
-| 1.4 | 7.2 | 0.004 | 0.028 | Transitional |
-| ≥2 | 10–15 | 0.10–0.34 | 0.51–0.90 | Thick-lens: Boccaletti fails |
+```
+P = sin²(κ × Bpeak × R × √(π/2))
+```
+
+**TIDAL numerical validation (48-point 2D sweep, κ=1, k=2, σ=5)**:
+
+| R/σ | R | Mean err | Max err | Status |
+|-----|---|----------|---------|--------|
+| 0.40 | 2.0 | 0.00004 | 0.00008 | Boccaletti exact |
+| 0.92 | 4.6 | 0.00029 | 0.00045 | Boccaletti exact |
+| 1.44 | 7.2 | 0.00078 | 0.00172 | Boccaletti exact |
+| 1.96 | 9.8 | 0.00113 | 0.00211 | Boccaletti exact |
+| 2.48 | 12.4 | 0.00091 | 0.00144 | Boccaletti exact |
+| 3.00 | 15.0 | 0.00058 | 0.00160 | Boccaletti exact |
+
+The formula is confirmed to < 0.003 error across all 48 parameter combinations, including
+R = 3σ (wavepacket width much narrower than field region). This is explained by perfect
+phase matching in massless vacuum conversion (see [§ Phase matching](#phase-matching)).
 
 ---
 
-## Boccaletti (1970) Thin-Lens Formula
+## Boccaletti (1970) Formula: Derivation and Exact Validity
 
-### Derivation and assumptions
+### Derivation
 
 Boccaletti et al. (1970) extended Gertsenshtein's (1962) original result to finite-region
 boundary conditions. For a localized background B₀(z), the conversion probability is:
@@ -40,23 +51,7 @@ For a Gaussian profile B₀(z) = Bpeak × exp(-z²/(2R²)):
 P = sin²(κ × Bpeak × R × √(π/2))
 ```
 
-**Physical picture**: In the thin-lens limit (R ≪ σ), the graviton wavepacket is much wider
-than the field region. From the wavepacket's perspective, the entire B-field acts as an
-instantaneous "phase kick." The conversion amplitude is:
-
-```
-a₂ ~ (κ/2 × ∫B dz) × h₇
-```
-
-The integral ∫B dz is the **DC Fourier component** of B₀(z), representing coherent,
-phase-matched conversion across the entire field region. This is the Born approximation
-(Domcke, Garcia-Cely & Lee 2025, arXiv:2507.16609, Section 4.2).
-
-**Validity condition**: R ≪ σ (B-field region much narrower than probe coherence length).
-Equivalently: the interaction is "sudden" — the field switches on and off before the
-wavepacket can evolve within it.
-
-**Confirmed numerically** (TIDAL, defaults κ=1, Bpeak=0.1, R=5=σ):
+**Confirmed numerically** (TIDAL, defaults κ=1, Bpeak=0.1, R=5.0, σ=5.0):
 ```
 P_numerical = 0.3436  (at t=80.4)
 P_Boccaletti = sin²(1.0 × 0.1 × 5.0 × √(π/2)) = sin²(0.627) = 0.3432
@@ -75,114 +70,90 @@ this to arbitrary spatial profiles.
 
 ---
 
-## Thick-Lens / Adiabatic Regime
+## Phase Matching: Why Boccaletti is Exact for Massless Vacuum Conversion {#phase-matching}
 
-### Physical picture
+### Perfect phase matching
 
-When R ≫ σ, the graviton wavepacket is much narrower than the magnetized region. The
-wavepacket propagates through the field, experiencing a **locally quasi-uniform** environment.
-At each position z, the local field amplitude B(z) drives local conversion according to the
-Rabi formula for a uniform field.
+For massless graviton-photon conversion in vacuum (no plasma), both modes travel at the same
+speed (c = 1): their dispersion relations are identical (k_h = k_γ = ω). This means:
 
-The conversion is no longer determined by the global integral ∫B dz, but by the **local
-field value** as the wavepacket propagates through it. This regime corresponds to the
-**adiabatic / WKB approximation** (Raffelt & Stodolsky 1988; Domcke, Garcia-Cely & Lee 2025,
-arXiv:2507.16609, Sections 5.1 and Appendix E).
-
-**WKB validity condition** (from Domcke et al. 2025, arXiv:2507.16609):
 ```
-|B₀'(z)/B₀(z)| ≪ ω     (field varies slowly on scale of wavelength)
-|(μ²(z))'| ≪ ω³         (effective mass varies slowly)
-```
-For our Gaussian field B₀ = Bpeak × exp(-z²/(2R²)):
-```
-|B₀'/B₀| = |z|/R²  →  max at |z| = R:  1/R
-```
-WKB valid when 1/R ≪ ω = k = 2.0, i.e., R ≫ 0.5. Our domain always satisfies this.
-
-**Note**: Both regimes (R ≪ σ and R ≫ σ) can satisfy the WKB condition — they are
-distinguished by the probe coherence length σ, not the field variation scale.
-
-### Local Rabi oscillation
-
-For R ≫ σ with peak field Bpeak, the wavepacket of width σ sweeps through the peak field
-region. Using the uniform-field formula with effective length ≈ σ:
-```
-P_local ≈ sin²(κ × B_eff × σ_eff / 2)
+Δk = k_γ - k_h = 0   (zero momentum transfer for forward scattering)
 ```
 
-For Bpeak=0.174, R=15, σ=5 (R/σ = 3): the wavepacket sees B ≈ Bpeak near z=0 for a
-duration ~σ. This gives P_local ≈ sin²(κ×Bpeak×σ/2) ≈ sin²(0.435) ≈ 0.18. In practice,
-the wavepacket spends extended time inside the wide Gaussian field, accumulating conversion
-over the full traversal — giving the numerically observed P ≈ 0.92.
-
-A full treatment requires numerical simulation (as done here) or the adiabatic integral
-formula of Domcke et al. (2025, arXiv:2507.16609):
+The conversion amplitude in the Born approximation is:
 ```
-A_h^T ~ ∫₀ᴸ dz' B₀(z') exp(i ∫₀^{z'} μ²(z'')/2ω dz'')
+A ~ (κ/2) ∫ B₀(z) e^{i Δk z} dz = (κ/2) ∫ B₀(z) dz   (since Δk = 0)
 ```
 
-### Non-resonant thick-lens formula (Berlin et al. 2024)
+Since Δk = 0 exactly, the integrand has **no oscillating phase factor** — all positions z
+contribute coherently, regardless of whether R ≪ σ or R ≫ σ. The Boccaletti formula is
+therefore **exact** for any spatial profile of B₀(z), not just a thin-lens approximation.
 
-For the analogous case of axion-photon mixing (Berlin et al. 2024, arXiv:2405.08865),
-the free-space non-resonant conversion probability is:
-```
-P_{a→γ}^free = (ω g²/4k) |∫ dy' e^{iω|y-y'|} e^{ik_a y'} B₀(y')|²
-```
-This is the Fourier transform of B₀ at the momentum transfer — identical to the
-graviton-photon Born approximation. In the forward scattering (k_a = k_γ) limit, the
-momentum transfer vanishes and the formula reduces to the Boccaletti ∫B dz result.
+**Physical picture**: Unlike in quantum optics (where different wavelengths create phase
+mismatch) or plasma-detuned conversion (where the photon has a mass), graviton and photon
+in vacuum have identical dispersion. There is no coherence length limiting the effective
+conversion region — the entire field extent contributes in phase.
 
-**Key insight**: Resonant conversion (axion-photon) depends only on the **local** B at
-the resonance point (where the plasma frequency equals the axion mass), not on the integral.
-This is the extreme thick-lens limit where the probe coherence length → 0.
+### Born approximation validity
+
+The formula is derived in the weak-coupling (Born) approximation. The small-angle condition
+is satisfied when:
+```
+κ/2 × ∫B₀(z) dz ≪ 1   (weak conversion)
+```
+For our sweep range (Bpeak ∈ [0.02, 0.20], R ∈ [2, 15]), the argument ranges from 0.05 to
+3.76 — this includes strong-field regimes near the first Rabi maximum, where the Born
+approximation breaks down yet the formula still holds (it is the exact non-perturbative Rabi
+formula sin²(θ/2), not just its small-angle limit).
+
+### When does the Boccaletti formula fail?
+
+The formula P = sin²(κ/2 × ∫B₀ dz) breaks down when:
+
+1. **Plasma detuning**: If the photon acquires a plasma mass ω_p, the phase mismatch is
+   Δk = ω_p²/(2ω), creating a coherence length L_coh = 2ω/ω_p². For R ≫ L_coh, contributions
+   from different parts of the field cancel and the formula fails (Raffelt & Stodolsky 1988).
+
+2. **Axion-photon mixing (non-zero axion mass)**: Same mechanism — the axion and photon travel
+   at different speeds, and the effective integral picks up the Fourier component at q = Δk
+   rather than q = 0.
+
+3. **Resonant conversion**: When ω_p = m_axion (or analogously Δk = 0 locally at some point),
+   the resonance condition creates a "thick-lens" Rabi behavior that is not captured by the
+   Born approximation.
+
+The TIDAL simulations in this document use massless fields without plasma, so none of these
+apply and the Boccaletti formula holds exactly.
 
 ---
 
-## Coherence Length and Regime Transition
+## Thin-Lens / Thick-Lens Distinction: When It Matters
 
-The transition between regimes is governed by the probe **coherence length** L_coh, which
-characterizes the spatial extent over which the wavepacket maintains phase coherence:
+The thin-lens / thick-lens terminology is used in the literature (and in the original
+version of this document) to describe two regimes of localized scattering:
 
-```
-L_coh ~ σ  (Gaussian wavepacket width in position space)
-       = 1/(Δk)  (inverse momentum width in Fourier space)
-```
+| Regime | Condition | Conversion formula | Context |
+|--------|-----------|-------------------|---------|
+| **Thin-lens** | R ≪ σ or R ≪ L_coh | P = sin²(κ/2 × ∫B dz) | Born approx., Boccaletti |
+| **Thick-lens** | R ≫ L_coh | Local Rabi oscillation | WKB / adiabatic |
+| Transitional | R ≈ L_coh | Neither formula exact | Numerical required |
 
-For our IC: L_coh = σ = 5 (in natural units where c=1).
+where the relevant coherence length is **not the wavepacket width σ** but the phase-mismatch
+coherence length L_coh = 1/|Δk|.
 
-**Regime boundaries**:
-- Thin-lens (Boccaletti valid): R ≪ L_coh = σ
-- Thick-lens (WKB/Rabi): R ≫ L_coh = σ
-- Transitional: R ≈ L_coh
+For **massless vacuum** conversion: Δk = 0, so L_coh → ∞. The "thin-lens" condition
+R ≪ L_coh is always satisfied — the formula is valid for any R. This is why the TIDAL
+sweep shows the Boccaletti formula holding even for R/σ = 3.
 
-The condition R ≪ L_coh is equivalent to requiring that the B-field region be a "thin"
-perturbation from the probe's perspective — the entire field region is traversed in a time
-much shorter than the probe's oscillation period.
-
-**Comparison with oscillation length**:
-The oscillation length L_osc = 2π/(κ × Bpeak) characterizes the Rabi cycle. For our
-parameters: L_osc = 2π/(1.0 × 0.1) ≈ 62.8. Since L_osc ≫ σ and L_osc ≫ R in all our
-sweep cases, the thin-lens condition is independent of L_osc — it depends purely on R vs σ.
-
-### Analogy with quantum optics
-
-The thin/thick-lens distinction is the graviton-photon version of the **thin/thick target
-approximation** in quantum optics and nuclear physics:
-
-| Concept | Thin target | Thick target |
-|---------|-------------|--------------|
-| Field/barrier | Much narrower than wavepacket | Much wider than wavepacket |
-| Conversion | Single integrated phase kick | Continuous accumulation |
-| Formula | Born approximation / ∫V(z)dz | WKB / local coupling |
-| Optical analogy | Thin lens (immediate refraction) | Thick lens (propagation inside) |
-| Neutrino analogy | Thin matter slab (MSW inactive) | Solar interior (MSW resonance) |
+For **plasma-detuned** conversion (Raffelt & Stodolsky 1988): L_coh = 2ω/ω_p². When
+R ≫ L_coh, the thick-lens regime applies. This is the relevant regime for axion dark matter
+searches in magnetized plasmas (neutron stars, galactic clusters).
 
 The MSW (Mikheyev-Smirnov-Wolfenstein) resonance in solar neutrino oscillations is the
-thick-lens analog: neutrinos propagate through a density gradient and undergo adiabatic
-level crossing, which is only possible in the thick-target regime (density varies over many
-oscillation lengths). Raffelt & Stodolsky (1988) explicitly drew this analogy for the
-graviton-photon case.
+extreme thick-lens case: a density gradient creates a slowly-varying phase mismatch that
+passes through zero, enabling adiabatic level crossing. Raffelt & Stodolsky (1988) drew
+this analogy explicitly for the graviton-photon case.
 
 ---
 
@@ -206,9 +177,10 @@ For large domains (ωL ≫ 1), reflected amplitude ∝ sin(ωL)/(ωL) → 0. Bac
 is suppressed relative to forward transmission for extended fields.
 
 **Physical meaning**: In the forward direction, all parts of the field contribute in phase
-(zero momentum transfer). In the backward direction, different parts of the field contribute
-with rapidly oscillating phases (momentum transfer 2ω), causing destructive interference.
-This is why the Boccaletti integral formula captures only forward (transmitted) conversion.
+(zero momentum transfer, Δk = 0). In the backward direction, different parts of the field
+contribute with rapidly oscillating phases (momentum transfer 2ω), causing destructive
+interference. This is why the Boccaletti integral formula captures only forward (transmitted)
+conversion, and only the DC Fourier component q=0 enters.
 
 ---
 
@@ -231,11 +203,20 @@ where B(x) = Bpeak × exp(-x²/(2R²)) and B'(x) = -Bpeak × x × exp(-x²/(2R²
 
 The photon source `B'(x) h_7 + B(x) ∂_x(h_7) = ∂_x(B(x) h_7)` is the **total derivative**
 form, consistent with the Boccaletti integral formula (integration by parts gives ∫B'h + Bh'
-= [Bh]_{-∞}^{+∞} - ∫B ∂_x(h)).
+= [Bh]_{-∞}^{+∞} - ∫B ∂_x(h))..
+
+### Coefficient overflow fix
+
+The Wolfram exporter sometimes serializes `Exp[-x²/R²]` as `1/E^(x²/R²)` in the
+coefficient strings. After the `E^` → `exp` substitution, this becomes `1/exp(x²/R²)`,
+which causes numpy to compute `exp(+x²/R²)` before dividing — triggering overflow warnings
+for large |x| (e.g., at grid boundaries x = ±100 with small R = 2).
+
+This is fixed in `tidal/symbolic/_eval_utils.py` (`_invert_exp_denominator`): `/exp(arg)` →
+`*exp(-(arg))`, avoiding the positive-exponent computation entirely.
 
 ### Simulation setup
 
-For the thin-lens regime (R ≤ σ = 5):
 ```bash
 uv run tidal simulate examples/data/gertsenshtein_localized.json \
   --grid-shape 1024 "--bounds=-100:100" \
@@ -263,8 +244,8 @@ uv run tidal simulate examples/data/gertsenshtein_localized.json \
 | Reference | Year | Key contribution |
 |-----------|------|-----------------|
 | [Gertsenshtein, JETP 14:84](https://www.scirp.org/reference/referencespapers?referenceid=1912195) | 1962 | Original graviton-photon conversion prediction (uniform B, plane wave) |
-| [Boccaletti et al., Nuovo Cimento 70B:129](https://link.springer.com/article/10.1007/BF02710177) | 1970 | **Finite-region formula** P=sin²(κ/2 × ∫B dz); thin-lens limit |
-| [Raffelt & Stodolsky, PRD 37:1237](https://journals.aps.org/prd/abstract/10.1103/PhysRevD.37.1237) | 1988 | 2×2 mixing matrix; MSW resonance analogy; **adiabatic / thick-lens framework** |
+| [Boccaletti et al., Nuovo Cimento 70B:129](https://link.springer.com/article/10.1007/BF02710177) | 1970 | **Finite-region formula** P=sin²(κ/2 × ∫B dz); exact for massless vacuum conversion |
+| [Raffelt & Stodolsky, PRD 37:1237](https://journals.aps.org/prd/abstract/10.1103/PhysRevD.37.1237) | 1988 | 2×2 mixing matrix; MSW resonance analogy; **plasma-detuned thick-lens regime** |
 | [Ejlli, JHEP 2020:029](https://arxiv.org/abs/2004.02714) | 2020 | **Exact (non-perturbative) solution** in uniform B — generalizes both limits |
 | [Dandoy, Lella et al., arXiv:2406.17853](https://arxiv.org/abs/2406.17853) | 2024 | 4-component mixing; canonical normalization; confirms P=sin²(κB₀D/2) |
 | [Berlin et al., arXiv:2405.08865](https://arxiv.org/abs/2405.08865) | 2024 | Axion-photon mixing numerics; WKB validity; free-space vs resonant regimes (analogous) |
@@ -274,28 +255,24 @@ uv run tidal simulate examples/data/gertsenshtein_localized.json \
 
 | This document | Domcke et al. (2025) | Berlin et al. (2024) | Raffelt & Stodolsky (1988) |
 |--------------|---------------------|---------------------|---------------------------|
-| Thin-lens | Born approx., far-field | Free-space (non-resonant) | Diabatic / sudden |
-| Thick-lens | WKB / adiabatic | Resonant conversion | Adiabatic / MSW-like |
+| Exact (massless vacuum) | Born approx. = exact at Δk=0 | Free-space (non-resonant, q=0) | Diabatic / sudden |
+| Plasma thick-lens | WKB / adiabatic | Resonant conversion | Adiabatic / MSW-like |
 | Boccaletti integral | DC Fourier component ∫B₀dx | ∫B₀ e^{iq·r} dr at q=0 | ∫B · (phase factor) |
-| Transition at R≈σ | Born-adiabatic crossover | Coherence length condition | Adiabaticity parameter Ψ |
+| Transition (plasma) | Born-adiabatic crossover | Coherence length condition | Adiabaticity parameter Ψ |
 
 ---
 
 ## Open Questions
 
-1. **Exact thick-lens formula**: What is the conversion probability for R ≫ σ with Gaussian
-   B-field? The Domcke et al. (2025) adiabatic formula requires a resonance (μ=0 crossing);
-   without plasma, B₀ variation alone doesn't create a resonance for massless fields.
+1. **Plasma detuning + localized B**: For theory_plasma.toml (Proca mass for photon) combined
+   with a Gaussian B(z), the thick-lens regime should manifest. The coherence length
+   L_coh = 2ω/ω_p² provides the transition scale R ≈ L_coh. TIDAL can simulate this.
 
-2. **Wavepacket dispersion**: For R ≫ σ, the wavepacket disperses as it traverses the field.
-   Position-dependent coupling can cause group velocity modification. Not captured by the
-   simple local-Rabi picture.
-
-3. **Cross-regime applications**: Real magnetic field configurations (e.g., magnetar dipole
+2. **Cross-regime applications**: Real magnetic field configurations (e.g., magnetar dipole
    B ∝ 1/r³, galactic B ∝ random) involve both thin-lens and thick-lens elements at different
    scales. The TIDAL framework can handle arbitrary B(z) profiles via the background field
    mechanism — the local equations of motion are exact regardless of regime.
 
-4. **σ dependence**: The thin-lens validation used σ=5. Verifying the formula for σ ≫ R at
-   various σ values would strengthen the regime characterization. Expect the Boccaletti formula
-   to hold for any σ ≫ R (the IC width should not appear in the conversion probability).
+3. **3D generalization**: The Domcke et al. (2025) framework treats full 3D B-field
+   configurations. TIDAL currently handles 1+1D plane-wave reductions. Extending to 2+1D
+   or 3+1D localized fields would require non-plane-wave IC and boundary conditions.

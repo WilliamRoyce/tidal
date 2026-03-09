@@ -80,6 +80,40 @@ _COMPILED_FUNCTION_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(rf"\b{mma}\b"), py) for mma, py in _FUNCTION_MAP
 ]
 
+
+def _invert_exp_denominator(expr: str) -> str:
+    """Convert ``/exp(arg)`` → ``*exp(-(arg))`` to avoid overflow.
+
+    Wolfram's InputForm may serialize ``Exp[-x^2/R^2]`` as
+    ``1/E^(x^2/R^2)``, which after ``E^`` → ``exp`` substitution becomes
+    ``1/exp(x**2/R**2)``.  Evaluating ``exp(+large)`` overflows before the
+    division by inf is computed, triggering numpy RuntimeWarnings even though
+    the final result is numerically correct (0).  This function detects
+    ``/exp(`` followed by a balanced-parenthesis argument and rewrites it to
+    ``*exp(-(arg))``, keeping the positive-exponent overflow from occurring.
+    """
+    result: list[str] = []
+    i = 0
+    n = len(expr)
+    while i < n:
+        if expr[i : i + 5] == "/exp(":
+            # Extract balanced parenthesised argument
+            depth = 1
+            j = i + 5
+            while j < n and depth > 0:
+                if expr[j] == "(":
+                    depth += 1
+                elif expr[j] == ")":
+                    depth -= 1
+                j += 1
+            inner = expr[i + 5 : j - 1]
+            result.append(f"*exp(-({inner}))")
+            i = j
+        else:
+            result.append(expr[i])
+            i += 1
+    return "".join(result)
+
 _COMPARISON_OPS: dict[str, str] = {
     "LessEqual": "<=",
     "Less": "<",
@@ -378,6 +412,10 @@ def mathematica_to_python(
 
     # E^(...) → exp(...)
     result = _RE_E_POWER.sub("exp", result)
+
+    # /exp(arg) → *exp(-(arg)) to prevent overflow from positive exponents in denominators
+    # (Wolfram may serialize Exp[-x^2/R^2] as 1/E^(x^2/R^2))
+    result = _invert_exp_denominator(result)
 
     # Power[x, y] → (x)**(y)
     result = _convert_power(result)
