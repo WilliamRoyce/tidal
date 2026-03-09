@@ -76,6 +76,50 @@ Four levels of caching prevent redundant evaluation:
 | Time-dependent background | `components = ["g0 * Cos[t[]]"]`       | Works (Python-level tested)      |
 | Background field gradient | `CD[-a][G[]]` in Lagrangian            | **NOT supported** — raises error |
 
+## Background Field Validity: Externally Imposed Fields
+
+**TIDAL does NOT validate that background fields satisfy the background equations of
+motion.** Validation is purely structural (type, rank, component count, name collisions
+— see `_derive_validate.py`). The user is responsible for ensuring physical consistency.
+
+For linearized perturbation theory, background fields are treated as **externally imposed**
+— maintained by some external source (e.g., a magnet, stellar interior currents, or an
+applied potential). The perturbation equations are valid regardless of whether the
+background configuration is self-consistent, because:
+
+1. The background is NOT varied in the Euler-Lagrange derivation (`VarD` acts only on
+   dynamical perturbation fields)
+2. The perturbation equations depend on the background only through its values and
+   derivatives at each grid point
+3. Whether those values satisfy the background EOM is irrelevant to the linearized dynamics
+
+**Example**: A spatially-varying magnetic field B₀(z) implies ∇×B = J ≠ 0, violating
+vacuum Maxwell equations. This is not a problem — B₀(z) is interpreted as the field
+produced by external currents (e.g., a solenoid or stellar magnetosphere). This treatment
+is standard in the graviton-photon mixing literature:
+- Raffelt & Stodolsky (1988, PRD 37:1237) — treat B(z) as external
+- Boccaletti et al. (1970, Nuovo Cimento 70B:129) — arbitrary B(z) profiles
+- Domcke & Garcia-Cely (2024, JCAP 05:051) — inhomogeneous B(z)
+
+**When self-consistency matters**: For strong-field or nonlinear regimes (not supported
+by TIDAL's linearized framework), the background must satisfy its own EOM. In TIDAL's
+linearized regime, this is never required.
+
+## Energy Measurement Limitation with Position-Dependent Coefficients
+
+**Known issue**: Energy measurements (`tidal measure --what energy`) do not properly
+account for spatially-varying mass or potential terms. The Hamiltonian density computation
+assumes translation-invariant coefficients. This affects:
+
+- Position-dependent mass terms (e.g., `m²(z) φ²`)
+- Localized coupling regions (e.g., Gaussian B₀(z) in Gertsenshtein scattering)
+- Potential wells (`examples/scalar_potential_well/`)
+
+**Workaround**: Use conversion probability measurement (`--what conversion`) as the
+primary validation metric — it measures amplitude ratios, which are unaffected by this
+issue. Energy conservation checks should use the `--what conservation` measurement,
+which tracks relative change rather than absolute values.
+
 ## Known Limitations
 
 1. **No background field gradients**: `CD[-a][G[]]` in the Lagrangian will raise

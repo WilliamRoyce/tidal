@@ -168,20 +168,37 @@ All equations are **derived from the Lagrangian** by the TIDAL pipeline — list
 - Compare against analytical curve
 - Check oscillation length scaling: L_osc ∝ 1/B₀
 
-### Target 3: Detuned Conversion (Future — Phase F1)
+### Target 3: Detuned Conversion (Phase F1)
 
-- Add effective plasma mass m_γ to EM perturbation
-- Sweep ω_p at fixed B₀
-- Compare with full detuned formula
+- Add effective plasma mass m_γ = ω_p to EM perturbation via Proca-type mass term
+- Implementation: `- omegaP2/2 * a[-mu] eta[mu, nu] a[-nu]` in Lagrangian
+- Sweep ω_p² at fixed B₀ to map resonance curve
+- Compare with Raffelt-Stodolsky detuned formula:
+  P = (μ/ω_m)² sin²(ω_m D), where μ = κB₀/2, ω_m = √(Δ² + μ²), Δ = m_γ²/(2ω)
 - Test MSW-like resonance when ω_p² = m_g²
 - **Acceptance**: Agreement to within 5%
+- **Reference**: Raffelt & Stodolsky (1988, PRD 37:1237); Dandoy, Lella et al. (2024, arXiv:2406.17853)
 
-### Target 4: Finite-Region Scattering (Phase E)
+### Target 4: Finite-Region Scattering (Phase F2)
 
-- Localized B₀(z) with Gaussian profile
-- Wave packet enters, converts, exits
-- Sweep region width R
-- Compare against Boccaletti et al. integral formula
+- Localized B₀(z) with Gaussian profile, specified via A_μ(z) background potential
+- Incident graviton wavepacket enters magnetized region, converts, exits
+- Sweep region width R and peak B₀
+- Compare against Boccaletti et al. (1970) integral formula
+- Use large domain + early termination (absorbing BCs not yet available)
+- **Note**: Background B₀(z) is externally imposed — see [background_fields.md](background_fields.md)
+  for the validity discussion. Position-dependent coefficients cause a known limitation
+  in energy measurements; use conversion probability as primary metric.
+- **Reference**: Boccaletti et al. (1970, Nuovo Cimento 70B:129); Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609)
+
+### Target 5: Magnetar/FRB Application (Phase F3)
+
+- Dipolar B(r) ∝ 1/r³ in 1+1D radial setup (spherical coordinates)
+- Domain [R_NS, r_max] — avoids r=0 singularity
+- Inner BC: Robin (impedance-matched) for graviton, Dirichlet for photon (conducting surface)
+- Inward-propagating graviton wavepacket from large r
+- Compare conversion efficiency with McDonald & Ellis (2024, arXiv:2406.18634)
+- **Reference**: Kushwaha et al. (2022, arXiv:2202.00032); Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609)
 
 ## Implementation in TIDAL
 
@@ -212,8 +229,9 @@ theory.toml → _derive.py generates .wls with:
 
 ## Future Extensions
 
-1. **Plasma/QED effects** (Phase F1): Effective photon mass from plasma frequency
-2. **Chern-Simons gravity** (Phase F2): Parity-violating h-a coupling, different L/R conversion rates
-3. **Axion-photon-graviton mixing** (Phase F3): Three-way mixing matrix with `g_{aγγ} a F F̃`
-4. **Photon-torsion conversion** (Phase F4): Obukhov et al. (2024) — axial torsion waves coupled to EM via Chern-Simons-like term. This is the ultimate project goal.
-5. **Non-abelian Yang-Mills** (Phase F5): Autocatalytic graviton production without external B field (Palessandro & Rothman 2023)
+1. **Plasma detuning** (Phase F1): Effective photon mass from plasma frequency — Proca-type mass term, Raffelt-Stodolsky detuned formula
+2. **Localized B-field scattering** (Phase F2): Gaussian/top-hat B(z) profiles, wavepacket IC, Boccaletti integral formula
+3. **Magnetar/FRB application** (Phase F3): Dipolar B(r), 1+1D radial setup, Gertsenshtein-Zel'dovich mechanism
+4. **Non-minimal couplings** (Phase F5): Chern-Simons gravity (parity-violating P_L ≠ P_R), ξRF² curvature-EM coupling. Ref: Kushwaha & Jain (2024, arXiv:2410.07338)
+5. **Axion-photon-graviton mixing** (future): Three-way mixing matrix with `g_{aγγ} a F F̃`. Ref: Dandoy, Lella et al. (2024)
+6. **Photon-torsion conversion** (ultimate goal): Obukhov et al. (2024, arXiv:2410.01355) — axial torsion waves coupled to EM. Separate branch after Gertsenshtein program matures.
