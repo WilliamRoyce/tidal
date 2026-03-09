@@ -18,8 +18,10 @@
 #
 # The coupling coefficient is proportional to B0, giving the Gertsenshtein effect.
 #
-# Validation target (Palessandro & Rothman 2023, arXiv:2301.02072, Eq. 26):
-#   P(graviton -> photon) = sin^2(kappa * B0 * D / (4*sqrt(pi)))
+# Conversion probability (derived from eigenmode analysis, confirmed numerically):
+#   P(graviton -> photon) = sin^2(kappa * B0 * D / 2)
+# Independently confirmed by Dandoy, Lella et al. (2024, arXiv:2406.17853).
+# Note: Palessandro & Rothman (2023) quote sin^2(sqrt(G)*B0*D) — incorrect by sqrt(4*pi).
 #
 # Ref: Gertsenshtein (1962), JETP 14:84
 

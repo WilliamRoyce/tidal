@@ -75,11 +75,15 @@ P(graviton → photon) = sin²(κ B₀ D / 2)
 
 This is confirmed numerically (RMS error < 0.02 across multiple B₀ values).
 
-**Note on P&R discrepancy:** Palessandro & Rothman (2023, Eq. 26) quote
-P = sin²(√G · B₀ · D) = sin²(κB₀D/(4√π)), which differs from our result by a
-factor of 2√π ≈ 3.54. The source of this discrepancy is under investigation. Our
-formula is derived directly from the E-L equations of (1/κ²)R - (1/4)F² with
-g = η + h and verified numerically.
+**Note on P&R error:** Palessandro & Rothman (2023, Eq. 26; 2024, arXiv:2405.01407)
+quote P = sin²(√G · B₀ · D), which is incorrect by a factor of √(4π) = 2√π ≈ 3.54
+in the argument. They fail to properly account for the 1/(16πG) kinetic prefactor
+when extracting the mixing frequency from their non-canonically-normalized system.
+Domcke & Garcia-Cely (2023, arXiv:2310.04150) independently criticize P&R's
+linearization. Our formula is confirmed by Dandoy, Lella et al. (2024,
+arXiv:2406.17853), who use canonical normalization and obtain Δ_{g,γ} = √(4πG)·B₀,
+matching κB₀/2 exactly. See [gertsenshtein_formula.md](gertsenshtein_formula.md)
+for the full derivation and literature comparison.
 
 **With detuning** (plasma frequency ω_p, or effective photon mass m_γ):
 
@@ -124,15 +128,16 @@ L_osc = 2π / (κ B₀)
 | [Boccaletti et al., Nuovo Cimento 70B:129](https://link.springer.com/article/10.1007/BF02710177) | 1970 | Finite-region boundary conditions, integral formula |
 | [Raffelt & Stodolsky, PRD 37:1237](https://journals.aps.org/prd/abstract/10.1103/PhysRevD.37.1237) | 1988 | 2×2 mixing-matrix formalism, MSW resonance analogy |
 | [Ejlli, JHEP 2020:029](https://arxiv.org/abs/2004.02714) | 2020 | First exact (non-perturbative) solution |
-| [**Palessandro & Rothman, PDU 40:101187**](https://arxiv.org/abs/2301.02072) | **2023** | **Simple derivation from Lagrangian — our primary validation target** |
-| [Palessandro, arXiv:2405.01407](https://arxiv.org/abs/2405.01407) | 2024 | Most complete reference: full Lagrangian, QED corrections, mixing matrix |
+| [Palessandro & Rothman, PDU 40:101187](https://arxiv.org/abs/2301.02072) | 2023 | Lagrangian derivation (**contains normalization error** — see [formula comparison](gertsenshtein_formula.md)) |
+| [Domcke & Garcia-Cely, arXiv:2310.04150](https://arxiv.org/abs/2310.04150) | 2023 | Criticizes P&R linearization; inhomogeneous B-field calculation |
+| [**Dandoy, Lella et al., arXiv:2406.17853**](https://arxiv.org/abs/2406.17853) | **2024** | **4-component mixing, canonical graviton — confirms our formula** |
+| [Palessandro, arXiv:2405.01407](https://arxiv.org/abs/2405.01407) | 2024 | Extended treatment (same normalization error as 2023) |
 
 ### Extensions and Modern Applications
 
 | Ref | Year | Key Contribution |
 | --- | ---- | ---------------- |
 | [Domcke & Garcia-Cely, JCAP 05:051](https://arxiv.org/abs/2312.17636) | 2024 | Inverse Gertsenshtein as HFGW probe |
-| [Dandoy et al., arXiv:2406.17853](https://arxiv.org/abs/2406.17853) | 2024 | Full 4-component mixing with plasma/QED effects |
 | [Obukhov et al., arXiv:2410.01355](https://arxiv.org/abs/2410.01355) | 2024 | Photon-torsion wave conversion in Poincaré gauge theory |
 | [arXiv:2507.02362](https://arxiv.org/abs/2507.02362) | 2025 | EM-torsion coupling near black holes |
 
@@ -159,7 +164,7 @@ All equations are **derived from the Lagrangian** by the TIDAL pipeline — list
 ### Target 2: B₀ Sweep
 
 - Sweep B₀ from weak to strong coupling
-- Plot P_max vs B₀
+- Plot P_final vs B₀
 - Compare against analytical curve
 - Check oscillation length scaling: L_osc ∝ 1/B₀
 
