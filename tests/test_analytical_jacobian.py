@@ -1124,6 +1124,93 @@ class TestCVODEDelivery:
         assert np.any(JJ != 0), "CVODE jacfn should fill JJ"
 
 
+# ---------------------------------------------------------------------------
+# SuperLU nnz limit and GMRES fallback
+# ---------------------------------------------------------------------------
+
+
+class TestSuperLUNnzFallback:
+    """Tests for nnz-based GMRES fallback in configure_linear_solver."""
+
+    def test_falls_back_to_gmres_when_nnz_exceeds_limit(self) -> None:
+        """When nnz exceeds SUPERLU_NNZ_LIMIT, configure_linear_solver selects GMRES."""
+        import warnings
+        from unittest.mock import patch
+
+        from tidal.solver._setup import configure_linear_solver
+
+        spec = _make_kg_1d_spec()
+        # Use a grid large enough to be in the sparse tier (N > DENSE_THRESHOLD)
+        # but use patch to force nnz check to fail.
+        n_pts = 64
+        grid = GridInfo(bounds=((0, 10),), shape=(n_pts,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        # Patch SUPERLU_NNZ_LIMIT to 1 so any nnz triggers the fallback.
+        options: dict[str, Any] = {}
+        with (
+            patch("tidal.solver._types.DENSE_THRESHOLD", 1),
+            patch("tidal.solver._types.SUPERLU_NNZ_LIMIT", 1),
+            warnings.catch_warnings(record=True) as caught,
+        ):
+            warnings.simplefilter("always")
+            configure_linear_solver(options, layout, spec, grid, "periodic")
+
+        assert options["linsolver"] == "gmres"
+        assert "sparsity" not in options
+
+        warning_messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        assert any("SUPERLU_NNZ_LIMIT" in m for m in warning_messages), (
+            f"Expected UserWarning about SUPERLU_NNZ_LIMIT, got: {warning_messages}"
+        )
+
+    def test_uses_superlu_when_nnz_under_limit(self) -> None:
+        """When nnz is under SUPERLU_NNZ_LIMIT, SuperLU is selected normally."""
+        from tidal.solver._setup import configure_linear_solver
+
+        spec = _make_kg_1d_spec()
+        # Small grid: nnz will be well under 100_000
+        n_pts = 8
+        grid = GridInfo(bounds=((0, 10),), shape=(n_pts,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        options: dict[str, Any] = {}
+        from unittest.mock import patch
+        with patch("tidal.solver._types.DENSE_THRESHOLD", 1):
+            configure_linear_solver(options, layout, spec, grid, "periodic")
+
+        assert options["linsolver"] == "sparse"
+        assert "sparsity" in options
+
+    def test_warning_contains_nnz_and_limit(self) -> None:
+        """UserWarning message includes nnz value and limit for diagnostics."""
+        import warnings
+        from unittest.mock import patch
+
+        from tidal.solver._setup import configure_linear_solver
+
+        spec = _make_kg_1d_spec()
+        n_pts = 64
+        grid = GridInfo(bounds=((0, 10),), shape=(n_pts,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        options: dict[str, Any] = {}
+        with (
+            patch("tidal.solver._types.DENSE_THRESHOLD", 1),
+            patch("tidal.solver._types.SUPERLU_NNZ_LIMIT", 1),
+            warnings.catch_warnings(record=True) as caught,
+        ):
+            warnings.simplefilter("always")
+            configure_linear_solver(options, layout, spec, grid, "periodic")
+
+        user_warnings = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        assert user_warnings, "Expected at least one UserWarning"
+        msg = user_warnings[0]
+        assert "nnz=" in msg
+        assert "SUPERLU_NNZ_LIMIT=1" in msg
+        assert "gmres" in msg
+
+
 class TestIDAIntegration:
     def test_kg_analytical_matches_fd(self) -> None:
         """IDA with analytical jacfn should match standard FD solve."""
