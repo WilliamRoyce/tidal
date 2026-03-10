@@ -4230,3 +4230,188 @@ path = "output.json"
 """)
         ret = main(["derive", str(config), "--dry-run"])
         assert ret == 0
+
+
+class TestCoordValuesPreEvaluation:
+    """Tests for _apply_coord_values and early coordinate-value substitution.
+
+    This covers the optimization that eliminates killed-coordinate factors
+    (e.g. Sin[y[]]^2) from Python-generated Wolfram strings *before* emission,
+    so they never enter xPert / Christoffel / TT-traceless computations.
+    """
+
+    def test_apply_coord_values_empty(self) -> None:
+        """Empty coord_values returns input unchanged."""
+        from tidal.cli._derive import _apply_coord_values
+
+        exprs = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+        assert _apply_coord_values(exprs, {}) == exprs
+
+    def test_apply_coord_values_substitutes(self) -> None:
+        """y[] -> Pi/2 is substituted in all strings."""
+        from tidal.cli._derive import _apply_coord_values
+
+        exprs = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+        result = _apply_coord_values(exprs, {"y": "Pi/2"})
+        assert result == ["-1", "1", "x[]^2", "x[]^2*Sin[Pi/2]^2"]
+
+    def test_apply_coord_values_multiple_coords(self) -> None:
+        """Multiple coord substitutions are all applied."""
+        from tidal.cli._derive import _apply_coord_values
+
+        exprs = ["y[]*z[]", "Sin[y[]]*Cos[z[]]"]
+        result = _apply_coord_values(exprs, {"y": "Pi/2", "z": "0"})
+        assert result == ["Pi/2*0", "Sin[Pi/2]*Cos[0]"]
+
+    def test_apply_coord_values_no_match(self) -> None:
+        """Strings without the coord function are returned unchanged."""
+        from tidal.cli._derive import _apply_coord_values
+
+        exprs = ["x[]^2", "Bpeak*z0^3/(2*x[]^2)"]
+        result = _apply_coord_values(exprs, {"y": "Pi/2"})
+        assert result == exprs
+
+    def test_metric_diagonal_pre_evaluated_in_wls(self, tmp_path: Path) -> None:
+        """With coordinate_values {y=Pi/2}, metric matrix ReplaceAll emitted early."""
+        from tidal.cli._derive import generate_wls
+        import tomllib
+
+        config_text = """
+[theory]
+name = "Spherical test"
+[spacetime]
+dimension = 4
+metric = "diagonal"
+diagonal = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+[[fields]]
+name = "phi"
+type = "scalar"
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] CD[a][phi[]]"
+[reduction]
+type = "plane_wave"
+propagation_axis = "x"
+coordinate_values = {y = "Pi/2"}
+[output]
+path = "out.json"
+"""
+        config_path = tmp_path / "theory.toml"
+        config_path.write_text(config_text)
+        with open(config_path, "rb") as f:
+            config = tomllib.load(f)
+        wls_text = generate_wls(config, str(config_path))
+        # Early metric substitution before MetricInBasis (prefix varies by theory name)
+        assert "MetricMatrix /. {y[] -> Pi/2}" in wls_text
+
+    def test_tt_traceless_weights_no_sin_y(self, tmp_path: Path) -> None:
+        """TT-traceless substitution weights use Sin[Pi/2], not Sin[y[]]."""
+        from tidal.cli._derive import generate_wls
+        import tomllib
+
+        config_text = """
+[theory]
+name = "GW spherical"
+[spacetime]
+dimension = 4
+metric = "diagonal"
+diagonal = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[]"
+[constants]
+names = ["kappa"]
+[linearization]
+perturbation_field = "h"
+[[gauge]]
+field = "h"
+type = "tt"
+[reduction]
+type = "plane_wave"
+propagation_axis = "x"
+coordinate_values = {y = "Pi/2"}
+[output]
+path = "out.json"
+"""
+        config_path = tmp_path / "theory.toml"
+        config_path.write_text(config_text)
+        with open(config_path, "rb") as f:
+            config = tomllib.load(f)
+        wls_text = generate_wls(config, str(config_path))
+        wls_lines = wls_text.splitlines()
+        # TT traceless substitution lines contain "args___" (RuleDelayed pattern)
+        # The last-diagonal field name is prefix-dependent (e.g. gsH9, gedH9)
+        tt_lines = [l for l in wls_lines if "args___" in l and "Sin[" in l]
+        assert tt_lines, "Expected TT traceless substitution lines with Sin[] weight"
+        for line in tt_lines:
+            assert "Sin[y[]]" not in line, f"Sin[y[]] in TT traceless: {line}"
+            assert "Sin[Pi/2]" in line, f"Expected Sin[Pi/2] in TT traceless: {line}"
+
+    def test_coordinate_values_plane_wave_uses_expand(self, tmp_path: Path) -> None:
+        """Plane-wave coordinate eval step uses Expand not Simplify."""
+        from tidal.cli._derive import generate_wls
+        import tomllib
+
+        config_text = """
+[theory]
+name = "Coord eval speed test"
+[spacetime]
+dimension = 4
+metric = "diagonal"
+diagonal = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+[[fields]]
+name = "phi"
+type = "scalar"
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] CD[a][phi[]]"
+[reduction]
+type = "plane_wave"
+propagation_axis = "x"
+coordinate_values = {y = "Pi/2"}
+[output]
+path = "out.json"
+"""
+        config_path = tmp_path / "theory.toml"
+        config_path.write_text(config_text)
+        with open(config_path, "rb") as f:
+            config = tomllib.load(f)
+        wls_text = generate_wls(config, str(config_path))
+        assert "fieldEquations = fieldEquations /. {y[] -> Pi/2}" in wls_text
+        assert "Expand[fieldEquations[[k, 2]]]" in wls_text
+
+    def test_no_coordinate_values_noop(self, tmp_path: Path) -> None:
+        """Absent coordinate_values emits no early metric substitution."""
+        from tidal.cli._derive import generate_wls
+        import tomllib
+
+        config_text = """
+[theory]
+name = "No coord values"
+[spacetime]
+dimension = 4
+metric = "minkowski"
+[[fields]]
+name = "phi"
+type = "scalar"
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] CD[a][phi[]]"
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+[output]
+path = "out.json"
+"""
+        config_path = tmp_path / "theory.toml"
+        config_path.write_text(config_text)
+        with open(config_path, "rb") as f:
+            config = tomllib.load(f)
+        wls_text = generate_wls(config, str(config_path))
+        # No coordinate_values → no early metric ReplaceAll
+        assert "MetricMatrix /. {" not in wls_text
+        # No coordinate_values → no killed-coordinate field-equation substitution
+        # (the plane-wave reduction does emit "fieldEquations /. {" for derivative-zeroing,
+        # so we check specifically for a coordinate-value substitution like "y[] ->")
+        assert "-> Pi/2" not in wls_text
