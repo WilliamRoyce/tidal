@@ -745,85 +745,118 @@ def eliminate_degenerate_constraints(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # Build original field name → index map for coupling matrix filtering
     original_field_names = [f["name"] for f in result.get("fields", [])]
 
+    # Iteratively eliminate two types of constraints until stable:
+    #
+    # 1. **Gradient-zero**: derivative self-constraints like ``gradient_x(h_4) = 0``
+    #    that imply ``h_4 = 0`` (with Neumann or periodic BCs and zero-mean IC).
+    #    These arise from TT-gauge transverse conditions after plane-wave reduction.
+    #    Must run *before* degenerate detection so that fields set to zero are
+    #    removed from degenerate constraint equations before those are processed —
+    #    otherwise position-dependent coefficients (from curved-metric traceless
+    #    substitutions) are incorrectly read as their float placeholders.
+    #
+    # 2. **Degenerate algebraic**: equations like ``h_9 = h_4 + h_7 + h_9`` where
+    #    the constraint field cancels from both sides, implying a relation between
+    #    the remaining fields.  Run *after* gradient-zero so that zeroed fields
+    #    are already removed from these constraints.
     while True:
-        found = _find_degenerate_constraint(equations)
-        if found is None:
+        any_eliminated = False
+
+        # --- Gradient-zero elimination (first pass per round) ---
+        while True:
+            zero_field = _find_gradient_zero_constraint(equations)
+            if zero_field is None:
+                break
+            any_eliminated = True
+
+            # Remove the zero-field's equation and substitute zero everywhere
+            new_equations = []
+            for eq in equations:
+                if eq["field"] == zero_field:
+                    continue
+
+                terms = eq.get("rhs", {}).get("terms", [])
+                new_terms = _substitute_in_terms(terms, zero_field, {})
+                # Also substitute the velocity form
+                new_terms = _substitute_in_terms(
+                    new_terms, f"v_{zero_field}", {}
+                )
+
+                if not new_terms:
+                    # Equation became 0=0 → remove
+                    continue
+
+                eq["rhs"]["terms"] = new_terms
+                new_equations.append(eq)
+
+            equations = new_equations
+            eliminated.append(zero_field)
+
+        # --- Degenerate constraint elimination (second pass per round) ---
+        while True:
+            found = _find_degenerate_constraint(equations)
+            if found is None:
+                break
+            any_eliminated = True
+
+            constraint_eq_field, dep_field, substitution = found
+
+            if not substitution:
+                # Single-field degenerate: dep_field is the sole non-self term.
+                # The WLS already applied the curved-metric traceless substitution;
+                # this constraint is the algebraic residual (e.g., ``h_9 = h_7 +
+                # h_9`` after other fields were zeroed → ``0 = h_7`` is degenerate
+                # but wrong — dep_field should NOT be zeroed).  Simply remove the
+                # constraint equation; the WLS substitution already made dep_field
+                # appear only via the constraint, so no further action is needed.
+                equations = [
+                    eq for eq in equations if eq["field"] != constraint_eq_field
+                ]
+                eliminated.append(constraint_eq_field)
+                break  # restart both loops
+
+            # Build velocity substitution: v_{dep_field} → Σ coeff * v_{target}
+            vel_dep = f"v_{dep_field}"
+            vel_substitution: dict[str, float] = {
+                f"v_{target}": coeff for target, coeff in substitution.items()
+            }
+
+            # Substitute dep_field AND v_{dep_field} in all equation terms
+            new_equations = []
+            for eq in equations:
+                field = eq["field"]
+
+                # Remove the degenerate constraint equation itself
+                if field == constraint_eq_field:
+                    continue
+
+                # Remove the equation *for* the dependent field
+                if field == dep_field:
+                    continue
+
+                # Substitute in RHS terms (both field and velocity)
+                terms = eq.get("rhs", {}).get("terms", [])
+                new_terms = _substitute_in_terms(terms, dep_field, substitution)
+                new_terms = _substitute_in_terms(new_terms, vel_dep, vel_substitution)
+
+                # If no terms remain, equation is trivially 0=0 → remove
+                if not new_terms:
+                    continue
+
+                eq["rhs"]["terms"] = new_terms
+                new_equations.append(eq)
+
+            equations = new_equations
+            eliminated.append(dep_field)
+
+            # Also track the constraint equation field if it disappeared
+            if constraint_eq_field != dep_field and constraint_eq_field not in {
+                eq["field"] for eq in equations
+            }:
+                eliminated.append(constraint_eq_field)
+
+        if not any_eliminated:
             break
-
-        constraint_eq_field, dep_field, substitution = found
-
-        # Build velocity substitution: v_{dep_field} → Σ coeff * v_{target}
-        vel_dep = f"v_{dep_field}"
-        vel_substitution: dict[str, float] = {
-            f"v_{target}": coeff for target, coeff in substitution.items()
-        }
-
-        # Phase 1: Substitute dep_field AND v_{dep_field} in all equation terms
-        new_equations: list[dict[str, Any]] = []
-        for eq in equations:
-            field = eq["field"]
-
-            # Remove the degenerate constraint equation itself
-            if field == constraint_eq_field:
-                continue
-
-            # Remove the equation *for* the dependent field
-            if field == dep_field:
-                continue
-
-            # Substitute in RHS terms (both field and velocity)
-            terms = eq.get("rhs", {}).get("terms", [])
-            new_terms = _substitute_in_terms(terms, dep_field, substitution)
-            new_terms = _substitute_in_terms(new_terms, vel_dep, vel_substitution)
-
-            # If no terms remain, equation is trivially 0=0 → remove
-            if not new_terms:
-                continue
-
-            eq["rhs"]["terms"] = new_terms
-            new_equations.append(eq)
-
-        equations = new_equations
-        eliminated.append(dep_field)
-
-        # Also track the constraint equation field if it disappeared
-        if constraint_eq_field != dep_field and constraint_eq_field not in {
-            eq["field"] for eq in equations
-        }:
-            eliminated.append(constraint_eq_field)
-
-    # --- Gradient-zero elimination ---
-    # After degenerate pairs are gone, detect derivative self-constraints
-    # like ``gradient_z(h_6) = 0`` that imply ``h_6 = 0`` with periodic BCs.
-    # Eliminating such fields may expose further degenerate constraints or
-    # trivial (0=0) equations, so we iterate.
-    while True:
-        zero_field = _find_gradient_zero_constraint(equations)
-        if zero_field is None:
-            break
-
-        # Remove the zero-field's equation and substitute zero everywhere
-        new_equations = []
-        for eq in equations:
-            if eq["field"] == zero_field:
-                continue
-
-            terms = eq.get("rhs", {}).get("terms", [])
-            new_terms = _substitute_in_terms(terms, zero_field, {})
-            # Also substitute the velocity form
-            new_terms = _substitute_in_terms(
-                new_terms, f"v_{zero_field}", {}
-            )
-
-            if not new_terms:
-                # Equation became 0=0 → remove
-                continue
-
-            eq["rhs"]["terms"] = new_terms
-            new_equations.append(eq)
-
-        equations = new_equations
-        eliminated.append(zero_field)
 
     if not eliminated:
         return spec_data  # No changes

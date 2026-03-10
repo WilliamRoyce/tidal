@@ -243,6 +243,7 @@ class _WlsContext:
     constraint_solver: dict[str, Any] | None
     gauge: list[dict[str, Any]]
     reduction: dict[str, Any] | None
+    metric_diagonal: list[str]
 
 
 def _wls_mem_print(label: str) -> str:
@@ -1403,25 +1404,35 @@ def _tt_transverse_constraints(
     comp_pfx: str,
     field_name: str,
     coord_args: str,
+    prop_spatial: int,
 ) -> list[str]:
     """Generate WLS for TT transverse constraints: d^i h_{i,j} = 0 per spatial j.
 
-    Instead of creating auxiliary fields (h_transverse_*), replaces the dynamical
-    equation of one existing component per constraint.  For each spatial j, the
-    constrained component is ``h_{dim-1, j}`` — the off-diagonal mixing with
-    the last spatial direction (e.g. h_{xz} for j=x in 4D).
+    For each spatial direction j, replaces ``h_{prop,j}``'s dynamical equation
+    with the transverse constraint ``Σ_i ∂_i h_{ij} = 0``.  After plane-wave
+    reduction (only propagation-axis derivatives survive), each constraint
+    simplifies to ``∂_{prop}(h_{prop,j}) = 0``, enabling the Python constraint
+    eliminator to detect the self-referencing gradient-zero and set h_{prop,j}=0.
 
-    The constraint for j = dim-1 is redundant with the traceless condition
-    (which already eliminates ``h_{dim-1, dim-1}``), so it is skipped.
+    Parameters
+    ----------
+    prop_spatial : int
+        1-based spatial coordinate index of the propagation axis
+        (e.g. 1 for ``x``, 2 for ``y``, 3 for ``z`` in 4D).
 
-    After plane-wave reduction (only last-axis derivatives survive), each
-    constraint simplifies to ``∂_z(h_{z,j}) = 0``, enabling the Python
-    constraint eliminator to remove these fields entirely.
+    The constraint for ``j = dim-1`` is skipped when ``prop_spatial == dim-1``
+    because that field (h_{dim-1, dim-1}) is already eliminated by the traceless
+    condition and has no equation to replace.  For other propagation axes, all
+    j from 1 to dim-1 (inclusive) are covered.
     """
     coords = _COORDS[dim]
     lines: list[str] = []
-    # Skip j = dim-1: that constraint is redundant with tracelessness
-    for j in range(1, dim - 1):
+    for j in range(1, dim):
+        # Skip when j == prop_spatial == dim-1: h_{prop,prop} = h_{last,last}
+        # is already eliminated by the traceless condition — no EOM to replace.
+        if j == dim - 1 and prop_spatial == dim - 1:
+            continue
+
         deriv_terms: list[str] = []
         for i in range(1, dim):
             flat_idx = _sym_flat_index(i, j, dim)
@@ -1432,10 +1443,10 @@ def _tt_transverse_constraints(
         constraint_expr = " + ".join(deriv_terms)
         coord_label = coords[j] if j < len(coords) else str(j)
 
-        # Replace h_{dim-1, j}'s dynamical equation with the transverse constraint.
-        # fieldEquations uses "h_N" names (field_name + "_" + flat_index),
-        # NOT Wolfram symbol names (comp_pfx + flat_index).
-        constrained_idx = _sym_flat_index(dim - 1, j, dim)
+        # Replace h_{prop, j}'s dynamical equation with the transverse constraint.
+        # After plane-wave reduction along prop_axis, only ∂_{prop}(h_{prop,j})
+        # survives → self-referencing gradient-zero detected by Python eliminator.
+        constrained_idx = _sym_flat_index(prop_spatial, j, dim)
         constrained_field = f"{field_name}_{constrained_idx}"
 
         lines.extend(
@@ -1462,23 +1473,77 @@ def _tt_traceless_substitution(
     comp_pfx: str,
     field_name: str,
     coord_args: str,
+    metric_diagonal: list[str] | None = None,
 ) -> list[str]:
-    """Generate WLS for TT traceless substitution: h_{d-1,d-1} → -(other diags)."""
+    """Generate WLS for TT traceless substitution: h_{d-1,d-1} → -(metric-weighted sum).
+
+    The TT traceless condition is ``g^{ij} h_{ij} = 0`` using the background
+    spatial metric.  Solving for the last spatial diagonal:
+
+    ``h_{last} = -Σ_{i≠last} (g_{last} / g_i) * h_i``
+
+    For flat (Minkowski/Cartesian) metrics all diagonal entries are ±1 so the
+    weights are all 1 and the formula reduces to ``h_{last} → -(Σ others)``.
+    For curved diagonal metrics (e.g. spherical ``diag[-1, 1, r², r²sin²θ]``)
+    the weights are metric-dependent expressions in the Wolfram coordinates.
+
+    The constraint equation written into ``fieldEquations`` is the numerator
+    of ``g^{ij} h_{ij} = 0`` multiplied by ``g_{last}`` so that h_{last}
+    appears with self-coefficient 1 (enabling the Python degenerate-constraint
+    detector after gradient-zero fields have been zeroed first):
+
+    ``h_last_EOM = w_0 * h_0 + w_1 * h_1 + ... + h_last``
+
+    where ``w_i = g_{last} / g_i`` (Wolfram Simplify is applied to each weight).
+
+    Parameters
+    ----------
+    metric_diagonal : list[str] | None
+        Diagonal metric entries as Wolfram expression strings, including the
+        time entry at index 0 (e.g. ``["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]``).
+        When ``None`` or empty, the flat-metric behaviour (all weights = 1) is used.
+    """
     spatial_diag_indices = [_sym_flat_index(i, i, dim) for i in range(1, dim)]
     last_diag_idx = spatial_diag_indices[-1]
     other_diag_indices = spatial_diag_indices[:-1]
     last_comp = f"{comp_pfx}{last_diag_idx}"
 
-    repl_sum = " + ".join(f"{comp_pfx}{idx}[args]" for idx in other_diag_indices)
-    deriv_repl_sum = " + ".join(
-        f"Derivative[d][{comp_pfx}{idx}][args]" for idx in other_diag_indices
+    # Compute metric weights for each spatial diagonal component.
+    # For diagonal metric with entries g_i, the traceless condition is:
+    #   Σ_i g^{ii} h_{ii} = Σ_i (1/g_i) h_{ii} = 0
+    # Solve for h_{last}: h_{last} = -Σ_{i≠last} (g_{last}/g_i) * h_i
+    if metric_diagonal and len(metric_diagonal) == dim:
+        spatial_metric = metric_diagonal[1:]  # drop time component
+        last_g = spatial_metric[-1]           # e.g. "x[]^2*Sin[y[]]^2"
+        other_g = spatial_metric[:-1]         # e.g. ["1", "x[]^2"]
+        # Wolfram Simplify will simplify e.g. (x[]^2*Sin[y[]]^2)/(x[]^2) → Sin[y[]]^2
+        weights = [f"Simplify[({last_g})/({g})]" for g in other_g]
+    else:
+        # Flat metric: all weights = 1
+        weights = ["1"] * len(other_diag_indices)
+
+    repl_sum = " + ".join(
+        f"{w} * {comp_pfx}{idx}[args]"
+        for w, idx in zip(weights, other_diag_indices)
     )
-    trace_terms = " + ".join(
-        f"{comp_pfx}{idx}[{coord_args}]" for idx in spatial_diag_indices
+    deriv_repl_sum = " + ".join(
+        f"{w} * Derivative[d][{comp_pfx}{idx}][args]"
+        for w, idx in zip(weights, other_diag_indices)
+    )
+    # Constraint equation: g_{last} * Σ g^{ii} h_{ii} = 0
+    # Written with h_{last} on both sides so self-coeff = 1 for Python detector:
+    # h_last_EOM = w_0*h_0 + w_1*h_1 + ... + h_last
+    trace_terms = (
+        " + ".join(
+            f"{w} * {comp_pfx}{idx}[{coord_args}]"
+            for w, idx in zip(weights, other_diag_indices)
+        )
+        + f" + {last_comp}[{coord_args}]"
     )
 
     return [
-        f"(* TT traceless: substitute {last_comp} → -(sum of other spatial diags) *)",
+        f"(* TT traceless: substitute {last_comp} → -(metric-weighted sum of other diags) *)",
+        f"(* Condition: g^{{ij}} h_{{ij}} = 0  ⟹  h_last = -Σ (g_last/g_i) h_i *)",
         f"fieldEquations = fieldEquations /. {{"
         f"{last_comp}[args___] :> -({repl_sum}), "
         f"Derivative[d__][{last_comp}][args___] :> -({deriv_repl_sum})}};",
@@ -1489,10 +1554,11 @@ def _tt_traceless_substitution(
         " {k, Length[fieldEquations]}];",
         "",
         f"(* Replace {last_comp} equation with algebraic traceless constraint *)",
+        f"(* Form: h_last_EOM = Σ w_i h_i + h_last  (self-coeff=1 for Python detector) *)",
         f'Do[If[fieldEquations[[k, 1]] === "{field_name}_{last_diag_idx}",'
         f' fieldEquations[[k]] = {{"{field_name}_{last_diag_idx}", {trace_terms}}}],'
         f" {{k, Length[fieldEquations]}}];",
-        f'Print["Applied TT traceless: {last_comp} → -(spatial diag sum), '
+        f'Print["Applied TT traceless: {last_comp} → -(metric-weighted sum), '
         f'eq replaced with constraint"];',
         "",
     ]
@@ -1526,6 +1592,15 @@ def _type_b_tt_gauge(
     coord_args = ", ".join(f"{c}[]" for c in _COORDS[dim])
     lines: list[str] = []
 
+    # Determine propagation axis spatial index (1-based).
+    # For z-propagation (default, last axis): prop_spatial = dim-1.
+    # For x-propagation (spherical radial): prop_spatial = 1.
+    if ctx.reduction is not None:
+        prop_coord = ctx.reduction["propagation_axis"]  # e.g. "x"
+        prop_spatial = _COORDS[dim].index(prop_coord)   # e.g. 1 for [t,x,y,z]
+    else:
+        prop_spatial = dim - 1  # default: last spatial axis
+
     # --- 1. Temporal: zero h_{0,mu} for mu = 0 .. dim-1 ---
     for mu in range(dim):
         idx = _sym_flat_index(0, mu, dim)
@@ -1534,10 +1609,18 @@ def _type_b_tt_gauge(
         )
 
     # --- 2. Transverse: d^i h_{i,j} = 0 per spatial j ---
-    lines.extend(_tt_transverse_constraints(dim, comp_pfx, field_name, coord_args))
+    # Uses propagation axis so constraints are self-referencing after reduction.
+    lines.extend(
+        _tt_transverse_constraints(dim, comp_pfx, field_name, coord_args, prop_spatial)
+    )
 
-    # --- 3. Traceless: h_{d-1,d-1} → -(sum of other spatial diags) ---
-    lines.extend(_tt_traceless_substitution(dim, comp_pfx, field_name, coord_args))
+    # --- 3. Traceless: h_{d-1,d-1} → -(metric-weighted sum of other spatial diags) ---
+    # Uses diagonal metric entries for curved backgrounds; flat weights for Minkowski.
+    lines.extend(
+        _tt_traceless_substitution(
+            dim, comp_pfx, field_name, coord_args, ctx.metric_diagonal
+        )
+    )
 
     return lines
 
@@ -1772,6 +1855,59 @@ def _wls_plane_wave_field_elimination(ctx: _WlsContext) -> list[str]:
         "",
     ]
     return lines
+
+
+def _wls_plane_wave_coordinate_evaluation(ctx: _WlsContext) -> list[str]:
+    """Generate Wolfram code to evaluate killed coordinates at specified values.
+
+    After plane-wave reduction zeros transverse derivatives, metric-dependent
+    coefficients (e.g. ``Sin[y[]]^2`` from curved TT-traceless substitution,
+    ``x[]^2`` from ``g_{θθ}`` in spherical coordinates) may survive as
+    position-dependent prefactors in the surviving equations.
+
+    The ``[reduction]`` TOML section supports an optional ``coordinate_values``
+    map specifying Wolfram expressions for each killed coordinate:
+
+    .. code-block:: toml
+
+        [reduction]
+        type = "plane_wave"
+        propagation_axis = "x"
+        coordinate_values = {y = "Pi/2"}   # equatorial plane, Sin[Pi/2]=1
+
+    This function generates a ``ReplaceAll`` step that substitutes those values
+    into all component equations and applies ``Simplify`` to reduce surviving
+    factors to constants.  When ``coordinate_values`` is absent or empty, no
+    code is generated (no-op).
+
+    Must be called *after* both ``_wls_plane_wave_reduction_equations`` and
+    ``_wls_plane_wave_field_elimination`` so that all derivative-zeroing and
+    field-elimination steps have already been applied.
+    """
+    if ctx.reduction is None:
+        return []
+
+    coord_values: dict[str, str] = ctx.reduction.get("coordinate_values", {})
+    if not coord_values:
+        return []
+
+    # Build Wolfram replacement rules: {y[] -> Pi/2, z[] -> 0, ...}
+    rules = ", ".join(f"{coord}[] -> {val}" for coord, val in coord_values.items())
+
+    return [
+        "",
+        "(* === Plane-wave: evaluate killed coordinates at specified values === *)",
+        f"(* coordinate_values from [reduction] TOML: {coord_values} *)",
+        f'Print["Evaluating killed coordinates: {coord_values}"];',
+        "",
+        f"fieldEquations = fieldEquations /. {{{rules}}};",
+        "fieldEquations = Table[",
+        "  {fieldEquations[[k, 1]], Simplify[fieldEquations[[k, 2]]]},",
+        "  {k, Length[fieldEquations]}",
+        "];",
+        f'Print["After coordinate evaluation: ", Length[fieldEquations], " equations"];',
+        "",
+    ]
 
 
 # --- WLS: Euler-Lagrange & decomposition ---
@@ -2548,6 +2684,9 @@ def generate_wls(
         constraint_solver=config.get("constraint_solver"),
         gauge=config.get("gauge", []),
         reduction=config.get("reduction"),
+        metric_diagonal=[
+            str(e) for e in config["spacetime"].get("diagonal", [])
+        ],
     )
 
     is_linearization = ctx.linearization is not None
@@ -2612,6 +2751,7 @@ def generate_wls(
     if ctx.reduction is not None:
         lines.extend(_wls_plane_wave_reduction_equations(ctx))
         lines.extend(_wls_plane_wave_field_elimination(ctx))
+        lines.extend(_wls_plane_wave_coordinate_evaluation(ctx))
 
     lines.extend(_wls_metadata_and_export(config, ctx))
 

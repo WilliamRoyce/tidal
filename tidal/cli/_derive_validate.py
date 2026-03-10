@@ -682,6 +682,21 @@ def _validate_reduction(config: dict[str, Any]) -> None:
         )
         raise ValueError(msg)
 
+    # Optional coordinate_values: map of killed-axis names → Wolfram value strings
+    coord_values = reduction.get("coordinate_values", {})
+    if not isinstance(coord_values, dict):
+        msg = "[reduction] coordinate_values must be a table (dict), e.g. {y = \"Pi/2\"}"
+        raise ValueError(msg)
+    killed = [c for c in (spatial or []) if c != prop_axis]
+    for key in coord_values:
+        if key not in killed:
+            msg = (
+                f"[reduction] coordinate_values key '{key}' is not a killed "
+                f"coordinate for propagation_axis '{prop_axis}'. "
+                f"Valid killed coordinates: {killed}"
+            )
+            raise ValueError(msg)
+
 
 # ---------------------------------------------------------------------------
 # Orchestrator
