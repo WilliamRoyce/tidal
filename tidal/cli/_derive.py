@@ -311,6 +311,45 @@ def _wls_packages(
     return lines
 
 
+# --- Coordinate-values pre-evaluation ---
+
+
+def _apply_coord_values(exprs: list[str], coord_values: dict[str, str]) -> list[str]:
+    """Substitute killed coordinates into Wolfram expression strings at the Python level.
+
+    This eliminates coordinate-dependent factors (e.g. ``Sin[y[]]^2``) from all
+    Python-generated Wolfram strings *before* they are emitted.  Combined with the
+    early metric-matrix substitution in :func:`_wls_spacetime`, this ensures that
+    ``Sin[y[]]^2`` (or any other killed-coordinate factor) never enters:
+
+    * the cached Christoffel symbols (metric is simplified first),
+    * the TT-traceless substitution weights (metric_diagonal is pre-evaluated here),
+    * background-field component strings (if they depend on the killed coordinate).
+
+    For example, with ``coord_values = {"y": "Pi/2"}`` the replacement is::
+
+        "x[]^2*Sin[y[]]^2"  →  "x[]^2*Sin[Pi/2]^2"
+
+    Wolfram then auto-evaluates ``Sin[Pi/2] → 1``, so the expensive ``Simplify``
+    in the TT-weight expression immediately collapses to a trivial result.
+
+    Parameters
+    ----------
+    exprs:
+        List of Wolfram expression strings (e.g. ``metric_diagonal``,
+        ``background_field.components``).
+    coord_values:
+        Mapping ``{coord_name: wolfram_value}`` from the ``[reduction]`` TOML section.
+        E.g. ``{"y": "Pi/2"}`` replaces every occurrence of ``y[]`` with ``Pi/2``.
+    """
+    if not coord_values:
+        return exprs
+    result = list(exprs)
+    for coord, val in coord_values.items():
+        result = [e.replace(f"{coord}[]", val) for e in result]
+    return result
+
+
 # --- WLS: Spacetime, fields & Lagrangian ---
 
 
@@ -320,7 +359,7 @@ def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
     indices = ", ".join(str(i) for i in range(ctx.dim))
     idx_str = ", ".join(_INDEX_LETTERS[: min(ctx.dim + 4, 8)])
 
-    return [
+    lines = [
         f"(* Step 1: Define {ctx.dim}D spacetime *)",
         f"If[!xTensorQ[{ctx.manifold}],",
         f"  DefManifold[{ctx.manifold}, {ctx.dim}, {{{idx_str}}}]",
@@ -337,10 +376,33 @@ def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
         "];",
         "",
         _generate_metric_code(config, ctx.prefix),
+    ]
+
+    # Apply coordinate_values to the metric matrix as early as possible.
+    # E.g. {y = "Pi/2"} → gedMetricMatrix = gedMetricMatrix /. {y[] -> Pi/2}
+    # After this substitution: Sin[Pi/2]->1 auto-evaluates, so x[]^2*Sin[y[]]^2
+    # becomes x[]^2. MetricInBasis and SetMetricDownValues then use the simplified
+    # matrix, eliminating Sin[y[]] from ALL subsequent computations (xPert Christoffels,
+    # component decomposition, curvature evaluation). This is correct physics: we are
+    # computing the theory on the equatorial slice θ=π/2.
+    reduction = config.get("reduction", {})
+    coord_values: dict[str, str] = reduction.get("coordinate_values", {})
+    if coord_values:
+        rules = ", ".join(f"{c}[] -> {v}" for c, v in coord_values.items())
+        p = ctx.prefix
+        lines += [
+            "",
+            "(* Apply coordinate_values to metric early — eliminates e.g. Sin[y[]]^2",
+            "   from ALL subsequent xPert/Christoffel/decomposition computations. *)",
+            f"{p}MetricMatrix = {p}MetricMatrix /. {{{rules}}};",
+        ]
+
+    lines += [
         f"MetricInBasis[{ctx.metric}, -{ctx.chart}, {ctx.prefix}MetricMatrix];",
         f"SetMetricDownValues[{ctx.metric}, {ctx.chart}, {ctx.prefix}MetricMatrix];",
         "",
     ]
+    return lines
 
 
 def _needs_bg_tensor(config: dict[str, Any]) -> bool:
@@ -1501,6 +1563,11 @@ def _tt_traceless_substitution(
     metric_diagonal : list[str] | None
         Diagonal metric entries as Wolfram expression strings, including the
         time entry at index 0 (e.g. ``["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]``).
+        Killed-coordinate values should already have been substituted by
+        :func:`_apply_coord_values` before this function is called, so that
+        weight expressions like ``Simplify[(x[]^2*1)/(x[]^2)]`` collapse
+        immediately to constants rather than carrying ``Sin[y[]]^2`` through
+        the full xPert/Christoffel computation.
         When ``None`` or empty, the flat-metric behaviour (all weights = 1) is used.
     """
     spatial_diag_indices = [_sym_flat_index(i, i, dim) for i in range(1, dim)]
@@ -1516,7 +1583,9 @@ def _tt_traceless_substitution(
         spatial_metric = metric_diagonal[1:]  # drop time component
         last_g = spatial_metric[-1]           # e.g. "x[]^2*Sin[y[]]^2"
         other_g = spatial_metric[:-1]         # e.g. ["1", "x[]^2"]
-        # Wolfram Simplify will simplify e.g. (x[]^2*Sin[y[]]^2)/(x[]^2) → Sin[y[]]^2
+        # Wolfram Simplify collapses ratios; killed-coordinate values have already
+        # been substituted in Python (via _apply_coord_values), so e.g.
+        # (x[]^2*Sin[Pi/2]^2)/(x[]^2) = 1 trivially — no Sin[y[]] survives.
         weights = [f"Simplify[({last_g})/({g})]" for g in other_g]
     else:
         # Flat metric: all weights = 1
@@ -2689,9 +2758,10 @@ def generate_wls(
         constraint_solver=config.get("constraint_solver"),
         gauge=config.get("gauge", []),
         reduction=config.get("reduction"),
-        metric_diagonal=[
-            str(e) for e in config["spacetime"].get("diagonal", [])
-        ],
+        metric_diagonal=_apply_coord_values(
+            [str(e) for e in config["spacetime"].get("diagonal", [])],
+            config.get("reduction", {}).get("coordinate_values", {}),
+        ),
     )
 
     is_linearization = ctx.linearization is not None
