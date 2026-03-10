@@ -40,13 +40,24 @@ class TestInvertExpDenominator:
     # --- Pattern 3: /(exp(arg)*rest) — compound denominator with trailing factor ---
 
     def test_compound_exp_with_rest(self) -> None:
-        # The exact failing pattern from gertsenshtein_localized.json
+        # exp at start of denominator, rest follows
         result = _invert_exp_denominator("-(Bpeak*x)/(exp(x**2/(2*R**2))*R**2)")
         assert result == "-(Bpeak*x)*exp(-(x**2/(2*R**2)))/(R**2)"
 
     def test_compound_exp_with_scalar_rest(self) -> None:
         result = _invert_exp_denominator("a/(exp(t)*2)")
         assert result == "a*exp(-(t))/(2)"
+
+    # --- Pattern 4: /(N*exp(arg)) — numeric factor precedes exp ---
+
+    def test_compound_exp_with_preceding_factor(self) -> None:
+        # The actual failing pattern from expression 3 in gertsenshtein_localized.json
+        result = _invert_exp_denominator("(Bpeak**2*kappa**2)/(2*exp(x**2/R**2))")
+        assert result == "(Bpeak**2*kappa**2)*exp(-(x**2/R**2))/(2)"
+
+    def test_compound_exp_with_preceding_and_trailing_factor(self) -> None:
+        result = _invert_exp_denominator("k/(A*exp(x**2)*B)")
+        assert result == "k*exp(-(x**2))/(A*B)"
 
     # --- Unchanged cases ---
 
@@ -75,6 +86,8 @@ class TestNoOverflowLocalized:
             "Bpeak/E^(x[]^2/(2*R^2))",
             # h_7 mass coefficient: -1/2*(Bpeak^2*kappa^2)/exp(x^2/R^2)
             "-1/2*(Bpeak^2*kappa^2)/E^(x[]^2/R^2)",
+            # Expression 3 — compound denominator with preceding factor /(2*exp(...))
+            "(-((Bpeak^2*kappa^2)/(2*E^(x[]^2/R^2)))) + (-1/2*(Bpeak^2*kappa^2)/E^(x[]^2/R^2))",
         ],
     )
     def test_no_overflow_warning(self, expr: str) -> None:

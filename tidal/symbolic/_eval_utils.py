@@ -84,60 +84,29 @@ _COMPILED_FUNCTION_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 def _invert_exp_denominator(expr: str) -> str:
     """Convert exp-in-denominator patterns to ``*exp(-(arg))`` to avoid overflow.
 
-    Wolfram's InputForm may serialize ``Exp[-x^2/R^2]`` in two forms:
+    Wolfram's InputForm may serialize ``Exp[-x^2/R^2]`` in several forms that
+    all produce positive-exponent overflow when evaluated naively:
 
     1. ``k/E^(x^2/R^2)`` → after ``E^→exp``: ``k/exp(x^2/R^2)``
        Handled as: ``/exp(arg)`` → ``*exp(-(arg))``
 
-    2. ``k/(E^(x^2/(2*R^2))*R^2)`` → after ``E^→exp``: ``k/(exp(x^2/(2*R^2))*R^2)``
-       Handled as:
-         ``/(exp(arg))``        → ``*exp(-(arg))``
-         ``/(exp(arg)*rest)``   → ``*exp(-(arg))/(rest)``
+    2. ``k/(A*E^(x^2/R^2)*B)`` → after ``E^→exp``: ``k/(A*exp(x^2/R^2)*B)``
+       Handled as: ``/(A*exp(arg)*B)`` → ``*exp(-(arg))/(A*B)``
+       This covers all compound-denominator patterns including:
+         ``/(exp(arg))``          → ``*exp(-(arg))``
+         ``/(exp(arg)*rest)``     → ``*exp(-(arg))/(rest)``
+         ``/(N*exp(arg))``        → ``*exp(-(arg))/(N)``
+         ``/(N*exp(arg)*rest)``   → ``*exp(-(arg))/(N*rest)``
 
-    Both patterns avoid evaluating ``exp(+large)``, preventing numpy
+    Both patterns prevent evaluating ``exp(+large)``, eliminating numpy
     ``RuntimeWarning: overflow encountered in exp``.
     """
     result: list[str] = []
     i = 0
     n = len(expr)
     while i < n:
-        if expr[i : i + 6] == "/(exp(":
-            # Compound denominator: /(exp(arg)) or /(exp(arg)*rest)
-            # Extract the exp() argument (balanced parens from i+6)
-            exp_depth = 1
-            j = i + 6
-            while j < n and exp_depth > 0:
-                if expr[j] == "(":
-                    exp_depth += 1
-                elif expr[j] == ")":
-                    exp_depth -= 1
-                j += 1
-            exp_arg = expr[i + 6 : j - 1]
-            # j now points to the character immediately after exp(...)'s closing paren
-            if j < n and expr[j] == ")":
-                # /(exp(arg))  →  *exp(-(arg))
-                result.append(f"*exp(-({exp_arg}))")
-                i = j + 1
-            elif j < n and expr[j] == "*":
-                # /(exp(arg)*rest)  →  *exp(-(arg))/(rest)
-                # The outer ( opened at i+1 is still at depth 1; find its matching )
-                outer_depth = 1
-                k = j + 1
-                while k < n and outer_depth > 0:
-                    if expr[k] == "(":
-                        outer_depth += 1
-                    elif expr[k] == ")":
-                        outer_depth -= 1
-                    k += 1
-                rest = expr[j + 1 : k - 1]
-                result.append(f"*exp(-({exp_arg}))/({rest})")
-                i = k
-            else:
-                # Unrecognised shape — pass through unchanged
-                result.append(expr[i])
-                i += 1
-        elif expr[i : i + 5] == "/exp(":
-            # Simple inverted exp: /exp(arg)  →  *exp(-(arg))
+        if expr[i : i + 5] == "/exp(":
+            # Pattern 1: /exp(arg) → *exp(-(arg))
             depth = 1
             j = i + 5
             while j < n and depth > 0:
@@ -149,6 +118,46 @@ def _invert_exp_denominator(expr: str) -> str:
             inner = expr[i + 5 : j - 1]
             result.append(f"*exp(-({inner}))")
             i = j
+        elif expr[i : i + 2] == "/(":
+            # Pattern 2: /(denom) where denom may contain exp(arg) anywhere
+            # Find matching ) for the ( at position i+1
+            depth = 1
+            k = i + 2
+            while k < n and depth > 0:
+                if expr[k] == "(":
+                    depth += 1
+                elif expr[k] == ")":
+                    depth -= 1
+                k += 1
+            denom = expr[i + 2 : k - 1]
+            exp_pos = denom.find("exp(")
+            if exp_pos >= 0:
+                # Extract the exp() argument (balanced parens)
+                exp_depth = 1
+                ej = exp_pos + 4
+                while ej < len(denom) and exp_depth > 0:
+                    if denom[ej] == "(":
+                        exp_depth += 1
+                    elif denom[ej] == ")":
+                        exp_depth -= 1
+                    ej += 1
+                exp_arg = denom[exp_pos + 4 : ej - 1]
+                pre = denom[:exp_pos].rstrip("*")
+                post = denom[ej:].lstrip("*")
+                # Rebuild denominator without exp factor; move exp to numerator
+                if pre and post:
+                    result.append(f"*exp(-({exp_arg}))/({pre}*{post})")
+                elif pre:
+                    result.append(f"*exp(-({exp_arg}))/({pre})")
+                elif post:
+                    result.append(f"*exp(-({exp_arg}))/({post})")
+                else:
+                    result.append(f"*exp(-({exp_arg}))")
+                i = k
+            else:
+                # No exp inside this denominator — pass / through unchanged
+                result.append(expr[i])
+                i += 1
         else:
             result.append(expr[i])
             i += 1
