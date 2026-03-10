@@ -261,6 +261,92 @@ metricNonDiagConst = {{-1, 0, 0}, {0, 1, 0.5}, {0, 0.5, 1}};
 TestTrue["IsNonConstantMetric[non-diagonal constant] = False",
   !TorsionGertsenshtein`CommonUtilities`IsNonConstantMetric[metricNonDiagConst, coords3D]];
 
+(* === Test 17: Geometric Cache ($TIDALGeometricCache) === *)
+Print["Test 17: Geometric caching — GetCachedInverseMetric, GetCachedChristoffels, GetCachedMetricRules"];
+
+(* Reset cache state for clean test *)
+TorsionGertsenshtein`CommonUtilities`$TIDALGeometricCache = <||>;
+
+(* Setup: spherical 3D metric (non-flat, curved coords) *)
+sphericMetric3D = DiagonalMatrix[{-1, 1, x[]^2}];
+
+(* --- GetCachedInverseMetric: correct inverse --- *)
+invM = TorsionGertsenshtein`CommonUtilities`GetCachedInverseMetric[sphericMetric3D];
+TestTrue["GetCachedInverseMetric: g_{11} = 1/x[]^2",
+  Simplify[invM[[3,3]] - 1/x[]^2] === 0];
+TestTrue["GetCachedInverseMetric: g_{00} = -1",
+  invM[[1,1]] === -1];
+
+(* Second call should hit cache — result must be identical *)
+invM2 = TorsionGertsenshtein`CommonUtilities`GetCachedInverseMetric[sphericMetric3D];
+TestTrue["GetCachedInverseMetric: cache hit returns same object",
+  invM === invM2];
+
+(* Cache should now contain the inverse metric *)
+TestTrue["GetCachedInverseMetric: cache key exists",
+  KeyExistsQ[TorsionGertsenshtein`CommonUtilities`$TIDALGeometricCache,
+    {"invMetric", Hash[sphericMetric3D, "MD5"]}]];
+
+(* --- GetCachedChristoffels: correct Christoffel for spherical 2D spatial --- *)
+(* For polar metric diag(-1, 1, r^2), known Christoffels:
+     Γ^r_{θθ} = -r = -x[]        (component [2,3,3] in 1-indexed = [[2,3,3]])
+     Γ^θ_{rθ} = 1/r = 1/x[]      (component [3,2,3] or [[3,2,3]])
+     All others zero for t direction *)
+If[!xTensorQ[cuM3], DefManifold[cuM3, 3, {cua, cub, cuc}]];
+If[!MetricQ[cuEta3], DefMetric[-1, cuEta3[-cua, -cub], cuCD3]];
+If[!ChartQ[cuChart3], DefChart[cuChart3, cuM3, {0, 1, 2}, {t[], x[], y[]}]];
+MetricInBasis[cuEta3, -cuChart3, sphericMetric3D];
+SetMetricDownValues[cuEta3, cuChart3, sphericMetric3D];
+
+christs = TorsionGertsenshtein`CommonUtilities`GetCachedChristoffels[cuChart3, sphericMetric3D];
+
+(* Γ^r_{θθ} = christs[[2, 3, 3]] (1-indexed: r=2nd coord, θ=3rd coord) *)
+TestTrue["GetCachedChristoffels: Gamma^r_theta_theta = -x[]",
+  Simplify[christs[[2, 3, 3]] + x[]] === 0];
+
+(* Γ^θ_{rθ} = christs[[3, 2, 3]] *)
+TestTrue["GetCachedChristoffels: Gamma^theta_r_theta = 1/x[]",
+  Simplify[christs[[3, 2, 3]] - 1/x[]] === 0];
+
+(* Γ^t_{tt} = 0 (no time dependence) *)
+TestTrue["GetCachedChristoffels: Gamma^t_t_t = 0",
+  christs[[1, 1, 1]] === 0];
+
+(* Second call must return same (cached) result *)
+christs2 = TorsionGertsenshtein`CommonUtilities`GetCachedChristoffels[cuChart3, sphericMetric3D];
+TestTrue["GetCachedChristoffels: cache hit",
+  christs === christs2];
+
+(* --- GetCachedMetricRules: rules correctly substitute metric components --- *)
+rules = TorsionGertsenshtein`CommonUtilities`GetCachedMetricRules[cuChart3, sphericMetric3D];
+TestTrue["GetCachedMetricRules: returns a list",
+  Head[rules] === List];
+TestTrue["GetCachedMetricRules: non-empty",
+  Length[rules] > 0];
+
+(* Second call returns cached rules *)
+rules2 = TorsionGertsenshtein`CommonUtilities`GetCachedMetricRules[cuChart3, sphericMetric3D];
+TestTrue["GetCachedMetricRules: cache hit (identical object)",
+  rules === rules2];
+
+(* EvaluateMetricComponents uses cached rules *)
+(* g^{θθ} = 1/x[]^2: covariant index {2, -cuChart3} matches contravariant *)
+testExpr = cuEta3[{2, cuChart3}, {2, cuChart3}];  (* g^{θθ} *)
+evaluated = TorsionGertsenshtein`CommonUtilities`EvaluateMetricComponents[testExpr, cuChart3, sphericMetric3D];
+TestTrue["EvaluateMetricComponents via cache: g^{theta,theta} = 1/x[]^2",
+  Simplify[evaluated - 1/x[]^2] === 0];
+
+(* --- Different metric → different cache entry --- *)
+flatMetric3D = DiagonalMatrix[{-1, 1, 1}];
+invFlat = TorsionGertsenshtein`CommonUtilities`GetCachedInverseMetric[flatMetric3D];
+TestTrue["GetCachedInverseMetric: flat metric g^{θθ} = 1",
+  invFlat[[3,3]] === 1];
+TestTrue["GetCachedInverseMetric: separate cache entries for different metrics",
+  !SameQ[
+    TorsionGertsenshtein`CommonUtilities`GetCachedInverseMetric[sphericMetric3D],
+    TorsionGertsenshtein`CommonUtilities`GetCachedInverseMetric[flatMetric3D]
+  ]];
+
 (* === Exit === *)
 Print[""];
 ExitWithTestStatus[];
