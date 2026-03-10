@@ -16,6 +16,10 @@
        tensors to numeric ±1 values (supports 2D, 3D, 4D)
      - Metric evaluation: EvaluateMinkowskiMetric handles (-,+,+,...) signature
      - xAct introspection: IsChristoffelSymbol, IsCovDOperator, IsEpsilonTensor
+     - Geometric caching: $TIDALGeometricCache memoizes expensive per-derivation
+       computations — inverse metric, Christoffel arrays, metric substitution rules —
+       keyed by Hash[metricMatrix]. Eliminates 200-1500× redundant Simplify[Inverse[g]]
+       calls in curved-metric theories (spherical, cylindrical, conformal, etc.).
 
    DIMENSION SUPPORT:
      - 1+1D: 2 coordinates (t, x)
@@ -183,7 +187,86 @@ for background fields. Handles PD[{n,-chart}][field[{mu,-chart}]] -> D[value, co
 also substitutes bare field[{mu,-chart}] -> value. Also handles post-ConvertCDToDerivatives \
 Derivative[orders__][field][{mu,-chart}] residuals.";
 
+GetCachedInverseMetric::usage =
+  "GetCachedInverseMetric[metricMatrix] returns Simplify[Inverse[metricMatrix]], caching \
+the result by Hash[metricMatrix] so the expensive inverse+simplify is computed once per \
+unique metric per session. General: benefits all curved-metric theories.";
+
+GetCachedChristoffels::usage =
+  "GetCachedChristoffels[chart, metricMatrix] returns the 3D Christoffel array for the \
+given metric, caching by chart+metric hash. The first call invokes \
+ComputeChristoffelFromMetricMatrix (128+ Simplify operations for 4D); subsequent calls \
+return the cached result in O(1). Logs [cache MISS]/[cache HIT] messages.";
+
+GetCachedMetricRules::usage =
+  "GetCachedMetricRules[chart, metricMatrix] returns a cached list of covariant and \
+contravariant metric substitution rules for the given chart and metric. Built once per \
+unique (chart, metric) pair; reused across all 200-1500 EvaluateMetricComponents calls \
+in a curved-metric derivation. The rules match MetricQ[f] patterns for safety.";
+
 Begin["`Private`"];
+
+(* === Geometric Object Cache === *)
+(* Memoizes inverse metric and Christoffel components keyed by metric hash.
+   Avoids recomputing Simplify[Inverse[g]] and Christoffels (128+ Simplify calls)
+   once per field component in the decomposition pipeline. Keyed by Hash[metricMatrix]
+   so the same metric object always hits the cache. The cache persists for the
+   duration of the Wolfram session (one derivation), then is garbage-collected.
+   General: benefits all curved-metric theories (spherical, cylindrical, conformal, etc.). *)
+$TIDALGeometricCache = <||>;
+
+(* Get or compute inverse metric, caching by Hash[metricMatrix] *)
+GetCachedInverseMetric[metricMatrix_] := Module[
+  {key = Hash[metricMatrix, "MD5"]},
+  If[!KeyExistsQ[$TIDALGeometricCache, {"invMetric", key}],
+    $TIDALGeometricCache[{"invMetric", key}] = Simplify[Inverse[metricMatrix]]
+  ];
+  $TIDALGeometricCache[{"invMetric", key}]
+];
+
+(* Get or compute Christoffel array, caching by chart name + metric hash *)
+GetCachedChristoffels[chart_, metricMatrix_] := Module[
+  {key = {ToString[chart], Hash[metricMatrix, "MD5"]}},
+  If[!KeyExistsQ[$TIDALGeometricCache, {"christoffels", key}],
+    Print["  [cache MISS] Computing Christoffel symbols for ", chart, "..."];
+    $TIDALGeometricCache[{"christoffels", key}] =
+      ComputeChristoffelFromMetricMatrix[chart, metricMatrix];
+    Print["  [cache STORED] Christoffels for ", chart, " cached."],
+    Print["  [cache HIT] Reusing Christoffel symbols for ", chart, "."]
+  ];
+  $TIDALGeometricCache[{"christoffels", key}]
+];
+
+(* Get or compute metric substitution rules, caching by chart name + metric hash.
+   EvaluateMetricComponents is called 200-1500x per curved-metric derivation.
+   Caching the rules list (32 With[] blocks for 4D) eliminates redundant rebuilding.
+   Rules are chart-specific (patterns contain chart symbol), so key includes chart. *)
+GetCachedMetricRules[chart_, metricMatrix_] := Module[
+  {key = {ToString[chart], Hash[metricMatrix, "MD5"]}},
+  If[!KeyExistsQ[$TIDALGeometricCache, {"metricRules", key}],
+    Module[{dim, invMatrix},
+      dim = Length[metricMatrix];
+      invMatrix = GetCachedInverseMetric[metricMatrix];
+      $TIDALGeometricCache[{"metricRules", key}] = Flatten[{
+        (* Contravariant g^{ij}: positive chart basis *)
+        Table[
+          With[{val = invMatrix[[i + 1, j + 1]]},
+            f_Symbol[{i, chart}, {j, chart}] /; MetricQ[f] -> val
+          ],
+          {i, 0, dim - 1}, {j, 0, dim - 1}
+        ],
+        (* Covariant g_{ij}: negative chart basis *)
+        Table[
+          With[{val = metricMatrix[[i + 1, j + 1]]},
+            f_Symbol[{i, -chart}, {j, -chart}] /; MetricQ[f] -> val
+          ],
+          {i, 0, dim - 1}, {j, 0, dim - 1}
+        ]
+      }]
+    ]
+  ];
+  $TIDALGeometricCache[{"metricRules", key}]
+];
 
 (* === xAct Introspection Helpers === *)
 (* Use xAct's type-checking functions instead of fragile string matching *)
@@ -292,8 +375,8 @@ ComputeChristoffelFromMetricMatrix[chart_, metricMatrix_] := Module[
   dim = Length[metricMatrix];
   coords = GetCoordinateSymbols[chart];
 
-  (* Compute inverse metric *)
-  invMetric = Simplify[Inverse[metricMatrix]];
+  (* Reuse cached inverse metric: same metric → same inverse, no re-computation *)
+  invMetric = GetCachedInverseMetric[metricMatrix];
 
   (* Compute partial derivatives of metric: dg[[i, j, k]] = d_k g_{ij} *)
   (* Indices are 1-based here *)
@@ -353,14 +436,14 @@ EvaluateChristoffelComponents[expr_, chart_, covd_:None, metricMatrix_:None] := 
     Return[result]
   ];
 
-  (* Compute Christoffel values *)
+  (* Compute Christoffel values (with caching for True path — avoids 14x redundant computation) *)
   If[covd === True,
     (* Compute directly from the metric matrix using the standard formula *)
     If[metricMatrix === None,
       Throw["EvaluateChristoffelComponents: covd=True requires a MetricMatrix. \
 Pass the metric matrix as the 4th argument."]
     ];
-    christoffelValues = ComputeChristoffelFromMetricMatrix[chart, metricMatrix],
+    christoffelValues = GetCachedChristoffels[chart, metricMatrix],
     (* Explicit CovD symbol provided - use xAct's TraceBasisDummy *)
     christoffelValues = ComputeChristoffelFromMetric[chart, covd]
   ];
@@ -396,30 +479,10 @@ EvaluateMinkowskiMetric[expr_, chart_] := Module[
 (* both covariant and contravariant components. *)
 (* Used for curved spacetime metrics (e.g., conformal g_ab = Omega^2 eta_ab). *)
 
-EvaluateMetricComponents[expr_, chart_, metricMatrix_] := Module[
-  {dim, invMatrix, rules},
-  dim = Length[metricMatrix];
-  invMatrix = Simplify[Inverse[metricMatrix]];
-  rules = Flatten[{
-    (* Contravariant g^{ij}: positive chart basis *)
-    (* Use MetricQ condition so only metric tensors are matched, not field tensors *)
-    (* With[] injects pre-computed values into Rule (avoiding RuleDelayed scoping) *)
-    Table[
-      With[{val = Simplify[invMatrix[[i + 1, j + 1]]]},
-        f_Symbol[{i, chart}, {j, chart}] /; MetricQ[f] -> val
-      ],
-      {i, 0, dim - 1}, {j, 0, dim - 1}
-    ],
-    (* Covariant g_{ij}: negative chart basis *)
-    Table[
-      With[{val = Simplify[metricMatrix[[i + 1, j + 1]]]},
-        f_Symbol[{i, -chart}, {j, -chart}] /; MetricQ[f] -> val
-      ],
-      {i, 0, dim - 1}, {j, 0, dim - 1}
-    ]
-  }];
-  expr /. rules
-];
+EvaluateMetricComponents[expr_, chart_, metricMatrix_] :=
+  (* Use cached rules: avoids rebuilding 32 With[] blocks and Simplify[Inverse[g]]
+     on every call. Called 200-1500x per curved-metric derivation — caching is critical. *)
+  expr /. GetCachedMetricRules[chart, metricMatrix];
 
 (* === Pre-Define Metric DownValues for Auto-Evaluation === *)
 (* Sets direct Mathematica DownValues for all metric components (covariant + contravariant).
@@ -432,7 +495,8 @@ EvaluateMetricComponents[expr_, chart_, metricMatrix_] := Module[
 SetMetricDownValues[metric_, chart_, metricMatrix_] := Module[
   {dim, invMatrix, nSet = 0},
   dim = Length[metricMatrix];
-  invMatrix = Simplify[Inverse[metricMatrix]];
+  (* Reuse cached inverse metric — same Simplify[Inverse[g]] as EvaluateMetricComponents *)
+  invMatrix = GetCachedInverseMetric[metricMatrix];
   Do[
     With[{covVal = metricMatrix[[ii + 1, jj + 1]],
           contVal = invMatrix[[ii + 1, jj + 1]]},

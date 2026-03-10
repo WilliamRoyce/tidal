@@ -11,6 +11,7 @@
    DATA FLOW:
      Tensor EOM (abstract indices: A_a, F_{ab})
        → SeparateFieldMetrics (undo ContractMetric: V^a → g^{ab} V_{-b})
+         [hoisted: applied once per EOM before component loop, not per component]
        → ToBasis (convert to chart basis)
        → **Batched** TraceBasisDummy + Expand + metric evaluation
          (fused to prevent O(dim^{2*rank}) intermediate memory blowup)
@@ -333,6 +334,13 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
         Print["SkipTuples: skipping ", Length[allTuples] - Length[componentTuples],
               " components, ", Length[componentTuples], " remaining"]
       ];
+      (* Pre-apply SeparateFieldMetrics once on the full EOM before extracting components.
+         This converts V^a → g^{ab} V_{-b} (undoes ContractMetric) at abstract-tensor level.
+         Safe to hoist: SeparateFieldMetrics acts on dummy/contracted indices, not free indices,
+         so it commutes with the per-component free-index replacements in ExtractTensorComponent
+         step 1. Hoisting eliminates O(rank * dim^rank) redundant calls. *)
+      eom = SeparateFieldMetrics[eom, chart];
+
       (* Use Do+AppendTo instead of Table so Share[] can reclaim memory
          between component extractions — critical for cross-field coupling
          cases like Einstein-Maxwell where expressions grow large. *)
@@ -478,10 +486,8 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
     componentEq = eom /. replacements;
   ];
 
-  (* Step 1.5: Separate metric contractions to ensure covariant field indices *)
-  (* SeparateMetric undoes ContractMetric: V^a → g^{ab} V_{-b} *)
-  (* Must happen BEFORE ToBasis so fields have canonical (down) indices in basis *)
-  componentEq = SeparateFieldMetrics[componentEq, chart];
+  (* Step 1.5: SeparateFieldMetrics is now hoisted to DecomposeToComponents before the
+     component loop. This step is a no-op here (already applied to eom). *)
 
   (* Step 2: ToBasis — term-by-term to avoid xperm segfault on large sums *)
   If[Head[componentEq] === Plus,
@@ -502,7 +508,7 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
      For curved spacetime: evaluates computed Christoffel components.
      After early metric eval (step 3.6), the expression is already much smaller,
      so this step operates on far fewer terms. *)
-  componentEq = EvaluateChristoffelComponents[componentEq, chart, computeChristoffels];
+  componentEq = EvaluateChristoffelComponents[componentEq, chart, computeChristoffels, metricMatrix];
   componentEq = Expand[componentEq];
   Print["    step4-Christoffel: ", Round[MemoryInUse[]/1024.^2], " MB, ",
         If[Head[componentEq]===Plus, Length[componentEq], 1], " terms"];
