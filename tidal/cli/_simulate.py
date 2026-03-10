@@ -1339,9 +1339,10 @@ def _check_mass_stability(
     coeff_eval = CoefficientEvaluator(spec, grid_info, params)
     stability = check_pointwise_mass_stability(coeff_eval, spec, grid_info)
     require_stable: bool = getattr(args, "require_stable", False)
-    # Informational notes (e.g. asymmetric matrix) — always printed, never fatal
-    for note in stability.notes:
-        print(f"  Note: {note}", file=sys.stderr)
+    # Informational notes (e.g. asymmetric matrix) — suppressed in --quiet mode
+    if not getattr(args, "quiet", False):
+        for note in stability.notes:
+            print(f"  Note: {note}", file=sys.stderr)
     # Stability errors (negative eigenvalues) — fatal with --require-stable
     for msg in stability.errors:
         if require_stable:
