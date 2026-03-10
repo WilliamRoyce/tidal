@@ -525,7 +525,11 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "  tidal plot output_dir/ --type amplitude --overlay 'exp(-0.1*t)'\n"
             "  tidal plot output_dir/ --type energy --fields phi_0,chi_0\n"
             "  tidal plot output_dir/ --type profile --cross-section y=25.0\n"
-            "  tidal plot output_dir/ --type compare --output compare.png"
+            "  tidal plot output_dir/ --type compare --output compare.png\n"
+            "  tidal plot sweep_dir/ --type sweep --metric P_final "
+            "--overlay 'sin(kappa * B0 * t_end / 2)**2'\n"
+            "  tidal plot sweep_dir/ --type sweep --metric P_final "
+            "--overlay 'sin(kappa * Bpeak * R * sqrt(pi/2))**2'"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -594,7 +598,14 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--overlay",
         default=None,
         metavar="EXPR",
-        help="Analytic formula vs time for amplitude plot (e.g. 'exp(-0.1*t)')",
+        help=(
+            "Analytic reference formula for overlay. "
+            "For --type=amplitude: variable 't' (time), e.g. 'exp(-0.1*t)'. "
+            "For --type=sweep: swept parameter names, fixed parameters, and numeric "
+            "sim settings (t_end, grid_shape) are available as variables. "
+            "1D example: 'sin(kappa * B0 * t_end / 2)**2'. "
+            "2D example: 'sin(kappa * Bpeak * R * sqrt(pi/2))**2' (3-panel figure)."
+        ),
     )
     # Conservation threshold
     plot_parser.add_argument(

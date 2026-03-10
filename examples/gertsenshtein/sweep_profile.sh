@@ -61,10 +61,12 @@ tidal sweep ../data/gertsenshtein_localized.json \
 
 echo ""
 
-# Plot sweep results: P(B0_peak, R) vs Boccaletti formula
+# Plot sweep results: P(Bpeak, R) vs Boccaletti formula sin^2(kappa * Bpeak * R * sqrt(pi/2))
+# 3-panel figure: TIDAL | analytical | |error| (Boccaletti 1970, Nuovo Cimento 70B:129)
 tidal plot ../data/gertsenshtein_sweep_profile --type sweep \
   --metric P_final \
   --title "Gertsenshtein P(Bpeak, R) — Boccaletti formula validation" \
+  --overlay 'sin(kappa * Bpeak * R * sqrt(pi/2))**2' \
   --output ../data/gertsenshtein_sweep_profile/sweep.png --quiet
 
 echo ""

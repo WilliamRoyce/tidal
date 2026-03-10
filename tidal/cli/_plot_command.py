@@ -351,6 +351,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
         render_sweep_1d,
         render_sweep_1d_multi,
         render_sweep_2d,
+        render_sweep_2d_with_overlay,
         render_sweep_compare,
         render_sweep_parallel,
         render_sweep_scatter,
@@ -405,17 +406,30 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
         if plot_type == "sweep":
             metrics = [s.strip() for s in raw_metric.split(",")]  # type: ignore[union-attr]
             n_swept = len(results.swept_params)
+            overlay: str | None = getattr(args, "overlay", None)
 
             if n_swept == 1:
                 if len(metrics) == 1:
                     fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
-                    render_sweep_1d(ax, results, metrics[0])
+                    try:
+                        render_sweep_1d(ax, results, metrics[0], overlay=overlay)
+                    except ValueError as exc:
+                        print(f"Error in --overlay formula: {exc}", file=sys.stderr)
+                        return 1
                 else:
                     fig = plt.figure(figsize=figsize or (8, 3 * len(metrics)))
                     render_sweep_1d_multi(fig, results, metrics)
             elif n_swept == 2:  # noqa: PLR2004
-                fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 6))
-                render_sweep_2d(ax, results, metrics[0])
+                if overlay:
+                    fig = plt.figure(figsize=figsize or (15, 5))
+                    try:
+                        render_sweep_2d_with_overlay(fig, results, metrics[0], overlay)
+                    except ValueError as exc:
+                        print(f"Error in --overlay formula: {exc}", file=sys.stderr)
+                        return 1
+                else:
+                    fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 6))
+                    render_sweep_2d(ax, results, metrics[0])
             else:
                 print(
                     f"Error: sweep plot supports 1 or 2 swept parameters, got {n_swept}",

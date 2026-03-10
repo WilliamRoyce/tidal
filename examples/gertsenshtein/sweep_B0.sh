@@ -51,10 +51,11 @@ tidal sweep ../data/gertsenshtein.json \
 
 echo ""
 
-# Plot sweep results: P(B0) vs analytical
+# Plot sweep results: P(B0) vs analytical sin^2(kappa * B0 * D / 2) where D = t_end * c = t_end
 tidal plot ../data/gertsenshtein_sweep_B0 --type sweep \
   --metric P_final \
   --title "Gertsenshtein P(B0) — graviton-photon conversion" \
+  --overlay 'sin(kappa * B0 * t_end / 2)**2' \
   --output ../data/gertsenshtein_sweep_B0/sweep.png --quiet
 
 echo ""
