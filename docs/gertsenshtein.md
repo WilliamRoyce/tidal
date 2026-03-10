@@ -73,7 +73,8 @@ B₀ on a (unit kinetic prefactor). The eigenmode analysis gives beat frequency
 P(graviton → photon) = sin²(κ B₀ D / 2)
 ```
 
-This is confirmed numerically (RMS error < 0.02 across multiple B₀ values).
+This is confirmed numerically (RMS error < 0.015 across a 40-point B₀ sweep at N=1024,
+using the corrected amplitude formula — see [gertsenshtein_formula.md](gertsenshtein_formula.md)).
 
 **Note on P&R error:** Palessandro & Rothman (2023, Eq. 26; 2024, arXiv:2405.01407)
 quote P = sin²(√G · B₀ · D), which is incorrect by a factor of √(4π) = 2√π ≈ 3.54
