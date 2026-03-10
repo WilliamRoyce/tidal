@@ -82,22 +82,62 @@ _COMPILED_FUNCTION_PATTERNS: list[tuple[re.Pattern[str], str]] = [
 
 
 def _invert_exp_denominator(expr: str) -> str:
-    """Convert ``/exp(arg)`` → ``*exp(-(arg))`` to avoid overflow.
+    """Convert exp-in-denominator patterns to ``*exp(-(arg))`` to avoid overflow.
 
-    Wolfram's InputForm may serialize ``Exp[-x^2/R^2]`` as
-    ``1/E^(x^2/R^2)``, which after ``E^`` → ``exp`` substitution becomes
-    ``1/exp(x**2/R**2)``.  Evaluating ``exp(+large)`` overflows before the
-    division by inf is computed, triggering numpy RuntimeWarnings even though
-    the final result is numerically correct (0).  This function detects
-    ``/exp(`` followed by a balanced-parenthesis argument and rewrites it to
-    ``*exp(-(arg))``, keeping the positive-exponent overflow from occurring.
+    Wolfram's InputForm may serialize ``Exp[-x^2/R^2]`` in two forms:
+
+    1. ``k/E^(x^2/R^2)`` → after ``E^→exp``: ``k/exp(x^2/R^2)``
+       Handled as: ``/exp(arg)`` → ``*exp(-(arg))``
+
+    2. ``k/(E^(x^2/(2*R^2))*R^2)`` → after ``E^→exp``: ``k/(exp(x^2/(2*R^2))*R^2)``
+       Handled as:
+         ``/(exp(arg))``        → ``*exp(-(arg))``
+         ``/(exp(arg)*rest)``   → ``*exp(-(arg))/(rest)``
+
+    Both patterns avoid evaluating ``exp(+large)``, preventing numpy
+    ``RuntimeWarning: overflow encountered in exp``.
     """
     result: list[str] = []
     i = 0
     n = len(expr)
     while i < n:
-        if expr[i : i + 5] == "/exp(":
-            # Extract balanced parenthesised argument
+        if expr[i : i + 6] == "/(exp(":
+            # Compound denominator: /(exp(arg)) or /(exp(arg)*rest)
+            # Extract the exp() argument (balanced parens from i+6)
+            exp_depth = 1
+            j = i + 6
+            while j < n and exp_depth > 0:
+                if expr[j] == "(":
+                    exp_depth += 1
+                elif expr[j] == ")":
+                    exp_depth -= 1
+                j += 1
+            exp_arg = expr[i + 6 : j - 1]
+            # j now points to the character immediately after exp(...)'s closing paren
+            if j < n and expr[j] == ")":
+                # /(exp(arg))  →  *exp(-(arg))
+                result.append(f"*exp(-({exp_arg}))")
+                i = j + 1
+            elif j < n and expr[j] == "*":
+                # /(exp(arg)*rest)  →  *exp(-(arg))/(rest)
+                # The outer ( opened at i+1 is still at depth 1; find its matching )
+                outer_depth = 1
+                k = j + 1
+                while k < n and outer_depth > 0:
+                    if expr[k] == "(":
+                        outer_depth += 1
+                    elif expr[k] == ")":
+                        outer_depth -= 1
+                    k += 1
+                rest = expr[j + 1 : k - 1]
+                result.append(f"*exp(-({exp_arg}))/({rest})")
+                i = k
+            else:
+                # Unrecognised shape — pass through unchanged
+                result.append(expr[i])
+                i += 1
+        elif expr[i : i + 5] == "/exp(":
+            # Simple inverted exp: /exp(arg)  →  *exp(-(arg))
             depth = 1
             j = i + 5
             while j < n and depth > 0:
