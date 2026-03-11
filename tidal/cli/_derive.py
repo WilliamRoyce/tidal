@@ -2303,10 +2303,75 @@ def _wls_constraint_metadata(
     return lines
 
 
-def _canonical_field_heads(ctx: _WlsContext) -> tuple[str, str]:
-    """Return (heads_str, all_heads_str) for canonical pipeline WLS generation."""
+def _matter_pert_head_map(ctx: _WlsContext) -> dict[str, str]:
+    """Build field_name → Wolfram head mapping for matter perturbation fields.
+
+    For matter perturbation theories (Einstein-Maxwell, etc.), the L^(2)
+    Lagrangian uses perturbation field heads (e.g. ``mmpa``), not the
+    original field heads (e.g. ``mmpA``).  This helper replicates the
+    collision-avoidance logic from ``_wls_matter_perturbation_setup``.
+
+    Returns a dict mapping perturbation field names to their Wolfram heads,
+    plus a set of original field names that should be excluded from the
+    canonical pipeline (they no longer appear in L^(2)).
+    """
+    if not ctx.linearization:
+        return {}
+    mp_list = ctx.linearization.get("matter_perturbations", [])
+    if not mp_list:
+        return {}
+
     p = ctx.prefix
-    field_heads = [f"{p}{f['name'].capitalize()}" for f in ctx.fields]
+    head_map: dict[str, str] = {}
+    for mp in mp_list:
+        mf_name = mp["field"]
+        mp_name = mp["perturbation_name"]
+        mf_head = f"{p}{mf_name.capitalize()}"
+        mp_head_candidate = f"{p}{mp_name.capitalize()}"
+        # Collision avoidance: if capitalize(pert) == capitalize(field),
+        # use the perturbation name as-is (e.g. "a" → "mmpa" not "mmpA").
+        mp_head = (
+            f"{p}{mp_name}" if mp_head_candidate == mf_head else mp_head_candidate
+        )
+        head_map[mp_name] = mp_head
+    return head_map
+
+
+def _matter_pert_originals(ctx: _WlsContext) -> set[str]:
+    """Return the set of original field names that are replaced by perturbations.
+
+    These fields should be excluded from the canonical pipeline because they
+    no longer appear as dynamical variables in L^(2).
+    """
+    if not ctx.linearization:
+        return set()
+    return {
+        mp["field"]
+        for mp in ctx.linearization.get("matter_perturbations", [])
+    }
+
+
+def _canonical_field_heads(ctx: _WlsContext) -> tuple[str, str]:
+    """Return (heads_str, all_heads_str) for canonical pipeline WLS generation.
+
+    For matter perturbation theories, uses the perturbation heads (e.g.
+    ``mmpa``) and excludes original fields that were replaced by perturbations.
+    """
+    p = ctx.prefix
+    pert_heads = _matter_pert_head_map(ctx)
+    originals = _matter_pert_originals(ctx)
+
+    field_heads: list[str] = []
+    for f in ctx.fields:
+        fname = f["name"]
+        if fname in originals:
+            # Original field replaced by perturbation — skip
+            continue
+        if fname in pert_heads:
+            field_heads.append(pert_heads[fname])
+        else:
+            field_heads.append(f"{p}{fname.capitalize()}")
+
     all_heads = list(field_heads)
     all_heads.extend(f"{p}{bg['name'].capitalize()}" for bg in ctx.background_fields)
     return ", ".join(field_heads), ", ".join(all_heads)
@@ -2370,9 +2435,28 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
     lines.extend(
         [
             "",
-            "(* Decompose Lagrangian to component form *)",
-            f"lagComp = DecomposeScalarExpression[lagForCanon, {ctx.chart}, {{{all_heads_str}}}, "
+            "(* Decompose Lagrangian to component form.                             *)",
+            "(* For memory efficiency, decompose each additive term separately and   *)",
+            "(* accumulate results.  This bounds peak memory by the single-term peak *)",
+            "(* instead of the whole-Lagrangian peak — critical for Einstein-Maxwell  *)",
+            "(* theories where ToBasis + TraceBasisDummy on the full L^(2) generates *)",
+            "(* O(dim^{2K}) intermediate terms (K = contracted index pairs).         *)",
+            "lagTerms = If[Head[lagForCanon] === Plus, List @@ lagForCanon, {lagForCanon}];",
+            f'Print["Decomposing Lagrangian: ", Length[lagTerms], " additive terms"];',
+            "lagComp = 0;",
+            "Do[",
+            "  Module[{termComp},",
+            f"    termComp = DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
             f'"MetricMatrix" -> {p}MetricMatrix];',
+            "    lagComp += termComp;",
+            "  ],",
+            "  {k, Length[lagTerms]}",
+            "];",
+            "Clear[lagTerms];",
+            "",
+            "(* Free abstract Lagrangian — only component form needed from here *)",
+            f"Clear[lagForCanon, {p}Lagrangian]; Share[];",
+            _wls_mem_print("After Lagrangian decomposition"),
         ]
     )
 
@@ -2428,10 +2512,20 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
         ]
     )
 
-    # Build component-to-function mapping from Python field definitions
+    # Build component-to-function mapping from Python field definitions.
+    # For matter perturbation fields, use the perturbation head (e.g. mmpa0)
+    # instead of the original head (e.g. mmpA0).
+    pert_heads = _matter_pert_head_map(ctx)
+    originals = _matter_pert_originals(ctx)
     for field in ctx.fields:
         fname = field["name"]
-        head = f"{p}{fname.capitalize()}"
+        if fname in originals:
+            # Original field replaced by perturbation — skip
+            continue
+        if fname in pert_heads:
+            head = pert_heads[fname]
+        else:
+            head = f"{p}{fname.capitalize()}"
         n_comps = _field_component_count(field, ctx.dim)
         lines.extend(f'compToFunc["{fname}_{j}"] = {head}{j};' for j in range(n_comps))
 
@@ -2664,6 +2758,20 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
     # exists (the canonical path reads allCompNames from fieldEquations).
     # Runs for ALL theories that have a Lagrangian.
     if ctx.lagrangian_expr:
+        # Memory preparation before canonical pipeline.  The EOM pass's
+        # cached kernel state (Christoffel symbols, metric DownValues,
+        # background field DownValues) is reused by DecomposeScalarExpression.
+        # Share[] deduplicates subexpressions to reclaim memory for the
+        # Lagrangian decomposition while preserving these caches.
+        lines.extend(
+            (
+                "(* Memory cleanup before canonical pipeline — preserves cached *)",
+                "(* Christoffels, metric DownValues, background field DownValues *)",
+                "Share[];",
+                _wls_mem_print("Before canonical pipeline"),
+                "",
+            )
+        )
         lines.extend(_wls_canonical_pipeline(ctx))
 
     # Free fieldEquations now that both JSON structure and canonical

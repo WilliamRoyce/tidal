@@ -903,6 +903,18 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
 
   componentExpr = expr;
 
+  (* Expand Scalar[] wrappers.  Gauge-fixing terms produce                   *)
+  (* Scalar[CD_a V^a]^2 — the Scalar wrapper is opaque and prevents ToBasis/ *)
+  (* TraceBasisDummy from decomposing the inner expression to chart-basis     *)
+  (* components.  Expand by applying ToBasis + TraceBasisDummy to the inner   *)
+  (* expression, replacing the Scalar with the resulting component sum.       *)
+  (* This must happen before the main ToBasis call.                           *)
+  componentExpr = componentExpr //. Scalar[x_] :> Module[{inner},
+    inner = ToBasis[chart][x];
+    inner = TraceBasisDummy[inner];
+    inner
+  ];
+
   (* For curved spacetime: expand Christoffel symbols to metric derivatives *)
   If[shouldComputeChristoffels && metricMatrix =!= None,
     Module[{covdOps, covdOp},
