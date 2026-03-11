@@ -15,8 +15,7 @@ import numpy as np
 
 from tidal.measurement._energy import (
     _ENERGY_FLOOR,  # pyright: ignore[reportPrivateUsage]
-    _resolve_mass_squared,  # pyright: ignore[reportPrivateUsage]
-    compute_field_energy,
+    compute_energy_timeseries,
 )
 from tidal.measurement._utils import (
     _normalize_group,  # pyright: ignore[reportPrivateUsage]
@@ -64,26 +63,19 @@ class ConversionResult:
     target_field: str
 
 
-def _field_energy_series(
+def _per_field_energy_timeseries(
     data: SimulationData,
-    field_name: str,
-    mass_squared: float | NDArray[np.float64],
-) -> NDArray[np.float64]:
-    """Compute energy density of *field_name* at every snapshot."""
-    energies: list[float] = []
-    for t_idx in range(data.n_snapshots):
-        field_arr = data.fields[field_name][t_idx]
-        mom_all = data.velocities.get(field_name)
-        mom_arr = mom_all[t_idx] if mom_all is not None else None
-        fe = compute_field_energy(
-            field_arr,
-            mom_arr,
-            mass_squared,
-            data.grid_spacing,
-            data.periodic,
-        )
-        energies.append(fe.total)
-    return np.array(energies, dtype=np.float64)
+) -> tuple[NDArray[np.float64], dict[str, NDArray[np.float64]]]:
+    """Compute per-field Hamiltonian energy timeseries.
+
+    Uses ``compute_energy_timeseries`` which correctly handles volume weights
+    (``sqrt|g_spatial|``), operator-aware gradient axes, BC types, and
+    position-dependent masses.  This ensures the conversion measurement is
+    physically correct for curved spacetimes (e.g. spherical coordinates
+    with r² volume element).
+    """
+    times, per_field, _interaction, _total = compute_energy_timeseries(data)
+    return times, per_field
 
 
 def compute_conversion_probability(
@@ -96,6 +88,11 @@ def compute_conversion_probability(
     This is the primary measurement for the Gertsenshtein effect.  The source
     field is excited with some initial energy; the target field starts at zero.
     Coupling terms transfer energy between them over time.
+
+    Energy is computed via the canonical Hamiltonian (kinetic + gradient + mass),
+    including the spatial volume element ``sqrt|g_spatial|`` for curved
+    coordinates.  This gives physically correct results for both flat and
+    curved spacetimes.
 
     Parameters
     ----------
@@ -127,16 +124,24 @@ def compute_conversion_probability(
         msg = f"Source and target must be different fields, got '{source_field}'"
         raise ValueError(msg)
 
-    source_arr = _field_energy_series(
-        data,
-        source_field,
-        _resolve_mass_squared(data, names.index(source_field)),
-    )
-    target_arr = _field_energy_series(
-        data,
-        target_field,
-        _resolve_mass_squared(data, names.index(target_field)),
-    )
+    # Use Hamiltonian energy (volume-weighted, operator-aware gradient axes)
+    times, per_field = _per_field_energy_timeseries(data)
+
+    if source_field not in per_field:
+        msg = (
+            f"Source field '{source_field}' is non-dynamical — "
+            f"cannot measure conversion"
+        )
+        raise ValueError(msg)
+    if target_field not in per_field:
+        msg = (
+            f"Target field '{target_field}' is non-dynamical — "
+            f"cannot measure conversion"
+        )
+        raise ValueError(msg)
+
+    source_arr = per_field[source_field]
+    target_arr = per_field[target_field]
     total_arr = source_arr + target_arr
 
     e_source_0 = source_arr[0]
@@ -156,7 +161,7 @@ def compute_conversion_probability(
     )
 
     return ConversionResult(
-        times=data.times.copy(),
+        times=times,
         probability=probability,
         source_energy=source_arr,
         target_energy=target_arr,
@@ -167,20 +172,6 @@ def compute_conversion_probability(
     )
 
 
-def _group_energy_series(
-    data: SimulationData,
-    field_group: tuple[str, ...],
-) -> NDArray[np.float64]:
-    """Sum per-field energy timeseries across a group of fields."""
-    names = data.spec.component_names
-    total: NDArray[np.float64] = np.zeros(data.n_snapshots, dtype=np.float64)
-    for f in field_group:
-        total += _field_energy_series(
-            data, f, _resolve_mass_squared(data, names.index(f))
-        )
-    return total
-
-
 def compute_group_conversion(
     data: SimulationData,
     source_fields: str | Sequence[str],
@@ -189,9 +180,13 @@ def compute_group_conversion(
     """Measure energy conversion between field groups.
 
     Computes ``P(t) = E_targets(t) / E_sources(0)`` where each energy
-    is the sum of per-field canonical energies across the group.  This is
-    the natural measurement for the Gertsenshtein effect where source and
-    target are multi-component tensor/vector field groups.
+    is the sum of per-field canonical Hamiltonian energies across the group.
+    This is the natural measurement for the Gertsenshtein effect where source
+    and target are multi-component tensor/vector field groups.
+
+    Energy is computed via ``compute_energy_timeseries`` which correctly
+    handles volume weights, operator-aware gradient axes, and position-
+    dependent masses for curved spacetimes.
 
     Parameters
     ----------
@@ -243,9 +238,22 @@ def compute_group_conversion(
         )
         raise ValueError(msg)
 
+    # Use Hamiltonian energy (volume-weighted, operator-aware gradient axes)
+    times, per_field = _per_field_energy_timeseries(data)
+
+    # Validate all fields are dynamical
+    for name in (*src, *tgt):
+        if name not in per_field:
+            msg = f"Field '{name}' is non-dynamical — cannot measure conversion"
+            raise ValueError(msg)
+
     # Sum energies across group members
-    source_arr = _group_energy_series(data, src)
-    target_arr = _group_energy_series(data, tgt)
+    source_arr = np.zeros(data.n_snapshots, dtype=np.float64)
+    for f in src:
+        source_arr += per_field[f]
+    target_arr = np.zeros(data.n_snapshots, dtype=np.float64)
+    for f in tgt:
+        target_arr += per_field[f]
     total_arr = source_arr + target_arr
 
     e_source_0 = float(source_arr[0])
@@ -265,7 +273,7 @@ def compute_group_conversion(
     )
 
     return ConversionResult(
-        times=data.times.copy(),
+        times=times,
         probability=probability,
         source_energy=source_arr,
         target_energy=target_arr,
