@@ -491,6 +491,17 @@ class HamiltonianFactor:
         return cls(field=str(data["field"]), operator=str(data["operator"]))
 
 
+def _base_field(field_name: str) -> str:
+    """Strip velocity prefix ``v_`` to get the base field name.
+
+    E-L velocity form uses ``v_{field}`` for velocities. This extracts the
+    underlying field name: ``"v_phi_0"`` → ``"phi_0"``, ``"phi_0"`` → ``"phi_0"``.
+    """
+    if field_name.startswith("v_"):
+        return field_name[2:]
+    return field_name
+
+
 @dataclass(frozen=True)
 class HamiltonianTerm:
     """A single quadratic term in the Hamiltonian density.
@@ -512,6 +523,11 @@ class HamiltonianTerm:
         When non-empty, the coefficient must be evaluated on the grid.
         Older JSON exports omit this field; auto-detection via
         ``position_dependent`` covers those cases.
+    term_class : str
+        Classification: ``"self"`` (both factors reference the same base
+        field) or ``"interaction"`` (cross-field coupling). Defaults to
+        ``"unknown"`` for older JSONs; use ``is_self_energy`` property
+        which auto-classifies by comparing factor field names.
     """
 
     coefficient: float
@@ -519,6 +535,7 @@ class HamiltonianTerm:
     factor_b: HamiltonianFactor
     coefficient_symbolic: str | None = None
     coordinate_dependent: tuple[str, ...] = ()
+    term_class: str = "unknown"  # "self" or "interaction"
 
     @property
     def position_dependent(self) -> bool:
@@ -535,6 +552,27 @@ class HamiltonianTerm:
             return bool(_COORD_CALL_RE.search(self.coefficient_symbolic))
         return False
 
+    @property
+    def is_self_energy(self) -> bool:
+        """True if both factors reference the same base field (self-energy).
+
+        Uses ``term_class`` when available (from Wolfram export), otherwise
+        classifies by comparing base field names (stripping ``v_`` prefix).
+        """
+        if self.term_class != "unknown":
+            return self.term_class == "self"
+        return _base_field(self.factor_a.field) == _base_field(self.factor_b.field)
+
+    @property
+    def base_field_a(self) -> str:
+        """Base field name for factor_a (strips ``v_`` velocity prefix)."""
+        return _base_field(self.factor_a.field)
+
+    @property
+    def base_field_b(self) -> str:
+        """Base field name for factor_b (strips ``v_`` velocity prefix)."""
+        return _base_field(self.factor_b.field)
+
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> HamiltonianTerm:
         """Parse from JSON dict."""
@@ -544,6 +582,7 @@ class HamiltonianTerm:
             factor_b=HamiltonianFactor.from_dict(data["factor_b"]),
             coefficient_symbolic=data.get("coefficient_symbolic"),
             coordinate_dependent=tuple(data.get("coordinate_dependent", [])),
+            term_class=str(data.get("term_class", "unknown")),
         )
 
 

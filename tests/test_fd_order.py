@@ -338,43 +338,6 @@ class TestSparsityWidensWithOrder:
 
 
 # ---------------------------------------------------------------------------
-# Energy measurement consistency test
-# ---------------------------------------------------------------------------
-
-
-class TestEnergyMeasurementConsistency:
-    """Verify energy measurement uses the same stencils as the solver.
-
-    After setting FD order to 4, the energy module's gradient computation
-    should be more accurate than order 2 (proving it delegates to
-    operators.py rather than using its own 2nd-order stencils).
-    """
-
-    def test_energy_gradient_uses_solver_stencils(self) -> None:
-        """Energy module gradient improves with FD order (delegates to operators.py)."""
-        from tidal.measurement._energy import _first_derivative
-
-        n = 64
-        dx = 2 * np.pi / n
-        x = np.linspace(0, 2 * np.pi - dx, n)
-        f = np.sin(x)
-        exact = np.cos(x)
-
-        set_fd_order(2)
-        grad_o2 = _first_derivative(f, 0, dx, bc_type="periodic")
-        err_o2 = float(np.max(np.abs(grad_o2 - exact)))
-
-        set_fd_order(4)
-        grad_o4 = _first_derivative(f, 0, dx, bc_type="periodic")
-        err_o4 = float(np.max(np.abs(grad_o4 - exact)))
-
-        # 4th-order should be significantly more accurate
-        assert err_o4 < err_o2 * 0.01, (
-            f"Energy gradient did not improve: o2={err_o2:.2e}, o4={err_o4:.2e}"
-        )
-
-
-# ---------------------------------------------------------------------------
 # Grid-size validation tests
 # ---------------------------------------------------------------------------
 

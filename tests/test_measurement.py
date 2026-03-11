@@ -30,7 +30,6 @@ from tidal.measurement import (
     compute_conversion_probability,
     compute_dispersion,
     compute_energy_timeseries,
-    compute_field_energy,
     compute_group_conversion,
     compute_group_spectral_conversion,
     compute_mixing_length,
@@ -44,12 +43,8 @@ from tidal.measurement import (
 )
 from tidal.measurement._energy import (
     _apply_spatial_operator,
-    _compute_constraint_coupling_energy,
-    _compute_constraint_self_energy,
     _compute_hamiltonian_from_canonical,
-    _compute_virial_potential,
     _evaluate_hamiltonian_factor,
-    _gradient_energy_density,
     _is_velocity_field,
     _resolve_term_target,
     _self_gradient_axes,
@@ -217,43 +212,6 @@ def _make_single_field_data(
 # ============================================================
 
 
-class TestFieldEnergy:
-    """Test compute_field_energy."""
-
-    def test_gaussian_energy_positive(self) -> None:
-        """Energy of a Gaussian pulse is positive."""
-        data = _make_single_field_data()
-        fe = compute_field_energy(
-            data.fields["phi_0"][0],
-            data.velocities["phi_0"][0],
-            mass_squared=1.0,
-            grid_spacing=data.grid_spacing,
-            periodic=data.periodic,
-        )
-        assert fe.total > 0
-        assert fe.kinetic == 0.0  # zero momentum
-        assert fe.gradient > 0  # non-constant field
-        assert fe.mass > 0  # nonzero mass and field
-
-    def test_nan_raises(self) -> None:
-        """NaN in field data raises ValueError."""
-        bad = np.array([1.0, np.nan, 3.0])
-        with pytest.raises(ValueError, match="NaN"):
-            compute_field_energy(bad, None, 1.0, (0.1,), (True,))
-
-    def test_inf_raises(self) -> None:
-        """Inf in field data raises ValueError."""
-        bad = np.array([1.0, np.inf, 3.0])
-        with pytest.raises(ValueError, match="NaN or Inf"):
-            compute_field_energy(bad, None, 1.0, (0.1,), (True,))
-
-    def test_zero_field_zero_energy(self) -> None:
-        """All-zero field has zero energy."""
-        zero = np.zeros(32)
-        fe = compute_field_energy(zero, zero, 1.0, (0.1,), (True,))
-        assert fe.total == 0.0
-
-
 class TestSystemEnergy:
     """Test compute_system_energy."""
 
@@ -414,12 +372,16 @@ class TestCanonicalHamiltonianEnergy:
         assert result is not None
         assert result.shape == data.fields["phi_0"][0].shape
 
-    def test_kg_hamiltonian_matches_field_energy(self) -> None:
-        """Canonical H for single field matches compute_field_energy.
+    def test_kg_hamiltonian_per_field_matches_total(self) -> None:
+        """Per-field Hamiltonian self-energy matches total for single-field excitation.
 
         Uses the coupled_scalars spec with only phi excited (chi=0).
         The KG canonical structure matches ½π² + ½(∇φ)² + ½m²φ².
         """
+        from tidal.measurement._energy import (
+            _compute_hamiltonian_per_field,
+        )
+
         data = _make_sim_data_two_fields(n_snapshots=3)
         m2_phi = float(data.spec.mass_matrix[0][0])
         canonical = _make_kg_canonical_structure(m2_phi)
@@ -435,19 +397,16 @@ class TestCanonicalHamiltonianEnergy:
             parameters=data.parameters,
         )
 
-        h_canonical = _compute_hamiltonian_from_canonical(data_with_canonical, 0)
-
-        # Compare with standard field energy (should match for scalars)
-        fe = compute_field_energy(
-            data.fields["phi_0"][0],
-            data.velocities["phi_0"][0],
-            m2_phi,
-            data.grid_spacing,
-            data.periodic,
+        h_total = _compute_hamiltonian_from_canonical(data_with_canonical, 0)
+        per_field, interaction = _compute_hamiltonian_per_field(
+            data_with_canonical, 0
         )
-        # The canonical H uses -½φ·∇²φ (IBP form) which differs from
-        # ½|∇φ|² by boundary terms. For periodic BCs, these are identical.
-        np.testing.assert_allclose(h_canonical, fe.total, rtol=1e-10)
+
+        # Per-field self-energy sums to total (no interaction for single KG)
+        np.testing.assert_allclose(
+            sum(per_field.values()) + interaction, h_total, rtol=1e-10
+        )
+        assert h_total > 0  # non-zero energy from excited field
 
     def test_coupled_canonical_energy_conservation(self) -> None:
         """Canonical H is conserved for exact coupled oscillator evolution."""
@@ -1524,38 +1483,6 @@ class TestSummarize:
 # ============================================================
 
 
-class TestNonPeriodicGradient:
-    """Test gradient energy with non-periodic boundary conditions."""
-
-    def test_linear_field_gradient(self) -> None:
-        """Periodic sin(2πx/L) field: gradient energy via solver stencils.
-
-        Uses periodic BCs where the Laplacian-based virial formula
-        ``-φ · ∂²φ/∂x²`` gives exact gradient energy density via discrete
-        integration by parts.  This tests that the energy module delegates
-        correctly to operators.py (same stencils as the PDE solver).
-
-        For f = sin(2πx/L): ∂f/∂x = (2π/L)cos(2πx/L),
-        |∇f|² = (2π/L)² cos²(2πx/L),
-        -f·∂²f/∂x² = (2π/L)² sin²(2πx/L).
-        Mean of both = (2π/L)²/2.
-        """
-        n = 64
-        domain_len = 10.0
-        dx = domain_len / n
-        x = np.linspace(0, domain_len - dx, n)
-        k = 2 * np.pi / domain_len
-        field = np.sin(k * x)
-
-        grad_sq = _gradient_energy_density(field, (dx,), (True,))
-
-        # Laplacian-based formula: -φ · ∂²φ/∂x² = k² sin²(kx) pointwise
-        expected = k**2 * np.sin(k * x) ** 2
-        # 2nd-order FD error is O((k*dx)²) ≈ 3e-4 pointwise;
-        # use atol for points near zero where rtol diverges
-        np.testing.assert_allclose(grad_sq, expected, atol=5e-4)
-
-
 class TestSpectrum2D:
     """Test spectral analysis in 2D."""
 
@@ -1696,6 +1623,57 @@ class TestPositionDependentMass:
             time_derivative_order=2,
             rhs_terms=chi_terms,
         )
+        # Add canonical structure with position-dependent mass for phi_0
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                # phi kinetic
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(
+                        field="phi_0", operator="time_derivative"
+                    ),
+                    factor_b=HamiltonianFactor(
+                        field="phi_0", operator="time_derivative"
+                    ),
+                ),
+                # phi gradient (IBP)
+                HamiltonianTerm(
+                    coefficient=-0.5,
+                    factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                    factor_b=HamiltonianFactor(field="phi_0", operator="laplacian"),
+                ),
+                # phi mass (position-dependent: m2 * x[])
+                HamiltonianTerm(
+                    coefficient=1.0,
+                    factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                    factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+                    coefficient_symbolic="m2/2*x[]",
+                    coordinate_dependent=("x",),
+                ),
+                # chi kinetic
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(
+                        field="chi_0", operator="time_derivative"
+                    ),
+                    factor_b=HamiltonianFactor(
+                        field="chi_0", operator="time_derivative"
+                    ),
+                ),
+                # chi gradient (IBP)
+                HamiltonianTerm(
+                    coefficient=-0.5,
+                    factor_a=HamiltonianFactor(field="chi_0", operator="identity"),
+                    factor_b=HamiltonianFactor(field="chi_0", operator="laplacian"),
+                ),
+                # chi mass
+                HamiltonianTerm(
+                    coefficient=2.0,
+                    factor_a=HamiltonianFactor(field="chi_0", operator="identity"),
+                    factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
+                ),
+            ),
+        )
         return EquationSystem(
             n_components=2,
             dimension=2,
@@ -1706,6 +1684,7 @@ class TestPositionDependentMass:
             coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
             metadata={},
             coordinates=("t", "x"),
+            canonical=canonical,
         )
 
     def test_position_dependent_mass_works(self) -> None:
@@ -1911,24 +1890,8 @@ class TestIsVelocityField:
 # ============================================================
 
 
-class TestVirialPotential:
-    """Test _compute_virial_potential."""
-
-    def test_single_kg_virial_matches_canonical(self) -> None:
-        """For single KG field, virial = gradient + mass energy."""
-        data = _make_single_field_data(n_snapshots=3)
-
-        v_virial = _compute_virial_potential(data, 0)
-        fe = compute_field_energy(
-            data.fields["phi_0"][0],
-            data.velocities["phi_0"][0],
-            mass_squared=float(data.spec.mass_matrix[0][0]),
-            grid_spacing=data.grid_spacing,
-            periodic=data.periodic,
-        )
-
-        # Virial should equal gradient + mass (the total potential energy)
-        np.testing.assert_allclose(v_virial, fe.gradient + fe.mass, rtol=1e-6)
+class TestHamiltonianEnergy:
+    """Test Hamiltonian-based energy computation."""
 
     def test_coupled_oscillator_energy_still_conserved(self) -> None:
         """Existing exact coupled-oscillator data still conserves energy."""
@@ -2090,6 +2053,40 @@ def _make_constraint_spec() -> EquationSystem:
         rhs_terms=a1_terms,
     )
 
+    # Hamiltonian: ½v_A1² + ½(∂_x A1)² + ½Am2·A1² - ½(∂_x A0)² - ½Am2·A0²
+    # Constraint field A_0 has NEGATIVE energy (g^{00} = -1).
+    canonical = CanonicalStructure(
+        hamiltonian_terms=(
+            HamiltonianTerm(
+                coefficient=0.5,
+                factor_a=HamiltonianFactor(field="A_1", operator="time_derivative"),
+                factor_b=HamiltonianFactor(field="A_1", operator="time_derivative"),
+            ),
+            HamiltonianTerm(
+                coefficient=-0.5,
+                factor_a=HamiltonianFactor(field="A_1", operator="identity"),
+                factor_b=HamiltonianFactor(field="A_1", operator="laplacian_x"),
+            ),
+            HamiltonianTerm(
+                coefficient=0.25,
+                factor_a=HamiltonianFactor(field="A_1", operator="identity"),
+                factor_b=HamiltonianFactor(field="A_1", operator="identity"),
+                coefficient_symbolic="Am2/2",
+            ),
+            # Constraint A_0: negative energy (from g^{00} = -1)
+            HamiltonianTerm(
+                coefficient=0.5,
+                factor_a=HamiltonianFactor(field="A_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="A_0", operator="laplacian_x"),
+            ),
+            HamiltonianTerm(
+                coefficient=-0.25,
+                factor_a=HamiltonianFactor(field="A_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="A_0", operator="identity"),
+                coefficient_symbolic="-Am2/2",
+            ),
+        ),
+    )
     return EquationSystem(
         n_components=2,
         dimension=2,
@@ -2102,71 +2099,15 @@ def _make_constraint_spec() -> EquationSystem:
         coordinates=("t", "x"),
         mass_matrix_symbolic=(("-Am2", "0"), ("0", "Am2")),
         coupling_matrix_symbolic=(("0", "0"), ("0", "0")),
+        canonical=canonical,
     )
-
-
-class TestConstraintSelfEnergy:
-    """Test _compute_constraint_self_energy."""
-
-    def test_constraint_energy_negative(self) -> None:
-        """Constraint field with nonzero gradient + mass gives negative energy."""
-        spec = _make_constraint_spec()
-        n = 64
-        dx = 10.0 / n
-        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
-
-        # A_0 = cos(kx), A_1 = 0
-        k = 2.0 * np.pi / 10.0
-        a0_field = np.cos(k * x)
-
-        data = SimulationData(
-            times=np.array([0.0]),
-            fields={"A_0": a0_field[np.newaxis, :], "A_1": np.zeros((1, n))},
-            velocities={"A_1": np.zeros((1, n))},
-            grid_spacing=(dx,),
-            grid_bounds=((0.0, 10.0),),
-            periodic=(True,),
-            spec=spec,
-            parameters={"Am2": 0.5},
-        )
-
-        energy = _compute_constraint_self_energy(data, 0)
-
-        # Should be negative: -1/2 |grad(A_0)|^2 - 1/2 m^2 A_0^2
-        assert energy < 0.0
-
-    def test_no_constraints_returns_zero(self) -> None:
-        """System without constraints gives zero constraint self-energy."""
-        data = _make_single_field_data(n_snapshots=3)
-        energy = _compute_constraint_self_energy(data, 0)
-        assert energy == 0.0
-
-    def test_constraint_field_not_in_data_skipped(self) -> None:
-        """Constraint field not stored in data is silently skipped."""
-        spec = _make_constraint_spec()
-        n = 32
-
-        # Only A_1 in data, A_0 omitted
-        data = SimulationData(
-            times=np.array([0.0]),
-            fields={"A_1": np.ones((1, n))},
-            velocities={"A_1": np.zeros((1, n))},
-            grid_spacing=(10.0 / n,),
-            grid_bounds=((0.0, 10.0),),
-            periodic=(True,),
-            spec=spec,
-            parameters={"Am2": 0.5},
-        )
-
-        energy = _compute_constraint_self_energy(data, 0)
-        assert energy == 0.0
 
 
 class TestVirialWithConstraints:
     """Test the full energy computation with constraint fields."""
 
     def test_total_includes_constraint_energy(self) -> None:
-        """Total system energy includes constraint self-energy."""
+        """Total system energy includes constraint field self-energy."""
         spec = _make_constraint_spec()
         n = 64
         dx = 10.0 / n
@@ -2190,18 +2131,17 @@ class TestVirialWithConstraints:
 
         se = compute_system_energy(data, 0)
 
-        # Constraint self-energy should be negative (g^{00} = -1 sign flip)
-        constraint_e = _compute_constraint_self_energy(data, 0)
-        assert constraint_e < 0.0
+        # Constraint A_0 self-energy should be negative (g^{00} = -1 sign flip)
+        assert "A_0" in se.per_field
+        assert se.per_field["A_0"].total < 0.0
 
-        # Verify total = kinetic + virial + constraint_self + constraint_cross
-        virial = _compute_virial_potential(data, 0)
-        cross_e = _compute_constraint_coupling_energy(data, 0)
-        expected_total = se.per_field["A_1"].kinetic + virial + constraint_e + cross_e
-        np.testing.assert_allclose(se.total, expected_total, rtol=1e-10)
+        # Dynamical A_1 self-energy should be positive
+        assert "A_1" in se.per_field
+        assert se.per_field["A_1"].total > 0.0
 
-        # Single-constraint system → cross coupling is zero
-        assert cross_e == 0.0
+        # Verify total matches sum of per-field contributions plus interaction
+        expected = sum(f.total for f in se.per_field.values()) + se.interaction
+        np.testing.assert_allclose(se.total, expected, rtol=1e-10)
 
 
 def _make_two_constraint_spec() -> EquationSystem:
@@ -2302,6 +2242,88 @@ def _make_two_constraint_spec() -> EquationSystem:
         rhs_terms=b1_terms,
     )
 
+    # Hamiltonian for 4-field system: A_0 (constraint), A_1 (dyn),
+    # B_0 (constraint), B_1 (dyn), with cross-constraint coupling
+    canonical = CanonicalStructure(
+        hamiltonian_terms=(
+            # A_1 kinetic
+            HamiltonianTerm(
+                coefficient=0.5,
+                factor_a=HamiltonianFactor(field="A_1", operator="time_derivative"),
+                factor_b=HamiltonianFactor(field="A_1", operator="time_derivative"),
+            ),
+            # A_1 gradient (IBP)
+            HamiltonianTerm(
+                coefficient=-0.5,
+                factor_a=HamiltonianFactor(field="A_1", operator="identity"),
+                factor_b=HamiltonianFactor(field="A_1", operator="laplacian_x"),
+            ),
+            # A_1 mass
+            HamiltonianTerm(
+                coefficient=0.5,
+                factor_a=HamiltonianFactor(field="A_1", operator="identity"),
+                factor_b=HamiltonianFactor(field="A_1", operator="identity"),
+                coefficient_symbolic="mA2/2",
+            ),
+            # B_1 kinetic
+            HamiltonianTerm(
+                coefficient=0.5,
+                factor_a=HamiltonianFactor(field="B_1", operator="time_derivative"),
+                factor_b=HamiltonianFactor(field="B_1", operator="time_derivative"),
+            ),
+            # B_1 gradient (IBP)
+            HamiltonianTerm(
+                coefficient=-0.5,
+                factor_a=HamiltonianFactor(field="B_1", operator="identity"),
+                factor_b=HamiltonianFactor(field="B_1", operator="laplacian_x"),
+            ),
+            # B_1 mass
+            HamiltonianTerm(
+                coefficient=1.0,
+                factor_a=HamiltonianFactor(field="B_1", operator="identity"),
+                factor_b=HamiltonianFactor(field="B_1", operator="identity"),
+                coefficient_symbolic="mB2/2",
+            ),
+            # A_1-B_1 coupling (interaction)
+            HamiltonianTerm(
+                coefficient=0.5,
+                factor_a=HamiltonianFactor(field="A_1", operator="identity"),
+                factor_b=HamiltonianFactor(field="B_1", operator="identity"),
+                coefficient_symbolic="gcoup",
+            ),
+            # Constraint A_0: negative energy (from g^{00} = -1)
+            HamiltonianTerm(
+                coefficient=0.5,
+                factor_a=HamiltonianFactor(field="A_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="A_0", operator="laplacian_x"),
+            ),
+            HamiltonianTerm(
+                coefficient=-0.5,
+                factor_a=HamiltonianFactor(field="A_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="A_0", operator="identity"),
+                coefficient_symbolic="-mA2/2",
+            ),
+            # Constraint B_0: negative energy
+            HamiltonianTerm(
+                coefficient=0.5,
+                factor_a=HamiltonianFactor(field="B_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="B_0", operator="laplacian_x"),
+            ),
+            HamiltonianTerm(
+                coefficient=-1.0,
+                factor_a=HamiltonianFactor(field="B_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="B_0", operator="identity"),
+                coefficient_symbolic="-mB2/2",
+            ),
+            # Cross-constraint A_0-B_0 coupling
+            HamiltonianTerm(
+                coefficient=-0.5,
+                factor_a=HamiltonianFactor(field="A_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="B_0", operator="identity"),
+                coefficient_symbolic="-gcoup",
+            ),
+        ),
+    )
     return EquationSystem(
         n_components=4,
         dimension=2,
@@ -2334,75 +2356,15 @@ def _make_two_constraint_spec() -> EquationSystem:
             ("gcoup", None, None, None),
             (None, "gcoup", None, None),
         ),
+        canonical=canonical,
     )
 
 
-class TestConstraintCouplingEnergy:
-    """Test _compute_constraint_coupling_energy."""
-
-    def test_cross_constraint_coupling_nonzero(self) -> None:
-        """Two constraints with cross identity terms give nonzero coupling."""
-        spec = _make_two_constraint_spec()
-        n = 64
-        dx = 10.0 / n
-        x = np.linspace(dx / 2, 10.0 - dx / 2, n)
-
-        k = 2.0 * np.pi / 10.0
-        a0 = np.cos(k * x)
-        b0 = 0.5 * np.sin(k * x)
-
-        data = SimulationData(
-            times=np.array([0.0]),
-            fields={
-                "A_0": a0[np.newaxis, :],
-                "A_1": np.zeros((1, n)),
-                "B_0": b0[np.newaxis, :],
-                "B_1": np.zeros((1, n)),
-            },
-            velocities={
-                "A_1": np.zeros((1, n)),
-                "B_1": np.zeros((1, n)),
-            },
-            grid_spacing=(dx,),
-            grid_bounds=((0.0, 10.0),),
-            periodic=(True,),
-            spec=spec,
-            parameters={"mA2": 1.0, "mB2": 2.0, "gcoup": 0.5},
-        )
-
-        energy = _compute_constraint_coupling_energy(data, 0)
-
-        # Expected: +½ * 0.5 * ⟨A_0*B_0⟩ (from A_0 eq)
-        #         + ½ * 0.5 * ⟨B_0*A_0⟩ (from B_0 eq)
-        #         = 0.5 * ⟨A_0*B_0⟩
-        expected = 0.5 * float(np.mean(a0 * b0))
-        np.testing.assert_allclose(energy, expected, rtol=1e-10)
-
-    def test_single_constraint_returns_zero(self) -> None:
-        """Single constraint system → no cross terms → zero."""
-        spec = _make_constraint_spec()
-        n = 32
-        dx = 10.0 / n
-
-        data = SimulationData(
-            times=np.array([0.0]),
-            fields={
-                "A_0": np.ones((1, n)),
-                "A_1": np.zeros((1, n)),
-            },
-            velocities={"A_1": np.zeros((1, n))},
-            grid_spacing=(dx,),
-            grid_bounds=((0.0, 10.0),),
-            periodic=(True,),
-            spec=spec,
-            parameters={"Am2": 0.5},
-        )
-
-        energy = _compute_constraint_coupling_energy(data, 0)
-        assert energy == 0.0
+class TestCrossConstraintEnergy:
+    """Test cross-constraint coupling in Hamiltonian energy."""
 
     def test_system_energy_includes_cross_constraint(self) -> None:
-        """compute_system_energy includes cross-constraint coupling."""
+        """compute_system_energy includes cross-field interaction terms."""
         spec = _make_two_constraint_spec()
         n = 64
         dx = 10.0 / n
@@ -2434,17 +2396,13 @@ class TestConstraintCouplingEnergy:
         )
 
         se = compute_system_energy(data, 0)
-        virial = _compute_virial_potential(data, 0)
-        constraint_self = _compute_constraint_self_energy(data, 0)
-        constraint_cross = _compute_constraint_coupling_energy(data, 0)
 
-        # Verify all energy components sum to the total
-        total_kinetic = sum(fe.kinetic for fe in se.per_field.values())
-        expected = total_kinetic + virial + constraint_self + constraint_cross
+        # Verify total = sum(per_field) + interaction
+        expected = sum(f.total for f in se.per_field.values()) + se.interaction
         np.testing.assert_allclose(se.total, expected, rtol=1e-10)
 
-        # Cross coupling should be nonzero for this configuration
-        assert constraint_cross != 0.0
+        # Interaction should be nonzero for coupled fields
+        assert se.interaction != 0.0
 
 
 # ============================================================
@@ -2898,7 +2856,8 @@ class TestSpectralEnergyPhysics:
         m2 = 1.0  # arbitrary positive mass squared
 
         # Real-space energy: purely mass term (gradient=0 for uniform, kinetic=0)
-        fe = compute_field_energy(field_arr, mom_arr, m2, (dx,), (True,))
+        # For uniform field: E = 0.5 * m² * amplitude² (exact)
+        expected_energy = 0.5 * m2 * amplitude**2
 
         # Spectral energy
         _wn, se_bins = compute_spectral_energy(
@@ -2911,7 +2870,7 @@ class TestSpectralEnergyPhysics:
         spectral_total = float(se_bins.sum())
 
         # Exact match for uniform field (k=0 only)
-        np.testing.assert_allclose(spectral_total, fe.total, rtol=1e-10)
+        np.testing.assert_allclose(spectral_total, expected_energy, rtol=1e-10)
 
     def test_spectral_energy_negative_mass(self) -> None:
         """Tachyonic m² < 0 should not crash; energy can be negative per mode."""
@@ -3940,7 +3899,7 @@ class TestMemmapMeasurementIntegration:
     """Test that measurement functions work on memmap-backed SimulationData."""
 
     def test_energy_from_directory(self, tmp_path: Path) -> None:
-        """compute_field_energy works on memmap data from from_directory."""
+        """compute_system_energy works on memmap data from from_directory."""
         # Build reference data in memory
         data_mem = _make_sim_data_two_fields(n_grid=16, n_snapshots=5)
 
@@ -4378,63 +4337,6 @@ class TestBCTypes:
         sd2 = SimulationData.from_directory(out_dir, sd1.spec)
         assert sd2.bc_types is None
 
-    def test_neumann_gradient_energy_symmetric(self) -> None:
-        """Neumann BC uses even-reflection (symmetric) ghost cells.
-
-        cos(pi*x/L) with Neumann BCs: the derivative at boundaries
-        is -sin(pi*x/L) * pi/L which is zero at x=0 and x=L, so
-        Neumann BCs are exact.  Compare gradient energy computed with
-        Neumann vs Dirichlet padding — they should differ because
-        Dirichlet (odd) padding reverses the sign.
-        """
-        from tidal.measurement._energy import _gradient_energy_density
-
-        n_x = 128
-        length = 2 * np.pi
-        dx = length / n_x
-        x = np.linspace(dx / 2, length - dx / 2, n_x)
-        field = np.cos(np.pi * x / length)
-
-        # With Neumann BC (correct for this mode)
-        grad_neumann = _gradient_energy_density(
-            field,
-            grid_spacing=(dx,),
-            periodic=(False,),
-            bc_types=("neumann",),
-        )
-        energy_neumann = 0.5 * float(grad_neumann.mean())
-
-        # Analytic: 0.5 * ⟨(pi/L)² sin²(pi*x/L)⟩ = 0.25 * (pi/L)²
-        k = np.pi / length
-        expected = 0.25 * k**2
-        np.testing.assert_allclose(energy_neumann, expected, rtol=0.01)
-
-    def test_neumann_vs_dirichlet_differ(self) -> None:
-        """Neumann and Dirichlet give different gradient energies for cos mode."""
-        from tidal.measurement._energy import _gradient_energy_density
-
-        n_x = 128
-        length = 2 * np.pi
-        dx = length / n_x
-        x = np.linspace(dx / 2, length - dx / 2, n_x)
-        field = np.cos(np.pi * x / length)
-
-        grad_neumann = _gradient_energy_density(
-            field,
-            (dx,),
-            (False,),
-            bc_types=("neumann",),
-        )
-        grad_dirichlet = _gradient_energy_density(
-            field,
-            (dx,),
-            (False,),
-            bc_types=("dirichlet",),
-        )
-        # They should not be equal — Dirichlet applies odd-reflection
-        # at the boundaries which distorts the cos mode
-        assert not np.allclose(grad_neumann, grad_dirichlet)
-
 
 class TestDtMetadata:
     """Test dt round-trip through save/load and conservation diagnostics."""
@@ -4482,6 +4384,26 @@ class TestDtMetadata:
                 },
             ],
             "coupling": {},
+            "canonical": {
+                "hamiltonian_terms": [
+                    {
+                        "coefficient": 0.5,
+                        "factor_a": {
+                            "field": "phi_0",
+                            "operator": "time_derivative",
+                        },
+                        "factor_b": {
+                            "field": "phi_0",
+                            "operator": "time_derivative",
+                        },
+                    },
+                    {
+                        "coefficient": -0.5,
+                        "factor_a": {"field": "phi_0", "operator": "identity"},
+                        "factor_b": {"field": "phi_0", "operator": "laplacian"},
+                    },
+                ],
+            },
         }
         spec = EquationSystem.from_dict(spec_dict)
         n_x = 64

@@ -182,6 +182,48 @@ _COUPLED_SCALARS_SPEC: dict[str, object] = {
         "mass_matrix_symbolic": [["-mPhi2", None], [None, "-mChi2"]],
         "coupling_matrix_symbolic": [[None, "-gCpl"], ["-gCpl", None]],
     },
+    "canonical": {
+        "hamiltonian_terms": [
+            {
+                "coefficient": 1.0,
+                "factor_a": {"field": "phi_0", "operator": "identity"},
+                "factor_b": {"field": "phi_0", "operator": "identity"},
+                "coefficient_symbolic": "mPhi2/2",
+            },
+            {
+                "coefficient": 1.0,
+                "factor_a": {"field": "chi_0", "operator": "identity"},
+                "factor_b": {"field": "chi_0", "operator": "identity"},
+                "coefficient_symbolic": "mChi2/2",
+            },
+            {
+                "coefficient": 1.0,
+                "factor_a": {"field": "chi_0", "operator": "identity"},
+                "factor_b": {"field": "phi_0", "operator": "identity"},
+                "coefficient_symbolic": "gCpl",
+            },
+            {
+                "coefficient": 0.5,
+                "factor_a": {"field": "phi_0", "operator": "gradient_x"},
+                "factor_b": {"field": "phi_0", "operator": "gradient_x"},
+            },
+            {
+                "coefficient": 0.5,
+                "factor_a": {"field": "chi_0", "operator": "gradient_x"},
+                "factor_b": {"field": "chi_0", "operator": "gradient_x"},
+            },
+            {
+                "coefficient": 0.5,
+                "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+            },
+            {
+                "coefficient": 0.5,
+                "factor_a": {"field": "chi_0", "operator": "time_derivative"},
+                "factor_b": {"field": "chi_0", "operator": "time_derivative"},
+            },
+        ],
+    },
 }
 
 _EM_3D_SPEC: dict[str, object] = {

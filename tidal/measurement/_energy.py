@@ -33,7 +33,11 @@ if TYPE_CHECKING:
     from numpy.typing import NDArray
 
     from tidal.measurement._io import SimulationData
-    from tidal.symbolic.json_loader import ComponentEquation, OperatorTerm
+    from tidal.symbolic.json_loader import (
+        ComponentEquation,
+        HamiltonianTerm,
+        OperatorTerm,
+    )
 
 # Threshold below which energy is treated as zero.  Prevents division by
 # near-zero values from floating-point integration noise.
@@ -154,68 +158,6 @@ def _resolve_bc_spec(
     return tuple("periodic" if p else "dirichlet" for p in periodic)
 
 
-def _first_derivative(
-    field: NDArray[np.float64],
-    axis: int,
-    dx: float,
-    *,
-    is_periodic: bool = False,
-    bc_type: str | None = None,
-) -> NDArray[np.float64]:
-    """Single-axis first derivative via the solver's central-difference stencil.
-
-    Delegates to ``operators.gradient()`` so that the FD order (2nd, 4th, 6th)
-    automatically matches the solver's current setting.
-    """
-    from tidal.solver.operators import gradient as _solver_gradient  # noqa: PLC0415
-
-    effective_bc = (
-        bc_type if bc_type is not None else ("periodic" if is_periodic else "dirichlet")
-    )
-    shape = field.shape
-    periodic = tuple(effective_bc == "periodic" for _ in range(field.ndim))
-    bc_tup = tuple(effective_bc for _ in range(field.ndim))
-    grid = _make_grid_info(
-        grid_spacing=tuple(dx for _ in range(field.ndim)),
-        periodic=periodic,
-        shape=shape,
-        bc_types=bc_tup,
-    )
-    return _solver_gradient(field, axis, grid, bc_tup)  # type: ignore[arg-type]
-
-
-def _second_derivative(
-    field: NDArray[np.float64],
-    axis: int,
-    dx: float,
-    *,
-    is_periodic: bool = False,
-    bc_type: str | None = None,
-) -> NDArray[np.float64]:
-    """Single-axis second derivative via the solver's central-difference stencil.
-
-    Delegates to ``operators.directional_laplacian()`` so that the FD order
-    (2nd, 4th, 6th) automatically matches the solver's current setting.
-    """
-    from tidal.solver.operators import (  # noqa: PLC0415
-        directional_laplacian as _solver_lap,
-    )
-
-    effective_bc = (
-        bc_type if bc_type is not None else ("periodic" if is_periodic else "dirichlet")
-    )
-    shape = field.shape
-    periodic = tuple(effective_bc == "periodic" for _ in range(field.ndim))
-    bc_tup = tuple(effective_bc for _ in range(field.ndim))
-    grid = _make_grid_info(
-        grid_spacing=tuple(dx for _ in range(field.ndim)),
-        periodic=periodic,
-        shape=shape,
-        bc_types=bc_tup,
-    )
-    return _solver_lap(field, axis, grid, bc_tup)  # type: ignore[arg-type]
-
-
 # ------------------------------------------------------------------
 # Operator-aware gradient axes
 # ------------------------------------------------------------------
@@ -249,58 +191,7 @@ def _self_gradient_axes(eq: ComponentEquation) -> list[int] | None:
 
 
 # ------------------------------------------------------------------
-# Gradient energy density (used by compute_field_energy)
-# ------------------------------------------------------------------
-
-
-def _gradient_energy_density(
-    field: NDArray[np.float64],
-    grid_spacing: tuple[float, ...],
-    periodic: tuple[bool, ...],
-    axes: list[int] | None = None,
-    bc_types: tuple[str, ...] | None = None,
-) -> NDArray[np.float64]:
-    """Gradient energy density consistent with the virial potential formula.
-
-    For **periodic** axes, uses the Laplacian-based identity
-    ``-φ · ∂²φ/∂x²`` so that ``0.5 * Σ * dV`` exactly matches the
-    virial potential's self-laplacian contribution (discrete integration
-    by parts is exact for periodic wrapping).
-
-    For **non-periodic** axes, uses ``(∂φ/∂x)²`` (central-difference
-    gradient squared), because the discrete IBP has nonzero boundary
-    terms that would make the Laplacian form inconsistent.
-
-    Parameters
-    ----------
-    axes : list[int] | None
-        If ``None``, sum over all spatial axes (isotropic gradient).
-        Otherwise, sum only over the specified axis indices.
-    bc_types : tuple[str, ...] | None
-        Per-axis BC type (``"periodic"``, ``"neumann"``, ``"dirichlet"``).
-        When ``None``, falls back to ``periodic`` booleans (legacy behavior).
-    """
-    result: NDArray[np.float64] = np.zeros_like(field)
-    iter_axes = range(len(grid_spacing)) if axes is None else axes
-    for axis in iter_axes:
-        dx = grid_spacing[axis]
-        bc = (
-            bc_types[axis]
-            if bc_types is not None
-            else ("periodic" if periodic[axis] else "dirichlet")
-        )
-        if bc == "periodic":
-            # Virial-consistent: -φ · ∂²φ/∂x² (exact discrete IBP)
-            result -= field * _second_derivative(field, axis, dx, bc_type="periodic")
-        else:
-            # Gradient squared: (∂φ/∂x)² (correct for non-periodic BCs)
-            grad = _first_derivative(field, axis, dx, bc_type=bc)
-            result += grad**2
-    return result
-
-
-# ------------------------------------------------------------------
-# Spatial operator application (for virial potential)
+# Spatial operator application (for Hamiltonian evaluation)
 # ------------------------------------------------------------------
 
 
@@ -745,83 +636,7 @@ def _resolve_term_target(
 
 
 # ------------------------------------------------------------------
-# Single-field energy
-# ------------------------------------------------------------------
-
-
-def compute_field_energy(  # noqa: PLR0913
-    field_data: NDArray[np.float64],
-    velocity_data: NDArray[np.float64] | None,
-    mass_squared: float | NDArray[np.float64],
-    grid_spacing: tuple[float, ...],
-    periodic: tuple[bool, ...],
-    *,
-    gradient_axes: list[int] | None = None,
-    bc_types: tuple[str, ...] | None = None,
-    volume_weight: float | NDArray[np.float64] = 1.0,
-) -> FieldEnergy:
-    """Compute canonical energy density for a single field at one snapshot.
-
-    Returns spatially-averaged energy density ⟨ε⟩ = E / V_domain.
-
-    Parameters
-    ----------
-    field_data : ndarray, shape ``(*grid_shape)``
-        Field values on the spatial grid.
-    velocity_data : ndarray or None
-        Velocity ``v = dq/dt``.  ``None`` for constraint fields.
-    mass_squared : float | ndarray
-        Diagonal mass matrix entry ``m²``.  May be a scalar (constant mass)
-        or a grid-shaped ndarray (position-dependent mass).
-    grid_spacing : tuple[float, ...]
-        Cell size per spatial axis.
-    periodic : tuple[bool, ...]
-        Per-axis periodicity.
-    gradient_axes : list[int] | None
-        Spatial axes to include in gradient energy.  ``None`` uses all
-        axes (isotropic gradient).  Pass a subset for operator-aware
-        gradient (e.g. ``[1]`` when the PDE has only ``laplacian_y``).
-    bc_types : tuple[str, ...] | None
-        Per-axis BC type.  When ``None``, falls back to ``periodic``.
-    volume_weight : float or ndarray
-        Spatial volume element ``sqrt|g_spatial|`` for curved coordinates.
-        Defaults to 1.0 (flat/Cartesian).
-
-    Returns
-    -------
-    FieldEnergy
-    """
-    _validate_array(field_data, "field_data")
-    if velocity_data is not None:
-        _validate_array(velocity_data, "velocity_data")
-
-    # Kinetic energy density: 0.5 * ⟨v² * sqrt|g|⟩
-    if velocity_data is not None:
-        kinetic = 0.5 * float((velocity_data**2 * volume_weight).mean())
-    else:
-        kinetic = 0.0
-
-    # Gradient energy density: 0.5 * ⟨|∇φ|² * sqrt|g|⟩ (over specified axes)
-    grad_sq = _gradient_energy_density(
-        field_data,
-        grid_spacing,
-        periodic,
-        axes=gradient_axes,
-        bc_types=bc_types,
-    )
-    gradient = 0.5 * float((grad_sq * volume_weight).mean())
-
-    # Mass energy density: 0.5 * ⟨m² φ² * sqrt|g|⟩ (m² may be scalar or ndarray)
-    mass_energy = 0.5 * float((mass_squared * field_data**2 * volume_weight).mean())
-
-    total = kinetic + gradient + mass_energy
-    return FieldEnergy(
-        kinetic=kinetic, gradient=gradient, mass=mass_energy, total=total
-    )
-
-
-# ------------------------------------------------------------------
-# System energy (virial + constraint)
+# Mass resolution (used by _spectral_conversion.py)
 # ------------------------------------------------------------------
 
 
@@ -895,187 +710,9 @@ def _resolve_mass_squared(
     return float(data.spec.mass_matrix[field_idx][field_idx])
 
 
-def _compute_virial_potential(
-    data: SimulationData,
-    t_idx: int,
-) -> float:
-    """Virial potential density from dynamical fields' spatial RHS terms.
-
-    ``⟨v_virial⟩ = -½ Σ_{i: dynamical} ⟨φ_i · RHS_i^{spatial}⟩``
-
-    Excludes ``first_derivative_t`` (gyroscopic, do no work) and
-    ``v_N`` velocity references (velocity-dependent forces).
-
-    Supports position-dependent coefficients by evaluating them on the
-    grid and performing elementwise averaging.
-    """
-    potential = 0.0
-
-    # Build coordinate arrays once (lazy, only if needed)
-    coord_arrays: dict[str, NDArray[np.float64]] | None = None
-    has_posdep = any(
-        term.position_dependent for eq in data.spec.equations for term in eq.rhs_terms
-    )
-    if has_posdep:
-        coord_arrays = _build_coord_arrays(data)
-
-    for eq in data.spec.equations:
-        if eq.time_derivative_order < 2:  # noqa: PLR2004
-            continue  # skip constraints and first-order
-
-        phi_i = data.fields[eq.field_name][t_idx]
-
-        for term in eq.rhs_terms:
-            # Skip time-derivative terms (gyroscopic forces)
-            if term.operator == "first_derivative_t":
-                continue
-
-            # Skip velocity-field references (velocity-dependent)
-            if _is_velocity_field(term.field):
-                continue
-
-            target = _resolve_term_target(data, term.field, t_idx)
-            if target is None:
-                continue
-
-            coeff = _resolve_coefficient_on_grid(term, data, coord_arrays or {})
-            operated = _apply_spatial_operator(
-                term.operator,
-                target,
-                data.grid_spacing,
-                data.periodic,
-                bc_types=data.bc_types,
-            )
-            # coeff may be scalar or ndarray — numpy handles both
-            potential += float((coeff * phi_i * operated).mean())
-
-    return -0.5 * potential
-
-
-def _compute_constraint_self_energy(
-    data: SimulationData,
-    t_idx: int,
-) -> float:
-    """Constraint field self-energy density with sign flip (g^{00} = -1).
-
-    ``⟨v_constraint⟩ = Σ_{j: constraint} [ -½ ⟨|∇C_j|²⟩ - ½ m_j² ⟨C_j²⟩ ]``
-
-    Temporal gauge components have NEGATIVE gradient and mass self-energy
-    relative to spatial/scalar fields, due to the Minkowski metric.
-    """
-    energy = 0.0
-
-    for field_idx, eq in enumerate(data.spec.equations):
-        if eq.time_derivative_order != 0:
-            continue  # only constraint fields
-        name = eq.field_name
-        if name not in data.fields:
-            continue  # constraint field not stored in data
-
-        c_field = data.fields[name][t_idx]
-
-        # Gradient: -½ ⟨|∇C|²⟩  (NEGATIVE)
-        grad_sq = _gradient_energy_density(
-            c_field,
-            data.grid_spacing,
-            data.periodic,
-            bc_types=data.bc_types,
-        )
-        energy -= 0.5 * float(grad_sq.mean())
-
-        # Mass: -½ ⟨m² C²⟩  (NEGATIVE, m² may be scalar or ndarray)
-        m2 = _resolve_mass_squared(data, field_idx)
-        energy -= 0.5 * float((m2 * c_field**2).mean())
-
-    return energy
-
-
-def _compute_constraint_coupling_energy(
-    data: SimulationData,
-    t_idx: int,
-) -> float:
-    """Cross-constraint coupling energy density from RHS terms between constraints.
-
-    For each constraint equation i with a term ``c * op(C_j)`` referencing
-    another constraint field C_j, accumulates:
-
-        ``⟨v_cross⟩ += +½ * c * ⟨C_i * op(C_j)⟩``
-
-    The ``+½`` sign (opposite of the dynamical virial ``-½``) arises because
-    constraint fields have ``π = 0``, so their Hamiltonian contribution is
-    ``H = -L``.  The RHS coefficients in the JSON already embed the Minkowski
-    sign, so the formula reproduces the correct Hamiltonian coupling.
-
-    For symmetric coupling (c_ij in eq_i AND c_ji in eq_j), the two halves
-    sum to the full coupling energy.
-
-    This handles any spatial operator (identity, gradient, laplacian, etc.)
-    between constraint fields, not just identity coupling.
-    """
-    # Identify constraint field names for fast lookup
-    constraint_names: set[str] = set()
-    for eq in data.spec.equations:
-        if eq.time_derivative_order == 0:
-            constraint_names.add(eq.field_name)
-
-    if len(constraint_names) < 2:  # noqa: PLR2004
-        return 0.0  # need at least 2 constraints for cross terms
-
-    # Build coordinate arrays lazily (only if position-dependent)
-    coord_arrays: dict[str, NDArray[np.float64]] | None = None
-    has_posdep = any(
-        term.position_dependent
-        for eq in data.spec.equations
-        if eq.time_derivative_order == 0
-        for term in eq.rhs_terms
-        if term.field in constraint_names and term.field != eq.field_name
-    )
-    if has_posdep:
-        coord_arrays = _build_coord_arrays(data)
-
-    return _accumulate_cross_constraint_terms(
-        data,
-        t_idx,
-        constraint_names,
-        coord_arrays,
-    )
-
-
-def _accumulate_cross_constraint_terms(
-    data: SimulationData,
-    t_idx: int,
-    constraint_names: set[str],
-    coord_arrays: dict[str, NDArray[np.float64]] | None,
-) -> float:
-    """Sum cross-constraint term densities: +½ c_ij ⟨C_i·op(C_j)⟩."""
-    energy = 0.0
-
-    for eq in data.spec.equations:
-        if eq.time_derivative_order != 0 or eq.field_name not in data.fields:
-            continue
-        c_i = data.fields[eq.field_name][t_idx]
-
-        for term in eq.rhs_terms:
-            if term.field == eq.field_name or term.field not in constraint_names:
-                continue
-            if _is_velocity_field(term.field):
-                continue
-
-            target = _resolve_term_target(data, term.field, t_idx)
-            if target is None:
-                continue
-
-            coeff = _resolve_coefficient_on_grid(term, data, coord_arrays or {})
-            operated = _apply_spatial_operator(
-                term.operator,
-                target,
-                data.grid_spacing,
-                data.periodic,
-                bc_types=data.bc_types,
-            )
-            energy += 0.5 * float((coeff * c_i * operated).mean())
-
-    return energy
+# ------------------------------------------------------------------
+# Hamiltonian evaluation helpers
+# ------------------------------------------------------------------
 
 
 def _evaluate_hamiltonian_factor(
@@ -1304,7 +941,7 @@ def _prepare_hamiltonian_context(data: SimulationData) -> _HamiltonianContext:
     )
 
 
-def _compute_hamiltonian_from_canonical(  # noqa: PLR0914
+def _compute_hamiltonian_from_canonical(
     data: SimulationData,
     t_idx: int,
     ctx: _HamiltonianContext | None = None,
@@ -1356,77 +993,148 @@ def _compute_hamiltonian_from_canonical(  # noqa: PLR0914
 
     total = 0.0
     for term_idx, term in enumerate(canonical.hamiltonian_terms):
-        coeff: float | NDArray[np.float64] = ctx.term_coeffs[term_idx]
-
-        op_a = term.factor_a.operator
-        op_b = term.factor_b.operator
-
-        # Gradient x gradient path: use _gradient_product_density (single source
-        # of truth).  BC-aware: periodic→IBP, non-periodic→CD.
-        # The helper returns a pointwise density array; coeff (possibly
-        # position-dependent NDArray) is multiplied in before .mean().
-        if op_a in _GRADIENT_AXES and op_b in _GRADIENT_AXES:
-            field_a = _resolve_term_target(data, term.factor_a.field, t_idx)
-            field_b = _resolve_term_target(data, term.factor_b.field, t_idx)
-            if field_a is None or field_b is None:
-                continue
-            density = _gradient_product_density(
-                op_a,
-                field_a,
-                op_b,
-                field_b,
-                data.grid_spacing,
-                data.periodic,
-                bc_types=data.bc_types,
-            )
-            total += float((coeff * density * volume_weight).mean())
-            continue
-
-        # Kinetic: time_derivative x time_derivative — direct velocity lookup.
-        # In E-L velocity form, data.velocities stores v = dq/dt directly.
-        # No field_rates expansion needed: vel_A = data.velocities[field_A].
-        if op_a == "time_derivative" and op_b == "time_derivative":
-            fname_a = term.factor_a.field
-            fname_b = term.factor_b.field
-            vel_a = data.velocities.get(fname_a)
-            vel_b = data.velocities.get(fname_b)
-            if vel_a is not None and vel_b is not None:
-                total += float(
-                    (coeff * vel_a[t_idx] * vel_b[t_idx] * volume_weight).mean()
-                )
-            continue
-
-        # All other terms: identity, mixed operator x identity, etc.
-        fa = _evaluate_hamiltonian_factor(
-            term.factor_a.field,
-            term.factor_a.operator,
-            data,
-            t_idx,
+        contrib = _evaluate_single_hamiltonian_term(
+            term, ctx.term_coeffs[term_idx], volume_weight, data, t_idx
         )
-        fb = _evaluate_hamiltonian_factor(
-            term.factor_b.field,
-            term.factor_b.operator,
-            data,
-            t_idx,
-        )
-        if fa is None or fb is None:
-            continue
-
-        total += float((coeff * fa * fb * volume_weight).mean())
+        total += contrib
 
     return total
 
 
-def compute_system_energy(  # noqa: PLR0914
+def _evaluate_single_hamiltonian_term(
+    term: HamiltonianTerm,
+    coeff: float | NDArray[np.float64],
+    volume_weight: float | NDArray[np.float64],
+    data: SimulationData,
+    t_idx: int,
+) -> float:
+    """Evaluate a single Hamiltonian term's contribution to energy density.
+
+    Returns the spatially-averaged contribution ``⟨coeff * f_a * f_b * √|g|⟩``.
+    """
+    op_a = term.factor_a.operator
+    op_b = term.factor_b.operator
+
+    # Gradient x gradient path: use _gradient_product_density (single source
+    # of truth).  BC-aware: periodic→IBP, non-periodic→CD.
+    if op_a in _GRADIENT_AXES and op_b in _GRADIENT_AXES:
+        field_a = _resolve_term_target(data, term.factor_a.field, t_idx)
+        field_b = _resolve_term_target(data, term.factor_b.field, t_idx)
+        if field_a is None or field_b is None:
+            return 0.0
+        density = _gradient_product_density(
+            op_a,
+            field_a,
+            op_b,
+            field_b,
+            data.grid_spacing,
+            data.periodic,
+            bc_types=data.bc_types,
+        )
+        return float((coeff * density * volume_weight).mean())
+
+    # Kinetic: time_derivative x time_derivative — direct velocity lookup.
+    if op_a == "time_derivative" and op_b == "time_derivative":
+        fname_a = term.factor_a.field
+        fname_b = term.factor_b.field
+        vel_a = data.velocities.get(fname_a)
+        vel_b = data.velocities.get(fname_b)
+        if vel_a is not None and vel_b is not None:
+            return float(
+                (coeff * vel_a[t_idx] * vel_b[t_idx] * volume_weight).mean()
+            )
+        return 0.0
+
+    # All other terms: identity, mixed operator x identity, etc.
+    fa = _evaluate_hamiltonian_factor(
+        term.factor_a.field,
+        term.factor_a.operator,
+        data,
+        t_idx,
+    )
+    fb = _evaluate_hamiltonian_factor(
+        term.factor_b.field,
+        term.factor_b.operator,
+        data,
+        t_idx,
+    )
+    if fa is None or fb is None:
+        return 0.0
+
+    return float((coeff * fa * fb * volume_weight).mean())
+
+
+def _compute_hamiltonian_per_field(
+    data: SimulationData,
+    t_idx: int,
+    ctx: _HamiltonianContext | None = None,
+) -> tuple[dict[str, float], float]:
+    """Decompose Hamiltonian into per-field self-energy and interaction.
+
+    Self-energy: terms where both factors reference the same base field.
+    Interaction: terms where factors reference different fields.
+
+    Parameters
+    ----------
+    data : SimulationData
+    t_idx : int
+        Snapshot index.
+    ctx : _HamiltonianContext or None
+        Pre-computed context (for timeseries path).
+
+    Returns
+    -------
+    per_field : dict[str, float]
+        Per-field self-energy density (base field name → energy).
+    interaction : float
+        Total interaction energy density (cross-field terms).
+
+    Raises
+    ------
+    ValueError
+        If the spec lacks hamiltonian_terms.
+    """
+    canonical = data.spec.canonical
+    if canonical is None or not canonical.hamiltonian_terms:
+        msg = (
+            "No hamiltonian_terms in JSON spec. Re-derive the theory to populate "
+            "the canonical Hamiltonian (required for correct energy measurement). "
+            "Run: uv run tidal derive <theory.toml>"
+        )
+        raise ValueError(msg)
+
+    if ctx is None:
+        ctx = _prepare_hamiltonian_context(data)
+
+    volume_weight = ctx.volume_weight
+    per_field: dict[str, float] = {}
+    interaction = 0.0
+
+    for term_idx, term in enumerate(canonical.hamiltonian_terms):
+        contrib = _evaluate_single_hamiltonian_term(
+            term, ctx.term_coeffs[term_idx], volume_weight, data, t_idx
+        )
+        if term.is_self_energy:
+            base = term.base_field_a
+            per_field[base] = per_field.get(base, 0.0) + contrib
+        else:
+            interaction += contrib
+
+    return per_field, interaction
+
+
+def compute_system_energy(
     data: SimulationData,
     t_idx: int,
     _ctx: _HamiltonianContext | None = None,
 ) -> SystemEnergy:
     """Compute Hamiltonian energy density at snapshot *t_idx*.
 
-    When the spec includes canonical structure (from ``tidal derive``),
-    evaluates the Legendre-transform Hamiltonian directly from structured
-    quadratic terms. Otherwise, falls back to the virial-based formula.
+    Uses the Legendre-transform Hamiltonian from canonical structure,
+    decomposed into per-field self-energy and cross-field interaction.
+    This is the only physically correct energy computation — the
+    Hamiltonian coefficients include all metric/kinetic prefactors
+    from the covariant Lagrangian, making it coordinate-invariant.
 
     Parameters
     ----------
@@ -1437,94 +1145,32 @@ def compute_system_energy(  # noqa: PLR0914
     Raises
     ------
     ValueError
-        If *t_idx* is out of range.
+        If *t_idx* is out of range, or if the spec lacks hamiltonian_terms
+        (re-derive with ``tidal derive`` to populate them).
     """
     if t_idx < 0 or t_idx >= data.n_snapshots:
         msg = f"t_idx={t_idx} out of range [0, {data.n_snapshots})"
         raise ValueError(msg)
 
-    # Per-field canonical energy (kinetic + gradient + mass) — dynamical only.
-    # Gradient uses operator-aware axes: only the spatial axes that appear
-    # as self-laplacian operators in each field's equation.  For scalar
-    # fields with a full ``laplacian``, this is all axes (unchanged).
-    # For vector components with directional laplacians (e.g. laplacian_y),
-    # only the corresponding axes contribute to per-field gradient energy.
-
-    # Pre-build coordinate arrays once if any field has position-dependent mass
-    # or we need the volume element for curved coordinates.
-    coord_arrays: dict[str, NDArray[np.float64]] | None = None
-    has_posdep_mass = any(
-        term.operator == "identity"
-        and term.field == eq.field_name
-        and term.position_dependent
-        for eq in data.spec.equations
-        for term in eq.rhs_terms
-    )
-    needs_coord_arrays = has_posdep_mass or (
-        data.spec.canonical is not None
-        and data.spec.canonical.volume_element is not None
-    )
-    if needs_coord_arrays:
-        coord_arrays = _build_coord_arrays(data)
-
-    # Volume element: sqrt|g_spatial| for curved coordinates.
-    # 1.0 for flat spacetimes (no grid allocation, scalar multiply is no-op).
-    volume_weight: float | NDArray[np.float64] = 1.0
     if (
-        data.spec.canonical is not None
-        and data.spec.canonical.volume_element is not None
-        and coord_arrays is not None
+        data.spec.canonical is None
+        or not data.spec.canonical.hamiltonian_terms
     ):
-        from tidal.symbolic._eval_utils import evaluate_coefficient  # noqa: PLC0415
-
-        volume_weight = evaluate_coefficient(
-            data.spec.canonical.volume_element,
-            _merge_parameters(data),
-            data.spec.effective_coordinates,
-            coord_arrays=coord_arrays,
-            t=0.0,
+        msg = (
+            "No hamiltonian_terms in JSON spec. Re-derive the theory to "
+            "populate the canonical Hamiltonian (required for correct energy "
+            "measurement). Run: uv run tidal derive <theory.toml>"
         )
+        raise ValueError(msg)
 
-    per_field: dict[str, FieldEnergy] = {}
-    for field_idx, eq in enumerate(data.spec.equations):
-        name = eq.field_name
-        if eq.time_derivative_order == 0:
-            continue
-
-        field_snapshot = data.fields[name][t_idx]
-        vel_snapshot = data.velocities.get(name)
-        vel_arr = vel_snapshot[t_idx] if vel_snapshot is not None else None
-
-        m2 = _resolve_mass_squared(data, field_idx, coord_arrays=coord_arrays)
-        axes = _self_gradient_axes(eq)
-        per_field[name] = compute_field_energy(
-            field_snapshot,
-            vel_arr,
-            m2,
-            data.grid_spacing,
-            data.periodic,
-            gradient_axes=axes,
-            bc_types=data.bc_types,
-            volume_weight=volume_weight,
-        )
-
-    # Use canonical Hamiltonian when available (Phase K: Legendre transform)
-    if data.spec.canonical is not None:
-        total = _compute_hamiltonian_from_canonical(data, t_idx, ctx=_ctx)
-        self_sum = sum(fe.total for fe in per_field.values())
-        interaction = total - self_sum
-        return SystemEnergy(per_field=per_field, interaction=interaction, total=total)
-
-    # Fallback: virial-based formula for legacy specs without canonical structure.
-    v_virial = _compute_virial_potential(data, t_idx)
-    v_constraint = _compute_constraint_self_energy(data, t_idx)
-    v_constraint_cross = _compute_constraint_coupling_energy(data, t_idx)
-    v_total = v_virial + v_constraint + v_constraint_cross
-    self_potential = sum(fe.gradient + fe.mass for fe in per_field.values())
-    interaction = v_total - self_potential
-    total_kinetic = sum(fe.kinetic for fe in per_field.values())
-    total = total_kinetic + v_total
-
+    per_field_totals, interaction = _compute_hamiltonian_per_field(
+        data, t_idx, ctx=_ctx
+    )
+    per_field = {
+        name: FieldEnergy(kinetic=0.0, gradient=0.0, mass=0.0, total=total)
+        for name, total in per_field_totals.items()
+    }
+    total = sum(per_field_totals.values()) + interaction
     return SystemEnergy(per_field=per_field, interaction=interaction, total=total)
 
 

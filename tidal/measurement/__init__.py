@@ -65,9 +65,6 @@ from tidal.measurement._energy import (
     compute_energy_timeseries as compute_energy_timeseries,
 )
 from tidal.measurement._energy import (
-    compute_field_energy as compute_field_energy,
-)
-from tidal.measurement._energy import (
     compute_system_energy as compute_system_energy,
 )
 from tidal.measurement._io import SimulationData as SimulationData
@@ -159,7 +156,6 @@ __all__ = [
     "compute_dispersion",
     "compute_effective_mass",
     "compute_energy_timeseries",
-    "compute_field_energy",
     "compute_group_conversion",
     "compute_group_spectral_conversion",
     "compute_mixing_length",
