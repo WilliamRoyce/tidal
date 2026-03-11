@@ -331,6 +331,13 @@ class SimulationData:
         if "dt" in metadata:
             dt_val = float(metadata["dt"])  # type: ignore[arg-type]
 
+        # Restore FD order so measurement stencils match the solver's.
+        # Must be set before any energy computation.
+        if "fd_order" in metadata:
+            from tidal.solver.operators import set_fd_order  # noqa: PLC0415
+
+            set_fd_order(int(metadata["fd_order"]))  # type: ignore[arg-type]
+
         return cls(
             times=times,
             fields=fields,

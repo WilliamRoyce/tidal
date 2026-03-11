@@ -104,38 +104,54 @@ class SystemEnergy:
 
 
 # ------------------------------------------------------------------
-# Derivative helpers
+# Derivative helpers — delegated to operators.py
 # ------------------------------------------------------------------
+#
+# Energy measurement MUST use the same finite-difference stencils as the
+# PDE solver (operators.py) to track the discrete conserved Hamiltonian
+# exactly.  Previous versions reimplemented stencils here independently;
+# this caused inconsistencies when the solver FD order changed.
+#
+# Now all spatial operators are called through the solver module, which
+# automatically inherits the current FD order from set_fd_order().
+#
+# Reference: the stencil-matching requirement is discussed in
+# Hairer, Lubich & Wanner, "Geometric Numerical Integration", Springer,
+# 2006, Chapter VI — virial energy tracks the discrete (shadow)
+# Hamiltonian only when the measurement stencils match the solver's.
 
 
-def _pad_dirichlet(
-    field: NDArray[np.float64],
-    axis: int,
-) -> NDArray[np.float64]:
-    """Pad *field* with one anti-symmetric ghost cell per side on *axis*.
+def _make_grid_info(
+    grid_spacing: tuple[float, ...],
+    periodic: tuple[bool, ...],
+    shape: tuple[int, ...],
+    bc_types: tuple[str, ...] | None = None,
+) -> object:
+    """Build a minimal ``GridInfo`` from measurement parameters.
 
-    For Dirichlet BCs (``field = 0`` at the boundary), the ghost cell
-    value is the negative of the adjacent interior cell.  This is
-    equivalent to ``np.pad(..., mode='reflect', reflect_type='odd')``.
+    Lazily imports ``GridInfo`` to avoid circular imports at module load.
+    The ``bounds`` are reconstructed from ``shape * dx`` per axis.
     """
-    pad_width = [(0, 0)] * field.ndim
-    pad_width[axis] = (1, 1)
-    return np.pad(field, pad_width, mode="reflect", reflect_type="odd")
+    from tidal.solver.grid import GridInfo  # noqa: PLC0415
+
+    bounds = tuple((0.0, float(n) * dx) for n, dx in zip(shape, grid_spacing, strict=True))
+    bc: tuple[str, ...] | None = bc_types
+    return GridInfo(
+        bounds=bounds,
+        shape=shape,
+        periodic=periodic,
+        bc=bc,
+    )
 
 
-def _pad_neumann(
-    field: NDArray[np.float64],
-    axis: int,
-) -> NDArray[np.float64]:
-    """Pad *field* with one symmetric ghost cell per side on *axis*.
-
-    For Neumann BCs (``∂field/∂n = 0`` at the boundary), the ghost cell
-    value equals the adjacent interior cell.  This is equivalent to
-    ``np.pad(..., mode='reflect', reflect_type='even')``.
-    """
-    pad_width = [(0, 0)] * field.ndim
-    pad_width[axis] = (1, 1)
-    return np.pad(field, pad_width, mode="reflect", reflect_type="even")
+def _resolve_bc_spec(
+    bc_types: tuple[str, ...] | None,
+    periodic: tuple[bool, ...],
+) -> str | tuple[str, ...]:
+    """Build a BC spec for operators.py from energy module parameters."""
+    if bc_types is not None:
+        return bc_types
+    return tuple("periodic" if p else "dirichlet" for p in periodic)
 
 
 def _first_derivative(
@@ -146,42 +162,26 @@ def _first_derivative(
     is_periodic: bool = False,
     bc_type: str | None = None,
 ) -> NDArray[np.float64]:
-    """Single-axis first derivative via central differences.
+    """Single-axis first derivative via the solver's central-difference stencil.
 
-    Uses ``np.roll`` for periodic wrapping, ghost-cell padding for
-    non-periodic axes.  Both paths use the same 2-point central stencil
-    ``(f[i+1] - f[i-1]) / (2 dx)``, matching py-pde's finite-difference
-    operators so the virial energy tracks the PDE solver's conserved
-    Hamiltonian exactly.
-
-    Parameters
-    ----------
-    bc_type : str or None
-        Boundary condition type: ``"periodic"``, ``"neumann"``, or
-        ``"dirichlet"``.  When provided, overrides *is_periodic*.
-    is_periodic : bool
-        Legacy parameter — used only when *bc_type* is ``None``.
+    Delegates to ``operators.gradient()`` so that the FD order (2nd, 4th, 6th)
+    automatically matches the solver's current setting.
     """
+    from tidal.solver.operators import gradient as _solver_gradient  # noqa: PLC0415
+
     effective_bc = (
         bc_type if bc_type is not None else ("periodic" if is_periodic else "dirichlet")
     )
-
-    if effective_bc == "periodic":
-        return (np.roll(field, -1, axis=axis) - np.roll(field, 1, axis=axis)) / (
-            2.0 * dx
-        )
-
-    # Central difference with ghost cells: (f[i+1] - f[i-1]) / (2dx)
-    padded = (
-        _pad_neumann(field, axis)
-        if effective_bc == "neumann"
-        else _pad_dirichlet(field, axis)
+    shape = field.shape
+    periodic = tuple(effective_bc == "periodic" for _ in range(field.ndim))
+    bc_tup = tuple(effective_bc for _ in range(field.ndim))
+    grid = _make_grid_info(
+        grid_spacing=tuple(dx for _ in range(field.ndim)),
+        periodic=periodic,
+        shape=shape,
+        bc_types=bc_tup,
     )
-    slc_plus: list[slice] = [slice(None)] * field.ndim
-    slc_minus: list[slice] = [slice(None)] * field.ndim
-    slc_plus[axis] = slice(2, None)
-    slc_minus[axis] = slice(None, -2)
-    return (padded[tuple(slc_plus)] - padded[tuple(slc_minus)]) / (2.0 * dx)
+    return _solver_gradient(field, axis, grid, bc_tup)  # type: ignore[arg-type]
 
 
 def _second_derivative(
@@ -192,48 +192,28 @@ def _second_derivative(
     is_periodic: bool = False,
     bc_type: str | None = None,
 ) -> NDArray[np.float64]:
-    """Single-axis second derivative via 3-point central stencil.
+    """Single-axis second derivative via the solver's central-difference stencil.
 
-    Uses ``np.roll`` for periodic wrapping, ghost-cell padding for
-    non-periodic axes.  Both paths use ``(f[i+1] - 2f[i] + f[i-1]) / dx²``,
-    matching py-pde's finite-difference operators so the virial energy
-    tracks the PDE solver's conserved Hamiltonian exactly.
-
-    Parameters
-    ----------
-    bc_type : str or None
-        Boundary condition type: ``"periodic"``, ``"neumann"``, or
-        ``"dirichlet"``.  When provided, overrides *is_periodic*.
-    is_periodic : bool
-        Legacy parameter — used only when *bc_type* is ``None``.
+    Delegates to ``operators.directional_laplacian()`` so that the FD order
+    (2nd, 4th, 6th) automatically matches the solver's current setting.
     """
+    from tidal.solver.operators import (  # noqa: PLC0415
+        directional_laplacian as _solver_lap,
+    )
+
     effective_bc = (
         bc_type if bc_type is not None else ("periodic" if is_periodic else "dirichlet")
     )
-
-    if effective_bc == "periodic":
-        return (
-            np.roll(field, -1, axis=axis) - 2.0 * field + np.roll(field, 1, axis=axis)
-        ) / (dx * dx)
-
-    # Standard 3-point stencil with ghost cells:
-    # (f[i+1] - 2f[i] + f[i-1]) / dx²
-    padded = (
-        _pad_neumann(field, axis)
-        if effective_bc == "neumann"
-        else _pad_dirichlet(field, axis)
+    shape = field.shape
+    periodic = tuple(effective_bc == "periodic" for _ in range(field.ndim))
+    bc_tup = tuple(effective_bc for _ in range(field.ndim))
+    grid = _make_grid_info(
+        grid_spacing=tuple(dx for _ in range(field.ndim)),
+        periodic=periodic,
+        shape=shape,
+        bc_types=bc_tup,
     )
-    slc_center: list[slice] = [slice(None)] * field.ndim
-    slc_plus: list[slice] = [slice(None)] * field.ndim
-    slc_minus: list[slice] = [slice(None)] * field.ndim
-    slc_center[axis] = slice(1, -1)
-    slc_plus[axis] = slice(2, None)
-    slc_minus[axis] = slice(None, -2)
-    return (
-        padded[tuple(slc_plus)]
-        - 2.0 * padded[tuple(slc_center)]
-        + padded[tuple(slc_minus)]
-    ) / (dx * dx)
+    return _solver_lap(field, axis, grid, bc_tup)  # type: ignore[arg-type]
 
 
 # ------------------------------------------------------------------
@@ -344,76 +324,24 @@ def _apply_spatial_operator(
 ) -> NDArray[np.float64]:
     """Apply a named spatial operator to a field array.
 
+    Delegates to ``operators.apply_operator()`` from the solver module,
+    ensuring the same FD stencils are used for energy measurement and
+    PDE integration.  This is critical for virial energy tracking the
+    discrete (shadow) Hamiltonian exactly.
+
     Parameters
     ----------
     bc_types : tuple[str, ...] | None
         Per-axis BC type.  When ``None``, falls back to ``periodic`` booleans.
-
-    Raises
-    ------
-    ValueError
-        If the operator is unknown.
     """
+    from tidal.solver.operators import apply_operator as _solver_apply  # noqa: PLC0415
+
     if operator == "identity":
         return field
 
-    # gradient_{x,y,z}
-    if operator.startswith("gradient_"):
-        axis_letter = operator[len("gradient_") :]
-        if axis_letter in _AXIS_MAP:
-            ax = _AXIS_MAP[axis_letter]
-            return _first_derivative(
-                field,
-                ax,
-                grid_spacing[ax],
-                bc_type=_effective_bc(ax, periodic, bc_types),
-            )
-
-    # laplacian_{x,y,z}
-    if operator.startswith("laplacian_"):
-        axis_letter = operator[len("laplacian_") :]
-        if axis_letter in _AXIS_MAP:
-            ax = _AXIS_MAP[axis_letter]
-            return _second_derivative(
-                field,
-                ax,
-                grid_spacing[ax],
-                bc_type=_effective_bc(ax, periodic, bc_types),
-            )
-
-    # laplacian (isotropic sum)
-    if operator == "laplacian":
-        result: NDArray[np.float64] = np.zeros_like(field)
-        for ax in range(len(grid_spacing)):
-            result += _second_derivative(
-                field,
-                ax,
-                grid_spacing[ax],
-                bc_type=_effective_bc(ax, periodic, bc_types),
-            )
-        return result
-
-    # cross_derivative_{xy,xz,yz}
-    if operator.startswith("cross_derivative_"):
-        axes_str = operator[len("cross_derivative_") :]
-        if len(axes_str) == 2 and axes_str[0] in _AXIS_MAP and axes_str[1] in _AXIS_MAP:  # noqa: PLR2004
-            ax0 = _AXIS_MAP[axes_str[0]]
-            ax1 = _AXIS_MAP[axes_str[1]]
-            tmp = _first_derivative(
-                field,
-                ax0,
-                grid_spacing[ax0],
-                bc_type=_effective_bc(ax0, periodic, bc_types),
-            )
-            return _first_derivative(
-                tmp,
-                ax1,
-                grid_spacing[ax1],
-                bc_type=_effective_bc(ax1, periodic, bc_types),
-            )
-
-    msg = f"Unknown spatial operator for energy measurement: '{operator}'"
-    raise ValueError(msg)
+    bc_spec = _resolve_bc_spec(bc_types, periodic)
+    grid = _make_grid_info(grid_spacing, periodic, field.shape, bc_types)
+    return _solver_apply(operator, field, grid, bc_spec)  # type: ignore[arg-type]
 
 
 # ------------------------------------------------------------------

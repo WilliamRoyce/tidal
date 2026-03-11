@@ -5,6 +5,20 @@ descriptor, returning an ``np.ndarray`` of the same shape.  No py-pde
 ScalarField / VectorField wrappers — pure numpy with explicit ghost-cell
 boundary handling.
 
+Finite-difference accuracy orders
+----------------------------------
+Supports 2nd, 4th, and 6th-order central-difference stencils, selectable
+at runtime via :func:`set_fd_order`.  Higher orders use wider stencils
+(more ghost cells) for dramatically improved spatial accuracy:
+
+- **Order 2** (default): 3-point stencil, 1 ghost cell/side.
+- **Order 4**: 5-point stencil, 2 ghost cells/side.
+- **Order 6**: 7-point stencil, 3 ghost cells/side.
+
+Stencil coefficients from Fornberg (1988), "Generation of Finite Difference
+Formulas on Arbitrarily Spaced Grids", Mathematics of Computation 51(184),
+pp. 699-706, Table 1 (central differences).
+
 Boundary condition types
 ------------------------
 - ``"periodic"`` — wraparound via ``np.roll``
@@ -15,15 +29,20 @@ Boundary condition types
 All non-periodic BCs are unified via the ghost-cell formula
 ``ghost = const + factor * interior_cell`` where ``(const, factor)``
 are determined by BC type, value, and grid spacing.  See ``SideBCSpec``
-for the derivation.
+for the derivation.  For higher-order stencils (order > 2), ghost cells
+are filled layer-by-layer from interior outward (recursive ghost fill;
+LeVeque, "Finite Difference Methods for ODEs and PDEs", SIAM, 2007, ch. 2).
 
 The ``bc`` parameter may be:
 - A single string applied to all axes (e.g. ``"periodic"``)
 - A tuple of strings, one per axis (e.g. ``("neumann", "periodic")``)
 - A tuple of ``AxisBCSpec`` objects for per-side / non-zero / Robin BCs
 
-Reference: py-pde's ghost-cell virtual-point approach
-(David Zwicker, J. Open Source Software 5(48), 2020).
+References
+----------
+- Fornberg (1988), Math. Comp. 51(184), pp. 699-706 — stencil coefficients.
+- LeVeque (2007), "Finite Difference Methods for ODEs and PDEs", SIAM — convergence theory.
+- Zwicker (2020), J. Open Source Software 5(48) — ghost-cell virtual-point approach.
 """
 
 from __future__ import annotations
@@ -35,6 +54,59 @@ import numpy as np
 
 if TYPE_CHECKING:
     from tidal.solver.grid import GridInfo
+
+# ---------------------------------------------------------------------------
+# Finite-difference order (module-level state)
+# ---------------------------------------------------------------------------
+# Set once at simulation startup via set_fd_order().  Determines stencil
+# width and ghost-cell count for all spatial operators.
+#
+# Reference: Fornberg, "Generation of Finite Difference Formulas on
+# Arbitrarily Spaced Grids", Mathematics of Computation 51(184), 1988.
+# Stencil coefficients from Table 1 (central differences).
+
+_fd_order: int = 2
+"""Current FD accuracy order: 2 (default), 4, or 6."""
+
+_n_ghost: int = 1
+"""Number of ghost cells per side: fd_order // 2."""
+
+
+def set_fd_order(order: int) -> None:
+    """Set the finite-difference accuracy order for all spatial operators.
+
+    Must be called before any operator evaluation (typically at simulation
+    startup).  Clears the ghost-cell padding cache since buffer shapes change.
+
+    Parameters
+    ----------
+    order : int
+        Accuracy order: 2 (3-point stencil), 4 (5-point), or 6 (7-point).
+
+    Raises
+    ------
+    ValueError
+        If *order* is not 2, 4, or 6.
+    """
+    global _fd_order, _n_ghost  # noqa: PLW0603
+    if order not in {2, 4, 6}:
+        msg = f"FD order must be 2, 4, or 6; got {order}"
+        raise ValueError(msg)
+    _fd_order = order
+    _n_ghost = order // 2
+    # Invalidate cached padding buffers — shapes depend on ghost count
+    _pad_cache.clear()
+
+
+def get_fd_order() -> int:
+    """Return the current FD accuracy order."""
+    return _fd_order
+
+
+def get_n_ghost() -> int:
+    """Return the current number of ghost cells per side."""
+    return _n_ghost
+
 
 # ---------------------------------------------------------------------------
 # BC data model
@@ -320,42 +392,77 @@ def _cached_corner(
 
 
 class _PadEntry:
-    """Pre-allocated buffer and cached slices for one (shape, axis) combo."""
+    """Pre-allocated buffer and cached slices for one (shape, axis, n_ghost) combo.
 
-    __slots__ = ("buf", "interior_slc", "left_slc", "right_slc", "src_hi", "src_lo")
+    Supports variable ghost-cell width for higher-order FD stencils:
+    - Order 2: 1 ghost cell per side (3-point stencil)
+    - Order 4: 2 ghost cells per side (5-point stencil)
+    - Order 6: 3 ghost cells per side (7-point stencil)
+    """
 
-    def __init__(self, data_shape: tuple[int, ...], axis: int) -> None:
+    __slots__ = (
+        "buf",
+        "interior_slc",
+        "left_slcs",
+        "ng",
+        "right_slcs",
+        "src_hi_slcs",
+        "src_lo_slcs",
+    )
+
+    def __init__(self, data_shape: tuple[int, ...], axis: int, ng: int) -> None:
         n = data_shape[axis]
         ndim = len(data_shape)
+        self.ng = ng
         padded_shape = list(data_shape)
-        padded_shape[axis] += 2
+        padded_shape[axis] += 2 * ng
         self.buf = np.empty(tuple(padded_shape))
-        # Cache all slice tuples (avoids per-call list+tuple creation)
-        self.interior_slc = _slice_tuple(ndim, axis, slice(1, n + 1))
-        self.left_slc = _slice_tuple(ndim, axis, slice(0, 1))
-        self.right_slc = _slice_tuple(ndim, axis, slice(n + 1, n + 2))
-        self.src_lo = _slice_tuple(ndim, axis, slice(0, 1))
-        self.src_hi = _slice_tuple(ndim, axis, slice(n - 1, n))
+        # Interior: data sits at [ng .. n+ng)
+        self.interior_slc = _slice_tuple(ndim, axis, slice(ng, n + ng))
+        # Per-layer ghost and source slices for non-periodic fill
+        self.left_slcs: list[tuple[slice, ...]] = []
+        self.right_slcs: list[tuple[slice, ...]] = []
+        self.src_lo_slcs: list[tuple[slice, ...]] = []
+        self.src_hi_slcs: list[tuple[slice, ...]] = []
+        for k in range(ng):
+            # Left ghost: layer k (0=outermost, ng-1=innermost adjacent to data)
+            self.left_slcs.append(_slice_tuple(ndim, axis, slice(k, k + 1)))
+            # Right ghost: layer k from outside
+            self.right_slcs.append(
+                _slice_tuple(ndim, axis, slice(n + 2 * ng - 1 - k, n + 2 * ng - k))
+            )
+            # Source from interior for left ghost (innermost=index 0, outermost=index ng-1)
+            self.src_lo_slcs.append(_slice_tuple(ndim, axis, slice(ng - 1 - k, ng - k)))
+            # Source from interior for right ghost
+            self.src_hi_slcs.append(
+                _slice_tuple(ndim, axis, slice(n + k, n + k + 1))
+            )
 
 
 class _PadBufferCache:
     """Lazily allocate and reuse padded buffers for ghost-cell operations.
 
-    Keyed by ``(data.shape, axis)`` — since TIDAL operates on a fixed grid,
-    each key is allocated only once.  Also caches the slice tuples needed
-    for ghost-cell writes.  Single-threaded assumption (no locking).
+    Keyed by ``(data.shape, axis, n_ghost)`` — since TIDAL operates on a
+    fixed grid with a fixed FD order per run, each key is allocated only
+    once.  Single-threaded assumption (no locking).
     """
 
     __slots__ = ("_cache",)
 
     def __init__(self) -> None:
-        self._cache: dict[tuple[tuple[int, ...], int], _PadEntry] = {}
+        self._cache: dict[tuple[tuple[int, ...], int, int], _PadEntry] = {}
 
-    def get(self, data_shape: tuple[int, ...], axis: int) -> _PadEntry:
-        key = (data_shape, axis)
+    def clear(self) -> None:
+        """Invalidate all cached padding buffers."""
+        self._cache.clear()
+
+    def get(self, data_shape: tuple[int, ...], axis: int, ng: int | None = None) -> _PadEntry:
+        if ng is None:
+            ng = _n_ghost
+        key = (data_shape, axis, ng)
         entry = self._cache.get(key)
         if entry is None:
-            entry = _PadEntry(data_shape, axis)
+            entry = _PadEntry(data_shape, axis, ng)
             self._cache[key] = entry
         return entry
 
@@ -363,16 +470,20 @@ class _PadBufferCache:
 _pad_cache = _PadBufferCache()
 
 
-def _pad_axis(
+def _pad_axis(  # noqa: PLR0914
     data: np.ndarray,
     axis: int,
     bc: str | AxisBCSpec,
     dx: float = 1.0,
+    ng: int | None = None,
 ) -> np.ndarray:
-    """Pad *data* with one ghost cell on each side along *axis*.
+    """Pad *data* with ghost cells on each side along *axis*.
 
     Uses pre-allocated buffers and cached slice tuples (via ``_pad_cache``)
     for zero-alloc ghost-cell writes in the hot path.
+
+    The number of ghost cells is determined by the current FD order
+    (``_n_ghost``), or overridden by *ng*.
 
     Parameters
     ----------
@@ -385,32 +496,76 @@ def _pad_axis(
     dx : float
         Grid spacing along this axis (needed for Neumann derivative and
         Robin formula; default 1.0 for backward compat).
+    ng : int, optional
+        Override ghost-cell count (default: ``_n_ghost`` from FD order).
     """
     if isinstance(bc, str):
         bc = _str_to_axis_bc(bc)
 
-    entry = _pad_cache.get(data.shape, axis)
+    if ng is None:
+        ng = _n_ghost
+    entry = _pad_cache.get(data.shape, axis, ng)
     buf = entry.buf
 
     # Copy interior into buffer
     buf[entry.interior_slc] = data
 
+    n = data.shape[axis]
+
     if bc.periodic:
-        buf[entry.left_slc] = data[entry.src_hi]
-        buf[entry.right_slc] = data[entry.src_lo]
+        # Copy ng cells from each end for periodic wrapping
+        for k in range(ng):
+            # Left ghost layer k (outermost=0): copies from right end of data
+            # In the padded buffer, ghost layers are at indices [0..ng-1]
+            # Source from data: rightmost cells
+            buf[entry.left_slcs[k]] = data[
+                _slice_tuple(data.ndim, axis, slice(n - ng + k, n - ng + k + 1))
+            ]
+            # Right ghost layer k (outermost=0): copies from left end of data
+            buf[entry.right_slcs[k]] = data[
+                _slice_tuple(data.ndim, axis, slice(ng - 1 - k, ng - k))
+            ]
     else:
         assert bc.low is not None  # guaranteed by AxisBCSpec.__post_init__
         assert bc.high is not None
         c_lo, f_lo = bc.low.ghost_params(dx)
         c_hi, f_hi = bc.high.ghost_params(dx)
 
-        # Write ghost cells in-place: ghost = const + factor * interior
-        np.multiply(f_lo, data[entry.src_lo], out=buf[entry.left_slc])
-        if c_lo != 0.0:
-            buf[entry.left_slc] += c_lo
-        np.multiply(f_hi, data[entry.src_hi], out=buf[entry.right_slc])
-        if c_hi != 0.0:
-            buf[entry.right_slc] += c_hi
+        # Fill ghost cells layer-by-layer from interior outward.
+        # Layer 0 (innermost, adjacent to data boundary) uses data edge.
+        # Layer k>0 uses the previously-filled ghost layer as source,
+        # implementing the recursive ghost-cell fill standard in
+        # computational physics (LeVeque, "Finite Difference Methods for
+        # Ordinary and Partial Differential Equations", SIAM, 2007, §2.12).
+        for k in range(ng):
+            # Left side: ghost[ng-1-k] mirrors from source
+            left_ghost_idx = ng - 1 - k  # innermost first
+            left_ghost_slc = entry.left_slcs[left_ghost_idx]
+            if k == 0:
+                # Innermost ghost mirrors from data boundary
+                src_lo_slc = _slice_tuple(data.ndim, axis, slice(0, 1))
+                np.multiply(f_lo, data[src_lo_slc], out=buf[left_ghost_slc])
+            else:
+                # Outer ghost mirrors from the previously filled ghost
+                # In the padded buffer, the source is at index (ng - k)
+                src_idx = ng - k
+                src_slc = _slice_tuple(buf.ndim, axis, slice(src_idx, src_idx + 1))
+                np.multiply(f_lo, buf[src_slc], out=buf[left_ghost_slc])
+            if c_lo != 0.0:
+                buf[left_ghost_slc] += c_lo
+
+            # Right side: ghost[ng-1-k] mirrors from source
+            right_ghost_idx = ng - 1 - k
+            right_ghost_slc = entry.right_slcs[right_ghost_idx]
+            if k == 0:
+                src_hi_slc = _slice_tuple(data.ndim, axis, slice(n - 1, n))
+                np.multiply(f_hi, data[src_hi_slc], out=buf[right_ghost_slc])
+            else:
+                src_idx = n + ng + k - 1
+                src_slc = _slice_tuple(buf.ndim, axis, slice(src_idx, src_idx + 1))
+                np.multiply(f_hi, buf[src_slc], out=buf[right_ghost_slc])
+            if c_hi != 0.0:
+                buf[right_ghost_slc] += c_hi
 
     return buf
 
@@ -428,7 +583,14 @@ def gradient(
 ) -> np.ndarray:
     """Central-difference gradient ∂f/∂x_i.
 
-    Stencil: ``(f[i+1] - f[i-1]) / (2·dx)``
+    Stencil width adapts to the current FD order (set via ``set_fd_order``):
+
+    - **Order 2** (3-point): ``(f[i+1] - f[i-1]) / (2·dx)``
+    - **Order 4** (5-point): ``(f[i-2]/12 - 2f[i-1]/3 + 2f[i+1]/3 - f[i+2]/12) / dx``
+    - **Order 6** (7-point): ``(-f[i-3]/60 + 3f[i-2]/20 - 3f[i-1]/4 + 3f[i+1]/4
+      - 3f[i+2]/20 + f[i+3]/60) / dx``
+
+    Reference: Fornberg (1988), Mathematics of Computation 51(184), Table 1.
 
     Parameters
     ----------
@@ -452,11 +614,69 @@ def gradient(
 
     # Inline _resolve_axis_bc to avoid function call overhead
     axis_bc = bc_axis if isinstance(bc_axis, AxisBCSpec) else _str_to_axis_bc(bc_axis)
-    padded = _pad_axis(data, axis, axis_bc, dx)
-    slc_left = _cached_slice(data.ndim, axis, _SLC_LO)
-    slc_right = _cached_slice(data.ndim, axis, _SLC_HI)
-    result = np.subtract(padded[slc_right], padded[slc_left])
-    result *= 1.0 / (2.0 * dx)
+    ng = _n_ghost
+    padded = _pad_axis(data, axis, axis_bc, dx, ng=ng)
+    ndim = data.ndim
+    inv_dx = 1.0 / dx
+
+    if _fd_order == 2:  # noqa: PLR2004
+        slc_left = _cached_slice(ndim, axis, _SLC_LO)
+        slc_right = _cached_slice(ndim, axis, _SLC_HI)
+        result = np.subtract(padded[slc_right], padded[slc_left])
+        result *= 0.5 * inv_dx
+    elif _fd_order == 4:  # noqa: PLR2004
+        result = _gradient_o4(padded, axis, ndim, ng, inv_dx)
+    else:  # order 6
+        result = _gradient_o6(padded, axis, ndim, ng, inv_dx)
+    return result
+
+
+def _gradient_o4(
+    padded: np.ndarray, axis: int, ndim: int, ng: int, inv_dx: float,
+) -> np.ndarray:
+    """4th-order central gradient on a padded array (5-point stencil).
+
+    Coefficients: {1/12, -2/3, 0, 2/3, -1/12} / dx
+
+    Reference: Fornberg (1988), Table 1, d=1, N=2.
+    """
+    n = padded.shape[axis] - 2 * ng
+
+    def _slc(offset: int) -> tuple[slice, ...]:
+        start = ng + offset
+        return _slice_tuple(ndim, axis, slice(start, start + n))
+
+    # Fornberg (1988) Table 1, d=1, N=2 coefficients
+    result = np.multiply(1.0 / 12.0, padded[_slc(-2)])
+    result -= np.multiply(2.0 / 3.0, padded[_slc(-1)])
+    result += np.multiply(2.0 / 3.0, padded[_slc(1)])
+    result -= np.multiply(1.0 / 12.0, padded[_slc(2)])
+    result *= inv_dx
+    return result
+
+
+def _gradient_o6(
+    padded: np.ndarray, axis: int, ndim: int, ng: int, inv_dx: float,
+) -> np.ndarray:
+    """6th-order central gradient on a padded array (7-point stencil).
+
+    Coefficients: {-1/60, 3/20, -3/4, 0, 3/4, -3/20, 1/60} / dx
+
+    Reference: Fornberg (1988), Table 1, d=1, N=3.
+    """
+    n = padded.shape[axis] - 2 * ng
+
+    def _slc(offset: int) -> tuple[slice, ...]:
+        start = ng + offset
+        return _slice_tuple(ndim, axis, slice(start, start + n))
+
+    result = np.multiply(-1.0 / 60.0, padded[_slc(-3)])
+    result += np.multiply(3.0 / 20.0, padded[_slc(-2)])
+    result -= np.multiply(3.0 / 4.0, padded[_slc(-1)])
+    result += np.multiply(3.0 / 4.0, padded[_slc(1)])
+    result -= np.multiply(3.0 / 20.0, padded[_slc(2)])
+    result += np.multiply(1.0 / 60.0, padded[_slc(3)])
+    result *= inv_dx
     return result
 
 
@@ -466,26 +686,92 @@ def _directional_laplacian_raw(
     grid: GridInfo,
     bc_axis: str | AxisBCSpec,
 ) -> np.ndarray:
-    """Core 3-point second derivative with pre-resolved per-axis BC.
+    """Central second derivative ∂²f/∂x_i² with pre-resolved per-axis BC.
+
+    Stencil width adapts to the current FD order:
+
+    - **Order 2** (3-point): ``(f[i+1] - 2f[i] + f[i-1]) / dx²``
+    - **Order 4** (5-point): ``(-f[i-2]/12 + 4f[i-1]/3 - 5f[i]/2
+      + 4f[i+1]/3 - f[i+2]/12) / dx²``
+    - **Order 6** (7-point): ``(f[i-3]/90 - 3f[i-2]/20 + 3f[i-1]/2
+      - 49f[i]/18 + 3f[i+1]/2 - 3f[i+2]/20 + f[i+3]/90) / dx²``
+
+    Reference: Fornberg (1988), Mathematics of Computation 51(184), Table 1.
 
     Used by ``directional_laplacian`` and ``laplacian`` to avoid
     redundant BC normalization when computing multiple axes.
-
-    Uses ghost-cell padding with cached slice tuples and in-place arithmetic.
     """
     dx = grid.dx[axis]
     inv_dx2 = 1.0 / (dx * dx)
 
     # Inline _resolve_axis_bc to avoid function call overhead
     axis_bc = bc_axis if isinstance(bc_axis, AxisBCSpec) else _str_to_axis_bc(bc_axis)
-    padded = _pad_axis(data, axis, axis_bc, dx)
-    slc_left = _cached_slice(data.ndim, axis, _SLC_LO)
-    slc_center = _cached_slice(data.ndim, axis, _SLC_MID)
-    slc_right = _cached_slice(data.ndim, axis, _SLC_HI)
-    # In-place arithmetic: result = (right - 2*center + left) * inv_dx2
-    result = np.subtract(padded[slc_right], padded[slc_center])
-    result -= padded[slc_center]
-    result += padded[slc_left]
+    ng = _n_ghost
+    padded = _pad_axis(data, axis, axis_bc, dx, ng=ng)
+    ndim = data.ndim
+
+    if _fd_order == 2:  # noqa: PLR2004
+        slc_left = _cached_slice(ndim, axis, _SLC_LO)
+        slc_center = _cached_slice(ndim, axis, _SLC_MID)
+        slc_right = _cached_slice(ndim, axis, _SLC_HI)
+        # In-place arithmetic: result = (right - 2*center + left) * inv_dx2
+        result = np.subtract(padded[slc_right], padded[slc_center])
+        result -= padded[slc_center]
+        result += padded[slc_left]
+        result *= inv_dx2
+    elif _fd_order == 4:  # noqa: PLR2004
+        result = _laplacian_raw_o4(padded, axis, ndim, ng, inv_dx2)
+    else:  # order 6
+        result = _laplacian_raw_o6(padded, axis, ndim, ng, inv_dx2)
+    return result
+
+
+def _laplacian_raw_o4(
+    padded: np.ndarray, axis: int, ndim: int, ng: int, inv_dx2: float,
+) -> np.ndarray:
+    """4th-order central Laplacian on a padded array (5-point stencil).
+
+    Coefficients: {-1/12, 4/3, -5/2, 4/3, -1/12} / dx²
+
+    Reference: Fornberg (1988), Table 1, d=2, N=2.
+    """
+    n = padded.shape[axis] - 2 * ng
+
+    def _slc(offset: int) -> tuple[slice, ...]:
+        start = ng + offset
+        return _slice_tuple(ndim, axis, slice(start, start + n))
+
+    result = np.multiply(-1.0 / 12.0, padded[_slc(-2)])
+    result += np.multiply(4.0 / 3.0, padded[_slc(-1)])
+    result -= np.multiply(5.0 / 2.0, padded[_slc(0)])
+    result += np.multiply(4.0 / 3.0, padded[_slc(1)])
+    result -= np.multiply(1.0 / 12.0, padded[_slc(2)])
+    result *= inv_dx2
+    return result
+
+
+def _laplacian_raw_o6(
+    padded: np.ndarray, axis: int, ndim: int, ng: int, inv_dx2: float,
+) -> np.ndarray:
+    """6th-order central Laplacian on a padded array (7-point stencil).
+
+    Coefficients: {1/90, -3/20, 3/2, -49/18, 3/2, -3/20, 1/90} / dx²
+
+    Reference: Fornberg (1988), Table 1, d=2, N=3.
+    """
+    n = padded.shape[axis] - 2 * ng
+
+    def _slc(offset: int) -> tuple[slice, ...]:
+        start = ng + offset
+        return _slice_tuple(ndim, axis, slice(start, start + n))
+
+    result = np.multiply(1.0 / 90.0, padded[_slc(-3)])
+    result -= np.multiply(3.0 / 20.0, padded[_slc(-2)])
+    result += np.multiply(3.0 / 2.0, padded[_slc(-1)])
+    result -= np.multiply(49.0 / 18.0, padded[_slc(0)])
+    result += np.multiply(3.0 / 2.0, padded[_slc(1)])
+    result -= np.multiply(3.0 / 20.0, padded[_slc(2)])
+    result += np.multiply(1.0 / 90.0, padded[_slc(3)])
     result *= inv_dx2
     return result
 
@@ -530,36 +816,22 @@ def cross_derivative(
 ) -> np.ndarray:
     """Mixed second derivative ∂²f/(∂x_i ∂x_j).
 
-    Uses a fused 4-point stencil with ghost-cell padding and cached slice
-    tuples for all BC types.
+    Implemented as successive application of the 1D gradient operator along
+    each axis: ``gradient(gradient(f, axis1), axis2)``.  This naturally
+    inherits the current FD order from :func:`set_fd_order`:
+
+    - **Order 2**: 4-point stencil (f[±1,±1])
+    - **Order 4**: product of 5-point 1D stencils (5x5 = 25-point)
+    - **Order 6**: product of 7-point 1D stencils (7x7 = 49-point)
+
+    Reference: LeVeque, "Finite Difference Methods for Ordinary and Partial
+    Differential Equations", SIAM, 2007, §1.4.
     """
-    bcs = _normalize_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
-    # Inline _resolve_axis_bc
-    bc_e1 = bcs[axis1]
-    bc_e2 = bcs[axis2]
-    bc1 = bc_e1 if isinstance(bc_e1, AxisBCSpec) else _str_to_axis_bc(bc_e1)
-    bc2 = bc_e2 if isinstance(bc_e2, AxisBCSpec) else _str_to_axis_bc(bc_e2)
-
-    dx = grid.dx[axis1]
-    dy = grid.dx[axis2]
-
-    # Pad along axis1, then axis2 on the padded result
-    padded1 = _pad_axis(data, axis1, bc1, dx)
-    padded = _pad_axis(padded1, axis2, bc2, dy)
-
-    # Cached 4-corner slices: f[i±1, j±1] on the doubly-padded array
-    ndim = data.ndim
-    pp = padded[_cached_corner(ndim, axis1, _SLC_HI, axis2, _SLC_HI)]
-    pm = padded[_cached_corner(ndim, axis1, _SLC_HI, axis2, _SLC_LO)]
-    mp = padded[_cached_corner(ndim, axis1, _SLC_LO, axis2, _SLC_HI)]
-    mm = padded[_cached_corner(ndim, axis1, _SLC_LO, axis2, _SLC_LO)]
-
-    # In-place: (pp - pm - mp + mm) / (4*dx*dy)
-    result = np.subtract(pp, pm)
-    result -= mp
-    result += mm
-    result *= 1.0 / (4.0 * dx * dy)
-    return result
+    # Apply gradient along axis1 first, then along axis2
+    # This is equivalent to the fused stencil but automatically inherits
+    # the correct FD order from the gradient function
+    tmp = gradient(data, axis1, grid, bc)
+    return gradient(tmp, axis2, grid, bc)
 
 
 def biharmonic(

@@ -1673,8 +1673,15 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     Handles IDA, CVODE, scipy, and leapfrog schemes.
     """
     from tidal.measurement._io import SimulationData
+    from tidal.solver.operators import set_fd_order
 
     log = _noop if args.quiet else print
+
+    # 0. FD order — must be set before any operator evaluation
+    fd_order: int = getattr(args, "fd_order", 2)
+    set_fd_order(fd_order)
+    if fd_order != 2:  # noqa: PLR2004
+        log(f"  FD order: {fd_order} (Fornberg stencils)")
 
     # 1. Grid
     bounds = _parse_bounds(args.bounds, spec.spatial_dimension)

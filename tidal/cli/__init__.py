@@ -300,6 +300,17 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="DT",
         help="Snapshot interval (default: t_end/100)",
     )
+    sim_parser.add_argument(
+        "--fd-order",
+        type=int,
+        choices=[2, 4, 6],
+        default=2,
+        help=(
+            "Finite-difference accuracy order for spatial operators (default: 2). "
+            "Higher orders use wider stencils: 2→3pt, 4→5pt, 6→7pt. "
+            "Ref: Fornberg (1988), Mathematics of Computation 51(184)."
+        ),
+    )
     # Output
     sim_parser.add_argument(
         "--output",
@@ -896,6 +907,17 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=None,
         metavar="DT",
         help="Snapshot interval (default: t_end/100)",
+    )
+    sweep_parser.add_argument(
+        "--fd-order",
+        type=int,
+        choices=[2, 4, 6],
+        default=2,
+        help=(
+            "Finite-difference accuracy order for spatial operators (default: 2). "
+            "Higher orders use wider stencils: 2→3pt, 4→5pt, 6→7pt. "
+            "Ref: Fornberg (1988), Mathematics of Computation 51(184)."
+        ),
     )
     sweep_parser.add_argument(
         "--mode",
