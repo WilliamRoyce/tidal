@@ -285,7 +285,7 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
       (* Evaluate background field components and their PD derivatives *)
       If[backgroundFieldRules =!= {},
         Do[
-          componentEq = EvaluatePDBackgroundField[componentEq, chart, bg[[1]], bg[[2]]],
+          componentEq = EvaluatePDBackgroundField[componentEq, chart, bg[[1]], bg[[2]], If[Length[bg] >= 3, bg[[3]], {}]],
           {bg, backgroundFieldRules}
         ];
         componentEq = Expand[componentEq]
@@ -297,8 +297,9 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
       (*   rank 0: fh[] -> fh0[t,x,y]  *)
       (*   rank 1: fh[{i,-chart}] -> fhi[t,x,y]  *)
       (*   rank 2+: full component replacement *)
+      (* Pass metricMatrix so rank-2 fallback uses correct metric weights for curved metrics *)
       Do[
-        componentEq = ReplaceTensorFieldComponents[componentEq, afh, chart, coordSyms, dim],
+        componentEq = ReplaceTensorFieldComponents[componentEq, afh, chart, coordSyms, dim, metricMatrix],
         {afh, allFieldHeads}
       ];
 
@@ -308,7 +309,7 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
       (* Post-ConvertCDToDerivatives: catch any residual Derivative[...][bgField][...] forms *)
       If[backgroundFieldRules =!= {},
         Do[
-          componentEq = EvaluatePDBackgroundField[componentEq, chart, bg[[1]], bg[[2]]],
+          componentEq = EvaluatePDBackgroundField[componentEq, chart, bg[[1]], bg[[2]], If[Length[bg] >= 3, bg[[3]], {}]],
           {bg, backgroundFieldRules}
         ];
         componentEq = Expand[componentEq]
@@ -322,7 +323,7 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
 
   (* For any tensor field of rank >= 1, use the unified pipeline *)
   If[fieldRank >= 1,
-    Module[{allTuples, componentTuples, skipTuples, flatIdxMap},
+    Module[{allTuples, componentTuples, skipTuples, flatIdxMap, eomSep},
       allTuples = EnumerateComponentTuples[fieldHead, dim];
       (* Build flat index map: tuple -> original 0-based position *)
       flatIdxMap = Association[Table[allTuples[[i]] -> i - 1, {i, Length[allTuples]}]];
@@ -338,8 +339,13 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
          This converts V^a → g^{ab} V_{-b} (undoes ContractMetric) at abstract-tensor level.
          Safe to hoist: SeparateFieldMetrics acts on dummy/contracted indices, not free indices,
          so it commutes with the per-component free-index replacements in ExtractTensorComponent
-         step 1. Hoisting eliminates O(rank * dim^rank) redundant calls. *)
-      eom = SeparateFieldMetrics[eom, chart];
+         step 1. Hoisting eliminates O(rank * dim^rank) redundant calls.
+         CRITICAL: Must use a local variable (eomSep), NOT reassign the function parameter
+         `eom`. Reassigning a pattern variable like `eom = ...` tries to set a DownValue on
+         the expression value (Set::write: Tag Times/Plus is Protected), silently failing.
+         This caused VarD's upper-index E^{ab} to bypass SeparateMetric, breaking the
+         metric contraction in the box operator and producing wrong-sign equations. *)
+      eomSep = SeparateFieldMetrics[eom, chart];
 
       (* Use Do+AppendTo instead of Table so Share[] can reclaim memory
          between component extractions — critical for cross-field coupling
@@ -348,7 +354,7 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
       Do[
         AppendTo[result,
           {flatIdxMap[componentTuples[[idx]]],
-           ExtractTensorComponent[eom, field, chart,
+           ExtractTensorComponent[eomSep, field, chart,
              componentTuples[[idx]], additionalFields, computeChristoffels, metricMatrix, backgroundFieldRules]}
         ];
         Share[];
@@ -411,7 +417,8 @@ BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_
     evalLen = If[Head[traced]===Plus, Length[traced], 1];
     (* Early background field evaluation: collapse PD derivatives of background fields *)
     If[backgroundFieldRules =!= {},
-      Do[traced = EvaluatePDBackgroundField[traced, chart, bg[[1]], bg[[2]]],
+      Do[traced = EvaluatePDBackgroundField[traced, chart, bg[[1]], bg[[2]],
+           If[Length[bg] >= 3, bg[[3]], {}]],
         {bg, backgroundFieldRules}];
       traced = Expand[traced]
     ];
@@ -549,7 +556,7 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   (* Step 7b: Evaluate background field components and PD derivatives *)
   If[backgroundFieldRules =!= {},
     Do[
-      componentEq = EvaluatePDBackgroundField[componentEq, chart, bg[[1]], bg[[2]]],
+      componentEq = EvaluatePDBackgroundField[componentEq, chart, bg[[1]], bg[[2]], If[Length[bg] >= 3, bg[[3]], {}]],
       {bg, backgroundFieldRules}
     ];
     componentEq = Expand[componentEq];
@@ -562,8 +569,9 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   dim = Length[coordSyms];
 
   allFieldHeads = Join[{fieldHead}, ExtractFieldHead /@ additionalFields];
+  (* Pass metricMatrix so rank-2 fallback uses correct metric weights for curved metrics *)
   Do[
-    componentEq = ReplaceTensorFieldComponents[componentEq, afh, chart, coordSyms, dim],
+    componentEq = ReplaceTensorFieldComponents[componentEq, afh, chart, coordSyms, dim, metricMatrix],
     {afh, allFieldHeads}
   ];
 
@@ -574,7 +582,7 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
      that may survive ConvertCDToDerivatives *)
   If[backgroundFieldRules =!= {},
     Do[
-      componentEq = EvaluatePDBackgroundField[componentEq, chart, bg[[1]], bg[[2]]],
+      componentEq = EvaluatePDBackgroundField[componentEq, chart, bg[[1]], bg[[2]], If[Length[bg] >= 3, bg[[3]], {}]],
       {bg, backgroundFieldRules}
     ];
     componentEq = Expand[componentEq]
@@ -680,8 +688,9 @@ EnumerateComponentTuples[fieldHead_, dim_] := Module[
 (* === Rank-Generic Field Component Replacement === *)
 (* Replaces basis-indexed tensor fields with named scalar functions *)
 (* Extensible: add a new rank branch to support higher-rank tensors *)
+(* metricMatrix: optional metric matrix for correct curved-metric index weighting in rank-2 fallback *)
 
-ReplaceTensorFieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module[
+ReplaceTensorFieldComponents[expr_, fh_, chart_, coordSyms_, dim_, metricMatrix_:None] := Module[
   {rank, result = expr},
 
   rank = Length[SlotsOfTensor[fh]];
@@ -710,7 +719,7 @@ ReplaceTensorFieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module[
       ],
 
     rank === 2,
-      result = ReplaceRank2FieldComponents[result, fh, chart, coordSyms, dim],
+      result = ReplaceRank2FieldComponents[result, fh, chart, coordSyms, dim, metricMatrix],
 
     rank >= 3,
       result = ReplaceHigherRankFieldComponents[result, fh, chart, coordSyms, dim],
@@ -728,7 +737,8 @@ ReplaceTensorFieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module[
 
 (* Helper: Replace rank-2 field basis indices with flat sequential scalar functions *)
 (* For symmetric h in dim=2: h[{0,-ch},{0,-ch}] -> h0[t,x], h[{0,-ch},{1,-ch}] -> h1[t,x], h[{1,-ch},{1,-ch}] -> h2[t,x] *)
-ReplaceRank2FieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module[
+(* metricMatrix: if provided (curved metric), non-covariant index fallback uses correct metric weights *)
+ReplaceRank2FieldComponents[expr_, fh_, chart_, coordSyms_, dim_, metricMatrix_:None] := Module[
   {result = expr, symQ, pairs},
 
   symQ = (SymmetryGroupOfTensor[fh] =!= StrongGenSet[{}, GenSet[]]);
@@ -758,18 +768,46 @@ ReplaceRank2FieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module[
         If[!FreeQ[result, fh[{pair[[1]], _}, {pair[[2]], _}]] ||
            (symQ && pair[[1]] =!= pair[[2]] && !FreeQ[result, fh[{pair[[2]], _}, {pair[[1]], _}]]),
           Print["WARNING: Non-covariant rank-2 indices for field ", fh,
-                " at pair ", pair, ". Falling back to all-config replacement."];
-          result = result /. {
-            fh[{pair[[1]], ch}, {pair[[2]], ch}] :> sym[Sequence @@ cs],
-            fh[{pair[[1]], ch}, {pair[[2]], -ch}] :> sym[Sequence @@ cs],
-            fh[{pair[[1]], -ch}, {pair[[2]], ch}] :> sym[Sequence @@ cs]
-          };
-          If[symQ && pair[[1]] =!= pair[[2]],
+                " at pair ", pair, ". Falling back to metric-weighted replacement."];
+          (* For curved metrics (diagonal): apply correct g^{ia}g^{jb} weights.
+             h^{ij} = (g^{ii})(g^{jj}) h_{ij}  (diagonal metric, no sum)
+             h^i_j  = g^{ii} h_{ij}
+             h_i^j  = g^{jj} h_{ij}
+             For flat metric (metricMatrix===None): weights are 1 (historical behaviour). *)
+          Module[{wUU, wUDi, wDUi, wUUji, wUDji, wDUji, invMatrix, diagInv},
+            If[metricMatrix =!= None,
+              invMatrix = GetCachedInverseMetric[metricMatrix];
+              (* Check diagonal: use diagonal weights; warn if non-diagonal *)
+              If[DiagonalMatrixQ[invMatrix],
+                diagInv = Diagonal[invMatrix];
+                wUU   = diagInv[[pair[[1]]+1]] * diagInv[[pair[[2]]+1]];
+                wUDi  = diagInv[[pair[[1]]+1]];  (* h^i_j: raise first index *)
+                wDUi  = diagInv[[pair[[2]]+1]];  (* h_i^j: raise second index *)
+                wUUji = diagInv[[pair[[2]]+1]] * diagInv[[pair[[1]]+1]];
+                wUDji = diagInv[[pair[[2]]+1]];
+                wDUji = diagInv[[pair[[1]]+1]],
+                (* Non-diagonal: correct weighting requires sum over all components — not implemented.
+                   Fall back to unweighted (wrong) behaviour with a clear error message. *)
+                Print["ERROR: Non-diagonal metric in ReplaceRank2FieldComponents fallback. ",
+                      "Metric-weighted index raising not implemented for non-diagonal metrics. ",
+                      "Equations may be incorrect for field ", fh, " at pair ", pair, "."];
+                wUU = wUDi = wDUi = wUUji = wUDji = wDUji = 1
+              ],
+              (* Flat metric or None: identity weights (historical behaviour) *)
+              wUU = wUDi = wDUi = wUUji = wUDji = wDUji = 1
+            ];
             result = result /. {
-              fh[{pair[[2]], ch}, {pair[[1]], ch}] :> sym[Sequence @@ cs],
-              fh[{pair[[2]], ch}, {pair[[1]], -ch}] :> sym[Sequence @@ cs],
-              fh[{pair[[2]], -ch}, {pair[[1]], ch}] :> sym[Sequence @@ cs]
-            }
+              fh[{pair[[1]], ch}, {pair[[2]], ch}]  :> wUU  * sym[Sequence @@ cs],
+              fh[{pair[[1]], ch}, {pair[[2]], -ch}] :> wUDi * sym[Sequence @@ cs],
+              fh[{pair[[1]], -ch}, {pair[[2]], ch}] :> wDUi * sym[Sequence @@ cs]
+            };
+            If[symQ && pair[[1]] =!= pair[[2]],
+              result = result /. {
+                fh[{pair[[2]], ch}, {pair[[1]], ch}]  :> wUUji * sym[Sequence @@ cs],
+                fh[{pair[[2]], ch}, {pair[[1]], -ch}] :> wUDji * sym[Sequence @@ cs],
+                fh[{pair[[2]], -ch}, {pair[[1]], ch}] :> wDUji * sym[Sequence @@ cs]
+              }
+            ]
           ]
         ]
       ],
@@ -909,8 +947,9 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
   ];
 
   (* Replace ALL tensor fields with named scalar component functions *)
+  (* Pass metricMatrix so rank-2 fallback uses correct metric weights for curved metrics *)
   Do[
-    componentExpr = ReplaceTensorFieldComponents[componentExpr, afh, chart, coordSyms, dim],
+    componentExpr = ReplaceTensorFieldComponents[componentExpr, afh, chart, coordSyms, dim, metricMatrix],
     {afh, allFieldHeads}
   ];
 
