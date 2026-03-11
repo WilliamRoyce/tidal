@@ -1,4 +1,4 @@
-"""Tests for tidal.solver.leapfrog — Störmer-Verlet symplectic integrator."""
+"""Tests for tidal.solver.leapfrog — Störmer-Verlet and Yoshida symplectic integrators."""
 
 from __future__ import annotations
 
@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from tidal.solver.grid import GridInfo
-from tidal.solver.leapfrog import solve_leapfrog
+from tidal.solver.leapfrog import YOSHIDA_WEIGHTS, solve_leapfrog
 from tidal.solver.state import StateLayout
 from tidal.symbolic.json_loader import EquationSystem
 
@@ -303,3 +303,210 @@ class TestLeapfrogSnapshotCount:
         # Should be close to n_steps + 1 (+ possible final)
         assert n_snapshots >= n_steps + 1
         assert n_snapshots <= n_steps + 2  # at most +1 final save
+
+
+# ===================================================================
+# Yoshida 4th-order integrator tests
+# ===================================================================
+# Ref: Yoshida (1990), Physics Letters A 150(5-7), pp. 262-268.
+
+
+class TestYoshidaConstants:
+    """Verify Yoshida weight properties."""
+
+    def test_weights_sum_to_one(self) -> None:
+        """Yoshida weights must sum to 1 (consistency condition)."""
+        assert abs(sum(YOSHIDA_WEIGHTS) - 1.0) < 1e-15
+
+    def test_weight_symmetry(self) -> None:
+        """w₁ = w₃ (time-reversibility)."""
+        w1, _w2, w3 = YOSHIDA_WEIGHTS
+        assert w1 == w3
+
+    def test_middle_weight_negative(self) -> None:
+        """w₂ < 0 (backward sub-step that cancels O(dt²) error)."""
+        assert YOSHIDA_WEIGHTS[1] < 0
+
+
+class TestYoshidaBasic:
+    def test_zero_state_stays_zero(self) -> None:
+        """Zero state should remain zero with Yoshida integrator."""
+        spec = _make_kg_spec()
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        y0 = np.zeros(layout.total_size)
+        result = solve_leapfrog(
+            spec, grid, y0, t_span=(0.0, 1.0), dt=0.01, order=4,
+        )
+        assert result["success"]
+        assert "Yoshida" in result["message"]
+        np.testing.assert_allclose(result["y"][-1], 0, atol=1e-14)
+
+    def test_standing_wave(self) -> None:
+        """Yoshida should preserve standing wave sin(x)cos(t) accurately."""
+        spec = _make_kg_spec()
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        n = grid.num_points
+        x = grid.axes_coords(0)
+
+        y0 = np.zeros(layout.total_size)
+        y0[0:n] = np.sin(x)
+
+        result = solve_leapfrog(
+            spec, grid, y0, t_span=(0.0, 1.0), dt=0.01,
+            snapshot_interval=1.0, order=4,
+        )
+        assert result["success"]
+
+        # At t=1, analytic: phi = sin(x)*cos(1) ≈ 0.5403*sin(x)
+        phi_final = result["y"][-1][0:n]
+        expected = np.sin(x) * np.cos(1.0)
+        np.testing.assert_allclose(phi_final, expected, atol=0.01)
+
+    def test_rejects_invalid_order(self) -> None:
+        """Order must be 2 or 4."""
+        spec = _make_kg_spec()
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(16,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        y0 = np.zeros(layout.total_size)
+
+        with pytest.raises(ValueError, match="must be 2 or 4"):
+            solve_leapfrog(spec, grid, y0, t_span=(0.0, 1.0), dt=0.01, order=3)
+
+
+class TestYoshidaEnergy:
+    def test_energy_conservation(self) -> None:
+        """Yoshida 4th-order should conserve the discrete Hamiltonian."""
+        from tidal.solver.operators import laplacian
+
+        spec = _make_kg_spec()
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        n = grid.num_points
+        x = grid.axes_coords(0)
+        dx = grid.dx[0]
+
+        y0 = np.zeros(layout.total_size)
+        y0[0:n] = np.sin(x)
+
+        energies: list[float] = []
+
+        def _energy_callback(_t: float, y: np.ndarray) -> None:
+            phi = y[0:n]
+            pi = y[n : 2 * n]
+            lap_phi = laplacian(phi, grid)
+            energy = 0.5 * dx * float(np.sum(pi**2 - phi * lap_phi))
+            energies.append(energy)
+
+        result = solve_leapfrog(
+            spec, grid, y0, t_span=(0.0, 10.0), dt=0.01,
+            snapshot_interval=0.1, snapshot_callback=_energy_callback,
+            order=4,
+        )
+        assert result["success"]
+        assert len(energies) > 10
+
+        # Yoshida shadow Hamiltonian error is O(dt⁴) ≈ 1e-8 — much tighter
+        # than Verlet's O(dt²) ≈ 1e-4.
+        e0 = energies[0]
+        max_drift = max(abs(e - e0) / e0 for e in energies)
+        assert max_drift < 1e-6, f"Energy drift {max_drift:.2e} exceeds tolerance"
+
+
+class TestYoshidaConvergenceOrder:
+    """Verify that Yoshida achieves 4th-order temporal convergence.
+
+    Measures temporal error by comparing against a fine-dt reference solution
+    on the SAME spatial grid, eliminating spatial error entirely.
+
+    Ref: Yoshida (1990), Physics Letters A 150(5-7), pp. 262-268.
+    """
+
+    @staticmethod
+    def _make_convergence_setup(
+        order: int,
+    ) -> tuple[EquationSystem, GridInfo, np.ndarray, np.ndarray]:
+        """Compute a reference solution at very fine dt."""
+        spec = _make_kg_spec()
+        # N=64 is enough — spatial error cancels via reference comparison
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(64,), periodic=(True,))
+        n = grid.num_points
+        x = grid.axes_coords(0)
+
+        y0 = np.zeros(2 * n)
+        y0[0:n] = np.sin(x)
+
+        t_end = 2.0
+        # Reference: same order integrator at very fine dt (temporal error negligible)
+        dt_ref = 0.001
+        if order == 4:
+            dt_ref = 0.002  # Yoshida already very accurate at this dt
+        ref = solve_leapfrog(
+            spec, grid, y0, t_span=(0.0, t_end), dt=dt_ref,
+            snapshot_interval=t_end, order=order,
+        )
+        ref_phi = ref["y"][-1][0:n]
+        return spec, grid, y0, ref_phi
+
+    def test_convergence_order_4(self) -> None:
+        """Error should scale as dt⁴ for Yoshida integrator."""
+        spec, grid, y0, ref_phi = self._make_convergence_setup(order=4)
+        n = grid.num_points
+
+        # CFL at N=64: dx ≈ 0.098.  Yoshida max |sub_dt| = dt * 1.70,
+        # so outer dt must be < 0.098 / 1.70 ≈ 0.058.
+        dts = [0.05, 0.025, 0.0125, 0.00625]
+        errors: list[float] = []
+
+        for dt in dts:
+            result = solve_leapfrog(
+                spec, grid, y0, t_span=(0.0, 2.0), dt=dt,
+                snapshot_interval=2.0, order=4,
+            )
+            phi_final = result["y"][-1][0:n]
+            errors.append(float(np.max(np.abs(phi_final - ref_phi))))
+
+        # Compute log-log slopes between consecutive points
+        slopes = []
+        for i in range(len(errors) - 1):
+            slope = np.log(errors[i] / errors[i + 1]) / np.log(dts[i] / dts[i + 1])
+            slopes.append(slope)
+
+        # All slopes should be close to 4 (Yoshida 4th-order)
+        avg_slope = np.mean(slopes)
+        assert avg_slope > 3.5, (
+            f"Yoshida convergence order {avg_slope:.2f} < 3.5 "
+            f"(slopes: {[f'{s:.2f}' for s in slopes]})"
+        )
+
+    def test_convergence_order_2_for_verlet(self) -> None:
+        """Verify order 2 baseline: error should scale as dt²."""
+        spec, grid, y0, ref_phi = self._make_convergence_setup(order=2)
+        n = grid.num_points
+
+        # CFL at N=64: dx ≈ 0.098.
+        dts = [0.08, 0.04, 0.02, 0.01]
+        errors: list[float] = []
+
+        for dt in dts:
+            result = solve_leapfrog(
+                spec, grid, y0, t_span=(0.0, 2.0), dt=dt,
+                snapshot_interval=2.0, order=2,
+            )
+            phi_final = result["y"][-1][0:n]
+            errors.append(float(np.max(np.abs(phi_final - ref_phi))))
+
+        slopes = []
+        for i in range(len(errors) - 1):
+            slope = np.log(errors[i] / errors[i + 1]) / np.log(dts[i] / dts[i + 1])
+            slopes.append(slope)
+
+        avg_slope = np.mean(slopes)
+        assert 1.5 < avg_slope < 2.5, (
+            f"Verlet convergence order {avg_slope:.2f} not near 2 "
+            f"(slopes: {[f'{s:.2f}' for s in slopes]})"
+        )

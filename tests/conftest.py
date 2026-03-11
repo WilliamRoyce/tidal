@@ -9,12 +9,11 @@ import pytest
 
 from tidal.solver.operators import set_fd_order
 
-
 # ==================== Module-state cleanup ====================
 
 
 @pytest.fixture(autouse=True)
-def _reset_fd_order() -> None:  # noqa: PT004
+def _reset_fd_order() -> None:
     """Reset FD order to 2 after every test.
 
     CLI tests call set_fd_order(4) (the CLI default), which persists as
@@ -22,6 +21,7 @@ def _reset_fd_order() -> None:  # noqa: PT004
     """
     yield
     set_fd_order(2)
+
 
 # ==================== CLI JSON Spec Fixtures ====================
 

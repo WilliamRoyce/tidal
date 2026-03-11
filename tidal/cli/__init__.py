@@ -313,6 +313,20 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Ref: Fornberg (1988), Mathematics of Computation 51(184)."
         ),
     )
+    sim_parser.add_argument(
+        "--leapfrog-order",
+        type=int,
+        choices=[2, 4],
+        default=2,
+        help=(
+            "Leapfrog integrator order (default: 2). "
+            "2 = Störmer-Verlet (1 force eval/step). "
+            "4 = Yoshida triple-composition (3 force evals/step, O(dt⁴) accuracy). "
+            "Yoshida allows ~2x larger dt for the same accuracy. "
+            "Only applies when --scheme leapfrog is used. "
+            "Ref: Yoshida (1990), Physics Letters A 150(5-7), pp. 262-268."
+        ),
+    )
     # Output
     sim_parser.add_argument(
         "--output",
@@ -921,6 +935,18 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Order 4 is recommended: O(dx^4) convergence at ~2x per-point cost "
             "vs order 2 — typically enables halving N for the same accuracy. "
             "Ref: Fornberg (1988), Mathematics of Computation 51(184)."
+        ),
+    )
+    sweep_parser.add_argument(
+        "--leapfrog-order",
+        type=int,
+        choices=[2, 4],
+        default=2,
+        help=(
+            "Leapfrog integrator order (default: 2). "
+            "2 = Störmer-Verlet, 4 = Yoshida. "
+            "Only applies when --scheme leapfrog. "
+            "Ref: Yoshida (1990), Physics Letters A 150(5-7)."
         ),
     )
     sweep_parser.add_argument(

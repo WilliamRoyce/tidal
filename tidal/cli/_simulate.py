@@ -1680,7 +1680,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # 0. FD order — must be set before any operator evaluation.
     # CLI default is 4 (5-point Fornberg stencil); module default is 2
     # for backward compatibility with library/test code.
-    fd_order: int = getattr(args, "fd_order", 4)  # noqa: PLR2004
+    fd_order: int = getattr(args, "fd_order", 4)
     set_fd_order(fd_order)
     if fd_order != 4:  # noqa: PLR2004
         log(f"  FD order: {fd_order}")
@@ -1758,10 +1758,21 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     # 5. Compute dt for leapfrog (needed before snapshot configuration)
     dt: float | None = None
+    lf_order: int = getattr(args, "leapfrog_order", 2)
     if scheme == "leapfrog":
         dt = args.dt
         if dt is None:
             dt = _compute_cfl_dt(spec, grid_info, params)
+        # Yoshida CFL correction: the effective CFL limit is reduced by
+        # max(|wᵢ|) ≈ 1.70 because the middle sub-step has |w₂| > 1.
+        # Must happen before snapshot configuration so the writer
+        # pre-allocates the correct number of snapshots.
+        # Ref: Yoshida (1990), Physics Letters A 150(5-7), pp. 262-268.
+        if lf_order == 4:  # noqa: PLR2004
+            from tidal.solver.leapfrog import YOSHIDA_WEIGHTS
+
+            cfl_factor = max(abs(w) for w in YOSHIDA_WEIGHTS)
+            dt /= cfl_factor
 
     # 6. Snapshot configuration — clamp interval to dt for leapfrog,
     # since the solver can't save more often than once per timestep.
@@ -1777,6 +1788,12 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         snapshot_interval = dt
 
     num_snapshots = max(int(duration / snapshot_interval) + 1, 2)
+    # When snapshot_interval ≈ dt (i.e., saving every step), ceil() in the
+    # leapfrog step count can exceed floor() in snapshot count by 1.  Add
+    # a safety margin to prevent writer overflow.
+    if dt is not None:
+        n_steps_est = max(1, math.ceil(duration / dt - 1e-10))
+        num_snapshots = max(num_snapshots, n_steps_est + 2)
 
     # 7. Disk writer (if directory output)
     fmt = _infer_output_format(args)
@@ -1890,7 +1907,16 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         from tidal.solver.leapfrog import solve_leapfrog
 
         assert dt is not None  # computed in step 5
-        log(f"Running leapfrog solver (t={t_start} → {args.t_end}, dt={dt:.4f})...")
+        if lf_order == 4:  # noqa: PLR2004
+            log(
+                f"Running Yoshida 4th-order leapfrog "
+                f"(t={t_start} → {args.t_end}, dt={dt:.4f})..."
+            )
+        else:
+            log(
+                f"Running leapfrog solver "
+                f"(t={t_start} → {args.t_end}, dt={dt:.4f})..."
+            )
         result = solve_leapfrog(
             spec,
             grid_info,
@@ -1902,6 +1928,7 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
             snapshot_interval=snapshot_interval,
             snapshot_callback=snapshot_cb,
             progress=progress,
+            order=lf_order,
         )
 
     if not result["success"]:
