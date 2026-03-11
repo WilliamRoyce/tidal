@@ -10,7 +10,7 @@ improvements (higher-order FD stencils, Yoshida integrator).
 |-------|---------|-------------|
 | Rounds 1-6 | Python hot-path micro-optimizations | Leapfrog 1.66x, scipy 1.29x |
 | Phase 1 | `--fd-order 4\|6` (higher-order FD stencils) | 500x spatial error reduction per order at same N |
-| Phase 2 | `--leapfrog-order 4` (Yoshida integrator) | 1.5x wall-clock at equal accuracy |
+| Phase 2 | `--leapfrog-order 4` (Yoshida + fused-kick) | 3x wall-clock at equal accuracy (Forest & Ruth 1990) |
 | Phase 3 | `--spectral` (FFT pseudo-spectral operators) | Machine-precision accuracy, 8x fewer DOFs |
 
 ### Auto-detection
@@ -159,10 +159,10 @@ leading O(dt^2) error term, achieving O(dt^4) accuracy.
 ### Key insight: speedup comes from accuracy, not per-step cost
 
 Each individual Yoshida step is approximately 3x more expensive than a
-Stormer-Verlet step (6 force evaluations vs 2). However, the O(dt^4)
-accuracy means far fewer total steps are needed to reach a given error
-target. The speedup is realized when comparing wall-clock time at
-**equal accuracy**, not equal step count:
+Stormer-Verlet step (3 force evaluations vs 1, using the fused-kick
+optimization below). However, the O(dt^4) accuracy means far fewer total
+steps are needed to reach a given error target. The speedup is realized
+when comparing wall-clock time at **equal accuracy**, not equal step count:
 
 | Integrator | dt | Steps | Force evals | Wall-clock | Error |
 |------------|--------|-------|-------------|------------|---------|
@@ -200,8 +200,11 @@ secular drift). The shadow Hamiltonian error scales with the integrator order:
 - Module constants: `_W1`, `_W2`, `YOSHIDA_WEIGHTS` (exported)
 - `solve_leapfrog()` accepts `order=2|4` keyword argument (default 2)
 - Order 2 path unchanged (KDK with force caching, 1 force eval/step)
-- Order 4: 3 KDK sub-steps per outer step, 6 force evals total
-  (no inter-sub-step force caching possible because position changes)
+- Order 4: fused-kick scheme (Forest & Ruth, 1990; Hairer et al., 2006
+  II.4) merges adjacent half-kicks between sub-steps, reducing 6 -> 3
+  force evaluations per step (plus 1 initial). Benchmarked 1.7-2.0x
+  speedup over naive 6-eval implementation. Mathematically identical
+  (max diff < 1e-12 vs unfused).
 - Sub-step time tracked via `t_sub` variable for correct handling of
   time-dependent coefficients (background fields, time-varying sources).
   This makes the implementation general -- not limited to time-independent
@@ -274,6 +277,7 @@ Scipy end-to-end: 1.29x (22.4% faster).
 ### Round 6: Inner solver hot-path
 
 - KDK force caching in leapfrog: halves force evaluations (2N -> N+1)
+- Yoshida fused-kick: halves force evaluations (6N -> 3N+1), 1.7-2.0x speedup
 - Zero-copy drift via `StateLayout.drift_slot_pairs`
 - IDA `begin_timestep` dedup
 - FieldSet pre-computed offsets
