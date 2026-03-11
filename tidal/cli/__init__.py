@@ -317,9 +317,10 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--leapfrog-order",
         type=int,
         choices=[2, 4],
-        default=2,
+        default=None,
         help=(
-            "Leapfrog integrator order (default: 2). "
+            "Leapfrog integrator order. Default: auto-detect (4 for time-independent "
+            "non-dissipative systems, 2 otherwise). "
             "2 = Störmer-Verlet (1 force eval/step). "
             "4 = Yoshida triple-composition (3 force evals/step, O(dt⁴) accuracy). "
             "Yoshida allows ~2x larger dt for the same accuracy. "
@@ -329,11 +330,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sim_parser.add_argument(
         "--spectral",
-        action="store_true",
-        default=False,
+        action=argparse.BooleanOptionalAction,
+        default=None,
         help=(
             "Use FFT-based spectral operators instead of finite-difference stencils. "
-            "Requires all boundary conditions to be periodic. "
+            "Default: auto-detect (enabled when all BCs are periodic and solver is "
+            "not IDA). Use --no-spectral to force finite-difference stencils. "
             "Achieves exponential convergence for smooth problems -- typically "
             "N=64-128 instead of N=512-1024. "
             "Incompatible with --scheme ida (use leapfrog, cvode, or scipy). "
@@ -954,9 +956,9 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--leapfrog-order",
         type=int,
         choices=[2, 4],
-        default=2,
+        default=None,
         help=(
-            "Leapfrog integrator order (default: 2). "
+            "Leapfrog integrator order (default: auto-detect). "
             "2 = Störmer-Verlet, 4 = Yoshida. "
             "Only applies when --scheme leapfrog. "
             "Ref: Yoshida (1990), Physics Letters A 150(5-7)."
@@ -964,11 +966,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sweep_parser.add_argument(
         "--spectral",
-        action="store_true",
-        default=False,
+        action=argparse.BooleanOptionalAction,
+        default=None,
         help=(
-            "Use FFT spectral operators (periodic BCs only). "
-            "Exponential convergence for smooth problems. "
+            "Use FFT spectral operators (default: auto-detect). "
+            "Auto-enabled when all BCs are periodic and solver is not IDA. "
+            "Use --no-spectral to force finite-difference. "
             "Ref: Burns et al. (2020), Phys. Rev. Research 2:023068."
         ),
     )

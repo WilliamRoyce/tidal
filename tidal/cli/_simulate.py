@@ -1614,6 +1614,33 @@ def _compute_cfl_dt(
     return float(_CFL_FACTOR * dx_min)
 
 
+def _has_dissipation(spec: EquationSystem) -> bool:
+    """Check if the system has dissipative terms (``first_derivative_t``).
+
+    Dissipation breaks symplecticity, so Yoshida 4th-order leapfrog should
+    not be used.  Also drives IDA auto-selection in ``_resolve_scheme()``.
+    """
+    return any(
+        term.operator == "first_derivative_t"
+        for eq in spec.equations
+        for term in eq.rhs_terms
+    )
+
+
+def _has_time_dependent_coeffs(spec: EquationSystem) -> bool:
+    """Check if any RHS term has a time-dependent coefficient.
+
+    Time-dependent coefficients mean the Hamiltonian is not conserved,
+    and Yoshida's negative middle sub-step (w₂ < 0) can introduce
+    artefacts when the system is non-autonomous.
+    """
+    return any(
+        term.time_dependent
+        for eq in spec.equations
+        for term in eq.rhs_terms
+    )
+
+
 def _resolve_scheme(scheme: str, spec: EquationSystem) -> str:
     """Resolve ``'auto'`` to the best adaptive solver for the equation system.
 
@@ -1649,10 +1676,8 @@ def _resolve_scheme(scheme: str, spec: EquationSystem) -> str:
             return "ida"
 
     # 3. Dissipation (first_derivative_t in any RHS term) → IDA
-    for eq in spec.equations:
-        for term in eq.rhs_terms:
-            if term.operator == "first_derivative_t":
-                return "ida"
+    if _has_dissipation(spec):
+        return "ida"
 
     # 4. No canonical Hamiltonian structure → IDA
     if spec.canonical is None:
@@ -1685,14 +1710,6 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     if fd_order != 4:  # noqa: PLR2004
         log(f"  FD order: {fd_order}")
 
-    # 0b. Spectral mode — FFT-based operators for periodic domains.
-    # Overrides FD stencils with pseudo-spectral differentiation.
-    # Ref: Burns et al. (2020), Phys. Rev. Research 2:023068.
-    use_spectral: bool = getattr(args, "spectral", False)
-    set_spectral(use_spectral)
-    if use_spectral:
-        log("  Operators: spectral (FFT)")
-
     # 1. Grid
     bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
     grid_info = _build_grid_info(args, spec, bounds)
@@ -1703,18 +1720,39 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # 2. BC (stored in GridInfo, derive tuple for solver calls)
     bc = grid_info.effective_bc
 
-    # 2b. Spectral mode validation: all BCs must be periodic.
-    if use_spectral and not all(grid_info.periodic):
-        non_periodic = [
-            i for i, p in enumerate(grid_info.periodic) if not p
-        ]
-        msg = (
-            f"--spectral requires all boundary conditions to be periodic. "
-            f"Non-periodic axes: {non_periodic}. "
-            f"Use --periodic or ensure all --bc entries are 'periodic'."
-        )
-        print(f"Error: {msg}", file=sys.stderr)
-        return 1
+    # 2b. Spectral mode — auto-detect or validate.
+    # Three states: None (auto-detect), True (force on), False (force off).
+    # Auto: enabled when ALL BCs are periodic (spectral requires periodicity).
+    # Ref: Burns et al. (2020), Phys. Rev. Research 2:023068.
+    spectral_arg = getattr(args, "spectral", None)
+    all_periodic = all(grid_info.periodic)
+
+    if spectral_arg is None:
+        # Auto-detect: enable spectral when all BCs are periodic
+        use_spectral = all_periodic
+        if use_spectral:
+            log("  Auto-selected: spectral operators (all BCs periodic)")
+    elif spectral_arg:
+        # User explicitly requested --spectral: validate periodic BCs
+        use_spectral = True
+        if not all_periodic:
+            non_periodic = [
+                i for i, p in enumerate(grid_info.periodic) if not p
+            ]
+            msg = (
+                f"--spectral requires all boundary conditions to be periodic. "
+                f"Non-periodic axes: {non_periodic}. "
+                f"Use --periodic or ensure all --bc entries are 'periodic'."
+            )
+            print(f"Error: {msg}", file=sys.stderr)
+            return 1
+    else:
+        # User explicitly passed --no-spectral: force FD stencils
+        use_spectral = False
+
+    set_spectral(use_spectral)
+    if use_spectral and spectral_arg is True:
+        log("  Operators: spectral (FFT)")
 
     # 3. Initial conditions (or resume from checkpoint)
     resume_state: ResumeState | None = None
@@ -1773,14 +1811,20 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # coupling (every grid point depends on every other), incompatible
     # with IDA's sparse Jacobian infrastructure.
     if use_spectral and scheme == "ida":
-        if args.scheme == "auto":
-            # Auto-selected IDA but spectral requested — switch to cvode
+        if spectral_arg is None:
+            # Auto-detected spectral + IDA needed → silently disable spectral
+            use_spectral = False
+            set_spectral(False)
+            log("  Note: IDA requires FD operators; spectral auto-disabled")
+        elif args.scheme == "auto":
+            # User explicitly requested --spectral, scheme auto-selected IDA
+            # → switch to CVODE to honour spectral request
             scheme = "cvode"
             log(
                 "  Note: --spectral incompatible with IDA; switching to CVODE"
             )
         else:
-            # User explicitly requested IDA + spectral — error
+            # User explicitly requested both IDA + spectral — error
             msg = (
                 "--spectral is incompatible with --scheme ida "
                 "(spectral operators produce dense coupling). "
@@ -1799,8 +1843,56 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     # 5. Compute dt for leapfrog (needed before snapshot configuration)
     dt: float | None = None
-    lf_order: int = getattr(args, "leapfrog_order", 2)
+    lf_order_arg: int | None = getattr(args, "leapfrog_order", None)
+    lf_order: int = lf_order_arg if lf_order_arg is not None else 2
     if scheme == "leapfrog":
+        # 5a. Auto-detect leapfrog order when not explicitly specified.
+        # Yoshida 4th-order is preferred for time-independent, non-dissipative
+        # systems: O(dt⁴) accuracy allows ~2x larger dt → net speedup.
+        # Ref: Yoshida (1990), Physics Letters A 150(5-7), pp. 262-268.
+        dissipative = _has_dissipation(spec)
+        time_dep = _has_time_dependent_coeffs(spec)
+        if lf_order_arg is None:
+            if not dissipative and not time_dep:
+                lf_order = 4
+                log(
+                    "  Auto-selected: Yoshida 4th-order leapfrog "
+                    "(time-independent, non-dissipative system)"
+                )
+            else:
+                lf_order = 2
+                reasons = []
+                if dissipative:
+                    reasons.append("dissipative terms")
+                if time_dep:
+                    reasons.append("time-dependent coefficients")
+                log(
+                    f"  Auto-selected: Störmer-Verlet 2nd-order leapfrog "
+                    f"({', '.join(reasons)} detected)"
+                )
+        elif lf_order_arg == 4:  # noqa: PLR2004
+            # User explicitly requested Yoshida — warn if inappropriate.
+            if dissipative:
+                import warnings
+
+                warnings.warn(
+                    "Yoshida 4th-order leapfrog is not recommended for "
+                    "dissipative systems (first_derivative_t terms detected). "
+                    "Dissipation breaks symplecticity. Consider --scheme ida "
+                    "or --leapfrog-order 2.",
+                    stacklevel=2,
+                )
+            if time_dep:
+                import warnings
+
+                warnings.warn(
+                    "Yoshida 4th-order leapfrog: time-dependent coefficients "
+                    "detected. The negative middle sub-step (w₂ ≈ -1.70) "
+                    "evolves backward in time, which may introduce artefacts "
+                    "for non-autonomous systems.",
+                    stacklevel=2,
+                )
+
         dt = args.dt
         if dt is None:
             dt = _compute_cfl_dt(spec, grid_info, params)
@@ -1808,7 +1900,6 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
         # max(|wᵢ|) ≈ 1.70 because the middle sub-step has |w₂| > 1.
         # Must happen before snapshot configuration so the writer
         # pre-allocates the correct number of snapshots.
-        # Ref: Yoshida (1990), Physics Letters A 150(5-7), pp. 262-268.
         if lf_order == 4:  # noqa: PLR2004
             from tidal.solver.leapfrog import YOSHIDA_WEIGHTS
 

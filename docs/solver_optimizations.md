@@ -13,6 +13,20 @@ improvements (higher-order FD stencils, Yoshida integrator).
 | Phase 2 | `--leapfrog-order 4` (Yoshida integrator) | 1.5x wall-clock at equal accuracy |
 | Phase 3 | `--spectral` (FFT pseudo-spectral operators) | Machine-precision accuracy, 8x fewer DOFs |
 
+### Auto-detection
+
+Spatial operators and leapfrog order are automatically selected based on
+equation properties and boundary conditions when not explicitly specified:
+
+| Setting | Auto-detection rule | Override |
+|---------|-------------------|----------|
+| `--spectral` | Enabled when all BCs are periodic (disabled for IDA) | `--no-spectral` forces FD |
+| `--leapfrog-order` | 4 (Yoshida) when time-independent and non-dissipative; 2 otherwise | `--leapfrog-order 2` forces Verlet |
+| `--fd-order` | Default: 4 (no auto-detection, user selects) | `--fd-order 2\|6` |
+
+The auto-detection runs after grid/BC construction and scheme resolution, so
+all relevant information is available.  Explicit flags always take precedence.
+
 ---
 
 ## Phase 1: Higher-order finite difference stencils
@@ -121,9 +135,19 @@ default stays at 2 for backward compatibility with library/test code.
 
 ## Phase 2: Yoshida 4th-order symplectic leapfrog
 
-**CLI flag**: `--leapfrog-order 2|4` (default: 2)
+**CLI flag**: `--leapfrog-order 2|4` (default: auto-detect)
 
-Yoshida triple-composition of Stormer-Verlet sub-steps:
+**Auto-detection**: When `--leapfrog-order` is not specified and `--scheme leapfrog`
+is used, the integrator order is auto-selected based on equation properties:
+
+- **Order 4 (Yoshida)**: time-independent coefficients AND no dissipative terms
+  (`first_derivative_t`). These are the conditions under which the symplectic
+  structure is preserved and the negative middle sub-step is safe.
+- **Order 2 (Störmer-Verlet)**: dissipative terms or time-dependent coefficients
+  detected. A warning is issued if the user explicitly requests `--leapfrog-order 4`
+  with incompatible systems.
+
+Yoshida triple-composition of Störmer-Verlet sub-steps:
 
     S4(dt) = S2(w1*dt) o S2(w2*dt) o S2(w3*dt)
 
@@ -261,12 +285,19 @@ Leapfrog speedup: 1.66x.
 
 ## Phase 3: FFT spectral operators
 
-**CLI flag**: `--spectral`
+**CLI flag**: `--spectral` / `--no-spectral` (default: auto-detect)
 
 FFT-based pseudo-spectral operators for periodic domains.  Achieves
 exponential convergence for smooth problems -- typically N=64-128 instead
 of N=512-1024 for equivalent accuracy.  Band-limited functions (e.g.
 single Fourier modes) are differentiated **exactly** to machine precision.
+
+**Auto-detection**: When neither `--spectral` nor `--no-spectral` is passed,
+spectral mode is automatically enabled when all BCs are periodic.  If IDA
+is auto-selected (e.g. for constraint/dissipative systems), spectral is
+silently disabled since IDA requires sparse Jacobians.  Explicit `--spectral`
+with IDA auto-selection switches to CVODE; explicit `--spectral --scheme ida`
+returns an error.
 
 ### Architecture
 

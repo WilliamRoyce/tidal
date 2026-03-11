@@ -22,6 +22,7 @@ from tidal.solver.operators import (
     laplacian,
     set_spectral,
 )
+from tidal.symbolic.json_loader import EquationSystem
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -501,10 +502,10 @@ class TestSpectralMetadata:
         metadata = json.loads(metadata_path.read_text())
         assert metadata.get("spectral") is True
 
-    def test_non_spectral_no_flag(
+    def test_no_spectral_explicit(
         self, inline_kg_1d_json: pytest.fixture, tmp_path: pytest.fixture,
     ) -> None:
-        """Running without --spectral does not save spectral in metadata."""
+        """--no-spectral forces FD operators, no spectral in metadata."""
         import json
 
         from tidal.cli import main
@@ -518,6 +519,7 @@ class TestSpectralMetadata:
             "--grid-shape", "32",
             "--periodic",
             "--scheme", "leapfrog",
+            "--no-spectral",
             "--output", str(output),
             "--quiet",
         ])
@@ -525,7 +527,7 @@ class TestSpectralMetadata:
 
         metadata_path = output / "metadata.json"
         metadata = json.loads(metadata_path.read_text())
-        assert "spectral" not in metadata
+        assert "spectral" not in metadata  # --no-spectral forces FD
 
 
 # ---------------------------------------------------------------------------
@@ -621,3 +623,192 @@ class TestSpectralIntegration:
         # Both should be small (sub 1e-4)
         assert error_sp < 1e-4, f"Spectral N=64 error {error_sp:.2e} too large"
         assert error_fd < 1e-4, f"FD-2 N=512 error {error_fd:.2e} too large"
+
+
+# ---------------------------------------------------------------------------
+# Test: auto-detection of solver settings
+# ---------------------------------------------------------------------------
+
+
+class TestAutoDetection:
+    """Verify auto-detection of spectral mode and leapfrog order."""
+
+    def test_spectral_auto_enabled_periodic(
+        self, inline_kg_1d_json: pytest.fixture, tmp_path: pytest.fixture,
+    ) -> None:
+        """Spectral auto-enables when all BCs are periodic."""
+        import json
+
+        from tidal.cli import main
+
+        output = tmp_path / "auto_spectral"
+        ret = main([
+            "simulate",
+            str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--t-end", "0.5",
+            "--grid-shape", "32",
+            "--periodic",
+            "--scheme", "leapfrog",
+            "--output", str(output),
+            "--quiet",
+        ])
+        assert ret == 0
+
+        metadata = json.loads((output / "metadata.json").read_text())
+        assert metadata.get("spectral") is True, (
+            "Spectral should auto-enable for all-periodic BCs"
+        )
+
+    def test_spectral_auto_disabled_nonperiodic(
+        self, inline_kg_1d_json: pytest.fixture, tmp_path: pytest.fixture,
+    ) -> None:
+        """Spectral stays off when BCs are non-periodic (auto mode)."""
+        import json
+
+        from tidal.cli import main
+
+        output = tmp_path / "auto_fd"
+        ret = main([
+            "simulate",
+            str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--t-end", "0.5",
+            "--grid-shape", "32",
+            "--no-periodic",
+            "--output", str(output),
+            "--quiet",
+        ])
+        assert ret == 0
+
+        metadata = json.loads((output / "metadata.json").read_text())
+        assert "spectral" not in metadata, (
+            "Spectral should not auto-enable with non-periodic BCs"
+        )
+
+    def test_spectral_auto_disabled_for_ida(
+        self, inline_kg_1d_json: pytest.fixture, tmp_path: pytest.fixture,
+    ) -> None:
+        """Spectral auto-disabled when IDA is needed (auto mode)."""
+        from tidal.cli import main
+
+        output = tmp_path / "auto_ida"
+        ret = main([
+            "simulate",
+            str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--t-end", "0.5",
+            "--grid-shape", "32",
+            "--periodic",
+            "--scheme", "ida",
+            "--output", str(output),
+            "--quiet",
+        ])
+        assert ret == 0  # should not error — spectral silently disabled
+
+    def test_no_spectral_overrides_auto(
+        self, inline_kg_1d_json: pytest.fixture, tmp_path: pytest.fixture,
+    ) -> None:
+        """--no-spectral disables auto-detection even for periodic BCs."""
+        import json
+
+        from tidal.cli import main
+
+        output = tmp_path / "no_spectral"
+        ret = main([
+            "simulate",
+            str(inline_kg_1d_json),
+            "--param", "m2=1.0",
+            "--t-end", "0.5",
+            "--grid-shape", "32",
+            "--periodic",
+            "--scheme", "leapfrog",
+            "--no-spectral",
+            "--output", str(output),
+            "--quiet",
+        ])
+        assert ret == 0
+
+        metadata = json.loads((output / "metadata.json").read_text())
+        assert "spectral" not in metadata  # forced off by --no-spectral
+
+
+# ---------------------------------------------------------------------------
+# Test: system property detection helpers
+# ---------------------------------------------------------------------------
+
+
+class TestSystemPropertyDetection:
+    """Test _has_dissipation() and _has_time_dependent_coeffs() helpers."""
+
+    def test_standard_kg_no_dissipation(self) -> None:
+        """Standard KG system has no dissipation."""
+        from tidal.cli._simulate import _has_dissipation
+
+        spec = EquationSystem.from_dict({
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [{
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {"type": "linear_combination", "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                    {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
+                ]},
+            }],
+        })
+        assert not _has_dissipation(spec)
+
+    def test_dissipative_system_detected(self) -> None:
+        """System with first_derivative_t is detected as dissipative."""
+        from tidal.cli._simulate import _has_dissipation
+
+        spec = EquationSystem.from_dict({
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [{
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {"type": "linear_combination", "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                    {"coefficient": -0.1, "operator": "first_derivative_t",
+                     "field": "phi_0"},
+                ]},
+            }],
+        })
+        assert _has_dissipation(spec)
+
+    def test_time_independent_system(self) -> None:
+        """Standard KG has no time-dependent coefficients."""
+        from tidal.cli._simulate import _has_time_dependent_coeffs
+
+        spec = EquationSystem.from_dict({
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [{
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {"type": "linear_combination", "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian", "field": "phi_0"},
+                ]},
+            }],
+        })
+        assert not _has_time_dependent_coeffs(spec)
+
+    def test_time_dependent_detected(self) -> None:
+        """System with time_dependent=True term is detected."""
+        from tidal.cli._simulate import _has_time_dependent_coeffs
+
+        spec = EquationSystem.from_dict({
+            "spacetime": {"dimension": 2, "signature": [-1, 1]},
+            "fields": [{"name": "phi_0", "index": 0}],
+            "equations": [{
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {"type": "linear_combination", "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian",
+                     "field": "phi_0", "time_dependent": True},
+                ]},
+            }],
+        })
+        assert _has_time_dependent_coeffs(spec)
