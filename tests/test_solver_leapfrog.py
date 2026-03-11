@@ -8,7 +8,7 @@ import numpy as np
 import pytest
 
 from tidal.solver.grid import GridInfo
-from tidal.solver.leapfrog import YOSHIDA_WEIGHTS, solve_leapfrog
+from tidal.solver.leapfrog import YOSHIDA_WEIGHTS, compute_force, solve_leapfrog
 from tidal.solver.state import StateLayout
 from tidal.symbolic.json_loader import EquationSystem
 
@@ -509,4 +509,144 @@ class TestYoshidaConvergenceOrder:
         assert 1.5 < avg_slope < 2.5, (
             f"Verlet convergence order {avg_slope:.2f} not near 2 "
             f"(slopes: {[f'{s:.2f}' for s in slopes]})"
+        )
+
+
+class TestYoshidaFusedKicks:
+    """Verify the fused-kick optimization for Yoshida order 4.
+
+    The Forest & Ruth (1990) fused-kick scheme merges adjacent half-kicks
+    between sub-steps, reducing 6N → 3N+1 force evaluations. Tests verify
+    both the force count and numerical equivalence with the unfused form.
+    """
+
+    def test_force_eval_count(self) -> None:
+        """Yoshida should use exactly 3N+1 force evaluations for N steps."""
+        from unittest.mock import patch
+
+        spec = _make_kg_spec()
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(16,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        y0 = np.zeros(layout.total_size)
+        x = grid.axes_coords(0)
+        y0[0:16] = np.sin(x)
+
+        call_count = 0
+        original_compute_force = compute_force
+
+        def counting_force(*args, **kwargs) -> np.ndarray:  # noqa: ANN002, ANN003
+            nonlocal call_count
+            call_count += 1
+            return original_compute_force(*args, **kwargs)
+
+        with patch("tidal.solver.leapfrog.compute_force", side_effect=counting_force):
+            n_steps = 10
+            t_end = 0.01 * n_steps  # dt=0.01, n_steps=10
+            solve_leapfrog(
+                spec, grid, y0, t_span=(0.0, t_end), dt=0.01,
+                snapshot_interval=t_end, order=4,
+            )
+
+        # Fused-kick: 1 (pre-loop) + 3 per step = 3N+1
+        expected = 3 * n_steps + 1
+        assert call_count == expected, (
+            f"Force evaluations: {call_count}, expected {expected} (3x{n_steps}+1)"
+        )
+
+    def test_verlet_force_eval_count(self) -> None:
+        """Verlet should use exactly N+1 force evaluations for N steps."""
+        from unittest.mock import patch
+
+        spec = _make_kg_spec()
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(16,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        y0 = np.zeros(layout.total_size)
+        x = grid.axes_coords(0)
+        y0[0:16] = np.sin(x)
+
+        call_count = 0
+        original_compute_force = compute_force
+
+        def counting_force(*args, **kwargs) -> np.ndarray:  # noqa: ANN002, ANN003
+            nonlocal call_count
+            call_count += 1
+            return original_compute_force(*args, **kwargs)
+
+        with patch("tidal.solver.leapfrog.compute_force", side_effect=counting_force):
+            n_steps = 10
+            t_end = 0.01 * n_steps
+            solve_leapfrog(
+                spec, grid, y0, t_span=(0.0, t_end), dt=0.01,
+                snapshot_interval=t_end, order=2,
+            )
+
+        expected = n_steps + 1
+        assert call_count == expected, (
+            f"Force evaluations: {call_count}, expected {expected} ({n_steps}+1)"
+        )
+
+    def test_numerical_equivalence_with_unfused(self) -> None:
+        """Fused-kick results should match an explicit unfused implementation.
+
+        Runs both the fused code path (current implementation) and a manually
+        unfused Yoshida loop, verifying results match to near machine precision.
+        """
+        from tidal.solver.fields import FieldSet
+        from tidal.solver.leapfrog import _half_kick
+
+        spec = _make_kg_spec()
+        grid = GridInfo(bounds=((0, 2 * np.pi),), shape=(32,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+        drift_pairs = layout.drift_slot_pairs
+
+        n = grid.num_points
+        x = grid.axes_coords(0)
+        y0 = np.zeros(layout.total_size)
+        y0[0:n] = np.sin(x)
+        y0[n:2 * n] = 0.5 * np.cos(x)
+
+        dt = 0.01
+        t_end = 1.0
+
+        # --- Fused version (current implementation) ---
+        result_fused = solve_leapfrog(
+            spec, grid, y0.copy(), t_span=(0.0, t_end), dt=dt,
+            snapshot_interval=t_end, order=4,
+        )
+        y_fused = result_fused["y"][-1]
+
+        # --- Unfused version (explicit 6 force evals per step) ---
+        import math
+
+        n_steps = max(1, math.ceil(t_end / dt - 1e-10))
+        y = y0.copy()
+        t = 0.0
+        force_buf = np.zeros(layout.total_size)
+        fieldset_buf = FieldSet.zeros(layout, grid.shape)
+
+        for _ in range(n_steps):
+            t_sub = t
+            for w in YOSHIDA_WEIGHTS:
+                sub_dt = w * dt
+                compute_force(
+                    spec, layout, grid, None, y, t_sub, None,
+                    out=force_buf, fieldset=fieldset_buf,
+                )
+                _half_kick(y, force_buf, sub_dt, layout)
+                for fs, vs in drift_pairs:
+                    y[fs] += sub_dt * y[vs]
+                t_sub += sub_dt
+                compute_force(
+                    spec, layout, grid, None, y, t_sub, None,
+                    out=force_buf, fieldset=fieldset_buf,
+                )
+                _half_kick(y, force_buf, sub_dt, layout)
+            t += dt
+
+        # Should match to near machine precision (only FP summation order differs)
+        max_diff = float(np.max(np.abs(y_fused - y)))
+        assert max_diff < 1e-12, (
+            f"Fused vs unfused max difference: {max_diff:.2e} exceeds 1e-12"
         )

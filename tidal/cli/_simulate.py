@@ -1687,7 +1687,7 @@ def _resolve_scheme(scheme: str, spec: EquationSystem) -> str:
     return "cvode"
 
 
-def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
+def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     args: Namespace,
     spec: EquationSystem,
     params: dict[str, float],
@@ -1719,6 +1719,24 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     # 2. BC (stored in GridInfo, derive tuple for solver calls)
     bc = grid_info.effective_bc
+
+    # 2a. Validate grid size vs FD order — a stencil of width (fd_order + 1)
+    # requires at least that many grid points on each axis.
+    min_n = min(grid_info.shape)
+    required_n = fd_order + 1
+    if min_n < required_n:
+        fd_order_explicit = getattr(args, "fd_order", 4) != 4  # noqa: PLR2004
+        if fd_order_explicit:
+            msg = (
+                f"Grid too small for --fd-order {fd_order}: minimum axis has "
+                f"{min_n} points but stencil width requires >= {required_n}."
+            )
+            print(f"Error: {msg}", file=sys.stderr)
+            return 1
+        # Default fd-order 4 on a tiny grid — fall back to order 2
+        fd_order = 2
+        set_fd_order(fd_order)
+        log(f"  FD order: reduced to {fd_order} (grid too small for order 4)")
 
     # 2b. Spectral mode — auto-detect or validate.
     # Three states: None (auto-detect), True (force on), False (force off).

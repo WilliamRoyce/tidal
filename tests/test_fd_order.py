@@ -372,3 +372,60 @@ class TestEnergyMeasurementConsistency:
         assert err_o4 < err_o2 * 0.01, (
             f"Energy gradient did not improve: o2={err_o2:.2e}, o4={err_o4:.2e}"
         )
+
+
+# ---------------------------------------------------------------------------
+# Grid-size validation tests
+# ---------------------------------------------------------------------------
+
+
+class TestGridSizeValidation:
+    """Verify that _simulate validates grid size vs FD order.
+
+    A stencil of width (fd_order + 1) requires at least that many grid points.
+    Default fd-order 4 on a tiny grid should fall back to order 2; explicit
+    --fd-order with a too-small grid should error.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _reset_fd_order(self) -> None:
+        """Reset FD order after each test."""
+        yield
+        set_fd_order(2)
+
+    def test_default_order_fallback_on_tiny_grid(self) -> None:
+        """Default fd-order 4 + N=4 grid falls back to order 2."""
+        import subprocess
+        import sys
+
+        result = subprocess.run(
+            [sys.executable, "-m", "tidal.cli", "simulate",
+             "examples/data/klein_gordon_1d.json",
+             "--grid-shape", "4", "--bounds", "0:6.28", "--periodic",
+             "--t-end", "0.01", "--output", "/tmp/tidal_tests/fd_fallback"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        # Should succeed (falls back to order 2)
+        assert result.returncode == 0, f"Unexpected failure:\n{result.stderr}"
+
+    def test_explicit_order_6_tiny_grid_errors(self) -> None:
+        """Explicit --fd-order 6 + N=4 grid errors."""
+        import subprocess
+        import sys
+
+        result = subprocess.run(
+            [sys.executable, "-m", "tidal.cli", "simulate",
+             "examples/data/klein_gordon_1d.json",
+             "--grid-shape", "4", "--bounds", "0:6.28", "--periodic",
+             "--fd-order", "6",
+             "--t-end", "0.01", "--output", "/tmp/tidal_tests/fd_error"],
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        assert result.returncode == 1, f"Expected error but got rc={result.returncode}"
+        assert "Grid too small" in result.stderr
