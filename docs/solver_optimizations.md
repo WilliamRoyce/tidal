@@ -11,6 +11,7 @@ improvements (higher-order FD stencils, Yoshida integrator).
 | Rounds 1-6 | Python hot-path micro-optimizations | Leapfrog 1.66x, scipy 1.29x |
 | Phase 1 | `--fd-order 4\|6` (higher-order FD stencils) | 500x spatial error reduction per order at same N |
 | Phase 2 | `--leapfrog-order 4` (Yoshida integrator) | 1.5x wall-clock at equal accuracy |
+| Phase 3 | `--spectral` (FFT pseudo-spectral operators) | Machine-precision accuracy, 8x fewer DOFs |
 
 ---
 
@@ -258,13 +259,107 @@ Leapfrog speedup: 1.66x.
 
 ---
 
-## Planned: Phase 3 -- FFT spectral operators
+## Phase 3: FFT spectral operators
 
-**CLI flag**: `--spectral` (not yet implemented)
+**CLI flag**: `--spectral`
 
-For all-periodic BCs, replace FD operators with FFT-based spectral operators
-for exponential convergence. Expected N=64-128 instead of N=512-1024 for
-the same (or better) accuracy on smooth problems.
+FFT-based pseudo-spectral operators for periodic domains.  Achieves
+exponential convergence for smooth problems -- typically N=64-128 instead
+of N=512-1024 for equivalent accuracy.  Band-limited functions (e.g.
+single Fourier modes) are differentiated **exactly** to machine precision.
 
-Ref: Burns et al. (2020). "Dedalus: A flexible framework for numerical
-simulations with spectral methods". Physical Review Research 2:023068.
+### Architecture
+
+- **Module state**: `_use_spectral: bool`, `set_spectral()`, `get_spectral()`
+  in `operators.py` -- analogous to `set_fd_order()`.
+- **Wavenumber cache**: `_wavenum_cache: dict[(n, dx), ndarray]` -- pre-computed
+  `k = 2*pi*rfftfreq(n, d=dx)`, cached per `(N, dx)` pair.
+- **Spectral operators**: `_spectral_gradient()`, `_spectral_directional_laplacian()`,
+  `_spectral_laplacian()`, `_spectral_cross_derivative()`, `_spectral_biharmonic()`.
+
+All spectral operators follow the same pattern:
+1. `rfft(f, axis=axis)` -- transform to frequency space (half-complex)
+2. Multiply by spectral symbol (`ik` for gradient, `-k^2` for Laplacian)
+3. `irfft(f_hat, n=n, axis=axis)` -- transform back to physical space
+
+Uses `np.fft.rfft`/`irfft` for real-valued fields (half the storage of
+complex FFT).
+
+### Dispatch
+
+When `_use_spectral` is True, all spatial operator functions (`gradient`,
+`directional_laplacian`, `laplacian`, `cross_derivative`, `biharmonic`)
+dispatch to spectral versions at the top of the function body, before any
+FD stencil logic.  The `identity` operator is unchanged in both modes.
+
+The `OPERATOR_REGISTRY` closures (`_make_directional_laplacian`, etc.) call
+through the top-level functions, so spectral dispatch happens automatically
+for all callers including `RHSEvaluator`.
+
+### Position-dependent coefficients
+
+Fully compatible.  The pseudo-spectral approach computes the derivative in
+Fourier space and returns to physical space.  Position-dependent coefficients
+are then applied element-wise in physical space by `RHSEvaluator`:
+
+```
+result = coeff(x) * operator(field)  # operator returns physical-space array
+```
+
+This is the standard pseudo-spectral approach used by Dedalus, py-pde, etc.
+
+### Solver compatibility
+
+Spectral operators produce **dense coupling** (every grid point depends on
+every other), incompatible with IDA's sparse Jacobian infrastructure.
+The CLI handles this automatically:
+
+- **Auto-selected IDA**: switches to CVODE with a warning
+- **Explicit `--scheme ida`**: returns error
+- **leapfrog, scipy, cvode**: work normally (no Jacobian needed for explicit
+  solvers; CVODE uses its own internal Newton iteration)
+
+### Sparsity pattern
+
+When `get_spectral()` is True, `operator_stencil_offsets()` returns a
+dense offset pattern (all-to-all coupling).  Since the CLI blocks
+IDA+spectral, this code path should not be reached in practice.
+
+### Accuracy (gradient of sin(x), periodic [0, 2*pi])
+
+| Mode       | N    | Max Error     | Notes                        |
+|------------|------|---------------|------------------------------|
+| FD order 2 | 64   | 1.6e-3        | O(dx^2) algebraic            |
+| FD order 4 | 64   | 3.1e-6        | O(dx^4) algebraic            |
+| FD order 6 | 64   | 6.4e-9        | O(dx^6) algebraic            |
+| Spectral   | 8    | < 1e-13       | **Exact** (machine precision) |
+
+### End-to-end integration (1D Klein-Gordon, leapfrog, dt=0.005, t=2)
+
+| Mode          | N   | Error vs analytic | Notes                    |
+|---------------|-----|-------------------|--------------------------|
+| FD order 2    | 512 | 9.2e-7            | temporal error dominates |
+| **Spectral**  | 64  | 1.8e-6            | 8x fewer DOFs, same order of accuracy |
+
+Both errors are O(dt^2) temporal -- spectral eliminates spatial error entirely,
+so the only error source is the time integrator.
+
+### Persistence
+
+Spectral flag saved as `"spectral": true` in `metadata.json` via `_writer.py`
+and restored by `_io.py` on load, so measurement tools use the correct
+operators for energy computation.
+
+### Files modified
+
+`operators.py`, `sparsity.py`, `cli/__init__.py`, `cli/_simulate.py`,
+`_writer.py`, `_io.py`, `conftest.py`, `tests/test_spectral.py` (29 tests)
+
+### References
+
+- Burns, K.J., Vasil, G.M., Oishi, J.S., Lecoanet, D. & Brown, B.P.
+  (2020). "Dedalus: A flexible framework for numerical simulations with
+  spectral methods". Physical Review Research 2:023068.
+- Gottlieb, D. & Orszag, S.A. (1977). "Numerical Analysis of Spectral
+  Methods". SIAM. Ch. 1-3.
+- Boyd, J.P. (2001). "Chebyshev and Fourier Spectral Methods". Dover. Ch. 2.

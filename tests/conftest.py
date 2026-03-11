@@ -7,20 +7,22 @@ from pathlib import Path
 
 import pytest
 
-from tidal.solver.operators import set_fd_order
+from tidal.solver.operators import set_fd_order, set_spectral
 
 # ==================== Module-state cleanup ====================
 
 
 @pytest.fixture(autouse=True)
-def _reset_fd_order() -> None:
-    """Reset FD order to 2 after every test.
+def _reset_operator_state() -> None:
+    """Reset FD order and spectral mode after every test.
 
-    CLI tests call set_fd_order(4) (the CLI default), which persists as
-    module-level state and pollutes subsequent tests that assume order 2.
+    CLI tests call set_fd_order(4) (the CLI default) and/or
+    set_spectral(True), which persist as module-level state and
+    pollute subsequent tests that assume order 2 / FD mode.
     """
     yield
     set_fd_order(2)
+    set_spectral(False)
 
 
 # ==================== CLI JSON Spec Fixtures ====================

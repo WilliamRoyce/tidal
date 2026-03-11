@@ -1,9 +1,31 @@
-"""Spatial finite-difference operators on plain numpy arrays.
+"""Spatial operators on plain numpy arrays (finite-difference and spectral).
 
 All operators accept an ``np.ndarray`` (field data) and a ``GridInfo``
 descriptor, returning an ``np.ndarray`` of the same shape.  No py-pde
 ScalarField / VectorField wrappers — pure numpy with explicit ghost-cell
-boundary handling.
+boundary handling for FD, or FFT-based spectral differentiation for
+periodic domains.
+
+Operator modes
+--------------
+Two modes are available, selectable at runtime:
+
+1. **Finite-difference** (default): Ghost-cell stencils with 2nd, 4th, or
+   6th-order accuracy (``set_fd_order``).  Works with all BC types.
+
+2. **Spectral** (``set_spectral(True)``): FFT-based pseudo-spectral
+   operators via ``np.fft.rfft``/``np.fft.irfft``.  Requires all-periodic
+   BCs.  Achieves exponential convergence for smooth problems — typically
+   N=64-128 instead of N=512-1024 for equivalent accuracy.
+
+   The pseudo-spectral approach computes derivatives in Fourier space
+   (multiply by ``ik`` for gradient, ``-k^2`` for Laplacian) and returns
+   to physical space.  Position-dependent coefficients are applied in
+   physical space after the operator, following the standard Dedalus/py-pde
+   pseudo-spectral pattern.
+
+   Ref: Burns et al. (2020), "Dedalus: A flexible framework for numerical
+   simulations with spectral methods", Physical Review Research 2:023068.
 
 Finite-difference accuracy orders
 ----------------------------------
@@ -40,6 +62,7 @@ The ``bc`` parameter may be:
 
 References
 ----------
+- Burns et al. (2020), Phys. Rev. Research 2:023068 — pseudo-spectral methods.
 - Fornberg (1988), Math. Comp. 51(184), pp. 699-706 — stencil coefficients.
 - LeVeque (2007), "Finite Difference Methods for ODEs and PDEs", SIAM — convergence theory.
 - Zwicker (2020), J. Open Source Software 5(48) — ghost-cell virtual-point approach.
@@ -106,6 +129,83 @@ def get_fd_order() -> int:
 def get_n_ghost() -> int:
     """Return the current number of ghost cells per side."""
     return _n_ghost
+
+
+# ---------------------------------------------------------------------------
+# Spectral mode (module-level state)
+# ---------------------------------------------------------------------------
+# When enabled, all spatial operators use FFT-based pseudo-spectral
+# differentiation instead of finite-difference stencils.  Requires all
+# boundary conditions to be periodic.
+#
+# Spectral operators achieve exponential convergence for smooth problems
+# (band-limited functions are differentiated exactly), enabling N=64-128
+# instead of N=512-1024 for equivalent accuracy.
+#
+# Reference: Burns et al. (2020), "Dedalus: A flexible framework for
+# numerical simulations with spectral methods", Phys. Rev. Research 2:023068.
+
+_use_spectral: bool = False
+"""Whether spectral (FFT) operators are active."""
+
+
+def set_spectral(enable: bool) -> None:  # noqa: FBT001
+    """Enable or disable FFT-based spectral operators.
+
+    When enabled, all spatial operators (gradient, Laplacian, cross-derivative,
+    biharmonic) use ``np.fft.rfft``/``np.fft.irfft`` instead of FD stencils.
+    Requires all boundary conditions to be periodic.
+
+    Must be called before any operator evaluation (typically at simulation
+    startup).  Clears the wavenumber cache when toggled.
+
+    Parameters
+    ----------
+    enable : bool
+        ``True`` to use spectral operators, ``False`` for finite-difference.
+    """
+    global _use_spectral  # noqa: PLW0603
+    if _use_spectral != enable:
+        _wavenum_cache.clear()
+    _use_spectral = enable
+
+
+def get_spectral() -> bool:
+    """Return whether spectral (FFT) operators are active."""
+    return _use_spectral
+
+
+# Wavenumber cache: (n_points, dx) -> wavenumber array.
+# Pre-computed once per (N, dx) pair and reused for all subsequent calls.
+# Uses ``np.fft.rfftfreq`` for real-valued fields (half-complex storage).
+_wavenum_cache: dict[tuple[int, float], np.ndarray] = {}
+
+
+def _get_wavenumbers(n: int, dx: float) -> np.ndarray:
+    """Return cached wavenumber array for ``rfft`` of length *n*.
+
+    Wavenumbers: ``k = 2*pi*rfftfreq(n, d=dx)`` — the angular frequencies
+    corresponding to the real-FFT output bins.
+
+    Parameters
+    ----------
+    n : int
+        Number of grid points along the axis.
+    dx : float
+        Grid spacing.
+
+    Returns
+    -------
+    np.ndarray
+        Wavenumber array of length ``n // 2 + 1``.
+    """
+    key = (n, dx)
+    cached = _wavenum_cache.get(key)
+    if cached is not None:
+        return cached
+    k = 2.0 * np.pi * np.fft.rfftfreq(n, d=dx)
+    _wavenum_cache[key] = k
+    return k
 
 
 # ---------------------------------------------------------------------------
@@ -631,6 +731,10 @@ def gradient(
     np.ndarray
         Gradient array, same shape as *data*.
     """
+    # Spectral fast path: FFT-based differentiation (periodic only)
+    if _use_spectral:
+        return _spectral_gradient(data, axis, grid, bc)
+
     bcs = _normalize_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
     dx = grid.dx[axis]
     bc_axis = bcs[axis]
@@ -805,10 +909,9 @@ def directional_laplacian(
     grid: GridInfo,
     bc: BCSpec | None = None,
 ) -> np.ndarray:
-    """3-point second derivative ∂²f/∂x_i².
-
-    Stencil: ``(f[i+1] - 2·f[i] + f[i-1]) / dx²``
-    """
+    """Second derivative ∂²f/∂x_i² (FD stencil or spectral FFT)."""
+    if _use_spectral:
+        return _spectral_directional_laplacian(data, axis, grid, bc)
     bcs = _normalize_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
     return _directional_laplacian_raw(data, axis, grid, bcs[axis])
 
@@ -818,11 +921,9 @@ def laplacian(
     grid: GridInfo,
     bc: BCSpec | None = None,
 ) -> np.ndarray:
-    """Full Laplacian ∇²f = Σ_i ∂²f/∂x_i².
-
-    Normalizes BCs once and fuses per-axis directional Laplacians
-    to avoid redundant BC validation and resolution.
-    """
+    """Full Laplacian nabla^2 f = sum_i d^2f/dx_i^2 (FD or spectral)."""
+    if _use_spectral:
+        return _spectral_laplacian(data, grid, bc)
     bcs = _normalize_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
     result = _directional_laplacian_raw(data, 0, grid, bcs[0])
     for ax in range(1, grid.ndim):
@@ -837,22 +938,18 @@ def cross_derivative(
     grid: GridInfo,
     bc: BCSpec | None = None,
 ) -> np.ndarray:
-    """Mixed second derivative ∂²f/(∂x_i ∂x_j).
+    """Mixed second derivative d^2f/(dx_i dx_j) (FD or spectral).
 
-    Implemented as successive application of the 1D gradient operator along
-    each axis: ``gradient(gradient(f, axis1), axis2)``.  This naturally
-    inherits the current FD order from :func:`set_fd_order`:
+    FD mode: successive application of the 1D gradient operator along
+    each axis, inheriting the current FD order from :func:`set_fd_order`.
 
-    - **Order 2**: 4-point stencil (f[±1,±1])
-    - **Order 4**: product of 5-point 1D stencils (5x5 = 25-point)
-    - **Order 6**: product of 7-point 1D stencils (7x7 = 49-point)
+    Spectral mode: successive FFT-based gradients (exact for band-limited
+    functions).
 
-    Reference: LeVeque, "Finite Difference Methods for Ordinary and Partial
-    Differential Equations", SIAM, 2007, §1.4.
+    Reference: LeVeque (2007), "Finite Difference Methods", SIAM, S1.4.
     """
-    # Apply gradient along axis1 first, then along axis2
-    # This is equivalent to the fused stencil but automatically inherits
-    # the correct FD order from the gradient function
+    if _use_spectral:
+        return _spectral_cross_derivative(data, axis1, axis2, grid, bc)
     tmp = gradient(data, axis1, grid, bc)
     return gradient(tmp, axis2, grid, bc)
 
@@ -862,7 +959,9 @@ def biharmonic(
     grid: GridInfo,
     bc: BCSpec | None = None,
 ) -> np.ndarray:
-    """Biharmonic operator ∇⁴f = ∇²(∇²f)."""
+    r"""Biharmonic operator nabla^4 f = nabla^2(nabla^2 f) (FD or spectral)."""
+    if _use_spectral:
+        return _spectral_biharmonic(data, grid, bc)
     return laplacian(laplacian(data, grid, bc), grid, bc)
 
 
@@ -876,6 +975,109 @@ def identity(
 
 
 # ---------------------------------------------------------------------------
+# Spectral (FFT) operators
+# ---------------------------------------------------------------------------
+# Pseudo-spectral differentiation: rfft -> multiply by spectral symbol -> irfft.
+# Exponential convergence for smooth (band-limited) problems on periodic domains.
+#
+# The pseudo-spectral approach computes the derivative in Fourier space:
+#   gradient:   f_hat *= i*k           (first derivative)
+#   laplacian:  f_hat *= -k^2          (second derivative)
+#   cross:      f_hat *= -k_i * k_j    (mixed second derivative)
+#   biharmonic: f_hat *= k^4           (fourth derivative)
+#
+# Position-dependent coefficients are applied in physical space AFTER the
+# operator returns, following the standard pseudo-spectral pattern in the
+# RHS evaluator (rhs.py): result = coeff(x) * operator(field).
+#
+# Reference: Burns et al. (2020), Phys. Rev. Research 2:023068.
+
+
+def _spectral_gradient(
+    data: np.ndarray,
+    axis: int,
+    grid: GridInfo,
+    bc: BCSpec | None = None,  # noqa: ARG001
+) -> np.ndarray:
+    """Spectral gradient ∂f/∂x_i via FFT.
+
+    Computes ``irfft(i*k * rfft(f))`` along the specified axis.
+    Exact for band-limited functions (up to Nyquist frequency).
+    """
+    n = grid.shape[axis]
+    dx = grid.dx[axis]
+    k = _get_wavenumbers(n, dx)
+
+    # Reshape k for broadcasting along the target axis
+    shape = [1] * data.ndim
+    shape[axis] = len(k)
+    k_shaped = k.reshape(shape)
+
+    f_hat = np.fft.rfft(data, axis=axis)
+    f_hat *= 1j * k_shaped
+    return np.fft.irfft(f_hat, n=n, axis=axis)
+
+
+def _spectral_directional_laplacian(
+    data: np.ndarray,
+    axis: int,
+    grid: GridInfo,
+    bc: BCSpec | None = None,  # noqa: ARG001
+) -> np.ndarray:
+    """Spectral second derivative ∂²f/∂x_i² via FFT.
+
+    Computes ``irfft(-k^2 * rfft(f))`` along the specified axis.
+    """
+    n = grid.shape[axis]
+    dx = grid.dx[axis]
+    k = _get_wavenumbers(n, dx)
+
+    shape = [1] * data.ndim
+    shape[axis] = len(k)
+    k2_shaped = (-(k ** 2)).reshape(shape)
+
+    f_hat = np.fft.rfft(data, axis=axis)
+    f_hat *= k2_shaped
+    return np.fft.irfft(f_hat, n=n, axis=axis)
+
+
+def _spectral_laplacian(
+    data: np.ndarray,
+    grid: GridInfo,
+    bc: BCSpec | None = None,
+) -> np.ndarray:
+    """Spectral full Laplacian sum_i d^2f/dx_i^2 via FFT."""
+    result = _spectral_directional_laplacian(data, 0, grid, bc)
+    for ax in range(1, grid.ndim):
+        result += _spectral_directional_laplacian(data, ax, grid, bc)
+    return result
+
+
+def _spectral_cross_derivative(
+    data: np.ndarray,
+    axis1: int,
+    axis2: int,
+    grid: GridInfo,
+    bc: BCSpec | None = None,  # noqa: ARG001
+) -> np.ndarray:
+    """Spectral mixed derivative d^2f/(dx_i dx_j) via successive FFTs.
+
+    Applies spectral gradient along axis1 then axis2.
+    """
+    tmp = _spectral_gradient(data, axis1, grid)
+    return _spectral_gradient(tmp, axis2, grid)
+
+
+def _spectral_biharmonic(
+    data: np.ndarray,
+    grid: GridInfo,
+    bc: BCSpec | None = None,
+) -> np.ndarray:
+    r"""Spectral biharmonic operator nabla^4 f = nabla^2(nabla^2 f)."""
+    return _spectral_laplacian(_spectral_laplacian(data, grid, bc), grid, bc)
+
+
+# ---------------------------------------------------------------------------
 # Operator registry
 # ---------------------------------------------------------------------------
 
@@ -885,9 +1087,10 @@ def identity(
 
 def _make_directional_laplacian(ax: int):  # noqa: ANN202
     def _op(data: np.ndarray, grid: GridInfo, bc: BCSpec | None = None) -> np.ndarray:
-        # Bypass directional_laplacian wrapper — normalize BCs once, call raw
-        bcs = _normalize_bc(bc, grid) if bc is not None else _bc_from_grid(grid)
-        return _directional_laplacian_raw(data, ax, grid, bcs[ax])
+        # Must go through directional_laplacian() for spectral dispatch.
+        # In FD mode this normalizes BCs and calls _directional_laplacian_raw.
+        # In spectral mode it dispatches to _spectral_directional_laplacian.
+        return directional_laplacian(data, ax, grid, bc)
 
     return _op
 

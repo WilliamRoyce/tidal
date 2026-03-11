@@ -325,13 +325,16 @@ class SnapshotWriter:
         if self._spec_path is not None:
             metadata["spec_path"] = str(self._spec_path)
 
-        # Save FD order so that measurement tools can restore the correct
-        # stencils for energy computation (must match solver's stencils).
-        from tidal.solver.operators import get_fd_order  # noqa: PLC0415
+        # Save FD order and spectral flag so that measurement tools can
+        # restore the correct operators for energy computation (must match
+        # the solver's spatial operators).
+        from tidal.solver.operators import get_fd_order, get_spectral  # noqa: PLC0415
 
         fd_order = get_fd_order()
         if fd_order != 2:  # noqa: PLR2004
             metadata["fd_order"] = fd_order
+        if get_spectral():
+            metadata["spectral"] = True
 
         metadata_path = self._output_dir / "metadata.json"
         # Atomic write: temp file + rename to avoid corrupt JSON on crash

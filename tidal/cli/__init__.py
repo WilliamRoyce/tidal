@@ -327,6 +327,19 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "Ref: Yoshida (1990), Physics Letters A 150(5-7), pp. 262-268."
         ),
     )
+    sim_parser.add_argument(
+        "--spectral",
+        action="store_true",
+        default=False,
+        help=(
+            "Use FFT-based spectral operators instead of finite-difference stencils. "
+            "Requires all boundary conditions to be periodic. "
+            "Achieves exponential convergence for smooth problems -- typically "
+            "N=64-128 instead of N=512-1024. "
+            "Incompatible with --scheme ida (use leapfrog, cvode, or scipy). "
+            "Ref: Burns et al. (2020), Phys. Rev. Research 2:023068."
+        ),
+    )
     # Output
     sim_parser.add_argument(
         "--output",
@@ -947,6 +960,16 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "2 = Störmer-Verlet, 4 = Yoshida. "
             "Only applies when --scheme leapfrog. "
             "Ref: Yoshida (1990), Physics Letters A 150(5-7)."
+        ),
+    )
+    sweep_parser.add_argument(
+        "--spectral",
+        action="store_true",
+        default=False,
+        help=(
+            "Use FFT spectral operators (periodic BCs only). "
+            "Exponential convergence for smooth problems. "
+            "Ref: Burns et al. (2020), Phys. Rev. Research 2:023068."
         ),
     )
     sweep_parser.add_argument(

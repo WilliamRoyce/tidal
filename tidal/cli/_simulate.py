@@ -1673,17 +1673,25 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     Handles IDA, CVODE, scipy, and leapfrog schemes.
     """
     from tidal.measurement._io import SimulationData
-    from tidal.solver.operators import set_fd_order
+    from tidal.solver.operators import set_fd_order, set_spectral
 
     log = _noop if args.quiet else print
 
-    # 0. FD order — must be set before any operator evaluation.
+    # 0a. FD order — must be set before any operator evaluation.
     # CLI default is 4 (5-point Fornberg stencil); module default is 2
     # for backward compatibility with library/test code.
     fd_order: int = getattr(args, "fd_order", 4)
     set_fd_order(fd_order)
     if fd_order != 4:  # noqa: PLR2004
         log(f"  FD order: {fd_order}")
+
+    # 0b. Spectral mode — FFT-based operators for periodic domains.
+    # Overrides FD stencils with pseudo-spectral differentiation.
+    # Ref: Burns et al. (2020), Phys. Rev. Research 2:023068.
+    use_spectral: bool = getattr(args, "spectral", False)
+    set_spectral(use_spectral)
+    if use_spectral:
+        log("  Operators: spectral (FFT)")
 
     # 1. Grid
     bounds = _parse_bounds(args.bounds, spec.spatial_dimension)
@@ -1694,6 +1702,19 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     # 2. BC (stored in GridInfo, derive tuple for solver calls)
     bc = grid_info.effective_bc
+
+    # 2b. Spectral mode validation: all BCs must be periodic.
+    if use_spectral and not all(grid_info.periodic):
+        non_periodic = [
+            i for i, p in enumerate(grid_info.periodic) if not p
+        ]
+        msg = (
+            f"--spectral requires all boundary conditions to be periodic. "
+            f"Non-periodic axes: {non_periodic}. "
+            f"Use --periodic or ensure all --bc entries are 'periodic'."
+        )
+        print(f"Error: {msg}", file=sys.stderr)
+        return 1
 
     # 3. Initial conditions (or resume from checkpoint)
     resume_state: ResumeState | None = None
@@ -1747,6 +1768,26 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
     scheme = _resolve_scheme(args.scheme, spec)
     if args.scheme == "auto":
         log(f"  Auto-selected solver: {scheme}")
+
+    # Spectral + IDA incompatibility: spectral operators produce dense
+    # coupling (every grid point depends on every other), incompatible
+    # with IDA's sparse Jacobian infrastructure.
+    if use_spectral and scheme == "ida":
+        if args.scheme == "auto":
+            # Auto-selected IDA but spectral requested — switch to cvode
+            scheme = "cvode"
+            log(
+                "  Note: --spectral incompatible with IDA; switching to CVODE"
+            )
+        else:
+            # User explicitly requested IDA + spectral — error
+            msg = (
+                "--spectral is incompatible with --scheme ida "
+                "(spectral operators produce dense coupling). "
+                "Use --scheme cvode, scipy, or leapfrog instead."
+            )
+            print(f"Error: {msg}", file=sys.stderr)
+            return 1
     log(f"  Scheme: {scheme}")
 
     # Constraint-only mode: solve algebraic equations via IDA, no time evolution

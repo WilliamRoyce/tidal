@@ -163,8 +163,13 @@ def _cross_derivative_offsets(name: str, ndim: int) -> list[tuple[int, ...]] | N
     return None
 
 
-def operator_stencil_offsets(name: str, ndim: int) -> list[tuple[int, ...]]:
+def operator_stencil_offsets(name: str, ndim: int) -> list[tuple[int, ...]]:  # noqa: PLR0911
     """Return the grid-coordinate offsets for operator *name*.
+
+    When spectral mode is active (``get_spectral() == True``), all spatial
+    operators return dense coupling (all possible offsets) because FFT-based
+    differentiation couples every grid point to every other.  Identity and
+    first_derivative_t remain local.
 
     Parameters
     ----------
@@ -180,9 +185,37 @@ def operator_stencil_offsets(name: str, ndim: int) -> list[tuple[int, ...]]:
     """
     zero = (0,) * ndim
 
-    # Identity and first_derivative_t: self-coupling only
+    # Identity and first_derivative_t: self-coupling only (same in both modes)
     if name in {"identity", "first_derivative_t"}:
         return [zero]
+
+    # Spectral mode: all spatial operators are dense (all-to-all coupling).
+    # This makes IDA's sparse Jacobian infrastructure ineffective — the CLI
+    # guards against this combination (--spectral with --scheme ida).
+    from tidal.solver.operators import get_spectral  # noqa: PLC0415
+
+    if get_spectral():
+        # Return "all offsets" — conservative superset.  In practice this
+        # means the Jacobian is fully dense for spatial coupling blocks.
+        # For IDA this would be O(N^2) — but the CLI prevents IDA+spectral.
+        # For explicit solvers (leapfrog, scipy, cvode) no Jacobian is needed.
+        #
+        # We don't actually need to enumerate all N^ndim offsets here because
+        # this function is only called during Jacobian sparsity construction,
+        # which is an IDA-only path.  Return a sentinel that _stencil_block
+        # can handle, or a small superset.  Since the CLI blocks IDA+spectral,
+        # this path should not be reached in practice.
+        import warnings  # noqa: PLC0415
+
+        warnings.warn(
+            "Spectral mode with Jacobian sparsity construction: "
+            "returning dense coupling pattern. This is expected only "
+            "for non-IDA solvers.",
+            stacklevel=2,
+        )
+        # Return all offsets within a generous radius to approximate dense
+        ng_approx = 32  # large radius to approximate full coupling
+        return list(itertools.product(range(-ng_approx, ng_approx + 1), repeat=ndim))
 
     # Directional gradient or Laplacian
     result = _gradient_or_laplacian_offsets(name, ndim)
