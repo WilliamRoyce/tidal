@@ -1677,11 +1677,13 @@ def _simulate(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     log = _noop if args.quiet else print
 
-    # 0. FD order — must be set before any operator evaluation
-    fd_order: int = getattr(args, "fd_order", 2)
+    # 0. FD order — must be set before any operator evaluation.
+    # CLI default is 4 (5-point Fornberg stencil); module default is 2
+    # for backward compatibility with library/test code.
+    fd_order: int = getattr(args, "fd_order", 4)  # noqa: PLR2004
     set_fd_order(fd_order)
-    if fd_order != 2:  # noqa: PLR2004
-        log(f"  FD order: {fd_order} (Fornberg stencils)")
+    if fd_order != 4:  # noqa: PLR2004
+        log(f"  FD order: {fd_order}")
 
     # 1. Grid
     bounds = _parse_bounds(args.bounds, spec.spatial_dimension)

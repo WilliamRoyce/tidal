@@ -304,10 +304,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--fd-order",
         type=int,
         choices=[2, 4, 6],
-        default=2,
+        default=4,
         help=(
-            "Finite-difference accuracy order for spatial operators (default: 2). "
-            "Higher orders use wider stencils: 2→3pt, 4→5pt, 6→7pt. "
+            "Finite-difference accuracy order for spatial operators (default: 4). "
+            "Higher orders use wider stencils: 2->3pt, 4->5pt, 6->7pt. "
+            "Order 4 is recommended: O(dx^4) convergence at ~2x per-point cost "
+            "vs order 2 — typically enables halving N for the same accuracy. "
             "Ref: Fornberg (1988), Mathematics of Computation 51(184)."
         ),
     )
@@ -912,10 +914,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--fd-order",
         type=int,
         choices=[2, 4, 6],
-        default=2,
+        default=4,
         help=(
-            "Finite-difference accuracy order for spatial operators (default: 2). "
-            "Higher orders use wider stencils: 2→3pt, 4→5pt, 6→7pt. "
+            "Finite-difference accuracy order for spatial operators (default: 4). "
+            "Higher orders use wider stencils: 2->3pt, 4->5pt, 6->7pt. "
+            "Order 4 is recommended: O(dx^4) convergence at ~2x per-point cost "
+            "vs order 2 — typically enables halving N for the same accuracy. "
             "Ref: Fornberg (1988), Mathematics of Computation 51(184)."
         ),
     )

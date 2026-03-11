@@ -394,6 +394,9 @@ def _cached_corner(
 class _PadEntry:
     """Pre-allocated buffer and cached slices for one (shape, axis, n_ghost) combo.
 
+    ALL slice tuples are pre-computed at construction time so the hot-path
+    ``_pad_axis()`` does zero per-call tuple/slice construction.
+
     Supports variable ghost-cell width for higher-order FD stencils:
     - Order 2: 1 ghost cell per side (3-point stencil)
     - Order 4: 2 ghost cells per side (5-point stencil)
@@ -405,6 +408,10 @@ class _PadEntry:
         "interior_slc",
         "left_slcs",
         "ng",
+        "periodic_left_src",
+        "periodic_right_src",
+        "recursive_left_src",
+        "recursive_right_src",
         "right_slcs",
         "src_hi_slcs",
         "src_lo_slcs",
@@ -419,24 +426,59 @@ class _PadEntry:
         self.buf = np.empty(tuple(padded_shape))
         # Interior: data sits at [ng .. n+ng)
         self.interior_slc = _slice_tuple(ndim, axis, slice(ng, n + ng))
-        # Per-layer ghost and source slices for non-periodic fill
+
+        # Per-layer ghost destination slices in padded buffer
         self.left_slcs: list[tuple[slice, ...]] = []
         self.right_slcs: list[tuple[slice, ...]] = []
+        # Per-layer source slices from original data (for non-periodic k=0)
         self.src_lo_slcs: list[tuple[slice, ...]] = []
         self.src_hi_slcs: list[tuple[slice, ...]] = []
+        # Per-layer source slices from data for periodic wrapping
+        self.periodic_left_src: list[tuple[slice, ...]] = []
+        self.periodic_right_src: list[tuple[slice, ...]] = []
+        # Per-layer source slices from padded buffer for recursive ghost fill (k>0)
+        self.recursive_left_src: list[tuple[slice, ...]] = []
+        self.recursive_right_src: list[tuple[slice, ...]] = []
+
         for k in range(ng):
-            # Left ghost: layer k (0=outermost, ng-1=innermost adjacent to data)
+            # Ghost cell destination: left_slcs[k] = layer k (0=outermost)
             self.left_slcs.append(_slice_tuple(ndim, axis, slice(k, k + 1)))
-            # Right ghost: layer k from outside
             self.right_slcs.append(
                 _slice_tuple(ndim, axis, slice(n + 2 * ng - 1 - k, n + 2 * ng - k))
             )
-            # Source from interior for left ghost (innermost=index 0, outermost=index ng-1)
+            # Non-periodic source from data boundary (innermost=index 0)
             self.src_lo_slcs.append(_slice_tuple(ndim, axis, slice(ng - 1 - k, ng - k)))
-            # Source from interior for right ghost
             self.src_hi_slcs.append(
                 _slice_tuple(ndim, axis, slice(n + k, n + k + 1))
             )
+            # Periodic source from data: left ghost copies from right end
+            self.periodic_left_src.append(
+                _slice_tuple(ndim, axis, slice(n - ng + k, n - ng + k + 1))
+            )
+            # Periodic source from data: right ghost copies from left end
+            self.periodic_right_src.append(
+                _slice_tuple(ndim, axis, slice(ng - 1 - k, ng - k))
+            )
+            # Recursive ghost fill source (from padded buffer, for k>0)
+            if k > 0:
+                # Left: source from previously-filled ghost at index (ng - k)
+                src_l = ng - k
+                self.recursive_left_src.append(
+                    _slice_tuple(ndim, axis, slice(src_l, src_l + 1))
+                )
+                # Right: source from previously-filled ghost
+                src_r = n + ng + k - 1
+                self.recursive_right_src.append(
+                    _slice_tuple(ndim, axis, slice(src_r, src_r + 1))
+                )
+            else:
+                # Placeholders for k=0 (use data directly, not buffer)
+                self.recursive_left_src.append(
+                    _slice_tuple(ndim, axis, slice(0, 1))
+                )
+                self.recursive_right_src.append(
+                    _slice_tuple(ndim, axis, slice(n - 1, n))
+                )
 
 
 class _PadBufferCache:
@@ -470,7 +512,7 @@ class _PadBufferCache:
 _pad_cache = _PadBufferCache()
 
 
-def _pad_axis(  # noqa: PLR0914
+def _pad_axis(
     data: np.ndarray,
     axis: int,
     bc: str | AxisBCSpec,
@@ -510,21 +552,11 @@ def _pad_axis(  # noqa: PLR0914
     # Copy interior into buffer
     buf[entry.interior_slc] = data
 
-    n = data.shape[axis]
-
     if bc.periodic:
-        # Copy ng cells from each end for periodic wrapping
+        # All source slices pre-cached in _PadEntry — zero per-call construction.
         for k in range(ng):
-            # Left ghost layer k (outermost=0): copies from right end of data
-            # In the padded buffer, ghost layers are at indices [0..ng-1]
-            # Source from data: rightmost cells
-            buf[entry.left_slcs[k]] = data[
-                _slice_tuple(data.ndim, axis, slice(n - ng + k, n - ng + k + 1))
-            ]
-            # Right ghost layer k (outermost=0): copies from left end of data
-            buf[entry.right_slcs[k]] = data[
-                _slice_tuple(data.ndim, axis, slice(ng - 1 - k, ng - k))
-            ]
+            buf[entry.left_slcs[k]] = data[entry.periodic_left_src[k]]
+            buf[entry.right_slcs[k]] = data[entry.periodic_right_src[k]]
     else:
         assert bc.low is not None  # guaranteed by AxisBCSpec.__post_init__
         assert bc.high is not None
@@ -537,33 +569,24 @@ def _pad_axis(  # noqa: PLR0914
         # implementing the recursive ghost-cell fill standard in
         # computational physics (LeVeque, "Finite Difference Methods for
         # Ordinary and Partial Differential Equations", SIAM, 2007, §2.12).
+        #
+        # All slice tuples pre-cached in _PadEntry for zero per-call overhead.
         for k in range(ng):
-            # Left side: ghost[ng-1-k] mirrors from source
             left_ghost_idx = ng - 1 - k  # innermost first
             left_ghost_slc = entry.left_slcs[left_ghost_idx]
             if k == 0:
-                # Innermost ghost mirrors from data boundary
-                src_lo_slc = _slice_tuple(data.ndim, axis, slice(0, 1))
-                np.multiply(f_lo, data[src_lo_slc], out=buf[left_ghost_slc])
+                np.multiply(f_lo, data[entry.recursive_left_src[0]], out=buf[left_ghost_slc])
             else:
-                # Outer ghost mirrors from the previously filled ghost
-                # In the padded buffer, the source is at index (ng - k)
-                src_idx = ng - k
-                src_slc = _slice_tuple(buf.ndim, axis, slice(src_idx, src_idx + 1))
-                np.multiply(f_lo, buf[src_slc], out=buf[left_ghost_slc])
+                np.multiply(f_lo, buf[entry.recursive_left_src[k]], out=buf[left_ghost_slc])
             if c_lo != 0.0:
                 buf[left_ghost_slc] += c_lo
 
-            # Right side: ghost[ng-1-k] mirrors from source
             right_ghost_idx = ng - 1 - k
             right_ghost_slc = entry.right_slcs[right_ghost_idx]
             if k == 0:
-                src_hi_slc = _slice_tuple(data.ndim, axis, slice(n - 1, n))
-                np.multiply(f_hi, data[src_hi_slc], out=buf[right_ghost_slc])
+                np.multiply(f_hi, data[entry.recursive_right_src[0]], out=buf[right_ghost_slc])
             else:
-                src_idx = n + ng + k - 1
-                src_slc = _slice_tuple(buf.ndim, axis, slice(src_idx, src_idx + 1))
-                np.multiply(f_hi, buf[src_slc], out=buf[right_ghost_slc])
+                np.multiply(f_hi, buf[entry.recursive_right_src[k]], out=buf[right_ghost_slc])
             if c_hi != 0.0:
                 buf[right_ghost_slc] += c_hi
 

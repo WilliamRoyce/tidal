@@ -39,7 +39,7 @@ OUT=../data/coupled_scalars_sweep
 
 echo "=== Coupled Scalars Coupling Sweep: gCpl = 0.05 to 1.99 (50 points, linear scale) ==="
 echo "    mPhi2 = 1.0, mChi2 = 4.0  (mass gap Δm² = 3.0, g_crit = 2.0)"
-echo "    Standing Gaussian on phi_0, domain [0,160], N=256, t_end=120"
+echo "    Standing Gaussian on phi_0, domain [0,160], N=256, t_end=120, fd_order=4"
 echo ""
 
 tidal sweep ../data/coupled_scalars.json \

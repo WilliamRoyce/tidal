@@ -7,6 +7,22 @@ from pathlib import Path
 
 import pytest
 
+from tidal.solver.operators import set_fd_order
+
+
+# ==================== Module-state cleanup ====================
+
+
+@pytest.fixture(autouse=True)
+def _reset_fd_order() -> None:  # noqa: PT004
+    """Reset FD order to 2 after every test.
+
+    CLI tests call set_fd_order(4) (the CLI default), which persists as
+    module-level state and pollutes subsequent tests that assume order 2.
+    """
+    yield
+    set_fd_order(2)
+
 # ==================== CLI JSON Spec Fixtures ====================
 
 _EXAMPLES_DIR = Path(__file__).parent.parent / "examples" / "data"

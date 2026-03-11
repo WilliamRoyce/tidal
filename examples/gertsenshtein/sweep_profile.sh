@@ -30,6 +30,10 @@
 # Note: Use --what conversion (not --what energy) — energy measurement is unreliable
 # with position-dependent coefficients (known limitation of current implementation).
 #
+# Grid: N=512, 4th-order FD stencils (default).
+# O(dx^4) convergence gives equivalent accuracy to N=1024 at 2nd-order.
+# Ref: Fornberg (1988), Mathematics of Computation 51(184).
+#
 # Ref: Boccaletti et al. (1970, Nuovo Cimento 70B:129)
 #      Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609)
 #
@@ -47,7 +51,7 @@ tidal sweep ../data/gertsenshtein_localized.json \
   --sweep "R=2.0:15.0:6" \
   --measure conversion \
   --source h_7 --target a_2 \
-  --grid-shape 1024 \
+  --grid-shape 512 \
   "--bounds=-100:100" \
   --ic gaussian \
   --ic-wavevector 2.0 \

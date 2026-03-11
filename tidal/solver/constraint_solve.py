@@ -134,13 +134,65 @@ def _classify_terms(  # noqa: PLR0913, PLR0917
 
 
 def _lap_axis(k: NDArray[np.float64], h: float) -> NDArray[np.float64]:
-    """Modified-wavenumber Laplacian along one axis: -(2/h²)(1 - cos(k*h))."""
-    return -(2.0 / (h * h)) * (1.0 - np.cos(k * h))
+    """Modified-wavenumber Laplacian along one axis.
+
+    Returns the Fourier symbol of the FD second-derivative stencil,
+    matching the current ``fd_order`` from ``operators.py``:
+
+    - Order 2: ``-(2/h²)(1 - cos(kh))``
+    - Order 4: ``(-cos(2kh)/6 + 8cos(kh)/3 - 5/2) / h²``
+    - Order 6: ``(cos(3kh)/45 - 3cos(2kh)/10 + 3cos(kh) - 49/18) / h²``
+
+    This ensures the FFT constraint solver uses the same dispersion
+    relation as the FD spatial operators.
+
+    Reference: Fornberg (1988), Mathematics of Computation 51(184).
+    """
+    from tidal.solver.operators import get_fd_order  # noqa: PLC0415
+
+    order = get_fd_order()
+    kh = k * h
+    inv_h2 = 1.0 / (h * h)
+    if order == 2:  # noqa: PLR2004
+        return -(2.0 * inv_h2) * (1.0 - np.cos(kh))
+    if order == 4:  # noqa: PLR2004
+        # Fourier symbol of [-1/12, 4/3, -5/2, 4/3, -1/12] / h²
+        return inv_h2 * (-np.cos(2 * kh) / 6.0 + 8.0 * np.cos(kh) / 3.0 - 5.0 / 2.0)
+    # order == 6
+    # Fourier symbol of [1/90, -3/20, 3/2, -49/18, 3/2, -3/20, 1/90] / h²
+    return inv_h2 * (
+        np.cos(3 * kh) / 45.0
+        - 3.0 * np.cos(2 * kh) / 10.0
+        + 3.0 * np.cos(kh)
+        - 49.0 / 18.0
+    )
 
 
 def _grad_axis(k: NDArray[np.float64], h: float) -> NDArray[np.complex128]:
-    """Modified-wavenumber gradient along one axis: i*sin(k*h)/h."""
-    return 1j * np.sin(k * h) / h
+    """Modified-wavenumber gradient along one axis.
+
+    Returns the Fourier symbol of the FD first-derivative stencil,
+    matching the current ``fd_order``:
+
+    - Order 2: ``i sin(kh) / h``
+    - Order 4: ``i (8sin(kh) - sin(2kh)) / (6h)``
+    - Order 6: ``i (45sin(kh) - 9sin(2kh) + sin(3kh)) / (30h)``
+
+    Reference: Fornberg (1988), Mathematics of Computation 51(184).
+    """
+    from tidal.solver.operators import get_fd_order  # noqa: PLC0415
+
+    order = get_fd_order()
+    kh = k * h
+    inv_h = 1.0 / h
+    if order == 2:  # noqa: PLR2004
+        return 1j * np.sin(kh) * inv_h
+    if order == 4:  # noqa: PLR2004
+        # Fourier symbol of [1/12, -2/3, 0, 2/3, -1/12] / h
+        return 1j * inv_h * (8.0 * np.sin(kh) - np.sin(2 * kh)) / 6.0
+    # order == 6
+    # Fourier symbol of [-1/60, 3/20, -3/4, 0, 3/4, -3/20, 1/60] / h
+    return 1j * inv_h * (45.0 * np.sin(kh) - 9.0 * np.sin(2 * kh) + np.sin(3 * kh)) / 30.0
 
 
 # Type for Fourier multiplier functions: (kvecs, dx) -> NDArray
@@ -376,7 +428,11 @@ def _fft_solve_single(
         max_incompatible = (
             float(np.max(source_at_singular)) if source_at_singular.size > 0 else 0.0
         )
-        if max_incompatible > _COMPAT_TOL * max_source:
+        # Use relative tolerance with an absolute floor to avoid
+        # false positives from floating-point noise (e.g. 4th-order FD
+        # stencils can produce ~1e-15 DC components from rounding).
+        compat_threshold = max(_COMPAT_TOL * max_source, 1e-12)
+        if max_incompatible > compat_threshold:
             msg = (
                 f"Constraint for '{terms.field_name}' is incompatible: "
                 f"source has nonzero projection (max={max_incompatible:.4g}) "
