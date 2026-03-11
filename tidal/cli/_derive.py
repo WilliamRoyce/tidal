@@ -317,14 +317,12 @@ def _wls_packages(
 def _apply_coord_values(exprs: list[str], coord_values: dict[str, str]) -> list[str]:
     """Substitute killed coordinates into Wolfram expression strings at the Python level.
 
-    This eliminates coordinate-dependent factors (e.g. ``Sin[y[]]^2``) from all
-    Python-generated Wolfram strings *before* they are emitted.  Combined with the
-    early metric-matrix substitution in :func:`_wls_spacetime`, this ensures that
-    ``Sin[y[]]^2`` (or any other killed-coordinate factor) never enters:
+    Applies ``coord_values`` to all Python-generated Wolfram string expressions before
+    they are emitted into the WLS. This ensures that:
 
-    * the cached Christoffel symbols (metric is simplified first),
-    * the TT-traceless substitution weights (metric_diagonal is pre-evaluated here),
-    * background-field component strings (if they depend on the killed coordinate).
+    * the TT-traceless substitution weights (``metric_diagonal``) have no killed-coordinate
+      factors (e.g. ``x[]^2*Sin[Pi/2]^2`` rather than ``x[]^2*Sin[y[]]^2``),
+    * background-field component strings evaluate cleanly if they depend on killed coords.
 
     For example, with ``coord_values = {"y": "Pi/2"}`` the replacement is::
 
@@ -332,6 +330,12 @@ def _apply_coord_values(exprs: list[str], coord_values: dict[str, str]) -> list[
 
     Wolfram then auto-evaluates ``Sin[Pi/2] → 1``, so the expensive ``Simplify``
     in the TT-weight expression immediately collapses to a trivial result.
+
+    NOTE: This function does NOT apply to the Wolfram-level metric matrix used for
+    ``MetricInBasis``/``SetMetricDownValues``.  Substituting killed coordinates into the
+    background metric before xPert's L^(2) expansion creates a non-flat background and
+    produces spurious Riemann coupling terms in tensor field equations.  The coordinate
+    evaluation of ``fieldEquations`` is handled by ``_wls_plane_wave_coordinate_evaluation``.
 
     Parameters
     ----------
@@ -378,24 +382,17 @@ def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
         _generate_metric_code(config, ctx.prefix),
     ]
 
-    # Apply coordinate_values to the metric matrix as early as possible.
-    # E.g. {y = "Pi/2"} → gedMetricMatrix = gedMetricMatrix /. {y[] -> Pi/2}
-    # After this substitution: Sin[Pi/2]->1 auto-evaluates, so x[]^2*Sin[y[]]^2
-    # becomes x[]^2. MetricInBasis and SetMetricDownValues then use the simplified
-    # matrix, eliminating Sin[y[]] from ALL subsequent computations (xPert Christoffels,
-    # component decomposition, curvature evaluation). This is correct physics: we are
-    # computing the theory on the equatorial slice θ=π/2.
-    reduction = config.get("reduction", {})
-    coord_values: dict[str, str] = reduction.get("coordinate_values", {})
-    if coord_values:
-        rules = ", ".join(f"{c}[] -> {v}" for c, v in coord_values.items())
-        p = ctx.prefix
-        lines += [
-            "",
-            "(* Apply coordinate_values to metric early — eliminates e.g. Sin[y[]]^2",
-            "   from ALL subsequent xPert/Christoffel/decomposition computations. *)",
-            f"{p}MetricMatrix = {p}MetricMatrix /. {{{rules}}};",
-        ]
+    # NOTE: coordinate_values (e.g. {y = "Pi/2"}) must NOT be applied to the metric
+    # matrix here. Substituting y→Pi/2 into the metric before xPert's L^(2) expansion
+    # creates a non-flat background: diag(-1,1,r²,r²) has R^θ_{φφ}θ = -1 ≠ 0, while
+    # the true spherical metric diag(-1,1,r²,r²sin²θ) is flat (Riemann=0 everywhere).
+    # xPert's background Riemann coupling terms in L^(2) would then contribute spurious
+    # curvature corrections to tensor component equations (h_θθ, h_θφ) that are NOT
+    # zeroed by the {RicciCD→0} substitution (Riemann ≠ Ricci).
+    # The coordinate evaluation is correctly deferred to _wls_plane_wave_coordinate_evaluation,
+    # which applies "fieldEquations /. {y[] -> Pi/2}" after full symbolic derivation.
+    # The Python-level _apply_coord_values is still applied to metric_diagonal strings
+    # (for TT-traceless weights and background field components) since those are correct.
 
     lines += [
         f"MetricInBasis[{ctx.metric}, -{ctx.chart}, {ctx.prefix}MetricMatrix];",
@@ -514,6 +511,31 @@ def _wls_scalar_background_substitution(
     return lines
 
 
+def _compute_contra_components(
+    comps: list[int | float | str],
+    metric_diagonal: list[str],
+) -> list[str]:
+    """Compute contravariant component values A^μ from covariant A_μ.
+
+    For a diagonal metric g_{μμ}: A^μ = A_μ / g_{μμ}.
+    For Minkowski (empty metric_diagonal): A^μ = A_μ (g^{ii} = 1 spatially;
+    temporal component A^0 = -A_0 but Abar_0 is always 0 in our gauge).
+    Returns a list of Wolfram expression strings.
+    """
+    contra: list[str] = []
+    for idx, val in enumerate(comps):
+        val_str = str(val)
+        if val_str.strip() in ("0", "0.0"):
+            contra.append("0")
+        elif metric_diagonal:
+            g_diag = metric_diagonal[idx]
+            contra.append(f"Simplify[({val_str}) / ({g_diag})]")
+        else:
+            # Minkowski: spatial A^i = A_i / 1 = A_i
+            contra.append(val_str)
+    return contra
+
+
 def _wls_vector_background_substitution(
     ctx: _WlsContext,
     comp_var: str,
@@ -526,10 +548,14 @@ def _wls_vector_background_substitution(
     xAct handles the index algebra (contractions, metric raising/lowering)
     before we inject numeric component values.
 
-    Both covariant (``{i, -chart}``) and contravariant (``{i, chart}``)
-    index orientations get the same component value.  This is correct for
-    diagonal metrics (Minkowski); non-diagonal metrics would need metric
-    factors for index raising/lowering.
+    For curved diagonal metrics, contravariant components ``A^μ`` differ
+    from covariant components ``A_μ``:  ``A^μ = g^{μμ} A_μ = A_μ / g_{μμ}``.
+    When ``ctx.metric_diagonal`` is non-empty, the correct contravariant
+    value is computed via ``Simplify[(A_μ) / (g_{μμ})]`` so Wolfram can
+    cancel coordinate factors algebraically.
+
+    For Minkowski (``ctx.metric_diagonal`` empty), both orientations get the
+    same value (``g^{μμ} = ±1`` so sign is already encoded in A_μ).
     """
     non_scalar_bgs = [f for f in ctx.background_fields if f["type"] != "scalar"]
     if not non_scalar_bgs:
@@ -545,17 +571,29 @@ def _wls_vector_background_substitution(
         rules: list[str] = []
         if field["type"] == "vector":
             for idx, val in enumerate(comps):
+                # Compute correct contravariant component value.
+                # For curved diagonal metrics: A^μ = A_μ / g_{μμ}.
+                # For Minkowski (metric_diagonal empty): A^μ = A_μ (flat).
+                val_str = str(val)
+                if ctx.metric_diagonal and val_str.strip() not in ("0", "0.0"):
+                    g_diag = ctx.metric_diagonal[idx]
+                    contra_val = f"Simplify[({val_str}) / ({g_diag})]"
+                else:
+                    contra_val = val_str
                 rules.extend(
                     (
-                        f"{prefixed}[{{{idx}, -{ctx.chart}}}] -> {val}",
-                        f"{prefixed}[{{{idx}, {ctx.chart}}}] -> {val}",
+                        f"{prefixed}[{{{idx}, -{ctx.chart}}}] -> {val_str}",
+                        f"{prefixed}[{{{idx}, {ctx.chart}}}] -> {contra_val}",
                         # Component function form (after ReplaceTensorFieldComponents
                         # converts vbdB[{i, -chart}] -> vbdBi[t, x, y])
-                        f"{prefixed}{idx}[__] -> {val}",
+                        f"{prefixed}{idx}[__] -> {val_str}",
                     )
                 )
         else:
-            # Tensor rank 2+: iterate over all index tuples
+            # Tensor rank 2+: iterate over all index tuples.
+            # For curved diagonal metrics, the fully-contravariant value T^{μν}
+            # needs two metric factors: T^{μν} = (T_{μν}) / (g_{μμ} * g_{νν}).
+            # This generalises the vector fix above.
             rank = field.get("rank", 2)
             for flat_idx, val in enumerate(comps):
                 multi_idx: list[int] = []
@@ -568,12 +606,21 @@ def _wls_vector_background_substitution(
                 idx_up = ", ".join(f"{{{k}, {ctx.chart}}}" for k in multi_idx)
                 # Component function name: head + concatenated index digits
                 comp_name = "".join(str(k) for k in multi_idx)
+                val_str = str(val)
+                # Fully contravariant: divide by each metric diagonal entry
+                if ctx.metric_diagonal and val_str.strip() not in ("0", "0.0"):
+                    g_factors = " * ".join(
+                        f"({ctx.metric_diagonal[k]})" for k in multi_idx
+                    )
+                    contra_val = f"Simplify[({val_str}) / ({g_factors})]"
+                else:
+                    contra_val = val_str
                 rules.extend(
                     (
-                        f"{prefixed}[{idx_down}] -> {val}",
-                        f"{prefixed}[{idx_up}] -> {val}",
+                        f"{prefixed}[{idx_down}] -> {val_str}",
+                        f"{prefixed}[{idx_up}] -> {contra_val}",
                         # Component function form (after ReplaceTensorFieldComponents)
-                        f"{prefixed}{comp_name}[__] -> {val}",
+                        f"{prefixed}{comp_name}[__] -> {val_str}",
                     )
                 )
 
@@ -618,8 +665,11 @@ def _wls_fields(ctx: _WlsContext, *, include_bg: bool = False) -> list[str]:
             bg_comps = field.get("components", [])
             if field["type"] == "vector" and bg_comps:
                 comps_str = ", ".join(str(c) for c in bg_comps)
+                contra_comps = _compute_contra_components(bg_comps, ctx.metric_diagonal)
+                contra_str = ", ".join(contra_comps)
                 lines.append(
-                    f"SetBackgroundFieldDownValues[{bg_prefixed}, {ctx.chart}, {{{comps_str}}}];"
+                    f"SetBackgroundFieldDownValues[{bg_prefixed}, {ctx.chart},"
+                    f" {{{comps_str}}}, {{{contra_str}}}];"
                 )
             lines.append("")
         lines.append("")
@@ -820,6 +870,8 @@ def _wls_multi_field_eom(
     lines: list[str] = []
 
     # VarD for each dynamical field
+    riemann_cd = f"Riemann{ctx.cd}"
+    einstein_cd = f"Einstein{ctx.cd}"
     for df in dyn_fields:
         eom_var = f"eom{df['name'].capitalize()}"
         lines.extend(
@@ -834,6 +886,13 @@ def _wls_multi_field_eom(
                 f"  {eom_var} = ToCanonical[{eom_var}]",
                 "];",
                 f"{eom_var} = ContractMetric[{eom_var}, {ctx.metric}];",
+                # Zero background curvature in the abstract EOM. VarD integration
+                # by parts on covariant derivatives can reintroduce abstract Riemann
+                # terms (via [∇_a, ∇_b] commutator) even if L^(2) was cleaned.
+                # For flat Minkowski in any coordinates (spherical, cylindrical, etc.),
+                # all Riemann components are zero — zero them explicitly here.
+                f"(* Zero any residual background curvature from VarD commutators *)",
+                f"{eom_var} = {eom_var} /. {{{riemann_cd}[__] :> 0, {einstein_cd}[__] :> 0}};",
                 _wls_mem_print(f"EOM({df['name']}) computed"),
                 "",
             ]
@@ -854,13 +913,22 @@ def _wls_multi_field_eom(
         entry["field"] for entry in ctx.gauge if entry["type"] == "tt"
     }
 
-    # Build BackgroundFieldRules for non-scalar background fields
+    # Build BackgroundFieldRules for non-scalar background fields.
+    # Format: {fieldHead, {covariantComps}, {contravariantComps}}
+    # EvaluatePDBackgroundField handles both covariant {mu,-chart} and
+    # contravariant {mu,+chart} derivative forms using the respective component lists.
     bg_rules_entries: list[str] = []
     for bf in ctx.background_fields:
         if bf["type"] != "scalar" and bf.get("components"):
             bg_head = f"{p}{bf['name'].capitalize()}"
             comps_str = ", ".join(str(c) for c in bf["components"])
-            bg_rules_entries.append(f"{{{bg_head}, {{{comps_str}}}}}")
+            contra_comps = _compute_contra_components(
+                bf["components"], ctx.metric_diagonal
+            )
+            contra_str = ", ".join(contra_comps)
+            bg_rules_entries.append(
+                f"{{{bg_head}, {{{comps_str}}}, {{{contra_str}}}}}"
+            )
     bg_rules_opt = ""
     if bg_rules_entries:
         bg_rules_str = ", ".join(bg_rules_entries)
@@ -1008,6 +1076,8 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     bg_name = f"{ctx.prefix}Bg"
     ricci_sym = f"Ricci{ctx.cd}"
     ricci_scalar_sym = f"RicciScalar{ctx.cd}"
+    riemann_sym = f"Riemann{ctx.cd}"
+    einstein_sym = f"Einstein{ctx.cd}"
 
     p = ctx.prefix
     det_sym = f"Det{ctx.metric}"
@@ -1128,8 +1198,11 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     lines.extend(
         [
             "",
-            "(* Set background curvature to zero (flat Minkowski) *)",
-            f"l2Raw = l2Raw /. {{{ricci_sym}[__] :> 0, {ricci_scalar_sym}[] :> 0}};",
+            "(* Set ALL background curvature to zero (flat Minkowski in any coordinates) *)",
+            "(* Riemann[__]:>0 catches curvature-coupling terms R^{abcd}h_ac h_bd from xPert. *)",
+            "(* Without this, spherical metrics leave symbolic RiemannCD unevaluated, *)",
+            "(* corrupting equations for tensor components (h_theta_theta etc.). *)",
+            f"l2Raw = l2Raw /. {{{riemann_sym}[__] :> 0, {ricci_sym}[__] :> 0, {ricci_scalar_sym}[] :> 0, {einstein_sym}[__] :> 0}};",
             "",
             "(* Canonical simplifications *)",
             "l2Raw = ToCanonical[l2Raw];",
@@ -2939,6 +3012,8 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
     try:
         ret = _run_wolframscript(tmp_path)
     finally:
+        import shutil as _shutil
+        _shutil.copy2(tmp_path, "/tmp/tidal_last_derive.wls")  # DEBUG: preserve for inspection
         tmp_path.unlink(missing_ok=True)
 
     # Resolve output path for post-processing and validation

@@ -25,6 +25,33 @@ Component values can be:
 - **Numbers**: `0`, `1.0` (constant)
 - **Strings**: Wolfram expressions evaluated symbolically (may depend on coordinates)
 
+#### ⚠ Index Convention: `components` always specifies **covariant** (lowered-index) values
+
+For a vector background field `A`, `components[μ]` defines **`A_μ`** (covariant, lower index).
+
+```
+components = [A_0, A_1, ..., A_{d-1}]   ← COVARIANT (A with subscript)
+```
+
+This is the convention throughout TIDAL's Wolfram pipeline:
+- `SetBackgroundFieldDownValues` sets `field[{μ, -chart}] = components[μ]` (covariant `-chart`)
+- `EvaluatePDBackgroundField` processes covariant `{μ, -chart}` forms
+- xAct's `ComponentValue` stores covariant components
+
+**Contravariant forms are derived automatically:**
+- For **Minkowski** metrics (`metric = "minkowski"`): `A^μ ≈ A_μ` (spatial components identical; temporal `A^0 = -A_0`, but typically zero)
+- For **curved diagonal** metrics (`metric = "diagonal"`): `A^μ = g^{μμ} A_μ = A_μ / g_{μμ}`, computed via `Simplify[(A_μ) / (g_{μμ})]`
+
+**Example: Dipolar magnetic field in spherical coordinates** (`diag[-1, 1, r², r²sin²θ]`):
+```
+A_θ = Bpeak*z0³/(2r²)    ← what you put in components[2]
+A^θ = g^{θθ} A_θ = A_θ/r² = Bpeak*z0³/(2r⁴)   ← computed automatically
+```
+
+**Gauge potentials**: Use the covariant gauge potential `A_μ` in `components`.
+The Faraday tensor `F_{μν} = ∂_μ A_ν - ∂_ν A_μ` is metric-independent (exterior derivative),
+so `F` is determined correctly from covariant `A_μ` alone.
+
 ### 2. WLS Generation (`_derive.py`)
 
 - `_wls_fields()` emits `DefTensor[G[], M2]` + `ComponentValue[G[{0,-Cart}], expr]`

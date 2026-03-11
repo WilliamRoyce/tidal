@@ -154,11 +154,12 @@ xAct-generated tensor name. Christoffel symbols are excluded.";
 
 EvaluateCurvatureComponents::usage =
   "EvaluateCurvatureComponents[expr, chart, metricMatrix:None] evaluates background \
-curvature tensor components from the metric definition. For a constant metric \
-(all components independent of coordinates), all curvature vanishes by the theorem \
-that d_i g_{ab} = 0 implies Gamma = 0 implies R_{abcd} = 0. The function COMPUTES \
-this from the metric properties rather than assuming it. For non-constant metrics, \
-curvature is left unevaluated (future: compute from Christoffel formula). \
+curvature tensor components from the metric definition. For a constant metric, all \
+curvature vanishes (Gamma=0 => R=0). For a non-constant metric (e.g. spherical \
+coordinates), computes Riemann R_{abcd} from Christoffel symbols via R^a_{bcd} = \
+∂_c Γ^a_{bd} - ∂_d Γ^a_{bc} + Γ^a_{cm}Γ^m_{bd} - Γ^a_{dm}Γ^m_{bc}, then derives \
+Ricci and Ricci scalar. Gives R=0 for flat space in curvilinear coordinates and \
+non-zero R for genuinely curved backgrounds (Schwarzschild etc.). \
 If metricMatrix is None, uses flat Minkowski metric diag(-1,+1,...).";
 
 MinkowskiMetricFactor::usage =
@@ -198,13 +199,23 @@ given metric, caching by chart+metric hash. The first call invokes \
 ComputeChristoffelFromMetricMatrix (128+ Simplify operations for 4D); subsequent calls \
 return the cached result in O(1). Logs [cache MISS]/[cache HIT] messages.";
 
+ComputeRiemannFromMetric::usage =
+  "ComputeRiemannFromMetric[chart, metricMatrix] computes the all-covariant Riemann tensor \
+R_{abcd} from the Christoffel symbols using R^a_{bcd} = ∂_c Γ^a_{bd} - ∂_d Γ^a_{bc} + \
+Γ^a_{cm}Γ^m_{bd} - Γ^a_{dm}Γ^m_{bc}, then lowers the first index via g_{ae}. \
+Returns a 4D array indexed result[[a+1,b+1,c+1,d+1]] = R_{abcd} (0-indexed coords). \
+For flat space in curvilinear coordinates (spherical, cylindrical), all components are 0.";
+
+GetCachedRiemann::usage =
+  "GetCachedRiemann[chart, metricMatrix] returns the all-covariant Riemann tensor \
+R_{abcd} for the given metric, caching by chart+metric hash. Used by \
+EvaluateCurvatureComponents to substitute component values for non-constant metrics.";
+
 GetCachedMetricRules::usage =
   "GetCachedMetricRules[chart, metricMatrix] returns a cached list of covariant and \
 contravariant metric substitution rules for the given chart and metric. Built once per \
 unique (chart, metric) pair; reused across all 200-1500 EvaluateMetricComponents calls \
 in a curved-metric derivation. The rules match MetricQ[f] patterns for safety.";
-
-Begin["`Private`"];
 
 (* === Geometric Object Cache === *)
 (* Memoizes inverse metric and Christoffel components keyed by metric hash.
@@ -212,8 +223,12 @@ Begin["`Private`"];
    once per field component in the decomposition pipeline. Keyed by Hash[metricMatrix]
    so the same metric object always hits the cache. The cache persists for the
    duration of the Wolfram session (one derivation), then is garbage-collected.
-   General: benefits all curved-metric theories (spherical, cylindrical, conformal, etc.). *)
+   General: benefits all curved-metric theories (spherical, cylindrical, conformal, etc.).
+   NOTE: Initialized outside Begin["`Private`"] so the symbol lives in the public context
+   (TorsionGertsenshtein`CommonUtilities`$TIDALGeometricCache), accessible by tests. *)
 $TIDALGeometricCache = <||>;
+
+Begin["`Private`"];
 
 (* Get or compute inverse metric, caching by Hash[metricMatrix] *)
 GetCachedInverseMetric[metricMatrix_] := Module[
@@ -235,6 +250,50 @@ GetCachedChristoffels[chart_, metricMatrix_] := Module[
     Print["  [cache HIT] Reusing Christoffel symbols for ", chart, "."]
   ];
   $TIDALGeometricCache[{"christoffels", key}]
+];
+
+(* Compute all-covariant Riemann tensor R_{abcd} from Christoffel symbols.
+   R^a_{bcd} = ∂_c Γ^a_{bd} - ∂_d Γ^a_{bc} + Γ^a_{cm}Γ^m_{bd} - Γ^a_{dm}Γ^m_{bc}
+   Then lower first index: R_{abcd} = g_{ae} R^e_{bcd}
+   Returns a 4D array indexed 1-based: result[[a+1,b+1,c+1,d+1]] = R_{abcd}. *)
+ComputeRiemannFromMetric[chart_, metricMatrix_] := Module[
+  {dim, coords, christoffels, riemannUp, riemannDown, a, b, c, d, e},
+  dim = GetChartDimension[chart];
+  coords = GetCoordinateSymbols[chart];
+  christoffels = GetCachedChristoffels[chart, metricMatrix];
+  (* christoffels[[a+1, b+1, c+1]] = Γ^a_{bc} (0-indexed coords) *)
+
+  (* R^a_{bcd} = ∂_c Γ^a_{bd} - ∂_d Γ^a_{bc} + Σ_m(Γ^a_{cm}Γ^m_{bd} - Γ^a_{dm}Γ^m_{bc}) *)
+  riemannUp = Table[
+    D[christoffels[[a+1, b+1, d+1]], coords[[c+1]]] -
+    D[christoffels[[a+1, b+1, c+1]], coords[[d+1]]] +
+    Sum[
+      christoffels[[a+1, c+1, e+1]] * christoffels[[e+1, b+1, d+1]] -
+      christoffels[[a+1, d+1, e+1]] * christoffels[[e+1, b+1, c+1]],
+      {e, 0, dim-1}
+    ],
+    {a, 0, dim-1}, {b, 0, dim-1}, {c, 0, dim-1}, {d, 0, dim-1}
+  ];
+
+  (* Lower first index: R_{abcd} = g_{ae} R^e_{bcd} *)
+  riemannDown = Table[
+    Sum[metricMatrix[[a+1, e+1]] * riemannUp[[e+1, b+1, c+1, d+1]], {e, 0, dim-1}],
+    {a, 0, dim-1}, {b, 0, dim-1}, {c, 0, dim-1}, {d, 0, dim-1}
+  ];
+
+  Simplify[riemannDown]
+];
+
+(* Get or compute all-covariant Riemann tensor, caching by chart + metric hash *)
+GetCachedRiemann[chart_, metricMatrix_] := Module[
+  {key = {ToString[chart], Hash[metricMatrix, "MD5"]}},
+  If[!KeyExistsQ[$TIDALGeometricCache, {"riemann", key}],
+    Print["  [cache MISS] Computing Riemann tensor for ", chart, "..."];
+    $TIDALGeometricCache[{"riemann", key}] = ComputeRiemannFromMetric[chart, metricMatrix];
+    Print["  [cache STORED] Riemann for ", chart, " cached."],
+    Print["  [cache HIT] Reusing Riemann tensor for ", chart, "."]
+  ];
+  $TIDALGeometricCache[{"riemann", key}]
 ];
 
 (* Get or compute metric substitution rules, caching by chart name + metric hash.
@@ -456,6 +515,62 @@ Pass the metric matrix as the 4th argument."]
       IsChristoffelSymbol[f] :> christoffelValues[[Abs[a]+1, Abs[b]+1, Abs[c]+1]]
   };
 
+  (* Fallback: handle Christoffels where one or more args are abstract Symbols.
+     These arise when BatchedTraceBasisDummyWithMetric fails to fully sum a contracted
+     dummy index — a Module-generated variable (e.g., h$25530) remains unsummed.
+     Since metric evaluation has already run by this point (concrete numbers for g^{μν}),
+     the abstract Symbol appears ONLY in the Christoffel factor, making it safe to
+     sum independently over all concrete basis values.
+     Example: ChristoffelgedCDPDgedCart[h$25530, {3,-gedCart}, {3,-gedCart}]
+              → Σ_{i=0}^{dim-1} Γ^i_{33} = christoffelValues sum over first index. *)
+  Module[{dim2 = Length[christoffelValues], abstractFound},
+    (* Loop until no abstract-Symbol Christoffel args remain *)
+    abstractFound = True;
+    While[abstractFound,
+      abstractFound = False;
+      (* Normalize negated abstract indices: Times[-1, sym] → sym.
+         In xAct, a lower-index abstract dummy like -{h$X} appears as Times[-1, sym].
+         Since we sum over all concrete values anyway, the covariant/contravariant
+         sign of the abstract index does not affect the sum result. *)
+      result = result /. {
+        f_[Times[-1, a_Symbol], b_, c_] /; IsChristoffelSymbol[f] :> f[a, b, c],
+        f_[a_, Times[-1, b_Symbol], c_] /; IsChristoffelSymbol[f] :> f[a, b, c],
+        f_[a_, b_, Times[-1, c_Symbol]] /; IsChristoffelSymbol[f] :> f[a, b, c]
+      };
+      result = result /. {
+        (* Abstract first index: Σ_i Γ^i_{bc} *)
+        f_[a_Symbol, {b_Integer, _}, {c_Integer, _}] /; IsChristoffelSymbol[f] :>
+          (abstractFound = True;
+           Total @ Table[christoffelValues[[i+1, Abs[b]+1, Abs[c]+1]], {i, 0, dim2-1}]),
+        (* Abstract second index: Σ_i Γ^a_{ic} *)
+        f_[{a_Integer, _}, b_Symbol, {c_Integer, _}] /; IsChristoffelSymbol[f] :>
+          (abstractFound = True;
+           Total @ Table[christoffelValues[[Abs[a]+1, i+1, Abs[c]+1]], {i, 0, dim2-1}]),
+        (* Abstract third index: Σ_i Γ^a_{bi} *)
+        f_[{a_Integer, _}, {b_Integer, _}, c_Symbol] /; IsChristoffelSymbol[f] :>
+          (abstractFound = True;
+           Total @ Table[christoffelValues[[Abs[a]+1, Abs[b]+1, i+1]], {i, 0, dim2-1}]),
+        (* Abstract first two indices *)
+        f_[a_Symbol, b_Symbol, {c_Integer, _}] /; IsChristoffelSymbol[f] :>
+          (abstractFound = True;
+           Total @ Table[christoffelValues[[i+1, j+1, Abs[c]+1]], {i, 0, dim2-1}, {j, 0, dim2-1}]),
+        (* Abstract first and third indices *)
+        f_[a_Symbol, {b_Integer, _}, c_Symbol] /; IsChristoffelSymbol[f] :>
+          (abstractFound = True;
+           Total @ Table[christoffelValues[[i+1, Abs[b]+1, j+1]], {i, 0, dim2-1}, {j, 0, dim2-1}]),
+        (* Abstract second and third indices *)
+        f_[{a_Integer, _}, b_Symbol, c_Symbol] /; IsChristoffelSymbol[f] :>
+          (abstractFound = True;
+           Total @ Table[christoffelValues[[Abs[a]+1, i+1, j+1]], {i, 0, dim2-1}, {j, 0, dim2-1}]),
+        (* All three abstract *)
+        f_[a_Symbol, b_Symbol, c_Symbol] /; IsChristoffelSymbol[f] :>
+          (abstractFound = True;
+           Total @ Table[christoffelValues[[i+1, j+1, k+1]], {i, 0, dim2-1}, {j, 0, dim2-1}, {k, 0, dim2-1}])
+      };
+      If[abstractFound, result = Expand[result]]
+    ]
+  ];
+
   Simplify[result]
 ];
 
@@ -534,60 +649,94 @@ EvaluatePDMetric[expr_, chart_, metricMatrix_] := Module[
 
 (* === Pre-Define Background Field DownValues for Auto-Evaluation === *)
 (* Like SetMetricDownValues but for rank-1 background fields.
-   Sets direct Mathematica DownValues so field[{mu,-chart}] auto-evaluates
-   to the component value during Expand[]. This auto-collapses zero components
-   (e.g., Abar = (0,0,-B0*z,0) has 3 zero components out of 4). *)
-SetBackgroundFieldDownValues[field_, chart_, componentValues_List] := Module[
+   Sets direct Mathematica DownValues so field[{mu,±chart}] auto-evaluates
+   to the component value during Expand[]. This auto-collapses zero components.
+   covariantValues: A_μ values (lower index, {mu,-chart}).
+   contravariantValues (optional): A^μ values (raised index, {mu,+chart}).
+     For curved diagonal metric g_{μμ}: A^μ = A_μ / g_{μμ}.
+     For Minkowski: A^i = A_i (spatial), so covariant == contravariant. *)
+SetBackgroundFieldDownValues[field_, chart_, covariantValues_List,
+    contravariantValues_List:{}] := Module[
   {dim, nSet = 0},
-  dim = Length[componentValues];
+  dim = Length[covariantValues];
+  (* Covariant DownValues: field[{mu,-chart}] = A_μ *)
   Do[
-    field[{mu, -chart}] = componentValues[[mu + 1]];
+    field[{mu, -chart}] = covariantValues[[mu + 1]];
     nSet++,
     {mu, 0, dim - 1}
+  ];
+  (* Contravariant DownValues: field[{mu,+chart}] = A^μ *)
+  If[Length[contravariantValues] == dim,
+    Do[
+      field[{mu, chart}] = contravariantValues[[mu + 1]];
+      nSet++,
+      {mu, 0, dim - 1}
+    ]
   ];
   Print["SetBackgroundFieldDownValues: Set ", nSet, " DownValues for ", field];
 ];
 
 (* === Evaluate Partial Derivatives of Background Field Components === *)
 (* Analogous to EvaluatePDMetric but for background fields (rank-1 tensors).
-   Handles three forms:
-   1. PD[{n,-chart}][field[{mu,-chart}]] → D[value, coord]  (pre-ConvertCDToDerivatives)
-   2. field[{mu,-chart}] → value  (bare component access)
-   3. Derivative[orders__][field][{mu,-chart}] → multi-derivative of value  (post-ConvertCDToDerivatives)
-   The third form catches any residuals that survived ConvertCDToDerivatives. *)
-EvaluatePDBackgroundField[expr_, chart_, fieldHead_, componentValues_List] := Module[
-  {dim, coords, rules, result},
-  dim = Length[componentValues];
-  coords = GetCoordinateSymbols[chart];
+   Handles six forms (covariant and contravariant variants):
+   1.  PD[{n,-chart}][field[{mu,-chart}]] → D[A_μ, coord_n]     (covariant PD)
+   1c. PD[{n,-chart}][field[{mu,+chart}]] → D[A^μ, coord_n]     (contravariant PD)
+   2.  field[{mu,-chart}] → A_μ                                   (bare covariant)
+   2c. field[{mu,+chart}] → A^μ                                   (bare contravariant)
+   3.  Derivative[...][field][{mu,-chart}] → iterated D[A_μ, ...]  (post-ConvertCD)
+   3c. Derivative[...][field][{mu,+chart}] → iterated D[A^μ, ...]  (post-ConvertCD)
 
-  (* Rule 1: PD derivatives — PD[{n,-chart}][field[{mu,-chart}]] → D[value, coord_n] *)
+   covariantValues: A_μ for each μ.
+   contravariantValues (optional): A^μ for each μ. For curved diagonal metric,
+     A^μ = A_μ / g_{μμ}. When absent, only covariant rules are applied. *)
+EvaluatePDBackgroundField[expr_, chart_, fieldHead_, covariantValues_List,
+    contravariantValues_List:{}] := Module[
+  {dim, coords, rules, result, hasCon},
+  dim = Length[covariantValues];
+  coords = GetCoordinateSymbols[chart];
+  hasCon = (Length[contravariantValues] == dim);
+
+  (* Rules 1+2: Covariant — PD and bare {mu,-chart} forms *)
   rules = Flatten[Table[
-    With[{deriv = Simplify[D[componentValues[[mu + 1]], coords[[n + 1]]]]},
+    With[{deriv = Simplify[D[covariantValues[[mu + 1]], coords[[n + 1]]]]},
       pd_[{n, -chart}][fieldHead[{mu, -chart}]] /;
         (IsCovDOperator[pd] || StringMatchQ[ToString[pd], "PD*"]) :> deriv
     ],
     {mu, 0, dim - 1}, {n, 0, dim - 1}
   ]];
-
-  (* Rule 2: Bare component values — field[{mu,-chart}] → value *)
   rules = Join[rules, Table[
-    With[{val = componentValues[[mu + 1]]},
+    With[{val = covariantValues[[mu + 1]]},
       fieldHead[{mu, -chart}] :> val
     ],
     {mu, 0, dim - 1}
   ]];
 
+  (* Rules 1c+2c: Contravariant — PD and bare {mu,+chart} forms *)
+  If[hasCon,
+    rules = Join[rules, Flatten[Table[
+      With[{deriv = Simplify[D[contravariantValues[[mu + 1]], coords[[n + 1]]]]},
+        pd_[{n, -chart}][fieldHead[{mu, chart}]] /;
+          (IsCovDOperator[pd] || StringMatchQ[ToString[pd], "PD*"]) :> deriv
+      ],
+      {mu, 0, dim - 1}, {n, 0, dim - 1}
+    ]]];
+    rules = Join[rules, Table[
+      With[{val = contravariantValues[[mu + 1]]},
+        fieldHead[{mu, chart}] :> val
+      ],
+      {mu, 0, dim - 1}
+    ]]
+  ];
+
   result = expr /. rules;
 
-  (* Rule 3: Post-ConvertCDToDerivatives residuals —
-     Derivative[n1,n2,...][field][{mu,-chart}] → iterated D[value, coords] *)
+  (* Rule 3: Post-ConvertCDToDerivatives residuals — Derivative[...][field][{mu,-chart}] *)
   result = result /. {
     Derivative[orders__][fieldHead][{mu_Integer, -chart}] :>
       Module[{val, cs, orderList, diffs},
-        val = componentValues[[mu + 1]];
+        val = covariantValues[[mu + 1]];
         cs = coords;
         orderList = {orders};
-        (* Build list of differentiation variables: order_i copies of coord_i *)
         diffs = Flatten[MapIndexed[
           Table[cs[[First[#2]]], {#1}] &,
           orderList
@@ -595,6 +744,23 @@ EvaluatePDBackgroundField[expr_, chart_, fieldHead_, componentValues_List] := Mo
         Simplify[Fold[D, val, diffs]]
       ]
   };
+
+  (* Rule 3c: Post-ConvertCDToDerivatives contravariant — Derivative[...][field][{mu,+chart}] *)
+  If[hasCon,
+    result = result /. {
+      Derivative[orders__][fieldHead][{mu_Integer, chart}] :>
+        Module[{val, cs, orderList, diffs},
+          val = contravariantValues[[mu + 1]];
+          cs = coords;
+          orderList = {orders};
+          diffs = Flatten[MapIndexed[
+            Table[cs[[First[#2]]], {#1}] &,
+            orderList
+          ]];
+          Simplify[Fold[D, val, diffs]]
+        ]
+    }
+  ];
 
   result
 ];
@@ -951,10 +1117,60 @@ EvaluateCurvatureComponents[expr_, chart_, metricMatrix_:None] := Module[
       f_[__] /; IsCurvatureTensor[f] :> 0,
       f_[] /; IsCurvatureTensor[f] :> 0
     },
-    (* Non-constant metric: curvature is non-trivial *)
-    (* Leave curvature tensors for the decomposition pipeline to handle *)
-    (* They will be evaluated through ToBasis + TraceBasisDummy + Christoffel evaluation *)
-    Null
+    (* Non-constant metric: compute Riemann from Christoffel symbols.
+       Handles both flat-but-curved-coords (spherical: R=0) and genuinely curved
+       backgrounds (Schwarzschild: R≠0).  Without this, unevaluated symbolic
+       RiemannCD[{i,-chart},...] components remain in the EOM, contributing
+       spurious constant mass-like terms to tensor field equations.
+       Root cause: xPert Perturbation[√g R, 2] generates R^{abcd}h_ac h_bd coupling
+       terms; VarD integration by parts regenerates Riemann via [∇_a,∇_b] commutators.
+       Christoffels were substituted in Step 4, but Riemann was not. Fix: compute it. *)
+    Module[{riemann, riemannRules},
+      riemann = GetCachedRiemann[chart, localMetric];
+      (* Substitute all-covariant Riemann R_{abcd} (all indices negative in xCoba basis) *)
+      riemannRules = {
+        f_[{a_Integer, _}, {b_Integer, _}, {c_Integer, _}, {d_Integer, _}] /;
+          IsCurvatureTensor[f] && StringContainsQ[ToString[f], "Riemann"] :>
+          riemann[[Abs[a]+1, Abs[b]+1, Abs[c]+1, Abs[d]+1]]
+      };
+      result = result /. riemannRules;
+
+      (* Compute and substitute Ricci tensor R_{ab} = Σ_c R^c_{acb} from Riemann *)
+      Module[{ricciValues, ricci},
+        ricciValues = GetCachedChristoffels[chart, localMetric];  (* reuse cache infrastructure *)
+        ricci = Simplify[Table[
+          Sum[
+            If[riemann[[c+1, a+1, c+1, b+1]] =!= 0,
+               riemann[[c+1, a+1, c+1, b+1]],
+               0],  (* R^c_{acb} from all-covariant via inverse metric *)
+            {c, 0, dim-1}
+          ],
+          {a, 0, dim-1}, {b, 0, dim-1}
+        ]];
+        (* Actually Ricci from all-covariant: R_{ab} = g^{cd} R_{cadb} *)
+        Module[{invMet = GetCachedInverseMetric[localMetric]},
+          ricci = Simplify[Table[
+            Sum[invMet[[c+1, d+1]] * riemann[[c+1, a+1, d+1, b+1]], {c, 0, dim-1}, {d, 0, dim-1}],
+            {a, 0, dim-1}, {b, 0, dim-1}
+          ]]
+        ];
+        result = result /. {
+          f_[{a_Integer, _}, {b_Integer, _}] /;
+            IsCurvatureTensor[f] && StringContainsQ[ToString[f], "Ricci"] &&
+            !StringContainsQ[ToString[f], "Scalar"] :>
+            ricci[[Abs[a]+1, Abs[b]+1]]
+        };
+        (* Ricci scalar R = g^{ab} R_{ab} *)
+        Module[{invMet = GetCachedInverseMetric[localMetric]},
+          Module[{ricciScalar = Simplify[Sum[invMet[[a+1,b+1]]*ricci[[a+1,b+1]], {a,0,dim-1},{b,0,dim-1}]]},
+            result = result /. {
+              f_[] /; IsCurvatureTensor[f] && StringContainsQ[ToString[f], "Scalar"] :>
+                ricciScalar
+            }
+          ]
+        ]
+      ]
+    ]
   ];
 
   result

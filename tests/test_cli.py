@@ -3481,6 +3481,107 @@ path = "coupled_scattering.json"
         assert "mChi2" in out
 
 
+    def test_background_vector_curved_metric_contravariant(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Vector background in curved diagonal metric: contravariant A^μ = A_μ / g_{μμ}.
+
+        For spherical metric diag[-1, 1, r², r²sin²θ], the θ-component (index 2)
+        has g_{22} = x[]^2 (= r²).  Given covariant A_θ = B/(2*x[]^2), the correct
+        contravariant value is A^θ = B/(2*x[]^4), NOT B/(2*x[]^2).
+
+        Bug 2: prior to this fix, the same covariant value was used for the
+        contravariant substitution in _wls_vector_background_substitution, giving
+        wrong coupling coefficients in curved-spacetime theories.
+        """
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Curved Metric Vector Background"
+
+[spacetime]
+dimension = 4
+metric = "diagonal"
+diagonal = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[constants]
+names = ["Bpeak", "z0"]
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "Bpeak*z0^3/(2*x[]^2)", "0"]
+
+[lagrangian]
+expression = "-1/4 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Covariant substitution (index 2, -Cart): covariant value unchanged
+        assert "Bpeak*z0^3/(2*x[]^2)" in out
+        # Contravariant substitution (index 2, +Cart): must be A_θ / g_{θθ}
+        # = Bpeak*z0^3/(2*x[]^2) / x[]^2 = Bpeak*z0^3/(2*x[]^4), computed via Simplify
+        assert "Simplify[(Bpeak*z0^3/(2*x[]^2)) / (x[]^2)]" in out
+
+    def test_background_vector_minkowski_covariant_eq_contravariant(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Vector background in Minkowski metric: A^μ = A_μ (spatial components equal).
+
+        For Minkowski metric, g_{ii} = 1 for spatial components so A^i = A_i.
+        The covariant == contravariant shortcut must be preserved (no Simplify wrapping).
+        """
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Minkowski Vector Background"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[constants]
+names = ["B0"]
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "B0", "0"]
+
+[lagrangian]
+expression = "-1/4 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # For Minkowski (empty metric_diagonal), contravariant = covariant
+        assert "[{2, -" in out and "-> B0" in out
+        assert "[{2, " in out and "-> B0" in out
+        # Must NOT generate Simplify[] wrapping for Minkowski (old shortcut preserved)
+        assert "Simplify[(B0)" not in out
+
+
 class TestExceptionHandling:
     def test_value_error_shows_clean_message(
         self, capsys: pytest.CaptureFixture[str]
@@ -4271,8 +4372,15 @@ class TestCoordValuesPreEvaluation:
         result = _apply_coord_values(exprs, {"y": "Pi/2"})
         assert result == exprs
 
-    def test_metric_diagonal_pre_evaluated_in_wls(self, tmp_path: Path) -> None:
-        """With coordinate_values {y=Pi/2}, metric matrix ReplaceAll emitted early."""
+    def test_metric_diagonal_not_pre_evaluated_in_wls(self, tmp_path: Path) -> None:
+        """Metric matrix must NOT be pre-evaluated with coordinate_values.
+
+        Substituting y→Pi/2 into the metric before xPert's L^(2) expansion
+        creates a non-flat background: diag(-1,1,r²,r²) has non-zero Riemann,
+        while the true spherical metric diag(-1,1,r²,r²sin²θ) is flat.
+        The coordinate evaluation is deferred to _wls_plane_wave_coordinate_evaluation
+        which applies "fieldEquations /. {y[] -> Pi/2}" after derivation.
+        """
         from tidal.cli._derive import generate_wls
         import tomllib
 
@@ -4300,8 +4408,10 @@ path = "out.json"
         with open(config_path, "rb") as f:
             config = tomllib.load(f)
         wls_text = generate_wls(config, str(config_path))
-        # Early metric substitution before MetricInBasis (prefix varies by theory name)
-        assert "MetricMatrix /. {y[] -> Pi/2}" in wls_text
+        # Metric matrix must NOT be pre-evaluated (creates non-flat background)
+        assert "MetricMatrix /. {y[] -> Pi/2}" not in wls_text
+        # But coordinate_values should still be applied to field equations after derivation
+        assert "fieldEquations = fieldEquations /. {y[] -> Pi/2}" in wls_text
 
     def test_tt_traceless_weights_no_sin_y(self, tmp_path: Path) -> None:
         """TT-traceless substitution weights use Sin[Pi/2], not Sin[y[]]."""
