@@ -21,6 +21,7 @@
 - `adaptive_timestepping.md` - Solver architecture and tolerance control
 - `constraint_fields.md` - Constraint field physics and solver treatment
 - `solver_migration.md` - Migration from py-pde to native SUNDIALS/numpy architecture
+- `solver_optimizations.md` - Solver performance optimizations (FD stencils, Yoshida integrator, benchmarks)
 
 ---
 
