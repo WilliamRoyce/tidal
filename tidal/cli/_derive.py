@@ -2468,32 +2468,6 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
     return lines
 
 
-def _total_raw_component_count(ctx: _WlsContext) -> int:
-    """Total *raw* (pre-symmetry-reduction) component count for all fields.
-
-    Used to decide whether `DecomposeScalarExpression` on the abstract
-    Lagrangian is feasible.  For rank-3 antisymmetric tensors in 4D the
-    raw count is 4^3 = 64 even though only C(4,3) = 4 are independent;
-    the Lagrangian still uses the full tensor head C[-a,-b,-c] so the
-    decomposition cost scales with the *raw* count.
-    """
-    total = 0
-    for f in ctx.fields:
-        ftype = f["type"]
-        if ftype == "scalar":
-            total += 1
-        elif ftype == "vector":
-            total += ctx.dim
-        else:
-            total += ctx.dim ** f.get("rank", 2)
-    return total
-
-
-# Maximum raw component count for which we attempt full Lagrangian
-# decomposition.  Beyond this threshold the EOM-based fast path is used.
-_LAGRANGIAN_DECOMPOSE_THRESHOLD = 30
-
-
 def _wls_volume_element_code(ctx: _WlsContext) -> list[str]:
     """Generate Wolfram code to compute spatial volume element.
 
@@ -2538,76 +2512,17 @@ def _wls_volume_element_code(ctx: _WlsContext) -> list[str]:
     ]
 
 
-def _wls_canonical_from_eom(ctx: _WlsContext) -> list[str]:
-    """Generate canonical structure directly from the already-decomposed EOM.
-
-    This is the **fast path** for high-rank tensor fields (rank >= 3) where
-    ``DecomposeScalarExpression`` on the abstract Lagrangian is prohibitively
-    slow.
-
-    E-L velocity form: equations are preserved as-is.  Only hamiltonian_terms
-    are injected (empty for fast path — H reconstruction is optional).
-
-    ``fieldEquations`` must already exist in the WLS script context.
-    """
-    return [
-        "",
-        "(* === Canonical Structure (EOM-based fast path) === *)",
-        "(* Lagrangian decomposition skipped: high raw component count. *)",
-        "(* E-L equations preserved as-is. hamiltonian_terms left empty. *)",
-        'Print[""];',
-        'Print["Building canonical structure from EOM (fast path)..."];',
-        "",
-        *_wls_volume_element_code(ctx),
-        "",
-        "(* Inject canonical structure — hamiltonian_terms empty (fast path). *)",
-        "canonicalSection = <|",
-        '  "hamiltonian_terms" -> {}',
-        "|>;",
-        "If[sqrtDetGSpatial =!= 1,",
-        '  canonicalSection["volume_element"] = ToString[sqrtDetGSpatial, InputForm]',
-        "];",
-        'jsonStructure["canonical"] = canonicalSection;',
-        "",
-        'Print["Canonical structure (EOM-based, hamiltonian_terms empty) injected."];',
-        'Print["E-L equations preserved (no Hamilton equation injection)."];',
-        'Print[""];',
-        "",
-    ]
-
-
 def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
     """Generate canonical momentum + Hamiltonian computation and JSON injection.
 
-    Two paths:
-
-    **Full path** (component count <= threshold): Decomposes the Lagrangian
-    to component form, computes momenta, Hamiltonian, and inverts K.
-
-    **EOM-based fast path** (component count > threshold): Constructs the
-    canonical structure directly from the already-decomposed EOM, assuming
-    K = I.  Used for high-rank tensors (e.g. rank-3 antisymmetric) where
-    ``DecomposeScalarExpression`` would be prohibitively slow.
+    Always uses the full Legendre-transform path: decomposes the Lagrangian
+    to component form, computes momenta, and builds structured Hamiltonian
+    terms.  This is required for correct coordinate-invariant energy
+    measurement — there is no fallback.
 
     The Lagrangian variable ``{prefix}Lagrangian`` and ``fieldEquations`` must
     already exist in the WLS script context (set by EL/linearization steps).
     """
-    raw_count = _total_raw_component_count(ctx)
-    # Multi-field perturbation systems (Einstein-Maxwell, etc.): always use
-    # the fast path to avoid a redundant second Lagrangian decomposition that
-    # doubles peak memory.  The EOM-based path produces empty hamiltonian_terms,
-    # which is valid for E-L velocity form.
-    has_matter_perts = bool(
-        ctx.linearization and ctx.linearization.get("matter_perturbations")
-    )
-    # Plane-wave reduction changes the surviving field set (adds transverse
-    # constraints, eliminates zero-equation fields) which breaks the 4D
-    # Hamiltonian parsing in ParseHamiltonianExpression.  Use the fast path
-    # (empty hamiltonian_terms) — energy is computed from equations instead.
-    has_plane_wave = ctx.reduction is not None
-    if raw_count > _LAGRANGIAN_DECOMPOSE_THRESHOLD or has_matter_perts or has_plane_wave:
-        return _wls_canonical_from_eom(ctx)
-
     _, all_heads_str = _canonical_field_heads(ctx)
 
     lines: list[str] = _wls_canonical_hamiltonian(ctx, all_heads_str)
@@ -2619,6 +2534,14 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
             "(* === E-L Velocity Form: Inject Canonical Structure === *)",
             "(* E-L equations are preserved as-is in equations[] array. *)",
             "(* Only hamiltonian_terms are injected for energy measurement. *)",
+            "",
+            "(* Validate that Hamiltonian computation succeeded *)",
+            "If[!ListQ[hamiltonianTerms] || Length[hamiltonianTerms] === 0,",
+            '  Print["ERROR: Canonical Hamiltonian computation produced no terms."];',
+            '  Print["This is required for correct energy measurement."];',
+            '  Print["Check that the Lagrangian has quadratic kinetic terms."];',
+            "  Exit[1]",
+            "];",
             "",
             *_wls_volume_element_code(ctx),
             "",
@@ -2722,7 +2645,6 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
     lines.extend(
         (
             "jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];",
-            "Clear[fieldEquations]; Share[];",
             "",
         )
     )
@@ -2738,12 +2660,15 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
         )
 
     # Canonical momentum + Hamiltonian pipeline (Phase K)
-    # Must run after jsonStructure is built (needs allCompNames from fieldEquations)
-    # and before JSON export. Runs for ALL theories that have a Lagrangian
-    # (including linearization, where {prefix}Lagrangian = L^(2)).
-    # Only skip for legacy linearization (no Lagrangian available).
+    # Must run after jsonStructure is built AND while fieldEquations still
+    # exists (the canonical path reads allCompNames from fieldEquations).
+    # Runs for ALL theories that have a Lagrangian.
     if ctx.lagrangian_expr:
         lines.extend(_wls_canonical_pipeline(ctx))
+
+    # Free fieldEquations now that both JSON structure and canonical
+    # pipeline have finished using it.
+    lines.extend(("Clear[fieldEquations]; Share[];", ""))
 
     # Export
     escaped_output = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')

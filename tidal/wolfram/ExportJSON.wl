@@ -1404,11 +1404,14 @@ ParseSingleHamiltonianTerm[term_, fieldHeads_List, allFieldNames_List] := Module
   factorB = ClassifyHamiltonianFactor[fieldFactors[[2]], allFieldNames];
 
   (* Build result *)
-  Module[{result, coordDeps},
+  Module[{result, coordDeps, termClass},
+    (* Classify as self-energy or interaction based on base field *)
+    termClass = If[factorA["field"] === factorB["field"], "self", "interaction"];
     result = <|
       "coefficient" -> numCoeff,
       "factor_a" -> factorA,
-      "factor_b" -> factorB
+      "factor_b" -> factorB,
+      "term_class" -> termClass
     |>;
     If[symbolicCoeff =!= Null,
       result["coefficient_symbolic"] = symbolicCoeff;
