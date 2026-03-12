@@ -1316,7 +1316,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     if not matter_pert_info:
         # --- Single-field linearization (metric only, original path) ---
-        assert has_metric_pert
+        if not has_metric_pert:
+            msg = "Single-field linearization requires metric perturbation"
+            raise RuntimeError(msg)
         lines.extend(
             [
                 "(* Vary L^(2) with respect to perturbation field H *)",
@@ -3683,8 +3685,6 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
     try:
         ret = _run_wolframscript(tmp_path)
     finally:
-        import shutil as _shutil
-        _shutil.copy2(tmp_path, "/tmp/tidal_last_derive.wls")  # DEBUG: preserve for inspection
         tmp_path.unlink(missing_ok=True)
 
     # Use resolved output path from cache check above

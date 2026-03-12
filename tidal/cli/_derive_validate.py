@@ -146,6 +146,29 @@ def _validate_fields(config: dict[str, Any]) -> None:
         _validate_single_field(field, i, dim)
 
 
+def _validate_constants(config: dict[str, Any]) -> None:
+    """Validate optional [constants] section of TOML config.
+
+    Constant names flow directly into Wolfram ``DefConstantSymbol[name]``
+    calls, so they must be valid Wolfram identifiers (alphanumeric,
+    starting with a letter, no underscores).
+
+    Raises
+    ------
+    ValueError
+        If a constant name is not a valid identifier.
+    """
+    names: list[str] = config.get("constants", {}).get("names", [])
+    for name in names:
+        if not _VALID_FIELD_NAME.match(name):
+            msg = (
+                f"Constant name '{name}' must be alphanumeric starting with "
+                f"a letter (no underscores — Mathematica parses X_Y as "
+                f"Pattern[X, Blank[Y]])"
+            )
+            raise ValueError(msg)
+
+
 def _validate_lagrangian(config: dict[str, Any]) -> None:
     """Validate [lagrangian] section of TOML config.
 
@@ -741,6 +764,7 @@ def _validate_config(config: dict[str, Any]) -> None:  # type: ignore[reportUnus
 
     _validate_spacetime(config)
     _validate_fields(config)
+    _validate_constants(config)
     _validate_derived_fields(config)
     _validate_background_fields(config)
     if has_lagrangian:
