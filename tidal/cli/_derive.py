@@ -1887,7 +1887,7 @@ def _wls_plane_wave_reduction_lagrangian(ctx: _WlsContext) -> list[str]:
     for c in killed:
         slot = coords.index(c) + 1  # 1-indexed Wolfram slot
         rules.append(
-            f"  Derivative[ords__][f_][args___] /; {{ords}}[[{slot}]] > 0 :> 0"
+            f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot} && {{ords}}[[{slot}]] > 0 :> 0"
         )
 
     p = ctx.prefix
@@ -1932,8 +1932,10 @@ def _wls_plane_wave_reduction_equations(ctx: _WlsContext) -> list[str]:
     rules: list[str] = []
     for c in killed:
         slot = coords.index(c) + 1
+        # Guard: short-arity derivatives (e.g. {2,0} in 3+1D) must not
+        # index beyond their length — Mathematica emits Part::partw.
         rules.append(
-            f"  Derivative[ords__][f_][args___] /; {{ords}}[[{slot}]] > 0 :> 0"
+            f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot} && {{ords}}[[{slot}]] > 0 :> 0"
         )
 
     lines: list[str] = [
@@ -2754,8 +2756,9 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
         rules: list[str] = []
         for c in killed:
             slot = coords.index(c) + 1
+            # Guard: short-arity derivatives must not index beyond their length
             rules.append(
-                f"  Derivative[ords__][f_][args___] /; {{ords}}[[{slot}]] > 0 :> 0"
+                f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot} && {{ords}}[[{slot}]] > 0 :> 0"
             )
         lines.extend(
             [
