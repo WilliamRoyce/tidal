@@ -41,6 +41,8 @@ import numpy as np
 if TYPE_CHECKING:
     from argparse import Namespace
 
+    from tidal.symbolic.json_loader import EquationSystem
+
 # Measurement types supported by sweep (subset of tidal measure)
 _SWEEP_MEASUREMENTS = frozenset(
     {
@@ -484,13 +486,17 @@ def _simulate_run(  # noqa: PLR0913
     *,
     replicate_seed: int | None = None,
     ic_perturbation: float | None = None,
-) -> tuple[int, float]:
-    """Execute a single simulation and return (exit_code, wall_time_s)."""
+    spec: EquationSystem | None = None,
+) -> tuple[int, float, EquationSystem]:
+    """Execute a single simulation and return (exit_code, wall_time_s, spec).
+
+    Returning the loaded ``EquationSystem`` allows callers to reuse it
+    for measurement without a redundant file read + JSON parse.
+    """
     from tidal.cli._simulate import (
         _parse_params,  # pyright: ignore[reportPrivateUsage]
         _simulate,  # pyright: ignore[reportPrivateUsage]
     )
-    from tidal.symbolic import load_equation_system
 
     sim_args = _build_sim_args(
         base_args,
@@ -500,13 +506,15 @@ def _simulate_run(  # noqa: PLR0913
         replicate_seed=replicate_seed,
         ic_perturbation=ic_perturbation,
     )
-    spec = load_equation_system(spec_path)
+    if spec is None:
+        from tidal.symbolic import load_equation_system
+        spec = load_equation_system(spec_path)
     params = _parse_params(sim_args.param, spec)
 
     t0 = time.monotonic()
     exit_code = _simulate(sim_args, spec, params)
     wall_time = time.monotonic() - t0
-    return exit_code, wall_time
+    return exit_code, wall_time, spec
 
 
 def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
@@ -516,6 +524,7 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
     source: tuple[str, ...] | None,
     target: tuple[str, ...] | None,
     threshold: float,
+    spec: EquationSystem | None = None,
 ) -> dict[str, Any]:
     """Run all requested measurements on an existing simulation output.
 
@@ -539,9 +548,10 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
         _run_velocity,  # pyright: ignore[reportPrivateUsage]
     )
     from tidal.measurement._io import SimulationData
-    from tidal.symbolic import load_equation_system
 
-    spec = load_equation_system(spec_path)
+    if spec is None:
+        from tidal.symbolic import load_equation_system
+        spec = load_equation_system(spec_path)
     data = SimulationData.load(run_dir, spec)
     metrics: dict[str, Any] = {}
 
@@ -725,7 +735,7 @@ def _run_single(  # noqa: PLR0913, PLR0917
     Always includes ``run_status``, ``error_message``, and ``solver_exit_code``.
     """
     # 1. Simulate
-    exit_code, wall_time = _simulate_run(
+    exit_code, wall_time, spec = _simulate_run(
         base_args,
         spec_path,
         param_overrides,
@@ -744,9 +754,10 @@ def _run_single(  # noqa: PLR0913, PLR0917
             "error": "simulation_failed",
         }
 
-    # 2. Measure
+    # 2. Measure (reuse spec from simulate — avoids redundant JSON parse)
     metrics = _measure_run(
-        output_dir, spec_path, measurements, source, target, threshold
+        output_dir, spec_path, measurements, source, target, threshold,
+        spec=spec,
     )
     metrics["wall_time_s"] = round(wall_time, 2)
     metrics["run_status"] = "success"
@@ -845,7 +856,7 @@ def _collect_sim_settings(args: Namespace) -> dict[str, Any]:
     return settings
 
 
-def _execute_sequential(  # noqa: PLR0913, PLR0917
+def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
     args: Namespace,
     spec_path: Path,
     run_plans: list[dict[str, Any]],
@@ -863,6 +874,8 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
 ) -> list[dict[str, Any]]:
     """Execute sweep runs sequentially with incremental saving."""
     total_runs = len(run_plans)
+    # Write CSV every ~5% of runs (min 1), balancing crash recovery vs I/O
+    save_interval = max(1, total_runs // 20)
     rows: list[dict[str, Any]] = []
     run_dirs: list[Path] = [rp["run_dir"] for rp in run_plans]
     sweep_start = time.monotonic()
@@ -972,20 +985,22 @@ def _execute_sequential(  # noqa: PLR0913, PLR0917
         # ETA
         _print_eta(len(rows), total_runs, sweep_start)
 
-        # Incremental save after each run (crash recovery)
-        _save_incremental(
-            output_dir,
-            rows,
-            run_dirs,
-            swept_params,
-            fixed_params,
-            sim_settings,
-            measurements,
-            source,
-            target,
-            spec_path,
-            converge_sizes,
-        )
+        # Incremental save for crash recovery (every save_interval runs
+        # + always after the last run).  Reduces O(N²) I/O for large sweeps.
+        if len(rows) % save_interval == 0 or len(rows) == total_runs:
+            _save_incremental(
+                output_dir,
+                rows,
+                run_dirs,
+                swept_params,
+                fixed_params,
+                sim_settings,
+                measurements,
+                source,
+                target,
+                spec_path,
+                converge_sizes,
+            )
 
     return rows
 
