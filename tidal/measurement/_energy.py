@@ -206,12 +206,13 @@ def _effective_bc(
     return "periodic" if periodic[axis] else "dirichlet"
 
 
-def _apply_spatial_operator(
+def _apply_spatial_operator(  # noqa: PLR0913, PLR0917
     operator: str,
     field: NDArray[np.float64],
     grid_spacing: tuple[float, ...],
     periodic: tuple[bool, ...],
     bc_types: tuple[str, ...] | None = None,
+    grid: object | None = None,
 ) -> NDArray[np.float64]:
     """Apply a named spatial operator to a field array.
 
@@ -224,6 +225,9 @@ def _apply_spatial_operator(
     ----------
     bc_types : tuple[str, ...] | None
         Per-axis BC type.  When ``None``, falls back to ``periodic`` booleans.
+    grid : GridInfo | None
+        Pre-built grid info.  When provided, skips ``_make_grid_info()``
+        reconstruction (avoids redundant allocation per call).
     """
     from tidal.solver.operators import apply_operator as _solver_apply  # noqa: PLC0415
 
@@ -231,7 +235,8 @@ def _apply_spatial_operator(
         return field
 
     bc_spec = _resolve_bc_spec(bc_types, periodic)
-    grid = _make_grid_info(grid_spacing, periodic, field.shape, bc_types)
+    if grid is None:
+        grid = _make_grid_info(grid_spacing, periodic, field.shape, bc_types)
     return _solver_apply(operator, field, grid, bc_spec)  # type: ignore[arg-type]
 
 
@@ -720,6 +725,7 @@ def _evaluate_hamiltonian_factor(
     factor_operator: str,
     data: SimulationData,
     t_idx: int,
+    grid: object | None = None,
 ) -> NDArray[np.float64] | None:
     """Evaluate a single Hamiltonian factor on the grid.
 
@@ -734,6 +740,11 @@ def _evaluate_hamiltonian_factor(
 
     Returns None if the factor cannot be evaluated (e.g., constraint
     field without stored velocity for time_derivative).
+
+    Parameters
+    ----------
+    grid : GridInfo | None
+        Pre-built grid info from context (avoids per-call reconstruction).
     """
     if factor_operator == "time_derivative":
         vel = data.velocities.get(factor_field)
@@ -763,6 +774,7 @@ def _evaluate_hamiltonian_factor(
         data.grid_spacing,
         data.periodic,
         bc_types=data.bc_types,
+        grid=grid,
     )
 
 
@@ -789,6 +801,7 @@ def _gradient_product_density(  # noqa: PLR0913, PLR0917
     grid_spacing: tuple[float, ...],
     periodic: tuple[bool, ...],
     bc_types: tuple[str, ...] | None = None,
+    grid: object | None = None,
 ) -> NDArray[np.float64]:
     """Pointwise density for the gradient inner product ⟨∂_a f, ∂_b g⟩.
 
@@ -824,6 +837,7 @@ def _gradient_product_density(  # noqa: PLR0913, PLR0917
             grid_spacing,
             periodic,
             bc_types=bc_types,
+            grid=grid,
         )
         return -(field_a * operated)
 
@@ -834,6 +848,7 @@ def _gradient_product_density(  # noqa: PLR0913, PLR0917
         grid_spacing,
         periodic,
         bc_types=bc_types,
+        grid=grid,
     )
     grad_b = _apply_spatial_operator(
         op_b,
@@ -841,6 +856,7 @@ def _gradient_product_density(  # noqa: PLR0913, PLR0917
         grid_spacing,
         periodic,
         bc_types=bc_types,
+        grid=grid,
     )
     return grad_a * grad_b
 
@@ -869,7 +885,8 @@ class _HamiltonianContext:
 
     Hoisting these computations out of the per-snapshot loop avoids
     redundant parameter merging, coordinate array construction, volume
-    element evaluation, and per-term coefficient resolution.
+    element evaluation, per-term coefficient resolution, and GridInfo
+    reconstruction.
     """
 
     params: dict[str, float]
@@ -877,6 +894,7 @@ class _HamiltonianContext:
     volume_weight: float | NDArray[np.float64]
     term_coeffs: list[float | NDArray[np.float64]]
     resolve_symbolic: Callable[..., float | None]
+    grid_info: object | None = None  # GridInfo, typed as object to avoid import
 
 
 def _prepare_hamiltonian_context(data: SimulationData) -> _HamiltonianContext:
@@ -932,12 +950,22 @@ def _prepare_hamiltonian_context(data: SimulationData) -> _HamiltonianContext:
                     coeff = float(resolved)
         term_coeffs.append(coeff)
 
+    # Pre-build GridInfo once (avoids reconstruction per operator call)
+    grid_info = None
+    if data.fields:
+        first_field = next(iter(data.fields.values()))
+        field_shape = first_field[0].shape  # spatial shape from first snapshot
+        grid_info = _make_grid_info(
+            data.grid_spacing, data.periodic, field_shape, data.bc_types
+        )
+
     return _HamiltonianContext(
         params=params,
         coord_arrays=coord_arrays,
         volume_weight=volume_weight,
         term_coeffs=term_coeffs,
         resolve_symbolic=_resolve_symbolic_coeff,
+        grid_info=grid_info,
     )
 
 
@@ -992,25 +1020,33 @@ def _compute_hamiltonian_from_canonical(
     volume_weight = ctx.volume_weight
 
     total = 0.0
+    grid = ctx.grid_info
     for term_idx, term in enumerate(canonical.hamiltonian_terms):
         contrib = _evaluate_single_hamiltonian_term(
-            term, ctx.term_coeffs[term_idx], volume_weight, data, t_idx
+            term, ctx.term_coeffs[term_idx], volume_weight, data, t_idx,
+            grid=grid,
         )
         total += contrib
 
     return total
 
 
-def _evaluate_single_hamiltonian_term(
+def _evaluate_single_hamiltonian_term(  # noqa: PLR0913, PLR0917
     term: HamiltonianTerm,
     coeff: float | NDArray[np.float64],
     volume_weight: float | NDArray[np.float64],
     data: SimulationData,
     t_idx: int,
+    grid: object | None = None,
 ) -> float:
     """Evaluate a single Hamiltonian term's contribution to energy density.
 
     Returns the spatially-averaged contribution ``⟨coeff * f_a * f_b * √|g|⟩``.
+
+    Parameters
+    ----------
+    grid : GridInfo | None
+        Pre-built grid info from context (avoids per-call reconstruction).
     """
     op_a = term.factor_a.operator
     op_b = term.factor_b.operator
@@ -1030,6 +1066,7 @@ def _evaluate_single_hamiltonian_term(
             data.grid_spacing,
             data.periodic,
             bc_types=data.bc_types,
+            grid=grid,
         )
         return float((coeff * density * volume_weight).mean())
 
@@ -1051,12 +1088,14 @@ def _evaluate_single_hamiltonian_term(
         term.factor_a.operator,
         data,
         t_idx,
+        grid=grid,
     )
     fb = _evaluate_hamiltonian_factor(
         term.factor_b.field,
         term.factor_b.operator,
         data,
         t_idx,
+        grid=grid,
     )
     if fa is None or fb is None:
         return 0.0
@@ -1107,12 +1146,14 @@ def _compute_hamiltonian_per_field(
         ctx = _prepare_hamiltonian_context(data)
 
     volume_weight = ctx.volume_weight
+    grid = ctx.grid_info
     per_field: dict[str, float] = {}
     interaction = 0.0
 
     for term_idx, term in enumerate(canonical.hamiltonian_terms):
         contrib = _evaluate_single_hamiltonian_term(
-            term, ctx.term_coeffs[term_idx], volume_weight, data, t_idx
+            term, ctx.term_coeffs[term_idx], volume_weight, data, t_idx,
+            grid=grid,
         )
         if term.is_self_energy:
             base = term.base_field_a
