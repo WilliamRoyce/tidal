@@ -604,15 +604,10 @@ class CanonicalStructure:
         volume element.  ``None`` for flat (Minkowski) spacetimes where
         the volume element is 1.  Used by energy measurement to weight
         the Hamiltonian density before spatial integration.
-    wolfram_constraint_elimination : bool
-        Whether constraint fields were eliminated in Wolfram before the
-        Legendre transform (exact symbolic algebra), or whether Python
-        post-processing is needed (string-algebra fallback).
     """
 
     hamiltonian_terms: tuple[HamiltonianTerm, ...]
     volume_element: str | None = None
-    wolfram_constraint_elimination: bool = False
 
     @classmethod
     def from_dict(cls, data: Mapping[str, Any]) -> CanonicalStructure:
@@ -632,11 +627,9 @@ class CanonicalStructure:
             raise ValueError(msg)
         h_terms = tuple(HamiltonianTerm.from_dict(t) for t in data["hamiltonian_terms"])
         vol_elem = data.get("volume_element")  # None for flat spacetimes
-        wolfram_elim = data.get("wolfram_constraint_elimination", False)
         return cls(
             hamiltonian_terms=h_terms,
             volume_element=vol_elem,
-            wolfram_constraint_elimination=wolfram_elim,
         )
 
 

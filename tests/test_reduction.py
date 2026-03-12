@@ -1176,6 +1176,55 @@ class TestEliminateDegenerateConstraints:
                         f"laplacian_x({term['field']})"
                     )
 
+    def test_hamiltonian_terms_untouched(self) -> None:
+        """Hamiltonian terms are not modified by Python elimination.
+
+        Wolfram handles Hamiltonian constraint substitution at derivation
+        time — Python only eliminates from EOM equations.
+        """
+        spec = _make_traceless_constraint_spec()
+        # Add canonical section with Hamiltonian terms referencing eliminated fields
+        h_terms = [
+            {
+                "coefficient": 0.5,
+                "coefficient_symbolic": "1/2",
+                "factor_a": {"field": "h_4", "operator": "identity"},
+                "factor_b": {"field": "h_4", "operator": "identity"},
+                "term_class": "self",
+            },
+            {
+                "coefficient": -0.5,
+                "coefficient_symbolic": "-1/2",
+                "factor_a": {"field": "h_9", "operator": "identity"},
+                "factor_b": {"field": "h_7", "operator": "identity"},
+                "term_class": "interaction",
+            },
+        ]
+        spec["canonical"] = {"hamiltonian_terms": h_terms}
+        result = eliminate_degenerate_constraints(spec)
+
+        # Hamiltonian terms must be identical (Python does not touch them)
+        result_h = result["canonical"]["hamiltonian_terms"]
+        assert len(result_h) == len(h_terms)
+        for orig, res in zip(h_terms, result_h):
+            assert orig["coefficient"] == res["coefficient"]
+            assert orig["factor_a"]["field"] == res["factor_a"]["field"]
+            assert orig["factor_b"]["field"] == res["factor_b"]["field"]
+
+    def test_metadata_merges_wolfram_eliminations(self) -> None:
+        """Metadata includes fields eliminated by both Python and Wolfram."""
+        spec = _make_traceless_constraint_spec()
+        spec["canonical"] = {
+            "hamiltonian_terms": [],
+            "wolfram_constraint_elimination": True,
+            "eliminated_from_canonical": ["h_6", "h_8"],
+        }
+        result = eliminate_degenerate_constraints(spec)
+        elim = result["metadata"]["constraint_elimination"]["eliminated_fields"]
+        # Should contain Python-eliminated fields AND Wolfram-eliminated fields
+        assert "h_6" in elim
+        assert "h_8" in elim
+
 
 # ---------------------------------------------------------------------------
 # Gradient-zero constraint elimination
