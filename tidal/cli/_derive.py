@@ -2420,6 +2420,224 @@ def _field_component_count(field: dict[str, Any], dim: int) -> int:
     return dim**rank
 
 
+def _wls_constraint_elimination() -> list[str]:
+    """Generate Wolfram code to detect and eliminate constraint fields.
+
+    Detects two constraint types in ``fieldEquations``:
+
+    1. **Gradient-zero**: equation where the RHS is a single spatial
+       derivative of the equation's own field (no time derivatives, no
+       cross-field terms).  With periodic/Neumann BCs and zero IC,
+       ``gradient(f) = 0`` implies ``f = 0``.
+
+    2. **Degenerate algebraic**: equation with ``lhsTimeOrder = 0`` where
+       the identity coefficient of the self-field sums to ≈ 1.0, meaning
+       the field cancels from both sides.  The residual constraint
+       ``0 = Σ c_i * other_i`` is solved for the field with largest
+       |coefficient| (dep_field), and both the equation's own field
+       AND dep_field are eliminated.
+
+    Substitutes detected constraints into ``lagComp`` using Mathematica's
+    exact symbolic algebra — replacing the fragile Python string-algebra
+    post-processing in ``reduction.py``.  Also filters ``fieldEquations``
+    to exclude eliminated fields (affects ``allCompNames`` downstream).
+
+    Emits a warning if a nonlinear constraint is detected (cannot happen
+    in the linearized regime but aids debugging for pipeline extensions).
+
+    Requires ``compToFunc``, ``fieldFuncList``, ``coordSyms``, and
+    ``lagComp`` to be defined in the Wolfram session.  Sets
+    ``eliminatedFromCanonical`` (list of eliminated field names).
+    """
+    return [
+        "",
+        "(* === Constraint Elimination (Wolfram-side) === *)",
+        "(* Detect and eliminate constraint fields from lagComp and          *)",
+        "(* fieldEquations BEFORE the Legendre transform, so the Hamiltonian *)",
+        "(* is computed for surviving fields only with exact symbolic         *)",
+        "(* coefficients.  Replaces fragile Python string-algebra in          *)",
+        "(* reduction.py:_substitute_hamiltonian_constraints().               *)",
+        'Print[""];',
+        'Print["Detecting constraint fields for Hamiltonian elimination..."];',
+        "",
+        "(* Phase 1: Gradient-zero constraints *)  ",
+        "(* Equations where RHS is spatial derivative of own field only. *)",
+        "(* With periodic BCs + zero IC: gradient(f)=0 => f=0.          *)",
+        "gradZeroFields = {};",
+        "Do[",
+        "  Module[{name, eq, ownHead},",
+        "    name = fieldEquations[[k, 1]];",
+        "    eq = fieldEquations[[k, 2]];",
+        "    ownHead = compToFunc[name];",
+        "    (* Skip if has time derivatives *)",
+        "    If[!FreeQ[eq, Derivative[n_, ___][_][___] /; n >= 1], Continue[]];",
+        "    (* Skip if references other fields *)",
+        "    If[!FreeQ[eq,",
+        "         f_Symbol[___] /; MemberQ[fieldFuncList, f] && f =!= ownHead],",
+        "       Continue[]];",
+        "    (* Must have spatial derivatives of own field *)",
+        "    If[!FreeQ[eq, Derivative[0, __][ownHead][___]],",
+        "      AppendTo[gradZeroFields, name]",
+        "    ]",
+        "  ],",
+        "  {k, Length[fieldEquations]}",
+        "];",
+        "",
+        "(* Phase 2: Degenerate algebraic constraints *)",
+        "(* When selfCoeff ~ 1.0, the equation's own field cancels from    *)",
+        "(* both sides, leaving a residual constraint among OTHER fields.   *)",
+        "(* Solve for the dep field with largest |coefficient| and          *)",
+        "(* eliminate both the equation field AND the dep field.            *)",
+        "(* Example: h_9 = h_4 + h_7 + h_9 => 0 = h_4 + h_7 => h_4=-h_7 *)",
+        "(* Warns if nonlinear constraint detected (cannot happen in       *)",
+        "(* linearized regime — quadratic L => linear PDEs).               *)",
+        "degenerateEqFields = {};",
+        "algebraicDepFields = <||>;",
+        "Do[",
+        "  Module[{name, eq, ownHead, selfCoeff, otherExpr,",
+        "          otherHeads, depHead, depCoeff, depName, remainExpr},",
+        "    name = fieldEquations[[k, 1]];",
+        "    eq = fieldEquations[[k, 2]];",
+        "    ownHead = compToFunc[name];",
+        "    If[MemberQ[gradZeroFields, name], Continue[]];",
+        "    (* Must be purely algebraic — no derivatives at all *)",
+        "    If[!FreeQ[eq, Derivative[__][_][___]], Continue[]];",
+        "",
+        "    (* Nonlinearity check: warn if field products detected *)",
+        "    If[!FreeQ[eq, Power[f_Symbol[___], n_Integer] /;",
+        "          n >= 2 && MemberQ[fieldFuncList, f]],",
+        '      Print["WARNING: Nonlinear constraint for ", name,',
+        '        ". Constraint elimination assumes linear equations ",',
+        '        "(quadratic Lagrangian). Skipping."];',
+        "      Continue[]",
+        "    ];",
+        "",
+        "    (* Extract coefficient of identity(self) *)",
+        "    selfCoeff = Coefficient[eq, ownHead[Sequence @@ coordSyms]];",
+        "    If[Abs[N[selfCoeff] - 1.0] > 10^-12, Continue[]];",
+        "",
+        "    (* Self cancels.  Residual constraint: 0 = otherExpr *)",
+        "    otherExpr = eq - selfCoeff * ownHead[Sequence @@ coordSyms];",
+        "    If[otherExpr === 0, Continue[]];  (* trivial identity *)",
+        "",
+        "    AppendTo[degenerateEqFields, name];",
+        "",
+        "    (* Find field heads in the residual constraint *)",
+        "    otherHeads = Select[fieldFuncList,",
+        "      !FreeQ[otherExpr, #] && # =!= ownHead &];",
+        "    If[Length[otherHeads] == 0, Continue[]];",
+        "",
+        "    (* Pick dep field: largest |coefficient| for stability *)",
+        "    depHead = First[SortBy[otherHeads,",
+        "      -Abs[Coefficient[otherExpr,",
+        "        #[Sequence @@ coordSyms]]] &]];",
+        "    depCoeff = Coefficient[otherExpr,",
+        "      depHead[Sequence @@ coordSyms]];",
+        "    If[Abs[N[depCoeff]] < 10^-12, Continue[]];",
+        "",
+        "    (* Find the component name for depHead *)",
+        "    depName = First[Select[Keys[compToFunc],",
+        "      compToFunc[#] === depHead &]];",
+        "",
+        "    (* Solve: depHead = -(remainExpr)/depCoeff *)",
+        "    remainExpr = otherExpr -",
+        "      depCoeff * depHead[Sequence @@ coordSyms];",
+        "    algebraicDepFields[depName] = -remainExpr / depCoeff",
+        "  ],",
+        "  {k, Length[fieldEquations]}",
+        "];",
+        "",
+        "(* Build the full list of eliminated fields *)",
+        "eliminatedFromCanonical = Join[gradZeroFields,",
+        "  degenerateEqFields, Keys[algebraicDepFields]];",
+        "(* Remove duplicates (dep field might also be an eq field) *)",
+        "eliminatedFromCanonical = DeleteDuplicates[eliminatedFromCanonical];",
+        "",
+        "If[Length[eliminatedFromCanonical] > 0,",
+        "  Module[{zeroRules, algRules, allSubRules,",
+        "          newLagComp, newFieldEqs},",
+        "",
+        "    (* Zero rules: gradient-zero + degenerate-eq fields -> 0 *)",
+        "    zeroRules = Flatten[Table[",
+        "      {compToFunc[name][___] -> 0,",
+        "       Derivative[__][compToFunc[name]][___] -> 0},",
+        "      {name, Join[gradZeroFields, degenerateEqFields]}",
+        "    ]];",
+        "",
+        "    (* Algebraic rules: dep fields -> linear combination.     *)",
+        "    (* Extract ALL derivative orders from lagComp for each     *)",
+        "    (* eliminated head, then create explicit rules using D[].  *)",
+        "    algRules = {};",
+        "    Do[",
+        "      Module[{head, subExpr, derivOrders},",
+        "        head = compToFunc[depName];",
+        "        subExpr = algebraicDepFields[depName];",
+        "",
+        "        (* Identity rule *)",
+        "        AppendTo[algRules,",
+        "          head[Sequence @@ coordSyms] -> subExpr];",
+        "",
+        "        (* Find all derivative orders for this head in lagComp *)",
+        "        derivOrders = DeleteDuplicates[Cases[lagComp,",
+        "          Derivative[ords__][head][___] :> {ords}, Infinity]];",
+        "",
+        "        (* Also scan fieldEquations for derivative patterns *)",
+        "        derivOrders = DeleteDuplicates[Join[derivOrders,",
+        "          Cases[fieldEquations,",
+        "            Derivative[ords__][head][___] :> {ords},",
+        "            Infinity]",
+        "        ]];",
+        "",
+        "        (* Filter: only keep orders matching coordinate count *)",
+        "        derivOrders = Select[derivOrders,",
+        "          Length[#] == Length[coordSyms] &];",
+        "",
+        "        (* Explicit rule for each derivative order *)",
+        "        Do[",
+        "          AppendTo[algRules,",
+        "            Derivative[Sequence @@ dOrd][head][",
+        "              Sequence @@ coordSyms] ->",
+        "            D[subExpr, Sequence @@ MapThread[",
+        "              {#1, #2} &, {coordSyms, dOrd}]]",
+        "          ],",
+        "          {dOrd, derivOrders}",
+        "        ]",
+        "      ],",
+        "      {depName, Keys[algebraicDepFields]}",
+        "    ];",
+        "",
+        "    allSubRules = Join[zeroRules, algRules];",
+        "",
+        "    (* Substitute in lagComp — no Expand, let Legendre handle *)",
+        "    newLagComp = lagComp /. allSubRules;",
+        "    lagComp = newLagComp;",
+        "",
+        "    (* Filter fieldEquations to surviving fields only *)",
+        "    newFieldEqs = Select[fieldEquations,",
+        "      !MemberQ[eliminatedFromCanonical, #[[1]]] &];",
+        "",
+        "    (* Substitute constraint expressions in surviving eqs *)",
+        "    fieldEquations = Table[",
+        "      {newFieldEqs[[k, 1]],",
+        "       Expand[newFieldEqs[[k, 2]] /. allSubRules]},",
+        "      {k, Length[newFieldEqs]}",
+        "    ];",
+        "",
+        "    (* Update field function list *)",
+        "    fieldFuncList = Select[fieldFuncList,",
+        "      !MemberQ[compToFunc /@ eliminatedFromCanonical, #] &];",
+        "",
+        '    Print["Eliminated from canonical: ",',
+        '      Length[eliminatedFromCanonical], " field(s): ",',
+        "      eliminatedFromCanonical];",
+        "  ],",
+        "",
+        '  Print["No constraint fields detected."];',
+        "];",
+        "",
+    ]
+
+
 def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str]:
     """Generate WLS code to compute H via component-level Legendre transform.
 
@@ -2555,6 +2773,22 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
         n_comps = _field_component_count(field, ctx.dim)
         lines.extend(f'compToFunc["{fname}_{j}"] = {head}{j};' for j in range(n_comps))
 
+    # Build field function list early — needed by constraint elimination
+    # and IBP (was previously only built for IBP).
+    lines.extend(
+        [
+            "",
+            "fieldFuncList = Values[compToFunc];",
+        ]
+    )
+
+    # --- Constraint elimination in Lagrangian ---
+    # Detect gradient-zero and degenerate algebraic constraints in
+    # fieldEquations, and substitute into lagComp using Mathematica's
+    # exact symbolic algebra.  This replaces the fragile Python
+    # string-algebra post-processing in reduction.py.
+    lines.extend(_wls_constraint_elimination())
+
     # --- Integration by parts on time variable ---
     # The Ricci scalar R contains second derivatives of the metric (∂²g),
     # so the linearized Lagrangian L^(2) has terms like h·∂²_t h.  The
@@ -2574,7 +2808,6 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
             "(* time variable converts f*d^2_t g -> -(d_t f)*(d_t g), the component- *)",
             "(* level analogue of the Gibbons-Hawking-York boundary term.             *)",
             "(* Ref: Gibbons & Hawking (1977, Phys. Rev. D 15, 2752)                 *)",
-            "fieldFuncList = Values[compToFunc];",
             "tVar = coordSyms[[1]];",
             "",
             "(* IBP helper: for a single additive term, find the factor with          *)",
@@ -2782,6 +3015,11 @@ def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
             "(* Only include volume_element when non-trivial (curved coordinates) *)",
             "If[sqrtDetGSpatial =!= 1,",
             '  canonicalSection["volume_element"] = ToString[sqrtDetGSpatial, InputForm]',
+            "];",
+            "(* Record Wolfram-side constraint elimination *)",
+            "If[Length[eliminatedFromCanonical] > 0,",
+            '  canonicalSection["wolfram_constraint_elimination"] = True;',
+            '  canonicalSection["eliminated_from_canonical"] = eliminatedFromCanonical',
             "];",
             'jsonStructure["canonical"] = canonicalSection;',
             "",

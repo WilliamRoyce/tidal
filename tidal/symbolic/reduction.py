@@ -732,16 +732,42 @@ def _substitute_hamiltonian_constraints(
       expand the quadratic term.  If ``field = Σ c_i target_i``, then a term
       ``C * field:op × other:op'`` becomes ``Σ C*c_i * target_i:op × other:op'``.
 
-    Substitutions are applied in elimination order so that cascading
-    dependencies (e.g. h_9 → f(h_4), then h_4 → 0) are resolved correctly.
+    Substitutions are applied in elimination order.  Cascading dependencies
+    (e.g. h_9 → f(h_4, h_7), h_4 → 0) are resolved by pre-simplifying each
+    substitution: targets that are themselves eliminated are replaced before
+    the substitution is applied.
     """
     result = list(terms)
 
+    # Pre-resolve cascading substitutions: if a target was previously eliminated,
+    # apply that elimination to the current substitution.
+    resolved_subs: dict[str, dict[str, float]] = {}
     for field in elimination_order:
         if field not in substitutions:
             continue
+        sub = dict(substitutions[field])
+        # Resolve targets that were previously eliminated
+        for prev_field in elimination_order:
+            if prev_field == field:
+                break  # only look at earlier eliminations
+            if prev_field not in sub:
+                continue
+            prev_sub = resolved_subs.get(prev_field, {})
+            c_prev = sub.pop(prev_field)
+            if prev_sub:
+                # prev_field = Σ c_j * target_j → substitute into current
+                for target, c_target in prev_sub.items():
+                    sub[target] = sub.get(target, 0.0) + c_prev * c_target
+            # else: prev_field → 0, so just removing it is correct
+        # Remove near-zero entries
+        sub = {k: v for k, v in sub.items() if abs(v) > 1e-12}
+        resolved_subs[field] = sub
 
-        sub = substitutions[field]
+    for field in elimination_order:
+        if field not in resolved_subs:
+            continue
+
+        sub = resolved_subs[field]
         if not sub:
             # Zero substitution: drop terms containing this field
             result = [
@@ -1034,8 +1060,12 @@ def eliminate_degenerate_constraints(  # noqa: C901, PLR0912, PLR0914, PLR0915
     _filter_coupling_matrices(result, surviving_original_indices)
 
     # Phase 4: Substitute constraints into hamiltonian terms
+    # Skip if Wolfram already handled elimination (exact symbolic algebra).
+    # For newly derived specs, the Hamiltonian was computed for surviving
+    # fields only — no Python string-algebra needed.
     canonical = result.get("canonical", {})
-    if "hamiltonian_terms" in canonical:
+    wolfram_handled = canonical.get("wolfram_constraint_elimination", False)
+    if "hamiltonian_terms" in canonical and not wolfram_handled:
         canonical["hamiltonian_terms"] = _substitute_hamiltonian_constraints(
             canonical["hamiltonian_terms"],
             elim_substitutions,
