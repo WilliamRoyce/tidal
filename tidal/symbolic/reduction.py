@@ -716,6 +716,137 @@ def _substitute_in_terms(  # noqa: C901
     return [t for t in merged.values() if abs(t["coefficient"]) > _ZERO_TOL]
 
 
+def _substitute_hamiltonian_constraints(
+    terms: list[dict[str, Any]],
+    substitutions: dict[str, dict[str, float]],
+    elimination_order: list[str],
+) -> list[dict[str, Any]]:
+    """Substitute constraint expressions into Hamiltonian terms.
+
+    Each Hamiltonian term has the form ``coeff * field_a:op_a × field_b:op_b``.
+    When a field is eliminated by a constraint:
+
+    - **Zero substitution** (``substitutions[field] == {}``): drop any term
+      referencing the field (same as old filter behavior).
+    - **Algebraic substitution** (``substitutions[field] == {target: c, ...}``):
+      expand the quadratic term.  If ``field = Σ c_i target_i``, then a term
+      ``C * field:op × other:op'`` becomes ``Σ C*c_i * target_i:op × other:op'``.
+
+    Substitutions are applied in elimination order so that cascading
+    dependencies (e.g. h_9 → f(h_4), then h_4 → 0) are resolved correctly.
+    """
+    result = list(terms)
+
+    for field in elimination_order:
+        if field not in substitutions:
+            continue
+
+        sub = substitutions[field]
+        if not sub:
+            # Zero substitution: drop terms containing this field
+            result = [
+                ht
+                for ht in result
+                if ht.get("factor_a", {}).get("field") != field
+                and ht.get("factor_b", {}).get("field") != field
+            ]
+            continue
+
+        # Algebraic substitution: field = Σ c_i * target_i
+        expanded: list[dict[str, Any]] = []
+        for ht in result:
+            fa = ht.get("factor_a", {})
+            fb = ht.get("factor_b", {})
+            fa_field = fa.get("field", "")
+            fb_field = fb.get("field", "")
+            a_match = fa_field == field
+            b_match = fb_field == field
+
+            if not a_match and not b_match:
+                expanded.append(ht)
+                continue
+
+            # Expand: for each target in the substitution, create a new term
+            if a_match and not b_match:
+                for target, c in sub.items():
+                    new_ht = copy.deepcopy(ht)
+                    new_ht["factor_a"]["field"] = target
+                    new_ht["coefficient"] = ht["coefficient"] * c
+                    # Update coefficient_symbolic (approximate — multiply by c)
+                    if "coefficient_symbolic" in new_ht and c != 1.0:
+                        old_sym = new_ht["coefficient_symbolic"]
+                        new_ht["coefficient_symbolic"] = (
+                            f"{c}*({old_sym})" if c != -1.0 else f"-({old_sym})"
+                        )
+                    # Update term_class: if target == fb_field, it's now "self"
+                    if target == fb_field:
+                        new_ht["term_class"] = "self"
+                    expanded.append(new_ht)
+
+            elif b_match and not a_match:
+                for target, c in sub.items():
+                    new_ht = copy.deepcopy(ht)
+                    new_ht["factor_b"]["field"] = target
+                    new_ht["coefficient"] = ht["coefficient"] * c
+                    if "coefficient_symbolic" in new_ht and c != 1.0:
+                        old_sym = new_ht["coefficient_symbolic"]
+                        new_ht["coefficient_symbolic"] = (
+                            f"{c}*({old_sym})" if c != -1.0 else f"-({old_sym})"
+                        )
+                    if fa_field == target:
+                        new_ht["term_class"] = "self"
+                    expanded.append(new_ht)
+
+            else:
+                # Both factors match the eliminated field
+                # field:op × field:op → (Σ c_i target_i):op × (Σ c_j target_j):op
+                for t1, c1 in sub.items():
+                    for t2, c2 in sub.items():
+                        new_ht = copy.deepcopy(ht)
+                        new_ht["factor_a"]["field"] = t1
+                        new_ht["factor_b"]["field"] = t2
+                        new_ht["coefficient"] = ht["coefficient"] * c1 * c2
+                        if "coefficient_symbolic" in new_ht:
+                            old_sym = new_ht["coefficient_symbolic"]
+                            factor = c1 * c2
+                            if factor != 1.0:
+                                new_ht["coefficient_symbolic"] = (
+                                    f"{factor}*({old_sym})"
+                                    if factor != -1.0
+                                    else f"-({old_sym})"
+                                )
+                        new_ht["term_class"] = (
+                            "self" if t1 == t2 else "interaction"
+                        )
+                        expanded.append(new_ht)
+
+        result = expanded
+
+    # Merge terms with identical (field_a, op_a, field_b, op_b) signatures
+    merged: dict[tuple[str, str, str, str], dict[str, Any]] = {}
+    for ht in result:
+        fa = ht.get("factor_a", {})
+        fb = ht.get("factor_b", {})
+        key = (
+            fa.get("field", ""),
+            fa.get("operator", ""),
+            fb.get("field", ""),
+            fb.get("operator", ""),
+        )
+        if key in merged:
+            merged[key]["coefficient"] += ht["coefficient"]
+            # Symbolic: concatenate (approximate)
+            if "coefficient_symbolic" in merged[key] and "coefficient_symbolic" in ht:
+                merged[key]["coefficient_symbolic"] = (
+                    f"({merged[key]['coefficient_symbolic']}) + ({ht['coefficient_symbolic']})"
+                )
+        else:
+            merged[key] = ht
+
+    # Remove near-zero terms
+    return [ht for ht in merged.values() if abs(ht["coefficient"]) > 1e-12]
+
+
 def eliminate_degenerate_constraints(  # noqa: C901, PLR0912, PLR0914, PLR0915
     spec_data: dict[str, Any],
 ) -> dict[str, Any]:
@@ -741,6 +872,10 @@ def eliminate_degenerate_constraints(  # noqa: C901, PLR0912, PLR0914, PLR0915
     result = copy.deepcopy(spec_data)
     equations: list[dict[str, Any]] = result.get("equations", [])
     eliminated: list[str] = []
+    # Track substitution rules for Hamiltonian update:
+    #   field → {} means field = 0 (gradient-zero)
+    #   field → {"h_7": -1.0, ...} means field = -1*h_7 + ... (algebraic)
+    elim_substitutions: dict[str, dict[str, float]] = {}
 
     # Build original field name → index map for coupling matrix filtering
     original_field_names = [f["name"] for f in result.get("fields", [])]
@@ -791,6 +926,7 @@ def eliminate_degenerate_constraints(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
             equations = new_equations
             eliminated.append(zero_field)
+            elim_substitutions[zero_field] = {}  # field → 0
 
         # --- Degenerate constraint elimination (second pass per round) ---
         while True:
@@ -813,6 +949,7 @@ def eliminate_degenerate_constraints(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     eq for eq in equations if eq["field"] != constraint_eq_field
                 ]
                 eliminated.append(constraint_eq_field)
+                elim_substitutions[constraint_eq_field] = {}  # removed equation
                 break  # restart both loops
 
             # Build velocity substitution: v_{dep_field} → Σ coeff * v_{target}
@@ -848,6 +985,7 @@ def eliminate_degenerate_constraints(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
             equations = new_equations
             eliminated.append(dep_field)
+            elim_substitutions[dep_field] = dict(substitution)
 
             # Also track the constraint equation field if it disappeared
             if constraint_eq_field != dep_field and constraint_eq_field not in {
@@ -895,15 +1033,14 @@ def eliminate_degenerate_constraints(  # noqa: C901, PLR0912, PLR0914, PLR0915
     ]
     _filter_coupling_matrices(result, surviving_original_indices)
 
-    # Phase 4: Filter hamiltonian terms
+    # Phase 4: Substitute constraints into hamiltonian terms
     canonical = result.get("canonical", {})
     if "hamiltonian_terms" in canonical:
-        canonical["hamiltonian_terms"] = [
-            ht
-            for ht in canonical["hamiltonian_terms"]
-            if ht.get("factor_a", {}).get("field") not in elim_set
-            and ht.get("factor_b", {}).get("field") not in elim_set
-        ]
+        canonical["hamiltonian_terms"] = _substitute_hamiltonian_constraints(
+            canonical["hamiltonian_terms"],
+            elim_substitutions,
+            eliminated,
+        )
 
     # Phase 5: Record metadata
     metadata = result.get("metadata", {})
