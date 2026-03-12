@@ -68,6 +68,11 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Print generated .wls without running wolframscript",
     )
     derive_parser.add_argument(
+        "--force-derive",
+        action="store_true",
+        help="Force re-derivation even if the generated script is unchanged",
+    )
+    derive_parser.add_argument(
         "--output",
         metavar="PATH",
         default=None,

@@ -367,7 +367,8 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
   ]
 ];
 
-(* === Batched TraceBasisDummy + Metric Evaluation ===
+(* === Batched TraceBasisDummy + Metric Evaluation (Adaptive) ===
+
    Fuses TraceBasisDummy, Expand, and early metric evaluation into a single
    batched loop to prevent intermediate expression blowup.
 
@@ -376,12 +377,42 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
    coupling to rank-1 a in Einstein-Maxwell), this creates ~970K terms from
    ~568 input terms. Early metric evaluation eliminates 99.97% by substituting
    η_{ij}=0 for off-diagonal i≠j. Fusing these steps keeps peak memory bounded
-   by a single batch (~800 terms) rather than the full expansion (~970K).
+   by a single batch rather than the full expansion (~970K).
+
+   Adaptive batch sizing (added 2026-03-12):
+   The first batch runs at the default size (50 terms). After processing,
+   the observed expansion factor (peak intermediate terms / input terms) is
+   measured. If the expansion factor is high enough to exceed the target peak
+   of ~2000 intermediate terms, subsequent batches are DECREASED in size.
+   The batch size is NEVER increased above the default — Expand[] scales
+   super-linearly with batch size due to cross-term interactions during
+   simplification (empirically: 2x batch → 10-20x time).
+
+     new_batch_size = Clamp(Floor(2000 / expansion_factor), 5, default)
+
+   This adapts automatically to theory complexity:
+   - Simple scalar theories (expansion ~1-5x): batch stays at 50 (default)
+   - Mixed rank (expansion ~17x, e.g. flat EM): batch stays at 50 (within target)
+   - High-rank cross-coupling (expansion ~40x+, e.g. curved EM): batch → 20-30
+   - Extreme coupling (expansion ~100x): batch → 5-10 (very conservative)
+
+   Per-batch diagnostics are printed showing TraceBD/Expand/Eval term counts,
+   elapsed time, and memory usage. The initial and adapted batch sizes are
+   reported in the summary line.
+
+   Parameters:
+   - componentEq_: Plus expression to decompose (additive terms of the EOM)
+   - chart_: xCoba chart for basis evaluation
+   - metricMatrix_: explicit metric matrix (or None for Minkowski fast path)
+   - batchSize_: initial batch size (default 50, adapted after first batch)
+   - backgroundFieldRules_: list of {head, bgHead, componentValues} for
+     early evaluation of background field partial derivatives
 
    Ref: Gertsenshtein a-field OOM fix (7.6+ GB peak → <1 GB with batching). *)
 BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_:50,
   backgroundFieldRules_List:{}] := Module[
-  {inputTerms, nTerms, result, batch, traced},
+  {inputTerms, nTerms, result, batch, traced, currentBatchSize, expansionFactor,
+   peakTerms, targetPeak, batchStart, batchEnd, tBatch},
 
   (* Single-term case: no batching needed *)
   If[Head[componentEq] =!= Plus,
@@ -400,8 +431,24 @@ BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_
   nTerms = Length[inputTerms];
   result = 0;
 
-  Do[
-    batch = inputTerms[[batchStart ;; Min[batchStart + batchSize - 1, nTerms]]];
+  (* Adaptive batch sizing: start with the requested batch size, then *)
+  (* adjust based on observed expansion factor from the first batch.  *)
+  (* Target: keep peak intermediate terms below ~2000 per batch.      *)
+  (* IMPORTANT: Expand[] scales super-linearly with batch size due to *)
+  (* cross-term interactions — never increase above the default.      *)
+  (* Only decrease for high-expansion theories (e.g. curved EM).      *)
+  (* Ref: Empirically, Einstein-Maxwell h decomposition generates     *)
+  (* O(2000) terms per batch=50; batch=142 takes 20x longer due to   *)
+  (* super-linear Expand cost. Keeping batch <= default is critical.  *)
+  targetPeak = 2000;
+  currentBatchSize = batchSize;
+  expansionFactor = 0;
+  batchStart = 1;
+
+  While[batchStart <= nTerms,
+    batchEnd = Min[batchStart + currentBatchSize - 1, nTerms];
+    tBatch = AbsoluteTime[];
+    batch = inputTerms[[batchStart ;; batchEnd]];
     (* TraceBasisDummy: sum dummy basis indices for this batch *)
     traced = Total[TraceBasisDummy /@ batch];
     tracedLen = If[Head[traced]===Plus, Length[traced], 1];
@@ -422,21 +469,45 @@ BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_
         {bg, backgroundFieldRules}];
       traced = Expand[traced]
     ];
-    (* Diagnostic: show term reduction at each stage (first batch only) *)
-    If[batchStart == 1,
-      Print["    batch-diag: TraceBasisDummy=", tracedLen,
-            " -> Expand=", expandLen, " -> MetricEval=", evalLen]
-    ];
+    peakTerms = Max[tracedLen, expandLen];
+    (* Diagnostic: show batch statistics *)
+    Print["    batch[", batchStart, ":", batchEnd, "/", nTerms, "]: ",
+          "TraceBD=", tracedLen, " Expand=", expandLen, " Eval=", evalLen,
+          " (", Round[AbsoluteTime[] - tBatch, 0.1], "s, ",
+          Round[MemoryInUse[]/1024.^2], " MB)"];
     result += traced;
     (* Release batch memory *)
-    batch =.; traced =.;,
-    {batchStart, 1, nTerms, batchSize}
+    batch =.; traced =.;
+
+    (* After the first batch, adapt batch size based on observed expansion.  *)
+    (* Only DECREASE — never increase above default. Expand[] is super-     *)
+    (* linear: doubling batch size can 10-20x the cost due to cross-term    *)
+    (* interactions during simplification. The default batchSize=50 is      *)
+    (* empirically optimal for most theories.                               *)
+    If[batchStart == 1 && peakTerms > 0,
+      expansionFactor = N[peakTerms / (batchEnd - batchStart + 1)];
+      If[expansionFactor > 0,
+        currentBatchSize = Max[5, Floor[targetPeak / expansionFactor]];
+        (* Never increase above default — Expand cost is super-linear *)
+        currentBatchSize = Min[currentBatchSize, batchSize];
+        If[currentBatchSize != batchSize,
+          Print["    adaptive batch: expansion=",
+                Round[expansionFactor, 0.1], "x, reducing batch to ", currentBatchSize,
+                " (target peak=", targetPeak, ")"]
+        ]
+      ]
+    ];
+
+    batchStart = batchEnd + 1;
   ];
 
   result = Expand[result];
   Print["    step3-FusedTrace: ", Round[MemoryInUse[]/1024.^2], " MB, ",
         If[Head[result]===Plus, Length[result], 1], " terms",
-        " (", nTerms, " input, batch=", batchSize, ")"];
+        " (", nTerms, " input, batch=", currentBatchSize,
+        If[currentBatchSize != batchSize,
+          " (reduced from " <> ToString[batchSize] <> ")", ""],
+        ")"];
   result
 ];
 

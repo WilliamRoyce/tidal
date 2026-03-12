@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import hashlib
+import json as _json_mod
 import re
 import shutil
 import subprocess
@@ -250,6 +252,21 @@ def _wls_mem_print(label: str) -> str:
     """Generate a Print statement that includes current Wolfram memory usage."""
     safe_label = label.replace('"', '\\"')
     return f'Print["[", Round[MemoryInUse[]/1024.^2], " MB] {safe_label}"];'
+
+
+def _wls_timing_start(timer_var: str) -> str:
+    """Generate WLS code to start a named timer using AbsoluteTime[]."""
+    return f"{timer_var} = AbsoluteTime[];"
+
+
+def _wls_timing_end(timer_var: str, label: str) -> str:
+    """Generate WLS code to print elapsed time since timer start."""
+    safe_label = label.replace('"', '\\"')
+    return (
+        f'Print["[TIMING] {safe_label}: ",'
+        f" Round[AbsoluteTime[] - {timer_var}, 0.1],"
+        f' " seconds"];'
+    )
 
 
 def _wls_header(ctx: _WlsContext) -> list[str]:
@@ -954,8 +971,10 @@ def _wls_multi_field_eom(
         lines.extend(
             [
                 _wls_mem_print(f"Before DecomposeToComponents({df['name']})"),
+                _wls_timing_start(f"tDecomp{df['name']}"),
                 f"(* Decompose {df['name']} EOM to components *)",
                 f'{comp_var} = DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}{bg_rules_opt}];',
+                _wls_timing_end(f"tDecomp{df['name']}", f"EOM decomposition ({df['name']})"),
                 f'Print["[", Round[MemoryInUse[]/1024.^2], " MB] {df["name"]} decomposed: ", Length[{comp_var}], " components"];',
             ]
         )
@@ -1095,6 +1114,7 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         "(* ============================================================ *)",
         "",
         "(* Save original nonlinear Lagrangian *)",
+        _wls_timing_start("tLinearize"),
         f"lOriginal = {p}Lagrangian;",
         "",
     ]
@@ -1402,6 +1422,7 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     ):
         lines.extend(_wls_gauge_fixing_type_b(ctx))
 
+    lines.append(_wls_timing_end("tLinearize", "Linearization (xPert L^(2) + EOM decomposition)"))
     return lines
 
 
@@ -2443,16 +2464,21 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
             "(* O(dim^{2K}) intermediate terms (K = contracted index pairs).         *)",
             "lagTerms = If[Head[lagForCanon] === Plus, List @@ lagForCanon, {lagForCanon}];",
             f'Print["Decomposing Lagrangian: ", Length[lagTerms], " additive terms"];',
+            _wls_timing_start("tCanonDecomp"),
             "lagComp = 0;",
             "Do[",
-            "  Module[{termComp},",
+            "  Module[{termComp, tTerm = AbsoluteTime[]},",
             f"    termComp = DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
             f'"MetricMatrix" -> {p}MetricMatrix];',
             "    lagComp += termComp;",
+            '    Print["  term ", k, "/", Length[lagTerms], ": ",',
+            '      Round[AbsoluteTime[] - tTerm, 0.1], "s, ",',
+            '      Round[MemoryInUse[]/1024.^2], " MB"];',
             "  ],",
             "  {k, Length[lagTerms]}",
             "];",
             "Clear[lagTerms];",
+            _wls_timing_end("tCanonDecomp", "Canonical Lagrangian decomposition"),
             "",
             "(* Free abstract Lagrangian — only component form needed from here *)",
             f"Clear[lagForCanon, {p}Lagrangian]; Share[];",
@@ -2533,6 +2559,7 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
         [
             "",
             "(* Compute canonical momenta: pi_i = dL/d(d_t q_i) *)",
+            _wls_timing_start("tLegendre"),
             "allCompNames = fieldEquations[[All, 1]];",
             "piCompList = {};",
             "canonicalH = 0;",
@@ -2551,10 +2578,14 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
             "",
             "(* Legendre transform: H = Sigma pi_i * vel_i - L *)",
             "canonicalH = Expand[canonicalH - lagComp];",
+            _wls_timing_end("tLegendre", "Legendre transform (momenta + H)"),
+            _wls_mem_print("After Legendre transform"),
             'Print["H (components): ", Short[canonicalH, 5]];',
             "",
             "(* Parse H into structured quadratic terms *)",
+            _wls_timing_start("tParseH"),
             "hamiltonianTerms = ParseHamiltonianExpression[canonicalH, allCompNames];",
+            _wls_timing_end("tParseH", "ParseHamiltonianExpression"),
             'Print["Hamiltonian terms: ", Length[hamiltonianTerms]];',
             "",
         ]
@@ -3024,6 +3055,33 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
         print(script_content)
         return 0
 
+    # --- Derivation caching ---
+    # Hash the generated WLS script (which captures all TOML config, Wolfram
+    # pipeline code paths, and field/parameter definitions).  If the output
+    # JSON already exists with a matching hash, skip the expensive Wolfram run.
+    script_hash = hashlib.sha256(script_content.encode("utf-8")).hexdigest()
+    raw_output = args.output or config.get("output", {}).get("path", "output.json")
+    resolved_out = Path(raw_output)
+    if not resolved_out.is_absolute():
+        resolved_out = (config_path.parent.resolve() / resolved_out).resolve()
+
+    force = getattr(args, "force_derive", False)
+    if not force and resolved_out.exists():
+        try:
+            existing = _json_mod.loads(resolved_out.read_text(encoding="utf-8"))
+            existing_hash = (
+                existing.get("metadata", {}).get("derivation_hash", "")
+            )
+            if existing_hash == script_hash:
+                print(f"Derivation cache hit: {resolved_out.name}")
+                print(
+                    "Generated script unchanged — skipping wolframscript. "
+                    "Use --force-derive to re-run."
+                )
+                return 0
+        except Exception:  # noqa: BLE001
+            pass  # Corrupted JSON or missing fields — re-derive
+
     if args.save_script:
         save_path = Path(args.save_script)
         save_path.write_text(script_content, encoding="utf-8")
@@ -3049,11 +3107,8 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
         _shutil.copy2(tmp_path, "/tmp/tidal_last_derive.wls")  # DEBUG: preserve for inspection
         tmp_path.unlink(missing_ok=True)
 
-    # Resolve output path for post-processing and validation
-    raw_output = args.output or config.get("output", {}).get("path", "output.json")
-    resolved = Path(raw_output)
-    if not resolved.is_absolute():
-        resolved = (config_path.parent.resolve() / resolved).resolve()
+    # Use resolved output path from cache check above
+    resolved = resolved_out
 
     # Post-process: apply plane-wave reduction to JSON if configured
     if ret == 0 and config.get("reduction") is not None and resolved.exists():
@@ -3119,6 +3174,17 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
         except Exception as exc:  # noqa: BLE001
             print(f"\nWarning: JSON validation failed: {exc}", file=sys.stderr)
             ret = 1
+
+    # Inject derivation hash into JSON metadata for future cache checks
+    if ret == 0 and resolved.exists():
+        try:
+            spec_data = _json_mod.loads(resolved.read_text(encoding="utf-8"))
+            spec_data.setdefault("metadata", {})["derivation_hash"] = script_hash
+            resolved.write_text(
+                _json_mod.dumps(spec_data, indent="\t"), encoding="utf-8"
+            )
+        except Exception:  # noqa: BLE001
+            pass  # Non-critical — derivation succeeded, hash injection is optional
 
     return ret
 
