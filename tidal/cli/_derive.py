@@ -3504,6 +3504,24 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
     # Use resolved output path from cache check above
     resolved = resolved_out
 
+    # Wolfram Engine in Docker sometimes exits with non-zero code due to
+    # license cleanup errors AFTER successfully writing the JSON.  If the
+    # output file exists with valid structure, treat as success for
+    # post-processing (reduction, validation, hash injection).
+    if ret != 0 and resolved.exists():
+        try:
+            _probe = _json_mod.loads(resolved.read_text(encoding="utf-8"))
+            if _probe.get("equations") and len(_probe["equations"]) > 0:
+                print(
+                    f"\nNote: wolframscript exited with code {ret} but "
+                    f"JSON was exported successfully — proceeding with "
+                    f"post-processing.",
+                    file=sys.stderr,
+                )
+                ret = 0
+        except Exception:  # noqa: BLE001
+            pass  # JSON missing or corrupt — honour the non-zero exit code
+
     # Post-process: apply plane-wave reduction to JSON if configured
     if ret == 0 and config.get("reduction") is not None and resolved.exists():
         import json
