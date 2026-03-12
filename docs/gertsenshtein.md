@@ -86,6 +86,25 @@ arXiv:2406.17853), who use canonical normalization and obtain Δ_{g,γ} = √(4�
 matching κB₀/2 exactly. See [gertsenshtein_formula.md](gertsenshtein_formula.md)
 for the full derivation and literature comparison.
 
+**Graviton effective mass from background EM field:**
+
+The graviton equation includes a mass-like term `-B₀²κ² h_+` from the interaction of the
+metric perturbation with the background EM stress-energy. This gives an effective graviton
+mass m_g² = κ²B₀²/2. The photon remains massless (in vacuum). This mass detuning limits
+the peak conversion for each k-mode:
+
+```
+P_max(k) = k² / (k² + κ²B₀²)
+```
+
+For k >> κB₀, the detuning is negligible and P_max → 1 (full conversion). For low-k modes
+(k ~ κB₀), the detuning is significant. A Gaussian IC (broad k-spectrum, dominant low-k)
+will show P_peak < 1 even in the absence of numerical error. Use a plane-wave IC with
+sufficiently high k for clean validation against P = sin²(κB₀t/2).
+
+Verified numerically: Gaussian IC (σ=1.5, L=50) gives P_peak=0.975 at N=512; plane-wave
+IC (k=2) gives P_peak=0.999 at N=1024 — both consistent with the mass correction factor.
+
 **With detuning** (plasma frequency ω_p, or effective photon mass m_γ):
 
 ```
