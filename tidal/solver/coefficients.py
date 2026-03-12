@@ -94,10 +94,21 @@ class CoefficientEvaluator:
         self._spatial_cache: dict[tuple[int, int], NDArray[np.float64]] = {}
         self._precompute_spatial()
 
+        # Reverse index: id(term) → (eq_idx, term_idx) for O(1) lookup
+        # in _check_mass_sign() (avoids O(S) scan of _spatial_cache)
+        self._term_to_spatial_key: dict[int, tuple[int, int]] = {
+            id(self._spec.equations[ei].rhs_terms[ti]): (ei, ti)
+            for (ei, ti) in self._spatial_cache
+        }
+
         # L3: Per-timestep cache
         self._timestep_cache: dict[
             tuple[int, int, float], float | NDArray[np.float64]
         ] = {}
+
+        # Pre-check: skip begin_timestep() cache clear when all
+        # coefficients are time-independent (common case)
+        self._has_time_dependent = not self.all_time_independent()
 
         # Fail-fast: validate all unresolved symbolic terms at init
         self._validate_unresolved()
@@ -167,9 +178,11 @@ class CoefficientEvaluator:
         """Clear per-timestep cache (L3).
 
         Call at the start of each timestep to ensure time-dependent
-        coefficients are re-evaluated.
+        coefficients are re-evaluated.  Skipped when all coefficients
+        are time-independent (common case — avoids empty dict.clear()).
         """
-        self._timestep_cache.clear()
+        if self._has_time_dependent:
+            self._timestep_cache.clear()
 
     def all_constant(self) -> bool:
         """Check if every RHS term has a constant (scalar) coefficient.
@@ -314,20 +327,20 @@ class CoefficientEvaluator:
                 ):
                     continue
 
-                # Find the spatial cache entry
-                for (ei, ti), arr in self._spatial_cache.items():
-                    spec_term = self._spec.equations[ei].rhs_terms[ti]
-                    if spec_term is term:
-                        if float(arr.min()) * float(arr.max()) < 0:
-                            warnings.warn(
-                                f"Position-dependent mass term "
-                                f"'{term.coefficient_symbolic}' for field "
-                                f"'{eq.field_name}' changes sign across "
-                                f"the grid (min={float(arr.min()):.4g}, "
-                                f"max={float(arr.max()):.4g}). This may "
-                                f"cause tachyonic instability at locations "
-                                f"where the effective mass² is negative.",
-                                UserWarning,
-                                stacklevel=2,
-                            )
-                        break
+                # O(1) lookup via reverse index (avoids scanning _spatial_cache)
+                cache_key = self._term_to_spatial_key.get(id(term))
+                if cache_key is None:
+                    continue
+                arr = self._spatial_cache[cache_key]
+                if float(arr.min()) * float(arr.max()) < 0:
+                    warnings.warn(
+                        f"Position-dependent mass term "
+                        f"'{term.coefficient_symbolic}' for field "
+                        f"'{eq.field_name}' changes sign across "
+                        f"the grid (min={float(arr.min()):.4g}, "
+                        f"max={float(arr.max()):.4g}). This may "
+                        f"cause tachyonic instability at locations "
+                        f"where the effective mass² is negative.",
+                        UserWarning,
+                        stacklevel=2,
+                    )

@@ -79,13 +79,14 @@ class RHSEvaluator:
             _resolve_axis_bc(bc_entry) for bc_entry in self._normalized_bc
         )
 
-        # Pre-resolve operator functions (avoids dict lookup per call)
-        self._resolved_ops: list[list[tuple[Any, str]]] = []
+        # Pre-resolve operator functions AND velocity names
+        # (avoids dict lookup and f-string allocation per call)
+        self._resolved_ops: list[list[tuple[Any, str, str]]] = []
         for eq in spec.equations:
-            ops: list[tuple[Any, str]] = []
+            ops: list[tuple[Any, str, str]] = []
             for term in eq.rhs_terms:
                 if term.operator == "first_derivative_t":
-                    ops.append((None, term.field))
+                    ops.append((None, term.field, f"v_{term.field}"))
                 else:
                     fn = OPERATOR_REGISTRY.get(term.operator)
                     if fn is None:
@@ -94,7 +95,7 @@ class RHSEvaluator:
                             f"known: {sorted(OPERATOR_REGISTRY)}"
                         )
                         raise ValueError(msg)
-                    ops.append((fn, term.field))
+                    ops.append((fn, term.field, ""))
             self._resolved_ops.append(ops)
 
     def begin_timestep(self, t: float) -> None:
@@ -174,13 +175,13 @@ class RHSEvaluator:
 
     def _apply_resolved(
         self,
-        resolved: tuple[Any, str],
+        resolved: tuple[Any, str, str],
         fields: FieldSet,
     ) -> np.ndarray:
         """Apply a pre-resolved operator, returning the operated data.
 
-        Uses pre-resolved function pointer and pre-normalized BCs to
-        avoid per-call dict lookup and BC validation overhead.
+        Uses pre-resolved function pointer, pre-computed velocity name,
+        and pre-normalized BCs to avoid per-call overhead.
 
         Raises
         ------
@@ -188,9 +189,8 @@ class RHSEvaluator:
             If a ``first_derivative_t`` term references a field whose
             velocity slot is not present in the state.
         """
-        op_fn, field_name = resolved
+        op_fn, field_name, vel_name = resolved
         if op_fn is None:  # first_derivative_t
-            vel_name = f"v_{field_name}"
             if vel_name not in fields:
                 msg = (
                     f"Cannot resolve first_derivative_t({field_name}): "

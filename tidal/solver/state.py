@@ -155,12 +155,12 @@ class StateLayout:
         """Map from slot name to slot index. Cached on frozen dataclass."""
         return {slot.name: i for i, slot in enumerate(self.slots)}
 
-    @property
+    @cached_property
     def total_size(self) -> int:
         """Total flat vector length (num_slots * num_points)."""
         return len(self.slots) * self.num_points
 
-    @property
+    @cached_property
     def num_slots(self) -> int:
         """Number of slots in the state vector."""
         return len(self.slots)
