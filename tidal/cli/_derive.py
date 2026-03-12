@@ -2659,16 +2659,19 @@ def _wls_constraint_elimination() -> list[str]:
     ]
 
 
-def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str]:
-    """Generate WLS code to compute H via component-level Legendre transform.
+def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:
+    """Generate WLS code for canonical Phase A: decompose Lagrangian + constraint elimination.
 
-    Computes canonical momenta using ``D[Lcomp, velocity_i]`` at the
-    component level, bypassing the abstract-index ``CanonicalMomentum``
-    (which fails when the Lagrangian uses abstract metric contractions).
+    Decomposes the abstract Lagrangian into component form (``lagComp``),
+    builds the component-to-function mapping (``compToFunc``), normalizes
+    derivative arities, applies plane-wave reduction, and runs constraint
+    elimination on ``fieldEquations`` + ``lagComp``.
 
-    Sets up WLS variables: ``lagComp``, ``piCompList``, ``canonicalH``,
-    ``compToFunc``, ``velOrders``, ``coordSyms``, ``allCompNames``,
-    ``hamiltonianTerms``.
+    This phase MUST run before ``BuildMultiFieldJSONStructure`` so that
+    ``fieldEquations`` contains only surviving fields.
+
+    Sets up WLS variables: ``lagComp``, ``compToFunc``, ``fieldFuncList``,
+    ``velOrders``, ``coordSyms``, ``eliminatedFromCanonical``.
     """
     p = ctx.prefix
 
@@ -2810,6 +2813,25 @@ def _wls_canonical_hamiltonian(ctx: _WlsContext, all_heads_str: str) -> list[str
     # exact symbolic algebra.  This replaces the fragile Python
     # string-algebra post-processing in reduction.py.
     lines.extend(_wls_constraint_elimination())
+
+    return lines
+
+
+def _wls_canonical_phase_b(ctx: _WlsContext, all_heads_str: str) -> list[str]:
+    """Generate WLS code for canonical Phase B: IBP + Legendre transform + Hamiltonian.
+
+    Integrates by parts on the time variable to remove second-time-derivative
+    terms, performs the Legendre transform to obtain the canonical Hamiltonian,
+    and parses it into structured ``hamiltonianTerms``.
+
+    Must run AFTER ``BuildMultiFieldJSONStructure`` (so it can inject the
+    canonical section into the JSON).  Reads WLS variables set by Phase A:
+    ``lagComp``, ``compToFunc``, ``fieldFuncList``, ``velOrders``, ``coordSyms``.
+
+    Sets up WLS variables: ``allCompNames``, ``piCompList``, ``canonicalH``,
+    ``hamiltonianTerms``.
+    """
+    lines: list[str] = []
 
     # --- Integration by parts on time variable ---
     # The Ricci scalar R contains second derivatives of the metric (∂²g),
@@ -2997,62 +3019,50 @@ def _wls_volume_element_code(ctx: _WlsContext) -> list[str]:
     ]
 
 
-def _wls_canonical_pipeline(ctx: _WlsContext) -> list[str]:
-    """Generate canonical momentum + Hamiltonian computation and JSON injection.
+def _wls_canonical_injection(ctx: _WlsContext) -> list[str]:
+    """Generate WLS code to inject canonical structure into JSON.
 
-    Always uses the full Legendre-transform path: decomposes the Lagrangian
-    to component form, computes momenta, and builds structured Hamiltonian
-    terms.  This is required for correct coordinate-invariant energy
-    measurement — there is no fallback.
+    Validates Hamiltonian terms, computes volume element, and injects
+    the canonical section (``hamiltonian_terms``, ``volume_element``,
+    ``eliminated_from_canonical``) into ``jsonStructure``.
 
-    The Lagrangian variable ``{prefix}Lagrangian`` and ``fieldEquations`` must
-    already exist in the WLS script context (set by EL/linearization steps).
+    Must run after Phase B has computed ``hamiltonianTerms``.
     """
-    _, all_heads_str = _canonical_field_heads(ctx)
-
-    lines: list[str] = _wls_canonical_hamiltonian(ctx, all_heads_str)
-
-    # E-L velocity form: keep original E-L equations, only inject
-    # Hamiltonian terms for energy measurement.
-    lines.extend(
-        [
-            "(* === E-L Velocity Form: Inject Canonical Structure === *)",
-            "(* E-L equations are preserved as-is in equations[] array. *)",
-            "(* Only hamiltonian_terms are injected for energy measurement. *)",
-            "",
-            "(* Validate that Hamiltonian computation succeeded *)",
-            "If[!ListQ[hamiltonianTerms] || Length[hamiltonianTerms] === 0,",
-            '  Print["ERROR: Canonical Hamiltonian computation produced no terms."];',
-            '  Print["This is required for correct energy measurement."];',
-            '  Print["Check that the Lagrangian has quadratic kinetic terms."];',
-            "  Exit[1]",
-            "];",
-            "",
-            *_wls_volume_element_code(ctx),
-            "",
-            "(* Inject canonical structure into JSON *)",
-            "canonicalSection = <|",
-            '  "hamiltonian_terms" -> hamiltonianTerms',
-            "|>;",
-            "(* Only include volume_element when non-trivial (curved coordinates) *)",
-            "If[sqrtDetGSpatial =!= 1,",
-            '  canonicalSection["volume_element"] = ToString[sqrtDetGSpatial, InputForm]',
-            "];",
-            "(* Record Wolfram-side constraint elimination *)",
-            "If[Length[eliminatedFromCanonical] > 0,",
-            '  canonicalSection["wolfram_constraint_elimination"] = True;',
-            '  canonicalSection["eliminated_from_canonical"] = eliminatedFromCanonical',
-            "];",
-            'jsonStructure["canonical"] = canonicalSection;',
-            "",
-            'Print["Canonical structure (hamiltonian_terms only) injected into JSON."];',
-            'Print["E-L equations preserved (no Hamilton equation injection)."];',
-            'Print[""];',
-            "",
-        ]
-    )
-
-    return lines
+    return [
+        "(* === E-L Velocity Form: Inject Canonical Structure === *)",
+        "(* E-L equations are preserved as-is in equations[] array. *)",
+        "(* Only hamiltonian_terms are injected for energy measurement. *)",
+        "",
+        "(* Validate that Hamiltonian computation succeeded *)",
+        "If[!ListQ[hamiltonianTerms] || Length[hamiltonianTerms] === 0,",
+        '  Print["ERROR: Canonical Hamiltonian computation produced no terms."];',
+        '  Print["This is required for correct energy measurement."];',
+        '  Print["Check that the Lagrangian has quadratic kinetic terms."];',
+        "  Exit[1]",
+        "];",
+        "",
+        *_wls_volume_element_code(ctx),
+        "",
+        "(* Inject canonical structure into JSON *)",
+        "canonicalSection = <|",
+        '  "hamiltonian_terms" -> hamiltonianTerms',
+        "|>;",
+        "(* Only include volume_element when non-trivial (curved coordinates) *)",
+        "If[sqrtDetGSpatial =!= 1,",
+        '  canonicalSection["volume_element"] = ToString[sqrtDetGSpatial, InputForm]',
+        "];",
+        "(* Record Wolfram-side constraint elimination *)",
+        "If[Length[eliminatedFromCanonical] > 0,",
+        '  canonicalSection["wolfram_constraint_elimination"] = True;',
+        '  canonicalSection["eliminated_from_canonical"] = eliminatedFromCanonical',
+        "];",
+        'jsonStructure["canonical"] = canonicalSection;',
+        "",
+        'Print["Canonical structure (hamiltonian_terms only) injected into JSON."];',
+        'Print["E-L equations preserved (no Hamilton equation injection)."];',
+        'Print[""];',
+        "",
+    ]
 
 
 # --- WLS: Metadata & JSON export ---
@@ -3130,8 +3140,32 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
 
     lines.extend(["|>;", ""])
 
+    # --- Canonical Phase A: Lagrangian decomposition + constraint elimination ---
+    # Must run BEFORE BuildMultiFieldJSONStructure so that fieldEquations
+    # contains only surviving fields (constraints already eliminated).
+    all_heads_str = ""
+    if ctx.lagrangian_expr:
+        _, all_heads_str = _canonical_field_heads(ctx)
+        # Memory preparation before canonical pipeline.  The EOM pass's
+        # cached kernel state (Christoffel symbols, metric DownValues,
+        # background field DownValues) is reused by DecomposeScalarExpression.
+        # Share[] deduplicates subexpressions to reclaim memory for the
+        # Lagrangian decomposition while preserving these caches.
+        lines.extend(
+            (
+                "(* Memory cleanup before canonical pipeline — preserves cached *)",
+                "(* Christoffels, metric DownValues, background field DownValues *)",
+                "Share[];",
+                _wls_mem_print("Before canonical pipeline"),
+                "",
+            )
+        )
+        lines.extend(_wls_canonical_phase_a(ctx, all_heads_str))
+
     # Build JSON — always use multi-field builder since fieldEquations
-    # is constructed with proper labels by both single and multi-field paths
+    # is constructed with proper labels by both single and multi-field paths.
+    # fieldEquations now contains only surviving fields (constraints
+    # eliminated by Phase A above), so the JSON is born correct.
     lines.extend(
         (
             "jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];",
@@ -3149,26 +3183,12 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
             )
         )
 
-    # Canonical momentum + Hamiltonian pipeline (Phase K)
-    # Must run after jsonStructure is built AND while fieldEquations still
-    # exists (the canonical path reads allCompNames from fieldEquations).
-    # Runs for ALL theories that have a Lagrangian.
+    # --- Canonical Phase B: IBP + Legendre transform + Hamiltonian ---
+    # Must run AFTER BuildMultiFieldJSONStructure (injects canonical section
+    # into jsonStructure).  Reads allCompNames from fieldEquations.
     if ctx.lagrangian_expr:
-        # Memory preparation before canonical pipeline.  The EOM pass's
-        # cached kernel state (Christoffel symbols, metric DownValues,
-        # background field DownValues) is reused by DecomposeScalarExpression.
-        # Share[] deduplicates subexpressions to reclaim memory for the
-        # Lagrangian decomposition while preserving these caches.
-        lines.extend(
-            (
-                "(* Memory cleanup before canonical pipeline — preserves cached *)",
-                "(* Christoffels, metric DownValues, background field DownValues *)",
-                "Share[];",
-                _wls_mem_print("Before canonical pipeline"),
-                "",
-            )
-        )
-        lines.extend(_wls_canonical_pipeline(ctx))
+        lines.extend(_wls_canonical_phase_b(ctx, all_heads_str))
+        lines.extend(_wls_canonical_injection(ctx))
 
     # Free fieldEquations now that both JSON structure and canonical
     # pipeline have finished using it.
@@ -3500,29 +3520,6 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
         except Exception as exc:  # noqa: BLE001
             print(f"\nError: Plane-wave reduction failed: {exc}", file=sys.stderr)
             ret = 1
-
-    # Post-process: eliminate degenerate algebraic constraints
-    # (e.g., TT gauge traceless conditions where the constraint field cancels)
-    if ret == 0 and resolved.exists():
-        import json as _json_elim
-
-        from tidal.symbolic.reduction import eliminate_degenerate_constraints
-
-        spec_raw = _json_elim.loads(resolved.read_text(encoding="utf-8"))
-        reduced_elim = eliminate_degenerate_constraints(spec_raw)
-        elim_fields = (
-            reduced_elim.get("metadata", {})
-            .get("constraint_elimination", {})
-            .get("eliminated_fields", [])
-        )
-        if elim_fields:
-            resolved.write_text(
-                _json_elim.dumps(reduced_elim, indent="\t"), encoding="utf-8",
-            )
-            print(
-                f"\nConstraint elimination: removed {len(elim_fields)} field(s): "
-                f"{', '.join(elim_fields)}"
-            )
 
     # Post-validate output JSON if wolframscript succeeded
     if ret == 0 and resolved.exists():

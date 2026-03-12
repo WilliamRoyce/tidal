@@ -56,19 +56,21 @@ for too long; the Python post-processing (plane-wave reduction, constraint elimi
 then fails because it checks `ret == 0`.
 
 **Workaround**: If the WLS completes but Python post-processing is skipped due to
-license error, run the post-processing manually:
+license error, run the plane-wave reduction manually:
 
 ```python
-from tidal.symbolic.reduction import reduce_spec, eliminate_degenerate_constraints
+from tidal.symbolic.reduction import reduce_spec
 import json, tomllib
 
 spec = json.loads(Path('examples/data/file.json').read_text())
 with open('examples/.../theory.toml', 'rb') as f:
     config = tomllib.load(f)
 reduced = reduce_spec(spec, config['reduction'])
-reduced = eliminate_degenerate_constraints(reduced)
 Path('examples/data/file.json').write_text(json.dumps(reduced, indent='\t'))
 ```
+
+> **Note**: Constraint elimination is now handled entirely by the Wolfram pipeline
+> (before JSON export). There is no Python post-processing step for constraints.
 
 ## Optimizations
 
