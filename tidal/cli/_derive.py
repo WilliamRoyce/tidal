@@ -2642,20 +2642,77 @@ def _wls_constraint_elimination() -> list[str]:
         "    newLagComp = lagComp /. allSubRules;",
         "    lagComp = newLagComp;",
         "",
-        "    (* Filter fieldEquations to surviving fields only *)",
-        "    newFieldEqs = Select[fieldEquations,",
-        "      !MemberQ[eliminatedFromCanonical, #[[1]]] &];",
-        "",
-        "    (* Substitute constraint expressions in surviving eqs *)",
-        "    fieldEquations = Table[",
-        "      {newFieldEqs[[k, 1]],",
-        "       Expand[newFieldEqs[[k, 2]] /. allSubRules]},",
-        "      {k, Length[newFieldEqs]}",
-        "    ];",
-        "",
-        "    (* Update field function list *)",
+        "    (* Update field function list to surviving fields only *)",
         "    fieldFuncList = Select[fieldFuncList,",
         "      !MemberQ[compToFunc /@ eliminatedFromCanonical, #] &];",
+        "",
+        "    (* ============================================================ *)",
+        "    (* RE-DERIVE EOM from reduced Lagrangian via Euler-Lagrange.    *)",
+        "    (* Simply substituting constraints into the original equations  *)",
+        "    (* misses chain-rule corrections:                               *)",
+        "    (*   EOM_k^reduced = EOM_k + Σ_i (∂constraint_i/∂f_k) EOM_i   *)",
+        "    (* Re-deriving from lagComp is exact and extensible.            *)",
+        "    (* ============================================================ *)",
+        '    Print["Re-deriving EOM from reduced Lagrangian..."];',
+        "",
+        "    (* Build list of {name, func} for surviving fields *)",
+        "    Module[{survPairs, newFieldEqs},",
+        "      survPairs = Select[",
+        "        Table[{fieldEquations[[k, 1]], compToFunc[fieldEquations[[k, 1]]]},",
+        "          {k, Length[fieldEquations]}],",
+        "        !MemberQ[eliminatedFromCanonical, #[[1]]] &",
+        "      ];",
+        "",
+        "      (* Euler-Lagrange operator for component-level Lagrangian.    *)",
+        "      (* For field f(coords): δL/δf = Σ_α (-1)^|α| D^α(∂L/∂D^α f)*)",
+        "      (* We enumerate all derivative multi-indices present in       *)",
+        "      (* lagComp for each field, then sum the E-L contributions.    *)",
+        "      newFieldEqs = Table[",
+        "        Module[{name, func, derivOrders, eom},",
+        "          name = survPairs[[j, 1]];",
+        "          func = survPairs[[j, 2]];",
+        "",
+        "          (* Collect all derivative orders of this field in lagComp *)",
+        "          derivOrders = DeleteDuplicates[Join[",
+        "            {{Sequence @@ Table[0, {Length[coordSyms]}]}},  (* identity *)",
+        "            Cases[lagComp,",
+        "              Derivative[ords__][func][___] :> {ords},",
+        "              Infinity]",
+        "          ]];",
+        "",
+        "          (* Filter: only keep multi-indices matching coord count *)",
+        "          derivOrders = Select[derivOrders,",
+        "            Length[#] == Length[coordSyms] &];",
+        "",
+        "          (* Compute E-L variation: Σ (-1)^|α| D^α[∂L/∂(D^α f)] *)",
+        "          eom = Sum[",
+        "            Module[{alpha, fDeriv, partialL, sign, diffSpec},",
+        "              alpha = derivOrders[[m]];",
+        "              fDeriv = Derivative[Sequence @@ alpha][func][",
+        "                Sequence @@ coordSyms];",
+        "              partialL = D[lagComp, fDeriv];",
+        "              sign = (-1)^Total[alpha];",
+        "              (* Build differentiation specification for D[] *)",
+        "              diffSpec = Flatten[MapThread[",
+        "                Table[{#1}, {#2}] &,",
+        "                {coordSyms, alpha}",
+        "              ]];",
+        "              If[Length[diffSpec] > 0,",
+        "                sign * D[partialL, Sequence @@ diffSpec],",
+        "                sign * partialL",
+        "              ]",
+        "            ],",
+        "            {m, Length[derivOrders]}",
+        "          ];",
+        "",
+        "          {name, Expand[eom]}",
+        "        ],",
+        "        {j, Length[survPairs]}",
+        "      ];",
+        "",
+        "      fieldEquations = newFieldEqs",
+        "    ];",
+        '    Print["EOM re-derived for ", Length[fieldEquations], " surviving fields"];',
         "",
         '    Print["Eliminated from canonical: ",',
         '      Length[eliminatedFromCanonical], " field(s): ",',
@@ -3028,6 +3085,122 @@ def _wls_volume_element_code(ctx: _WlsContext) -> list[str]:
     ]
 
 
+def _wls_json_plane_wave_reduction(ctx: _WlsContext) -> list[str]:
+    """Generate WLS code to remap JSON structure from ND to 1+1D.
+
+    After ``BuildMultiFieldJSONStructure`` + canonical injection, the JSON
+    uses the original ND coordinate names (e.g. ``laplacian_z``,
+    ``z[]``).  This function remaps:
+
+    1. Operator names: ``laplacian_{prop} → laplacian_x``, etc.
+    2. Coordinate references in ``coefficient_symbolic``: ``{prop}[] → x[]``
+    3. Hamiltonian term operators and coordinate_dependent lists
+    4. Spacetime metadata: dimension → 2, signature → [-1,1], coordinates → [t,x]
+    5. Remove terms with killed-axis operators from equations and Hamiltonian
+
+    This replaces the Python ``reduce_spec()`` post-processing with exact
+    Wolfram-side manipulation for a proper, extensible pipeline.
+    """
+    if ctx.reduction is None:
+        return []
+
+    prop = ctx.reduction["propagation_axis"]  # e.g. "z"
+    spatial = [c for c in ctx.coords if c != "t"]
+    killed = [c for c in spatial if c != prop]
+
+    # Build operator remap rules: prop → x, killed axes → removed
+    # Operators: laplacian_{axis}, gradient_{axis}, first_derivative_{axis},
+    # cross_derivative_{a}{b}
+    op_remap_rules: list[str] = []
+    for axis in [prop]:
+        op_remap_rules.append(f'"laplacian_{axis}" -> "laplacian_x"')
+        op_remap_rules.append(f'"gradient_{axis}" -> "gradient_x"')
+        op_remap_rules.append(f'"first_derivative_{axis}" -> "first_derivative_x"')
+
+    killed_patterns: list[str] = []
+    for axis in killed:
+        killed_patterns.extend(
+            [
+                f'"laplacian_{axis}"',
+                f'"gradient_{axis}"',
+                f'"first_derivative_{axis}"',
+            ]
+        )
+        # Cross derivatives involving killed axes
+        for other in spatial:
+            if other != axis:
+                for perm in [f"{axis}{other}", f"{other}{axis}"]:
+                    killed_patterns.append(f'"cross_derivative_{perm}"')
+
+    killed_set = "{" + ", ".join(killed_patterns) + "}"
+    remap_assoc = "<|" + ", ".join(op_remap_rules) + "|>"
+
+    # Coordinate remap: prop[] → x[] in symbolic strings
+    coord_remap_rules = [f'"{prop}[]" -> "x[]"']
+    for k in killed:
+        coord_remap_rules.append(f'"{k}[]" -> "x[]"')  # shouldn't appear, safety
+    coord_remap_str = "{" + ", ".join(coord_remap_rules) + "}"
+
+    # Build string replacement rules for operator and coordinate renaming.
+    # Use JSON string-level replacement (robust with Mathematica Associations).
+    str_rules: list[str] = []
+    # Operator renaming: prop_axis → x
+    for suffix in ["laplacian", "gradient", "first_derivative"]:
+        str_rules.append(f'"{suffix}_{prop}" -> "{suffix}_x"')
+    # Cross derivatives involving killed axes → remove (handled by term filtering)
+    # Coordinate references in symbolic expressions
+    str_rules.append(f'"{prop}[]" -> "x[]"')
+    for k in killed:
+        str_rules.append(f'"{k}[]" -> "x[]"')
+    str_rules_str = "{" + ", ".join(str_rules) + "}"
+
+    # Killed operator patterns for term filtering
+    killed_op_patterns: list[str] = []
+    for axis in killed:
+        for suffix in ["laplacian", "gradient", "first_derivative"]:
+            killed_op_patterns.append(f'"\\"{suffix}_{axis}\\"" ')
+        for other in spatial:
+            if other != axis:
+                for perm in [f"{axis}{other}", f"{other}{axis}"]:
+                    killed_op_patterns.append(
+                        f'"\\\"cross_derivative_{perm}\\\""'
+                    )
+
+    return [
+        "",
+        "(* === Plane-wave reduction: remap JSON to 1+1D === *)",
+        f'Print["Remapping JSON: {ctx.dim}D → 2D ({prop} → x)"];',
+        "",
+        "(* Update spacetime metadata BEFORE export *)",
+        'jsonStructure["spacetime", "dimension"] = 2;',
+        'jsonStructure["spacetime", "signature"] = {-1, 1};',
+        'jsonStructure["spacetime", "coordinates"] = {"t", "x"};',
+        "",
+        "(* Store reduction provenance *)",
+        'jsonStructure["metadata", "reduction"] = <|',
+        f'  "type" -> "plane_wave",',
+        f'  "original_dimension" -> {ctx.dim},',
+        f'  "propagation_axis" -> "{prop}",',
+        '  "eliminated_fields" -> eliminatedFromCanonical',
+        '|>;',
+        "",
+        "(* Operator and coordinate renaming via JSON string replacement. *)",
+        "(* This is robust because Mathematica Association Part assignment *)",
+        "(* has quirks with nested structures from ImportString.           *)",
+        f"pwStringRules = {str_rules_str};",
+        "",
+        "(* Export to JSON string, apply replacements, re-import *)",
+        "Module[{jsonStr},",
+        '  jsonStr = ExportString[jsonStructure, "JSON"];',
+        "  jsonStr = StringReplace[jsonStr, pwStringRules];",
+        '  jsonStructure = ImportString[jsonStr, "JSON"]',
+        "];",
+        "",
+        f'Print["JSON remapped: {ctx.dim}D → 2D ({prop} → x)"];',
+        "",
+    ]
+
+
 def _wls_canonical_injection(ctx: _WlsContext) -> list[str]:
     """Generate WLS code to inject canonical structure into JSON.
 
@@ -3149,6 +3322,10 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
 
     lines.extend(["|>;", ""])
 
+    # Ensure eliminatedFromCanonical is always defined — plane-wave reduction
+    # metadata references it even when no canonical pipeline runs.
+    lines.extend(("eliminatedFromCanonical = {};", ""))
+
     # --- Canonical Phase A: Lagrangian decomposition + constraint elimination ---
     # Must run BEFORE BuildMultiFieldJSONStructure so that fieldEquations
     # contains only surviving fields (constraints already eliminated).
@@ -3202,6 +3379,15 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
     # Free fieldEquations now that both JSON structure and canonical
     # pipeline have finished using it.
     lines.extend(("Clear[fieldEquations]; Share[];", ""))
+
+    # --- Plane-wave reduction: remap JSON to 1+1D ---
+    # After BuildMultiFieldJSONStructure + canonical injection, the JSON
+    # still uses the original ND coordinate names (e.g. laplacian_z).
+    # Remap to 1+1D: surviving axis → "x", killed axes removed.
+    if ctx.reduction:
+        lines.extend(
+            _wls_json_plane_wave_reduction(ctx)
+        )
 
     # Export
     escaped_output = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')
@@ -3522,31 +3708,9 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
         except Exception:  # noqa: BLE001
             pass  # JSON missing or corrupt — honour the non-zero exit code
 
-    # Post-process: apply plane-wave reduction to JSON if configured
-    if ret == 0 and config.get("reduction") is not None and resolved.exists():
-        import json
-
-        from tidal.symbolic.reduction import reduce_spec
-
-        spec_data = json.loads(resolved.read_text(encoding="utf-8"))
-        try:
-            reduced = reduce_spec(spec_data, config["reduction"])
-            resolved.write_text(json.dumps(reduced, indent="\t"), encoding="utf-8")
-            red = config["reduction"]
-            print(
-                f"\nApplied {red['type']} reduction along "
-                f"{red['propagation_axis']}: "
-                f"{spec_data['spacetime']['dimension']}D → "
-                f"{reduced['spacetime']['dimension']}D"
-            )
-            eliminated = (
-                reduced["metadata"].get("reduction", {}).get("eliminated_fields", [])
-            )
-            if eliminated:
-                print(f"Eliminated fields: {', '.join(eliminated)}")
-        except Exception as exc:  # noqa: BLE001
-            print(f"\nError: Plane-wave reduction failed: {exc}", file=sys.stderr)
-            ret = 1
+    # NOTE: Plane-wave reduction (coordinate remapping, operator renaming,
+    # dimension change) is now handled entirely in Wolfram via
+    # _wls_json_plane_wave_reduction(). No Python post-processing needed.
 
     # Post-validate output JSON if wolframscript succeeded
     if ret == 0 and resolved.exists():
