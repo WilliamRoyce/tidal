@@ -226,8 +226,11 @@ configuration to ensure correct writer pre-allocation.
 
 - Yoshida, H. (1990). "Construction of higher order symplectic integrators".
   Physics Letters A, 150(5-7), pp. 262-268.
+- Forest, E. & Ruth, R.D. (1990). "Fourth-order symplectic integration".
+  Physica D, 43(1), pp. 105-117. (Fused-kick composition method.)
 - Hairer, E., Lubich, C. & Wanner, G. (2006). "Geometric Numerical Integration".
-  Springer. Ch. VI: Symplectic Integration of Hamiltonian Systems.
+  Springer. Ch. VI: Symplectic Integration of Hamiltonian Systems;
+  Ch. II.4: Composition Methods.
 
 ---
 
