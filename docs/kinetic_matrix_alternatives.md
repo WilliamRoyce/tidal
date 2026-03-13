@@ -78,7 +78,7 @@ where M encodes the kinetic coupling. Specialised solvers handle M directly.
 - Position-dependent K (curved spacetime with non-constant metric)
 - Very large K (>50×50) where symbolic inversion produces huge expressions
 - Stiff systems where explicit methods are CFL-limited
-- If py-pde is replaced with a Julia or C++ backend
+- If the numpy backend is replaced with a Julia or C++ backend
 
 ---
 

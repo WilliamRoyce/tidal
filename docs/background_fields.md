@@ -189,6 +189,6 @@ both delegate to `_eval_utils.py`, so no changes are needed in `pde_builder.py`.
 - Gertsenshtein (1962), "Wave resonance of light and gravitational waves", JETP 14, 84 — original prediction requiring external B-field as background
 - Domcke & Garcia-Cely (2023), "A simple derivation of the Gertsenshtein effect", [arXiv:2301.02072](https://arxiv.org/abs/2301.02072) — modern derivation with inhomogeneous background profiles
 - Martín-García et al., "xAct: Efficient tensor computer algebra for Mathematica", [xact.es](http://www.xact.es/) — symbolic tensor algebra (`VarD`, `ComponentValue`, `ToBasis`)
-- Zwicker (2020), "py-pde: A Python package for solving partial differential equations", JOSS 5(48), 2158 — PDE solver backend
+- Zwicker (2020), "py-pde: A Python package for solving partial differential equations", JOSS 5(48), 2158 — original PDE backend; FD stencil conventions retained in TIDAL's native operators
 
 See [`docs/references.md`](references.md) for the full citation list.

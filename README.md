@@ -209,6 +209,8 @@ tidal validate examples/data/klein_gordon_1d.json      # validate JSON spec stru
 | `spherical_kg_1d/`        | 1+1D | Spherical coordinates, plane-wave dimensional reduction                              |
 | `proca_background/`       | 2+1D | Lorentzian scalar background, two Proca vectors, constraint+BG integration           |
 | `vector_background/`      | 2+1D | Tanh domain wall vector background, ComponentValue mechanism, sign-changing coupling |
+| `gertsenshtein/`          | 1+1D | Einstein-Maxwell graviton-photon conversion, multi-field perturbation                |
+| `maxwell_perturbation/`   | 1+1D | Matter-only Proca perturbation, lightweight CI test for perturbation pipeline        |
 
 See [examples/README.md](examples/README.md) for complete documentation and verification that the Python layer contains zero hardcoded physics.
 

@@ -6,17 +6,17 @@ TIDAL implements a two-stage pipeline that transforms symbolic Lagrangians into 
 ## Data Flow
 
 ```
-Mathematica/xAct              JSON                Python/py-pde
+Mathematica/xAct              JSON                Python/SUNDIALS
 ┌──────────────────┐    ┌──────────────┐    ┌──────────────────┐
-│ Lagrangian L(φ)  │    │   Equation   │    │   PDEFromSpec    │
+│ Lagrangian L(φ)  │    │   Equation   │    │ EquationSystem   │
 │                  │ -> │   System     │ -> │                  │
-│ Euler-Lagrange   │    │   (JSON)     │    │ FieldCollection  │
-│ Decompose        │    │              │    │ Solve (py-pde)   │
+│ Euler-Lagrange   │    │   (JSON)     │    │ FieldSet + RHS   │
+│ Decompose        │    │              │    │ IDA/CVODE/LF     │
 └──────────────────┘    └──────────────┘    └──────────────────┘
 ```
 
 **Stage 1 (Mathematica/xAct)** derives field equations symbolically from a Lagrangian.
-**Stage 2 (Python/py-pde)** loads the specification and runs a numerical simulation.
+**Stage 2 (Python/SUNDIALS + numpy)** loads the specification and runs a numerical simulation.
 
 ## Wolfram Modules
 
@@ -68,16 +68,12 @@ For the full schema reference, see the [JSON Schema Guide](https://github.com/Wi
 Parsed equation specification loaded from JSON:
 
 ```python
-from tidal.symbolic import build_pde_from_json
+from tidal.symbolic.json_loader import load_equation_system
 
-# Load and build PDE in one step
-pde = build_pde_from_json("examples/data/klein_gordon_1d.json")
+# Load equation specification
+spec = load_equation_system("examples/data/klein_gordon_1d.json")
 
-# Or with runtime parameter overrides
-pde = build_pde_from_json(
-    "examples/data/coupled_scalars.json",
-    parameters={"m_phi2": 1.0, "g": 0.5}
-)
+# Runtime parameter overrides are passed to the solver via --param or programmatically
 ```
 
 Key features:
@@ -85,25 +81,20 @@ Key features:
 - Auto-computes mass/coupling matrices from equation terms
 - Preserves symbolic coefficient expressions for runtime parameter sweeps
 
-### `PDEFromSpec` (pde_builder.py)
+### Solver Classes (tidal/solver/)
 
-Dynamically constructs a `PDEBase` subclass from the equation specification:
+The solver layer builds the numerical system from the equation specification:
 
-```python
-class PDEFromSpec(PDEBase):
-    def __init__(self, spec: EquationSystem, parameters: dict | None = None):
-        self.spec = spec  # All physics comes from here
-
-    def evolution_rate(self, state, t=0.0):
-        # Builds RHS from spec.equations — no hardcoded physics
-        ...
-```
+- `FieldSet.from_spec(spec)` — field storage and boundary conditions
+- `CoefficientEvaluator(spec)` — 4-level cached coefficient resolution
+- `RHSEvaluator(spec)` — evaluates RHS from JSON terms (no hardcoded physics)
+- `StateLayout.from_spec(spec)` — maps fields to state vector slots
 
 Supports second-order (wave), first-order, and constraint (order-0) equations in the same system.
 
 ## Supported Operators
 
-Operators map JSON terms to py-pde field operations. All support cross-field references.
+Operators map JSON terms to numpy spatial operations (finite-difference stencils). All support cross-field references.
 
 | Operator | Min Dim | Description |
 |----------|---------|-------------|

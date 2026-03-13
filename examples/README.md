@@ -10,7 +10,7 @@ The pipeline has two stages:
 
 Lagrangian → Euler-Lagrange equations → Component PDEs → JSON export
 
-### Stage 2: Numerical Simulation (Python/py-pde)
+### Stage 2: Numerical Simulation (Python/SUNDIALS + numpy)
 
 JSON → Dynamic PDE construction → Simulation → Visualization
 
@@ -104,26 +104,25 @@ cd examples/scalar_field && bash run.sh
 
 ## Verifying No Hardcoded Physics
 
-The Python simulation scripts use `build_pde_from_json()` which:
+The solver loads JSON specifications via `load_equation_system()` and builds the PDE system dynamically:
 
-1. **Loads** the JSON specification
-2. **Parses** operator types (laplacian, identity, etc.)
-3. **Builds** PDE class dynamically from specification
+1. **Loads** the JSON specification into an `EquationSystem`
+2. **Parses** operator types (laplacian, identity, etc.) and coefficients
+3. **Builds** `RHSEvaluator` dynamically from the specification
 4. **Applies** operators based on JSON, not hardcoded logic
 
 ### Key Code Structure
 
 ```python
+from tidal.symbolic.json_loader import load_equation_system
+
 # Load equation specification from JSON
-spec = load_equation_system("examples/data/em_1d.json")
+spec = load_equation_system("examples/data/em_3d.json")
 
-# Build PDE dynamically (NO hardcoded equations)
-pde = build_pde_from_json("examples/data/em_1d.json")
-
-# The PDE's evolution_rate method uses:
+# The solver's RHS evaluator uses:
 #   for term in eq.rhs_terms:  # From JSON spec
 #       operator = self.operators[term.operator]  # Dynamic dispatch
-#       result += term.coefficient * operator(field)
+#       result += coefficient * operator(field)
 ```
 
 ### Proof of Dynamic Construction
@@ -133,7 +132,7 @@ Compare the two examples:
 - **EM**: JSON has `{"operator": "laplacian", "coefficient": 1.0}` only
 - **KG**: JSON has `{"operator": "laplacian", "coefficient": 1.0}` AND `{"operator": "identity", "coefficient": -1.0}`
 
-The Python code doesn't "know" about mass terms - it reads them from JSON and applies them.
+The Python code doesn't "know" about mass terms — it reads them from JSON and applies them.
 
 ---
 
@@ -628,7 +627,7 @@ examples/
 
 **Python** (Stage 2):
 
-- py-pde ≥ 0.38
+- scikit-sundae (SUNDIALS IDA/CVODE)
 - numpy, matplotlib
 - tidal package
 
@@ -639,7 +638,7 @@ examples/
 The separation into two stages is **intentional and beneficial**:
 
 1. **Stage 1 (symbolic)**: Mathematica/xAct excels at tensor algebra and symbolic manipulation
-2. **Stage 2 (numerical)**: Python/py-pde excels at efficient numerical simulation
+2. **Stage 2 (numerical)**: Python/SUNDIALS + numpy excels at efficient numerical simulation
 
 The JSON format serves as a **well-defined interface** between the symbolic and numerical worlds, allowing each tool to do what it does best.
 

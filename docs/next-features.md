@@ -68,7 +68,7 @@ TIDAL supports theories from flat 1+1D scalars to curved 3+1D tensor fields. Mea
 
 ### Tier 1: General (any spacetime, any theory)
 
-These modules use the volume-element-aware energy computation and operate on scalar timeseries. They work for all 25 examples including curved spacetimes (polar_kg, sphere_kg, spherical_kg), background fields, and constraint systems.
+These modules use the volume-element-aware energy computation and operate on scalar timeseries. They work for all 27 examples including curved spacetimes (polar_kg, sphere_kg, spherical_kg), background fields, and constraint systems.
 
 | Module            | Why General                                                                                              |
 | ----------------- | -------------------------------------------------------------------------------------------------------- |

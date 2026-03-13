@@ -25,7 +25,7 @@
 
 **Organization:**
 
-- Group by subsystem: Wolfram/xAct, Python/py-pde, Pipeline Integration
+- Group by subsystem: Wolfram/xAct, Python solver, Pipeline Integration
 - Keep "Debugging Techniques" and "Verification Checklist" sections at the end
 - Cross-reference with `MEMORY.md` for architectural context
 - Link to example-specific notes (like `chern-simons-notes.md`) for complex cases

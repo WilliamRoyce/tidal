@@ -294,6 +294,8 @@ L3: Per-timestep dedup      — time+position dependent, deduplicated within eac
 | `cylindrical_kg/` | 3+1D | phi_0 | Mixed curved (r,θ) and flat (z) directions |
 | `gravitational_waves/` | 3+1D | h_ij | xPert linearization, TT gauge, rank-2 tensor |
 | `massive_3form/` | 3+1D | C_ijk | Rank-3 antisymmetric tensor, symmetry reduction 64→4 |
+| `gertsenshtein/` | 1+1D | h_5, gea_1 | Einstein-Maxwell graviton-photon conversion, multi-field perturbation |
+| `maxwell_perturbation/` | 1+1D | gea_0, gea_1 | Matter-only Proca perturbation, lightweight CI test |
 
 ---
 
