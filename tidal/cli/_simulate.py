@@ -1641,28 +1641,53 @@ def _has_time_dependent_coeffs(spec: EquationSystem) -> bool:
     )
 
 
-def _resolve_scheme(scheme: str, spec: EquationSystem) -> str:
-    """Resolve ``'auto'`` to the best adaptive solver for the equation system.
+def _resolve_scheme(  # noqa: C901
+    scheme: str,
+    spec: EquationSystem,
+    grid: GridInfo | None = None,
+    bc: BCSpec | None = None,
+) -> str:
+    """Resolve ``'auto'`` to the best solver for the equation system.
 
-    Auto-selection ALWAYS picks an adaptive, tolerance-controlled solver.
-    Leapfrog is opt-in only (``--scheme leapfrog``).
-
-    Detection algorithm (checked in order):
+    Auto-selection algorithm (checked in order):
 
     1. Constraint equations (time_order=0) → IDA (algebraic constraints need
        DAE residual form).
-    2. First-order (time_order=1) equations → IDA (diffusion/transport needs
-       implicit time integration).
-    3. Dissipation (``first_derivative_t`` operator in any RHS) → IDA (breaks
+    2. Flat metric + all-periodic + time-independent + supported operators
+       → modal (exact Fourier spectral evolution, machine-precision).
+    3. First-order (time_order=1) equations → IDA (diffusion/transport needs
+       implicit time integration; eligible periodic first-order caught by 2).
+    4. Dissipation (``first_derivative_t`` operator in any RHS) → IDA (breaks
        symplecticity, BDF handles well).
-    4. No canonical Hamiltonian structure → IDA (leapfrog/CVODE require
-       separable H = T(pi) + V(q)).
-    5. Pure wave (all second-order, Hamiltonian) → CVODE BDF (adaptive,
+    5. No canonical Hamiltonian structure for second-order wave equations
+       → warning + CVODE fallback (may indicate hand-crafted or legacy JSON).
+    6. Pure wave (all second-order, Hamiltonian) → CVODE BDF (adaptive,
        tolerance-controlled, same SUNDIALS ecosystem as IDA).
 
-    Reference: Hindmarsh et al., "SUNDIALS", ACM TOMS, 2005.
+    Raises
+    ------
+    RuntimeError
+        If ``--scheme modal`` is explicitly requested but the system is not
+        eligible (wrong metric, BCs, or operators).
+
+    References
+    ----------
+        Hindmarsh et al., "SUNDIALS", ACM TOMS, 2005.
+        Moler & Van Loan (2003), SIAM Review 45(1):3-49 (modal solver).
     """
     if scheme != "auto":
+        if scheme == "modal" and grid is not None:
+            # Validate modal eligibility when explicitly requested
+            from tidal.solver.modal import can_use_modal
+
+            if not can_use_modal(spec, grid, bc):
+                msg = (
+                    "--scheme modal requested but system is not eligible. "
+                    "Modal solver requires: flat metric, all-periodic BCs, "
+                    "time-independent coefficients, and supported spatial "
+                    "operators.  Use 'auto' or another solver."
+                )
+                raise RuntimeError(msg)
         return scheme
 
     # 1. Constraint equations (time_order=0) → IDA (DAE solver required)
@@ -1670,20 +1695,41 @@ def _resolve_scheme(scheme: str, spec: EquationSystem) -> str:
         if eq.time_derivative_order == 0:
             return "ida"
 
-    # 2. First-order (diffusion/transport) equations → IDA
+    # 2. Modal solver — flat metric, all-periodic, time-independent,
+    #    supported operators (exact Fourier spectral evolution)
+    if grid is not None:
+        from tidal.solver.modal import can_use_modal
+
+        if can_use_modal(spec, grid, bc):
+            return "modal"
+
+    # 3. First-order (diffusion/transport) equations → IDA
     for eq in spec.equations:
         if eq.time_derivative_order == 1:
             return "ida"
 
-    # 3. Dissipation (first_derivative_t in any RHS term) → IDA
+    # 4. Dissipation (first_derivative_t in any RHS term) → IDA
     if _has_dissipation(spec):
         return "ida"
 
-    # 4. No canonical Hamiltonian structure → IDA
+    # 5. No canonical Hamiltonian structure → fall through to CVODE with
+    #    a warning.  Missing canonical indicates hand-crafted or legacy JSON;
+    #    pipeline-derived specs should always include it.
     if spec.canonical is None:
-        return "ida"
+        has_wave = any(eq.time_derivative_order >= 2 for eq in spec.equations)  # noqa: PLR2004
+        if has_wave:
+            import warnings
 
-    # 5. Pure wave, Hamiltonian → CVODE BDF (adaptive, tolerance-controlled)
+            warnings.warn(
+                "Second-order wave equations missing canonical Hamiltonian "
+                "structure in JSON spec.  This may indicate a hand-crafted "
+                "or legacy JSON — consider using 'tidal derive' to generate "
+                "specs from the Wolfram pipeline.",
+                UserWarning,
+                stacklevel=2,
+            )
+
+    # 6. Pure wave, Hamiltonian → CVODE BDF (adaptive, tolerance-controlled)
     return "cvode"
 
 
@@ -1821,7 +1867,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     _validate_solver_params(args)
 
     # Resolve solver scheme (auto-select based on equation operators)
-    scheme = _resolve_scheme(args.scheme, spec)
+    scheme = _resolve_scheme(args.scheme, spec, grid_info, bc)
     if args.scheme == "auto":
         log(f"  Auto-selected solver: {scheme}")
 
@@ -1850,6 +1896,12 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
             )
             print(f"Error: {msg}", file=sys.stderr)
             return 1
+    # Modal solver operates in pure k-space — spectral operators are
+    # redundant (and unused).  Silently disable to avoid confusion.
+    if use_spectral and scheme == "modal":
+        use_spectral = False
+        set_spectral(False)
+        log("  Note: modal solver uses k-space natively; spectral auto-disabled")
     log(f"  Scheme: {scheme}")
 
     # Constraint-only mode: solve algebraic equations via IDA, no time evolution
@@ -2049,6 +2101,26 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
             rtol=args.rtol,
             atol=args.atol,
             max_step=max_step,
+            num_snapshots=num_snapshots,
+            snapshot_callback=snapshot_cb,
+            progress=progress,
+        )
+    elif scheme == "modal":
+        from tidal.solver.modal import solve_modal
+
+        log(
+            f"Running modal solver (t={t_start} → {args.t_end}, "
+            f"{num_snapshots} snapshots)..."
+        )
+        result = solve_modal(
+            spec,
+            grid_info,
+            y0,
+            t_span=(t_start, args.t_end),
+            bc=bc,
+            parameters=params,
+            rtol=args.rtol,
+            atol=args.atol,
             num_snapshots=num_snapshots,
             snapshot_callback=snapshot_cb,
             progress=progress,

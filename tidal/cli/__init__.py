@@ -255,7 +255,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sim_parser.add_argument(
         "--scheme",
-        choices=["ida", "leapfrog", "cvode", "scipy", "auto"],
+        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "auto"],
         default="auto",
         help=(
             "Solver scheme (default: auto). "
@@ -909,7 +909,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sweep_parser.add_argument(
         "--scheme",
-        choices=["ida", "leapfrog", "cvode", "scipy", "auto"],
+        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "auto"],
         default="auto",
         help="Solver scheme (default: auto)",
     )
