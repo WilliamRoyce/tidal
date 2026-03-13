@@ -30,7 +30,7 @@ requires matrix inversion. Without this, the pipeline produced field_rates conta
 
 **1. Symbolic K^{-1} inversion (gauge-independent)**
 
-The canonical pipeline (`_wls_canonical_pipeline()` in `_derive.py`) now:
+The canonical pipeline (`_wls_canonical_phase_a()` / `_wls_canonical_phase_b()` in `_derive.py`) now:
 1. Computes the kinetic matrix `K_{ij} = D[pi_i, vel_j]` symbolically
 2. Validates `det(K) != 0` (throws if singular)
 3. Inverts symbolically via `Simplify[Inverse[K]]`
@@ -87,8 +87,8 @@ K = [[1, 0, -1/2, ...],
 
 ### Current State
 
-All 25 example JSON specs load, build PDE systems, and evolve correctly.
-1,343 Python tests pass, 0 failures, 0 xfails. The `_NON_EVOLVABLE_SPECS` set
+All 27 example JSON specs load, build PDE systems, and evolve correctly.
+1,484 Python tests pass, 0 failures, 0 xfails. The `_NON_EVOLVABLE_SPECS` set
 in `test_example_jsons.py` is now empty.
 
 ### References

@@ -3,11 +3,11 @@
 **Created:** February 2026
 **Last Updated:** March 2026
 **Status:** Phases A, B, C, F, J complete; Phases D–E, G–I planned
-**Version:** 0.5.0 | **Tests:** 1,343 collected | **Examples:** 25 working (1+1D to 3+1D)
+**Version:** 0.5.0 | **Tests:** 1,484 collected | **Examples:** 27 working (1+1D to 3+1D)
 
 ## Context
 
-TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) → measurement/analysis. With 25 working examples spanning 1+1D to 3+1D, a full CLI with 9 subcommands (`tidal derive|simulate|measure|inspect|list|validate|plot|sweep|analyze`), a comprehensive measurement module (13 types: energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary), and a complete parameter sweep framework with sensitivity analysis, the project is mature and ready for its next major advances.
+TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) → measurement/analysis. With 27 working examples spanning 1+1D to 3+1D, a full CLI with 9 subcommands (`tidal derive|simulate|measure|inspect|list|validate|plot|sweep|analyze`), a comprehensive measurement module (13 types: energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary), and a complete parameter sweep framework with sensitivity analysis, the project is mature and ready for its next major advances.
 
 The project's core research motivation is the **Gertsenshtein effect** (electromagnetic ↔ gravitational wave conversion in external magnetic fields). The project operates exclusively in the **linearised regime** — all Lagrangians are quadratic, producing linear PDEs. The phases below are ordered by their impact toward enabling realistic Gertsenshtein simulations, while also broadening TIDAL's general utility as a linearised field theory simulation framework.
 

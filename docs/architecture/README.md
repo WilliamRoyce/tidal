@@ -265,7 +265,7 @@ L3: Per-timestep dedup      — time+position dependent, deduplicated within eac
 
 ---
 
-## Working Examples (25 total)
+## Working Examples (27 total)
 
 | Example | Dim | Fields | Key Features |
 |---------|-----|--------|--------------|

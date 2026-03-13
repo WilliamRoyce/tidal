@@ -1,6 +1,6 @@
 # Examples
 
-TIDAL includes 25 pipeline examples spanning 1+1D through 3+1D spacetimes with scalar, vector, and tensor fields.
+TIDAL includes 27 pipeline examples spanning 1+1D through 3+1D spacetimes with scalar, vector, and tensor fields.
 
 ## Pipeline Examples
 

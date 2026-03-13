@@ -11,7 +11,7 @@ gravity). Also implemented Lagrangian-first linearization via xPert's `Perturbat
 
 **New features:**
 
-- **Canonical momentum pipeline** (`_wls_canonical_pipeline()` in `_derive.py`): Computes
+- **Canonical momentum pipeline** (`_wls_canonical_phase_a()` / `_wls_canonical_phase_b()` in `_derive.py`): Computes
   conjugate momenta π_i = ∂L/∂(∂_t q_i), constructs Hamiltonian H = Σ π_i·vel_i − L,
   emits first-order evolution equations dq_i/dt and dπ_i/dt. Handles arbitrary multi-field
   systems with cross-coupled kinetic terms.
