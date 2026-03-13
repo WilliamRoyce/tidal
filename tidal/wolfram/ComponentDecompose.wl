@@ -844,7 +844,7 @@ ReplaceRank2FieldComponents[expr_, fh_, chart_, coordSyms_, dim_, metricMatrix_:
              h^{ij} = (g^{ii})(g^{jj}) h_{ij}  (diagonal metric, no sum)
              h^i_j  = g^{ii} h_{ij}
              h_i^j  = g^{jj} h_{ij}
-             For flat metric (metricMatrix===None): weights are 1 (historical behaviour). *)
+             For flat metric (metricMatrix===None): weights are 1 (historical behavior). *)
           Module[{wUU, wUDi, wDUi, wUUji, wUDji, wDUji, invMatrix, diagInv},
             If[metricMatrix =!= None,
               invMatrix = GetCachedInverseMetric[metricMatrix];
@@ -858,13 +858,13 @@ ReplaceRank2FieldComponents[expr_, fh_, chart_, coordSyms_, dim_, metricMatrix_:
                 wUDji = diagInv[[pair[[2]]+1]];
                 wDUji = diagInv[[pair[[1]]+1]],
                 (* Non-diagonal: correct weighting requires sum over all components — not implemented.
-                   Fall back to unweighted (wrong) behaviour with a clear error message. *)
+                   Fall back to unweighted (wrong) behavior with a clear error message. *)
                 Print["ERROR: Non-diagonal metric in ReplaceRank2FieldComponents fallback. ",
                       "Metric-weighted index raising not implemented for non-diagonal metrics. ",
                       "Equations may be incorrect for field ", fh, " at pair ", pair, "."];
                 wUU = wUDi = wDUi = wUUji = wUDji = wDUji = 1
               ],
-              (* Flat metric or None: identity weights (historical behaviour) *)
+              (* Flat metric or None: identity weights (historical behavior) *)
               wUU = wUDi = wDUi = wUUji = wUDji = wDUji = 1
             ];
             result = result /. {

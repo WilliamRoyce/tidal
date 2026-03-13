@@ -542,7 +542,7 @@ def _compute_contra_components(
     contra: list[str] = []
     for idx, val in enumerate(comps):
         val_str = str(val)
-        if val_str.strip() in ("0", "0.0"):
+        if val_str.strip() in {"0", "0.0"}:
             contra.append("0")
         elif metric_diagonal:
             g_diag = metric_diagonal[idx]
@@ -592,7 +592,7 @@ def _wls_vector_background_substitution(
                 # For curved diagonal metrics: A^μ = A_μ / g_{μμ}.
                 # For Minkowski (metric_diagonal empty): A^μ = A_μ (flat).
                 val_str = str(val)
-                if ctx.metric_diagonal and val_str.strip() not in ("0", "0.0"):
+                if ctx.metric_diagonal and val_str.strip() not in {"0", "0.0"}:
                     g_diag = ctx.metric_diagonal[idx]
                     contra_val = f"Simplify[({val_str}) / ({g_diag})]"
                 else:
@@ -625,7 +625,7 @@ def _wls_vector_background_substitution(
                 comp_name = "".join(str(k) for k in multi_idx)
                 val_str = str(val)
                 # Fully contravariant: divide by each metric diagonal entry
-                if ctx.metric_diagonal and val_str.strip() not in ("0", "0.0"):
+                if ctx.metric_diagonal and val_str.strip() not in {"0", "0.0"}:
                     g_factors = " * ".join(
                         f"({ctx.metric_diagonal[k]})" for k in multi_idx
                     )
@@ -786,7 +786,9 @@ def _wls_lagrangian(ctx: _WlsContext) -> list[str]:
 
 
 def _xpert_index_pattern(
-    pert_sym: str, full_head: str, field: dict[str, Any],
+    pert_sym: str,
+    full_head: str,
+    field: dict[str, Any],
 ) -> tuple[str, str]:
     """Return (pert_idx, full_idx) for DefTensorPerturbation."""
     ftype = field["type"]
@@ -837,14 +839,14 @@ def _wls_matter_perturbation_setup(  # noqa: PLR0914
         # use the perturbation name as-is (Mathematica is case-sensitive).
         # E.g., field "A" → geA, perturbation "a" → gea (not geA).
         mp_head_candidate = f"{p}{mp_name.capitalize()}"
-        mp_head = (
-            f"{p}{mp_name}" if mp_head_candidate == mf_head else mp_head_candidate
-        )
+        mp_head = f"{p}{mp_name}" if mp_head_candidate == mf_head else mp_head_candidate
 
         # Build DefTensorPerturbation arguments + perturbation field DefTensor
         pert_idx, full_idx = _xpert_index_pattern(mp_sym, mf_head, mf)
         mp_def = _generate_field_def(
-            _pert_field_dict(mp_name, mf), ctx.prefix, ctx.manifold,
+            _pert_field_dict(mp_name, mf),
+            ctx.prefix,
+            ctx.manifold,
             head_override=mp_head,
         )
 
@@ -908,7 +910,7 @@ def _wls_multi_field_eom(
                 # terms (via [∇_a, ∇_b] commutator) even if L^(2) was cleaned.
                 # For flat Minkowski in any coordinates (spherical, cylindrical, etc.),
                 # all Riemann components are zero — zero them explicitly here.
-                f"(* Zero any residual background curvature from VarD commutators *)",
+                "(* Zero any residual background curvature from VarD commutators *)",
                 f"{eom_var} = {eom_var} /. {{{riemann_cd}[__] :> 0, {einstein_cd}[__] :> 0}};",
                 _wls_mem_print(f"EOM({df['name']}) computed"),
                 "",
@@ -926,9 +928,7 @@ def _wls_multi_field_eom(
     )
 
     # Build set of TT-gauged field names for SkipTuples optimization
-    tt_fields = {
-        entry["field"] for entry in ctx.gauge if entry["type"] == "tt"
-    }
+    tt_fields = {entry["field"] for entry in ctx.gauge if entry["type"] == "tt"}
 
     # Build BackgroundFieldRules for non-scalar background fields.
     # Format: {fieldHead, {covariantComps}, {contravariantComps}}
@@ -943,9 +943,7 @@ def _wls_multi_field_eom(
                 bf["components"], ctx.metric_diagonal
             )
             contra_str = ", ".join(contra_comps)
-            bg_rules_entries.append(
-                f"{{{bg_head}, {{{comps_str}}}, {{{contra_str}}}}}"
-            )
+            bg_rules_entries.append(f"{{{bg_head}, {{{comps_str}}}, {{{contra_str}}}}}")
     bg_rules_opt = ""
     if bg_rules_entries:
         bg_rules_str = ", ".join(bg_rules_entries)
@@ -957,16 +955,12 @@ def _wls_multi_field_eom(
     for i, df in enumerate(dyn_fields):
         eom_var = f"eom{df['name'].capitalize()}"
         comp_var = f"comp{df['name'].capitalize()}"
-        others_str = ", ".join(
-            d["fexpr"] for j, d in enumerate(dyn_fields) if j != i
-        )
+        others_str = ", ".join(d["fexpr"] for j, d in enumerate(dyn_fields) if j != i)
         # For TT-gauged symmetric rank-2 fields, skip temporal components
         # {0,0}, {0,1}, ..., {0,dim-1} — they are zero by gauge choice
         skip_opt = ""
         if df["name"] in tt_fields:
-            skip_tuples = ", ".join(
-                f"{{{0},{mu}}}" for mu in range(ctx.dim)
-            )
+            skip_tuples = ", ".join(f"{{{0},{mu}}}" for mu in range(ctx.dim))
             skip_opt = f', "SkipTuples" -> {{{skip_tuples}}}'
         lines.extend(
             [
@@ -974,7 +968,9 @@ def _wls_multi_field_eom(
                 _wls_timing_start(f"tDecomp{df['name']}"),
                 f"(* Decompose {df['name']} EOM to components *)",
                 f'{comp_var} = DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}{bg_rules_opt}];',
-                _wls_timing_end(f"tDecomp{df['name']}", f"EOM decomposition ({df['name']})"),
+                _wls_timing_end(
+                    f"tDecomp{df['name']}", f"EOM decomposition ({df['name']})"
+                ),
                 f'Print["[", Round[MemoryInUse[]/1024.^2], " MB] {df["name"]} decomposed: ", Length[{comp_var}], " components"];',
             ]
         )
@@ -1011,25 +1007,31 @@ def _wls_matter_pert_truncation(mpi: dict[str, str]) -> list[str]:
     pname = mpi["pert_name"]
     lines: list[str] = []
     if mpi["field_type"] == "scalar":
-        lines.extend([
-            f"(* Drop 2nd-order matter perturbation {pname}^(2) *)",
-            f"l2Raw = l2Raw /. {mp_sym}[LI[2]] :> 0;",
-            f"(* Replace xPert notation -> perturbation field {pname} *)",
-            f"l2Raw = l2Raw /. {mp_sym}[LI[1]] :> {mp_head}[];",
-        ])
+        lines.extend(
+            [
+                f"(* Drop 2nd-order matter perturbation {pname}^(2) *)",
+                f"l2Raw = l2Raw /. {mp_sym}[LI[2]] :> 0;",
+                f"(* Replace xPert notation -> perturbation field {pname} *)",
+                f"l2Raw = l2Raw /. {mp_sym}[LI[1]] :> {mp_head}[];",
+            ]
+        )
     else:
-        lines.extend([
-            f"(* Drop 2nd-order matter perturbation {pname}^(2) *)",
-            f"l2Raw = l2Raw /. {mp_sym}[LI[2], idx__] :> 0;",
-            f"(* Replace xPert notation -> perturbation field {pname} *)",
-            f"l2Raw = l2Raw /. {mp_sym}[LI[1], idx__] :> {mp_head}[idx];",
-        ])
+        lines.extend(
+            [
+                f"(* Drop 2nd-order matter perturbation {pname}^(2) *)",
+                f"l2Raw = l2Raw /. {mp_sym}[LI[2], idx__] :> 0;",
+                f"(* Replace xPert notation -> perturbation field {pname} *)",
+                f"l2Raw = l2Raw /. {mp_sym}[LI[1], idx__] :> {mp_head}[idx];",
+            ]
+        )
     # Replace original field -> background so ComponentValues evaluate
     if bg_head and bg_head != field_head:
-        lines.extend([
-            f"(* Replace zeroth-order field {field_head} -> background {bg_head} *)",
-            f"l2Raw = l2Raw /. {field_head} -> {bg_head};",
-        ])
+        lines.extend(
+            [
+                f"(* Replace zeroth-order field {field_head} -> background {bg_head} *)",
+                f"l2Raw = l2Raw /. {field_head} -> {bg_head};",
+            ]
+        )
     return lines
 
 
@@ -1091,7 +1093,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     pert_sym = f"{ctx.prefix}hpert"
     eps_sym = f"{ctx.prefix}Epsilon"
-    field_head = f"{ctx.prefix}{pert_field_name.capitalize()}" if has_metric_pert else None
+    field_head = (
+        f"{ctx.prefix}{pert_field_name.capitalize()}" if has_metric_pert else None
+    )
     bg_name = f"{ctx.prefix}Bg"
     ricci_sym = f"Ricci{ctx.cd}"
     ricci_scalar_sym = f"RicciScalar{ctx.cd}"
@@ -1141,7 +1145,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     # --- Matter field perturbation setup (multi-field xPert) ---
     matter_pert_info, mp_lines = _wls_matter_perturbation_setup(
-        ctx, matter_perts, eps_sym,
+        ctx,
+        matter_perts,
+        eps_sym,
     )
     lines.extend(mp_lines)
 
@@ -1339,13 +1345,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
         # Build SkipTuples for TT-gauged field
         skip_opt = ""
-        tt_fields = {
-            entry["field"] for entry in ctx.gauge if entry["type"] == "tt"
-        }
+        tt_fields = {entry["field"] for entry in ctx.gauge if entry["type"] == "tt"}
         if pert_field_name in tt_fields:
-            skip_tuples = ", ".join(
-                f"{{{0},{mu}}}" for mu in range(ctx.dim)
-            )
+            skip_tuples = ", ".join(f"{{{0},{mu}}}" for mu in range(ctx.dim))
             skip_opt = f', "SkipTuples" -> {{{skip_tuples}}}'
 
         lines.extend(
@@ -1356,9 +1358,7 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             ]
         )
         lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
-        lines.extend(
-            _wls_validate_backgrounds_after_decompose(ctx, "componentEqs")
-        )
+        lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
 
         # Build fieldEquations table
         lines.extend(
@@ -1397,7 +1397,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             if mpi["field_type"] not in {"scalar", "vector"}:
                 mp_field_dict["rank"] = int(mpi["field_rank"])
             mp_fexpr = _field_expression(
-                mp_field_dict, ctx.prefix, head_override=mpi["pert_head"],
+                mp_field_dict,
+                ctx.prefix,
+                head_override=mpi["pert_head"],
             )
             dyn_fields.append(
                 {
@@ -1424,7 +1426,9 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     ):
         lines.extend(_wls_gauge_fixing_type_b(ctx))
 
-    lines.append(_wls_timing_end("tLinearize", "Linearization (xPert L^(2) + EOM decomposition)"))
+    lines.append(
+        _wls_timing_end("tLinearize", "Linearization (xPert L^(2) + EOM decomposition)")
+    )
     return lines
 
 
@@ -1677,8 +1681,8 @@ def _tt_traceless_substitution(
     # Solve for h_{last}: h_{last} = -Σ_{i≠last} (g_{last}/g_i) * h_i
     if metric_diagonal and len(metric_diagonal) == dim:
         spatial_metric = metric_diagonal[1:]  # drop time component
-        last_g = spatial_metric[-1]           # e.g. "x[]^2*Sin[y[]]^2"
-        other_g = spatial_metric[:-1]         # e.g. ["1", "x[]^2"]
+        last_g = spatial_metric[-1]  # e.g. "x[]^2*Sin[y[]]^2"
+        other_g = spatial_metric[:-1]  # e.g. ["1", "x[]^2"]
         # Wolfram Simplify collapses ratios; killed-coordinate values have already
         # been substituted in Python (via _apply_coord_values), so e.g.
         # (x[]^2*Sin[Pi/2]^2)/(x[]^2) = 1 trivially — no Sin[y[]] survives.
@@ -1689,11 +1693,11 @@ def _tt_traceless_substitution(
 
     repl_sum = " + ".join(
         f"{w} * {comp_pfx}{idx}[args]"
-        for w, idx in zip(weights, other_diag_indices)
+        for w, idx in zip(weights, other_diag_indices, strict=False)
     )
     deriv_repl_sum = " + ".join(
         f"{w} * Derivative[d][{comp_pfx}{idx}][args]"
-        for w, idx in zip(weights, other_diag_indices)
+        for w, idx in zip(weights, other_diag_indices, strict=False)
     )
     # Constraint equation: g_{last} * Σ g^{ii} h_{ii} = 0
     # Written with h_{last} on both sides so self-coeff = 1 for Python detector:
@@ -1701,14 +1705,14 @@ def _tt_traceless_substitution(
     trace_terms = (
         " + ".join(
             f"{w} * {comp_pfx}{idx}[{coord_args}]"
-            for w, idx in zip(weights, other_diag_indices)
+            for w, idx in zip(weights, other_diag_indices, strict=False)
         )
         + f" + {last_comp}[{coord_args}]"
     )
 
     return [
         f"(* TT traceless: substitute {last_comp} → -(metric-weighted sum of other diags) *)",
-        f"(* Condition: g^{{ij}} h_{{ij}} = 0  ⟹  h_last = -Σ (g_last/g_i) h_i *)",
+        "(* Condition: g^{ij} h_{ij} = 0  ⟹  h_last = -Σ (g_last/g_i) h_i *)",
         f"fieldEquations = fieldEquations /. {{"
         f"{last_comp}[args___] :> -({repl_sum}), "
         f"Derivative[d__][{last_comp}][args___] :> -({deriv_repl_sum})}};",
@@ -1719,7 +1723,7 @@ def _tt_traceless_substitution(
         " {k, Length[fieldEquations]}];",
         "",
         f"(* Replace {last_comp} equation with algebraic traceless constraint *)",
-        f"(* Form: h_last_EOM = Σ w_i h_i + h_last  (self-coeff=1 for Python detector) *)",
+        "(* Form: h_last_EOM = Σ w_i h_i + h_last  (self-coeff=1 for Python detector) *)",
         f'Do[If[fieldEquations[[k, 1]] === "{field_name}_{last_diag_idx}",'
         f' fieldEquations[[k]] = {{"{field_name}_{last_diag_idx}", {trace_terms}}}],'
         f" {{k, Length[fieldEquations]}}];",
@@ -1762,7 +1766,7 @@ def _type_b_tt_gauge(
     # For x-propagation (spherical radial): prop_spatial = 1.
     if ctx.reduction is not None:
         prop_coord = ctx.reduction["propagation_axis"]  # e.g. "x"
-        prop_spatial = _COORDS[dim].index(prop_coord)   # e.g. 1 for [t,x,y,z]
+        prop_spatial = _COORDS[dim].index(prop_coord)  # e.g. 1 for [t,x,y,z]
     else:
         prop_spatial = dim - 1  # default: last spatial axis
 
@@ -2077,7 +2081,7 @@ def _wls_plane_wave_coordinate_evaluation(ctx: _WlsContext) -> list[str]:
         "  {fieldEquations[[k, 1]], Expand[fieldEquations[[k, 2]]]},",
         "  {k, Length[fieldEquations]}",
         "];",
-        f'Print["After coordinate evaluation: ", Length[fieldEquations], " equations"];',
+        'Print["After coordinate evaluation: ", Length[fieldEquations], " equations"];',
         "",
     ]
 
@@ -2112,9 +2116,7 @@ def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
     # Step 5: Decompose
     lines.append("(* Step 5: Decompose to components *)")
     # Build set of TT-gauged field names for SkipTuples optimization
-    tt_fields = {
-        entry["field"] for entry in ctx.gauge if entry["type"] == "tt"
-    }
+    tt_fields = {entry["field"] for entry in ctx.gauge if entry["type"] == "tt"}
     for i, field in enumerate(ctx.fields):
         fname = field["name"]
         fexpr = _field_expression(field, ctx.prefix)
@@ -2128,9 +2130,7 @@ def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
 
         skip_opt = ""
         if fname in tt_fields:
-            skip_tuples = ", ".join(
-                f"{{{0},{mu}}}" for mu in range(ctx.dim)
-            )
+            skip_tuples = ", ".join(f"{{{0},{mu}}}" for mu in range(ctx.dim))
             skip_opt = f', "SkipTuples" -> {{{skip_tuples}}}'
 
         lines.extend(
@@ -2355,9 +2355,7 @@ def _matter_pert_head_map(ctx: _WlsContext) -> dict[str, str]:
         mp_head_candidate = f"{p}{mp_name.capitalize()}"
         # Collision avoidance: if capitalize(pert) == capitalize(field),
         # use the perturbation name as-is (e.g. "a" → "mmpa" not "mmpA").
-        mp_head = (
-            f"{p}{mp_name}" if mp_head_candidate == mf_head else mp_head_candidate
-        )
+        mp_head = f"{p}{mp_name}" if mp_head_candidate == mf_head else mp_head_candidate
         head_map[mp_name] = mp_head
     return head_map
 
@@ -2370,10 +2368,7 @@ def _matter_pert_originals(ctx: _WlsContext) -> set[str]:
     """
     if not ctx.linearization:
         return set()
-    return {
-        mp["field"]
-        for mp in ctx.linearization.get("matter_perturbations", [])
-    }
+    return {mp["field"] for mp in ctx.linearization.get("matter_perturbations", [])}
 
 
 def _canonical_field_heads(ctx: _WlsContext) -> tuple[str, str]:
@@ -2773,7 +2768,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:
             "(* theories where ToBasis + TraceBasisDummy on the full L^(2) generates *)",
             "(* O(dim^{2K}) intermediate terms (K = contracted index pairs).         *)",
             "lagTerms = If[Head[lagForCanon] === Plus, List @@ lagForCanon, {lagForCanon}];",
-            f'Print["Decomposing Lagrangian: ", Length[lagTerms], " additive terms"];',
+            'Print["Decomposing Lagrangian: ", Length[lagTerms], " additive terms"];',
             _wls_timing_start("tCanonDecomp"),
             "lagComp = 0;",
             "Do[",
@@ -2859,10 +2854,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:
         if fname in originals:
             # Original field replaced by perturbation — skip
             continue
-        if fname in pert_heads:
-            head = pert_heads[fname]
-        else:
-            head = f"{p}{fname.capitalize()}"
+        head = pert_heads[fname] if fname in pert_heads else f"{p}{fname.capitalize()}"
         n_comps = _field_component_count(field, ctx.dim)
         lines.extend(f'compToFunc["{fname}_{j}"] = {head}{j};' for j in range(n_comps))
 
@@ -3096,109 +3088,103 @@ def _wls_json_plane_wave_reduction(ctx: _WlsContext) -> list[str]:
 
     1. Operator names: ``laplacian_{prop} → laplacian_x``, etc.
     2. Coordinate references in ``coefficient_symbolic``: ``{prop}[] → x[]``
-    3. Hamiltonian term operators and coordinate_dependent lists
+    3. Bare coordinate names in ``coordinate_dependent``: ``["z"] → ["x"]``
     4. Spacetime metadata: dimension → 2, signature → [-1,1], coordinates → [t,x]
-    5. Remove terms with killed-axis operators from equations and Hamiltonian
+    5. Reduction provenance in metadata
 
-    This replaces the Python ``reduce_spec()`` post-processing with exact
-    Wolfram-side manipulation for a proper, extensible pipeline.
+    All replacement logic is self-contained in Wolfram — Python only passes
+    the propagation axis name and spatial coordinate list.  Wolfram builds
+    all string-replacement rules, applies them via
+    ``ExportString → StringReplace → ImportString``, and restores any
+    metadata that the bare-coordinate rule inadvertently touched.
     """
     if ctx.reduction is None:
         return []
 
     prop = ctx.reduction["propagation_axis"]  # e.g. "z"
     spatial = [c for c in ctx.coords if c != "t"]
-    killed = [c for c in spatial if c != prop]
-
-    # Build operator remap rules: prop → x, killed axes → removed
-    # Operators: laplacian_{axis}, gradient_{axis}, first_derivative_{axis},
-    # cross_derivative_{a}{b}
-    op_remap_rules: list[str] = []
-    for axis in [prop]:
-        op_remap_rules.append(f'"laplacian_{axis}" -> "laplacian_x"')
-        op_remap_rules.append(f'"gradient_{axis}" -> "gradient_x"')
-        op_remap_rules.append(f'"first_derivative_{axis}" -> "first_derivative_x"')
-
-    killed_patterns: list[str] = []
-    for axis in killed:
-        killed_patterns.extend(
-            [
-                f'"laplacian_{axis}"',
-                f'"gradient_{axis}"',
-                f'"first_derivative_{axis}"',
-            ]
-        )
-        # Cross derivatives involving killed axes
-        for other in spatial:
-            if other != axis:
-                for perm in [f"{axis}{other}", f"{other}{axis}"]:
-                    killed_patterns.append(f'"cross_derivative_{perm}"')
-
-    killed_set = "{" + ", ".join(killed_patterns) + "}"
-    remap_assoc = "<|" + ", ".join(op_remap_rules) + "|>"
-
-    # Coordinate remap: prop[] → x[] in symbolic strings
-    coord_remap_rules = [f'"{prop}[]" -> "x[]"']
-    for k in killed:
-        coord_remap_rules.append(f'"{k}[]" -> "x[]"')  # shouldn't appear, safety
-    coord_remap_str = "{" + ", ".join(coord_remap_rules) + "}"
-
-    # Build string replacement rules for operator and coordinate renaming.
-    # Use JSON string-level replacement (robust with Mathematica Associations).
-    str_rules: list[str] = []
-    # Operator renaming: prop_axis → x
-    for suffix in ["laplacian", "gradient", "first_derivative"]:
-        str_rules.append(f'"{suffix}_{prop}" -> "{suffix}_x"')
-    # Cross derivatives involving killed axes → remove (handled by term filtering)
-    # Coordinate references in symbolic expressions
-    str_rules.append(f'"{prop}[]" -> "x[]"')
-    for k in killed:
-        str_rules.append(f'"{k}[]" -> "x[]"')
-    str_rules_str = "{" + ", ".join(str_rules) + "}"
-
-    # Killed operator patterns for term filtering
-    killed_op_patterns: list[str] = []
-    for axis in killed:
-        for suffix in ["laplacian", "gradient", "first_derivative"]:
-            killed_op_patterns.append(f'"\\"{suffix}_{axis}\\"" ')
-        for other in spatial:
-            if other != axis:
-                for perm in [f"{axis}{other}", f"{other}{axis}"]:
-                    killed_op_patterns.append(
-                        f'"\\\"cross_derivative_{perm}\\\""'
-                    )
+    spatial_str = "{" + ", ".join(f'"{c}"' for c in spatial) + "}"
 
     return [
         "",
         "(* === Plane-wave reduction: remap JSON to 1+1D === *)",
-        f'Print["Remapping JSON: {ctx.dim}D → 2D ({prop} → x)"];',
+        f'pwPropAxis = "{prop}";',
+        f"pwSpatialAxes = {spatial_str};",
+        "pwKilledAxes = DeleteCases[pwSpatialAxes, pwPropAxis];",
         "",
-        "(* Update spacetime metadata BEFORE export *)",
+        'Print["Remapping JSON: " <> ToString[Length[pwSpatialAxes]+1]',
+        '  <> "D → 2D (" <> pwPropAxis <> " → x)"];',
+        "",
+        "(* --- Update spacetime metadata --- *)",
         'jsonStructure["spacetime", "dimension"] = 2;',
         'jsonStructure["spacetime", "signature"] = {-1, 1};',
         'jsonStructure["spacetime", "coordinates"] = {"t", "x"};',
         "",
-        "(* Store reduction provenance *)",
+        "(* --- Store reduction provenance --- *)",
         'jsonStructure["metadata", "reduction"] = <|',
-        f'  "type" -> "plane_wave",',
+        '  "type" -> "plane_wave",',
         f'  "original_dimension" -> {ctx.dim},',
-        f'  "propagation_axis" -> "{prop}",',
+        '  "propagation_axis" -> pwPropAxis,',
         '  "eliminated_fields" -> eliminatedFromCanonical',
-        '|>;',
+        "|>;",
         "",
-        "(* Operator and coordinate renaming via JSON string replacement. *)",
-        "(* This is robust because Mathematica Association Part assignment *)",
-        "(* has quirks with nested structures from ImportString.           *)",
-        f"pwStringRules = {str_rules_str};",
+        "(* --- Remap coordinate_dependent arrays in the Association --- *)",
+        "(* Fix coordinate names BEFORE ExportString, so no fragile     *)",
+        "(* string-level patching is needed.                            *)",
+        "pwCoordMap = {};",
+        'If[pwPropAxis =!= "x", AppendTo[pwCoordMap, pwPropAxis -> "x"]];',
+        'Do[If[k =!= "x", AppendTo[pwCoordMap, k -> "x"]], {k, pwKilledAxes}];',
         "",
-        "(* Export to JSON string, apply replacements, re-import *)",
-        "Module[{jsonStr},",
-        '  jsonStr = ExportString[jsonStructure, "JSON"];',
-        "  jsonStr = StringReplace[jsonStr, pwStringRules];",
-        '  jsonStructure = ImportString[jsonStr, "JSON"]',
+        "(* Remap coordinate_dependent in equations *)",
+        'Do[',
+        '  Module[{terms, j, cd},',
+        '    terms = eqn["rhs", "terms"];',
+        '    Do[',
+        '      cd = terms[[j, "coordinate_dependent"]];',
+        '      If[ListQ[cd],',
+        '        terms[[j, "coordinate_dependent"]] = cd /. pwCoordMap],',
+        '      {j, Length[terms]}',
+        '    ];',
+        '    eqn["rhs", "terms"] = terms',
+        "  ],",
+        '  {eqn, jsonStructure["equations"]}',
         "];",
         "",
-        f'Print["JSON remapped: {ctx.dim}D → 2D ({prop} → x)"];',
+        "(* Remap coordinate_dependent in hamiltonian_terms *)",
+        'If[KeyExistsQ[jsonStructure, "canonical"],',
+        '  Module[{hterms, j, cd},',
+        '    hterms = jsonStructure["canonical", "hamiltonian_terms"];',
+        "    Do[",
+        '      cd = hterms[[j, "coordinate_dependent"]];',
+        '      If[ListQ[cd],',
+        '        hterms[[j, "coordinate_dependent"]] = cd /. pwCoordMap],',
+        "      {j, Length[hterms]}",
+        "    ];",
+        '    jsonStructure["canonical", "hamiltonian_terms"] = hterms',
+        "  ]",
+        "];",
+        "",
+        "(* --- Build string replacement rules for operators and coords --- *)",
+        "pwStringRules = {};",
+        "",
+        "(* Operator renaming: prop_axis → x *)",
+        "Do[",
+        "  AppendTo[pwStringRules,",
+        '    pfx <> "_" <> pwPropAxis -> pfx <> "_x"],',
+        '  {pfx, {"laplacian", "gradient", "first_derivative"}}',
+        "];",
+        "",
+        "(* Coordinate references in symbolic expressions: prop[] → x[] *)",
+        'If[pwPropAxis =!= "x",',
+        '  AppendTo[pwStringRules, pwPropAxis <> "[]" -> "x[]"]',
+        "];",
+        'Do[AppendTo[pwStringRules, k <> "[]" -> "x[]"], {k, pwKilledAxes}];',
+        "",
+        "(* Apply string rules to the JSON text (operators + symbolic coords) *)",
+        'jsonStringFinal = ExportString[jsonStructure, "JSON"];',
+        "jsonStringFinal = StringReplace[jsonStringFinal, pwStringRules];",
+        "",
+        'Print["JSON remapped to 1+1D."];',
         "",
     ]
 
@@ -3387,9 +3373,7 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
     # still uses the original ND coordinate names (e.g. laplacian_z).
     # Remap to 1+1D: surviving axis → "x", killed axes removed.
     if ctx.reduction:
-        lines.extend(
-            _wls_json_plane_wave_reduction(ctx)
-        )
+        lines.extend(_wls_json_plane_wave_reduction(ctx))
 
     # Export
     escaped_output = str(ctx.output_path).replace("\\", "\\\\").replace('"', '\\"')
@@ -3400,9 +3384,16 @@ def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[s
             'If[outputDir =!= "" && !DirectoryQ[outputDir], CreateDirectory[outputDir]];',
             "",
             'Print["JSON Output:"];',
-            'Print[ExportString[jsonStructure, "JSON"]];',
+            # When reduction is active, jsonStringFinal holds the remapped
+            # JSON string (never re-imported to avoid Association issues).
+            "Print[jsonStringFinal];"
+            if ctx.reduction
+            else 'Print[ExportString[jsonStructure, "JSON"]];',
             "",
-            'Export[outputPath, jsonStructure, "JSON"];',
+            # Write directly from string when reduction was applied
+            "WriteString[outputPath, jsonStringFinal]; Close[outputPath];"
+            if ctx.reduction
+            else 'Export[outputPath, jsonStructure, "JSON"];',
             'Print[""];',
             'Print["Exported to: ", outputPath];',
             "",
@@ -3579,9 +3570,7 @@ def _run_wolframscript(script_path: Path) -> int:
     # The Wolfram Engine license limits concurrent sessions; orphaned kernels
     # from previous crashed/interrupted runs consume seats and cause
     # "license error" segfaults on subsequent invocations.
-    subprocess.run(
-        ["pkill", "-f", "WolframKernel"], capture_output=True, check=False
-    )
+    subprocess.run(["pkill", "-f", "WolframKernel"], capture_output=True, check=False)
 
     # Warn if no swap — large derivations may crash without sufficient memory
     try:
@@ -3651,9 +3640,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
     if not force and resolved_out.exists():
         try:
             existing = _json_mod.loads(resolved_out.read_text(encoding="utf-8"))
-            existing_hash = (
-                existing.get("metadata", {}).get("derivation_hash", "")
-            )
+            existing_hash = existing.get("metadata", {}).get("derivation_hash", "")
             if existing_hash == script_hash:
                 print(f"Derivation cache hit: {resolved_out.name}")
                 print(
@@ -3696,8 +3683,8 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
     # post-processing (reduction, validation, hash injection).
     if ret != 0 and resolved.exists():
         try:
-            _probe = _json_mod.loads(resolved.read_text(encoding="utf-8"))
-            if _probe.get("equations") and len(_probe["equations"]) > 0:
+            probe = _json_mod.loads(resolved.read_text(encoding="utf-8"))
+            if probe.get("equations") and len(probe["equations"]) > 0:
                 print(
                     f"\nNote: wolframscript exited with code {ret} but "
                     f"JSON was exported successfully — proceeding with "
