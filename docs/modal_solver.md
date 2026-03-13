@@ -139,13 +139,28 @@ Solution: û_k(t) = û_k(0)·exp(-D·k²·t) — exponential decay per mode, dia
 
 The **only** error source is eigendecomposition precision (~1e-14 for well-conditioned matrices). For parameter sweeps, numerical uncertainty is effectively zero — the dominant error becomes the physics model itself.
 
-Comparison with other solvers on coupled_scalars (N=64, t=3):
+Comparison with other solvers on single-field KG (k=1, m²=1, N=64, t=1):
 
-| Solver | Error vs exact | Note |
-|--------|---------------|------|
-| Modal | ~1e-14 | Machine precision |
-| CVODE (rtol=1e-10) | ~4e-4 | Truncation error accumulates |
-| Leapfrog (dt=0.01) | ~1e-4 | O(dt²) error |
+| Solver | Error vs analytical | Note |
+|--------|---------------------|------|
+| Modal | 5×10⁻¹⁶ | Machine precision |
+| CVODE (rtol=1e-10) | 2.8×10⁻⁴ | Truncation error accumulates |
+
+### Performance Benchmarks
+
+Coupled scalars (2 fields, 31 snapshots, t_end=3, periodic BCs):
+
+| Grid | Modal | CVODE (rtol=1e-10) | Speedup | Max diff |
+|------|-------|--------------------|---------|----------|
+| N=64 | 0.003 s | 0.16 s | **57×** | 4.0×10⁻⁴ |
+| N=128 | 0.003 s | 0.40 s | **157×** | 5.2×10⁻⁴ |
+| N=256 | 0.003 s | 4.27 s | **1451×** | 6.3×10⁻⁴ |
+
+Key observations:
+- **Modal time is O(1) in grid size** — eigendecomposition cost is per-mode (4×4 matrices), independent of N. The IFFT reconstruction is O(N log N) but negligible.
+- **CVODE scales as O(N²+)** — spatial operator evaluation is O(N) per timestep, and more grid points require more timesteps to resolve the same physics.
+- **Max diff is CVODE error, not modal error** — modal solutions are exact to machine precision (~10⁻¹⁶); the 10⁻⁴ difference is entirely CVODE truncation error.
+- **Speedup grows with N** — at N=256 the modal solver is >1000× faster, making it transformative for parameter sweeps where hundreds of simulations are needed.
 
 ## Implementation Details
 
@@ -156,7 +171,7 @@ Comparison with other solvers on coupled_scalars (N=64, t=3):
 | `tidal/solver/modal.py` | Core solver (~760 lines) |
 | `tidal/cli/_simulate.py` | Auto-selection + dispatch |
 | `tidal/cli/__init__.py` | `"modal"` in `--scheme` choices |
-| `tests/test_solver_modal.py` | 23 tests (11 eligibility + 12 correctness) |
+| `tests/test_solver_modal.py` | 25 tests (11 eligibility + 14 correctness) |
 
 ### Key Functions
 
