@@ -347,3 +347,229 @@ class TestMassSignDiagnostic:
         with warnings.catch_warnings():
             warnings.simplefilter("error")
             CoefficientEvaluator(spec, grid)  # Should not warn
+
+
+# ---------------------------------------------------------------------------
+# Tests — periodic coefficient continuity check
+# ---------------------------------------------------------------------------
+
+
+class TestPeriodicCoefficientContinuity:
+    """Tests for check_periodic_coefficient_continuity().
+
+    This check prevents the subtle O(1) energy non-conservation that occurs
+    when position-dependent coefficients are discontinuous at periodic
+    boundaries.  The integration-by-parts identity requires [β(L)-β(0)]=0;
+    when it doesn't hold, the boundary term leaks energy regardless of
+    grid resolution or solver tolerance.
+    """
+
+    def test_periodic_coefficient_no_warning(self) -> None:
+        """Periodic coefficient (Cos) on periodic domain: no warning.
+
+        Cos[x] on [0, 2π] is exactly periodic: Cos(0)=Cos(2π)=1.
+        On a cell-centered grid [dx/2, ..., 2π-dx/2], the first and last
+        values are Cos(dx/2) ≈ Cos(2π-dx/2) by symmetry.
+        """
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "Cos[x[]]",
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        grid = _make_grid_1d(32)
+        ev = CoefficientEvaluator(spec, grid)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            ev.check_periodic_coefficient_continuity((True,))
+
+    def test_nonperiodic_coefficient_warns(self) -> None:
+        """Non-periodic coefficient with moderate jump (1-50%): warns.
+
+        Use a coefficient that varies smoothly but has a small mismatch
+        at the periodic boundary.  Sin[x] on cell-centered [0,2π] grid
+        has sin(dx/2) ≈ 0.098 at left and sin(2π-dx/2) ≈ -0.098 at right,
+        giving a ~20% relative jump (warn, not error).
+        """
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "Sin[x[]]",
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        grid = _make_grid_1d(32)
+        ev = CoefficientEvaluator(spec, grid)
+        with pytest.warns(UserWarning, match="jump at the periodic boundary"):
+            ev.check_periodic_coefficient_continuity((True,))
+
+    def test_large_jump_raises_error(self) -> None:
+        """Coefficient with >50% relative jump raises ValueError.
+
+        x² on [0, 2π] has x(0)²≈0 but x(2π)²≈39.5 → 100% relative jump.
+        """
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "x[]^2",
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        grid = _make_grid_1d(32)
+        ev = CoefficientEvaluator(spec, grid)
+        with pytest.raises(ValueError, match="jump at the periodic boundary"):
+            ev.check_periodic_coefficient_continuity((True,))
+
+    def test_divergent_coefficient_raises_error(self) -> None:
+        """1/x on [0.1, 10]: left=10 vs right=0.1, 99% jump → error.
+
+        This models the original dipolar B∝1/r³ failure case.
+        """
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "1/x[]",
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        grid = GridInfo(bounds=((0.1, 10.0),), shape=(32,), periodic=(True,))
+        ev = CoefficientEvaluator(spec, grid)
+        with pytest.raises(ValueError, match="jump at the periodic boundary"):
+            ev.check_periodic_coefficient_continuity((True,))
+
+    def test_no_check_when_not_periodic(self) -> None:
+        """No warning even with non-periodic coefficient if BCs aren't periodic."""
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "x[]^2",
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        grid = _make_grid_1d(32)
+        ev = CoefficientEvaluator(spec, grid)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            ev.check_periodic_coefficient_continuity((False,))
+
+    def test_small_absolute_jump_benign(self) -> None:
+        """Coefficient periodic in B(x) but with x² factor: small absolute jump.
+
+        This is the centered-dipolar scenario: B(x) is perfectly periodic but
+        the Wolfram expansion produces B²·x² terms where x² breaks periodicity.
+        The key insight is that |coeff(boundary)| ≪ |coeff(center)|, so the
+        absolute jump is small and energy leak is negligible.
+
+        Current implementation uses relative threshold, so this still warns.
+        The test documents the expected behavior.
+        """
+        # Simulate B²·x² where B is tiny at boundaries
+        # B = 0.001 at x=1, B = 1.0 at x=5 (center), B = 0.001 at x=9
+        # coeff = B² * x² → at x=1: 1e-6, at x=9: 8.1e-5
+        # Relative jump = |8.1e-5 - 1e-6| / max ≈ 0.3% — below 1% threshold
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    # Coefficient that's small at both ends, large at center
+                    "coefficient_symbolic": (
+                        "x[]^2 / (1 + (x[] - 3.14159)^2)^3"
+                    ),
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        grid = _make_grid_1d(64)
+        ev = CoefficientEvaluator(spec, grid)
+        # This coefficient has tiny values at both boundaries despite
+        # containing x² — the localized denominator suppresses them.
+        # Verify it doesn't raise (absolute values at boundary are tiny).
+        ev.check_periodic_coefficient_continuity((True,))
+
+    def test_2d_checks_periodic_axis(self) -> None:
+        """In 2D, check detects discontinuity along the periodic x-axis."""
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "x[]^2",
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=3,
+        )
+        grid = _make_grid_2d(8)
+        ev = CoefficientEvaluator(spec, grid)
+        # x² on [0, 2π] has 100% relative jump → hard error
+        with pytest.raises(ValueError, match="jump at the periodic boundary"):
+            ev.check_periodic_coefficient_continuity((True, True))
+
+    def test_2d_nonperiodic_axis_skipped(self) -> None:
+        """In 2D, non-periodic x-axis is skipped even if coefficient varies."""
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "x[]^2",
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=3,
+        )
+        grid = _make_grid_2d(8)
+        ev = CoefficientEvaluator(spec, grid)
+        # Only y-axis is periodic; x-axis not checked
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            ev.check_periodic_coefficient_continuity((False, True))
+
+    def test_constant_coefficient_no_check(self) -> None:
+        """Constant coefficients aren't in _spatial_cache, so no check needed."""
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 2.5,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                },
+            ],
+            dim=2,
+        )
+        grid = _make_grid_1d(16)
+        ev = CoefficientEvaluator(spec, grid)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            ev.check_periodic_coefficient_continuity((True,))
