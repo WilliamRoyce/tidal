@@ -1,0 +1,114 @@
+# Gertsenshtein Effect: Graviton-Photon Conversion in Centered Dipolar B-field (Flat Space)
+#
+# Lagrangian: L = (1/kappa^2) R - (1/4) F_{ab} F^{ab}
+#   (Einstein-Hilbert gravity + Maxwell electrodynamics)
+#
+# Background: Regularized dipolar B-field centered at zc in the simulation domain.
+# B_x(z) = Bpeak * z0^3 / ((z - zc)^2 + z0^2)^(3/2)
+#
+# This is the EXACT on-axis magnetic field of a magnetic dipole (Jackson §5.6).
+# It peaks at z=zc with B_max = Bpeak, and falls off as Bpeak*(z0/|z-zc|)^3
+# at large distances. Unlike the singular 1/z^3 profile, this is smooth everywhere
+# and can be made periodic by centering (zc = domain center).
+#
+# Gauge potential (Coulomb gauge, A_y component):
+#   Abar_y = -Bpeak * z0 * (z - zc) / Sqrt[(z - zc)^2 + z0^2]
+# Check: dAbar_y/dz = -Bpeak * z0^3 / ((z-zc)^2 + z0^2)^(3/2) = -B_x(z) ✓
+#
+# Boccaletti formula (exact for massless vacuum, Delta_k = 0):
+#   P = sin^2(kappa/2 * integral(B_x dz))
+# Full integral (z = -inf to +inf): integral = 2*Bpeak*z0
+# Over finite symmetric domain [zc-L, zc+L]:
+#   integral = 2*Bpeak*z0*L / sqrt(L^2 + z0^2)
+#
+# For domain [5, 80], zc=42.5, L=37.5, z0=10:
+#   integral = 2*0.1*10*37.5/sqrt(1506.25) = 1.933
+#   P = sin^2(0.967) = 0.681
+#
+# Refs:
+#   Boccaletti et al. (1970, Nuovo Cimento 70B:129) — conversion formula
+#   Jackson (1998, Classical Electrodynamics §5.6) — on-axis dipole field
+#   Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609) — inhomogeneous B
+
+[theory]
+name = "Gertsenshtein Effect (Centered Dipolar B-field, Flat Space)"
+description = "Graviton-photon conversion in regularized on-axis dipolar B-field (periodic-compatible)"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+# h: metric perturbation (graviton), A/a: EM potential/perturbation, F = dA
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+# Electromagnetic field strength tensor F = dA (exterior derivative)
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Centered dipolar B-field background potential (Coulomb gauge).
+# Abar_y = -Bpeak * z0 * (z - zc) / Sqrt[(z - zc)^2 + z0^2]
+# -> B_x(z) = Bpeak * z0^3 / ((z - zc)^2 + z0^2)^(3/2)
+# Centered at z=zc so that B(zc-L) = B(zc+L) for periodic domains.
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-Bpeak*z0*(z[]-zc)/Sqrt[(z[]-zc)^2+z0^2]", "0"]
+
+[constants]
+names = ["kappa", "Bpeak", "z0", "zc"]
+
+# Full Einstein-Maxwell Lagrangian:
+# (1/kappa^2) R - (1/4) F_ab F^ab
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]"
+
+# Multi-field perturbation:
+# Metric: g = eta + epsilon*h  (SetupMetricPerturbation)
+# EM: A = Abar + epsilon*a     (DefTensorPerturbation)
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# TT gauge for graviton
+[[gauge]]
+field = "h"
+type = "tt"
+
+# Lorenz gauge for photon perturbation
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction: d/dx = d/dy = 0
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[parameters]
+kappa = 1.0
+Bpeak = 0.1
+z0 = 10.0
+zc = 42.5
+
+[output]
+path = "../data/gertsenshtein_dipolar_centered.json"
