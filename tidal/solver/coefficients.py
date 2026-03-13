@@ -344,3 +344,64 @@ class CoefficientEvaluator:
                         UserWarning,
                         stacklevel=2,
                     )
+
+    def check_periodic_coefficient_continuity(
+        self,
+        periodic: tuple[bool, ...],
+    ) -> None:
+        """Warn if position-dependent coefficients are discontinuous at periodic boundaries.
+
+        When periodic BCs are used, the conservation proof for the PDE system
+        requires all coefficient functions to be continuous across the periodic
+        boundary (so that integration-by-parts boundary terms vanish).
+        Non-periodic coefficients (e.g. B(x) = B₀/x³ on [5, 80]) produce
+        O(1) energy non-conservation that is independent of grid resolution
+        and solver tolerances.
+
+        Parameters
+        ----------
+        periodic : tuple[bool, ...]
+            Per-axis periodicity flags.
+        """
+        if not any(periodic):
+            return  # no periodic axes → no check needed
+
+        for (eq_idx, term_idx), arr in self._spatial_cache.items():
+            # Check each periodic axis for boundary discontinuity
+            for axis, is_periodic in enumerate(periodic):
+                if not is_periodic:
+                    continue
+                if axis >= arr.ndim:
+                    continue
+
+                # Compare first and last slices along this axis
+                first = np.take(arr, 0, axis=axis)
+                last = np.take(arr, arr.shape[axis] - 1, axis=axis)
+
+                scale = max(float(np.abs(arr).max()), 1e-30)
+                jump = float(np.abs(first - last).max())
+                rel_jump = jump / scale
+
+                if rel_jump > 0.01:  # >1% discontinuity
+                    term = self._spec.equations[eq_idx].rhs_terms[term_idx]
+                    field = self._spec.equations[eq_idx].field_name
+                    axis_name = (
+                        self._spatial_coords[axis]
+                        if axis < len(self._spatial_coords)
+                        else f"axis {axis}"
+                    )
+                    msg = (
+                        f"Position-dependent coefficient "
+                        f"'{term.coefficient_symbolic}' in equation for "
+                        f"'{field}' has {rel_jump:.0%} jump at the periodic "
+                        f"boundary along {axis_name} "
+                        f"(left={float(first.flat[0]):.4g}, "
+                        f"right={float(last.flat[0]):.4g}). "
+                        f"This breaks the integration-by-parts identity "
+                        f"and causes O(1) energy non-conservation. "
+                        f"Use a larger domain, non-periodic BCs, or a "
+                        f"localized coefficient profile."
+                    )
+                    if rel_jump > 0.50:  # >50%: hard error
+                        raise ValueError(msg)
+                    warnings.warn(msg, UserWarning, stacklevel=2)

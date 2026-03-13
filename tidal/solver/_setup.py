@@ -51,6 +51,15 @@ def build_rhs_evaluator(
     from tidal.solver.rhs import RHSEvaluator as _RHSEvaluator  # noqa: PLC0415
 
     coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
+
+    # Warn about non-periodic coefficients with periodic BCs — these break
+    # the integration-by-parts identity and cause O(1) energy non-conservation.
+    if bc is not None:
+        from tidal.solver.operators import is_periodic_bc  # noqa: PLC0415
+
+        periodic = tuple(is_periodic_bc(b) for b in bc)
+        coeff_eval.check_periodic_coefficient_continuity(periodic)
+
     return _RHSEvaluator(spec, grid, coeff_eval, bc=bc)
 
 
