@@ -373,7 +373,7 @@ class TestModalCorrectness:
         # Modal is exact (machine-precision); CVODE has O(rtol) truncation
         # error, so agreement is limited by CVODE's tolerance, not modal's.
         max_diff = np.max(np.abs(result_modal["y"][-1] - result_cvode["y"][-1]))
-        assert max_diff < 1e-3, f"Modal vs CVODE max diff: {max_diff:.2e}"
+        assert max_diff < 5e-4, f"Modal vs CVODE max diff: {max_diff:.2e}"
 
     def test_diffusion_exponential_decay(self) -> None:
         """Diffusion: single mode decays as exp(-D*k^2*t).
@@ -492,6 +492,119 @@ class TestModalCorrectness:
         )
         assert result["y"].shape == (n_snap, layout.num_slots * N)
         assert result["t"].shape == (n_snap,)
+
+    def test_2d_wave_dispersion(self) -> None:
+        """2D wave: omega^2 = kx^2 + ky^2 + m^2, single Fourier mode."""
+        spec_2d: dict[str, object] = {
+            "metadata": {"source": "inline-test", "parameters": {"m2": 1.0}},
+            "spacetime": {
+                "dimension": 3,
+                "signature": [-1, 1, 1],
+                "coordinates": ["t", "x", "y"],
+            },
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {
+                        "expression": "d2_t(phi_0)",
+                        "order": {"time": 2, "space": 0},
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-m2",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                }
+            ],
+        }
+        spec = _make_spec(spec_2d)
+        Nx, Ny = 16, 16
+        Lx, Ly = 4.0, 4.0
+        grid = GridInfo(
+            shape=(Nx, Ny),
+            bounds=((0.0, Lx), (0.0, Ly)),
+            periodic=(True, True),
+        )
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        # Single-mode IC: phi = cos(kx*x + ky*y), v = 0
+        nx_mode, ny_mode = 2, 1
+        kx = 2 * np.pi * nx_mode / Lx
+        ky = 2 * np.pi * ny_mode / Ly
+        m2 = 1.0
+        omega = np.sqrt(kx**2 + ky**2 + m2)
+
+        x = np.linspace(0, Lx, Nx, endpoint=False)
+        y = np.linspace(0, Ly, Ny, endpoint=False)
+        X, Y = np.meshgrid(x, y, indexing="ij")
+
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[: grid.num_points] = (np.cos(kx * X + ky * Y)).ravel()
+
+        t_period = 2 * np.pi / omega
+        result = solve_modal(
+            spec, grid, y0, t_span=(0, t_period),
+            parameters={"m2": m2}, num_snapshots=2,
+        )
+        assert result["success"]
+
+        # After one full period, should return to IC
+        np.testing.assert_allclose(
+            result["y"][-1, : grid.num_points],
+            y0[: grid.num_points],
+            atol=1e-11,
+        )
+
+    def test_position_dependent_correctness(self) -> None:
+        """Position-dependent coefficient correctness via convolution path.
+
+        Diffusion with spatially varying coefficient: dt(u) = c(x)*laplacian(u).
+        c(x) = 1.0 (constant, but marked position-dependent with symbolic 'x[]').
+        This forces the convolution path while remaining analytically tractable:
+        the result should match the constant-coefficient solution.
+        """
+        spec_data = copy.deepcopy(_DIFFUSION_SPEC)
+        # Mark the term as position-dependent with symbolic expression
+        # Use coefficient 0.1 as before (D=0.1), but force position_dependent path
+        spec_data["equations"][0]["rhs"]["terms"][0][  # type: ignore[index]
+            "coefficient_symbolic"
+        ] = "D*(1 + 0*x[])"
+        spec = _make_spec(spec_data)
+
+        N = 64
+        L = 10.0
+        D = 0.1
+        grid = GridInfo(shape=(N,), bounds=((0.0, L),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        n_mode = 2
+        k = 2 * np.pi * n_mode / L
+        x = np.linspace(0, L, N, endpoint=False)
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        y0[:N] = np.cos(k * x)
+
+        t_end = 2.0
+        result = solve_modal(
+            spec, grid, y0, t_span=(0, t_end),
+            parameters={"D": D}, num_snapshots=2,
+        )
+        assert result["success"]
+
+        # Exact solution (same as constant-coefficient diffusion)
+        exact = np.exp(-D * k**2 * t_end) * np.cos(k * x)
+        np.testing.assert_allclose(result["y"][-1, :N], exact, atol=1e-10)
 
     def test_zero_ic_stays_zero(self) -> None:
         """Zero initial conditions produce zero output (no spurious modes)."""

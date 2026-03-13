@@ -47,10 +47,11 @@ from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
     from tidal.solver._types import SolverResult
+    from tidal.solver.coefficients import CoefficientEvaluator
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
     from tidal.solver.progress import SimulationProgress
-    from tidal.symbolic.json_loader import EquationSystem
+    from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
 
 # ---------------------------------------------------------------------------
 # Exact Fourier multipliers (angular wavenumber convention: k = 2π·rfftfreq)
@@ -265,7 +266,7 @@ def _build_per_mode_matrices(
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
-    coeff_eval: object,  # CoefficientEvaluator
+    coeff_eval: CoefficientEvaluator,
     k_grid: list[NDArray[np.float64]],
     rfft_shape: tuple[int, ...],
 ) -> NDArray[np.complex128]:
@@ -309,32 +310,42 @@ def _build_per_mode_matrices(
             A[:, field_slot, vel_slot] = 1.0
 
             # dv/dt = Σ coeff * operator(target_field)
-            for term in eq.rhs_terms:
+            for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = layout.field_slot_map[term.field]
-                coeff = _resolve_constant_coeff(term, coeff_eval)
+                coeff = _resolve_constant_coeff(
+                    term, coeff_eval, eq_idx=_eq_idx, term_idx=_term_idx,
+                )
                 mult = multiplier_cache[term.operator]
                 A[:, vel_slot, target_slot] += coeff * mult
 
         else:
             # First-order: du/dt = Σ coeff * operator(target_field)
             this_slot = layout.field_slot_map[field_name]
-            for term in eq.rhs_terms:
+            for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = layout.field_slot_map[term.field]
-                coeff = _resolve_constant_coeff(term, coeff_eval)
+                coeff = _resolve_constant_coeff(
+                    term, coeff_eval, eq_idx=_eq_idx, term_idx=_term_idx,
+                )
                 mult = multiplier_cache[term.operator]
                 A[:, this_slot, target_slot] += coeff * mult
 
     return A
 
 
-def _resolve_constant_coeff(term: object, coeff_eval: object) -> complex:
+def _resolve_constant_coeff(
+    term: OperatorTerm,
+    coeff_eval: CoefficientEvaluator,
+    *,
+    eq_idx: int = -1,
+    term_idx: int = -1,
+) -> complex:
     """Resolve a constant (non-position-dependent) coefficient to a scalar.
 
     Uses CoefficientEvaluator.resolve() which returns a float for constant
     coefficients or an ndarray for position-dependent ones (the latter should
     not reach this function).
     """
-    resolved = coeff_eval.resolve(term, 0.0)  # type: ignore[union-attr]
+    resolved = coeff_eval.resolve(term, 0.0, eq_idx=eq_idx, term_idx=term_idx)
     if isinstance(resolved, np.ndarray):
         # Position-dependent — should not happen for constant-coeff path
         return complex(resolved.ravel()[0])
@@ -345,7 +356,7 @@ def _build_convolution_matrix(
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
-    coeff_eval: object,  # CoefficientEvaluator
+    coeff_eval: CoefficientEvaluator,
     k_grid: list[NDArray[np.float64]],
     rfft_shape: tuple[int, ...],
 ) -> NDArray[np.complex128]:
@@ -393,13 +404,15 @@ def _build_convolution_matrix(
                 A[row, col] = 1.0
 
             # dv/dt = Σ coeff(x) * operator(target_field)
-            for term in eq.rhs_terms:
+            for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = layout.field_slot_map[term.field]
                 mult = multiplier_cache[term.operator]
 
                 if not term.position_dependent:
                     # Constant coefficient: diagonal in mode space
-                    coeff = _resolve_constant_coeff(term, coeff_eval)
+                    coeff = _resolve_constant_coeff(
+                        term, coeff_eval, eq_idx=_eq_idx, term_idx=_term_idx,
+                    )
                     for m in range(n_modes):
                         row = vel_slot * n_modes + m
                         col = target_slot * n_modes + m
@@ -416,16 +429,20 @@ def _build_convolution_matrix(
                         grid,
                         rfft_shape,
                         n_modes,
+                        eq_idx=_eq_idx,
+                        term_idx=_term_idx,
                     )
         else:
             # First-order
             this_slot = layout.field_slot_map[field_name]
-            for term in eq.rhs_terms:
+            for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = layout.field_slot_map[term.field]
                 mult = multiplier_cache[term.operator]
 
                 if not term.position_dependent:
-                    coeff = _resolve_constant_coeff(term, coeff_eval)
+                    coeff = _resolve_constant_coeff(
+                        term, coeff_eval, eq_idx=_eq_idx, term_idx=_term_idx,
+                    )
                     for m in range(n_modes):
                         row = this_slot * n_modes + m
                         col = target_slot * n_modes + m
@@ -441,6 +458,8 @@ def _build_convolution_matrix(
                         grid,
                         rfft_shape,
                         n_modes,
+                        eq_idx=_eq_idx,
+                        term_idx=_term_idx,
                     )
 
     return A
@@ -450,12 +469,15 @@ def _add_convolution_coupling(
     A: NDArray[np.complex128],
     row_slot: int,
     col_slot: int,
-    term: object,
-    coeff_eval: object,
+    term: OperatorTerm,
+    coeff_eval: CoefficientEvaluator,
     operator_mult: NDArray[np.complex128],
     grid: GridInfo,
     rfft_shape: tuple[int, ...],
     n_modes: int,
+    *,
+    eq_idx: int = -1,
+    term_idx: int = -1,
 ) -> None:
     """Add convolution coupling from a position-dependent coefficient.
 
@@ -465,22 +487,10 @@ def _add_convolution_coupling(
     This creates off-diagonal entries in the evolution matrix coupling
     different k-modes.
     """
-    from tidal.solver.coefficients import CoefficientEvaluator  # noqa: PLC0415
-
-    assert isinstance(coeff_eval, CoefficientEvaluator)
-
     # Get the coefficient array on the spatial grid
-    coeff_array = coeff_eval.resolve(term, 0.0)
+    coeff_array = coeff_eval.resolve(term, 0.0, eq_idx=eq_idx, term_idx=term_idx)
     if isinstance(coeff_array, (int, float)):
         coeff_array = np.full(grid.shape, float(coeff_array))
-
-    # FFT the coefficient array to get convolution kernel
-    np.fft.rfftn(coeff_array).ravel()
-
-    # Build convolution matrix: C[m, m'] = ĉ(m - m') / N
-    # The normalization comes from the DFT convolution theorem:
-    # FFT[c·u] = (1/N) · ĉ * û  (circular convolution)
-    int(np.prod(grid.shape))
 
     # For each pair of output mode m and input mode m',
     # the coupling is (1/N) * ĉ(m-m') * mult(m')
