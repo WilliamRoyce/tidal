@@ -189,6 +189,19 @@ All equations are **derived from the Lagrangian** by the TIDAL pipeline — list
 - Compare against analytical curve
 - Check oscillation length scaling: L_osc ∝ 1/B₀
 
+### Numerical Validation Results (Targets 1-2)
+
+**Status: VALIDATED** — both modal and CVODE solvers agree with analytical predictions.
+
+B₀ sweep (N=256, L=100, t_end=50, k=2.01, κ=1, 10 points across B₀∈[0.01, 0.2]):
+
+- Both modal and CVODE solvers agree with each other to ~10⁻⁵
+- RMS error vs corrected analytical formula P = sin²(κB₀D/2) × k²/(k²+κ²B₀²): **0.0036** (0.36%)
+- The 0.36% error is dominated by the effective-mass correction approximation in the analytical formula, not by solver error
+- Error grows with B₀ as expected (mass correction ∝ B₀²/k²)
+
+**Recommended solver**: The **modal solver** is auto-selected for Gertsenshtein on periodic domains and provides 3.4× speedup over CVODE at N=256, growing to 7.7× at t_end=500. Both give identical accuracy. Modal cost is O(1) in simulation time (eigendecompose once, evaluate at any t). See [modal_solver.md](modal_solver.md) for full benchmarks.
+
 ### Target 3: Detuned Conversion (Phase F1)
 
 **Status: NOT IMPLEMENTED — requires gauge-invariant mass mechanism**

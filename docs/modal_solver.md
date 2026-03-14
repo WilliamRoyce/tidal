@@ -161,6 +161,45 @@ Key observations:
 - **CVODE scales as O(N²+)** — spatial operator evaluation is O(N) per timestep, and more grid points require more timesteps to resolve the same physics.
 - **Max diff is CVODE error, not modal error** — modal solutions are exact to machine precision (~10⁻¹⁶); the 10⁻⁴ difference is entirely CVODE truncation error.
 - **Speedup grows with N** — at N=256 the modal solver is >1000× faster, making it transformative for parameter sweeps where hundreds of simulations are needed.
+- **Modal time is O(1) in simulation time** — eigendecomposition is done once; evaluating at any t is just `exp(λ·dt)`. CVODE must take more timesteps for longer runs. See scaling table below.
+
+### Gertsenshtein Effect (6 fields, gradient coupling)
+
+B₀ sweep (N=256, L=100, t_end=50, k=2.01, κ=1, 10 points), P_final compared to analytical P = sin²(κB₀D/2) × k²/(k²+κ²B₀²):
+
+| B₀ | P(modal) | P(CVODE) | P(analytical) | Error |
+|----|----------|----------|---------------|-------|
+| 0.010 | 0.0612 | 0.0612 | 0.0612 | 2×10⁻⁶ |
+| 0.031 | 0.4924 | 0.4924 | 0.4923 | 1×10⁻⁴ |
+| 0.052 | 0.9313 | 0.9312 | 0.9307 | 6×10⁻⁴ |
+| 0.073 | 0.9325 | 0.9325 | 0.9314 | 1×10⁻³ |
+| 0.094 | 0.4949 | 0.4948 | 0.4940 | 9×10⁻⁴ |
+| 0.116 | 0.0624 | 0.0624 | 0.0623 | 5×10⁻⁵ |
+| 0.137 | 0.0740 | 0.0740 | 0.0734 | 6×10⁻⁴ |
+| 0.158 | 0.5180 | 0.5180 | 0.5143 | 4×10⁻³ |
+| 0.179 | 0.9435 | 0.9435 | 0.9360 | 7×10⁻³ |
+| 0.200 | 0.9181 | 0.9181 | 0.9105 | 8×10⁻³ |
+
+- **Both solvers agree to ~10⁻⁵** with each other — identical physics, different numerics
+- **RMS error vs analytical: 0.0036** (0.36%) — dominated by the effective-mass correction approximation, not solver error
+- **Modal: 0.49s/point, CVODE: 1.66s/point → 3.4× speedup** at N=256
+- Speedup is lower than coupled_scalars because the 6-field Gertsenshtein system has 12×12 per-mode matrices (vs 4×4 for 2 fields) and 6× more IFFT reconstructions per snapshot
+
+### Scaling with Simulation Time (t_end)
+
+Gertsenshtein (6 fields, N=256, 101 snapshots, B₀=0.1):
+
+| t_end | Modal | CVODE | Speedup |
+|-------|-------|-------|---------|
+| 10 | 1.4 s | 1.7 s | **1.2×** |
+| 50 | 1.5 s | 3.1 s | **2.0×** |
+| 100 | 1.6 s | 4.3 s | **2.8×** |
+| 200 | 2.1 s | 7.2 s | **3.4×** |
+| 500 | 1.6 s | 12.2 s | **7.7×** |
+
+- **Modal cost is constant in t_end** (~1.5s) — eigendecomposition is done once, and evaluating exp(λ·Δt) at each output time is O(1) regardless of Δt. The ~1.5s is Python startup + FFT + eigendecomposition overhead.
+- **CVODE cost scales linearly with t_end** — each additional unit of simulation time requires proportionally more adaptive timesteps.
+- **Speedup grows linearly with t_end** — for a 40-point parameter sweep at t_end=500, modal saves ~7 minutes vs CVODE. For t_end=5000 (astrophysical timescales), the advantage would be ~50×.
 
 ## Implementation Details
 
