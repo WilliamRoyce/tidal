@@ -1459,12 +1459,16 @@ def _setup_disk_writer_native(  # noqa: PLR0913, PLR0917
             for name, idx in velocity_slots_map.items()
             if name in velocity_set
         }
-        # Extract constraint velocities from IDA's yp vector
-        if yp_flat is not None:
-            for cname, slot_idx in constraint_slot_map.items():
+        # Extract constraint velocities from IDA's yp vector.
+        # For modal solver (no yp), provide zeros — constraint velocities
+        # are not directly available from the eigendecomposition output.
+        for cname, slot_idx in constraint_slot_map.items():
+            if yp_flat is not None:
                 vels_d[cname] = yp_flat[
                     slot_idx * n_pts : (slot_idx + 1) * n_pts
                 ].reshape(shape)
+            else:
+                vels_d[cname] = np.zeros(shape)
         writer.append(t, fields_d, vels_d)
 
     return writer, _disk_callback
@@ -1651,12 +1655,13 @@ def _resolve_scheme(  # noqa: C901
 
     Auto-selection algorithm (checked in order):
 
-    1. Constraint equations (time_order=0) → IDA (algebraic constraints need
-       DAE residual form).
-    2. Flat metric + all-periodic + time-independent + supported operators
-       → modal (exact Fourier spectral evolution, machine-precision).
+    1. Modal eligible (flat metric + all-periodic + time-independent +
+       supported operators) → modal. Handles constraints via Fourier-space
+       Schur complement elimination (Hairer & Wanner 1996, Ch. VII).
+    2. Constraint equations (time_order=0) not modal-eligible → IDA
+       (algebraic constraints need DAE residual form).
     3. First-order (time_order=1) equations → IDA (diffusion/transport needs
-       implicit time integration; eligible periodic first-order caught by 2).
+       implicit time integration; eligible periodic first-order caught by 1).
     4. Dissipation (``first_derivative_t`` operator in any RHS) → IDA (breaks
        symplecticity, BDF handles well).
     5. No canonical Hamiltonian structure for second-order wave equations
@@ -1690,18 +1695,20 @@ def _resolve_scheme(  # noqa: C901
                 raise RuntimeError(msg)
         return scheme
 
-    # 1. Constraint equations (time_order=0) → IDA (DAE solver required)
-    for eq in spec.equations:
-        if eq.time_derivative_order == 0:
-            return "ida"
-
-    # 2. Modal solver — flat metric, all-periodic, time-independent,
-    #    supported operators (exact Fourier spectral evolution)
+    # 1-2. Modal solver (handles constraints via Schur complement if eligible)
+    #      Flat metric, all-periodic, time-independent, supported operators.
+    #      Constraints are Fourier-eliminable if their operators have exact
+    #      Fourier multipliers.
     if grid is not None:
         from tidal.solver.modal import can_use_modal
 
         if can_use_modal(spec, grid, bc):
             return "modal"
+
+    # 1b. Constraint equations not modal-eligible → IDA (DAE solver required)
+    for eq in spec.equations:
+        if eq.time_derivative_order == 0:
+            return "ida"
 
     # 3. First-order (diffusion/transport) equations → IDA
     for eq in spec.equations:

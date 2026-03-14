@@ -656,10 +656,10 @@ class TestSimulateCommand:
         assert "Auto-selected solver:" in captured.out
         assert "Scheme:" in captured.out
 
-    def test_auto_selects_ida_for_constraints(
+    def test_auto_selects_modal_for_periodic_constraints(
         self, inline_em_1d_json: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Constraint equations (time_order=0) should auto-select IDA."""
+        """Periodic constraint equations should auto-select modal (Schur)."""
         ret = main(
             [
                 "simulate",
@@ -675,7 +675,7 @@ class TestSimulateCommand:
         )
         assert ret == 0
         captured = capsys.readouterr()
-        assert "Auto-selected solver: ida" in captured.out
+        assert "Auto-selected solver: modal" in captured.out
 
     def test_simulate_ida_scheme(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]

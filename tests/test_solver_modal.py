@@ -219,9 +219,23 @@ class TestModalEligibility:
         )
         assert can_use_modal(spec, grid, None) is False
 
-    def test_constraints_rejected(self) -> None:
-        """Constraint equations (time_order=0) → not eligible."""
+    def test_constraints_eligible_if_fourier_eliminable(self) -> None:
+        """Fourier-eliminable constraints (time_order=0) → eligible via Schur."""
         spec = _make_spec(_CONSTRAINT_SPEC)
+        grid = GridInfo(
+            shape=(32, 32),
+            bounds=((0.0, 10.0), (0.0, 10.0)),
+            periodic=(True, True),
+        )
+        # Constraint with laplacian_x (has exact Fourier multiplier) is eliminable
+        assert can_use_modal(spec, grid, None) is True
+
+    def test_constraints_rejected_unsupported_operator(self) -> None:
+        """Constraint with unsupported operator → not eligible."""
+        spec_data = copy.deepcopy(dict(_CONSTRAINT_SPEC))
+        # Change constraint operator to something not in _EXACT_MULTIPLIERS
+        spec_data["equations"][0]["rhs"]["terms"][0]["operator"] = "derivative_3_x"
+        spec = _make_spec(spec_data)
         grid = GridInfo(
             shape=(32, 32),
             bounds=((0.0, 10.0), (0.0, 10.0)),
@@ -638,8 +652,8 @@ class TestModalAutoSelection:
         scheme = _resolve_scheme("auto", spec, grid, None)
         assert scheme == "modal"
 
-    def test_auto_selects_ida_for_constraints(self) -> None:
-        """Auto-selection picks IDA for constraint equations."""
+    def test_auto_selects_modal_for_periodic_constraints(self) -> None:
+        """Auto-selection picks modal for periodic constraint systems."""
         from tidal.cli._simulate import _resolve_scheme
 
         spec = _make_spec(_CONSTRAINT_SPEC)
@@ -647,6 +661,21 @@ class TestModalAutoSelection:
             shape=(32, 32),
             bounds=((0.0, 10.0), (0.0, 10.0)),
             periodic=(True, True),
+        )
+        # Fourier-eliminable constraints with periodic BCs → modal
+        scheme = _resolve_scheme("auto", spec, grid, None)
+        assert scheme == "modal"
+
+    def test_auto_selects_ida_for_non_periodic_constraints(self) -> None:
+        """Auto-selection picks IDA for non-periodic constraint systems."""
+        from tidal.cli._simulate import _resolve_scheme
+
+        spec = _make_spec(_CONSTRAINT_SPEC)
+        grid = GridInfo(
+            shape=(32, 32),
+            bounds=((0.0, 10.0), (0.0, 10.0)),
+            periodic=(False, False),
+            bc=("neumann", "neumann"),
         )
         scheme = _resolve_scheme("auto", spec, grid, None)
         assert scheme == "ida"
