@@ -921,12 +921,18 @@ ConvertCDToDerivatives[expr_, chart_] := Module[
 
   (* CD-like operator check for convergence validation using xAct introspection *)
   (* Falls back to string matching for edge cases xAct doesn't handle *)
-  (* Excludes Christoffel symbols (which contain "CD" in their name but are connection *)
-  (* coefficients, not covariant derivative operators) *)
+  (* Excludes: Christoffel symbols, and PD (partial derivative — already in target form). *)
+  (* PD is registered as a CovD in xAct (flat connection, zero Christoffels) but should *)
+  (* NOT be flagged as unconverted, since PD[{i,-chart}][expr] IS explicit derivative form. *)
+  (* PD acting on metric components (PD[{i,-chart}][g[{j,-chart},{k,-chart}]]) arises in *)
+  (* curved-metric Hamiltonians after DecomposeScalarExpression; these are legitimate and *)
+  (* will be evaluated by EvaluatePDMetric or numerically at grid points. *)
   isCDlike[x_] := Module[{h = Head[x], hStr},
     If[IsChristoffelSymbol[h], Return[False]];
     hStr = ToString[h];
     If[StringMatchQ[hStr, "*Christoffel*"], Return[False]];
+    (* PD is the flat partial derivative — not an unconverted CD *)
+    If[StringMatchQ[hStr, "PD*"], Return[False]];
     IsCovDOperator[x] || StringMatchQ[hStr, "*CD*"]
   ];
 
