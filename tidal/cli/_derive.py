@@ -2758,6 +2758,26 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:
     """
     p = ctx.prefix
 
+    # Build BackgroundFieldRules for DecomposeScalarExpression (same as EOM path).
+    # Enables early background field evaluation during batched TraceBasisDummy,
+    # critical for memory reduction in Einstein-Maxwell theories.
+    bg_rules_entries: list[str] = []
+    for bf in ctx.background_fields:
+        if bf["type"] != "scalar" and bf.get("components"):
+            bg_head = f"{p}{bf['name'].capitalize()}"
+            comps_str = ", ".join(str(c) for c in bf["components"])
+            contra_comps = _compute_contra_components(
+                bf["components"], ctx.metric_diagonal
+            )
+            contra_str = ", ".join(contra_comps)
+            bg_rules_entries.append(
+                f"{{{bg_head}, {{{comps_str}}}, {{{contra_str}}}}}"
+            )
+    bg_rules_opt = ""
+    if bg_rules_entries:
+        bg_rules_str = ", ".join(bg_rules_entries)
+        bg_rules_opt = f', "BackgroundFieldRules" -> {{{bg_rules_str}}}'
+
     lines: list[str] = [
         "",
         "(* === Phase K: Canonical Momentum & Hamiltonian (component-level) === *)",
@@ -2794,8 +2814,9 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:
             "Do[",
             "  Module[{termComp, tTerm = AbsoluteTime[]},",
             f"    termComp = DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
-            f'"MetricMatrix" -> {p}MetricMatrix];',
+            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}];',
             "    lagComp += termComp;",
+            "    Share[];",
             '    Print["  term ", k, "/", Length[lagTerms], ": ",',
             '      Round[AbsoluteTime[] - tTerm, 0.1], "s, ",',
             '      Round[MemoryInUse[]/1024.^2], " MB"];',
