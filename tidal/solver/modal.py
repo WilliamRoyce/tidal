@@ -527,6 +527,61 @@ def _add_convolution_coupling(
 
 
 # ---------------------------------------------------------------------------
+# Block decomposition
+# ---------------------------------------------------------------------------
+
+
+def _find_independent_blocks(
+    A: NDArray[np.complex128],
+    threshold: float = 1e-14,
+) -> list[list[int]]:
+    """Find independent (decoupled) blocks in an evolution matrix.
+
+    Analyzes the sparsity pattern of A: slots i and j are coupled if
+    |A[i,j]| > threshold or |A[j,i]| > threshold.  Returns a list of
+    slot-index groups (connected components).
+
+    This prevents degenerate-eigenvalue mixing when ``np.linalg.eig``
+    processes a block-diagonal matrix with repeated eigenvalues across
+    independent blocks — a common situation in symmetric multi-field
+    theories (e.g. Gertsenshtein h₅↔a₁ + h₇↔a₂).
+    """
+    n = A.shape[0]
+    # Union-find (path compression + union by rank)
+    parent = list(range(n))
+    rank = [0] * n
+
+    def _find(x: int) -> int:
+        while parent[x] != x:
+            parent[x] = parent[parent[x]]  # path compression
+            x = parent[x]
+        return x
+
+    def _union(x: int, y: int) -> None:
+        rx, ry = _find(x), _find(y)
+        if rx == ry:
+            return
+        if rank[rx] < rank[ry]:
+            rx, ry = ry, rx
+        parent[ry] = rx
+        if rank[rx] == rank[ry]:
+            rank[rx] += 1
+
+    # Build coupling graph from matrix entries
+    for i in range(n):
+        for j in range(i + 1, n):
+            if abs(A[i, j]) > threshold or abs(A[j, i]) > threshold:
+                _union(i, j)
+
+    # Group by root
+    groups: dict[int, list[int]] = {}
+    for i in range(n):
+        root = _find(i)
+        groups.setdefault(root, []).append(i)
+    return list(groups.values())
+
+
+# ---------------------------------------------------------------------------
 # Eigendecomposition and time evolution
 # ---------------------------------------------------------------------------
 
@@ -545,6 +600,28 @@ def _is_all_second_order(spec: EquationSystem) -> bool:
     return all(eq.time_derivative_order >= 2 for eq in spec.equations)
 
 
+def _warn_eigenvalue_growth(
+    eigenvalues: NDArray[np.complex128],
+    dt_total: float,
+    context: str = "",
+) -> None:
+    """Warn if eigenvalues have positive real parts that could cause overflow."""
+    import warnings  # noqa: PLC0415
+
+    max_real = float(np.max(np.real(eigenvalues)))
+    if max_real > 1e-10:
+        max_growth = max_real * dt_total
+        if max_growth > 30:  # exp(30) ≈ 1e13
+            ctx = f" ({context})" if context else ""
+            warnings.warn(
+                f"Modal solver{ctx}: eigenvalues with positive real parts "
+                f"(max Re(λ)={max_real:.3e}). Growth factor exp({max_growth:.1f}) "
+                f"over Δt={dt_total:.1f} may cause overflow. "
+                f"Consider --scheme cvode for numerical stability.",
+                stacklevel=3,
+            )
+
+
 def _evolve_per_mode(
     A_modes: NDArray[np.complex128],
     y0_hat: NDArray[np.complex128],
@@ -559,44 +636,91 @@ def _evolve_per_mode(
     A_modes has shape (n_modes, n_slots, n_slots).
     y0_hat has shape (n_slots, n_modes).
 
-    Uses eigendecomposition of each small block for exact evolution.
+    Uses block-aware eigendecomposition: independent field blocks are detected
+    and eigendecomposed separately to prevent degenerate-eigenvalue mixing.
+    Blocks with all-zero initial conditions are skipped entirely.
+
     Ref: Golub & Van Loan (1996), Matrix Computations, §4.8.
     """
-    A_modes.shape[0]
     n_slots = layout.num_slots
     n_pts = layout.num_points
     n_snapshots = len(t_eval)
+    t0 = t_eval[0]
+    dt_total = float(t_eval[-1] - t0)
 
-    # Batch eigendecomposition: eigendecompose all modes at once
-    # A_modes shape: (n_modes, n_slots, n_slots)
-    eigenvalues, V = np.linalg.eig(
-        A_modes
-    )  # (n_modes, n_slots), (n_modes, n_slots, n_slots)
-    V_inv = np.linalg.inv(V)  # (n_modes, n_slots, n_slots)
+    # Detect independent blocks from the first mode's matrix.
+    # Block structure is k-independent for constant coefficients, so we only
+    # need to analyze one representative mode (use max across a few modes for
+    # robustness against accidental zeros at specific k).
+    n_check = min(3, A_modes.shape[0])
+    combined = np.max(np.abs(A_modes[:n_check]), axis=0)
+    blocks = _find_independent_blocks(combined)
 
-    # Transform IC to eigenbasis: y0_eigen[m, :] = V_inv[m] @ y0_hat[:, m]
-    # y0_hat is (n_slots, n_modes), we need (n_modes, n_slots) for each mode
-    y0_per_mode = y0_hat.T  # (n_modes, n_slots)
-    y0_eigen = np.einsum("mij,mj->mi", V_inv, y0_per_mode)  # (n_modes, n_slots)
+    # Pre-compute eigendecomposition for each active block
+    block_data: list[
+        tuple[
+            list[int],  # slot indices
+            NDArray[np.complex128],  # eigenvalues (n_modes, block_size)
+            NDArray[np.complex128],  # V (n_modes, block_size, block_size)
+            NDArray[np.complex128],  # y0_eigen (n_modes, block_size)
+        ]
+    ] = []
 
-    # Evolve at each time point
+    for block_slots in blocks:
+        # Extract IC for this block
+        y0_block = y0_hat[block_slots, :]  # (block_size, n_modes)
+
+        # Skip blocks with all-zero IC — output stays at zero
+        if np.max(np.abs(y0_block)) < 1e-15:
+            continue
+
+        # Extract block sub-matrices: (n_modes, block_size, block_size)
+        idx = np.array(block_slots)
+        A_block = A_modes[:, idx[:, None], idx[None, :]]
+
+        # Batch eigendecomposition for this block
+        eig_vals, V = np.linalg.eig(A_block)
+        V_inv = np.linalg.inv(V)
+
+        # Warn about potential overflow
+        _warn_eigenvalue_growth(eig_vals, dt_total, context="per-mode")
+
+        # Transform IC to eigenbasis
+        y0_eigen = np.einsum("mij,mj->mi", V_inv, y0_block.T)
+
+        block_data.append((block_slots, eig_vals, V, y0_eigen))
+
+    # Evolve at each time point.
+    # Pre-multiply V @ diag(y0_eigen) for each block so the inner loop only
+    # needs element-wise exp + matrix-vector product, not a full einsum.
+    block_evolved: list[
+        tuple[
+            list[int],  # slot indices
+            NDArray[np.complex128],  # V_y0: V * y0_eigen, (n_modes, bs, bs)
+            NDArray[np.complex128],  # eigenvalues (n_modes, bs)
+        ]
+    ] = []
+    for block_slots, eig_vals, V, y0_eigen in block_data:
+        # V_y0[m, i, j] = V[m, i, j] * y0_eigen[m, j]
+        # so y(t) = V_y0 @ exp(λ*dt) is just a matvec
+        V_y0 = V * y0_eigen[:, np.newaxis, :]  # (n_modes, bs, bs)
+        block_evolved.append((block_slots, V_y0, eig_vals))
+
     snapshots = np.zeros((n_snapshots, n_slots * n_pts))
     times = np.zeros(n_snapshots)
+    n_modes = y0_hat.shape[1]
 
-    t0 = t_eval[0]
     for ti, t in enumerate(t_eval):
-        # Elapsed time from IC — eigendecomposition gives exp(λ·Δt)·y₀
         dt = t - t0
-        exp_lambda = np.exp(eigenvalues * dt)  # (n_modes, n_slots)
+        y_hat_t = np.zeros((n_slots, n_modes), dtype=np.complex128)
 
-        # y_hat[m, :] = V[m] @ (exp_lambda[m] * y0_eigen[m])
-        scaled = exp_lambda * y0_eigen  # (n_modes, n_slots)
-        y_evolved = np.einsum("mij,mj->mi", V, scaled)  # (n_modes, n_slots)
+        for block_slots, V_y0, eig_vals in block_evolved:
+            # exp_lambda shape: (n_modes, block_size)
+            exp_lambda = np.exp(eig_vals * dt)
+            # y_evolved[m, i] = Σ_j V_y0[m, i, j] * exp(λ_j * dt)
+            y_evolved = np.einsum("mij,mj->mi", V_y0, exp_lambda)
+            y_hat_t[block_slots, :] = y_evolved.T
 
-        # y_evolved is (n_modes, n_slots), transpose to (n_slots, n_modes)
-        y_hat_t = y_evolved.T
-
-        # IFFT back to physical space
         y_physical = _ifft_slots(y_hat_t, layout, grid)
         snapshots[ti] = y_physical
         times[ti] = t
@@ -655,6 +779,18 @@ def _evolve_full_matrix(
         V = Z
         V_inv = Z.conj().T  # Unitary for Schur
         y0_eigen = V_inv @ y0_flat
+
+    # Clean up eigencoefficient roundoff: entries far below the dominant
+    # IC amplitude are numerical noise that can seed exponential growth
+    # in systems with positive-real-part eigenvalues.
+    y0_max = np.max(np.abs(y0_eigen))
+    if y0_max > 0:
+        cleanup_threshold = y0_max * 1e-14
+        y0_eigen[np.abs(y0_eigen) < cleanup_threshold] = 0.0
+
+    # Warn about potential overflow from growing eigenvalues
+    dt_total = float(t_eval[-1] - t_eval[0])
+    _warn_eigenvalue_growth(eigenvalues, dt_total, context="full-matrix")
 
     snapshots = np.zeros((n_snapshots, n_slots * n_pts))
     times = np.zeros(n_snapshots)

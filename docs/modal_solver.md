@@ -171,7 +171,7 @@ Key observations:
 | `tidal/solver/modal.py` | Core solver (~760 lines) |
 | `tidal/cli/_simulate.py` | Auto-selection + dispatch |
 | `tidal/cli/__init__.py` | `"modal"` in `--scheme` choices |
-| `tests/test_solver_modal.py` | 25 tests (11 eligibility + 14 correctness) |
+| `tests/test_solver_modal.py` | 29 tests (11 eligibility + 14 correctness + 4 stability) |
 
 ### Key Functions
 
@@ -196,6 +196,16 @@ Key observations:
 | `SimulationProgress` | `progress.py` | tqdm progress bar |
 
 **NOT reused:** `constraint_solve.py:_MULTIPLIERS` — uses modified wavenumbers matching FD stencils. Modal solver defines its own exact multiplier registry.
+
+## Block-Aware Eigendecomposition
+
+Multi-field systems often have block-diagonal per-mode matrices (e.g. Gertsenshtein: h₅↔a₁ and h₇↔a₂ as independent 4×4 blocks). The modal solver detects these blocks via union-find on the coupling graph and eigendecomposes each independently. This:
+
+1. **Prevents degenerate-eigenvalue mixing** — `np.linalg.eig` on a full matrix with repeated eigenvalues across independent blocks can mix eigenvectors, projecting nonzero-IC components onto zero-IC blocks
+2. **Enables zero-IC block skipping** — blocks where all initial conditions are zero produce exact zeros without eigendecomposition
+3. **Reduces computation** — many small eigendecompositions instead of one large one
+
+For systems with gradient coupling (e.g. Gertsenshtein h↔a), low-k modes may have genuinely positive real eigenvalues (physical parametric conversion). A warning is issued when `max(Re(λ)) × Δt > 30` (approaching overflow).
 
 ## Constraints and Limitations
 

@@ -676,3 +676,221 @@ class TestModalAutoSelection:
         grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
         scheme = _resolve_scheme("modal", spec, grid, None)
         assert scheme == "modal"
+
+
+# =========================================================================
+# Block isolation and eigenvalue stability tests
+# =========================================================================
+
+
+# 4-field system with two identical coupled pairs (mimics Gertsenshtein):
+# Pair 1: phi_0 ↔ chi_0 (gradient coupling, nonzero IC)
+# Pair 2: phi_1 ↔ chi_1 (identical coupling, zero IC)
+# The degenerate eigenvalues across pairs would cause eigenvector mixing
+# in a single 8×8 eigendecomposition, seeding exponential growth in pair 2.
+_DEGENERATE_PAIRS_SPEC: dict[str, object] = {
+    "metadata": {
+        "source": "inline-test",
+        "parameters": {"B0": 0.3, "kappa2": 1.0},
+    },
+    "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+    "fields": [
+        {"name": "phi_0", "index": 0, "is_dynamical": True},
+        {"name": "chi_0", "index": 1, "is_dynamical": True},
+        {"name": "phi_1", "index": 2, "is_dynamical": True},
+        {"name": "chi_1", "index": 3, "is_dynamical": True},
+    ],
+    "equations": [
+        {
+            "field": "phi_0",
+            "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                    {
+                        "coefficient": -1.0,
+                        "operator": "gradient_x",
+                        "field": "chi_0",
+                        "coefficient_symbolic": "-(B0*kappa2)",
+                    },
+                ],
+            },
+        },
+        {
+            "field": "chi_0",
+            "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2, "space": 0}},
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "chi_0"},
+                    {
+                        "coefficient": 1.0,
+                        "operator": "gradient_x",
+                        "field": "phi_0",
+                        "coefficient_symbolic": "B0",
+                    },
+                ],
+            },
+        },
+        {
+            "field": "phi_1",
+            "lhs": {"expression": "d2_t(phi_1)", "order": {"time": 2, "space": 0}},
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_1"},
+                    {
+                        "coefficient": -1.0,
+                        "operator": "gradient_x",
+                        "field": "chi_1",
+                        "coefficient_symbolic": "-(B0*kappa2)",
+                    },
+                ],
+            },
+        },
+        {
+            "field": "chi_1",
+            "lhs": {"expression": "d2_t(chi_1)", "order": {"time": 2, "space": 0}},
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "chi_1"},
+                    {
+                        "coefficient": 1.0,
+                        "operator": "gradient_x",
+                        "field": "phi_1",
+                        "coefficient_symbolic": "B0",
+                    },
+                ],
+            },
+        },
+    ],
+}
+
+
+class TestModalBlockIsolation:
+    """Test block-aware eigendecomposition for multi-field stability."""
+
+    def test_zero_ic_block_stays_zero(self) -> None:
+        """Zero-IC blocks remain at machine zero despite degenerate eigenvalues.
+
+        Creates a 4-field system with two identical coupled pairs. Only pair 1
+        gets nonzero IC. Without block isolation, np.linalg.eig mixes the
+        degenerate eigenvectors, seeding exponential growth in pair 2. With
+        block-aware decomposition, pair 2 stays exactly zero.
+        """
+        spec = _make_spec(_DEGENERATE_PAIRS_SPEC)
+        grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        # IC: Gaussian on phi_0 only, everything else zero
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        x = np.linspace(0.0, 10.0, 64, endpoint=False)
+        y0[: grid.num_points] = 0.1 * np.exp(-((x - 5.0) ** 2) / (2 * 1.5**2))
+
+        result = solve_modal(
+            spec,
+            grid,
+            y0,
+            (0.0, 100.0),
+            parameters={"B0": 0.3, "kappa2": 1.0},
+            num_snapshots=11,
+        )
+
+        # Pair 2 fields (phi_1, chi_1) and their velocities should be zero
+        phi_1_slot = layout.field_slot_map["phi_1"]
+        chi_1_slot = layout.field_slot_map["chi_1"]
+        v_phi_1_slot = layout.velocity_slot_map["phi_1"]
+        v_chi_1_slot = layout.velocity_slot_map["chi_1"]
+
+        final = result["y"][-1]  # last snapshot
+        n = grid.num_points
+        for slot in [phi_1_slot, chi_1_slot, v_phi_1_slot, v_chi_1_slot]:
+            max_val = np.max(np.abs(final[slot * n : (slot + 1) * n]))
+            assert max_val < 1e-13, (
+                f"Zero-IC slot {slot} grew to {max_val:.2e} — "
+                f"block isolation failed"
+            )
+
+    def test_nonzero_pair_evolves_correctly(self) -> None:
+        """The nonzero-IC pair still evolves correctly with block decomposition."""
+        spec = _make_spec(_DEGENERATE_PAIRS_SPEC)
+        grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        x = np.linspace(0.0, 10.0, 64, endpoint=False)
+        y0[: grid.num_points] = 0.1 * np.exp(-((x - 5.0) ** 2) / (2 * 1.5**2))
+
+        result = solve_modal(
+            spec, grid, y0, (0.0, 10.0),
+            parameters={"B0": 0.3, "kappa2": 1.0},
+            num_snapshots=11,
+        )
+
+        # Pair 1 should have non-trivial evolution (not all zero)
+        phi_0_slot = layout.field_slot_map["phi_0"]
+        n = grid.num_points
+        final = result["y"][-1]  # last snapshot
+        max_phi0 = np.max(np.abs(final[phi_0_slot * n : (phi_0_slot + 1) * n]))
+        assert max_phi0 > 1e-4, "Nonzero-IC field did not evolve"
+
+    def test_eigenvalue_growth_warning(self) -> None:
+        """Warning is issued when eigenvalues have large positive real parts.
+
+        Uses a large domain (L=100) so that k_min=2π/100≈0.063 < k_crit=B₀κ/√2≈0.212,
+        ensuring low-k modes have genuinely positive real eigenvalues.
+        """
+        import warnings
+
+        spec = _make_spec(_DEGENERATE_PAIRS_SPEC)
+        # Large domain to get k_min < k_crit for unstable modes
+        grid = GridInfo(shape=(64,), bounds=((0.0, 100.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        x = np.linspace(0.0, 100.0, 64, endpoint=False)
+        y0[: grid.num_points] = 0.1 * np.exp(-((x - 50.0) ** 2) / (2 * 5.0**2))
+
+        # Long time → growth factor > exp(30) should trigger warning
+        with warnings.catch_warnings(record=True) as w:
+            warnings.simplefilter("always")
+            solve_modal(
+                spec, grid, y0, (0.0, 500.0),
+                parameters={"B0": 0.3, "kappa2": 1.0},
+                num_snapshots=6,
+            )
+
+        modal_warnings = [
+            x for x in w if "positive real parts" in str(x.message)
+        ]
+        assert len(modal_warnings) > 0, (
+            "No eigenvalue growth warning issued for t=500"
+        )
+
+    def test_find_independent_blocks_utility(self) -> None:
+        """Verify _find_independent_blocks correctly detects block structure."""
+        from tidal.solver.modal import _find_independent_blocks
+
+        # 4×4 block-diagonal: [[A, 0], [0, B]]
+        M = np.zeros((4, 4), dtype=np.complex128)
+        M[0, 1] = 1.0
+        M[1, 0] = -1.0
+        M[2, 3] = 1.0
+        M[3, 2] = -2.0
+        blocks = _find_independent_blocks(M)
+        assert len(blocks) == 2
+        assert sorted(blocks[0]) in ([0, 1], [2, 3])
+        assert sorted(blocks[1]) in ([0, 1], [2, 3])
+
+        # Fully coupled 4×4
+        M2 = np.ones((4, 4), dtype=np.complex128)
+        blocks2 = _find_independent_blocks(M2)
+        assert len(blocks2) == 1
+        assert sorted(blocks2[0]) == [0, 1, 2, 3]
+
+        # Diagonal (all independent)
+        M3 = np.diag([1.0, 2.0, 3.0]).astype(np.complex128)
+        blocks3 = _find_independent_blocks(M3)
+        assert len(blocks3) == 3
