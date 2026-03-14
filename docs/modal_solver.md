@@ -101,8 +101,9 @@ The modal solver is auto-selected (step 2 in `_resolve_scheme()`) when ALL condi
 Position-dependent coefficients are OK (handled via convolution). The full auto-selection hierarchy:
 
 ```
-1. Constraints (time_order=0)         → IDA
-2. Modal eligible (flat+periodic+...) → modal  ← NEW
+1. Modal eligible (flat+periodic+time-independent+supported operators)
+   → modal (handles constraints via Schur complement if present)
+2. Constraints (time_order=0) not modal-eligible → IDA
 3. First-order (time_order=1)         → IDA
 4. Dissipation (first_derivative_t)   → IDA
 5. Missing canonical (wave eq)        → warning + CVODE
@@ -210,7 +211,7 @@ Gertsenshtein (6 fields, N=256, 101 snapshots, B₀=0.1):
 | `tidal/solver/modal.py` | Core solver (~760 lines) |
 | `tidal/cli/_simulate.py` | Auto-selection + dispatch |
 | `tidal/cli/__init__.py` | `"modal"` in `--scheme` choices |
-| `tests/test_solver_modal.py` | 29 tests (11 eligibility + 14 correctness + 4 stability) |
+| `tests/test_solver_modal.py` | 35 tests (12 eligibility + 14 correctness + 4 stability + 5 constraint) |
 
 ### Key Functions
 
@@ -246,9 +247,34 @@ Multi-field systems often have block-diagonal per-mode matrices (e.g. Gertsensht
 
 For systems with gradient coupling (e.g. Gertsenshtein h↔a), low-k modes may have genuinely positive real eigenvalues (physical parametric conversion). A warning is issued when `max(Re(λ)) × Δt > 30` (approaching overflow).
 
+## Constraint Elimination (Fourier Schur Complement)
+
+Systems with constraint equations (time_order=0, e.g., Proca A₀) are now handled via algebraic elimination in Fourier space. The constraint self-operator L (e.g., m²-∇²) has exact Fourier multipliers, so L⁻¹ is trivially 1/(m²+k²) per mode.
+
+**How it works**: For a mixed system with dynamical (d) and constraint (c) fields:
+
+```
+d/dt[d] = A_dd·d + A_dc·c     (dynamical equations)
+    0   = S_cd·d + S_cc·c      (constraint defines c algebraically)
+```
+
+Substituting c = -S_cc⁻¹·S_cd·d gives the reduced system:
+
+```
+d/dt[d] = (A_dd - A_dc·S_cc⁻¹·S_cd)·d
+```
+
+The constraint velocity coupling (when dynamical equations reference v_A₀ = ∂ₜA₀) creates an implicit equation resolved by matrix inversion of (I - A_dc_vel·S_cc⁻¹·S_cd) — a small per-mode operation.
+
+At each output time, constraint fields are reconstructed: c(k) = -S_cc⁻¹·S_cd·d(k).
+
+**Performance**: On coupled_proca_3d (16×16, t=5): modal 2.0s vs IDA 19.0s — **9.5× speedup**. IDA fails entirely at 32×32 (convergence issues), while modal runs at any grid size.
+
+**References**: Hairer & Wanner (1996), *Solving ODEs II*, Ch. VII; Ascher & Petzold (1998), *Computer Methods for ODEs/DAEs*, §10.2.
+
 ## Constraints and Limitations
 
-1. **Constraint equations** (time_order=0): Incompatible — algebraic constraints are not ODEs. Systems with constraints auto-select IDA.
+1. **Constraint equations** (time_order=0): Handled via Fourier Schur complement (see above) when all constraint operators have exact Fourier multipliers. Otherwise falls back to IDA.
 
 2. **Curved metrics** (spherical, cylindrical, polar): Not applicable — non-periodic domains and position-dependent operators with slowly-decaying Fourier transforms create dense all-to-all coupling.
 

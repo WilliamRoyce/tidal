@@ -38,8 +38,8 @@ Detection algorithm:
 
 | Priority | Condition | Solver | Reason |
 |----------|-----------|--------|--------|
-| 1 | Constraint equations (time_order=0) | IDA | Algebraic constraints need DAE residual form |
-| 2 | Modal eligible (flat metric + periodic BCs + time-independent + supported operators) | **Modal** | Machine-precision eigendecomposition, O(1) in t_end. See [modal_solver.md](modal_solver.md) |
+| 1 | Modal eligible (flat metric + periodic BCs + time-independent + supported operators) | **Modal** | Machine-precision eigendecomposition, O(1) in t_end. Handles constraints via Fourier Schur complement. See [modal_solver.md](modal_solver.md) |
+| 2 | Constraint equations (time_order=0) not modal-eligible | IDA | Algebraic constraints need DAE residual form |
 | 3 | First-order equations (time_order=1) | IDA | Diffusion/transport need implicit handling |
 | 4 | Dissipation (`first_derivative_t` in RHS) | IDA | Friction breaks symplecticity, BDF handles well |
 | 5 | No canonical Hamiltonian | CVODE (warning) | Missing canonical section — likely hand-crafted JSON |
@@ -79,6 +79,8 @@ tidal simulate spec.json --scheme modal                  # Auto for eligible
 (~10⁻¹⁶ error). Cost is O(1) in simulation time — eigendecomposition is done
 once, evaluation at any t is just `exp(λ·Δt)`. Speedup over CVODE: 57-1451×
 on coupled_scalars (N=64-256), 3.4-7.7× on Gertsenshtein (N=256, t=50-500).
+Constraint systems (e.g., Proca A₀) are handled via Fourier Schur complement
+elimination — 9.5× speedup over IDA on coupled_proca_3d.
 
 **Requires:** Flat metric, all-periodic BCs, time-independent coefficients,
 supported Fourier operators. Position-dependent coefficients are handled via
