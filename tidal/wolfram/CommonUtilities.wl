@@ -846,7 +846,17 @@ GenerateCDRules[dim_Integer, chart_] := GenerateCDRules[dim, chart] = Module[
 
   (* CD-like operator check using xAct introspection *)
   (* Falls back to string matching for edge cases xAct doesn't handle *)
-  isCDlike[x_] := IsCovDOperator[x] || StringMatchQ[ToString[Head[x]], "*CD*"];
+  (* Excludes: Christoffel symbols, PD (flat partial derivative), and xAct    *)
+  (* curvature tensors (Ricci, Riemann, Einstein, Weyl, etc.) which carry the *)
+  (* CovD name suffix but are NOT derivative operators.                       *)
+  isCDlike[x_] := Module[{h = Head[x], hStr},
+    If[IsChristoffelSymbol[h], Return[False]];
+    hStr = ToString[h];
+    If[StringMatchQ[hStr, "*Christoffel*"], Return[False]];
+    If[StringMatchQ[hStr, "PD*"], Return[False]];
+    If[IsCurvatureTensor[h] || IsCurvatureTensor[x], Return[False]];
+    IsCovDOperator[x] || StringMatchQ[hStr, "*CD*"]
+  ];
 
   (* Generate rules for all combinations:
      - Each coordinate index: 0 to dim-1
@@ -933,6 +943,11 @@ ConvertCDToDerivatives[expr_, chart_] := Module[
     If[StringMatchQ[hStr, "*Christoffel*"], Return[False]];
     (* PD is the flat partial derivative — not an unconverted CD *)
     If[StringMatchQ[hStr, "PD*"], Return[False]];
+    (* xAct curvature tensors carry the CovD name suffix (e.g. RicciScalarCD, *)
+    (* RicciCD, RiemannCD, EinsteinCD, WeylCD, SchoutenCD, CottonCD) but are  *)
+    (* NOT derivative operators.  Use the shared IsCurvatureTensor predicate   *)
+    (* to exclude all of them — avoids maintaining a parallel exclusion list.  *)
+    If[IsCurvatureTensor[h] || IsCurvatureTensor[x], Return[False]];
     IsCovDOperator[x] || StringMatchQ[hStr, "*CD*"]
   ];
 
@@ -1089,7 +1104,7 @@ EvaluateEpsilonComponents[expr_, chart_, metricMatrix_] := Module[
 (* xAct generates names like RiemannCD, RicciCD, RicciScalarCD, etc. *)
 IsCurvatureTensor[f_] := Module[{name = ToString[f]},
   StringContainsQ[name,
-    "Riemann" | "Ricci" | "Weyl" | "Schouten" | "Cotton" | "Kretschner"
+    "Riemann" | "Ricci" | "Weyl" | "Schouten" | "Cotton" | "Kretschner" | "Einstein"
   ] && !StringContainsQ[name, "Christoffel"]
 ];
 
