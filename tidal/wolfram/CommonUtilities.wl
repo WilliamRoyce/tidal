@@ -877,11 +877,17 @@ GenerateCDRules[dim_Integer, chart_] := GenerateCDRules[dim, chart] = Module[
           Nothing
         ],
 
-        (* Rule for PROMOTING lower-arity Derivative to this arity (for indices beyond current arity) *)
-        If[idx >= arity - 1 && arity > 2,
+        (* Rule for PROMOTING lower-arity Derivative to full dimension.
+           Catches ANY CD applied to a Derivative whose arity < dim, including
+           cases where idx < arity (which the old condition idx >= arity-1 missed).
+           Example: CD[{0,-chart}][Derivative[0,1][f][t,x]] in 4D:
+             pad {0,1} -> {0,1,0,0}, then increment idx 0 -> {1,1,0,0}.
+           This is essential for curved-metric Hamiltonian IBP where partial
+           derivatives create lower-arity Derivative wrappers. *)
+        If[idx < dim,
           f_[{idx, chartSign*chart}][Derivative[orders__][g_][args__]] /;
-            isCDlike[f[{idx, chartSign*chart}]] && Length[{orders}] < arity :>
-            With[{paddedOrders = PadRight[{orders}, Max[arity, idx + 1], 0]},
+            isCDlike[f[{idx, chartSign*chart}]] && Length[{orders}] < dim :>
+            With[{paddedOrders = PadRight[{orders}, dim, 0]},
               With[{newOrders = ReplacePart[paddedOrders, idx + 1 -> paddedOrders[[idx + 1]] + 1]},
                 Derivative[Sequence @@ newOrders][g][args]
               ]
