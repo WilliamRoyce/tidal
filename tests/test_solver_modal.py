@@ -923,3 +923,151 @@ class TestModalBlockIsolation:
         M3 = np.diag([1.0, 2.0, 3.0]).astype(np.complex128)
         blocks3 = _find_independent_blocks(M3)
         assert len(blocks3) == 3
+
+
+# =========================================================================
+# Constraint elimination tests (Fourier Schur complement)
+# =========================================================================
+
+
+# Simple 1D Proca-like: A₀ constraint + A₁ dynamical, with coupling.
+# Constraint: (m² - ∇²)A₀ = -∂ₓ(v_A₁)
+# Dynamical: ∂²ₜA₁ = ∂²ₓA₁ - m²A₁ + ∂ₓ(v_A₀)
+# This is a simplified version of the coupled Proca system.
+_PROCA_1D_CONSTRAINT_SPEC: dict[str, object] = {
+    "metadata": {"source": "inline-test", "parameters": {"m2": 1.0}},
+    "spacetime": {"dimension": 2, "signature": [-1, 1], "coordinates": ["t", "x"]},
+    "fields": [
+        {"name": "A_0", "index": 0, "is_dynamical": True},
+        {"name": "A_1", "index": 1, "is_dynamical": True},
+    ],
+    "equations": [
+        {
+            "field": "A_0",
+            "lhs": {"expression": "A_0", "order": {"time": 0, "space": 0}},
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {
+                        "coefficient": 1.0,
+                        "operator": "identity",
+                        "field": "A_0",
+                        "coefficient_symbolic": "m2",
+                    },
+                    {"coefficient": -1.0, "operator": "laplacian_x", "field": "A_0"},
+                    {"coefficient": 1.0, "operator": "gradient_x", "field": "v_A_1"},
+                ],
+            },
+        },
+        {
+            "field": "A_1",
+            "lhs": {"expression": "d2_t(A_1)", "order": {"time": 2, "space": 0}},
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {
+                        "coefficient": -1.0,
+                        "operator": "identity",
+                        "field": "A_1",
+                        "coefficient_symbolic": "-m2",
+                    },
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_1"},
+                    {"coefficient": 1.0, "operator": "gradient_x", "field": "v_A_0"},
+                ],
+            },
+        },
+    ],
+}
+
+
+class TestConstraintElimination:
+    """Test Fourier Schur complement constraint elimination."""
+
+    def test_constraint_system_eligible(self) -> None:
+        """Proca-like constraint system with periodic BCs is modal-eligible."""
+        spec = _make_spec(_PROCA_1D_CONSTRAINT_SPEC)
+        grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
+        assert can_use_modal(spec, grid, None) is True
+
+    def test_constraint_elimination_runs(self) -> None:
+        """Modal solver runs on constraint system without error."""
+        spec = _make_spec(_PROCA_1D_CONSTRAINT_SPEC)
+        grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        x = np.linspace(0.0, 10.0, 64, endpoint=False)
+        # IC on A₁ field (slot 1)
+        a1_slot = layout.field_slot_map["A_1"]
+        y0[a1_slot * grid.num_points : (a1_slot + 1) * grid.num_points] = (
+            0.1 * np.exp(-((x - 5.0) ** 2) / (2 * 1.5**2))
+        )
+
+        result = solve_modal(
+            spec, grid, y0, (0.0, 5.0),
+            parameters={"m2": 1.0},
+            num_snapshots=11,
+        )
+
+        assert result["success"]
+        assert result["y"].shape == (11, layout.num_slots * grid.num_points)
+        assert not np.any(np.isnan(result["y"]))
+
+    def test_constraint_field_reconstructed(self) -> None:
+        """Constraint field A₀ is non-trivially reconstructed (not zero)."""
+        spec = _make_spec(_PROCA_1D_CONSTRAINT_SPEC)
+        grid = GridInfo(shape=(64,), bounds=((0.0, 10.0),), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        y0 = np.zeros(layout.num_slots * grid.num_points)
+        x = np.linspace(0.0, 10.0, 64, endpoint=False)
+        a1_slot = layout.field_slot_map["A_1"]
+        y0[a1_slot * grid.num_points : (a1_slot + 1) * grid.num_points] = (
+            0.1 * np.exp(-((x - 5.0) ** 2) / (2 * 1.5**2))
+        )
+
+        result = solve_modal(
+            spec, grid, y0, (0.0, 2.0),
+            parameters={"m2": 1.0},
+            num_snapshots=11,
+        )
+
+        # A₀ should be non-zero at later times (constraint couples to A₁)
+        a0_slot = layout.field_slot_map["A_0"]
+        n = grid.num_points
+        final = result["y"][-1]
+        a0_max = np.max(np.abs(final[a0_slot * n : (a0_slot + 1) * n]))
+        assert a0_max > 1e-6, (
+            f"Constraint field A₀ is effectively zero ({a0_max:.2e}) — "
+            f"reconstruction failed"
+        )
+
+    def test_eigenvalues_purely_imaginary(self) -> None:
+        """Reduced system eigenvalues are purely imaginary (Hamiltonian)."""
+        from tidal.solver.modal import (
+            _build_constraint_eliminated_matrices,
+            _build_k_axes,
+            _build_k_grid,
+        )
+        from tidal.solver.coefficients import CoefficientEvaluator
+
+        spec = _make_spec(_PROCA_1D_CONSTRAINT_SPEC)
+        grid = GridInfo(shape=(32,), bounds=((0.0, 10.0),), periodic=(True,))
+        coeff_eval = CoefficientEvaluator(spec, grid, {"m2": 1.0})
+
+        k_axes = _build_k_axes(grid)
+        k_grid = _build_k_grid(k_axes)
+        rfft_shape = (17,)
+
+        A_red, _, _, _ = _build_constraint_eliminated_matrices(
+            spec, StateLayout.from_spec(spec, grid.num_points),
+            grid, coeff_eval, k_grid, rfft_shape,
+        )
+
+        # All eigenvalues should be purely imaginary for a Hamiltonian system
+        for m in range(A_red.shape[0]):
+            eigs = np.linalg.eigvals(A_red[m])
+            max_real = np.max(np.abs(np.real(eigs)))
+            assert max_real < 1e-10, (
+                f"Mode {m}: max |Re(λ)| = {max_real:.2e}, expected < 1e-10"
+            )
