@@ -1,0 +1,200 @@
+\documentclass[border=10pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{tikz}
+\usepackage[svgnames]{xcolor}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit,
+                 backgrounds, decorations.pathreplacing}
+
+% ---------------------------------------------------------------
+% Colour palette (matches solver_flowchart.tex)
+% ---------------------------------------------------------------
+\colorlet{OrangeFill}{LightSalmon}
+\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
+\colorlet{GreenFill}{MediumAquamarine}
+\colorlet{GreenLine}{MediumAquamarine!30!Teal}
+\colorlet{PurpleFill}{MediumPurple}
+\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
+\colorlet{PinkFill}{Thistle}
+\colorlet{PinkLine}{Thistle!30!Plum}
+\colorlet{BlueFill}{LightSkyBlue}
+\colorlet{BlueLine}{SteelBlue}
+\colorlet{LimeFill}{YellowGreen}
+\colorlet{LimeLine}{YellowGreen!30!Olive}
+\colorlet{GrayFill}{LightGray!60!OldLace}
+\colorlet{GrayLine}{RosyBrown!50!Silver}
+
+\begin{document}
+\begin{tikzpicture}[
+    % --- Node styles ---
+    stage/.style={
+        rectangle, rounded corners=2pt, minimum width=2.6cm,
+        minimum height=0.9cm, draw=#1, line width=0.7pt,
+        font=\footnotesize, align=center, text opacity=1, text=black
+    },
+    stage/.default={black!70},
+    cost/.style={
+        font=\scriptsize\bfseries, text=#1, align=center
+    },
+    cost/.default={GrayLine},
+    check/.style={
+        rectangle, rounded corners=1pt, draw=OrangeLine, dashed,
+        fill=OrangeFill, fill opacity=0.25, font=\scriptsize,
+        align=center, text opacity=1, inner sep=3pt
+    },
+    schur/.style={
+        rectangle, rounded corners=2pt, draw=PinkLine, dashed,
+        fill=PinkFill, fill opacity=0.3, font=\scriptsize,
+        align=center, text opacity=1, inner sep=5pt, text width=3.6cm
+    },
+    annot/.style={
+        font=\scriptsize\itshape, text=GrayLine, align=center
+    },
+    arr/.style={
+        -{Stealth[length=5pt, width=4pt]}, thick, black!70
+    },
+    node distance=0.7cm and 1.2cm
+]
+
+% ===================================================================
+% ELIGIBILITY GATE (top)
+% ===================================================================
+\node[check, text width=3.2cm] (gate)
+    {\textbf{\texttt{can\_use\_modal()}}\\[2pt]
+     flat metric $\cdot$ periodic BCs\\
+     supported operators\\
+     time-independent coeffs\\
+     constraints eliminable};
+
+% ===================================================================
+% MAIN FLOW (left to right)
+% ===================================================================
+
+% Physical space input
+\node[stage=BlueLine, fill=BlueFill, fill opacity=0.3,
+      below left=1.2cm and 0.5cm of gate] (input)
+    {$\mathbf{y}(x, t_0)$\\[-1pt]\scriptsize physical space};
+
+% FFT
+\node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
+      right=1.0cm of input] (fft)
+    {\textbf{FFT}\\[-1pt]\scriptsize \texttt{rfftn} per slot};
+
+% Build matrix
+\node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
+      right=1.0cm of fft] (matrix)
+    {Build $A(k)$\\[-1pt]\scriptsize per-mode matrix};
+
+% Eigendecompose
+\node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
+      right=1.0cm of matrix] (eigen)
+    {Eigendecompose\\[-1pt]\scriptsize $A = V \Lambda V^{-1}$};
+
+% Evolve
+\node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
+      right=1.0cm of eigen] (evolve)
+    {Evolve\\[-1pt]\scriptsize $e^{\Lambda \Delta t}$};
+
+% IFFT
+\node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
+      right=1.0cm of evolve] (ifft)
+    {\textbf{IFFT}\\[-1pt]\scriptsize \texttt{irfftn} per slot};
+
+% Physical space output
+\node[stage=BlueLine, fill=BlueFill, fill opacity=0.3,
+      right=1.0cm of ifft] (output)
+    {$\mathbf{y}(x, t)$\\[-1pt]\scriptsize physical space};
+
+% ===================================================================
+% ARROWS
+% ===================================================================
+\draw[arr] (gate) -- (input);
+\draw[arr] (input) -- (fft);
+\draw[arr] (fft) -- (matrix);
+\draw[arr] (matrix) -- (eigen);
+\draw[arr] (eigen) -- (evolve);
+\draw[arr] (evolve) -- (ifft);
+\draw[arr] (ifft) -- (output);
+
+% Repeat arrow for multiple snapshots
+\draw[arr, rounded corners=3pt, densely dotted, GrayLine]
+    (output.south) -- ++(0,-0.5) -| (evolve.south)
+    node[midway, below, font=\scriptsize\itshape, text=GrayLine]
+    {next snapshot};
+
+% ===================================================================
+% COST ANNOTATIONS (above stages)
+% ===================================================================
+\node[cost=PurpleLine, above=0.15cm of eigen]
+    {$O(N^3)$ once};
+\node[cost=PurpleLine, above=0.15cm of evolve]
+    {$O(N^2)$/snap};
+\node[cost=BlueLine, above=0.15cm of output]
+    {$\sim\!10^{-16}$};
+
+% ===================================================================
+% BLOCK-AWARE CHECK (below eigendecompose)
+% ===================================================================
+\node[check, below=0.6cm of eigen, text width=3.4cm] (blocks)
+    {\texttt{\_find\_independent\_blocks()}\\[1pt]
+     union-find $\to$ skip zero-IC blocks\\
+     warn if $\max(\mathrm{Re}\,\lambda)\cdot\Delta t > 30$};
+\draw[arr, densely dotted, OrangeLine] (blocks) -- (eigen);
+
+% ===================================================================
+% TIERED ALGORITHM (below matrix build)
+% ===================================================================
+\node[annot, below=0.6cm of matrix, text width=3.0cm] (tiers)
+    {per-mode $\leq 12 \times 12$: batch\\
+     $\leq 2000$: dense \texttt{eig}\\
+     $> 2000$: Schur decomp};
+\draw[arr, densely dotted, GrayLine] (tiers) -- (matrix);
+
+% ===================================================================
+% CONSTRAINT ELIMINATION (Schur complement, side branch)
+% ===================================================================
+\node[schur, below=1.8cm of fft] (schur)
+    {\textbf{Schur complement}\\[2pt]
+     $S_{cc}^{-1} = \frac{1}{m^2 + k^2}$ per mode\\[2pt]
+     $A_{\mathrm{red}} = A_{dd} - A_{dc} S_{cc}^{-1} S_{cd}$\\[2pt]
+     implicit velocity solve:\\
+     $(I - A_{dc,v}\cdot\mathrm{recovery})^{-1}$};
+
+\node[annot, below=0.15cm of schur] {if constraints present};
+
+% Arrow from FFT down to Schur, then back up to matrix
+\draw[arr, PinkLine, densely dashed, rounded corners=3pt]
+    (fft.south) -- ++(0,-0.4) -| (schur.north);
+\draw[arr, PinkLine, densely dashed, rounded corners=3pt]
+    (schur.east) -| ([xshift=-0.3cm]matrix.south) -- (matrix.south);
+
+% Recovery arrow from evolve down to reconstruction
+\node[schur, below=1.8cm of evolve, text width=2.8cm] (recover)
+    {\textbf{Reconstruct}\\[2pt]
+     $\hat{c}(k) = -S_{cc}^{-1} S_{cd}\, \hat{d}(k)$\\[2pt]
+     IFFT $\to c(x,t)$};
+\draw[arr, PinkLine, densely dashed] (evolve.south) -- (recover.north);
+\draw[arr, PinkLine, densely dashed, rounded corners=3pt]
+    (recover.east) -| ([xshift=0.3cm]ifft.south) -- (ifft.south);
+
+% ===================================================================
+% BACKGROUND ZONES
+% ===================================================================
+\begin{scope}[on background layer]
+    % Physical space zone (blue tint)
+    \node[fit=(input)(output), inner sep=12pt, fill=BlueFill,
+          fill opacity=0.08, rounded corners=5pt] {};
+    % Fourier space zone (purple tint) — just the middle stages
+    \node[fit=(fft)(ifft), inner sep=8pt, fill=PurpleFill,
+          fill opacity=0.06, rounded corners=5pt] {};
+\end{scope}
+
+% Zone labels
+\node[font=\scriptsize\bfseries, text=BlueLine,
+      below=0.15cm of input.south west, anchor=north west]
+    {Physical space};
+\node[font=\scriptsize\bfseries, text=PurpleLine,
+      above=0.15cm of fft.north west, anchor=south west]
+    {Fourier space};
+
+\end{tikzpicture}
+\end{document}
