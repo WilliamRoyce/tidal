@@ -1,0 +1,136 @@
+\documentclass[border=10pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{tikz}
+\usepackage[svgnames]{xcolor}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit,
+                 matrix, decorations.pathreplacing}
+
+\colorlet{OrangeFill}{LightSalmon}
+\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
+\colorlet{GreenFill}{MediumAquamarine}
+\colorlet{GreenLine}{MediumAquamarine!30!Teal}
+\colorlet{PurpleFill}{MediumPurple}
+\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
+\colorlet{PinkFill}{Thistle}
+\colorlet{PinkLine}{Thistle!30!Plum}
+\colorlet{BlueFill}{LightSkyBlue}
+\colorlet{BlueLine}{SteelBlue}
+\colorlet{GrayFill}{LightGray!60!OldLace}
+\colorlet{GrayLine}{RosyBrown!50!Silver}
+
+\begin{document}
+\begin{tikzpicture}[
+    stage/.style={
+        rectangle, rounded corners=2pt, minimum width=3.0cm,
+        minimum height=0.8cm, draw=#1, line width=0.7pt,
+        fill=#1!20, font=\footnotesize, align=center,
+        text opacity=1, text=black
+    },
+    stage/.default={black!70},
+    mat/.style={
+        rectangle, draw=PurpleLine, fill=PurpleFill, fill opacity=0.15,
+        font=\footnotesize, align=center, text opacity=1,
+        inner sep=5pt, rounded corners=1pt, minimum width=2.4cm
+    },
+    check/.style={
+        rectangle, rounded corners=1pt, draw=OrangeLine, dashed,
+        fill=OrangeFill, fill opacity=0.25, font=\scriptsize,
+        align=center, text opacity=1, inner sep=3pt
+    },
+    annot/.style={font=\scriptsize\itshape, text=GrayLine, align=center},
+    arr/.style={-{Stealth[length=5pt, width=4pt]}, thick, black!70},
+    node distance=0.7cm
+]
+
+% ===================================================================
+% TITLE
+% ===================================================================
+\node[font=\normalsize\bfseries] (title) at (0,0)
+    {Fourier Schur Complement --- Constraint Elimination};
+
+% ===================================================================
+% FULL SYSTEM (left)
+% ===================================================================
+\node[mat, below=0.8cm of title, text width=4.8cm] (full) {%
+    \textbf{Full system} (per mode $k$)\\[4pt]
+    $\displaystyle\frac{d}{dt}\!\begin{pmatrix} d \\ c \end{pmatrix}
+    = \begin{pmatrix} A_{dd} & A_{dc} \\ S_{cd} & S_{cc} \end{pmatrix}
+    \begin{pmatrix} d \\ c \end{pmatrix}$\\[4pt]
+    \scriptsize $d$ = dynamical,\quad $c$ = constraint\\
+    \scriptsize constraint row: $0 = S_{cd}\,d + S_{cc}\,c$};
+
+% ===================================================================
+% INVERT S_cc
+% ===================================================================
+\node[stage=PurpleLine, below=0.7cm of full, text width=3.6cm] (invert) {%
+    \textbf{Invert} $S_{cc}$ per mode\\[2pt]
+    \scriptsize $S_{cc}^{-1}(k) = \dfrac{1}{m^2 + k^2}$\\[2pt]
+    \scriptsize (scalar per mode for single constraint)};
+
+\node[check, right=2.8cm of invert, text width=3.4cm] (singcheck) {%
+    \textbf{$k{=}0$ singularity check}\\[2pt]
+    $|\det S_{cc}| < 10^{-14}$\\
+    $\to$ regularise (gauge pinning)};
+\draw[arr, densely dashed, OrangeLine] (singcheck) -- (invert);
+
+% ===================================================================
+% SCHUR COMPLEMENT
+% ===================================================================
+\node[mat, below=0.7cm of invert, text width=5.2cm] (schur) {%
+    \textbf{Schur complement}\\[4pt]
+    $A_{\mathrm{red}} = A_{dd} - A_{dc}\,S_{cc}^{-1}\,S_{cd}$\\[4pt]
+    \scriptsize field correction: $A_{dc,\mathrm{field}} \cdot \mathrm{recovery}$\\[2pt]
+    \scriptsize velocity coupling (implicit):\\
+    \scriptsize $\dot{d} = (I - A_{dc,v}\cdot\mathrm{recovery})^{-1}\,A_{\mathrm{rhs}}\,d$};
+
+% ===================================================================
+% REDUCED SYSTEM
+% ===================================================================
+\node[stage=GreenLine, below=0.7cm of schur] (reduced) {%
+    \textbf{Reduced system} (dynamical only)\\[2pt]
+    \scriptsize $\dot{d} = A_{\mathrm{red}}(k)\,d$ \quad---\quad eigendecompose as usual};
+
+% ===================================================================
+% RECOVERY
+% ===================================================================
+\node[stage=PinkLine, below=0.7cm of reduced, text width=4.0cm] (recover) {%
+    \textbf{Reconstruct constraints} (per snapshot)\\[2pt]
+    $\hat{c}(k) = -S_{cc}^{-1}\,S_{cd}\,\hat{d}(k)$\\[2pt]
+    \scriptsize IFFT $\to c(x,t)$};
+
+% ===================================================================
+% ARROWS
+% ===================================================================
+\draw[arr] (full) -- (invert);
+\draw[arr] (invert) -- (schur);
+\draw[arr] (schur) -- (reduced);
+\draw[arr] (reduced) -- (recover);
+
+% Recovery feeds back
+\draw[arr, densely dotted, PinkLine, rounded corners=3pt]
+    (recover.east) -- ++(1.5,0) |- (reduced.east)
+    node[pos=0.25, right, font=\scriptsize\itshape, text=PinkLine]
+    {at each output time};
+
+% ===================================================================
+% CHECKS (left side)
+% ===================================================================
+\node[check, left=2.8cm of full, text width=3.8cm] (eligcheck) {%
+    \textbf{\texttt{\_constraints\_fourier\_eliminable()}}\\[2pt]
+    \textbullet\ All constraint operators $\in$\\
+    \quad \texttt{\_EXACT\_MULTIPLIERS}\\
+    \textbullet\ No time-dependent coefficients\\
+    \textbullet\ \texttt{ensure\_consistent\_ic()} runs\\
+    \quad on original layout first};
+\draw[arr, densely dashed, OrangeLine] (eligcheck.east) -- (full.west);
+
+% ===================================================================
+% EXAMPLE ANNOTATION
+% ===================================================================
+\node[annot, below=0.3cm of recover, text width=6.0cm] (perf) {%
+    Coupled Proca (2+1D): 2 constraints eliminated, 8 dynamical slots\\
+    Modal 2.0\,s vs IDA 19.0\,s --- \textbf{9.5$\times$ speedup}\\
+    IDA fails at $32{\times}32$; modal works at any $N$};
+
+\end{tikzpicture}
+\end{document}

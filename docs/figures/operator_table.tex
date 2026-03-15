@@ -1,0 +1,66 @@
+\documentclass[border=10pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{tikz}
+\usepackage[svgnames]{xcolor}
+\usepackage{booktabs}
+\usepackage{array}
+
+\colorlet{GreenFill}{MediumAquamarine}
+\colorlet{GreenLine}{MediumAquamarine!30!Teal}
+\colorlet{PurpleFill}{MediumPurple}
+\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
+\colorlet{GrayFill}{LightGray!60!OldLace}
+\colorlet{GrayLine}{RosyBrown!50!Silver}
+\colorlet{OrangeFill}{LightSalmon}
+\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
+
+\newcommand{\yes}{\textcolor{GreenLine}{\checkmark}}
+\newcommand{\no}{\textcolor{OrangeLine}{---}}
+
+\begin{document}
+\begin{tikzpicture}
+\node[inner sep=0pt] {%
+\footnotesize
+\begin{tabular}{
+    >{\ttfamily}l
+    l
+    >{\raggedright\arraybackslash}p{3.6cm}
+    c
+    c
+}
+\toprule
+\textrm{\textbf{Operator}} & \textbf{Math} & \textbf{Fourier multiplier}
+    & \textbf{Modal} & \textbf{FD} \\
+\midrule
+identity         & $1$                    & $1$                          & \yes & \yes \\
+laplacian        & $\nabla^2$             & $-\sum_i k_i^2$             & \yes & \yes \\
+laplacian\_x     & $\partial_x^2$         & $-k_x^2$                    & \yes & \yes \\
+laplacian\_y     & $\partial_y^2$         & $-k_y^2$                    & \yes & \yes \\
+laplacian\_z     & $\partial_z^2$         & $-k_z^2$                    & \yes & \yes \\
+gradient\_x      & $\partial_x$           & $ik_x$                      & \yes & \yes \\
+gradient\_y      & $\partial_y$           & $ik_y$                      & \yes & \yes \\
+gradient\_z      & $\partial_z$           & $ik_z$                      & \yes & \yes \\
+cross\_deriv\_xy & $\partial_x\partial_y$ & $-k_x k_y$                  & \yes & \yes \\
+cross\_deriv\_xz & $\partial_x\partial_z$ & $-k_x k_z$                  & \yes & \yes \\
+cross\_deriv\_yz & $\partial_y\partial_z$ & $-k_y k_z$                  & \yes & \yes \\
+biharmonic       & $\nabla^4$             & $(\sum_i k_i^2)^2$          & \yes & \yes \\
+\midrule
+first\_deriv\_t  & $\partial_t$           & \textit{n/a (time operator)} & \no  & \yes \\
+derivative\_N\_x & $\partial_x^N$         & $(ik_x)^N$                  & \no  & \yes \\
+mixed\_T\_S1\_\ldots & mixed               & \textit{varies}             & \no  & \yes \\
+\bottomrule
+\end{tabular}
+};
+
+% Legend annotation
+\node[below=0.3cm of current bounding box.south, font=\scriptsize\itshape,
+      text=GrayLine, align=center] {%
+    \yes\ = supported (in \texttt{\_EXACT\_MULTIPLIERS} for modal;
+    FD stencils for all solvers) \qquad
+    \no\ = not available (modal ineligible if present)\\[2pt]
+    FD orders 2/4/6 via \texttt{--fd-order}. \quad
+    Spectral (\texttt{--spectral}) uses exact multipliers for all-periodic BCs.\\[2pt]
+    $k = 2\pi \cdot \texttt{rfftfreq}(N, d{=}dx)$ --- consistent with \texttt{operators.py} convention.};
+
+\end{tikzpicture}
+\end{document}
