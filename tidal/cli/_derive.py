@@ -2843,6 +2843,77 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "lagTerms = If[Head[lagForCanon] === Plus, List @@ lagForCanon, {lagForCanon}];",
             'Print["Decomposing Lagrangian: ", Length[lagTerms], " additive terms"];',
             _wls_timing_start("tCanonDecomp"),
+        ]
+    )
+
+    # Pre-decomposition: set ComponentValue = 0 for transverse PD on perturbation
+    # fields.  TraceBasisDummy evaluates these during dummy-index summation,
+    # so zeroed components are never enumerated — directly reducing the O(4^{2K})
+    # cost.  Same mechanism as _wls_pre_decomposition_tt_zeroing for h_{0μ}=0.
+    # Generalizes to any propagation axis, dimension, and field set.
+    if ctx.reduction is not None and pert_field_heads:
+        cv_lines: list[str] = [
+            "",
+            "(* Pre-decomposition plane-wave zeroing: PD in transverse directions  *)",
+            "(* on perturbation fields → ComponentValue = 0.  TraceBasisDummy will *)",
+            "(* skip these components during enumeration, reducing O(4^{2K}) cost. *)",
+            "(* Same mechanism as TT zeroing (h_{0μ}=0 via ComponentValue).        *)",
+        ]
+        n_cv = 0
+        for fld in ctx.fields:
+            fname = fld["name"]
+            if fname in _matter_pert_originals(ctx):
+                continue
+            head = (
+                pert_heads_map[fname]
+                if fname in pert_heads_map
+                else f"{p}{fname.capitalize()}"
+            )
+            ftype = fld["type"]
+            dim = ctx.dim
+
+            if ftype == "scalar":
+                for ki in killed_basis_indices:
+                    cv_lines.append(
+                        f"ComponentValue[PD[{{{ki}, -{ctx.chart}}}][{head}[]], 0];"
+                    )
+                    n_cv += 1
+            elif ftype == "vector":
+                for ki in killed_basis_indices:
+                    for mu in range(dim):
+                        cv_lines.append(
+                            f"ComponentValue[PD[{{{ki}, -{ctx.chart}}}]"
+                            f"[{head}[{{{mu}, -{ctx.chart}}}]], 0];"
+                        )
+                        n_cv += 1
+            elif ftype == "tensor":
+                rank = fld.get("rank", 2)
+                sym = fld.get("symmetry", "")
+                if rank == 2:
+                    for ki in killed_basis_indices:
+                        for i in range(dim):
+                            j_start = i if sym == "symmetric" else 0
+                            for j in range(j_start, dim):
+                                cv_lines.append(
+                                    f"ComponentValue[PD[{{{ki}, -{ctx.chart}}}]"
+                                    f"[{head}[{{{i}, -{ctx.chart}}}, {{{j}, -{ctx.chart}}}]], 0];"
+                                )
+                                n_cv += 1
+                                if sym == "symmetric" and i != j:
+                                    cv_lines.append(
+                                        f"ComponentValue[PD[{{{ki}, -{ctx.chart}}}]"
+                                        f"[{head}[{{{j}, -{ctx.chart}}}, {{{i}, -{ctx.chart}}}]], 0];"
+                                    )
+                                    n_cv += 1
+
+        cv_lines.append(
+            f'Print["Set ", {n_cv}, " ComponentValues for transverse PD zeroing"];'
+        )
+        cv_lines.append("")
+        lines.extend(cv_lines)
+
+    lines.extend(
+        [
             "lagComp = 0;",
             "Do[",
             "  Module[{termComp, tTerm = AbsoluteTime[]},",
