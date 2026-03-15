@@ -2778,38 +2778,13 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         bg_rules_str = ", ".join(bg_rules_entries)
         bg_rules_opt = f', "BackgroundFieldRules" -> {{{bg_rules_str}}}'
 
-    # Compute plane-wave options for DecomposeScalarExpression.
-    # KilledAxes: basis indices of transverse axes (0-indexed: t=0, x=1, y=2, z=3).
-    # PertFieldHeads: perturbation field head symbols whose transverse PD = 0.
-    # These enable pre-TraceBasisDummy zeroing of transverse derivatives,
-    # dramatically reducing the O(4^{2K}) enumeration cost.
-    # Generalizes to any propagation axis and any number of perturbation fields.
-    pw_killed_opt = ""
-    pw_pertheads_opt = ""
-    if ctx.reduction is not None:
-        prop_axis = ctx.reduction["propagation_axis"]
-        coords = ctx.coords  # e.g. ["t", "x", "y", "z"]
-        killed_coords = [c for c in coords[1:] if c != prop_axis]
-        killed_basis_indices = [coords.index(c) for c in killed_coords]
-        if killed_basis_indices:
-            indices_str = ", ".join(str(i) for i in killed_basis_indices)
-            pw_killed_opt = f', "KilledAxes" -> {{{indices_str}}}'
-
-        # Perturbation field heads: same as field_heads from _canonical_field_heads
-        pert_heads_map = _matter_pert_head_map(ctx)
-        originals = _matter_pert_originals(ctx)
-        pert_field_heads: list[str] = []
-        for f in ctx.fields:
-            fname = f["name"]
-            if fname in originals:
-                continue
-            if fname in pert_heads_map:
-                pert_field_heads.append(pert_heads_map[fname])
-            else:
-                pert_field_heads.append(f"{p}{fname.capitalize()}")
-        if pert_field_heads:
-            heads_str = ", ".join(pert_field_heads)
-            pw_pertheads_opt = f', "PertFieldHeads" -> {{{heads_str}}}'
+    # NOTE: ComponentValue PD zeroing was attempted for the canonical path but
+    # REMOVED.  For scalar Lagrangians, all indices are dummy — TraceBasisDummy
+    # must enumerate all combinations regardless.  Extra xAct rules add
+    # pattern-matching overhead that outweighs any benefit.
+    # Measured: 8 rules +56% slower, 40 rules +9% slower on batch[1:50/82].
+    # The per-term plane-wave reduction (after ConvertCDToDerivatives) is the
+    # correct and effective approach for the canonical path.
 
     lines: list[str] = [
         "",
@@ -2864,79 +2839,13 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         ]
     )
 
-    # Pre-decomposition: set ComponentValue = 0 for transverse PD on perturbation
-    # fields.  TraceBasisDummy evaluates these during dummy-index summation,
-    # so zeroed components are never enumerated — directly reducing the O(4^{2K})
-    # cost.  Same mechanism as _wls_pre_decomposition_tt_zeroing for h_{0μ}=0.
-    # Generalizes to any propagation axis, dimension, and field set.
-    if ctx.reduction is not None and pert_field_heads:
-        cv_lines: list[str] = [
-            "",
-            "(* Pre-decomposition plane-wave zeroing: PD in transverse directions  *)",
-            "(* on perturbation fields → ComponentValue = 0.  TraceBasisDummy will *)",
-            "(* skip these components during enumeration, reducing O(4^{2K}) cost. *)",
-            "(* Same mechanism as TT zeroing (h_{0μ}=0 via ComponentValue).        *)",
-        ]
-        n_cv = 0
-        for fld in ctx.fields:
-            fname = fld["name"]
-            if fname in _matter_pert_originals(ctx):
-                continue
-            head = (
-                pert_heads_map[fname]
-                if fname in pert_heads_map
-                else f"{p}{fname.capitalize()}"
-            )
-            ftype = fld["type"]
-            dim = ctx.dim
-
-            if ftype == "scalar":
-                for ki in killed_basis_indices:
-                    cv_lines.append(
-                        f"ComponentValue[PD[{{{ki}, -{ctx.chart}}}][{head}[]], 0];"
-                    )
-                    n_cv += 1
-            elif ftype == "vector":
-                for ki in killed_basis_indices:
-                    for mu in range(dim):
-                        cv_lines.append(
-                            f"ComponentValue[PD[{{{ki}, -{ctx.chart}}}]"
-                            f"[{head}[{{{mu}, -{ctx.chart}}}]], 0];"
-                        )
-                        n_cv += 1
-            elif ftype == "tensor":
-                rank = fld.get("rank", 2)
-                sym = fld.get("symmetry", "")
-                if rank == 2:
-                    for ki in killed_basis_indices:
-                        for i in range(dim):
-                            j_start = i if sym == "symmetric" else 0
-                            for j in range(j_start, dim):
-                                cv_lines.append(
-                                    f"ComponentValue[PD[{{{ki}, -{ctx.chart}}}]"
-                                    f"[{head}[{{{i}, -{ctx.chart}}}, {{{j}, -{ctx.chart}}}]], 0];"
-                                )
-                                n_cv += 1
-                                if sym == "symmetric" and i != j:
-                                    cv_lines.append(
-                                        f"ComponentValue[PD[{{{ki}, -{ctx.chart}}}]"
-                                        f"[{head}[{{{j}, -{ctx.chart}}}, {{{i}, -{ctx.chart}}}]], 0];"
-                                    )
-                                    n_cv += 1
-
-        cv_lines.append(
-            f'Print["Set ", {n_cv}, " ComponentValues for transverse PD zeroing"];'
-        )
-        cv_lines.append("")
-        lines.extend(cv_lines)
-
     lines.extend(
         [
             "lagComp = 0;",
             "Do[",
             "  Module[{termComp, tTerm = AbsoluteTime[]},",
             f"    termComp = DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
-            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}{pw_killed_opt}{pw_pertheads_opt}];',
+            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}];',
         ]
     )
 

@@ -964,14 +964,11 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List] :=
 (* Einstein-Hilbert sector in spherical coords, exceeded 10 GB unbatched).     *)
 DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern[DecomposeToComponents]] := Module[
   {componentExpr, metricMatrix, computeChristoffelsOption, shouldComputeChristoffels,
-   coords, dim, coordSyms, backgroundFieldRules, computeChristoffels,
-   killedAxes, pertFieldHeads},
+   coords, dim, coordSyms, backgroundFieldRules, computeChristoffels},
 
   metricMatrix = OptionValue[DecomposeToComponents, {opts}, "MetricMatrix"];
   computeChristoffelsOption = OptionValue[DecomposeToComponents, {opts}, "ComputeChristoffels"];
   backgroundFieldRules = OptionValue[DecomposeToComponents, {opts}, "BackgroundFieldRules"];
-  killedAxes = OptionValue[DecomposeToComponents, {opts}, "KilledAxes"];
-  pertFieldHeads = OptionValue[DecomposeToComponents, {opts}, "PertFieldHeads"];
 
   coords = GetCoordinateSymbols[chart];
   dim = GetChartDimension[chart];
@@ -1024,39 +1021,14 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
   Print["    [scalar] step2-ToBasis: ", Round[MemoryInUse[]/1024.^2], " MB, ",
         If[Head[componentExpr]===Plus, Length[componentExpr], 1], " terms"];
 
-  (* Step 2.5: Plane-wave reduction — zero transverse PD on perturbation fields.  *)
-  (* After ExpandChristoffelsToMetricDerivatives (step 1), all covariant           *)
-  (* derivatives are split into PD + Christoffel terms.  After ToBasis (step 2),   *)
-  (* PD operators carry explicit basis indices: PD[{k, -chart}][field[...]].       *)
-  (* For plane-wave propagation, perturbation fields depend only on (t, prop_axis) *)
-  (* so PD in transverse directions is identically zero.  Zeroing these BEFORE     *)
-  (* TraceBasisDummy dramatically reduces the number of terms that must be          *)
-  (* enumerated (O(4^{2K}) → much fewer), directly cutting the dominant cost.      *)
-  (* Christoffel connection terms (Γ × field, no PD on field) survive correctly.   *)
-  (* PD on metric/background (position-dependent) is NOT affected.                 *)
-  (* Ref: EOM path uses ComponentValue zeros (TT gauge) for the same purpose.      *)
-  If[killedAxes =!= {} && pertFieldHeads =!= {},
-    Module[{nBefore, nAfter, exprBefore},
-      nBefore = If[Head[componentExpr] === Plus, Length[componentExpr], 1];
-      exprBefore = componentExpr;
-      Do[
-        componentExpr = componentExpr /. PD[{killedIdx, -chart}][fh_[___]] /; MemberQ[pertFieldHeads, fh] :> 0,
-        {killedIdx, killedAxes}
-      ];
-      (* Only Expand if substitution changed the expression — avoids costly *)
-      (* no-op expansion in flat spacetime where PD patterns don't appear   *)
-      (* (derivatives are still CD at this stage, converted later).         *)
-      If[componentExpr =!= exprBefore,
-        componentExpr = Expand[componentExpr];
-        nAfter = If[componentExpr === 0, 0,
-          If[Head[componentExpr] === Plus, Length[componentExpr], 1]];
-        Print["    [scalar] step2.5-PlaneWaveZero: ", Round[MemoryInUse[]/1024.^2], " MB, ",
-              nBefore, " -> ", nAfter, " terms (killed axes: ", killedAxes, ")"];
-        (* Early return if all terms vanished — skip expensive TraceBasisDummy *)
-        If[componentExpr === 0, Return[0]]
-      ]
-    ]
-  ];
+  (* NOTE: Pre-TraceBasisDummy plane-wave zeroing was attempted here but does     *)
+  (* NOT work for scalar Lagrangian decomposition.  After ToBasis, PD operators  *)
+  (* retain abstract dummy indices (not basis indices) — they only become basis  *)
+  (* indices DURING TraceBasisDummy enumeration.  The per-term plane-wave        *)
+  (* reduction in _derive.py (after ConvertCDToDerivatives) correctly zeros      *)
+  (* transverse Derivative patterns when all indices are resolved.               *)
+  (* ComponentValue-based zeroing also degrades performance: +9% on radial       *)
+  (* Gertsenshtein due to pattern-matching overhead on 40 extra xAct rules.      *)
 
   (* Steps 3+3.5+3.6 fused: TraceBasisDummy + Expand + early metric evaluation.
      Batched to prevent O(dim^{2*n_dummy}) intermediate memory blowup.
