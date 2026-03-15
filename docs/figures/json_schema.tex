@@ -22,6 +22,10 @@
 \colorlet{GrayFill}{LightGray!60!OldLace}
 \colorlet{GrayLine}{RosyBrown!50!Silver}
 
+% --- Inline text commands (used inside node content) ---
+\newcommand{\key}[1]{{\footnotesize\ttfamily\bfseries #1}}
+\newcommand{\val}[1]{{\scriptsize\ttfamily\color{GrayLine}#1}}
+
 \begin{document}
 \begin{tikzpicture}[
     % --- Node styles ---
@@ -32,8 +36,6 @@
         inner sep=4pt
     },
     block/.default={black!60},
-    key/.style={font=\footnotesize\ttfamily\bfseries, text=black},
-    val/.style={font=\scriptsize\ttfamily, text=GrayLine},
     role/.style={font=\scriptsize\itshape, text=#1, align=left},
     role/.default={GrayLine},
     arr/.style={semithick, black!50},
