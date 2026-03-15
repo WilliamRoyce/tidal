@@ -1,5 +1,6 @@
 \documentclass[border=10pt]{standalone}
 \usepackage[T1]{fontenc}
+\usepackage{amsmath}
 \usepackage{tikz}
 \usepackage[svgnames]{xcolor}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit,
@@ -51,21 +52,25 @@
 % ===================================================================
 % FULL SYSTEM (left)
 % ===================================================================
-\node[mat, below=0.8cm of title, text width=4.8cm] (full) {%
+\node[mat, below=0.8cm of title] (full) {%
+    \parbox{5.0cm}{\centering
     \textbf{Full system} (per mode $k$)\\[4pt]
     $\displaystyle\frac{d}{dt}\!\begin{pmatrix} d \\ c \end{pmatrix}
     = \begin{pmatrix} A_{dd} & A_{dc} \\ S_{cd} & S_{cc} \end{pmatrix}
     \begin{pmatrix} d \\ c \end{pmatrix}$\\[4pt]
-    \scriptsize $d$ = dynamical,\quad $c$ = constraint\\
-    \scriptsize constraint row: $0 = S_{cd}\,d + S_{cc}\,c$};
+    {\scriptsize $d$ = dynamical,\quad $c$ = constraint}\\[2pt]
+    {\scriptsize constraint row: $0 = S_{cd}\,d + S_{cc}\,c$}%
+    }};
 
 % ===================================================================
 % INVERT S_cc
 % ===================================================================
-\node[stage=PurpleLine, below=0.7cm of full, text width=3.6cm] (invert) {%
+\node[stage=PurpleLine, below=0.7cm of full] (invert) {%
+    \parbox{3.8cm}{\centering
     \textbf{Invert} $S_{cc}$ per mode\\[2pt]
-    \scriptsize $S_{cc}^{-1}(k) = \dfrac{1}{m^2 + k^2}$\\[2pt]
-    \scriptsize (scalar per mode for single constraint)};
+    {\scriptsize $S_{cc}^{-1}(k) = \dfrac{1}{m^2 + k^2}$}\\[2pt]
+    {\scriptsize (scalar per mode for single constraint)}%
+    }};
 
 \node[check, right=2.8cm of invert, text width=3.4cm] (singcheck) {%
     \textbf{$k{=}0$ singularity check}\\[2pt]
@@ -76,12 +81,14 @@
 % ===================================================================
 % SCHUR COMPLEMENT
 % ===================================================================
-\node[mat, below=0.7cm of invert, text width=5.2cm] (schur) {%
+\node[mat, below=0.7cm of invert] (schur) {%
+    \parbox{5.4cm}{\centering
     \textbf{Schur complement}\\[4pt]
     $A_{\mathrm{red}} = A_{dd} - A_{dc}\,S_{cc}^{-1}\,S_{cd}$\\[4pt]
-    \scriptsize field correction: $A_{dc,\mathrm{field}} \cdot \mathrm{recovery}$\\[2pt]
-    \scriptsize velocity coupling (implicit):\\
-    \scriptsize $\dot{d} = (I - A_{dc,v}\cdot\mathrm{recovery})^{-1}\,A_{\mathrm{rhs}}\,d$};
+    {\scriptsize field correction: $A_{dc,\mathrm{field}} \cdot \mathrm{recovery}$}\\[2pt]
+    {\scriptsize velocity coupling (implicit):}\\[1pt]
+    {\scriptsize $\dot{d} = (I - A_{dc,v}\cdot\mathrm{recovery})^{-1}\,A_{\mathrm{rhs}}\,d$}%
+    }};
 
 % ===================================================================
 % REDUCED SYSTEM
