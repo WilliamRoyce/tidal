@@ -33,7 +33,7 @@ Includes:
 
 - API reference
 - Pipeline architecture
-- Example gallery with 18 working examples
+- Example gallery with 27 working examples
 - Troubleshooting guide
 
 ## Contributing

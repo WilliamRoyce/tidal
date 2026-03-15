@@ -216,7 +216,7 @@ For uniform B₀, the coupling coefficients are constants (proportional to B₀)
 2. **TOML validation**: `matter_perturbations` accepted/rejected correctly (5 error-case tests)
 3. **WLS generation**: `--dry-run` produces correct `DefTensorPerturbation` + multi-field `VarD` (verified)
 4. **End-to-end**: Einstein-Maxwell `--dry-run` generates correct WLS with coupling terms
-5. **Physics**: Conversion probability validation pending (requires wolframscript execution)
+5. **Physics**: Conversion probability validated — uniform B₀ (RMS 0.012, 40-point sweep) and localized Gaussian (0.04% agreement with Boccaletti formula, 48-point sweep). See `docs/gertsenshtein.md`.
 
 ## Design Principles
 

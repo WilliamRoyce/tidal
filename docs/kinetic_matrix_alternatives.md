@@ -84,7 +84,7 @@ where M encodes the kinetic coupling. Specialised solvers handle M directly.
 
 ## Alternative 2: Gauge Fixing (Reduce K to Diagonal)
 
-**Status:** TT gauge implemented (Phase B, uncommitted). De Donder planned.
+**Status:** TT gauge implemented (Phase B). De Donder implemented (Phase B). See `docs/gauge_fixing.md`.
 
 Instead of inverting K, apply gauge conditions that eliminate off-diagonal
 kinetic coupling, making K diagonal (or even identity).
@@ -101,7 +101,7 @@ kinetic coupling, making K diagonal (or even identity).
 
 - Adds L_gf = -(1/2ξ)(∂^a h_ab - ½ ∂_b h)² to Lagrangian
 - Diagonalizes K and exposes constraint structure (h_0, h_0i become constraints)
-- Type A (Lagrangian term): pipeline infrastructure exists, needs testing
+- Type A (Lagrangian term): implemented — see `docs/gauge_fixing.md` for usage
 - **Works for:** Both massless and massive gravity
 - **Disadvantage:** Gauge-dependent; results must be checked for gauge artifacts
 
