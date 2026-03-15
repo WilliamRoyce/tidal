@@ -2742,7 +2742,7 @@ def _wls_constraint_elimination() -> list[str]:
     ]
 
 
-def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:
+def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: C901, PLR0912, PLR0915
     """Generate WLS code for canonical Phase A: decompose Lagrangian + constraint elimination.
 
     Decomposes the abstract Lagrangian into component form (``lagComp``),
@@ -2777,6 +2777,39 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:
     if bg_rules_entries:
         bg_rules_str = ", ".join(bg_rules_entries)
         bg_rules_opt = f', "BackgroundFieldRules" -> {{{bg_rules_str}}}'
+
+    # Compute plane-wave options for DecomposeScalarExpression.
+    # KilledAxes: basis indices of transverse axes (0-indexed: t=0, x=1, y=2, z=3).
+    # PertFieldHeads: perturbation field head symbols whose transverse PD = 0.
+    # These enable pre-TraceBasisDummy zeroing of transverse derivatives,
+    # dramatically reducing the O(4^{2K}) enumeration cost.
+    # Generalizes to any propagation axis and any number of perturbation fields.
+    pw_killed_opt = ""
+    pw_pertheads_opt = ""
+    if ctx.reduction is not None:
+        prop_axis = ctx.reduction["propagation_axis"]
+        coords = ctx.coords  # e.g. ["t", "x", "y", "z"]
+        killed_coords = [c for c in coords[1:] if c != prop_axis]
+        killed_basis_indices = [coords.index(c) for c in killed_coords]
+        if killed_basis_indices:
+            indices_str = ", ".join(str(i) for i in killed_basis_indices)
+            pw_killed_opt = f', "KilledAxes" -> {{{indices_str}}}'
+
+        # Perturbation field heads: same as field_heads from _canonical_field_heads
+        pert_heads_map = _matter_pert_head_map(ctx)
+        originals = _matter_pert_originals(ctx)
+        pert_field_heads: list[str] = []
+        for f in ctx.fields:
+            fname = f["name"]
+            if fname in originals:
+                continue
+            if fname in pert_heads_map:
+                pert_field_heads.append(pert_heads_map[fname])
+            else:
+                pert_field_heads.append(f"{p}{fname.capitalize()}")
+        if pert_field_heads:
+            heads_str = ", ".join(pert_field_heads)
+            pw_pertheads_opt = f', "PertFieldHeads" -> {{{heads_str}}}'
 
     lines: list[str] = [
         "",
@@ -2814,15 +2847,56 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:
             "Do[",
             "  Module[{termComp, tTerm = AbsoluteTime[]},",
             f"    termComp = DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
-            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}];',
+            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}{pw_killed_opt}{pw_pertheads_opt}];',
+        ]
+    )
+
+    # Per-term plane-wave reduction: zero transverse Derivative patterns and
+    # apply coordinate_values (e.g. y→π/2) on each term BEFORE accumulation.
+    # This is applied AFTER DecomposeScalarExpression (which already zeroed
+    # transverse PD at the pre-TraceBasisDummy stage) as defense-in-depth for
+    # any residual transverse derivatives (e.g. from Christoffel connections
+    # that produce Derivative form only after ConvertCDToDerivatives).
+    # Applying per-term instead of post-loop keeps lagComp small, making
+    # downstream IBP + Legendre transform much faster.
+    if ctx.reduction is not None:
+        prop_axis = ctx.reduction["propagation_axis"]
+        coords = ctx.coords
+        killed = [c for c in coords[1:] if c != prop_axis]
+        deriv_rules: list[str] = []
+        for c in killed:
+            slot = coords.index(c) + 1
+            deriv_rules.append(
+                f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
+                f" && {{ords}}[[{slot}]] > 0 :> 0"
+            )
+        lines.append(f"    termComp = termComp /. {{{','.join(deriv_rules)}}};")
+
+        coord_values: dict[str, str] = ctx.reduction.get("coordinate_values", {})
+        if coord_values:
+            cv_rules = ", ".join(
+                f"{coord}[] -> {val}" for coord, val in coord_values.items()
+            )
+            lines.append(f"    termComp = termComp /. {{{cv_rules}}};")
+
+        lines.append("    termComp = Expand[termComp];")
+
+    lines.extend(
+        [
             "    lagComp += termComp;",
             "    Share[];",
             '    Print["  term ", k, "/", Length[lagTerms], ": ",',
             '      Round[AbsoluteTime[] - tTerm, 0.1], "s, ",',
-            '      Round[MemoryInUse[]/1024.^2], " MB"];',
+            '      Round[MemoryInUse[]/1024.^2], " MB",',
+            '      If[termComp === 0, " (ZERO)", ""]];',
             "  ],",
             "  {k, Length[lagTerms]}",
             "];",
+        ]
+    )
+
+    lines.extend(
+        [
             "Clear[lagTerms];",
             _wls_timing_end("tCanonDecomp", "Canonical Lagrangian decomposition"),
             "",
@@ -2855,28 +2929,10 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:
         ]
     )
 
-    # Apply plane-wave reduction to the component-form Lagrangian
-    if ctx.reduction is not None:
-        prop_axis = ctx.reduction["propagation_axis"]
-        coords = ctx.coords
-        killed = [c for c in coords[1:] if c != prop_axis]
-        rules: list[str] = []
-        for c in killed:
-            slot = coords.index(c) + 1
-            # Guard: short-arity derivatives must not index beyond their length
-            rules.append(
-                f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot} && {{ords}}[[{slot}]] > 0 :> 0"
-            )
-        lines.extend(
-            [
-                "(* Plane-wave reduction: zero transverse derivatives in Lagrangian components *)",
-                "lagComp = lagComp /. {",
-                ",\n".join(rules),
-                "};",
-                "lagComp = Expand[lagComp];",
-                "",
-            ]
-        )
+    # NOTE: Plane-wave reduction (transverse Derivative zeroing + coordinate_values)
+    # is now applied per-term inside the Do loop above, keeping lagComp small for
+    # faster IBP + Legendre transform.  Pre-TraceBasisDummy PD zeroing (step 2.5
+    # in DecomposeScalarExpression) handles the xAct-level reduction.
 
     lines.extend(
         [
