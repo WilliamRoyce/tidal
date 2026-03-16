@@ -4703,7 +4703,8 @@ path = "/tmp/torsion_pert_test.json"
         wls_text = capsys.readouterr().out
         # DefTensorPerturbation for TorsionCDT
         assert "DefTensorPerturbation" in wls_text
-        assert "TorsionPert" in wls_text
+        assert "torsionPert" in wls_text  # perturbation label (with LI)
+        assert "TorsionField" in wls_text  # physical field (no LI, for VarD)
         # TorsionCDT correctly prefixed in Lagrangian
         assert "Torsion" in wls_text
         # Torsion perturbation has antisymmetry
