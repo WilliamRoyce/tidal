@@ -132,6 +132,17 @@ def _generate_field_def(
         sym_spec = f", Antisymmetric[{{{indices}}}]"
     elif symmetry == "symmetric":
         sym_spec = f", Symmetric[{{{indices}}}]"
+    elif symmetry.startswith("antisymmetric_"):
+        # Partial antisymmetry: "antisymmetric_23" → antisymmetric in slots 2,3
+        # xAct syntax: Antisymmetric[{-b, -c}] for rank-3 T[-a,-b,-c]
+        slot_digits = symmetry.split("_", 1)[1]
+        slot_indices = ", ".join(f"-{_INDEX_LETTERS[int(s) - 1]}" for s in slot_digits)
+        sym_spec = f", Antisymmetric[{{{slot_indices}}}]"
+    elif symmetry.startswith("symmetric_"):
+        # Partial symmetry: "symmetric_12" → symmetric in slots 1,2
+        slot_digits = symmetry.split("_", 1)[1]
+        slot_indices = ", ".join(f"-{_INDEX_LETTERS[int(s) - 1]}" for s in slot_digits)
+        sym_spec = f", Symmetric[{{{slot_indices}}}]"
     else:
         sym_spec = ""
 
@@ -2477,7 +2488,7 @@ def _wls_constraint_elimination() -> list[str]:
         "    fieldFuncList = Select[fieldFuncList,",
         "      !MemberQ[compToFunc /@ gaugeElim, #] &];",
         '    Print["Zeroed gauge-eliminated fields in Lagrangian: ",',
-        '      gaugeElim];',
+        "      gaugeElim];",
         "  ];",
         "];",
         "",
@@ -2742,7 +2753,7 @@ def _wls_constraint_elimination() -> list[str]:
     ]
 
 
-def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: C901, PLR0912, PLR0915
+def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:
     """Generate WLS code for canonical Phase A: decompose Lagrangian + constraint elimination.
 
     Decomposes the abstract Lagrangian into component form (``lagComp``),
@@ -2770,9 +2781,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
                 bf["components"], ctx.metric_diagonal
             )
             contra_str = ", ".join(contra_comps)
-            bg_rules_entries.append(
-                f"{{{bg_head}, {{{comps_str}}}, {{{contra_str}}}}}"
-            )
+            bg_rules_entries.append(f"{{{bg_head}, {{{comps_str}}}, {{{contra_str}}}}}")
     bg_rules_opt = ""
     if bg_rules_entries:
         bg_rules_str = ", ".join(bg_rules_entries)
@@ -3299,7 +3308,7 @@ def _wls_json_plane_wave_reduction(ctx: _WlsContext) -> list[str]:
         'Do[If[k =!= "x", AppendTo[pwCoordMap, k -> "x"]], {k, pwKilledAxes}];',
         "",
         "(* Remap coordinate_dependent in equations — use [[...]] Part    *)",
-        "(* syntax throughout; [\"key\"][[i]] is a function call, not Part. *)",
+        '(* syntax throughout; ["key"][[i]] is a function call, not Part. *)',
         "Do[",
         "  Module[{nTerms, cd},",
         '    nTerms = Length[jsonStructure[["equations", i, "rhs", "terms"]]];',
