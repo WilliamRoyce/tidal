@@ -1903,11 +1903,13 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
             )
             print(f"Error: {msg}", file=sys.stderr)
             return 1
-    # Modal solver operates in pure k-space — spectral operators are
-    # redundant (and unused).  Silently disable to avoid confusion.
+    # Modal solver operates in pure k-space — spectral operators are not
+    # used during time evolution.  However, keep spectral=True so that
+    # energy measurements use FFT operators matching the modal solver's
+    # conserved Hamiltonian.  Without this, energy measurement uses FD
+    # operators that differ from the exact Fourier Hamiltonian, producing
+    # spurious conservation errors that increase with grid size.
     if use_spectral and scheme == "modal":
-        use_spectral = False
-        set_spectral(False)
         log("  Note: modal solver uses k-space natively; spectral auto-disabled")
     log(f"  Scheme: {scheme}")
 
