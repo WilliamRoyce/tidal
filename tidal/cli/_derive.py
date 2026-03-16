@@ -1164,6 +1164,39 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         "",
     ]
 
+    # --- Torsion decomposition (PGT): CDT → CD + torsion-as-tensor ---
+    # For Poincaré gauge theories with torsion = true, the Lagrangian uses
+    # the Riemann-Cartan connection CDT.  Before xPert perturbation (which
+    # assumes Levi-Civita), decompose all CDT quantities into CD (Levi-Civita)
+    # + torsion tensor (contortion) using xAct's ChangeCurvature/ChangeTorsion.
+    # This converts RicciScalarCDT[] → RicciScalarCD[] + torsion² terms,
+    # and TorsionCDT[a,-b,-c] → Christoffel differences (contortion).
+    # The torsion tensor then becomes an independent field for perturbation.
+    # Ref: xAct ChangeCurvature documentation; Blagojevic & Hehl (2013).
+    if ctx.torsion:
+        lines.extend(
+            [
+                "(* === PGT decomposition: R̃(CDT) → R(CD) + TorsionCDT terms === *)",
+                "(* ChangeCurvature: R̃ → R^{LC} + ∇K + K²                             *)",
+                "(*   (K = Christoffel[CD,CDT] = contortion from torsion)               *)",
+                "(* ChangeTorsion: Christoffel[CD,CDT] → f(TorsionCDT)                  *)",
+                "(*   converts contortion back to the fundamental torsion tensor         *)",
+                "(* Result: L expressed entirely as R^{LC}(CD) + TorsionCDT[...] terms  *)",
+                "(* This is essential for DefTensorPerturbation on TorsionCDT to         *)",
+                "(* correctly perturb ALL torsion contributions — both from T² terms     *)",
+                "(* AND from the contortion in the R̃ decomposition.                     *)",
+                "(* Ref: xAct ChangeCurvature/ChangeTorsion; Blagojevic & Hehl (2013). *)",
+                'Print["PGT decomposition: R̃(CDT) → R(CD) + TorsionCDT terms..."];',
+                f"{p}Lagrangian = ChangeCurvature[{p}Lagrangian, {ctx.cdt}, {ctx.cd}];",
+                f"{p}Lagrangian = ChangeTorsion[{p}Lagrangian, {ctx.cdt}, {ctx.cd}];",
+                f"{p}Lagrangian = ContractMetric[{p}Lagrangian, {ctx.metric}];",
+                f"{p}Lagrangian = ToCanonical[{p}Lagrangian];",
+                f'Print["L (CD + TorsionCDT): ", Short[{p}Lagrangian, 5]];',
+                'Print["[", Round[MemoryInUse[]/1024.^2], " MB] After PGT decomposition"];',
+                "",
+            ]
+        )
+
     # --- Metric perturbation setup ---
     # xPert requires SetupMetricPerturbation to register the global perturbation
     # parameter, even for matter-only perturbation. Without it, Perturbation[]
