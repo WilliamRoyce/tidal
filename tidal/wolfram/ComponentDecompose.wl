@@ -1021,14 +1021,20 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
   Print["    [scalar] step2-ToBasis: ", Round[MemoryInUse[]/1024.^2], " MB, ",
         If[Head[componentExpr]===Plus, Length[componentExpr], 1], " terms"];
 
-  (* NOTE: Pre-TraceBasisDummy plane-wave zeroing was attempted here but does     *)
-  (* NOT work for scalar Lagrangian decomposition.  After ToBasis, PD operators  *)
-  (* retain abstract dummy indices (not basis indices) — they only become basis  *)
-  (* indices DURING TraceBasisDummy enumeration.  The per-term plane-wave        *)
-  (* reduction in _derive.py (after ConvertCDToDerivatives) correctly zeros      *)
-  (* transverse Derivative patterns when all indices are resolved.               *)
-  (* ComponentValue-based zeroing also degrades performance: +9% on radial       *)
-  (* Gertsenshtein due to pattern-matching overhead on 40 extra xAct rules.      *)
+  (* NOTE: Pre-TraceBasisDummy plane-wave zeroing was attempted here via three    *)
+  (* approaches; ALL caused performance regression.  Root cause verified:        *)
+  (* after ToBasis, PD operators retain abstract dummy indices (e.g. -h$34637,   *)
+  (* not {2,-chart}) — concrete basis integers only appear INSIDE TraceBasisDummy *)
+  (* enumeration.  Therefore:                                                    *)
+  (* 1. ComponentValue PD zeroing: +9-56% slower (xAct internal rule tables add  *)
+  (*    pattern-matching overhead but DON'T auto-evaluate during Mathematica eval)*)
+  (* 2. Direct DownValues (specific integers): +66% slower (adds O(1) hash       *)
+  (*    lookups to EVERY TraceBasisDummy evaluation step — metric DownValues work *)
+  (*    because metrics are multiplicative factors; PD wraps inner expressions    *)
+  (*    that are already evaluated)                                               *)
+  (* 3. ReplaceAll on PD[{killedAxis,-chart}]: impossible (indices are abstract)  *)
+  (* The per-term plane-wave reduction in _derive.py (after ConvertCDToDerivatives*)
+  (* resolves indices) correctly zeros transverse Derivative patterns.            *)
 
   (* Steps 3+3.5+3.6 fused: TraceBasisDummy + Expand + early metric evaluation.
      Batched to prevent O(dim^{2*n_dummy}) intermediate memory blowup.

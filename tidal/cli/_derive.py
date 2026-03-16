@@ -2839,6 +2839,17 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         ]
     )
 
+    # NOTE: PD DownValues approach was tested (both ComponentValue and direct
+    # DownValues with specific integers) and BOTH caused regressions:
+    # - ComponentValue: +9-56% slower (xAct internal tables, not auto-evaluating)
+    # - Direct DownValues: +66% slower on EM curved (adds overhead to every
+    #   TraceBasisDummy evaluation step; metric DownValues work because metrics
+    #   are multiplicative factors that zero products before inner evaluation,
+    #   but PD wraps inner expressions that are already evaluated)
+    # The correct approach is post-ToBasis ReplaceAll in DecomposeScalarExpression,
+    # which zeros PD[{killedAxis,-chart}][...] terms BEFORE TraceBasisDummy.
+    # This is implemented in ComponentDecompose.wl step 2.5.
+
     lines.extend(
         [
             "lagComp = 0;",
