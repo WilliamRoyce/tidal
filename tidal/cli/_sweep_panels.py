@@ -52,9 +52,9 @@ def _build_overlay_scalars(results: SweepResults) -> dict[str, float]:
 
 def _evaluate_sweep_overlay(
     formula: str,
-    param_arrays: dict[str, NDArray],
+    param_arrays: dict[str, NDArray[np.float64]],
     scalar_params: dict[str, float],
-) -> NDArray:
+) -> NDArray[np.float64]:
     """Evaluate an overlay formula over swept parameter arrays.
 
     Parameters

@@ -165,7 +165,7 @@ def _resolve_bc_spec(
 # ------------------------------------------------------------------
 
 
-def _self_gradient_axes(eq: ComponentEquation) -> list[int] | None:
+def _self_gradient_axes(eq: ComponentEquation) -> list[int] | None:  # pyright: ignore[reportUnusedFunction]
     """Return spatial axes that have self-laplacian operators in *eq*.
 
     Inspects ``eq.rhs_terms`` for laplacian-type operators acting on the
@@ -554,7 +554,7 @@ def _build_coord_arrays(
     }
 
 
-def _resolve_coefficient_on_grid(
+def _resolve_coefficient_on_grid(  # pyright: ignore[reportUnusedFunction]
     term: OperatorTerm,
     data: SimulationData,
     coord_arrays: dict[str, NDArray[np.float64]],
@@ -647,7 +647,7 @@ def _resolve_term_target(
 # ------------------------------------------------------------------
 
 
-def _resolve_mass_squared(
+def _resolve_mass_squared(  # pyright: ignore[reportUnusedFunction]
     data: SimulationData,
     field_idx: int,
     coord_arrays: dict[str, NDArray[np.float64]] | None = None,
@@ -978,7 +978,7 @@ def _prepare_hamiltonian_context(data: SimulationData) -> _HamiltonianContext:
     )
 
 
-def _compute_hamiltonian_from_canonical(
+def _compute_hamiltonian_from_canonical(  # pyright: ignore[reportUnusedFunction]
     data: SimulationData,
     t_idx: int,
     ctx: _HamiltonianContext | None = None,
@@ -1289,7 +1289,7 @@ def compute_energy_timeseries(
 # ------------------------------------------------------------------
 
 
-def _validate_array(arr: NDArray[np.float64], label: str) -> None:
+def _validate_array(arr: NDArray[np.float64], label: str) -> None:  # pyright: ignore[reportUnusedFunction]
     """Check array for non-finite values.
 
     Raises

@@ -1932,7 +1932,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 )
             else:
                 lf_order = 2
-                reasons = []
+                reasons: list[str] = []
                 if dissipative:
                     reasons.append("dissipative terms")
                 if time_dep:

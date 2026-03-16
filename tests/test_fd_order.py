@@ -12,7 +12,7 @@ Arbitrarily Spaced Grids", Mathematics of Computation 51(184), 1988.
 
 from __future__ import annotations
 
-from typing import ClassVar
+from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
 import pytest
@@ -28,15 +28,18 @@ from tidal.solver.operators import (
 )
 from tidal.solver.sparsity import operator_stencil_offsets
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
 
 
 @pytest.fixture(autouse=True)
-def _reset_fd_order() -> None:
+def _reset_fd_order() -> Generator[None, None, None]:  # pyright: ignore[reportUnusedFunction]
     """Reset FD order to default (2) after each test."""
-    yield  # type: ignore[misc]
+    yield
     set_fd_order(2)
 
 
@@ -371,7 +374,7 @@ class TestGridSizeValidation:
     """
 
     @pytest.fixture(autouse=True)
-    def _reset_fd_order(self) -> None:
+    def _reset_fd_order(self) -> Generator[None, None, None]:
         """Reset FD order after each test."""
         yield
         set_fd_order(2)

@@ -34,7 +34,7 @@ References
 
 from __future__ import annotations
 
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -42,7 +42,7 @@ from numpy.typing import NDArray
 
 from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
 from tidal.solver._setup import warn_frozen_constraints
-from tidal.solver.operators import _get_wavenumbers, is_periodic_bc
+from tidal.solver.operators import get_wavenumbers, is_periodic_bc
 from tidal.solver.state import StateLayout
 
 if TYPE_CHECKING:
@@ -51,7 +51,11 @@ if TYPE_CHECKING:
     from tidal.solver.grid import GridInfo
     from tidal.solver.operators import BCSpec
     from tidal.solver.progress import SimulationProgress
-    from tidal.symbolic.json_loader import EquationSystem, OperatorTerm
+    from tidal.symbolic.json_loader import (
+        ComponentEquation,
+        EquationSystem,
+        OperatorTerm,
+    )
 
 # ---------------------------------------------------------------------------
 # Exact Fourier multipliers (angular wavenumber convention: k = 2π·rfftfreq)
@@ -217,7 +221,7 @@ def _ifft_slots(
 def _build_k_axes(grid: GridInfo) -> list[NDArray[np.float64]]:
     """Build wavenumber arrays for each spatial axis.
 
-    Uses the same convention as operators._get_wavenumbers:
+    Uses the same convention as operators.get_wavenumbers:
     k = 2π · rfftfreq(N, d=dx) for the last axis (rfft),
     k = 2π · fftfreq(N, d=dx) for all other axes (full fft).
     """
@@ -229,10 +233,10 @@ def _build_k_axes(grid: GridInfo) -> list[NDArray[np.float64]]:
         dx = grid.dx[ax]
         if ax == ndim - 1:
             # Last axis uses rfft (half-complex)
-            k = _get_wavenumbers(n, dx)
+            k = get_wavenumbers(n, dx)
         else:
             # Other axes use full fft
-            k = 2.0 * np.pi * np.fft.fftfreq(n, d=dx)
+            k = np.asarray(2.0 * np.pi * np.fft.fftfreq(n, d=dx), dtype=np.float64)
         k_axes.append(k)
 
     return k_axes
@@ -267,7 +271,7 @@ def _build_k_grid(
 
 def _constraints_fourier_eliminable(
     spec: EquationSystem,
-    constraint_eqs: list[object],
+    constraint_eqs: Sequence[ComponentEquation],
 ) -> bool:
     """Check if all constraint equations can be eliminated in Fourier space.
 
@@ -871,11 +875,6 @@ def _has_position_dependent_terms(spec: EquationSystem) -> bool:
     return False
 
 
-def _is_all_second_order(spec: EquationSystem) -> bool:
-    """Check if all equations are second-order (wave-type)."""
-    return all(eq.time_derivative_order >= 2 for eq in spec.equations)
-
-
 def _warn_eigenvalue_growth(
     eigenvalues: NDArray[np.complex128],
     dt_total: float,
@@ -976,10 +975,10 @@ def _evolve_per_mode(
             NDArray[np.complex128],  # eigenvalues (n_modes, bs)
         ]
     ] = []
-    for block_slots, eig_vals, V, y0_eigen in block_data:
-        # V_y0[m, i, j] = V[m, i, j] * y0_eigen[m, j]
+    for block_slots, eig_vals, v_mat, y0_eigen in block_data:
+        # V_y0[m, i, j] = v_mat[m, i, j] * y0_eigen[m, j]
         # so y(t) = V_y0 @ exp(λ*dt) is just a matvec
-        V_y0 = V * y0_eigen[:, np.newaxis, :]  # (n_modes, bs, bs)
+        V_y0 = v_mat * y0_eigen[:, np.newaxis, :]  # (n_modes, bs, bs)
         block_evolved.append((block_slots, V_y0, eig_vals))
 
     snapshots = np.zeros((n_snapshots, n_slots * n_pts))
@@ -1034,7 +1033,9 @@ def _evolve_full_matrix(
     Ref: Al-Mohy & Higham (2011), "Computing the Action of the Matrix
     Exponential", SIAM J. Sci. Comput. 33(2):488-511.
     """
-    from scipy.sparse.linalg import expm_multiply  # noqa: PLC0415
+    from scipy.sparse.linalg import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
+        expm_multiply,  # pyright: ignore[reportUnknownVariableType]
+    )
 
     n_slots = layout.num_slots
     n_pts = layout.num_points
@@ -1054,12 +1055,15 @@ def _evolve_full_matrix(
 
     if n_snapshots > 1 and t_end > t0:
         # Use expm_multiply's built-in multi-point evaluation
-        y_all = expm_multiply(
-            A_full,
-            y0_flat,
-            start=t0,
-            stop=t_end,
-            num=n_snapshots,
+        y_all: NDArray[np.complex128] = np.asarray(
+            expm_multiply(
+                A_full,
+                y0_flat,
+                start=t0,
+                stop=t_end,
+                num=n_snapshots,
+            ),
+            dtype=np.complex128,
         )
         # y_all has shape (n_snapshots, n_total)
         for ti in range(n_snapshots):
@@ -1079,9 +1083,10 @@ def _evolve_full_matrix(
             if t == t0:
                 y_evolved = y0_flat.copy()
             else:
-                y_evolved = expm_multiply(
-                    A_full, y0_flat, start=t0, stop=float(t), num=2
-                )[-1]
+                y_evolved = np.asarray(
+                    expm_multiply(A_full, y0_flat, start=t0, stop=float(t), num=2)[-1],
+                    dtype=np.complex128,
+                )
             y_hat_t = y_evolved.reshape(n_slots, n_modes)
             y_physical = _ifft_slots(y_hat_t, layout, grid)
             snapshots[ti] = y_physical

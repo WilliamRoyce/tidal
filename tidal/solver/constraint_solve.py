@@ -186,15 +186,20 @@ def _grad_axis(k: NDArray[np.float64], h: float) -> NDArray[np.complex128]:
     kh = k * h
     inv_h = 1.0 / h
     if order == 2:  # noqa: PLR2004
-        return 1j * np.sin(kh) * inv_h
-    if order == 4:  # noqa: PLR2004
+        result = 1j * np.sin(kh) * inv_h
+    elif order == 4:  # noqa: PLR2004
         # Fourier symbol of [1/12, -2/3, 0, 2/3, -1/12] / h
-        return 1j * inv_h * (8.0 * np.sin(kh) - np.sin(2 * kh)) / 6.0
-    # Fall-through: order 6
-    # Fourier symbol of [-1/60, 3/20, -3/4, 0, 3/4, -3/20, 1/60] / h
-    return (
-        1j * inv_h * (45.0 * np.sin(kh) - 9.0 * np.sin(2 * kh) + np.sin(3 * kh)) / 30.0
-    )
+        result = 1j * inv_h * (8.0 * np.sin(kh) - np.sin(2 * kh)) / 6.0
+    else:
+        # Fall-through: order 6
+        # Fourier symbol of [-1/60, 3/20, -3/4, 0, 3/4, -3/20, 1/60] / h
+        result = (
+            1j
+            * inv_h
+            * (45.0 * np.sin(kh) - 9.0 * np.sin(2 * kh) + np.sin(3 * kh))
+            / 30.0
+        )
+    return np.asarray(result, dtype=np.complex128)
 
 
 # Type for Fourier multiplier functions: (kvecs, dx) -> NDArray

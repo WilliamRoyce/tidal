@@ -496,9 +496,11 @@ class TestYoshidaConvergenceOrder:
             errors.append(float(np.max(np.abs(phi_final - ref_phi))))
 
         # Compute log-log slopes between consecutive points
-        slopes = []
+        slopes: list[float] = []
         for i in range(len(errors) - 1):
-            slope = np.log(errors[i] / errors[i + 1]) / np.log(dts[i] / dts[i + 1])
+            slope = float(
+                np.log(errors[i] / errors[i + 1]) / np.log(dts[i] / dts[i + 1])
+            )
             slopes.append(slope)
 
         # All slopes should be close to 4 (Yoshida 4th-order)
@@ -530,9 +532,11 @@ class TestYoshidaConvergenceOrder:
             phi_final = result["y"][-1][0:n]
             errors.append(float(np.max(np.abs(phi_final - ref_phi))))
 
-        slopes = []
+        slopes: list[float] = []
         for i in range(len(errors) - 1):
-            slope = np.log(errors[i] / errors[i + 1]) / np.log(dts[i] / dts[i + 1])
+            slope = float(
+                np.log(errors[i] / errors[i + 1]) / np.log(dts[i] / dts[i + 1])
+            )
             slopes.append(slope)
 
         avg_slope = np.mean(slopes)
@@ -565,7 +569,7 @@ class TestYoshidaFusedKicks:
         call_count = 0
         original_compute_force = compute_force
 
-        def counting_force(*args, **kwargs) -> np.ndarray:  # noqa: ANN002, ANN003
+        def counting_force(*args: Any, **kwargs: Any) -> np.ndarray:  # noqa: ANN401
             nonlocal call_count
             call_count += 1
             return original_compute_force(*args, **kwargs)
@@ -604,7 +608,7 @@ class TestYoshidaFusedKicks:
         call_count = 0
         original_compute_force = compute_force
 
-        def counting_force(*args, **kwargs) -> np.ndarray:  # noqa: ANN002, ANN003
+        def counting_force(*args: Any, **kwargs: Any) -> np.ndarray:  # noqa: ANN401
             nonlocal call_count
             call_count += 1
             return original_compute_force(*args, **kwargs)

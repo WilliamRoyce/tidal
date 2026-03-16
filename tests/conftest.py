@@ -4,16 +4,20 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
 
 from tidal.solver.operators import set_fd_order, set_spectral
 
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
 # ==================== Module-state cleanup ====================
 
 
 @pytest.fixture(autouse=True)
-def _reset_operator_state() -> None:
+def _reset_operator_state() -> Generator[None, None, None]:  # pyright: ignore[reportUnusedFunction]
     """Reset FD order and spectral mode after every test.
 
     CLI tests call set_fd_order(4) (the CLI default) and/or

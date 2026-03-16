@@ -9,8 +9,13 @@ simulations with spectral methods", Physical Review Research 2:023068.
 
 from __future__ import annotations
 
+from typing import TYPE_CHECKING
+
 import numpy as np
 import pytest
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from tidal.solver.grid import GridInfo
 from tidal.solver.operators import (
@@ -265,7 +270,7 @@ class TestSpectralConvergence:
     def test_exponential_convergence_gradient(self) -> None:
         """Gradient error decreases exponentially with N."""
         set_spectral(True)
-        errors = []
+        errors: list[float] = []
         ns = [8, 16, 32, 64]
         for n in ns:
             grid = _periodic_grid_1d(n)
@@ -291,7 +296,7 @@ class TestSpectralConvergence:
     def test_exponential_convergence_laplacian(self) -> None:
         """Laplacian error decreases exponentially with N for Gaussian."""
         set_spectral(True)
-        errors = []
+        errors: list[float] = []
         ns = [16, 32, 64, 128]
 
         for n in ns:
@@ -391,8 +396,8 @@ class TestSpectralCLI:
 
     def test_simulate_spectral_1d(
         self,
-        inline_kg_1d_json: pytest.fixture,
-        tmp_path: pytest.fixture,
+        inline_kg_1d_json: Path,
+        tmp_path: Path,
     ) -> None:
         """1D KG simulation with --spectral runs without error."""
         from tidal.cli import main
@@ -422,8 +427,8 @@ class TestSpectralCLI:
 
     def test_spectral_rejects_nonperiodic(
         self,
-        inline_kg_1d_json: pytest.fixture,
-        tmp_path: pytest.fixture,
+        inline_kg_1d_json: Path,
+        tmp_path: Path,
     ) -> None:
         """--spectral with non-periodic BC should fail."""
         from tidal.cli import main
@@ -450,8 +455,8 @@ class TestSpectralCLI:
 
     def test_spectral_ida_auto_switch(
         self,
-        inline_kg_1d_json: pytest.fixture,
-        tmp_path: pytest.fixture,
+        inline_kg_1d_json: Path,
+        tmp_path: Path,
     ) -> None:
         """--spectral with auto scheme should avoid IDA."""
         from tidal.cli import main
@@ -478,8 +483,8 @@ class TestSpectralCLI:
 
     def test_spectral_explicit_ida_error(
         self,
-        inline_kg_1d_json: pytest.fixture,
-        tmp_path: pytest.fixture,
+        inline_kg_1d_json: Path,
+        tmp_path: Path,
     ) -> None:
         """--spectral with explicit --scheme ida should fail."""
         from tidal.cli import main
@@ -517,8 +522,8 @@ class TestSpectralMetadata:
 
     def test_spectral_saved_in_metadata(
         self,
-        inline_kg_1d_json: pytest.fixture,
-        tmp_path: pytest.fixture,
+        inline_kg_1d_json: Path,
+        tmp_path: Path,
     ) -> None:
         """Running with --spectral saves spectral=True in metadata.json."""
         import json
@@ -554,8 +559,8 @@ class TestSpectralMetadata:
 
     def test_no_spectral_explicit(
         self,
-        inline_kg_1d_json: pytest.fixture,
-        tmp_path: pytest.fixture,
+        inline_kg_1d_json: Path,
+        tmp_path: Path,
     ) -> None:
         """--no-spectral forces FD operators, no spectral in metadata."""
         import json
@@ -717,8 +722,8 @@ class TestAutoDetection:
 
     def test_spectral_auto_enabled_periodic(
         self,
-        inline_kg_1d_json: pytest.fixture,
-        tmp_path: pytest.fixture,
+        inline_kg_1d_json: Path,
+        tmp_path: Path,
     ) -> None:
         """Spectral auto-enables when all BCs are periodic."""
         import json
@@ -753,8 +758,8 @@ class TestAutoDetection:
 
     def test_spectral_auto_disabled_nonperiodic(
         self,
-        inline_kg_1d_json: pytest.fixture,
-        tmp_path: pytest.fixture,
+        inline_kg_1d_json: Path,
+        tmp_path: Path,
     ) -> None:
         """Spectral stays off when BCs are non-periodic (auto mode)."""
         import json
@@ -787,8 +792,8 @@ class TestAutoDetection:
 
     def test_spectral_auto_disabled_for_ida(
         self,
-        inline_kg_1d_json: pytest.fixture,
-        tmp_path: pytest.fixture,
+        inline_kg_1d_json: Path,
+        tmp_path: Path,
     ) -> None:
         """Spectral auto-disabled when IDA is needed (auto mode)."""
         from tidal.cli import main
@@ -816,8 +821,8 @@ class TestAutoDetection:
 
     def test_no_spectral_overrides_auto(
         self,
-        inline_kg_1d_json: pytest.fixture,
-        tmp_path: pytest.fixture,
+        inline_kg_1d_json: Path,
+        tmp_path: Path,
     ) -> None:
         """--no-spectral disables auto-detection even for periodic BCs."""
         import json

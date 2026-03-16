@@ -10,6 +10,7 @@ Tests cover:
 from __future__ import annotations
 
 import copy
+from typing import Any, cast
 
 import numpy as np
 import pytest
@@ -173,8 +174,8 @@ _DIFFUSION_SPEC: dict[str, object] = {
 }
 
 
-def _make_spec(data: dict) -> EquationSystem:
-    return EquationSystem.from_dict(data)
+def _make_spec(data: dict[str, object]) -> EquationSystem:
+    return EquationSystem.from_dict(data)  # type: ignore[arg-type]
 
 
 def _make_gaussian_ic(
@@ -236,7 +237,7 @@ class TestModalEligibility:
 
     def test_constraints_rejected_unsupported_operator(self) -> None:
         """Constraint with unsupported operator → not eligible."""
-        spec_data = copy.deepcopy(dict(_CONSTRAINT_SPEC))
+        spec_data: dict[str, Any] = copy.deepcopy(dict(_CONSTRAINT_SPEC))
         # Change constraint operator to something not in _EXACT_MULTIPLIERS
         spec_data["equations"][0]["rhs"]["terms"][0]["operator"] = "derivative_3_x"
         spec = _make_spec(spec_data)
@@ -1140,8 +1141,8 @@ class TestConstraintElimination:
 
         # All eigenvalues should be purely imaginary for a Hamiltonian system
         for m in range(A_red.shape[0]):
-            eigs = np.linalg.eigvals(A_red[m])
-            max_real = np.max(np.abs(np.real(eigs)))
+            eigs = cast("np.ndarray[Any, Any]", np.linalg.eigvals(A_red[m]))
+            max_real = float(np.max(np.abs(np.real(eigs))))
             assert max_real < 1e-10, (
                 f"Mode {m}: max |Re(λ)| = {max_real:.2e}, expected < 1e-10"
             )

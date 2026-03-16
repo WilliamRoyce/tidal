@@ -181,7 +181,7 @@ def get_spectral() -> bool:
 _wavenum_cache: dict[tuple[int, float], np.ndarray] = {}
 
 
-def _get_wavenumbers(n: int, dx: float) -> np.ndarray:
+def get_wavenumbers(n: int, dx: float) -> np.ndarray:
     """Return cached wavenumber array for ``rfft`` of length *n*.
 
     Wavenumbers: ``k = 2*pi*rfftfreq(n, d=dx)`` — the angular frequencies
@@ -452,45 +452,6 @@ def _cached_slice(ndim: int, axis: int, slc: slice) -> tuple[slice, ...]:
         return cached
     result = _slice_tuple(ndim, axis, slc)
     _SLICE_CACHE[key] = result
-    return result
-
-
-def _cached_slice_2(
-    ndim: int,
-    axis1: int,
-    slc1: slice,
-    axis2: int,
-    slc2: slice,
-) -> tuple[slice, ...]:
-    """Build a 2-axis slice tuple for cross_derivative corners."""
-    s = [slice(None)] * ndim
-    s[axis1] = slc1
-    s[axis2] = slc2
-    return tuple(s)
-
-
-# Cross-derivative corner cache: (ndim, axis1, axis2, slc1_id, slc2_id)
-_CORNER_CACHE: dict[tuple[int, int, int, int, int], tuple[slice, ...]] = {}
-
-
-def _cached_corner(
-    ndim: int,
-    axis1: int,
-    slc1: slice,
-    axis2: int,
-    slc2: slice,
-) -> tuple[slice, ...]:
-    """Return cached corner slice for cross_derivative (2-axis)."""
-    s1 = _SLC_ID.get(id(slc1), -1)
-    s2 = _SLC_ID.get(id(slc2), -1)
-    if s1 < 0 or s2 < 0:
-        return _cached_slice_2(ndim, axis1, slc1, axis2, slc2)
-    key = (ndim, axis1, axis2, s1, s2)
-    cached = _CORNER_CACHE.get(key)
-    if cached is not None:
-        return cached
-    result = _cached_slice_2(ndim, axis1, slc1, axis2, slc2)
-    _CORNER_CACHE[key] = result
     return result
 
 
@@ -1036,7 +997,7 @@ def _spectral_gradient(
     """
     n = grid.shape[axis]
     dx = grid.dx[axis]
-    k = _get_wavenumbers(n, dx)
+    k = get_wavenumbers(n, dx)
 
     # Reshape k for broadcasting along the target axis
     shape = [1] * data.ndim
@@ -1060,7 +1021,7 @@ def _spectral_directional_laplacian(
     """
     n = grid.shape[axis]
     dx = grid.dx[axis]
-    k = _get_wavenumbers(n, dx)
+    k = get_wavenumbers(n, dx)
 
     shape = [1] * data.ndim
     shape[axis] = len(k)

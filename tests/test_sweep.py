@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import json
 from pathlib import Path
+from typing import Any
 
 import pytest
 
@@ -1238,7 +1239,7 @@ def _make_1d_sweep_results() -> SweepResults:
     import math
 
     b0_vals = [0.05, 0.10, 0.15, 0.20]
-    rows = []
+    rows: list[dict[str, Any]] = []
     for b0 in b0_vals:
         p = math.sin(1.0 * b0 * 50.0 / 2.0) ** 2
         rows.append({"B0": b0, "kappa": 1.0, "P_final": p, "wall_time_s": 1.0})
@@ -1259,7 +1260,7 @@ def _make_2d_sweep_results() -> SweepResults:
 
     bpeak_vals = [0.05, 0.10, 0.15]
     r_vals = [3.0, 6.0]
-    rows = []
+    rows: list[dict[str, Any]] = []
     for bp in bpeak_vals:
         for r in r_vals:
             p = math.sin(1.0 * bp * r * math.sqrt(math.pi / 2.0)) ** 2
@@ -1412,8 +1413,8 @@ class TestSweepPlotOverlay:
 
         # The second line is the overlay
         overlay_line = ax.get_lines()[1]
-        x_data = overlay_line.get_xdata()
-        y_data = overlay_line.get_ydata()
+        x_data = np.asarray(overlay_line.get_xdata(), dtype=np.float64)
+        y_data = np.asarray(overlay_line.get_ydata(), dtype=np.float64)
         expected = np.array([math.sin(1.0 * b * 50.0 / 2.0) ** 2 for b in x_data])
         np.testing.assert_allclose(y_data, expected, atol=1e-12)
         plt.close(fig)

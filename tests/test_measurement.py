@@ -113,9 +113,7 @@ def _make_sim_data_two_fields(
     m2_0 = float(spec.mass_matrix[0][0])
     m2_1 = float(spec.mass_matrix[1][1])
     # Gradient coupling vanishes at k=0; identity coupling appears in coupling_matrix
-    g_val = 0.0
-    if spec.coupling_matrix is not None:
-        g_val = float(spec.coupling_matrix[0][1])
+    g_val = float(spec.coupling_matrix[0][1]) if spec.coupling_matrix else 0.0
 
     # Time range
     t_end = 10.0
@@ -424,9 +422,7 @@ class TestCanonicalHamiltonianEnergy:
         m2_phi = float(data.spec.mass_matrix[0][0])
         m2_chi = float(data.spec.mass_matrix[1][1])
         g_val = (
-            float(data.spec.coupling_matrix[0][1])
-            if data.spec.coupling_matrix is not None
-            else 0.0
+            float(data.spec.coupling_matrix[0][1]) if data.spec.coupling_matrix else 0.0
         )
 
         canonical = _make_coupled_canonical_structure(
@@ -460,9 +456,7 @@ class TestCanonicalHamiltonianEnergy:
         m2_phi = float(data.spec.mass_matrix[0][0])
         m2_chi = float(data.spec.mass_matrix[1][1])
         g_val = (
-            float(data.spec.coupling_matrix[0][1])
-            if data.spec.coupling_matrix is not None
-            else 0.0
+            float(data.spec.coupling_matrix[0][1]) if data.spec.coupling_matrix else 0.0
         )
 
         canonical = _make_coupled_canonical_structure(
@@ -493,9 +487,7 @@ class TestCanonicalHamiltonianEnergy:
         m2_phi = float(data.spec.mass_matrix[0][0])
         m2_chi = float(data.spec.mass_matrix[1][1])
         g_val = (
-            float(data.spec.coupling_matrix[0][1])
-            if data.spec.coupling_matrix is not None
-            else 0.0
+            float(data.spec.coupling_matrix[0][1]) if data.spec.coupling_matrix else 0.0
         )
 
         # Virial energy (no canonical)
@@ -1336,7 +1328,7 @@ class TestConversionProbability:
         # P should grow > 0 at some point for identity coupling.
         # For gradient coupling at k=0 (uniform mode), fields are uncoupled
         # and P stays 0 — this is correct physics (∂_x of constant = 0).
-        has_identity_coupling = data.spec.coupling_matrix is not None and any(
+        has_identity_coupling = bool(data.spec.coupling_matrix) and any(
             data.spec.coupling_matrix[i][j] != 0
             for i in range(len(data.spec.coupling_matrix))
             for j in range(len(data.spec.coupling_matrix[0]))
@@ -1362,9 +1354,7 @@ class TestConversionProbability:
         m2_0 = float(data.spec.mass_matrix[0][0])
         m2_1 = float(data.spec.mass_matrix[1][1])
         g_val = (
-            float(data.spec.coupling_matrix[0][1])
-            if data.spec.coupling_matrix is not None
-            else 0.0
+            float(data.spec.coupling_matrix[0][1]) if data.spec.coupling_matrix else 0.0
         )
 
         m_eff = np.array([[m2_0, g_val], [g_val, m2_1]])
