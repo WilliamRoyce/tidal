@@ -36,11 +36,10 @@ DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
 
 
 def _build_coupled_scalars_spec() -> EquationSystem:
-    """Load coupled_scalars.json spec."""
-    path = DATA_DIR / "coupled_scalars.json"
-    if not path.exists():
-        pytest.skip("coupled_scalars.json not found")
-    return load_equation_system(path)
+    """Build coupled scalar spec using the conftest inline spec (identity coupling)."""
+    from tests.conftest import _COUPLED_SCALARS_SPEC  # noqa: PLC0415
+
+    return EquationSystem.from_dict(_COUPLED_SCALARS_SPEC)  # type: ignore[arg-type]
 
 
 def _make_travelling_wave_data(

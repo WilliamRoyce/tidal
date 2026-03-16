@@ -67,11 +67,15 @@ DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
 
 
 def _build_coupled_scalars_spec() -> EquationSystem:
-    """Load coupled_scalars.json spec."""
-    path = DATA_DIR / "coupled_scalars.json"
-    if not path.exists():
-        pytest.skip("coupled_scalars.json not found")
-    return load_equation_system(path)
+    """Build a coupled scalar spec for measurement tests.
+
+    Uses the conftest inline spec which has identity coupling with phi_0/chi_0.
+    This ensures measurement tests have a k=0 coupled oscillator for analytical
+    comparison, independent of the example TOML (which uses gradient coupling).
+    """
+    from tests.conftest import _COUPLED_SCALARS_SPEC  # noqa: PLC0415
+
+    return EquationSystem.from_dict(_COUPLED_SCALARS_SPEC)  # type: ignore[arg-type]
 
 
 def _make_sim_data_two_fields(
@@ -81,10 +85,21 @@ def _make_sim_data_two_fields(
 ) -> SimulationData:
     """Build synthetic SimulationData for two coupled scalar fields.
 
-    Creates a uniform (k=0) mode in phi and zero in chi, then
-    computes the exact coupled-oscillator time evolution.
+    Creates a uniform (k=0) mode in field 0 (h_0) and zero in field 1 (a_0),
+    then computes the exact coupled-oscillator time evolution.
+
+    For gradient-coupling theories (like the Gertsenshtein effective theory),
+    the coupling vanishes at k=0 (∂_x of a uniform field = 0), so the
+    two fields oscillate independently at their respective mass frequencies.
+    For identity-coupling theories, the fields exchange energy via the
+    off-diagonal coupling matrix.
     """
     spec = _build_coupled_scalars_spec()
+
+    # Get field names from the spec (h_0/a_0 for Gertsenshtein, phi_0/chi_0 for legacy)
+    field_names = list(spec.component_names)
+    assert len(field_names) == 2, f"Expected 2 fields, got {field_names}"  # noqa: S101
+    fname_0, fname_1 = field_names[0], field_names[1]
 
     dx = 10.0 / n_grid
     grid_spacing = (dx,)
@@ -92,54 +107,47 @@ def _make_sim_data_two_fields(
     periodic = (True,)
 
     # For uniform mode (k=0), the equations reduce to:
-    # d²φ/dt² = -m²_φ φ - g χ
-    # d²χ/dt² = -m²_χ χ - g φ
-    # Use mass matrix from spec to get correct values
-    m2_phi = float(spec.mass_matrix[0][0])
-    m2_chi = float(spec.mass_matrix[1][1])
-    g_val = float(spec.coupling_matrix[0][1])
+    # d²f₀/dt² = -m²₀ f₀ - g f₁
+    # d²f₁/dt² = -m²₁ f₁ - g f₀
+    # Use mass matrix from spec; coupling is 0 for gradient theories (k=0)
+    m2_0 = float(spec.mass_matrix[0][0])
+    m2_1 = float(spec.mass_matrix[1][1])
+    # Gradient coupling vanishes at k=0; identity coupling appears in coupling_matrix
+    g_val = 0.0
+    if spec.coupling_matrix is not None:
+        g_val = float(spec.coupling_matrix[0][1])
 
     # Time range
     t_end = 10.0
     times = np.linspace(0.0, t_end, n_snapshots)
 
     # Exact solution for uniform mode: eigenfrequency analysis
-    m_eff = np.array([[m2_phi, g_val], [g_val, m2_chi]])
+    m_eff = np.array([[m2_0, g_val], [g_val, m2_1]])
     eigenvalues, eigenvectors = np.linalg.eigh(m_eff)
     omega = np.sqrt(np.maximum(eigenvalues, 0.0))
 
-    # IC: phi(0) = amplitude (uniform), chi(0) = 0, pi_phi(0) = 0, pi_chi(0) = 0
+    # IC: f₀(0) = amplitude (uniform), f₁(0) = 0, velocities = 0
     ic = np.array([amplitude, 0.0])
-    # Decompose into eigenmodes
-    c = eigenvectors.T @ ic  # coefficients in eigenmode basis
+    c = eigenvectors.T @ ic
 
-    fields_lists: dict[str, list[np.ndarray]] = {"phi_0": [], "chi_0": []}
-    velocities_lists: dict[str, list[np.ndarray]] = {"phi_0": [], "chi_0": []}
+    fields_lists: dict[str, list[np.ndarray]] = {fname_0: [], fname_1: []}
+    velocities_lists: dict[str, list[np.ndarray]] = {fname_0: [], fname_1: []}
 
     for t in times:
-        # Mode amplitudes
         mode_vals = c * np.cos(omega * t)
         mode_dots = -c * omega * np.sin(omega * t)
 
-        # Transform back to field basis
         field_vals = eigenvectors @ mode_vals
         mom_vals = eigenvectors @ mode_dots
 
-        # Uniform field across grid
-        phi_arr = np.full(n_grid, field_vals[0])
-        chi_arr = np.full(n_grid, field_vals[1])
-        pi_phi_arr = np.full(n_grid, mom_vals[0])
-        pi_chi_arr = np.full(n_grid, mom_vals[1])
-
-        fields_lists["phi_0"].append(phi_arr)
-        fields_lists["chi_0"].append(chi_arr)
-        velocities_lists["phi_0"].append(pi_phi_arr)
-        velocities_lists["chi_0"].append(pi_chi_arr)
+        fields_lists[fname_0].append(np.full(n_grid, field_vals[0]))
+        fields_lists[fname_1].append(np.full(n_grid, field_vals[1]))
+        velocities_lists[fname_0].append(np.full(n_grid, mom_vals[0]))
+        velocities_lists[fname_1].append(np.full(n_grid, mom_vals[1]))
 
     fields_np = {k: np.stack(v) for k, v in fields_lists.items()}
     velocities_np = {k: np.stack(v) for k, v in velocities_lists.items()}
 
-    # Extract metadata parameters so symbolic coefficients resolve correctly
     params = {
         k: float(v)
         for k, v in spec.metadata.get("parameters", {}).items()
@@ -221,8 +229,9 @@ class TestSystemEnergy:
         se = compute_system_energy(data, 0)
 
         assert isinstance(se, SystemEnergy)
-        assert "phi_0" in se.per_field
-        assert "chi_0" in se.per_field
+        # Check that both field names from the spec are present
+        for fname in data.spec.component_names:
+            assert fname in se.per_field
         assert se.total > 0
 
     def test_out_of_range_raises(self) -> None:
@@ -242,8 +251,9 @@ class TestEnergyTimeseries:
 
         assert len(times) == 11
         assert len(total) == 11
-        assert "phi_0" in per_field
-        assert len(per_field["phi_0"]) == 11
+        fname_0 = data.spec.component_names[0]
+        assert fname_0 in per_field
+        assert len(per_field[fname_0]) == 11
 
     def test_coupled_oscillator_energy_conservation(self) -> None:
         """Total energy (field + interaction) is conserved for exact solution."""
@@ -261,88 +271,85 @@ class TestEnergyTimeseries:
 # ============================================================
 
 
-def _make_kg_canonical_structure(m2: float = 1.0) -> CanonicalStructure:
+def _make_kg_canonical_structure(
+    m2: float = 1.0,
+    field: str = "phi_0",
+) -> CanonicalStructure:
     """Build canonical structure for Klein-Gordon: H = ½π² + ½(∇φ)² + ½m²φ².
 
     Decomposed as quadratic terms:
-      ½ * time_derivative(phi_0) * time_derivative(phi_0)  → kinetic
-      -½ * phi_0 * laplacian(phi_0)                        → gradient (IBP)
-      ½m² * phi_0 * phi_0                                  → mass
+      ½ * time_derivative(f) * time_derivative(f)  → kinetic
+      -½ * f * laplacian(f)                        → gradient (IBP)
+      ½m² * f * f                                  → mass
     """
     return CanonicalStructure(
         hamiltonian_terms=(
             HamiltonianTerm(
                 coefficient=0.5,
-                factor_a=HamiltonianFactor(field="phi_0", operator="time_derivative"),
-                factor_b=HamiltonianFactor(field="phi_0", operator="time_derivative"),
+                factor_a=HamiltonianFactor(field=field, operator="time_derivative"),
+                factor_b=HamiltonianFactor(field=field, operator="time_derivative"),
             ),
             HamiltonianTerm(
                 coefficient=-0.5,
-                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
-                factor_b=HamiltonianFactor(field="phi_0", operator="laplacian"),
+                factor_a=HamiltonianFactor(field=field, operator="identity"),
+                factor_b=HamiltonianFactor(field=field, operator="laplacian"),
             ),
             HamiltonianTerm(
                 coefficient=0.5 * m2,
-                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
-                factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+                factor_a=HamiltonianFactor(field=field, operator="identity"),
+                factor_b=HamiltonianFactor(field=field, operator="identity"),
             ),
         ),
     )
 
 
 def _make_coupled_canonical_structure(
-    m2_phi: float,
-    m2_chi: float,
+    m2_0: float,
+    m2_1: float,
     g: float,
+    field_0: str = "phi_0",
+    field_1: str = "chi_0",
 ) -> CanonicalStructure:
     """Build canonical structure for two coupled scalars.
 
-    H = ½π_φ² + ½(∇φ)² + ½m²_φ φ² + ½π_χ² + ½(∇χ)² + ½m²_χ χ² + g φ χ
+    H = ½π₀² + ½(∇f₀)² + ½m²₀f₀² + ½π₁² + ½(∇f₁)² + ½m²₁f₁² + g·f₀·f₁
     """
     return CanonicalStructure(
         hamiltonian_terms=(
-            # phi kinetic
             HamiltonianTerm(
                 coefficient=0.5,
-                factor_a=HamiltonianFactor(field="phi_0", operator="time_derivative"),
-                factor_b=HamiltonianFactor(field="phi_0", operator="time_derivative"),
+                factor_a=HamiltonianFactor(field=field_0, operator="time_derivative"),
+                factor_b=HamiltonianFactor(field=field_0, operator="time_derivative"),
             ),
-            # phi gradient (IBP form)
             HamiltonianTerm(
                 coefficient=-0.5,
-                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
-                factor_b=HamiltonianFactor(field="phi_0", operator="laplacian"),
+                factor_a=HamiltonianFactor(field=field_0, operator="identity"),
+                factor_b=HamiltonianFactor(field=field_0, operator="laplacian"),
             ),
-            # phi mass
             HamiltonianTerm(
-                coefficient=0.5 * m2_phi,
-                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
-                factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+                coefficient=0.5 * m2_0,
+                factor_a=HamiltonianFactor(field=field_0, operator="identity"),
+                factor_b=HamiltonianFactor(field=field_0, operator="identity"),
             ),
-            # chi kinetic
             HamiltonianTerm(
                 coefficient=0.5,
-                factor_a=HamiltonianFactor(field="chi_0", operator="time_derivative"),
-                factor_b=HamiltonianFactor(field="chi_0", operator="time_derivative"),
+                factor_a=HamiltonianFactor(field=field_1, operator="time_derivative"),
+                factor_b=HamiltonianFactor(field=field_1, operator="time_derivative"),
             ),
-            # chi gradient (IBP form)
             HamiltonianTerm(
                 coefficient=-0.5,
-                factor_a=HamiltonianFactor(field="chi_0", operator="identity"),
-                factor_b=HamiltonianFactor(field="chi_0", operator="laplacian"),
+                factor_a=HamiltonianFactor(field=field_1, operator="identity"),
+                factor_b=HamiltonianFactor(field=field_1, operator="laplacian"),
             ),
-            # chi mass
             HamiltonianTerm(
-                coefficient=0.5 * m2_chi,
-                factor_a=HamiltonianFactor(field="chi_0", operator="identity"),
-                factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
+                coefficient=0.5 * m2_1,
+                factor_a=HamiltonianFactor(field=field_1, operator="identity"),
+                factor_b=HamiltonianFactor(field=field_1, operator="identity"),
             ),
-            # coupling: g * phi * chi (split as ½g φχ + ½g χφ in symmetric form,
-            # but a single term g*φ*χ works since it's symmetric)
             HamiltonianTerm(
                 coefficient=g,
-                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
-                factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
+                factor_a=HamiltonianFactor(field=field_0, operator="identity"),
+                factor_b=HamiltonianFactor(field=field_1, operator="identity"),
             ),
         ),
     )
@@ -354,23 +361,26 @@ class TestCanonicalHamiltonianEnergy:
     def test_evaluate_factor_identity(self) -> None:
         """Identity factor returns field data directly."""
         data = _make_sim_data_two_fields(n_snapshots=3)
-        result = _evaluate_hamiltonian_factor("phi_0", "identity", data, 0)
+        fname = data.spec.component_names[0]
+        result = _evaluate_hamiltonian_factor(fname, "identity", data, 0)
         assert result is not None
-        np.testing.assert_array_equal(result, data.fields["phi_0"][0])
+        np.testing.assert_array_equal(result, data.fields[fname][0])
 
     def test_evaluate_factor_time_derivative(self) -> None:
         """time_derivative factor returns stored momentum."""
         data = _make_sim_data_two_fields(n_snapshots=3)
-        result = _evaluate_hamiltonian_factor("phi_0", "time_derivative", data, 0)
+        fname = data.spec.component_names[0]
+        result = _evaluate_hamiltonian_factor(fname, "time_derivative", data, 0)
         assert result is not None
-        np.testing.assert_array_equal(result, data.velocities["phi_0"][0])
+        np.testing.assert_array_equal(result, data.velocities[fname][0])
 
     def test_evaluate_factor_gradient(self) -> None:
         """gradient_x factor applies first derivative."""
         data = _make_sim_data_two_fields(n_snapshots=3)
-        result = _evaluate_hamiltonian_factor("phi_0", "gradient_x", data, 0)
+        fname = data.spec.component_names[0]
+        result = _evaluate_hamiltonian_factor(fname, "gradient_x", data, 0)
         assert result is not None
-        assert result.shape == data.fields["phi_0"][0].shape
+        assert result.shape == data.fields[fname][0].shape
 
     def test_kg_hamiltonian_per_field_matches_total(self) -> None:
         """Per-field Hamiltonian self-energy matches total for single-field excitation.
@@ -383,8 +393,9 @@ class TestCanonicalHamiltonianEnergy:
         )
 
         data = _make_sim_data_two_fields(n_snapshots=3)
+        fname_0 = data.spec.component_names[0]
         m2_phi = float(data.spec.mass_matrix[0][0])
-        canonical = _make_kg_canonical_structure(m2_phi)
+        canonical = _make_kg_canonical_structure(m2_phi, field=fname_0)
         spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
         data_with_canonical = SimulationData(
             times=data.times,
@@ -411,11 +422,12 @@ class TestCanonicalHamiltonianEnergy:
     def test_coupled_canonical_energy_conservation(self) -> None:
         """Canonical H is conserved for exact coupled oscillator evolution."""
         data = _make_sim_data_two_fields(n_snapshots=51)
+        fname_0, fname_1 = data.spec.component_names[0], data.spec.component_names[1]
         m2_phi = float(data.spec.mass_matrix[0][0])
         m2_chi = float(data.spec.mass_matrix[1][1])
-        g_val = float(data.spec.coupling_matrix[0][1])
+        g_val = float(data.spec.coupling_matrix[0][1]) if data.spec.coupling_matrix is not None else 0.0
 
-        canonical = _make_coupled_canonical_structure(m2_phi, m2_chi, g_val)
+        canonical = _make_coupled_canonical_structure(m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1)
         spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
         data_c = SimulationData(
             times=data.times,
@@ -440,11 +452,12 @@ class TestCanonicalHamiltonianEnergy:
     def test_system_energy_uses_canonical_when_available(self) -> None:
         """compute_system_energy uses canonical H when spec has canonical structure."""
         data = _make_sim_data_two_fields(n_snapshots=5)
+        fname_0, fname_1 = data.spec.component_names[0], data.spec.component_names[1]
         m2_phi = float(data.spec.mass_matrix[0][0])
         m2_chi = float(data.spec.mass_matrix[1][1])
-        g_val = float(data.spec.coupling_matrix[0][1])
+        g_val = float(data.spec.coupling_matrix[0][1]) if data.spec.coupling_matrix is not None else 0.0
 
-        canonical = _make_coupled_canonical_structure(m2_phi, m2_chi, g_val)
+        canonical = _make_coupled_canonical_structure(m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1)
         spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
         data_c = SimulationData(
             times=data.times,
@@ -466,15 +479,16 @@ class TestCanonicalHamiltonianEnergy:
     def test_canonical_matches_virial_for_scalars(self) -> None:
         """For coupled scalars, canonical H and virial formula give same total."""
         data = _make_sim_data_two_fields(n_snapshots=5)
+        fname_0, fname_1 = data.spec.component_names[0], data.spec.component_names[1]
         m2_phi = float(data.spec.mass_matrix[0][0])
         m2_chi = float(data.spec.mass_matrix[1][1])
-        g_val = float(data.spec.coupling_matrix[0][1])
+        g_val = float(data.spec.coupling_matrix[0][1]) if data.spec.coupling_matrix is not None else 0.0
 
         # Virial energy (no canonical)
         se_virial = compute_system_energy(data, 0)
 
         # Canonical energy
-        canonical = _make_coupled_canonical_structure(m2_phi, m2_chi, g_val)
+        canonical = _make_coupled_canonical_structure(m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1)
         spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
         data_c = SimulationData(
             times=data.times,
@@ -1295,15 +1309,28 @@ class TestConversionProbability:
     def test_basic_conversion(self) -> None:
         """Conversion probability grows from zero for excited source."""
         data = _make_sim_data_two_fields(n_snapshots=51)
-        result = compute_conversion_probability(data, "phi_0", "chi_0")
+        fname_0, fname_1 = data.spec.component_names[0], data.spec.component_names[1]
+        result = compute_conversion_probability(data, fname_0, fname_1)
 
         assert isinstance(result, ConversionResult)
-        assert result.source_field == "phi_0"
-        assert result.target_field == "chi_0"
-        # P(0) should be ~0 (chi starts at zero)
+        assert result.source_field == fname_0
+        assert result.target_field == fname_1
+        # P(0) should be ~0 (target starts at zero)
         assert result.probability[0] < 1e-10
-        # P should grow > 0 at some point
-        assert np.max(result.probability) > 0.01
+        # P should grow > 0 at some point for identity coupling.
+        # For gradient coupling at k=0 (uniform mode), fields are uncoupled
+        # and P stays 0 — this is correct physics (∂_x of constant = 0).
+        has_identity_coupling = (
+            data.spec.coupling_matrix is not None
+            and any(
+                data.spec.coupling_matrix[i][j] != 0
+                for i in range(len(data.spec.coupling_matrix))
+                for j in range(len(data.spec.coupling_matrix[0]))
+                if i != j
+            )
+        )
+        if has_identity_coupling:
+            assert np.max(result.probability) > 0.01
 
     def test_rabi_oscillation(self) -> None:
         """Conversion matches exact analytical P(t) for uniform-mode oscillators.
@@ -1311,62 +1338,64 @@ class TestConversionProbability:
         For uniform (k=0) initial conditions in a coupled system,
         the exact conversion probability includes both kinetic and mass
         contributions:
-            P(t) = [pi_chi(t)^2 + m2_chi * chi(t)^2] / [m2_phi * phi(0)^2]
+            P(t) = [pi_1(t)^2 + m2_1 * f1(t)^2] / [m2_0 * f0(0)^2]
+
+        For gradient-coupled theories, k=0 coupling is zero, so P(t) = 0.
+        The test verifies this correctly.
         """
         data = _make_sim_data_two_fields(n_snapshots=201)
+        fname_0, fname_1 = data.spec.component_names[0], data.spec.component_names[1]
 
-        m2_phi = float(data.spec.mass_matrix[0][0])
-        m2_chi = float(data.spec.mass_matrix[1][1])
-        g_val = float(data.spec.coupling_matrix[0][1])
+        m2_0 = float(data.spec.mass_matrix[0][0])
+        m2_1 = float(data.spec.mass_matrix[1][1])
+        g_val = float(data.spec.coupling_matrix[0][1]) if data.spec.coupling_matrix is not None else 0.0
 
-        # Compute analytical P(t) at each snapshot time
-        m_eff = np.array([[m2_phi, g_val], [g_val, m2_chi]])
+        m_eff = np.array([[m2_0, g_val], [g_val, m2_1]])
         eigenvalues, eigenvectors = np.linalg.eigh(m_eff)
         omega = np.sqrt(np.maximum(eigenvalues, 0.0))
 
-        ic = np.array([1.0, 0.0])  # phi=1, chi=0
+        ic = np.array([1.0, 0.0])
         c = eigenvectors.T @ ic
 
-        result = compute_conversion_probability(data, "phi_0", "chi_0")
+        result = compute_conversion_probability(data, fname_0, fname_1)
 
-        # E_phi(0) = 0.5 * L * m2_phi * 1^2 (uniform field, zero momentum)
-        # E_chi(t) = 0.5 * L * [pi_chi^2 + m2_chi * chi^2]
-        # P(t) = E_chi(t) / E_phi(0) = [pi_chi^2 + m2_chi * chi^2] / m2_phi
         p_expected = np.zeros(len(data.times))
         for i, t in enumerate(data.times):
-            chi_t = c[0] * eigenvectors[1, 0] * np.cos(omega[0] * t) + c[
+            f1_t = c[0] * eigenvectors[1, 0] * np.cos(omega[0] * t) + c[
                 1
             ] * eigenvectors[1, 1] * np.cos(omega[1] * t)
-            pi_chi_t = -c[0] * eigenvectors[1, 0] * omega[0] * np.sin(omega[0] * t) - c[
+            pf1_t = -c[0] * eigenvectors[1, 0] * omega[0] * np.sin(omega[0] * t) - c[
                 1
             ] * eigenvectors[1, 1] * omega[1] * np.sin(omega[1] * t)
-            p_expected[i] = (pi_chi_t**2 + m2_chi * chi_t**2) / m2_phi
+            p_expected[i] = (pf1_t**2 + m2_1 * f1_t**2) / m2_0 if m2_0 > 0 else 0.0
 
-        # Pointwise comparison — exact data, should match to floating-point precision
         np.testing.assert_allclose(
             result.probability, p_expected, rtol=1e-10, atol=1e-15
         )
 
-        assert result.probability.max() > 0.01  # nontrivial conversion
+        if g_val != 0:
+            assert result.probability.max() > 0.01
 
     def test_same_field_raises(self) -> None:
         """Same source and target raises ValueError."""
         data = _make_sim_data_two_fields(n_snapshots=5)
+        fname_0 = data.spec.component_names[0]
         with pytest.raises(ValueError, match="different"):
-            compute_conversion_probability(data, "phi_0", "phi_0")
+            compute_conversion_probability(data, fname_0, fname_0)
 
     def test_invalid_field_raises(self) -> None:
         """Invalid field name raises ValueError."""
         data = _make_sim_data_two_fields(n_snapshots=5)
+        fname_0 = data.spec.component_names[0]
         with pytest.raises(ValueError, match="not in spec"):
-            compute_conversion_probability(data, "phi_0", "nonexistent")
+            compute_conversion_probability(data, fname_0, "nonexistent")
 
     def test_zero_source_energy_raises(self) -> None:
         """Zero initial source energy raises ValueError."""
         data = _make_sim_data_two_fields(n_snapshots=5, amplitude=0.0)
-        # Both fields zero → zero energy
+        fname_0, fname_1 = data.spec.component_names[0], data.spec.component_names[1]
         with pytest.raises(ValueError, match="zero initial energy"):
-            compute_conversion_probability(data, "phi_0", "chi_0")
+            compute_conversion_probability(data, fname_0, fname_1)
 
 
 # ============================================================
@@ -1465,7 +1494,7 @@ class TestSummarize:
         assert isinstance(result["energy_conservation"], EnergyDiagnostics)
         per_field: dict[str, object] = result["per_field_energy"]
         assert isinstance(per_field, dict)
-        assert set(per_field.keys()) == {"phi_0", "chi_0"}
+        assert set(per_field.keys()) == set(data.spec.component_names)
 
     def test_summarize_field_peaks(self) -> None:
         """Field peaks match manual np.max(np.abs(...)) of first/last snapshots."""
@@ -1513,34 +1542,36 @@ class TestDecoupledFields:
     def test_zero_coupling_no_conversion(self) -> None:
         """With g=0 (decoupled), P(t) = 0 for all t."""
         spec = _build_coupled_scalars_spec()
+        fname_0, fname_1 = spec.component_names[0], spec.component_names[1]
 
         n_grid = 32
         n_snapshots = 11
         dx = 10.0 / n_grid
         times = np.linspace(0.0, 10.0, n_snapshots)
 
-        # For g=0, phi just oscillates at its own frequency, chi stays at zero
-        m2_phi = float(spec.mass_matrix[0][0])
-        omega_phi = np.sqrt(max(m2_phi, 0.0))
+        # For g=0, f₀ just oscillates at its own frequency, f₁ stays at zero
+        m2_0 = float(spec.mass_matrix[0][0])
+        omega_0 = np.sqrt(max(m2_0, 0.0))
 
-        fields_np: dict[str, np.ndarray] = {}
-        velocities_np: dict[str, np.ndarray] = {}
-
-        phi_list: list[np.ndarray] = []
-        chi_list: list[np.ndarray] = []
-        pi_phi_list: list[np.ndarray] = []
-        pi_chi_list: list[np.ndarray] = []
+        f0_list: list[np.ndarray] = []
+        f1_list: list[np.ndarray] = []
+        v0_list: list[np.ndarray] = []
+        v1_list: list[np.ndarray] = []
 
         for t in times:
-            phi_list.append(np.full(n_grid, np.cos(omega_phi * t)))
-            chi_list.append(np.zeros(n_grid))
-            pi_phi_list.append(np.full(n_grid, -omega_phi * np.sin(omega_phi * t)))
-            pi_chi_list.append(np.zeros(n_grid))
+            f0_list.append(np.full(n_grid, np.cos(omega_0 * t)))
+            f1_list.append(np.zeros(n_grid))
+            v0_list.append(np.full(n_grid, -omega_0 * np.sin(omega_0 * t)))
+            v1_list.append(np.zeros(n_grid))
 
-        fields_np["phi_0"] = np.stack(phi_list)
-        fields_np["chi_0"] = np.stack(chi_list)
-        velocities_np["phi_0"] = np.stack(pi_phi_list)
-        velocities_np["chi_0"] = np.stack(pi_chi_list)
+        fields_np: dict[str, np.ndarray] = {
+            fname_0: np.stack(f0_list),
+            fname_1: np.stack(f1_list),
+        }
+        velocities_np: dict[str, np.ndarray] = {
+            fname_0: np.stack(v0_list),
+            fname_1: np.stack(v1_list),
+        }
 
         data = SimulationData(
             times=times,
@@ -1550,10 +1581,10 @@ class TestDecoupledFields:
             grid_bounds=((0.0, 10.0),),
             periodic=(True,),
             spec=spec,
-            parameters={},
+            parameters=dict(spec.metadata.get("parameters", {})),
         )
 
-        result = compute_conversion_probability(data, "phi_0", "chi_0")
+        result = compute_conversion_probability(data, fname_0, fname_1)
         # chi energy is zero at all times → P(t) = 0
         np.testing.assert_allclose(result.probability, 0.0, atol=1e-12)
 
@@ -1564,14 +1595,15 @@ class TestNearZeroEnergyThreshold:
     def test_near_zero_source_raises(self) -> None:
         """Near-zero source energy (below _ENERGY_FLOOR) raises ValueError."""
         data = _make_sim_data_two_fields(n_snapshots=5, amplitude=1e-15)
+        fname_0, fname_1 = data.spec.component_names[0], data.spec.component_names[1]
         with pytest.raises(ValueError, match="zero initial energy"):
-            compute_conversion_probability(data, "phi_0", "chi_0")
+            compute_conversion_probability(data, fname_0, fname_1)
 
     def test_above_floor_succeeds(self) -> None:
         """Source energy above _ENERGY_FLOOR succeeds."""
-        # amplitude=1.0 gives substantial energy — should not raise
         data = _make_sim_data_two_fields(n_snapshots=5, amplitude=1.0)
-        result = compute_conversion_probability(data, "phi_0", "chi_0")
+        fname_0, fname_1 = data.spec.component_names[0], data.spec.component_names[1]
+        result = compute_conversion_probability(data, fname_0, fname_1)
         assert result.probability is not None
 
 
@@ -1725,23 +1757,26 @@ class TestGroupConversion:
     def test_single_source_single_target_matches_pairwise(self) -> None:
         """Single-field groups degenerate to pairwise conversion."""
         data = _make_sim_data_two_fields(n_snapshots=11)
-        pairwise = compute_conversion_probability(data, "phi_0", "chi_0")
-        group = compute_group_conversion(data, "phi_0", "chi_0")
+        f0, f1 = data.spec.component_names[0], data.spec.component_names[1]
+        pairwise = compute_conversion_probability(data, f0, f1)
+        group = compute_group_conversion(data, f0, f1)
         np.testing.assert_allclose(group.probability, pairwise.probability)
-        assert group.source_field == "phi_0"
-        assert group.target_field == "chi_0"
+        assert group.source_field == f0
+        assert group.target_field == f1
 
     def test_none_target_uses_all_dynamical(self) -> None:
         """target_fields=None auto-selects all other dynamical fields."""
         data = _make_sim_data_two_fields(n_snapshots=5)
-        result = compute_group_conversion(data, "phi_0")
-        assert result.target_field == "chi_0"
+        f0, f1 = data.spec.component_names[0], data.spec.component_names[1]
+        result = compute_group_conversion(data, f0)
+        assert result.target_field == f1
 
     def test_multi_target_explicit_equals_auto(self) -> None:
         """Explicit target list matches auto-target."""
         data = _make_sim_data_two_fields(n_snapshots=11)
-        explicit = compute_group_conversion(data, "phi_0", ["chi_0"])
-        auto = compute_group_conversion(data, "phi_0")
+        f0, f1 = data.spec.component_names[0], data.spec.component_names[1]
+        explicit = compute_group_conversion(data, f0, [f1])
+        auto = compute_group_conversion(data, f0)
         np.testing.assert_allclose(explicit.probability, auto.probability)
 
     def test_overlap_raises(self) -> None:
