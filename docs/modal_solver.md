@@ -77,14 +77,31 @@ y_k(t) = V @ (exp(eigenvalues * t) * V_inv @ y0_k)
 
 This has no time-stepping error and no CFL condition. O(N³_fields) per mode, O(N_modes × N³_fields) total.
 
-**Known precision limitation:** Energy conservation for the per-mode path is ~1.5e-5, decreasing slowly with N but plateauing. Investigation confirmed:
+### Nyquist Mode Zeroing (Critical for Energy Conservation)
 
-- Individual modes are machine-precision (single mode: |dE/E| = 1.9e-14)
-- The 4×4 eigendecomp conditioning (cond up to 10^291 at k=0) is NOT the cause — `scipy.linalg.expm` gives identical error
-- The error comes from accumulated roundoff across all ~N/2 active modes when fields are reconstructed via IFFT and products (like the interaction term B₀·h·∂_x(a)) are evaluated in physical space
-- Error scales as O(10⁻⁵) regardless of coupling strength B₀ or method (eigendecomp vs expm)
+The per-mode eigendecomposition achieves **machine-precision energy conservation** (|dE/E| ≈ 2e-14) after zeroing the Nyquist mode in the initial conditions. Without this, conservation degrades to ~1.5e-5.
 
-**Possible improvement** (future work): compute the Hamiltonian directly in Fourier space using Parseval's theorem, avoiding the physical-space product evaluation. This would eliminate the mode-summation roundoff. Alternatively, use the Hamiltonian cos/sin structure for the [[0,I],[K,0]] blocks: eigendecompose the 2×2 K matrix and evolve via `cos(√(-K)·t)` / `sin(√(-K)·t)` matrix functions. Ref: Van Loan (1978); Higham (2008), Ch. 12.
+**Root cause**: The rfft Nyquist bin (k = N/2, the last mode in even-N grids) must have a purely real Fourier coefficient for real-valued fields. However, the per-mode evolution matrix A_k has complex entries from the gradient coupling (ik term). When exp(A_k·t) evolves the Nyquist mode, it creates imaginary components in the Fourier coefficient. The `irfft` reconstruction silently drops these imaginary parts (by construction — the Nyquist bin of a real signal IS real). This truncation discards energy from the Nyquist mode at every snapshot.
+
+**Investigation**: Per-mode analysis showed that ALL modes except the Nyquist are exactly conserved to machine precision (dH_k = 0 for k < N/2). The Nyquist mode's Hamiltonian grew by 500× (from 0.029 to 16.8) in the complex eigendecomp, but the stored (irfft-reconstructed) field showed shrinking amplitude — the discarded imaginary part contained the "missing" energy.
+
+**Fix**: Zero the Nyquist mode's IC before eigendecomposition. This is standard practice in pseudospectral methods — the Nyquist frequency aliases with its negative-frequency conjugate and cannot faithfully represent directional (travelling wave) content. It is the highest resolvable frequency and carries negligible physical content for well-resolved simulations.
+
+**Results** (coupled_scalars, Gertsenshtein gradient coupling):
+
+| Grid | Before fix | After fix |
+|------|-----------|-----------|
+| N=128 | |dE/E| = 2.8e-5 | |dE/E| = 2.2e-14 |
+| N=256 | |dE/E| = 1.8e-5 | |dE/E| = 2.2e-14 |
+| N=512 | |dE/E| = 1.7e-5 | |dE/E| = 2.2e-14 |
+| N=1024 | |dE/E| = 1.6e-5 | |dE/E| = 2.2e-14 |
+
+Full Gertsenshtein (6 fields): |dE/E| = 1.3e-14.
+
+**References**:
+- Boyd, J.P. (2001). *Chebyshev and Fourier Spectral Methods*, 2nd ed. Dover. §11.5 (aliasing and the Nyquist mode).
+- Canuto, C. et al. (2006). *Spectral Methods: Fundamentals in Single Domains*. Springer. §3.2 (dealiasing via mode truncation).
+- Burns et al. (2020). Dedalus framework zeroes the top 1/3 of modes ("2/3 dealiasing rule") to prevent aliasing in nonlinear terms. Our Nyquist zeroing is the minimal version for linear systems.
 
 **Krylov matrix exponential (position-dependent coefficients):**
 

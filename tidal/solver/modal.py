@@ -1147,6 +1147,25 @@ def solve_modal(
     # FFT initial conditions
     y0_hat = _fft_slots(y0, layout, grid)
 
+    # Zero the Nyquist mode(s) in the IC.  The rfft Nyquist bin (last mode
+    # in each dimension) must be real for real-valued fields.  The modal
+    # evolution matrix has complex entries (from gradient coupling ik),
+    # which creates imaginary components at the Nyquist bin.  irfft
+    # silently drops these, causing energy non-conservation proportional
+    # to the Nyquist power.  Zeroing the Nyquist IC prevents this entirely.
+    # This is standard practice in spectral methods — the Nyquist mode
+    # aliases with its conjugate and cannot represent physical content.
+    # Ref: Boyd (2001), Chebyshev & Fourier Spectral Methods, §11.5.
+    for dim_idx, n in enumerate(grid.shape):
+        if n % 2 == 0:  # Nyquist mode exists only for even N
+            nyq_mode = n // 2  # last rfft bin
+            if len(grid.shape) == 1:
+                y0_hat[:, nyq_mode] = 0.0
+            else:
+                # Multi-D: zero along the last-axis Nyquist slice
+                rfft_last = grid.shape[-1] // 2
+                y0_hat[:, ..., rfft_last] = 0.0
+
     has_pos_dep = _has_position_dependent_terms(spec)
 
     if has_constraints and not has_pos_dep:
