@@ -828,7 +828,11 @@ def _gradient_product_density(  # noqa: PLR0913, PLR0917
     ax_a = _GRADIENT_AXES[op_a]
     bc_a = _effective_bc(ax_a, periodic, bc_types)
 
-    if bc_a == "periodic":
+    from tidal.solver.operators import get_spectral as _get_spectral  # noqa: PLC0415
+
+    if bc_a == "periodic" and not _get_spectral():
+        # FD periodic: IBP is more accurate than two separate FD gradients
+        # because it uses a single laplacian stencil (fewer FD applications).
         # IBP: ⟨∂_a f, ∂_b g⟩ = mean(-f · ∂²_ab g)
         second_op = _gradient_pair_to_second_order(op_a, op_b)
         operated = _apply_spatial_operator(
@@ -841,7 +845,10 @@ def _gradient_product_density(  # noqa: PLR0913, PLR0917
         )
         return -(field_a * operated)
 
-    # Non-periodic: direct gradient product
+    # Spectral or non-periodic: direct gradient product.
+    # For spectral operators, direct gradient×gradient is more accurate
+    # than IBP (laplacian) because rfft Nyquist-mode handling introduces
+    # O(1/N) discrepancy between mean(|∂f|²) and -mean(f·∂²f).
     grad_a = _apply_spatial_operator(
         op_a,
         field_a,
