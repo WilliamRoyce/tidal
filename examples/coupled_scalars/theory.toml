@@ -1,28 +1,75 @@
+# Gertsenshtein Effect: Effective 1+1D Graviton-Photon Mixing
+#
+# Effective 1+1D theory for the h_+/a_y subsystem of Einstein-Maxwell in a
+# uniform background magnetic field B_0.  The scalar fields h (graviton mode)
+# and a (photon mode) are coupled via a gradient term B0*h*∂_x(a) that produces
+# Rabi-like graviton-photon conversion oscillations.
+#
+# The gradient coupling is expressed covariantly using a background vector
+# field n^a = (0, 1) that selects the spatial derivative: B0*h*n^a*∂_a(a).
+# VarD then gives the correct antisymmetric coupling structure:
+#   h equation: ... + B0 * ∂_x(a)
+#   a equation: ... - B0 * ∂_x(h)
+#
+# Analytical formulas:
+#
+#   Massless vacuum (omegaP2=0, mg2=0):
+#     P(graviton → photon) = sin^2(kappa * B0 * D / 2)
+#   where D = propagation distance (= t_end for c=1).
+#   Ref: Gertsenshtein (1962), JETP 14:84.
+#
+#   With plasma detuning (omegaP2 > 0):
+#     P = sin^2(2*theta) * sin^2(Delta_osc * D / 2)
+#   where tan(2*theta) = kappa*B0 / |Delta|,
+#         Delta = (mg2 - omegaP2) / (2*omega),
+#         Delta_osc = sqrt(Delta^2 + (kappa*B0)^2).
+#   Ref: Raffelt & Stodolsky (1988), Phys. Rev. D 37:1237.
+#
+# Running:
+#   cd examples/coupled_scalars && bash run.sh
+
 [theory]
-name = "Coupled Scalars"
+name = "Coupled Scalars (Gertsenshtein Effective)"
+description = "Effective 1+1D graviton-photon mixing: gradient coupling + plasma and graviton masses"
 
 [spacetime]
 dimension = 2
 metric = "minkowski"
 
+# h: graviton mode (h_+ polarization in the full Einstein-Maxwell theory)
 [[fields]]
-name = "phi"
+name = "h"
 type = "scalar"
 
+# a: photon mode (a_y component in the full Einstein-Maxwell theory)
 [[fields]]
-name = "chi"
+name = "a"
 type = "scalar"
+
+# n: spatial unit vector (selects spatial gradient in the coupling term)
+# n^a = (0, 1) in 1+1D → n^a ∂_a = ∂_x
+[[background_fields]]
+name = "n"
+type = "vector"
+components = ["0", "1"]
 
 [constants]
-names = ["mPhi2", "mChi2", "gCpl"]
+names = ["kappa", "B0", "omegaP2", "mg2"]
 
+# Effective 1+1D Lagrangian:
+#   Graviton kinetic:   -1/(2*kappa^2) (∂h)^2
+#   Graviton mass:      -(B0^2 + mg2/kappa^2)/2 h^2
+#   Photon kinetic:     -1/2 (∂a)^2
+#   Photon mass:        -omegaP2/2 a^2
+#   Gradient coupling:  -B0 h n^a ∂_a(a) = -B0 h ∂_x(a)
 [lagrangian]
-expression = "-1/2 CD[-a][phi[]] eta[a, b] CD[-b][phi[]] - mPhi2/2 phi[]^2 - 1/2 CD[-a][chi[]] eta[a, b] CD[-b][chi[]] - mChi2/2 chi[]^2 - gCpl phi[] chi[]"
+expression = "(  -1/(2*kappa^2) CD[-a][h[]] eta[a, b] CD[-b][h[]] - (B0^2 + mg2/kappa^2)/2 * h[]^2 - 1/2 CD[-a][a[]] eta[a, b] CD[-b][a[]] - omegaP2/2 * a[]^2 - B0 * h[] * n[a] * CD[-a][a[]]  )"
 
 [parameters]
-mPhi2 = 1.0
-mChi2 = 4.0
-gCpl = 0.5
+kappa = 1.0
+B0 = 0.3
+omegaP2 = 0.0
+mg2 = 0.0
 
 [output]
 path = "../data/coupled_scalars.json"

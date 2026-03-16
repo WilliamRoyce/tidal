@@ -1278,7 +1278,7 @@ def solve_modal(
         )
         n_total = A_full.shape[0]
         method_desc = (
-            f"full eigendecomposition ({n_total}×{n_total}, position-dependent)"
+            f"expm_multiply ({n_total}×{n_total}, position-dependent)"
         )
 
     if progress is not None:
