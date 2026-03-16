@@ -1318,6 +1318,24 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "(* Without this, spherical metrics leave symbolic RiemannCD unevaluated, *)",
             "(* corrupting equations for tensor components (h_theta_theta etc.). *)",
             f"l2Raw = l2Raw /. {{{riemann_sym}[__] :> 0, {ricci_sym}[__] :> 0, {ricci_scalar_sym}[] :> 0, {einstein_sym}[__] :> 0}};",
+        ]
+    )
+
+    # Zero background torsion for flat Minkowski (no torsion source).
+    # After xPert expansion, TorsionCDT[a,-b,-c] (without LI[n] index) is
+    # the background torsion — zero for Minkowski.  TorsionPert[LI[1],...] is
+    # the perturbation and must be kept.  This is analogous to RicciCD → 0.
+    if ctx.torsion:
+        torsion_head = f"Torsion{ctx.cdt}"
+        lines.extend(
+            [
+                "(* Zero background torsion (flat Minkowski, no torsion source) *)",
+                f"l2Raw = l2Raw /. {torsion_head}[__] :> 0;",
+            ]
+        )
+
+    lines.extend(
+        [
             "",
             "(* Canonical simplifications *)",
             "l2Raw = ToCanonical[l2Raw];",
@@ -1409,7 +1427,7 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         ]
     )
 
-    if not matter_pert_info:
+    if not matter_pert_info and not ctx.torsion:
         # --- Single-field linearization (metric only, original path) ---
         if not has_metric_pert:
             msg = "Single-field linearization requires metric perturbation"
@@ -1497,6 +1515,28 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
                     "head": mpi["pert_head"],
                     "fexpr": mp_fexpr,
                     "vard_expr": mp_fexpr,
+                }
+            )
+
+        # Add torsion perturbation as a dynamical field for VarD.
+        # TorsionPert[LI[1], a, -b, -c] is the perturbation of TorsionCDT,
+        # auto-registered by the torsion pipeline.  VarD w.r.t. TorsionPert
+        # gives the torsion field equations from the PGT Lagrangian.
+        if ctx.torsion:
+            torsion_pert_head = f"{ctx.prefix}TorsionPert"
+            torsion_fexpr = f"{torsion_pert_head}[a, -b, -c]"
+            dyn_fields.append(
+                {
+                    "name": "torsion",
+                    "field": {
+                        "name": "torsion",
+                        "type": "tensor",
+                        "rank": 3,
+                        "symmetry": "antisymmetric_23",
+                    },
+                    "head": torsion_pert_head,
+                    "fexpr": torsion_fexpr,
+                    "vard_expr": torsion_fexpr,
                 }
             )
 
