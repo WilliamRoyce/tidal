@@ -855,6 +855,7 @@ GenerateCDRules[dim_Integer, chart_] := GenerateCDRules[dim, chart] = Module[
     If[StringMatchQ[hStr, "*Christoffel*"], Return[False]];
     If[StringMatchQ[hStr, "PD*"], Return[False]];
     If[IsCurvatureTensor[h] || IsCurvatureTensor[x], Return[False]];
+    If[StringContainsQ[hStr, "Torsion"], Return[False]];
     IsCovDOperator[x] || StringMatchQ[hStr, "*CD*"]
   ];
 
@@ -948,6 +949,9 @@ ConvertCDToDerivatives[expr_, chart_] := Module[
     (* NOT derivative operators.  Use the shared IsCurvatureTensor predicate   *)
     (* to exclude all of them — avoids maintaining a parallel exclusion list.  *)
     If[IsCurvatureTensor[h] || IsCurvatureTensor[x], Return[False]];
+    (* Torsion tensors (TorsionCDT) carry the CovD name but are NOT           *)
+    (* derivative operators — they are field-strength tensors in PGT.          *)
+    If[StringContainsQ[hStr, "Torsion"], Return[False]];
     IsCovDOperator[x] || StringMatchQ[hStr, "*CD*"]
   ];
 
