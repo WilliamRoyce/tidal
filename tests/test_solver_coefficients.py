@@ -515,6 +515,85 @@ class TestPeriodicCoefficientContinuity:
         # Verify it doesn't raise (absolute values at boundary are tiny).
         ev.check_periodic_coefficient_continuity((True,))
 
+    def test_antisymmetric_localized_no_warning(self) -> None:
+        """Antisymmetric localized coefficient: large relative jump but negligible boundaries.
+
+        x·exp(-x²/R²) is antisymmetric — opposite signs at boundaries.
+        On [0, 2π] with R=1 (center at π): boundary values are ~10⁻⁴ of peak,
+        so the relative jump appears large (~200%) but the absolute boundary
+        magnitude is negligible.  The boundary-magnitude filter should suppress
+        this false positive.
+        """
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": (
+                        "(x[] - 3.14159) * exp(-(x[] - 3.14159)^2)"
+                    ),
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        grid = _make_grid_1d(64)
+        ev = CoefficientEvaluator(spec, grid)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            ev.check_periodic_coefficient_continuity((True,))
+
+    def test_localized_gaussian_periodic_no_warning(self) -> None:
+        """Gaussian exp(-x²/R²) on large periodic domain: zero at boundaries.
+
+        This models the Gertsenshtein localized B-field on a periodic domain.
+        The Gaussian decays to float64 zero at the boundaries, so no warning
+        should trigger regardless of domain size.
+        """
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "exp(-x[]^2 / 50)",
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        # Domain [-50, 50] with R=5: exp(-50²/50) ≈ 10⁻²²
+        grid = GridInfo(bounds=((-50.0, 50.0),), shape=(64,), periodic=(True,))
+        ev = CoefficientEvaluator(spec, grid)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            ev.check_periodic_coefficient_continuity((True,))
+
+    def test_genuine_discontinuity_still_errors(self) -> None:
+        """x² on [0, 2π] with large boundary values: still detected.
+
+        Verifies the boundary-magnitude filter doesn't weaken detection of
+        real discontinuities where boundary values are significant.
+        x(0)²≈0 but x(2π)²≈39.5 → 100% relative jump with large |last|.
+        """
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": "x[]^2",
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        grid = _make_grid_1d(32)
+        ev = CoefficientEvaluator(spec, grid)
+        with pytest.raises(ValueError, match="jump at the periodic boundary"):
+            ev.check_periodic_coefficient_continuity((True,))
+
     def test_2d_checks_periodic_axis(self) -> None:
         """In 2D, check detects discontinuity along the periodic x-axis."""
         spec = _make_spec(

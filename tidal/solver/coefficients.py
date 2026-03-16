@@ -382,6 +382,19 @@ class CoefficientEvaluator:
                 jump = float(np.abs(first - last).max())
                 rel_jump = jump / scale
 
+                # Skip if both boundary values are negligible relative to the
+                # coefficient peak.  When the coefficient effectively vanishes
+                # at the boundary (e.g. Gaussian B-field on a large periodic
+                # domain), any "jump" is between two near-zero values and the
+                # IBP energy leak ∝ |jump| × amplitude² is negligible.
+                # Threshold 1e-4: boundary magnitude < 0.01% of peak.
+                boundary_magnitude = max(
+                    float(np.abs(first).max()),
+                    float(np.abs(last).max()),
+                )
+                if boundary_magnitude < 1e-4 * scale:
+                    continue
+
                 if rel_jump > 0.01:  # >1% discontinuity
                     term = self._spec.equations[eq_idx].rhs_terms[term_idx]
                     field = self._spec.equations[eq_idx].field_name
