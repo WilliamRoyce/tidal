@@ -4578,3 +4578,172 @@ path = "out.json"
         # (the plane-wave reduction does emit "fieldEquations /. {" for derivative-zeroing,
         # so we check specifically for a coordinate-value substitution like "y[] ->")
         assert "-> Pi/2" not in wls_text
+
+
+class TestTorsionPipeline:
+    """Tests for PGT torsion pipeline extensions (torsion = true)."""
+
+    def test_partial_antisymmetry_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Partial antisymmetry generates correct xAct Antisymmetric spec."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Partial Antisymmetry Test"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "T"
+type = "tensor"
+rank = 3
+symmetry = "antisymmetric_23"
+
+[constants]
+names = ["m2"]
+
+[lagrangian]
+expression = "-m2/12 T[-a, -b, -c] eta[a, e] eta[b, f] eta[c, g] T[-e, -f, -g]"
+
+[parameters]
+m2 = 1.0
+
+[output]
+path = "/tmp/partial_antisym_test.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+        wls_text = capsys.readouterr().out
+        # Check xAct gets Antisymmetric[{-b, -c}] (not full antisymmetric)
+        assert "Antisymmetric[{-b, -c}]" in wls_text
+        # Must NOT have full antisymmetric (which would be {-a, -b, -c})
+        assert "Antisymmetric[{-a, -b, -c}]" not in wls_text
+
+    def test_torsion_covd_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Torsion = true generates DefCovD with Torsion -> True."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Torsion CovD Test"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+torsion = true
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[constants]
+names = ["kappa"]
+
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[]"
+
+[parameters]
+kappa = 1.0
+
+[output]
+path = "/tmp/torsion_covd_test.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+        wls_text = capsys.readouterr().out
+        # DefCovD with Torsion -> True
+        assert "Torsion -> True" in wls_text
+        # RicciScalarCD correctly prefixed (Levi-Civita, not CDT)
+        assert "RicciScalar" in wls_text
+
+    def test_torsion_perturbation_dry_run(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Torsion = true + linearization auto-registers torsion perturbation."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "PGT Perturbation Test"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+torsion = true
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[constants]
+names = ["kappa", "alpha1"]
+
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f]"
+
+[linearization]
+perturbation_field = "h"
+
+[parameters]
+kappa = 1.0
+alpha1 = 0.5
+
+[output]
+path = "/tmp/torsion_pert_test.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+        wls_text = capsys.readouterr().out
+        # DefTensorPerturbation for TorsionCDT
+        assert "DefTensorPerturbation" in wls_text
+        assert "TorsionPert" in wls_text
+        # TorsionCDT correctly prefixed in Lagrangian
+        assert "Torsion" in wls_text
+        # Torsion perturbation has antisymmetry
+        assert "Antisymmetric[{-b, -c}]" in wls_text
+
+    def test_no_torsion_no_covd(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Without torsion = true, no CDT is defined."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Standard GR"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[constants]
+names = ["kappa"]
+
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[]"
+
+[parameters]
+kappa = 1.0
+
+[output]
+path = "/tmp/no_torsion_test.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+        wls_text = capsys.readouterr().out
+        # No torsion CovD
+        assert "Torsion -> True" not in wls_text
+        # No TorsionPert
+        assert "TorsionPert" not in wls_text
