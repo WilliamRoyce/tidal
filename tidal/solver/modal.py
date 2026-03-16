@@ -142,6 +142,24 @@ def can_use_modal(
             if term.time_dependent:
                 return False
 
+    # 6. No position-dependent gradient/derivative coupling.
+    # Gradient operators (ik multiplier) combined with position-dependent
+    # convolution kernels create non-normal evolution matrices whose
+    # eigendecomposition has large real-part eigenvalues despite the
+    # physical system being conservative.  The modal exp(λt) approach
+    # overflows for these spurious growing modes.  Identity and laplacian
+    # operators with position-dependent coefficients are fine (they
+    # produce symmetric/Hermitian convolution matrices).
+    # Ref: Trefethen & Embree (2005), Spectra and Pseudospectra, Ch. 14.
+    _GRADIENT_OPS = frozenset({
+        "gradient_x", "gradient_y", "gradient_z",
+        "first_derivative_t",
+    })
+    for eq in spec.equations:
+        for term in eq.rhs_terms:
+            if term.position_dependent and term.operator in _GRADIENT_OPS:
+                return False
+
     return True
 
 
