@@ -27,7 +27,9 @@ class TestInvertExpDenominator:
 
     def test_simple_slash_exp_nested_parens(self) -> None:
         # Argument itself contains parens
-        assert _invert_exp_denominator("1/exp(x**2/(2*R**2))") == "1*exp(-(x**2/(2*R**2)))"
+        assert (
+            _invert_exp_denominator("1/exp(x**2/(2*R**2))") == "1*exp(-(x**2/(2*R**2)))"
+        )
 
     # --- Pattern 2: /(exp(arg)) — compound denominator, exp only ---
 
@@ -35,7 +37,10 @@ class TestInvertExpDenominator:
         assert _invert_exp_denominator("k/(exp(x**2))") == "k*exp(-(x**2))"
 
     def test_compound_exp_alone_nested(self) -> None:
-        assert _invert_exp_denominator("-(k)/(exp(x**2/(2*R**2)))") == "-(k)*exp(-(x**2/(2*R**2)))"
+        assert (
+            _invert_exp_denominator("-(k)/(exp(x**2/(2*R**2)))")
+            == "-(k)*exp(-(x**2/(2*R**2)))"
+        )
 
     # --- Pattern 3: /(exp(arg)*rest) — compound denominator with trailing factor ---
 
@@ -66,7 +71,7 @@ class TestInvertExpDenominator:
         assert _invert_exp_denominator(expr) == expr
 
     def test_empty_string(self) -> None:
-        assert _invert_exp_denominator("") == ""
+        assert not _invert_exp_denominator("")
 
     def test_unrelated_expression_unchanged(self) -> None:
         expr = "sin(x) + cos(y)"
@@ -75,7 +80,8 @@ class TestInvertExpDenominator:
 
 class TestNoOverflowLocalized:
     """Regression guard: exact coefficient strings from gertsenshtein_localized.json
-    must evaluate without RuntimeWarning overflow."""
+    must evaluate without RuntimeWarning overflow.
+    """
 
     @pytest.mark.parametrize(
         "expr",
@@ -97,7 +103,9 @@ class TestNoOverflowLocalized:
         with warnings.catch_warnings():
             warnings.simplefilter("error", RuntimeWarning)
             result = evaluate_coefficient(expr, params, ("t", "x"), {"x": x})
-        assert np.all(np.isfinite(result)), f"Non-finite values in result for expr: {expr}"
+        assert np.all(np.isfinite(result)), (
+            f"Non-finite values in result for expr: {expr}"
+        )
 
     def test_compound_denominator_value_correctness(self) -> None:
         """-(Bpeak*x)/(exp(x^2/(2R^2))*R^2) = -Bpeak*x*exp(-x^2/(2R^2))/R^2."""
@@ -118,7 +126,8 @@ class TestMathematicaToPython:
     def test_exp_conversion(self) -> None:
         result = mathematica_to_python("Exp[-x[]^2]", ("t", "x"))
         # Wolfram Exp[-x^2] → exp(-x**2) (valid Python)
-        assert "exp(" in result and "x" in result
+        assert "exp(" in result
+        assert "x" in result
 
     def test_e_power_conversion(self) -> None:
         result = mathematica_to_python("1/E^(x[]^2/R^2)", ("t", "x"))

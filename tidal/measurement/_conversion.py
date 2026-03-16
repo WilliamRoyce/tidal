@@ -172,7 +172,7 @@ def compute_conversion_probability(
     )
 
 
-def compute_group_conversion(
+def compute_group_conversion(  # noqa: C901
     data: SimulationData,
     source_fields: str | Sequence[str],
     target_fields: str | Sequence[str] | None = None,

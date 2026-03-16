@@ -17,6 +17,7 @@ and Applications*, SIAM. Ch. 3 (sample statistics, SEM, CI).
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -44,10 +45,8 @@ def _build_overlay_scalars(results: SweepResults) -> dict[str, float]:
     """
     ns: dict[str, float] = dict(results.fixed_params)
     for k, v in results.sim_settings.items():
-        try:
+        with contextlib.suppress(TypeError, ValueError):
             ns[k] = float(v)
-        except (TypeError, ValueError):
-            pass
     return ns
 
 
@@ -81,7 +80,9 @@ def _evaluate_sweep_overlay(
     ValueError
         If the formula contains a syntax/name error or evaluation fails.
     """
-    from tidal.cli._simulate import FORMULA_NAMESPACE  # pyright: ignore[reportPrivateUsage]
+    from tidal.cli._simulate import (
+        FORMULA_NAMESPACE,  # pyright: ignore[reportPrivateUsage]
+    )
 
     ns: dict[str, object] = {**FORMULA_NAMESPACE, **scalar_params, **param_arrays}
     try:
@@ -138,7 +139,15 @@ def render_sweep_1d(
         y_mean = agg.column(f"{metric}_mean")
         y_std = agg.column(f"{metric}_std")
         num_label = "TIDAL" if overlay else None
-        ax.plot(x, y_mean, "o-", color="tab:blue", linewidth=1.5, markersize=5, label=num_label)
+        ax.plot(
+            x,
+            y_mean,
+            "o-",
+            color="tab:blue",
+            linewidth=1.5,
+            markersize=5,
+            label=num_label,
+        )
         ax.fill_between(
             x,
             y_mean - y_std,
@@ -151,7 +160,9 @@ def render_sweep_1d(
         x = results.column(param_name)
         y = results.column(metric)
         num_label = "TIDAL" if overlay else None
-        ax.plot(x, y, "o-", color="tab:blue", linewidth=1.5, markersize=5, label=num_label)
+        ax.plot(
+            x, y, "o-", color="tab:blue", linewidth=1.5, markersize=5, label=num_label
+        )
 
     # Analytical overlay curve
     if overlay is not None:
@@ -391,7 +402,7 @@ def _render_2d_grid(
     ax.figure.colorbar(im, ax=ax, label=metric)  # type: ignore[union-attr]
 
 
-def render_sweep_2d_with_overlay(
+def render_sweep_2d_with_overlay(  # noqa: PLR0914
     fig: Figure,
     results: SweepResults,
     metric: str,
@@ -465,7 +476,9 @@ def render_sweep_2d_with_overlay(
 
     # Panel 0: TIDAL numerical
     ax0 = axes[0]
-    im0 = ax0.pcolormesh(p1_vals, p2_vals, z_num, shading="nearest", cmap="viridis", vmin=vmin, vmax=vmax)
+    im0 = ax0.pcolormesh(
+        p1_vals, p2_vals, z_num, shading="nearest", cmap="viridis", vmin=vmin, vmax=vmax
+    )
     ax0.set_xlabel(p1_name)
     ax0.set_ylabel(p2_name)
     ax0.set_title(f"{metric} (TIDAL)")
@@ -473,7 +486,15 @@ def render_sweep_2d_with_overlay(
 
     # Panel 1: analytical formula
     ax1 = axes[1]
-    im1 = ax1.pcolormesh(p1_vals, p2_vals, z_anal, shading="nearest", cmap="viridis", vmin=vmin, vmax=vmax)
+    im1 = ax1.pcolormesh(
+        p1_vals,
+        p2_vals,
+        z_anal,
+        shading="nearest",
+        cmap="viridis",
+        vmin=vmin,
+        vmax=vmax,
+    )
     ax1.set_xlabel(p1_name)
     ax1.set_ylabel(p2_name)
     ax1.set_title(f"{metric} (analytical)")

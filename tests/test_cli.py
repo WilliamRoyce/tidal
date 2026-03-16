@@ -2141,7 +2141,9 @@ class TestValidateCommand:
         capsys: pytest.CaptureFixture[str],
     ) -> None:
         """--stability on a stable spec should return 0 and say [stable]."""
-        ret = main(["validate", str(inline_kg_1d_json), "--stability", "--param", "m2=1.0"])
+        ret = main(
+            ["validate", str(inline_kg_1d_json), "--stability", "--param", "m2=1.0"]
+        )
         assert ret == 0
         out = capsys.readouterr().out
         assert "stable" in out.lower()
@@ -2165,17 +2167,24 @@ class TestValidateCommand:
             "equations": [
                 {
                     "field": "phi_0",
-                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(phi_0)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
                             {
-                                "coefficient": 1.0,   # positive identity → negative eigenvalue
+                                "coefficient": 1.0,  # positive identity → negative eigenvalue
                                 "operator": "identity",
                                 "field": "phi_0",
                                 "coefficient_symbolic": "-m2",
                             },
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 }
@@ -2200,7 +2209,10 @@ class TestValidateCommand:
         # coupled_scalars: stable when gCpl² < mPhi2 * mChi2 = 1*4 = 4
         # With gCpl=3.0 it becomes unstable (g² = 9 > 4)
         spec = {
-            "metadata": {"source": "test", "parameters": {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5}},
+            "metadata": {
+                "source": "test",
+                "parameters": {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5},
+            },
             "spacetime": {
                 "dimension": 2,
                 "signature": [-1, 1],
@@ -2213,25 +2225,59 @@ class TestValidateCommand:
             "equations": [
                 {
                     "field": "phi_0",
-                    "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(phi_0)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -1.0, "operator": "identity", "field": "phi_0", "coefficient_symbolic": "-mPhi2"},
-                            {"coefficient": -0.5, "operator": "identity", "field": "chi_0", "coefficient_symbolic": "-gCpl"},
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-mPhi2",
+                            },
+                            {
+                                "coefficient": -0.5,
+                                "operator": "identity",
+                                "field": "chi_0",
+                                "coefficient_symbolic": "-gCpl",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 },
                 {
                     "field": "chi_0",
-                    "lhs": {"expression": "d2_t(chi_0)", "order": {"time": 2, "space": 0}},
+                    "lhs": {
+                        "expression": "d2_t(chi_0)",
+                        "order": {"time": 2, "space": 0},
+                    },
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -4.0, "operator": "identity", "field": "chi_0", "coefficient_symbolic": "-mChi2"},
-                            {"coefficient": -0.5, "operator": "identity", "field": "phi_0", "coefficient_symbolic": "-gCpl"},
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "chi_0"},
+                            {
+                                "coefficient": -4.0,
+                                "operator": "identity",
+                                "field": "chi_0",
+                                "coefficient_symbolic": "-mChi2",
+                            },
+                            {
+                                "coefficient": -0.5,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-gCpl",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "chi_0",
+                            },
                         ],
                     },
                 },
@@ -2246,7 +2292,9 @@ class TestValidateCommand:
         assert ret_stable == 0
 
         # Override: gCpl=3.0 → unstable (g²=9 > mPhi2*mChi2=4)
-        ret_unstable = main(["validate", str(spec_path), "--stability", "--param", "gCpl=3.0"])
+        ret_unstable = main(
+            ["validate", str(spec_path), "--stability", "--param", "gCpl=3.0"]
+        )
         assert ret_unstable == 1
 
 
@@ -3480,7 +3528,6 @@ path = "coupled_scattering.json"
         assert "g0" in out
         assert "mChi2" in out
 
-
     def test_background_vector_curved_metric_contravariant(
         self,
         tmp_path: Path,
@@ -3576,8 +3623,10 @@ path = "output.json"
 
         out = capsys.readouterr().out
         # For Minkowski (empty metric_diagonal), contravariant = covariant
-        assert "[{2, -" in out and "-> B0" in out
-        assert "[{2, " in out and "-> B0" in out
+        assert "[{2, -" in out
+        assert "-> B0" in out
+        assert "[{2, " in out
+        assert "-> B0" in out
         # Must NOT generate Simplify[] wrapping for Minkowski (old shortcut preserved)
         assert "Simplify[(B0)" not in out
 
@@ -4381,8 +4430,9 @@ class TestCoordValuesPreEvaluation:
         The coordinate evaluation is deferred to _wls_plane_wave_coordinate_evaluation
         which applies "fieldEquations /. {y[] -> Pi/2}" after derivation.
         """
-        from tidal.cli._derive import generate_wls
         import tomllib
+
+        from tidal.cli._derive import generate_wls
 
         config_text = """
 [theory]
@@ -4405,7 +4455,7 @@ path = "out.json"
 """
         config_path = tmp_path / "theory.toml"
         config_path.write_text(config_text)
-        with open(config_path, "rb") as f:
+        with Path(config_path).open("rb") as f:
             config = tomllib.load(f)
         wls_text = generate_wls(config, str(config_path))
         # Metric matrix must NOT be pre-evaluated (creates non-flat background)
@@ -4415,8 +4465,9 @@ path = "out.json"
 
     def test_tt_traceless_weights_no_sin_y(self, tmp_path: Path) -> None:
         """TT-traceless substitution weights use Sin[Pi/2], not Sin[y[]]."""
-        from tidal.cli._derive import generate_wls
         import tomllib
+
+        from tidal.cli._derive import generate_wls
 
         config_text = """
 [theory]
@@ -4448,13 +4499,13 @@ path = "out.json"
 """
         config_path = tmp_path / "theory.toml"
         config_path.write_text(config_text)
-        with open(config_path, "rb") as f:
+        with Path(config_path).open("rb") as f:
             config = tomllib.load(f)
         wls_text = generate_wls(config, str(config_path))
         wls_lines = wls_text.splitlines()
         # TT traceless substitution lines contain "args___" (RuleDelayed pattern)
         # The last-diagonal field name is prefix-dependent (e.g. gsH9, gedH9)
-        tt_lines = [l for l in wls_lines if "args___" in l and "Sin[" in l]
+        tt_lines = [line for line in wls_lines if "args___" in line and "Sin[" in line]
         assert tt_lines, "Expected TT traceless substitution lines with Sin[] weight"
         for line in tt_lines:
             assert "Sin[y[]]" not in line, f"Sin[y[]] in TT traceless: {line}"
@@ -4462,8 +4513,9 @@ path = "out.json"
 
     def test_coordinate_values_plane_wave_uses_expand(self, tmp_path: Path) -> None:
         """Plane-wave coordinate eval step uses Expand not Simplify."""
-        from tidal.cli._derive import generate_wls
         import tomllib
+
+        from tidal.cli._derive import generate_wls
 
         config_text = """
 [theory]
@@ -4486,7 +4538,7 @@ path = "out.json"
 """
         config_path = tmp_path / "theory.toml"
         config_path.write_text(config_text)
-        with open(config_path, "rb") as f:
+        with Path(config_path).open("rb") as f:
             config = tomllib.load(f)
         wls_text = generate_wls(config, str(config_path))
         assert "fieldEquations = fieldEquations /. {y[] -> Pi/2}" in wls_text
@@ -4494,8 +4546,9 @@ path = "out.json"
 
     def test_no_coordinate_values_noop(self, tmp_path: Path) -> None:
         """Absent coordinate_values emits no early metric substitution."""
-        from tidal.cli._derive import generate_wls
         import tomllib
+
+        from tidal.cli._derive import generate_wls
 
         config_text = """
 [theory]
@@ -4516,7 +4569,7 @@ path = "out.json"
 """
         config_path = tmp_path / "theory.toml"
         config_path.write_text(config_text)
-        with open(config_path, "rb") as f:
+        with Path(config_path).open("rb") as f:
             config = tomllib.load(f)
         wls_text = generate_wls(config, str(config_path))
         # No coordinate_values → no early metric ReplaceAll

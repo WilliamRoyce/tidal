@@ -41,6 +41,10 @@ if TYPE_CHECKING:
 
 _MISSING = object()  # sentinel for dict.get() fast path
 
+# Thresholds for periodic boundary discontinuity checks
+_JUMP_WARN_THRESHOLD = 0.01  # >1% relative jump → warning
+_JUMP_ERROR_THRESHOLD = 0.50  # >50% relative jump → hard error
+
 
 class CoefficientEvaluator:
     """Resolve operator term coefficients with multi-level caching.
@@ -354,7 +358,7 @@ class CoefficientEvaluator:
         When periodic BCs are used, the conservation proof for the PDE system
         requires all coefficient functions to be continuous across the periodic
         boundary (so that integration-by-parts boundary terms vanish).
-        Non-periodic coefficients (e.g. B(x) = B₀/x³ on [5, 80]) produce
+        Non-periodic coefficients (e.g. B(x) = B0/x^3 on [5, 80]) produce
         O(1) energy non-conservation that is independent of grid resolution
         and solver tolerances.
 
@@ -362,6 +366,11 @@ class CoefficientEvaluator:
         ----------
         periodic : tuple[bool, ...]
             Per-axis periodicity flags.
+
+        Raises
+        ------
+        ValueError
+            If a coefficient has >50% discontinuity at a periodic boundary.
         """
         if not any(periodic):
             return  # no periodic axes → no check needed
@@ -386,7 +395,7 @@ class CoefficientEvaluator:
                 # coefficient peak.  When the coefficient effectively vanishes
                 # at the boundary (e.g. Gaussian B-field on a large periodic
                 # domain), any "jump" is between two near-zero values and the
-                # IBP energy leak ∝ |jump| × amplitude² is negligible.
+                # IBP energy leak proportional to |jump| * amplitude^2 is negligible.
                 # Threshold 1e-4: boundary magnitude < 0.01% of peak.
                 boundary_magnitude = max(
                     float(np.abs(first).max()),
@@ -395,7 +404,7 @@ class CoefficientEvaluator:
                 if boundary_magnitude < 1e-4 * scale:
                     continue
 
-                if rel_jump > 0.01:  # >1% discontinuity
+                if rel_jump > _JUMP_WARN_THRESHOLD:
                     term = self._spec.equations[eq_idx].rhs_terms[term_idx]
                     field = self._spec.equations[eq_idx].field_name
                     axis_name = (
@@ -415,6 +424,6 @@ class CoefficientEvaluator:
                         f"Use a larger domain, non-periodic BCs, or a "
                         f"localized coefficient profile."
                     )
-                    if rel_jump > 0.50:  # >50%: hard error
+                    if rel_jump > _JUMP_ERROR_THRESHOLD:
                         raise ValueError(msg)
                     warnings.warn(msg, UserWarning, stacklevel=2)

@@ -592,7 +592,7 @@ def _compute_contra_components(
     return contra
 
 
-def _wls_vector_background_substitution(
+def _wls_vector_background_substitution(  # noqa: PLR0914
     ctx: _WlsContext,
     comp_var: str,
 ) -> list[str]:
@@ -647,8 +647,8 @@ def _wls_vector_background_substitution(
                 )
         else:
             # Tensor rank 2+: iterate over all index tuples.
-            # For curved diagonal metrics, the fully-contravariant value T^{μν}
-            # needs two metric factors: T^{μν} = (T_{μν}) / (g_{μμ} * g_{νν}).
+            # For curved diagonal metrics, the fully-contravariant value T^{uv}
+            # needs two metric factors: T^{uv} = (T_{uv}) / (g_{uu} * g_{vv}).
             # This generalises the vector fix above.
             rank = field.get("rank", 2)
             for flat_idx, val in enumerate(comps):
@@ -919,7 +919,7 @@ def _wls_matter_perturbation_setup(  # noqa: PLR0914
     return info, lines
 
 
-def _wls_multi_field_eom(
+def _wls_multi_field_eom(  # noqa: PLR0914
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
@@ -970,9 +970,9 @@ def _wls_multi_field_eom(
     tt_fields = {entry["field"] for entry in ctx.gauge if entry["type"] == "tt"}
 
     # Build BackgroundFieldRules for non-scalar background fields.
-    # Format: {fieldHead, {covariantComps}, {contravariantComps}}
-    # EvaluatePDBackgroundField handles both covariant {mu,-chart} and
-    # contravariant {mu,+chart} derivative forms using the respective component lists.
+    # Each rule is a triple: field head, covariant components list, contravariant
+    # components list.  EvaluatePDBackgroundField handles both covariant and
+    # contravariant derivative forms using the respective component lists.
     bg_rules_entries: list[str] = []
     for bf in ctx.background_fields:
         if bf["type"] != "scalar" and bf.get("components"):
@@ -1114,6 +1114,8 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     ------
     ValueError
         If ``ctx.linearization`` is ``None``.
+    RuntimeError
+        If linearization produces an unexpected number of equations.
     """
     if ctx.linearization is None:
         msg = "_wls_linearize_from_lagrangian called without linearization config"
@@ -1738,9 +1740,9 @@ def _tt_traceless_substitution(
         f"{w} * Derivative[d][{comp_pfx}{idx}][args]"
         for w, idx in zip(weights, other_diag_indices, strict=False)
     )
-    # Constraint equation: g_{last} * Σ g^{ii} h_{ii} = 0
-    # Written with h_{last} on both sides so self-coeff = 1 for Python detector:
-    # h_last_EOM = w_0*h_0 + w_1*h_1 + ... + h_last
+    # Constraint equation: g_{last} * Sum g^{ii} h_{ii} = 0
+    # Written with h_{last} on both sides so self-coeff = 1 for Python detector.
+    # The EOM for h_last is a weighted sum of the other diagonal components plus h_last.
     trace_terms = (
         " + ".join(
             f"{w} * {comp_pfx}{idx}[{coord_args}]"
@@ -2720,7 +2722,7 @@ def _wls_constraint_elimination() -> list[str]:
         "      ];",
         "",
         "      (* Euler-Lagrange operator for component-level Lagrangian.    *)",
-        "      (* For field f(coords): δL/δf = Σ_α (-1)^|α| D^α(∂L/∂D^α f)*)",
+        "      (* For field f(coords): dL/df = Sum_a (-1)^|a| D^a(dL/d(D^a f))*)",
         "      (* We enumerate all derivative multi-indices present in       *)",
         "      (* lagComp for each field, then sum the E-L contributions.    *)",
         "      newFieldEqs = Table[",
@@ -2740,7 +2742,7 @@ def _wls_constraint_elimination() -> list[str]:
         "          derivOrders = Select[derivOrders,",
         "            Length[#] == Length[coordSyms] &];",
         "",
-        "          (* Compute E-L variation: Σ (-1)^|α| D^α[∂L/∂(D^α f)] *)",
+        "          (* Compute E-L variation: Sum_a (-1)^|a| D^a[dL/d(D^a f)] *)",
         "          eom = Sum[",
         "            Module[{alpha, fDeriv, partialL, sign, diffSpec},",
         "              alpha = derivOrders[[m]];",
@@ -2781,7 +2783,7 @@ def _wls_constraint_elimination() -> list[str]:
     ]
 
 
-def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:
+def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: PLR0914
     """Generate WLS code for canonical Phase A: decompose Lagrangian + constraint elimination.
 
     Decomposes the abstract Lagrangian into component form (``lagComp``),
@@ -3010,7 +3012,7 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:
     return lines
 
 
-def _wls_canonical_phase_b(ctx: _WlsContext, all_heads_str: str) -> list[str]:
+def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
     """Generate WLS code for canonical Phase B: IBP + Legendre transform + Hamiltonian.
 
     Integrates by parts on the time variable to remove second-time-derivative
@@ -3029,10 +3031,10 @@ def _wls_canonical_phase_b(ctx: _WlsContext, all_heads_str: str) -> list[str]:
     # --- Integration by parts on time variable ---
     # The Ricci scalar R contains second derivatives of the metric (∂²g),
     # so the linearized Lagrangian L^(2) has terms like h·∂²_t h.  The
-    # standard Legendre transform H = π·v − L requires L to depend only on
+    # standard Legendre transform H = pi*v - L requires L to depend only on
     # (q, ∂_t q), not on accelerations.  We integrate by parts on the time
     # variable to convert all second-time-derivative terms to first-order
-    # form: f·∂²_t g → −(∂_t f)·(∂_t g).  This is the component-level
+    # form: f*d^2_t g -> -(d_t f)*(d_t g).  This is the component-level
     # analogue of the Gibbons-Hawking-York boundary term in GR.
     #
     # Ref: Gibbons & Hawking (1977, Phys. Rev. D 15, 2752)
@@ -3158,7 +3160,7 @@ def _wls_canonical_phase_b(ctx: _WlsContext, all_heads_str: str) -> list[str]:
             'Print["H (components): ", Short[canonicalH, 5]];',
             "",
             "(* --- Spatial IBP on the Hamiltonian --- *)",
-            "(* Convert f · ∂²_x g → −(∂_x f)·(∂_x g) for ALL spatial axes.        *)",
+            "(* Convert f * d^2_x g -> -(d_x f)*(d_x g) for ALL spatial axes.      *)",
             "(* The Hamiltonian from the Legendre transform can contain f·∇² g       *)",
             "(* terms alongside |∇f|² terms.  These must CANCEL via IBP to give      *)",
             "(* the correct coefficient on |∇f|².  Evaluating f·∇²g numerically      *)",
@@ -3437,7 +3439,10 @@ def _wls_canonical_injection(ctx: _WlsContext) -> list[str]:
 # --- WLS: Metadata & JSON export ---
 
 
-def _wls_metadata_and_export(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
+def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
+    config: dict[str, Any],
+    ctx: _WlsContext,
+) -> list[str]:
     """Generate metadata and JSON export lines.
 
     Raises
@@ -3801,7 +3806,7 @@ def _run_wolframscript(script_path: Path) -> int:
     return result.returncode
 
 
-def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901, PLR0915
+def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901, PLR0912, PLR0915
     """Run derivation from a TOML config file.
 
     Parameters
@@ -3849,7 +3854,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
                     "Use --force-derive to re-run."
                 )
                 return 0
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             pass  # Corrupted JSON or missing fields — re-derive
 
     if args.save_script:
@@ -3893,7 +3898,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
                     file=sys.stderr,
                 )
                 ret = 0
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             pass  # JSON missing or corrupt — honour the non-zero exit code
 
     # NOTE: Plane-wave reduction (coordinate remapping, operator renaming,
@@ -3924,7 +3929,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
             resolved.write_text(
                 _json_mod.dumps(spec_data, indent="\t"), encoding="utf-8"
             )
-        except Exception:  # noqa: BLE001
+        except Exception:  # noqa: BLE001, S110
             pass  # Non-critical — derivation succeeded, hash injection is optional
 
     return ret

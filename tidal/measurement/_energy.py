@@ -138,7 +138,9 @@ def _make_grid_info(
     """
     from tidal.solver.grid import GridInfo  # noqa: PLC0415
 
-    bounds = tuple((0.0, float(n) * dx) for n, dx in zip(shape, grid_spacing, strict=True))
+    bounds = tuple(
+        (0.0, float(n) * dx) for n, dx in zip(shape, grid_spacing, strict=True)
+    )
     bc: tuple[str, ...] | None = bc_types
     return GridInfo(
         bounds=bounds,
@@ -846,7 +848,7 @@ def _gradient_product_density(  # noqa: PLR0913, PLR0917
         return -(field_a * operated)
 
     # Spectral or non-periodic: direct gradient product.
-    # For spectral operators, direct gradient×gradient is more accurate
+    # For spectral operators, direct gradient*gradient is more accurate
     # than IBP (laplacian) because rfft Nyquist-mode handling introduces
     # O(1/N) discrepancy between mean(|∂f|²) and -mean(f·∂²f).
     grad_a = _apply_spatial_operator(
@@ -1030,7 +1032,11 @@ def _compute_hamiltonian_from_canonical(
     grid = ctx.grid_info
     for term_idx, term in enumerate(canonical.hamiltonian_terms):
         contrib = _evaluate_single_hamiltonian_term(
-            term, ctx.term_coeffs[term_idx], volume_weight, data, t_idx,
+            term,
+            ctx.term_coeffs[term_idx],
+            volume_weight,
+            data,
+            t_idx,
             grid=grid,
         )
         total += contrib
@@ -1084,9 +1090,7 @@ def _evaluate_single_hamiltonian_term(  # noqa: PLR0913, PLR0917
         vel_a = data.velocities.get(fname_a)
         vel_b = data.velocities.get(fname_b)
         if vel_a is not None and vel_b is not None:
-            return float(
-                (coeff * vel_a[t_idx] * vel_b[t_idx] * volume_weight).mean()
-            )
+            return float((coeff * vel_a[t_idx] * vel_b[t_idx] * volume_weight).mean())
         return 0.0
 
     # All other terms: identity, mixed operator x identity, etc.
@@ -1159,7 +1163,11 @@ def _compute_hamiltonian_per_field(
 
     for term_idx, term in enumerate(canonical.hamiltonian_terms):
         contrib = _evaluate_single_hamiltonian_term(
-            term, ctx.term_coeffs[term_idx], volume_weight, data, t_idx,
+            term,
+            ctx.term_coeffs[term_idx],
+            volume_weight,
+            data,
+            t_idx,
             grid=grid,
         )
         if term.is_self_energy:
@@ -1200,10 +1208,7 @@ def compute_system_energy(
         msg = f"t_idx={t_idx} out of range [0, {data.n_snapshots})"
         raise ValueError(msg)
 
-    if (
-        data.spec.canonical is None
-        or not data.spec.canonical.hamiltonian_terms
-    ):
+    if data.spec.canonical is None or not data.spec.canonical.hamiltonian_terms:
         msg = (
             "No hamiltonian_terms in JSON spec. Re-derive the theory to "
             "populate the canonical Hamiltonian (required for correct energy "

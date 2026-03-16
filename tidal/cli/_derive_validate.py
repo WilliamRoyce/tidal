@@ -665,6 +665,8 @@ def _validate_reduction(config: dict[str, Any]) -> None:
     ------
     ValueError
         If reduction config is invalid (bad type, axis, or dimension).
+    TypeError
+        If ``coordinate_values`` is not a dict.
     """
     reduction = config.get("reduction")
     if reduction is None:
@@ -708,8 +710,8 @@ def _validate_reduction(config: dict[str, Any]) -> None:
     # Optional coordinate_values: map of killed-axis names → Wolfram value strings
     coord_values = reduction.get("coordinate_values", {})
     if not isinstance(coord_values, dict):
-        msg = "[reduction] coordinate_values must be a table (dict), e.g. {y = \"Pi/2\"}"
-        raise ValueError(msg)
+        msg = "[reduction] coordinate_values must be a table (dict), e.g. {y = 'Pi/2'}"
+        raise TypeError(msg)
     killed = [c for c in (spatial or []) if c != prop_axis]
     for key in coord_values:
         if key not in killed:
