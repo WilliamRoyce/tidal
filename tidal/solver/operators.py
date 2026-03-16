@@ -416,11 +416,11 @@ def _resolve_axis_bc(bc_entry: str | AxisBCSpec) -> AxisBCSpec:  # pyright: igno
 # ---------------------------------------------------------------------------
 
 # Module-level constants for common slices
-_SLC_LO = slice(0, -2)   # ghost-cell frame: left neighbor
+_SLC_LO = slice(0, -2)  # ghost-cell frame: left neighbor
 _SLC_MID = slice(1, -1)  # ghost-cell frame: center
 _SLC_HI = slice(2, None)  # ghost-cell frame: right neighbor
-_SLC_GHOST_L = slice(0, 1)       # left ghost cell
-_SLC_INTERIOR = slice(1, -1)     # interior (for writing)
+_SLC_GHOST_L = slice(0, 1)  # left ghost cell
+_SLC_INTERIOR = slice(1, -1)  # interior (for writing)
 
 
 def _slice_tuple(ndim: int, axis: int, axis_slice: slice) -> tuple[slice, ...]:
@@ -456,7 +456,11 @@ def _cached_slice(ndim: int, axis: int, slc: slice) -> tuple[slice, ...]:
 
 
 def _cached_slice_2(
-    ndim: int, axis1: int, slc1: slice, axis2: int, slc2: slice,
+    ndim: int,
+    axis1: int,
+    slc1: slice,
+    axis2: int,
+    slc2: slice,
 ) -> tuple[slice, ...]:
     """Build a 2-axis slice tuple for cross_derivative corners."""
     s = [slice(None)] * ndim
@@ -470,7 +474,11 @@ _CORNER_CACHE: dict[tuple[int, int, int, int, int], tuple[slice, ...]] = {}
 
 
 def _cached_corner(
-    ndim: int, axis1: int, slc1: slice, axis2: int, slc2: slice,
+    ndim: int,
+    axis1: int,
+    slc1: slice,
+    axis2: int,
+    slc2: slice,
 ) -> tuple[slice, ...]:
     """Return cached corner slice for cross_derivative (2-axis)."""
     s1 = _SLC_ID.get(id(slc1), -1)
@@ -548,9 +556,7 @@ class _PadEntry:
             )
             # Non-periodic source from data boundary (innermost=index 0)
             self.src_lo_slcs.append(_slice_tuple(ndim, axis, slice(ng - 1 - k, ng - k)))
-            self.src_hi_slcs.append(
-                _slice_tuple(ndim, axis, slice(n + k, n + k + 1))
-            )
+            self.src_hi_slcs.append(_slice_tuple(ndim, axis, slice(n + k, n + k + 1)))
             # Periodic source from data: left ghost copies from right end
             self.periodic_left_src.append(
                 _slice_tuple(ndim, axis, slice(n - ng + k, n - ng + k + 1))
@@ -573,9 +579,7 @@ class _PadEntry:
                 )
             else:
                 # Placeholders for k=0 (use data directly, not buffer)
-                self.recursive_left_src.append(
-                    _slice_tuple(ndim, axis, slice(0, 1))
-                )
+                self.recursive_left_src.append(_slice_tuple(ndim, axis, slice(0, 1)))
                 self.recursive_right_src.append(
                     _slice_tuple(ndim, axis, slice(n - 1, n))
                 )
@@ -598,7 +602,9 @@ class _PadBufferCache:
         """Invalidate all cached padding buffers."""
         self._cache.clear()
 
-    def get(self, data_shape: tuple[int, ...], axis: int, ng: int | None = None) -> _PadEntry:
+    def get(
+        self, data_shape: tuple[int, ...], axis: int, ng: int | None = None
+    ) -> _PadEntry:
         if ng is None:
             ng = _n_ghost
         key = (data_shape, axis, ng)
@@ -675,18 +681,26 @@ def _pad_axis(
             left_ghost_idx = ng - 1 - k  # innermost first
             left_ghost_slc = entry.left_slcs[left_ghost_idx]
             if k == 0:
-                np.multiply(f_lo, data[entry.recursive_left_src[0]], out=buf[left_ghost_slc])
+                np.multiply(
+                    f_lo, data[entry.recursive_left_src[0]], out=buf[left_ghost_slc]
+                )
             else:
-                np.multiply(f_lo, buf[entry.recursive_left_src[k]], out=buf[left_ghost_slc])
+                np.multiply(
+                    f_lo, buf[entry.recursive_left_src[k]], out=buf[left_ghost_slc]
+                )
             if c_lo != 0.0:
                 buf[left_ghost_slc] += c_lo
 
             right_ghost_idx = ng - 1 - k
             right_ghost_slc = entry.right_slcs[right_ghost_idx]
             if k == 0:
-                np.multiply(f_hi, data[entry.recursive_right_src[0]], out=buf[right_ghost_slc])
+                np.multiply(
+                    f_hi, data[entry.recursive_right_src[0]], out=buf[right_ghost_slc]
+                )
             else:
-                np.multiply(f_hi, buf[entry.recursive_right_src[k]], out=buf[right_ghost_slc])
+                np.multiply(
+                    f_hi, buf[entry.recursive_right_src[k]], out=buf[right_ghost_slc]
+                )
             if c_hi != 0.0:
                 buf[right_ghost_slc] += c_hi
 
@@ -759,7 +773,11 @@ def gradient(
 
 
 def _gradient_o4(
-    padded: np.ndarray, axis: int, ndim: int, ng: int, inv_dx: float,
+    padded: np.ndarray,
+    axis: int,
+    ndim: int,
+    ng: int,
+    inv_dx: float,
 ) -> np.ndarray:
     """4th-order central gradient on a padded array (5-point stencil).
 
@@ -783,7 +801,11 @@ def _gradient_o4(
 
 
 def _gradient_o6(
-    padded: np.ndarray, axis: int, ndim: int, ng: int, inv_dx: float,
+    padded: np.ndarray,
+    axis: int,
+    ndim: int,
+    ng: int,
+    inv_dx: float,
 ) -> np.ndarray:
     """6th-order central gradient on a padded array (7-point stencil).
 
@@ -854,7 +876,11 @@ def _directional_laplacian_raw(
 
 
 def _laplacian_raw_o4(
-    padded: np.ndarray, axis: int, ndim: int, ng: int, inv_dx2: float,
+    padded: np.ndarray,
+    axis: int,
+    ndim: int,
+    ng: int,
+    inv_dx2: float,
 ) -> np.ndarray:
     """4th-order central Laplacian on a padded array (5-point stencil).
 
@@ -878,7 +904,11 @@ def _laplacian_raw_o4(
 
 
 def _laplacian_raw_o6(
-    padded: np.ndarray, axis: int, ndim: int, ng: int, inv_dx2: float,
+    padded: np.ndarray,
+    axis: int,
+    ndim: int,
+    ng: int,
+    inv_dx2: float,
 ) -> np.ndarray:
     """6th-order central Laplacian on a padded array (7-point stencil).
 
@@ -1034,7 +1064,7 @@ def _spectral_directional_laplacian(
 
     shape = [1] * data.ndim
     shape[axis] = len(k)
-    k2_shaped = (-(k ** 2)).reshape(shape)
+    k2_shaped = (-(k**2)).reshape(shape)
 
     f_hat = np.fft.rfft(data, axis=axis)
     f_hat *= k2_shaped

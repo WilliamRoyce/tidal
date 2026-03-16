@@ -115,7 +115,11 @@ _COUPLED_SPEC: dict[str, object] = {
 # Constraint spec (time_order=0) — modal should reject
 _CONSTRAINT_SPEC: dict[str, object] = {
     "metadata": {"source": "inline-test"},
-    "spacetime": {"dimension": 3, "signature": [-1, 1, 1], "coordinates": ["t", "x", "y"]},
+    "spacetime": {
+        "dimension": 3,
+        "signature": [-1, 1, 1],
+        "coordinates": ["t", "x", "y"],
+    },
     "fields": [
         {"name": "A_0", "index": 0, "is_dynamical": True},
         {"name": "A_1", "index": 1, "is_dynamical": True},
@@ -355,8 +359,12 @@ class TestModalCorrectness:
         omega = np.sqrt(k**2 + m2)
 
         result = solve_modal(
-            spec, grid, y0, t_span=(0, 2 * np.pi / omega),
-            parameters={"m2": m2}, num_snapshots=51,
+            spec,
+            grid,
+            y0,
+            t_span=(0, 2 * np.pi / omega),
+            parameters={"m2": m2},
+            num_snapshots=51,
         )
         assert result["success"]
 
@@ -374,11 +382,22 @@ class TestModalCorrectness:
         params = {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5}
 
         result_modal = solve_modal(
-            spec, grid, y0, t_span=(0, 3), parameters=params, num_snapshots=31,
+            spec,
+            grid,
+            y0,
+            t_span=(0, 3),
+            parameters=params,
+            num_snapshots=31,
         )
         result_cvode = solve_cvode(
-            spec, grid, y0, t_span=(0, 3), parameters=params,
-            num_snapshots=31, rtol=1e-10, atol=1e-12,
+            spec,
+            grid,
+            y0,
+            t_span=(0, 3),
+            parameters=params,
+            num_snapshots=31,
+            rtol=1e-10,
+            atol=1e-12,
         )
 
         assert result_modal["success"]
@@ -409,8 +428,12 @@ class TestModalCorrectness:
 
         t_end = 5.0
         result = solve_modal(
-            spec, grid, y0, t_span=(0, t_end),
-            parameters={"D": D}, num_snapshots=11,
+            spec,
+            grid,
+            y0,
+            t_span=(0, t_end),
+            parameters={"D": D},
+            num_snapshots=11,
         )
         assert result["success"]
 
@@ -439,8 +462,12 @@ class TestModalCorrectness:
 
         t_end = 1.0
         result = solve_modal(
-            spec, grid, y0, t_span=(0, t_end),
-            parameters={"m2": m2}, num_snapshots=2,
+            spec,
+            grid,
+            y0,
+            t_span=(0, t_end),
+            parameters={"m2": m2},
+            num_snapshots=2,
         )
 
         # Exact solution: phi(t) = cos(omega*t) * sin(x)
@@ -457,16 +484,31 @@ class TestModalCorrectness:
 
         # Full run
         result_full = solve_modal(
-            spec, grid, y0, t_span=(0, 10), parameters=params, num_snapshots=21,
+            spec,
+            grid,
+            y0,
+            t_span=(0, 10),
+            parameters=params,
+            num_snapshots=21,
         )
 
         # Split run
         result_a = solve_modal(
-            spec, grid, y0, t_span=(0, 5), parameters=params, num_snapshots=11,
+            spec,
+            grid,
+            y0,
+            t_span=(0, 5),
+            parameters=params,
+            num_snapshots=11,
         )
         y5 = result_a["y"][-1]
         result_b = solve_modal(
-            spec, grid, y5, t_span=(5, 10), parameters=params, num_snapshots=11,
+            spec,
+            grid,
+            y5,
+            t_span=(5, 10),
+            parameters=params,
+            num_snapshots=11,
         )
 
         diff = np.max(np.abs(result_full["y"][-1] - result_b["y"][-1]))
@@ -484,8 +526,13 @@ class TestModalCorrectness:
             callback_times.append(t)
 
         result = solve_modal(
-            spec, grid, y0, t_span=(0, 1), parameters={"m2": 1.0},
-            num_snapshots=11, snapshot_callback=cb,
+            spec,
+            grid,
+            y0,
+            t_span=(0, 1),
+            parameters={"m2": 1.0},
+            num_snapshots=11,
+            snapshot_callback=cb,
         )
         assert result["success"]
         assert len(callback_times) == 11
@@ -501,7 +548,11 @@ class TestModalCorrectness:
 
         n_snap = 21
         result = solve_modal(
-            spec, grid, y0, t_span=(0, 1), parameters={"m2": 1.0},
+            spec,
+            grid,
+            y0,
+            t_span=(0, 1),
+            parameters={"m2": 1.0},
             num_snapshots=n_snap,
         )
         assert result["y"].shape == (n_snap, layout.num_slots * N)
@@ -569,8 +620,12 @@ class TestModalCorrectness:
 
         t_period = 2 * np.pi / omega
         result = solve_modal(
-            spec, grid, y0, t_span=(0, t_period),
-            parameters={"m2": m2}, num_snapshots=2,
+            spec,
+            grid,
+            y0,
+            t_span=(0, t_period),
+            parameters={"m2": m2},
+            num_snapshots=2,
         )
         assert result["success"]
 
@@ -611,8 +666,12 @@ class TestModalCorrectness:
 
         t_end = 2.0
         result = solve_modal(
-            spec, grid, y0, t_span=(0, t_end),
-            parameters={"D": D}, num_snapshots=2,
+            spec,
+            grid,
+            y0,
+            t_span=(0, t_end),
+            parameters={"D": D},
+            num_snapshots=2,
         )
         assert result["success"]
 
@@ -628,7 +687,11 @@ class TestModalCorrectness:
         y0 = np.zeros(layout.num_slots * grid.num_points)
 
         result = solve_modal(
-            spec, grid, y0, t_span=(0, 5), parameters={"m2": 1.0},
+            spec,
+            grid,
+            y0,
+            t_span=(0, 5),
+            parameters={"m2": 1.0},
             num_snapshots=11,
         )
         assert result["success"]
@@ -838,8 +901,7 @@ class TestModalBlockIsolation:
         for slot in [phi_1_slot, chi_1_slot, v_phi_1_slot, v_chi_1_slot]:
             max_val = np.max(np.abs(final[slot * n : (slot + 1) * n]))
             assert max_val < 1e-13, (
-                f"Zero-IC slot {slot} grew to {max_val:.2e} — "
-                f"block isolation failed"
+                f"Zero-IC slot {slot} grew to {max_val:.2e} — block isolation failed"
             )
 
     def test_nonzero_pair_evolves_correctly(self) -> None:
@@ -853,7 +915,10 @@ class TestModalBlockIsolation:
         y0[: grid.num_points] = 0.1 * np.exp(-((x - 5.0) ** 2) / (2 * 1.5**2))
 
         result = solve_modal(
-            spec, grid, y0, (0.0, 10.0),
+            spec,
+            grid,
+            y0,
+            (0.0, 10.0),
             parameters={"B0": 0.3, "kappa2": 1.0},
             num_snapshots=11,
         )
@@ -886,17 +951,16 @@ class TestModalBlockIsolation:
         with warnings.catch_warnings(record=True) as w:
             warnings.simplefilter("always")
             solve_modal(
-                spec, grid, y0, (0.0, 500.0),
+                spec,
+                grid,
+                y0,
+                (0.0, 500.0),
                 parameters={"B0": 0.3, "kappa2": 1.0},
                 num_snapshots=6,
             )
 
-        modal_warnings = [
-            x for x in w if "positive real parts" in str(x.message)
-        ]
-        assert len(modal_warnings) > 0, (
-            "No eigenvalue growth warning issued for t=500"
-        )
+        modal_warnings = [x for x in w if "positive real parts" in str(x.message)]
+        assert len(modal_warnings) > 0, "No eigenvalue growth warning issued for t=500"
 
     def test_find_independent_blocks_utility(self) -> None:
         """Verify _find_independent_blocks correctly detects block structure."""
@@ -999,12 +1063,15 @@ class TestConstraintElimination:
         x = np.linspace(0.0, 10.0, 64, endpoint=False)
         # IC on A₁ field (slot 1)
         a1_slot = layout.field_slot_map["A_1"]
-        y0[a1_slot * grid.num_points : (a1_slot + 1) * grid.num_points] = (
-            0.1 * np.exp(-((x - 5.0) ** 2) / (2 * 1.5**2))
+        y0[a1_slot * grid.num_points : (a1_slot + 1) * grid.num_points] = 0.1 * np.exp(
+            -((x - 5.0) ** 2) / (2 * 1.5**2)
         )
 
         result = solve_modal(
-            spec, grid, y0, (0.0, 5.0),
+            spec,
+            grid,
+            y0,
+            (0.0, 5.0),
             parameters={"m2": 1.0},
             num_snapshots=11,
         )
@@ -1022,12 +1089,15 @@ class TestConstraintElimination:
         y0 = np.zeros(layout.num_slots * grid.num_points)
         x = np.linspace(0.0, 10.0, 64, endpoint=False)
         a1_slot = layout.field_slot_map["A_1"]
-        y0[a1_slot * grid.num_points : (a1_slot + 1) * grid.num_points] = (
-            0.1 * np.exp(-((x - 5.0) ** 2) / (2 * 1.5**2))
+        y0[a1_slot * grid.num_points : (a1_slot + 1) * grid.num_points] = 0.1 * np.exp(
+            -((x - 5.0) ** 2) / (2 * 1.5**2)
         )
 
         result = solve_modal(
-            spec, grid, y0, (0.0, 2.0),
+            spec,
+            grid,
+            y0,
+            (0.0, 2.0),
             parameters={"m2": 1.0},
             num_snapshots=11,
         )
@@ -1044,12 +1114,12 @@ class TestConstraintElimination:
 
     def test_eigenvalues_purely_imaginary(self) -> None:
         """Reduced system eigenvalues are purely imaginary (Hamiltonian)."""
+        from tidal.solver.coefficients import CoefficientEvaluator
         from tidal.solver.modal import (
             _build_constraint_eliminated_matrices,
             _build_k_axes,
             _build_k_grid,
         )
-        from tidal.solver.coefficients import CoefficientEvaluator
 
         spec = _make_spec(_PROCA_1D_CONSTRAINT_SPEC)
         grid = GridInfo(shape=(32,), bounds=((0.0, 10.0),), periodic=(True,))
@@ -1060,8 +1130,12 @@ class TestConstraintElimination:
         rfft_shape = (17,)
 
         A_red, _, _, _ = _build_constraint_eliminated_matrices(
-            spec, StateLayout.from_spec(spec, grid.num_points),
-            grid, coeff_eval, k_grid, rfft_shape,
+            spec,
+            StateLayout.from_spec(spec, grid.num_points),
+            grid,
+            coeff_eval,
+            k_grid,
+            rfft_shape,
         )
 
         # All eigenvalues should be purely imaginary for a Hamiltonian system

@@ -22,7 +22,7 @@ from tidal.measurement._velocity import (
     compute_velocities,
     compute_velocity_mismatch,
 )
-from tidal.symbolic.json_loader import EquationSystem, load_equation_system
+from tidal.symbolic.json_loader import EquationSystem
 
 DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
 
@@ -34,7 +34,7 @@ DATA_DIR = Path(__file__).parent.parent / "examples" / "data"
 
 def _build_coupled_scalars_spec() -> EquationSystem:
     """Build coupled scalar spec using the conftest inline spec (identity coupling)."""
-    from tests.conftest import _COUPLED_SCALARS_SPEC  # noqa: PLC0415
+    from tests.conftest import _COUPLED_SCALARS_SPEC
 
     return EquationSystem.from_dict(_COUPLED_SCALARS_SPEC)  # type: ignore[arg-type]
 

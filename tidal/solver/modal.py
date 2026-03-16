@@ -295,8 +295,8 @@ def _build_constraint_eliminated_matrices(
 ) -> tuple[
     NDArray[np.complex128],  # A_reduced (n_modes, n_dyn, n_dyn)
     NDArray[np.complex128],  # recovery (n_modes, n_constraints, n_dyn)
-    list[str],               # constraint_field_names
-    dict[int, int],          # orig_to_reduced slot mapping
+    list[str],  # constraint_field_names
+    dict[int, int],  # orig_to_reduced slot mapping
 ]:
     """Build reduced per-mode matrices with constraints algebraically eliminated.
 
@@ -403,7 +403,10 @@ def _build_constraint_eliminated_matrices(
             ci = c_idx_map[eq.field_name]
             for term_idx, term in enumerate(eq.rhs_terms):
                 coeff = _resolve_constant_coeff(
-                    term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
+                    term,
+                    coeff_eval,
+                    eq_idx=eq_idx,
+                    term_idx=term_idx,
                 )
                 mult = multiplier_cache[term.operator]
 
@@ -426,7 +429,10 @@ def _build_constraint_eliminated_matrices(
             # RHS terms: dv/dt = Σ coeff·op(target)
             for term_idx, term in enumerate(eq.rhs_terms):
                 coeff = _resolve_constant_coeff(
-                    term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
+                    term,
+                    coeff_eval,
+                    eq_idx=eq_idx,
+                    term_idx=term_idx,
                 )
                 mult = multiplier_cache[term.operator]
 
@@ -448,7 +454,10 @@ def _build_constraint_eliminated_matrices(
             this_slot = orig_to_reduced[layout.field_slot_map[eq.field_name]]
             for term_idx, term in enumerate(eq.rhs_terms):
                 coeff = _resolve_constant_coeff(
-                    term, coeff_eval, eq_idx=eq_idx, term_idx=term_idx,
+                    term,
+                    coeff_eval,
+                    eq_idx=eq_idx,
+                    term_idx=term_idx,
                 )
                 mult = multiplier_cache[term.operator]
 
@@ -497,7 +506,8 @@ def _build_constraint_eliminated_matrices(
     if has_vel_coupling:
         # Implicit solve: (I - vel_coupling) · d' = A_rhs · d
         eye = np.broadcast_to(
-            np.eye(n_dyn, dtype=np.complex128), (n_modes, n_dyn, n_dyn),
+            np.eye(n_dyn, dtype=np.complex128),
+            (n_modes, n_dyn, n_dyn),
         ).copy()
         lhs = eye - vel_coupling
         # A_reduced = lhs⁻¹ · A_rhs (per mode)
@@ -566,7 +576,10 @@ def _build_per_mode_matrices(
             for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = layout.field_slot_map[term.field]
                 coeff = _resolve_constant_coeff(
-                    term, coeff_eval, eq_idx=_eq_idx, term_idx=_term_idx,
+                    term,
+                    coeff_eval,
+                    eq_idx=_eq_idx,
+                    term_idx=_term_idx,
                 )
                 mult = multiplier_cache[term.operator]
                 A[:, vel_slot, target_slot] += coeff * mult
@@ -577,7 +590,10 @@ def _build_per_mode_matrices(
             for _term_idx, term in enumerate(eq.rhs_terms):
                 target_slot = layout.field_slot_map[term.field]
                 coeff = _resolve_constant_coeff(
-                    term, coeff_eval, eq_idx=_eq_idx, term_idx=_term_idx,
+                    term,
+                    coeff_eval,
+                    eq_idx=_eq_idx,
+                    term_idx=_term_idx,
                 )
                 mult = multiplier_cache[term.operator]
                 A[:, this_slot, target_slot] += coeff * mult
@@ -664,7 +680,10 @@ def _build_convolution_matrix(
                 if not term.position_dependent:
                     # Constant coefficient: diagonal in mode space
                     coeff = _resolve_constant_coeff(
-                        term, coeff_eval, eq_idx=_eq_idx, term_idx=_term_idx,
+                        term,
+                        coeff_eval,
+                        eq_idx=_eq_idx,
+                        term_idx=_term_idx,
                     )
                     for m in range(n_modes):
                         row = vel_slot * n_modes + m
@@ -694,7 +713,10 @@ def _build_convolution_matrix(
 
                 if not term.position_dependent:
                     coeff = _resolve_constant_coeff(
-                        term, coeff_eval, eq_idx=_eq_idx, term_idx=_term_idx,
+                        term,
+                        coeff_eval,
+                        eq_idx=_eq_idx,
+                        term_idx=_term_idx,
                     )
                     for m in range(n_modes):
                         row = this_slot * n_modes + m
@@ -765,7 +787,8 @@ def _add_convolution_coupling(
 
         # Reconstruct to physical space, multiply by coefficient, FFT back
         probe_physical = np.fft.irfftn(
-            probe_hat.reshape(rfft_shape), s=grid.shape,
+            probe_hat.reshape(rfft_shape),
+            s=grid.shape,
             axes=list(range(len(grid.shape))),
         )
         product = coeff_array * probe_physical
@@ -1032,7 +1055,11 @@ def _evolve_full_matrix(
     if n_snapshots > 1 and t_end > t0:
         # Use expm_multiply's built-in multi-point evaluation
         y_all = expm_multiply(
-            A_full, y0_flat, start=t0, stop=t_end, num=n_snapshots,
+            A_full,
+            y0_flat,
+            start=t0,
+            stop=t_end,
+            num=n_snapshots,
         )
         # y_all has shape (n_snapshots, n_total)
         for ti in range(n_snapshots):
@@ -1052,7 +1079,9 @@ def _evolve_full_matrix(
             if t == t0:
                 y_evolved = y0_flat.copy()
             else:
-                y_evolved = expm_multiply(A_full, y0_flat, start=t0, stop=float(t), num=2)[-1]
+                y_evolved = expm_multiply(
+                    A_full, y0_flat, start=t0, stop=float(t), num=2
+                )[-1]
             y_hat_t = y_evolved.reshape(n_slots, n_modes)
             y_physical = _ifft_slots(y_hat_t, layout, grid)
             snapshots[ti] = y_physical
@@ -1126,9 +1155,7 @@ def solve_modal(
     coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
 
     # Detect constraint fields
-    has_constraints = any(
-        eq.time_derivative_order == 0 for eq in spec.equations
-    )
+    has_constraints = any(eq.time_derivative_order == 0 for eq in spec.equations)
     if not has_constraints:
         warn_frozen_constraints(layout, "modal")
 
@@ -1156,7 +1183,7 @@ def solve_modal(
     # This is standard practice in spectral methods — the Nyquist mode
     # aliases with its conjugate and cannot represent physical content.
     # Ref: Boyd (2001), Chebyshev & Fourier Spectral Methods, §11.5.
-    for dim_idx, n in enumerate(grid.shape):
+    for _dim_idx, n in enumerate(grid.shape):
         if n % 2 == 0:  # Nyquist mode exists only for even N
             nyq_mode = n // 2  # last rfft bin
             if len(grid.shape) == 1:
@@ -1172,9 +1199,17 @@ def solve_modal(
         # Constraint elimination via Fourier Schur complement
         # Ref: Hairer & Wanner (1996), Solving ODEs II, Ch. VII
         (
-            A_reduced, recovery_matrix, c_names, orig_to_reduced,
+            A_reduced,
+            recovery_matrix,
+            c_names,
+            orig_to_reduced,
         ) = _build_constraint_eliminated_matrices(
-            spec, layout, grid, coeff_eval, k_grid, rfft_shape,
+            spec,
+            layout,
+            grid,
+            coeff_eval,
+            k_grid,
+            rfft_shape,
         )
 
         n_dyn = A_reduced.shape[1]
@@ -1207,8 +1242,13 @@ def solve_modal(
 
         # Evolve dynamical fields
         times, dyn_snapshots = _evolve_per_mode(
-            A_reduced, y0_hat_dyn, t_eval, dyn_layout, grid,
-            None, progress,  # callback handled below with full state
+            A_reduced,
+            y0_hat_dyn,
+            t_eval,
+            dyn_layout,
+            grid,
+            None,
+            progress,  # callback handled below with full state
         )
 
         # Reconstruct full state (including constraints) at each snapshot
@@ -1232,9 +1272,9 @@ def solve_modal(
             # Assemble full physical state
             full_state = np.zeros(n_full)
             for orig_si, red_pos in orig_to_reduced.items():
-                full_state[orig_si * n_pts : (orig_si + 1) * n_pts] = (
-                    dyn_phys[red_pos * n_pts : (red_pos + 1) * n_pts]
-                )
+                full_state[orig_si * n_pts : (orig_si + 1) * n_pts] = dyn_phys[
+                    red_pos * n_pts : (red_pos + 1) * n_pts
+                ]
             for ci, c_name in enumerate(c_names):
                 c_slot = layout.field_slot_map[c_name]
                 c_phys = np.fft.irfftn(
@@ -1296,9 +1336,7 @@ def solve_modal(
             progress,
         )
         n_total = A_full.shape[0]
-        method_desc = (
-            f"expm_multiply ({n_total}×{n_total}, position-dependent)"
-        )
+        method_desc = f"expm_multiply ({n_total}×{n_total}, position-dependent)"
 
     if progress is not None:
         progress.finish()

@@ -249,18 +249,20 @@ def _make_position_dependent_sim_data(
     # Build canonical Hamiltonian terms for energy measurement
     h_terms: list[HamiltonianTerm] = []
     for fname in ("phi_0", "chi_0"):
-        h_terms.extend([
-            HamiltonianTerm(
-                coefficient=0.5,
-                factor_a=HamiltonianFactor(field=fname, operator="time_derivative"),
-                factor_b=HamiltonianFactor(field=fname, operator="time_derivative"),
-            ),
-            HamiltonianTerm(
-                coefficient=-0.5,
-                factor_a=HamiltonianFactor(field=fname, operator="identity"),
-                factor_b=HamiltonianFactor(field=fname, operator="laplacian"),
-            ),
-        ])
+        h_terms.extend(
+            [
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field=fname, operator="time_derivative"),
+                    factor_b=HamiltonianFactor(field=fname, operator="time_derivative"),
+                ),
+                HamiltonianTerm(
+                    coefficient=-0.5,
+                    factor_a=HamiltonianFactor(field=fname, operator="identity"),
+                    factor_b=HamiltonianFactor(field=fname, operator="laplacian"),
+                ),
+            ]
+        )
     # Mass terms — position-dependent for phi if requested
     if position_dependent_mass:
         h_terms.append(
@@ -481,12 +483,8 @@ class TestProcaScalarBackground:
             hamiltonian_terms=(
                 HamiltonianTerm(
                     coefficient=0.5,
-                    factor_a=HamiltonianFactor(
-                        field="B_1", operator="time_derivative"
-                    ),
-                    factor_b=HamiltonianFactor(
-                        field="B_1", operator="time_derivative"
-                    ),
+                    factor_a=HamiltonianFactor(field="B_1", operator="time_derivative"),
+                    factor_b=HamiltonianFactor(field="B_1", operator="time_derivative"),
                 ),
                 HamiltonianTerm(
                     coefficient=-0.5,
@@ -555,12 +553,8 @@ class TestProcaScalarBackground:
             hamiltonian_terms=(
                 HamiltonianTerm(
                     coefficient=0.5,
-                    factor_a=HamiltonianFactor(
-                        field="B_1", operator="time_derivative"
-                    ),
-                    factor_b=HamiltonianFactor(
-                        field="B_1", operator="time_derivative"
-                    ),
+                    factor_a=HamiltonianFactor(field="B_1", operator="time_derivative"),
+                    factor_b=HamiltonianFactor(field="B_1", operator="time_derivative"),
                 ),
                 HamiltonianTerm(
                     coefficient=-0.5,

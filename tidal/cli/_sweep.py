@@ -508,6 +508,7 @@ def _simulate_run(  # noqa: PLR0913
     )
     if spec is None:
         from tidal.symbolic import load_equation_system
+
         spec = load_equation_system(spec_path)
     params = _parse_params(sim_args.param, spec)
 
@@ -551,6 +552,7 @@ def _measure_run(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915, PLR0917
 
     if spec is None:
         from tidal.symbolic import load_equation_system
+
         spec = load_equation_system(spec_path)
     data = SimulationData.load(run_dir, spec)
     metrics: dict[str, Any] = {}
@@ -756,7 +758,12 @@ def _run_single(  # noqa: PLR0913, PLR0917
 
     # 2. Measure (reuse spec from simulate — avoids redundant JSON parse)
     metrics = _measure_run(
-        output_dir, spec_path, measurements, source, target, threshold,
+        output_dir,
+        spec_path,
+        measurements,
+        source,
+        target,
+        threshold,
         spec=spec,
     )
     metrics["wall_time_s"] = round(wall_time, 2)

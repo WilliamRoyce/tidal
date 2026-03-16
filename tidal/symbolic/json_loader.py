@@ -208,8 +208,7 @@ class OperatorTerm:
         if self.coefficient_symbolic is not None:
             # findall returns strings like "x[]", "t[]"; exclude time coord
             return any(
-                m[0] != "t"
-                for m in _COORD_CALL_RE.findall(self.coefficient_symbolic)
+                m[0] != "t" for m in _COORD_CALL_RE.findall(self.coefficient_symbolic)
             )
         return False
 

@@ -355,8 +355,15 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
         # position, so F(q_{n+1}) from step n is reused at the start of step
         # n+1.  This halves force evaluations (2N → N+1).
         compute_force(
-            spec, layout, grid, bc, y, t, rhs_eval,
-            out=force_buf, fieldset=fieldset_buf,
+            spec,
+            layout,
+            grid,
+            bc,
+            y,
+            t,
+            rhs_eval,
+            out=force_buf,
+            fieldset=fieldset_buf,
         )
 
         for _step in range(n_steps):
@@ -369,8 +376,15 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
 
             # Force at new position F(q_{n+1}) — cached for next step
             compute_force(
-                spec, layout, grid, bc, y, t + dt, rhs_eval,
-                out=force_buf, fieldset=fieldset_buf,
+                spec,
+                layout,
+                grid,
+                bc,
+                y,
+                t + dt,
+                rhs_eval,
+                out=force_buf,
+                fieldset=fieldset_buf,
             )
 
             # Half-kick with F(q_{n+1})
@@ -409,15 +423,22 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
         #      Hairer, Lubich, Wanner (2006), §II.4 "Composition Methods".
 
         # Pre-compute kick weights * dt for the 3 drifts + 4 kicks per step
-        d1 = _W1 * dt      # drift 1 and 3
-        d2 = _W2 * dt      # drift 2 (negative: backward sub-step)
-        k_init = _YOSHIDA_KICK_INIT * dt      # initial/final half-kick
-        k_fused = _YOSHIDA_KICK_FUSED * dt    # merged kick between sub-steps
+        d1 = _W1 * dt  # drift 1 and 3
+        d2 = _W2 * dt  # drift 2 (negative: backward sub-step)
+        k_init = _YOSHIDA_KICK_INIT * dt  # initial/final half-kick
+        k_fused = _YOSHIDA_KICK_FUSED * dt  # merged kick between sub-steps
 
         # Initial force + opening half-kick (cached across integration)
         compute_force(
-            spec, layout, grid, bc, y, t, rhs_eval,
-            out=force_buf, fieldset=fieldset_buf,
+            spec,
+            layout,
+            grid,
+            bc,
+            y,
+            t,
+            rhs_eval,
+            out=force_buf,
+            fieldset=fieldset_buf,
         )
         _weighted_kick(y, force_buf, k_init, layout)
 
@@ -431,8 +452,15 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
             t_sub += d1
 
             compute_force(
-                spec, layout, grid, bc, y, t_sub, rhs_eval,
-                out=force_buf, fieldset=fieldset_buf,
+                spec,
+                layout,
+                grid,
+                bc,
+                y,
+                t_sub,
+                rhs_eval,
+                out=force_buf,
+                fieldset=fieldset_buf,
             )
             _weighted_kick(y, force_buf, k_fused, layout)
 
@@ -442,8 +470,15 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
             t_sub += d2
 
             compute_force(
-                spec, layout, grid, bc, y, t_sub, rhs_eval,
-                out=force_buf, fieldset=fieldset_buf,
+                spec,
+                layout,
+                grid,
+                bc,
+                y,
+                t_sub,
+                rhs_eval,
+                out=force_buf,
+                fieldset=fieldset_buf,
             )
             _weighted_kick(y, force_buf, k_fused, layout)
 
@@ -453,8 +488,15 @@ def solve_leapfrog(  # noqa: C901, PLR0912, PLR0913, PLR0914, PLR0915
             t_sub += d1
 
             compute_force(
-                spec, layout, grid, bc, y, t_sub, rhs_eval,
-                out=force_buf, fieldset=fieldset_buf,
+                spec,
+                layout,
+                grid,
+                bc,
+                y,
+                t_sub,
+                rhs_eval,
+                out=force_buf,
+                fieldset=fieldset_buf,
             )
 
             # Closing half-kick w₁/2 — state is now synchronized

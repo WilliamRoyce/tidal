@@ -1638,11 +1638,7 @@ def _has_time_dependent_coeffs(spec: EquationSystem) -> bool:
     and Yoshida's negative middle sub-step (w₂ < 0) can introduce
     artefacts when the system is non-autonomous.
     """
-    return any(
-        term.time_dependent
-        for eq in spec.equations
-        for term in eq.rhs_terms
-    )
+    return any(term.time_dependent for eq in spec.equations for term in eq.rhs_terms)
 
 
 def _resolve_scheme(  # noqa: C901
@@ -1807,9 +1803,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         # User explicitly requested --spectral: validate periodic BCs
         use_spectral = True
         if not all_periodic:
-            non_periodic = [
-                i for i, p in enumerate(grid_info.periodic) if not p
-            ]
+            non_periodic = [i for i, p in enumerate(grid_info.periodic) if not p]
             msg = (
                 f"--spectral requires all boundary conditions to be periodic. "
                 f"Non-periodic axes: {non_periodic}. "
@@ -1891,9 +1885,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
             # User explicitly requested --spectral, scheme auto-selected IDA
             # → switch to CVODE to honour spectral request
             scheme = "cvode"
-            log(
-                "  Note: --spectral incompatible with IDA; switching to CVODE"
-            )
+            log("  Note: --spectral incompatible with IDA; switching to CVODE")
         else:
             # User explicitly requested both IDA + spectral — error
             msg = (
@@ -2144,10 +2136,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 f"(t={t_start} → {args.t_end}, dt={dt:.4f})..."
             )
         else:
-            log(
-                f"Running leapfrog solver "
-                f"(t={t_start} → {args.t_end}, dt={dt:.4f})..."
-            )
+            log(f"Running leapfrog solver (t={t_start} → {args.t_end}, dt={dt:.4f})...")
         result = solve_leapfrog(
             spec,
             grid_info,

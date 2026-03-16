@@ -83,9 +83,7 @@ def _make_grid_results(
 
     # For grid data, swept_params stores the unique values per param
     # repeated to match rows (n_per_param^n_params total)
-    swept = {
-        name: [row[name] for row in rows] for name in param_names
-    }
+    swept = {name: [row[name] for row in rows] for name in param_names}
 
     return SweepResults(
         swept_params=swept,
@@ -402,7 +400,8 @@ class TestIsScatteredData:
         from tidal.cli._sweep_panels import _is_scattered_data
 
         results = _make_sweep_results(
-            n_params=2, n_runs=10,
+            n_params=2,
+            n_runs=10,
             metadata={"sampling_strategy": "latin_hypercube"},
         )
         assert _is_scattered_data(results) is True
@@ -459,7 +458,8 @@ class TestRenderSweep2D:
         from tidal.cli._sweep_panels import render_sweep_2d
 
         results = _make_sweep_results(
-            n_params=2, n_runs=30,
+            n_params=2,
+            n_runs=30,
             metadata={"sampling_strategy": "latin_hypercube"},
         )
         ax = self._make_ax()
@@ -544,7 +544,8 @@ class TestRenderSweepTornado:
         from tidal.cli._sweep_panels import render_sweep_tornado
 
         results = _make_sweep_results(
-            n_params=3, n_runs=30,
+            n_params=3,
+            n_runs=30,
             metadata={"sampling_strategy": "latin_hypercube"},
         )
         ax = self._make_ax()

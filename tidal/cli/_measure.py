@@ -880,8 +880,13 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
     target = _parse_field_list(getattr(args, "target", None))
 
     # Measurements that require --source (error if missing).
-    require_source = {"conversion", "spectral_conversion", "asymptotic",
-                      "peak_conversion", "resonance"}
+    require_source = {
+        "conversion",
+        "spectral_conversion",
+        "asymptotic",
+        "peak_conversion",
+        "resonance",
+    }
     needs_source = measurements & require_source
     if needs_source and source is None:
         names = ", ".join(sorted(needs_source))

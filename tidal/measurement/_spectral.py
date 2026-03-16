@@ -104,9 +104,7 @@ def _build_k_grid(
             np.asarray(g, dtype=np.float64)
             for g in np.meshgrid(*k_arrays, indexing="ij")
         ]
-        k_mag = np.sqrt(
-            np.asarray(sum(ki**2 for ki in k_grid), dtype=np.float64)
-        )
+        k_mag = np.sqrt(np.asarray(sum(ki**2 for ki in k_grid), dtype=np.float64))
     else:
         # Compute k_mag via broadcasting (avoids full meshgrid allocation)
         rfft_shape = (*field_shape[:-1], len(k_arrays[-1]))

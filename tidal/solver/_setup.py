@@ -99,7 +99,13 @@ def configure_linear_solver(  # noqa: PLR0913
 
     # Analytical Jacobian for constant-coefficient systems
     if try_analytical_jacobian(
-        options, spec, layout, grid, bc, parameters or {}, solver=solver,
+        options,
+        spec,
+        layout,
+        grid,
+        bc,
+        parameters or {},
+        solver=solver,
     ):
         return
 

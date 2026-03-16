@@ -500,9 +500,7 @@ class TestPeriodicCoefficientContinuity:
                     "operator": "laplacian",
                     "field": "phi_0",
                     # Coefficient that's small at both ends, large at center
-                    "coefficient_symbolic": (
-                        "x[]^2 / (1 + (x[] - 3.14159)^2)^3"
-                    ),
+                    "coefficient_symbolic": ("x[]^2 / (1 + (x[] - 3.14159)^2)^3"),
                     "coordinate_dependent": ["x"],
                 },
             ],

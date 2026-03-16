@@ -73,7 +73,7 @@ def _build_coupled_scalars_spec() -> EquationSystem:
     This ensures measurement tests have a k=0 coupled oscillator for analytical
     comparison, independent of the example TOML (which uses gradient coupling).
     """
-    from tests.conftest import _COUPLED_SCALARS_SPEC  # noqa: PLC0415
+    from tests.conftest import _COUPLED_SCALARS_SPEC
 
     return EquationSystem.from_dict(_COUPLED_SCALARS_SPEC)  # type: ignore[arg-type]
 
@@ -98,7 +98,7 @@ def _make_sim_data_two_fields(
 
     # Get field names from the spec (h_0/a_0 for Gertsenshtein, phi_0/chi_0 for legacy)
     field_names = list(spec.component_names)
-    assert len(field_names) == 2, f"Expected 2 fields, got {field_names}"  # noqa: S101
+    assert len(field_names) == 2, f"Expected 2 fields, got {field_names}"
     fname_0, fname_1 = field_names[0], field_names[1]
 
     dx = 10.0 / n_grid
@@ -409,9 +409,7 @@ class TestCanonicalHamiltonianEnergy:
         )
 
         h_total = _compute_hamiltonian_from_canonical(data_with_canonical, 0)
-        per_field, interaction = _compute_hamiltonian_per_field(
-            data_with_canonical, 0
-        )
+        per_field, interaction = _compute_hamiltonian_per_field(data_with_canonical, 0)
 
         # Per-field self-energy sums to total (no interaction for single KG)
         np.testing.assert_allclose(
@@ -425,9 +423,15 @@ class TestCanonicalHamiltonianEnergy:
         fname_0, fname_1 = data.spec.component_names[0], data.spec.component_names[1]
         m2_phi = float(data.spec.mass_matrix[0][0])
         m2_chi = float(data.spec.mass_matrix[1][1])
-        g_val = float(data.spec.coupling_matrix[0][1]) if data.spec.coupling_matrix is not None else 0.0
+        g_val = (
+            float(data.spec.coupling_matrix[0][1])
+            if data.spec.coupling_matrix is not None
+            else 0.0
+        )
 
-        canonical = _make_coupled_canonical_structure(m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1)
+        canonical = _make_coupled_canonical_structure(
+            m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1
+        )
         spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
         data_c = SimulationData(
             times=data.times,
@@ -455,9 +459,15 @@ class TestCanonicalHamiltonianEnergy:
         fname_0, fname_1 = data.spec.component_names[0], data.spec.component_names[1]
         m2_phi = float(data.spec.mass_matrix[0][0])
         m2_chi = float(data.spec.mass_matrix[1][1])
-        g_val = float(data.spec.coupling_matrix[0][1]) if data.spec.coupling_matrix is not None else 0.0
+        g_val = (
+            float(data.spec.coupling_matrix[0][1])
+            if data.spec.coupling_matrix is not None
+            else 0.0
+        )
 
-        canonical = _make_coupled_canonical_structure(m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1)
+        canonical = _make_coupled_canonical_structure(
+            m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1
+        )
         spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
         data_c = SimulationData(
             times=data.times,
@@ -482,13 +492,19 @@ class TestCanonicalHamiltonianEnergy:
         fname_0, fname_1 = data.spec.component_names[0], data.spec.component_names[1]
         m2_phi = float(data.spec.mass_matrix[0][0])
         m2_chi = float(data.spec.mass_matrix[1][1])
-        g_val = float(data.spec.coupling_matrix[0][1]) if data.spec.coupling_matrix is not None else 0.0
+        g_val = (
+            float(data.spec.coupling_matrix[0][1])
+            if data.spec.coupling_matrix is not None
+            else 0.0
+        )
 
         # Virial energy (no canonical)
         se_virial = compute_system_energy(data, 0)
 
         # Canonical energy
-        canonical = _make_coupled_canonical_structure(m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1)
+        canonical = _make_coupled_canonical_structure(
+            m2_phi, m2_chi, g_val, field_0=fname_0, field_1=fname_1
+        )
         spec_with_canonical = dataclasses.replace(data.spec, canonical=canonical)
         data_c = SimulationData(
             times=data.times,
@@ -1320,14 +1336,11 @@ class TestConversionProbability:
         # P should grow > 0 at some point for identity coupling.
         # For gradient coupling at k=0 (uniform mode), fields are uncoupled
         # and P stays 0 — this is correct physics (∂_x of constant = 0).
-        has_identity_coupling = (
-            data.spec.coupling_matrix is not None
-            and any(
-                data.spec.coupling_matrix[i][j] != 0
-                for i in range(len(data.spec.coupling_matrix))
-                for j in range(len(data.spec.coupling_matrix[0]))
-                if i != j
-            )
+        has_identity_coupling = data.spec.coupling_matrix is not None and any(
+            data.spec.coupling_matrix[i][j] != 0
+            for i in range(len(data.spec.coupling_matrix))
+            for j in range(len(data.spec.coupling_matrix[0]))
+            if i != j
         )
         if has_identity_coupling:
             assert np.max(result.probability) > 0.01
@@ -1348,7 +1361,11 @@ class TestConversionProbability:
 
         m2_0 = float(data.spec.mass_matrix[0][0])
         m2_1 = float(data.spec.mass_matrix[1][1])
-        g_val = float(data.spec.coupling_matrix[0][1]) if data.spec.coupling_matrix is not None else 0.0
+        g_val = (
+            float(data.spec.coupling_matrix[0][1])
+            if data.spec.coupling_matrix is not None
+            else 0.0
+        )
 
         m_eff = np.array([[m2_0, g_val], [g_val, m2_1]])
         eigenvalues, eigenvectors = np.linalg.eigh(m_eff)
@@ -1826,7 +1843,11 @@ class TestApplySpatialOperator:
         field = 2.0 * x  # f(x) = 2x
 
         result = _apply_spatial_operator(
-            "gradient_x", field, (dx,), (False,), bc_types=("neumann",),
+            "gradient_x",
+            field,
+            (dx,),
+            (False,),
+            bc_types=("neumann",),
         )
         # Neumann ghost mirrors interior: boundary cells get gradient = 1
         # (half the interior value) — check only interior cells

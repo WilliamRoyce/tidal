@@ -36,7 +36,11 @@ def _make_kg_1d_spec() -> EquationSystem:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_x",
+                            "field": "phi_0",
+                        },
                         {"coefficient": -1.0, "operator": "identity", "field": "phi_0"},
                     ],
                 },
@@ -63,7 +67,11 @@ def _make_em_2d_spec() -> EquationSystem:
                     "type": "linear_combination",
                     "terms": [
                         {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
-                        {"coefficient": -1.0, "operator": "gradient_x", "field": "v_A_1"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "gradient_x",
+                            "field": "v_A_1",
+                        },
                     ],
                 },
             },
@@ -98,8 +106,16 @@ def _make_constraint_velocity_spec() -> EquationSystem:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": -1.0, "operator": "laplacian_x", "field": "A_0"},
-                        {"coefficient": 1.0, "operator": "gradient_x", "field": "v_A_1"},
+                        {
+                            "coefficient": -1.0,
+                            "operator": "laplacian_x",
+                            "field": "A_0",
+                        },
+                        {
+                            "coefficient": 1.0,
+                            "operator": "gradient_x",
+                            "field": "v_A_1",
+                        },
                     ],
                 },
             },
@@ -110,7 +126,11 @@ def _make_constraint_velocity_spec() -> EquationSystem:
                     "type": "linear_combination",
                     "terms": [
                         {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_1"},
-                        {"coefficient": 1.0, "operator": "gradient_x", "field": "v_A_0"},
+                        {
+                            "coefficient": 1.0,
+                            "operator": "gradient_x",
+                            "field": "v_A_0",
+                        },
                     ],
                 },
             },
@@ -135,8 +155,16 @@ def _make_first_deriv_t_constraint_spec() -> EquationSystem:
                 "rhs": {
                     "type": "linear_combination",
                     "terms": [
-                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
-                        {"coefficient": -1.0, "operator": "first_derivative_t", "field": "A_0"},
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_x",
+                            "field": "phi_0",
+                        },
+                        {
+                            "coefficient": -1.0,
+                            "operator": "first_derivative_t",
+                            "field": "A_0",
+                        },
                     ],
                 },
             },
@@ -186,7 +214,11 @@ class TestAllConstant:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
                             {
                                 "coefficient": -1.0,
                                 "operator": "identity",
@@ -269,7 +301,11 @@ class TestResolveTermTarget:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "first_derivative_t", "field": "A_1"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "first_derivative_t",
+                                "field": "A_1",
+                            },
                         ],
                     },
                 },
@@ -279,7 +315,11 @@ class TestResolveTermTarget:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_1"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "A_1",
+                            },
                         ],
                     },
                 },
@@ -362,7 +402,7 @@ class TestBuildJacobianMatrices:
 
         n = grid.num_points
         # Slot 0: phi_0 (field), slot 1: v_phi_0 (velocity)
-        field_block_dy = dF_dy[:n, n:2 * n].toarray()
+        field_block_dy = dF_dy[:n, n : 2 * n].toarray()
         field_block_dyp = dF_dyp[:n, :n].toarray()
 
         np.testing.assert_array_equal(field_block_dy, -np.eye(n))
@@ -378,12 +418,12 @@ class TestBuildJacobianMatrices:
 
         n = grid.num_points
         # Velocity slot dyp diagonal should be I
-        vel_dyp = dF_dyp[n:2 * n, n:2 * n].toarray()
+        vel_dyp = dF_dyp[n : 2 * n, n : 2 * n].toarray()
         np.testing.assert_array_equal(vel_dyp, np.eye(n))
 
         # Velocity slot dF/dy should have -laplacian and +identity blocks
         # from negated RHS: -(1.0 * laplacian + -1.0 * identity)
-        vel_dy_phi = dF_dy[n:2 * n, :n].toarray()
+        vel_dy_phi = dF_dy[n : 2 * n, :n].toarray()
         # Build expected: -laplacian + identity
         from tidal.solver.operators import apply_operator
 
@@ -402,7 +442,11 @@ class TestBuildJacobianMatrices:
         layout = StateLayout.from_spec(spec, grid.num_points)
 
         dF_dy, dF_dyp = build_jacobian_matrices(
-            spec, layout, grid, ("periodic", "periodic"), {},
+            spec,
+            layout,
+            grid,
+            ("periodic", "periodic"),
+            {},
         )
 
         n = grid.num_points  # 16
@@ -484,11 +528,15 @@ class TestBuildJacobianMatrices:
             fd_dF_dyp[:, j] = (res_plus - res0) / eps
 
         np.testing.assert_allclose(
-            dF_dy.toarray(), fd_dF_dy, atol=1e-5,
+            dF_dy.toarray(),
+            fd_dF_dy,
+            atol=1e-5,
             err_msg="dF/dy mismatch",
         )
         np.testing.assert_allclose(
-            dF_dyp.toarray(), fd_dF_dyp, atol=1e-5,
+            dF_dyp.toarray(),
+            fd_dF_dyp,
+            atol=1e-5,
             err_msg="dF/dyp mismatch",
         )
 
@@ -499,13 +547,21 @@ class TestBuildJacobianMatrices:
         layout = StateLayout.from_spec(spec, grid.num_points)
 
         dF_dy, dF_dyp = build_jacobian_matrices(
-            spec, layout, grid, ("periodic", "periodic"), {},
+            spec,
+            layout,
+            grid,
+            ("periodic", "periodic"),
+            {},
         )
 
         from tidal.solver.ida import build_residual_fn
 
         resfn = build_residual_fn(
-            spec, layout, grid, ("periodic", "periodic"), parameters={},
+            spec,
+            layout,
+            grid,
+            ("periodic", "periodic"),
+            parameters={},
         )
 
         n_total = layout.total_size
@@ -537,11 +593,15 @@ class TestBuildJacobianMatrices:
             fd_dyp[:, j] = (res_plus - res0) / eps
 
         np.testing.assert_allclose(
-            dF_dy.toarray(), fd_dy, atol=1e-5,
+            dF_dy.toarray(),
+            fd_dy,
+            atol=1e-5,
             err_msg="dF/dy mismatch for constraint velocity system",
         )
         np.testing.assert_allclose(
-            dF_dyp.toarray(), fd_dyp, atol=1e-5,
+            dF_dyp.toarray(),
+            fd_dyp,
+            atol=1e-5,
             err_msg="dF/dyp mismatch for constraint velocity system",
         )
 
@@ -582,7 +642,9 @@ class TestJacobianDelivery:
         options: dict[str, Any] = {}
         # Lower DENSE_THRESHOLD so system is in sparse tier
         with patch("tidal.solver._types.DENSE_THRESHOLD", 1):
-            result = try_analytical_jacobian(options, spec, layout, grid, "periodic", {})
+            result = try_analytical_jacobian(
+                options, spec, layout, grid, "periodic", {}
+            )
 
         # Sparse tier falls through to FD (returns False)
         assert result is False
@@ -640,7 +702,9 @@ class TestTryAnalyticalJacobian:
         layout = StateLayout.from_spec(spec, grid.num_points)
 
         options: dict[str, Any] = {}
-        result = try_analytical_jacobian(options, spec, layout, grid, "periodic", {"H": 1.0})
+        result = try_analytical_jacobian(
+            options, spec, layout, grid, "periodic", {"H": 1.0}
+        )
 
         assert result is False
         assert "jacfn" not in options
@@ -657,7 +721,11 @@ class TestTryAnalyticalJacobian:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
                             {
                                 "coefficient": -1.0,
                                 "operator": "identity",
@@ -677,7 +745,12 @@ class TestTryAnalyticalJacobian:
 
         options: dict[str, Any] = {}
         result = try_analytical_jacobian(
-            options, spec, layout, grid, "neumann", {"V0": 2.0},
+            options,
+            spec,
+            layout,
+            grid,
+            "neumann",
+            {"V0": 2.0},
         )
 
         assert result is True
@@ -703,10 +776,17 @@ class TestSparseTier:
 
         options: dict[str, Any] = {}
         # Lower both thresholds so system is in GMRES tier
-        with patch("tidal.solver._types.DENSE_THRESHOLD", 1), \
-             patch("tidal.solver._types.SPARSE_THRESHOLD", 1):
+        with (
+            patch("tidal.solver._types.DENSE_THRESHOLD", 1),
+            patch("tidal.solver._types.SPARSE_THRESHOLD", 1),
+        ):
             result = try_analytical_jacobian(
-                options, spec, layout, grid, "periodic", {},
+                options,
+                spec,
+                layout,
+                grid,
+                "periodic",
+                {},
             )
 
         assert result is True
@@ -734,7 +814,11 @@ class TestPositionDependentJacobian:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
                             {
                                 "coefficient": -1.0,
                                 "operator": "identity",
@@ -754,7 +838,11 @@ class TestPositionDependentJacobian:
 
         # Should not raise (previously would fail with float(ndarray))
         dF_dy, dF_dyp = build_jacobian_matrices(
-            spec, layout, grid, "neumann", {},
+            spec,
+            layout,
+            grid,
+            "neumann",
+            {},
         )
 
         assert issparse(dF_dy)
@@ -865,7 +953,11 @@ class TestConstraintSubCases:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 },
@@ -876,7 +968,11 @@ class TestConstraintSubCases:
                         "type": "linear_combination",
                         "terms": [
                             # Only references phi_0, NOT A_0 itself
-                            {"coefficient": 1.0, "operator": "gradient_x", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "gradient_x",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                     # constraint_solver not enabled (default) → no-self-term path
@@ -920,7 +1016,11 @@ class TestConstraintSubCases:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                 },
@@ -931,8 +1031,16 @@ class TestConstraintSubCases:
                         "type": "linear_combination",
                         "terms": [
                             # Pure Laplacian self-term → triggers gauge fix
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
-                            {"coefficient": 0.5, "operator": "gradient_x", "field": "phi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "A_0",
+                            },
+                            {
+                                "coefficient": 0.5,
+                                "operator": "gradient_x",
+                                "field": "phi_0",
+                            },
                         ],
                     },
                     "constraint_solver": {"enabled": True},
@@ -981,8 +1089,16 @@ class TestConstraintSubCases:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "psi_0"},
-                            {"coefficient": -0.5, "operator": "identity", "field": "psi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "psi_0",
+                            },
+                            {
+                                "coefficient": -0.5,
+                                "operator": "identity",
+                                "field": "psi_0",
+                            },
                         ],
                     },
                 },
@@ -1024,8 +1140,16 @@ class TestConstraintSubCases:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "psi_0"},
-                            {"coefficient": -0.5, "operator": "identity", "field": "psi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "psi_0",
+                            },
+                            {
+                                "coefficient": -0.5,
+                                "operator": "identity",
+                                "field": "psi_0",
+                            },
                         ],
                     },
                 },
@@ -1068,11 +1192,15 @@ class TestConstraintSubCases:
             fd_dyp[:, j] = (res_plus - res0) / eps
 
         np.testing.assert_allclose(
-            dF_dy.toarray(), fd_dy, atol=1e-5,
+            dF_dy.toarray(),
+            fd_dy,
+            atol=1e-5,
             err_msg="dF/dy mismatch for first-order equation",
         )
         np.testing.assert_allclose(
-            dF_dyp.toarray(), fd_dyp, atol=1e-5,
+            dF_dyp.toarray(),
+            fd_dyp,
+            atol=1e-5,
             err_msg="dF/dyp mismatch for first-order equation",
         )
 
@@ -1109,7 +1237,13 @@ class TestCVODEDelivery:
 
         options: dict[str, Any] = {}
         result = try_analytical_jacobian(
-            options, spec, layout, grid, "periodic", {}, solver="cvode",
+            options,
+            spec,
+            layout,
+            grid,
+            "periodic",
+            {},
+            solver="cvode",
         )
 
         assert result is True
@@ -1159,7 +1293,9 @@ class TestSuperLUNnzFallback:
         assert options["linsolver"] == "gmres"
         assert "sparsity" not in options
 
-        warning_messages = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        warning_messages = [
+            str(w.message) for w in caught if issubclass(w.category, UserWarning)
+        ]
         assert any("SUPERLU_NNZ_LIMIT" in m for m in warning_messages), (
             f"Expected UserWarning about SUPERLU_NNZ_LIMIT, got: {warning_messages}"
         )
@@ -1176,6 +1312,7 @@ class TestSuperLUNnzFallback:
 
         options: dict[str, Any] = {}
         from unittest.mock import patch
+
         with patch("tidal.solver._types.DENSE_THRESHOLD", 1):
             configure_linear_solver(options, layout, spec, grid, "periodic")
 
@@ -1203,7 +1340,9 @@ class TestSuperLUNnzFallback:
             warnings.simplefilter("always")
             configure_linear_solver(options, layout, spec, grid, "periodic")
 
-        user_warnings = [str(w.message) for w in caught if issubclass(w.category, UserWarning)]
+        user_warnings = [
+            str(w.message) for w in caught if issubclass(w.category, UserWarning)
+        ]
         assert user_warnings, "Expected at least one UserWarning"
         msg = user_warnings[0]
         assert "nnz=" in msg
@@ -1219,7 +1358,9 @@ class TestIDAIntegration:
         spec = _make_kg_1d_spec()
         n_pts = 32
         grid = GridInfo(
-            bounds=((0, 2 * np.pi),), shape=(n_pts,), periodic=(True,),
+            bounds=((0, 2 * np.pi),),
+            shape=(n_pts,),
+            periodic=(True,),
         )
 
         x = np.linspace(0, 2 * np.pi, n_pts, endpoint=False)
@@ -1229,15 +1370,24 @@ class TestIDAIntegration:
 
         # Solve with analytical Jacobian (parameters triggers it)
         result_analytical = solve_ida(
-            spec, grid, y0, t_span=(0.0, 0.5),
-            bc="periodic", parameters={}, num_snapshots=5,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 0.5),
+            bc="periodic",
+            parameters={},
+            num_snapshots=5,
         )
         assert result_analytical["success"]
 
         # Solve without analytical Jacobian (no parameters → FD)
         result_fd = solve_ida(
-            spec, grid, y0, t_span=(0.0, 0.5),
-            bc="periodic", num_snapshots=5,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 0.5),
+            bc="periodic",
+            num_snapshots=5,
         )
         assert result_fd["success"]
 

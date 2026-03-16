@@ -180,9 +180,7 @@ class TestLoadResumeState:
         actual_field = state.y0[: np.prod(state.grid_shape)]
         np.testing.assert_array_equal(actual_field, expected_field.ravel())
 
-    def test_snapshot_index_out_of_range(
-        self, tmp_path: Path, kg_spec: Path
-    ) -> None:
+    def test_snapshot_index_out_of_range(self, tmp_path: Path, kg_spec: Path) -> None:
         """Snapshot index beyond range raises ValueError."""
         from tidal.symbolic import load_equation_system
 
@@ -247,9 +245,7 @@ class TestLoadResumeState:
         spec_path.write_text(json.dumps(spec_data, indent=2))
         spec = load_equation_system(spec_path)
 
-        snap_dir = _make_snapshot_dir(
-            tmp_path, fields=["chi_0"], velocities=["chi_0"]
-        )
+        snap_dir = _make_snapshot_dir(tmp_path, fields=["chi_0"], velocities=["chi_0"])
 
         with pytest.raises(ValueError, match="missing fields"):
             _load_resume_state(snap_dir, spec)
@@ -305,9 +301,7 @@ class TestLoadResumeState:
         with pytest.raises(ValueError, match="out of range"):
             _load_resume_state(snap_dir, spec, snapshot_index=-1)
 
-    def test_single_snapshot_directory(
-        self, tmp_path: Path, kg_spec: Path
-    ) -> None:
+    def test_single_snapshot_directory(self, tmp_path: Path, kg_spec: Path) -> None:
         """Resume from a directory with exactly 1 snapshot."""
         from tidal.symbolic import load_equation_system
 
@@ -409,9 +403,7 @@ class TestValidateResumeGrid:
 class TestSimulateResume:
     """Integration tests for --resume flag through the CLI."""
 
-    def test_resume_roundtrip(
-        self, inline_kg_1d_json: Path, tmp_path: Path
-    ) -> None:
+    def test_resume_roundtrip(self, inline_kg_1d_json: Path, tmp_path: Path) -> None:
         """Run a simulation, then resume from checkpoint and verify continuity."""
         from tidal.cli import main
 
@@ -513,9 +505,7 @@ class TestSimulateResume:
         resumed_times = np.load(resume_dir / "times.npy")
         assert resumed_times[0] == pytest.approx(ckpt_times[5], abs=0.1)
 
-    def test_resume_t_additional(
-        self, inline_kg_1d_json: Path, tmp_path: Path
-    ) -> None:
+    def test_resume_t_additional(self, inline_kg_1d_json: Path, tmp_path: Path) -> None:
         """--t-additional computes correct absolute t_end."""
         from tidal.cli import main
 

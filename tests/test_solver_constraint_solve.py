@@ -685,9 +685,7 @@ class TestFindConnectedComponents:
     ) -> _ConstraintTerms:
         """Create a minimal _ConstraintTerms for component testing."""
         config = ConstraintSolverConfig(enabled=True, method="auto")
-        source_terms = [
-            (1.0, "identity", f) for f in (source_fields or [])
-        ]
+        source_terms = [(1.0, "identity", f) for f in (source_fields or [])]
         return _ConstraintTerms(
             field_name=name,
             self_terms=[(1.0, "identity")],
@@ -1743,9 +1741,7 @@ class TestEnsureConsistentIC:
         # Set v_A_1 to a Gaussian (source for A_0 constraint)
         va1_slot = layout.velocity_slot_map["A_1"]
         x_arr, _ = grid.coord_arrays()
-        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(
-            -((x_arr - 5) ** 2) / 2
-        ).ravel()
+        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(-((x_arr - 5) ** 2) / 2).ravel()
 
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
 
@@ -1866,7 +1862,11 @@ class TestEnsureConsistentIC:
 
         with pytest.warns(UserWarning, match="does not satisfy constraint"):
             result = ensure_consistent_ic(
-                spec, grid, y0, bc="periodic", strict=False,
+                spec,
+                grid,
+                y0,
+                bc="periodic",
+                strict=False,
             )
 
         # Should return y0 unchanged (no field could be solved)
@@ -1933,16 +1933,20 @@ class TestEnsureConsistentIC:
         # Set v_A_1 and A_2 as sources (CS has both velocity and field sources)
         va1_slot = layout.velocity_slot_map["A_1"]
         x_arr, _ = grid.coord_arrays()
-        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(
-            -((x_arr - 5) ** 2) / 2
-        ).ravel()
+        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(-((x_arr - 5) ** 2) / 2).ravel()
 
         y0_old = pre_solve_constraints(
-            spec, grid, y0.copy(), bc="periodic",
+            spec,
+            grid,
+            y0.copy(),
+            bc="periodic",
             parameters={"kappa": 0.5},
         )
         y0_new = ensure_consistent_ic(
-            spec, grid, y0.copy(), bc="periodic",
+            spec,
+            grid,
+            y0.copy(),
+            bc="periodic",
             parameters={"kappa": 0.5},
         )
 
@@ -1970,9 +1974,7 @@ class TestEnsureConsistentIC:
         y0 = np.zeros(layout.total_size)
         # Set rho_0 = cos(x)*cos(y) as source
         rho_slot = layout.field_slot_map["rho_0"]
-        y0[rho_slot * n : (rho_slot + 1) * n] = (
-            np.cos(x_arr) * np.cos(y_arr)
-        ).ravel()
+        y0[rho_slot * n : (rho_slot + 1) * n] = (np.cos(x_arr) * np.cos(y_arr)).ravel()
 
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
 
@@ -2009,9 +2011,7 @@ class TestEnsureConsistentIC:
         y0 = np.zeros(layout.total_size)
         rho_slot = layout.field_slot_map["rho_0"]
         # Source compatible with Neumann BCs (zero normal derivative at boundary)
-        y0[rho_slot * n : (rho_slot + 1) * n] = (
-            np.cos(x_arr) * np.cos(y_arr)
-        ).ravel()
+        y0[rho_slot * n : (rho_slot + 1) * n] = (np.cos(x_arr) * np.cos(y_arr)).ravel()
 
         bc = ("neumann", "neumann")
         result = ensure_consistent_ic(spec, grid, y0, bc=bc)
@@ -2042,7 +2042,11 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_a"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "h_a",
+                            },
                         ],
                     },
                 },
@@ -2052,7 +2056,11 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_b"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "h_b",
+                            },
                         ],
                     },
                 },
@@ -2062,9 +2070,21 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "identity", "field": "h_a"},
-                            {"coefficient": 1.0, "operator": "identity", "field": "h_b"},
-                            {"coefficient": 1.0, "operator": "identity", "field": "h_c"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "h_a",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "h_b",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "h_c",
+                            },
                         ],
                     },
                 },
@@ -2116,8 +2136,16 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "identity", "field": "phi_0"},
-                            {"coefficient": 1.0, "operator": "identity", "field": "psi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "psi_0",
+                            },
                         ],
                     },
                     "constraint_solver": {"enabled": False},
@@ -2128,7 +2156,11 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "psi_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "psi_0",
+                            },
                         ],
                     },
                 },
@@ -2143,9 +2175,7 @@ class TestEnsureConsistentIC:
         y0 = np.zeros(layout.total_size)
         x = grid.axes_coords(0)
         psi_slot = layout.field_slot_map["psi_0"]
-        y0[psi_slot * n : (psi_slot + 1) * n] = np.exp(
-            -((x - 5) ** 2) / 2
-        ).ravel()
+        y0[psi_slot * n : (psi_slot + 1) * n] = np.exp(-((x - 5) ** 2) / 2).ravel()
 
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
 
@@ -2176,8 +2206,16 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "gradient_x", "field": "h_a"},
-                            {"coefficient": 1.0, "operator": "gradient_x", "field": "h_b"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "gradient_x",
+                                "field": "h_a",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "gradient_x",
+                                "field": "h_b",
+                            },
                         ],
                     },
                 },
@@ -2187,7 +2225,11 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_a"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "h_a",
+                            },
                         ],
                     },
                 },
@@ -2197,7 +2239,11 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_b"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "h_b",
+                            },
                         ],
                     },
                 },
@@ -2230,8 +2276,16 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "gradient_x", "field": "h_a"},
-                            {"coefficient": 1.0, "operator": "gradient_x", "field": "h_b"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "gradient_x",
+                                "field": "h_a",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "gradient_x",
+                                "field": "h_b",
+                            },
                         ],
                     },
                 },
@@ -2241,7 +2295,11 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_a"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "h_a",
+                            },
                         ],
                     },
                 },
@@ -2251,7 +2309,11 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_b"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "h_b",
+                            },
                         ],
                     },
                 },
@@ -2289,7 +2351,11 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_a"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "h_a",
+                            },
                         ],
                     },
                 },
@@ -2299,7 +2365,11 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_b"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "h_b",
+                            },
                         ],
                     },
                 },
@@ -2309,7 +2379,11 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "h_c"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "h_c",
+                            },
                         ],
                     },
                 },
@@ -2320,8 +2394,16 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -1.0, "operator": "gradient_x", "field": "h_a"},
-                            {"coefficient": -1.0, "operator": "gradient_x", "field": "h_b"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "gradient_x",
+                                "field": "h_a",
+                            },
+                            {
+                                "coefficient": -1.0,
+                                "operator": "gradient_x",
+                                "field": "h_b",
+                            },
                         ],
                     },
                 },
@@ -2332,8 +2414,16 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -1.0, "operator": "gradient_x", "field": "h_a"},
-                            {"coefficient": -1.0, "operator": "gradient_x", "field": "h_c"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "gradient_x",
+                                "field": "h_a",
+                            },
+                            {
+                                "coefficient": -1.0,
+                                "operator": "gradient_x",
+                                "field": "h_c",
+                            },
                         ],
                     },
                 },
@@ -2398,10 +2488,26 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "A_0"},
-                            {"coefficient": -1.0, "operator": "identity", "field": "A_0"},
-                            {"coefficient": 0.5, "operator": "identity", "field": "B_0"},
-                            {"coefficient": -1.0, "operator": "gradient_x", "field": "v_A_1"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "A_0",
+                            },
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "A_0",
+                            },
+                            {
+                                "coefficient": 0.5,
+                                "operator": "identity",
+                                "field": "B_0",
+                            },
+                            {
+                                "coefficient": -1.0,
+                                "operator": "gradient_x",
+                                "field": "v_A_1",
+                            },
                         ],
                     },
                     "constraint_solver": {
@@ -2417,10 +2523,26 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "B_0"},
-                            {"coefficient": -1.0, "operator": "identity", "field": "B_0"},
-                            {"coefficient": 0.5, "operator": "identity", "field": "A_0"},
-                            {"coefficient": -1.0, "operator": "gradient_x", "field": "v_B_1"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "B_0",
+                            },
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "B_0",
+                            },
+                            {
+                                "coefficient": 0.5,
+                                "operator": "identity",
+                                "field": "A_0",
+                            },
+                            {
+                                "coefficient": -1.0,
+                                "operator": "gradient_x",
+                                "field": "v_B_1",
+                            },
                         ],
                     },
                     "constraint_solver": {
@@ -2435,7 +2557,11 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "A_1"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "A_1",
+                            },
                         ],
                     },
                 },
@@ -2445,7 +2571,11 @@ class TestEnsureConsistentIC:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian", "field": "B_1"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian",
+                                "field": "B_1",
+                            },
                         ],
                     },
                 },
@@ -2461,9 +2591,7 @@ class TestEnsureConsistentIC:
         x = grid.axes_coords(0)
         # Set v_A_1 source (for A_0)
         va1_slot = layout.velocity_slot_map["A_1"]
-        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(
-            -((x - 5) ** 2) / 2
-        ).ravel()
+        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(-((x - 5) ** 2) / 2).ravel()
 
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
 
@@ -2489,9 +2617,7 @@ class TestEnsureConsistentIC:
         y0 = np.zeros(layout.total_size)
         ha_slot = layout.field_slot_map["h_a"]
         x = grid.axes_coords(0)
-        y0[ha_slot * n : (ha_slot + 1) * n] = np.exp(
-            -((x - 5) ** 2) / 2
-        ).ravel()
+        y0[ha_slot * n : (ha_slot + 1) * n] = np.exp(-((x - 5) ** 2) / 2).ravel()
 
         y0_orig = y0.copy()
         _ = ensure_consistent_ic(spec, grid, y0, bc="periodic")
@@ -2596,9 +2722,7 @@ class TestEnsureConsistentICRealJSON:
         y0 = np.zeros(layout.total_size)
         h5_slot = layout.field_slot_map["h_5"]
         x = grid.axes_coords(0)
-        y0[h5_slot * n : (h5_slot + 1) * n] = np.exp(
-            -((x - 5) ** 2) / 2
-        ).ravel()
+        y0[h5_slot * n : (h5_slot + 1) * n] = np.exp(-((x - 5) ** 2) / 2).ravel()
 
         # Should not raise — no constraints in 2-field system
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
@@ -2633,9 +2757,7 @@ class TestEnsureConsistentICRealJSON:
         # Set v_A_1 as source
         va1_slot = layout.velocity_slot_map["A_1"]
         x_arr, _ = grid.coord_arrays()
-        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(
-            -((x_arr - 5) ** 2) / 2
-        ).ravel()
+        y0[va1_slot * n : (va1_slot + 1) * n] = np.exp(-((x_arr - 5) ** 2) / 2).ravel()
 
         result = ensure_consistent_ic(spec, grid, y0, bc="periodic")
 
@@ -2688,7 +2810,11 @@ class TestEnsureConsistentICRealJSON:
         y0[h5_slot * n : (h5_slot + 1) * n] = (-wave).ravel()
 
         result = ensure_consistent_ic(
-            spec, grid, y0, bc="periodic", parameters={"m2": 1.0},
+            spec,
+            grid,
+            y0,
+            bc="periodic",
+            parameters={"m2": 1.0},
         )
 
         # h_0 remains at zero (not constrained by its own equation)
@@ -2736,14 +2862,22 @@ class TestEnsureConsistentICRealJSON:
         # strict=True should raise for the violated h_0 constraint
         with pytest.raises(ValueError, match="does not satisfy"):
             ensure_consistent_ic(
-                spec, grid, y0, bc="periodic", parameters={"m2": 1.0},
+                spec,
+                grid,
+                y0,
+                bc="periodic",
+                parameters={"m2": 1.0},
                 strict=True,
             )
 
         # strict=False should warn but succeed
         with pytest.warns(UserWarning, match="does not satisfy"):
             result = ensure_consistent_ic(
-                spec, grid, y0, bc="periodic", parameters={"m2": 1.0},
+                spec,
+                grid,
+                y0,
+                bc="periodic",
+                parameters={"m2": 1.0},
                 strict=False,
             )
 

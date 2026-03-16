@@ -50,9 +50,21 @@ def _make_3d_kg_spec() -> dict[str, Any]:
                             "field": "phi_0",
                             "coefficient_symbolic": "-m2",
                         },
-                        {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
-                        {"coefficient": 1.0, "operator": "laplacian_y", "field": "phi_0"},
-                        {"coefficient": 1.0, "operator": "laplacian_z", "field": "phi_0"},
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_x",
+                            "field": "phi_0",
+                        },
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_y",
+                            "field": "phi_0",
+                        },
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_z",
+                            "field": "phi_0",
+                        },
                     ],
                 },
             }
@@ -96,17 +108,19 @@ def _make_2field_3d_spec() -> dict[str, Any]:
     spec = _make_3d_kg_spec()
     spec["fields"].append({"name": "psi_0", "index": 1, "is_dynamical": True})
     # psi_0 equation only has transverse operators (should be eliminated)
-    spec["equations"].append({
-        "field": "psi_0",
-        "lhs": {"expression": "d2_t(psi_0)", "order": {"time": 2, "space": 0}},
-        "rhs": {
-            "type": "linear_combination",
-            "terms": [
-                {"coefficient": 1.0, "operator": "laplacian_x", "field": "psi_0"},
-                {"coefficient": 1.0, "operator": "laplacian_y", "field": "psi_0"},
-            ],
-        },
-    })
+    spec["equations"].append(
+        {
+            "field": "psi_0",
+            "lhs": {"expression": "d2_t(psi_0)", "order": {"time": 2, "space": 0}},
+            "rhs": {
+                "type": "linear_combination",
+                "terms": [
+                    {"coefficient": 1.0, "operator": "laplacian_x", "field": "psi_0"},
+                    {"coefficient": 1.0, "operator": "laplacian_y", "field": "psi_0"},
+                ],
+            },
+        }
+    )
     spec["coupling"]["mass_matrix_symbolic"].append(["-m2"])
     spec["coupling"]["mass_matrix_symbolic"][0].append("0")
     return spec
@@ -136,7 +150,11 @@ def _make_curved_spec_surviving() -> dict[str, Any]:
                             "coefficient_symbolic": "2/z[]",
                             "coordinate_dependent": ["z"],
                         },
-                        {"coefficient": 1.0, "operator": "laplacian_z", "field": "phi_0"},
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_z",
+                            "field": "phi_0",
+                        },
                     ],
                 },
             }
@@ -450,8 +468,7 @@ class TestReduceSpec:
         ham_terms = result["canonical"]["hamiltonian_terms"]
         # Should keep: identity*identity, gradient_x (from z), time_derivative
         ops = [
-            (h["factor_a"]["operator"], h["factor_b"]["operator"])
-            for h in ham_terms
+            (h["factor_a"]["operator"], h["factor_b"]["operator"]) for h in ham_terms
         ]
         assert ("identity", "identity") in ops
         assert ("gradient_x", "gradient_x") in ops
@@ -645,9 +662,11 @@ class TestWlsReduction:
 
     def test_reduction_before_el(self) -> None:
         """Reduction code appears before E-L derivation when [reduction] present."""
-        wls = self._generate({
-            "reduction": {"type": "plane_wave", "propagation_axis": "z"},
-        })
+        wls = self._generate(
+            {
+                "reduction": {"type": "plane_wave", "propagation_axis": "z"},
+            }
+        )
         reduction_idx = wls.find("Plane-wave reduction")
         el_idx = wls.find("Euler-Lagrange equations")
         assert reduction_idx != -1, "Plane-wave reduction block not found"
@@ -661,38 +680,46 @@ class TestWlsReduction:
 
     def test_field_elimination_code_present(self) -> None:
         """Field elimination code is generated when reduction is active."""
-        wls = self._generate({
-            "reduction": {"type": "plane_wave", "propagation_axis": "z"},
-        })
+        wls = self._generate(
+            {
+                "reduction": {"type": "plane_wave", "propagation_axis": "z"},
+            }
+        )
         assert "zeroFieldNames" in wls
         assert "Eliminating zero fields" in wls
 
     def test_factored_volume_element_for_reduction(self) -> None:
         """Factored volume element code generated when reduction is active."""
-        wls = self._generate({
-            "reduction": {"type": "plane_wave", "propagation_axis": "z"},
-            "spacetime": {
-                "dimension": 4,
-                "metric": "diagonal",
-                "diagonal": [-1, "x[]^2", "x[]^2", 1],
-            },
-        })
+        wls = self._generate(
+            {
+                "reduction": {"type": "plane_wave", "propagation_axis": "z"},
+                "spacetime": {
+                    "dimension": 4,
+                    "metric": "diagonal",
+                    "diagonal": [-1, "x[]^2", "x[]^2", 1],
+                },
+            }
+        )
         assert "FreeQ" in wls or "killedVars" in wls
 
     def test_derivative_slots_correct_for_z(self) -> None:
         """z-propagation in 3+1D kills slots 2 (x) and 3 (y)."""
-        wls = self._generate({
-            "reduction": {"type": "plane_wave", "propagation_axis": "z"},
-        })
+        wls = self._generate(
+            {
+                "reduction": {"type": "plane_wave", "propagation_axis": "z"},
+            }
+        )
         # Slots 2 and 3 should be zeroed (x=slot 2, y=slot 3 in t,x,y,z)
         assert "{ords}[[2]]" in wls
         assert "{ords}[[3]]" in wls
 
     def test_derivative_slots_correct_for_x(self) -> None:
         """x-propagation in 3+1D kills slots 3 (y) and 4 (z)."""
-        wls = self._generate({
-            "reduction": {"type": "plane_wave", "propagation_axis": "x"},
-        })
+        wls = self._generate(
+            {
+                "reduction": {"type": "plane_wave", "propagation_axis": "x"},
+            }
+        )
         assert "{ords}[[3]]" in wls
         assert "{ords}[[4]]" in wls
 
@@ -713,10 +740,12 @@ class TestValidateReduction:
 
     def test_valid_plane_wave(self) -> None:
         """Valid plane_wave reduction config accepted."""
-        self._validate({
-            "spacetime": {"dimension": 4},
-            "reduction": {"type": "plane_wave", "propagation_axis": "z"},
-        })
+        self._validate(
+            {
+                "spacetime": {"dimension": 4},
+                "reduction": {"type": "plane_wave", "propagation_axis": "z"},
+            }
+        )
 
     def test_no_reduction_ok(self) -> None:
         """No [reduction] section is fine."""
@@ -725,38 +754,48 @@ class TestValidateReduction:
     def test_invalid_type(self) -> None:
         """Non-plane_wave type rejected."""
         with pytest.raises(ValueError, match="plane_wave"):
-            self._validate({
-                "spacetime": {"dimension": 4},
-                "reduction": {"type": "spherical"},
-            })
+            self._validate(
+                {
+                    "spacetime": {"dimension": 4},
+                    "reduction": {"type": "spherical"},
+                }
+            )
 
     def test_missing_propagation_axis(self) -> None:
         """Missing propagation_axis rejected."""
         with pytest.raises(ValueError, match="propagation_axis"):
-            self._validate({
-                "spacetime": {"dimension": 4},
-                "reduction": {"type": "plane_wave"},
-            })
+            self._validate(
+                {
+                    "spacetime": {"dimension": 4},
+                    "reduction": {"type": "plane_wave"},
+                }
+            )
 
     def test_invalid_propagation_axis(self) -> None:
         """Invalid propagation_axis rejected."""
         with pytest.raises(ValueError, match="valid spatial"):
-            self._validate({
-                "spacetime": {"dimension": 4},
-                "reduction": {"type": "plane_wave", "propagation_axis": "w"},
-            })
+            self._validate(
+                {
+                    "spacetime": {"dimension": 4},
+                    "reduction": {"type": "plane_wave", "propagation_axis": "w"},
+                }
+            )
 
     def test_1d_cannot_reduce(self) -> None:
         """Cannot reduce a 1+1D theory."""
         with pytest.raises(ValueError, match="cannot reduce"):
-            self._validate({
-                "spacetime": {"dimension": 2},
-                "reduction": {"type": "plane_wave", "propagation_axis": "x"},
-            })
+            self._validate(
+                {
+                    "spacetime": {"dimension": 2},
+                    "reduction": {"type": "plane_wave", "propagation_axis": "x"},
+                }
+            )
 
     def test_2d_valid(self) -> None:
         """2+1D can be reduced along x."""
-        self._validate({
-            "spacetime": {"dimension": 3},
-            "reduction": {"type": "plane_wave", "propagation_axis": "x"},
-        })
+        self._validate(
+            {
+                "spacetime": {"dimension": 3},
+                "reduction": {"type": "plane_wave", "propagation_axis": "x"},
+            }
+        )

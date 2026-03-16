@@ -337,7 +337,12 @@ class TestYoshidaBasic:
 
         y0 = np.zeros(layout.total_size)
         result = solve_leapfrog(
-            spec, grid, y0, t_span=(0.0, 1.0), dt=0.01, order=4,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            dt=0.01,
+            order=4,
         )
         assert result["success"]
         assert "Yoshida" in result["message"]
@@ -356,8 +361,13 @@ class TestYoshidaBasic:
         y0[0:n] = np.sin(x)
 
         result = solve_leapfrog(
-            spec, grid, y0, t_span=(0.0, 1.0), dt=0.01,
-            snapshot_interval=1.0, order=4,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            dt=0.01,
+            snapshot_interval=1.0,
+            order=4,
         )
         assert result["success"]
 
@@ -403,8 +413,13 @@ class TestYoshidaEnergy:
             energies.append(energy)
 
         result = solve_leapfrog(
-            spec, grid, y0, t_span=(0.0, 10.0), dt=0.01,
-            snapshot_interval=0.1, snapshot_callback=_energy_callback,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 10.0),
+            dt=0.01,
+            snapshot_interval=0.1,
+            snapshot_callback=_energy_callback,
             order=4,
         )
         assert result["success"]
@@ -446,8 +461,13 @@ class TestYoshidaConvergenceOrder:
         if order == 4:
             dt_ref = 0.002  # Yoshida already very accurate at this dt
         ref = solve_leapfrog(
-            spec, grid, y0, t_span=(0.0, t_end), dt=dt_ref,
-            snapshot_interval=t_end, order=order,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, t_end),
+            dt=dt_ref,
+            snapshot_interval=t_end,
+            order=order,
         )
         ref_phi = ref["y"][-1][0:n]
         return spec, grid, y0, ref_phi
@@ -464,8 +484,13 @@ class TestYoshidaConvergenceOrder:
 
         for dt in dts:
             result = solve_leapfrog(
-                spec, grid, y0, t_span=(0.0, 2.0), dt=dt,
-                snapshot_interval=2.0, order=4,
+                spec,
+                grid,
+                y0,
+                t_span=(0.0, 2.0),
+                dt=dt,
+                snapshot_interval=2.0,
+                order=4,
             )
             phi_final = result["y"][-1][0:n]
             errors.append(float(np.max(np.abs(phi_final - ref_phi))))
@@ -494,8 +519,13 @@ class TestYoshidaConvergenceOrder:
 
         for dt in dts:
             result = solve_leapfrog(
-                spec, grid, y0, t_span=(0.0, 2.0), dt=dt,
-                snapshot_interval=2.0, order=2,
+                spec,
+                grid,
+                y0,
+                t_span=(0.0, 2.0),
+                dt=dt,
+                snapshot_interval=2.0,
+                order=2,
             )
             phi_final = result["y"][-1][0:n]
             errors.append(float(np.max(np.abs(phi_final - ref_phi))))
@@ -544,8 +574,13 @@ class TestYoshidaFusedKicks:
             n_steps = 10
             t_end = 0.01 * n_steps  # dt=0.01, n_steps=10
             solve_leapfrog(
-                spec, grid, y0, t_span=(0.0, t_end), dt=0.01,
-                snapshot_interval=t_end, order=4,
+                spec,
+                grid,
+                y0,
+                t_span=(0.0, t_end),
+                dt=0.01,
+                snapshot_interval=t_end,
+                order=4,
             )
 
         # Fused-kick: 1 (pre-loop) + 3 per step = 3N+1
@@ -578,8 +613,13 @@ class TestYoshidaFusedKicks:
             n_steps = 10
             t_end = 0.01 * n_steps
             solve_leapfrog(
-                spec, grid, y0, t_span=(0.0, t_end), dt=0.01,
-                snapshot_interval=t_end, order=2,
+                spec,
+                grid,
+                y0,
+                t_span=(0.0, t_end),
+                dt=0.01,
+                snapshot_interval=t_end,
+                order=2,
             )
 
         expected = n_steps + 1
@@ -605,15 +645,20 @@ class TestYoshidaFusedKicks:
         x = grid.axes_coords(0)
         y0 = np.zeros(layout.total_size)
         y0[0:n] = np.sin(x)
-        y0[n:2 * n] = 0.5 * np.cos(x)
+        y0[n : 2 * n] = 0.5 * np.cos(x)
 
         dt = 0.01
         t_end = 1.0
 
         # --- Fused version (current implementation) ---
         result_fused = solve_leapfrog(
-            spec, grid, y0.copy(), t_span=(0.0, t_end), dt=dt,
-            snapshot_interval=t_end, order=4,
+            spec,
+            grid,
+            y0.copy(),
+            t_span=(0.0, t_end),
+            dt=dt,
+            snapshot_interval=t_end,
+            order=4,
         )
         y_fused = result_fused["y"][-1]
 
@@ -631,16 +676,30 @@ class TestYoshidaFusedKicks:
             for w in YOSHIDA_WEIGHTS:
                 sub_dt = w * dt
                 compute_force(
-                    spec, layout, grid, None, y, t_sub, None,
-                    out=force_buf, fieldset=fieldset_buf,
+                    spec,
+                    layout,
+                    grid,
+                    None,
+                    y,
+                    t_sub,
+                    None,
+                    out=force_buf,
+                    fieldset=fieldset_buf,
                 )
                 _half_kick(y, force_buf, sub_dt, layout)
                 for fs, vs in drift_pairs:
                     y[fs] += sub_dt * y[vs]
                 t_sub += sub_dt
                 compute_force(
-                    spec, layout, grid, None, y, t_sub, None,
-                    out=force_buf, fieldset=fieldset_buf,
+                    spec,
+                    layout,
+                    grid,
+                    None,
+                    y,
+                    t_sub,
+                    None,
+                    out=force_buf,
+                    fieldset=fieldset_buf,
                 )
                 _half_kick(y, force_buf, sub_dt, layout)
             t += dt

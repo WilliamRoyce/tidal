@@ -169,7 +169,9 @@ class TestOperatorTerm:
     def test_position_dependent_autodetect_x(self) -> None:
         """Auto-detect x[] in coefficient_symbolic → position_dependent True."""
         term = OperatorTerm(
-            -1.0, "identity", "h_7",
+            -1.0,
+            "identity",
+            "h_7",
             coefficient_symbolic="(-1/2*(B0^2*kappa^2*omegaP2*x[]^2))",
         )
         assert term.position_dependent
@@ -177,7 +179,9 @@ class TestOperatorTerm:
     def test_position_dependent_autodetect_y(self) -> None:
         """Auto-detect y[] in coefficient_symbolic → position_dependent True."""
         term = OperatorTerm(
-            -1.0, "identity", "phi",
+            -1.0,
+            "identity",
+            "phi",
             coefficient_symbolic="-m2*y[]^2",
         )
         assert term.position_dependent
@@ -185,7 +189,9 @@ class TestOperatorTerm:
     def test_position_dependent_time_only(self) -> None:
         """Time-only dependency (t[]) → position_dependent is False."""
         term = OperatorTerm(
-            1.0, "identity", "phi",
+            1.0,
+            "identity",
+            "phi",
             coefficient_symbolic="g0*Cos[t[]]",
         )
         assert not term.position_dependent
@@ -193,7 +199,9 @@ class TestOperatorTerm:
     def test_position_dependent_explicit_coordinate_dependent(self) -> None:
         """Explicit coordinate_dependent field overrides auto-detection."""
         term = OperatorTerm(
-            -1.0, "identity", "phi",
+            -1.0,
+            "identity",
+            "phi",
             coefficient_symbolic="-m2",  # no x[] in symbolic
             coordinate_dependent=("x",),
         )

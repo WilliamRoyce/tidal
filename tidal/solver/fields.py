@@ -36,8 +36,16 @@ class FieldSet:  # noqa: PLR0904
     """
 
     __slots__ = (
-        "_aux", "_data", "_field_names", "_grid_shape", "_layout", "_n",
-        "_name_to_idx", "_name_to_range", "_slot_names", "_velocity_names",
+        "_aux",
+        "_data",
+        "_field_names",
+        "_grid_shape",
+        "_layout",
+        "_n",
+        "_name_to_idx",
+        "_name_to_range",
+        "_slot_names",
+        "_velocity_names",
     )
 
     def __init__(

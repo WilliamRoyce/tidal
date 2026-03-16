@@ -77,7 +77,9 @@ class TestGradientConvergenceOrder:
         errors: dict[int, float] = {}
         for n in self.grid_sizes:
             grid = GridInfo(
-                bounds=((0.0, 2 * np.pi),), shape=(n,), periodic=(True,),
+                bounds=((0.0, 2 * np.pi),),
+                shape=(n,),
+                periodic=(True,),
             )
             x = grid.cell_coords[..., 0]
             f = np.sin(x)
@@ -90,19 +92,25 @@ class TestGradientConvergenceOrder:
         """2nd-order gradient converges as O(dx²)."""
         errors = self._compute_gradient_errors(2)
         slope = _convergence_slope(errors, self.grid_sizes)
-        assert slope == pytest.approx(2.0, abs=0.2), f"Expected slope ~2, got {slope:.2f}"
+        assert slope == pytest.approx(2.0, abs=0.2), (
+            f"Expected slope ~2, got {slope:.2f}"
+        )
 
     def test_order_4(self) -> None:
         """4th-order gradient converges as O(dx⁴)."""
         errors = self._compute_gradient_errors(4)
         slope = _convergence_slope(errors, self.grid_sizes)
-        assert slope == pytest.approx(4.0, abs=0.2), f"Expected slope ~4, got {slope:.2f}"
+        assert slope == pytest.approx(4.0, abs=0.2), (
+            f"Expected slope ~4, got {slope:.2f}"
+        )
 
     def test_order_6(self) -> None:
         """6th-order gradient converges as O(dx⁶)."""
         errors = self._compute_gradient_errors(6)
         slope = _convergence_slope(errors, self.grid_sizes)
-        assert slope == pytest.approx(6.0, abs=0.2), f"Expected slope ~6, got {slope:.2f}"
+        assert slope == pytest.approx(6.0, abs=0.2), (
+            f"Expected slope ~6, got {slope:.2f}"
+        )
 
 
 class TestLaplacianConvergenceOrder:
@@ -123,7 +131,9 @@ class TestLaplacianConvergenceOrder:
         errors: dict[int, float] = {}
         for n in self.grid_sizes:
             grid = GridInfo(
-                bounds=((0.0, 2 * np.pi),), shape=(n,), periodic=(True,),
+                bounds=((0.0, 2 * np.pi),),
+                shape=(n,),
+                periodic=(True,),
             )
             x = grid.cell_coords[..., 0]
             f = np.sin(k * x)
@@ -136,19 +146,25 @@ class TestLaplacianConvergenceOrder:
         """2nd-order Laplacian converges as O(dx²)."""
         errors = self._compute_laplacian_errors(2)
         slope = _convergence_slope(errors, self.grid_sizes)
-        assert slope == pytest.approx(2.0, abs=0.2), f"Expected slope ~2, got {slope:.2f}"
+        assert slope == pytest.approx(2.0, abs=0.2), (
+            f"Expected slope ~2, got {slope:.2f}"
+        )
 
     def test_order_4(self) -> None:
         """4th-order Laplacian converges as O(dx⁴)."""
         errors = self._compute_laplacian_errors(4)
         slope = _convergence_slope(errors, self.grid_sizes)
-        assert slope == pytest.approx(4.0, abs=0.2), f"Expected slope ~4, got {slope:.2f}"
+        assert slope == pytest.approx(4.0, abs=0.2), (
+            f"Expected slope ~4, got {slope:.2f}"
+        )
 
     def test_order_6(self) -> None:
         """6th-order Laplacian converges as O(dx⁶)."""
         errors = self._compute_laplacian_errors(6)
         slope = _convergence_slope(errors, self.grid_sizes)
-        assert slope == pytest.approx(6.0, abs=0.3), f"Expected slope ~6, got {slope:.2f}"
+        assert slope == pytest.approx(6.0, abs=0.3), (
+            f"Expected slope ~6, got {slope:.2f}"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -163,7 +179,9 @@ class TestHigherOrderAccuracy:
         """At N=64, order 4 is more accurate than order 2, and 6 > 4."""
         n = 64
         grid = GridInfo(
-            bounds=((0.0, 2 * np.pi),), shape=(n,), periodic=(True,),
+            bounds=((0.0, 2 * np.pi),),
+            shape=(n,),
+            periodic=(True,),
         )
         x = grid.cell_coords[..., 0]
         f = np.sin(x)
@@ -183,7 +201,9 @@ class TestHigherOrderAccuracy:
         """At N=64, order 4 is more accurate than order 2, and 6 > 4."""
         n = 64
         grid = GridInfo(
-            bounds=((0.0, 2 * np.pi),), shape=(n,), periodic=(True,),
+            bounds=((0.0, 2 * np.pi),),
+            shape=(n,),
+            periodic=(True,),
         )
         x = grid.cell_coords[..., 0]
         f = np.sin(x)
@@ -362,10 +382,22 @@ class TestGridSizeValidation:
         import sys
 
         result = subprocess.run(
-            [sys.executable, "-m", "tidal.cli", "simulate",
-             "examples/data/klein_gordon_1d.json",
-             "--grid-shape", "4", "--bounds", "0:6.28", "--periodic",
-             "--t-end", "0.01", "--output", "/tmp/tidal_tests/fd_fallback"],
+            [
+                sys.executable,
+                "-m",
+                "tidal.cli",
+                "simulate",
+                "examples/data/klein_gordon_1d.json",
+                "--grid-shape",
+                "4",
+                "--bounds",
+                "0:6.28",
+                "--periodic",
+                "--t-end",
+                "0.01",
+                "--output",
+                "/tmp/tidal_tests/fd_fallback",
+            ],
             capture_output=True,
             text=True,
             timeout=30,
@@ -380,11 +412,24 @@ class TestGridSizeValidation:
         import sys
 
         result = subprocess.run(
-            [sys.executable, "-m", "tidal.cli", "simulate",
-             "examples/data/klein_gordon_1d.json",
-             "--grid-shape", "4", "--bounds", "0:6.28", "--periodic",
-             "--fd-order", "6",
-             "--t-end", "0.01", "--output", "/tmp/tidal_tests/fd_error"],
+            [
+                sys.executable,
+                "-m",
+                "tidal.cli",
+                "simulate",
+                "examples/data/klein_gordon_1d.json",
+                "--grid-shape",
+                "4",
+                "--bounds",
+                "0:6.28",
+                "--periodic",
+                "--fd-order",
+                "6",
+                "--t-end",
+                "0.01",
+                "--output",
+                "/tmp/tidal_tests/fd_error",
+            ],
             capture_output=True,
             text=True,
             timeout=30,
