@@ -12,6 +12,7 @@ Arbitrarily Spaced Grids", Mathematics of Computation 51(184), 1988.
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import TYPE_CHECKING, ClassVar
 
 import numpy as np
@@ -365,6 +366,20 @@ class TestSparsityWidensWithOrder:
 # ---------------------------------------------------------------------------
 
 
+_KG_1D_JSON = (
+    Path(__file__).resolve().parent.parent
+    / "examples"
+    / "data"
+    / "klein_gordon_1d.json"
+)
+
+_requires_kg_1d = pytest.mark.skipif(
+    not _KG_1D_JSON.exists(),
+    reason="klein_gordon_1d.json not derived",
+)
+
+
+@_requires_kg_1d
 class TestGridSizeValidation:
     """Verify that _simulate validates grid size vs FD order.
 
