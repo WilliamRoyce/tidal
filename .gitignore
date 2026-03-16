@@ -19,6 +19,8 @@ wolfram_test_output.txt
 .claude-project-backup/
 .claude-session-context/
 
+.claude/settings.local.json
+
 # Build artifacts
 docs/build/
 coverage.xml
