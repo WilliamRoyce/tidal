@@ -28,7 +28,7 @@ This directory contains living documentation that captures the project's evoluti
 **Contents:**
 
 - Common Wolfram/xAct errors and fixes
-- Python/py-pde issues (operators, grids, state)
+- Python solver issues (operators, grids, state)
 - Debugging techniques for both sides
 - Verification checklists after changes
 

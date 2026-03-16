@@ -36,8 +36,16 @@ class FieldSet:  # noqa: PLR0904
     """
 
     __slots__ = (
-        "_aux", "_data", "_grid_shape", "_layout", "_n",
-        "_name_to_idx", "_name_to_range",
+        "_aux",
+        "_data",
+        "_field_names",
+        "_grid_shape",
+        "_layout",
+        "_n",
+        "_name_to_idx",
+        "_name_to_range",
+        "_slot_names",
+        "_velocity_names",
     )
 
     def __init__(
@@ -74,6 +82,15 @@ class FieldSet:  # noqa: PLR0904
         # Auxiliary fields not backed by the flat state array (e.g.
         # constraint velocities injected from IDA's yp vector).
         self._aux: dict[str, np.ndarray] = {}
+
+        # Pre-compute name tuples (layout is immutable, names never change)
+        self._field_names = tuple(
+            slot.name for slot in layout.slots if slot.kind != "velocity"
+        )
+        self._velocity_names = tuple(
+            slot.name for slot in layout.slots if slot.kind == "velocity"
+        )
+        self._slot_names = tuple(slot.name for slot in layout.slots)
 
     # ---- Named access (zero-copy views) ----
 
@@ -155,9 +172,7 @@ class FieldSet:  # noqa: PLR0904
 
         Excludes velocity slots.
         """
-        return tuple(
-            slot.name for slot in self._layout.slots if slot.kind != "velocity"
-        )
+        return self._field_names
 
     @property
     def velocity_names(self) -> tuple[str, ...]:
@@ -165,19 +180,17 @@ class FieldSet:  # noqa: PLR0904
 
         Only present for second-order equations.
         """
-        return tuple(
-            slot.name for slot in self._layout.slots if slot.kind == "velocity"
-        )
+        return self._velocity_names
 
     @property
     def momentum_names(self) -> tuple[str, ...]:
         """Alias for ``velocity_names`` (transition aid)."""
-        return self.velocity_names
+        return self._velocity_names
 
     @property
     def slot_names(self) -> tuple[str, ...]:
         """All slot names in order."""
-        return tuple(slot.name for slot in self._layout.slots)
+        return self._slot_names
 
     # ---- Dict-like views (zero-copy) ----
 

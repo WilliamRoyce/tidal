@@ -1,6 +1,6 @@
 # JSON Schema Reference
 
-Complete reference for the JSON specification format used as the interface between the Wolfram/xAct symbolic layer and the Python/py-pde simulation layer.
+Complete reference for the JSON specification format used as the interface between the Wolfram/xAct symbolic layer and the Python solver (SUNDIALS + numpy).
 
 **Source of truth:** [`tidal/symbolic/json_loader.py`](../tidal/symbolic/json_loader.py)
 
@@ -317,7 +317,7 @@ No symbolic expression. The numeric `coefficient` value is used directly.
 
 ### Parametric
 
-A `coefficient_symbolic` that is a simple parameter name (or its negation). Resolved at runtime from the `parameters` dict passed to `build_pde_from_json()`.
+A `coefficient_symbolic` that is a simple parameter name (or its negation). Resolved at runtime from the `parameters` dict passed via `--param` or `CoefficientEvaluator`.
 
 ```json
 {
@@ -328,7 +328,7 @@ A `coefficient_symbolic` that is a simple parameter name (or its negation). Reso
 }
 ```
 
-At runtime: `build_pde_from_json(path, parameters={"polm2": 0.5})` resolves this to `+0.5`.
+At runtime: `--param polm2=0.5` (CLI) or `CoefficientEvaluator.resolve()` resolves this to `+0.5`.
 
 Convention: a leading `-` in the symbolic name means the parameter value is negated. So `"-polm2"` with `polm2=0.5` gives `coefficient = +0.5`.
 
@@ -837,13 +837,13 @@ Poisson equation solved as a constraint at each timestep:
 ### Loading and Simulating
 
 ```python
-from tidal.symbolic import load_equation_system, build_pde_from_json
+from tidal.symbolic.json_loader import load_equation_system
 
 # Load spec (validates JSON)
 spec = load_equation_system("examples/data/polar_kg.json")
 
-# Build PDE with runtime parameters
-pde = build_pde_from_json("examples/data/polar_kg.json", parameters={"polm2": 0.5})
+# Runtime parameters are passed via CLI (--param polm2=0.5) or programmatically
+# to CoefficientEvaluator during simulation
 ```
 
 ### Key `EquationSystem` Properties

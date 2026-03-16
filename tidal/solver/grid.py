@@ -109,17 +109,17 @@ class GridInfo:
                     )
                     raise ValueError(msg)
 
-    @property
+    @cached_property
     def ndim(self) -> int:
         """Number of spatial dimensions."""
         return len(self.shape)
 
-    @property
+    @cached_property
     def num_points(self) -> int:
         """Total number of grid cells (product of shape)."""
         return math.prod(self.shape)
 
-    @property
+    @cached_property
     def effective_bc(self) -> tuple[str, ...] | tuple[AxisBCSpec, ...]:
         """Per-axis BC specs.
 
@@ -133,7 +133,7 @@ class GridInfo:
             return self.bc
         return tuple("periodic" if p else "neumann" for p in self.periodic)
 
-    @property
+    @cached_property
     def bc_types(self) -> tuple[str, ...]:
         """Per-axis BC type as simple strings.
 

@@ -1,7 +1,7 @@
 # Next Features: Parameter Sweeps & Measurements
 
 **Created:** March 2026
-**Branch:** `feature/parameter-sweep` (1,343 tests passing)
+**Branch:** `feature/parameter-sweep` (1,484 tests passing)
 **Status:** All phases (A–D) complete
 
 This document tracks proposed features for TIDAL's parameter sweep framework and measurement modules. Each feature includes scope, generality analysis, implementation details, and acceptance criteria.
@@ -68,7 +68,7 @@ TIDAL supports theories from flat 1+1D scalars to curved 3+1D tensor fields. Mea
 
 ### Tier 1: General (any spacetime, any theory)
 
-These modules use the volume-element-aware energy computation and operate on scalar timeseries. They work for all 25 examples including curved spacetimes (polar_kg, sphere_kg, spherical_kg), background fields, and constraint systems.
+These modules use the volume-element-aware energy computation and operate on scalar timeseries. They work for all 27 examples including curved spacetimes (polar_kg, sphere_kg, spherical_kg), background fields, and constraint systems.
 
 | Module            | Why General                                                                                              |
 | ----------------- | -------------------------------------------------------------------------------------------------------- |
@@ -886,4 +886,4 @@ Most features are independent. The main dependency chain is F1 -> F2 -> F4 (TOML
 | C     | F3 + F6       | Medium     | `feature/parameter-sweep` | Complete |
 | D     | F4 + F8       | Medium     | `feature/parameter-sweep` | Complete |
 
-All 8 features are implemented. 1,343 tests passing, lint clean.
+All 8 features are implemented. 1,484 tests passing, lint clean.

@@ -1,0 +1,113 @@
+# Gertsenshtein Effect: Graviton-Photon Conversion in Dipolar Magnetic Field (Flat Space)
+#
+# Lagrangian: L = (1/kappa^2) R - (1/4) F_{ab} F^{ab}
+#   (Einstein-Hilbert gravity + Maxwell electrodynamics)
+#
+# Background: Dipolar B-field B_x(z) = Bpeak * (z0/z)^3 transverse to propagation axis z.
+# This models the equatorial transverse field of a magnetic dipole (magnetar/neutron star),
+# simulated in flat space to avoid spherical-coordinate tensor complications.
+#
+# Gauge potential: Abar_y = Bpeak * z0^3 / (2 * z^2)  [Coulomb gauge]
+# Check: F_{zy} = d/dz(Abar_y) = -Bpeak * z0^3 / z^3 = -B_x(z) ✓
+#
+# Analytical target (Boccaletti 1970, WKB limit):
+#   integral_{z_min}^{inf} B_x(z) dz = Bpeak * z0^3 / (2 * z_min^2)
+#   P = sin^2(kappa/2 * integral(B_x, z_min, inf))
+#     = sin^2(kappa * Bpeak * z0^3 / (4 * z_min^2))
+#
+# This is the same Boccaletti formula as for any B-field profile (Gaussian, uniform, etc.)
+# since P = sin^2(kappa/2 * integral(B)) is exact for massless vacuum conversion (Delta_k=0).
+#
+# Note: domain must start at z_min > 0 since B diverges at z=0.
+# z_min corresponds to R_NS (neutron star surface) in the astrophysical context.
+#
+# Refs:
+#   Boccaletti et al. (1970, Nuovo Cimento 70B:129) — finite-region conversion formula
+#   McDonald & Ellis (2024, arXiv:2406.18634) — magnetar graviton-photon conversion
+#   Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609) — inhomogeneous B-field treatment
+
+[theory]
+name = "Gertsenshtein Effect (Dipolar B-field, Flat Space)"
+description = "Graviton-photon conversion in dipolar background B-field (flat space proxy for spherical radial propagation)"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+# h: metric perturbation (graviton), A/a: EM potential/perturbation, F = dA
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+# Electromagnetic field strength tensor F = dA (exterior derivative)
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Dipolar B-field background potential in Coulomb gauge.
+# Abar_y (component[2], covariant y-component) = Bpeak * z0^3 / (2 * z^2)
+# -> F_{zy} = d/dz(Abar_y) = -Bpeak * z0^3 / z^3 = -B_x(z)
+# -> B_x(z) = Bpeak * (z0/z)^3
+# This is the equatorial transverse field of a magnetic dipole.
+# Refs: McDonald & Ellis (2024, arXiv:2406.18634); Boccaletti et al. (1970)
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "Bpeak*z0^3/(2*z[]^2)", "0"]
+
+[constants]
+names = ["kappa", "Bpeak", "z0"]
+
+# Full Einstein-Maxwell Lagrangian:
+# (1/kappa^2) R - (1/4) F_ab F^ab
+# where kappa^2 = 16*pi*G in natural units
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]"
+
+# Multi-field perturbation:
+# Metric: g = eta + epsilon*h  (SetupMetricPerturbation)
+# EM: A = Abar + epsilon*a     (DefTensorPerturbation)
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# TT gauge for graviton (h_{0mu}=0, h^i_i=0, d^i h_{ij}=0)
+[[gauge]]
+field = "h"
+type = "tt"
+
+# Lorenz gauge for photon perturbation (d_mu a^mu = 0)
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction: d/dx = d/dy = 0
+# Reduces 3+1D to effective 1+1D along z (propagation direction)
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+[parameters]
+kappa = 1.0
+Bpeak = 0.1
+z0 = 1.0
+
+[output]
+path = "../data/gertsenshtein_dipolar.json"

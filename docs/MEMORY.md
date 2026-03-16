@@ -21,6 +21,7 @@
 - `adaptive_timestepping.md` - Solver architecture and tolerance control
 - `constraint_fields.md` - Constraint field physics and solver treatment
 - `solver_migration.md` - Migration from py-pde to native SUNDIALS/numpy architecture
+- `solver_optimizations.md` - Solver performance optimizations (FD stencils, Yoshida integrator, benchmarks)
 
 ---
 
@@ -226,7 +227,7 @@ jsonStructure = BuildMultiFieldJSONStructure[fieldEquations, metadata];
 
 ### Test Counts
 
-- **~1,343 Python tests** + **~115 Wolfram tests** passing
+- **~1,484 Python tests** + **~115 Wolfram tests** passing (as of 2026-03-12)
 - Run: `uv run pytest tests/` and `./scripts/full_test.sh`
 
 ### Verification Pattern

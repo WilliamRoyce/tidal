@@ -179,7 +179,7 @@ The constraint solver handles the 3 constraints:
 - [ ] Symbolic coefficient preservation (`"m2"` string in JSON)
 
 ### JSON -> Simulation (requires JSON output)
-- [ ] `build_pde_from_json` loads with `parameters={"m2": 1.0}`
+- [ ] `load_equation_system` loads with `parameters={"m2": 1.0}` via `--param`
 - [ ] Mass terms evaluated from symbolic coefficients
 - [ ] `create_initial_state` handles mixed constraint/evolution layout
 - [ ] RK4 evolution stable with dt=0.005

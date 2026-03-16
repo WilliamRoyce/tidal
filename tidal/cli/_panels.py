@@ -280,7 +280,9 @@ def render_snapshot(
     if dim == 1:
         x_min, x_max = data.grid_bounds[0]
         x = np.linspace(
-            x_min + data.grid_spacing[0] / 2, x_max - data.grid_spacing[0] / 2, snap.shape[0]
+            x_min + data.grid_spacing[0] / 2,
+            x_max - data.grid_spacing[0] / 2,
+            snap.shape[0],
         )
         ax.plot(x, snap, "b-", linewidth=1.5)
         ax.set_xlabel("x")
@@ -493,7 +495,9 @@ def render_compare(
         if dim == 1:
             x_min, x_max = data.grid_bounds[0]
             x = np.linspace(
-                x_min + data.grid_spacing[0] / 2, x_max - data.grid_spacing[0] / 2, initial.shape[0]
+                x_min + data.grid_spacing[0] / 2,
+                x_max - data.grid_spacing[0] / 2,
+                initial.shape[0],
             )
             ax.plot(x, initial, color=color, linewidth=1.5, label=f"{name} (t=0)")
             ax.plot(
@@ -521,8 +525,7 @@ def render_compare(
             raise ValueError(msg)
         elif dim == 3:  # noqa: PLR2004
             z, init_profile = _z_profile_1d(initial, data)
-            ax.plot(z, init_profile, color=color, linewidth=1.5,
-                    label=f"{name} (t=0)")
+            ax.plot(z, init_profile, color=color, linewidth=1.5, label=f"{name} (t=0)")
             ax.plot(
                 z,
                 _z_profile_1d(final, data)[1],

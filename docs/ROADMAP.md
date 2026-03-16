@@ -3,7 +3,7 @@
 This document outlines the planned improvements and features for the TIDAL symbolic physics pipeline project.
 
 **Last Updated:** March 2026
-**Project Status:** Phase 13+ Complete, CLI + measurement + solver migration + parameter sweeps done (1,343 Python tests + ~115 Wolfram tests)
+**Project Status:** Phase 13+ Complete, CLI + measurement + solver migration + parameter sweeps done (1,484 Python tests + ~115 Wolfram tests)
 
 ## Overview
 
@@ -147,6 +147,14 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 | `docs/COMMUNITY.md` — community guidelines and support channels                             | ✅ Complete |
 | Sphinx extensions: autosummary, doctest                                                     | ✅ Complete |
 | README Community & Support section                                                          | ✅ Complete |
+| Performance optimizations (6 rounds + Phases 1-3): hot-path elimination, ghost-cell padding, fused operators, higher-order FD stencils (`--fd-order 4\|6`), Yoshida 4th-order leapfrog (`--leapfrog-order 4`), FFT spectral operators (`--spectral`) | ✅ Complete |
+| Analytical Jacobian — precomputed dF/dy + dF/dyp for time-independent systems (5.3x IDA speedup) | ✅ Complete |
+| Multi-field perturbation pipeline — `[[linearization.matter_perturbations]]` TOML for xPert DefTensorPerturbation | ✅ Complete |
+| Curved-metric pipeline — non-constant metrics (spherical, cylindrical) in derive → JSON workflow | ✅ Complete |
+| TT gauge constraint elimination — transverse constraints replace constrained EOM in-place (Wolfram-side) | ✅ Complete |
+| Simulation progress bar — tqdm-based `SimulationProgress` class, auto-suppressed in sweep inner runs | ✅ Complete |
+| Simulation resume — `--resume DIR [--snapshot N] [--t-additional T]` checkpoint loading | ✅ Complete |
+| Gertsenshtein effect (Phase D) — graviton-photon conversion validated: uniform B₀ (sin²(κB₀t/2)), localized Gaussian (Boccaletti formula), radial dipolar (in progress) | 🔄 In Progress |
 
 ---
 
@@ -206,8 +214,8 @@ Issues should be tagged with appropriate labels:
 - ✅ Parameter sweep framework (Phase C): `tidal sweep` + `tidal analyze`, 13 measurement types, adaptive/LHS/Sobol sampling, Sobol/Morris sensitivity, convergence mode, 6 plot types
 - ✅ CLI (`tidal` command) implemented: 9 subcommands, zero new dependencies
 - ✅ Measurement module: 13 types (energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary)
-- ✅ 25 working examples spanning 1+1D through 3+1D
-- ✅ 1,343 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
+- ✅ 27 working examples spanning 1+1D through 3+1D
+- ✅ 1,484 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
 - ✅ 21 of 25 original issues resolved (84%)
 - 🔄 **Primary remaining focus:** Phase D (Gertsenshtein example — the project's raison d'être)
 - 🔄 **Secondary:** Phase 2 (Wolfram CI)
@@ -232,9 +240,9 @@ Issues should be tagged with appropriate labels:
    - Yang-Mills equations (linearized sector)
    - SU(2) and SU(3) gauge groups
 
-4. **Spectral Spatial Discretisation (Phase E)**
-   - FFT-based operators for exponential convergence on periodic domains
-   - Chebyshev for non-periodic directions (following Dedalus architecture)
+4. **Spectral Spatial Discretisation (Phase E)** — ✅ FFT COMPLETE
+   - ~~FFT-based operators for exponential convergence on periodic domains~~ **Done** (`--spectral`, auto-enabled for all-periodic BCs)
+   - Chebyshev for non-periodic directions (following Dedalus architecture) — remaining
 
 5. **Performance Scaling**
    - GPU acceleration for large grids

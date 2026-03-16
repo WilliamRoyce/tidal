@@ -2,6 +2,7 @@
 
 **Status:** Accepted
 **Date:** 2026-02-16
+**Note:** This ADR predates the SUNDIALS migration (Feb 2026). References to py-pde reflect the architecture at time of writing; the solver layer now uses SUNDIALS IDA/CVODE + native numpy operators.
 **Context:** TIDAL simulation pipeline stores entire time history in RAM, killing long-running simulations.
 
 ## Problem Statement

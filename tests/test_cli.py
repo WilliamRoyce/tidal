@@ -656,10 +656,10 @@ class TestSimulateCommand:
         assert "Auto-selected solver:" in captured.out
         assert "Scheme:" in captured.out
 
-    def test_auto_selects_ida_for_constraints(
+    def test_auto_selects_modal_for_periodic_constraints(
         self, inline_em_1d_json: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Constraint equations (time_order=0) should auto-select IDA."""
+        """Periodic constraint equations should auto-select modal (Schur)."""
         ret = main(
             [
                 "simulate",
@@ -675,7 +675,7 @@ class TestSimulateCommand:
         )
         assert ret == 0
         captured = capsys.readouterr()
-        assert "Auto-selected solver: ida" in captured.out
+        assert "Auto-selected solver: modal" in captured.out
 
     def test_simulate_ida_scheme(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
@@ -2135,6 +2135,168 @@ class TestValidateCommand:
         ret = main(["validate", str(tmp_path)])
         assert ret == 1
 
+    def test_validate_stability_stable_spec(
+        self,
+        inline_kg_1d_json: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--stability on a stable spec should return 0 and say [stable]."""
+        ret = main(
+            ["validate", str(inline_kg_1d_json), "--stability", "--param", "m2=1.0"]
+        )
+        assert ret == 0
+        out = capsys.readouterr().out
+        assert "stable" in out.lower()
+
+    def test_validate_stability_tachyon_detection(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--stability should detect a tachyonic mode (negative mass²)."""
+        import json
+
+        spec = {
+            "metadata": {"source": "test", "parameters": {"m2": -1.0}},
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [{"name": "phi_0", "index": 0, "is_dynamical": True}],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {
+                        "expression": "d2_t(phi_0)",
+                        "order": {"time": 2, "space": 0},
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": 1.0,  # positive identity → negative eigenvalue
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-m2",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                }
+            ],
+            "coupling": {"mass_matrix_symbolic": [["-m2"]]},
+        }
+        spec_path = tmp_path / "tachyon.json"
+        spec_path.write_text(json.dumps(spec), encoding="utf-8")
+        ret = main(["validate", str(spec_path), "--stability"])
+        assert ret == 1
+        err = capsys.readouterr().err
+        assert "ERROR" in err
+
+    def test_validate_stability_param_override_triggers_instability(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """--param overrides should affect stability check (large coupling → tachyon)."""
+        import json
+
+        # coupled_scalars: stable when gCpl² < mPhi2 * mChi2 = 1*4 = 4
+        # With gCpl=3.0 it becomes unstable (g² = 9 > 4)
+        spec = {
+            "metadata": {
+                "source": "test",
+                "parameters": {"mPhi2": 1.0, "mChi2": 4.0, "gCpl": 0.5},
+            },
+            "spacetime": {
+                "dimension": 2,
+                "signature": [-1, 1],
+                "coordinates": ["t", "x"],
+            },
+            "fields": [
+                {"name": "phi_0", "index": 0, "is_dynamical": True},
+                {"name": "chi_0", "index": 1, "is_dynamical": True},
+            ],
+            "equations": [
+                {
+                    "field": "phi_0",
+                    "lhs": {
+                        "expression": "d2_t(phi_0)",
+                        "order": {"time": 2, "space": 0},
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-mPhi2",
+                            },
+                            {
+                                "coefficient": -0.5,
+                                "operator": "identity",
+                                "field": "chi_0",
+                                "coefficient_symbolic": "-gCpl",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
+                        ],
+                    },
+                },
+                {
+                    "field": "chi_0",
+                    "lhs": {
+                        "expression": "d2_t(chi_0)",
+                        "order": {"time": 2, "space": 0},
+                    },
+                    "rhs": {
+                        "type": "linear_combination",
+                        "terms": [
+                            {
+                                "coefficient": -4.0,
+                                "operator": "identity",
+                                "field": "chi_0",
+                                "coefficient_symbolic": "-mChi2",
+                            },
+                            {
+                                "coefficient": -0.5,
+                                "operator": "identity",
+                                "field": "phi_0",
+                                "coefficient_symbolic": "-gCpl",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "chi_0",
+                            },
+                        ],
+                    },
+                },
+            ],
+            "coupling": {"mass_matrix_symbolic": [["-mPhi2", None], [None, "-mChi2"]]},
+        }
+        spec_path = tmp_path / "coupled.json"
+        spec_path.write_text(json.dumps(spec), encoding="utf-8")
+
+        # Default params: gCpl=0.5 → stable
+        ret_stable = main(["validate", str(spec_path), "--stability"])
+        assert ret_stable == 0
+
+        # Override: gCpl=3.0 → unstable (g²=9 > mPhi2*mChi2=4)
+        ret_unstable = main(
+            ["validate", str(spec_path), "--stability", "--param", "gCpl=3.0"]
+        )
+        assert ret_unstable == 1
+
 
 class TestMeasureCommand:
     def test_measure_help(self) -> None:
@@ -3366,6 +3528,108 @@ path = "coupled_scattering.json"
         assert "g0" in out
         assert "mChi2" in out
 
+    def test_background_vector_curved_metric_contravariant(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Vector background in curved diagonal metric: contravariant A^μ = A_μ / g_{μμ}.
+
+        For spherical metric diag[-1, 1, r², r²sin²θ], the θ-component (index 2)
+        has g_{22} = x[]^2 (= r²).  Given covariant A_θ = B/(2*x[]^2), the correct
+        contravariant value is A^θ = B/(2*x[]^4), NOT B/(2*x[]^2).
+
+        Bug 2: prior to this fix, the same covariant value was used for the
+        contravariant substitution in _wls_vector_background_substitution, giving
+        wrong coupling coefficients in curved-spacetime theories.
+        """
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Curved Metric Vector Background"
+
+[spacetime]
+dimension = 4
+metric = "diagonal"
+diagonal = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[constants]
+names = ["Bpeak", "z0"]
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "Bpeak*z0^3/(2*x[]^2)", "0"]
+
+[lagrangian]
+expression = "-1/4 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # Covariant substitution (index 2, -Cart): covariant value unchanged
+        assert "Bpeak*z0^3/(2*x[]^2)" in out
+        # Contravariant substitution (index 2, +Cart): must be A_θ / g_{θθ}
+        # = Bpeak*z0^3/(2*x[]^2) / x[]^2 = Bpeak*z0^3/(2*x[]^4), computed via Simplify
+        assert "Simplify[(Bpeak*z0^3/(2*x[]^2)) / (x[]^2)]" in out
+
+    def test_background_vector_minkowski_covariant_eq_contravariant(
+        self,
+        tmp_path: Path,
+        capsys: pytest.CaptureFixture[str],
+    ) -> None:
+        """Vector background in Minkowski metric: A^μ = A_μ (spatial components equal).
+
+        For Minkowski metric, g_{ii} = 1 for spatial components so A^i = A_i.
+        The covariant == contravariant shortcut must be preserved (no Simplify wrapping).
+        """
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Minkowski Vector Background"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[constants]
+names = ["B0"]
+
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "B0", "0"]
+
+[lagrangian]
+expression = "-1/4 CD[-a][A[-b]] eta[a,c] eta[b,d] CD[-c][A[-d]]"
+
+[output]
+path = "output.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret == 0
+
+        out = capsys.readouterr().out
+        # For Minkowski (empty metric_diagonal), contravariant = covariant
+        assert "[{2, -" in out
+        assert "-> B0" in out
+        assert "[{2, " in out
+        assert "-> B0" in out
+        # Must NOT generate Simplify[] wrapping for Minkowski (old shortcut preserved)
+        assert "Simplify[(B0)" not in out
+
 
 class TestExceptionHandling:
     def test_value_error_shows_clean_message(
@@ -4116,3 +4380,201 @@ path = "output.json"
 """)
         ret = main(["derive", str(config), "--dry-run"])
         assert ret == 0
+
+
+class TestCoordValuesPreEvaluation:
+    """Tests for _apply_coord_values and early coordinate-value substitution.
+
+    This covers the optimization that eliminates killed-coordinate factors
+    (e.g. Sin[y[]]^2) from Python-generated Wolfram strings *before* emission,
+    so they never enter xPert / Christoffel / TT-traceless computations.
+    """
+
+    def test_apply_coord_values_empty(self) -> None:
+        """Empty coord_values returns input unchanged."""
+        from tidal.cli._derive import _apply_coord_values
+
+        exprs = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+        assert _apply_coord_values(exprs, {}) == exprs
+
+    def test_apply_coord_values_substitutes(self) -> None:
+        """y[] -> Pi/2 is substituted in all strings."""
+        from tidal.cli._derive import _apply_coord_values
+
+        exprs = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+        result = _apply_coord_values(exprs, {"y": "Pi/2"})
+        assert result == ["-1", "1", "x[]^2", "x[]^2*Sin[Pi/2]^2"]
+
+    def test_apply_coord_values_multiple_coords(self) -> None:
+        """Multiple coord substitutions are all applied."""
+        from tidal.cli._derive import _apply_coord_values
+
+        exprs = ["y[]*z[]", "Sin[y[]]*Cos[z[]]"]
+        result = _apply_coord_values(exprs, {"y": "Pi/2", "z": "0"})
+        assert result == ["Pi/2*0", "Sin[Pi/2]*Cos[0]"]
+
+    def test_apply_coord_values_no_match(self) -> None:
+        """Strings without the coord function are returned unchanged."""
+        from tidal.cli._derive import _apply_coord_values
+
+        exprs = ["x[]^2", "Bpeak*z0^3/(2*x[]^2)"]
+        result = _apply_coord_values(exprs, {"y": "Pi/2"})
+        assert result == exprs
+
+    def test_metric_diagonal_not_pre_evaluated_in_wls(self, tmp_path: Path) -> None:
+        """Metric matrix must NOT be pre-evaluated with coordinate_values.
+
+        Substituting y→Pi/2 into the metric before xPert's L^(2) expansion
+        creates a non-flat background: diag(-1,1,r²,r²) has non-zero Riemann,
+        while the true spherical metric diag(-1,1,r²,r²sin²θ) is flat.
+        The coordinate evaluation is deferred to _wls_plane_wave_coordinate_evaluation
+        which applies "fieldEquations /. {y[] -> Pi/2}" after derivation.
+        """
+        import tomllib
+
+        from tidal.cli._derive import generate_wls
+
+        config_text = """
+[theory]
+name = "Spherical test"
+[spacetime]
+dimension = 4
+metric = "diagonal"
+diagonal = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+[[fields]]
+name = "phi"
+type = "scalar"
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] CD[a][phi[]]"
+[reduction]
+type = "plane_wave"
+propagation_axis = "x"
+coordinate_values = {y = "Pi/2"}
+[output]
+path = "out.json"
+"""
+        config_path = tmp_path / "theory.toml"
+        config_path.write_text(config_text)
+        with Path(config_path).open("rb") as f:
+            config = tomllib.load(f)
+        wls_text = generate_wls(config, str(config_path))
+        # Metric matrix must NOT be pre-evaluated (creates non-flat background)
+        assert "MetricMatrix /. {y[] -> Pi/2}" not in wls_text
+        # But coordinate_values should still be applied to field equations after derivation
+        assert "fieldEquations = fieldEquations /. {y[] -> Pi/2}" in wls_text
+
+    def test_tt_traceless_weights_no_sin_y(self, tmp_path: Path) -> None:
+        """TT-traceless substitution weights use Sin[Pi/2], not Sin[y[]]."""
+        import tomllib
+
+        from tidal.cli._derive import generate_wls
+
+        config_text = """
+[theory]
+name = "GW spherical"
+[spacetime]
+dimension = 4
+metric = "diagonal"
+diagonal = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[]"
+[constants]
+names = ["kappa"]
+[linearization]
+perturbation_field = "h"
+[[gauge]]
+field = "h"
+type = "tt"
+[reduction]
+type = "plane_wave"
+propagation_axis = "x"
+coordinate_values = {y = "Pi/2"}
+[output]
+path = "out.json"
+"""
+        config_path = tmp_path / "theory.toml"
+        config_path.write_text(config_text)
+        with Path(config_path).open("rb") as f:
+            config = tomllib.load(f)
+        wls_text = generate_wls(config, str(config_path))
+        wls_lines = wls_text.splitlines()
+        # TT traceless substitution lines contain "args___" (RuleDelayed pattern)
+        # The last-diagonal field name is prefix-dependent (e.g. gsH9, gedH9)
+        tt_lines = [line for line in wls_lines if "args___" in line and "Sin[" in line]
+        assert tt_lines, "Expected TT traceless substitution lines with Sin[] weight"
+        for line in tt_lines:
+            assert "Sin[y[]]" not in line, f"Sin[y[]] in TT traceless: {line}"
+            assert "Sin[Pi/2]" in line, f"Expected Sin[Pi/2] in TT traceless: {line}"
+
+    def test_coordinate_values_plane_wave_uses_expand(self, tmp_path: Path) -> None:
+        """Plane-wave coordinate eval step uses Expand not Simplify."""
+        import tomllib
+
+        from tidal.cli._derive import generate_wls
+
+        config_text = """
+[theory]
+name = "Coord eval speed test"
+[spacetime]
+dimension = 4
+metric = "diagonal"
+diagonal = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+[[fields]]
+name = "phi"
+type = "scalar"
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] CD[a][phi[]]"
+[reduction]
+type = "plane_wave"
+propagation_axis = "x"
+coordinate_values = {y = "Pi/2"}
+[output]
+path = "out.json"
+"""
+        config_path = tmp_path / "theory.toml"
+        config_path.write_text(config_text)
+        with Path(config_path).open("rb") as f:
+            config = tomllib.load(f)
+        wls_text = generate_wls(config, str(config_path))
+        assert "fieldEquations = fieldEquations /. {y[] -> Pi/2}" in wls_text
+        assert "Expand[fieldEquations[[k, 2]]]" in wls_text
+
+    def test_no_coordinate_values_noop(self, tmp_path: Path) -> None:
+        """Absent coordinate_values emits no early metric substitution."""
+        import tomllib
+
+        from tidal.cli._derive import generate_wls
+
+        config_text = """
+[theory]
+name = "No coord values"
+[spacetime]
+dimension = 4
+metric = "minkowski"
+[[fields]]
+name = "phi"
+type = "scalar"
+[lagrangian]
+expression = "-1/2 CD[-a][phi[]] CD[a][phi[]]"
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+[output]
+path = "out.json"
+"""
+        config_path = tmp_path / "theory.toml"
+        config_path.write_text(config_text)
+        with Path(config_path).open("rb") as f:
+            config = tomllib.load(f)
+        wls_text = generate_wls(config, str(config_path))
+        # No coordinate_values → no early metric ReplaceAll
+        assert "MetricMatrix /. {" not in wls_text
+        # No coordinate_values → no killed-coordinate field-equation substitution
+        # (the plane-wave reduction does emit "fieldEquations /. {" for derivative-zeroing,
+        # so we check specifically for a coordinate-value substitution like "y[] ->")
+        assert "-> Pi/2" not in wls_text

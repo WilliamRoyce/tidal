@@ -520,8 +520,16 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "identity", "field": "A_0"},
-                            {"coefficient": -0.5, "operator": "identity", "field": "B_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "A_0",
+                            },
+                            {
+                                "coefficient": -0.5,
+                                "operator": "identity",
+                                "field": "B_0",
+                            },
                         ],
                     },
                 },
@@ -531,8 +539,16 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -1.0, "operator": "identity", "field": "A_1"},
-                            {"coefficient": 0.5, "operator": "identity", "field": "B_1"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "A_1",
+                            },
+                            {
+                                "coefficient": 0.5,
+                                "operator": "identity",
+                                "field": "B_1",
+                            },
                         ],
                     },
                 },
@@ -542,8 +558,16 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -1.0, "operator": "identity", "field": "A_2"},
-                            {"coefficient": 0.5, "operator": "identity", "field": "B_2"},
+                            {
+                                "coefficient": -1.0,
+                                "operator": "identity",
+                                "field": "A_2",
+                            },
+                            {
+                                "coefficient": 0.5,
+                                "operator": "identity",
+                                "field": "B_2",
+                            },
                         ],
                     },
                 },
@@ -553,8 +577,16 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": -0.5, "operator": "identity", "field": "A_0"},
-                            {"coefficient": 2.0, "operator": "identity", "field": "B_0"},
+                            {
+                                "coefficient": -0.5,
+                                "operator": "identity",
+                                "field": "A_0",
+                            },
+                            {
+                                "coefficient": 2.0,
+                                "operator": "identity",
+                                "field": "B_0",
+                            },
                         ],
                     },
                 },
@@ -564,8 +596,16 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 0.5, "operator": "identity", "field": "A_1"},
-                            {"coefficient": -2.0, "operator": "identity", "field": "B_1"},
+                            {
+                                "coefficient": 0.5,
+                                "operator": "identity",
+                                "field": "A_1",
+                            },
+                            {
+                                "coefficient": -2.0,
+                                "operator": "identity",
+                                "field": "B_1",
+                            },
                         ],
                     },
                 },
@@ -575,8 +615,16 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 0.5, "operator": "identity", "field": "A_2"},
-                            {"coefficient": -2.0, "operator": "identity", "field": "B_2"},
+                            {
+                                "coefficient": 0.5,
+                                "operator": "identity",
+                                "field": "A_2",
+                            },
+                            {
+                                "coefficient": -2.0,
+                                "operator": "identity",
+                                "field": "B_2",
+                            },
                         ],
                     },
                 },
@@ -605,7 +653,11 @@ class TestPointwiseMassStability:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "identity", "field": "A_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "identity",
+                                "field": "A_0",
+                            },
                         ],
                     },
                 },

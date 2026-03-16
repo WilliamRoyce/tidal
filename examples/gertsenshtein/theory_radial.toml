@@ -1,0 +1,132 @@
+# Gertsenshtein Effect: Graviton-Photon Conversion in Dipolar Magnetic Field (Spherical)
+#
+# Lagrangian: L = (1/kappa^2) R - (1/4) F_{ab} F^{ab}
+#   (Einstein-Hilbert gravity + Maxwell electrodynamics)
+#
+# Background: Dipolar B-field B_T(r) = Bpeak * (z0/r)^3 (transverse to radial propagation).
+# This represents the equatorial magnetic field of a magnetar/neutron star.
+#
+# Coordinate system: Spherical {t, r, θ, φ} = TIDAL {t, x[], y[], z[]}
+#   Metric: ds^2 = -dt^2 + dr^2 + r^2 dθ^2 + r^2 sin^2(θ) dφ^2
+#
+# Gauge potential: Abar_θ = Bpeak * z0^3 / (2 r^2)  [Coulomb gauge, θ-component]
+# Check: F̄_{rθ} = ∂_r(Abar_θ) = -Bpeak * z0^3 / r^3
+#        (F = dA is exterior derivative — Christoffels cancel exactly in F = dA)
+#        Physical B_T = |F̄_{rθ}| / sqrt(g_rr * g_θθ) = |F̄_{rθ}| / r = Bpeak * (z0/r)^3 ✓
+#
+# Analytical target (Boccaletti formula, WKB limit r >> λ_GW):
+#   ∫_{RNS}^∞ B_T(r) dr = Bpeak * z0^3 / (2 * RNS^2)
+#   P = sin^2(κ/2 × Bpeak * z0^3 / RNS^2)
+#     = sin^2(κ * Bpeak * z0^3 / (4 * RNS^2))
+#
+# TT gauge in spherical coordinates (fixed for general propagation axis):
+# - Temporal: h_{0μ} = 0  [metric-independent, works in any coordinates]
+# - Transverse: ∂_r h_{r,j} = 0 for j=r,θ,φ → h_rr=h_rθ=h_rφ=0  [after radial reduction]
+# - Traceless: g^{ij} h_{ij} = 0 → h_φφ = -(r^2 * h_rr + h_θθ)  [at θ=π/2]
+#   (curved-metric weighted traceless condition; weights from diagonal metric entries)
+#
+# coordinate_values {y = "Pi/2"}: evaluates surviving Sin[y[]] factors after reduction
+# (arises from g_φφ = r^2*sin^2θ in traceless weights) at the equatorial plane θ=π/2.
+# This is a general mechanism — not a special case — applicable to any curved metric
+# where plane-wave reduction leaves angular coordinate factors in coefficients.
+#
+# Refs:
+#   Boccaletti et al. (1970, Nuovo Cimento 70B:129) — finite-region conversion formula
+#   McDonald & Ellis (2024, arXiv:2406.18634) — magnetar graviton-photon conversion
+#   Kushwaha et al. (2022, arXiv:2202.00032) — neutron star GW-EM coupling
+
+[theory]
+name = "Gertsenshtein Effect (Radial, Dipolar B-field, Spherical)"
+description = "Graviton-photon conversion via dipolar background B-field in spherical radial coordinates, representing astrophysical conversion in a neutron star magnetosphere"
+
+[spacetime]
+dimension = 4
+metric = "diagonal"
+# Spherical coordinates: {t, r, θ, φ} = TIDAL {t, x[], y[], z[]}
+# ds^2 = -dt^2 + dr^2 + r^2 dθ^2 + r^2 sin^2(θ) dφ^2
+diagonal = ["-1", "1", "x[]^2", "x[]^2*Sin[y[]]^2"]
+
+# h: metric perturbation (graviton), A/a: EM potential/perturbation, F = dA
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+# Electromagnetic field strength tensor F = dA (exterior derivative)
+# Christoffel corrections cancel exactly in F = dA, so F̄_{rθ} = ∂_r(Abar_θ) directly.
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Dipolar B-field background potential in spherical Coulomb gauge.
+# Abar_θ (component[2], covariant θ-component) = Bpeak * z0^3 / (2 r^2)
+# → F̄_{rθ} = ∂_r(Abar_θ) = -Bpeak * z0^3 / r^3
+# → physical B_T(r) = |F̄_{rθ}| / sqrt(g_rr * g_θθ) = Bpeak * (z0/r)^3
+# This is the equatorial transverse field of a magnetic dipole.
+# Refs: McDonald & Ellis (2024, arXiv:2406.18634); Boccaletti et al. (1970)
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "Bpeak*z0^3/(2*x[]^2)", "0"]
+
+[constants]
+names = ["kappa", "Bpeak", "z0"]
+
+# Full Einstein-Maxwell Lagrangian:
+# (1/kappa^2) R - (1/4) F_ab F^ab
+# where kappa^2 = 16*pi*G in natural units
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]"
+
+# Multi-field perturbation:
+# Metric: g = eta + epsilon*h  (SetupMetricPerturbation)
+# EM: A = Abar + epsilon*a     (DefTensorPerturbation)
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# TT gauge for graviton (h_{0μ}=0, g^{ij}h_{ij}=0, ∂^i h_{ij}=0)
+# Fixed for spherical radial propagation:
+# - Transverse constraints use prop_spatial=1 (x=r) so ∂_r h_{rj}=0 after reduction
+# - Traceless uses curved metric weights: h_{φφ} = -(r^2 h_{rr} + h_{θθ}) [θ=π/2]
+[[gauge]]
+field = "h"
+type = "tt"
+
+# Lorenz gauge for photon perturbation (∂_μ a^μ = 0)
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Radial propagation: ∂_θ = ∂_φ = 0 (plane wave along r = x[])
+# coordinate_values: evaluate surviving angular factors at equatorial plane θ=π/2
+# - Sin[y[]] → Sin[Pi/2] = 1 (from g_φφ = r^2*sin^2θ in TT traceless weights)
+# - This is a GENERAL mechanism for any curved metric; not specialized to spherical
+[reduction]
+type = "plane_wave"
+propagation_axis = "x"
+coordinate_values = {y = "Pi/2"}
+
+[parameters]
+kappa = 1.0
+Bpeak = 0.1
+z0 = 1.0
+
+[output]
+path = "../data/gertsenshtein_radial.json"

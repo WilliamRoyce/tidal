@@ -1,49 +1,49 @@
-# Coupled Scalars — Ensemble Sweep Configuration
+# Gertsenshtein Effective — Ensemble Sweep Configuration
 #
-# TOML config demonstrating all ensemble/replicate options.
-# Equivalent to running sweep_coupling_ensemble.sh + sweep_param_uq.sh
-# features combined.
+# TOML config demonstrating ensemble/replicate options with the
+# Gertsenshtein effective theory.  Sweeps B0 with IC perturbation
+# and parameter noise on omegaP2 for uncertainty quantification.
 #
 # Usage:
 #   tidal sweep --config examples/coupled_scalars/sweep_ensemble.toml
 #
 # References:
 #   Smith, R.C. (2013) Uncertainty Quantification, SIAM. Ch. 3-5.
-#   Palmer, T.N. et al. (1993) "Ensemble prediction", ECMWF Tech Memo 188.
+#   Raffelt & Stodolsky (1988), Phys. Rev. D 37:1237.
 
 spec = "../data/coupled_scalars.json"
 
-[sweep.gCpl]
-start = 0.1
-stop = 1.8
+[sweep.B0]
+start = 0.01
+stop = 0.25
 count = 8
 
 [measurement]
-types = ["peak_conversion", "conservation"]
-source = "phi_0"
-target = "chi_0"
+types = ["conversion", "conservation"]
+source = "h_0"
+target = "a_0"
 
 [simulation]
-grid_shape = 128
-bounds = "0:160"
+grid_shape = 256
+bounds = "0:100"
 bc = "periodic"
-t_end = 60.0
-ic = "gaussian"
+t_end = 50.0
+ic = "plane-wave"
 ic_amplitude = 0.1
-ic_width = 3.0
-ic_center = 20.0
-ic_component = "phi_0"
+ic_wavevector = "2.0"
+ic_component = "h_0"
 
 [parameters]
-mPhi2 = 1.0
-mChi2 = 4.0
+kappa = 1.0
+omegaP2 = 0.0
+mg2 = 0.0
 
 # Ensemble settings: N replicates per parameter point
 [execution]
-n_replicates = 10
+n_replicates = 5
 base_seed = 42
 
-# Variation sources (either or both can be enabled)
+# Variation sources
 [ensemble]
-ic_perturbation = 0.05              # 5% of ic_amplitude Gaussian noise on ICs
-param_noise = { mChi2 = 0.1 }      # mChi2 ~ N(4.0, 0.1²) per replicate
+ic_perturbation = 0.02              # 2% Gaussian noise on ICs
+param_noise = { omegaP2 = 0.01 }   # omegaP2 ~ N(0.0, 0.01²) per replicate

@@ -1,35 +1,20 @@
 #!/usr/bin/env bash
-# Coupled Scalars — Comprehensive coupling strength investigation
+# Gertsenshtein Effective Theory — B0 coupling strength sweep
 #
-# Sweeps the coupling constant gCpl from weak to strong coupling,
-# measuring conversion probability P(t), mixing timescale, asymptotic
-# efficiency, effective mass renormalization, and energy conservation.
+# Sweeps the background magnetic field strength B0, measuring the
+# graviton-photon conversion probability P(t) = sin²(κ*B0*t/2).
 #
-# Uses a standing Gaussian wave packet (no wavevector) in a homogeneous
-# coupling field. The k-mode spread in the wave packet causes decoherence
-# that averages Rabi oscillations into smooth sigmoid saturation curves.
+# Expected physics (massless vacuum, κ=1):
+#   P(t) = sin²(B0 * t_end / 2) → Rabi oscillation in B0
+#   First maximum at B0 = π/t_end ≈ 0.063 (for t_end=50)
+#   Period: ΔB0 = 2π/t_end ≈ 0.126
 #
-# Expected physics:
-#   - Weak coupling (gCpl << |m1² - m2²|/2):
-#       P_max ≈ 4g²/(Δm²)² (perturbative), slow saturation
-#   - Moderate coupling (gCpl ~ |m1² - m2²|/2 = 1.5):
-#       P_max approaches 1, fastest energy transfer
-#   - Strong coupling (gCpl >> |m1² - m2²|/2):
-#       Normal mode splitting modifies dispersion; group velocity
-#       mismatch between k-modes reduces coherent conversion.
-#       Non-monotonic P_max may appear due to over-coupling.
-#   - Rabi mixing angle: θ = ½ atan(2g / |m1² - m2²|)
-#   - Homogeneous limit: P_max = sin²(2θ) = 4g²/[(Δm²)² + 4g²]
-#   - Mixing length L_mix decreases with coupling (faster oscillations)
-#   - Energy conservation tight: max |dE/E| < 1e-3
+# This sweeps B0 from weak to strong coupling, covering ~2 Rabi cycles.
 #
-# Stability bound:
-#   The coupled mass matrix M² = [[m1², g], [g, m2²]] becomes indefinite
-#   (tachyonic mode) when g > √(m1² · m2²) = √(1·4) = 2.0.
-#   Sweep is capped at gCpl = 1.8 to stay safely below this threshold.
-#   (Sweeps default to --require-stable, which aborts unstable runs.)
+# Ref: Gertsenshtein (1962), JETP 14:84
+#      Raffelt & Stodolsky (1988), Phys. Rev. D 37:1237
 #
-# Running this script:
+# Running:
 #   cd examples/coupled_scalars && bash sweep_coupling.sh
 
 set -euo pipefail
@@ -37,29 +22,31 @@ cd "$(dirname "$0")"
 
 OUT=../data/coupled_scalars_sweep
 
-echo "=== Coupled Scalars Coupling Sweep: gCpl = 0.05 to 1.99 (50 points, linear scale) ==="
-echo "    mPhi2 = 1.0, mChi2 = 4.0  (mass gap Δm² = 3.0, g_crit = 2.0)"
-echo "    Standing Gaussian on phi_0, domain [0,160], N=256, t_end=120"
+echo "=== Gertsenshtein Effective: B0 Coupling Sweep ==="
+echo "    B0 = 0.005 to 0.25 (20 points), kappa=1, omegaP2=0, mg2=0"
+echo "    Plane-wave k=2.0 on h_0, domain [0,100], N=256, t_end=50"
 echo ""
 
 tidal sweep ../data/coupled_scalars.json \
-  --sweep "gCpl=0.05:1.99:50" \
-  --param mPhi2=1.0 --param mChi2=4.0 \
-  --measure conversion,peak_conversion,mixing,asymptotic,effective_mass,conservation \
-  --source phi_0 --target chi_0 \
+  --sweep "B0=0.005:0.25:20" \
+  --param kappa=1.0 --param omegaP2=0.0 --param mg2=0.0 \
+  --measure conversion,conservation \
+  --source h_0 --target a_0 \
   --grid-shape 256 \
-  --bounds 0:160 \
+  --bounds 0:100 \
   --periodic \
-  --ic gaussian --ic-component phi_0 --ic-center 20.0 --ic-width 3.0 \
-  --t-end 120.0 \
+  --ic plane-wave --ic-component h_0 --ic-wavevector 2.0 --ic-amplitude 0.1 \
+  --t-end 50.0 \
   --output "$OUT"
 
 echo ""
-echo "Results written to: $OUT/"
-echo ""
-echo "Visualize the results:"
-echo "  tidal plot $OUT/ --type sweep --metric P_max"
-echo "  tidal plot $OUT/ --type sweep --metric P_max,mixing_length"
-echo "  tidal plot $OUT/ --type sweep-compare --metric conversion"
-echo "  tidal plot $OUT/ --type sweep --metric P_final,P_transmitted,P_reflected"
-echo "  tidal plot $OUT/ --type sweep --metric m2_eff"
+
+# Plot with Gertsenshtein analytical overlay
+tidal plot "$OUT" --type sweep \
+  --metric P_final \
+  --title "Gertsenshtein P(B0) — effective 1+1D theory" \
+  --overlay 'sin(kappa * B0 * t_end / 2)**2' \
+  --output "$OUT/sweep.png" --quiet
+
+echo "Results: $OUT/"
+echo "Plot:    $OUT/sweep.png"

@@ -80,6 +80,81 @@ _COMPILED_FUNCTION_PATTERNS: list[tuple[re.Pattern[str], str]] = [
     (re.compile(rf"\b{mma}\b"), py) for mma, py in _FUNCTION_MAP
 ]
 
+
+def _find_matching_paren(s: str, start: int) -> int:
+    """Return index *past* the closing paren matching the open-paren at *start*."""
+    depth = 1
+    j = start + 1
+    n = len(s)
+    while j < n and depth > 0:
+        if s[j] == "(":
+            depth += 1
+        elif s[j] == ")":
+            depth -= 1
+        j += 1
+    return j
+
+
+def _replace_compound_denom(denom: str) -> str | None:
+    """If *denom* contains ``exp(arg)``, return the numerator replacement.
+
+    Returns ``None`` if no ``exp(`` is found inside *denom*.
+    """
+    exp_pos = denom.find("exp(")
+    if exp_pos < 0:
+        return None
+    ej = _find_matching_paren(denom, exp_pos + 3)
+    exp_arg = denom[exp_pos + 4 : ej - 1]
+    pre = denom[:exp_pos].rstrip("*")
+    post = denom[ej:].lstrip("*")
+    remaining = f"{pre}*{post}" if (pre and post) else (pre or post)
+    if remaining:
+        return f"*exp(-({exp_arg}))/({remaining})"
+    return f"*exp(-({exp_arg}))"
+
+
+def _invert_exp_denominator(expr: str) -> str:
+    """Convert exp-in-denominator patterns to ``*exp(-(arg))`` to avoid overflow.
+
+    Wolfram's InputForm may serialize ``Exp[-x^2/R^2]`` in several forms that
+    all produce positive-exponent overflow when evaluated naively:
+
+    1. ``k/E^(x^2/R^2)`` after ``E^`` to ``exp``: ``k/exp(x^2/R^2)``
+       Handled as: ``/exp(arg)`` to ``*exp(-(arg))``
+
+    2. ``k/(A*E^(x^2/R^2)*B)`` after ``E^`` to ``exp``: ``k/(A*exp(x^2/R^2)*B)``
+       Handled as: ``/(A*exp(arg)*B)`` to ``*exp(-(arg))/(A*B)``
+
+    Both patterns prevent evaluating ``exp(+large)``, eliminating numpy
+    ``RuntimeWarning: overflow encountered in exp``.
+    """
+    result: list[str] = []
+    i = 0
+    n = len(expr)
+    while i < n:
+        if expr[i : i + 5] == "/exp(":
+            # Pattern 1: /exp(arg) → *exp(-(arg))
+            j = _find_matching_paren(expr, i + 4)
+            inner = expr[i + 5 : j - 1]
+            result.append(f"*exp(-({inner}))")
+            i = j
+        elif expr[i : i + 2] == "/(":
+            # Pattern 2: /(denom) where denom may contain exp(arg) anywhere
+            k = _find_matching_paren(expr, i + 1)
+            denom = expr[i + 2 : k - 1]
+            replacement = _replace_compound_denom(denom)
+            if replacement is not None:
+                result.append(replacement)
+                i = k
+            else:
+                result.append(expr[i])
+                i += 1
+        else:
+            result.append(expr[i])
+            i += 1
+    return "".join(result)
+
+
 _COMPARISON_OPS: dict[str, str] = {
     "LessEqual": "<=",
     "Less": "<",
@@ -378,6 +453,10 @@ def mathematica_to_python(
 
     # E^(...) → exp(...)
     result = _RE_E_POWER.sub("exp", result)
+
+    # /exp(arg) → *exp(-(arg)) to prevent overflow from positive exponents in denominators
+    # (Wolfram may serialize Exp[-x^2/R^2] as 1/E^(x^2/R^2))
+    result = _invert_exp_denominator(result)
 
     # Power[x, y] → (x)**(y)
     result = _convert_power(result)

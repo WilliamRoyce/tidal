@@ -1,6 +1,6 @@
 # CLI Reference
 
-TIDAL provides the `tidal` command-line tool with seven subcommands for the full derive-to-measure workflow.
+TIDAL provides the `tidal` command-line tool with nine subcommands for the full derive-to-measure workflow.
 **Zero additional dependencies** — uses only `argparse` and `tomllib` from the Python standard library.
 
 ## Installation

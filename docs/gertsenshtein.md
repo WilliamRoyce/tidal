@@ -73,7 +73,8 @@ B₀ on a (unit kinetic prefactor). The eigenmode analysis gives beat frequency
 P(graviton → photon) = sin²(κ B₀ D / 2)
 ```
 
-This is confirmed numerically (RMS error < 0.02 across multiple B₀ values).
+This is confirmed numerically (RMS error < 0.015 across a 40-point B₀ sweep at N=1024,
+using the corrected amplitude formula — see [gertsenshtein_formula.md](gertsenshtein_formula.md)).
 
 **Note on P&R error:** Palessandro & Rothman (2023, Eq. 26; 2024, arXiv:2405.01407)
 quote P = sin²(√G · B₀ · D), which is incorrect by a factor of √(4π) = 2√π ≈ 3.54
@@ -84,6 +85,25 @@ linearization. Our formula is confirmed by Dandoy, Lella et al. (2024,
 arXiv:2406.17853), who use canonical normalization and obtain Δ_{g,γ} = √(4πG)·B₀,
 matching κB₀/2 exactly. See [gertsenshtein_formula.md](gertsenshtein_formula.md)
 for the full derivation and literature comparison.
+
+**Graviton effective mass from background EM field:**
+
+The graviton equation includes a mass-like term `-B₀²κ² h_+` from the interaction of the
+metric perturbation with the background EM stress-energy. This gives an effective graviton
+mass m_g² = κ²B₀²/2. The photon remains massless (in vacuum). This mass detuning limits
+the peak conversion for each k-mode:
+
+```
+P_max(k) = k² / (k² + κ²B₀²)
+```
+
+For k >> κB₀, the detuning is negligible and P_max → 1 (full conversion). For low-k modes
+(k ~ κB₀), the detuning is significant. A Gaussian IC (broad k-spectrum, dominant low-k)
+will show P_peak < 1 even in the absence of numerical error. Use a plane-wave IC with
+sufficiently high k for clean validation against P = sin²(κB₀t/2).
+
+Verified numerically: Gaussian IC (σ=1.5, L=50) gives P_peak=0.975 at N=512; plane-wave
+IC (k=2) gives P_peak=0.999 at N=1024 — both consistent with the mass correction factor.
 
 **With detuning** (plasma frequency ω_p, or effective photon mass m_γ):
 
@@ -138,6 +158,7 @@ L_osc = 2π / (κ B₀)
 | Ref | Year | Key Contribution |
 | --- | ---- | ---------------- |
 | [Domcke & Garcia-Cely, JCAP 05:051](https://arxiv.org/abs/2312.17636) | 2024 | Inverse Gertsenshtein as HFGW probe |
+| [**Domcke, Garcia-Cely & Lee, arXiv:2507.16609**](https://arxiv.org/abs/2507.16609) | **2025** | **GW scattering on 3D B-fields; Born approx. = thin-lens Boccaletti; WKB = thick-lens** |
 | [Obukhov et al., arXiv:2410.01355](https://arxiv.org/abs/2410.01355) | 2024 | Photon-torsion wave conversion in Poincaré gauge theory |
 | [arXiv:2507.02362](https://arxiv.org/abs/2507.02362) | 2025 | EM-torsion coupling near black holes |
 
@@ -145,7 +166,7 @@ L_osc = 2π / (κ B₀)
 
 | Ref | Year | Key Contribution |
 | --- | ---- | ---------------- |
-| [Berlin et al., arXiv:2405.08865](https://arxiv.org/abs/2405.08865) | 2024 | Numerical analysis of resonant axion-photon mixing — directly analogous methodology |
+| [Berlin et al., arXiv:2405.08865](https://arxiv.org/abs/2405.08865) | 2024 | Numerical analysis of resonant axion-photon mixing — directly analogous methodology; WKB vs exact regimes |
 
 ## Validation Targets
 
@@ -168,20 +189,118 @@ All equations are **derived from the Lagrangian** by the TIDAL pipeline — list
 - Compare against analytical curve
 - Check oscillation length scaling: L_osc ∝ 1/B₀
 
-### Target 3: Detuned Conversion (Future — Phase F1)
+### Numerical Validation Results (Targets 1-2)
 
-- Add effective plasma mass m_γ to EM perturbation
-- Sweep ω_p at fixed B₀
-- Compare with full detuned formula
-- Test MSW-like resonance when ω_p² = m_g²
-- **Acceptance**: Agreement to within 5%
+**Status: VALIDATED** — both modal and CVODE solvers agree with analytical predictions.
 
-### Target 4: Finite-Region Scattering (Phase E)
+B₀ sweep (N=256, L=100, t_end=50, k=2.01, κ=1, 10 points across B₀∈[0.01, 0.2]):
 
-- Localized B₀(z) with Gaussian profile
-- Wave packet enters, converts, exits
-- Sweep region width R
-- Compare against Boccaletti et al. integral formula
+- Both modal and CVODE solvers agree with each other to ~10⁻⁵
+- RMS error vs corrected analytical formula P = sin²(κB₀D/2) × k²/(k²+κ²B₀²): **0.0036** (0.36%)
+- The 0.36% error is dominated by the effective-mass correction approximation in the analytical formula, not by solver error
+- Error grows with B₀ as expected (mass correction ∝ B₀²/k²)
+
+**Recommended solver**: The **modal solver** is auto-selected for Gertsenshtein on periodic domains and provides 3.4× speedup over CVODE at N=256, growing to 7.7× at t_end=500. Both give identical accuracy. Modal cost is O(1) in simulation time (eigendecompose once, evaluate at any t). See [modal_solver.md](modal_solver.md) for full benchmarks.
+
+### Target 3: Detuned Conversion (Phase F1)
+
+**Status: NOT IMPLEMENTED — requires gauge-invariant mass mechanism**
+
+Adding a Proca-type photon mass `- omegaP2/2 * a[-mu] eta[mu, nu] a[-nu]` to the full 4D
+Lagrangian generates position-dependent coefficients `B₀²κ²omegaP2 z²` on the graviton equations.
+These arise from the volume element expansion `(ε/2)Tr(h) × (omegaP2/2)|Ā|²` where `|Ā|² = B₀²z²`
+(since `Ā_y = -B₀z` in the plane-wave gauge). With periodic BCs, z² is discontinuous at the wrap
+point — incorrect for a uniform plasma model.
+
+**Root cause**: xPert correctly evaluates the full second-order action including the metric coupling
+to the background EM energy density. In the plasma context (which is a medium effect, not a
+fundamental Proca field), this coupling is unphysical. No Lagrangian reformulation within the
+current 4D gauge-field framework can avoid this: any gauge representation of a transverse B-field
+has `|Ā|² ∝ z²` in 1D. An effective 1+1D scalar theory (hgw, aem scalars) yields constant
+coefficients but is no different from the existing `coupled_scalars` example.
+
+**What would be needed**: A gauge-invariant effective mass that couples only to the transverse
+photon polarization without coupling to the background gauge potential through the volume element.
+Possible approaches: (a) a Stueckelberg mass in unitary gauge with a carefully chosen gauge field,
+or (b) a medium/refractive-index formulation at the level of the equations of motion (bypassing
+the Lagrangian for the plasma sector). See `.github-issues-pending.md` for the tracking issue.
+
+- **Reference**: Raffelt & Stodolsky (1988, PRD 37:1237); Dandoy, Lella et al. (2024, arXiv:2406.17853)
+
+### Target 4: Finite-Region Scattering (Phase F2)
+
+**Status: IMPLEMENTED** — see `examples/gertsenshtein/theory_localized.toml`
+
+**Setup**: Gaussian B₀(z) = Bpeak × exp(-z²/(2R²)) along x-axis. The gauge potential
+`Ā_y = -Bpeak × R × √(π/2) × Erf(z/(√2·R))` satisfies ∂_z(Ā_y) = -B₀(z). The
+`Erf` function is supported by the TIDAL evaluator (`_eval_utils.py` `_FUNCTION_MAP`).
+Constant named `Bpeak` (not `B0_peak`) — in Wolfram, `X_Y` parses as `Pattern[X, Blank[Y]]`
+(a pattern expression, not a symbol), silently corrupting the symbolic computation.
+
+**Analytical target (Boccaletti 1970, weak-field Gaussian)**:
+```
+P(graviton → photon) = sin²(κ/2 × ∫B₀(z)dz) = sin²(κ × Bpeak × R × √(π/2))
+```
+
+**Simulation parameters**:
+- Domain: [-100, 100], 1024 points, non-periodic (Neumann BCs) — periodic BCs are
+  incorrect since Ā_y is not periodic
+- IC: Gaussian wavepacket (h_7) at z = -50, σ=5, k = 2.0, t_end = 120
+  (stops after one pass through B-field, before wavepacket hits right boundary at t≈150)
+- Measurement: `--what conversion --source h_7 --target a_2`
+  (NOT `--what energy` — position-dependent coefficients cause known limitation)
+- **Bounds/center require `=` syntax**: `--bounds="-100:100"`, `--ic-center=-50.0`
+  (shell interprets leading `-` as flag otherwise)
+
+**Confirmed numerical result** (defaults: κ=1, Bpeak=0.1, R=5=σ):
+```
+P_numerical = 0.3436  (at t=80.4, peak of single pass)
+P_Boccaletti = sin²(1.0 × 0.1 × 5.0 × √(π/2)) = sin²(0.627) = 0.3432
+Agreement: 0.04% — excellent
+```
+
+**2D sweep (Bpeak × R, 48 points)** — Boccaletti formula confirmed across all regimes (σ=5):
+
+| R/σ | R | Mean err vs Boccaletti | Max err |
+|-----|---|----------------------|---------|
+| 0.40 | 2.0 | 0.00004 | 0.00008 |
+| 0.92 | 4.6 | 0.00029 | 0.00045 |
+| 1.44 | 7.2 | 0.00078 | 0.00172 |
+| 1.96 | 9.8 | 0.00113 | 0.00211 |
+| 2.48 | 12.4 | 0.00091 | 0.00144 |
+| 3.00 | 15.0 | 0.00058 | 0.00160 |
+
+The Boccaletti formula P = sin²(κ/2 × ∫B₀ dz) is **exact for massless vacuum conversion**
+for any R/σ ratio. For massless graviton-photon conversion (no plasma), both modes travel at
+c with identical dispersion (k_h = k_γ), so Δk = 0 exactly. The conversion amplitude at
+q = Δk = 0 is just the DC component ∫B₀ dz — independent of R/σ (Boccaletti 1970;
+Domcke, Garcia-Cely & Lee 2025, arXiv:2507.16609, Section 4.2).
+
+The thin-lens / thick-lens distinction applies when Δk ≠ 0 (plasma detuning, axion mass),
+creating a coherence length L_coh = 1/|Δk| that limits coherent accumulation. Without plasma,
+L_coh → ∞ and the formula holds for all R (see [gertsenshtein_localized.md](gertsenshtein_localized.md)).
+
+See [gertsenshtein_localized.md](gertsenshtein_localized.md) for the full physics derivation,
+regime conditions, terminology mapping to literature, and open questions.
+
+**Scripts**:
+- `examples/gertsenshtein/run_localized.sh` — single run
+- `examples/gertsenshtein/sweep_profile.sh` — 2D sweep over Bpeak × R
+
+**Note**: Background B₀(z) is externally imposed — see [background_fields.md](background_fields.md)
+for the validity discussion.
+
+**References**: Boccaletti et al. (1970, Nuovo Cimento 70B:129); Raffelt & Stodolsky (1988,
+PRD 37:1237); Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609)
+
+### Target 5: Magnetar/FRB Application (Phase F3)
+
+- Dipolar B(r) ∝ 1/r³ in 1+1D radial setup (spherical coordinates)
+- Domain [R_NS, r_max] — avoids r=0 singularity
+- Inner BC: Robin (impedance-matched) for graviton, Dirichlet for photon (conducting surface)
+- Inward-propagating graviton wavepacket from large r
+- Compare conversion efficiency with McDonald & Ellis (2024, arXiv:2406.18634)
+- **Reference**: Kushwaha et al. (2022, arXiv:2202.00032); Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609)
 
 ## Implementation in TIDAL
 
@@ -212,8 +331,9 @@ theory.toml → _derive.py generates .wls with:
 
 ## Future Extensions
 
-1. **Plasma/QED effects** (Phase F1): Effective photon mass from plasma frequency
-2. **Chern-Simons gravity** (Phase F2): Parity-violating h-a coupling, different L/R conversion rates
-3. **Axion-photon-graviton mixing** (Phase F3): Three-way mixing matrix with `g_{aγγ} a F F̃`
-4. **Photon-torsion conversion** (Phase F4): Obukhov et al. (2024) — axial torsion waves coupled to EM via Chern-Simons-like term. This is the ultimate project goal.
-5. **Non-abelian Yang-Mills** (Phase F5): Autocatalytic graviton production without external B field (Palessandro & Rothman 2023)
+1. **Plasma detuning** (Phase F1): ~~Proca-type mass term~~ — blocked by gauge-potential coupling artifact (see Target 3 above). Requires gauge-invariant mass mechanism for the transverse photon sector.
+2. **Localized B-field scattering** (Phase F2): ✓ Implemented — `theory_localized.toml`, `run_localized.sh`, `sweep_profile.sh`. Validates Boccaletti formula P = sin²(κ × Bpeak × R × √(π/2)).
+3. **Magnetar/FRB application** (Phase F3): Dipolar B(r), 1+1D radial setup, Gertsenshtein-Zel'dovich mechanism
+4. **Non-minimal couplings** (Phase F5): Chern-Simons gravity (parity-violating P_L ≠ P_R), ξRF² curvature-EM coupling. Ref: Kushwaha & Jain (2024, arXiv:2410.07338)
+5. **Axion-photon-graviton mixing** (future): Three-way mixing matrix with `g_{aγγ} a F F̃`. Ref: Dandoy, Lella et al. (2024)
+6. **Photon-torsion conversion** (ultimate goal): Obukhov et al. (2024, arXiv:2410.01355) — axial torsion waves coupled to EM. Separate branch after Gertsenshtein program matures.

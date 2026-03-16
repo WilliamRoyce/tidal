@@ -842,7 +842,28 @@ def _format_text(results: dict[str, Any], data: SimulationData) -> str:  # noqa:
 # ------------------------------------------------------------------
 
 
-def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
+def _filter_to_dynamical(
+    source: tuple[str, ...] | None,
+    data: SimulationData,
+    measurement_name: str,
+) -> list[str]:
+    """Filter source fields to dynamical-only, falling back to all dynamical."""
+    dyn = list(data.dynamical_fields)
+    if source is None:
+        return dyn
+    filtered = [f for f in source if f in set(dyn)]
+    if filtered:
+        return filtered
+    if dyn:
+        print(
+            f"Note: {measurement_name}: no dynamical fields in --source list; "
+            f"using all dynamical fields: {dyn}",
+            file=sys.stderr,
+        )
+    return dyn
+
+
+def _run_individual_measurements(  # noqa: C901, PLR0912
     measurements: set[str],
     data: SimulationData,
     args: Namespace,
@@ -854,6 +875,28 @@ def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
     """
     results: dict[str, Any] = {}
 
+    # Parse source/target once for all measurements that use them.
+    source = _parse_field_list(getattr(args, "source", None))
+    target = _parse_field_list(getattr(args, "target", None))
+
+    # Measurements that require --source (error if missing).
+    require_source = {
+        "conversion",
+        "spectral_conversion",
+        "asymptotic",
+        "peak_conversion",
+        "resonance",
+    }
+    needs_source = measurements & require_source
+    if needs_source and source is None:
+        names = ", ".join(sorted(needs_source))
+        print(
+            f"Error: --source required for --what={names} "
+            f"(or use --what=summary for auto-detection)",
+            file=sys.stderr,
+        )
+        return 1
+
     if "energy" in measurements:
         results["energy"] = _run_measurement_safe(_run_energy, data)
 
@@ -863,17 +906,6 @@ def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
         )
 
     if "conversion" in measurements or "mixing" in measurements:
-        source = _parse_field_list(getattr(args, "source", None))
-        target = _parse_field_list(getattr(args, "target", None))
-
-        if "conversion" in measurements and source is None:
-            print(
-                "Error: --source required for --what=conversion "
-                "(or use --what=summary for auto-detection)",
-                file=sys.stderr,
-            )
-            return 1
-
         try:
             conv = _run_conversion(data, source, target)
             results["conversion"] = conv
@@ -890,125 +922,44 @@ def _run_individual_measurements(  # noqa: C901, PLR0911, PLR0912, PLR0915
         results["spectrum"] = _run_measurement_safe(_run_spectrum, data)
 
     if "spectral_conversion" in measurements:
-        source = _parse_field_list(getattr(args, "source", None))
-        target = _parse_field_list(getattr(args, "target", None))
-
-        if source is None:
-            print(
-                "Error: --source required for --what=spectral_conversion "
-                "(or use --what=summary for auto-detection)",
-                file=sys.stderr,
-            )
-            return 1
-
         results["spectral_conversion"] = _run_measurement_safe(
             _run_spectral_conversion, data, source, target
         )
 
     if "dispersion" in measurements:
-        source = _parse_field_list(getattr(args, "source", None))
-        dyn_set = set(data.dynamical_fields)
-
-        if source is not None:
-            # Filter source list to dynamical fields only.  Constraint fields
-            # (time_derivative_order=0) have no temporal oscillation and produce
-            # a flat S(k,omega) spectrum.
-            dyn_in_source = [f for f in source if f in dyn_set]
-            if not dyn_in_source:
-                # Entire source list is constraints — fall back to all dynamical fields
-                dyn_in_source = list(data.dynamical_fields)
-                print(
-                    "Note: dispersion: no dynamical fields in --source list; "
-                    f"using all dynamical fields: {dyn_in_source}",
-                    file=sys.stderr,
-                )
-        else:
-            dyn_in_source = list(data.dynamical_fields)
-
+        dyn_in_source = _filter_to_dynamical(source, data, "dispersion")
         if not dyn_in_source:
             print("Error: no dynamical fields for dispersion", file=sys.stderr)
             return 1
-
         results["dispersion"] = _run_measurement_safe(
             _run_dispersion, data, dyn_in_source
         )
 
     if "effective_mass" in measurements:
-        source = _parse_field_list(getattr(args, "source", None))
-        dyn_set = set(data.dynamical_fields)
-        if source is not None:
-            dyn_in_source = [f for f in source if f in dyn_set]
-            if not dyn_in_source:
-                dyn_in_source = list(data.dynamical_fields)
-        else:
-            dyn_in_source = list(data.dynamical_fields)
-
+        dyn_in_source = _filter_to_dynamical(source, data, "effective_mass")
         results["effective_mass"] = _run_measurement_safe(
             _run_effective_mass, data, dyn_in_source
         )
 
     if "asymptotic" in measurements:
-        source = _parse_field_list(getattr(args, "source", None))
-        target = _parse_field_list(getattr(args, "target", None))
-
-        if source is None:
-            print(
-                "Error: --source required for --what=asymptotic "
-                "(or use --what=summary for auto-detection)",
-                file=sys.stderr,
-            )
-            return 1
-
         results["asymptotic"] = _run_measurement_safe(
             _run_asymptotic, data, source, target
         )
 
     if "peak_conversion" in measurements:
-        source = _parse_field_list(getattr(args, "source", None))
-        target = _parse_field_list(getattr(args, "target", None))
-
-        if source is None:
-            print(
-                "Error: --source required for --what=peak_conversion "
-                "(or use --what=summary for auto-detection)",
-                file=sys.stderr,
-            )
-            return 1
-
         results["peak_conversion"] = _run_measurement_safe(
             _run_peak_conversion, data, source, target
         )
 
     if "velocity" in measurements:
-        source = _parse_field_list(getattr(args, "source", None))
-        dyn_set = set(data.dynamical_fields)
-        if source is not None:
-            dyn_in_source = [f for f in source if f in dyn_set]
-            if not dyn_in_source:
-                dyn_in_source = list(data.dynamical_fields)
-        else:
-            dyn_in_source = list(data.dynamical_fields)
-
+        dyn_in_source = _filter_to_dynamical(source, data, "velocity")
         results["velocity"] = _run_measurement_safe(_run_velocity, data, dyn_in_source)
-        # If both source and target provided, also compute mismatch
-        if "error" not in results["velocity"]:
-            target = _parse_field_list(getattr(args, "target", None))
-            if target is not None:
-                results["velocity_mismatch"] = _run_measurement_safe(
-                    _run_velocity_mismatch, data, tuple(dyn_in_source), target
-                )
+        if "error" not in results["velocity"] and target is not None:
+            results["velocity_mismatch"] = _run_measurement_safe(
+                _run_velocity_mismatch, data, tuple(dyn_in_source), target
+            )
 
     if "resonance" in measurements:
-        source = _parse_field_list(getattr(args, "source", None))
-        target = _parse_field_list(getattr(args, "target", None))
-
-        if source is None:
-            print(
-                "Error: --source required for --what=resonance",
-                file=sys.stderr,
-            )
-            return 1
-
         results["resonance"] = _run_measurement_safe(
             _run_resonance, data, source, target
         )

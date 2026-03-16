@@ -314,6 +314,12 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
         terms = If[Head[workingEqs[[i, 2]]] === Plus,
                    List @@ workingEqs[[i, 2]],
                    {workingEqs[[i, 2]]}];
+        (* Check own field (j=i) first: if equation i already evolves its own
+           field i, no reassignment is needed even if d²_t of other fields also
+           appears (e.g. h_{φφ} → -(g1·h_{rr} + g2·h_{θθ}) traceless sub injects
+           d²_t(h_rr) into h_{θθ}'s equation, but h_{θθ}'s equation also contains
+           d²_t(h_{θθ}) and must stay with h_{θθ}).  Scanning j = {i, 1..nFields∖i}
+           ensures the own-field test happens before any cross-field candidate. *)
         Do[
           d2tTerms = Select[terms,
             ContainsOwnTimeDerivative[#, allFieldNames[[j]], 2] &];
@@ -334,7 +340,7 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
               ]
             ]
           ],
-          {j, nFields}];
+          {j, Join[{i}, DeleteCases[Range[nFields], i]]}];
         result],
       {i, nFields}];
 
@@ -1398,11 +1404,14 @@ ParseSingleHamiltonianTerm[term_, fieldHeads_List, allFieldNames_List] := Module
   factorB = ClassifyHamiltonianFactor[fieldFactors[[2]], allFieldNames];
 
   (* Build result *)
-  Module[{result, coordDeps},
+  Module[{result, coordDeps, termClass},
+    (* Classify as self-energy or interaction based on base field *)
+    termClass = If[factorA["field"] === factorB["field"], "self", "interaction"];
     result = <|
       "coefficient" -> numCoeff,
       "factor_a" -> factorA,
-      "factor_b" -> factorB
+      "factor_b" -> factorB,
+      "term_class" -> termClass
     |>;
     If[symbolicCoeff =!= Null,
       result["coefficient_symbolic"] = symbolicCoeff;

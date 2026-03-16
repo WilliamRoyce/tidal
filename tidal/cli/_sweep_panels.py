@@ -4,6 +4,7 @@ Provides:
 
 - ``render_sweep_1d``   — metric vs single swept parameter (line plot)
 - ``render_sweep_2d``   — metric vs two swept parameters (heatmap)
+- ``render_sweep_2d_with_overlay`` — 3-panel comparison: TIDAL | analytical | |error|
 - ``render_sweep_compare`` — overlay timeseries from multiple runs
 - ``render_convergence`` — log-log error vs resolution
 - ``render_replicate_convergence`` — SEM vs replicate count diagnostic
@@ -16,6 +17,7 @@ and Applications*, SIAM. Ch. 3 (sample statistics, SEM, CI).
 
 from __future__ import annotations
 
+import contextlib
 from typing import TYPE_CHECKING
 
 import numpy as np
@@ -29,10 +31,74 @@ if TYPE_CHECKING:
     from tidal.measurement._sweep_results import SweepResults
 
 
+# ------------------------------------------------------------------
+# Analytical overlay helpers
+# ------------------------------------------------------------------
+
+
+def _build_overlay_scalars(results: SweepResults) -> dict[str, float]:
+    """Build scalar namespace from fixed params and numeric sim settings.
+
+    Returns a dict suitable for use in overlay formula evaluation,
+    containing all fixed sweep parameters (e.g. ``kappa``) and any
+    numeric simulation settings (e.g. ``t_end``, ``grid_shape``).
+    """
+    ns: dict[str, float] = dict(results.fixed_params)
+    for k, v in results.sim_settings.items():
+        with contextlib.suppress(TypeError, ValueError):
+            ns[k] = float(v)
+    return ns
+
+
+def _evaluate_sweep_overlay(
+    formula: str,
+    param_arrays: dict[str, NDArray[np.float64]],
+    scalar_params: dict[str, float],
+) -> NDArray[np.float64]:
+    """Evaluate an overlay formula over swept parameter arrays.
+
+    Parameters
+    ----------
+    formula : str
+        Python expression using swept parameter names, fixed parameter
+        names, sim settings (``t_end``, ``grid_shape``), and standard
+        math functions (``sin``, ``cos``, ``sqrt``, ``pi``, ``exp``, ...).
+        Example: ``'sin(kappa * B0 * t_end / 2)**2'``.
+    param_arrays : dict
+        Swept parameters as numpy arrays (broadcast-ready).  For 1D
+        sweeps this is a 1-D array; for 2D sweeps use meshgrid outputs.
+    scalar_params : dict
+        Fixed parameters and numeric sim settings as Python floats.
+
+    Returns
+    -------
+    NDArray
+        Evaluated formula values with the same shape as the input arrays.
+
+    Raises
+    ------
+    ValueError
+        If the formula contains a syntax/name error or evaluation fails.
+    """
+    from tidal.cli._simulate import (
+        FORMULA_NAMESPACE,  # pyright: ignore[reportPrivateUsage]
+    )
+
+    ns: dict[str, object] = {**FORMULA_NAMESPACE, **scalar_params, **param_arrays}
+    try:
+        result = eval(formula, {"__builtins__": {}}, ns)  # noqa: S307
+    except Exception as exc:
+        msg = f"Error evaluating overlay formula {formula!r}: {exc}"
+        raise ValueError(msg) from exc
+    return np.asarray(result, dtype=np.float64)
+
+
 def render_sweep_1d(
     ax: Axes,
     results: SweepResults,
     metric: str,
+    *,
+    overlay: str | None = None,
 ) -> None:
     """Plot a scalar metric vs a single swept parameter.
 
@@ -44,11 +110,18 @@ def render_sweep_1d(
         Loaded sweep data.
     metric : str
         Column name in results.rows to plot on the y-axis.
+    overlay : str or None
+        Optional analytical formula to overlay as a dashed reference
+        curve.  The formula may reference the swept parameter by name,
+        fixed parameters (e.g. ``kappa``), and simulation settings
+        (e.g. ``t_end``).  Standard math functions (``sin``, ``cos``,
+        ``sqrt``, ``pi``, ``exp``) are available.
+        Example: ``'sin(kappa * B0 * t_end / 2)**2'``.
 
     Raises
     ------
     ValueError
-        If not exactly 1 swept parameter.
+        If not exactly 1 swept parameter, or if the overlay formula fails.
     """
     param_names = list(results.swept_params.keys())
     if len(param_names) != 1:
@@ -65,7 +138,16 @@ def render_sweep_1d(
         x = agg.column(param_name)
         y_mean = agg.column(f"{metric}_mean")
         y_std = agg.column(f"{metric}_std")
-        ax.plot(x, y_mean, "o-", color="tab:blue", linewidth=1.5, markersize=5)
+        num_label = "TIDAL" if overlay else None
+        ax.plot(
+            x,
+            y_mean,
+            "o-",
+            color="tab:blue",
+            linewidth=1.5,
+            markersize=5,
+            label=num_label,
+        )
         ax.fill_between(
             x,
             y_mean - y_std,
@@ -74,11 +156,29 @@ def render_sweep_1d(
             color="tab:blue",
             label=r"$\pm 1\sigma$",
         )
-        ax.legend(fontsize="small")
     else:
         x = results.column(param_name)
         y = results.column(metric)
-        ax.plot(x, y, "o-", color="tab:blue", linewidth=1.5, markersize=5)
+        num_label = "TIDAL" if overlay else None
+        ax.plot(
+            x, y, "o-", color="tab:blue", linewidth=1.5, markersize=5, label=num_label
+        )
+
+    # Analytical overlay curve
+    if overlay is not None:
+        x_arr = np.asarray(x, dtype=np.float64)
+        scalar_ns = _build_overlay_scalars(results)
+        y_ref = _evaluate_sweep_overlay(overlay, {param_name: x_arr}, scalar_ns)
+        ax.plot(
+            x_arr,
+            y_ref,
+            "--",
+            color="tab:orange",
+            linewidth=1.5,
+            label="analytical",
+            zorder=3,
+        )
+        ax.legend(fontsize="small")
 
     ax.set_xlabel(param_name)
     ax.set_ylabel(metric)
@@ -300,6 +400,116 @@ def _render_2d_grid(
     ax.set_ylabel(p2_name)
     ax.set_title(metric)
     ax.figure.colorbar(im, ax=ax, label=metric)  # type: ignore[union-attr]
+
+
+def render_sweep_2d_with_overlay(  # noqa: PLR0914
+    fig: Figure,
+    results: SweepResults,
+    metric: str,
+    overlay: str,
+) -> None:
+    """3-panel comparison: TIDAL numerical | analytical formula | absolute error.
+
+    Creates three side-by-side pcolormesh panels so that the TIDAL
+    simulation result can be directly compared against an analytical
+    reference formula.  The TIDAL and analytical panels share the same
+    colour scale; the error panel uses a separate sequential colourmap.
+
+    Parameters
+    ----------
+    fig : Figure
+        Matplotlib figure (caller should size it to ~(15, 5)).
+    results : SweepResults
+        Loaded 2D sweep data (exactly 2 swept parameters required).
+    metric : str
+        Column name in results.rows for the y-values (e.g. ``"P_final"``).
+    overlay : str
+        Analytical formula string evaluated on a meshgrid of the two swept
+        parameters.  Fixed parameters and numeric sim settings are available
+        as scalar variables.  Example:
+        ``'sin(kappa * Bpeak * R * sqrt(pi/2))**2'``.
+
+    Raises
+    ------
+    ValueError
+        If not exactly 2 swept parameters or overlay evaluation fails.
+    """
+    param_names = list(results.swept_params.keys())
+    if len(param_names) != 2:  # noqa: PLR2004
+        msg = (
+            f"render_sweep_2d_with_overlay expects exactly 2 swept parameters, "
+            f"got {len(param_names)}: {param_names}"
+        )
+        raise ValueError(msg)
+
+    p1_name, p2_name = param_names
+    p1_vals = np.sort(np.asarray(results.swept_params[p1_name], dtype=np.float64))
+    p2_vals = np.sort(np.asarray(results.swept_params[p2_name], dtype=np.float64))
+    n1, n2 = len(p1_vals), len(p2_vals)
+
+    # Build numerical grid
+    z_num = np.full((n2, n1), np.nan)
+    for row in results.rows:
+        v1 = row.get(p1_name)
+        v2 = row.get(p2_name)
+        val = row.get(metric)
+        if v1 is None or v2 is None or val is None:
+            continue
+        i1 = min(int(np.searchsorted(p1_vals, float(v1))), n1 - 1)
+        i2 = min(int(np.searchsorted(p2_vals, float(v2))), n2 - 1)
+        z_num[i2, i1] = float(val)
+
+    # Evaluate analytical formula on meshgrid
+    p1m, p2m = np.meshgrid(p1_vals, p2_vals)
+    scalar_ns = _build_overlay_scalars(results)
+    z_anal = _evaluate_sweep_overlay(overlay, {p1_name: p1m, p2_name: p2m}, scalar_ns)
+
+    # Absolute error
+    z_err = np.abs(z_num - z_anal)
+
+    # Shared colour scale for numerical + analytical panels
+    valid = z_num[np.isfinite(z_num)]
+    vmin = float(valid.min()) if len(valid) else 0.0
+    vmax = float(valid.max()) if len(valid) else 1.0
+
+    axes = fig.subplots(1, 3)
+
+    # Panel 0: TIDAL numerical
+    ax0 = axes[0]
+    im0 = ax0.pcolormesh(
+        p1_vals, p2_vals, z_num, shading="nearest", cmap="viridis", vmin=vmin, vmax=vmax
+    )
+    ax0.set_xlabel(p1_name)
+    ax0.set_ylabel(p2_name)
+    ax0.set_title(f"{metric} (TIDAL)")
+    fig.colorbar(im0, ax=ax0, label=metric)
+
+    # Panel 1: analytical formula
+    ax1 = axes[1]
+    im1 = ax1.pcolormesh(
+        p1_vals,
+        p2_vals,
+        z_anal,
+        shading="nearest",
+        cmap="viridis",
+        vmin=vmin,
+        vmax=vmax,
+    )
+    ax1.set_xlabel(p1_name)
+    ax1.set_ylabel(p2_name)
+    ax1.set_title(f"{metric} (analytical)")
+    fig.colorbar(im1, ax=ax1, label=metric)
+
+    # Panel 2: absolute error
+    ax2 = axes[2]
+    im2 = ax2.pcolormesh(p1_vals, p2_vals, z_err, shading="nearest", cmap="YlOrRd")
+    ax2.set_xlabel(p1_name)
+    ax2.set_ylabel(p2_name)
+    ax2.set_title("|error|")
+    fig.colorbar(im2, ax=ax2, label="|error|")
+
+    fig.suptitle(f"{metric}: TIDAL vs analytical", y=1.02)
+    fig.tight_layout()
 
 
 def render_sweep_compare(

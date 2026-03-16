@@ -68,6 +68,11 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Print generated .wls without running wolframscript",
     )
     derive_parser.add_argument(
+        "--force-derive",
+        action="store_true",
+        help="Force re-derivation even if the generated script is unchanged",
+    )
+    derive_parser.add_argument(
         "--output",
         metavar="PATH",
         default=None,
@@ -250,7 +255,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sim_parser.add_argument(
         "--scheme",
-        choices=["ida", "leapfrog", "cvode", "scipy", "auto"],
+        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "auto"],
         default="auto",
         help=(
             "Solver scheme (default: auto). "
@@ -299,6 +304,48 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=None,
         metavar="DT",
         help="Snapshot interval (default: t_end/100)",
+    )
+    sim_parser.add_argument(
+        "--fd-order",
+        type=int,
+        choices=[2, 4, 6],
+        default=4,
+        help=(
+            "Finite-difference accuracy order for spatial operators (default: 4). "
+            "Higher orders use wider stencils: 2->3pt, 4->5pt, 6->7pt. "
+            "Order 4 is recommended: O(dx^4) convergence at ~2x per-point cost "
+            "vs order 2 — typically enables halving N for the same accuracy. "
+            "Ref: Fornberg (1988), Mathematics of Computation 51(184)."
+        ),
+    )
+    sim_parser.add_argument(
+        "--leapfrog-order",
+        type=int,
+        choices=[2, 4],
+        default=None,
+        help=(
+            "Leapfrog integrator order. Default: auto-detect (4 for time-independent "
+            "non-dissipative systems, 2 otherwise). "
+            "2 = Störmer-Verlet (1 force eval/step). "
+            "4 = Yoshida triple-composition (3 force evals/step, O(dt⁴) accuracy). "
+            "Yoshida allows ~2x larger dt for the same accuracy. "
+            "Only applies when --scheme leapfrog is used. "
+            "Ref: Yoshida (1990), Physics Letters A 150(5-7), pp. 262-268."
+        ),
+    )
+    sim_parser.add_argument(
+        "--spectral",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=(
+            "Use FFT-based spectral operators instead of finite-difference stencils. "
+            "Default: auto-detect (enabled when all BCs are periodic and solver is "
+            "not IDA). Use --no-spectral to force finite-difference stencils. "
+            "Achieves exponential convergence for smooth problems -- typically "
+            "N=64-128 instead of N=512-1024. "
+            "Incompatible with --scheme ida (use leapfrog, cvode, or scipy). "
+            "Ref: Burns et al. (2020), Phys. Rev. Research 2:023068."
+        ),
     )
     # Output
     sim_parser.add_argument(
@@ -400,13 +447,31 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         epilog=(
             "Examples:\n"
             "  tidal validate examples/data/klein_gordon_1d.json\n"
-            "  tidal validate spec.json"
+            "  tidal validate spec.json --stability\n"
+            "  tidal validate spec.json --stability --param m2=1.0"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     validate_parser.add_argument(
         "json_path",
         help="Path to the JSON equation specification to validate",
+    )
+    validate_parser.add_argument(
+        "--stability",
+        action="store_true",
+        default=False,
+        help=(
+            "Run stability checks: tachyon detection (negative mass-matrix eigenvalues) "
+            "and ghost detection (wrong-sign kinetic terms from Hamiltonian). "
+            "Uses a 1-point grid; exact for constant-coefficient systems."
+        ),
+    )
+    validate_parser.add_argument(
+        "--param",
+        action="append",
+        default=[],
+        metavar="KEY=VAL",
+        help="Set symbolic parameter for stability check (repeatable, e.g. --param m2=1.0)",
     )
 
     # --- measure ---
@@ -507,7 +572,11 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
             "  tidal plot output_dir/ --type amplitude --overlay 'exp(-0.1*t)'\n"
             "  tidal plot output_dir/ --type energy --fields phi_0,chi_0\n"
             "  tidal plot output_dir/ --type profile --cross-section y=25.0\n"
-            "  tidal plot output_dir/ --type compare --output compare.png"
+            "  tidal plot output_dir/ --type compare --output compare.png\n"
+            "  tidal plot sweep_dir/ --type sweep --metric P_final "
+            "--overlay 'sin(kappa * B0 * t_end / 2)**2'\n"
+            "  tidal plot sweep_dir/ --type sweep --metric P_final "
+            "--overlay 'sin(kappa * Bpeak * R * sqrt(pi/2))**2'"
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
@@ -576,7 +645,14 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--overlay",
         default=None,
         metavar="EXPR",
-        help="Analytic formula vs time for amplitude plot (e.g. 'exp(-0.1*t)')",
+        help=(
+            "Analytic reference formula for overlay. "
+            "For --type=amplitude: variable 't' (time), e.g. 'exp(-0.1*t)'. "
+            "For --type=sweep: swept parameter names, fixed parameters, and numeric "
+            "sim settings (t_end, grid_shape) are available as variables. "
+            "1D example: 'sin(kappa * B0 * t_end / 2)**2'. "
+            "2D example: 'sin(kappa * Bpeak * R * sqrt(pi/2))**2' (3-panel figure)."
+        ),
     )
     # Conservation threshold
     plot_parser.add_argument(
@@ -833,7 +909,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sweep_parser.add_argument(
         "--scheme",
-        choices=["ida", "leapfrog", "cvode", "scipy", "auto"],
+        choices=["ida", "leapfrog", "cvode", "scipy", "modal", "auto"],
         default="auto",
         help="Solver scheme (default: auto)",
     )
@@ -867,6 +943,42 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=None,
         metavar="DT",
         help="Snapshot interval (default: t_end/100)",
+    )
+    sweep_parser.add_argument(
+        "--fd-order",
+        type=int,
+        choices=[2, 4, 6],
+        default=4,
+        help=(
+            "Finite-difference accuracy order for spatial operators (default: 4). "
+            "Higher orders use wider stencils: 2->3pt, 4->5pt, 6->7pt. "
+            "Order 4 is recommended: O(dx^4) convergence at ~2x per-point cost "
+            "vs order 2 — typically enables halving N for the same accuracy. "
+            "Ref: Fornberg (1988), Mathematics of Computation 51(184)."
+        ),
+    )
+    sweep_parser.add_argument(
+        "--leapfrog-order",
+        type=int,
+        choices=[2, 4],
+        default=None,
+        help=(
+            "Leapfrog integrator order (default: auto-detect). "
+            "2 = Störmer-Verlet, 4 = Yoshida. "
+            "Only applies when --scheme leapfrog. "
+            "Ref: Yoshida (1990), Physics Letters A 150(5-7)."
+        ),
+    )
+    sweep_parser.add_argument(
+        "--spectral",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help=(
+            "Use FFT spectral operators (default: auto-detect). "
+            "Auto-enabled when all BCs are periodic and solver is not IDA. "
+            "Use --no-spectral to force finite-difference. "
+            "Ref: Burns et al. (2020), Phys. Rev. Research 2:023068."
+        ),
     )
     sweep_parser.add_argument(
         "--mode",

@@ -1,27 +1,23 @@
 #!/usr/bin/env bash
-# Mass Ratio Sweep — Resonance Structure of Coupled Scalars
+# Gertsenshtein Effective — Plasma Detuning Sweep
 #
-# Sweeps the target mass mChi2 from 0.1 to 10.0 at fixed coupling,
-# demonstrating the resonance peak when mChi2 ≈ mPhi2 = 1.0
-# (degenerate masses = exact frequency matching at all k).
+# Sweeps the photon effective mass omegaP2 (= plasma frequency squared)
+# from 0 to 2.0, demonstrating detuning suppression of conversion.
 #
-# Measures conversion probability, velocity, and resonance analysis
-# to show how conversion bandwidth narrows as the mass ratio moves
-# away from resonance.
+# Expected physics (Raffelt-Stodolsky master formula):
+#   P = sin²(2θ) × sin²(Δ_osc * D / 2)
+#   tan(2θ) = κ*B0 / |Δ|,  Δ = -omegaP2/(2ω),  Δ_osc = √(Δ² + (κB0)²)
 #
-# Expected physics:
-#   - P_max peaks sharply at mChi2 ≈ 1.0 (resonant)
-#   - Conversion bandwidth is widest at resonance, narrowing for |mChi2 - mPhi2| >> 0
-#   - Group velocity mismatch increases off-resonance (decoherence)
-#   - v_group = k/sqrt(k^2 + m^2) differs for fields with different masses
+# At omegaP2=0 (massless): full Rabi oscillation P = sin²(κB0D/2)
+# At omegaP2>>0: suppressed as P ~ (κB0/omegaP2)² — detuned
 #
-# Uses --ic-wavevector 3 to create a propagating wave packet, which
-# concentrates Fourier energy around k=3 for cleaner velocity/resonance
-# analysis.
+# Uses --ic-wavevector 2 for a propagating graviton wavepacket.
+# The velocity and resonance measurements show how the conversion
+# bandwidth narrows as the mass mismatch increases.
 #
-# Demonstrates features F3 (velocity/resonance) and F6 (spectrum scalars).
+# Ref: Raffelt & Stodolsky (1988), Phys. Rev. D 37:1237
 #
-# Running this script:
+# Running:
 #   cd examples/coupled_scalars && bash sweep_mass_ratio.sh
 
 set -euo pipefail
@@ -29,24 +25,22 @@ cd "$(dirname "$0")"
 
 OUT=../data/sweep_mass_ratio
 
-echo "=== Mass Ratio Sweep: mChi2 = 0.1 to 10.0 (15 points, log scale) ==="
+echo "=== Plasma Detuning Sweep: omegaP2 = 0.0 to 2.0 (15 points) ==="
 
 tidal sweep ../data/coupled_scalars.json \
-  --sweep "mChi2=0.1:10.0:15:log" \
-  --param mPhi2=1.0 --param gCpl=0.3 \
-  --measure conversion,velocity,resonance,conservation \
-  --source phi_0 --target chi_0 \
-  --grid-shape 128 \
-  --bounds 0:80 \
+  --sweep "omegaP2=0.0:2.0:15" \
+  --param kappa=1.0 --param B0=0.1 --param mg2=0.0 \
+  --measure conversion,conservation \
+  --source h_0 --target a_0 \
+  --grid-shape 256 \
+  --bounds 0:100 \
   --periodic \
-  --ic gaussian --ic-component phi_0 --ic-center 20.0 --ic-width 4.0 --ic-wavevector 3 \
-  --t-end 20.0 \
+  --ic plane-wave --ic-component h_0 --ic-wavevector 2.0 --ic-amplitude 0.1 \
+  --t-end 50.0 \
   --output "$OUT"
 
 echo ""
-echo "Results written to: $OUT/"
+echo "Results: $OUT/"
 echo ""
-echo "Plot resonance structure:"
+echo "Visualize:"
 echo "  tidal plot $OUT/ --type sweep --metric P_max"
-echo "  tidal plot $OUT/ --type sweep --metric conversion_bandwidth"
-echo "  tidal plot $OUT/ --type sweep --metric n_resonant_modes"

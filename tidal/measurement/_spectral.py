@@ -48,6 +48,8 @@ def _apply_hann_window(
     periodic: tuple[bool, ...],
 ) -> NDArray[np.float64]:
     """Apply Hann window on non-periodic axes; emit warning if needed."""
+    if all(periodic):
+        return field_data  # No windowing needed, no copy
     data = field_data.copy()
     any_non_periodic = False
     for axis in range(len(periodic)):
@@ -71,8 +73,19 @@ def _apply_hann_window(
 def _build_k_grid(
     field_shape: tuple[int, ...],
     grid_spacing: tuple[float, ...],
+    *,
+    need_grid: bool = True,
 ) -> tuple[list[NDArray[np.float64]], NDArray[np.float64]]:
-    """Build wavenumber arrays and ``|k|`` magnitude grid."""
+    """Build wavenumber arrays and ``|k|`` magnitude grid.
+
+    Parameters
+    ----------
+    need_grid : bool
+        If False, skip the full meshgrid allocation and return an empty
+        list for ``k_grid``.  Use when only ``k_mag`` is needed (e.g.
+        ``compute_power_spectrum``), saving N full-size array allocations
+        for N-dimensional data.
+    """
     k_arrays: list[NDArray[np.float64]] = []
     ndim = len(grid_spacing)
     for axis in range(ndim):
@@ -85,10 +98,24 @@ def _build_k_grid(
         else:
             freq = np.asarray(np.fft.fftfreq(n, d=dx) * (2.0 * np.pi), dtype=np.float64)
         k_arrays.append(freq)
-    k_grid: list[NDArray[np.float64]] = [
-        np.asarray(g, dtype=np.float64) for g in np.meshgrid(*k_arrays, indexing="ij")
-    ]
-    k_mag = np.sqrt(np.asarray(sum(ki**2 for ki in k_grid), dtype=np.float64))
+
+    if need_grid:
+        k_grid: list[NDArray[np.float64]] = [
+            np.asarray(g, dtype=np.float64)
+            for g in np.meshgrid(*k_arrays, indexing="ij")
+        ]
+        k_mag = np.sqrt(np.asarray(sum(ki**2 for ki in k_grid), dtype=np.float64))
+    else:
+        # Compute k_mag via broadcasting (avoids full meshgrid allocation)
+        rfft_shape = (*field_shape[:-1], len(k_arrays[-1]))
+        k_sq = np.zeros(rfft_shape, dtype=np.float64)
+        for axis_idx, ka in enumerate(k_arrays):
+            bcast = [1] * ndim
+            bcast[axis_idx] = len(ka)
+            k_sq += ka.reshape(bcast) ** 2
+        k_mag = np.sqrt(k_sq)
+        k_grid = []
+
     return k_grid, k_mag
 
 
@@ -150,7 +177,7 @@ def compute_spectrum(
     fhat = np.fft.rfftn(data_for_fft)
     power_full = np.abs(fhat) ** 2
 
-    _k_grid, k_mag = _build_k_grid(field_data.shape, grid_spacing)
+    _k_grid, k_mag = _build_k_grid(field_data.shape, grid_spacing, need_grid=False)
     wavenumbers, binned = _radial_bin(k_mag, power_full, grid_spacing, field_data.shape)
     return SpectralSnapshot(wavenumbers=wavenumbers, power_spectrum=binned)
 

@@ -1,0 +1,120 @@
+# Gertsenshtein Effect: Graviton-Photon Conversion in Localized Background Magnetic Field
+#
+# Lagrangian: L = (1/kappa^2) R - (1/4) F_{ab} F^{ab}
+#   (Einstein-Hilbert gravity + Maxwell electrodynamics)
+#
+# Background: Gaussian B-field profile B_x(z) = Bpeak * exp(-z^2/(2*R^2)) along x-axis.
+# Gauge potential: Abar_y = -Bpeak * R * Sqrt[Pi/2] * Erf[z/(Sqrt[2]*R)]
+# so that d/dz(Abar_y) = -Bpeak * exp(-z^2/(2*R^2)) = -B_x(z). Coulomb gauge.
+#
+# NOTE: constant names must not contain underscores — Mathematica parses "X_Y" as
+# Pattern[X, Blank[Y]], corrupting the symbolic computation. Use "Bpeak" not "B0_peak".
+#
+# An incident graviton wavepacket scatters through the magnetized region (centered at z=0),
+# partially converting to photons. The conversion probability in the weak-field limit is:
+#
+#   P(graviton -> photon) = sin^2(kappa/2 * integral(B_x(z), -inf, +inf))
+#                         = sin^2(kappa * Bpeak * R * sqrt(pi/2))
+#
+# This is the Boccaletti et al. (1970) formula for a finite magnetized region:
+#   Boccaletti et al. (1970, Nuovo Cimento 70B:129)
+#   Domcke, Garcia-Cely & Lee (2025, arXiv:2507.16609) for inhomogeneous B-field treatment
+#
+# Unlike the uniform-B case (theory.toml), this uses:
+# - Non-periodic domain (large [-L, L], Neumann BCs) to avoid boundary wrap artifacts
+# - Wavepacket IC at z = -L/2 (enters magnetized region, converts, exits)
+# - Conversion measurement (NOT energy — position-dependent coefficients limitation)
+
+[theory]
+name = "Gertsenshtein Effect (Localized B-field)"
+description = "Graviton-photon conversion in Gaussian background magnetic field via wavepacket scattering"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+# h: metric perturbation (graviton), symmetric rank-2 tensor
+# A: full EM 4-potential (fundamental field for perturbation)
+# a: EM perturbation (photon), vector — the dynamical 1st-order variable
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[[fields]]
+name = "A"
+type = "vector"
+
+[[fields]]
+name = "a"
+type = "vector"
+
+# Electromagnetic field strength tensor F = dA (derived from A)
+# Expanded via MakeRule BEFORE xPert perturbation
+[[derived_fields]]
+name = "F"
+type = "tensor"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+
+# Gaussian B-field profile: B_x(z) = Bpeak * exp(-z^2 / (2*R^2))
+# Gauge potential: Abar_y = -Bpeak * R * Sqrt[Pi/2] * Erf[z / (Sqrt[2]*R)]
+# Check: d/dz(Abar_y) = -Bpeak * exp(-z^2/(2*R^2)) = -B_x(z) ✓
+# (Coulomb gauge, localized magnetic field along x-axis, centered at z=0)
+# Ref: Boccaletti et al. (1970, Nuovo Cimento 70B:129)
+[[background_fields]]
+name = "Abar"
+type = "vector"
+components = ["0", "0", "-Bpeak * R * Sqrt[Pi/2] * Erf[z[]/(Sqrt[2]*R)]", "0"]
+
+[constants]
+names = ["kappa", "Bpeak", "R"]
+
+# Full Einstein-Maxwell Lagrangian
+# (1/kappa^2) R - (1/4) F_ab F^ab
+# where kappa^2 = 16*pi*G in natural units
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[] - 1/4 F[-a,-b] eta[a,c] eta[b,d] F[-c,-d]"
+
+# Multi-field perturbation:
+# - Metric: g = eta + epsilon*h  (via SetupMetricPerturbation)
+# - EM: A = Abar + epsilon*a     (via DefTensorPerturbation)
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+# TT gauge for graviton (transverse-traceless: h_0mu = 0, h^i_i = 0, d^i h_ij = 0)
+# Ref: Flanagan & Hughes (2005), §2; Maggiore (2008), §1.3
+[[gauge]]
+field = "h"
+type = "tt"
+
+# Lorenz gauge for photon perturbation (d_mu a^mu = 0)
+# Ref: Palessandro & Rothman (2023) [arXiv:2301.02072]; Raffelt & Stodolsky (1988) [PRD 37:1237]
+[[gauge]]
+field = "a"
+type = "lorenz"
+
+# Plane-wave reduction: d/dx = d/dy = 0
+# Reduces 3+1D to effective 1+1D along z (propagation direction)
+[reduction]
+type = "plane_wave"
+propagation_axis = "z"
+
+# Default parameters:
+# kappa = 1.0 (natural units; physical value ~ 1.15e-18 GeV^-1)
+# Bpeak = 0.1 (peak magnetic field strength; "B0_peak" not used — underscores are Mathematica patterns)
+# R = 5.0 (Gaussian half-width; integral = Bpeak * R * sqrt(2*pi))
+[parameters]
+kappa = 1.0
+Bpeak = 0.1
+R = 5.0
+
+[output]
+path = "../data/gertsenshtein_localized.json"

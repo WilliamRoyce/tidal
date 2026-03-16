@@ -134,13 +134,72 @@ def _classify_terms(  # noqa: PLR0913, PLR0917
 
 
 def _lap_axis(k: NDArray[np.float64], h: float) -> NDArray[np.float64]:
-    """Modified-wavenumber Laplacian along one axis: -(2/h²)(1 - cos(k*h))."""
-    return -(2.0 / (h * h)) * (1.0 - np.cos(k * h))
+    """Modified-wavenumber Laplacian along one axis.
+
+    Returns the Fourier symbol of the FD second-derivative stencil,
+    matching the current ``fd_order`` from ``operators.py``:
+
+    - Order 2: ``-(2/h²)(1 - cos(kh))``
+    - Order 4: ``(-cos(2kh)/6 + 8cos(kh)/3 - 5/2) / h²``
+    - Order 6: ``(cos(3kh)/45 - 3cos(2kh)/10 + 3cos(kh) - 49/18) / h²``
+
+    This ensures the FFT constraint solver uses the same dispersion
+    relation as the FD spatial operators.
+
+    Reference: Fornberg (1988), Mathematics of Computation 51(184).
+    """
+    from tidal.solver.operators import get_fd_order  # noqa: PLC0415
+
+    order = get_fd_order()
+    kh = k * h
+    inv_h2 = 1.0 / (h * h)
+    if order == 2:  # noqa: PLR2004
+        return -(2.0 * inv_h2) * (1.0 - np.cos(kh))
+    if order == 4:  # noqa: PLR2004
+        # Fourier symbol of [-1/12, 4/3, -5/2, 4/3, -1/12] / h²
+        return inv_h2 * (-np.cos(2 * kh) / 6.0 + 8.0 * np.cos(kh) / 3.0 - 5.0 / 2.0)
+    # Fall-through: order 6
+    # Fourier symbol of [1/90, -3/20, 3/2, -49/18, 3/2, -3/20, 1/90] / h^2
+    return inv_h2 * (
+        np.cos(3 * kh) / 45.0
+        - 3.0 * np.cos(2 * kh) / 10.0
+        + 3.0 * np.cos(kh)
+        - 49.0 / 18.0
+    )
 
 
 def _grad_axis(k: NDArray[np.float64], h: float) -> NDArray[np.complex128]:
-    """Modified-wavenumber gradient along one axis: i*sin(k*h)/h."""
-    return 1j * np.sin(k * h) / h
+    """Modified-wavenumber gradient along one axis.
+
+    Returns the Fourier symbol of the FD first-derivative stencil,
+    matching the current ``fd_order``:
+
+    - Order 2: ``i sin(kh) / h``
+    - Order 4: ``i (8sin(kh) - sin(2kh)) / (6h)``
+    - Order 6: ``i (45sin(kh) - 9sin(2kh) + sin(3kh)) / (30h)``
+
+    Reference: Fornberg (1988), Mathematics of Computation 51(184).
+    """
+    from tidal.solver.operators import get_fd_order  # noqa: PLC0415
+
+    order = get_fd_order()
+    kh = k * h
+    inv_h = 1.0 / h
+    if order == 2:  # noqa: PLR2004
+        result = 1j * np.sin(kh) * inv_h
+    elif order == 4:  # noqa: PLR2004
+        # Fourier symbol of [1/12, -2/3, 0, 2/3, -1/12] / h
+        result = 1j * inv_h * (8.0 * np.sin(kh) - np.sin(2 * kh)) / 6.0
+    else:
+        # Fall-through: order 6
+        # Fourier symbol of [-1/60, 3/20, -3/4, 0, 3/4, -3/20, 1/60] / h
+        result = (
+            1j
+            * inv_h
+            * (45.0 * np.sin(kh) - 9.0 * np.sin(2 * kh) + np.sin(3 * kh))
+            / 30.0
+        )
+    return np.asarray(result, dtype=np.complex128)
 
 
 # Type for Fourier multiplier functions: (kvecs, dx) -> NDArray
@@ -376,7 +435,11 @@ def _fft_solve_single(
         max_incompatible = (
             float(np.max(source_at_singular)) if source_at_singular.size > 0 else 0.0
         )
-        if max_incompatible > _COMPAT_TOL * max_source:
+        # Use relative tolerance with an absolute floor to avoid
+        # false positives from floating-point noise (e.g. 4th-order FD
+        # stencils can produce ~1e-15 DC components from rounding).
+        compat_threshold = max(_COMPAT_TOL * max_source, 1e-12)
+        if max_incompatible > compat_threshold:
             msg = (
                 f"Constraint for '{terms.field_name}' is incompatible: "
                 f"source has nonzero projection (max={max_incompatible:.4g}) "
@@ -823,16 +886,19 @@ def _find_target_field(  # noqa: PLR0913, PLR0917
     all_referenced: set[str] = {term.field for term in rhs_terms}
 
     # Find free (undetermined) fields
-    free_fields: list[str] = [
-        f for f in all_referenced if f not in determined
-    ]
+    free_fields: list[str] = [f for f in all_referenced if f not in determined]
 
     if len(free_fields) != 1:
         return None, None
 
     target = free_fields[0]
     terms = _classify_terms(
-        eq_idx, rhs_terms, target, coeff_eval, t, config,
+        eq_idx,
+        rhs_terms,
+        target,
+        coeff_eval,
+        t,
+        config,
     )
     if terms.self_terms:
         return target, terms
@@ -905,9 +971,7 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
 
     # Collect ALL constraint equations
     constraint_eqs = [
-        (i, eq)
-        for i, eq in enumerate(spec.equations)
-        if eq.time_derivative_order == 0
+        (i, eq) for i, eq in enumerate(spec.equations) if eq.time_derivative_order == 0
     ]
 
     if not constraint_eqs:
@@ -937,7 +1001,8 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
     # Without it, the constraint field won't be solved via Phase 1 (FFT /
     # Gauss-Seidel) and may stall in Phase 2 iterative propagation.
     unconfigured = [
-        eq.field_name for _i, eq in constraint_eqs
+        eq.field_name
+        for _i, eq in constraint_eqs
         if not eq.constraint_solver.enabled
         and any(term.field == eq.field_name for term in eq.rhs_terms)
     ]
@@ -954,15 +1019,17 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
 
     # Phase 1: Handle enabled constraints with coupled detection
     # (preserves existing coupled-constraint behavior for EM, Chern-Simons)
-    enabled_eqs = [
-        (i, eq) for i, eq in constraint_eqs if eq.constraint_solver.enabled
-    ]
+    enabled_eqs = [(i, eq) for i, eq in constraint_eqs if eq.constraint_solver.enabled]
     if enabled_eqs:
         enabled_groups: list[_ConstraintTerms] = []
         for eq_idx, eq in enabled_eqs:
             terms = _classify_terms(
-                eq_idx, eq.rhs_terms, eq.field_name,
-                coeff_eval, t, eq.constraint_solver,
+                eq_idx,
+                eq.rhs_terms,
+                eq.field_name,
+                coeff_eval,
+                t,
+                eq.constraint_solver,
             )
             if not terms.self_terms:
                 # The labeled field doesn't appear in this equation.
@@ -978,19 +1045,30 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
         for component in components:
             if len(component) == 1:
                 _solve_independent(
-                    component, grid, bc, fields, layout, y0_out, name_map,
+                    component,
+                    grid,
+                    bc,
+                    fields,
+                    layout,
+                    y0_out,
+                    name_map,
                 )
             else:
                 _solve_coupled(
-                    component, grid, bc, fields, layout, y0_out, name_map,
+                    component,
+                    grid,
+                    bc,
+                    fields,
+                    layout,
+                    y0_out,
+                    name_map,
                 )
 
         determined.update(g.field_name for g in enabled_groups)
 
     # Phase 2: Iterative propagation for remaining constraints
     remaining_eqs = [
-        (i, eq) for i, eq in constraint_eqs
-        if not eq.constraint_solver.enabled
+        (i, eq) for i, eq in constraint_eqs if not eq.constraint_solver.enabled
     ]
 
     for _iteration in range(_MAX_PROPAGATION_ITERATIONS):
@@ -998,15 +1076,24 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
 
         for eq_idx, eq in remaining_eqs:
             target, terms = _find_target_field(
-                eq_idx, eq.rhs_terms, eq.field_name,
-                determined, coeff_eval, t, eq.constraint_solver,
+                eq_idx,
+                eq.rhs_terms,
+                eq.field_name,
+                determined,
+                coeff_eval,
+                t,
+                eq.constraint_solver,
             )
 
             if target is None or terms is None:
                 continue
 
             source = _evaluate_source(
-                terms.source_terms, fields, grid, bc, name_map,
+                terms.source_terms,
+                fields,
+                grid,
+                bc,
+                name_map,
             )
 
             solution = _solve_for_target(terms, grid, bc, source)
@@ -1020,9 +1107,7 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
                 vel_field = target.removeprefix("v_")
                 if vel_field in layout.velocity_slot_map:
                     slot_idx = layout.velocity_slot_map[vel_field]
-                    y0_out[slot_idx * n : (slot_idx + 1) * n] = (
-                        solution.ravel()
-                    )
+                    y0_out[slot_idx * n : (slot_idx + 1) * n] = solution.ravel()
                     fields[target] = solution
 
             determined.add(target)
@@ -1064,8 +1149,10 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
             for f in free_set:
                 field_counts[f] = field_counts.get(f, 0) + 1
 
-        lines = ["Constraint propagation stalled — these constraints have "
-                 "multiple undetermined fields:"]
+        lines = [
+            "Constraint propagation stalled — these constraints have "
+            "multiple undetermined fields:"
+        ]
         for eq_name, free_set in sorted(stall_free_fields.items()):
             lines.append(
                 f"  {eq_name}: {len(free_set)} undetermined "
@@ -1080,8 +1167,7 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
             )
             hints = [f"{f} (in {shared[f]} constraints)" for f in top[:3]]
             lines.append(
-                f"Setting IC for: {', '.join(hints)} may resolve "
-                f"multiple constraints."
+                f"Setting IC for: {', '.join(hints)} may resolve multiple constraints."
             )
         warnings.warn("\n".join(lines), UserWarning, stacklevel=2)
 
@@ -1091,7 +1177,10 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
         rhs = np.zeros(grid.shape)
         for term_idx, term in enumerate(eq.rhs_terms):
             coeff = coeff_eval.resolve(
-                term, t, eq_idx=eq_idx, term_idx=term_idx,
+                term,
+                t,
+                eq_idx=eq_idx,
+                term_idx=term_idx,
             )
             # first_derivative_t(X) → identity(v_X)
             op_name = term.operator
@@ -1101,11 +1190,7 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
                 field_ref = f"v_{field_ref}"
             if name_map and field_ref in name_map:
                 field_ref = name_map[field_ref]
-            data = (
-                fields[field_ref]
-                if field_ref in fields
-                else np.zeros(grid.shape)
-            )
+            data = fields[field_ref] if field_ref in fields else np.zeros(grid.shape)
             operated = apply_operator(op_name, data, grid, bc)
             rhs += coeff * operated
 
@@ -1115,9 +1200,7 @@ def ensure_consistent_ic(  # noqa: PLR0912, PLR0913, PLR0914, PLR0915, C901
             violations.append((eq.field_name, max_res, involved))
 
     if violations:
-        lines = [
-            "Initial data does not satisfy constraint equation(s):"
-        ]
+        lines = ["Initial data does not satisfy constraint equation(s):"]
         for field_name, max_res, involved in violations:
             free_info = ""
             if field_name in stall_free_fields:

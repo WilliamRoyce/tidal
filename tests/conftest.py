@@ -4,8 +4,30 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import pytest
+
+from tidal.solver.operators import set_fd_order, set_spectral
+
+if TYPE_CHECKING:
+    from collections.abc import Generator
+
+# ==================== Module-state cleanup ====================
+
+
+@pytest.fixture(autouse=True)
+def _reset_operator_state() -> Generator[None, None, None]:  # pyright: ignore[reportUnusedFunction]
+    """Reset FD order and spectral mode after every test.
+
+    CLI tests call set_fd_order(4) (the CLI default) and/or
+    set_spectral(True), which persist as module-level state and
+    pollute subsequent tests that assume order 2 / FD mode.
+    """
+    yield
+    set_fd_order(2)
+    set_spectral(False)
+
 
 # ==================== CLI JSON Spec Fixtures ====================
 
@@ -163,6 +185,48 @@ _COUPLED_SCALARS_SPEC: dict[str, object] = {
     "coupling": {
         "mass_matrix_symbolic": [["-mPhi2", None], [None, "-mChi2"]],
         "coupling_matrix_symbolic": [[None, "-gCpl"], ["-gCpl", None]],
+    },
+    "canonical": {
+        "hamiltonian_terms": [
+            {
+                "coefficient": 1.0,
+                "factor_a": {"field": "phi_0", "operator": "identity"},
+                "factor_b": {"field": "phi_0", "operator": "identity"},
+                "coefficient_symbolic": "mPhi2/2",
+            },
+            {
+                "coefficient": 1.0,
+                "factor_a": {"field": "chi_0", "operator": "identity"},
+                "factor_b": {"field": "chi_0", "operator": "identity"},
+                "coefficient_symbolic": "mChi2/2",
+            },
+            {
+                "coefficient": 1.0,
+                "factor_a": {"field": "chi_0", "operator": "identity"},
+                "factor_b": {"field": "phi_0", "operator": "identity"},
+                "coefficient_symbolic": "gCpl",
+            },
+            {
+                "coefficient": 0.5,
+                "factor_a": {"field": "phi_0", "operator": "gradient_x"},
+                "factor_b": {"field": "phi_0", "operator": "gradient_x"},
+            },
+            {
+                "coefficient": 0.5,
+                "factor_a": {"field": "chi_0", "operator": "gradient_x"},
+                "factor_b": {"field": "chi_0", "operator": "gradient_x"},
+            },
+            {
+                "coefficient": 0.5,
+                "factor_a": {"field": "phi_0", "operator": "time_derivative"},
+                "factor_b": {"field": "phi_0", "operator": "time_derivative"},
+            },
+            {
+                "coefficient": 0.5,
+                "factor_a": {"field": "chi_0", "operator": "time_derivative"},
+                "factor_b": {"field": "chi_0", "operator": "time_derivative"},
+            },
+        ],
     },
 }
 

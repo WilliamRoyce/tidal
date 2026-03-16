@@ -135,8 +135,12 @@ class TestProgressIntegration:
 
         p = SimulationProgress(0.0, 1.0, solver_name="CVODE", disable=True)
         result = solve_cvode(
-            spec, grid, y0, t_span=(0.0, 1.0),
-            num_snapshots=5, progress=p,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            num_snapshots=5,
+            progress=p,
         )
         assert result["success"]
 
@@ -151,7 +155,11 @@ class TestProgressIntegration:
 
         p = SimulationProgress(0.0, 1.0, solver_name="leapfrog", disable=True)
         result = solve_leapfrog(
-            spec, grid, y0, t_span=(0.0, 1.0), dt=0.01,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            dt=0.01,
             progress=p,
         )
         assert result["success"]
@@ -167,8 +175,12 @@ class TestProgressIntegration:
 
         p = SimulationProgress(0.0, 1.0, solver_name="scipy", disable=True)
         result = solve_scipy(
-            spec, grid, y0, t_span=(0.0, 1.0),
-            num_snapshots=5, progress=p,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            num_snapshots=5,
+            progress=p,
         )
         assert result["success"]
 
@@ -183,7 +195,11 @@ class TestProgressIntegration:
 
         # progress=None is the default — should work exactly as before
         result = solve_cvode(
-            spec, grid, y0, t_span=(0.0, 1.0), num_snapshots=5,
+            spec,
+            grid,
+            y0,
+            t_span=(0.0, 1.0),
+            num_snapshots=5,
         )
         assert result["success"]
 
@@ -198,22 +214,32 @@ class TestProgressIntegration:
         # Use a Gaussian pulse so there's actual dynamics
         y0 = np.zeros(layout.total_size)
         x = grid.coord_arrays()[0]
-        y0[:grid.num_points] = np.exp(-(x - np.pi) ** 2)
+        y0[: grid.num_points] = np.exp(-((x - np.pi) ** 2))
 
         # Without progress (standard .solve path)
         result_std = solve_cvode(
-            spec, grid, y0.copy(), t_span=(0.0, 1.0), num_snapshots=11,
+            spec,
+            grid,
+            y0.copy(),
+            t_span=(0.0, 1.0),
+            num_snapshots=11,
         )
 
         # With progress (stepwise path)
         p = SimulationProgress(0.0, 1.0, disable=True)
         result_step = solve_cvode(
-            spec, grid, y0.copy(), t_span=(0.0, 1.0), num_snapshots=11,
+            spec,
+            grid,
+            y0.copy(),
+            t_span=(0.0, 1.0),
+            num_snapshots=11,
             progress=p,
         )
 
         assert result_std["success"]
         assert result_step["success"]
         np.testing.assert_allclose(
-            result_std["y"][-1], result_step["y"][-1], rtol=1e-6,
+            result_std["y"][-1],
+            result_step["y"][-1],
+            rtol=1e-6,
         )

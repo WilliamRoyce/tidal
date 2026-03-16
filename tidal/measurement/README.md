@@ -8,7 +8,7 @@ TIDAL pipeline.
 This module sits at the end of the TIDAL pipeline:
 
 ```
-Lagrangian (xAct) --> JSON spec --> PDE simulation (py-pde) --> measurement
+Lagrangian (xAct) --> JSON spec --> PDE simulation (SUNDIALS/numpy) --> measurement
 ```
 
 It extracts quantitative physics from simulation output: per-field energy
@@ -479,7 +479,7 @@ be used with different parameter values.
 | Non-periodic | Central differences with Dirichlet ghost cells | O(dx^2) |
 
 For non-periodic axes, the derivative stencils use anti-symmetric ghost
-cell padding (`f_ghost = -f_interior`) to match py-pde's Dirichlet BC
+cell padding (`f_ghost = -f_interior`) to match the solver's Dirichlet BC
 convention. This gives `(f[i+1] - f[i-1]) / (2dx)` for first
 derivatives and `(f[i+1] - 2f[i] + f[i-1]) / dx^2` for second
 derivatives, including at boundary cells where the ghost cell is implied.
@@ -577,7 +577,7 @@ All functions follow the project's fail-fast convention:
 - Gertsenshtein (1962), "Wave resonance of light and gravitational waves", JETP 14, 84
 - Domcke & Garcia-Cely (2023), "A simple derivation of the Gertsenshtein effect", [arXiv:2301.02072](https://arxiv.org/abs/2301.02072)
 - Burns et al. (2020), "Dedalus: A Flexible Framework for Numerical Simulations with Spectral Methods", Phys. Rev. Research 2, 023068, [arXiv:1905.10388](https://arxiv.org/abs/1905.10388)
-- Zwicker (2020), "py-pde: A Python package for solving partial differential equations", JOSS 5(48), 2158
+- Zwicker (2020), "py-pde: A Python package for solving partial differential equations", JOSS 5(48), 2158 — original PDE backend; FD stencil conventions retained
 
 See [`docs/references.md`](../../docs/references.md) for the full citation list.
 

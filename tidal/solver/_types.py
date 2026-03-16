@@ -33,3 +33,10 @@ class SolverResult(TypedDict):
 # Beyond that, matrix-free GMRES avoids storing any Jacobian.
 DENSE_THRESHOLD: int = 2_000
 SPARSE_THRESHOLD: int = 200_000
+
+# Sparsity pattern nnz limit for SuperLU_MT. Above this, SuperLU's fill-in
+# during LU factorization can exhaust memory. Fall back to FD GMRES instead.
+# Calibrated against massive_gravity (32x32 fails at nnz~172K, 16x16 passes
+# at nnz~43K). Value of 100_000 gives a conservative safety margin.
+# Reference: Li & Demmel, "SuperLU_MT", ACM TOMS 29(2), 2003.
+SUPERLU_NNZ_LIMIT: int = 100_000

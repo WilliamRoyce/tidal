@@ -12,7 +12,7 @@
        → Equation of motion (tensor form)
 
    NOTE: Canonical momentum and Hamiltonian computation is now performed at
-   the component level in _derive.py (_wls_canonical_pipeline). The old
+   the component level in _derive.py (_wls_canonical_phase_a / _wls_canonical_phase_b). The old
    abstract-index CanonicalMomentum/LegendreTransformH functions have been
    removed — they were superseded by the component-level Legendre transform
    which correctly handles gauge theories (Proca, Chern-Simons, etc.).

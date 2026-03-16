@@ -1,0 +1,208 @@
+\documentclass[border=10pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit}
+
+% ---------------------------------------------------------------
+% Colour palette (muted, print-friendly, greyscale-distinguishable)
+% ---------------------------------------------------------------
+\definecolor{modalblue}{HTML}{D0E4F5}
+\definecolor{idaorange}{HTML}{FDDCB5}
+\definecolor{cvodegreen}{HTML}{D5EDCF}
+\definecolor{manualgrey}{HTML}{E0E0E0}
+\definecolor{startgrey}{HTML}{F0F0F0}
+\definecolor{annotgrey}{HTML}{888888}
+\definecolor{subcheckbg}{HTML}{EEF4FB}
+
+\begin{document}
+\sffamily
+\begin{tikzpicture}[
+    % --- Node styles ---
+    startstop/.style={
+        rectangle, rounded corners=4pt, minimum width=3.8cm,
+        minimum height=0.9cm, draw=black!70, fill=startgrey,
+        font=\small\sffamily, align=center, text width=3.5cm
+    },
+    decision/.style={
+        diamond, aspect=2.4, minimum width=4.2cm,
+        draw=black!70, fill=white, font=\small\sffamily,
+        align=center, inner sep=2pt, text width=3.0cm
+    },
+    solver/.style={
+        rectangle, rounded corners=2pt, minimum width=3.2cm,
+        minimum height=0.9cm, draw=black!70,
+        font=\small\bfseries\sffamily, align=center
+    },
+    subcheck/.style={
+        rectangle, rounded corners=2pt, draw=black!50, dashed,
+        fill=subcheckbg, font=\scriptsize\sffamily, align=left,
+        inner sep=6pt, text width=5.2cm
+    },
+    annot/.style={
+        font=\scriptsize\sffamily\itshape, text=annotgrey,
+        align=left, text width=4.0cm
+    },
+    % --- Arrow styles ---
+    arr/.style={
+        -{Stealth[length=5pt, width=4pt]}, thick, black!70
+    },
+    dotarr/.style={
+        -{Stealth[length=4pt, width=3pt]}, densely dotted, black!50
+    },
+    yeslbl/.style={font=\scriptsize\sffamily\bfseries, text=black!70},
+    nolbl/.style={font=\scriptsize\sffamily\bfseries, text=black!70},
+    node distance=1.6cm and 2.8cm
+]
+
+% ===================================================================
+% NODES
+% ===================================================================
+
+% --- Start ---
+\node[startstop] (start) {%
+    \texttt{\_resolve\_scheme()}\\[1pt]
+    scheme, spec, grid, bc};
+
+% --- D0: Explicit scheme? ---
+\node[decision, below=1.4cm of start] (d0) {Explicit\\scheme?};
+
+% --- Explicit result ---
+\node[solver, right=2.8cm of d0, fill=manualgrey] (explicit)
+    {Use specified\\solver};
+
+% --- D1: Modal eligible? ---
+\node[decision, below=1.6cm of d0] (d1) {Modal\\eligible?};
+
+% --- Modal sub-check panel (left of d1) ---
+\node[subcheck, left=2.6cm of d1] (subchecks) {%
+    \textbf{All conditions required:}\\[3pt]
+    1.\ Flat metric (\texttt{volume\_element = None})\\
+    2.\ Constraints Fourier-eliminable\\
+    \quad (operators $\in$ exact multipliers,\\
+    \quad\, no time-dependent coefficients)\\
+    3.\ All BCs periodic\\
+    4.\ All operators $\in$ \texttt{\_EXACT\_MULTIPLIERS}\\
+    \quad (12 supported: identity, laplacian,\\
+    \quad\, gradient$_{x,y,z}$, laplacian$_{x,y,z}$,\\
+    \quad\, cross\_deriv$_{xy,xz,yz}$, biharmonic)\\
+    5.\ No time-dependent coefficients};
+
+% --- Modal solver ---
+\node[solver, right=2.8cm of d1, fill=modalblue] (modal)
+    {Modal solver};
+
+% --- D2: Constraint eqs? ---
+\node[decision, below=1.6cm of d1] (d2) {Constraint\\equations?};
+\node[annot, right=0.3cm of d2.east, anchor=west, yshift=0.4cm]
+    (a2) {time\_order $= 0$\\(elliptic / algebraic)};
+
+% --- IDA (constraint) ---
+\node[solver, right=2.8cm of d2, fill=idaorange] (ida1) {IDA};
+
+% --- D3: First-order eqs? ---
+\node[decision, below=1.6cm of d2] (d3) {First-order\\equations?};
+\node[annot, right=0.3cm of d3.east, anchor=west, yshift=0.4cm]
+    (a3) {time\_order $= 1$\\(diffusion / transport)};
+
+% --- IDA (first-order) ---
+\node[solver, right=2.8cm of d3, fill=idaorange] (ida2) {IDA};
+
+% --- D4: Dissipation? ---
+\node[decision, below=1.6cm of d3] (d4) {Dissipation?};
+\node[annot, right=0.3cm of d4.east, anchor=west, yshift=0.4cm]
+    (a4) {\texttt{first\_derivative\_t}\\(breaks symplecticity)};
+
+% --- IDA (dissipation) ---
+\node[solver, right=2.8cm of d4, fill=idaorange] (ida3) {IDA};
+
+% --- D5: Missing Hamiltonian? ---
+\node[decision, below=1.6cm of d4] (d5) {Missing\\Hamiltonian?};
+\node[annot, right=0.3cm of d5.east, anchor=west, yshift=0.4cm]
+    (a5) {canonical $=$ None with\\second-order wave eqs};
+
+% --- Warning + fallthrough ---
+\node[startstop, right=2.8cm of d5, fill=cvodegreen!50] (warn)
+    {\textit{Warning} $\to$\\CVODE fallback};
+
+% --- Default: CVODE ---
+\node[solver, below=1.6cm of d5, fill=cvodegreen] (cvode)
+    {CVODE};
+\node[annot, right=0.3cm of cvode.east, anchor=west]
+    (a6) {Pure wave, Hamiltonian\\(adaptive BDF)};
+
+% ===================================================================
+% EDGES
+% ===================================================================
+
+% Start -> D0
+\draw[arr] (start) -- (d0);
+
+% D0 -> Explicit (yes)
+\draw[arr] (d0) -- node[yeslbl, above] {Yes} (explicit);
+
+% D0 -> D1 (no / "auto")
+\draw[arr] (d0) -- node[nolbl, left] {No (auto)} (d1);
+
+% Sub-check panel -> D1
+\draw[dotarr] (subchecks.east) -- node[yeslbl, above, text=annotgrey]
+    {\itshape requires all} (d1.west);
+
+% D1 -> Modal (yes)
+\draw[arr] (d1) -- node[yeslbl, above] {Yes} (modal);
+
+% D1 -> D2 (no)
+\draw[arr] (d1) -- node[nolbl, left] {No} (d2);
+
+% D2 -> IDA (yes)
+\draw[arr] (d2) -- node[yeslbl, above] {Yes} (ida1);
+
+% D2 -> D3 (no)
+\draw[arr] (d2) -- node[nolbl, left] {No} (d3);
+
+% D3 -> IDA (yes)
+\draw[arr] (d3) -- node[yeslbl, above] {Yes} (ida2);
+
+% D3 -> D4 (no)
+\draw[arr] (d3) -- node[nolbl, left] {No} (d4);
+
+% D4 -> IDA (yes)
+\draw[arr] (d4) -- node[yeslbl, above] {Yes} (ida3);
+
+% D4 -> D5 (no)
+\draw[arr] (d4) -- node[nolbl, left] {No} (d5);
+
+% D5 -> warn (yes)
+\draw[arr] (d5) -- node[yeslbl, above] {Yes} (warn);
+
+% D5 -> CVODE (no)
+\draw[arr] (d5) -- node[nolbl, left] {No} (cvode);
+
+% ===================================================================
+% LEGEND
+% ===================================================================
+\node[below right=0.6cm and -1.0cm of cvode, anchor=north west,
+      draw=black!50, rounded corners=3pt, inner sep=8pt,
+      fill=white, font=\scriptsize\sffamily] (legend) {%
+\begin{tabular}{@{}l l l l@{}}
+    \multicolumn{4}{@{}l}{\normalsize\textbf{Solver Key}}\\[4pt]
+    \tikz\fill[modalblue, draw=black!50, rounded corners=1pt]
+        (0,0) rectangle (0.5,0.3); & \textbf{Modal}
+        & NumPy/SciPy eigdecomp & $\sim\!10^{-16}$ precision\\[2pt]
+    \tikz\fill[idaorange, draw=black!50, rounded corners=1pt]
+        (0,0) rectangle (0.5,0.3); & \textbf{IDA}
+        & SUNDIALS implicit DAE & $\sim\!10^{-8}$ tolerance\\[2pt]
+    \tikz\fill[cvodegreen, draw=black!50, rounded corners=1pt]
+        (0,0) rectangle (0.5,0.3); & \textbf{CVODE}
+        & SUNDIALS adaptive ODE & $\sim\!10^{-8}$ tolerance\\[2pt]
+    \tikz\fill[manualgrey, draw=black!50, rounded corners=1pt]
+        (0,0) rectangle (0.5,0.3); & \textbf{Leapfrog}
+        & Symplectic KDK/Yoshida & Manual only\\[2pt]
+    \tikz\fill[manualgrey, draw=black!50, rounded corners=1pt]
+        (0,0) rectangle (0.5,0.3); & \textbf{scipy}
+        & DOP853/Radau/BDF & Manual only\\[4pt]
+    \multicolumn{4}{@{}l}{\textit{Leapfrog and scipy are never auto-selected}}\\
+    \multicolumn{4}{@{}l}{\textit{(require explicit \texttt{-{}-scheme}).}}
+\end{tabular}};
+
+\end{tikzpicture}
+\end{document}

@@ -51,6 +51,15 @@ def build_rhs_evaluator(
     from tidal.solver.rhs import RHSEvaluator as _RHSEvaluator  # noqa: PLC0415
 
     coeff_eval = CoefficientEvaluator(spec, grid, parameters or {})
+
+    # Warn about non-periodic coefficients with periodic BCs — these break
+    # the integration-by-parts identity and cause O(1) energy non-conservation.
+    if bc is not None:
+        from tidal.solver.operators import is_periodic_bc  # noqa: PLC0415
+
+        periodic = tuple(is_periodic_bc(b) for b in bc)
+        coeff_eval.check_periodic_coefficient_continuity(periodic)
+
     return _RHSEvaluator(spec, grid, coeff_eval, bc=bc)
 
 
@@ -79,14 +88,24 @@ def configure_linear_solver(  # noqa: PLR0913
         ``"ida"`` or ``"cvode"``.  Controls the analytical Jacobian callback
         signature (IDA uses 6-arg ``jacfn`` with ``cj``; CVODE uses 4-arg).
     """
-    from tidal.solver._types import DENSE_THRESHOLD, SPARSE_THRESHOLD  # noqa: PLC0415
+    from tidal.solver._types import (  # noqa: PLC0415
+        DENSE_THRESHOLD,
+        SPARSE_THRESHOLD,
+        SUPERLU_NNZ_LIMIT,
+    )
     from tidal.solver.analytical_jacobian import (  # noqa: PLC0415
         try_analytical_jacobian,
     )
 
     # Analytical Jacobian for constant-coefficient systems
     if try_analytical_jacobian(
-        options, spec, layout, grid, bc, parameters or {}, solver=solver,
+        options,
+        spec,
+        layout,
+        grid,
+        bc,
+        parameters or {},
+        solver=solver,
     ):
         return
 
@@ -98,7 +117,23 @@ def configure_linear_solver(  # noqa: PLR0913
         from tidal.solver.sparsity import build_jacobian_sparsity  # noqa: PLC0415
 
         pattern = build_jacobian_sparsity(spec, layout, grid, bc)
-        options["linsolver"] = "sparse"
-        options["sparsity"] = pattern
+        if pattern.nnz > SUPERLU_NNZ_LIMIT:
+            # SuperLU_MT fill-in can reach 20-50x the sparsity pattern nnz for
+            # 2D FD systems, exhausting memory. Fall back to FD GMRES instead.
+            # FD GMRES (no jactimes callback) is safe with IDACalcIC; see plan
+            # comment on analytical GMRES regression (commit 7f3df3e) which was
+            # specific to the jactimes callback, not this FD path.
+            warnings.warn(
+                f"Sparse tier: sparsity pattern nnz={pattern.nnz} exceeds "
+                f"SUPERLU_NNZ_LIMIT={SUPERLU_NNZ_LIMIT}. SuperLU_MT fill-in "
+                f"may exhaust memory for this {n_state}-state system. "
+                f"Falling back to FD GMRES (linsolver='gmres').",
+                UserWarning,
+                stacklevel=3,
+            )
+            options["linsolver"] = "gmres"
+        else:
+            options["linsolver"] = "sparse"
+            options["sparsity"] = pattern
     else:
         options["linsolver"] = "gmres"

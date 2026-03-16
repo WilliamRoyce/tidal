@@ -36,11 +36,31 @@ if TYPE_CHECKING:
 # describe which neighbor grid points contribute to the output at a given
 # point.  These are used to populate the Jacobian sparsity blocks.
 #
+# The stencil width adapts to the current FD order (from operators.py):
+#   Order 2: [-1, 0, +1] (3-point)
+#   Order 4: [-2, -1, 0, +1, +2] (5-point)
+#   Order 6: [-3, -2, -1, 0, +1, +2, +3] (7-point)
+#
+# Reference: Fornberg (1988), Mathematics of Computation 51(184), Table 1.
+#
 # Convention: offset tuple length = spatial_dimension (ndim).
 # For operators that work per-axis, ``_axis_stencil`` builds the full
 # offset tuple from the axis index.
 
 _AXIS_MAP = {"x": 0, "y": 1, "z": 2}
+
+
+def _fd_deltas() -> list[int]:
+    """Return the stencil offsets for the current FD order.
+
+    - Order 2: ``[-1, 0, 1]``
+    - Order 4: ``[-2, -1, 0, 1, 2]``
+    - Order 6: ``[-3, -2, -1, 0, 1, 2, 3]``
+    """
+    from tidal.solver.operators import get_n_ghost  # noqa: PLC0415
+
+    ng = get_n_ghost()
+    return list(range(-ng, ng + 1))
 
 
 def _axis_offsets(axis: int, ndim: int, deltas: list[int]) -> list[tuple[int, ...]]:
@@ -58,34 +78,46 @@ def _cross_offsets(
     ax2: int,
     ndim: int,
 ) -> list[tuple[int, ...]]:
-    """Build offsets for cross-derivative d^2/(dx_i dx_j).
+    """Build offsets for cross-derivative ∂²f/(∂x_i ∂x_j).
 
-    Stencil: (f[i+1,j+1] - f[i+1,j-1] - f[i-1,j+1] + f[i-1,j-1]) / (4 dx dy)
-    Plus self at origin (conservative -- covers the cj diagonal contribution).
+    For higher-order FD, the cross derivative uses the product of 1D gradient
+    stencils along each axis.  The sparsity pattern is the Cartesian product
+    of the per-axis deltas (conservative superset of the actual stencil).
+    Plus self at origin (covers the cj diagonal contribution).
     """
-    offsets: list[tuple[int, ...]] = []
-    for d1 in (-1, 1):
-        for d2 in (-1, 1):
+    deltas = _fd_deltas()
+    offsets_set: set[tuple[int, ...]] = set()
+    for d1 in deltas:
+        for d2 in deltas:
             o = [0] * ndim
             o[ax1] = d1
             o[ax2] = d2
-            offsets.append(tuple(o))
+            offsets_set.add(tuple(o))
     # Include self (origin) for robustness
-    offsets.append((0,) * ndim)
-    return offsets
+    offsets_set.add((0,) * ndim)
+    return list(offsets_set)
 
 
 def _biharmonic_offsets(ndim: int) -> list[tuple[int, ...]]:
-    r"""Build offsets for biharmonic nabla^4 f = nabla^2(nabla^2 f).
+    r"""Build offsets for biharmonic ∇⁴f = ∇²(∇²f).
 
     The biharmonic stencil is the convolution of the Laplacian stencil with
-    itself.  For 1D: 5-point stencil {-2, -1, 0, 1, 2}.  For 2D, all
-    (dx, dy) with \|dx\| + \|dy\| <= 2.
+    itself.  The effective radius doubles relative to the Laplacian:
+
+    - Order 2: L1-radius 2  (offsets within \|Δ\| ≤ 2)
+    - Order 4: L1-radius 4  (offsets within \|Δ\| ≤ 4)
+    - Order 6: L1-radius 6  (offsets within \|Δ\| ≤ 6)
+
+    Reference: composition of Fornberg stencils — the convolved stencil
+    radius is the sum of the inner and outer stencil radii.
     """
-    # Conservative: all offsets within L1-radius 2
+    from tidal.solver.operators import get_n_ghost  # noqa: PLC0415
+
+    ng = get_n_ghost()
+    radius = 2 * ng  # biharmonic = laplacian(laplacian), so radius doubles
     offsets_set: set[tuple[int, ...]] = set()
-    for combo in itertools.product(range(-2, 3), repeat=ndim):
-        if sum(abs(c) for c in combo) <= 2:  # noqa: PLR2004
+    for combo in itertools.product(range(-radius, radius + 1), repeat=ndim):
+        if sum(abs(c) for c in combo) <= radius:
             offsets_set.add(combo)
     return list(offsets_set)
 
@@ -94,26 +126,28 @@ def _gradient_or_laplacian_offsets(
     name: str, ndim: int
 ) -> list[tuple[int, ...]] | None:
     """Try to resolve gradient_X or laplacian_X operators."""
+    deltas = _fd_deltas()
     if name.startswith("gradient_"):
         ax = _AXIS_MAP.get(name[-1])
         if ax is not None:
-            return _axis_offsets(ax, ndim, [-1, 0, 1])
+            return _axis_offsets(ax, ndim, deltas)
 
     if name.startswith("laplacian_"):
         parts = name.split("_")
         ax = _AXIS_MAP.get(parts[1]) if len(parts) > 1 else None
         if ax is not None:
-            return _axis_offsets(ax, ndim, [-1, 0, 1])
+            return _axis_offsets(ax, ndim, deltas)
 
     return None
 
 
 def _full_laplacian_offsets(ndim: int) -> list[tuple[int, ...]]:
     """Full Laplacian = union of per-axis stencils."""
+    deltas = _fd_deltas()
     zero = (0,) * ndim
     offsets_set: set[tuple[int, ...]] = {zero}
     for ax in range(ndim):
-        offsets_set.update(_axis_offsets(ax, ndim, [-1, 1]))
+        offsets_set.update(_axis_offsets(ax, ndim, deltas))
     return list(offsets_set)
 
 
@@ -129,8 +163,13 @@ def _cross_derivative_offsets(name: str, ndim: int) -> list[tuple[int, ...]] | N
     return None
 
 
-def operator_stencil_offsets(name: str, ndim: int) -> list[tuple[int, ...]]:
+def operator_stencil_offsets(name: str, ndim: int) -> list[tuple[int, ...]]:  # noqa: PLR0911
     """Return the grid-coordinate offsets for operator *name*.
+
+    When spectral mode is active (``get_spectral() == True``), all spatial
+    operators return dense coupling (all possible offsets) because FFT-based
+    differentiation couples every grid point to every other.  Identity and
+    first_derivative_t remain local.
 
     Parameters
     ----------
@@ -146,9 +185,37 @@ def operator_stencil_offsets(name: str, ndim: int) -> list[tuple[int, ...]]:
     """
     zero = (0,) * ndim
 
-    # Identity and first_derivative_t: self-coupling only
+    # Identity and first_derivative_t: self-coupling only (same in both modes)
     if name in {"identity", "first_derivative_t"}:
         return [zero]
+
+    # Spectral mode: all spatial operators are dense (all-to-all coupling).
+    # This makes IDA's sparse Jacobian infrastructure ineffective — the CLI
+    # guards against this combination (--spectral with --scheme ida).
+    from tidal.solver.operators import get_spectral  # noqa: PLC0415
+
+    if get_spectral():
+        # Return "all offsets" — conservative superset.  In practice this
+        # means the Jacobian is fully dense for spatial coupling blocks.
+        # For IDA this would be O(N^2) — but the CLI prevents IDA+spectral.
+        # For explicit solvers (leapfrog, scipy, cvode) no Jacobian is needed.
+        #
+        # We don't actually need to enumerate all N^ndim offsets here because
+        # this function is only called during Jacobian sparsity construction,
+        # which is an IDA-only path.  Return a sentinel that _stencil_block
+        # can handle, or a small superset.  Since the CLI blocks IDA+spectral,
+        # this path should not be reached in practice.
+        import warnings  # noqa: PLC0415
+
+        warnings.warn(
+            "Spectral mode with Jacobian sparsity construction: "
+            "returning dense coupling pattern. This is expected only "
+            "for non-IDA solvers.",
+            stacklevel=2,
+        )
+        # Return all offsets within a generous radius to approximate dense
+        ng_approx = 32  # large radius to approximate full coupling
+        return list(itertools.product(range(-ng_approx, ng_approx + 1), repeat=ndim))
 
     # Directional gradient or Laplacian
     result = _gradient_or_laplacian_offsets(name, ndim)
@@ -168,8 +235,11 @@ def operator_stencil_offsets(name: str, ndim: int) -> list[tuple[int, ...]]:
     if name == "biharmonic":
         return _biharmonic_offsets(ndim)
 
-    # Unknown operator -- conservative: assume full local coupling (radius 1)
-    return list(itertools.product(range(-1, 2), repeat=ndim))
+    # Unknown operator -- conservative: assume full local coupling (FD radius)
+    from tidal.solver.operators import get_n_ghost  # noqa: PLC0415
+
+    ng = get_n_ghost()
+    return list(itertools.product(range(-ng, ng + 1), repeat=ndim))
 
 
 # ---------------------------------------------------------------------------

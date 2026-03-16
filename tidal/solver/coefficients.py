@@ -41,6 +41,10 @@ if TYPE_CHECKING:
 
 _MISSING = object()  # sentinel for dict.get() fast path
 
+# Thresholds for periodic boundary discontinuity checks
+_JUMP_WARN_THRESHOLD = 0.01  # >1% relative jump → warning
+_JUMP_ERROR_THRESHOLD = 0.50  # >50% relative jump → hard error
+
 
 class CoefficientEvaluator:
     """Resolve operator term coefficients with multi-level caching.
@@ -94,10 +98,21 @@ class CoefficientEvaluator:
         self._spatial_cache: dict[tuple[int, int], NDArray[np.float64]] = {}
         self._precompute_spatial()
 
+        # Reverse index: id(term) → (eq_idx, term_idx) for O(1) lookup
+        # in _check_mass_sign() (avoids O(S) scan of _spatial_cache)
+        self._term_to_spatial_key: dict[int, tuple[int, int]] = {
+            id(self._spec.equations[ei].rhs_terms[ti]): (ei, ti)
+            for (ei, ti) in self._spatial_cache
+        }
+
         # L3: Per-timestep cache
         self._timestep_cache: dict[
             tuple[int, int, float], float | NDArray[np.float64]
         ] = {}
+
+        # Pre-check: skip begin_timestep() cache clear when all
+        # coefficients are time-independent (common case)
+        self._has_time_dependent = not self.all_time_independent()
 
         # Fail-fast: validate all unresolved symbolic terms at init
         self._validate_unresolved()
@@ -167,9 +182,11 @@ class CoefficientEvaluator:
         """Clear per-timestep cache (L3).
 
         Call at the start of each timestep to ensure time-dependent
-        coefficients are re-evaluated.
+        coefficients are re-evaluated.  Skipped when all coefficients
+        are time-independent (common case — avoids empty dict.clear()).
         """
-        self._timestep_cache.clear()
+        if self._has_time_dependent:
+            self._timestep_cache.clear()
 
     def all_constant(self) -> bool:
         """Check if every RHS term has a constant (scalar) coefficient.
@@ -314,20 +331,99 @@ class CoefficientEvaluator:
                 ):
                     continue
 
-                # Find the spatial cache entry
-                for (ei, ti), arr in self._spatial_cache.items():
-                    spec_term = self._spec.equations[ei].rhs_terms[ti]
-                    if spec_term is term:
-                        if float(arr.min()) * float(arr.max()) < 0:
-                            warnings.warn(
-                                f"Position-dependent mass term "
-                                f"'{term.coefficient_symbolic}' for field "
-                                f"'{eq.field_name}' changes sign across "
-                                f"the grid (min={float(arr.min()):.4g}, "
-                                f"max={float(arr.max()):.4g}). This may "
-                                f"cause tachyonic instability at locations "
-                                f"where the effective mass² is negative.",
-                                UserWarning,
-                                stacklevel=2,
-                            )
-                        break
+                # O(1) lookup via reverse index (avoids scanning _spatial_cache)
+                cache_key = self._term_to_spatial_key.get(id(term))
+                if cache_key is None:
+                    continue
+                arr = self._spatial_cache[cache_key]
+                if float(arr.min()) * float(arr.max()) < 0:
+                    warnings.warn(
+                        f"Position-dependent mass term "
+                        f"'{term.coefficient_symbolic}' for field "
+                        f"'{eq.field_name}' changes sign across "
+                        f"the grid (min={float(arr.min()):.4g}, "
+                        f"max={float(arr.max()):.4g}). This may "
+                        f"cause tachyonic instability at locations "
+                        f"where the effective mass² is negative.",
+                        UserWarning,
+                        stacklevel=2,
+                    )
+
+    def check_periodic_coefficient_continuity(
+        self,
+        periodic: tuple[bool, ...],
+    ) -> None:
+        """Warn if position-dependent coefficients are discontinuous at periodic boundaries.
+
+        When periodic BCs are used, the conservation proof for the PDE system
+        requires all coefficient functions to be continuous across the periodic
+        boundary (so that integration-by-parts boundary terms vanish).
+        Non-periodic coefficients (e.g. B(x) = B0/x^3 on [5, 80]) produce
+        O(1) energy non-conservation that is independent of grid resolution
+        and solver tolerances.
+
+        Parameters
+        ----------
+        periodic : tuple[bool, ...]
+            Per-axis periodicity flags.
+
+        Raises
+        ------
+        ValueError
+            If a coefficient has >50% discontinuity at a periodic boundary.
+        """
+        if not any(periodic):
+            return  # no periodic axes → no check needed
+
+        for (eq_idx, term_idx), arr in self._spatial_cache.items():
+            # Check each periodic axis for boundary discontinuity
+            for axis, is_periodic in enumerate(periodic):
+                if not is_periodic:
+                    continue
+                if axis >= arr.ndim:
+                    continue
+
+                # Compare first and last slices along this axis
+                first = np.take(arr, 0, axis=axis)
+                last = np.take(arr, arr.shape[axis] - 1, axis=axis)
+
+                scale = max(float(np.abs(arr).max()), 1e-30)
+                jump = float(np.abs(first - last).max())
+                rel_jump = jump / scale
+
+                # Skip if both boundary values are negligible relative to the
+                # coefficient peak.  When the coefficient effectively vanishes
+                # at the boundary (e.g. Gaussian B-field on a large periodic
+                # domain), any "jump" is between two near-zero values and the
+                # IBP energy leak proportional to |jump| * amplitude^2 is negligible.
+                # Threshold 1e-4: boundary magnitude < 0.01% of peak.
+                boundary_magnitude = max(
+                    float(np.abs(first).max()),
+                    float(np.abs(last).max()),
+                )
+                if boundary_magnitude < 1e-4 * scale:
+                    continue
+
+                if rel_jump > _JUMP_WARN_THRESHOLD:
+                    term = self._spec.equations[eq_idx].rhs_terms[term_idx]
+                    field = self._spec.equations[eq_idx].field_name
+                    axis_name = (
+                        self._spatial_coords[axis]
+                        if axis < len(self._spatial_coords)
+                        else f"axis {axis}"
+                    )
+                    msg = (
+                        f"Position-dependent coefficient "
+                        f"'{term.coefficient_symbolic}' in equation for "
+                        f"'{field}' has {rel_jump:.0%} jump at the periodic "
+                        f"boundary along {axis_name} "
+                        f"(left={float(first.flat[0]):.4g}, "
+                        f"right={float(last.flat[0]):.4g}). "
+                        f"This breaks the integration-by-parts identity "
+                        f"and causes O(1) energy non-conservation. "
+                        f"Use a larger domain, non-periodic BCs, or a "
+                        f"localized coefficient profile."
+                    )
+                    if rel_jump > _JUMP_ERROR_THRESHOLD:
+                        raise ValueError(msg)
+                    warnings.warn(msg, UserWarning, stacklevel=2)

@@ -63,7 +63,7 @@ uv run pre-commit install
 ### 3. Verify Setup
 
 ```bash
-# Run tests (1,343 Python tests)
+# Run tests (1,484 Python tests)
 uv run pytest
 
 # Run linter
@@ -474,7 +474,7 @@ tidal/                   # TIDAL project root
 │   │   ├── CommonUtilities.wl
 │   │   └── ...
 │   └── measurement/          # Post-hoc analysis (energy, conversion, spectra)
-├── tests/                    # Test suite (1,343 Python tests)
+├── tests/                    # Test suite (1,484 Python tests)
 │   ├── conftest.py          # Shared fixtures
 │   ├── test_cli.py          # CLI integration tests
 │   ├── test_solver_ida.py   # IDA solver tests

@@ -1,47 +1,23 @@
 #!/usr/bin/env bash
-# Coupled Scalars 1+1D — Full derive → inspect → simulate → measure pipeline
+# Coupled Scalars (Gertsenshtein Effective) — Full derive → inspect → simulate → measure pipeline
 #
-# Physics: Two coupled Klein-Gordon scalar fields (phi, chi) in 1+1D.
-# The coupling term gCpl transfers energy from phi to chi over time,
-# producing Rabi-like oscillations in the conversion probability P(t).
-# The mixing length L_mix = pi/omega_dom characterizes the oscillation period.
+# Physics: Effective 1+1D graviton-photon mixing from Einstein-Maxwell.
+# The gradient coupling B0*h*∂_x(a) transfers energy between the graviton
+# mode (h) and photon mode (a), producing Rabi oscillations in conversion
+# probability P(t) = sin²(κ*B0*t/2) for massless vacuum.
 #
-# Running this script:
+# Parameters:
+#   kappa  = graviton-photon coupling (= √(16πG) in natural units)
+#   B0     = background magnetic field strength
+#   omegaP2 = plasma frequency squared (photon effective mass)
+#   mg2    = graviton mass squared
+#
+# Refs:
+#   Gertsenshtein (1962), JETP 14:84
+#   Raffelt & Stodolsky (1988), Phys. Rev. D 37:1237
+#
+# Running:
 #   cd examples/coupled_scalars && bash run.sh
-#
-# Or run each step manually to learn the tidal CLI:
-#
-#   # Step 1: Derive equations from the Lagrangian (requires wolframscript)
-#   uv run tidal derive theory.toml
-#
-#   # Step 2: Inspect the generated equation system
-#   uv run tidal inspect ../data/coupled_scalars.json
-#
-#   # Step 3: Simulate with Gaussian IC in phi only (chi starts at zero)
-#   uv run tidal simulate ../data/coupled_scalars.json \
-#     --param mPhi2=1.0 --param mChi2=4.0 --param gCpl=0.5 \
-#     --grid-shape 256 --bounds 0:100 --periodic \
-#     --ic gaussian --ic-component phi_0 --ic-center 30.0 --ic-width 5.0 \
-#     --ic-amplitude 1.0 \
-#     --t-end 20.0 --output ../data/coupled_scalars_output
-#
-#   # Step 4: Measure conversion probability and characteristic mixing length
-#   uv run tidal measure ../data/coupled_scalars_output \
-#     --what conversion,mixing --source phi_0 --target chi_0
-#
-#   # Step 5: Spectral conversion P(k,t) — which modes participate in mixing?
-#   uv run tidal measure ../data/coupled_scalars_output \
-#     --what spectral_conversion --source phi_0 --target chi_0
-#
-#   # Step 6: Dispersion relation omega(k) — wave frequency vs wavenumber
-#   uv run tidal measure ../data/coupled_scalars_output \
-#     --what dispersion --source phi_0
-#
-#   # Step 7: Combined plot with all measurements
-#   uv run tidal measure ../data/coupled_scalars_output \
-#     --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
-#     --source phi_0 --target chi_0 \
-#     --output ../data/coupled_scalars_output/measurement.png
 
 set -euo pipefail
 cd "$(dirname "$0")"
@@ -49,110 +25,49 @@ cd "$(dirname "$0")"
 # Step 1: Derive equations from Lagrangian (requires wolframscript)
 tidal derive theory.toml
 
-# Step 2: Inspect the equation system (2 fields: phi_0, chi_0)
+# Step 2: Inspect the equation system (2 fields: h_0, a_0)
 tidal inspect ../data/coupled_scalars.json
 
 # ============================================================================
-# Run 1: Asymmetric — phi only (chi starts at zero)
+# Run 1: Graviton wavepacket → photon conversion (massless vacuum)
 # ============================================================================
-# Off-center Gaussian in phi only; coupling transfers energy to chi over time
+# Plane-wave IC in h_0 only; gradient coupling converts h → a.
+# With B0=0.1, kappa=1: conversion period T = 2π/(κB₀) ≈ 63, t_end=50 covers ~80%.
 tidal simulate ../data/coupled_scalars.json \
-  --rtol 1e-6 \
-  --atol 1e-8 \
-  --param mPhi2=1.0 --param mChi2=4.0 --param gCpl=0.5 \
+  --param kappa=1.0 --param B0=0.1 --param omegaP2=0.0 --param mg2=0.0 \
   --grid-shape 256 \
   --bounds 0:100 \
   --periodic \
-  --ic gaussian \
-  --ic-component phi_0 \
-  --ic-center 30.0 \
-  --ic-width 5.0 \
-  --ic-amplitude 1.0 \
-  --t-end 20.0 \
+  --ic plane-wave \
+  --ic-component h_0 \
+  --ic-wavevector 2.0 \
+  --ic-amplitude 0.1 \
+  --t-end 50.0 \
   --output ../data/coupled_scalars_output
 
 # --- Run 1 measurements ---
-
-# P(t) = E_chi(t) / E_phi(0) tracks what fraction of phi's energy went to chi
-# L_mix = pi / omega_dom is the half-period of the dominant oscillation in P(t)
+# P(t) = E_a(t) / E_h(0): what fraction of graviton energy converted to photon
 tidal measure ../data/coupled_scalars_output \
-  --what conversion,mixing \
-  --source phi_0 --target chi_0
+  --what conversion,conservation \
+  --source h_0 --target a_0 \
+  --param kappa=1.0 --param B0=0.1 --param omegaP2=0.0 --param mg2=0.0
 
-# Step 5: Spectral conversion P(k,t)
-# Shows which Fourier modes participate in the energy conversion over time
-tidal measure ../data/coupled_scalars_output \
-  --what spectral_conversion \
-  --source phi_0 --target chi_0
-
-# Step 6: Dispersion relation omega(k)
-# Extracts wave frequency vs wavenumber via spacetime FFT
+# Dispersion relation omega(k)
 tidal measure ../data/coupled_scalars_output \
   --what dispersion \
-  --source phi_0
-
-# Step 7: Combined measurement plot (all panels in one figure)
-tidal measure ../data/coupled_scalars_output \
-  --what energy,conservation,conversion,mixing,spectral_conversion,dispersion \
-  --source phi_0 --target chi_0 \
-  --output ../data/coupled_scalars_output/measurement.png
+  --source h_0 \
+  --param kappa=1.0 --param B0=0.1 --param omegaP2=0.0 --param mg2=0.0
 
 # --- Run 1 plots ---
-tidal plot ../data/coupled_scalars_output --type heatmap --field phi_0 --quiet
-tidal plot ../data/coupled_scalars_output --type heatmap --field chi_0 --quiet
+tidal plot ../data/coupled_scalars_output --type heatmap --field h_0 \
+  --title "Graviton h (Gertsenshtein conversion)" --quiet
+tidal plot ../data/coupled_scalars_output --type heatmap --field a_0 \
+  --title "Photon a (converted from h)" --quiet
 tidal plot ../data/coupled_scalars_output --type amplitude --quiet
 tidal plot ../data/coupled_scalars_output --type energy --quiet
-tidal plot ../data/coupled_scalars_output --type compare --quiet
-tidal plot ../data/coupled_scalars_output --type hamiltonian --quiet
 tidal plot ../data/coupled_scalars_output --type conservation --quiet
 
 echo ""
-echo "=== Run 1 (asymmetric) complete ==="
-
-# ============================================================================
-# Run 2: Symmetric — both fields excited (using --ic-field)
-# ============================================================================
-# What happens when both fields start with energy? Using --ic-field, we set
-# chi_0 to a Gaussian at x=70 (far from phi's Gaussian at x=30). The
-# conversion dynamics are qualitatively different: both fields exchange
-# energy bidirectionally from the start, rather than one-way transfer.
-
-tidal simulate ../data/coupled_scalars.json \
-  --param mPhi2=1.0 --param mChi2=4.0 --param gCpl=0.5 \
-  --grid-shape 256 \
-  --bounds 0:100 \
-  --periodic \
-  --ic gaussian \
-  --ic-component phi_0 \
-  --ic-center 30.0 \
-  --ic-width 5.0 \
-  --ic-amplitude 1.0 \
-  --ic-field 'chi_0:exp(-(x - 70)**2 / 50)' \
-  --t-end 20.0 \
-  --output ../data/coupled_scalars_symmetric
-
-# --- Run 2 measurements ---
-tidal measure ../data/coupled_scalars_symmetric \
-  --what conversion,mixing \
-  --source phi_0 --target chi_0
-
-tidal measure ../data/coupled_scalars_symmetric \
-  --what energy,conservation,conversion,mixing \
-  --source phi_0 --target chi_0 \
-  --output ../data/coupled_scalars_symmetric/measurement.png
-
-# --- Run 2 plots ---
-tidal plot ../data/coupled_scalars_symmetric --type heatmap --field phi_0 \
-  --title "phi (symmetric excitation)" --quiet
-tidal plot ../data/coupled_scalars_symmetric --type heatmap --field chi_0 \
-  --title "chi (symmetric excitation)" --quiet
-tidal plot ../data/coupled_scalars_symmetric --type amplitude --quiet
-tidal plot ../data/coupled_scalars_symmetric --type hamiltonian --quiet
-tidal plot ../data/coupled_scalars_symmetric --type conservation --quiet
-
-echo ""
-echo "=== Run 2 (symmetric) complete ==="
-echo ""
-echo "Compare Run 1 (phi only) vs Run 2 (both fields excited)."
-echo "  Asymmetric:  ../data/coupled_scalars_output/"
-echo "  Symmetric:   ../data/coupled_scalars_symmetric/"
+echo "=== Run complete ==="
+echo "  Output: ../data/coupled_scalars_output/"
+echo "  Expected: P_max = sin²(κ*B0*t_peak/2) = sin²(π/2) ≈ 1.0 at t ≈ π/(κB₀) ≈ 31.4"

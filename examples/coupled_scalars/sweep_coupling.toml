@@ -1,50 +1,39 @@
-# Coupled Scalars — Comprehensive coupling strength investigation
+# Gertsenshtein Effective — B0 coupling strength sweep (TOML config)
 #
-# Sweeps gCpl from weak to strong coupling with full measurement suite:
-# conversion probability, mixing timescale, asymptotic efficiency,
-# effective mass renormalization, and energy conservation.
-#
-# Physics: Two coupled Klein-Gordon fields (mPhi2=1.0, mChi2=4.0).
-# Standing Gaussian wave packet on phi_0. The k-mode spread causes
-# decoherence that averages Rabi oscillations into smooth sigmoid
-# saturation curves. At strong coupling, normal mode splitting
-# modifies dispersion and may cause non-monotonic P_max.
-#
-# Stability bound: g_crit = sqrt(mPhi2 * mChi2) = 2.0.
-# Sweep capped at 1.8 to stay below tachyonic threshold.
+# Sweeps B0 from weak to strong coupling, measuring conversion probability.
+# P(t) = sin²(κ*B0*t_end/2) shows Rabi oscillation as a function of B0.
 #
 # Usage:
 #   tidal sweep --config examples/coupled_scalars/sweep_coupling.toml
 #
-# Requires: pre-derived JSON spec at examples/data/coupled_scalars.json
-#   (run `tidal derive examples/coupled_scalars/theory.toml` first)
+# Ref: Gertsenshtein (1962), Raffelt & Stodolsky (1988)
 
 spec = "../data/coupled_scalars.json"
 
 [parameters]
-mPhi2 = 1.0
-mChi2 = 4.0
+kappa = 1.0
+omegaP2 = 0.0
+mg2 = 0.0
 
-[sweep.gCpl]
-start = 0.05
-stop = 1.8
+[sweep.B0]
+start = 0.005
+stop = 0.25
 count = 20
-scale = "log"
 
 [simulation]
-grid_shape = 128
-bounds = [0, 80]
+grid_shape = 256
+bounds = [0, 100]
 periodic = true
-ic = "gaussian"
-ic_component = "phi_0"
-ic_center = 20.0
-ic_width = 3.0
-t_end = 60.0
+ic = "plane-wave"
+ic_component = "h_0"
+ic_wavevector = "2.0"
+ic_amplitude = 0.1
+t_end = 50.0
 
 [measurement]
-types = ["conversion", "peak_conversion", "mixing", "asymptotic", "effective_mass", "conservation"]
-source = "phi_0"
-target = "chi_0"
+types = ["conversion", "conservation"]
+source = "h_0"
+target = "a_0"
 
 [output]
 path = "../data/coupled_scalars_sweep_toml"

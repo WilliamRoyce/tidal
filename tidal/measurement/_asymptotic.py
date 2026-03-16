@@ -37,8 +37,7 @@ import numpy as np
 
 from tidal.measurement._energy import (
     _ENERGY_FLOOR,  # pyright: ignore[reportPrivateUsage]
-    _resolve_mass_squared,  # pyright: ignore[reportPrivateUsage]
-    compute_field_energy,
+    _compute_hamiltonian_per_field,  # pyright: ignore[reportPrivateUsage]
 )
 from tidal.measurement._utils import (
     _normalize_group,  # pyright: ignore[reportPrivateUsage]
@@ -95,23 +94,15 @@ def _group_energy_at_snapshot(
     field_names: Sequence[str],
     t_idx: int,
 ) -> float:
-    """Compute total energy for a group of fields at snapshot *t_idx*."""
-    names = [eq.field_name for eq in data.spec.equations]
+    """Compute total energy for a group of fields at snapshot *t_idx*.
+
+    Uses the Hamiltonian per-field self-energy decomposition for
+    coordinate-invariant results.
+    """
+    per_field, _interaction = _compute_hamiltonian_per_field(data, t_idx)
     total = 0.0
     for fname in field_names:
-        field_arr = data.fields[fname][t_idx]
-        vel_all = data.velocities.get(fname)
-        vel_arr = vel_all[t_idx] if vel_all is not None else None
-        m2 = _resolve_mass_squared(data, names.index(fname))
-        fe = compute_field_energy(
-            field_arr,
-            vel_arr,
-            m2,
-            data.grid_spacing,
-            data.periodic,
-            volume_weight=getattr(data, "volume_weight", 1.0),
-        )
-        total += fe.total
+        total += per_field.get(fname, 0.0)
     return total
 
 

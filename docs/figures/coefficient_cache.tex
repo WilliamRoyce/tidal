@@ -1,0 +1,138 @@
+\documentclass[border=10pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{tikz}
+\usepackage[svgnames]{xcolor}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit,
+                 decorations.pathreplacing}
+
+\colorlet{OrangeFill}{LightSalmon}
+\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
+\colorlet{GreenFill}{MediumAquamarine}
+\colorlet{GreenLine}{MediumAquamarine!30!Teal}
+\colorlet{PurpleFill}{MediumPurple}
+\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
+\colorlet{PinkFill}{Thistle}
+\colorlet{PinkLine}{Thistle!30!Plum}
+\colorlet{BlueFill}{LightSkyBlue}
+\colorlet{BlueLine}{SteelBlue}
+\colorlet{GrayFill}{LightGray!60!OldLace}
+\colorlet{GrayLine}{RosyBrown!50!Silver}
+
+\newcommand{\costlbl}[2]{{\scriptsize\bfseries\color{#1}#2}}
+
+\begin{document}
+\begin{tikzpicture}[
+    level/.style={
+        rectangle, rounded corners=2pt, minimum width=10.0cm,
+        minimum height=1.1cm, draw=#1, line width=0.7pt,
+        font=\footnotesize, align=left, text opacity=1, text=black,
+        inner sep=6pt
+    },
+    level/.default={black!60},
+    check/.style={
+        rectangle, rounded corners=1pt, draw=OrangeLine, dashed,
+        fill=OrangeFill, fill opacity=0.25, font=\scriptsize,
+        align=left, text opacity=1, inner sep=4pt
+    },
+    annot/.style={font=\scriptsize\itshape, text=GrayLine, align=left},
+    costlbl/.style={font=\scriptsize\bfseries, text=#1},
+    arr/.style={-{Stealth[length=4pt, width=3pt]}, semithick, black!70},
+    node distance=0.35cm
+]
+
+% ===================================================================
+% TITLE
+% ===================================================================
+\node[font=\normalsize\bfseries] (title) at (0,0)
+    {Coefficient Resolution Hierarchy (4-Level Cache)};
+
+\node[annot, below=0.1cm of title]  (sub)
+    {\texttt{CoefficientEvaluator} in \texttt{coefficients.py}};
+
+% ===================================================================
+% LEVELS (top = fastest/most common, bottom = slowest/rarest)
+% ===================================================================
+
+% L0
+\node[level=GreenLine, fill=GreenFill, fill opacity=0.2,
+      below=0.6cm of sub, text width=9.6cm] (l0) {%
+    \textbf{L0 --- Pre-resolved constants} \hfill
+    \costlbl{GreenLine}{$O(1)$ dict lookup}\\[2pt]
+    Numeric coefficients with no symbolic expression (e.g., \texttt{1.0}, \texttt{-0.5}).\\
+    Resolved at \texttt{\_\_init\_\_()} and stored in \texttt{\_constants} dict.\\
+    \textit{Example:} $\texttt{coefficient} = 1.0$, $\texttt{coefficient\_symbolic} = \texttt{None}$};
+
+% L1
+\node[level=BlueLine, fill=BlueFill, fill opacity=0.15,
+      below=of l0, text width=9.6cm] (l1) {%
+    \textbf{L1 --- Parametric constants} \hfill
+    \costlbl{BlueLine}{$O(1)$ eval + param lookup}\\[2pt]
+    Symbolic expressions resolved via \texttt{--param} overrides (e.g., \texttt{"m2"} $\to$ 1.0).\\
+    Mathematica$\to$Python string conversion cached once.\\
+    \textit{Example:} $\texttt{coefficient\_symbolic} = \texttt{"mA2"}$, resolved to \texttt{float}};
+
+% L2
+\node[level=PurpleLine, fill=PurpleFill, fill opacity=0.12,
+      below=of l1, text width=9.6cm] (l2) {%
+    \textbf{L2 --- Spatial grid arrays} \hfill
+    \costlbl{PurpleLine}{$O(N)$ eval, cached}\\[2pt]
+    Position-dependent coefficients evaluated on the spatial grid once.\\
+    Stored in \texttt{\_spatial\_cache[(eq\_idx, term\_idx)]} as \texttt{ndarray}.\\
+    \textit{Example:} $\texttt{coefficient\_symbolic} = \texttt{"B0*x[]"}$,
+    $\texttt{coordinate\_dependent} = \texttt{["x"]}$};
+
+% L3
+\node[level=OrangeLine, fill=OrangeFill, fill opacity=0.12,
+      below=of l2, text width=9.6cm] (l3) {%
+    \textbf{L3 --- Per-timestep dedup} \hfill
+    \costlbl{OrangeLine}{$O(N)$ eval per step, deduped}\\[2pt]
+    Time \emph{and} position-dependent coefficients re-evaluated each timestep.\\
+    Cached within one step to deduplicate across Newton iterations (IDA).\\
+    Cleared by \texttt{begin\_timestep()}.\\
+    \textit{Example:} $\texttt{coefficient\_symbolic} = \texttt{"Exp[-dSH*t[]]"}$,
+    $\texttt{time\_dependent} = \texttt{true}$};
+
+% ===================================================================
+% ARROWS (resolve() fallthrough)
+% ===================================================================
+\draw[arr] (l0.south west) ++(0.3,0) -- ++(0,-0.35)
+    node[midway, right, font=\scriptsize, text=GrayLine] {miss};
+\draw[arr] (l1.south west) ++(0.3,0) -- ++(0,-0.35)
+    node[midway, right, font=\scriptsize, text=GrayLine] {miss};
+\draw[arr] (l2.south west) ++(0.3,0) -- ++(0,-0.35)
+    node[midway, right, font=\scriptsize, text=GrayLine] {miss};
+
+% Hit labels
+\node[costlbl=GreenLine, right=0.3cm of l0.east] {hit $\to$ return};
+\node[costlbl=BlueLine, right=0.3cm of l1.east] {hit $\to$ return};
+\node[costlbl=PurpleLine, right=0.3cm of l2.east] {hit $\to$ return};
+\node[costlbl=OrangeLine, right=0.3cm of l3.east] {hit $\to$ return};
+
+% ===================================================================
+% FREQUENCY ANNOTATION (left brace)
+% ===================================================================
+\draw[decorate, decoration={brace, amplitude=6pt, raise=2pt, mirror},
+      GreenLine, thick]
+    (l0.north west) -- (l0.south west)
+    node[midway, left=10pt, font=\scriptsize, text=GreenLine, align=right]
+    {most\\common};
+
+\draw[decorate, decoration={brace, amplitude=6pt, raise=2pt, mirror},
+      OrangeLine, thick]
+    (l3.north west) -- (l3.south west)
+    node[midway, left=10pt, font=\scriptsize, text=OrangeLine, align=right]
+    {rarest};
+
+% ===================================================================
+% VALIDATION CHECKS (below)
+% ===================================================================
+\node[check, below=0.6cm of l3, text width=9.6cm] (checks) {%
+    \textbf{Init-time checks} (\texttt{\_\_init\_\_()}):\\[2pt]
+    \textbullet\ \texttt{\_validate\_unresolved()}: fail-fast if any symbolic coefficient
+    cannot be evaluated (missing \texttt{--param})\\
+    \textbullet\ \texttt{\_check\_mass\_sign()}: diagnostic warning for unexpected sign in mass terms\\
+    \textbullet\ \texttt{all\_time\_independent()}: if true, skip L3 cache clear each step
+    (common-case optimisation)};
+
+\end{tikzpicture}
+\end{document}

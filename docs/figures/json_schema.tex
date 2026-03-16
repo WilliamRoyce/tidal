@@ -1,0 +1,178 @@
+\documentclass[border=10pt]{standalone}
+\usepackage[T1]{fontenc}
+\usepackage{tikz}
+\usepackage[svgnames]{xcolor}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit}
+
+% ---------------------------------------------------------------
+% Colour palette (matches solver_flowchart.tex)
+% ---------------------------------------------------------------
+\colorlet{OrangeFill}{LightSalmon}
+\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
+\colorlet{GreenFill}{MediumAquamarine}
+\colorlet{GreenLine}{MediumAquamarine!30!Teal}
+\colorlet{PurpleFill}{MediumPurple}
+\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
+\colorlet{PinkFill}{Thistle}
+\colorlet{PinkLine}{Thistle!30!Plum}
+\colorlet{BlueFill}{LightSkyBlue}
+\colorlet{BlueLine}{SteelBlue}
+\colorlet{LimeFill}{YellowGreen}
+\colorlet{LimeLine}{YellowGreen!30!Olive}
+\colorlet{GrayFill}{LightGray!60!OldLace}
+\colorlet{GrayLine}{RosyBrown!50!Silver}
+
+% --- Inline text commands (used inside node content) ---
+\newcommand{\key}[1]{{\footnotesize\ttfamily\bfseries #1}}
+\newcommand{\val}[1]{{\scriptsize\ttfamily\color{GrayLine}#1}}
+
+\begin{document}
+\begin{tikzpicture}[
+    % --- Node styles ---
+    block/.style={
+        rectangle, rounded corners=2pt, minimum height=0.65cm,
+        draw=#1, line width=0.6pt, fill=#1!20,
+        font=\footnotesize, align=left, text opacity=1, text=black,
+        inner sep=4pt
+    },
+    block/.default={black!60},
+    role/.style={font=\scriptsize\itshape, text=#1, align=left},
+    role/.default={GrayLine},
+    arr/.style={semithick, black!50},
+    connector/.style={semithick, black!30},
+    node distance=0.4cm
+]
+
+% ===================================================================
+% ROOT
+% ===================================================================
+\node[block=BlueLine, minimum width=2.2cm, font=\footnotesize\bfseries]
+    (root) {\texttt{spec.json}};
+
+% ===================================================================
+% TOP-LEVEL BLOCKS (vertical list, connected by tree lines)
+% ===================================================================
+
+% metadata
+\node[block=GrayLine, below left=0.8cm and 0.5cm of root, anchor=north east,
+      text width=5.8cm] (meta) {%
+    \key{metadata}\\[-1pt]
+    \val{source, parameters: \{m2: 1.0, gCpl: 0.5, ...\}}\\[-1pt]
+    \val{gauge\_choice, derived\_fields}};
+\node[role, right=0.2cm of meta.north east, anchor=north west]
+    {provenance +\\default param values};
+
+% spacetime
+\node[block=PurpleLine, below=0.35cm of meta.south west, anchor=north west,
+      text width=5.8cm] (space) {%
+    \key{spacetime}\\[-1pt]
+    \val{dimension: 3, signature: [-1, +1, +1]}\\[-1pt]
+    \val{coordinates: ["t", "x", "y"]}};
+\node[role=PurpleLine, right=0.2cm of space.north east, anchor=north west]
+    {determines component\\count and metric};
+
+% fields
+\node[block=BlueLine, below=0.35cm of space.south west, anchor=north west,
+      text width=5.8cm] (fields) {%
+    \key{fields}\\[-1pt]
+    \val{[\{name: "phi\_0", index: 0, is\_dynamical: true\}, ...]}};
+\node[role=BlueLine, right=0.2cm of fields.north east, anchor=north west]
+    {validated: unique names,\\sequential indices};
+
+% equations (largest block)
+\node[block=OrangeLine, below=0.35cm of fields.south west, anchor=north west,
+      text width=5.8cm] (eqs) {%
+    \key{equations} \textnormal{(one per component field)}};
+
+% Equation detail sub-block
+\node[block=OrangeLine, below=0.15cm of eqs.south west, anchor=north west,
+      text width=5.4cm, xshift=0.3cm] (eqdetail) {%
+    \key{field}: \val{"phi\_0"}\\[1pt]
+    \key{lhs}: \val{\{expression: "d2\_t(phi\_0)",}\\
+    \val{\phantom{lhs: \{}order: \{time: \textbf{2}, space: 0\}\}}\\[1pt]
+    \key{rhs}: \val{\{type: "linear\_combination",}\\
+    \val{\phantom{rhs: \{}terms: [\{...term...\}, ...]\}}\\[1pt]
+    \key{constraint\_solver}: \val{null | \{enabled, method, bc\}}};
+
+% Role annotations for equation fields
+\node[role=OrangeLine, right=0.2cm of eqdetail.north east, anchor=north west,
+      text width=3.6cm] (eqroles) {%
+    \textbf{time order} drives solver:\\
+    $0 \to$ constraint (IDA/Schur)\\
+    $1 \to$ diffusion (IDA)\\
+    $\geq 2 \to$ wave (modal/CVODE)};
+
+% RHS term detail
+\node[block=PinkLine, below=0.15cm of eqdetail.south west, anchor=north west,
+      text width=5.0cm, xshift=0.3cm] (term) {%
+    \key{term}\\[1pt]
+    \val{coefficient: 1.0}\\
+    \val{coefficient\_symbolic: "m2"}\\
+    \val{operator: "laplacian\_x"}\\
+    \val{field: "phi\_0"}\\
+    \val{coordinate\_dependent: []}\\
+    \val{time\_dependent: false}};
+
+\node[role=PinkLine, right=0.2cm of term.north east, anchor=north west,
+      text width=3.6cm] (termroles) {%
+    \textbf{operator} $\in$ \texttt{\_EXACT\_}\\
+    \texttt{MULTIPLIERS}? $\to$ modal eligible\\[2pt]
+    \textbf{coefficient\_symbolic}:\\
+    enables \texttt{-{}-param} sweeps\\
+    without re-derivation\\[2pt]
+    \textbf{time\_dependent}:\\
+    true $\to$ modal ineligible\\[2pt]
+    \textbf{coordinate\_dependent}:\\
+    non-empty $\to$ position-dep\\
+    $\to$ convolution in modal};
+
+% canonical
+\node[block=GreenLine, below=0.55cm of term.south west, anchor=north west,
+      text width=5.8cm, xshift=-0.6cm] (canonical) {%
+    \key{canonical} \textnormal{(optional, from Wolfram pipeline)}\\[-1pt]
+    \val{hamiltonian\_terms: [\{coeff, factor\_a, factor\_b\}, ...]}\\[-1pt]
+    \val{volume\_element: null | "Sqrt[Abs[Sin[y[]]{\string^}2*x[]{\string^}4]]"}};
+
+\node[role=GreenLine, right=0.2cm of canonical.north east, anchor=north west,
+      text width=3.6cm] (canroles) {%
+    \textbf{volume\_element}:\\
+    null $\to$ flat (modal OK)\\
+    non-null $\to$ curved metric\\[2pt]
+    Drives energy measurement\\
+    and modal eligibility};
+
+% matrices
+\node[block=LimeLine, below=0.35cm of canonical.south west, anchor=north west,
+      text width=5.8cm] (matrices) {%
+    \key{mass\_matrix}: \val{[[m\string^2, 0], [0, m\string^2]]}\\[-1pt]
+    \key{coupling\_matrix}: \val{[[0, g], [g, 0]]}};
+
+\node[role=LimeLine, right=0.2cm of matrices.north east, anchor=north west]
+    {validated: dimensions\\match field count};
+
+% ===================================================================
+% TREE CONNECTORS (root to each block)
+% ===================================================================
+\foreach \blk in {meta, space, fields, eqs, canonical, matrices} {
+    \draw[connector] (root.south) |- (\blk.east);
+}
+\draw[connector] (eqs.south) |- (eqdetail.east);
+\draw[connector] (eqdetail.south) |- (term.east);
+
+% ===================================================================
+% VALIDATION BOX
+% ===================================================================
+\node[below=0.5cm of matrices.south west, anchor=north west,
+      rectangle, rounded corners=2pt, draw=OrangeLine, dashed,
+      fill=OrangeFill, fill opacity=0.2, inner sep=6pt,
+      font=\scriptsize, text opacity=1, text width=5.6cm] (validation) {%
+    \textbf{Validation} (\texttt{EquationSystem.from\_dict()}):\\[2pt]
+    \textbullet\ Field name uniqueness + index 0..N-1\\
+    \textbullet\ Operator name validity\\
+    \textbullet\ Field reference validity (incl.\ \texttt{v\_X})\\
+    \textbullet\ Matrix dimensions match field count\\
+    \textbullet\ \texttt{constraint\_solver} only for time\_order=0\\
+    \textbullet\ \texttt{coordinate\_dependent} consistency};
+
+\end{tikzpicture}
+\end{document}

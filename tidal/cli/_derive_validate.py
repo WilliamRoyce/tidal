@@ -12,7 +12,7 @@ and single-responsibility.
 from __future__ import annotations
 
 import re
-from typing import Any
+from typing import Any, cast
 
 # ---------------------------------------------------------------------------
 # Constants and presets
@@ -144,6 +144,29 @@ def _validate_fields(config: dict[str, Any]) -> None:
     dim = config["spacetime"]["dimension"]
     for i, field in enumerate(config["fields"]):
         _validate_single_field(field, i, dim)
+
+
+def _validate_constants(config: dict[str, Any]) -> None:
+    """Validate optional [constants] section of TOML config.
+
+    Constant names flow directly into Wolfram ``DefConstantSymbol[name]``
+    calls, so they must be valid Wolfram identifiers (alphanumeric,
+    starting with a letter, no underscores).
+
+    Raises
+    ------
+    ValueError
+        If a constant name is not a valid identifier.
+    """
+    names: list[str] = config.get("constants", {}).get("names", [])
+    for name in names:
+        if not _VALID_FIELD_NAME.match(name):
+            msg = (
+                f"Constant name '{name}' must be alphanumeric starting with "
+                f"a letter (no underscores — Mathematica parses X_Y as "
+                f"Pattern[X, Blank[Y]])"
+            )
+            raise ValueError(msg)
 
 
 def _validate_lagrangian(config: dict[str, Any]) -> None:
@@ -642,6 +665,8 @@ def _validate_reduction(config: dict[str, Any]) -> None:
     ------
     ValueError
         If reduction config is invalid (bad type, axis, or dimension).
+    TypeError
+        If ``coordinate_values`` is not a dict.
     """
     reduction = config.get("reduction")
     if reduction is None:
@@ -681,6 +706,22 @@ def _validate_reduction(config: dict[str, Any]) -> None:
             f"Valid axes: {spatial}"
         )
         raise ValueError(msg)
+
+    # Optional coordinate_values: map of killed-axis names → Wolfram value strings
+    coord_values_raw = reduction.get("coordinate_values", {})
+    if not isinstance(coord_values_raw, dict):
+        msg = "[reduction] coordinate_values must be a table (dict), e.g. {y = 'Pi/2'}"
+        raise TypeError(msg)
+    coord_values = dict(cast("dict[str, Any]", coord_values_raw))
+    killed = [c for c in (spatial or []) if c != prop_axis]
+    for key in coord_values:
+        if key not in killed:
+            msg = (
+                f"[reduction] coordinate_values key '{key}' is not a killed "
+                f"coordinate for propagation_axis '{prop_axis}'. "
+                f"Valid killed coordinates: {killed}"
+            )
+            raise ValueError(msg)
 
 
 # ---------------------------------------------------------------------------
@@ -726,6 +767,7 @@ def _validate_config(config: dict[str, Any]) -> None:  # type: ignore[reportUnus
 
     _validate_spacetime(config)
     _validate_fields(config)
+    _validate_constants(config)
     _validate_derived_fields(config)
     _validate_background_fields(config)
     if has_lagrangian:

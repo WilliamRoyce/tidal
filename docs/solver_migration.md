@@ -319,7 +319,7 @@ or `np.ndarray` (grid-shaped) depending on coordinate dependence.
 
 #### 2a. Modify `_derive.py`
 
-- [ ] In `_wls_canonical_pipeline()` (lines 2054-2220):
+- [ ] In `_wls_canonical_phase_b()` (canonical Hamiltonian pipeline):
   - Keep K computation (lines 2089-2096)
   - Keep K validation / det(K) check (lines 2101-2107)
   - Keep spatial momentum S computation (lines 2120-2126)

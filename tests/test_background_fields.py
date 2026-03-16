@@ -17,8 +17,11 @@ from numpy.testing import assert_allclose
 
 from tidal.measurement._io import SimulationData
 from tidal.symbolic.json_loader import (
+    CanonicalStructure,
     ComponentEquation,
     EquationSystem,
+    HamiltonianFactor,
+    HamiltonianTerm,
     OperatorTerm,
 )
 
@@ -29,164 +32,6 @@ if TYPE_CHECKING:
 # ===========================================================================
 # Group 3: Energy computation with background-derived terms
 # ===========================================================================
-
-
-class TestBackgroundEnergy:
-    """Verify energy computation with background-field-like coefficient patterns."""
-
-    def test_constant_background_mass_resolves(self) -> None:
-        """Constant symbolic mass from background field resolves for energy."""
-        from tidal.measurement._energy import _resolve_mass_squared
-
-        spec = EquationSystem(
-            n_components=1,
-            dimension=3,
-            spatial_dimension=2,
-            component_names=("phi",),
-            equations=(
-                ComponentEquation(
-                    field_name="phi",
-                    field_index=0,
-                    time_derivative_order=2,
-                    rhs_terms=(
-                        OperatorTerm(1.0, "laplacian", "phi"),
-                        OperatorTerm(
-                            -4.0,
-                            "identity",
-                            "phi",
-                            coefficient_symbolic="-V0",
-                        ),
-                    ),
-                ),
-            ),
-            mass_matrix=((4.0,),),
-            coupling_matrix=((0.0,),),
-            mass_matrix_symbolic=(("-V0",),),
-            metadata={},
-            coordinates=("t", "x", "y"),
-        )
-
-        # Minimal SimulationData — only need spec + parameters for mass resolution
-        data = SimulationData(
-            spec=spec,
-            fields={"phi": np.zeros((2, 8, 8))},
-            velocities={"phi": np.zeros((2, 8, 8))},
-            times=np.array([0.0, 1.0]),
-            grid_spacing=(10.0 / 8, 10.0 / 8),
-            grid_bounds=((0.0, 10.0), (0.0, 10.0)),
-            periodic=(True, True),
-            parameters={"V0": 4.0},
-        )
-
-        m2 = _resolve_mass_squared(data, 0)
-        # Convention: matrix[i][j] = -(coefficient of identity(field_j))
-        # mass_matrix_symbolic stores raw "-V0", resolution gives -V0 = -4.0
-        # then _resolve_mass_squared negates: -(-4.0) = 4.0
-        assert m2 == pytest.approx(4.0)
-
-    def test_position_dependent_mass_in_virial_works(self) -> None:
-        """Position-dependent identity term evaluates on grid in virial energy."""
-        from tidal.measurement._energy import _compute_virial_potential
-
-        spec = EquationSystem(
-            n_components=1,
-            dimension=3,
-            spatial_dimension=2,
-            component_names=("phi",),
-            equations=(
-                ComponentEquation(
-                    field_name="phi",
-                    field_index=0,
-                    time_derivative_order=2,
-                    rhs_terms=(
-                        OperatorTerm(1.0, "laplacian", "phi"),
-                        OperatorTerm(
-                            -1.0,
-                            "identity",
-                            "phi",
-                            coefficient_symbolic="-V0*UnitStep[x() - 3]",
-                            coordinate_dependent=("x",),
-                        ),
-                    ),
-                ),
-            ),
-            mass_matrix=((1.0,),),
-            coupling_matrix=((0.0,),),
-            metadata={},
-            coordinates=("t", "x", "y"),
-        )
-
-        data = SimulationData(
-            spec=spec,
-            fields={"phi": np.ones((2, 8, 8))},
-            velocities={"phi": np.zeros((2, 8, 8))},
-            times=np.array([0.0, 1.0]),
-            grid_spacing=(10.0 / 8, 10.0 / 8),
-            grid_bounds=((0.0, 10.0), (0.0, 10.0)),
-            periodic=(True, True),
-            parameters={"V0": 4.0},
-        )
-
-        # Should now work (no longer raises) — position-dependent coefficients
-        # are evaluated on the grid for the virial integral.
-        result = _compute_virial_potential(data, t_idx=0)
-        assert np.isfinite(result)
-        # With constant phi=1 field, virial is non-trivial
-        assert result != 0.0
-
-    def test_position_dependent_mass_resolved_on_grid(self) -> None:
-        """_resolve_mass_squared returns ndarray for position-dependent mass."""
-        from tidal.measurement._energy import _resolve_mass_squared
-
-        spec = EquationSystem(
-            n_components=1,
-            dimension=3,
-            spatial_dimension=2,
-            component_names=("phi",),
-            equations=(
-                ComponentEquation(
-                    field_name="phi",
-                    field_index=0,
-                    time_derivative_order=2,
-                    rhs_terms=(
-                        OperatorTerm(1.0, "laplacian", "phi"),
-                        OperatorTerm(
-                            -1.0,
-                            "identity",
-                            "phi",
-                            coefficient_symbolic="-V0*exp(-(x()^2 + y()^2))",
-                            coordinate_dependent=("x", "y"),
-                        ),
-                    ),
-                ),
-            ),
-            mass_matrix=((1.0,),),
-            coupling_matrix=((0.0,),),
-            metadata={},
-            coordinates=("t", "x", "y"),
-        )
-
-        data = SimulationData(
-            spec=spec,
-            fields={"phi": np.ones((2, 16, 16))},
-            velocities={"phi": np.zeros((2, 16, 16))},
-            times=np.array([0.0, 1.0]),
-            grid_spacing=(10.0 / 16, 10.0 / 16),
-            grid_bounds=((-5.0, 5.0), (-5.0, 5.0)),
-            periodic=(True, True),
-            parameters={"V0": 3.0},
-        )
-
-        m2 = _resolve_mass_squared(data, 0)
-        # Position-dependent → returns ndarray
-        assert isinstance(m2, np.ndarray)
-        assert m2.shape == (16, 16)
-        # Center cell at (0.3125, 0.3125) — not exactly (0,0) so exp != 1
-        # coefficient_symbolic = -V0*exp(-(x^2+y^2)), _resolve_mass_squared negates
-        # Verify center has highest value and edges are smaller
-        assert m2[8, 8] > m2[0, 0], "Center should be > corner"
-        assert m2[8, 8] == pytest.approx(3.0, abs=0.6)  # close to V0=3.0
-        assert m2[0, 0] < 0.01  # far from center, exp decays
 
 
 # ===========================================================================
@@ -401,6 +246,61 @@ def _make_position_dependent_sim_data(
         rhs_terms=tuple(chi_terms_list),
     )
 
+    # Build canonical Hamiltonian terms for energy measurement
+    h_terms: list[HamiltonianTerm] = []
+    for fname in ("phi_0", "chi_0"):
+        h_terms.extend(
+            [
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field=fname, operator="time_derivative"),
+                    factor_b=HamiltonianFactor(field=fname, operator="time_derivative"),
+                ),
+                HamiltonianTerm(
+                    coefficient=-0.5,
+                    factor_a=HamiltonianFactor(field=fname, operator="identity"),
+                    factor_b=HamiltonianFactor(field=fname, operator="laplacian"),
+                ),
+            ]
+        )
+    # Mass terms — position-dependent for phi if requested
+    if position_dependent_mass:
+        h_terms.append(
+            HamiltonianTerm(
+                coefficient=1.0,
+                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+                coefficient_symbolic="g0/2 * exp(-(x()^2 + y()^2))",
+                coordinate_dependent=("x", "y"),
+            )
+        )
+    else:
+        h_terms.append(
+            HamiltonianTerm(
+                coefficient=0.5,
+                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+            )
+        )
+    h_terms.append(
+        HamiltonianTerm(
+            coefficient=0.5,
+            factor_a=HamiltonianFactor(field="chi_0", operator="identity"),
+            factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
+        )
+    )
+    if position_dependent_coupling:
+        h_terms.append(
+            HamiltonianTerm(
+                coefficient=0.1,
+                factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                factor_b=HamiltonianFactor(field="chi_0", operator="identity"),
+                coefficient_symbolic="g0 * exp(-(x()^2 + y()^2))",
+                coordinate_dependent=("x", "y"),
+            )
+        )
+    canonical = CanonicalStructure(hamiltonian_terms=tuple(h_terms))
+
     spec = EquationSystem(
         n_components=2,
         dimension=3,
@@ -413,6 +313,7 @@ def _make_position_dependent_sim_data(
         else ((0.0, 0.0), (0.0, 0.0)),
         metadata={},
         coordinates=("t", "x", "y"),
+        canonical=canonical,
     )
 
     n_grid = 16
@@ -578,6 +479,25 @@ class TestProcaScalarBackground:
             OperatorTerm(coefficient=1.0, operator="laplacian", field="B_1"),
             OperatorTerm(coefficient=-2.0, operator="identity", field="B_1"),
         )
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="B_1", operator="time_derivative"),
+                    factor_b=HamiltonianFactor(field="B_1", operator="time_derivative"),
+                ),
+                HamiltonianTerm(
+                    coefficient=-0.5,
+                    factor_a=HamiltonianFactor(field="B_1", operator="identity"),
+                    factor_b=HamiltonianFactor(field="B_1", operator="laplacian"),
+                ),
+                HamiltonianTerm(
+                    coefficient=1.0,
+                    factor_a=HamiltonianFactor(field="B_1", operator="identity"),
+                    factor_b=HamiltonianFactor(field="B_1", operator="identity"),
+                ),
+            ),
+        )
         spec = EquationSystem(
             n_components=2,
             dimension=3,
@@ -601,6 +521,7 @@ class TestProcaScalarBackground:
             coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
             metadata={},
             coordinates=("t", "x", "y"),
+            canonical=canonical,
         )
         data = SimulationData(
             times=np.array([0.0, 1.0]),
@@ -628,6 +549,25 @@ class TestProcaScalarBackground:
             OperatorTerm(coefficient=1.0, operator="laplacian", field="B_1"),
             OperatorTerm(coefficient=-2.0, operator="identity", field="B_1"),
         )
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="B_1", operator="time_derivative"),
+                    factor_b=HamiltonianFactor(field="B_1", operator="time_derivative"),
+                ),
+                HamiltonianTerm(
+                    coefficient=-0.5,
+                    factor_a=HamiltonianFactor(field="B_1", operator="identity"),
+                    factor_b=HamiltonianFactor(field="B_1", operator="laplacian"),
+                ),
+                HamiltonianTerm(
+                    coefficient=1.0,
+                    factor_a=HamiltonianFactor(field="B_1", operator="identity"),
+                    factor_b=HamiltonianFactor(field="B_1", operator="identity"),
+                ),
+            ),
+        )
         spec = EquationSystem(
             n_components=2,
             dimension=3,
@@ -651,6 +591,7 @@ class TestProcaScalarBackground:
             coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
             metadata={},
             coordinates=("t", "x", "y"),
+            canonical=canonical,
         )
         # Uniform B_1 = 1.0: KE=0, PE = m²/2 * integral of B_1^2
         n_grid = 16
@@ -842,6 +783,81 @@ class TestVectorBackground:
                 coordinate_dependent=("x", "y"),
             ),
         )
+        canonical = CanonicalStructure(
+            hamiltonian_terms=(
+                # ½ v_phi_0²
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="v_phi_0", operator="identity"),
+                    factor_b=HamiltonianFactor(field="v_phi_0", operator="identity"),
+                    coefficient_symbolic="1/2",
+                    term_class="self",
+                ),
+                # ½ (∇phi_0)²
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="phi_0", operator="gradient_x"),
+                    factor_b=HamiltonianFactor(field="phi_0", operator="gradient_x"),
+                    coefficient_symbolic="1/2",
+                    term_class="self",
+                ),
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="phi_0", operator="gradient_y"),
+                    factor_b=HamiltonianFactor(field="phi_0", operator="gradient_y"),
+                    coefficient_symbolic="1/2",
+                    term_class="self",
+                ),
+                # ½ m² phi_0²
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                    factor_b=HamiltonianFactor(field="phi_0", operator="identity"),
+                    coefficient_symbolic="1/2",
+                    term_class="self",
+                ),
+                # ½ v_A_2²
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="v_A_2", operator="identity"),
+                    factor_b=HamiltonianFactor(field="v_A_2", operator="identity"),
+                    coefficient_symbolic="1/2",
+                    term_class="self",
+                ),
+                # ½ (∇A_2)²
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="A_2", operator="gradient_x"),
+                    factor_b=HamiltonianFactor(field="A_2", operator="gradient_x"),
+                    coefficient_symbolic="1/2",
+                    term_class="self",
+                ),
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="A_2", operator="gradient_y"),
+                    factor_b=HamiltonianFactor(field="A_2", operator="gradient_y"),
+                    coefficient_symbolic="1/2",
+                    term_class="self",
+                ),
+                # ½ × 2.0 × A_2²
+                HamiltonianTerm(
+                    coefficient=1.0,
+                    factor_a=HamiltonianFactor(field="A_2", operator="identity"),
+                    factor_b=HamiltonianFactor(field="A_2", operator="identity"),
+                    coefficient_symbolic="1",
+                    term_class="self",
+                ),
+                # Position-dependent coupling: gBV * B0 * f(x,y) * phi_0 * A_2
+                HamiltonianTerm(
+                    coefficient=0.5,
+                    factor_a=HamiltonianFactor(field="phi_0", operator="identity"),
+                    factor_b=HamiltonianFactor(field="A_2", operator="identity"),
+                    coefficient_symbolic="gBV * B0 * tanh(x / W) * exp(-(x**2 + y**2) / (2 * R**2))",
+                    coordinate_dependent=("x", "y"),
+                    term_class="interaction",
+                ),
+            ),
+        )
         spec = EquationSystem(
             n_components=2,
             dimension=3,
@@ -865,6 +881,7 @@ class TestVectorBackground:
             coupling_matrix=((0.0, 0.0), (0.0, 0.0)),
             metadata={},
             coordinates=("t", "x", "y"),
+            canonical=canonical,
         )
         n_grid = 16
         dx = 20.0 / n_grid

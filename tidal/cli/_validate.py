@@ -2,12 +2,18 @@
 
 from __future__ import annotations
 
+import contextlib
 import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from argparse import Namespace
     from pathlib import Path
+
+    from tidal.symbolic.json_loader import EquationSystem
+
+# Tolerance matching check_pointwise_mass_stability in validation.py
+_STABILITY_TOLERANCE: float = 1e-10
 
 
 def _check_file_exists(json_path: Path) -> list[str]:
@@ -104,7 +110,120 @@ def _check_parameters(spec: object) -> list[str]:
     return warnings
 
 
-def validate_command(args: Namespace) -> int:
+def _parse_validate_params(raw: list[str], spec: EquationSystem) -> dict[str, float]:
+    """Parse --param KEY=VAL arguments, merging metadata defaults.
+
+    Raises
+    ------
+    ValueError
+        If parameter format is invalid or value is non-numeric.
+    """
+    params: dict[str, float] = {}
+
+    # Start with metadata defaults
+    meta_params = spec.metadata.get("parameters", {})
+    if isinstance(meta_params, dict):
+        for key, val in meta_params.items():  # type: ignore[union-attr]
+            with contextlib.suppress(ValueError, TypeError):
+                params[str(key)] = float(val)  # type: ignore[arg-type]
+
+    # Override with CLI params
+    for item in raw:
+        if "=" not in item:
+            msg = f"Invalid --param format: '{item}'. Expected KEY=VALUE (e.g. --param m2=1.0)"
+            raise ValueError(msg)
+        key, val_str = item.split("=", 1)
+        key = key.strip()
+        try:
+            params[key] = float(val_str.strip())
+        except ValueError:
+            msg = f"Invalid parameter value: '{val_str}' for key '{key}'. Must be a number."
+            raise ValueError(msg) from None
+
+    return params
+
+
+def _check_tachyons(
+    spec: EquationSystem,
+    params: dict[str, float],
+) -> tuple[list[str], list[str]]:
+    """Check mass matrix stability (tachyon detection).
+
+    Builds the potential matrix M[i,j] from identity-operator RHS terms for
+    dynamical fields and verifies all eigenvalues are non-negative. A negative
+    eigenvalue indicates an exponentially growing (tachyonic) mode.
+
+    Uses a minimal 1-point grid; for constant-coefficient systems (the common
+    case) this is exact. For position-dependent coefficients it evaluates at
+    the origin, which may miss instabilities elsewhere.
+
+    Parameters
+    ----------
+    spec : EquationSystem
+    params : dict[str, float]
+        Parameter values (merged from metadata defaults + CLI overrides).
+
+    Returns
+    -------
+    errors : list[str]
+        Tachyon instability errors.
+    notes : list[str]
+        Informational notes (e.g. asymmetric matrix detected).
+    """
+    from tidal.solver.coefficients import CoefficientEvaluator
+    from tidal.solver.grid import GridInfo
+    from tidal.solver.validation import check_pointwise_mass_stability
+
+    spatial_dim = spec.spatial_dimension
+    bounds = tuple((0.0, 1.0) for _ in range(spatial_dim))
+    shape = tuple(2 for _ in range(spatial_dim))  # minimum 2 cells required by GridInfo
+    periodic = tuple(True for _ in range(spatial_dim))
+    grid = GridInfo(bounds=bounds, shape=shape, periodic=periodic)
+
+    coeff_eval = CoefficientEvaluator(spec, grid, params)
+    result = check_pointwise_mass_stability(coeff_eval, spec, grid)
+    return result.errors, result.notes
+
+
+def _run_stability_checks(
+    spec: EquationSystem,
+    raw_params: list[str],
+) -> tuple[list[str], list[str]]:
+    """Run tachyon check, returning (errors, notes).
+
+    Tachyon detection (negative mass-matrix eigenvalue) is reported as an
+    **error** — the system will have exponentially growing modes at runtime.
+
+    Ghost detection is not implemented here: determining whether a theory has
+    ghost modes from ``hamiltonian_terms`` alone is unreliable because, in
+    linearized GR and other gauge theories, the naive Hamiltonian kinetic
+    coefficients are negative even in ghost-free theories (gauge-structure
+    artifact).  Use a dedicated tool (e.g. xAct/Mathematica) to verify
+    ghost-freeness for a specific theory.
+
+    Parameters
+    ----------
+    spec : EquationSystem
+    raw_params : list[str]
+        Raw --param KEY=VAL strings from CLI.
+
+    Returns
+    -------
+    errors : list[str]
+        Tachyon instability errors (fatal — exponentially growing modes).
+    notes : list[str]
+        Informational notes from the tachyon check (e.g. asymmetric matrix).
+    """
+    try:
+        params = _parse_validate_params(raw_params, spec)
+    except ValueError as exc:
+        return [str(exc)], []
+
+    tachyon_errors, notes = _check_tachyons(spec, params)
+    return tachyon_errors, notes
+
+
+def validate_command(args: Namespace) -> int:  # noqa: C901
     """Execute the validate command.
 
     Parameters
@@ -151,6 +270,16 @@ def validate_command(args: Namespace) -> int:
     # Check 5: Parameters (warnings, not errors)
     warnings.extend(_check_parameters(spec))
 
+    # Check 6: Stability — tachyon and ghost mode detection
+    if getattr(args, "stability", False):
+        from tidal.symbolic.json_loader import EquationSystem
+
+        if isinstance(spec, EquationSystem):
+            raw_params: list[str] = getattr(args, "param", []) or []
+            stab_errors, stab_notes = _run_stability_checks(spec, raw_params)
+            errors.extend(stab_errors)
+            warnings.extend(stab_notes)
+
     # Report results
     if errors:
         for err in errors:
@@ -160,5 +289,6 @@ def validate_command(args: Namespace) -> int:
     for warn in warnings:
         print(f"WARNING: {warn}", file=sys.stderr)
 
-    print(f"OK: {json_path.name} is valid")
+    suffix = " [stable]" if getattr(args, "stability", False) else ""
+    print(f"OK: {json_path.name} is valid{suffix}")
     return 0

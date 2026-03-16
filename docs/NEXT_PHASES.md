@@ -2,12 +2,12 @@
 
 **Created:** February 2026
 **Last Updated:** March 2026
-**Status:** Phases A, B, C, F, J complete; Phases D–E, G–I planned
-**Version:** 0.5.0 | **Tests:** 1,343 collected | **Examples:** 25 working (1+1D to 3+1D)
+**Status:** Phases A, B, C, E (FFT), F, J complete; Phase D in progress; Phases G–I planned
+**Version:** 0.5.0 | **Tests:** 1,484 collected | **Examples:** 27 working (1+1D to 3+1D)
 
 ## Context
 
-TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) → measurement/analysis. With 25 working examples spanning 1+1D to 3+1D, a full CLI with 9 subcommands (`tidal derive|simulate|measure|inspect|list|validate|plot|sweep|analyze`), a comprehensive measurement module (13 types: energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary), and a complete parameter sweep framework with sensitivity analysis, the project is mature and ready for its next major advances.
+TIDAL (Tensor Integration and Derivation for Any Lagrangian) has completed its core pipeline: Lagrangian (xAct/Mathematica) → JSON spec → native PDE solver (SUNDIALS IDA/CVODE, leapfrog, scipy) → measurement/analysis. With 27 working examples spanning 1+1D to 3+1D, a full CLI with 9 subcommands (`tidal derive|simulate|measure|inspect|list|validate|plot|sweep|analyze`), a comprehensive measurement module (13 types: energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary), and a complete parameter sweep framework with sensitivity analysis, the project is mature and ready for its next major advances.
 
 The project's core research motivation is the **Gertsenshtein effect** (electromagnetic ↔ gravitational wave conversion in external magnetic fields). The project operates exclusively in the **linearised regime** — all Lagrangians are quadratic, producing linear PDEs. The phases below are ordered by their impact toward enabling realistic Gertsenshtein simulations, while also broadening TIDAL's general utility as a linearised field theory simulation framework.
 
@@ -172,73 +172,60 @@ A comprehensive parameter sweep framework implemented as two CLI commands (`tida
 
 ---
 
-## Phase D: Coupled EM-Gravity Gertsenshtein Example
+## Phase D: Coupled EM-Gravity Gertsenshtein Example 🔄
 
 **Priority: HIGH — the culmination of the project's research goal**
-**Status:** Planned
+**Status:** In Progress (Phases A–F2 complete, F3a in progress)
 
 ### What and Why
 
 This is the integration example that combines Phase A (and optionally Phase B) into the first fully automated, Lagrangian-derived simulation of the Gertsenshtein effect. The repository is named "torsion-gertsenshtein" — this example is the raison d'être.
 
-### What It Enables
+### Delivered
 
-- End-to-end Gertsenshtein simulation from a single `theory.toml`
-- Validation against the analytical thin-magnet formula: P ≈ (κ B₀ L / 2)² (Domcke & Garcia-Cely 2023)
-- Full measurement suite: P(t), P(k,t), mixing length, dispersion
-- **Automated analytic benchmark test**: a pytest parametrised test comparing numerical P against the thin-magnet prediction at multiple coupling strengths, ensuring agreement to within 5% for weak coupling
-
-### Implementation Details
-
-1. **theory.toml**: EM field A_μ, linearised metric perturbation h_ab, background B₀, optional gauge fixing (Lorenz for EM, de Donder for gravity — simplifies equations but not required)
-2. **Simulation**: Plane wave in A, zero in h, measure energy transfer A → h
-3. **Validation**: Compare P(t) against the analytic Gertsenshtein formula at steady state
-4. **Measurement**: Existing `compute_conversion_probability`, `compute_mixing_length`, `compute_spectral_conversion`
-5. **Benchmark test**: `tests/test_gertsenshtein_benchmark.py` with parametrised coupling values
+- **Pipeline extension**: `[[linearization.matter_perturbations]]` in TOML — uses xPert's `DefTensorPerturbation` for matter fields alongside `SetupMetricPerturbation`
+- **End-to-end simulation** from `examples/gertsenshtein/theory.toml` — graviton-photon conversion via Einstein-Maxwell Lagrangian
+- **Uniform B₀ validation (Phase E)**: P = sin²(κB₀t/2) confirmed via 40-point B₀ sweep (N=1024, RMS < 0.012). Corrected P&R (2023) error: missing √(4π) in coupling. Confirmed by Dandoy/Lella (arXiv:2406.17853).
+- **Localized B-field validation (Phase F2)**: Gaussian B_x(z) via `theory_localized.toml`. Boccaletti formula P = sin²(κ/2 × ∫B dz) validated: P_numerical = 0.3436 vs P_Boccaletti = 0.3432 (0.04% agreement). 48-point sweep max error < 0.003.
+- **Radial dipolar (Phase F3a)**: `theory_radial.toml` derived (spherical coords, 6 surviving fields after TT gauge). In progress — WKB normalization needed for quantitative comparison.
+- **Plasma detuning (Phase F1)**: BLOCKED — xPert treats standalone background 4-potential as having non-zero background, generating spurious z²-terms.
 
 ### References
 
 - Gertsenshtein (1962), "Wave resonance of light and gravitational waves", JETP 14, 84
 - Domcke & Garcia-Cely (2023), "A simple derivation of the Gertsenshtein effect", [arXiv:2301.02072](https://arxiv.org/abs/2301.02072) — thin-magnet formula
 - Domcke & Garcia-Cely (2023), "On graviton-photon conversions in magnetic environments", [arXiv:2310.04150](https://arxiv.org/abs/2310.04150)
-- Berlin et al. (2024), "Numerical analysis of resonant axion-photon mixing", [arXiv:2405.08865](https://arxiv.org/abs/2405.08865) — numerical methods for resonant mixing
+- Dandoy & Lella (2024), "Graviton-photon oscillations", [arXiv:2406.17853](https://arxiv.org/abs/2406.17853) — confirms correct coupling normalization
+- Berlin et al. (2024), "Numerical analysis of resonant axion-photon mixing", [arXiv:2405.08865](https://arxiv.org/abs/2405.08865)
 
-### Scope: Medium (~3–5 days)
-
-### Dependencies: Phase A (complete) required; Phase B optional (simplifies EM and gravity equations)
+### Dependencies: Phase A (complete) required; Phase B (complete) simplifies EM and gravity equations
 
 ---
 
-## Phase E: Spectral (Fourier) Spatial Discretisation
+## Phase E: Spectral (Fourier) Spatial Discretisation ✓
 
 **Priority: MEDIUM — significant accuracy and performance improvement**
-**Status:** Planned
+**Status:** Complete (FFT operators); Chebyshev remaining
 
 ### What and Why
 
-TIDAL currently uses 2nd-order finite-difference spatial discretisation (native numpy operators in `tidal/solver/operators.py`). For wave propagation (the core use case), spectral methods (FFT-based) offer exponential convergence for smooth solutions on periodic domains. The Dedalus framework (Burns et al. 2020) demonstrates that spectral methods are the natural foundation for PDE solvers targeting wave physics.
+TIDAL supports FFT spectral operators (`--spectral`) alongside finite-difference stencils (2nd/4th/6th order via `--fd-order`). For wave propagation on periodic domains, spectral methods offer exponential convergence for smooth solutions. Auto-enabled when all boundary conditions are periodic.
 
-### What It Enables
+### Delivered
 
-- Exponential spatial convergence for periodic wave problems (vs. O(h²) for FD)
-- Much smaller grids for the same accuracy (e.g., 64 points vs. 512)
-- Exact Laplacian in Fourier space (no numerical dispersion)
-- Resolves the Dirichlet + cross_derivative energy drift issue
+- FFT spectral operators in `tidal/solver/operators.py` — machine-precision accuracy for smooth fields
+- CLI flag: `--spectral` (auto-enabled for all-periodic BCs)
+- All operators: spectral implementations (laplacian, gradient, cross_derivative)
+- Higher-order FD stencils (`--fd-order 4|6`) via Fornberg (1988) coefficients — 500x error reduction per order doubling
 
-### Implementation Details
+### Remaining
 
-1. **New spatial backend**: `SpectralPDE` class computing derivatives via FFT
-2. **CLI flag**: `--spatial spectral`
-3. **All operators**: Spectral implementations (laplacian, gradient, cross_derivative)
-4. **Chebyshev basis**: For non-periodic directions (mixed Fourier-Chebyshev, following Dedalus architecture)
+- **Chebyshev basis** for non-periodic directions (mixed Fourier-Chebyshev, following Dedalus architecture)
 
 ### References
 
 - Burns et al. (2020), "Dedalus: A Flexible Framework for Numerical Simulations with Spectral Methods", Phys. Rev. Research 2, 023068
-
-### Scope: Large (~7–10 days)
-
-### Dependencies: None
+- Fornberg (1988), "Generation of Finite Difference Formulas on Arbitrarily Spaced Grids", Math. Comp. 51(184), 699–706
 
 ---
 

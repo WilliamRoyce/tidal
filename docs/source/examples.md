@@ -1,6 +1,6 @@
 # Examples
 
-TIDAL includes 25 pipeline examples spanning 1+1D through 3+1D spacetimes with scalar, vector, and tensor fields.
+TIDAL includes 27 pipeline examples spanning 1+1D through 3+1D spacetimes with scalar, vector, and tensor fields.
 
 ## Pipeline Examples
 
@@ -33,6 +33,8 @@ All pipeline examples follow the same pattern: `tidal derive theory.toml` derive
 | `spherical_kg_1d/` | 1+1D | phi_0 | Spherical coordinates, plane-wave 1D reduction |
 | `proca_background/` | 2+1D | A_i, B_i | Lorentzian scalar background, two Proca vectors, constraint+BG integration |
 | `vector_background/` | 2+1D | phi_0, A_i | Tanh domain wall vector background, ComponentValue mechanism, sign-changing coupling |
+| `gertsenshtein/` | 1+1D | h_5, gea_1 | Einstein-Maxwell graviton-photon conversion, multi-field perturbation |
+| `maxwell_perturbation/` | 1+1D | gea_0, gea_1 | Matter-only Proca perturbation, lightweight CI test |
 
 ## Running Examples
 
@@ -96,6 +98,8 @@ cd examples/scalar_vector_coupling && bash run.sh
 | cylindrical_kg_1d | Yes | Yes |
 | gravitational_waves_1d | Yes | Yes |
 | spherical_kg_1d | Yes | Yes |
+| gertsenshtein | Yes | Yes |
+| maxwell_perturbation | Yes | Yes |
 
 ## Parameter Sweeps
 
@@ -116,6 +120,9 @@ TIDAL includes example scripts demonstrating the `tidal sweep` framework for aut
 | `coupled_scalars/sweep_2d_sensitivity.toml` | Latin Hypercube 2D | LHS sampling (F2b) |
 | `coupled_scalars/sweep_2d_sensitivity.sh` | Sensitivity analysis | Sobol/Morris + advanced viz (F4+F8) |
 | `scalar_field/sweep_convergence.sh` | Single-field convergence | Conservation convergence study |
+| `gertsenshtein/sweep_B0.sh` | B₀ field strength sweep | Rabi oscillation validation (sin²(κB₀t/2)) |
+| `gertsenshtein/sweep_coupling.sh` | Coupling constant sweep | Graviton-photon conversion rate |
+| `gertsenshtein/sweep_profile.sh` | Localized B-field sweep | Boccaletti formula validation |
 
 ### Running Sweep Examples
 
@@ -161,9 +168,9 @@ ls examples/data/*.json
 Each JSON file is a self-contained equation system specification that can be loaded with:
 
 ```python
-from tidal.symbolic import build_pde_from_json
+from tidal.symbolic.json_loader import load_equation_system
 
-pde = build_pde_from_json("examples/data/klein_gordon_1d.json")
+spec = load_equation_system("examples/data/klein_gordon_1d.json")
 ```
 
 See the [Pipeline](pipeline.md) page for details on the JSON schema.

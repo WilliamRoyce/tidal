@@ -285,7 +285,11 @@ class TestBuildJacobianSparsity:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "A_0",
+                            },
                         ],
                     },
                 },
@@ -295,8 +299,16 @@ class TestBuildJacobianSparsity:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_1"},
-                            {"coefficient": 1.0, "operator": "gradient_x", "field": "v_A_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "A_1",
+                            },
+                            {
+                                "coefficient": 1.0,
+                                "operator": "gradient_x",
+                                "field": "v_A_0",
+                            },
                         ],
                     },
                 },
@@ -341,8 +353,16 @@ class TestBuildJacobianSparsity:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0"},
-                            {"coefficient": -1.0, "operator": "first_derivative_t", "field": "A_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "phi_0",
+                            },
+                            {
+                                "coefficient": -1.0,
+                                "operator": "first_derivative_t",
+                                "field": "A_0",
+                            },
                         ],
                     },
                 },
@@ -352,7 +372,11 @@ class TestBuildJacobianSparsity:
                     "rhs": {
                         "type": "linear_combination",
                         "terms": [
-                            {"coefficient": 1.0, "operator": "laplacian_x", "field": "A_0"},
+                            {
+                                "coefficient": 1.0,
+                                "operator": "laplacian_x",
+                                "field": "A_0",
+                            },
                         ],
                     },
                 },
