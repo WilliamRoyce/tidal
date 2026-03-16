@@ -17,7 +17,12 @@ name = "Graviton-Torsion 2+1D"
 [spacetime]
 dimension = 3
 metric = "minkowski"
-torsion = true
+
+# Torsion: extends the connection to include torsion (PGT).
+# Creates TorsionCDT[a,-b,-c] for use in the Lagrangian.
+# perturbation_name: the field name used in linearized equations and JSON output.
+[torsion]
+perturbation_name = "t"
 
 [[fields]]
 name = "h"

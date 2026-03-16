@@ -39,7 +39,9 @@ description = "Quadratic Poincaré gauge theory: Einstein-Hilbert + torsion kine
 [spacetime]
 dimension = 4
 metric = "minkowski"
-torsion = true
+
+[torsion]
+perturbation_name = "t"
 
 # Metric perturbation h_{ab} (graviton, rank-2 symmetric)
 [[fields]]

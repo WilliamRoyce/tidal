@@ -4634,7 +4634,9 @@ name = "Torsion CovD Test"
 [spacetime]
 dimension = 4
 metric = "minkowski"
-torsion = true
+
+[torsion]
+perturbation_name = "t"
 
 [[fields]]
 name = "h"
@@ -4665,7 +4667,7 @@ path = "/tmp/torsion_covd_test.json"
     def test_torsion_perturbation_dry_run(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Torsion = true + linearization auto-registers torsion perturbation."""
+        """[torsion] + linearization registers torsion perturbation with configured name."""
         config = tmp_path / "theory.toml"
         config.write_text("""
 [theory]
@@ -4674,7 +4676,9 @@ name = "PGT Perturbation Test"
 [spacetime]
 dimension = 4
 metric = "minkowski"
-torsion = true
+
+[torsion]
+perturbation_name = "t"
 
 [[fields]]
 name = "h"
@@ -4703,8 +4707,9 @@ path = "/tmp/torsion_pert_test.json"
         wls_text = capsys.readouterr().out
         # DefTensorPerturbation for TorsionCDT
         assert "DefTensorPerturbation" in wls_text
-        assert "torsionPert" in wls_text  # perturbation label (with LI)
-        assert "TorsionField" in wls_text  # physical field (no LI, for VarD)
+        assert "tPert" in wls_text  # perturbation label uses configured name
+        # Physical field for VarD uses capitalised perturbation_name
+        assert "pptT[" in wls_text  # {prefix}T[a, -b, -c]
         # TorsionCDT correctly prefixed in Lagrangian
         assert "Torsion" in wls_text
         # Torsion perturbation has antisymmetry
@@ -4713,7 +4718,7 @@ path = "/tmp/torsion_pert_test.json"
     def test_no_torsion_no_covd(
         self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """Without torsion = true, no CDT is defined."""
+        """Without [torsion] section, no CDT is defined."""
         config = tmp_path / "theory.toml"
         config.write_text("""
 [theory]

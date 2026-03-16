@@ -249,7 +249,7 @@ class _WlsContext:
     metric: str
     cd: str
     chart: str
-    torsion: bool  # True if spacetime has torsion (PGT)
+    torsion: dict[str, Any] | None  # [torsion] TOML section (None = no torsion)
     cdt: str  # torsion-full CovD name (e.g. "geCDT")
     theory_name: str
     output_path: str
@@ -1221,22 +1221,24 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # with antisymmetry in (-b, -c).  Background torsion = 0 (flat Minkowski).
     # The perturbation tensor inherits the same index structure and symmetry.
     if ctx.torsion:
-        torsion_head = f"Torsion{ctx.cdt}"
-        torsion_pert_label = f"{p}torsionPert"
-        torsion_field_head = f"{p}TorsionField"
+        torsion_xact_head = f"Torsion{ctx.cdt}"  # xAct auto-created
+        torsion_pert_name = ctx.torsion["perturbation_name"]
+        torsion_field_head = f"{p}{torsion_pert_name.capitalize()}"
+        torsion_pert_label = f"{p}{torsion_pert_name}Pert"
+        torsion_print_as = torsion_pert_name
         lines.extend(
             [
-                "(* === Torsion perturbation (auto-registered for PGT) === *)",
-                "(* Two tensors: TorsionField[a,-b,-c] for VarD/decomposition (no LI),  *)",
-                "(* and torsionPert[LI[n],a,-b,-c] for xPert (has LI order index).      *)",
-                "(* DefTensorPerturbation connects: Perturbation[TorsionCDT] → ε*field. *)",
+                "(* === Torsion perturbation (from [torsion] section) === *)",
+                f"(* Perturbation field: {torsion_pert_name}[a,-b,-c] for VarD/decomposition *)",
+                f"(* xPert label: {torsion_pert_name}Pert[LI[n],a,-b,-c]                     *)",
+                "(* Connected to TorsionCDT via DefTensorPerturbation                       *)",
                 f"If[!xTensorQ[{torsion_field_head}],",
                 f"  DefTensor[{torsion_field_head}[a, -b, -c], {ctx.manifold}, "
-                f'Antisymmetric[{{-b, -c}}], PrintAs -> "t"]',
+                f'Antisymmetric[{{-b, -c}}], PrintAs -> "{torsion_print_as}"]',
                 "];",
                 f"DefTensorPerturbation[{torsion_pert_label}[LI[order], a, -b, -c], "
-                f"{torsion_head}[a, -b, -c], {ctx.manifold}];",
-                f'Print["Torsion perturbation: {torsion_head} = 0 + {eps_sym} * {torsion_field_head}"];',
+                f"{torsion_xact_head}[a, -b, -c], {ctx.manifold}];",
+                f'Print["Torsion perturbation: {torsion_xact_head} = 0 + {eps_sym} * {torsion_pert_name}"];',
                 "",
             ]
         )
@@ -1303,17 +1305,18 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # torsionPert[LI[1], ...] → TorsionField[...]  (replace with physical field)
     # TorsionCDT[...] → 0  (background torsion = 0 for flat Minkowski)
     if ctx.torsion:
-        torsion_pert_label = f"{p}torsionPert"
-        torsion_field_head = f"{p}TorsionField"
-        torsion_head = f"Torsion{ctx.cdt}"
+        torsion_pert_name = ctx.torsion["perturbation_name"]
+        torsion_pert_label = f"{p}{torsion_pert_name}Pert"
+        torsion_field_head = f"{p}{torsion_pert_name.capitalize()}"
+        torsion_xact_head = f"Torsion{ctx.cdt}"
         lines.extend(
             [
-                "(* Drop 2nd-order torsion perturbation *)",
+                f"(* Drop 2nd-order torsion perturbation ({torsion_pert_name}) *)",
                 f"l2Raw = l2Raw /. {torsion_pert_label}[LI[2], idx__] :> 0;",
-                "(* Replace xPert notation → physical torsion field *)",
+                f"(* Replace xPert notation → physical torsion field {torsion_pert_name} *)",
                 f"l2Raw = l2Raw /. {torsion_pert_label}[LI[1], idx__] :> {torsion_field_head}[idx];",
                 "(* Background torsion = 0 (flat Minkowski, no torsion source) *)",
-                f"l2Raw = l2Raw /. {torsion_head}[__] :> 0;",
+                f"l2Raw = l2Raw /. {torsion_xact_head}[__] :> 0;",
             ]
         )
 
@@ -1535,17 +1538,16 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         # auto-registered by the torsion pipeline.  VarD w.r.t. TorsionPert
         # gives the torsion field equations from the PGT Lagrangian.
         if ctx.torsion:
-            # Use TorsionField (no LI index) for VarD and decomposition.
-            # SlotsOfTensor[TorsionField] = 3 (correct rank), while
-            # SlotsOfTensor[torsionPert] = 4 (includes LI slot — wrong for
-            # EnumerateComponentTuples and ExtractTensorComponent).
-            torsion_field_head = f"{ctx.prefix}TorsionField"
+            # Use the perturbation field (no LI index) for VarD and decomposition.
+            # SlotsOfTensor with LI = 4 (wrong), without LI = 3 (correct rank).
+            torsion_pert_name = ctx.torsion["perturbation_name"]
+            torsion_field_head = f"{ctx.prefix}{torsion_pert_name.capitalize()}"
             torsion_fexpr = f"{torsion_field_head}[a, -b, -c]"
             dyn_fields.append(
                 {
-                    "name": "torsion",
+                    "name": torsion_pert_name,
                     "field": {
-                        "name": "torsion",
+                        "name": torsion_pert_name,
                         "type": "tensor",
                         "rank": 3,
                         "symmetry": "antisymmetric_23",
@@ -3764,7 +3766,7 @@ def generate_wls(
         metric=f"{prefix}Eta",
         cd=f"{prefix}CD",
         chart=f"{prefix}Cart",
-        torsion=config.get("spacetime", {}).get("torsion", False),
+        torsion=config.get("torsion"),  # [torsion] section (None if absent)
         cdt=f"{prefix}CDT",
         theory_name=config.get("theory", {}).get("name", "Custom Theory"),
         output_path=str(resolved_output),
