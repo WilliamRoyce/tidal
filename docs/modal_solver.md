@@ -62,31 +62,42 @@ FFT[c(x) · u(x)] = ĉ ∗ û  (k-space convolution)
 
 This couples different k-modes, creating a full (N_modes × N_slots)² matrix. Built via probe vectors (unit impulse per mode): reconstruct to physical space, multiply by coefficient, FFT back. For Gaussian c(x), the kernel ĉ(q) decays exponentially → banded matrix.
 
-### 4. Eigendecomposition and Exact Evolution
+### 4. Time Evolution Algorithms
 
-The evolution matrix A is constant → exact solution via eigendecomposition:
+Two paths depending on coefficient structure:
+
+**Per-mode eigendecomposition (constant coefficients):**
+
+When all coefficients are constant, the evolution matrix is block-diagonal in mode space. Each mode's small block (≤ 12×12) is eigendecomposed independently:
 
 ```python
-eigenvalues, V = np.linalg.eig(A)
-V_inv = np.linalg.inv(V)
-y0_eigen = V_inv @ y0_k
-
-for t in t_eval:
-    y_k(t) = V @ (exp(eigenvalues * (t - t0)) * y0_eigen)
-    y(t) = IFFT(y_k(t))
+eigenvalues, V = np.linalg.eig(A_k)  # per-mode block
+y_k(t) = V @ (exp(eigenvalues * t) * V_inv @ y0_k)
 ```
 
-This is **exact** — no time-stepping error, no CFL condition, no tolerance parameter needed.
+This is **exact** — no time-stepping error, no CFL condition. O(N³_fields) per mode, O(N_modes × N³_fields) total.
 
-### 5. Tiered Matrix Algorithms
+**Krylov matrix exponential (position-dependent coefficients):**
 
-| Matrix size | Algorithm | Reference |
-|-------------|-----------|-----------|
-| Per-mode blocks ≤ 12×12 | Batch dense `np.linalg.eig` | Golub & Van Loan (1996), §4.8 |
-| Full matrix ≤ 2000×2000 | Dense eigendecomposition | `np.linalg.eig` |
-| Full matrix > 2000×2000 | Schur decomposition | Moler & Van Loan (2003), SIAM Review 45(1):3-49 |
+Position-dependent convolution produces a full (N_slots × N_modes)² matrix that is generally **non-normal**: gradient operators (ik) combined with real convolution kernels create eigenvalues with significant positive real parts despite conservative physics. Eigendecomposition overflows because individual exp(λ·t) diverge even though exp(A·t)·y₀ is bounded (pseudospectral phenomenon; Trefethen & Embree 2005, Ch. 14).
 
-Schur decomposition (T, Z = schur(A)) provides better numerical stability for large matrices: eigenvalues from diag(T), evolution via Z·diag(exp(λ·t))·Zᴴ (unitary Z gives exact inverse).
+The fix: `scipy.sparse.linalg.expm_multiply` computes exp(A·t)·y₀ directly via scaling + truncated Taylor series in matrix-vector products, which is backward-stable for non-normal matrices:
+
+```python
+from scipy.sparse.linalg import expm_multiply
+y_all = expm_multiply(A_full, y0_flat, start=0, stop=t_end, num=n_snapshots)
+```
+
+Ref: Al-Mohy & Higham (2011), "Computing the Action of the Matrix Exponential", SIAM J. Sci. Comput. 33(2):488-511.
+
+### 5. Algorithm Selection
+
+| Coefficient type | Matrix structure | Algorithm | Time (Gertsenshtein, N=512) |
+|------------------|-----------------|-----------|---------------------------|
+| Constant | Per-mode blocks (12×12) | Eigendecomposition | ~1.5s |
+| Position-dependent | Full convolution (3000×3000) | `expm_multiply` | ~21s |
+
+The routing is automatic — `_has_position_dependent_terms()` determines which path is used. The per-mode path is ~14x faster because it avoids building the full matrix.
 
 ## Auto-Selection
 
