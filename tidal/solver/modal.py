@@ -142,24 +142,6 @@ def can_use_modal(
             if term.time_dependent:
                 return False
 
-    # 6. No position-dependent gradient/derivative coupling.
-    # Gradient operators (ik multiplier) combined with position-dependent
-    # convolution kernels create non-normal evolution matrices whose
-    # eigendecomposition has large real-part eigenvalues despite the
-    # physical system being conservative.  The modal exp(λt) approach
-    # overflows for these spurious growing modes.  Identity and laplacian
-    # operators with position-dependent coefficients are fine (they
-    # produce symmetric/Hermitian convolution matrices).
-    # Ref: Trefethen & Embree (2005), Spectra and Pseudospectra, Ch. 14.
-    _GRADIENT_OPS = frozenset({
-        "gradient_x", "gradient_y", "gradient_z",
-        "first_derivative_t",
-    })
-    for eq in spec.equations:
-        for term in eq.rhs_terms:
-            if term.position_dependent and term.operator in _GRADIENT_OPS:
-                return False
-
     return True
 
 
@@ -1019,72 +1001,67 @@ def _evolve_full_matrix(
     A_full has shape (n_total, n_total) where n_total = n_slots × n_modes.
     y0_hat has shape (n_slots, n_modes).
 
-    Uses eigendecomposition of the full matrix for exact evolution.
-    For large matrices (>2000), uses Schur decomposition for stability.
-    Ref: Moler & Van Loan (2003), SIAM Review 45(1):3-49.
+    Uses ``scipy.sparse.linalg.expm_multiply`` to compute exp(A·t)·y₀ at each
+    output time without eigendecomposition.  This is backward-stable for
+    non-normal matrices (position-dependent gradient coupling creates non-normal
+    convolution matrices whose eigenvalues have large real parts, but the true
+    dynamics are bounded).  The algorithm uses scaling + truncated Taylor series
+    in matrix-vector products, avoiding individual exp(λ·t) overflow.
+
+    Ref: Al-Mohy & Higham (2011), "Computing the Action of the Matrix
+    Exponential", SIAM J. Sci. Comput. 33(2):488-511.
     """
+    from scipy.sparse.linalg import expm_multiply  # noqa: PLC0415
+
     n_slots = layout.num_slots
     n_pts = layout.num_points
     n_modes = y0_hat.shape[1]
-    n_total = A_full.shape[0]
     n_snapshots = len(t_eval)
 
-    # Flatten y0_hat to (n_total,) — interleave as [slot0_mode0, slot0_mode1, ...]
-    y0_flat = y0_hat.ravel()  # (n_slots * n_modes,) — slot-major order
-
-    # Choose algorithm based on matrix size
-    # Ref: Moler & Van Loan (2003), Table 1
-    SCHUR_THRESHOLD = 2000
-
-    if n_total <= SCHUR_THRESHOLD:
-        # Dense eigendecomposition
-        eigenvalues, V = np.linalg.eig(A_full)
-        V_inv = np.linalg.inv(V)
-        y0_eigen = V_inv @ y0_flat
-    else:
-        # Schur decomposition for numerical stability on large matrices
-        from scipy.linalg import schur  # noqa: PLC0415
-
-        T, Z = schur(A_full, output="complex")
-        eigenvalues = np.diag(T)
-        V = Z
-        V_inv = Z.conj().T  # Unitary for Schur
-        y0_eigen = V_inv @ y0_flat
-
-    # Clean up eigencoefficient roundoff: entries far below the dominant
-    # IC amplitude are numerical noise that can seed exponential growth
-    # in systems with positive-real-part eigenvalues.
-    y0_max = np.max(np.abs(y0_eigen))
-    if y0_max > 0:
-        cleanup_threshold = y0_max * 1e-14
-        y0_eigen[np.abs(y0_eigen) < cleanup_threshold] = 0.0
-
-    # Warn about potential overflow from growing eigenvalues
-    dt_total = float(t_eval[-1] - t_eval[0])
-    _warn_eigenvalue_growth(eigenvalues, dt_total, context="full-matrix")
+    # Flatten y0_hat to (n_total,) — slot-major order
+    y0_flat = y0_hat.ravel()
 
     snapshots = np.zeros((n_snapshots, n_slots * n_pts))
     times = np.zeros(n_snapshots)
 
-    t0 = t_eval[0]
-    for ti, t in enumerate(t_eval):
-        dt = t - t0  # elapsed time from IC
-        exp_lambda = np.exp(eigenvalues * dt)
-        y_evolved = V @ (exp_lambda * y0_eigen)
+    # Compute exp(A·t)·y₀ at all requested times using Krylov/Taylor method.
+    # expm_multiply handles the scaling internally — no manual dt stepping.
+    t0 = float(t_eval[0])
+    t_end = float(t_eval[-1])
 
-        # Reshape from (n_total,) = (n_slots * n_modes,) back to (n_slots, n_modes)
-        y_hat_t = y_evolved.reshape(n_slots, n_modes)
+    if n_snapshots > 1 and t_end > t0:
+        # Use expm_multiply's built-in multi-point evaluation
+        y_all = expm_multiply(
+            A_full, y0_flat, start=t0, stop=t_end, num=n_snapshots,
+        )
+        # y_all has shape (n_snapshots, n_total)
+        for ti in range(n_snapshots):
+            t = float(t_eval[ti])
+            y_hat_t = y_all[ti].reshape(n_slots, n_modes)
+            y_physical = _ifft_slots(y_hat_t, layout, grid)
+            snapshots[ti] = y_physical
+            times[ti] = t
 
-        # IFFT back to physical space
-        y_physical = _ifft_slots(y_hat_t, layout, grid)
-        snapshots[ti] = y_physical
-        times[ti] = t
+            if snapshot_callback is not None:
+                snapshot_callback(t, y_physical)
+            if progress is not None:
+                progress.update(t)
+    else:
+        # Single time point or t0 == t_end
+        for ti, t in enumerate(t_eval):
+            if t == t0:
+                y_evolved = y0_flat.copy()
+            else:
+                y_evolved = expm_multiply(A_full, y0_flat, start=t0, stop=float(t), num=2)[-1]
+            y_hat_t = y_evolved.reshape(n_slots, n_modes)
+            y_physical = _ifft_slots(y_hat_t, layout, grid)
+            snapshots[ti] = y_physical
+            times[ti] = t
 
-        if snapshot_callback is not None:
-            snapshot_callback(t, y_physical)
-
-        if progress is not None:
-            progress.update(t)
+            if snapshot_callback is not None:
+                snapshot_callback(t, y_physical)
+            if progress is not None:
+                progress.update(t)
 
     return times, snapshots
 
