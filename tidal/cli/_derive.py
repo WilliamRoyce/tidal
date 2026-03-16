@@ -1164,38 +1164,28 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         "",
     ]
 
-    # --- Torsion decomposition (PGT): CDT → CD + torsion-as-tensor ---
-    # For Poincaré gauge theories with torsion = true, the Lagrangian uses
-    # the Riemann-Cartan connection CDT.  Before xPert perturbation (which
-    # assumes Levi-Civita), decompose all CDT quantities into CD (Levi-Civita)
-    # + torsion tensor (contortion) using xAct's ChangeCurvature/ChangeTorsion.
-    # This converts RicciScalarCDT[] → RicciScalarCD[] + torsion² terms,
-    # and TorsionCDT[a,-b,-c] → Christoffel differences (contortion).
-    # The torsion tensor then becomes an independent field for perturbation.
-    # Ref: xAct ChangeCurvature documentation; Blagojevic & Hehl (2013).
-    if ctx.torsion:
-        lines.extend(
-            [
-                "(* === PGT decomposition: R̃(CDT) → R(CD) + TorsionCDT terms === *)",
-                "(* ChangeCurvature: R̃ → R^{LC} + ∇K + K²                             *)",
-                "(*   (K = Christoffel[CD,CDT] = contortion from torsion)               *)",
-                "(* ChangeTorsion: Christoffel[CD,CDT] → f(TorsionCDT)                  *)",
-                "(*   converts contortion back to the fundamental torsion tensor         *)",
-                "(* Result: L expressed entirely as R^{LC}(CD) + TorsionCDT[...] terms  *)",
-                "(* This is essential for DefTensorPerturbation on TorsionCDT to         *)",
-                "(* correctly perturb ALL torsion contributions — both from T² terms     *)",
-                "(* AND from the contortion in the R̃ decomposition.                     *)",
-                "(* Ref: xAct ChangeCurvature/ChangeTorsion; Blagojevic & Hehl (2013). *)",
-                'Print["PGT decomposition: R̃(CDT) → R(CD) + TorsionCDT terms..."];',
-                f"{p}Lagrangian = ChangeCurvature[{p}Lagrangian, {ctx.cdt}, {ctx.cd}];",
-                f"{p}Lagrangian = ChangeTorsion[{p}Lagrangian, {ctx.cdt}, {ctx.cd}];",
-                f"{p}Lagrangian = ContractMetric[{p}Lagrangian, {ctx.metric}];",
-                f"{p}Lagrangian = ToCanonical[{p}Lagrangian];",
-                f'Print["L (CD + TorsionCDT): ", Short[{p}Lagrangian, 5]];',
-                'Print["[", Round[MemoryInUse[]/1024.^2], " MB] After PGT decomposition"];',
-                "",
-            ]
-        )
+    # --- Torsion note for PGT theories ---
+    # For theories with torsion = true, the Lagrangian should be written in
+    # ALREADY-DECOMPOSED form: RicciScalarCD[] (Levi-Civita) + explicit
+    # TorsionCDT[...] terms.  This uses the standard identity:
+    #   R̃ = R^{LC} - 1/4 T_{abc}T^{abc} - 1/2 T_{abc}T^{bac}
+    #                + T^a_{ab}T^{cb}_c + total derivative
+    # (Shapiro 2002, eq. 2.17; Hehl et al. 1976).
+    #
+    # The `torsion = true` flag creates CDT (DefCovD with Torsion->True)
+    # which auto-defines TorsionCDT[a,-b,-c] for use in the T² terms.
+    # The Levi-Civita part uses RicciScalarCD[] (standard xPert-compatible).
+    #
+    # NOTE: Automatic ChangeCurvature/ChangeTorsion decomposition was
+    # investigated but has a fundamental issue: ChangeTorsion converts
+    # TorsionCDT → Christoffel[CD,CDT] (contortion), which is a DERIVED
+    # quantity that DefTensorPerturbation cannot perturb.  The inverse
+    # conversion (contortion → torsion) is not provided by xAct.
+    # Future work: implement the inverse contortion→torsion substitution
+    # to enable automatic R̃ decomposition from a single RicciScalarCDT[]
+    # in the Lagrangian.
+    #
+    # For now: the user writes the decomposed form explicitly.
 
     # --- Metric perturbation setup ---
     # xPert requires SetupMetricPerturbation to register the global perturbation
