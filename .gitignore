@@ -6,7 +6,6 @@ __pycache__/
 /outputs/
 importtime.log
 third_party/
-.claude
 .claude-memory-backup/
 phd-application-context.md
 wolfram_test_output.txt

@@ -36,6 +36,33 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - Gauge fixing via `[[gauge]]` TOML section (presets: Lorenz, de Donder, Coulomb, temporal, axial)
 - Velocity naming: v_{field_name} (e.g., v_phi_0, v_A_1) — E-L velocity form, not canonical momenta
 
+## Workflow Rules
+
+- **After completing any code change**, run relevant tests before moving on. Source→test mapping: `tidal/solver/X.py` → `tests/test_solver_X.py`, `tidal/cli/_X.py` → `tests/test_cli.py`, `tidal/measurement/` → `tests/test_measurement.py`. Unsure → full suite: `uv run pytest tests/ -x -q`
+- **After completing a feature/fix**, commit promptly with conventional format (feat:/fix:/refactor:/test:/docs:). No Co-Authored-By trailer. Separate unrelated changes into distinct commits.
+- **Fix lint/type/spell errors immediately** — `uv run ruff check --fix && uv run ruff format` after code changes. Fix pyright errors. Add domain terms to `.cspell.json`, fix genuine typos.
+- **Wolfram pipeline integrity**: ALL symbolic processing stays in Wolfram — never post-process equations in Python. Never skip/bypass the canonical pipeline; fix root causes.
+- **Only ONE wolframscript at a time** — single engine license. NEVER run `tidal derive` in parallel.
+- **Use minimal test theories** (scalar_field, coupled_scalars) before expensive derivations.
+- **Negative energies** may be physical with (-,+,+,+) metric convention — don't "fix" without understanding the physics.
+- **Before context compaction**, update all relevant docs and memory files.
+
+## Common Pitfalls
+
+- **Underscore constants**: `B0_peak` → `Pattern[B0, Blank[peak]]` in Mathematica. Use `Bpeak`.
+- **Negative CLI values**: use `=` syntax: `--bounds="-100:100"` (not `--bounds "-100:100"`)
+- **Memory size**: MEMORY.md must stay under 200 lines (excess silently truncated)
+- **Wolfram Exp overflow**: serializes `Exp[-x²]` as `1/E^(x²)` → Python overflow. Use `_invert_exp_denominator()`.
+
+## Claude Code Skills
+
+Custom commands in `.claude/skills/` (main conversation only, not available to subagents):
+- `/test [args]` — Smart-scope pytest (auto-detects relevant tests from git diff)
+- `/derive <toml>` — Safe Wolfram derivation (blocks parallel runs, validates, smoke tests)
+- `/validate` — Full pipeline validation with auto-fix (lint → types → spell → tests → simulate)
+- `/backup` — Memory backup and MEMORY.md health check
+- `/commit [message]` — Conventional commit with mandatory pre-commit testing
+
 ## Architecture Reference
 
 See `docs/MEMORY.md` for the complete architecture reference covering: solver backends, E-L velocity form, mass/coupling matrices, Christoffel computation, background fields, gauge fixing, xAct patterns, operators, examples, and known issues.
