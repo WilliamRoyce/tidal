@@ -1636,7 +1636,7 @@ def _has_time_dependent_coeffs(spec: EquationSystem) -> bool:
 
     Time-dependent coefficients mean the Hamiltonian is not conserved,
     and Yoshida's negative middle sub-step (w₂ < 0) can introduce
-    artefacts when the system is non-autonomous.
+    artifacts when the system is non-autonomous.
     """
     return any(term.time_dependent for eq in spec.equations for term in eq.rhs_terms)
 
@@ -1959,7 +1959,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 warnings.warn(
                     "Yoshida 4th-order leapfrog: time-dependent coefficients "
                     "detected. The negative middle sub-step (w₂ ≈ -1.70) "
-                    "evolves backward in time, which may introduce artefacts "
+                    "evolves backward in time, which may introduce artifacts "
                     "for non-autonomous systems.",
                     stacklevel=2,
                 )

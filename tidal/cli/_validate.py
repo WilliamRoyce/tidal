@@ -196,9 +196,9 @@ def _run_stability_checks(
 
     Ghost detection is not implemented here: determining whether a theory has
     ghost modes from ``hamiltonian_terms`` alone is unreliable because, in
-    linearised GR and other gauge theories, the naive Hamiltonian kinetic
+    linearized GR and other gauge theories, the naive Hamiltonian kinetic
     coefficients are negative even in ghost-free theories (gauge-structure
-    artefact).  Use a dedicated tool (e.g. xAct/Mathematica) to verify
+    artifact).  Use a dedicated tool (e.g. xAct/Mathematica) to verify
     ghost-freeness for a specific theory.
 
     Parameters

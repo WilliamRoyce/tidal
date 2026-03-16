@@ -649,7 +649,7 @@ def _wls_vector_background_substitution(  # noqa: PLR0914
             # Tensor rank 2+: iterate over all index tuples.
             # For curved diagonal metrics, the fully-contravariant value T^{uv}
             # needs two metric factors: T^{uv} = (T_{uv}) / (g_{uu} * g_{vv}).
-            # This generalises the vector fix above.
+            # This generalizes the vector fix above.
             rank = field.get("rank", 2)
             for flat_idx, val in enumerate(comps):
                 multi_idx: list[int] = []
@@ -1709,7 +1709,7 @@ def _tt_traceless_substitution(
         weight expressions like ``Simplify[(x[]^2*1)/(x[]^2)]`` collapse
         immediately to constants rather than carrying ``Sin[y[]]^2`` through
         the full xPert/Christoffel computation.
-        When ``None`` or empty, the flat-metric behaviour (all weights = 1) is used.
+        When ``None`` or empty, the flat-metric behavior (all weights = 1) is used.
     """
     spatial_diag_indices = [_sym_flat_index(i, i, dim) for i in range(1, dim)]
     last_diag_idx = spatial_diag_indices[-1]
