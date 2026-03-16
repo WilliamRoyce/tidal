@@ -77,9 +77,14 @@ y_k(t) = V @ (exp(eigenvalues * t) * V_inv @ y0_k)
 
 This has no time-stepping error and no CFL condition. O(N³_fields) per mode, O(N_modes × N³_fields) total.
 
-**Known precision limitation:** The per-mode 4×4 block A_k = [[0, I], [K, 0]] has Hamiltonian structure where K is the 2×2 spatial operator matrix. For coupled fields with similar frequencies (e.g., massless graviton-photon coupling where both have ω ≈ k), the 4×4 eigenvalue problem is ill-conditioned: cond(V) can reach 10^291 due to near-degenerate eigenvalue pairs. This produces energy conservation errors of ~1.5e-5 even though the eigenvalues themselves are correct to machine precision.
+**Known precision limitation:** Energy conservation for the per-mode path is ~1.5e-5, decreasing slowly with N but plateauing. Investigation confirmed:
 
-The fix (not yet implemented): eigendecompose the 2×2 K matrix instead of the 4×4 A, then use the Hamiltonian cos/sin structure: `y(t) = [[cos(Ω·t), Ω⁻¹·sin(Ω·t)], [-Ω·sin(Ω·t), cos(Ω·t)]] @ y₀` where `Ω = √(-K)`. The 2×2 eigendecomp has cond ≈ O(1), giving machine-precision conservation. Ref: Van Loan (1978), "Computing Integrals Involving the Matrix Exponential"; Higham (2008), "Functions of Matrices", Ch. 12.
+- Individual modes are machine-precision (single mode: |dE/E| = 1.9e-14)
+- The 4×4 eigendecomp conditioning (cond up to 10^291 at k=0) is NOT the cause — `scipy.linalg.expm` gives identical error
+- The error comes from accumulated roundoff across all ~N/2 active modes when fields are reconstructed via IFFT and products (like the interaction term B₀·h·∂_x(a)) are evaluated in physical space
+- Error scales as O(10⁻⁵) regardless of coupling strength B₀ or method (eigendecomp vs expm)
+
+**Possible improvement** (future work): compute the Hamiltonian directly in Fourier space using Parseval's theorem, avoiding the physical-space product evaluation. This would eliminate the mode-summation roundoff. Alternatively, use the Hamiltonian cos/sin structure for the [[0,I],[K,0]] blocks: eigendecompose the 2×2 K matrix and evolve via `cos(√(-K)·t)` / `sin(√(-K)·t)` matrix functions. Ref: Van Loan (1978); Higham (2008), Ch. 12.
 
 **Krylov matrix exponential (position-dependent coefficients):**
 
