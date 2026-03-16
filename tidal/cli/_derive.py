@@ -1215,6 +1215,31 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     )
     lines.extend(mp_lines)
 
+    # --- Torsion perturbation (automatic for PGT) ---
+    # When torsion = true, auto-register DefTensorPerturbation for TorsionCDT.
+    # TorsionCDT[a, -b, -c] is auto-created by DefCovD[CDT, Torsion->True]
+    # with antisymmetry in (-b, -c).  Background torsion = 0 (flat Minkowski).
+    # The perturbation tensor inherits the same index structure and symmetry.
+    if ctx.torsion:
+        torsion_head = f"Torsion{ctx.cdt}"
+        torsion_pert_head = f"{p}TorsionPert"
+        lines.extend(
+            [
+                "(* === Torsion perturbation (auto-registered for PGT) === *)",
+                "(* TorsionCDT[a,-b,-c] is the field strength of the translational gauge. *)",
+                "(* Background torsion = 0 (flat Minkowski).  Perturbation inherits the   *)",
+                "(* antisymmetry in (-b,-c) from the parent tensor.                        *)",
+                f"If[!xTensorQ[{torsion_pert_head}],",
+                f"  DefTensor[{torsion_pert_head}[LI[n_], a, -b, -c], {ctx.manifold}, "
+                f"Antisymmetric[{{-b, -c}}]]",
+                "];",
+                f"DefTensorPerturbation[{torsion_pert_head}[LI[order], a, -b, -c], "
+                f"{torsion_head}[a, -b, -c], {ctx.manifold}];",
+                f'Print["Torsion perturbation: {torsion_head} = 0 + {eps_sym} * torsion_pert"];',
+                "",
+            ]
+        )
+
     lines.extend(
         [
             "(* Include sqrt(-g) volume element: S = int sqrt(-g) L d^n x      *)",
