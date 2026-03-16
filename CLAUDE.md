@@ -47,6 +47,14 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - **Negative energies** may be physical with (-,+,+,+) metric convention — don't "fix" without understanding the physics.
 - **Before context compaction**, update all relevant docs and memory files.
 
+## Physics Coding Patterns
+
+- **Specify success criteria before coding**: "Modal solver must agree with CVODE to RMS < 1%" — not just "implement modal solver". Include quantitative thresholds.
+- **Wolfram derivations**: Read an existing .wls template first, generate new by modifying template, review diff against template before running wolframscript
+- **After derivation**: Verify JSON has `canonical.hamiltonian_terms` — without this, all energy measurements fail silently. Run `tidal validate <json> --stability`.
+- **Convergence testing**: After solver changes, verify error decreases at expected rate with resolution (4x for 2nd-order FD, 16x for 4th-order, machine-precision for spectral)
+- **Regression detection**: Map changed files to relevant physics tests (see `/validate-physics` skill). Run those tests, not the full suite, for fast feedback.
+
 ## Common Pitfalls
 
 - **Underscore constants**: `B0_peak` → `Pattern[B0, Blank[peak]]` in Mathematica. Use `Bpeak`.
@@ -62,6 +70,7 @@ Custom commands in `.claude/skills/` (main conversation only, not available to s
 - `/validate` — Full pipeline validation with auto-fix (lint → types → spell → tests → simulate)
 - `/backup` — Memory backup and MEMORY.md health check
 - `/commit [message]` — Conventional commit with mandatory pre-commit testing
+- `/validate-physics` — Physics regression detection (maps changed solver/measurement files to relevant tests)
 
 ## Architecture Reference
 
