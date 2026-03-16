@@ -1,0 +1,46 @@
+# Graviton-Torsion in 2+1D — Fast Test Configuration
+#
+# 2+1D has fewer torsion components (9 vs 24 in 4D) and faster
+# TraceBasisDummy (3^{2K} vs 4^{2K}), making derivation much faster.
+#
+# NOTE: Standard gravitons don't propagate in 2+1D (Weyl tensor = 0).
+# However, torsion modes DO propagate with T² kinetic terms.
+# This test verifies the torsion pipeline works correctly before
+# attempting the full 4D derivation.
+#
+# Lagrangian: (1/kappa^2) R + alpha1 T_{abc}T^{abc}
+# where R = RicciScalarCD[] (Levi-Civita) and T = TorsionCDT[a,-b,-c]
+
+[theory]
+name = "Graviton-Torsion 2+1D"
+
+[spacetime]
+dimension = 3
+metric = "minkowski"
+torsion = true
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[constants]
+names = ["kappa", "alpha1"]
+
+[lagrangian]
+expression = "((1/kappa^2) RicciScalarCD[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f])"
+
+[linearization]
+perturbation_field = "h"
+
+[reduction]
+type = "plane_wave"
+propagation_axis = "x"
+
+[parameters]
+kappa = 1.0
+alpha1 = 0.5
+
+[output]
+path = "../data/graviton_torsion_2plus1d.json"
