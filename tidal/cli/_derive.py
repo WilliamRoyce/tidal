@@ -185,14 +185,19 @@ def _substitute_field_names(
     """Replace user field names with prefixed xAct names in the Lagrangian."""
     result = expression
 
-    # Substitute built-in names (eta, CD, bg) FIRST — before field names —
+    # Substitute built-in names (eta, CD, CDT, bg) FIRST — before field names —
     # to prevent short field names (e.g., "a") from corrupting built-in
     # identifiers (e.g., "eta[" contains "a[", which would become "etgeA[").
+    # CDT must be substituted BEFORE CD to avoid CD matching inside CDT.
     result = result.replace("eta[", f"{prefix}Eta[")
     result = result.replace("bg[", f"{prefix}Bg[")
-    result = result.replace("CD[", f"{prefix}CD[")
-    result = result.replace("CD]", f"{prefix}CD]")
-    result = result.replace("CD ]", f"{prefix}CD ]")
+    # Torsion CovD (CDT) and Levi-Civita CovD (CD).
+    # Replace "CDT" in ALL positions (standalone CDT[-a], compound RicciScalarCDT[],
+    # TorsionCDT[], etc.).  Single global replace avoids double-prefixing.
+    result = result.replace("CDT", f"{prefix}CDT")
+    # Levi-Civita CD — must NOT match the "CD" inside "{prefix}CDT".
+    # Replace only bare "CD" not followed by "T" (negative lookahead).
+    result = re.sub(r"CD(?!T)", f"{prefix}CD", result)
     # Substitute chart placeholder for component-derivative notation
     # e.g., CD[{0, -chart}][ux[]] → {prefix}CD[{0, -{prefix}Cart}][...]
     result = result.replace("-chart}", f"-{prefix}Cart}}")
@@ -244,6 +249,8 @@ class _WlsContext:
     metric: str
     cd: str
     chart: str
+    torsion: bool  # True if spacetime has torsion (PGT)
+    cdt: str  # torsion-full CovD name (e.g. "geCDT")
     theory_name: str
     output_path: str
     lagrangian_expr: str
@@ -427,6 +434,27 @@ def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
         f"SetMetricDownValues[{ctx.metric}, {ctx.chart}, {ctx.prefix}MetricMatrix];",
         "",
     ]
+
+    # Define torsion-full covariant derivative for PGT theories.
+    # CDT is metric-compatible but has torsion: Gamma = Christoffel + contortion.
+    # xAct auto-creates TorsionCDT[a, -b, -c], RicciScalarCDT[], etc.
+    # The Lagrangian can then reference these operators directly.
+    # Before perturbation, ChangeCurvature/ChangeTorsion decomposes to CD form
+    # for xPert compatibility.
+    # Ref: xAct DefCovD documentation; Blagojevic & Hehl (2013).
+    if ctx.torsion:
+        lines += [
+            "(* === Torsion-full covariant derivative (Poincaré gauge theory) === *)",
+            f"If[!CovDQ[{ctx.cdt}],",
+            f"  DefCovD[{ctx.cdt}[-a], "
+            f'{{"#", "DT"}}, '
+            f"FromMetric -> {ctx.metric}, "
+            f"Torsion -> True]",
+            "];",
+            f'Print["Torsion CovD defined: ", {ctx.cdt}];',
+            "",
+        ]
+
     return lines
 
 
@@ -3627,6 +3655,8 @@ def generate_wls(
         metric=f"{prefix}Eta",
         cd=f"{prefix}CD",
         chart=f"{prefix}Cart",
+        torsion=config.get("spacetime", {}).get("torsion", False),
+        cdt=f"{prefix}CDT",
         theory_name=config.get("theory", {}).get("name", "Custom Theory"),
         output_path=str(resolved_output),
         lagrangian_expr=config.get("lagrangian", {}).get("expression", "").strip(),
