@@ -75,7 +75,11 @@ eigenvalues, V = np.linalg.eig(A_k)  # per-mode block
 y_k(t) = V @ (exp(eigenvalues * t) * V_inv @ y0_k)
 ```
 
-This is **exact** — no time-stepping error, no CFL condition. O(N³_fields) per mode, O(N_modes × N³_fields) total.
+This has no time-stepping error and no CFL condition. O(N³_fields) per mode, O(N_modes × N³_fields) total.
+
+**Known precision limitation:** The per-mode 4×4 block A_k = [[0, I], [K, 0]] has Hamiltonian structure where K is the 2×2 spatial operator matrix. For coupled fields with similar frequencies (e.g., massless graviton-photon coupling where both have ω ≈ k), the 4×4 eigenvalue problem is ill-conditioned: cond(V) can reach 10^291 due to near-degenerate eigenvalue pairs. This produces energy conservation errors of ~1.5e-5 even though the eigenvalues themselves are correct to machine precision.
+
+The fix (not yet implemented): eigendecompose the 2×2 K matrix instead of the 4×4 A, then use the Hamiltonian cos/sin structure: `y(t) = [[cos(Ω·t), Ω⁻¹·sin(Ω·t)], [-Ω·sin(Ω·t), cos(Ω·t)]] @ y₀` where `Ω = √(-K)`. The 2×2 eigendecomp has cond ≈ O(1), giving machine-precision conservation. Ref: Van Loan (1978), "Computing Integrals Involving the Matrix Exponential"; Higham (2008), "Functions of Matrices", Ch. 12.
 
 **Krylov matrix exponential (position-dependent coefficients):**
 
@@ -291,7 +295,9 @@ At each output time, constraint fields are reconstructed: c(k) = -S_cc⁻¹·S_c
 
 3. **Time-dependent coefficients**: Would require ODE integration in modal space (`scipy.integrate.solve_ivp`). Currently rejected by eligibility check (no known TIDAL examples need this).
 
-4. **Spectral operators**: Redundant when using modal solver (both operate in k-space). The `--spectral` flag is silently disabled when modal is selected.
+4. **Spectral operators and energy measurement**: The modal solver works in k-space, but the energy measurement evaluates the Hamiltonian in physical space. The `--spectral` flag is preserved (not disabled) for modal so that the energy measurement uses FFT-based gradient operators matching the modal solver's conserved Hamiltonian. Without this, FD gradients produce conservation errors that increase with N (the FD Hamiltonian differs from the Fourier Hamiltonian). For gradient×gradient terms in the Hamiltonian, the measurement uses direct gradient product ⟨∂f, ∂g⟩ rather than IBP ⟨-f, ∂²g⟩ when spectral is active, because rfft Nyquist-mode handling creates O(1/N) discrepancy between the two.
+
+5. **Per-mode eigendecomposition conditioning**: For coupled multi-field systems where fields have similar dispersion (e.g., massless graviton-photon), the 4×4 per-mode block A = [[0, I], [K, 0]] has near-degenerate eigenvalue pairs, causing cond(V) up to 10^291. This limits energy conservation to ~1.5e-5 (eigenvector reconstruction error). The solution (future work) is to eigendecompose the 2×2 K matrix and use Hamiltonian cos/sin structure, reducing conditioning to O(1).
 
 ## References
 
@@ -302,3 +308,7 @@ At each output time, constraint fields are reconstructed: c(k) = -S_cc⁻¹·S_c
 - Raffelt, G. & Stodolsky, L. (1988). "Mixing of photons with low-mass particles in magnetic fields." *Physical Review D*, 37:1237. DOI: [10.1103/PhysRevD.37.1237](https://doi.org/10.1103/PhysRevD.37.1237)
 - Dormand, J.R. & Prince, P.J. (1980). "A family of embedded Runge-Kutta formulae." *Journal of Computational and Applied Mathematics*, 6. DOI: [10.1016/0771-050X(80)90013-3](https://doi.org/10.1016/0771-050X(80)90013-3)
 - Hindmarsh, A.C. et al. (2005). "SUNDIALS: Suite of nonlinear and differential/algebraic equation solvers." *ACM TOMS*, 31(3):363-396. DOI: [10.1145/1089014.1089020](https://doi.org/10.1145/1089014.1089020)
+- Al-Mohy, A.H. & Higham, N.J. (2011). "Computing the action of the matrix exponential, with an application to exponential integrators." *SIAM J. Sci. Comput.*, 33(2):488-511. DOI: [10.1137/100788860](https://doi.org/10.1137/100788860)
+- Trefethen, L.N. & Embree, M. (2005). *Spectra and Pseudospectra: The Behavior of Nonnormal Matrices and Operators*. Princeton University Press.
+- Van Loan, C. (1978). "Computing integrals involving the matrix exponential." *IEEE Trans. Automatic Control*, 23(3):395-404.
+- Higham, N.J. (2008). *Functions of Matrices: Theory and Computation*. SIAM. Ch. 12 (matrix cosine/sine).
