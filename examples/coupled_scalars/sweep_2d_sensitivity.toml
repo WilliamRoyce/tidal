@@ -1,11 +1,8 @@
-# Coupled Scalars — 2D Latin Hypercube Sweep + Sensitivity Analysis
+# Gertsenshtein Effective — 2D Latin Hypercube Sweep + Sensitivity Analysis
 #
-# Demonstrates space-filling sampling (Latin Hypercube) over the
-# coupling strength × target mass parameter plane, followed by
-# Morris sensitivity screening and advanced visualization.
-#
-# Note: Morris screening works with any sampling strategy (grid, LHS, etc.).
-# Sobol sensitivity analysis requires Saltelli-structured sampling.
+# Space-filling sampling (Latin Hypercube) over B0 × omegaP2 parameter plane.
+# Demonstrates how conversion efficiency depends on both coupling strength
+# and plasma detuning, with Morris sensitivity screening.
 #
 # Features demonstrated:
 #   - F2b: Latin Hypercube sampling (space-filling design)
@@ -18,44 +15,40 @@
 # After running, analyze sensitivity:
 #   tidal analyze <output_path>/ --sensitivity morris --metric P_max
 #
-# Visualization:
-#   tidal plot <output_path>/ --type sweep-parallel --metric P_max
-#   tidal plot <output_path>/ --type sweep-tornado --metric P_max
-#   tidal plot <output_path>/ --type sweep-scatter --metric P_max
-#
-# Requires: pre-derived JSON spec at examples/data/coupled_scalars.json
+# Ref: Gertsenshtein (1962), Raffelt & Stodolsky (1988)
 
 spec = "../data/coupled_scalars.json"
 
 [parameters]
-mPhi2 = 1.0
+kappa = 1.0
+mg2 = 0.0
 
 [sweep]
 strategy = "latin_hypercube"
 n_samples = 30
 
-[sweep.gCpl]
+[sweep.B0]
 start = 0.01
-stop = 1.0
+stop = 0.3
 
-[sweep.mChi2]
-start = 0.5
-stop = 8.0
+[sweep.omegaP2]
+start = 0.0
+stop = 2.0
 
 [simulation]
-grid_shape = 64
-bounds = [0, 50]
+grid_shape = 256
+bounds = [0, 100]
 periodic = true
-ic = "gaussian"
-ic_component = "phi_0"
-ic_center = 15.0
-ic_width = 3.0
-t_end = 10.0
+ic = "plane-wave"
+ic_component = "h_0"
+ic_wavevector = "2.0"
+ic_amplitude = 0.1
+t_end = 50.0
 
 [measurement]
 types = ["conversion", "conservation"]
-source = "phi_0"
-target = "chi_0"
+source = "h_0"
+target = "a_0"
 
 [output]
 path = "../data/coupled_scalars_sensitivity"
