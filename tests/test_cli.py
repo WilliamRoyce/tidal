@@ -4753,3 +4753,113 @@ path = "/tmp/no_torsion_test.json"
         assert "Torsion -> True" not in wls_text
         # No TorsionPert
         assert "TorsionPert" not in wls_text
+
+    def test_reserved_field_name_rejected(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Field named 'CD' is rejected as a reserved name."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Reserved Name Test"
+[spacetime]
+dimension = 2
+metric = "minkowski"
+[[fields]]
+name = "CD"
+type = "scalar"
+[lagrangian]
+expression = "CD[]^2"
+[parameters]
+[output]
+path = "/tmp/reserved_test.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret != 0
+        err = capsys.readouterr().err
+        assert "reserved" in err.lower() or ret != 0
+
+    def test_reserved_constant_name_rejected(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """Constant named 'eta' is rejected as a reserved name."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Reserved Constant Test"
+[spacetime]
+dimension = 2
+metric = "minkowski"
+[[fields]]
+name = "phi"
+type = "scalar"
+[constants]
+names = ["eta"]
+[lagrangian]
+expression = "-eta/2 phi[]^2"
+[parameters]
+eta = 1.0
+[output]
+path = "/tmp/reserved_const_test.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret != 0
+
+    def test_torsion_missing_perturbation_name_rejected(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """[torsion] without perturbation_name raises ValueError."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Missing Pert Name"
+[spacetime]
+dimension = 2
+metric = "minkowski"
+[torsion]
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[]"
+[constants]
+names = ["kappa"]
+[parameters]
+kappa = 1.0
+[output]
+path = "/tmp/missing_pert_test.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret != 0
+
+    def test_torsion_pert_name_collision_with_field_rejected(
+        self, tmp_path: Path, capsys: pytest.CaptureFixture[str]
+    ) -> None:
+        """[torsion].perturbation_name colliding with [[fields]] name is rejected."""
+        config = tmp_path / "theory.toml"
+        config.write_text("""
+[theory]
+name = "Name Collision Test"
+[spacetime]
+dimension = 2
+metric = "minkowski"
+[torsion]
+perturbation_name = "h"
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[]"
+[constants]
+names = ["kappa"]
+[parameters]
+kappa = 1.0
+[output]
+path = "/tmp/collision_test.json"
+""")
+        ret = main(["derive", str(config), "--dry-run"])
+        assert ret != 0

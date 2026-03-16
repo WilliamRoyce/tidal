@@ -28,17 +28,28 @@ R̃ = R - 1/4 T_{abc}T^{abc} - 1/2 T_{abc}T^{bac} + T^a_{ab}T^{cb}_c + total der
 
 ### Enabling Torsion
 
+Add a `[torsion]` section to the TOML config. This is an optional, standalone section — existing theories without torsion are unaffected.
+
 ```toml
 [spacetime]
 dimension = 4
 metric = "minkowski"
-torsion = true   # Creates CDT with DefCovD[..., Torsion -> True]
+
+[torsion]
+perturbation_name = "t"     # name for the linearized torsion field in equations/JSON
+# background = "Tbar"       # future: non-zero background torsion
+# irreducible = "axial"     # future: restrict to specific torsion sector
 ```
 
-This auto-creates:
-- `TorsionCDT[a, -b, -c]`: torsion tensor (antisymmetric in -b, -c)
-- `RicciScalarCDT[]`: full Riemann-Cartan Ricci scalar
-- Other curvature tensors with torsion contributions
+The `[torsion]` section:
+1. Extends the connection: defines CDT with `DefCovD[..., Torsion -> True]`
+2. Auto-creates `TorsionCDT[a, -b, -c]` (antisymmetric in -b, -c) for use in the Lagrangian
+3. Registers a perturbation field named by `perturbation_name` (e.g., `t_0`, `t_1`, ..., `t_8` in the JSON)
+4. Handles background torsion zeroing (flat Minkowski) and xPert label management
+
+**Architecture**: The `[torsion]` section is separate from `[spacetime]` because in PGT, the metric (from tetrad) and torsion (from connection) are independent gauge fields. The `[spacetime]` section defines the metric and coordinates; `[torsion]` extends the connection.
+
+**Reserved names**: The `perturbation_name` must not collide with field names, constant names, or built-in operators (CD, CDT, eta, Ricci, Torsion, etc.). The validation system checks this automatically.
 
 ### Writing the Lagrangian
 
@@ -63,7 +74,12 @@ The three T² invariants correspond to the three irreducible pieces of torsion u
 perturbation_field = "h"   # Metric perturbation (standard xPert)
 ```
 
-Torsion perturbation is **auto-registered** when `torsion = true`. No `[[linearization.matter_perturbations]]` entry is needed — the pipeline automatically calls `DefTensorPerturbation` on `TorsionCDT` with background = 0.
+Torsion perturbation is **auto-registered** when a `[torsion]` section is present. No `[[linearization.matter_perturbations]]` entry is needed — the pipeline automatically:
+1. Defines the perturbation field (e.g., `t[a,-b,-c]`) from `perturbation_name`
+2. Calls `DefTensorPerturbation` to connect it to `TorsionCDT`
+3. Handles the xPert label/truncation (LI[2]→0, LI[1]→field)
+4. Sets background torsion to zero (flat Minkowski)
+5. Calls VarD w.r.t. the torsion perturbation field for the torsion EOM
 
 ## Torsion Irreducible Decomposition
 
@@ -92,13 +108,15 @@ The PGT Lagrangian parameters α₁, α₂, α₃ control the mass and kinetic t
 
 ### What Happens During Derivation
 
-1. `torsion = true` → `DefCovD[CDT, Torsion -> True, FromMetric -> metric]`
-2. Lagrangian parsed with `RicciScalarCD[]` + `TorsionCDT[...]` terms
-3. `SetupMetricPerturbation` for metric h
-4. Auto `DefTensorPerturbation` for `TorsionCDT` (background = 0)
-5. xPert: L^(2) = second-order perturbation in both h and TorsionCDT
-6. VarD: derive EOM for h components and TorsionCDT components
-7. Component decomposition → plane-wave reduction → constraint elimination
+1. `[torsion]` section present → `DefCovD[CDT, Torsion -> True, FromMetric -> metric]`
+2. Perturbation field defined: `DefTensor[{prefix}T[a,-b,-c], M, Antisymmetric[{-b,-c}]]`
+3. `DefTensorPerturbation` connects `{prefix}tPert[LI[order],...]` to `TorsionCDT[...]`
+4. Lagrangian parsed with `RicciScalarCD[]` + `TorsionCDT[...]` terms
+5. `SetupMetricPerturbation` for metric h
+6. xPert: L^(2) = second-order perturbation in both h and torsion
+7. Truncation: `tPert[LI[2],...] → 0`, `tPert[LI[1],...] → T[...]`, `TorsionCDT[...] → 0`
+8. VarD: derive EOM for both h and T components
+9. Component decomposition → plane-wave reduction → constraint elimination
 
 ### Why ChangeCurvature/ChangeTorsion Were NOT Used
 
