@@ -2,7 +2,10 @@
 \usepackage{tidal-tikz-styles}
 
 \begin{document}
-\begin{tikzpicture}[thick]
+\begin{tikzpicture}[
+    node distance=0.8cm and 2.8cm,
+    thick
+]
 
 % ===================================================================
 % NODES
@@ -14,14 +17,14 @@
     scheme, spec, grid, bc};
 
 % --- D0: Explicit scheme? ---
-\node[decision, below=0.8cm of start] (d0) {Explicit\\scheme?};
+\node[decision, below=of start] (d0) {Explicit\\scheme?};
 
 % --- Explicit result ---
-\node[solver, right=2.8cm of d0] (explicit)
+\node[solver, right=of d0] (explicit)
     {Use specified\\solver};
 
 % --- D1: Modal eligible? ---
-\node[decision, below=0.8cm of d0] (d1) {Modal\\eligible?};
+\node[decision, below=of d0] (d1) {Modal\\eligible?};
 
 % --- Modal sub-check panel (left of d1) ---
 \node[subcheck, left=2.6cm of d1] (subchecks) {%
@@ -38,27 +41,27 @@
     5.\ No time-dependent coefficients};
 
 % --- Modal solver ---
-\node[solver=Purple, right=2.8cm of d1] (modal)
+\node[solver=Purple, right=of d1] (modal)
     {Modal solver};
 
 % --- D2: Constraint eqs? ---
-\node[decision, below=0.8cm of d1] (d2) {Constraint\\equations?};
+\node[decision, below=of d1] (d2) {Constraint\\equations?};
 \node[annot, right=0.1cm of d2.east, anchor=north west]
     (a2) {time\_order $= 0$\\(elliptic / algebraic DAE)};
 
 % --- IDA (constraint) ---
-\node[solver=Orange, right=2.8cm of d2] (ida1) {IDA};
+\node[solver=Orange, right=of d2] (ida1) {IDA};
 
 % --- D3: First-order eqs? ---
-\node[decision, below=0.8cm of d2] (d3) {First-order\\equations?};
+\node[decision, below=of d2] (d3) {First-order\\equations?};
 \node[annot, right=0.1cm of d3.east, anchor=north west]
     (a3) {time\_order $= 1$\\(diffusion / transport) \\ (implicit BDF)};
 
 % --- IDA (first-order) ---
-\node[solver=Orange, right=2.8cm of d3] (ida2) {IDA};
+\node[solver=Orange, right=of d3] (ida2) {IDA};
 
 % --- D4: Dissipation? ---
-\node[decision, below=0.8cm of d3] (d4) {Dissipation?};
+\node[decision, below=of d3] (d4) {Dissipation?};
 \node[annot, right=0.1cm of d4.east, anchor=north west]
     (a4) {\texttt{first\_derivative\_t}\\(breaks symplecticity)};
 
@@ -66,7 +69,7 @@
 \node[solver=Orange, right=3.2cm of d4] (ida3) {IDA};
 
 % --- D5: Missing Hamiltonian? ---
-\node[decision, below=0.8cm of d4] (d5) {Missing\\Hamiltonian?};
+\node[decision, below=of d4] (d5) {Missing\\Hamiltonian?};
 \node[annot, right=0.1cm of d5.east, anchor=north west]
     (a5) {canonical $=$ None with\\second-order wave eqs};
 
@@ -75,7 +78,7 @@
     {\textit{Warning} $\to$\\CVODE fallback};
 
 % --- Default: CVODE ---
-\node[solver=Green, left=2.8cm of d5] (cvode)
+\node[solver=Green, left=of d5] (cvode)
     {CVODE};
 \node[annot, left=-0.1cm of d5.west, anchor=north east]
     (a6) {Pure wave, Hamiltonian\\(adaptive BDF)};
