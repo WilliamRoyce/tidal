@@ -1,16 +1,25 @@
-# Graviton-Torsion in 2+1D — Fast Test Configuration
+# Graviton-Torsion in 2+1D — Curvature-Squared PGT
+#
+# Poincaré gauge theory with R̃² curvature-squared term for propagating
+# torsion with graviton-torsion coupling.
 #
 # 2+1D has fewer torsion components (9 vs 24 in 4D) and faster
 # TraceBasisDummy (3^{2K} vs 4^{2K}), making derivation much faster.
 #
 # NOTE: Standard gravitons don't propagate in 2+1D (Weyl tensor = 0).
-# However, torsion modes DO propagate with T² kinetic terms.
-# This test verifies the torsion pipeline works correctly before
-# attempting the full 4D derivation.
+# However, torsion modes DO propagate with the R̃² kinetic terms.
+# The R̃² term provides:
+#   - (∇T)² kinetic terms → torsion propagates as a wave
+#   - R·∇T cross terms → graviton-torsion coupling (mixing)
 #
-# Lagrangian: (1/kappa^2) R̃ + alpha1 T_{abc}T^{abc}
+# Lagrangian: (1/kappa^2) R̃ + alpha1 T_{abc}T^{abc} + b5 R̃²
 # where R̃ = RicciScalarCDT[] (Riemann-Cartan, auto-decomposed to R + T terms)
-# and T = TorsionCDT[a,-b,-c] (explicit torsion squared mass term)
+#
+# Without b5: torsion is non-propagating (algebraic constraint, EC theory)
+# With b5 ≠ 0: torsion propagates and couples to gravity via R̃² cross terms
+#
+# Ref: Sezgin & van Nieuwenhuizen (1980, Phys.Rev.D 21:3269) — linearized PGT
+#      Shapiro (2002, hep-th/0103093) — R̃ decomposition identity
 
 [theory]
 name = "Graviton-Torsion 2+1D"
@@ -32,10 +41,10 @@ rank = 2
 symmetry = "symmetric"
 
 [constants]
-names = ["kappa", "alpha1"]
+names = ["kappa", "alpha1", "b5"]
 
 [lagrangian]
-expression = "((1/kappa^2) RicciScalarCDT[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f])"
+expression = "((1/kappa^2) RicciScalarCDT[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + b5 RicciScalarCDT[]^2)"
 
 [linearization]
 perturbation_field = "h"
@@ -47,6 +56,7 @@ propagation_axis = "x"
 [parameters]
 kappa = 1.0
 alpha1 = 0.5
+b5 = 0.1
 
 [output]
 path = "../data/graviton_torsion_2plus1d.json"

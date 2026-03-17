@@ -3101,8 +3101,10 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "lagComp = 0;",
             "Do[",
             "  Module[{termComp, tTerm = AbsoluteTime[]},",
-            f"    termComp = DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
-            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}];',
+            "(* Quiet suppresses Validate::repeated from xAct's index checker     *)",
+            "(* on R̃-decomposed torsion expressions with complex contractions.   *)",
+            f"    termComp = Quiet[DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
+            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}], Validate::repeated];',
         ]
     )
 
