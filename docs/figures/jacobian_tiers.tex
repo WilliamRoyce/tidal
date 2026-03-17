@@ -10,7 +10,7 @@
         text opacity=1, text=black
     },
     tier/.default={black!70},
-    node distance=0.8cm and 2.4cm
+    node distance=0.9cm and 2.4cm
 ]
 
 % Entry
@@ -20,21 +20,21 @@
      \scriptsize (time-independent systems only)};
 
 % D1: size check
-\node[decision, below=0.9cm of entry] (d1)
+\node[decision, below=of entry] (d1)
     {$N \leq 2000$?};
 
 % Dense tier
-\node[tier=GreenLine, right=2.4cm of d1] (dense)
+\node[tier=GreenLine, right=of d1] (dense)
     {\textbf{Dense tier}\\[1pt]
      \scriptsize 2D \texttt{jacfn} callback\\
      \scriptsize \textbf{5.3$\times$ speedup}};
 
 % D2
-\node[decision, below=0.9cm of d1] (d2)
+\node[decision, below=of d1] (d2)
     {$N \leq 200\text{K}$?};
 
 % Sparse tier
-\node[tier=PurpleLine, right=2.4cm of d2] (sparse)
+\node[tier=PurpleLine, right=of d2] (sparse)
     {\textbf{Sparse tier}\\[1pt]
      \scriptsize falls through to FD\\
      \scriptsize (sksundae bug)};
@@ -42,7 +42,7 @@
     {blocked assembly\\works but callback\\not supported};
 
 % GMRES tier
-\node[tier=BlueLine, below=0.9cm of d2] (gmres)
+\node[tier=BlueLine, below=of d2] (gmres)
     {\textbf{GMRES tier}\\[1pt]
      \scriptsize analytical JVP (\texttt{jactimes})\\
      \scriptsize matrix-free};

@@ -18,7 +18,7 @@
     role/.style={font=\scriptsize\itshape, text=#1, align=left},
     role/.default={GrayLine},
     connector/.style={semithick, black!30},
-    node distance=0.4cm
+    node distance=0.35cm
 ]
 
 % ===================================================================
@@ -41,7 +41,7 @@
     {provenance +\\default param values};
 
 % spacetime
-\node[block=PurpleLine, below=0.35cm of meta.south west, anchor=north west,
+\node[block=PurpleLine, below=of meta.south west, anchor=north west,
       text width=5.8cm] (space) {%
     \key{spacetime}\\[-1pt]
     \val{dimension: 3, signature: [-1, +1, +1]}\\[-1pt]
@@ -50,7 +50,7 @@
     {determines component\\count and metric};
 
 % fields
-\node[block=BlueLine, below=0.35cm of space.south west, anchor=north west,
+\node[block=BlueLine, below=of space.south west, anchor=north west,
       text width=5.8cm] (fields) {%
     \key{fields}\\[-1pt]
     \val{[\{name: "phi\_0", index: 0, is\_dynamical: true\}, ...]}};
@@ -58,7 +58,7 @@
     {validated: unique names,\\sequential indices};
 
 % equations (largest block)
-\node[block=OrangeLine, below=0.35cm of fields.south west, anchor=north west,
+\node[block=OrangeLine, below=of fields.south west, anchor=north west,
       text width=5.8cm] (eqs) {%
     \key{equations} \textnormal{(one per component field)}};
 
@@ -120,7 +120,7 @@
     and modal eligibility};
 
 % matrices
-\node[block=LimeLine, below=0.35cm of canonical.south west, anchor=north west,
+\node[block=LimeLine, below=of canonical.south west, anchor=north west,
       text width=5.8cm] (matrices) {%
     \key{mass\_matrix}: \val{[[m\string^2, 0], [0, m\string^2]]}\\[-1pt]
     \key{coupling\_matrix}: \val{[[0, g], [g, 0]]}};

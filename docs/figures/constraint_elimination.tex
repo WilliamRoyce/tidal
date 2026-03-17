@@ -33,7 +33,7 @@
 % ===================================================================
 % INVERT S_cc
 % ===================================================================
-\node[stage=Purple, below=0.7cm of full] (invert) {%
+\node[stage=Purple, below=of full] (invert) {%
     \parbox{3.8cm}{\centering
     \textbf{Invert} $S_{cc}$ per mode\\[2pt]
     {\scriptsize $S_{cc}^{-1}(k) = \dfrac{1}{m^2 + k^2}$}\\[2pt]
@@ -49,7 +49,7 @@
 % ===================================================================
 % SCHUR COMPLEMENT
 % ===================================================================
-\node[mat, below=0.7cm of invert] (schur) {%
+\node[mat, below=of invert] (schur) {%
     \parbox{5.4cm}{\centering
     \textbf{Schur complement}\\[4pt]
     $A_{\mathrm{red}} = A_{dd} - A_{dc}\,S_{cc}^{-1}\,S_{cd}$\\[4pt]
@@ -61,14 +61,14 @@
 % ===================================================================
 % REDUCED SYSTEM
 % ===================================================================
-\node[stage=Green, below=0.7cm of schur] (reduced) {%
+\node[stage=Green, below=of schur] (reduced) {%
     \textbf{Reduced system} (dynamical only)\\[2pt]
     \scriptsize $\dot{d} = A_{\mathrm{red}}(k)\,d$ \quad---\quad eigendecompose as usual};
 
 % ===================================================================
 % RECOVERY
 % ===================================================================
-\node[stage=Pink, below=0.7cm of reduced, text width=4.0cm] (recover) {%
+\node[stage=Pink, below=of reduced, text width=4.0cm] (recover) {%
     \textbf{Reconstruct constraints} (per snapshot)\\[2pt]
     $\hat{c}(k) = -S_{cc}^{-1}\,S_{cd}\,\hat{d}(k)$\\[2pt]
     \scriptsize IFFT $\to c(x,t)$};

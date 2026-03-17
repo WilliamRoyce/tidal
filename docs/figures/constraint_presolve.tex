@@ -16,22 +16,22 @@
 % ===================================================================
 % PHASE 1: Standard constraints
 % ===================================================================
-\node[stage=Blue, below=0.8cm of entry, text width=3.8cm] (ph1)
+\node[stage=Blue, below=of entry, text width=3.8cm] (ph1)
     {\textbf{Phase 1: Standard constraints}\\[1pt]
      \scriptsize \texttt{constraint\_solver.enabled = true}};
 
-\node[decision, below=0.8cm of ph1] (d1)
+\node[decision, below=of ph1] (d1)
     {Self-term\\present?};
 
 \node[annot, right=0.2cm of d1.east, anchor=west]
     {does equation\\reference its\\own field?};
 
 % Tier selection
-\node[decision, below=0.8cm of d1] (d2)
+\node[decision, below=of d1] (d2)
     {All periodic\\+ const coeff?};
 
 % Tier 1
-\node[stage=Green, right=2.6cm of d2] (t1)
+\node[stage=Green, right=of d2] (t1)
     {\textbf{Tier 1: FFT}\\[1pt]
      \scriptsize $O(N \log N)$};
 \node[annot, below=0.15cm of t1]
@@ -39,7 +39,7 @@
      gauge pin: $\hat{u}(0)=0$};
 
 % Tier 2
-\node[stage=Purple, below=0.8cm of d2] (t2)
+\node[stage=Purple, below=of d2] (t2)
     {\textbf{Tier 2: Sparse probe}\\[1pt]
      \scriptsize $O(N^2)$ build, $O(N)$ solve};
 \node[annot, right=0.2cm of t2.east, anchor=west]
@@ -56,7 +56,7 @@
 % ===================================================================
 % PHASE 3: Verification
 % ===================================================================
-\node[check, below=0.8cm of ph2, text width=4.6cm] (ph3)
+\node[check, below=of ph2, text width=4.6cm] (ph3)
     {\textbf{Phase 3: Verification}\\[2pt]
      evaluate all constraint residuals\\
      strict mode: \texttt{ValueError} if violated\\
@@ -86,7 +86,7 @@
 % ===================================================================
 % METHOD SELECTION BOX
 % ===================================================================
-\node[check, left=2.6cm of d2, text width=3.2cm] (selmethod) {%
+\node[check, left=of d2, text width=3.2cm] (selmethod) {%
     \texttt{\_select\_method()}\\[2pt]
     auto-chooses tier based\\
     on BCs + coefficient type\\[2pt]
