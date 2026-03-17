@@ -363,9 +363,19 @@ class CoefficientEvaluator:
         When periodic BCs are used, the conservation proof for the PDE system
         requires all coefficient functions to be continuous across the periodic
         boundary (so that integration-by-parts boundary terms vanish).
-        Non-periodic coefficients (e.g. B(x) = B0/x^3 on [5, 80]) produce
-        O(1) energy non-conservation that is independent of grid resolution
-        and solver tolerances.
+        Non-periodic coefficients (e.g. ``B(x) = B0/x^3`` on ``[5, 80]``)
+        produce O(1) energy non-conservation that is independent of grid
+        resolution and solver tolerances.
+
+        The check uses a **leak metric** that estimates the IBP energy leak::
+
+            leak = (jump / scale) * (boundary_magnitude / scale)
+
+        where *jump* is ``|coeff(L) - coeff(0)|``, *scale* is the peak
+        ``|coeff|``, and *boundary_magnitude* is the larger of ``|coeff(0)|``
+        and ``|coeff(L)|``.  This product naturally suppresses false positives
+        for localised coefficients (both factors small at boundaries) while
+        preserving detection of genuine discontinuities.
 
         Parameters
         ----------
@@ -375,7 +385,7 @@ class CoefficientEvaluator:
         Raises
         ------
         ValueError
-            If a coefficient has >50% discontinuity at a periodic boundary.
+            If the leak metric exceeds ``_LEAK_ERROR_THRESHOLD`` (0.25).
         """
         if not any(periodic):
             return  # no periodic axes → no check needed

@@ -228,6 +228,32 @@ Print["Result: ", result];  (* Should be a number, not symbolic *)
 - Constraint fields: 1 slot each (solved algebraically)
 - Example: 3 vector components (2nd order) → 6 total slots
 
+### Non-Periodic Coefficient Warning / Error
+
+**Symptoms:** Warning or `ValueError` at simulation start:
+`"Position-dependent coefficient '...' has N% jump at the periodic boundary along x (left=..., right=..., leak_metric=...)"`
+
+**Cause:** Position-dependent coefficients (e.g., background magnetic field `B(x)`) must be
+continuous across periodic boundaries. If they aren't, the integration-by-parts identity
+fails and causes O(1) energy non-conservation that does **not** improve with finer grids.
+
+The check uses a *leak metric* = `(rel_jump) * (boundary_significance)` to estimate the
+actual energy leak magnitude. Warnings fire when the metric exceeds 0.01; errors when it
+exceeds 0.25.
+
+**Solutions:**
+
+1. **Large domain**: Use a domain large enough that the non-periodic coefficient (e.g.,
+   dipolar `B ~ 1/r^3`) is negligible at both boundaries. Terminate the simulation before
+   waves reach the edges.
+2. **Localised profile**: Use a windowed/Gaussian profile that naturally goes to the same
+   value at both boundaries (e.g., `B(x) = Bpeak * exp(-(x-x0)^2/R^2)`).
+3. **Non-periodic BCs**: Switch to Dirichlet or Neumann BCs (`--bc neumann`).
+4. **False positive?**: If the warning fires but energy conservation is actually fine
+   (check with `tidal measure --what conservation`), the coefficient boundary values are
+   small enough that the leak is negligible. The leak metric should be very small in this
+   case — if it isn't, the warning is genuine.
+
 ### Constraint Solver Failures
 
 **Symptoms:** IDA fails to converge, or constraint fields have NaN values

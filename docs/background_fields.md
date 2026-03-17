@@ -132,20 +132,32 @@ is standard in the graviton-photon mixing literature:
 by TIDAL's linearized framework), the background must satisfy its own EOM. In TIDAL's
 linearized regime, this is never required.
 
-## Energy Measurement Limitation with Position-Dependent Coefficients
+## Energy Measurement with Position-Dependent Coefficients
 
-**Known issue**: Energy measurements (`tidal measure --what energy`) do not properly
-account for spatially-varying mass or potential terms. The Hamiltonian density computation
-assumes translation-invariant coefficients. This affects:
+Energy measurements (`tidal measure --what energy`) correctly handle
+spatially-varying coefficients.  The Hamiltonian context
+(`_prepare_hamiltonian_context` in `_energy.py`) pre-resolves all
+position-dependent coefficients as full spatial arrays via
+`evaluate_coefficient()`, and the per-term evaluation computes
+`coeff(x) * f_a(x) * f_b(x) * sqrt(g)` pointwise before spatial
+averaging.  This covers:
 
-- Position-dependent mass terms (e.g., `m²(z) φ²`)
-- Localized coupling regions (e.g., Gaussian B₀(z) in Gertsenshtein scattering)
-- Potential wells (`examples/scalar_potential_well/`)
+- Position-dependent mass terms (e.g., `m^2(z) * phi^2`)
+- Localised coupling regions (e.g., Gaussian B_0(z) in Gertsenshtein)
+- Potential wells
 
-**Workaround**: Use conversion probability measurement (`--what conversion`) as the
-primary validation metric — it measures amplitude ratios, which are unaffected by this
-issue. Energy conservation checks should use the `--what conservation` measurement,
-which tracks relative change rather than absolute values.
+## Periodic BC Requirement for Position-Dependent Coefficients
+
+When using periodic BCs with position-dependent coefficients, the
+coefficients must be approximately continuous at the domain boundaries.
+Non-periodic coefficients (e.g., `B(x) = Bpeak/x^3` on `[5, 80]`)
+break the integration-by-parts identity and cause O(1) energy
+non-conservation **independent of grid resolution and solver tolerance**.
+
+A runtime check (`check_periodic_coefficient_continuity`) runs
+automatically at solver initialisation.  It uses a *leak metric* =
+`(rel_jump) * (boundary_fraction)` to estimate the actual energy leak.
+See `docs/troubleshooting.md` for solutions when this warning fires.
 
 ## Known Limitations
 
