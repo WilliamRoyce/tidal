@@ -3,7 +3,7 @@
 **Created:** February 2026
 **Last Updated:** March 2026
 **Status:** Phases A, B, C, E (FFT), F, J complete; Phase D in progress; Phases G–I planned
-**Version:** 0.5.0 | **Tests:** 1,484 collected | **Examples:** 27 working (1+1D to 3+1D)
+**Version:** 0.6.0 | **Tests:** 1,484 collected | **Examples:** 27 working (1+1D to 3+1D)
 
 ## Context
 
