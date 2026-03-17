@@ -1,21 +1,5 @@
 \documentclass[border=10pt]{standalone}
-\usepackage[T1]{fontenc}
-\usepackage{tikz}
-\usepackage[svgnames]{xcolor}
-\usetikzlibrary{arrows.meta, positioning, calc}
-
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
-\colorlet{PinkFill}{Thistle}
-\colorlet{PinkLine}{Thistle!30!Plum}
-\colorlet{BlueFill}{LightSkyBlue}
-\colorlet{BlueLine}{SteelBlue}
-\colorlet{GrayFill}{LightGray!60!OldLace}
-\colorlet{GrayLine}{RosyBrown!50!Silver}
+\usepackage{tidal-tikz-styles}
 
 \begin{document}
 \begin{tikzpicture}[
@@ -38,7 +22,6 @@
         fill opacity=0.4, font=\footnotesize, align=center,
         text opacity=1
     },
-    arr/.style={-{Stealth[length=3pt, width=2.5pt]}, thin, black!50},
     node distance=0.18cm
 ]
 

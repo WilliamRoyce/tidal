@@ -1,0 +1,166 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{tidal-tikz-styles}[2026/03/17 TIDAL TikZ shared styles]
+
+% ---------------------------------------------------------------
+% Required packages
+% ---------------------------------------------------------------
+\RequirePackage[T1]{fontenc}
+\RequirePackage{tikz}
+\RequirePackage[svgnames]{xcolor}
+\RequirePackage{amsmath}
+
+\usetikzlibrary{
+    shapes.geometric,
+    arrows.meta,
+    positioning,
+    calc,
+    fit,
+    backgrounds,
+    matrix,
+    decorations.pathreplacing,
+    decorations.pathmorphing,
+    decorations.markings,
+}
+
+% ---------------------------------------------------------------
+% Colour palette (muted, print-friendly, greyscale-distinguishable)
+%
+% Convention: XxxLine = border (darker), XxxFill = fill (lighter).
+% Parametric styles take the *base name* (e.g. Purple) and append
+% Line / Fill automatically: stage=Purple → draw=PurpleLine,
+% fill=PurpleFill, fill opacity=0.4.
+% ---------------------------------------------------------------
+\colorlet{OrangeFill}{LightSalmon}
+\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
+\colorlet{GreenFill}{MediumAquamarine}
+\colorlet{GreenLine}{MediumAquamarine!30!Teal}
+\colorlet{PurpleFill}{MediumPurple}
+\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
+\colorlet{PinkFill}{Thistle}
+\colorlet{PinkLine}{Thistle!30!Plum}
+\colorlet{BlueFill}{LightSkyBlue}
+\colorlet{BlueLine}{SteelBlue}
+\colorlet{LimeFill}{YellowGreen}
+\colorlet{LimeLine}{YellowGreen!30!Olive}
+\colorlet{GrayFill}{LightGray!60!OldLace}
+\colorlet{GrayLine}{RosyBrown!50!Silver}
+
+% ---------------------------------------------------------------
+% Shared TikZ styles — single source of truth for all figures.
+%
+% Parametric colour styles take a base name: stage=Purple expands
+% to draw=PurpleLine, fill=PurpleFill, fill opacity=0.4.
+% Individual figures may add file-specific styles but should NOT
+% redefine these.  Per-node size overrides are fine.
+% ---------------------------------------------------------------
+\tikzset{
+    % --- Generic pipeline / flowchart stage ---
+    % Usage: stage=Purple, stage=Blue, stage=Gray, etc.
+    stage/.style={
+        rectangle, rounded corners=2pt, minimum width=3.0cm,
+        minimum height=0.8cm, draw=#1Line, line width=0.7pt,
+        fill=#1Fill, fill opacity=0.4, font=\footnotesize,
+        align=center, text opacity=1, text=black
+    },
+    stage/.default={Gray},
+    % --- Solver outcome box (bold label) ---
+    % Usage: solver=Purple, solver=Orange, etc.
+    solver/.style={
+        rectangle, rounded corners=2pt, minimum width=3.2cm,
+        minimum height=0.9cm, draw=#1Line,
+        fill=#1Fill, fill opacity=0.4,
+        font=\footnotesize\bfseries, align=center,
+        text opacity=1, text=black
+    },
+    solver/.default={Gray},
+    % --- Decision diamonds ---
+    decision/.style={
+        diamond, aspect=2.2, minimum width=1.6cm,
+        draw=black!70, fill=white, font=\footnotesize,
+        align=center, inner sep=2pt, text width=2.0cm
+    },
+    decide/.style={
+        diamond, aspect=2.2, draw=OrangeLine,
+        fill=OrangeFill, fill opacity=0.25, font=\scriptsize,
+        align=center, text opacity=1, inner sep=2pt, text width=1.8cm
+    },
+    % --- Dashed check / condition box ---
+    check/.style={
+        rectangle, rounded corners=1pt, draw=OrangeLine, dashed,
+        fill=OrangeFill, fill opacity=0.25, font=\scriptsize,
+        align=center, text opacity=1, inner sep=3pt
+    },
+    % --- Sub-check panel (multi-condition, left-aligned) ---
+    subcheck/.style={
+        rectangle, rounded corners=2pt, draw=PinkLine, dashed,
+        fill=PinkFill, fill opacity=0.4, font=\scriptsize, align=left,
+        text opacity=1, inner sep=6pt, text width=5.2cm
+    },
+    % --- Schur complement / constraint box ---
+    schur/.style={
+        rectangle, rounded corners=2pt, draw=PinkLine, dashed,
+        fill=PinkFill, fill opacity=0.3, font=\scriptsize,
+        align=center, text opacity=1, inner sep=5pt, text width=3.6cm
+    },
+    % --- Preset / tag box ---
+    preset/.style={
+        rectangle, rounded corners=1pt, draw=GrayLine,
+        fill=GrayFill, fill opacity=0.4, font=\scriptsize\ttfamily,
+        align=center, text opacity=1, inner sep=3pt
+    },
+    % --- Optimisation cascade phase ---
+    % Usage: phase=Pink, phase=Blue, etc.
+    phase/.style={
+        rectangle, rounded corners=2pt, minimum width=7.0cm,
+        minimum height=0.65cm, draw=#1Line, line width=0.7pt,
+        fill=#1Fill, fill opacity=0.4, font=\footnotesize, align=left,
+        text opacity=1, text=black, inner sep=5pt
+    },
+    phase/.default={Gray},
+    % --- Speedup annotation ---
+    speedup/.style={
+        font=\scriptsize\bfseries, text=#1Line, align=right
+    },
+    speedup/.default={Green},
+    % --- Cost annotation ---
+    cost/.style={
+        font=\scriptsize\bfseries, text=#1Line, align=center
+    },
+    cost/.default={Gray},
+    % --- Italic annotation (set text width per-node as needed) ---
+    annot/.style={
+        font=\scriptsize\itshape, text=GrayLine, align=center
+    },
+    % --- Data / intermediate artefact box ---
+    data/.style={
+        rectangle, minimum width=1.6cm, minimum height=0.7cm,
+        draw=GrayLine, fill=GrayFill, fill opacity=0.5,
+        font=\footnotesize, align=center, text opacity=1,
+        rounded corners=1pt
+    },
+    % --- Library / external tool label ---
+    lib/.style={
+        font=\scriptsize\itshape, text=GrayLine, align=center
+    },
+    % --- Wolfram module label ---
+    wlmod/.style={
+        font=\scriptsize\ttfamily, text=PinkLine, anchor=west
+    },
+    % --- Standard arrows ---
+    arr/.style={
+        -{Stealth[length=5pt, width=4pt]}, thick, black!70
+    },
+    dataarr/.style={
+        -{Stealth[length=4pt, width=3pt]}, thick, GrayLine
+    },
+    dotarr/.style={
+        -{Stealth[length=4pt, width=3pt]}, densely dotted, GrayLine
+    },
+    cachearr/.style={
+        -{Stealth[length=4pt, width=3pt]}, semithick, BlueLine,
+        densely dashed
+    },
+    % --- Edge labels ---
+    yeslbl/.style={font=\scriptsize\bfseries, text=black!70},
+    nolbl/.style={font=\scriptsize\bfseries, text=black!70},
+}

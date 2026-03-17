@@ -1,21 +1,5 @@
 \documentclass[border=10pt]{standalone}
-\usepackage[T1]{fontenc}
-\usepackage{tikz}
-\usepackage[svgnames]{xcolor}
-\usetikzlibrary{arrows.meta, positioning, calc, decorations.pathreplacing}
-
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
-\colorlet{PinkFill}{Thistle}
-\colorlet{PinkLine}{Thistle!30!Plum}
-\colorlet{BlueFill}{LightSkyBlue}
-\colorlet{BlueLine}{SteelBlue}
-\colorlet{GrayFill}{LightGray!60!OldLace}
-\colorlet{GrayLine}{RosyBrown!50!Silver}
+\usepackage{tidal-tikz-styles}
 
 \newcommand{\gridpt}[3]{% x, y, style
     \filldraw[#3] (#1,#2) circle (3pt);
@@ -23,9 +7,7 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    annot/.style={font=\scriptsize\itshape, text=GrayLine, align=center},
     lbl/.style={font=\scriptsize, text=black, align=center},
-    arr/.style={-{Stealth[length=4pt, width=3pt]}, semithick},
     node distance=0.5cm
 ]
 

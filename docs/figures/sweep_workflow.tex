@@ -1,59 +1,32 @@
 \documentclass[border=10pt]{standalone}
-\usepackage[T1]{fontenc}
-\usepackage{tikz}
-\usepackage[svgnames]{xcolor}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit}
-
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
-\colorlet{PinkFill}{Thistle}
-\colorlet{PinkLine}{Thistle!30!Plum}
-\colorlet{BlueFill}{LightSkyBlue}
-\colorlet{BlueLine}{SteelBlue}
-\colorlet{LimeFill}{YellowGreen}
-\colorlet{LimeLine}{YellowGreen!30!Olive}
-\colorlet{GrayFill}{LightGray!60!OldLace}
-\colorlet{GrayLine}{RosyBrown!50!Silver}
+\usepackage{tidal-tikz-styles}
 
 \begin{document}
 \begin{tikzpicture}[
-    stage/.style={
-        rectangle, rounded corners=2pt, minimum width=2.4cm,
-        minimum height=0.8cm, draw=#1, line width=0.7pt,
-        fill=#1!20, font=\footnotesize, align=center,
-        text opacity=1, text=black
-    },
-    stage/.default={black!70},
-    annot/.style={font=\scriptsize\itshape, text=GrayLine, align=center},
-    arr/.style={-{Stealth[length=5pt, width=4pt]}, thick, black!70},
     node distance=0.6cm and 1.2cm
 ]
 
 % Row 1: Config
-\node[stage=GrayLine, fill=GrayFill, fill opacity=0.4] (config)
+\node[stage=Gray] (config)
     {\textbf{Sweep config}\\[1pt]
      \scriptsize \texttt{--sweep "B0=0.01:0.25:40"}};
 
 % Row 2: Grid generation
-\node[stage=PinkLine, below=0.7cm of config] (grid)
+\node[stage=Pink, below=0.7cm of config] (grid)
     {\textbf{Parameter grid}\\[1pt]
      \scriptsize cartesian / LHS / adaptive};
 \draw[arr] (config) -- (grid);
 
 % Row 3: Dispatch
-\node[stage=PurpleLine, below=0.7cm of grid, minimum width=3.0cm] (dispatch)
+\node[stage=Purple, below=0.7cm of grid, minimum width=3.0cm] (dispatch)
     {\textbf{Dispatch workers}\\[1pt]
      \scriptsize sequential or \texttt{--parallel N}};
 \draw[arr] (grid) -- (dispatch);
 
 % Row 4: Per-point pipeline (boxed)
-\node[stage=BlueLine, below left=0.9cm and 0.3cm of dispatch,
+\node[stage=Blue, below left=0.9cm and 0.3cm of dispatch,
       minimum width=2.0cm] (sim) {\texttt{simulate}};
-\node[stage=GreenLine, right=0.8cm of sim,
+\node[stage=Green, right=0.8cm of sim,
       minimum width=2.0cm] (meas) {\texttt{measure}};
 \draw[arr] (sim) -- (meas);
 
@@ -65,7 +38,7 @@
 \draw[arr] (dispatch) -- (perpoint);
 
 % Row 5: Status tracking
-\node[stage=OrangeLine, right=2.0cm of dispatch, minimum width=2.2cm] (status)
+\node[stage=Orange, right=2.0cm of dispatch, minimum width=2.2cm] (status)
     {\textbf{Status tracking}\\[1pt]
      \scriptsize pending $\to$ running\\
      \scriptsize $\to$ complete / error};
@@ -75,18 +48,18 @@
 \node[annot, below=0.15cm of status] {\texttt{--resume}\\skips completed};
 
 % Row 6: Aggregate
-\node[stage=LimeLine, below=0.9cm of perpoint] (agg)
+\node[stage=Lime, below=0.9cm of perpoint] (agg)
     {\textbf{Aggregate}\\[1pt]
      \scriptsize \texttt{SweepResults}};
 \draw[arr] (perpoint) -- (agg);
 
 % Row 7: Outputs
-\node[stage=GrayLine, fill=GrayFill, fill opacity=0.4,
+\node[stage=Gray,
       below left=0.8cm and 1.0cm of agg] (csv)
     {\texttt{results.csv}};
-\node[stage=LimeLine, below=0.8cm of agg] (plot)
+\node[stage=Lime, below=0.8cm of agg] (plot)
     {\textbf{\texttt{tidal plot}}};
-\node[stage=LimeLine, below right=0.8cm and 1.0cm of agg] (analyze)
+\node[stage=Lime, below right=0.8cm and 1.0cm of agg] (analyze)
     {\textbf{\texttt{tidal analyze}}\\[1pt]
      \scriptsize Sobol / Morris};
 

@@ -1,26 +1,5 @@
 \documentclass[border=10pt]{standalone}
-\usepackage[T1]{fontenc}
-\usepackage{amsmath}
-\usepackage{tikz}
-\usepackage[svgnames]{xcolor}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit,
-                 decorations.pathreplacing}
-
-% ---------------------------------------------------------------
-% Colour palette (matches solver_flowchart.tex)
-% ---------------------------------------------------------------
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
-\colorlet{PinkFill}{Thistle}
-\colorlet{PinkLine}{Thistle!30!Plum}
-\colorlet{BlueFill}{LightSkyBlue}
-\colorlet{BlueLine}{SteelBlue}
-\colorlet{GrayFill}{LightGray!60!OldLace}
-\colorlet{GrayLine}{RosyBrown!50!Silver}
+\usepackage{tidal-tikz-styles}
 
 \begin{document}
 \begin{tikzpicture}[
@@ -29,12 +8,10 @@
         draw=black!60, line width=0.6pt, font=\footnotesize,
         align=center, text opacity=1, text=black
     },
-    fieldslot/.style={slot, fill=BlueFill, fill opacity=0.4},
-    velslot/.style={slot, fill=PurpleFill, fill opacity=0.3},
-    conslot/.style={slot, fill=OrangeFill, fill opacity=0.4, draw=OrangeLine, dashed},
+    fieldslot/.style={slot},
+    velslot/.style={slot},
+    conslot/.style={slot, draw=OrangeLine, dashed},
     lbl/.style={font=\footnotesize\bfseries, text=black},
-    annot/.style={font=\scriptsize\itshape, text=GrayLine, align=center},
-    arr/.style={-{Stealth[length=4pt, width=3pt]}, semithick, black!70},
     node distance=0cm
 ]
 

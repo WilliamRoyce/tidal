@@ -1,59 +1,8 @@
 \documentclass[border=10pt]{standalone}
-\usepackage[T1]{fontenc}
-\usepackage{tikz}
-\usepackage[svgnames]{xcolor}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit}
-
-% ---------------------------------------------------------------
-% Colour palette (muted, print-friendly, greyscale-distinguishable)
-% ---------------------------------------------------------------
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
-\colorlet{PinkFill}{Thistle}
-\colorlet{PinkLine}{Thistle!30!Plum}
-\colorlet{BlueFill}{LightSkyBlue}
-\colorlet{BlueLine}{SteelBlue}
-\colorlet{LimeFill}{YellowGreen}
-\colorlet{LimeLine}{YellowGreen!30!Olive}
-\colorlet{GrayFill}{LightGray!60!OldLace}
-\colorlet{GrayLine}{RosyBrown!50!Silver}
+\usepackage{tidal-tikz-styles}
 
 \begin{document}
 \begin{tikzpicture}[
-    % --- Node styles ---
-    decision/.style={
-        diamond, aspect=2.4, minimum width=1.8cm,
-        draw=black!70, fill=white, font=\footnotesize,
-        align=center, inner sep=2pt, text width=1.8cm
-    },
-    solver/.style={
-        rectangle, rounded corners=2pt, minimum width=3.2cm,
-        minimum height=0.9cm, draw=black!70,
-        font=\footnotesize\bfseries, align=center,
-        text opacity=1.0, text=black, draw opacity=1
-    },
-    subcheck/.style={
-        rectangle, rounded corners=2pt, draw=PinkLine, dashed,
-        fill=PinkFill, fill opacity=0.4, font=\scriptsize, align=left, text opacity=1,
-        inner sep=6pt, text width=5.2cm
-    },
-    annot/.style={
-        font=\scriptsize\itshape, text=GrayLine,
-        align=center, text width=2.4cm
-    },
-    % --- Arrow styles ---
-    arr/.style={
-        -{Stealth[length=5pt, width=4pt]}, thick, black!70
-    },
-    dotarr/.style={
-        -{Stealth[length=4pt, width=3pt]}, densely dotted, GrayLine
-    },
-    yeslbl/.style={font=\scriptsize\bfseries, text=black!70},
-    nolbl/.style={font=\scriptsize\bfseries, text=black!70},
     node distance=0.8cm and 2.8cm,
     thick
 ]
@@ -63,7 +12,7 @@
 % ===================================================================
 
 % --- Start ---
-\node[solver, fill=GrayFill, fill opacity=0.4] (start) {%
+\node[solver] (start) {%
     \texttt{\_resolve\_scheme()}\\[1pt]
     scheme, spec, grid, bc};
 
@@ -71,7 +20,7 @@
 \node[decision, below=0.8cm of start] (d0) {Explicit\\scheme?};
 
 % --- Explicit result ---
-\node[solver, right=2.8cm of d0, fill=GrayFill, fill opacity=0.4] (explicit)
+\node[solver, right=2.8cm of d0] (explicit)
     {Use specified\\solver};
 
 % --- D1: Modal eligible? ---
@@ -92,7 +41,7 @@
     5.\ No time-dependent coefficients};
 
 % --- Modal solver ---
-\node[solver, right=2.8cm of d1, fill=PurpleFill, fill opacity=0.4, draw=PurpleLine] (modal)
+\node[solver, right=2.8cm of d1, draw=PurpleLine] (modal)
     {Modal solver};
 
 % --- D2: Constraint eqs? ---
@@ -101,7 +50,7 @@
     (a2) {time\_order $= 0$\\(elliptic / algebraic DAE)};
 
 % --- IDA (constraint) ---
-\node[solver, right=2.8cm of d2, draw=OrangeLine, fill=OrangeFill, fill opacity=0.4] (ida1) {IDA};
+\node[solver, right=2.8cm of d2, draw=OrangeLine] (ida1) {IDA};
 
 % --- D3: First-order eqs? ---
 \node[decision, below=0.8cm of d2] (d3) {First-order\\equations?};
@@ -109,7 +58,7 @@
     (a3) {time\_order $= 1$\\(diffusion / transport) \\ (implicit BDF)};
 
 % --- IDA (first-order) ---
-\node[solver, right=2.8cm of d3, draw=OrangeLine, fill=OrangeFill, fill opacity=0.4] (ida2) {IDA};
+\node[solver, right=2.8cm of d3, draw=OrangeLine] (ida2) {IDA};
 
 % --- D4: Dissipation? ---
 \node[decision, below=0.8cm of d3] (d4) {Dissipation?};
@@ -117,7 +66,7 @@
     (a4) {\texttt{first\_derivative\_t}\\(breaks symplecticity)};
 
 % --- IDA (dissipation) ---
-\node[solver, right=3.2cm of d4, draw=OrangeLine, fill=OrangeFill, fill opacity=0.4] (ida3) {IDA};
+\node[solver, right=3.2cm of d4, draw=OrangeLine] (ida3) {IDA};
 
 % --- D5: Missing Hamiltonian? ---
 \node[decision, below=0.8cm of d4] (d5) {Missing\\Hamiltonian?};
@@ -125,11 +74,11 @@
     (a5) {canonical $=$ None with\\second-order wave eqs};
 
 % --- Warning + fallthrough ---
-\node[solver, right=2.86cm of d5, fill=GreenFill, fill opacity=0.4, draw=GreenLine] (warn)
+\node[solver, right=2.86cm of d5, draw=GreenLine] (warn)
     {\textit{Warning} $\to$\\CVODE fallback};
 
 % --- Default: CVODE ---
-\node[solver, left=2.8cm of d5, fill=GreenFill, fill opacity=0.4, draw=GreenLine] (cvode)
+\node[solver, left=2.8cm of d5, draw=GreenLine] (cvode)
     {CVODE};
 \node[annot, left=-0.1cm of d5.west, anchor=north east]
     (a6) {Pure wave, Hamiltonian\\(adaptive BDF)};

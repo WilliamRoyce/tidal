@@ -1,23 +1,5 @@
 \documentclass[border=10pt]{standalone}
-\usepackage[T1]{fontenc}
-\usepackage{amsmath}
-\usepackage{tikz}
-\usepackage[svgnames]{xcolor}
-\usetikzlibrary{arrows.meta, positioning, calc, decorations.pathmorphing,
-                 decorations.markings}
-
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
-\colorlet{PinkFill}{Thistle}
-\colorlet{PinkLine}{Thistle!30!Plum}
-\colorlet{BlueFill}{LightSkyBlue}
-\colorlet{BlueLine}{SteelBlue}
-\colorlet{GrayFill}{LightGray!60!OldLace}
-\colorlet{GrayLine}{RosyBrown!50!Silver}
+\usepackage{tidal-tikz-styles}
 
 \begin{document}
 \begin{tikzpicture}[
@@ -34,9 +16,7 @@
         fill=OrangeFill, fill opacity=0.3, font=\footnotesize,
         align=center, text opacity=1
     },
-    annot/.style={font=\scriptsize\itshape, text=GrayLine, align=center},
     formula/.style={font=\footnotesize, align=center},
-    arr/.style={-{Stealth[length=5pt, width=4pt]}, thick},
     wavy/.style={
         decorate, decoration={snake, amplitude=1.5pt, segment length=6pt},
         thick

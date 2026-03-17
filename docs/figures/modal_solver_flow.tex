@@ -1,64 +1,8 @@
 \documentclass[border=10pt]{standalone}
-\usepackage[T1]{fontenc}
-\usepackage{tikz}
-\usepackage[svgnames]{xcolor}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit,
-                backgrounds, decorations.pathreplacing}
-
-% ---------------------------------------------------------------
-% Colour palette (matches solver_flowchart.tex)
-% ---------------------------------------------------------------
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
-\colorlet{PinkFill}{Thistle}
-\colorlet{PinkLine}{Thistle!30!Plum}
-\colorlet{BlueFill}{LightSkyBlue}
-\colorlet{BlueLine}{SteelBlue}
-\colorlet{LimeFill}{YellowGreen}
-\colorlet{LimeLine}{YellowGreen!30!Olive}
-\colorlet{GrayFill}{LightGray!60!OldLace}
-\colorlet{GrayLine}{RosyBrown!50!Silver}
+\usepackage{tidal-tikz-styles}
 
 \begin{document}
 \begin{tikzpicture}[
-    % --- Node styles ---
-    stage/.style={
-        rectangle, rounded corners=2pt, minimum width=2.6cm,
-        minimum height=0.9cm, draw=#1, line width=0.7pt,
-        font=\footnotesize, align=center, text opacity=1, text=black
-    },
-    stage/.default={black!70},
-    cost/.style={
-        font=\scriptsize\bfseries, text=#1, align=center
-    },
-    cost/.default={GrayLine},
-    check/.style={
-        rectangle, rounded corners=1pt, draw=OrangeLine, dashed,
-        fill=OrangeFill, fill opacity=0.25, font=\scriptsize,
-        align=center, text opacity=1, inner sep=3pt
-    },
-    decide/.style={
-        diamond, aspect=2.2, draw=OrangeLine, fill=OrangeFill,
-        fill opacity=0.25, font=\scriptsize, align=center,
-        text opacity=1, inner sep=2pt, text width=1.8cm
-    },
-    schur/.style={
-        rectangle, rounded corners=2pt, draw=PinkLine, dashed,
-        fill=PinkFill, fill opacity=0.3, font=\scriptsize,
-        align=center, text opacity=1, inner sep=5pt, text width=3.6cm
-    },
-    annot/.style={
-        font=\scriptsize\itshape, text=GrayLine, align=center
-    },
-    arr/.style={
-        -{Stealth[length=5pt, width=4pt]}, thick, black!70
-    },
-    yeslbl/.style={font=\scriptsize\bfseries, text=black!70},
-    nolbl/.style={font=\scriptsize\bfseries, text=black!70},
     node distance=0.7cm and 1.0cm
 ]
 
@@ -75,14 +19,14 @@
 % ===================================================================
 % PHYSICAL SPACE INPUT
 % ===================================================================
-\node[stage=BlueLine, fill=BlueFill, fill opacity=0.3,
+\node[stage=Blue,
       below left=1.2cm and 0.5cm of gate] (input)
     {$\mathbf{y}(x, t_0)$\\[-1pt]\scriptsize physical space};
 
 % ===================================================================
 % FFT
 % ===================================================================
-\node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
+\node[stage=Purple,
       right=1.0cm of input] (fft)
     {\textbf{FFT}\\[-1pt]\scriptsize \texttt{rfftn} per slot};
 
@@ -95,41 +39,41 @@
 % ===================================================================
 % PATH A: Per-mode eigendecomposition (upper branch, purple)
 % ===================================================================
-\node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
+\node[stage=Purple,
       above right=0.9cm and 0.8cm of branch] (matrix_pm)
     {Build $A(k)$\\[-1pt]\scriptsize per-mode ($\leq\!12{\times}12$)};
 
-\node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
+\node[stage=Purple,
       right=0.8cm of matrix_pm] (eigen)
     {Eigendecompose\\[-1pt]\scriptsize $A = V \Lambda V^{-1}$};
 
-\node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
+\node[stage=Purple,
       right=0.8cm of eigen] (evolve_eig)
     {Evolve\\[-1pt]\scriptsize $e^{\Lambda \Delta t}$};
 
 % ===================================================================
 % PATH B: expm_multiply (lower branch, lime)
 % ===================================================================
-\node[stage=LimeLine, fill=LimeFill, fill opacity=0.3,
+\node[stage=Lime,
       below right=0.9cm and 0.8cm of branch] (matrix_full)
     {Build full matrix\\[-1pt]\scriptsize $(N_k {\times} N_s)^2$ convolution};
 
-\node[stage=LimeLine, fill=LimeFill, fill opacity=0.3,
+\node[stage=Lime,
       right=0.8cm of matrix_full] (sparsify)
     {Sparsify\\[-1pt]\scriptsize threshold $+$ CSC if $<\!30\%$};
 
-\node[stage=LimeLine, fill=LimeFill, fill opacity=0.3,
+\node[stage=Lime,
       right=0.8cm of sparsify] (expm)
     {\texttt{expm\_multiply}\\[-1pt]\scriptsize $\exp(A \cdot t) \cdot y_0$};
 
 % ===================================================================
 % CONVERGENCE: IFFT + output
 % ===================================================================
-\node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
+\node[stage=Purple,
       right=0.8cm of evolve_eig, yshift=-0.9cm] (ifft)
     {\textbf{IFFT}\\[-1pt]\scriptsize \texttt{irfftn} per slot};
 
-\node[stage=BlueLine, fill=BlueFill, fill opacity=0.3,
+\node[stage=Blue,
       right=1.0cm of ifft] (output)
     {$\mathbf{y}(x, t)$\\[-1pt]\scriptsize physical space};
 
@@ -162,19 +106,19 @@
 % ===================================================================
 
 % Path A costs (above upper branch)
-\node[cost=PurpleLine, above=0.15cm of eigen]
+\node[cost=Purple, above=0.15cm of eigen]
     {$O(N_f^3)$/mode};
-\node[cost=PurpleLine, above=0.15cm of evolve_eig]
+\node[cost=Purple, above=0.15cm of evolve_eig]
     {$O(N_f^2)$/snap};
 
 % Path B costs (below lower branch)
-\node[cost=LimeLine, below=0.15cm of sparsify]
+\node[cost=Lime, below=0.15cm of sparsify]
     {23--27$\times$ speedup\\[-1pt]\scriptsize for localized $B_0$};
-\node[cost=LimeLine, below=0.15cm of expm]
+\node[cost=Lime, below=0.15cm of expm]
     {$O(\mathrm{nnz} \!\cdot\! s)$\\[-1pt]\scriptsize sparse matvec};
 
 % Precision (output)
-\node[cost=BlueLine, above=0.15cm of output]
+\node[cost=Blue, above=0.15cm of output]
     {$\sim\!10^{-16}$};
 
 % ===================================================================

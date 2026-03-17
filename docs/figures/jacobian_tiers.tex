@@ -1,28 +1,8 @@
 \documentclass[border=10pt]{standalone}
-\usepackage[T1]{fontenc}
-\usepackage{amsmath}
-\usepackage{tikz}
-\usepackage[svgnames]{xcolor}
-\usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc}
-
-\colorlet{OrangeFill}{LightSalmon}
-\colorlet{OrangeLine}{DarkSalmon!30!Chocolate}
-\colorlet{GreenFill}{MediumAquamarine}
-\colorlet{GreenLine}{MediumAquamarine!30!Teal}
-\colorlet{PurpleFill}{MediumPurple}
-\colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
-\colorlet{BlueFill}{LightSkyBlue}
-\colorlet{BlueLine}{SteelBlue}
-\colorlet{GrayFill}{LightGray!60!OldLace}
-\colorlet{GrayLine}{RosyBrown!50!Silver}
+\usepackage{tidal-tikz-styles}
 
 \begin{document}
 \begin{tikzpicture}[
-    decision/.style={
-        diamond, aspect=2.2, minimum width=1.6cm,
-        draw=black!70, fill=white, font=\footnotesize,
-        align=center, inner sep=2pt, text width=2.0cm
-    },
     tier/.style={
         rectangle, rounded corners=2pt, minimum width=3.6cm,
         minimum height=0.9cm, draw=#1, line width=0.7pt,
@@ -30,16 +10,11 @@
         text opacity=1, text=black
     },
     tier/.default={black!70},
-    annot/.style={font=\scriptsize\itshape, text=GrayLine, align=center,
-                  text width=3.0cm},
-    arr/.style={-{Stealth[length=5pt, width=4pt]}, thick, black!70},
-    yeslbl/.style={font=\scriptsize\bfseries, text=black!70},
-    nolbl/.style={font=\scriptsize\bfseries, text=black!70},
     node distance=0.8cm and 2.4cm
 ]
 
 % Entry
-\node[tier=GrayLine, fill=GrayFill, fill opacity=0.4] (entry)
+\node[tier=GrayLine] (entry)
     {\textbf{Analytical Jacobian}\\[1pt]
      \scriptsize precomputed $dF/dy + dF/dy'$\\
      \scriptsize (time-independent systems only)};
