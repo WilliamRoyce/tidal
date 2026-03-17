@@ -11,9 +11,12 @@ Applicable to any linear PDE system with:
 - Time-independent coefficients (position-dependent OK via convolution)
 - Operators with known exact Fourier multipliers
 
-For second-order wave equations the Hamiltonian structure A = [[0, I], [L, 0]]
-is exploited: only L is eigendecomposed (halves the eigenproblem), and the
-solution uses cos/sin matrix functions.
+Two algorithm paths are used depending on coefficient structure:
+- Constant coefficients: per-mode eigendecomposition with block-aware independent
+  blocks (machine-precision, ~14x faster).
+- Position-dependent coefficients: Krylov matrix exponential (expm_multiply) which
+  is backward-stable for non-normal convolution matrices where eigendecomposition
+  gives incorrect results due to pseudospectral overflow.
 
 References
 ----------
@@ -640,8 +643,10 @@ def _build_convolution_matrix(
     different k-modes, producing a full (n_total × n_total) matrix where
     n_total = n_slots × n_modes.
 
-    For Gaussian c(x), the convolution kernel ĉ(q) decays exponentially,
-    making the matrix effectively banded.
+    For localized c(x) (e.g. Gaussian B₀), the convolution kernel ĉ(q)
+    decays exponentially, making the matrix effectively banded.  The
+    downstream ``_evolve_full_matrix`` exploits this by thresholding small
+    entries and converting to sparse CSC format for faster expm_multiply.
 
     Reference: Burns et al. (2020), Phys. Rev. Research 2:023068.
     """
@@ -1030,9 +1035,23 @@ def _evolve_full_matrix(
     dynamics are bounded).  The algorithm uses scaling + truncated Taylor series
     in matrix-vector products, avoiding individual exp(λ·t) overflow.
 
+    **Why not eigendecomposition?**  The original full-matrix eigendecomposition
+    gave incorrect physics for localized Gertsenshtein (P=0.477 vs correct
+    P=0.3437) because non-normal convolution matrices have eigenvalues with
+    significant positive real parts despite conservative physics — individual
+    exp(λ·t) overflow while exp(A·t)·y₀ is bounded (pseudospectral phenomenon;
+    Trefethen & Embree 2005, Ch. 14).
+
+    **Sparse optimization:** For localized coefficients (e.g. Gaussian B₀), the
+    convolution kernel ĉ(q) decays exponentially, making the matrix effectively
+    banded.  Entries below a relative threshold (1e-14 × max|A|) are zeroed, and
+    if density < 30% the matrix is converted to sparse CSC format.  This
+    accelerates expm_multiply's internal matrix-vector products.
+
     Ref: Al-Mohy & Higham (2011), "Computing the Action of the Matrix
     Exponential", SIAM J. Sci. Comput. 33(2):488-511.
     """
+    import scipy.sparse  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
     from scipy.sparse.linalg import (  # noqa: PLC0415  # pyright: ignore[reportMissingTypeStubs]
         expm_multiply,  # pyright: ignore[reportUnknownVariableType]
     )
@@ -1044,6 +1063,28 @@ def _evolve_full_matrix(
 
     # Flatten y0_hat to (n_total,) — slot-major order
     y0_flat = y0_hat.ravel()
+
+    # --- Sparse matrix optimization ---
+    # Position-dependent convolution matrices are effectively banded: for
+    # Gaussian B₀(x) the kernel ĉ(q) decays exponentially, so most off-
+    # diagonal entries are negligibly small.  Thresholding and converting to
+    # sparse CSC format accelerates expm_multiply's internal matrix-vector
+    # products (the dominant cost) without affecting accuracy.
+    abs_max = float(np.max(np.abs(A_full)))
+    if abs_max > 0:
+        threshold = abs_max * 1e-14
+        A_work = A_full.copy()
+        A_work[np.abs(A_work) < threshold] = 0.0
+        density = np.count_nonzero(A_work) / A_work.size
+        if density < 0.3:
+            A_op: NDArray[np.complex128] | scipy.sparse.csc_array = (
+                scipy.sparse.csc_array(A_work)
+            )
+        else:
+            A_op = A_work
+    else:
+        A_op = A_full
+        density = 1.0
 
     snapshots = np.zeros((n_snapshots, n_slots * n_pts))
     times = np.zeros(n_snapshots)
@@ -1057,7 +1098,7 @@ def _evolve_full_matrix(
         # Use expm_multiply's built-in multi-point evaluation
         y_all: NDArray[np.complex128] = np.asarray(
             expm_multiply(
-                A_full,
+                A_op,
                 y0_flat,
                 start=t0,
                 stop=t_end,
@@ -1084,7 +1125,7 @@ def _evolve_full_matrix(
                 y_evolved = y0_flat.copy()
             else:
                 y_evolved = np.asarray(
-                    expm_multiply(A_full, y0_flat, start=t0, stop=float(t), num=2)[-1],
+                    expm_multiply(A_op, y0_flat, start=t0, stop=float(t), num=2)[-1],
                     dtype=np.complex128,
                 )
             y_hat_t = y_evolved.reshape(n_slots, n_modes)

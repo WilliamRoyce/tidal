@@ -116,14 +116,57 @@ y_all = expm_multiply(A_full, y0_flat, start=0, stop=t_end, num=n_snapshots)
 
 Ref: Al-Mohy & Higham (2011), "Computing the Action of the Matrix Exponential", SIAM J. Sci. Comput. 33(2):488-511.
 
-### 5. Algorithm Selection
+### 5. Algorithm Selection (Dual-Path Design)
 
-| Coefficient type | Matrix structure | Algorithm | Time (Gertsenshtein, N=512) |
-|------------------|-----------------|-----------|---------------------------|
-| Constant | Per-mode blocks (12×12) | Eigendecomposition | ~1.5s |
-| Position-dependent | Full convolution (3000×3000) | `expm_multiply` | ~21s |
+The modal solver maintains two distinct time-evolution algorithms because they handle fundamentally different matrix structures. The routing is automatic — `_has_position_dependent_terms()` determines which path is used at runtime.
 
-The routing is automatic — `_has_position_dependent_terms()` determines which path is used. The per-mode path is ~14x faster because it avoids building the full matrix.
+#### Why two methods?
+
+**Constant coefficients** (uniform B₀, mass terms, coupling constants): each Fourier mode decouples, producing small per-mode blocks (e.g. 12×12 for 6-field Gertsenshtein). Eigendecomposition of these tiny matrices is exact, fast, and well-conditioned.
+
+**Position-dependent coefficients** (localized B₀(x), spatially-varying backgrounds): the product c(x)·u(x) becomes a convolution ĉ∗û in k-space, coupling all modes into a single large matrix (e.g. 3000×3000 for N=512, 6 fields). This matrix is **non-normal** — gradient operators (ik) combined with real convolution kernels create eigenvalues with significant positive real parts despite conservative physics. Individual exp(λ·t) diverge even though exp(A·t)·y₀ is bounded (pseudospectral phenomenon; Trefethen & Embree 2005, Ch. 14).
+
+**Concrete failure case:** For localized Gertsenshtein, eigendecomposition gave P=0.477 (wrong) vs the correct P=0.3437 from the Boccaletti formula. The eigendecomposition was also slower (44s) than `expm_multiply` (21s) for this case.
+
+#### Algorithm routing
+
+| Case | Coefficient type | Matrix structure | Algorithm | Time (Gertsenshtein, N=512) |
+|------|------------------|-----------------|-----------|---------------------------|
+| Constant | Uniform | Per-mode blocks (12×12) | Eigendecomposition | ~0.03s |
+| Position-dependent | Spatially varying (e.g. localized B₀) | Sparse convolution (3084×3084) | `expm_multiply` (sparse CSC) | ~2.3s |
+| Constraints + constant | Uniform with algebraic constraints | Reduced per-mode blocks | Schur complement + eigendecomposition | ~0.5s |
+
+Detection: `_has_position_dependent_terms()` checks for spatially-varying coefficients in the JSON spec. **Both paths are O(1) in simulation time t_end** — the key advantage over time-stepping solvers.
+
+#### Can't we just use one method for everything?
+
+- **expm_multiply for everything?** No — eigendecomposition is ~80x faster for constant-coefficient cases and gives machine precision (~1e-14 error).
+- **Eigendecomposition for everything?** No — it gives **wrong results** for non-normal convolution matrices (position-dependent case). This is not a precision issue but a fundamental numerical instability: individual exp(λ·t) overflow while exp(A·t)·y₀ is bounded (pseudospectral phenomenon).
+
+#### Sparse convolution matrix optimization
+
+For localized coefficients (e.g. Gaussian B₀(x)), the Fourier convolution kernel ĉ(q) decays exponentially, making the matrix effectively banded. The `_evolve_full_matrix` function exploits this: entries below a relative threshold (1e-14 × max|A|) are zeroed, and if the resulting density is below 30%, the matrix is converted to sparse CSC format. `scipy.sparse.linalg.expm_multiply` natively supports sparse matrices, and its internal matrix-vector products become dramatically cheaper.
+
+**Benchmark: localized Gertsenshtein (6 fields, t_end=120, 51 snapshots)**
+
+| Grid N | Matrix size | Density | Dense expm_multiply | Sparse expm_multiply | Speedup | Max diff |
+|--------|-------------|---------|--------------------|--------------------|---------|----------|
+| 128 | 780×780 | 4.0% | 5.44s | 0.23s | **23×** | 7.4e-14 |
+| 256 | 1548×1548 | 2.6% | 15.85s | 0.59s | **27×** | 1.2e-13 |
+| 512 | 3084×3084 | 1.4% | 29.08s | 1.23s | **24×** | 1.1e-12 |
+
+The density decreases with N because the convolution bandwidth (set by the Gaussian width R) is fixed while the total mode count grows — the matrix becomes sparser at higher resolution.
+
+**End-to-end improvement:** Total `solve_modal` time for localized Gertsenshtein at N=512 dropped from ~21s (dense) to ~2.3s (sparse), bringing it within ~2x of the constant-coefficient eigendecomposition path and **~50x faster than CVODE** (~120s).
+
+#### Both paths outperform CVODE
+
+| Case | Modal | CVODE | Speedup |
+|------|-------|-------|---------|
+| Constant (coupled_scalars, N=256) | 0.003s | 4.27s | **1,451×** |
+| Constant (Gertsenshtein, N=512) | 0.03s | 1.66s | **55×** |
+| Position-dependent (localized Gertsenshtein, N=512) | 2.3s | ~120s | **~52×** |
+| Long runs (Gertsenshtein, t_end=500) | 1.6s | 12.2s | **7.7×** |
 
 ## Auto-Selection
 
@@ -260,7 +303,7 @@ Gertsenshtein (6 fields, N=256, 101 snapshots, B₀=0.1):
 | `_build_per_mode_matrices` | Per-mode evolution matrices (constant coefficients) |
 | `_build_convolution_matrix` | Full convolution matrix (position-dependent) |
 | `_evolve_per_mode` | Batch eigendecomposition solver |
-| `_evolve_full_matrix` | Full matrix solver (dense or Schur) |
+| `_evolve_full_matrix` | Full matrix solver (expm_multiply, sparse-aware) |
 
 ### Reused Infrastructure
 
