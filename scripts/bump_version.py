@@ -3,18 +3,22 @@
 
 Updates version numbers across:
 - pyproject.toml
-- tidal/__init__.py
 - CITATION.cff (version + date)
+- docs/NEXT_PHASES.md (version header)
+- docs/ROADMAP.md (current version line)
+- SECURITY.md (supported version table)
 - uv.lock (via uv lock regeneration)
 
-Note: docs/source/conf.py reads the version dynamically via
-importlib.metadata.version("tidal"), so it does not need updating.
+Note: tidal/__init__.py and docs/source/conf.py read the version dynamically
+via importlib.metadata.version("tidal"), so they do not need updating.
 
 Usage:
     python scripts/bump_version.py              # Interactive mode
-    python scripts/bump_version.py 0.3.0        # Direct mode
-    python scripts/bump_version.py 0.3.0 --commit  # With git commit
-    python scripts/bump_version.py 0.3.0 --dry-run # Preview changes
+    python scripts/bump_version.py 0.6.0        # Direct mode
+    python scripts/bump_version.py --patch      # Auto-compute next patch
+    python scripts/bump_version.py --minor      # Auto-compute next minor
+    python scripts/bump_version.py --minor --commit  # With git commit + tag
+    python scripts/bump_version.py 0.6.0 --dry-run   # Preview changes
 """
 
 import argparse
@@ -57,6 +61,7 @@ class VersionBumper:
         dry_run: bool = False,
         allow_dirty: bool = False,
         commit: bool = False,
+        tag: bool = True,
     ) -> None:
         """Initialize the version bumper.
 
@@ -70,21 +75,58 @@ class VersionBumper:
             If True, allow uncommitted changes in git
         commit : bool
             If True, create a git commit after updating
+        tag : bool
+            If True (default), create a git tag when committing
 
         """
         self.new_version = new_version
         self.dry_run = dry_run
         self.allow_dirty = allow_dirty
         self.commit = commit
+        self.tag = tag
         self.root = Path(__file__).parent.parent
         self.backups: list[Path] = []
 
         # Files to update
-        # Note: docs/source/conf.py reads version dynamically via
-        # importlib.metadata, so it does not need explicit updating.
         self.pyproject_toml = self.root / "pyproject.toml"
-        self.init_py = self.root / "tidal" / "__init__.py"
         self.citation_cff = self.root / "CITATION.cff"
+        self.next_phases_md = self.root / "docs" / "NEXT_PHASES.md"
+        self.roadmap_md = self.root / "docs" / "ROADMAP.md"
+        self.security_md = self.root / "SECURITY.md"
+
+    @staticmethod
+    def compute_next_version(current: str, level: str) -> str:
+        """Compute next version from current by bumping patch or minor.
+
+        Parameters
+        ----------
+        current : str
+            Current version string (e.g., "0.5.0", "0.5.0-alpha.1")
+        level : str
+            Bump level: "patch" or "minor"
+
+        Returns
+        -------
+        str
+            Next version string
+
+        Raises
+        ------
+        ValueError
+            If level is not "patch" or "minor"
+
+        """
+        base = current.split("-", maxsplit=1)[0]  # strip pre-release suffix
+        parts = [int(x) for x in base.split(".")]
+        if level == "minor":
+            parts[1] += 1
+            parts[2] = 0
+        elif level == "patch":
+            parts[2] += 1
+        else:
+            msg = f"Unsupported bump level: {level!r}. Use 'patch' or 'minor'."
+            raise ValueError(msg)
+        return ".".join(str(p) for p in parts)
 
     def run(self) -> None:
         """Execute the three-phase update process."""
@@ -138,12 +180,21 @@ class VersionBumper:
             raise VersionBumpError(msg)
         print("  ✓ Version format valid (semantic versioning)")
 
-        # Check all files exist
-        for file_path in [self.pyproject_toml, self.init_py, self.citation_cff]:
+        # Check required files exist (docs files are optional)
+        for file_path in [self.pyproject_toml, self.citation_cff]:
             if not file_path.exists():
                 msg = f"Required file not found: {file_path}\nEnsure you are running this script from the project root and that all files are present."
                 raise VersionBumpError(msg)
-        print("  ✓ All target files exist")
+        print("  ✓ All required files exist")
+
+        # Check optional docs files
+        for file_path in [self.next_phases_md, self.roadmap_md, self.security_md]:
+            if file_path.exists():
+                print(f"  ✓ Found {file_path.relative_to(self.root)}")
+            else:
+                print(
+                    f"  ⚠ Optional file not found: {file_path.relative_to(self.root)}"
+                )
 
         # Check git status
         if (
@@ -191,13 +242,6 @@ class VersionBumper:
             self._update_pyproject_toml()
             print("  ✓ Updated pyproject.toml")
 
-        # Update __init__.py
-        if self.dry_run:
-            print("  [DRY RUN] Would update __init__.py")
-        else:
-            self._update_init_py()
-            print("  ✓ Updated __init__.py")
-
         # Update CITATION.cff
         today = datetime.now().strftime("%Y-%m-%d")  # noqa: DTZ005  # Local date for citation file
         if self.dry_run:
@@ -205,6 +249,30 @@ class VersionBumper:
         else:
             self._update_citation_cff(today)
             print(f"  ✓ Updated CITATION.cff (version + date: {today})")
+
+        # Update docs/NEXT_PHASES.md
+        if self.next_phases_md.exists():
+            if self.dry_run:
+                print("  [DRY RUN] Would update docs/NEXT_PHASES.md")
+            else:
+                self._update_next_phases_md()
+                print("  ✓ Updated docs/NEXT_PHASES.md")
+
+        # Update docs/ROADMAP.md
+        if self.roadmap_md.exists():
+            if self.dry_run:
+                print("  [DRY RUN] Would update docs/ROADMAP.md")
+            else:
+                self._update_roadmap_md()
+                print("  ✓ Updated docs/ROADMAP.md")
+
+        # Update SECURITY.md
+        if self.security_md.exists():
+            if self.dry_run:
+                print("  [DRY RUN] Would update SECURITY.md")
+            else:
+                self._update_security_md()
+                print("  ✓ Updated SECURITY.md")
 
         # Regenerate uv.lock
         if self.dry_run:
@@ -231,7 +299,7 @@ class VersionBumper:
             print()
             return
 
-        # Verify all versions match
+        # Verify core versions match (pyproject.toml + CITATION.cff)
         current_versions = self._get_all_current_versions()
         for file_name, version in current_versions.items():
             if version != self.new_version:
@@ -250,6 +318,10 @@ class VersionBumper:
         if self.commit:
             self._create_git_commit()
             print("  ✓ Created git commit")
+
+            if self.tag:
+                self._create_git_tag()
+                print(f"  ✓ Created git tag v{self.new_version}")
 
     def rollback(self) -> None:
         """Restore backups on failure."""
@@ -302,12 +374,6 @@ class VersionBumper:
         if match:
             versions["pyproject.toml"] = match.group(1)
 
-        # __init__.py
-        content = self.init_py.read_text()
-        match = re.search(r'^__version__\s*=\s*"([^"]+)"', content, re.MULTILINE)
-        if match:
-            versions["__init__.py"] = match.group(1)
-
         # CITATION.cff
         content = self.citation_cff.read_text()
         match = re.search(r"^version:\s*(.+)$", content, re.MULTILINE)
@@ -318,7 +384,9 @@ class VersionBumper:
 
     def _create_backups(self) -> None:
         """Create .bak copies of all files before modification."""
-        for file_path in [self.pyproject_toml, self.init_py, self.citation_cff]:
+        files = [self.pyproject_toml, self.citation_cff]
+        files.extend(f for f in [self.next_phases_md, self.roadmap_md, self.security_md] if f.exists())
+        for file_path in files:
             backup_path = file_path.with_suffix(file_path.suffix + ".bak")
             shutil.copy2(file_path, backup_path)
             self.backups.append(backup_path)
@@ -348,17 +416,6 @@ class VersionBumper:
             )
             self.pyproject_toml.write_text(updated)
 
-    def _update_init_py(self) -> None:
-        """Update __version__ in __init__.py."""
-        content = self.init_py.read_text()
-        updated = re.sub(
-            r'^(__version__\s*=\s*)"[^"]+"',
-            rf'\1"{self.new_version}"',
-            content,
-            flags=re.MULTILINE,
-        )
-        self.init_py.write_text(updated)
-
     def _update_citation_cff(self, date: str) -> None:
         """Update version and date in CITATION.cff."""
         if has_ruamel_yaml:
@@ -386,6 +443,45 @@ class VersionBumper:
                 flags=re.MULTILINE,
             )
             self.citation_cff.write_text(updated)
+
+    def _update_next_phases_md(self) -> None:
+        """Update version in docs/NEXT_PHASES.md header."""
+        content = self.next_phases_md.read_text()
+        updated = re.sub(
+            r"\*\*Version:\*\*\s*\d+\.\d+\.\d+",
+            f"**Version:** {self.new_version}",
+            content,
+        )
+        self.next_phases_md.write_text(updated)
+
+    def _update_roadmap_md(self) -> None:
+        """Update current version line in docs/ROADMAP.md."""
+        content = self.roadmap_md.read_text()
+        updated = re.sub(
+            r"\*\*Current Version:\*\*\s*\d+\.\d+\.\d+",
+            f"**Current Version:** {self.new_version}",
+            content,
+        )
+        self.roadmap_md.write_text(updated)
+
+    def _update_security_md(self) -> None:
+        """Update supported version table in SECURITY.md."""
+        parts = self.new_version.split(".")
+        major_minor = f"{parts[0]}.{parts[1]}"
+        content = self.security_md.read_text()
+        # Replace the supported version row
+        updated = re.sub(
+            r"\|\s*\d+\.\d+\.x\s*\|\s*:white_check_mark:\s*\|",
+            f"| {major_minor}.x   | :white_check_mark: |",
+            content,
+        )
+        # Replace the unsupported version row
+        updated = re.sub(
+            r"\|\s*<\s*\d+\.\d+\s*\|\s*:x:\s*\|",
+            f"| < {major_minor}   | :x:                |",
+            updated,
+        )
+        self.security_md.write_text(updated)
 
     def _regenerate_uv_lock(self) -> None:
         """Regenerate uv.lock file via uv lock command.
@@ -438,10 +534,7 @@ class VersionBumper:
             )
 
             # Create commit
-            commit_msg = (
-                f"chore: bump version to {self.new_version}\n\n"
-                f"Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>"
-            )
+            commit_msg = f"chore: bump version to {self.new_version}"
             subprocess.run(
                 ["git", "commit", "-m", commit_msg],
                 cwd=self.root,
@@ -453,6 +546,26 @@ class VersionBumper:
             msg = f"Failed to create git commit: {e}"
             raise VersionBumpError(msg) from e
 
+    def _create_git_tag(self) -> None:
+        """Create a git tag for the new version.
+
+        Raises
+        ------
+        VersionBumpError
+            If git tag creation fails.
+
+        """
+        try:
+            subprocess.run(
+                ["git", "tag", f"v{self.new_version}"],
+                cwd=self.root,
+                check=True,
+                capture_output=True,
+            )
+        except subprocess.CalledProcessError as e:
+            msg = f"Failed to create git tag: {e}"
+            raise VersionBumpError(msg) from e
+
 
 def main() -> None:
     """Run the version bump script."""
@@ -462,17 +575,32 @@ def main() -> None:
         epilog="""
 Examples:
   python scripts/bump_version.py                # Interactive mode
-  python scripts/bump_version.py 0.3.0          # Direct mode
-  python scripts/bump_version.py 0.3.0 --commit # With git commit
-  python scripts/bump_version.py 0.3.0 --dry-run # Preview changes
+  python scripts/bump_version.py 0.6.0          # Direct mode
+  python scripts/bump_version.py --patch        # Auto-compute next patch
+  python scripts/bump_version.py --minor        # Auto-compute next minor
+  python scripts/bump_version.py --minor --commit  # With git commit + tag
+  python scripts/bump_version.py 0.6.0 --dry-run  # Preview changes
         """,
     )
 
     parser.add_argument(
         "version",
         nargs="?",
-        help="New version number (semantic versioning format, e.g., 0.3.0)",
+        help="New version number (semantic versioning format, e.g., 0.6.0)",
     )
+
+    bump_group = parser.add_mutually_exclusive_group()
+    bump_group.add_argument(
+        "--patch",
+        action="store_true",
+        help="Auto-compute next patch version (0.5.0 → 0.5.1)",
+    )
+    bump_group.add_argument(
+        "--minor",
+        action="store_true",
+        help="Auto-compute next minor version (0.5.0 → 0.6.0)",
+    )
+
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -488,18 +616,32 @@ Examples:
         action="store_true",
         help="Create a git commit after updating",
     )
+    parser.add_argument(
+        "--no-tag",
+        action="store_true",
+        help="Skip git tag creation (only relevant with --commit)",
+    )
 
     args = parser.parse_args()
 
-    # Interactive mode if no version provided
-    if args.version is None:
+    # Determine version
+    if args.patch or args.minor:
+        if args.version:
+            parser.error("Cannot use --patch/--minor with an explicit version")
+        level = "patch" if args.patch else "minor"
+        current = VersionBumper("0.0.0", dry_run=True).get_current_version()
+        args.version = VersionBumper.compute_next_version(current, level)
+        print(f"Auto-computed {level} bump: {current} → {args.version}")
+        print()
+    elif args.version is None:
+        # Interactive mode
         print("Interactive Version Bump")
         print("=" * 60)
         print()
         current = VersionBumper("0.0.0", dry_run=True).get_current_version()
         print(f"Current version: {current}")
         print()
-        version = input("Enter new version (e.g., 0.3.0): ").strip()
+        version = input("Enter new version (e.g., 0.6.0): ").strip()
         if not version:
             print("Error: Version required")
             sys.exit(1)
@@ -511,6 +653,7 @@ Examples:
         dry_run=args.dry_run,
         allow_dirty=args.allow_dirty,
         commit=args.commit,
+        tag=not args.no_tag,
     )
     bumper.run()
 

@@ -46,6 +46,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - **Use minimal test theories** (scalar_field, coupled_scalars) before expensive derivations.
 - **Negative energies** may be physical with (-,+,+,+) metric convention — don't "fix" without understanding the physics.
 - **Before context compaction**, update all relevant docs and memory files.
+- **Version bump after completing work**: After committing a completed feature/fix (all tests pass, no remaining tasks), bump the version: `--patch` for fixes/small changes, `--minor` for new features. Skip if mid-feature or WIP. NEVER bump the major version automatically. Use `python scripts/bump_version.py --{level} --commit --allow-dirty`.
 
 ## Physics Coding Patterns
 
@@ -71,6 +72,7 @@ Custom commands in `.claude/skills/` (main conversation only, not available to s
 - `/backup` — Memory backup and MEMORY.md health check
 - `/commit [message]` — Conventional commit with mandatory pre-commit testing
 - `/validate-physics` — Physics regression detection (maps changed solver/measurement files to relevant tests)
+- `/bump [patch|minor]` — Version bump with commit analysis (suggests level, dry-run preview, git tag)
 
 ## Architecture Reference
 
