@@ -181,6 +181,13 @@ ExpandScalarWrappers[expr_, chart_] := Module[
       inner = TraceBasisDummy[inner];
       inner
     ];
+    (* Normalize negative-integer basis indices to non-negative.          *)
+    (* xCoba uses {-n, -chart} for covariant component n (the negative   *)
+    (* on the integer mirrors the negative on the chart).  For component  *)
+    (* extraction and CD→Derivative conversion, {-n, -chart} ≡ {n,-chart}*)
+    (* Normalize so downstream patterns (GenerateCDRules, etc.) match.   *)
+    (* Ref: CommonUtilities.wl line 511 — same convention, handled w/ Abs*)
+    result = result /. {n_Integer?Negative, s:(chart | -chart)} :> {-n, s};
     iter++;
     If[result === prev, Break[]]  (* Fixed point reached *)
   ];
