@@ -26,6 +26,9 @@ Otherwise, analyze the commit type breakdown above:
 **NEVER bump the major version.** Only `--patch` and `--minor` are available.
 Major bumps require explicit version: `python scripts/bump_version.py X.0.0 --commit`.
 
+### Step 1.5 — Sync documentation
+Before bumping, ensure docs are current. Check key stats (test counts, example counts) and ROADMAP status. If discrepancies found, fix them so they're included in the bump.
+
 ### Step 2 — Dry-run preview
 ```bash
 python scripts/bump_version.py --{level} --dry-run

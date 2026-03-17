@@ -9,8 +9,8 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - `tidal/symbolic/` -- Python symbolic pipeline (_derive.py, json_loader.py)
 - `tidal/cli/` -- CLI entry points (9 subcommands: derive, simulate, measure, inspect, list, validate, plot, sweep, analyze)
 - `tidal/measurement/` -- Physics measurements (energy, conversion, mixing, spectra)
-- `examples/` -- 27 physics examples (1+1D through 3+1D), each with theory.toml + .wls + data/*.json
-- `tests/` -- ~1,484 Python tests + ~115 Wolfram tests
+- `examples/` -- 28 physics examples (1+1D through 3+1D), each with theory.toml + .wls + data/*.json
+- `tests/` -- ~1,568 Python tests + ~115 Wolfram tests
 - `docs/` -- Architecture docs (MEMORY.md is the main reference)
 
 ## Key Commands
@@ -47,6 +47,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - **Negative energies** may be physical with (-,+,+,+) metric convention — don't "fix" without understanding the physics.
 - **Before context compaction**, update all relevant docs and memory files.
 - **Version bump after completing work**: After committing a completed feature/fix (all tests pass, no remaining tasks), bump the version: `--patch` for fixes/small changes, `--minor` for new features. Skip if mid-feature or WIP. NEVER bump the major version automatically. Use `python scripts/bump_version.py --{level} --commit --allow-dirty`.
+- **Update documentation after completing work**: After committing a feature/fix, identify and update relevant docs. To find which docs are affected, search `docs/` for mentions of the changed component/feature (e.g., `grep -rl "Jacobian\|sparse" docs/`). Common update patterns: phase/issue status changes → `docs/ROADMAP.md`, `docs/NEXT_PHASES.md`; implementation substep done → active checklist in `docs/`; performance changed → whichever `docs/*.md` has benchmark tables for that subsystem; new error pattern → `docs/troubleshooting.md`; algorithm/architecture changed → whichever `docs/*.md` describes that component. See `docs/README.md` for the documentation index. Commit doc updates separately: `docs: update {topic} documentation`.
 
 ## Physics Coding Patterns
 
@@ -73,6 +74,7 @@ Custom commands in `.claude/skills/` (main conversation only, not available to s
 - `/commit [message]` — Conventional commit with mandatory pre-commit testing
 - `/validate-physics` — Physics regression detection (maps changed solver/measurement files to relevant tests)
 - `/bump [patch|minor]` — Version bump with commit analysis (suggests level, dry-run preview, git tag)
+- `/sync-docs` — Review and update all documentation for accuracy (stats, phase status, resolved issues)
 
 ## Architecture Reference
 

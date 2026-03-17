@@ -17,6 +17,9 @@ description: Conventional commit with mandatory pre-commit testing and auto-form
 ## Version status
 !`cd /workspaces/torsion-gertsenshtein && echo "v$(python3 -c "import re; print(re.search(r'^version\s*=\"([^\"]+)\"', open('pyproject.toml').read(), re.MULTILINE).group(1))" 2>/dev/null) — $(git log --oneline $(git log --all --grep='chore: bump version' --format='%H' -1 2>/dev/null || git rev-list --max-parents=0 HEAD)..HEAD 2>/dev/null | wc -l) commits since last bump"`
 
+## Docs mentioning changed components
+!`cd /workspaces/torsion-gertsenshtein && for f in $(git diff --name-only HEAD 2>/dev/null | head -5); do base=$(basename "$f" .py); grep -rl --include="*.md" "$base" docs/ 2>/dev/null; done | sort -u | head -10`
+
 ## Instructions
 
 ### Step 1 — Run relevant tests
@@ -64,6 +67,31 @@ If bumping:
 python scripts/bump_version.py --{level} --commit --allow-dirty
 ```
 NEVER bump the major version automatically — major bumps require explicit user request.
+
+### Step 6 — Update documentation (if task is complete)
+After committing a completed feature or fix, check if documentation needs updating.
+
+**How to find relevant docs:** Search `docs/` for mentions of the component you changed:
+```bash
+grep -rl "keyword" docs/
+```
+Also check the "Docs mentioning changed components" section above.
+
+**Common patterns:**
+- Resolved an issue? → Update status in `docs/ROADMAP.md` or `docs/NEXT_PHASES.md`
+- Completed a checklist item? → Mark done in the relevant `docs/*checklist*.md`
+- Changed performance? → Update benchmark tables in whichever doc covers that subsystem
+- Discovered new error pattern? → Add to `docs/troubleshooting.md`
+- Changed algorithm/architecture? → Update the doc that describes that component
+
+See `docs/README.md` for the full documentation index.
+
+If docs need updating, make the changes and commit separately:
+```bash
+git add docs/ && git commit -m "docs: update {topic} after {feature/fix}"
+```
+
+**Skip if**: this is a WIP commit, the change is trivial, or no docs mention the changed component.
 
 ### CRITICAL RULES
 - **NO Co-Authored-By trailer** — never add it
