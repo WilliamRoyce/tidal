@@ -91,11 +91,14 @@
 
 % --- Modal solver ---
 \node[phase=PinkLine, below=0.4cm of p3, text width=6.6cm] (modal)
-    {\textbf{Modal solver:} Fourier eigendecomposition,
-     $O(1)$ in $t_{\mathrm{end}}$, constraint Schur complement};
+    {\textbf{Modal solver:} per-mode eigdecomp (constant) /
+     \texttt{expm\_multiply} + sparse (position-dep.),
+     $O(1)$ in $t_{\mathrm{end}}$, Schur complement};
 \node[speedup=PinkLine, right=0.2cm of modal.east, anchor=west,
       text width=2.6cm]
-    {57--1451$\times$ vs CVODE\\9.5$\times$ vs IDA};
+    {57--1451$\times$ vs CVODE (const.)\\
+     $\sim\!52\times$ vs CVODE (pos.-dep.)\\
+     9.5$\times$ vs IDA};
 
 % Arrows (timeline)
 \foreach \a/\b in {r1/r4, r4/r5, r5/r6, r6/p1, p1/p2, p2/p3, p3/modal} {

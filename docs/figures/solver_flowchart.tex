@@ -191,7 +191,7 @@
     \multicolumn{4}{@{}l}{\normalsize\textbf{Solver Key}}\\[4pt]
     \tikz\fill[PurpleFill!40, draw=PurpleLine, rounded corners=1pt]
         (0,0) rectangle (0.5,0.3); & \textbf{Modal}
-        & NumPy/SciPy eigdecomp & $\sim\!10^{-16}$ precision\\[2pt]
+        & eigdecomp / \texttt{expm\_multiply} & $\sim\!10^{-16}$ precision\\[2pt]
     \tikz\fill[OrangeFill!40, draw=OrangeLine, rounded corners=1pt]
         (0,0) rectangle (0.5,0.3); & \textbf{IDA}
         & SUNDIALS implicit DAE & $\sim\!10^{-8}$ tolerance\\[2pt]

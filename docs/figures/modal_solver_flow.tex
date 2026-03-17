@@ -3,7 +3,7 @@
 \usepackage{tikz}
 \usepackage[svgnames]{xcolor}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, calc, fit,
-                 backgrounds, decorations.pathreplacing}
+                backgrounds, decorations.pathreplacing}
 
 % ---------------------------------------------------------------
 % Colour palette (matches solver_flowchart.tex)
@@ -41,6 +41,11 @@
         fill=OrangeFill, fill opacity=0.25, font=\scriptsize,
         align=center, text opacity=1, inner sep=3pt
     },
+    decide/.style={
+        diamond, aspect=2.2, draw=OrangeLine, fill=OrangeFill,
+        fill opacity=0.25, font=\scriptsize, align=center,
+        text opacity=1, inner sep=2pt, text width=1.8cm
+    },
     schur/.style={
         rectangle, rounded corners=2pt, draw=PinkLine, dashed,
         fill=PinkFill, fill opacity=0.3, font=\scriptsize,
@@ -52,7 +57,9 @@
     arr/.style={
         -{Stealth[length=5pt, width=4pt]}, thick, black!70
     },
-    node distance=0.7cm and 1.2cm
+    yeslbl/.style={font=\scriptsize\bfseries, text=black!70},
+    nolbl/.style={font=\scriptsize\bfseries, text=black!70},
+    node distance=0.7cm and 1.0cm
 ]
 
 % ===================================================================
@@ -66,93 +73,132 @@
      constraints eliminable};
 
 % ===================================================================
-% MAIN FLOW (left to right)
+% PHYSICAL SPACE INPUT
 % ===================================================================
-
-% Physical space input
 \node[stage=BlueLine, fill=BlueFill, fill opacity=0.3,
       below left=1.2cm and 0.5cm of gate] (input)
     {$\mathbf{y}(x, t_0)$\\[-1pt]\scriptsize physical space};
 
+% ===================================================================
 % FFT
+% ===================================================================
 \node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
       right=1.0cm of input] (fft)
     {\textbf{FFT}\\[-1pt]\scriptsize \texttt{rfftn} per slot};
 
-% Build matrix
-\node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
-      right=1.0cm of fft] (matrix)
-    {Build $A(k)$\\[-1pt]\scriptsize per-mode matrix};
+% ===================================================================
+% DECISION: Position-dependent coefficients?
+% ===================================================================
+\node[decide, right=1.2cm of fft] (branch)
+    {Position-dep.\\coefficients?};
 
-% Eigendecompose
+% ===================================================================
+% PATH A: Per-mode eigendecomposition (upper branch, purple)
+% ===================================================================
 \node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
-      right=1.0cm of matrix] (eigen)
+      above right=0.9cm and 0.8cm of branch] (matrix_pm)
+    {Build $A(k)$\\[-1pt]\scriptsize per-mode ($\leq\!12{\times}12$)};
+
+\node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
+      right=0.8cm of matrix_pm] (eigen)
     {Eigendecompose\\[-1pt]\scriptsize $A = V \Lambda V^{-1}$};
 
-% Evolve
 \node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
-      right=1.0cm of eigen] (evolve)
+      right=0.8cm of eigen] (evolve_eig)
     {Evolve\\[-1pt]\scriptsize $e^{\Lambda \Delta t}$};
 
-% IFFT
+% ===================================================================
+% PATH B: expm_multiply (lower branch, lime)
+% ===================================================================
+\node[stage=LimeLine, fill=LimeFill, fill opacity=0.3,
+      below right=0.9cm and 0.8cm of branch] (matrix_full)
+    {Build full matrix\\[-1pt]\scriptsize $(N_k {\times} N_s)^2$ convolution};
+
+\node[stage=LimeLine, fill=LimeFill, fill opacity=0.3,
+      right=0.8cm of matrix_full] (sparsify)
+    {Sparsify\\[-1pt]\scriptsize threshold $+$ CSC if $<\!30\%$};
+
+\node[stage=LimeLine, fill=LimeFill, fill opacity=0.3,
+      right=0.8cm of sparsify] (expm)
+    {\texttt{expm\_multiply}\\[-1pt]\scriptsize $\exp(A \cdot t) \cdot y_0$};
+
+% ===================================================================
+% CONVERGENCE: IFFT + output
+% ===================================================================
 \node[stage=PurpleLine, fill=PurpleFill, fill opacity=0.3,
-      right=1.0cm of evolve] (ifft)
+      right=0.8cm of evolve_eig, yshift=-0.9cm] (ifft)
     {\textbf{IFFT}\\[-1pt]\scriptsize \texttt{irfftn} per slot};
 
-% Physical space output
 \node[stage=BlueLine, fill=BlueFill, fill opacity=0.3,
       right=1.0cm of ifft] (output)
     {$\mathbf{y}(x, t)$\\[-1pt]\scriptsize physical space};
 
 % ===================================================================
-% ARROWS
+% ARROWS — main flow
 % ===================================================================
 \draw[arr] (gate) -- (input);
 \draw[arr] (input) -- (fft);
-\draw[arr] (fft) -- (matrix);
-\draw[arr] (matrix) -- (eigen);
-\draw[arr] (eigen) -- (evolve);
-\draw[arr] (evolve) -- (ifft);
+\draw[arr] (fft) -- (branch);
+
+% Path A (upper): No position-dependent → per-mode eigendecomp
+\draw[arr] (branch) -- node[yeslbl, above left] {No} (matrix_pm);
+\draw[arr] (matrix_pm) -- (eigen);
+\draw[arr] (eigen) -- (evolve_eig);
+\draw[arr, rounded corners=3pt]
+    (evolve_eig.east) -| ([xshift=-0.3cm]ifft.north) -- (ifft.north);
+
+% Path B (lower): Yes position-dependent → sparsify → expm_multiply
+\draw[arr] (branch) -- node[nolbl, below left] {Yes} (matrix_full);
+\draw[arr] (matrix_full) -- (sparsify);
+\draw[arr] (sparsify) -- (expm);
+\draw[arr, rounded corners=3pt]
+    (expm.east) -| ([xshift=-0.3cm]ifft.south) -- (ifft.south);
+
+% IFFT -> output
 \draw[arr] (ifft) -- (output);
 
-% Repeat arrow for multiple snapshots
-\draw[arr, rounded corners=3pt, densely dotted, GrayLine]
-    (output.south) -- ++(0,-0.5) -| (evolve.south)
-    node[midway, below, font=\scriptsize\itshape, text=GrayLine]
-    {next snapshot};
+% ===================================================================
+% COST ANNOTATIONS
+% ===================================================================
 
-% ===================================================================
-% COST ANNOTATIONS (above stages)
-% ===================================================================
+% Path A costs (above upper branch)
 \node[cost=PurpleLine, above=0.15cm of eigen]
-    {$O(N^3)$ once};
-\node[cost=PurpleLine, above=0.15cm of evolve]
-    {$O(N^2)$/snap};
+    {$O(N_f^3)$/mode};
+\node[cost=PurpleLine, above=0.15cm of evolve_eig]
+    {$O(N_f^2)$/snap};
+
+% Path B costs (below lower branch)
+\node[cost=LimeLine, below=0.15cm of sparsify]
+    {23--27$\times$ speedup\\[-1pt]\scriptsize for localized $B_0$};
+\node[cost=LimeLine, below=0.15cm of expm]
+    {$O(\mathrm{nnz} \!\cdot\! s)$\\[-1pt]\scriptsize sparse matvec};
+
+% Precision (output)
 \node[cost=BlueLine, above=0.15cm of output]
     {$\sim\!10^{-16}$};
 
 % ===================================================================
-% BLOCK-AWARE CHECK (below eigendecompose)
+% BLOCK-AWARE CHECK (above per-mode matrix, Path A only)
 % ===================================================================
-\node[check, below=0.6cm of eigen, text width=3.4cm] (blocks)
+\node[check, above=0.6cm of matrix_pm, text width=3.4cm] (blocks)
     {\texttt{\_find\_independent\_blocks()}\\[1pt]
      union-find $\to$ skip zero-IC blocks\\
      warn if $\max(\mathrm{Re}\,\lambda)\cdot\Delta t > 30$};
-\draw[arr, densely dotted, OrangeLine] (blocks) -- (eigen);
+\draw[arr, densely dotted, OrangeLine] (blocks) -- (matrix_pm);
 
 % ===================================================================
-% TIERED ALGORITHM (below matrix build)
+% PATH B ANNOTATION (non-normal matrix note)
 % ===================================================================
-\node[annot, below=0.6cm of matrix, text width=3.0cm] (tiers)
-    {per-mode $\leq 12 \times 12$: batch\\
-     $\leq 2000$: dense \texttt{eig}\\
-     $> 2000$: Schur decomp};
-\draw[arr, densely dotted, GrayLine] (tiers) -- (matrix);
+\node[annot, below=0.4cm of matrix_full, text width=3.2cm] (posdep_note)
+    {non-normal $A$: eigdecomp overflows\\
+     backward-stable Krylov method\\
+     Al-Mohy \& Higham (2011)};
+\draw[arr, densely dotted, GrayLine] (posdep_note) -- (matrix_full);
 
 % ===================================================================
-% CONSTRAINT ELIMINATION (Schur complement, side branch)
+% CONSTRAINT ELIMINATION (Schur complement, Path A only)
 % ===================================================================
-\node[schur, below=1.8cm of fft] (schur)
+\node[schur, below=2.6cm of matrix_pm] (schur)
     {\textbf{Schur complement}\\[2pt]
      $S_{cc}^{-1} = \frac{1}{m^2 + k^2}$ per mode\\[2pt]
      $A_{\mathrm{red}} = A_{dd} - A_{dc} S_{cc}^{-1} S_{cd}$\\[2pt]
@@ -161,20 +207,21 @@
 
 \node[annot, below=0.15cm of schur] {if constraints present};
 
-% Arrow from FFT down to Schur, then back up to matrix
+% Arrow from matrix_pm down to Schur, then to eigen
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
-    (fft.south) -- ++(0,-0.4) -| (schur.north);
+    (matrix_pm.south) -- ++(0,-0.4) -| (schur.north);
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
-    (schur.east) -| ([xshift=-0.3cm]matrix.south) -- (matrix.south);
+    (schur.east) -| ([xshift=-0.3cm]eigen.south) -- (eigen.south);
 
-% Recovery arrow from evolve down to reconstruction
-\node[schur, below=1.8cm of evolve, text width=2.8cm] (recover)
+% Recovery arrow from evolve_eig down to reconstruction
+\node[schur, below=2.6cm of evolve_eig, text width=2.8cm] (recover)
     {\textbf{Reconstruct}\\[2pt]
      $\hat{c}(k) = -S_{cc}^{-1} S_{cd}\, \hat{d}(k)$\\[2pt]
      IFFT $\to c(x,t)$};
-\draw[arr, PinkLine, densely dashed] (evolve.south) -- (recover.north);
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
-    (recover.east) -| ([xshift=0.3cm]ifft.south) -- (ifft.south);
+    (evolve_eig.south) -- ++(0,-0.4) -| (recover.north);
+\draw[arr, PinkLine, densely dashed, rounded corners=3pt]
+    (recover.east) -| ([xshift=0.3cm]ifft.south east) -- (ifft.south east);
 
 % ===================================================================
 % BACKGROUND ZONES
@@ -183,18 +230,33 @@
     % Physical space zone (blue tint)
     \node[fit=(input)(output), inner sep=12pt, fill=BlueFill,
           fill opacity=0.08, rounded corners=5pt] {};
-    % Fourier space zone (purple tint) — just the middle stages
-    \node[fit=(fft)(ifft), inner sep=8pt, fill=PurpleFill,
+    % Fourier space zone (purple tint) — encompasses both branches
+    \node[fit=(fft)(ifft)(matrix_pm)(evolve_eig)(matrix_full)(sparsify)(expm),
+          inner sep=8pt, fill=PurpleFill,
           fill opacity=0.06, rounded corners=5pt] {};
 \end{scope}
 
 % Zone labels
 \node[font=\scriptsize\bfseries, text=BlueLine,
-      below=0.15cm of input.south west, anchor=north west]
+      below left=0.1cm and 0cm of input.south west, anchor=north west]
     {Physical space};
 \node[font=\scriptsize\bfseries, text=PurpleLine,
       above=0.15cm of fft.north west, anchor=south west]
     {Fourier space};
+
+% ===================================================================
+% PATH LEGEND (bottom right)
+% ===================================================================
+\node[font=\scriptsize, align=left,
+      below right=0.2cm and 0cm of output.south east, anchor=north west,
+      draw=GrayLine, rounded corners=2pt, inner sep=5pt, fill=white] {
+    \textcolor{PurpleLine}{\rule{0.5cm}{2pt}}
+        \textbf{Path A}: per-mode eigdecomp (constant coeffs)\\
+    \textcolor{LimeLine}{\rule{0.5cm}{2pt}}
+        \textbf{Path B}: sparse \texttt{expm\_multiply} (position-dep.)\\
+    \textcolor{PinkLine}{\rule[1pt]{0.5cm}{1pt}}
+        Schur constraint elimination (Path A only)
+};
 
 \end{tikzpicture}
 \end{document}
