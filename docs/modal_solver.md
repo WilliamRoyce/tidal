@@ -132,15 +132,15 @@ The modal solver maintains two distinct time-evolution algorithms because they h
 
 | Case | Coefficient type | Matrix structure | Algorithm | Time (Gertsenshtein, N=512) |
 |------|------------------|-----------------|-----------|---------------------------|
-| Constant | Uniform | Per-mode blocks (12×12) | Eigendecomposition | ~0.03s |
-| Position-dependent | Spatially varying (e.g. localized B₀) | Sparse convolution (3084×3084) | `expm_multiply` (sparse CSC) | ~2.3s |
-| Constraints + constant | Uniform with algebraic constraints | Reduced per-mode blocks | Schur complement + eigendecomposition | ~0.5s |
+| Constant | Uniform | Per-mode blocks (12×12) | Eigendecomposition | ~0.02s |
+| Position-dependent | Spatially varying (e.g. localized B₀) | Sparse convolution (3084×3084) | `expm_multiply` (sparse CSC) | ~1.4s |
+| Constraints + constant | Uniform with algebraic constraints | Reduced per-mode blocks | Schur complement + eigendecomposition | ~0.08s |
 
 Detection: `_has_position_dependent_terms()` checks for spatially-varying coefficients in the JSON spec. **Both paths are O(1) in simulation time t_end** — the key advantage over time-stepping solvers.
 
 #### Can't we just use one method for everything?
 
-- **expm_multiply for everything?** No — eigendecomposition is ~80x faster for constant-coefficient cases and gives machine precision (~1e-14 error).
+- **expm_multiply for everything?** No — eigendecomposition is ~70x faster for constant-coefficient cases and gives machine precision (~1e-14 error).
 - **Eigendecomposition for everything?** No — it gives **wrong results** for non-normal convolution matrices (position-dependent case). This is not a precision issue but a fundamental numerical instability: individual exp(λ·t) overflow while exp(A·t)·y₀ is bounded (pseudospectral phenomenon).
 
 #### Sparse convolution matrix optimization
@@ -157,15 +157,16 @@ For localized coefficients (e.g. Gaussian B₀(x)), the Fourier convolution kern
 
 The density decreases with N because the convolution bandwidth (set by the Gaussian width R) is fixed while the total mode count grows — the matrix becomes sparser at higher resolution.
 
-**End-to-end improvement:** Total `solve_modal` time for localized Gertsenshtein at N=512 dropped from ~21s (dense) to ~2.3s (sparse), bringing it within ~2x of the constant-coefficient eigendecomposition path and **~50x faster than CVODE** (~120s).
+**End-to-end improvement:** Total `solve_modal` time for localized Gertsenshtein at N=512 dropped from ~29s (dense) to ~1.4s (sparse + micro-optimizations), bringing it within ~70x of the constant-coefficient eigendecomposition path and **~85x faster than CVODE** (~120s).
 
 #### Both paths outperform CVODE
 
 | Case | Modal | CVODE | Speedup |
 |------|-------|-------|---------|
 | Constant (coupled_scalars, N=256) | 0.003s | 4.27s | **1,451×** |
-| Constant (Gertsenshtein, N=512) | 0.03s | 1.66s | **55×** |
-| Position-dependent (localized Gertsenshtein, N=512) | 2.3s | ~120s | **~52×** |
+| Constant (Gertsenshtein, N=512) | 0.02s | 1.66s | **83×** |
+| Position-dependent (localized Gertsenshtein, N=512) | 1.4s | ~120s | **~86×** |
+| Constraint (coupled_proca_3d, 16³) | 0.08s | 19.0s | **~238×** |
 | Long runs (Gertsenshtein, t_end=500) | 1.6s | 12.2s | **7.7×** |
 
 ## Auto-Selection
@@ -288,7 +289,7 @@ Gertsenshtein (6 fields, N=256, 101 snapshots, B₀=0.1):
 
 | File | Purpose |
 |------|---------|
-| `tidal/solver/modal.py` | Core solver (~760 lines) |
+| `tidal/solver/modal.py` | Core solver (~1,400 lines) |
 | `tidal/cli/_simulate.py` | Auto-selection + dispatch |
 | `tidal/cli/__init__.py` | `"modal"` in `--scheme` choices |
 | `tests/test_solver_modal.py` | 35 tests (12 eligibility + 14 correctness + 4 stability + 5 constraint) |
@@ -298,12 +299,14 @@ Gertsenshtein (6 fields, N=256, 101 snapshots, B₀=0.1):
 | Function | Purpose |
 |----------|---------|
 | `can_use_modal(spec, grid, bc)` | Eligibility check (shared with auto-selection) |
-| `solve_modal(spec, grid, y0, ...)` | Main entry point |
-| `_fft_slots / _ifft_slots` | State ↔ Fourier transforms |
+| `solve_modal(spec, grid, y0, ...)` | Main entry point — routes to per-mode, full-matrix, or Schur path |
+| `_fft_slots / _ifft_slots` | State ↔ Fourier transforms (analytical shape computation) |
 | `_build_per_mode_matrices` | Per-mode evolution matrices (constant coefficients) |
-| `_build_convolution_matrix` | Full convolution matrix (position-dependent) |
-| `_evolve_per_mode` | Batch eigendecomposition solver |
-| `_evolve_full_matrix` | Full matrix solver (expm_multiply, sparse-aware) |
+| `_build_convolution_matrix` | Convolution matrix with vectorized coupling (position-dependent) |
+| `_build_constraint_eliminated_matrices` | Fourier Schur complement with batched inversion |
+| `_evolve_per_mode` | Block-aware eigendecomposition solver; optional Fourier snapshot return |
+| `_evolve_full_matrix` | Sparse-aware expm_multiply solver (auto-thresholds to CSC) |
+| `_find_independent_blocks` | Union-find block detection for eigendecomposition |
 
 ### Reused Infrastructure
 
@@ -344,11 +347,16 @@ Substituting c = -S_cc⁻¹·S_cd·d gives the reduced system:
 d/dt[d] = (A_dd - A_dc·S_cc⁻¹·S_cd)·d
 ```
 
-The constraint velocity coupling (when dynamical equations reference v_A₀ = ∂ₜA₀) creates an implicit equation resolved by matrix inversion of (I - A_dc_vel·S_cc⁻¹·S_cd) — a small per-mode operation.
+The constraint velocity coupling (when dynamical equations reference v_A₀ = ∂ₜA₀) creates an implicit equation resolved by batched `np.linalg.solve` across all modes: (I - A_dc_vel·S_cc⁻¹·S_cd)·d' = A_rhs·d.
 
-At each output time, constraint fields are reconstructed: c(k) = -S_cc⁻¹·S_cd·d(k).
+**Optimizations:**
+- **Batched S_cc inversion**: `np.linalg.inv(S_cc)` inverts all modes at once (no Python loop), with vectorized singularity detection for gauge-freedom modes (k=0)
+- **Batched implicit solve**: `np.linalg.solve(lhs, A_rhs)` across all modes simultaneously
+- **Fourier snapshot reuse**: `_evolve_per_mode(return_fourier=True)` saves the already-computed Fourier-space data at each snapshot, eliminating n_snapshots × n_dyn redundant forward FFTs during constraint field reconstruction
 
-**Performance**: On coupled_proca_3d (16×16, t=5): modal 2.0s vs IDA 19.0s — **9.5× speedup**. IDA fails entirely at 32×32 (convergence issues), while modal runs at any grid size.
+At each output time, constraint fields are reconstructed directly from the saved Fourier data: c(k) = -S_cc⁻¹·S_cd·d(k).
+
+**Performance**: On coupled_proca_3d (16³, t=5, 51 snapshots): modal 0.08s vs IDA 19.0s — **~238× speedup**. IDA fails entirely at 32×32 (convergence issues), while modal runs at any grid size.
 
 **References**: Hairer & Wanner (1996), *Solving ODEs II*, Ch. VII; Ascher & Petzold (1998), *Computer Methods for ODEs/DAEs*, §10.2.
 
@@ -363,6 +371,43 @@ At each output time, constraint fields are reconstructed: c(k) = -S_cc⁻¹·S_c
 4. **Spectral operators and energy measurement**: The modal solver works in k-space, but the energy measurement evaluates the Hamiltonian in physical space. The `--spectral` flag is preserved (not disabled) for modal so that the energy measurement uses FFT-based gradient operators matching the modal solver's conserved Hamiltonian. Without this, FD gradients produce conservation errors that increase with N (the FD Hamiltonian differs from the Fourier Hamiltonian). For gradient×gradient terms in the Hamiltonian, the measurement uses direct gradient product ⟨∂f, ∂g⟩ rather than IBP ⟨-f, ∂²g⟩ when spectral is active, because rfft Nyquist-mode handling creates O(1/N) discrepancy between the two.
 
 5. **Per-mode eigendecomposition conditioning**: For coupled multi-field systems where fields have similar dispersion (e.g., massless graviton-photon), the 4×4 per-mode block A = [[0, I], [K, 0]] has near-degenerate eigenvalue pairs, causing cond(V) up to 10^291. This limits energy conservation to ~1.5e-5 (eigenvector reconstruction error). The solution (future work) is to eigendecompose the 2×2 K matrix and use Hamiltonian cos/sin structure, reducing conditioning to O(1).
+
+## Performance Optimizations
+
+The modal solver has undergone two rounds of targeted optimization, each measured with incremental benchmarking. All changes preserve machine-precision accuracy.
+
+### Round 1: Sparse convolution matrix (commit dfa1002)
+
+**Problem:** The position-dependent path built a dense n_total×n_total convolution matrix, but for localized coefficients (Gaussian B₀) most entries are negligibly small.
+
+**Fix:** Threshold entries below 1e-14 × max|A|, convert to sparse CSC when density < 30%. `scipy.sparse.linalg.expm_multiply` natively supports sparse matrices.
+
+| Grid N | Density | Dense | Sparse | Speedup | Max diff |
+|--------|---------|-------|--------|---------|----------|
+| 128 | 4.0% | 5.44s | 0.23s | **24×** | 7.4e-14 |
+| 256 | 2.6% | 15.85s | 0.59s | **27×** | 1.2e-13 |
+| 512 | 1.4% | 29.08s | 1.23s | **24×** | 1.1e-12 |
+
+### Round 2: Micro-optimizations (commit 7f32722)
+
+| ID | Optimization | Location | Impact |
+|----|-------------|----------|--------|
+| O1 | Vectorize convolution coupling inner loop | `_add_convolution_coupling` | pos-dep N=512: 1.79→1.36s |
+| O3 | Batch S_cc inversion (eliminate per-mode loop) | `_build_constraint_eliminated_matrices` | constraint path 1.7× faster |
+| O4 | Batch vel_coupling solve | `_build_constraint_eliminated_matrices` | (part of constraint 1.7×) |
+| O5 | Analytical rfft shape (eliminate FFT-of-zeros probe) | `_fft_slots` | removes wasted computation |
+| O6 | Pre-allocate y_hat_t buffer outside timestep loop | `_evolve_per_mode` | fewer allocations |
+| O7 | Return Fourier snapshots to avoid re-FFT | `_evolve_per_mode` + `solve_modal` | constraint path 1.7× faster |
+
+**Rejected:** O2 (vectorize snapshot evaluation across all output times) — the batched exp+einsum created larger intermediate arrays with more memory pressure, making it 1.3× slower than the lightweight per-timestep loop.
+
+### Combined result
+
+| Path | Before optimization | After | Total speedup |
+|------|-------------------|-------|--------------|
+| Constant-coeff (eigendecomp, N=512) | 0.026s | 0.020s | **1.3×** |
+| Position-dep (expm_multiply, N=512) | ~29s | 1.4s | **~21×** |
+| Constraint (Proca 3D, 16³) | 0.136s | 0.078s | **1.7×** |
 
 ## References
 
