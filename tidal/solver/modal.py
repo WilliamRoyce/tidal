@@ -173,11 +173,11 @@ def _fft_slots(
     shape = grid.shape
 
     # For 1D: rfft output length is shape[0]//2 + 1
-    # For nD: use rfftn which produces shape[:-1] + (shape[-1]//2+1,)
-    # We flatten the modal output for uniform handling.
-    sample_data = np.zeros(shape)
-    sample_hat = np.fft.rfftn(sample_data)
-    n_modes = sample_hat.size
+    # For nD: rfftn produces shape[:-1] + (shape[-1]//2+1,)
+    # Compute analytically instead of probing with a zero FFT.
+    rfft_shape = list(shape)
+    rfft_shape[-1] = shape[-1] // 2 + 1
+    n_modes = int(np.prod(rfft_shape))
 
     y_hat = np.zeros((n_slots, n_modes), dtype=np.complex128)
     for slot_idx in range(n_slots):
@@ -477,17 +477,14 @@ def _build_constraint_eliminated_matrices(
 
     # --- Compute Schur complement ---
 
-    # Invert S_cc per mode (small matrix, typically 1x1 or 2x2)
-    S_cc_inv = np.zeros_like(S_cc)
-    for m in range(n_modes):
-        det = np.linalg.det(S_cc[m]) if n_c > 0 else 1.0
-        if abs(det) < 1e-14:
-            # Singular at k=0 (gauge freedom) — regularize
-            S_cc_inv[m] = np.linalg.inv(
-                S_cc[m] + 1e-14 * np.eye(n_c, dtype=np.complex128),
-            )
-        else:
-            S_cc_inv[m] = np.linalg.inv(S_cc[m])
+    # Batch-invert S_cc across all modes (small matrices, typically 1x1 or 2x2)
+    # Detect and regularize singular modes (e.g. k=0 gauge freedom)
+    dets = np.linalg.det(S_cc) if n_c > 0 else np.ones(n_modes)
+    singular_mask = np.abs(dets) < 1e-14
+    S_cc_reg = S_cc.copy()
+    if np.any(singular_mask):
+        S_cc_reg[singular_mask] += 1e-14 * np.eye(n_c, dtype=np.complex128)
+    S_cc_inv = np.linalg.inv(S_cc_reg)  # (n_modes, n_c, n_c)
 
     # Recovery: c = -S_cc⁻¹ · S_cd · d
     # recovery[m, ci, dj] = -Σ_cj S_cc_inv[m,ci,cj] · S_cd[m,cj,dj]
@@ -517,10 +514,11 @@ def _build_constraint_eliminated_matrices(
             (n_modes, n_dyn, n_dyn),
         ).copy()
         lhs = eye - vel_coupling
-        # A_reduced = lhs⁻¹ · A_rhs (per mode)
-        A_reduced = np.zeros((n_modes, n_dyn, n_dyn), dtype=np.complex128)
-        for m in range(n_modes):
-            A_reduced[m] = np.linalg.solve(lhs[m], A_rhs[m])
+        # Batch solve: A_reduced = lhs⁻¹ · A_rhs (all modes at once)
+        A_reduced: NDArray[np.complex128] = np.asarray(
+            np.linalg.solve(lhs, A_rhs),
+            dtype=np.complex128,
+        )
     else:
         A_reduced = A_rhs
 
@@ -805,10 +803,9 @@ def _add_convolution_coupling(
 
         # result_hat[m] = Σ_{k'} (1/N) ĉ_{m-k'} δ_{k',m'} = (1/N) ĉ_{m-m'}
         # multiplied by operator multiplier at m'
-        for m in range(n_modes):
-            row = row_slot * n_modes + m
-            col = col_slot * n_modes + m_prime
-            A[row, col] += result_hat[m] * operator_mult[m_prime]
+        row_start = row_slot * n_modes
+        col = col_slot * n_modes + m_prime
+        A[row_start : row_start + n_modes, col] += result_hat * operator_mult[m_prime]
 
 
 # ---------------------------------------------------------------------------
@@ -910,7 +907,9 @@ def _evolve_per_mode(
     grid: GridInfo,
     snapshot_callback: Callable[[float, NDArray[np.float64]], None] | None,
     progress: SimulationProgress | None,
-) -> tuple[NDArray[np.float64], NDArray[np.float64]]:
+    *,
+    return_fourier: bool = False,
+) -> tuple[NDArray[np.float64], NDArray[np.float64], NDArray[np.complex128] | None]:
     """Evolve system with per-mode independent matrices (constant coefficients).
 
     A_modes has shape (n_modes, n_slots, n_slots).
@@ -990,9 +989,21 @@ def _evolve_per_mode(
     times = np.zeros(n_snapshots)
     n_modes = y0_hat.shape[1]
 
+    # Optionally collect Fourier-space snapshots (avoids re-FFT in constraint
+    # recovery — the Fourier data is already computed here).
+    fourier_snaps: NDArray[np.complex128] | None = None
+    if return_fourier:
+        fourier_snaps = np.zeros(
+            (n_snapshots, n_slots, n_modes),
+            dtype=np.complex128,
+        )
+
+    # Pre-allocate buffer reused each timestep (avoids n_snapshots allocations)
+    y_hat_t = np.zeros((n_slots, n_modes), dtype=np.complex128)
+
     for ti, t in enumerate(t_eval):
         dt = t - t0
-        y_hat_t = np.zeros((n_slots, n_modes), dtype=np.complex128)
+        y_hat_t[:] = 0.0
 
         for block_slots, V_y0, eig_vals in block_evolved:
             # exp_lambda shape: (n_modes, block_size)
@@ -1000,6 +1011,9 @@ def _evolve_per_mode(
             # y_evolved[m, i] = Σ_j V_y0[m, i, j] * exp(λ_j * dt)
             y_evolved = np.einsum("mij,mj->mi", V_y0, exp_lambda)
             y_hat_t[block_slots, :] = y_evolved.T
+
+        if fourier_snaps is not None:
+            fourier_snaps[ti] = y_hat_t
 
         y_physical = _ifft_slots(y_hat_t, layout, grid)
         snapshots[ti] = y_physical
@@ -1011,7 +1025,7 @@ def _evolve_per_mode(
         if progress is not None:
             progress.update(t)
 
-    return times, snapshots
+    return times, snapshots, fourier_snaps
 
 
 def _evolve_full_matrix(
@@ -1286,8 +1300,8 @@ def solve_modal(
             dynamical_fields=layout.dynamical_fields,
         )
 
-        # Evolve dynamical fields
-        times, dyn_snapshots = _evolve_per_mode(
+        # Evolve dynamical fields (return Fourier data to avoid re-FFT)
+        times, dyn_snapshots, dyn_fourier = _evolve_per_mode(
             A_reduced,
             y0_hat_dyn,
             t_eval,
@@ -1295,22 +1309,18 @@ def solve_modal(
             grid,
             None,
             progress,  # callback handled below with full state
+            return_fourier=True,
         )
 
         # Reconstruct full state (including constraints) at each snapshot
         n_full = layout.num_slots * n_pts
         snapshots = np.zeros((len(t_eval), n_full))
+        assert dyn_fourier is not None  # guaranteed by return_fourier=True
 
         for ti in range(len(t_eval)):
             dyn_phys = dyn_snapshots[ti]
-            # Re-FFT dynamical fields for constraint recovery
-            y_hat_dyn_t = np.zeros((n_dyn, n_modes), dtype=np.complex128)
-            for di in range(n_dyn):
-                y_hat_dyn_t[di] = np.fft.rfftn(
-                    dyn_phys[di * n_pts : (di + 1) * n_pts].reshape(
-                        grid.shape,
-                    ),
-                ).ravel()
+            # Use Fourier data directly (already computed in _evolve_per_mode)
+            y_hat_dyn_t = dyn_fourier[ti]  # (n_dyn, n_modes)
 
             # Recover constraint fields: c_hat = recovery @ d_hat
             c_hat = np.einsum("mcj,jm->cm", recovery_matrix, y_hat_dyn_t)
@@ -1352,7 +1362,7 @@ def solve_modal(
             k_grid,
             rfft_shape,
         )
-        times, snapshots = _evolve_per_mode(
+        times, snapshots, _ = _evolve_per_mode(
             A_modes,
             y0_hat,
             t_eval,
