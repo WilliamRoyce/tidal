@@ -256,12 +256,13 @@ is precomputed once and supplied analytically via three delivery tiers:
 | Tier | Size Range | Method | Speedup vs FD |
 |------|-----------|--------|---------------|
 | Dense | N ≤ 2,000 | 2D `jacfn` callback | 5.3x |
-| Sparse | 2K < N ≤ 200K | 1D CSC `jacfn` + SuperLU_MT | IDA: 1.35x |
+| Sparse | 2K < N ≤ 200K | 1D CSC `jacfn` + SuperLU_MT | IDA: 2.5x, CVODE: 1.2-1.4x |
 | GMRES | N > 200K | `jactimes` mat-vec product | Eliminates O(n_colors) evals |
 
-Operator matrices use O(nnz) circulant construction for periodic BCs (28x
-faster than probing). Falls through to FD tiers for time-dependent systems.
-Requires sksundae ≥ 1.1.2.
+Construction uses COO triple accumulation (`_COOAccumulator`) with a single
+CSC conversion — O(nnz) total instead of O(N²) LIL block-assignment.
+Operator matrices use O(nnz) circulant construction for periodic BCs.
+Falls through to FD tiers for time-dependent systems. Requires sksundae ≥ 1.1.2.
 
 ### Coefficient Resolution Hierarchy (4-Level Cache)
 

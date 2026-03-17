@@ -9,15 +9,24 @@ and ``dF/dyp`` once and supply them analytically.
 Three delivery modes depending on system size:
 
 - **Dense tier** (N <= DENSE_THRESHOLD):  ``jacfn`` fills a 2D numpy
-  array with ``dF_dy + cj * dF_dyp``.
+  array with ``dF_dy + cj * dF_dyp``.  ~5.3x speedup vs FD.
 - **Sparse tier** (DENSE_THRESHOLD < N <= SPARSE_THRESHOLD):  ``jacfn``
   fills a 1D CSC data array with ``dF_dy.data + cj * dF_dyp.data``,
   paired with a sparsity pattern for SuperLU_MT direct factorisation.
-  Requires sksundae >= 1.1.2.
+  Requires sksundae >= 1.1.2.  IDA: ~2.5x, CVODE: ~1.2-1.4x.
 - **GMRES tier** (N > SPARSE_THRESHOLD):  ``jactimes`` provides an
   analytical Jacobian-vector product ``Jv = dF_dy @ v + cj * dF_dyp @ v``
   using sparse matrix-vector products, eliminating finite-difference
   residual evaluations per GMRES iteration.
+
+Performance optimisations:
+
+- **COO accumulation**: ``build_jacobian_matrices()`` uses
+  ``_COOAccumulator`` to append block triples and do a single CSC
+  conversion, avoiding O(N²)-per-block LIL slice assignment.
+- **Circulant operators**: For all-periodic BCs,
+  ``build_operator_matrix()`` probes a single grid point and tiles the
+  stencil via modular arithmetic — O(nnz) instead of O(N²) probing.
 
 Position-dependent (but time-independent) coefficients are supported:
 the spatial grid is fixed, so the Jacobian is still constant.

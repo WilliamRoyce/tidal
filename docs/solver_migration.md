@@ -516,21 +516,24 @@ For **time-independent** systems (most TIDAL examples), the Jacobian
 precomputed once and supplied analytically, eliminating finite-difference
 residual evaluations.  Three delivery modes by system size:
 
-| Tier | Size Range | Method | Speedup |
-|------|-----------|--------|---------|
-| Dense | N ≤ 2,000 | 2D `jacfn` fills dense array | 5.3x vs FD |
-| Sparse | 2,000 < N ≤ 200,000 | 1D CSC `jacfn` + SuperLU_MT direct | IDA: 1.35x, CVODE: wins at long t_end |
+| Tier | Size Range | Method | Speedup vs FD |
+|------|-----------|--------|---------------|
+| Dense | N ≤ 2,000 | 2D `jacfn` fills dense array | 5.3x |
+| Sparse | 2,000 < N ≤ 200,000 | 1D CSC `jacfn` + SuperLU_MT direct | IDA: 2.5x, CVODE: 1.2-1.4x |
 | GMRES | N > 200,000 | `jactimes` analytical mat-vec product | Eliminates O(n_colors) residual evals |
 
 The sparse tier requires sksundae ≥ 1.1.2 (fixes
 [scikit-sundae#46](https://github.com/NatLabRockies/scikit-sundae/issues/46)
 where `jacfn` was silently overwritten when `sparsity` was provided).
 When sparsity nnz exceeds `SUPERLU_NNZ_LIMIT` (100K), the sparse tier falls
-through to GMRES with analytical `jactimes`.
+through to GMRES with analytical `jactimes`.  A cheap nnz pre-check via
+`build_jacobian_sparsity()` avoids building full matrices when they would
+be discarded.
 
-**Operator matrix construction**: For all-periodic BCs, operator matrices
-are built via a circulant single-probe approach in O(nnz) time (28x faster
-than O(N²) column probing).  Non-periodic BCs use the probing fallback.
+**Construction performance**: Jacobian matrices are assembled via COO triple
+accumulation (`_COOAccumulator`) with a single CSC conversion — O(nnz)
+total.  For all-periodic BCs, operator matrices use a circulant single-probe
+construction (O(nnz) vs O(N²) column probing).
 
 Time-dependent systems bypass the analytical Jacobian and use the FD-based
 tier system described above.
