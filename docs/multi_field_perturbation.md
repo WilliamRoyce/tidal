@@ -212,7 +212,7 @@ For uniform B₀, the coupling coefficients are constants (proportional to B₀)
 
 ## Validation
 
-1. **Regression**: All 1484 tests pass; 27 examples unaffected
+1. **Regression**: All 1568 tests pass; 28 examples unaffected
 2. **TOML validation**: `matter_perturbations` accepted/rejected correctly (5 error-case tests)
 3. **WLS generation**: `--dry-run` produces correct `DefTensorPerturbation` + multi-field `VarD` (verified)
 4. **End-to-end**: Einstein-Maxwell `--dry-run` generates correct WLS with coupling terms

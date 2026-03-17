@@ -1,7 +1,7 @@
 # Next Features: Parameter Sweeps & Measurements
 
 **Created:** March 2026
-**Branch:** `feature/parameter-sweep` (1,484 tests passing)
+**Branch:** `feature/parameter-sweep` (1,568 tests passing)
 **Status:** All phases (A–D) complete
 
 This document tracks proposed features for TIDAL's parameter sweep framework and measurement modules. Each feature includes scope, generality analysis, implementation details, and acceptance criteria.
@@ -886,4 +886,4 @@ Most features are independent. The main dependency chain is F1 -> F2 -> F4 (TOML
 | C     | F3 + F6       | Medium     | `feature/parameter-sweep` | Complete |
 | D     | F4 + F8       | Medium     | `feature/parameter-sweep` | Complete |
 
-All 8 features are implemented. 1,484 tests passing, lint clean.
+All 8 features are implemented. 1,568 tests passing, lint clean.

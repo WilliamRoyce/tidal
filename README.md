@@ -18,7 +18,7 @@ View the `tidal` package documentation [here](https://williamroyce.github.io/tor
 
 A research codebase for exploring **electromagnetic ↔ gravitational wave conversion** ([Gertsenshtein effect](https://arxiv.org/abs/2301.02072); Gertsenshtein 1962, Domcke & Garcia-Cely 2023) and potential **amplification mechanisms** in gravity theories with **torsion** (Poincaré gauge theory; parity-even quadratic invariants). The repository includes:
 
-- **A native PDE solver framework** (SUNDIALS IDA/CVODE + leapfrog + scipy, with numpy spatial operators) for time-domain simulations with **1,484 Python tests + ~115 Wolfram tests**.
+- **A native PDE solver framework** (SUNDIALS IDA/CVODE + leapfrog + scipy, with numpy spatial operators) for time-domain simulations with **1,568 Python tests + ~115 Wolfram tests**.
 - A symbolic pipeline (Mathematica + xAct) for **deriving linearized field equations** and exporting them to Python-friendly JSON specifications.
 - Documentation and experiments for **mixing mechanisms** and **hyperbolicity/causality checks** relevant to the effect.
 
@@ -44,7 +44,7 @@ For more, visit the [Documentation](https://williamroyce.github.io/torsion-gerts
 - **CLI (`tidal` command)**: unified command-line interface with 9 subcommands — `tidal derive` (Lagrangian → JSON via TOML config), `tidal simulate` (JSON → PDE simulation with plotting), `tidal measure` (post-hoc measurement extraction from snapshot directories), `tidal inspect` (equation system info), `tidal list` (discover available specs), `tidal validate` (JSON spec validation), `tidal plot` (standalone plotting from simulation output), `tidal sweep` (automated parameter sweeps with adaptive sampling, convergence analysis, and sensitivity analysis), `tidal analyze` (post-hoc Sobol/Morris sensitivity analysis of sweep results). Supports `theory.toml` configs with `[[derived_fields]]`, `[[background_fields]]`, and optional `[[gauge]]` sections. Zero new dependencies (stdlib argparse + tomllib).
 - **Measurement module (`tidal.measurement`)**: 13 post-hoc analysis types — summary, energy, conversion P(t), mixing length, spectrum, spectral conversion P(k,t), dispersion omega(k), conservation diagnostics, effective mass, asymptotic scattering, peak conversion, group/phase velocity, and resonance analysis. Disk-backed snapshot storage for long simulations via `SnapshotWriter`.
 - **Dev environment**: container-first, [`uv`] for Python (3.11 pinned), Wolfram Engine 14.3 with xAct tensor framework, optional ffmpeg; Sphinx docs skeleton; type-checked codebase with pytest test suite.
-- **Professional development infrastructure**: 1,484 Python tests + ~115 Wolfram tests, 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution. 0 ruff violations, 0 pyright errors (strict mode).
+- **Professional development infrastructure**: 1,568 Python tests + ~115 Wolfram tests, 5 utility scripts for streamlined workflows (`run_wolfram_tests.sh`, `run_examples.sh`, `full_test.sh`, `validate_pipeline.sh`, `lint_wolfram.sh`), comprehensive documentation with module headers and usage strings, robust kernel caching handling for reliable test execution. 0 ruff violations, 0 pyright errors (strict mode).
 
 This README describes the current capabilities, how to run the examples, and planned improvements.
 
@@ -96,7 +96,7 @@ See [`scripts/README.md`](scripts/README.md) for complete setup instructions and
 
 - **Solver migration to SUNDIALS (February 2026)**: Replaced py-pde with a native solver architecture: SUNDIALS IDA for DAE systems (algebraic constraints), CVODE for adaptive BDF time-stepping with tolerance control, Störmer-Verlet leapfrog for symplectic integration, and scipy `solve_ivp` for general-purpose adaptive ODE. Pure numpy spatial operators. Automatic solver selection based on equation structure. Three-tier constraint pre-solve (FFT, sparse matrix, automatic). See [docs/solver_migration.md](docs/solver_migration.md) and [docs/adaptive_timestepping.md](docs/adaptive_timestepping.md).
 - **Parameter Sweep Framework (March 2026)**: Complete `tidal sweep` and `tidal analyze` commands with 13 measurement types, TOML sweep configuration, adaptive + Latin Hypercube + Sobol sampling, Sobol/Morris sensitivity analysis, run status tracking, and advanced visualization (parallel coordinates, tornado, scatter plots). See [docs/next-features.md](docs/next-features.md).
-- **Phase 4-13+ Pipeline Evolution (February 2026)**: All critical implementation complete. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **CLI**: Full `tidal` command with 9 subcommands. **Background fields**: `[[background_fields]]` TOML for non-dynamical tensors with position-dependent coefficients and 4-level caching. **Gauge fixing**: Optional per-field `[[gauge]]` TOML (Lorenz, de Donder, Coulomb, temporal, axial). **1,484 Python tests + ~115 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
+- **Phase 4-13+ Pipeline Evolution (February 2026)**: All critical implementation complete. **Phase 12**: Auto-computed mass/coupling matrices with symbolic preservation. **Phase 13**: Rank 3+ tensor support. **CLI**: Full `tidal` command with 9 subcommands. **Background fields**: `[[background_fields]]` TOML for non-dynamical tensors with position-dependent coefficients and 4-level caching. **Gauge fixing**: Optional per-field `[[gauge]]` TOML (Lorenz, de Donder, Coulomb, temporal, axial). **1,568 Python tests + ~115 Wolfram tests passing**. See [CHANGELOG.md](CHANGELOG.md) for complete history.
 - **Lagrangian-to-PDE pipeline (February 2026)**: Complete symbolic derivation pipeline: Mathematica/xAct → JSON → native Python solvers. Canonical momentum pipeline with symbolic K^{-1} inversion for non-diagonal kinetic matrices. Lagrangian-first linearization via xPert (`Perturbation[L, 2]`). See [CHANGELOG.md](CHANGELOG.md) for details.
 
 ## Future Development
@@ -145,7 +145,7 @@ Common CLI tools pre-installed in the container: `git`, `node`, `npm`, `eslint`,
 
 ### Lagrangian-to-PDE Pipeline Examples
 
-The repository includes a complete symbolic-to-numerical pipeline for deriving field equations from Lagrangians and simulating them numerically. **27 examples** cover scalars, vectors, rank-3 tensors, coupled multi-field systems, curvilinear coordinates, curved spacetimes, and background-field scattering.
+The repository includes a complete symbolic-to-numerical pipeline for deriving field equations from Lagrangians and simulating them numerically. **28 examples** cover scalars, vectors, rank-3 tensors, coupled multi-field systems, curvilinear coordinates, curved spacetimes, and background-field scattering.
 
 ```bash
 # Each example has a run.sh showing the full derive → inspect → simulate workflow:
@@ -227,9 +227,9 @@ If `ffmpeg` is unavailable, the example falls back to a GIF via Pillow.
 
 ## Tests
 
-The project includes a comprehensive test suite with **1,484 Python tests + ~115 Wolfram tests**.
+The project includes a comprehensive test suite with **1,568 Python tests + ~115 Wolfram tests**.
 
-### Python Tests (1,484 tests)
+### Python Tests (1,568 tests)
 
 ```bash
 # Run all Python tests with pytest
@@ -380,7 +380,7 @@ See [`scripts/README.md`](scripts/README.md) for detailed setup instructions.
 ## Contributing
 
 - Open an issue or submit a PR.
-- **Test requirements**: All changes must maintain 100% test pass rate (1,484 Python + ~115 Wolfram tests). New features require corresponding unit tests in both Python and Wolfram layers where applicable.
+- **Test requirements**: All changes must maintain 100% test pass rate (1,568 Python + ~115 Wolfram tests). New features require corresponding unit tests in both Python and Wolfram layers where applicable.
 - Run `./scripts/full_test.sh` before submitting PRs to verify all tests pass.
 - Follow the project's type-checking and linting conventions (keyword-only booleans, explicit type annotations, no print in library code).
 

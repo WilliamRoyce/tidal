@@ -3,7 +3,7 @@
 This document outlines the planned improvements and features for the TIDAL symbolic physics pipeline project.
 
 **Last Updated:** March 2026
-**Project Status:** Phase 13+ Complete, CLI + measurement + solver migration + parameter sweeps done (1,484 Python tests + ~115 Wolfram tests)
+**Project Status:** Phase 13+ Complete, CLI + measurement + solver migration + parameter sweeps done (1,568 Python tests + ~115 Wolfram tests)
 
 ## Overview
 
@@ -203,7 +203,7 @@ Issues should be tagged with appropriate labels:
 
 ## Current Focus
 
-**As of v0.5.0:**
+**As of v0.6.0:**
 
 - ✅ Phase 13+ completed: All core pipeline features implemented
 - ✅ Solver migration: SUNDIALS IDA/CVODE + leapfrog + scipy replaces py-pde
@@ -215,7 +215,7 @@ Issues should be tagged with appropriate labels:
 - ✅ CLI (`tidal` command) implemented: 9 subcommands, zero new dependencies
 - ✅ Measurement module: 13 types (energy, conversion, mixing, spectrum, spectral_conversion, dispersion, conservation, effective_mass, asymptotic, peak_conversion, velocity, resonance, summary)
 - ✅ 27 working examples spanning 1+1D through 3+1D
-- ✅ 1,484 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
+- ✅ 1,568 Python tests + ~115 Wolfram tests passing, 0 ruff violations, 0 pyright errors
 - ✅ 21 of 25 original issues resolved (84%)
 - 🔄 **Primary remaining focus:** Phase D (Gertsenshtein example — the project's raison d'être)
 - 🔄 **Secondary:** Phase 2 (Wolfram CI)
