@@ -248,6 +248,21 @@ Each backend calls `RHSEvaluator.evaluate()` with different integration strategi
 
 Automatic solver selection: systems with algebraic constraints → IDA; pure wave equations → CVODE or leapfrog.
 
+### Analytical Jacobian (`analytical_jacobian.py`)
+
+For time-independent linear systems, the Jacobian `J = dF/dy + cj * dF/dyp`
+is precomputed once and supplied analytically via three delivery tiers:
+
+| Tier | Size Range | Method | Speedup vs FD |
+|------|-----------|--------|---------------|
+| Dense | N ≤ 2,000 | 2D `jacfn` callback | 5.3x |
+| Sparse | 2K < N ≤ 200K | 1D CSC `jacfn` + SuperLU_MT | IDA: 1.35x |
+| GMRES | N > 200K | `jactimes` mat-vec product | Eliminates O(n_colors) evals |
+
+Operator matrices use O(nnz) circulant construction for periodic BCs (28x
+faster than probing). Falls through to FD tiers for time-dependent systems.
+Requires sksundae ≥ 1.1.2.
+
 ### Coefficient Resolution Hierarchy (4-Level Cache)
 
 Each RHS term has a coefficient that may be constant, time-dependent, or position-dependent.

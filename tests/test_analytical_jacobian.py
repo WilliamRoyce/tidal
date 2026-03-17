@@ -738,6 +738,252 @@ class TestJacobianDelivery:
 
 
 # ---------------------------------------------------------------------------
+# Circulant operator matrix construction
+# ---------------------------------------------------------------------------
+
+
+class TestCirculantOperatorMatrix:
+    """Verify circulant fast-path matches probing for all operator types."""
+
+    @staticmethod
+    def _build_probing(operator: str, grid: GridInfo, bc: str | tuple[str, ...]) -> Any:
+        """Build operator matrix via O(N²) probing (reference)."""
+        from tidal.solver.operators import apply_operator
+
+        n = grid.num_points
+        from tidal.solver._scipy_types import lil_matrix as _lil
+
+        mat = _lil((n, n))
+        e_j = np.zeros(grid.shape)
+        for j in range(n):
+            e_j.flat[:] = 0.0
+            e_j.flat[j] = 1.0
+            col = apply_operator(operator, e_j, grid, bc)
+            col_flat = col.ravel()
+            nz = np.nonzero(col_flat)[0]
+            for row in nz:
+                mat[row, j] = col_flat[row]
+        return mat.tocsc()
+
+    def test_laplacian_x_2d(self) -> None:
+        """laplacian_x on 2D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("laplacian_x", grid, "periodic")
+        ref = self._build_probing("laplacian_x", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_laplacian_y_2d(self) -> None:
+        """laplacian_y on 2D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("laplacian_y", grid, "periodic")
+        ref = self._build_probing("laplacian_y", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_gradient_x_2d(self) -> None:
+        """gradient_x on 2D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("gradient_x", grid, "periodic")
+        ref = self._build_probing("gradient_x", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_gradient_y_2d(self) -> None:
+        """gradient_y on 2D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("gradient_y", grid, "periodic")
+        ref = self._build_probing("gradient_y", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_cross_derivative_xy_2d(self) -> None:
+        """cross_derivative_xy on 2D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("cross_derivative_xy", grid, "periodic")
+        ref = self._build_probing("cross_derivative_xy", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_laplacian_full_2d(self) -> None:
+        """Full laplacian (sum of directional) on 2D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("laplacian", grid, "periodic")
+        ref = self._build_probing("laplacian", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_biharmonic_1d(self) -> None:
+        """Biharmonic on 1D periodic grid."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10),), shape=(16,), periodic=(True,))
+        mat = build_operator_matrix("biharmonic", grid, "periodic")
+        ref = self._build_probing("biharmonic", grid, "periodic")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_3d_operators(self) -> None:
+        """laplacian_z, gradient_z, cross_derivative_xz, cross_derivative_yz on 3D."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(
+            bounds=((0, 10), (0, 10), (0, 10)),
+            shape=(4, 4, 4),
+            periodic=(True, True, True),
+        )
+        for op in [
+            "laplacian_z",
+            "gradient_z",
+            "cross_derivative_xz",
+            "cross_derivative_yz",
+        ]:
+            mat = build_operator_matrix(op, grid, ("periodic", "periodic", "periodic"))
+            ref = self._build_probing(op, grid, ("periodic", "periodic", "periodic"))
+            np.testing.assert_allclose(
+                mat.toarray(), ref.toarray(), atol=1e-14, err_msg=f"{op} mismatch"
+            )
+
+    def test_identity_uses_probing_fallback(self) -> None:
+        """Identity operator should NOT use circulant (trivially sparse eye)."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        mat = build_operator_matrix("identity", grid, "periodic")
+        expected = np.eye(8)
+        np.testing.assert_allclose(mat.toarray(), expected, atol=1e-14)
+
+    def test_nonperiodic_uses_probing_fallback(self) -> None:
+        """Non-periodic BCs should fall back to probing."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(False,))
+        mat = build_operator_matrix("laplacian_x", grid, "neumann")
+        ref = self._build_probing("laplacian_x", grid, "neumann")
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+    def test_tuple_bc_periodic(self) -> None:
+        """Tuple BC ('periodic', 'periodic') should use circulant path."""
+        from tidal.solver.analytical_jacobian import build_operator_matrix
+
+        grid = GridInfo(bounds=((0, 10), (0, 10)), shape=(8, 8), periodic=(True, True))
+        mat = build_operator_matrix("laplacian_x", grid, ("periodic", "periodic"))
+        ref = self._build_probing("laplacian_x", grid, ("periodic", "periodic"))
+        np.testing.assert_allclose(mat.toarray(), ref.toarray(), atol=1e-14)
+
+
+# ---------------------------------------------------------------------------
+# Multi-theory sparse Jacobian integration tests
+# ---------------------------------------------------------------------------
+
+
+class TestMultiTheorySparseJacobian:
+    """Test sparse analytical Jacobian across real example theories.
+
+    These tests load real JSON specs and verify that the sparse jacfn
+    callback produces values matching the reference dense Jacobian.
+    """
+
+    @staticmethod
+    def _test_theory(json_name: str, params: dict[str, float]) -> None:
+        """Load a theory JSON and verify sparse jacfn matches dense Jacobian."""
+        import json
+        from pathlib import Path
+
+        from tidal.solver.analytical_jacobian import (
+            _create_sparse_jacfn,
+            _extract_aligned_data,
+        )
+
+        json_path = Path("examples/data") / json_name
+        if not json_path.exists():
+            return  # skip if example not available
+        spec_data = json.loads(json_path.read_text(encoding="utf-8"))
+        spec = EquationSystem.from_dict(spec_data)
+
+        # Use small grid to keep test fast
+        ndim = spec_data["spacetime"]["dimension"] - 1
+        if ndim == 1:
+            grid = GridInfo(bounds=((0, 10),), shape=(16,), periodic=(True,))
+        elif ndim == 2:
+            grid = GridInfo(
+                bounds=((0, 10), (0, 10)), shape=(6, 6), periodic=(True, True)
+            )
+        else:
+            grid = GridInfo(
+                bounds=((0, 10), (0, 10), (0, 10)),
+                shape=(4, 4, 4),
+                periodic=(True, True, True),
+            )
+        bc = "periodic"
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        # Build analytical Jacobian matrices
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, bc, params)
+
+        # Create sparse jacfn
+        jacfn, sparsity = _create_sparse_jacfn(dF_dy, dF_dyp)
+
+        # Test for several cj values
+        n = layout.total_size
+        for cj in [0.0, 1.0, math.pi]:
+            JJ = np.zeros(sparsity.nnz)
+            jacfn(0.0, np.zeros(n), np.zeros(n), np.zeros(n), cj, JJ)
+
+            # Reference
+            J_ref = (dF_dy + cj * dF_dyp).tocsc()
+            ref_data = _extract_aligned_data(J_ref, sparsity)
+            np.testing.assert_allclose(
+                JJ,
+                ref_data,
+                atol=1e-12,
+                err_msg=f"{json_name} cj={cj}",
+            )
+
+    def test_klein_gordon_1d(self) -> None:
+        """1D scalar: identity + laplacian_x."""
+        self._test_theory("klein_gordon_1d.json", {"m2": 1.0})
+
+    def test_coupled_scalars(self) -> None:
+        """2-field coupled: identity + laplacian_x + gradient coupling."""
+        self._test_theory(
+            "coupled_scalars.json",
+            {"B0": 1.0, "kappa": 0.1, "mg2": 1.0, "omegaP2": 1.0},
+        )
+
+    def test_proca_1d(self) -> None:
+        """1D Proca: identity + laplacian_x + gradient_x."""
+        self._test_theory("proca_1d.json", {"procaMassSquared": 1.0})
+
+    def test_em_3d(self) -> None:
+        """3D EM with constraints: laplacian + gradient + cross_derivative."""
+        self._test_theory("em_3d.json", {})
+
+    def test_navier_cauchy_2d(self) -> None:
+        """2D Navier-Cauchy: laplacian_x/y + cross_derivative_xy."""
+        self._test_theory("navier_cauchy_2d.json", {"lam": 1.0, "mu": 1.0, "rho": 1.0})
+
+    def test_scalar_vector_coupling(self) -> None:
+        """4-field with constraints + first_derivative_t."""
+        self._test_theory(
+            "scalar_vector_coupling.json",
+            {"Am2": 1.0, "phim2": 1.0, "gSV": 0.5, "kCS": 0.1},
+        )
+
+    def test_coupled_scattering(self) -> None:
+        """Position-dependent (Gaussian) coefficients."""
+        self._test_theory(
+            "coupled_scattering.json",
+            {"g0": 0.5, "R": 2.0, "mPhi2": 1.0, "mChi2": 1.0},
+        )
+
+
+# ---------------------------------------------------------------------------
 # try_analytical_jacobian integration
 # ---------------------------------------------------------------------------
 

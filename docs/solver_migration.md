@@ -509,7 +509,35 @@ the equation coupling structure:
 The sparsity pattern can be pre-computed from the equation specification without
 evaluating any numerical values.
 
-### 6.4 Performance Expectations
+### 6.4 Analytical Jacobian
+
+For **time-independent** systems (most TIDAL examples), the Jacobian
+`J = dF/dy + cj * dF/dyp` consists of two constant sparse matrices that are
+precomputed once and supplied analytically, eliminating finite-difference
+residual evaluations.  Three delivery modes by system size:
+
+| Tier | Size Range | Method | Speedup |
+|------|-----------|--------|---------|
+| Dense | N ≤ 2,000 | 2D `jacfn` fills dense array | 5.3x vs FD |
+| Sparse | 2,000 < N ≤ 200,000 | 1D CSC `jacfn` + SuperLU_MT direct | IDA: 1.35x, CVODE: wins at long t_end |
+| GMRES | N > 200,000 | `jactimes` analytical mat-vec product | Eliminates O(n_colors) residual evals |
+
+The sparse tier requires sksundae ≥ 1.1.2 (fixes
+[scikit-sundae#46](https://github.com/NatLabRockies/scikit-sundae/issues/46)
+where `jacfn` was silently overwritten when `sparsity` was provided).
+When sparsity nnz exceeds `SUPERLU_NNZ_LIMIT` (100K), the sparse tier falls
+through to GMRES with analytical `jactimes`.
+
+**Operator matrix construction**: For all-periodic BCs, operator matrices
+are built via a circulant single-probe approach in O(nnz) time (28x faster
+than O(N²) column probing).  Non-periodic BCs use the probing fallback.
+
+Time-dependent systems bypass the analytical Jacobian and use the FD-based
+tier system described above.
+
+Implementation: `tidal/solver/analytical_jacobian.py`.
+
+### 6.5 Performance Expectations
 
 | Grid Size | N (state) | Linear Solver          | Expected Step Time |
 | --------- | --------- | ---------------------- | ------------------ |
@@ -518,7 +546,7 @@ evaluating any numerical values.
 | 128×128   | ~160,000  | sparse or GMRES        | ~100 ms            |
 | 256×256   | ~650,000  | GMRES + preconditioner | ~1 s               |
 
-### 6.5 Index-1 DAE Requirement
+### 6.6 Index-1 DAE Requirement
 
 IDA requires index-1 DAEs. TIDAL's constraint equations are index-1 when:
 
