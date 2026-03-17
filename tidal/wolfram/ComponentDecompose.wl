@@ -401,6 +401,17 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
          metric contraction in the box operator and producing wrong-sign equations. *)
       eomSep = SeparateFieldMetrics[eom, chart];
 
+      (* Pre-expand Scalar[] wrappers ONCE on the full EOM before the     *)
+      (* per-component loop.  Without hoisting, ExpandScalarWrappers runs *)
+      (* inside ExtractTensorComponent for EACH component, redundantly    *)
+      (* re-expanding the same Scalar contents dim^rank times.            *)
+      (* For R̃²-coupled torsion theories: 6x speedup (h) + 9x (t).     *)
+      If[!FreeQ[eomSep, Scalar],
+        Print["  Pre-expanding Scalar[] wrappers (hoisted)..."];
+        eomSep = ExpandScalarWrappers[eomSep, chart];
+        Print["  Scalar expansion complete: ", If[FreeQ[eomSep, Scalar], "all resolved", "some remain"]];
+      ];
+
       (* Use Do+AppendTo instead of Table so Share[] can reclaim memory
          between component extractions — critical for cross-field coupling
          cases like Einstein-Maxwell where expressions grow large. *)
