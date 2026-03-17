@@ -151,6 +151,48 @@ SeparateFieldMetrics[expr_, chart_] := Module[
 ];
 
 
+(* === Scalar Wrapper Expansion === *)
+(* xPert wraps contracted tensor subexpressions in Scalar[...], marking  *)
+(* them as scalar invariants.  ToBasis[chart] treats Scalar as opaque —  *)
+(* it will not enter the wrapper to convert abstract indices to basis     *)
+(* form.  This leaves abstract dummy indices (e.g. -g$27013) inside,     *)
+(* causing ConvertCDToDerivatives to fail (it expects {i, -chart} form). *)
+(*                                                                        *)
+(* ExpandScalarWrappers resolves this by applying ToBasis + TraceBasis-   *)
+(* Dummy to the contents of each Scalar[], converting abstract indices    *)
+(* to concrete basis sums.  The Scalar wrapper is then removed (the      *)
+(* result is a plain numeric/symbolic expression).                        *)
+(*                                                                        *)
+(* Uses bounded iteration (max 5 passes) with fixed-point check to       *)
+(* prevent $RecursionLimit if ToBasis re-introduces Scalar wrappers.     *)
+(* Zero overhead for Scalar-free expressions (FreeQ early exit).         *)
+(*                                                                        *)
+(* Used by: ExtractTensorComponent, DecomposeToComponents (rank 0),      *)
+(*          DecomposeScalarExpression.                                    *)
+ExpandScalarWrappers[expr_, chart_] := Module[
+  {result = expr, prev, iter = 0, maxIter = 5},
+  (* Early exit if no Scalar wrappers present *)
+  If[FreeQ[result, Scalar], Return[result]];
+  While[!FreeQ[result, Scalar] && iter < maxIter,
+    prev = result;
+    (* Single-pass replacement: Scalar[x] → ToBasis + TraceBasisDummy *)
+    result = result /. Scalar[x_] :> Module[{inner},
+      inner = ToBasis[chart][x];
+      inner = TraceBasisDummy[inner];
+      inner
+    ];
+    iter++;
+    If[result === prev, Break[]]  (* Fixed point reached *)
+  ];
+  If[!FreeQ[result, Scalar] && iter >= maxIter,
+    Print["WARNING: ExpandScalarWrappers did not fully converge after ",
+      maxIter, " iterations. Remaining Scalar[]: ",
+      Short[Cases[result, Scalar[x_] :> Short[x, 2], {0, Infinity}], 3]]
+  ];
+  result
+];
+
+
 (* === Component Decomposition === *)
 
 (* Options for DecomposeToComponents *)
@@ -241,6 +283,9 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
     (* Separate metric contractions before ToBasis *)
     (* Ensures cross-field vector/tensor terms have covariant indices *)
     componentEq = SeparateFieldMetrics[componentEq, chart];
+
+    (* Expand Scalar[] wrappers before ToBasis (same issue as rank >= 1) *)
+    componentEq = ExpandScalarWrappers[componentEq, chart];
 
     (* Apply ToBasis term-by-term to avoid xperm segfault on large sums *)
     If[Head[componentEq] === Plus,
@@ -565,6 +610,13 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
     ];
     componentEq = eom /. replacements;
   ];
+
+  (* Step 1.3: Expand Scalar[] wrappers before ToBasis.                    *)
+  (* xPert wraps contracted sub-expressions in Scalar[...] which is opaque *)
+  (* to ToBasis — abstract indices inside remain unconverted.  Critical    *)
+  (* for R̃-decomposed torsion expressions where xPert produces            *)
+  (* Scalar[eta[a,b] * CD[-a][TorsionCDT[-b,-c,-d]]] contractions.       *)
+  componentEq = ExpandScalarWrappers[componentEq, chart];
 
   (* Step 1.5: SeparateFieldMetrics is now hoisted to DecomposeToComponents before the
      component loop. This step is a no-op here (already applied to eom). *)
@@ -986,17 +1038,11 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
 
   componentExpr = expr;
 
-  (* Expand Scalar[] wrappers.  Gauge-fixing terms produce                   *)
-  (* Scalar[CD_a V^a]^2 — the Scalar wrapper is opaque and prevents ToBasis/ *)
-  (* TraceBasisDummy from decomposing the inner expression to chart-basis     *)
-  (* components.  Expand by applying ToBasis + TraceBasisDummy to the inner   *)
-  (* expression, replacing the Scalar with the resulting component sum.       *)
-  (* This must happen before the main ToBasis call.                           *)
-  componentExpr = componentExpr //. Scalar[x_] :> Module[{inner},
-    inner = ToBasis[chart][x];
-    inner = TraceBasisDummy[inner];
-    inner
-  ];
+  (* Expand Scalar[] wrappers.  Gauge-fixing terms and R̃-decomposed torsion  *)
+  (* produce Scalar[CD_a V^a]^2 and Scalar[eta[a,b]*CD[-a][T[-b,-c,-d]]]    *)
+  (* that ToBasis cannot penetrate.  Uses shared ExpandScalarWrappers with   *)
+  (* bounded iteration for safety.                                           *)
+  componentExpr = ExpandScalarWrappers[componentExpr, chart];
 
   (* For curved spacetime: expand Christoffel symbols to metric derivatives *)
   If[shouldComputeChristoffels && metricMatrix =!= None,

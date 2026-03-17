@@ -8,8 +8,9 @@
 # This test verifies the torsion pipeline works correctly before
 # attempting the full 4D derivation.
 #
-# Lagrangian: (1/kappa^2) R + alpha1 T_{abc}T^{abc}
-# where R = RicciScalarCD[] (Levi-Civita) and T = TorsionCDT[a,-b,-c]
+# Lagrangian: (1/kappa^2) R̃ + alpha1 T_{abc}T^{abc}
+# where R̃ = RicciScalarCDT[] (Riemann-Cartan, auto-decomposed to R + T terms)
+# and T = TorsionCDT[a,-b,-c] (explicit torsion squared mass term)
 
 [theory]
 name = "Graviton-Torsion 2+1D"
@@ -34,7 +35,7 @@ symmetry = "symmetric"
 names = ["kappa", "alpha1"]
 
 [lagrangian]
-expression = "((1/kappa^2) RicciScalarCD[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f])"
+expression = "((1/kappa^2) RicciScalarCDT[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f])"
 
 [linearization]
 perturbation_field = "h"
