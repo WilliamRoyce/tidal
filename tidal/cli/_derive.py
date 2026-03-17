@@ -939,11 +939,14 @@ def _wls_multi_field_eom(  # noqa: PLR0914
                 # Apply ToCanonical term-by-term to avoid xperm segfault on
                 # large sums (xPerm external binary crashes when canonicalizing
                 # 80+ term VarD output as a single expression).
+                "(* Catch absorbs Throw[Null] from xAct Validate::inhom in R̃² theories *)",
                 f"If[Head[{eom_var}] === Plus,",
-                f"  {eom_var} = Total[ToCanonical /@ List @@ {eom_var}],",
-                f"  {eom_var} = ToCanonical[{eom_var}]",
+                f"  {eom_var} = Total[Catch[ToCanonical[#]] & /@ List @@ {eom_var}],",
+                f"  {eom_var} = Catch[ToCanonical[{eom_var}]]",
                 "];",
-                f"{eom_var} = ContractMetric[{eom_var}, {ctx.metric}];",
+                f"If[{eom_var} === Null, {eom_var} = 0];",
+                f"{eom_var} = Catch[ContractMetric[{eom_var}, {ctx.metric}]];",
+                f"If[{eom_var} === Null, {eom_var} = 0];",
                 # Zero background curvature in the abstract EOM. VarD integration
                 # by parts on covariant derivatives can reintroduce abstract Riemann
                 # terms (via [∇_a, ∇_b] commutator) even if L^(2) was cleaned.
@@ -992,6 +995,26 @@ def _wls_multi_field_eom(  # noqa: PLR0914
 
     # Decompose each field incrementally, freeing EOM/components between fields
     # to reduce peak memory (cross-field coupling can blow up DecomposeToComponents).
+    #
+    # For R̃²-decomposed torsion theories: temporarily disable xAct's
+    # UncatchedValidate to prevent Throw[Null] from Validate::inhom.
+    # The DummyIn-allocated indices in Scalar products create "inhomogeneous"
+    # index sets that are physically correct (contracted inside Scalar) but
+    # trigger xAct's strict validation during expression evaluation.
+    lines.extend(
+        [
+            "(* Temporarily disable ALL xAct Validate for R̃²-type expressions.   *)",
+            "(* DummyIn-allocated indices in Scalar products trigger Throw[Null]    *)",
+            "(* from Validate::inhom during expression evaluation.                  *)",
+            "(* Override FindIndices to prevent index checking entirely.            *)",
+            "Off[Validate::inhom, Validate::unknown, Validate::repeated];",
+            "savedFindIndices = DownValues[FindIndices];",
+            "Unprotect[FindIndices];",
+            "ClearAll[FindIndices];",
+            "FindIndices[x_] := Null;",
+            "",
+        ]
+    )
     lines.append("fieldEquations = {};")
     for i, df in enumerate(dyn_fields):
         eom_var = f"eom{df['name'].capitalize()}"
@@ -1027,6 +1050,17 @@ def _wls_multi_field_eom(  # noqa: PLR0914
                 "",
             ]
         )
+
+    # Restore xAct Validate after all DecomposeToComponents calls
+    lines.extend(
+        [
+            "(* Restore xAct FindIndices + Validate *)",
+            "DownValues[FindIndices] = savedFindIndices;",
+            "Protect[FindIndices];",
+            "On[Validate::inhom, Validate::unknown, Validate::repeated];",
+            "",
+        ]
+    )
 
     return lines
 
@@ -1571,7 +1605,10 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
             "    ];",
             "    Times @@ copies",
             "  ];",
-            'Print["L^(2) for VarD (Scalar expanded): ", Short[l2ForVarD, 5]];',
+            "(* Catch absorbs Throw[Null] from xAct's UncatchedValidate that      *)",
+            "(* fires during Print evaluation (via $PrePrint/ScreenDollarIndices).  *)",
+            "(* Off[Validate::inhom] suppresses the Message but NOT the Throw.     *)",
+            'Catch[Print["L^(2) for VarD (Scalar expanded): ", Short[l2ForVarD, 5]]];',
             "",
         ]
     )

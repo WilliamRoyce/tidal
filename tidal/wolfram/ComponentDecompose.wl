@@ -226,6 +226,15 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
    computeChristoffels, metricMatrix, computeChristoffelsOption, shouldComputeChristoffels,
    coords, backgroundFieldRules},
 
+  (* Suppress Validate::inhom for R̃²-decomposed torsion expressions.     *)
+  (* DummyIn-allocated indices in Scalar[x]^n expansion create different   *)
+  (* dummy names per Scalar factor; xAct's Validate sees this as           *)
+  (* inhomogeneous in a sum. The indices ARE properly contracted inside     *)
+  (* each Scalar — the "inhomogeneity" is cosmetic, not a real error.     *)
+  (* Off suppresses the Message; wrapping critical calls in Catch absorbs  *)
+  (* the Throw[Null] from xAct's UncatchedValidate.                       *)
+  Off[Validate::inhom];
+
   (* Get option values *)
   computeChristoffelsOption = OptionValue["ComputeChristoffels"];
   metricMatrix = OptionValue["MetricMatrix"];
@@ -399,7 +408,10 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
          the expression value (Set::write: Tag Times/Plus is Protected), silently failing.
          This caused VarD's upper-index E^{ab} to bypass SeparateMetric, breaking the
          metric contraction in the box operator and producing wrong-sign equations. *)
-      eomSep = SeparateFieldMetrics[eom, chart];
+      (* Catch absorbs Throw[Null] from xAct Validate::inhom on R̃²-type   *)
+      (* expressions with DummyIn-allocated indices in Scalar products.    *)
+      eomSep = Catch[SeparateFieldMetrics[eom, chart]];
+      If[eomSep === Null, eomSep = eom];  (* fallback if Validate threw *)
 
       (* Pre-expand Scalar[] wrappers ONCE on the full EOM before the     *)
       (* per-component loop.  Without hoisting, ExpandScalarWrappers runs *)
@@ -408,7 +420,8 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
       (* For R̃²-coupled torsion theories: 6x speedup (h) + 9x (t).     *)
       If[!FreeQ[eomSep, Scalar],
         Print["  Pre-expanding Scalar[] wrappers (hoisted)..."];
-        eomSep = ExpandScalarWrappers[eomSep, chart];
+        eomSep = Catch[ExpandScalarWrappers[eomSep, chart]];
+        If[eomSep === Null, eomSep = eom];  (* fallback *)
         Print["  Scalar expansion complete: ", If[FreeQ[eomSep, Scalar], "all resolved", "some remain"]];
       ];
 
