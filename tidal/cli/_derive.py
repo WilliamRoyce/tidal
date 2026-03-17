@@ -939,14 +939,11 @@ def _wls_multi_field_eom(  # noqa: PLR0914
                 # Apply ToCanonical term-by-term to avoid xperm segfault on
                 # large sums (xPerm external binary crashes when canonicalizing
                 # 80+ term VarD output as a single expression).
-                "(* Catch absorbs Throw[Null] from xAct Validate::inhom in R̃² theories *)",
                 f"If[Head[{eom_var}] === Plus,",
-                f"  {eom_var} = Total[Catch[ToCanonical[#]] & /@ List @@ {eom_var}],",
-                f"  {eom_var} = Catch[ToCanonical[{eom_var}]]",
+                f"  {eom_var} = Total[ToCanonical /@ List @@ {eom_var}],",
+                f"  {eom_var} = ToCanonical[{eom_var}]",
                 "];",
-                f"If[{eom_var} === Null, {eom_var} = 0];",
-                f"{eom_var} = Catch[ContractMetric[{eom_var}, {ctx.metric}]];",
-                f"If[{eom_var} === Null, {eom_var} = 0];",
+                f"{eom_var} = ContractMetric[{eom_var}, {ctx.metric}];",
                 # Zero background curvature in the abstract EOM. VarD integration
                 # by parts on covariant derivatives can reintroduce abstract Riemann
                 # terms (via [∇_a, ∇_b] commutator) even if L^(2) was cleaned.
@@ -1003,15 +1000,7 @@ def _wls_multi_field_eom(  # noqa: PLR0914
     # trigger xAct's strict validation during expression evaluation.
     lines.extend(
         [
-            "(* Temporarily disable ALL xAct Validate for R̃²-type expressions.   *)",
-            "(* DummyIn-allocated indices in Scalar products trigger Throw[Null]    *)",
-            "(* from Validate::inhom during expression evaluation.                  *)",
-            "(* Override FindIndices to prevent index checking entirely.            *)",
-            "Off[Validate::inhom, Validate::unknown, Validate::repeated];",
-            "savedFindIndices = DownValues[FindIndices];",
-            "Unprotect[FindIndices];",
-            "ClearAll[FindIndices];",
-            "FindIndices[x_] := Null;",
+            "",
             "",
         ]
     )
@@ -1050,17 +1039,6 @@ def _wls_multi_field_eom(  # noqa: PLR0914
                 "",
             ]
         )
-
-    # Restore xAct Validate after all DecomposeToComponents calls
-    lines.extend(
-        [
-            "(* Restore xAct FindIndices + Validate *)",
-            "DownValues[FindIndices] = savedFindIndices;",
-            "Protect[FindIndices];",
-            "On[Validate::inhom, Validate::unknown, Validate::repeated];",
-            "",
-        ]
-    )
 
     return lines
 
@@ -1571,44 +1549,15 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
 
     lines.extend(
         [
-            "(* Expand Scalar[x]^n into products with UNIQUE dummies per copy.    *)",
-            "(* This fixes VarD index collision from squared scalars like          *)",
-            "(*   Scalar[eta^ab H_ab]^2 and R̃²-decomposed Scalar[R+T]^2.       *)",
-            "(*                                                                    *)",
-            "(* IMPORTANT: RenameDummies alone is insufficient — for expressions   *)",
-            "(* already in canonical form (common with torsion R̃ decomposition), *)",
-            "(* RenameDummies returns the identical expression, and Mathematica    *)",
-            "(* simplifies Scalar[x]*Scalar[x] back to Scalar[x]^2.             *)",
-            "(*                                                                    *)",
-            "(* Fix: use DummyIn[VBundleOfIndex[d]] to allocate FRESH unique       *)",
-            "(* dummy indices for each copy. This guarantees distinct index names  *)",
-            "(* so the product cannot collapse back to a power.                    *)",
-            "(*                                                                    *)",
-            "(* Ref: xAct DummyIn allocates from the manifold's index pool.       *)",
-            "(* Evaluate Scalar[metric] → dimension first (constant, no dummies). *)",
+            "(* Evaluate Scalar[metric] → dimension (constant trace).             *)",
             f"l2ForVarD = l2ForVarD /. Scalar[{ctx.metric}[a_, b_]] :> {ctx.dim};",
-            "(* Temporarily suppress xAct's Validate::inhom during Scalar^n expansion *)",
-            "(* and VarD. DummyIn creates fresh dummies for each Scalar copy, giving  *)",
-            "(* different dummy names in different Scalar factors of the same sum.     *)",
-            "(* xAct's Validate incorrectly flags this as inhomogeneous (the indices  *)",
-            "(* ARE contracted inside Scalar, just with different names per copy).     *)",
-            "Off[Validate::inhom];",
-            "l2ForVarD = l2ForVarD /. Scalar[x_]^n_Integer?Positive :>",
-            "  Module[{copies},",
-            "    copies = Table[",
-            "      Module[{dummies, rules},",
-            "        dummies = List @@ IndicesOf[Dummy][x];",
-            "        rules = Table[d -> DummyIn[VBundleOfIndex[d]], {d, dummies}];",
-            "        Scalar[x /. rules]",
-            "      ],",
-            "      {k, n}",
-            "    ];",
-            "    Times @@ copies",
-            "  ];",
-            "(* Catch absorbs Throw[Null] from xAct's UncatchedValidate that      *)",
-            "(* fires during Print evaluation (via $PrePrint/ScreenDollarIndices).  *)",
-            "(* Off[Validate::inhom] suppresses the Message but NOT the Throw.     *)",
-            'Catch[Print["L^(2) for VarD (Scalar expanded): ", Short[l2ForVarD, 5]]];',
+            "(* NOTE: Scalar[x]^n terms from xPert's ExpandPerturbation are left   *)",
+            "(* as-is. xPert already handled the Leibniz rule on R² during          *)",
+            "(* Perturbation[lDensity, 2], producing 2*(δR)² + 2R·δ²R terms.     *)",
+            "(* VarD handles Scalar[x]^n via its own chain rule.                   *)",
+            "(* Manual expansion with RenameDummies/DummyIn is NOT needed and      *)",
+            "(* causes index inhomogeneity problems with R̃² torsion theories.     *)",
+            'Print["L^(2) for VarD: ", Short[l2ForVarD, 5]];',
             "",
         ]
     )

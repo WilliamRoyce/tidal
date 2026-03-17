@@ -408,20 +408,16 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
          the expression value (Set::write: Tag Times/Plus is Protected), silently failing.
          This caused VarD's upper-index E^{ab} to bypass SeparateMetric, breaking the
          metric contraction in the box operator and producing wrong-sign equations. *)
-      (* Catch absorbs Throw[Null] from xAct Validate::inhom on R̃²-type   *)
-      (* expressions with DummyIn-allocated indices in Scalar products.    *)
-      eomSep = Catch[SeparateFieldMetrics[eom, chart]];
-      If[eomSep === Null, eomSep = eom];  (* fallback if Validate threw *)
+      eomSep = SeparateFieldMetrics[eom, chart];
 
       (* Pre-expand Scalar[] wrappers ONCE on the full EOM before the     *)
       (* per-component loop.  Without hoisting, ExpandScalarWrappers runs *)
       (* inside ExtractTensorComponent for EACH component, redundantly    *)
       (* re-expanding the same Scalar contents dim^rank times.            *)
-      (* For R̃²-coupled torsion theories: 6x speedup (h) + 9x (t).     *)
+      (* For R̃-decomposed torsion theories: 6x speedup (h) + 9x (t).   *)
       If[!FreeQ[eomSep, Scalar],
         Print["  Pre-expanding Scalar[] wrappers (hoisted)..."];
-        eomSep = Catch[ExpandScalarWrappers[eomSep, chart]];
-        If[eomSep === Null, eomSep = eom];  (* fallback *)
+        eomSep = ExpandScalarWrappers[eomSep, chart];
         Print["  Scalar expansion complete: ", If[FreeQ[eomSep, Scalar], "all resolved", "some remain"]];
       ];
 
