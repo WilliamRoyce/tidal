@@ -484,10 +484,7 @@ class TestPeriodicCoefficientContinuity:
         This is the centered-dipolar scenario: B(x) is perfectly periodic but
         the Wolfram expansion produces B²·x² terms where x² breaks periodicity.
         The key insight is that |coeff(boundary)| ≪ |coeff(center)|, so the
-        absolute jump is small and energy leak is negligible.
-
-        Current implementation uses relative threshold, so this still warns.
-        The test documents the expected behavior.
+        leak metric (rel_jump * boundary_fraction) is negligible.
         """
         # Simulate B²·x² where B is tiny at boundaries
         # B = 0.001 at x=1, B = 1.0 at x=5 (center), B = 0.001 at x=9
@@ -563,6 +560,36 @@ class TestPeriodicCoefficientContinuity:
         )
         # Domain [-50, 50] with R=5: exp(-50²/50) ≈ 10⁻²²
         grid = GridInfo(bounds=((-50.0, 50.0),), shape=(64,), periodic=(True,))
+        ev = CoefficientEvaluator(spec, grid)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error")
+            ev.check_periodic_coefficient_continuity((True,))
+
+    def test_centered_dipolar_no_warning(self) -> None:
+        """Centered dipolar B²·x²: localised with small boundary values.
+
+        Models the Gertsenshtein false-positive scenario.  The coefficient
+        peaks at ~10 in the centre but boundary values are ~0.02.  The old
+        relative-jump check warned (rel_jump ~2-6%), but the leak metric
+        (rel_jump * boundary_fraction) is ~8e-6, consistent with the
+        observed |dE/E| = 4.53e-7 in actual simulations.
+        """
+        # Simulate B(x)² * x² where B is a Gaussian centred at x=π
+        # on [0, 2π].  The x² factor breaks strict periodicity but both
+        # boundary values are negligible (B(0)² * 0² ≈ 0, B(2π)² * (2π)² ≈ tiny).
+        spec = _make_spec(
+            [
+                {
+                    "coefficient": 1.0,
+                    "operator": "laplacian",
+                    "field": "phi_0",
+                    "coefficient_symbolic": ("x[]^2 * exp(-(x[] - 3.14159)^2 / 0.5)"),
+                    "coordinate_dependent": ["x"],
+                },
+            ],
+            dim=2,
+        )
+        grid = _make_grid_1d(128)
         ev = CoefficientEvaluator(spec, grid)
         with warnings.catch_warnings():
             warnings.simplefilter("error")

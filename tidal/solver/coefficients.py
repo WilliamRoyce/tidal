@@ -41,9 +41,14 @@ if TYPE_CHECKING:
 
 _MISSING = object()  # sentinel for dict.get() fast path
 
-# Thresholds for periodic boundary discontinuity checks
-_JUMP_WARN_THRESHOLD = 0.01  # >1% relative jump → warning
-_JUMP_ERROR_THRESHOLD = 0.50  # >50% relative jump → hard error
+# Thresholds for periodic boundary discontinuity checks.
+# The leak metric = (jump/scale) * (boundary_magnitude/scale) estimates the
+# IBP energy leak: dE/dt ~ |β(L)-β(0)| * |f(L)|².  For localised problems
+# both the coefficient jump AND the boundary significance are small, so the
+# product naturally suppresses false positives without a hardcoded skip.
+_LEAK_WARN_THRESHOLD = 0.01  # leak metric > 1% → warning
+_LEAK_ERROR_THRESHOLD = 0.25  # leak metric > 25% → hard error
+_BOUNDARY_NEGLIGIBLE = 1e-10  # absolute boundary values below this are noise
 
 
 class CoefficientEvaluator:
@@ -389,22 +394,29 @@ class CoefficientEvaluator:
 
                 scale = max(float(np.abs(arr).max()), 1e-30)
                 jump = float(np.abs(first - last).max())
-                rel_jump = jump / scale
-
-                # Skip if both boundary values are negligible relative to the
-                # coefficient peak.  When the coefficient effectively vanishes
-                # at the boundary (e.g. Gaussian B-field on a large periodic
-                # domain), any "jump" is between two near-zero values and the
-                # IBP energy leak proportional to |jump| * amplitude^2 is negligible.
-                # Threshold 1e-4: boundary magnitude < 0.01% of peak.
                 boundary_magnitude = max(
                     float(np.abs(first).max()),
                     float(np.abs(last).max()),
                 )
-                if boundary_magnitude < 1e-4 * scale:
+
+                # Skip if boundary values are at machine noise level.
+                if boundary_magnitude < _BOUNDARY_NEGLIGIBLE:
                     continue
 
-                if rel_jump > _JUMP_WARN_THRESHOLD:
+                # Leak metric: product of relative jump and boundary significance.
+                # IBP leak ~ |β(L)-β(0)| * |f(L)|².  For localised problems both
+                # the coefficient jump and field amplitude are small at boundaries.
+                # We use boundary_magnitude/scale as a proxy for field localisation
+                # (localised coefficients ↔ localised fields), giving:
+                #   leak ~ (jump/scale) * (boundary_magnitude/scale)
+                # This naturally suppresses false positives for localised
+                # coefficients while preserving detection of genuine
+                # discontinuities where boundary values are significant.
+                rel_jump = jump / scale
+                boundary_fraction = boundary_magnitude / scale
+                leak_metric = rel_jump * boundary_fraction
+
+                if leak_metric > _LEAK_WARN_THRESHOLD:
                     term = self._spec.equations[eq_idx].rhs_terms[term_idx]
                     field = self._spec.equations[eq_idx].field_name
                     axis_name = (
@@ -418,12 +430,13 @@ class CoefficientEvaluator:
                         f"'{field}' has {rel_jump:.0%} jump at the periodic "
                         f"boundary along {axis_name} "
                         f"(left={float(first.flat[0]):.4g}, "
-                        f"right={float(last.flat[0]):.4g}). "
+                        f"right={float(last.flat[0]):.4g}, "
+                        f"leak_metric={leak_metric:.2g}). "
                         f"This breaks the integration-by-parts identity "
                         f"and causes O(1) energy non-conservation. "
                         f"Use a larger domain, non-periodic BCs, or a "
                         f"localized coefficient profile."
                     )
-                    if rel_jump > _JUMP_ERROR_THRESHOLD:
+                    if leak_metric > _LEAK_ERROR_THRESHOLD:
                         raise ValueError(msg)
                     warnings.warn(msg, UserWarning, stacklevel=2)
