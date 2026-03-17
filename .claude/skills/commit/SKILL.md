@@ -20,6 +20,9 @@ description: Conventional commit with mandatory pre-commit testing and auto-form
 ## Docs mentioning changed components
 !`cd /workspaces/torsion-gertsenshtein && for f in $(git diff --name-only HEAD 2>/dev/null | head -5); do base=$(basename "$f" .py); grep -rl --include="*.md" "$base" docs/ 2>/dev/null; done | sort -u | head -10`
 
+## Related open issues
+!`cd /workspaces/torsion-gertsenshtein && gh issue list --limit 10 --json number,title --jq '.[] | "#\(.number): \(.title)"' 2>/dev/null`
+
 ## Instructions
 
 ### Step 1 — Run relevant tests
@@ -92,6 +95,30 @@ git add docs/ && git commit -m "docs: update {topic} after {feature/fix}"
 ```
 
 **Skip if**: this is a WIP commit, the change is trivial, or no docs mention the changed component.
+
+### Step 7 — Create issues for anything notable discovered
+During this work, if you encountered any of the following, create a GitHub issue to build a searchable trail:
+- Bugs or unexpected behavior (even if you fixed them)
+- Performance issues worth investigating
+- Missing features that would have helped
+- Technical debt or inconsistencies
+- Design decisions worth recording
+- Test gaps or coverage holes
+
+Check for duplicates first: `gh issue list -S "keyword"`.
+
+For things you **fixed in this commit**:
+```bash
+gh issue create --title "Short title" --body "..." --label "bug"
+gh issue close N -c "Fixed in <commit-hash>"
+```
+
+For things **still open**:
+```bash
+gh issue create --title "Short title" --body "..." --label "enhancement"
+```
+
+**Skip if**: truly trivial (typo/formatting) or a duplicate already exists.
 
 ### CRITICAL RULES
 - **NO Co-Authored-By trailer** — never add it

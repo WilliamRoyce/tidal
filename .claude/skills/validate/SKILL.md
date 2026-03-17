@@ -53,3 +53,9 @@ Summary table of everything found and fixed:
 - Spelling: N words added to dictionary, M typos fixed
 - Tests: N passed, M failed (with details)
 - Docs: in sync / N discrepancies found
+
+### Step 7 — File issues for problems found
+If validation revealed notable problems (whether fixed or not), create GitHub issues to build a trail:
+- Issues you fixed during validation → create and close immediately with the fix details
+- Issues that couldn't be auto-fixed (architectural, design, persistent failures) → create and leave open
+Check for duplicates first: `gh issue list -S "keyword"`.

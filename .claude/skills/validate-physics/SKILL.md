@@ -39,3 +39,10 @@ If tests fail:
 - Which files changed and which tests were run
 - Pass/fail results with failure details
 - Whether failures are regressions vs expected changes
+
+### Step 5 — File issues for regressions
+If physics tests revealed regressions or notable behavior:
+- Regressions you fixed → create issue with label `validation`, then close with fix commit
+- Unclear root cause or needs investigation → create issue with labels `validation` + `needs-investigation`, leave open
+- Include: affected example, observed vs expected behavior, relevant file paths
+Check for duplicates first: `gh issue list -S "keyword"`.
