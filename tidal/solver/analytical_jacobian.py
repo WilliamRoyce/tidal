@@ -121,8 +121,8 @@ def _build_operator_matrix_circulant(
         row_coords = tuple(
             (all_coords[d] + offsets_nd[d][k]) % shape[d] for d in range(len(shape))
         )
-        row_flat = np.ravel_multi_index(row_coords, shape)
-        rows_list.append(np.asarray(row_flat))
+        row_flat: NDArray[np.intp] = np.ravel_multi_index(row_coords, shape)  # type: ignore[assignment]
+        rows_list.append(row_flat)
         cols_list.append(arange_n)
         data_list.append(np.full(n, vals[k]))
 
@@ -324,7 +324,7 @@ def _detect_gauge_fix_fields(
     }
 
 
-def build_jacobian_matrices(
+def build_jacobian_matrices(  # noqa: C901, PLR0914
     spec: EquationSystem,
     layout: StateLayout,
     grid: GridInfo,
@@ -370,9 +370,9 @@ def build_jacobian_matrices(
     no_self_term_fields = _detect_no_self_term_fields(spec)
     gauge_fix_fields = _detect_gauge_fix_fields(spec, grid, bc)
 
-    # Build in LIL format for efficient incremental construction
-    dF_dy = lil_matrix((n_total, n_total))  # noqa: N806
-    dF_dyp = lil_matrix((n_total, n_total))  # noqa: N806
+    # COO accumulation: append blocks as triples, single CSC conversion
+    dF_dy = _COOAccumulator((n_total, n_total))  # noqa: N806
+    dF_dyp = _COOAccumulator((n_total, n_total))  # noqa: N806
 
     for slot_idx, slot in enumerate(layout.slots):
         if slot.time_order == 0:
@@ -386,7 +386,6 @@ def build_jacobian_matrices(
                 op_cache,
                 constraint_fields,
                 no_self_term_fields,
-                gauge_fix_fields,
                 n,
                 dF_dy,
                 dF_dyp,
@@ -394,7 +393,7 @@ def build_jacobian_matrices(
 
         elif slot.kind == "velocity":
             # res = yp - RHS → dF/dyp[slot, slot] = I
-            _set_diagonal_identity(dF_dyp, slot_idx, n, I_mat)
+            dF_dyp.add_block(slot_idx, slot_idx, n, I_mat)
             eq_idx = eq_map.get(slot.field_name)
             if eq_idx is not None:
                 _add_rhs_terms(
@@ -413,14 +412,14 @@ def build_jacobian_matrices(
 
         elif slot.time_order >= 2 and slot.kind == "field":  # noqa: PLR2004
             # res = yp - v → dF/dyp[slot, slot] = I, dF/dy[slot, vel] = -I
-            _set_diagonal_identity(dF_dyp, slot_idx, n, I_mat)
+            dF_dyp.add_block(slot_idx, slot_idx, n, I_mat)
             vel_slot = layout.velocity_slot_map.get(slot.field_name)
             if vel_slot is not None:
-                _set_block(dF_dy, slot_idx, vel_slot, n, -I_mat)
+                dF_dy.add_block(slot_idx, vel_slot, n, -I_mat)
 
         elif slot.time_order == 1:
             # res = yp - RHS → dF/dyp[slot, slot] = I
-            _set_diagonal_identity(dF_dyp, slot_idx, n, I_mat)
+            dF_dyp.add_block(slot_idx, slot_idx, n, I_mat)
             eq_idx = eq_map.get(slot.field_name)
             if eq_idx is not None:
                 _add_rhs_terms(
@@ -437,7 +436,27 @@ def build_jacobian_matrices(
                     negate=True,
                 )
 
-    return dF_dy.tocsc(), dF_dyp.tocsc()
+    result_dy = dF_dy.to_csc()
+    result_dyp = dF_dyp.to_csc()
+
+    # Post-process gauge-fix rows: zero out entire row, set pinning entry.
+    # This is done on the final CSC because COO can't "overwrite" earlier
+    # entries — it can only sum.
+    for slot_idx, slot in enumerate(layout.slots):
+        if slot.time_order == 0 and slot.field_name in gauge_fix_fields:
+            field_slot = layout.field_slot_map[slot.field_name]
+            global_row = slot_idx * n
+            # Zero out row in both matrices
+            result_dy[global_row, :] = 0  # type: ignore[index]
+            result_dyp[global_row, :] = 0  # type: ignore[index]
+            # Pinning entry: dF/dy[row, field_col] = 1
+            result_dy[global_row, field_slot * n] = 1.0  # type: ignore[index]
+            # Re-convert after row modification
+    if gauge_fix_fields:
+        result_dy = result_dy.tocsc()
+        result_dyp = result_dyp.tocsc()
+
+    return result_dy, result_dyp
 
 
 # ---------------------------------------------------------------------------
@@ -445,41 +464,44 @@ def build_jacobian_matrices(
 # ---------------------------------------------------------------------------
 
 
-def _set_diagonal_identity(
-    mat: SparseMatrix,
-    slot_idx: int,
-    n: int,
-    I_mat: SparseMatrix,  # noqa: N803
-) -> None:
-    """Set diagonal block mat[slot, slot] = I."""
-    s = slice(slot_idx * n, (slot_idx + 1) * n)
-    mat[s, s] = I_mat
+class _COOAccumulator:
+    """Accumulate sparse blocks as COO triples for fast final assembly.
 
+    Instead of LIL slice assignment (O(N²) per block due to dense
+    intermediate), this appends COO triples and does a single CSC
+    conversion at the end.  Duplicate entries are summed automatically
+    by scipy's CSC constructor, so ``+=`` semantics come for free.
+    """
 
-def _set_block(
-    mat: SparseMatrix,
-    row_slot: int,
-    col_slot: int,
-    n: int,
-    block: SparseMatrix,
-) -> None:
-    """Set block mat[row_slot, col_slot] = block."""
-    rs = slice(row_slot * n, (row_slot + 1) * n)
-    cs = slice(col_slot * n, (col_slot + 1) * n)
-    mat[rs, cs] = block
+    def __init__(self, shape: tuple[int, int]) -> None:
+        self._shape = shape
+        self._rows: list[NDArray[np.intp]] = []
+        self._cols: list[NDArray[np.intp]] = []
+        self._data: list[NDArray[np.float64]] = []
 
+    def add_block(
+        self,
+        row_slot: int,
+        col_slot: int,
+        n: int,
+        block: SparseMatrix,
+    ) -> None:
+        """Append a block at the ``(row_slot, col_slot)`` position."""
+        coo = block.tocoo()
+        self._rows.append(coo.row.astype(np.intp) + row_slot * n)
+        self._cols.append(coo.col.astype(np.intp) + col_slot * n)
+        self._data.append(np.asarray(coo.data, dtype=np.float64))
 
-def _add_block(
-    mat: SparseMatrix,
-    row_slot: int,
-    col_slot: int,
-    n: int,
-    block: SparseMatrix,
-) -> None:
-    """Add block: mat[row_slot, col_slot] += block."""
-    rs = slice(row_slot * n, (row_slot + 1) * n)
-    cs = slice(col_slot * n, (col_slot + 1) * n)
-    mat[rs, cs] += block
+    def to_csc(self) -> SparseMatrix:
+        """Convert accumulated triples to a CSC matrix."""
+        from tidal.solver._scipy_types import csc_matrix as _csc  # noqa: PLC0415
+
+        if not self._rows:
+            return _csc(self._shape)
+        rows = np.concatenate(self._rows)
+        cols = np.concatenate(self._cols)
+        data = np.concatenate(self._data)
+        return _csc((data, (rows, cols)), shape=self._shape)
 
 
 def _add_rhs_terms(  # noqa: PLR0913, PLR0917
@@ -491,8 +513,8 @@ def _add_rhs_terms(  # noqa: PLR0913, PLR0917
     op_cache: _OperatorCache,
     constraint_fields: set[str],
     n: int,
-    dF_dy: SparseMatrix,  # noqa: N803
-    dF_dyp: SparseMatrix,  # noqa: N803
+    dF_dy: _COOAccumulator,  # noqa: N803
+    dF_dyp: _COOAccumulator,  # noqa: N803
     *,
     negate: bool,
 ) -> None:
@@ -523,7 +545,7 @@ def _add_rhs_terms(  # noqa: PLR0913, PLR0917
             scaled = sign * float(coeff) * op_mat
 
         target_mat = dF_dyp if is_dyp else dF_dy
-        _add_block(target_mat, row_slot, col_slot, n, scaled)
+        target_mat.add_block(row_slot, col_slot, n, scaled)
 
 
 def _build_constraint_block(  # noqa: PLR0913, PLR0917
@@ -536,16 +558,15 @@ def _build_constraint_block(  # noqa: PLR0913, PLR0917
     op_cache: _OperatorCache,
     constraint_fields: set[str],
     no_self_term_fields: set[str],
-    gauge_fix_fields: set[str],
     n: int,
-    dF_dy: SparseMatrix,  # noqa: N803
-    dF_dyp: SparseMatrix,  # noqa: N803
+    dF_dy: _COOAccumulator,  # noqa: N803
+    dF_dyp: _COOAccumulator,  # noqa: N803
 ) -> None:
     """Build Jacobian blocks for a constraint slot (time_order=0).
 
     Three sub-cases matching ida.py handle_constraint():
     1. No-self-term: res = y[field] → dF/dy = I
-    2. Gauge-fix: normal RHS, then pin row 0 in both matrices
+    2. Gauge-fix: normal RHS (gauge-fix row pinning applied post-hoc)
     3. Normal: res = RHS
     """
     eq_idx = eq_map.get(slot.field_name)
@@ -556,11 +577,13 @@ def _build_constraint_block(  # noqa: PLR0913, PLR0917
     if slot.field_name in no_self_term_fields:
         field_slot = layout.field_slot_map[slot.field_name]
         I_mat = op_cache.get_identity()  # noqa: N806
-        _set_block(dF_dy, slot_idx, field_slot, n, I_mat)
+        dF_dy.add_block(slot_idx, field_slot, n, I_mat)
         return
 
     # Case 3 (and setup for case 2): normal RHS
     # res = RHS → dF/dy += coeff * op_mat (no negation)
+    # Note: gauge-fix row pinning (case 2) is applied post-hoc in
+    # build_jacobian_matrices() after COO→CSC conversion.
     _add_rhs_terms(
         slot_idx,
         eq_idx,
@@ -574,16 +597,6 @@ def _build_constraint_block(  # noqa: PLR0913, PLR0917
         dF_dyp,
         negate=False,
     )
-
-    # Case 2: gauge-fix — overwrite row 0 with y[field_slot*n] = 0
-    if slot.field_name in gauge_fix_fields:
-        field_slot = layout.field_slot_map[slot.field_name]
-        global_row = slot_idx * n
-        # Zero out entire row in both matrices
-        dF_dy[global_row, :] = 0
-        dF_dyp[global_row, :] = 0
-        # Set pinning entry: dF/dy[row, field_col] = 1
-        dF_dy[global_row, field_slot * n] = 1.0
 
 
 # ---------------------------------------------------------------------------
@@ -893,17 +906,15 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
     if not _is_system_time_independent(spec, grid, parameters):
         return False
 
-    # All tiers share the same precomputed Jacobian matrices.
-    jac_y, jac_yp = build_jacobian_matrices(
-        spec,
-        layout,
-        grid,
-        bc,
-        parameters,
-    )
-
     if n_state <= DENSE_THRESHOLD:
         # Dense tier: 2D jacfn
+        jac_y, jac_yp = build_jacobian_matrices(
+            spec,
+            layout,
+            grid,
+            bc,
+            parameters,
+        )
         options["linsolver"] = "dense"
         if solver == "cvode":
             options["jacfn"] = _create_cvode_jacfn(jac_y)
@@ -919,15 +930,34 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
         # Sparse tier: 1D CSC jacfn + SuperLU_MT direct factorisation.
         # Eliminates O(n_colors) FD residual evaluations per Newton step.
         # Requires sksundae >= 1.1.2 (fixes aux.jacfn overwrite bug).
-        if solver == "cvode":
-            jacfn_cb, sparsity = _create_cvode_sparse_jacfn(jac_y)
-        else:
-            jacfn_cb, sparsity = _create_sparse_jacfn(jac_y, jac_yp)
 
-        if sparsity.nnz > SUPERLU_NNZ_LIMIT:
-            # SuperLU_MT fill-in risk — use GMRES with analytical jactimes.
+        # Cheap nnz pre-check: build_jacobian_sparsity is O(nnz) and
+        # returns a conservative superset of the actual pattern.  If it
+        # already exceeds SUPERLU_NNZ_LIMIT, skip straight to GMRES.
+        from tidal.solver.sparsity import build_jacobian_sparsity  # noqa: PLC0415
+
+        pattern_est = build_jacobian_sparsity(spec, layout, grid, bc)
+        if pattern_est.nnz > SUPERLU_NNZ_LIMIT:
+            jac_y, jac_yp = build_jacobian_matrices(
+                spec,
+                layout,
+                grid,
+                bc,
+                parameters,
+            )
             _configure_gmres_tier(options, jac_y, jac_yp, solver, n_state)
         else:
+            jac_y, jac_yp = build_jacobian_matrices(
+                spec,
+                layout,
+                grid,
+                bc,
+                parameters,
+            )
+            if solver == "cvode":
+                jacfn_cb, sparsity = _create_cvode_sparse_jacfn(jac_y)
+            else:
+                jacfn_cb, sparsity = _create_sparse_jacfn(jac_y, jac_yp)
             options["linsolver"] = "sparse"
             options["sparsity"] = sparsity
             options["jacfn"] = jacfn_cb
@@ -942,6 +972,13 @@ def try_analytical_jacobian(  # noqa: PLR0913, PLR0917
         # GMRES tier (N > SPARSE_THRESHOLD): analytical Jacobian-vector
         # product.  Eliminates O(n_colors) residual evaluations per GMRES
         # iteration compared to the FD GMRES path.
+        jac_y, jac_yp = build_jacobian_matrices(
+            spec,
+            layout,
+            grid,
+            bc,
+            parameters,
+        )
         _configure_gmres_tier(options, jac_y, jac_yp, solver, n_state)
 
     return True
