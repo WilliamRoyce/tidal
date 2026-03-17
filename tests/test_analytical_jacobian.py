@@ -631,8 +631,8 @@ class TestJacobianDelivery:
         expected = dF_dy.toarray() + cj * dF_dyp.toarray()
         np.testing.assert_allclose(JJ, expected, atol=1e-12)
 
-    def test_sparse_tier_falls_through(self) -> None:
-        """Systems in sparse tier (DENSE < N <= SPARSE) fall through to FD."""
+    def test_sparse_tier_configures_sparse_jacfn(self) -> None:
+        """Sparse tier should configure 1D CSC jacfn + sparsity pattern."""
         from unittest.mock import patch
 
         spec = _make_kg_1d_spec()
@@ -646,10 +646,95 @@ class TestJacobianDelivery:
                 options, spec, layout, grid, "periodic", {}
             )
 
-        # Sparse tier falls through to FD (returns False)
-        assert result is False
+        assert result is True
+        assert options["linsolver"] == "sparse"
+        assert "jacfn" in options
+        assert callable(options["jacfn"])
+        assert "sparsity" in options
+        assert issparse(options["sparsity"])
+
+    def test_sparse_jacfn_fills_1d_array(self) -> None:
+        """Sparse jacfn callback should fill 1D CSC data array correctly."""
+        from tidal.solver.analytical_jacobian import _create_sparse_jacfn
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        jacfn, sparsity = _create_sparse_jacfn(dF_dy, dF_dyp)
+
+        # Test for several cj values
+        for cj in [0.0, 1.0, math.pi, 100.0]:
+            JJ = np.zeros(sparsity.nnz)
+            n = layout.total_size
+            jacfn(0.0, np.zeros(n), np.zeros(n), np.zeros(n), cj, JJ)
+
+            # Build reference: full J = dF_dy + cj * dF_dyp, extract CSC data
+            J_ref = (dF_dy + cj * dF_dyp).tocsc()
+            from tidal.solver.analytical_jacobian import _extract_aligned_data
+
+            ref_data = _extract_aligned_data(J_ref, sparsity)
+            np.testing.assert_allclose(JJ, ref_data, atol=1e-14)
+
+    def test_sparse_jacfn_csc_alignment(self) -> None:
+        """Sparsity pattern should have CSC structure matching union of matrices."""
+        from tidal.solver.analytical_jacobian import _create_sparse_jacfn
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, dF_dyp = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        _, sparsity = _create_sparse_jacfn(dF_dy, dF_dyp)
+
+        # Union pattern should cover all nonzeros from both matrices
+        union_ref = (abs(dF_dy) + abs(dF_dyp)).tocsc()
+        union_ref.eliminate_zeros()
+        np.testing.assert_array_equal(sparsity.indptr, union_ref.indptr)
+        np.testing.assert_array_equal(sparsity.indices, union_ref.indices)
+        assert sparsity.nnz == union_ref.nnz
+
+    def test_sparse_tier_superlu_nnz_limit_fallback(self) -> None:
+        """Sparse tier should fall through to GMRES when nnz > SUPERLU_NNZ_LIMIT."""
+        from unittest.mock import patch
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        options: dict[str, Any] = {}
+        with (
+            patch("tidal.solver._types.DENSE_THRESHOLD", 1),
+            patch("tidal.solver._types.SUPERLU_NNZ_LIMIT", 1),
+        ):
+            result = try_analytical_jacobian(
+                options, spec, layout, grid, "periodic", {}
+            )
+
+        assert result is True
+        assert options["linsolver"] == "gmres"
+        assert "jactimes" in options
         assert "jacfn" not in options
-        assert "jactimes" not in options
+
+    def test_cvode_sparse_jacfn(self) -> None:
+        """CVODE sparse jacfn should produce ODE Jacobian -dF_dy."""
+        from tidal.solver.analytical_jacobian import _create_cvode_sparse_jacfn
+
+        spec = _make_kg_1d_spec()
+        grid = GridInfo(bounds=((0, 10),), shape=(8,), periodic=(True,))
+        layout = StateLayout.from_spec(spec, grid.num_points)
+
+        dF_dy, _ = build_jacobian_matrices(spec, layout, grid, "periodic", {})
+        jacfn, sparsity = _create_cvode_sparse_jacfn(dF_dy)
+
+        JJ = np.zeros(sparsity.nnz)
+        n = layout.total_size
+        jacfn(0.0, np.zeros(n), np.zeros(n), JJ)
+
+        neg_dy = (-dF_dy).tocsc()
+        neg_dy.eliminate_zeros()
+        np.testing.assert_allclose(JJ, neg_dy.data, atol=1e-14)
 
 
 # ---------------------------------------------------------------------------
@@ -1263,8 +1348,45 @@ class TestCVODEDelivery:
 # ---------------------------------------------------------------------------
 
 
+def _make_time_dependent_spec() -> EquationSystem:
+    """KG with time-dependent coefficient — bypasses analytical Jacobian."""
+    data: dict[str, Any] = {
+        "spacetime": {"dimension": 2, "signature": [-1, 1]},
+        "fields": [{"name": "phi_0", "index": 0}],
+        "equations": [
+            {
+                "field": "phi_0",
+                "lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2}},
+                "rhs": {
+                    "type": "linear_combination",
+                    "terms": [
+                        {
+                            "coefficient": 1.0,
+                            "operator": "laplacian_x",
+                            "field": "phi_0",
+                        },
+                        {
+                            "coefficient": 1.0,
+                            "operator": "identity",
+                            "field": "phi_0",
+                            "coefficient_symbolic": "E^(2*H*t[])",
+                            "time_dependent": True,
+                        },
+                    ],
+                },
+            },
+        ],
+        "canonical": {"hamiltonian_terms": []},
+    }
+    return EquationSystem.from_dict(data)
+
+
 class TestSuperLUNnzFallback:
-    """Tests for nnz-based GMRES fallback in configure_linear_solver."""
+    """Tests for nnz-based GMRES fallback in configure_linear_solver.
+
+    Uses a time-dependent spec so the analytical Jacobian path is bypassed
+    and the FD sparse tier in configure_linear_solver is exercised.
+    """
 
     def test_falls_back_to_gmres_when_nnz_exceeds_limit(self) -> None:
         """When nnz exceeds SUPERLU_NNZ_LIMIT, configure_linear_solver selects GMRES."""
@@ -1273,14 +1395,11 @@ class TestSuperLUNnzFallback:
 
         from tidal.solver._setup import configure_linear_solver
 
-        spec = _make_kg_1d_spec()
-        # Use a grid large enough to be in the sparse tier (N > DENSE_THRESHOLD)
-        # but use patch to force nnz check to fail.
+        spec = _make_time_dependent_spec()
         n_pts = 64
         grid = GridInfo(bounds=((0, 10),), shape=(n_pts,), periodic=(True,))
         layout = StateLayout.from_spec(spec, grid.num_points)
 
-        # Patch SUPERLU_NNZ_LIMIT to 1 so any nnz triggers the fallback.
         options: dict[str, Any] = {}
         with (
             patch("tidal.solver._types.DENSE_THRESHOLD", 1),
@@ -1288,7 +1407,9 @@ class TestSuperLUNnzFallback:
             warnings.catch_warnings(record=True) as caught,
         ):
             warnings.simplefilter("always")
-            configure_linear_solver(options, layout, spec, grid, "periodic")
+            configure_linear_solver(
+                options, layout, spec, grid, "periodic", parameters={"H": 1.0}
+            )
 
         assert options["linsolver"] == "gmres"
         assert "sparsity" not in options
@@ -1302,19 +1423,20 @@ class TestSuperLUNnzFallback:
 
     def test_uses_superlu_when_nnz_under_limit(self) -> None:
         """When nnz is under SUPERLU_NNZ_LIMIT, SuperLU is selected normally."""
+        from unittest.mock import patch
+
         from tidal.solver._setup import configure_linear_solver
 
-        spec = _make_kg_1d_spec()
-        # Small grid: nnz will be well under 100_000
+        spec = _make_time_dependent_spec()
         n_pts = 8
         grid = GridInfo(bounds=((0, 10),), shape=(n_pts,), periodic=(True,))
         layout = StateLayout.from_spec(spec, grid.num_points)
 
         options: dict[str, Any] = {}
-        from unittest.mock import patch
-
         with patch("tidal.solver._types.DENSE_THRESHOLD", 1):
-            configure_linear_solver(options, layout, spec, grid, "periodic")
+            configure_linear_solver(
+                options, layout, spec, grid, "periodic", parameters={"H": 1.0}
+            )
 
         assert options["linsolver"] == "sparse"
         assert "sparsity" in options
@@ -1326,7 +1448,7 @@ class TestSuperLUNnzFallback:
 
         from tidal.solver._setup import configure_linear_solver
 
-        spec = _make_kg_1d_spec()
+        spec = _make_time_dependent_spec()
         n_pts = 64
         grid = GridInfo(bounds=((0, 10),), shape=(n_pts,), periodic=(True,))
         layout = StateLayout.from_spec(spec, grid.num_points)
@@ -1338,7 +1460,9 @@ class TestSuperLUNnzFallback:
             warnings.catch_warnings(record=True) as caught,
         ):
             warnings.simplefilter("always")
-            configure_linear_solver(options, layout, spec, grid, "periodic")
+            configure_linear_solver(
+                options, layout, spec, grid, "periodic", parameters={"H": 1.0}
+            )
 
         user_warnings = [
             str(w.message) for w in caught if issubclass(w.category, UserWarning)
