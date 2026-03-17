@@ -393,15 +393,15 @@ class CoefficientEvaluator:
 
                 # Skip if both boundary values are negligible relative to the
                 # coefficient peak.  When the coefficient effectively vanishes
-                # at the boundary (e.g. Gaussian B-field on a large periodic
+                # at the boundary (e.g. centered dipolar B-field on a periodic
                 # domain), any "jump" is between two near-zero values and the
                 # IBP energy leak proportional to |jump| * amplitude^2 is negligible.
-                # Threshold 1e-4: boundary magnitude < 0.01% of peak.
+                # Threshold 1e-2: boundary magnitude < 1% of peak.
                 boundary_magnitude = max(
                     float(np.abs(first).max()),
                     float(np.abs(last).max()),
                 )
-                if boundary_magnitude < 1e-4 * scale:
+                if boundary_magnitude < 1e-2 * scale:
                     continue
 
                 if rel_jump > _JUMP_WARN_THRESHOLD:

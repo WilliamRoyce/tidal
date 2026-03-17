@@ -780,18 +780,31 @@ def _measure_existing(  # noqa: PLR0913, PLR0917
     source: tuple[str, ...] | None,
     target: tuple[str, ...] | None,
     threshold: float,
+    spec: EquationSystem | None = None,
 ) -> dict[str, Any]:
     """Measure an existing run directory with error handling.
 
     Used by resume logic in sequential, parallel, and adaptive execution
     paths. Wraps ``_measure_run()`` with status tracking and error capture.
 
+    Parameters
+    ----------
+    spec : EquationSystem or None
+        Pre-loaded equation system.  When supplied the JSON is not re-parsed,
+        avoiding redundant I/O on sweep resume (one parse instead of N).
+
     Returns metrics dict with ``run_status``, ``error_message``, and
     ``solver_exit_code`` always set.
     """
     try:
         metrics = _measure_run(
-            run_dir, spec_path, measurements, source, target, threshold
+            run_dir,
+            spec_path,
+            measurements,
+            source,
+            target,
+            threshold,
+            spec=spec,
         )
     except (ValueError, TypeError, KeyError, OSError, RuntimeError) as exc:
         return {
@@ -887,6 +900,11 @@ def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
     run_dirs: list[Path] = [rp["run_dir"] for rp in run_plans]
     sweep_start = time.monotonic()
 
+    # Pre-load spec once for measurement reuse (avoids N re-parses on resume)
+    from tidal.symbolic import load_equation_system
+
+    cached_spec = load_equation_system(spec_path)
+
     for rp in run_plans:
         i = rp["index"]
         run_dir: Path = rp["run_dir"]
@@ -907,7 +925,13 @@ def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
                 flush=True,
             )
             metrics = _measure_existing(
-                run_dir, spec_path, measurements, source, target, threshold
+                run_dir,
+                spec_path,
+                measurements,
+                source,
+                target,
+                threshold,
+                spec=cached_spec,
             )
             if metrics.get("run_status") == "measurement_error":
                 print(f" measure error: {metrics.get('error_message', '')}")
@@ -1012,7 +1036,7 @@ def _execute_sequential(  # noqa: PLR0913, PLR0914, PLR0917
     return rows
 
 
-def _execute_parallel(  # noqa: PLR0913, PLR0917
+def _execute_parallel(  # noqa: PLR0913, PLR0914, PLR0917
     args: Namespace,
     spec_path: Path,
     run_plans: list[dict[str, Any]],
@@ -1041,6 +1065,11 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
     completed: set[int] = set()
     sweep_start = time.monotonic()
 
+    # Pre-load spec once for measurement reuse (avoids N re-parses on resume)
+    from tidal.symbolic import load_equation_system
+
+    cached_spec = load_equation_system(spec_path)
+
     for rp in run_plans:
         i = rp["index"]
         run_dir: Path = rp["run_dir"]
@@ -1056,7 +1085,13 @@ def _execute_parallel(  # noqa: PLR0913, PLR0917
                 flush=True,
             )
             metrics = _measure_existing(
-                run_dir, spec_path, measurements, source, target, threshold
+                run_dir,
+                spec_path,
+                measurements,
+                source,
+                target,
+                threshold,
+                spec=cached_spec,
             )
             if metrics.get("run_status") == "measurement_error":
                 print(f" measure error: {metrics.get('error_message', '')}")
@@ -1183,6 +1218,7 @@ def _adaptive_run_point(  # noqa: PLR0913, PLR0917
     run_dirs: list[Path],
     *,
     resume: bool,
+    cached_spec: EquationSystem | None = None,
 ) -> dict[str, Any]:
     """Run a single adaptive point and return the results row."""
     swept_vals = {param_name: val}
@@ -1196,7 +1232,13 @@ def _adaptive_run_point(  # noqa: PLR0913, PLR0917
     if resume and (run_dir / "metadata.json").exists():
         print(f"  [adaptive] {subdir} — measuring existing...", end="", flush=True)
         metrics = _measure_existing(
-            run_dir, spec_path, measurements, source, target, energy_threshold
+            run_dir,
+            spec_path,
+            measurements,
+            source,
+            target,
+            energy_threshold,
+            spec=cached_spec,
         )
         if metrics.get("run_status") == "measurement_error":
             print(f" measure error: {metrics.get('error_message', '')}")
@@ -1269,6 +1311,11 @@ def _execute_adaptive(  # noqa: PLR0913, PLR0917
     rows: list[dict[str, Any]] = []
     run_dirs: list[Path] = []
 
+    # Pre-load spec once for measurement reuse (avoids N re-parses on resume)
+    from tidal.symbolic import load_equation_system
+
+    cached_spec = load_equation_system(spec_path)
+
     # Phase 1: Run initial grid
     print(f"  Adaptive: initial grid ({len(points)} points)")
     for val in points:
@@ -1288,6 +1335,7 @@ def _execute_adaptive(  # noqa: PLR0913, PLR0917
                 output_dir=output_dir,
                 run_dirs=run_dirs,
                 resume=resume,
+                cached_spec=cached_spec,
             )
         )
 
@@ -1346,6 +1394,7 @@ def _execute_adaptive(  # noqa: PLR0913, PLR0917
             output_dir=output_dir,
             run_dirs=run_dirs,
             resume=resume,
+            cached_spec=cached_spec,
         )
         points.insert(idx + 1, midpoint)
         rows.insert(idx + 1, row)

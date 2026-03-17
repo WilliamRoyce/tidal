@@ -3514,10 +3514,10 @@ def _wls_json_plane_wave_reduction(ctx: _WlsContext) -> list[str]:
     5. Reduction provenance in metadata
 
     All replacement logic is self-contained in Wolfram — Python only passes
-    the propagation axis name and spatial coordinate list.  Wolfram builds
-    all string-replacement rules, applies them via
-    ``ExportString → StringReplace → ImportString``, and restores any
-    metadata that the bare-coordinate rule inadvertently touched.
+    the propagation axis name and spatial coordinate list.  Coordinate-dependent
+    arrays are remapped at the Association level (before serialisation).
+    Operator names and symbolic coordinate references are remapped via
+    ``ExportString → StringReplace`` on the JSON string.
     """
     if ctx.reduction is None:
         return []
