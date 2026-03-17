@@ -41,7 +41,7 @@
     5.\ No time-dependent coefficients};
 
 % --- Modal solver ---
-\node[solver, right=2.8cm of d1, draw=PurpleLine] (modal)
+\node[solver=Purple, right=2.8cm of d1] (modal)
     {Modal solver};
 
 % --- D2: Constraint eqs? ---
@@ -50,7 +50,7 @@
     (a2) {time\_order $= 0$\\(elliptic / algebraic DAE)};
 
 % --- IDA (constraint) ---
-\node[solver, right=2.8cm of d2, draw=OrangeLine] (ida1) {IDA};
+\node[solver=Orange, right=2.8cm of d2] (ida1) {IDA};
 
 % --- D3: First-order eqs? ---
 \node[decision, below=0.8cm of d2] (d3) {First-order\\equations?};
@@ -58,7 +58,7 @@
     (a3) {time\_order $= 1$\\(diffusion / transport) \\ (implicit BDF)};
 
 % --- IDA (first-order) ---
-\node[solver, right=2.8cm of d3, draw=OrangeLine] (ida2) {IDA};
+\node[solver=Orange, right=2.8cm of d3] (ida2) {IDA};
 
 % --- D4: Dissipation? ---
 \node[decision, below=0.8cm of d3] (d4) {Dissipation?};
@@ -66,7 +66,7 @@
     (a4) {\texttt{first\_derivative\_t}\\(breaks symplecticity)};
 
 % --- IDA (dissipation) ---
-\node[solver, right=3.2cm of d4, draw=OrangeLine] (ida3) {IDA};
+\node[solver=Orange, right=3.2cm of d4] (ida3) {IDA};
 
 % --- D5: Missing Hamiltonian? ---
 \node[decision, below=0.8cm of d4] (d5) {Missing\\Hamiltonian?};
@@ -74,11 +74,11 @@
     (a5) {canonical $=$ None with\\second-order wave eqs};
 
 % --- Warning + fallthrough ---
-\node[solver, right=2.86cm of d5, draw=GreenLine] (warn)
+\node[solver=Green, right=2.86cm of d5] (warn)
     {\textit{Warning} $\to$\\CVODE fallback};
 
 % --- Default: CVODE ---
-\node[solver, left=2.8cm of d5, draw=GreenLine] (cvode)
+\node[solver=Green, left=2.8cm of d5] (cvode)
     {CVODE};
 \node[annot, left=-0.1cm of d5.west, anchor=north east]
     (a6) {Pure wave, Hamiltonian\\(adaptive BDF)};
