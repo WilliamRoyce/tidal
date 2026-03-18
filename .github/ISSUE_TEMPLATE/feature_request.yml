@@ -31,8 +31,10 @@ body:
     attributes:
       label: Which component does this affect?
       options:
-        - Python PDE builder
+        - CLI (tidal command)
+        - Solver backends (IDA/CVODE/leapfrog/modal/scipy)
         - Wolfram/xAct pipeline
+        - Measurement module
         - Documentation
         - Examples
         - Testing infrastructure

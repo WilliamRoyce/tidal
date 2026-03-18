@@ -49,7 +49,7 @@ Fixes #(issue number)
 - [ ] **No hardcoded physics equations** - all PDEs derive from Lagrangian
 - [ ] Type hints added to all functions (`-> None` for tests)
 - [ ] Docstrings added/updated (NumPy style)
-- [ ] Documentation updated (docstrings, docs/MEMORY.md, troubleshooting.md if needed)
+- [ ] Documentation updated (docstrings, relevant `docs/*.md` if needed)
 - [ ] Ruff linting passes (`uv run ruff check`)
 - [ ] Pyright type checking passes (`uv run pyright`)
 - [ ] Commit messages are descriptive

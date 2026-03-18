@@ -254,10 +254,9 @@ from dataclasses import dataclass
 
 # Third-party
 import numpy as np
-from pde import CartesianGrid
 
 # Local
-from tidal.symbolic import load_equation_system
+from tidal.symbolic.json_loader import load_equation_system
 
 # Type-only imports
 if TYPE_CHECKING:
@@ -292,10 +291,7 @@ Example test:
 ```python
 from __future__ import annotations
 
-import pytest
-from pde import CartesianGrid
-
-from pde import CartesianGrid
+import numpy as np
 
 
 def test_my_feature() -> None:
@@ -304,7 +300,7 @@ def test_my_feature() -> None:
     expected_value = 42
 
     # Act
-    result = my_feature(grid_1d)
+    result = my_feature()
 
     # Assert
     assert result == expected_value
@@ -446,6 +442,7 @@ tidal/                   # TIDAL project root
 │   │   ├── ida.py           # SUNDIALS IDA (DAE solver)
 │   │   ├── cvode.py         # SUNDIALS CVODE (adaptive BDF ODE)
 │   │   ├── leapfrog.py      # Störmer-Verlet symplectic integrator
+│   │   ├── modal.py         # Fourier modal solver (eigendecomposition)
 │   │   ├── fields.py        # FieldSet typed container
 │   │   ├── coefficients.py  # CoefficientEvaluator (4-level cache)
 │   │   ├── rhs.py           # RHSEvaluator (operator+coefficient application)
@@ -453,7 +450,8 @@ tidal/                   # TIDAL project root
 │   │   ├── grid.py          # GridInfo minimal grid dataclass
 │   │   ├── state.py         # StateLayout (field→slice mapping)
 │   │   ├── validation.py    # SpecValidator (CFL, mass sign, dimensions)
-│   │   └── constraint_solve.py  # Three-tier constraint pre-solve
+│   │   ├── constraint_solve.py  # Three-tier constraint pre-solve
+│   │   └── progress.py     # Simulation progress bar (tqdm)
 │   ├── cli/                  # CLI (`tidal` command, 9 subcommands)
 │   │   ├── __init__.py      # Entry point + argument parsing
 │   │   ├── _derive.py       # tidal derive: TOML → .wls → wolframscript
@@ -474,14 +472,14 @@ tidal/                   # TIDAL project root
 │   │   ├── CommonUtilities.wl
 │   │   └── ...
 │   └── measurement/          # Post-hoc analysis (energy, conversion, spectra)
-├── tests/                    # Test suite (1,568 Python tests)
+├── tests/                    # Test suite (1,484 Python tests)
 │   ├── conftest.py          # Shared fixtures
 │   ├── test_cli.py          # CLI integration tests
 │   ├── test_solver_ida.py   # IDA solver tests
 │   ├── test_solver_leapfrog.py  # Leapfrog tests
 │   └── test_*.py            # Other test modules
-├── examples/                 # 25 pipeline examples
-│   ├── data/                # Generated JSON specifications (24 files)
+├── examples/                 # 27 pipeline examples
+│   ├── data/                # Generated JSON specifications
 │   └── {example}/           # Each has theory.toml, run.sh
 ├── docs/                     # Documentation
 │   └── source/              # Sphinx source files
