@@ -309,37 +309,33 @@ def _wls_parallel_init(ctx: _WlsContext) -> list[str]:
 
     lines: list[str] = [
         "",
-        "(* === Parallel Subkernel Initialization === *)",
-        "(* Launch subkernels for parallel component/term decomposition.      *)",
-        "(* Uses all available CPUs via $MaxLicenseSubprocesses.               *)",
-        "(* xAct (xPerm, xTensor, xCoba) is loaded on each subkernel along    *)",
-        "(* with pipeline modules and tensor definitions.  Geometric caches    *)",
-        "(* ($TIDALGeometricCache) are pre-computed on the master and          *)",
-        "(* distributed to avoid redundant Christoffel/Riemann computation.    *)",
-        "(* Ref: GitHub issue #144                                             *)",
-        _wls_timing_start("tParallelInit"),
+        "(* === Lazy Parallel Subkernel Initialization === *)",
+        "(* EnsureParallelInit[] launches subkernels on first call, no-op      *)",
+        "(* after.  Called by component extraction (Level 1) and canonical     *)",
+        "(* Lagrangian decomposition (Level 3a) when there is enough work to  *)",
+        "(* amortize the ~16s overhead.  Ref: GitHub issue #144               *)",
         "",
-        "(* Adaptive: only parallelize if enough work to amortize overhead *)",
-        "$useParallel = True;",
-        "LaunchKernels[$MaxLicenseSubprocesses];",
-        'Print["[Parallel] Launched ", Length[Kernels[]], " subkernels"];',
+        "EnsureParallelInit[] := If[Length[Kernels[]] == 0,",
+        "  Module[{tInit = AbsoluteTime[]},",
+        "    LaunchKernels[$MaxLicenseSubprocesses];",
+        '    Print["[Parallel] Launched ", Length[Kernels[]], " subkernels"];',
         "",
-        "(* Step 1: Load packages on each subkernel *)",
-        "ParallelEvaluate[Quiet[<< xAct`xTensor`; << xAct`xCoba`]];",
-        'ParallelEvaluate[Quiet[Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]]]];',
-        'ParallelEvaluate[Quiet[Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]]]];',
-        "ParallelEvaluate[$DefInfoQ = False];",
+        "    (* Load packages on each subkernel *)",
+        "    ParallelEvaluate[Quiet[<< xAct`xTensor`; << xAct`xCoba`]];",
+        '    ParallelEvaluate[Quiet[Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]]]];',
+        '    ParallelEvaluate[Quiet[Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]]]];',
+        "    ParallelEvaluate[$DefInfoQ = False];",
         "",
-        "(* Step 2: Replicate tensor definitions to each subkernel *)",
-        "ParallelEvaluate[Quiet[",
-        f"  If[!xTensorQ[{ctx.manifold}],",
-        f"    DefManifold[{ctx.manifold}, {ctx.dim}, {{{idx_str}}}]];",
-        f"  If[!MetricQ[{ctx.metric}],",
-        f"    DefMetric[-1, {ctx.metric}[-a, -b], {ctx.cd},",
-        '      SymbolOfCovD -> {";", "\\[Del]"},',
-        '      PrintAs -> "\\[Eta]"]];',
-        f"  If[!ChartQ[{ctx.chart}],",
-        f"    DefChart[{ctx.chart}, {ctx.manifold}, {{{indices}}}, {{{coord_funcs}}}]];",
+        "    (* Replicate tensor definitions to each subkernel *)",
+        "    ParallelEvaluate[Quiet[",
+        f"      If[!xTensorQ[{ctx.manifold}],",
+        f"        DefManifold[{ctx.manifold}, {ctx.dim}, {{{idx_str}}}]];",
+        f"      If[!MetricQ[{ctx.metric}],",
+        f"        DefMetric[-1, {ctx.metric}[-a, -b], {ctx.cd},",
+        '          SymbolOfCovD -> {";", "\\[Del]"},',
+        '          PrintAs -> "\\[Eta]"]];',
+        f"      If[!ChartQ[{ctx.chart}],",
+        f"        DefChart[{ctx.chart}, {ctx.manifold}, {{{indices}}}, {{{coord_funcs}}}]];",
     ]
 
     # Replicate field definitions on subkernels
@@ -349,44 +345,48 @@ def _wls_parallel_init(ctx: _WlsContext) -> list[str]:
         head = f"{p}{fname.capitalize()}"
         if ftype == "scalar":
             lines.append(
-                f"  If[!xTensorQ[{head}], DefTensor[{head}[], {ctx.manifold}]];"
+                f"      If[!xTensorQ[{head}], DefTensor[{head}[], {ctx.manifold}]];"
             )
         elif ftype == "vector":
             lines.append(
-                f"  If[!xTensorQ[{head}], DefTensor[{head}[-a], {ctx.manifold}]];",
+                f"      If[!xTensorQ[{head}], DefTensor[{head}[-a], {ctx.manifold}]];",
             )
         elif ftype == "symmetric_tensor":
             lines.append(
-                f"  If[!xTensorQ[{head}], DefTensor[{head}[-a, -b], {ctx.manifold}, Symmetric[{{1, 2}}]]];",
+                f"      If[!xTensorQ[{head}],"
+                f" DefTensor[{head}[-a, -b], {ctx.manifold},"
+                f" Symmetric[{{1, 2}}]]];",
             )
 
     # Replicate constant symbols
     lines.extend(
-        f"  If[!ConstantSymbolQ[{p}{const}], DefConstantSymbol[{p}{const}]];"
+        f"      If[!ConstantSymbolQ[{p}{const}], DefConstantSymbol[{p}{const}]];"
         for const in ctx.constants
     )
 
     lines.extend(
         [
-            "]];",  # close ParallelEvaluate[Quiet[...]]
+            "    ]];",  # close ParallelEvaluate[Quiet[...]]
             "",
-            "(* Step 3: Set metric components and DownValues on subkernels *)",
-            f"ParallelEvaluate[MetricInBasis[{ctx.metric}, -{ctx.chart}, {p}MetricMatrix]];",
-            f"ParallelEvaluate[SetMetricDownValues[{ctx.metric}, {ctx.chart}, {p}MetricMatrix]];",
+            "    (* Set metric components and DownValues on subkernels *)",
+            f"    ParallelEvaluate[MetricInBasis[{ctx.metric}, -{ctx.chart}, {p}MetricMatrix]];",
+            f"    ParallelEvaluate[SetMetricDownValues[{ctx.metric}, {ctx.chart}, {p}MetricMatrix]];",
             "",
-            "(* Step 4: Pre-compute geometric caches on master, then distribute *)",
-            f"GetCachedChristoffels[{ctx.chart}, {p}MetricMatrix];",
-            f"GetCachedInverseMetric[{p}MetricMatrix];",
-            f"GetCachedMetricRules[{ctx.chart}, {p}MetricMatrix];",
-            "DistributeDefinitions[$TIDALGeometricCache];",
+            "    (* Pre-compute geometric caches on master, then distribute *)",
+            f"    GetCachedChristoffels[{ctx.chart}, {p}MetricMatrix];",
+            f"    GetCachedInverseMetric[{p}MetricMatrix];",
+            f"    GetCachedMetricRules[{ctx.chart}, {p}MetricMatrix];",
+            "    DistributeDefinitions[$TIDALGeometricCache];",
             "",
-            "(* Step 5: Memoize lightweight caches on each subkernel *)",
-            f"ParallelEvaluate[GetCoordinateSymbols[{ctx.chart}]];",
-            f"ParallelEvaluate[GetChartDimension[{ctx.chart}]];",
-            f"ParallelEvaluate[GenerateCDRules[{ctx.dim}, {ctx.chart}]];",
+            "    (* Memoize lightweight caches on each subkernel *)",
+            f"    ParallelEvaluate[GetCoordinateSymbols[{ctx.chart}]];",
+            f"    ParallelEvaluate[GetChartDimension[{ctx.chart}]];",
+            f"    ParallelEvaluate[GenerateCDRules[{ctx.dim}, {ctx.chart}]];",
             "",
-            _wls_timing_end("tParallelInit", "Parallel subkernel initialization"),
-            _wls_mem_print("After parallel init"),
+            "    $useParallel = True;",
+            '    Print["[Parallel] Init: ", Round[AbsoluteTime[] - tInit, 0.1], "s"];',
+            "  ]",
+            "];",
             "",
         ]
     )
@@ -3285,8 +3285,9 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
     # Adaptive: parallel if enough terms, serial otherwise
     lines.extend(
         [
-            "If[$useParallel && Length[lagTerms] >= 4 && Length[Kernels[]] > 0,",
-            "  (* === Parallel path: distribute terms across subkernels === *)",
+            "If[Length[lagTerms] >= 4,",
+            "  (* === Parallel path: launch subkernels lazily, distribute terms === *)",
+            "  EnsureParallelInit[];",
             '  Print["[Parallel] Decomposing ", Length[lagTerms], " Lagrangian terms on ",',
             '    Length[Kernels[]], " subkernels..."];',
             "  DistributeDefinitions[lagTerms, canonDecompWorker];",
@@ -3899,15 +3900,6 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # metadata references it even when no canonical pipeline runs.
     lines.extend(("eliminatedFromCanonical = {};", ""))
 
-    # --- Parallel subkernel initialization ---
-    # Launch subkernels BEFORE canonical decomposition.  This is after all
-    # xAct definitions (manifold, metric, chart, fields, constants) so the
-    # subkernels can replicate the full tensor state.  Subkernels are reused
-    # for both EOM decomposition (Level 1, in ComponentDecompose.wl) and
-    # canonical Lagrangian decomposition (Level 3a, below).
-    if ctx.lagrangian_expr:
-        lines.extend(_wls_parallel_init(ctx))
-
     # --- Canonical Phase A: Lagrangian decomposition + constraint elimination ---
     # Must run BEFORE BuildMultiFieldJSONStructure so that fieldEquations
     # contains only surviving fields (constraints already eliminated).
@@ -4095,6 +4087,15 @@ def generate_wls(
     lines.extend(_wls_spacetime(config, ctx))
     lines.extend(_wls_fields(ctx, include_bg=_needs_bg_tensor(config)))
     lines.extend(_wls_derived_fields(ctx))
+
+    # Define EnsureParallelInit[] — a lazy, idempotent function that launches
+    # subkernels on first call.  Placed here (after all field definitions)
+    # so it's available to both _wls_linearize_from_lagrangian (Level 1:
+    # EOM component decomposition) and _wls_canonical_phase_a (Level 3a:
+    # canonical Lagrangian term decomposition).  The ~16s initialization
+    # overhead is only paid when a parallel-capable workload is encountered.
+    if ctx.lagrangian_expr:
+        lines.extend(_wls_parallel_init(ctx))
 
     if is_linearization and ctx.lagrangian_expr:
         # Lagrangian-first linearization: single-path via L^(2)

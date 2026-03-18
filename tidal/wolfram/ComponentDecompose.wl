@@ -429,8 +429,9 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
          For simple theories or when subkernels aren't running, fall back
          to the original serial Do+AppendTo+Share[] path.
          Ref: GitHub issue #144 *)
-      If[TrueQ[$useParallel] && Length[componentTuples] >= 3 && Length[Kernels[]] > 0,
-        (* Parallel path *)
+      If[Length[componentTuples] >= 3 && DownValues[EnsureParallelInit] =!= {},
+        (* Parallel path: lazily launch subkernels if not already running *)
+        EnsureParallelInit[];
         Print["  [Parallel] Extracting ", Length[componentTuples],
               " components on ", Length[Kernels[]], " subkernels..."];
         DistributeDefinitions[eomSep, flatIdxMap, componentTuples,
