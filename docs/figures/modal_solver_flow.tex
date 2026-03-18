@@ -57,15 +57,15 @@
 % ===================================================================
 \node[stage=Blue,
       below left=0.4cm and 0.0cm of branch] (matrix_full)
-    {Build full matrix\\[-1pt]\scriptsize $(N_k {\times} N_s)^2$ convolution};
+    {Build full matrix\\[-1pt]\scriptsize $c(x)\!\cdot\!u \to \hat{c}\ast\hat{u}$ couples all modes};
 
 \node[stage=Blue,
       below=0.4cm of matrix_full] (sparsify)
-    {Sparsify\\[-1pt]\scriptsize threshold $+$ CSC if $<\!30\%$};
+    {Sparsify\\[-1pt]\scriptsize $|A_{ij}| < 10^{-14}\!\cdot\!\max|A| \to 0$; CSC};
 
 \node[stage=Blue,
       below=0.4cm of sparsify] (expm)
-    {\texttt{expm\_multiply}\\[-1pt]\scriptsize $\exp(A \cdot t) \cdot y_0$};
+    {\texttt{expm\_multiply}\\[-1pt]\scriptsize $\exp(A \cdot t) \cdot y_0$ (all $t$ at once)};
 
 % ===================================================================
 % CONVERGENCE: IFFT + output
@@ -111,40 +111,6 @@
      union-find $\to$ skip zero-IC blocks\\
      warn if $\max(\mathrm{Re}\,\lambda)\cdot\Delta t > 30$};
 \draw[arr, densely dotted, OrangeLine] (blocks.south) -- (matrix_pm.north east);
-
-% ===================================================================
-% PATH B DETAIL: convolution, sparsity, non-normality
-% ===================================================================
-
-% Convolution explanation (alongside matrix_full)
-\node[detail=Blue, left=0.4cm of matrix_full] (convol)
-    {\textbf{k-space convolution}\\[2pt]
-     $\mathrm{FFT}[c(x)\!\cdot\! u]_k = \!\sum_{k'} \hat{c}_{k\!-\!k'}\!\cdot\!\hat{u}_{k'}$\\[2pt]
-     all modes coupled $\to$\\
-     $(N_k \!\times\! N_s)^2$ dense matrix};
-\node[annot, above=0.1cm of convol] {Burns et al.\ (2020)};
-\draw[arr, BlueLine, densely dashed, rounded corners=3pt]
-    (convol.east) -- (matrix_full.west);
-
-% Sparsity explanation (alongside sparsify)
-\node[detail=Blue, left=0.4cm of sparsify] (sparse_why)
-    {\textbf{Localized $\boldsymbol{\to}$ banded}\\[2pt]
-     $c(x)$ localized $\Rightarrow$\\
-     $\hat{c}(q)$ decays exponentially\\[2pt]
-     density $\downarrow$ with $N$:\\
-     4\% ($N\!=\!128$) $\to$ 1.4\% ($N\!=\!512$)};
-\draw[arr, BlueLine, densely dashed, rounded corners=3pt]
-    (sparse_why.east) -- (sparsify.west);
-
-% Non-normality explanation (alongside expm)
-\node[detail=Blue, left=0.4cm of expm] (nonnormal)
-    {\textbf{Why not eigendecomp?}\\[2pt]
-     non-normal $A$: $\mathrm{Re}(\lambda)\!>\!0$\\
-     but $\|e^{At}y_0\|$ bounded\\[2pt]
-     scaling $+$ Taylor: backward-stable\\
-     Al-Mohy \& Higham (2011)};
-\draw[arr, BlueLine, densely dashed, rounded corners=3pt]
-    (nonnormal.east) -- (expm.west);
 
 % ===================================================================
 % CONSTRAINT ELIMINATION (Schur complement, Path A only)
@@ -205,9 +171,7 @@
     \textcolor{BlueLine}{\rule{0.5cm}{2pt}}
         \textbf{Path B}: sparse \texttt{expm\_multiply} (position-dep.)\\
     \textcolor{PinkLine}{\rule[1pt]{0.5cm}{1pt}}
-        Schur constraint elimination (Path A only)\\
-    \textcolor{BlueLine}{\rule[1pt]{0.5cm}{1pt}}
-        k-space detail (Path B only)
+        Schur constraint elimination (Path A only)
 };
 
 \end{tikzpicture}
