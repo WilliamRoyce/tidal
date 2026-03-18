@@ -421,20 +421,45 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
         Print["  Scalar expansion complete: ", If[FreeQ[eomSep, Scalar], "all resolved", "some remain"]];
       ];
 
-      (* Use Do+AppendTo instead of Table so Share[] can reclaim memory
-         between component extractions — critical for cross-field coupling
-         cases like Einstein-Maxwell where expressions grow large. *)
-      result = {};
-      Do[
-        AppendTo[result,
-          {flatIdxMap[componentTuples[[idx]]],
-           ExtractTensorComponent[eomSep, field, chart,
-             componentTuples[[idx]], additionalFields, computeChristoffels, metricMatrix, backgroundFieldRules]}
+      (* === Adaptive parallel/serial component extraction ===
+         Level 1 parallelism: when subkernels are available ($useParallel)
+         and there are enough components (>= 3), use ParallelTable to
+         distribute component extractions across subkernels.  Each
+         extraction is independent (reads eomSep, writes one result).
+         For simple theories or when subkernels aren't running, fall back
+         to the original serial Do+AppendTo+Share[] path.
+         Ref: GitHub issue #144 *)
+      If[TrueQ[$useParallel] && Length[componentTuples] >= 3 && Length[Kernels[]] > 0,
+        (* Parallel path *)
+        Print["  [Parallel] Extracting ", Length[componentTuples],
+              " components on ", Length[Kernels[]], " subkernels..."];
+        DistributeDefinitions[eomSep, flatIdxMap, componentTuples,
+          additionalFields, computeChristoffels, metricMatrix, backgroundFieldRules];
+        Module[{tPar = AbsoluteTime[]},
+          result = ParallelTable[
+            {flatIdxMap[componentTuples[[idx]]],
+             ExtractTensorComponent[eomSep, field, chart,
+               componentTuples[[idx]], additionalFields, computeChristoffels,
+               metricMatrix, backgroundFieldRules]},
+            {idx, 1, Length[componentTuples]}
+          ];
+          Print["  [Parallel] ", Length[componentTuples], " components extracted in ",
+                Round[AbsoluteTime[] - tPar, 0.1], "s, ",
+                Round[MemoryInUse[]/1024.^2], " MB"];
+        ],
+        (* Serial fallback — original path with Share[] between components *)
+        result = {};
+        Do[
+          AppendTo[result,
+            {flatIdxMap[componentTuples[[idx]]],
+             ExtractTensorComponent[eomSep, field, chart,
+               componentTuples[[idx]], additionalFields, computeChristoffels, metricMatrix, backgroundFieldRules]}
+          ];
+          Share[];
+          Print["  [", Round[MemoryInUse[]/1024.^2], " MB] component ",
+                idx, "/", Length[componentTuples]];,
+          {idx, 1, Length[componentTuples]}
         ];
-        Share[];
-        Print["  [", Round[MemoryInUse[]/1024.^2], " MB] component ",
-              idx, "/", Length[componentTuples]];,
-        {idx, 1, Length[componentTuples]}
       ];
       Return[result]
     ]

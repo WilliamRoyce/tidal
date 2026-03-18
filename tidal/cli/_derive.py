@@ -287,6 +287,126 @@ def _wls_timing_end(timer_var: str, label: str) -> str:
     )
 
 
+def _wls_parallel_init(ctx: _WlsContext) -> list[str]:
+    """Generate WLS code to initialize Wolfram subkernels for parallel decomposition.
+
+    Launches subkernels, loads xAct + pipeline modules, replicates tensor
+    definitions, and distributes geometric caches ($TIDALGeometricCache).
+    Subkernels are launched once and reused across both EOM decomposition
+    (Level 1) and canonical Lagrangian decomposition (Level 3a).
+
+    The Professional license supports up to $MaxLicenseSubprocesses (8)
+    subkernels within a single wolframscript session.  xAct is fully
+    compatible with subkernels (confirmed: ToBasis, TraceBasisDummy produce
+    identical results to serial execution).
+
+    Ref: GitHub issue #144
+    """
+    p = ctx.prefix
+    idx_str = ", ".join(_INDEX_LETTERS[: min(ctx.dim + 4, 8)])
+    coord_funcs = ", ".join(f"{c}[]" for c in ctx.coords)
+    indices = ", ".join(str(i) for i in range(ctx.dim))
+
+    lines: list[str] = [
+        "",
+        "(* === Parallel Subkernel Initialization === *)",
+        "(* Launch subkernels for parallel component/term decomposition.      *)",
+        "(* Uses all available CPUs via $MaxLicenseSubprocesses.               *)",
+        "(* xAct (xPerm, xTensor, xCoba) is loaded on each subkernel along    *)",
+        "(* with pipeline modules and tensor definitions.  Geometric caches    *)",
+        "(* ($TIDALGeometricCache) are pre-computed on the master and          *)",
+        "(* distributed to avoid redundant Christoffel/Riemann computation.    *)",
+        "(* Ref: GitHub issue #144                                             *)",
+        _wls_timing_start("tParallelInit"),
+        "",
+        "(* Adaptive: only parallelize if enough work to amortize overhead *)",
+        "$useParallel = True;",
+        "LaunchKernels[$MaxLicenseSubprocesses];",
+        'Print["[Parallel] Launched ", Length[Kernels[]], " subkernels"];',
+        "",
+        "(* Step 1: Load packages on each subkernel *)",
+        "ParallelEvaluate[Quiet[<< xAct`xTensor`; << xAct`xCoba`]];",
+        'ParallelEvaluate[Quiet[Get[FileNameJoin[{pipelinePath, "CommonUtilities.wl"}]]]];',
+        'ParallelEvaluate[Quiet[Get[FileNameJoin[{pipelinePath, "ComponentDecompose.wl"}]]]];',
+        "ParallelEvaluate[$DefInfoQ = False];",
+        "",
+        "(* Step 2: Replicate tensor definitions to each subkernel *)",
+        "ParallelEvaluate[Quiet[",
+        f"  If[!xTensorQ[{ctx.manifold}],",
+        f"    DefManifold[{ctx.manifold}, {ctx.dim}, {{{idx_str}}}]];",
+        f"  If[!MetricQ[{ctx.metric}],",
+        f"    DefMetric[-1, {ctx.metric}[-a, -b], {ctx.cd},",
+        '      SymbolOfCovD -> {";", "\\[Del]"},',
+        '      PrintAs -> "\\[Eta]"]];',
+        f"  If[!ChartQ[{ctx.chart}],",
+        f"    DefChart[{ctx.chart}, {ctx.manifold}, {{{indices}}}, {{{coord_funcs}}}]];",
+    ]
+
+    # Replicate field definitions on subkernels
+    for field in ctx.fields:
+        fname = field["name"]
+        ftype = field["type"]
+        head = f"{p}{fname.capitalize()}"
+        if ftype == "scalar":
+            lines.append(
+                f"  If[!xTensorQ[{head}], DefTensor[{head}[], {ctx.manifold}]];"
+            )
+        elif ftype == "vector":
+            lines.append(
+                f"  If[!xTensorQ[{head}], DefTensor[{head}[-a], {ctx.manifold}]];",
+            )
+        elif ftype == "symmetric_tensor":
+            lines.append(
+                f"  If[!xTensorQ[{head}], DefTensor[{head}[-a, -b], {ctx.manifold}, Symmetric[{{1, 2}}]]];",
+            )
+
+    # Replicate constant symbols
+    lines.extend(
+        f"  If[!ConstantSymbolQ[{p}{const}], DefConstantSymbol[{p}{const}]];"
+        for const in ctx.constants
+    )
+
+    lines.extend(
+        [
+            "]];",  # close ParallelEvaluate[Quiet[...]]
+            "",
+            "(* Step 3: Set metric components and DownValues on subkernels *)",
+            f"ParallelEvaluate[MetricInBasis[{ctx.metric}, -{ctx.chart}, {p}MetricMatrix]];",
+            f"ParallelEvaluate[SetMetricDownValues[{ctx.metric}, {ctx.chart}, {p}MetricMatrix]];",
+            "",
+            "(* Step 4: Pre-compute geometric caches on master, then distribute *)",
+            f"GetCachedChristoffels[{ctx.chart}, {p}MetricMatrix];",
+            f"GetCachedInverseMetric[{p}MetricMatrix];",
+            f"GetCachedMetricRules[{ctx.chart}, {p}MetricMatrix];",
+            "DistributeDefinitions[$TIDALGeometricCache];",
+            "",
+            "(* Step 5: Memoize lightweight caches on each subkernel *)",
+            f"ParallelEvaluate[GetCoordinateSymbols[{ctx.chart}]];",
+            f"ParallelEvaluate[GetChartDimension[{ctx.chart}]];",
+            f"ParallelEvaluate[GenerateCDRules[{ctx.dim}, {ctx.chart}]];",
+            "",
+            _wls_timing_end("tParallelInit", "Parallel subkernel initialization"),
+            _wls_mem_print("After parallel init"),
+            "",
+        ]
+    )
+
+    return lines
+
+
+def _wls_parallel_cleanup() -> list[str]:
+    """Generate WLS code to close subkernels at end of derivation."""
+    return [
+        "",
+        "(* Close parallel subkernels *)",
+        "If[$useParallel && Length[Kernels[]] > 0,",
+        "  CloseKernels[];",
+        '  Print["[Parallel] Subkernels closed."]',
+        "];",
+        "",
+    ]
+
+
 def _wls_header(ctx: _WlsContext) -> list[str]:
     """Generate script header lines."""
     return [
@@ -295,6 +415,9 @@ def _wls_header(ctx: _WlsContext) -> list[str]:
         "",
         "(* Prevent Wolfram from caching all In/Out expressions — reduces memory *)",
         "$HistoryLength = 0;",
+        "",
+        "(* Parallel flag — set True after subkernel init, False for serial fallback *)",
+        "$useParallel = False;",
         "",
         f'Print["=== {ctx.theory_name} ==="];',
         'Print[""];',
@@ -3105,26 +3228,8 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
     # which zeros PD[{killedAxis,-chart}][...] terms BEFORE TraceBasisDummy.
     # This is implemented in ComponentDecompose.wl step 2.5.
 
-    lines.extend(
-        [
-            "lagComp = 0;",
-            "Do[",
-            "  Module[{termComp, tTerm = AbsoluteTime[]},",
-            "(* Quiet suppresses Validate::repeated from xAct's index checker     *)",
-            "(* on R̃-decomposed torsion expressions with complex contractions.   *)",
-            f"    termComp = Quiet[DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
-            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}], Validate::repeated];',
-        ]
-    )
-
-    # Per-term plane-wave reduction: zero transverse Derivative patterns and
-    # apply coordinate_values (e.g. y→π/2) on each term BEFORE accumulation.
-    # This is applied AFTER DecomposeScalarExpression (which already zeroed
-    # transverse PD at the pre-TraceBasisDummy stage) as defense-in-depth for
-    # any residual transverse derivatives (e.g. from Christoffel connections
-    # that produce Derivative form only after ConvertCDToDerivatives).
-    # Applying per-term instead of post-loop keeps lagComp small, making
-    # downstream IBP + Legendre transform much faster.
+    # Build plane-wave reduction rules (if active) for per-term application
+    reduction_rules_str = ""
     if ctx.reduction is not None:
         prop_axis = ctx.reduction["propagation_axis"]
         coords = ctx.coords
@@ -3136,27 +3241,75 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
                 f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
                 f" && {{ords}}[[{slot}]] > 0 :> 0"
             )
-        lines.append(f"    termComp = termComp /. {{{','.join(deriv_rules)}}};")
+        reduction_rules_str = f"{{{','.join(deriv_rules)}}}"
 
         coord_values: dict[str, str] = ctx.reduction.get("coordinate_values", {})
         if coord_values:
             cv_rules = ", ".join(
                 f"{coord}[] -> {val}" for coord, val in coord_values.items()
             )
-            lines.append(f"    termComp = termComp /. {{{cv_rules}}};")
+            reduction_rules_str = f"Join[{reduction_rules_str}, {{{cv_rules}}}]"
 
-        lines.append("    termComp = Expand[termComp];")
+    # --- Parallel canonical decomposition (Level 3a) ---
+    # Each Lagrangian term is decomposed independently through the same
+    # 9-step pipeline (ToBasis → BatchedTraceBasisDummy → Christoffel →
+    # Curvature → Epsilon → Metric → FieldReplace → ConvertCD).
+    # Results combine via simple addition.  This is a textbook ParallelMap
+    # target.  For simple theories (< 4 terms), serial is faster due to
+    # communication overhead (~0.3s/dispatch).
+    # Ref: GitHub issue #144
 
+    # Define the per-term worker function (used by both parallel and serial paths)
     lines.extend(
         [
-            "    lagComp += termComp;",
-            "    Share[];",
-            '    Print["  term ", k, "/", Length[lagTerms], ": ",',
-            '      Round[AbsoluteTime[] - tTerm, 0.1], "s, ",',
-            '      Round[MemoryInUse[]/1024.^2], " MB",',
-            '      If[termComp === 0, " (ZERO)", ""]];',
+            "canonDecompWorker[term_] := Module[{comp}, Quiet[",
+            f"  comp = DecomposeScalarExpression[term, {ctx.chart}, {{{all_heads_str}}}, "
+            f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}];',
+        ]
+    )
+    if reduction_rules_str:
+        lines.extend(
+            [
+                f"  comp = comp /. {reduction_rules_str};",
+                "  comp = Expand[comp];",
+            ]
+        )
+    lines.extend(
+        [
+            "  comp",
+            ", Validate::repeated]];",
+            "",
+        ]
+    )
+
+    # Adaptive: parallel if enough terms, serial otherwise
+    lines.extend(
+        [
+            "If[$useParallel && Length[lagTerms] >= 4 && Length[Kernels[]] > 0,",
+            "  (* === Parallel path: distribute terms across subkernels === *)",
+            '  Print["[Parallel] Decomposing ", Length[lagTerms], " Lagrangian terms on ",',
+            '    Length[Kernels[]], " subkernels..."];',
+            "  DistributeDefinitions[lagTerms, canonDecompWorker];",
+            "  Module[{decomposedTerms, tPar = AbsoluteTime[]},",
+            '    decomposedTerms = ParallelMap[canonDecompWorker, lagTerms, Method -> "CoarsestGrained"];',
+            "    lagComp = Total[decomposedTerms];",
+            '    Print["[Parallel] All terms decomposed in ", Round[AbsoluteTime[] - tPar, 0.1], "s, ",',
+            '      Round[MemoryInUse[]/1024.^2], " MB"];',
             "  ],",
-            "  {k, Length[lagTerms]}",
+            "  (* === Serial fallback for simple theories === *)",
+            "  lagComp = 0;",
+            "  Do[",
+            "    Module[{termComp, tTerm = AbsoluteTime[]},",
+            "      termComp = canonDecompWorker[lagTerms[[k]]];",
+            "      lagComp += termComp;",
+            "      Share[];",
+            '      Print["  term ", k, "/", Length[lagTerms], ": ",',
+            '        Round[AbsoluteTime[] - tTerm, 0.1], "s, ",',
+            '        Round[MemoryInUse[]/1024.^2], " MB",',
+            '        If[termComp === 0, " (ZERO)", ""]];',
+            "    ],",
+            "    {k, Length[lagTerms]}",
+            "  ];",
             "];",
         ]
     )
@@ -3746,6 +3899,15 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # metadata references it even when no canonical pipeline runs.
     lines.extend(("eliminatedFromCanonical = {};", ""))
 
+    # --- Parallel subkernel initialization ---
+    # Launch subkernels BEFORE canonical decomposition.  This is after all
+    # xAct definitions (manifold, metric, chart, fields, constants) so the
+    # subkernels can replicate the full tensor state.  Subkernels are reused
+    # for both EOM decomposition (Level 1, in ComponentDecompose.wl) and
+    # canonical Lagrangian decomposition (Level 3a, below).
+    if ctx.lagrangian_expr:
+        lines.extend(_wls_parallel_init(ctx))
+
     # --- Canonical Phase A: Lagrangian decomposition + constraint elimination ---
     # Must run BEFORE BuildMultiFieldJSONStructure so that fieldEquations
     # contains only surviving fields (constraints already eliminated).
@@ -3795,6 +3957,10 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
     if ctx.lagrangian_expr:
         lines.extend(_wls_canonical_phase_b(ctx, all_heads_str))
         lines.extend(_wls_canonical_injection(ctx))
+
+    # Close parallel subkernels — all decomposition work is done.
+    if ctx.lagrangian_expr:
+        lines.extend(_wls_parallel_cleanup())
 
     # Free fieldEquations now that both JSON structure and canonical
     # pipeline have finished using it.
