@@ -36,8 +36,8 @@
 \colorlet{GreenLine}{MediumAquamarine!30!Teal}
 \colorlet{PurpleFill}{MediumPurple}
 \colorlet{PurpleLine}{MediumPurple!30!SlateBlue}
-\colorlet{PinkFill}{Thistle}
-\colorlet{PinkLine}{Thistle!30!Plum}
+\colorlet{PinkFill}{Thistle!50!Plum}
+\colorlet{PinkLine}{Thistle!30!Orchid}
 \colorlet{BlueFill}{LightSkyBlue}
 \colorlet{BlueLine}{SteelBlue}
 \colorlet{LimeFill}{YellowGreen}
@@ -97,6 +97,14 @@
         fill=PinkFill!30, font=\scriptsize,
         align=center, inner sep=5pt, text width=3.6cm
     },
+    % --- Detail / explanation box (parametric colour) ---
+    % Blue analog of 'schur' — used for Path B annotations etc.
+    detail/.style={
+        rectangle, rounded corners=2pt, draw=#1Line, dashed,
+        fill=#1Fill!30, font=\scriptsize,
+        align=center, inner sep=5pt, text width=3.6cm
+    },
+    detail/.default={Blue},
     % --- Preset / tag box ---
     preset/.style={
         rectangle, rounded corners=1pt, draw=GrayLine,
