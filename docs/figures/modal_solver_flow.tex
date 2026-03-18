@@ -34,7 +34,7 @@
 % ===================================================================
 % DECISION: Position-dependent coefficients?
 % ===================================================================
-\node[decide, right=1.2cm of fft] (branch)
+\node[decision, right=1.2cm of fft] (branch)
     {Position-dep.\\coefficients?};
 
 % ===================================================================
@@ -172,19 +172,13 @@
 % BACKGROUND ZONES
 % ===================================================================
 \begin{scope}[on background layer]
-    % 1. Coloured zone fills (visible between nodes)
+    % Physical space zone (blue tint)
     \node[fit=(input)(output), inner sep=12pt, fill=BlueFill,
-          fill opacity=0.12, rounded corners=5pt,
-          draw=BlueLine, draw opacity=0.15, line width=0.5pt] {};
+          fill opacity=0.12, rounded corners=5pt] {};
+    % Fourier space zone (purple tint) — encompasses both branches
     \node[fit=(fft)(ifft)(matrix_pm)(evolve_eig)(matrix_full)(sparsify)(expm),
           inner sep=8pt, fill=PurpleFill,
-          fill opacity=0.12, rounded corners=5pt,
-          draw=PurpleLine, draw opacity=0.15, line width=0.5pt] {};
-    % 2. White masks under each node — prevents zone tint bleeding through
-    \foreach \n in {input, fft, branch, matrix_pm, eigen, evolve_eig,
-                    matrix_full, sparsify, expm, ifft, output} {
-        \node[fill=white, inner sep=1pt, rounded corners=2pt, fit=(\n)] {};
-    }
+          fill opacity=0.12, rounded corners=5pt] {};
 \end{scope}
 
 % Zone labels
