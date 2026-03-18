@@ -23,6 +23,7 @@
       left=0.8cm of gate.west] (input)
     {$\mathbf{y}(x, t_0)$\\[-1pt]\scriptsize physical space};
 
+
 % ===================================================================
 % FFT
 % ===================================================================
@@ -109,12 +110,12 @@
     {Detect decoupled field blocks\\[1pt]
      skip blocks with zero initial data\\
      warn on unstable eigenvalues};
-\draw[arr, densely dotted, OrangeLine] (blocks.south) -- (matrix_pm.north east);
+\draw[arr, densely dotted, OrangeLine] ([xshift=-0.8cm]blocks.south) -- ([xshift=-0.8cm]matrix_pm.north east);
 
 % ===================================================================
 % CONSTRAINT ELIMINATION (Schur complement, Path A only)
 % ===================================================================
-\node[detail=Pink, text width=3.1cm, right=0.4cm of matrix_pm] (schur)
+\node[detail=Pink, text width=3.1cm, below right=0.6cm and 0.4cm of matrix_pm.east, anchor=west] (schur)
     {\textbf{Schur complement}\\[2pt]
      eliminate constraints:\\
      $A_{\mathrm{red}} = A_{dd} - A_{dc} S_{cc}^{-1} S_{cd}$\\[2pt]
@@ -124,9 +125,9 @@
 
 % Arrow from matrix_pm down to Schur, then to eigen
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
-    (matrix_pm.east) -- (schur.west);
+    (matrix_pm.east) -- ([yshift=0.6cm]schur.west);
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
-    (schur.south) |- (eigen.east);
+    ([yshift=-0.63cm]schur.west) -- (eigen.east);
 
 % Recovery arrow from evolve_eig down to reconstruction
 \node[detail=Pink, text width=3.0cm, below right=0.2cm and -0.6cm of evolve_eig, text width=2.8cm] (recover)
@@ -136,12 +137,14 @@
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
     (evolve_eig.east) -| (recover.north);
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
-    (recover.south) |- (ifft.south east);
+    ([yshift=-0.5cm]recover.west) -- ([yshift=-0.2cm]ifft.east);
 
 % ===================================================================
 % BACKGROUND ZONES
 % ===================================================================
 \begin{scope}[on background layer]
+    \draw[white] (input) --++ (8,0);
+    \draw[white] (input) --++ (-8,0);
     % Physical space zone (blue tint)
     \node[fit=(input)(output), inner sep=12pt, fill=GrayFill, densely dashed, draw=GrayLine, fill opacity=0.2, rounded corners=5pt] {};
     % Fourier space zone (purple tint) — encompasses both branches
