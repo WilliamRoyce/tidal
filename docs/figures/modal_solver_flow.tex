@@ -29,7 +29,7 @@
 % ===================================================================
 \node[stage=Purple,
       below=0.4cm of input] (fft)
-    {\textbf{FFT}\\[-1pt]\scriptsize \texttt{rfftn} per slot};
+    {\textbf{FFT}\\[-1pt]\scriptsize per field slot};
 
 % ===================================================================
 % DECISION: Position-dependent coefficients?
@@ -41,8 +41,8 @@
 % PATH A: Per-mode eigendecomposition (upper branch, purple)
 % ===================================================================
 \node[stage=Pink,
-      below right=0.4cm and 0.0cm of branch] (matrix_pm)
-    {Build $A(k)$\\[-1pt]\scriptsize per-mode ($\leq\!12{\times}12$)};
+      below right=0.8cm and 0.6cm of branch.east, anchor=north] (matrix_pm)
+    {Build $A(k)$\\[-1pt]\scriptsize independent per mode $k$};
 
 \node[stage=Pink,
       below=0.4cm of matrix_pm] (eigen)
@@ -56,12 +56,12 @@
 % PATH B: expm_multiply (lower branch, lime)
 % ===================================================================
 \node[stage=Blue,
-      below left=0.4cm and 0.0cm of branch] (matrix_full)
+      below left=0.8cm and 0.6cm of branch.west, anchor=north] (matrix_full)
     {Build full matrix\\[-1pt]\scriptsize $c(x)\!\cdot\!u \to \hat{c}\ast\hat{u}$ couples all modes};
 
 \node[stage=Blue,
       below=0.4cm of matrix_full] (sparsify)
-    {Sparsify\\[-1pt]\scriptsize $|A_{ij}| < 10^{-14}\!\cdot\!\max|A| \to 0$; CSC};
+    {Sparsify\\[-1pt]\scriptsize zero negligible entries; sparse CSC};
 
 \node[stage=Blue,
       below=0.4cm of sparsify] (expm)
@@ -72,7 +72,7 @@
 % ===================================================================
 \node[stage=Purple,
       below=4.2cm of branch] (ifft)
-    {\textbf{IFFT}\\[-1pt]\scriptsize \texttt{irfftn} per slot};
+    {\textbf{IFFT}\\[-1pt]\scriptsize per field slot};
 
 \node[stage=Gray,
       below=0.4cm of ifft] (output)
@@ -107,20 +107,19 @@
 % BLOCK-AWARE CHECK (above per-mode matrix, Path A only)
 % ===================================================================
 \node[check, above =1.2cm of matrix_pm.north east, text width=3.4cm] (blocks)
-    {\texttt{\_find\_independent\_blocks()}\\[1pt]
-     union-find $\to$ skip zero-IC blocks\\
-     warn if $\max(\mathrm{Re}\,\lambda)\cdot\Delta t > 30$};
+    {Detect decoupled field blocks\\[1pt]
+     skip blocks with zero initial data\\
+     warn on unstable eigenvalues};
 \draw[arr, densely dotted, OrangeLine] (blocks.south) -- (matrix_pm.north east);
 
 % ===================================================================
 % CONSTRAINT ELIMINATION (Schur complement, Path A only)
 % ===================================================================
-\node[schur, right=0.4cm of matrix_pm] (schur)
+\node[detail=Pink, right=0.4cm of matrix_pm] (schur)
     {\textbf{Schur complement}\\[2pt]
-     $S_{cc}^{-1} = \frac{1}{m^2 + k^2}$ per mode\\[2pt]
+     eliminate constraints:\\
      $A_{\mathrm{red}} = A_{dd} - A_{dc} S_{cc}^{-1} S_{cd}$\\[2pt]
-     implicit velocity solve:\\
-     $(I - A_{dc,v}\cdot\mathrm{recovery})^{-1}$};
+     (dynamical DOFs only)};
 
 \node[annot, above=0.1cm of schur] {if constraints present};
 
@@ -131,7 +130,7 @@
     (schur.south) |- (eigen.east);
 
 % Recovery arrow from evolve_eig down to reconstruction
-\node[schur, below right=0.2cm and -1.2cm of evolve_eig, text width=2.8cm] (recover)
+\node[detail=Pink, below right=0.2cm and -1.2cm of evolve_eig, text width=2.8cm] (recover)
     {\textbf{Reconstruct}\\[2pt]
      $\hat{c}(k) = -S_{cc}^{-1} S_{cd}\, \hat{d}(k)$\\[2pt]
      IFFT $\to c(x,t)$};
@@ -145,7 +144,7 @@
 % ===================================================================
 \begin{scope}[on background layer]
     % Physical space zone (blue tint)
-    \node[fit=(input)(output), inner sep=8pt, fill=GrayFill, densely dashed, draw=GrayLine, fill opacity=0.12, rounded corners=5pt] {};
+    \node[fit=(input)(output), inner sep=12pt, fill=GrayFill, densely dashed, draw=GrayLine, fill opacity=0.12, rounded corners=5pt] {};
     % Fourier space zone (purple tint) — encompasses both branches
     \node[fit=(fft)(ifft)(matrix_pm)(evolve_eig)(matrix_full)(sparsify)(expm),
           inner sep=4pt, fill=PurpleFill, draw=PurpleLine, densely dashed,
@@ -154,7 +153,7 @@
 
 % Zone labels
 \node[font=\scriptsize\bfseries, text=GrayLine,
-      below left=0.2cm and 0cm of input.south west, anchor=north west]
+      above left=0.0cm and -0.4cm of input.north, anchor=south east]
     {Physical space};
 \node[font=\scriptsize\bfseries, text=PurpleLine,
       above left=0.2cm and 0.8cm of fft.west, anchor=east]
@@ -164,7 +163,7 @@
 % PATH LEGEND (bottom right)
 % ===================================================================
 \node[font=\scriptsize, align=left,
-      right=0.8cm of output.east, anchor=west,
+      below right=0.2cm and 0.8cm of output.east, anchor=west,
       draw=GrayLine, rounded corners=2pt, inner sep=5pt, fill=white] {
     \textcolor{PinkLine}{\rule{0.5cm}{2pt}}
         \textbf{Path A}: per-mode eigdecomp (constant coeffs)\\
