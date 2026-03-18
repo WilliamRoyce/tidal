@@ -1,5 +1,6 @@
 \documentclass[border=10pt]{standalone}
 \usepackage{tidal-tikz-styles}
+\usetikzlibrary{backgrounds}
 
 \begin{document}
 \begin{tikzpicture}[
@@ -20,7 +21,7 @@
 % PHYSICAL SPACE INPUT
 % ===================================================================
 \node[stage=Blue,
-      below left=1.2cm and 0.5cm of gate] (input)
+      below=1.6cm of gate.south] (input)
     {$\mathbf{y}(x, t_0)$\\[-1pt]\scriptsize physical space};
 
 % ===================================================================
@@ -80,7 +81,7 @@
 % ===================================================================
 % ARROWS — main flow
 % ===================================================================
-\draw[arr] (gate) -- (input);
+\draw[arr] (gate.south) -- (input.north);
 \draw[arr] (input) -- (fft);
 \draw[arr] (fft) -- (branch);
 
@@ -89,14 +90,14 @@
 \draw[arr] (matrix_pm) -- (eigen);
 \draw[arr] (eigen) -- (evolve_eig);
 \draw[arr, rounded corners=3pt]
-    (evolve_eig.east) -| ([xshift=-0.3cm]ifft.north) -- (ifft.north);
+    (evolve_eig.east) -| (ifft.north);
 
 % Path B (lower): Yes position-dependent → sparsify → expm_multiply
 \draw[arr] (branch) -- node[nolbl, below left] {Yes} (matrix_full);
 \draw[arr] (matrix_full) -- (sparsify);
 \draw[arr] (sparsify) -- (expm);
 \draw[arr, rounded corners=3pt]
-    (expm.east) -| ([xshift=-0.3cm]ifft.south) -- (ifft.south);
+    (expm.east) -| (ifft.south);
 
 % IFFT -> output
 \draw[arr] (ifft) -- (output);
@@ -106,9 +107,9 @@
 % ===================================================================
 
 % Path A costs (above upper branch)
-\node[cost=Purple, above=0.15cm of eigen]
+\node[cost=Purple, below=0.15cm of eigen]
     {$O(N_f^3)$/mode};
-\node[cost=Purple, above=0.15cm of evolve_eig]
+\node[cost=Purple, below=0.15cm of evolve_eig]
     {$O(N_f^2)$/snap};
 
 % Path B costs (below lower branch)
@@ -124,11 +125,11 @@
 % ===================================================================
 % BLOCK-AWARE CHECK (above per-mode matrix, Path A only)
 % ===================================================================
-\node[check, above=0.6cm of matrix_pm, text width=3.4cm] (blocks)
+\node[check, above left=0.8cm and 0.8cm of matrix_pm, text width=3.4cm] (blocks)
     {\texttt{\_find\_independent\_blocks()}\\[1pt]
      union-find $\to$ skip zero-IC blocks\\
      warn if $\max(\mathrm{Re}\,\lambda)\cdot\Delta t > 30$};
-\draw[arr, densely dotted, OrangeLine] (blocks) -- (matrix_pm);
+\draw[arr, densely dotted, OrangeLine] (blocks) |- (matrix_pm);
 
 % ===================================================================
 % PATH B ANNOTATION (non-normal matrix note)
@@ -142,42 +143,44 @@
 % ===================================================================
 % CONSTRAINT ELIMINATION (Schur complement, Path A only)
 % ===================================================================
-\node[schur, below=2.6cm of matrix_pm] (schur)
+\node[schur, above=0.8cm of matrix_pm] (schur)
     {\textbf{Schur complement}\\[2pt]
      $S_{cc}^{-1} = \frac{1}{m^2 + k^2}$ per mode\\[2pt]
      $A_{\mathrm{red}} = A_{dd} - A_{dc} S_{cc}^{-1} S_{cd}$\\[2pt]
      implicit velocity solve:\\
      $(I - A_{dc,v}\cdot\mathrm{recovery})^{-1}$};
 
-\node[annot, below=0.15cm of schur] {if constraints present};
+\node[annot, above=0.15cm of schur] {if constraints present};
 
 % Arrow from matrix_pm down to Schur, then to eigen
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
-    (matrix_pm.south) -- ++(0,-0.4) -| (schur.north);
+    (matrix_pm.north) -- (schur.south);
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
-    (schur.east) -| ([xshift=-0.3cm]eigen.south) -- (eigen.south);
+    (schur.east) -| (eigen.north);
 
 % Recovery arrow from evolve_eig down to reconstruction
-\node[schur, below=2.6cm of evolve_eig, text width=2.8cm] (recover)
+\node[schur, above right=0.8cm and -0.2cm of evolve_eig, text width=2.8cm] (recover)
     {\textbf{Reconstruct}\\[2pt]
      $\hat{c}(k) = -S_{cc}^{-1} S_{cd}\, \hat{d}(k)$\\[2pt]
      IFFT $\to c(x,t)$};
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
-    (evolve_eig.south) -- ++(0,-0.4) -| (recover.north);
+    (evolve_eig.north) |- (recover.west);
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
-    (recover.east) -| ([xshift=0.3cm]ifft.south east) -- (ifft.south east);
+    (recover.east) -| (ifft.north east);
 
 % ===================================================================
 % BACKGROUND ZONES
 % ===================================================================
 \begin{scope}[on background layer]
-    % Physical space zone (blue tint)
+    % Physical space zone (blue tint — very faint so nodes stay crisp)
     \node[fit=(input)(output), inner sep=12pt, fill=BlueFill,
-          fill opacity=0.08, rounded corners=5pt] {};
-    % Fourier space zone (purple tint) — encompasses both branches
+          fill opacity=0.04, rounded corners=5pt,
+          draw=BlueLine, draw opacity=0.15, line width=0.5pt] {};
+    % Fourier space zone (purple tint)
     \node[fit=(fft)(ifft)(matrix_pm)(evolve_eig)(matrix_full)(sparsify)(expm),
           inner sep=8pt, fill=PurpleFill,
-          fill opacity=0.06, rounded corners=5pt] {};
+          fill opacity=0.04, rounded corners=5pt,
+          draw=PurpleLine, draw opacity=0.15, line width=0.5pt] {};
 \end{scope}
 
 % Zone labels
@@ -192,7 +195,7 @@
 % PATH LEGEND (bottom right)
 % ===================================================================
 \node[font=\scriptsize, align=left,
-      below right=0.2cm and 0cm of output.south east, anchor=north west,
+      below right=0.8cm and 0cm of output.south east, anchor=north,
       draw=GrayLine, rounded corners=2pt, inner sep=5pt, fill=white] {
     \textcolor{PurpleLine}{\rule{0.5cm}{2pt}}
         \textbf{Path A}: per-mode eigdecomp (constant coeffs)\\
