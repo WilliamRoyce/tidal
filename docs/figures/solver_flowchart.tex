@@ -13,7 +13,7 @@
 
 % --- Start ---
 \node[solver] (start) {%
-    \texttt{\_resolve\_scheme()}\\[1pt]
+    \textbf{Auto-select solver}\\[1pt]
     scheme, spec, grid, bc};
 
 % --- D0: Explicit scheme? ---
@@ -29,12 +29,12 @@
 % --- Modal sub-check panel (left of d1) ---
 \node[subcheck, left=2.6cm of d1] (subchecks) {%
     \textbf{All conditions required:}\\[3pt]
-    1.\ Flat metric (\texttt{volume\_element = None})\\
+    1.\ Flat metric\\
     2.\ Constraints Fourier-eliminable\\
     \quad (operators $\in$ exact multipliers,\\
     \quad\, no time-dependent coefficients)\\
     3.\ All BCs periodic\\
-    4.\ All operators $\in$ \texttt{\_EXACT\_MULTIPLIERS}\\
+    4.\ All operators modal-supported\\
     \quad (12 supported: identity, laplacian,\\
     \quad\, gradient$_{x,y,z}$, laplacian$_{x,y,z}$,\\
     \quad\, cross\_deriv$_{xy,xz,yz}$, biharmonic)\\

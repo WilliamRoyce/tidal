@@ -10,15 +10,15 @@
 % ENTRY
 % ===================================================================
 \node[stage=Gray] (entry)
-    {\textbf{\texttt{ensure\_consistent\_ic()}}\\[1pt]
-     \scriptsize constraint\_solve.py};
+    {\textbf{Constraint IC Solver}\\[1pt]
+     \scriptsize ensure consistent initial conditions};
 
 % ===================================================================
 % PHASE 1: Standard constraints
 % ===================================================================
 \node[stage=Blue, below=of entry, text width=3.8cm] (ph1)
     {\textbf{Phase 1: Standard constraints}\\[1pt]
-     \scriptsize \texttt{constraint\_solver.enabled = true}};
+     \scriptsize constraint equations present};
 
 \node[decision, below=of ph1] (d1)
     {Self-term\\present?};
@@ -87,8 +87,8 @@
 % METHOD SELECTION BOX
 % ===================================================================
 \node[check, left=of d2, text width=3.2cm] (selmethod) {%
-    \texttt{\_select\_method()}\\[2pt]
-    auto-chooses tier based\\
+    \textbf{Auto-select tier}\\[2pt]
+    chooses method based\\
     on BCs + coefficient type\\[2pt]
     Tier 3 (CG/GMRES):\\
     future, for $N > 10^6$};

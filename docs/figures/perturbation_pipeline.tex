@@ -16,7 +16,7 @@
     {User writes Lagrangian with\\derived field $F$ (field strength)};
 
 \node[stage=Pink, below=of lagr] (makerule)
-    {\texttt{MakeRule}: $F \to dA$};
+    {Expand: $F_{\mu\nu} \to \partial_{[\mu}A_{\nu]}$};
 \node[annot, right=0.4cm of makerule.east, anchor=west]
     {Expand $F_{\mu\nu} = \partial_\mu A_\nu - \partial_\nu A_\mu$\\
      \emph{before} perturbation};
@@ -29,7 +29,7 @@
      expand to $O(\varepsilon^2)$};
 
 \node[stage=Purple, below=of xpert] (truncate)
-    {Drop $O(\varepsilon^{3+})$, replace $\mathrm{LI}[1]$};
+    {Drop $O(\varepsilon^{3+})$, linearise to $O(\varepsilon)$};
 \node[annot, right=0.4cm of truncate.east, anchor=west]
     {Keep quadratic Lagrangian only\\
      (linear PDE regime)};
@@ -49,11 +49,11 @@
      separate EOM per perturbation field};
 
 \node[stage=Green, below=of vard] (decompose)
-    {\texttt{DecomposeToComponents}};
+    {Decompose to components};
 \node[annot, right=0.4cm of decompose.east, anchor=west]
     {$h_{\mu\nu} \to h_0, \ldots, h_9$\\
      $a_\mu \to a_0, \ldots, a_3$\\
-     cross-field via \texttt{additionalFields}};
+     including cross-field terms};
 
 \node[stage=Green, below=of decompose] (elim)
     {Gauge + constraint elimination};

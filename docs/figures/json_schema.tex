@@ -93,8 +93,8 @@
 
 \node[role=PinkLine, right=0.2cm of term.north east, anchor=north west,
       text width=3.6cm] (termroles) {%
-    \textbf{operator} $\in$ \texttt{\_EXACT\_}\\
-    \texttt{MULTIPLIERS}? $\to$ modal eligible\\[2pt]
+    \textbf{operator} modal-supported?\\
+    $\to$ modal eligible\\[2pt]
     \textbf{coefficient\_symbolic}:\\
     enables \texttt{-{}-param} sweeps\\
     without re-derivation\\[2pt]
@@ -144,7 +144,7 @@
       rectangle, rounded corners=2pt, draw=OrangeLine, dashed,
       fill=OrangeFill, fill opacity=0.2, inner sep=6pt,
       font=\scriptsize, text opacity=1, text width=5.6cm] (validation) {%
-    \textbf{Validation} (\texttt{EquationSystem.from\_dict()}):\\[2pt]
+    \textbf{Validation} (on load):\\[2pt]
     \textbullet\ Field name uniqueness + index 0..N-1\\
     \textbullet\ Operator name validity\\
     \textbullet\ Field reference validity (incl.\ \texttt{v\_X})\\

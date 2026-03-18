@@ -91,12 +91,11 @@
 % CHECKS (left side)
 % ===================================================================
 \node[check, left=2.8cm of full, text width=3.8cm] (eligcheck) {%
-    \textbf{\texttt{\_constraints\_fourier\_eliminable()}}\\[2pt]
-    \textbullet\ All constraint operators $\in$\\
-    \quad \texttt{\_EXACT\_MULTIPLIERS}\\
+    \textbf{Fourier-eliminable?}\\[2pt]
+    \textbullet\ All constraint operators\\
+    \quad modal-supported\\
     \textbullet\ No time-dependent coefficients\\
-    \textbullet\ \texttt{ensure\_consistent\_ic()} runs\\
-    \quad on original layout first};
+    \textbullet\ Constraint IC solved first};
 \draw[arr, densely dashed, OrangeLine] (eligcheck.east) -- (full.west);
 
 % ===================================================================
