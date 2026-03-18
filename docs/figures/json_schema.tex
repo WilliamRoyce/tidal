@@ -7,14 +7,6 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    % --- Node styles ---
-    block/.style={
-        rectangle, rounded corners=2pt, minimum height=0.65cm,
-        draw=#1, line width=0.6pt, fill=#1!20,
-        font=\footnotesize, align=left, text opacity=1, text=black,
-        inner sep=4pt
-    },
-    block/.default={black!60},
     role/.style={font=\scriptsize\itshape, text=#1, align=left},
     role/.default={GrayLine},
     connector/.style={semithick, black!30},
@@ -24,7 +16,7 @@
 % ===================================================================
 % ROOT
 % ===================================================================
-\node[block=BlueLine, minimum width=2.2cm, font=\footnotesize\bfseries]
+\node[stage=Blue, minimum width=2.2cm, font=\footnotesize\bfseries]
     (root) {\texttt{spec.json}};
 
 % ===================================================================
@@ -32,7 +24,7 @@
 % ===================================================================
 
 % metadata
-\node[block=GrayLine, below left=0.8cm and 0.5cm of root, anchor=north east,
+\node[stage=Gray, below left=0.8cm and 0.5cm of root, anchor=north east,
       text width=5.8cm] (meta) {%
     \key{metadata}\\[-1pt]
     \val{source, parameters: \{m2: 1.0, gCpl: 0.5, ...\}}\\[-1pt]
@@ -41,7 +33,7 @@
     {provenance +\\default param values};
 
 % spacetime
-\node[block=PurpleLine, below=of meta.south west, anchor=north west,
+\node[stage=Purple, below=of meta.south west, anchor=north west,
       text width=5.8cm] (space) {%
     \key{spacetime}\\[-1pt]
     \val{dimension: 3, signature: [-1, +1, +1]}\\[-1pt]
@@ -50,7 +42,7 @@
     {determines component\\count and metric};
 
 % fields
-\node[block=BlueLine, below=of space.south west, anchor=north west,
+\node[stage=Blue, below=of space.south west, anchor=north west,
       text width=5.8cm] (fields) {%
     \key{fields}\\[-1pt]
     \val{[\{name: "phi\_0", index: 0, is\_dynamical: true\}, ...]}};
@@ -58,12 +50,12 @@
     {validated: unique names,\\sequential indices};
 
 % equations (largest block)
-\node[block=OrangeLine, below=of fields.south west, anchor=north west,
+\node[stage=Orange, below=of fields.south west, anchor=north west,
       text width=5.8cm] (eqs) {%
     \key{equations} \textnormal{(one per component field)}};
 
 % Equation detail sub-block
-\node[block=OrangeLine, below=0.15cm of eqs.south west, anchor=north west,
+\node[stage=Orange, below=0.15cm of eqs.south west, anchor=north west,
       text width=5.4cm, xshift=0.3cm] (eqdetail) {%
     \key{field}: \val{"phi\_0"}\\[1pt]
     \key{lhs}: \val{\{expression: "d2\_t(phi\_0)",}\\
@@ -73,7 +65,7 @@
     \key{constraint\_solver}: \val{null | \{enabled, method, bc\}}};
 
 % Role annotations for equation fields
-\node[role=OrangeLine, right=0.2cm of eqdetail.north east, anchor=north west,
+\node[role=Orange, right=0.2cm of eqdetail.north east, anchor=north west,
       text width=3.6cm] (eqroles) {%
     \textbf{time order} drives solver:\\
     $0 \to$ constraint (IDA/Schur)\\
@@ -81,7 +73,7 @@
     $\geq 2 \to$ wave (modal/CVODE)};
 
 % RHS term detail
-\node[block=PinkLine, below=0.15cm of eqdetail.south west, anchor=north west,
+\node[stage=Pink, below=0.15cm of eqdetail.south west, anchor=north west,
       text width=5.0cm, xshift=0.3cm] (term) {%
     \key{term}\\[1pt]
     \val{coefficient: 1.0}\\
@@ -91,7 +83,7 @@
     \val{coordinate\_dependent: []}\\
     \val{time\_dependent: false}};
 
-\node[role=PinkLine, right=0.2cm of term.north east, anchor=north west,
+\node[role=Pink, right=0.2cm of term.north east, anchor=north west,
       text width=3.6cm] (termroles) {%
     \textbf{operator} modal-supported?\\
     $\to$ modal eligible\\[2pt]
@@ -105,13 +97,13 @@
     $\to$ convolution in modal};
 
 % canonical
-\node[block=GreenLine, below=0.55cm of term.south west, anchor=north west,
+\node[stage=Green, below=0.55cm of term.south west, anchor=north west,
       text width=5.8cm, xshift=-0.6cm] (canonical) {%
     \key{canonical} \textnormal{(optional, from Wolfram pipeline)}\\[-1pt]
     \val{hamiltonian\_terms: [\{coeff, factor\_a, factor\_b\}, ...]}\\[-1pt]
     \val{volume\_element: null | "Sqrt[Abs[Sin[y[]]{\string^}2*x[]{\string^}4]]"}};
 
-\node[role=GreenLine, right=0.2cm of canonical.north east, anchor=north west,
+\node[role=Green, right=0.2cm of canonical.north east, anchor=north west,
       text width=3.6cm] (canroles) {%
     \textbf{volume\_element}:\\
     null $\to$ flat (modal OK)\\
@@ -120,7 +112,7 @@
     and modal eligibility};
 
 % matrices
-\node[block=LimeLine, below=of canonical.south west, anchor=north west,
+\node[stage=Lime, below=of canonical.south west, anchor=north west,
       text width=5.8cm] (matrices) {%
     \key{mass\_matrix}: \val{[[m\string^2, 0], [0, m\string^2]]}\\[-1pt]
     \key{coupling\_matrix}: \val{[[0, g], [g, 0]]}};

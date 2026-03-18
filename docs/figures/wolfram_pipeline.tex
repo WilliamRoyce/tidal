@@ -105,7 +105,7 @@
 % ===================================================================
 % CACHE BOX (left side)
 % ===================================================================
-\node[cache, left=2.8cm of batch, anchor=north east,
+\node[cache, left=1.8cm of christoffel, anchor=east,
       text width=4.8cm] (cachebox) {%
     \textbf{\$TIDALGeometricCache}\\[3pt]
     \textbullet\ Inverse metric: \texttt{Simplify[Inverse[g]]}\\
@@ -130,7 +130,7 @@
     ([xshift=-0.6cm]replace.west) -- (replace.west);
 
 % SetMetricDownValues set at manifold stage
-\draw[cachearr] (manifold.west) -- +(-0.4,0)
+\draw[cachearr] (manifold.west) -- ++(-0.8,0)
     |- ([yshift=0.8cm]cachebox.east);
 
 % ===================================================================

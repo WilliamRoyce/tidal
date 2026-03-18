@@ -3,11 +3,6 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    mat/.style={
-        rectangle, draw=PurpleLine, fill=PurpleFill, fill opacity=0.15,
-        font=\footnotesize, align=center, text opacity=1,
-        inner sep=5pt, rounded corners=1pt, minimum width=2.4cm
-    },
     node distance=0.7cm
 ]
 
@@ -20,7 +15,7 @@
 % ===================================================================
 % FULL SYSTEM (left)
 % ===================================================================
-\node[mat, below=0.8cm of title] (full) {%
+\node[stage=Pink, below=0.8cm of title] (full) {%
     \parbox{5.0cm}{\centering
     \textbf{Full system} (per mode $k$)\\[4pt]
     $\displaystyle\frac{d}{dt}\!\begin{pmatrix} d \\ c \end{pmatrix}
@@ -40,7 +35,7 @@
     {\scriptsize (scalar per mode for single constraint)}%
     }};
 
-\node[check, right=2.8cm of invert, text width=3.4cm] (singcheck) {%
+\node[check, right=0.8cm of invert, text width=3.4cm] (singcheck) {%
     \textbf{$k{=}0$ singularity check}\\[2pt]
     $|\det S_{cc}| < 10^{-14}$\\
     $\to$ regularise (gauge pinning)};
@@ -49,7 +44,7 @@
 % ===================================================================
 % SCHUR COMPLEMENT
 % ===================================================================
-\node[mat, below=of invert] (schur) {%
+\node[stage=Pink, below=of invert] (schur) {%
     \parbox{5.4cm}{\centering
     \textbf{Schur complement}\\[4pt]
     $A_{\mathrm{red}} = A_{dd} - A_{dc}\,S_{cc}^{-1}\,S_{cd}$\\[4pt]
@@ -90,7 +85,7 @@
 % ===================================================================
 % CHECKS (left side)
 % ===================================================================
-\node[check, left=2.8cm of full, text width=3.8cm] (eligcheck) {%
+\node[check, left=0.8cm of full, text width=3.8cm] (eligcheck) {%
     \textbf{Fourier-eliminable?}\\[2pt]
     \textbullet\ All constraint operators\\
     \quad modal-supported\\

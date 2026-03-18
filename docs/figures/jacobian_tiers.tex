@@ -3,18 +3,11 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    tier/.style={
-        rectangle, rounded corners=2pt, minimum width=3.6cm,
-        minimum height=0.9cm, draw=#1, line width=0.7pt,
-        fill=#1!20, font=\footnotesize, align=center,
-        text opacity=1, text=black
-    },
-    tier/.default={black!70},
-    node distance=0.9cm and 2.4cm
+    node distance=0.4cm and 1.2cm
 ]
 
 % Entry
-\node[tier=GrayLine] (entry)
+\node[stage=Gray] (entry)
     {\textbf{Analytical Jacobian}\\[1pt]
      \scriptsize precomputed $dF/dy + dF/dy'$\\
      \scriptsize (time-independent systems only)};
@@ -24,7 +17,7 @@
     {$N \leq 2000$?};
 
 % Dense tier
-\node[tier=GreenLine, right=of d1] (dense)
+\node[stage=Green, right=of d1] (dense)
     {\textbf{Dense tier}\\[1pt]
      \scriptsize 2D \texttt{jacfn} callback\\
      \scriptsize \textbf{5.3$\times$ speedup}};
@@ -34,7 +27,7 @@
     {$N \leq 200\text{K}$?};
 
 % Sparse tier
-\node[tier=PurpleLine, right=of d2] (sparse)
+\node[stage=Purple, right=of d2] (sparse)
     {\textbf{Sparse tier}\\[1pt]
      \scriptsize 1D CSC \texttt{jacfn} + SuperLU\_MT\\
      \scriptsize \textbf{IDA 2.5$\times$ / CVODE 1.2--1.4$\times$}};
@@ -42,7 +35,7 @@
     {COO accumulation\\(415$\times$ assembly)\\sksundae $\geq$ 1.1.2};
 
 % GMRES tier
-\node[tier=BlueLine, below=of d2] (gmres)
+\node[stage=Blue, below=of d2] (gmres)
     {\textbf{GMRES tier}\\[1pt]
      \scriptsize analytical JVP (\texttt{jactimes})\\
      \scriptsize matrix-free};
