@@ -303,9 +303,16 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
     (* Expand Scalar[] wrappers before ToBasis (same issue as rank >= 1) *)
     componentEq = ExpandScalarWrappers[componentEq, chart];
 
-    (* Apply ToBasis term-by-term to avoid xperm segfault on large sums *)
+    (* Apply ToBasis term-by-term to avoid xperm segfault on large sums.
+       Parallel for >= 50 terms when subkernels are available. *)
     If[Head[componentEq] === Plus,
-      componentEq = Total[ToBasis[chart] /@ List @@ componentEq],
+      Module[{toBasisTerms = List @@ componentEq, nTB},
+        nTB = Length[toBasisTerms];
+        If[nTB >= 50 && Length[Kernels[]] > 0,
+          componentEq = Total[ParallelMap[ToBasis[chart], toBasisTerms]],
+          componentEq = Total[ToBasis[chart] /@ toBasisTerms]
+        ]
+      ],
       componentEq = ToBasis[chart][componentEq]
     ];
     (* TraceBasisDummy also term-by-term for the same reason *)
@@ -512,7 +519,36 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
 BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_:50,
   backgroundFieldRules_List:{}] := Module[
   {inputTerms, nTerms, result, batch, traced, currentBatchSize, expansionFactor,
-   peakTerms, targetPeak, batchStart, batchEnd, tBatch},
+   peakTerms, targetPeak, batchStart, batchEnd, tBatch,
+   processOneBatch, batch1Result, batch1Info, remainingTerms, chunks,
+   parallelResults, tracedLen, expandLen, evalLen},
+
+  (* === Per-batch worker function ===
+     Self-contained: takes all context as arguments so it works in subkernels.
+     Returns {processedExpr, {nInput, tracedLen, expandLen, evalLen, elapsed}}.
+     Each batch is independent: reads a disjoint slice of input terms, uses
+     read-only chart/metric state, results combine via addition.
+     Ref: GitHub issue #144 *)
+  processOneBatch[terms_List, chartArg_, metricMatrixArg_, bgRules_List] :=
+    Module[{tr, trLen, expLen, evLen, tB = AbsoluteTime[]},
+      tr = Total[TraceBasisDummy /@ terms];
+      trLen = If[Head[tr]===Plus, Length[tr], 1];
+      tr = Expand[tr];
+      expLen = If[Head[tr]===Plus, Length[tr], 1];
+      If[metricMatrixArg =!= None,
+        tr = EvaluateMetricComponents[tr, chartArg, metricMatrixArg],
+        tr = EvaluateMinkowskiMetric[tr, chartArg]
+      ];
+      tr = Expand[tr];
+      evLen = If[Head[tr]===Plus, Length[tr], 1];
+      If[bgRules =!= {},
+        Do[tr = EvaluatePDBackgroundField[tr, chartArg, bg[[1]], bg[[2]],
+             If[Length[bg] >= 3, bg[[3]], {}]],
+          {bg, bgRules}];
+        tr = Expand[tr]
+      ];
+      {tr, {Length[terms], trLen, expLen, evLen, AbsoluteTime[] - tB}}
+    ];
 
   (* Single-term case: no batching needed *)
   If[Head[componentEq] =!= Plus,
@@ -537,68 +573,85 @@ BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_
   (* IMPORTANT: Expand[] scales super-linearly with batch size due to *)
   (* cross-term interactions — never increase above the default.      *)
   (* Only decrease for high-expansion theories (e.g. curved EM).      *)
-  (* Ref: Empirically, Einstein-Maxwell h decomposition generates     *)
-  (* O(2000) terms per batch=50; batch=142 takes 20x longer due to   *)
-  (* super-linear Expand cost. Keeping batch <= default is critical.  *)
   targetPeak = 2000;
   currentBatchSize = batchSize;
   expansionFactor = 0;
-  batchStart = 1;
 
-  While[batchStart <= nTerms,
-    batchEnd = Min[batchStart + currentBatchSize - 1, nTerms];
-    tBatch = AbsoluteTime[];
-    batch = inputTerms[[batchStart ;; batchEnd]];
-    (* TraceBasisDummy: sum dummy basis indices for this batch *)
-    traced = Total[TraceBasisDummy /@ batch];
-    tracedLen = If[Head[traced]===Plus, Length[traced], 1];
-    (* Expand: propagate ComponentValue zeros (MetricInBasis + TT + background) *)
-    traced = Expand[traced];
-    expandLen = If[Head[traced]===Plus, Length[traced], 1];
-    (* Early metric evaluation: collapse off-diagonal zeros immediately *)
-    If[metricMatrix =!= None,
-      traced = EvaluateMetricComponents[traced, chart, metricMatrix],
-      traced = EvaluateMinkowskiMetric[traced, chart]
-    ];
-    traced = Expand[traced];
-    evalLen = If[Head[traced]===Plus, Length[traced], 1];
-    (* Early background field evaluation: collapse PD derivatives of background fields *)
-    If[backgroundFieldRules =!= {},
-      Do[traced = EvaluatePDBackgroundField[traced, chart, bg[[1]], bg[[2]],
-           If[Length[bg] >= 3, bg[[3]], {}]],
-        {bg, backgroundFieldRules}];
-      traced = Expand[traced]
-    ];
-    peakTerms = Max[tracedLen, expandLen];
-    (* Diagnostic: show batch statistics *)
-    Print["    batch[", batchStart, ":", batchEnd, "/", nTerms, "]: ",
-          "TraceBD=", tracedLen, " Expand=", expandLen, " Eval=", evalLen,
-          " (", Round[AbsoluteTime[] - tBatch, 0.1], "s, ",
-          Round[MemoryInUse[]/1024.^2], " MB)"];
-    result += traced;
-    (* Release batch memory *)
-    batch =.; traced =.;
+  (* === Phase 1: Serial batch 1 — measure expansion factor === *)
+  batch = inputTerms[[1 ;; Min[batchSize, nTerms]]];
+  {batch1Result, batch1Info} = processOneBatch[batch, chart, metricMatrix, backgroundFieldRules];
+  result = batch1Result;
+  peakTerms = Max[batch1Info[[2]], batch1Info[[3]]];
+  Print["    batch[1:", Min[batchSize, nTerms], "/", nTerms, "]: ",
+        "TraceBD=", batch1Info[[2]], " Expand=", batch1Info[[3]], " Eval=", batch1Info[[4]],
+        " (", Round[batch1Info[[5]], 0.1], "s, ",
+        Round[MemoryInUse[]/1024.^2], " MB)"];
 
-    (* After the first batch, adapt batch size based on observed expansion.  *)
-    (* Only DECREASE — never increase above default. Expand[] is super-     *)
-    (* linear: doubling batch size can 10-20x the cost due to cross-term    *)
-    (* interactions during simplification. The default batchSize=50 is      *)
-    (* empirically optimal for most theories.                               *)
-    If[batchStart == 1 && peakTerms > 0,
-      expansionFactor = N[peakTerms / (batchEnd - batchStart + 1)];
-      If[expansionFactor > 0,
-        currentBatchSize = Max[5, Floor[targetPeak / expansionFactor]];
-        (* Never increase above default — Expand cost is super-linear *)
-        currentBatchSize = Min[currentBatchSize, batchSize];
-        If[currentBatchSize != batchSize,
-          Print["    adaptive batch: expansion=",
-                Round[expansionFactor, 0.1], "x, reducing batch to ", currentBatchSize,
-                " (target peak=", targetPeak, ")"]
-        ]
+  (* Adapt batch size based on observed expansion factor *)
+  If[peakTerms > 0,
+    expansionFactor = N[peakTerms / Min[batchSize, nTerms]];
+    If[expansionFactor > 0,
+      currentBatchSize = Max[5, Floor[targetPeak / expansionFactor]];
+      currentBatchSize = Min[currentBatchSize, batchSize];
+      If[currentBatchSize != batchSize,
+        Print["    adaptive batch: expansion=",
+              Round[expansionFactor, 0.1], "x, reducing batch to ", currentBatchSize,
+              " (target peak=", targetPeak, ")"]
       ]
-    ];
+    ]
+  ];
 
-    batchStart = batchEnd + 1;
+  (* === Phase 2: Remaining batches — parallel if possible === *)
+  If[nTerms > batchSize,
+    remainingTerms = inputTerms[[batchSize + 1 ;; ]];
+    chunks = Partition[remainingTerms, UpTo[currentBatchSize]];
+
+    If[Length[chunks] >= 2 && Length[Kernels[]] > 0,
+      (* --- Parallel path: distribute batches across subkernels --- *)
+      (* Each batch is independent: reads disjoint input terms, uses *)
+      (* read-only chart/metric/cache state already on subkernels.   *)
+      (* Results combine via addition.  Ref: GitHub issue #144       *)
+      DistributeDefinitions[processOneBatch, chunks, backgroundFieldRules];
+      Print["    [Parallel] ", Length[chunks], " batches on ",
+            Length[Kernels[]], " subkernels..."];
+      Module[{tPar = AbsoluteTime[]},
+        parallelResults = ParallelMap[
+          processOneBatch[#, chart, metricMatrix, backgroundFieldRules]&,
+          chunks,
+          Method -> "CoarsestGrained"
+        ];
+        (* Print diagnostics for each parallel batch *)
+        Do[
+          With[{info = parallelResults[[k, 2]],
+                startIdx = batchSize + 1 + (k-1)*currentBatchSize},
+            Print["    batch[", startIdx, ":",
+                  Min[startIdx + info[[1]] - 1, nTerms], "/", nTerms, "]: ",
+                  "TraceBD=", info[[2]], " Expand=", info[[3]], " Eval=", info[[4]],
+                  " (", Round[info[[5]], 0.1], "s, parallel)"]
+          ],
+          {k, Length[parallelResults]}
+        ];
+        result += Total[parallelResults[[All, 1]]];
+        Print["    [Parallel] ", Length[chunks], " batches in ",
+              Round[AbsoluteTime[] - tPar, 0.1], "s"];
+      ],
+      (* --- Serial fallback: not enough batches or no subkernels --- *)
+      batchStart = batchSize + 1;
+      While[batchStart <= nTerms,
+        batchEnd = Min[batchStart + currentBatchSize - 1, nTerms];
+        Module[{res},
+          res = processOneBatch[inputTerms[[batchStart ;; batchEnd]],
+                  chart, metricMatrix, backgroundFieldRules];
+          Print["    batch[", batchStart, ":", batchEnd, "/", nTerms, "]: ",
+                "TraceBD=", res[[2,2]], " Expand=", res[[2,3]], " Eval=", res[[2,4]],
+                " (", Round[res[[2,5]], 0.1], "s, ",
+                Round[MemoryInUse[]/1024.^2], " MB)"];
+          result += res[[1]];
+        ];
+        Share[];
+        batchStart = batchEnd + 1;
+      ];
+    ];
   ];
 
   result = Expand[result];
@@ -674,9 +727,18 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   (* Step 1.5: SeparateFieldMetrics is now hoisted to DecomposeToComponents before the
      component loop. This step is a no-op here (already applied to eom). *)
 
-  (* Step 2: ToBasis — term-by-term to avoid xperm segfault on large sums *)
+  (* Step 2: ToBasis — term-by-term to avoid xperm segfault on large sums.
+     For large expressions (>= 50 terms) with subkernels available, use
+     ParallelMap to distribute ToBasis across subkernels.  Each term is
+     independent.  Ref: GitHub issue #144 *)
   If[Head[componentEq] === Plus,
-    componentEq = Total[ToBasis[chart] /@ List @@ componentEq],
+    Module[{toBasisTerms = List @@ componentEq, nTB},
+      nTB = Length[toBasisTerms];
+      If[nTB >= 50 && Length[Kernels[]] > 0,
+        componentEq = Total[ParallelMap[ToBasis[chart], toBasisTerms]],
+        componentEq = Total[ToBasis[chart] /@ toBasisTerms]
+      ]
+    ],
     componentEq = ToBasis[chart][componentEq]
   ];
   Print["    step2-ToBasis: ", Round[MemoryInUse[]/1024.^2], " MB, ",
@@ -1112,9 +1174,16 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
   (* Ensures all field tensor indices are in canonical (covariant) form *)
   componentExpr = SeparateFieldMetrics[componentExpr, chart];
 
-  (* Step 2: ToBasis — term-by-term to avoid xperm segfault on large sums *)
+  (* Step 2: ToBasis — term-by-term to avoid xperm segfault on large sums.
+     Parallel for >= 50 terms when subkernels are available. *)
   If[Head[componentExpr] === Plus,
-    componentExpr = Total[ToBasis[chart] /@ List @@ componentExpr],
+    Module[{toBasisTerms = List @@ componentExpr, nTB},
+      nTB = Length[toBasisTerms];
+      If[nTB >= 50 && Length[Kernels[]] > 0,
+        componentExpr = Total[ParallelMap[ToBasis[chart], toBasisTerms]],
+        componentExpr = Total[ToBasis[chart] /@ toBasisTerms]
+      ]
+    ],
     componentExpr = ToBasis[chart][componentExpr]
   ];
   Print["    [scalar] step2-ToBasis: ", Round[MemoryInUse[]/1024.^2], " MB, ",
