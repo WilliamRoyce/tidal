@@ -36,10 +36,10 @@
 % Sparse tier
 \node[tier=PurpleLine, right=of d2] (sparse)
     {\textbf{Sparse tier}\\[1pt]
-     \scriptsize falls through to FD\\
-     \scriptsize (sksundae bug)};
+     \scriptsize 1D CSC \texttt{jacfn} + SuperLU\_MT\\
+     \scriptsize \textbf{IDA 2.5$\times$ / CVODE 1.2--1.4$\times$}};
 \node[annot, below=0.15cm of sparse]
-    {blocked assembly\\works but callback\\not supported};
+    {COO accumulation\\(415$\times$ assembly)\\sksundae $\geq$ 1.1.2};
 
 % GMRES tier
 \node[tier=BlueLine, below=of d2] (gmres)

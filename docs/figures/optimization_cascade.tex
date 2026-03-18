@@ -60,8 +60,19 @@
       text width=2.6cm]
     {machine precision\\exponential convergence};
 
+% --- Analytical Jacobian ---
+\node[phase=Orange, below=0.4cm of p3, text width=6.6cm] (jac)
+    {\textbf{Analytical Jacobian:} precomputed $dF/dy + cj\cdot dF/dy'$,
+     three tiers (dense/sparse CSC/GMRES JVP),
+     COO assembly, circulant operators};
+\node[speedup=Orange, right=0.2cm of jac.east, anchor=west,
+      text width=2.6cm]
+    {dense 5.3$\times$\\
+     sparse 1.2--2.5$\times$\\
+     415$\times$ assembly};
+
 % --- Modal solver ---
-\node[phase=Pink, below=0.4cm of p3, text width=6.6cm] (modal)
+\node[phase=Pink, below=0.4cm of jac, text width=6.6cm] (modal)
     {\textbf{Modal solver:} per-mode eigdecomp (constant) /
      \texttt{expm\_multiply} + sparse (position-dep.),
      $O(1)$ in $t_{\mathrm{end}}$, Schur complement};
@@ -72,7 +83,7 @@
      9.5$\times$ vs IDA};
 
 % Arrows (timeline)
-\foreach \a/\b in {r1/r4, r4/r5, r5/r6, r6/p1, p1/p2, p2/p3, p3/modal} {
+\foreach \a/\b in {r1/r4, r4/r5, r5/r6, r6/p1, p1/p2, p2/p3, p3/jac, jac/modal} {
     \draw[-{Stealth[length=3pt, width=2.5pt]}, thin, GrayLine]
         (\a.south west) ++(0.3,0) -- ++(0,-0.25);
 }
