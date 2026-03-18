@@ -617,18 +617,27 @@ BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_
       (* Each batch is independent: reads disjoint input terms, uses *)
       (* read-only chart/metric/cache state already on subkernels.   *)
       (* Results combine via addition.  Ref: GitHub issue #144       *)
-      (* processOneBatch is already on subkernels (package-level, loaded via
-         EnsureParallelInit). Only distribute the input data (chunks) and
-         background field rules. Chunks are post-ToBasis plain expressions
-         (Derivative/Plus/Times) — no xAct DownValues to serialize. *)
-      DistributeDefinitions[chunks, backgroundFieldRules];
-      Print["    [Parallel] ", Length[chunks], " batches on ",
-            Length[Kernels[]], " subkernels..."];
+      (* Serialize chunks to InputForm strings to avoid distributing xAct
+         symbol metadata (DownValues/UpValues). This is the critical fix:
+         DistributeDefinitions on xAct expressions triggers serialization
+         of the entire tensor symbol tree (~630s overhead), but InputForm
+         strings are just strings (~0.1s to distribute).
+         Each subkernel parses its chunk back via ToExpression. *)
+      Module[{chunkStrings, tSer = AbsoluteTime[], bgRulesStr},
+        chunkStrings = ToString[#, InputForm]& /@ chunks;
+        bgRulesStr = ToString[backgroundFieldRules, InputForm];
+        Print["    [Parallel] ", Length[chunks], " batches on ",
+              Length[Kernels[]], " subkernels (serialized in ",
+              Round[AbsoluteTime[] - tSer, 0.1], "s)..."];
+        DistributeDefinitions[chunkStrings, bgRulesStr];
+      ];
       Module[{tPar = AbsoluteTime[]},
-        parallelResults = ParallelMap[
-          processOneBatch[#, chart, metricMatrix, backgroundFieldRules]&,
-          chunks,
-          Method -> "CoarsestGrained"
+        parallelResults = ParallelTable[
+          processOneBatch[
+            ToExpression[chunkStrings[[k]]],
+            chart, metricMatrix,
+            ToExpression[bgRulesStr]],
+          {k, Length[chunkStrings]}
         ];
         (* Print diagnostics for each parallel batch *)
         Do[
