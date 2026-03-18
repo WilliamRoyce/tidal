@@ -436,9 +436,9 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
          For simple theories or when subkernels aren't running, fall back
          to the original serial Do+AppendTo+Share[] path.
          Ref: GitHub issue #144 *)
-      If[Length[componentTuples] >= 3 && DownValues[EnsureParallelInit] =!= {},
+      If[Length[componentTuples] >= 3 && DownValues[Global`EnsureParallelInit] =!= {},
         (* Parallel path: lazily launch subkernels if not already running *)
-        EnsureParallelInit[];
+        Global`EnsureParallelInit[];
         Print["  [Parallel] Extracting ", Length[componentTuples],
               " components on ", Length[Kernels[]], " subkernels..."];
         DistributeDefinitions[eomSep, flatIdxMap, componentTuples,
@@ -606,6 +606,9 @@ BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_
     remainingTerms = inputTerms[[batchSize + 1 ;; ]];
     chunks = Partition[remainingTerms, UpTo[currentBatchSize]];
 
+    (* Lazily launch subkernels if enough batches to benefit *)
+    If[Length[chunks] >= 2 && DownValues[Global`EnsureParallelInit] =!= {},
+      Global`EnsureParallelInit[]];
     If[Length[chunks] >= 2 && Length[Kernels[]] > 0,
       (* --- Parallel path: distribute batches across subkernels --- *)
       (* Each batch is independent: reads disjoint input terms, uses *)
