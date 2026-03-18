@@ -11,8 +11,7 @@
 % ELIGIBILITY GATE (top)
 % ===================================================================
 \node[check, text width=3.2cm] (gate)
-    {\textbf{\texttt{can\_use\_modal()}}\\[2pt]
-     flat metric $\cdot$ periodic BCs\\
+    {flat metric $\cdot$ periodic BCs\\
      supported operators\\
      time-independent coeffs\\
      constraints eliminable};
@@ -41,7 +40,7 @@
 % PATH A: Per-mode eigendecomposition (upper branch, purple)
 % ===================================================================
 \node[stage=Pink,
-      below right=0.8cm and 0.6cm of branch.east, anchor=north] (matrix_pm)
+      below right=1.0cm and 0.6cm of branch.east, anchor=north] (matrix_pm)
     {Build $A(k)$\\[-1pt]\scriptsize independent per mode $k$};
 
 \node[stage=Pink,
@@ -50,13 +49,13 @@
 
 \node[stage=Pink,
       below=0.4cm of eigen] (evolve_eig)
-    {Evolve\\[-1pt]\scriptsize $e^{\Lambda \Delta t}$};
+    {Evolve\\[-1pt]\scriptsize $e^{\Lambda \Delta t}$ (all $\Delta t$ at once)};
 
 % ===================================================================
 % PATH B: expm_multiply (lower branch, lime)
 % ===================================================================
 \node[stage=Blue,
-      below left=0.8cm and 0.6cm of branch.west, anchor=north] (matrix_full)
+      below left=1.0cm and 0.6cm of branch.west, anchor=north] (matrix_full)
     {Build full matrix\\[-1pt]\scriptsize $c(x)\!\cdot\!u \to \hat{c}\ast\hat{u}$ couples all modes};
 
 \node[stage=Blue,
@@ -65,7 +64,7 @@
 
 \node[stage=Blue,
       below=0.4cm of sparsify] (expm)
-    {\texttt{expm\_multiply}\\[-1pt]\scriptsize $\exp(A \cdot t) \cdot y_0$ (all $t$ at once)};
+    {\texttt{expm\_multiply}\\[-1pt]\scriptsize $\exp(A \cdot \Delta t) \cdot y_0$ (all $\Delta t$ at once)};
 
 % ===================================================================
 % CONVERGENCE: IFFT + output
@@ -106,7 +105,7 @@
 % ===================================================================
 % BLOCK-AWARE CHECK (above per-mode matrix, Path A only)
 % ===================================================================
-\node[check, above =1.2cm of matrix_pm.north east, text width=3.4cm] (blocks)
+\node[check, above =1.2cm of matrix_pm.north east, text width=4.2cm] (blocks)
     {Detect decoupled field blocks\\[1pt]
      skip blocks with zero initial data\\
      warn on unstable eigenvalues};
@@ -115,13 +114,13 @@
 % ===================================================================
 % CONSTRAINT ELIMINATION (Schur complement, Path A only)
 % ===================================================================
-\node[detail=Pink, right=0.4cm of matrix_pm] (schur)
+\node[detail=Pink, text width=3.1cm, right=0.4cm of matrix_pm] (schur)
     {\textbf{Schur complement}\\[2pt]
      eliminate constraints:\\
      $A_{\mathrm{red}} = A_{dd} - A_{dc} S_{cc}^{-1} S_{cd}$\\[2pt]
      (dynamical DOFs only)};
 
-\node[annot, above=0.1cm of schur] {if constraints present};
+\node[annot, above=0.0cm of schur] {if constraints present};
 
 % Arrow from matrix_pm down to Schur, then to eigen
 \draw[arr, PinkLine, densely dashed, rounded corners=3pt]
@@ -130,7 +129,7 @@
     (schur.south) |- (eigen.east);
 
 % Recovery arrow from evolve_eig down to reconstruction
-\node[detail=Pink, below right=0.2cm and -1.2cm of evolve_eig, text width=2.8cm] (recover)
+\node[detail=Pink, text width=3.0cm, below right=0.2cm and -0.6cm of evolve_eig, text width=2.8cm] (recover)
     {\textbf{Reconstruct}\\[2pt]
      $\hat{c}(k) = -S_{cc}^{-1} S_{cd}\, \hat{d}(k)$\\[2pt]
      IFFT $\to c(x,t)$};
@@ -144,11 +143,11 @@
 % ===================================================================
 \begin{scope}[on background layer]
     % Physical space zone (blue tint)
-    \node[fit=(input)(output), inner sep=12pt, fill=GrayFill, densely dashed, draw=GrayLine, fill opacity=0.12, rounded corners=5pt] {};
+    \node[fit=(input)(output), inner sep=12pt, fill=GrayFill, densely dashed, draw=GrayLine, fill opacity=0.2, rounded corners=5pt] {};
     % Fourier space zone (purple tint) — encompasses both branches
     \node[fit=(fft)(ifft)(matrix_pm)(evolve_eig)(matrix_full)(sparsify)(expm),
           inner sep=4pt, fill=PurpleFill, draw=PurpleLine, densely dashed,
-          fill opacity=0.12, rounded corners=5pt] {};
+          fill opacity=0.08, rounded corners=5pt] {};
 \end{scope}
 
 % Zone labels
@@ -162,16 +161,16 @@
 % ===================================================================
 % PATH LEGEND (bottom right)
 % ===================================================================
-\node[font=\scriptsize, align=left,
-      below right=0.2cm and 0.8cm of output.east, anchor=west,
-      draw=GrayLine, rounded corners=2pt, inner sep=5pt, fill=white] {
-    \textcolor{PinkLine}{\rule{0.5cm}{2pt}}
-        \textbf{Path A}: per-mode eigdecomp (constant coeffs)\\
-    \textcolor{BlueLine}{\rule{0.5cm}{2pt}}
-        \textbf{Path B}: sparse \texttt{expm\_multiply} (position-dep.)\\
-    \textcolor{PinkLine}{\rule[1pt]{0.5cm}{1pt}}
-        Schur constraint elimination (Path A only)
-};
+% \node[font=\scriptsize, align=left,
+%       below right=0.2cm and 0.8cm of output.east, anchor=west,
+%       draw=GrayLine, rounded corners=2pt, inner sep=5pt, fill=white] {
+%     \textcolor{PinkLine}{\rule{0.5cm}{2pt}}
+%         \textbf{Path A}: per-mode eigdecomp (constant coeffs)\\
+%     \textcolor{BlueLine}{\rule{0.5cm}{2pt}}
+%         \textbf{Path B}: sparse \texttt{expm\_multiply} (position-dep.)\\
+%     \textcolor{PinkLine}{\rule[1pt]{0.5cm}{1pt}}
+%         Schur constraint elimination (Path A only)
+% };
 
 \end{tikzpicture}
 \end{document}
