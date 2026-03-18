@@ -436,26 +436,21 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
          For simple theories or when subkernels aren't running, fall back
          to the original serial Do+AppendTo+Share[] path.
          Ref: GitHub issue #144 *)
-      If[Length[componentTuples] >= 3 && DownValues[Global`EnsureParallelInit] =!= {},
-        (* Parallel path: lazily launch subkernels if not already running *)
-        Global`EnsureParallelInit[];
-        Print["  [Parallel] Extracting ", Length[componentTuples],
-              " components on ", Length[Kernels[]], " subkernels..."];
-        DistributeDefinitions[eomSep, flatIdxMap, componentTuples,
-          additionalFields, computeChristoffels, metricMatrix, backgroundFieldRules];
-        Module[{tPar = AbsoluteTime[]},
-          result = ParallelTable[
-            {flatIdxMap[componentTuples[[idx]]],
-             ExtractTensorComponent[eomSep, field, chart,
-               componentTuples[[idx]], additionalFields, computeChristoffels,
-               metricMatrix, backgroundFieldRules]},
-            {idx, 1, Length[componentTuples]}
-          ];
-          Print["  [Parallel] ", Length[componentTuples], " components extracted in ",
-                Round[AbsoluteTime[] - tPar, 0.1], "s, ",
-                Round[MemoryInUse[]/1024.^2], " MB"];
-        ],
-        (* Serial fallback — original path with Share[] between components *)
+      (* Level 1 (per-component parallelism) is DISABLED: ParallelTable
+         over ExtractTensorComponent produces incorrect results because the
+         abstract tensor expressions (eomSep, field, chart) contain xAct
+         symbols with DownValues/UpValues that don't fully replicate to
+         subkernels via DistributeDefinitions.  The EOM expressions come
+         out as zero on subkernels, causing all fields to be eliminated.
+         Inter-batch parallelism (inside BatchedTraceBasisDummyWithMetric)
+         works correctly because it operates on already-basis-converted
+         expressions (no abstract tensor symbols).
+         TODO: Fix by distributing xAct symbol state or serializing
+         expressions to InputForm before distribution.
+         Ref: GitHub issue #144 *)
+      If[False,  (* Level 1 disabled — see above *)
+        Null,
+        (* Serial path with Share[] between components *)
         result = {};
         Do[
           AppendTo[result,
