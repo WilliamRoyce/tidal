@@ -511,39 +511,44 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
      early evaluation of background field partial derivatives
 
    Ref: Gertsenshtein a-field OOM fix (7.6+ GB peak → <1 GB with batching). *)
+
+(* === Per-batch worker function (package scope) ===
+   Self-contained: takes all context as arguments so it works in subkernels.
+   Defined at package level so it's loaded once on subkernels via
+   EnsureParallelInit (which loads ComponentDecompose.wl on each subkernel).
+   This avoids the catastrophic 630s overhead of DistributeDefinitions
+   serializing the function + xAct closure state to all subkernels.
+   Returns {processedExpr, {nInput, tracedLen, expandLen, evalLen, elapsed}}.
+   Each batch is independent: reads a disjoint slice of input terms, uses
+   read-only chart/metric state, results combine via addition.
+   Ref: GitHub issue #144 *)
+processOneBatch[terms_List, chartArg_, metricMatrixArg_, bgRules_List] :=
+  Module[{tr, trLen, expLen, evLen, tB = AbsoluteTime[]},
+    tr = Total[TraceBasisDummy /@ terms];
+    trLen = If[Head[tr]===Plus, Length[tr], 1];
+    tr = Expand[tr];
+    expLen = If[Head[tr]===Plus, Length[tr], 1];
+    If[metricMatrixArg =!= None,
+      tr = EvaluateMetricComponents[tr, chartArg, metricMatrixArg],
+      tr = EvaluateMinkowskiMetric[tr, chartArg]
+    ];
+    tr = Expand[tr];
+    evLen = If[Head[tr]===Plus, Length[tr], 1];
+    If[bgRules =!= {},
+      Do[tr = EvaluatePDBackgroundField[tr, chartArg, bg[[1]], bg[[2]],
+           If[Length[bg] >= 3, bg[[3]], {}]],
+        {bg, bgRules}];
+      tr = Expand[tr]
+    ];
+    {tr, {Length[terms], trLen, expLen, evLen, AbsoluteTime[] - tB}}
+  ];
+
 BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_:50,
   backgroundFieldRules_List:{}] := Module[
   {inputTerms, nTerms, result, batch, traced, currentBatchSize, expansionFactor,
    peakTerms, targetPeak, batchStart, batchEnd, tBatch,
-   processOneBatch, batch1Result, batch1Info, remainingTerms, chunks,
+   batch1Result, batch1Info, remainingTerms, chunks,
    parallelResults, tracedLen, expandLen, evalLen},
-
-  (* === Per-batch worker function ===
-     Self-contained: takes all context as arguments so it works in subkernels.
-     Returns {processedExpr, {nInput, tracedLen, expandLen, evalLen, elapsed}}.
-     Each batch is independent: reads a disjoint slice of input terms, uses
-     read-only chart/metric state, results combine via addition.
-     Ref: GitHub issue #144 *)
-  processOneBatch[terms_List, chartArg_, metricMatrixArg_, bgRules_List] :=
-    Module[{tr, trLen, expLen, evLen, tB = AbsoluteTime[]},
-      tr = Total[TraceBasisDummy /@ terms];
-      trLen = If[Head[tr]===Plus, Length[tr], 1];
-      tr = Expand[tr];
-      expLen = If[Head[tr]===Plus, Length[tr], 1];
-      If[metricMatrixArg =!= None,
-        tr = EvaluateMetricComponents[tr, chartArg, metricMatrixArg],
-        tr = EvaluateMinkowskiMetric[tr, chartArg]
-      ];
-      tr = Expand[tr];
-      evLen = If[Head[tr]===Plus, Length[tr], 1];
-      If[bgRules =!= {},
-        Do[tr = EvaluatePDBackgroundField[tr, chartArg, bg[[1]], bg[[2]],
-             If[Length[bg] >= 3, bg[[3]], {}]],
-          {bg, bgRules}];
-        tr = Expand[tr]
-      ];
-      {tr, {Length[terms], trLen, expLen, evLen, AbsoluteTime[] - tB}}
-    ];
 
   (* Single-term case: no batching needed *)
   If[Head[componentEq] =!= Plus,
@@ -601,15 +606,22 @@ BatchedTraceBasisDummyWithMetric[componentEq_, chart_, metricMatrix_, batchSize_
     remainingTerms = inputTerms[[batchSize + 1 ;; ]];
     chunks = Partition[remainingTerms, UpTo[currentBatchSize]];
 
-    (* Lazily launch subkernels if enough batches to benefit *)
-    If[Length[chunks] >= 2 && DownValues[Global`EnsureParallelInit] =!= {},
+    (* Lazily launch subkernels if enough batches to benefit.
+       Threshold >= 4 batches: communication overhead (~1-2s per ParallelMap
+       call) needs enough parallel work to amortize. For 4 batches at ~5s
+       each: serial = 20s, parallel = 5s + 2s overhead = 7s. *)
+    If[Length[chunks] >= 4 && DownValues[Global`EnsureParallelInit] =!= {},
       Global`EnsureParallelInit[]];
-    If[Length[chunks] >= 2 && Length[Kernels[]] > 0,
+    If[Length[chunks] >= 4 && Length[Kernels[]] > 0,
       (* --- Parallel path: distribute batches across subkernels --- *)
       (* Each batch is independent: reads disjoint input terms, uses *)
       (* read-only chart/metric/cache state already on subkernels.   *)
       (* Results combine via addition.  Ref: GitHub issue #144       *)
-      DistributeDefinitions[processOneBatch, chunks, backgroundFieldRules];
+      (* processOneBatch is already on subkernels (package-level, loaded via
+         EnsureParallelInit). Only distribute the input data (chunks) and
+         background field rules. Chunks are post-ToBasis plain expressions
+         (Derivative/Plus/Times) — no xAct DownValues to serialize. *)
+      DistributeDefinitions[chunks, backgroundFieldRules];
       Print["    [Parallel] ", Length[chunks], " batches on ",
             Length[Kernels[]], " subkernels..."];
       Module[{tPar = AbsoluteTime[]},
