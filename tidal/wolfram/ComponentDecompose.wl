@@ -421,35 +421,20 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
         Print["  Scalar expansion complete: ", If[FreeQ[eomSep, Scalar], "all resolved", "some remain"]];
       ];
 
-      (* Level 1 (per-component) and inter-batch parallelism are DISABLED.
-         Investigation (GitHub #144, #145) found that:
-         - Level 1: DistributeDefinitions on abstract xAct tensor expressions
-           fails to replicate symbol DownValues/UpValues, producing zero results
-         - Inter-batch: DistributeDefinitions on post-ToBasis expressions still
-           triggers ~630s overhead due to xAct chart/metric symbol metadata
-         - InputForm string serialization avoids overhead but loses xAct context
-           (ToExpression creates new symbols instead of finding existing ones)
-         These are fundamental limitations of Wolfram's parallel computing with
-         xAct — symbol state is kernel-local and expensive to transfer.
-         Level 3a (per-Lagrangian-term in _derive.py) works because each term
-         is decomposed independently in a full DecomposeScalarExpression call
-         that runs the entire 9-step pipeline on a single subkernel.
-         Ref: GitHub issue #144 *)
-      If[False,  (* Level 1 disabled *)
-        Null,
-        (* Serial path with Share[] between components *)
-        result = {};
-        Do[
-          AppendTo[result,
-            {flatIdxMap[componentTuples[[idx]]],
-             ExtractTensorComponent[eomSep, field, chart,
-               componentTuples[[idx]], additionalFields, computeChristoffels, metricMatrix, backgroundFieldRules]}
-          ];
-          Share[];
-          Print["  [", Round[MemoryInUse[]/1024.^2], " MB] component ",
-                idx, "/", Length[componentTuples]];,
-          {idx, 1, Length[componentTuples]}
+      (* Use Do+AppendTo instead of Table so Share[] can reclaim memory
+         between component extractions — critical for cross-field coupling
+         cases like Einstein-Maxwell where expressions grow large. *)
+      result = {};
+      Do[
+        AppendTo[result,
+          {flatIdxMap[componentTuples[[idx]]],
+           ExtractTensorComponent[eomSep, field, chart,
+             componentTuples[[idx]], additionalFields, computeChristoffels, metricMatrix, backgroundFieldRules]}
         ];
+        Share[];
+        Print["  [", Round[MemoryInUse[]/1024.^2], " MB] component ",
+              idx, "/", Length[componentTuples]];,
+        {idx, 1, Length[componentTuples]}
       ];
       Return[result]
     ]
