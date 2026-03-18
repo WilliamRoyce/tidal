@@ -172,15 +172,19 @@
 % BACKGROUND ZONES
 % ===================================================================
 \begin{scope}[on background layer]
-    % Physical space zone (blue tint — very faint so nodes stay crisp)
+    % 1. Coloured zone fills (visible between nodes)
     \node[fit=(input)(output), inner sep=12pt, fill=BlueFill,
-          fill opacity=0.04, rounded corners=5pt,
+          fill opacity=0.12, rounded corners=5pt,
           draw=BlueLine, draw opacity=0.15, line width=0.5pt] {};
-    % Fourier space zone (purple tint)
     \node[fit=(fft)(ifft)(matrix_pm)(evolve_eig)(matrix_full)(sparsify)(expm),
           inner sep=8pt, fill=PurpleFill,
-          fill opacity=0.04, rounded corners=5pt,
+          fill opacity=0.12, rounded corners=5pt,
           draw=PurpleLine, draw opacity=0.15, line width=0.5pt] {};
+    % 2. White masks under each node — prevents zone tint bleeding through
+    \foreach \n in {input, fft, branch, matrix_pm, eigen, evolve_eig,
+                    matrix_full, sparsify, expm, ifft, output} {
+        \node[fill=white, inner sep=1pt, rounded corners=2pt, fit=(\n)] {};
+    }
 \end{scope}
 
 % Zone labels
