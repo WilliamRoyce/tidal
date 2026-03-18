@@ -25,13 +25,13 @@ uv run tidal derive "$TOML" --dry-run > "$WLS_BASE" 2>/dev/null
 WLS_PARALLEL="/tmp/bench_parallel_${THEORY}.wls"
 sed "s|outputPath = \"[^\"]*\"|outputPath = \"$OUT_PARALLEL\"|" "$WLS_BASE" > "$WLS_PARALLEL"
 
-# Create serial version: delete the entire parallel init block and
-# keep $useParallel = False (header default).  This gives a true serial
-# baseline without the 16s subkernel launch overhead.
+# Create serial version: neuter EnsureParallelInit so it never launches
+# subkernels, and force $useParallel = False.  The function definition
+# stays (so DownValues check passes) but LaunchKernels is skipped.
 WLS_SERIAL="/tmp/bench_serial_${THEORY}.wls"
 sed "s|outputPath = \"[^\"]*\"|outputPath = \"$OUT_SERIAL\"|" "$WLS_BASE" | \
-    sed '/=== Parallel Subkernel Initialization ===/,/After parallel init/d' | \
-    sed '/Close parallel subkernels/,/Subkernels closed/d' \
+    sed 's/LaunchKernels\[$MaxLicenseSubprocesses\]/Null (* BENCHMARK: skip launch *)/' | \
+    sed 's/\$useParallel = True;/$useParallel = False; (* BENCHMARK: forced serial *)/' \
     > "$WLS_SERIAL"
 
 echo "--- PARALLEL run ---"
