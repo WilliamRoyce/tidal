@@ -530,7 +530,99 @@ with expanded index pool). This is a dimensional identity: the
 $\eps$ tensor's 4-index antisymmetrization combined with the
 inherent symmetries of $\Rt$ and $T$ forces over-antisymmetrization.
 
-\textbf{(Exact counts from enumeration.)}
+%% ================================================================
+\section{Derivative Structure and Ghost Freedom}
+\label{sec:ghosts}
+%% ================================================================
+
+Not all enumerated sectors are physically viable. The
+\emph{Ostrogradsky theorem} states that non-degenerate Lagrangians
+depending on time derivatives higher than first order generically
+propagate ghost degrees of freedom (negative kinetic energy). This
+constrains which building blocks can appear.
+
+\subsection{Derivative Counting in First-Order Formulation}
+
+In PGT, the fundamental gauge fields are the tetrad $e^i_\mu$ and
+the Lorentz connection $\omega^{ij}{}_\mu$ (or equivalently $\Gamma$).
+The field strengths are:
+\begin{align}
+  \Rt^\rho{}_{\sigma\mu\nu} &\sim \pd\Gamma + \Gamma \cdot \Gamma
+    && O(\pd^1\Gamma)\,,
+    \label{eq:deriv_R} \\
+  T^\lambda{}_{\mu\nu} &\sim \Gamma
+    && O(\pd^0\Gamma)\,,
+    \label{eq:deriv_T} \\
+  F_{\mu\nu} &\sim \pd A
+    && O(\pd^1 A)\,.
+    \label{eq:deriv_F}
+\end{align}
+
+Crucially, the \emph{covariant derivative of torsion} has the
+\textbf{same derivative order as curvature}:
+\begin{equation}
+\boxed{
+  \del T \sim \pd\Gamma \sim \Rt
+  \qquad [\text{both } O(\pd^1\Gamma)]
+}
+  \label{eq:DT_order}
+\end{equation}
+This is why Barker's $\chi$ and $\xi$ terms (which involve $\del T$)
+are \emph{not} higher-derivative --- they are Yang--Mills type,
+the same order as $\Rt^2$.
+
+In contrast:
+\begin{equation}
+  \del\Rt \sim \pd^2\Gamma\,,\qquad
+  \del F \sim \pd^2 A\,.
+  \label{eq:higher_deriv}
+\end{equation}
+These are \textbf{higher-derivative} building blocks.
+
+\subsection{Ghost Classification of Sectors}
+
+A Yang--Mills-type Lagrangian is quadratic in field strengths, giving
+equations of motion at most 2nd order in the gauge fields.
+The \textbf{safe building blocks} are $\{\Rt,\, T,\, F,\, \del T\}$,
+all $\leq O(\pd^1)$ in $\Gamma$ and $A$.
+
+\begin{itemize}
+  \item \textbf{Safe} (Yang--Mills type): products of $\{\Rt, T, F, \del T\}$ only.
+    EOMs $\leq 2$nd order. \emph{31 sectors, 975 contractions.}
+
+  \item \textbf{Ghost-prone}: contain $(\del\Rt)^2$, $(\del F)^2$,
+    or $\del\Rt \times \del F$.
+    These give 4th-order EOMs $\Rightarrow$ Ostrogradsky instability.
+    \emph{15 sectors, 3{,}589 contractions} (64\% of total).
+
+  \item \textbf{Borderline}: contain $\del\Rt$ or $\del F$
+    \emph{linearly} (e.g., $\del\Rt \times T$).
+    Analogous to how $R$ depends on $\pd^2 g$ linearly in GR
+    without producing ghosts. Requires propagator analysis
+    (cf.\ Barker's PSALTer~\cite{Barker:2024ydb}) to confirm.
+    \emph{11 sectors, 1{,}048 contractions.}
+\end{itemize}
+
+\subsection{Barker's Ghost-Freedom Constraint}
+
+Even within the safe $\Rt^2$ sector, not all 6 parameters are
+automatically ghost-free. Barker~\cite{Barker:2024ydb} shows that
+the propagator contains a \emph{quartic pole} ($k^4$ in the
+parity-odd spin-1 sector) unless the ``Master Constraint'' is satisfied:
+\begin{equation}
+  (2\alpha_2 + 4\alpha_4 + \alpha_5)\,\xi = \chi^2\,.
+  \label{eq:master_constraint}
+\end{equation}
+When this holds, the $k^4$ pole is removed and the theory propagates
+up to 6 torsion particles with well-defined masses.
+
+\subsection{Shapiro's Unitarity Condition}
+
+For propagating torsion, Shapiro~\cite{Shapiro:2001rz} proves that
+the longitudinal and transverse modes \emph{cannot propagate
+simultaneously} without one being a ghost. The constraint is:
+the coefficient of $(\pd_\mu S^\mu)^2$ must vanish ($b = 0$),
+leaving only the transverse (Maxwell-like) torsion kinetic term.
 
 
 %% ================================================================

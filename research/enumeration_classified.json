@@ -1,330 +1,412 @@
 {
-	"R x R":{
-		"count":6,
-		"mixing":"curvature self-interaction"
-	},
-	"R x F":{
-		"count":1,
-		"mixing":"h-f mixing"
-	},
-	"R x DT":{
-		"count":10,
-		"mixing":"h-t mixing (B0-independent)"
-	},
-	"T x T":{
-		"count":3,
-		"mixing":"torsion self\/kinetic"
-	},
-	"T x DF":{
-		"count":3,
-		"mixing":"t-f mixing"
-	},
-	"T x DR":{
-		"count":10,
-		"mixing":"h-t mixing (B0-independent)"
-	},
-	"F x F":{
-		"count":1,
-		"mixing":"EM self\/kinetic"
-	},
-	"F x DT":{
-		"count":3,
-		"mixing":"t-f mixing"
-	},
-	"DT x DT":{
-		"count":16,
-		"mixing":"torsion self\/kinetic"
-	},
-	"DF x DF":{
-		"count":3,
-		"mixing":"EM self\/kinetic"
-	},
-	"DF x DR":{
-		"count":10,
-		"mixing":"h-f mixing"
-	},
-	"DR x DR":{
-		"count":32,
-		"mixing":"curvature self-interaction"
-	},
-	"eps R x R":{
-		"count":13,
-		"mixing":"curvature self-interaction"
-	},
-	"eps R x F":{
-		"count":3,
-		"mixing":"h-f mixing"
-	},
-	"eps R x DT":{
-		"count":36,
-		"mixing":"h-t mixing (B0-independent)"
-	},
-	"eps T x T":{
-		"count":4,
-		"mixing":"torsion self\/kinetic"
-	},
-	"eps T x DF":{
-		"count":6,
-		"mixing":"t-f mixing"
-	},
-	"eps T x DR":{
-		"count":36,
-		"mixing":"h-t mixing (B0-independent)"
-	},
-	"eps F x F":{
-		"count":1,
-		"mixing":"EM self\/kinetic"
-	},
-	"eps F x DT":{
-		"count":6,
-		"mixing":"t-f mixing"
-	},
-	"eps DT x DT":{
-		"count":38,
-		"mixing":"torsion self\/kinetic"
-	},
-	"eps DF x DF":{
-		"count":4,
-		"mixing":"EM self\/kinetic"
-	},
-	"eps DF x DR":{
-		"count":36,
-		"mixing":"h-f mixing"
-	},
-	"eps DR x DR":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"R x R x R":{
-		"count":31,
-		"mixing":"curvature self-interaction"
-	},
-	"R x R x F":{
-		"count":8,
-		"mixing":"h-f mixing"
-	},
-	"R x R x DT":{
-		"count":126,
-		"mixing":"h-t mixing (B0-independent)"
-	},
-	"R x T x T":{
-		"count":26,
-		"mixing":"h-t mixing (B0-independent)"
-	},
-	"R x T x DF":{
-		"count":46,
-		"mixing":"h-t mixing via B0"
-	},
-	"R x T x DR":{
-		"count":252,
-		"mixing":"h-t mixing (B0-independent)"
-	},
-	"R x F x F":{
-		"count":4,
-		"mixing":"h-f mixing (Gertsenshtein)"
-	},
-	"R x F x DT":{
-		"count":46,
-		"mixing":"h-t mixing via B0"
-	},
-	"R x DT x DT":{
-		"count":269,
-		"mixing":"h-t mixing (B0-independent)"
-	},
-	"R x DF x DF":{
-		"count":26,
-		"mixing":"h-f mixing (Gertsenshtein)"
-	},
-	"R x DF x DR":{
-		"count":252,
-		"mixing":"h-f mixing"
-	},
-	"R x DR x DR":{
-		"count":846,
-		"mixing":"curvature self-interaction"
-	},
-	"T x T x F":{
-		"count":3,
-		"mixing":"t-f mixing"
-	},
-	"T x T x DT":{
-		"count":46,
-		"mixing":"torsion self\/kinetic"
-	},
-	"T x F x DF":{
-		"count":10,
-		"mixing":"t-f mixing via B0"
-	},
-	"T x F x DR":{
-		"count":46,
-		"mixing":"h-t mixing via B0"
-	},
-	"T x DT x DF":{
-		"count":93,
-		"mixing":"t-f mixing"
-	},
-	"T x DT x DR":{
-		"count":510,
-		"mixing":"h-t mixing (B0-independent)"
-	},
-	"F x F x F":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"F x F x DT":{
-		"count":5,
-		"mixing":"t-f mixing via B0"
-	},
-	"F x DT x DT":{
-		"count":40,
-		"mixing":"t-f mixing"
-	},
-	"F x DF x DF":{
-		"count":3,
-		"mixing":"EM self\/kinetic"
-	},
-	"F x DF x DR":{
-		"count":46,
-		"mixing":"h-f mixing (Gertsenshtein)"
-	},
-	"F x DR x DR":{
-		"count":112,
-		"mixing":"h-f mixing"
-	},
-	"DT x DT x DT":{
-		"count":178,
-		"mixing":"torsion self\/kinetic"
-	},
-	"DT x DF x DF":{
-		"count":46,
-		"mixing":"t-f mixing via B0"
-	},
-	"DT x DF x DR":{
-		"count":510,
-		"mixing":"h-t mixing via B0"
-	},
-	"DT x DR x DR":{
-		"count":1648,
-		"mixing":"h-t mixing (B0-independent)"
-	},
-	"eps R x R x R":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps R x R x F":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps R x R x DT":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps R x T x T":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps R x T x DF":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps R x T x DR":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps R x F x F":{
-		"count":12,
-		"mixing":"h-f mixing (Gertsenshtein)"
-	},
-	"eps R x F x DT":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps R x DT x DT":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps R x DF x DF":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps R x DF x DR":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps R x DR x DR":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps T x T x F":{
-		"count":15,
-		"mixing":"t-f mixing"
-	},
-	"eps T x T x DT":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps T x F x DF":{
-		"count":36,
-		"mixing":"t-f mixing via B0"
-	},
-	"eps T x F x DR":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps T x DT x DF":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps T x DT x DR":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps F x F x F":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps F x F x DT":{
-		"count":18,
-		"mixing":"t-f mixing via B0"
-	},
-	"eps F x DT x DT":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps F x DF x DF":{
-		"count":15,
-		"mixing":"EM self\/kinetic"
-	},
-	"eps F x DF x DR":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps F x DR x DR":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps DT x DT x DT":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps DT x DF x DF":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps DT x DF x DR":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"eps DT x DR x DR":{
-		"count":0,
-		"mixing":"vanishing"
-	},
-	"CS: eps Tvec A F":{
-		"count":1,
-		"mixing":"EM self\/kinetic"
-	},
-	"CS: eps Tor A F":{
-		"count":6,
-		"mixing":"EM self\/kinetic"
+	"R x R": {
+		"count": 6,
+		"mixing": "curvature self-interaction",
+		"ghost_status": "safe"
+	},
+	"R x F": {
+		"count": 1,
+		"mixing": "h-f mixing",
+		"ghost_status": "safe"
+	},
+	"R x DT": {
+		"count": 10,
+		"mixing": "h-t mixing (B0-independent)",
+		"ghost_status": "safe"
+	},
+	"T x T": {
+		"count": 3,
+		"mixing": "torsion self/kinetic",
+		"ghost_status": "safe"
+	},
+	"T x DF": {
+		"count": 3,
+		"mixing": "t-f mixing",
+		"ghost_status": "borderline"
+	},
+	"T x DR": {
+		"count": 10,
+		"mixing": "h-t mixing (B0-independent)",
+		"ghost_status": "borderline"
+	},
+	"F x F": {
+		"count": 1,
+		"mixing": "EM self/kinetic",
+		"ghost_status": "safe"
+	},
+	"F x DT": {
+		"count": 3,
+		"mixing": "t-f mixing",
+		"ghost_status": "safe"
+	},
+	"DT x DT": {
+		"count": 16,
+		"mixing": "torsion self/kinetic",
+		"ghost_status": "safe"
+	},
+	"DF x DF": {
+		"count": 3,
+		"mixing": "EM self/kinetic",
+		"ghost_status": "ghost_prone"
+	},
+	"DF x DR": {
+		"count": 10,
+		"mixing": "h-f mixing",
+		"ghost_status": "ghost_prone"
+	},
+	"DR x DR": {
+		"count": 32,
+		"mixing": "curvature self-interaction",
+		"ghost_status": "ghost_prone"
+	},
+	"eps R x R": {
+		"count": 13,
+		"mixing": "curvature self-interaction",
+		"ghost_status": "safe"
+	},
+	"eps R x F": {
+		"count": 3,
+		"mixing": "h-f mixing",
+		"ghost_status": "safe"
+	},
+	"eps R x DT": {
+		"count": 36,
+		"mixing": "h-t mixing (B0-independent)",
+		"ghost_status": "safe"
+	},
+	"eps T x T": {
+		"count": 4,
+		"mixing": "torsion self/kinetic",
+		"ghost_status": "safe"
+	},
+	"eps T x DF": {
+		"count": 6,
+		"mixing": "t-f mixing",
+		"ghost_status": "borderline"
+	},
+	"eps T x DR": {
+		"count": 36,
+		"mixing": "h-t mixing (B0-independent)",
+		"ghost_status": "borderline"
+	},
+	"eps F x F": {
+		"count": 1,
+		"mixing": "EM self/kinetic",
+		"ghost_status": "safe"
+	},
+	"eps F x DT": {
+		"count": 6,
+		"mixing": "t-f mixing",
+		"ghost_status": "safe"
+	},
+	"eps DT x DT": {
+		"count": 38,
+		"mixing": "torsion self/kinetic",
+		"ghost_status": "safe"
+	},
+	"eps DF x DF": {
+		"count": 4,
+		"mixing": "EM self/kinetic",
+		"ghost_status": "ghost_prone"
+	},
+	"eps DF x DR": {
+		"count": 36,
+		"mixing": "h-f mixing",
+		"ghost_status": "ghost_prone"
+	},
+	"eps DR x DR": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "ghost_prone"
+	},
+	"R x R x R": {
+		"count": 31,
+		"mixing": "curvature self-interaction",
+		"ghost_status": "safe"
+	},
+	"R x R x F": {
+		"count": 8,
+		"mixing": "h-f mixing",
+		"ghost_status": "safe"
+	},
+	"R x R x DT": {
+		"count": 126,
+		"mixing": "h-t mixing (B0-independent)",
+		"ghost_status": "safe"
+	},
+	"R x T x T": {
+		"count": 26,
+		"mixing": "h-t mixing (B0-independent)",
+		"ghost_status": "safe"
+	},
+	"R x T x DF": {
+		"count": 46,
+		"mixing": "h-t mixing via B0",
+		"ghost_status": "borderline"
+	},
+	"R x T x DR": {
+		"count": 252,
+		"mixing": "h-t mixing (B0-independent)",
+		"ghost_status": "borderline"
+	},
+	"R x F x F": {
+		"count": 4,
+		"mixing": "h-f mixing (Gertsenshtein)",
+		"ghost_status": "safe"
+	},
+	"R x F x DT": {
+		"count": 46,
+		"mixing": "h-t mixing via B0",
+		"ghost_status": "safe"
+	},
+	"R x DT x DT": {
+		"count": 269,
+		"mixing": "h-t mixing (B0-independent)",
+		"ghost_status": "safe"
+	},
+	"R x DF x DF": {
+		"count": 26,
+		"mixing": "h-f mixing (Gertsenshtein)",
+		"ghost_status": "ghost_prone"
+	},
+	"R x DF x DR": {
+		"count": 252,
+		"mixing": "h-f mixing",
+		"ghost_status": "ghost_prone"
+	},
+	"R x DR x DR": {
+		"count": 846,
+		"mixing": "curvature self-interaction",
+		"ghost_status": "ghost_prone"
+	},
+	"T x T x F": {
+		"count": 3,
+		"mixing": "t-f mixing",
+		"ghost_status": "safe"
+	},
+	"T x T x DT": {
+		"count": 46,
+		"mixing": "torsion self/kinetic",
+		"ghost_status": "safe"
+	},
+	"T x F x DF": {
+		"count": 10,
+		"mixing": "t-f mixing via B0",
+		"ghost_status": "borderline"
+	},
+	"T x F x DR": {
+		"count": 46,
+		"mixing": "h-t mixing via B0",
+		"ghost_status": "borderline"
+	},
+	"T x DT x DF": {
+		"count": 93,
+		"mixing": "t-f mixing",
+		"ghost_status": "borderline"
+	},
+	"T x DT x DR": {
+		"count": 510,
+		"mixing": "h-t mixing (B0-independent)",
+		"ghost_status": "borderline"
+	},
+	"F x F x F": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "safe"
+	},
+	"F x F x DT": {
+		"count": 5,
+		"mixing": "t-f mixing via B0",
+		"ghost_status": "safe"
+	},
+	"F x DT x DT": {
+		"count": 40,
+		"mixing": "t-f mixing",
+		"ghost_status": "safe"
+	},
+	"F x DF x DF": {
+		"count": 3,
+		"mixing": "EM self/kinetic",
+		"ghost_status": "ghost_prone"
+	},
+	"F x DF x DR": {
+		"count": 46,
+		"mixing": "h-f mixing (Gertsenshtein)",
+		"ghost_status": "ghost_prone"
+	},
+	"F x DR x DR": {
+		"count": 112,
+		"mixing": "h-f mixing",
+		"ghost_status": "ghost_prone"
+	},
+	"DT x DT x DT": {
+		"count": 178,
+		"mixing": "torsion self/kinetic",
+		"ghost_status": "safe"
+	},
+	"DT x DF x DF": {
+		"count": 46,
+		"mixing": "t-f mixing via B0",
+		"ghost_status": "ghost_prone"
+	},
+	"DT x DF x DR": {
+		"count": 510,
+		"mixing": "h-t mixing via B0",
+		"ghost_status": "ghost_prone"
+	},
+	"DT x DR x DR": {
+		"count": 1648,
+		"mixing": "h-t mixing (B0-independent)",
+		"ghost_status": "ghost_prone"
+	},
+	"eps R x R x R": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "safe"
+	},
+	"eps R x R x F": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "safe"
+	},
+	"eps R x R x DT": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "safe"
+	},
+	"eps R x T x T": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "safe"
+	},
+	"eps R x T x DF": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "borderline"
+	},
+	"eps R x T x DR": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "borderline"
+	},
+	"eps R x F x F": {
+		"count": 12,
+		"mixing": "h-f mixing (Gertsenshtein)",
+		"ghost_status": "safe"
+	},
+	"eps R x F x DT": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "safe"
+	},
+	"eps R x DT x DT": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "safe"
+	},
+	"eps R x DF x DF": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "ghost_prone"
+	},
+	"eps R x DF x DR": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "ghost_prone"
+	},
+	"eps R x DR x DR": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "ghost_prone"
+	},
+	"eps T x T x F": {
+		"count": 15,
+		"mixing": "t-f mixing",
+		"ghost_status": "safe"
+	},
+	"eps T x T x DT": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "safe"
+	},
+	"eps T x F x DF": {
+		"count": 36,
+		"mixing": "t-f mixing via B0",
+		"ghost_status": "borderline"
+	},
+	"eps T x F x DR": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "borderline"
+	},
+	"eps T x DT x DF": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "borderline"
+	},
+	"eps T x DT x DR": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "borderline"
+	},
+	"eps F x F x F": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "safe"
+	},
+	"eps F x F x DT": {
+		"count": 18,
+		"mixing": "t-f mixing via B0",
+		"ghost_status": "safe"
+	},
+	"eps F x DT x DT": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "safe"
+	},
+	"eps F x DF x DF": {
+		"count": 15,
+		"mixing": "EM self/kinetic",
+		"ghost_status": "ghost_prone"
+	},
+	"eps F x DF x DR": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "ghost_prone"
+	},
+	"eps F x DR x DR": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "ghost_prone"
+	},
+	"eps DT x DT x DT": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "safe"
+	},
+	"eps DT x DF x DF": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "ghost_prone"
+	},
+	"eps DT x DF x DR": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "ghost_prone"
+	},
+	"eps DT x DR x DR": {
+		"count": 0,
+		"mixing": "vanishing",
+		"ghost_status": "ghost_prone"
+	},
+	"CS: eps Tvec A F": {
+		"count": 1,
+		"mixing": "EM self/kinetic",
+		"ghost_status": "safe"
+	},
+	"CS: eps Tor A F": {
+		"count": 6,
+		"mixing": "EM self/kinetic",
+		"ghost_status": "safe"
 	}
 }
