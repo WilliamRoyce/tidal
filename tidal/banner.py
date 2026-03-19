@@ -20,113 +20,69 @@ import sys
 from typing import TextIO
 
 # ────────────────────────────────────────────────────────────
-#  Rasterized icons (from SVG vector paths)
+#  Pre-composed layouts (no dynamic padding — immune to
+#  variable-width Unicode rendering across terminals)
 # ────────────────────────────────────────────────────────────
 
-# 12-col, 9 rows — compact side-by-side
-_ICON_COMPACT = [
-    "   ▄█████▄",
-    "   ██████▀",
-    "    ▀███▀",
-    "    ████",
-    " ▄██ ██ ██▄",
-    "████▀  ▀████",
-    "██ ████████ ██",
-    " ██████████▀",
-    "   ▀█████▀",
-]
+# Compact: icon left, TIDAL text right (pre-composed, ~65 display cols)
+_LAYOUT_COMPACT = r"""
+     ▗▄▄▄▄▄▄▄▄▖
+      ▜█▛▀▀▜█▛         ████████╗██╗██████╗  █████╗ ██╗
+       ▜█▖▗█▛          ╚══██╔══╝██║██╔══██╗██╔══██╗██║
+     ▗  ▝██▘  ▖           ██║   ██║██║  ██║███████║██║
+ ▗▞▘█▙   ▝▘   ▟█▝▚▖       ██║   ██║██║  ██║██╔══██║██║
+ █▙ ▀▀████████▀▀ ▟█       ██║   ██║██████╔╝██║  ██║███████╗
+ ▝▜█▙▄▄▄▄▄▄▄▄▄▄▟█▛▘       ╚═╝   ╚═╝╚═════╝ ╚═╝  ╚═╝╚══════╝
+    ▝▀▀▀▀▀▀▀▀▀▀▘
+""".strip("\n")
 
-# 14-col, 11 rows — stacked layout
-_ICON_STACKED = [
-    "    ▄█████▄",
-    "    ██████▀",
-    "    ██  ██",
-    "     ▀██▀",
-    "     ████",
-    "  ▄██ ██ ██▄",
-    " ████    ████",
-    "██ ████████ ██",
-    "████ ████ ████",
-    " ████████████▀",
-    "    ▀█████▀",
-]
+# Stacked: icon on top, TIDAL text below
+_LAYOUT_STACKED = r"""
+         ▗▄▄▄▄▄▄▄▄▖
+          ▜█▛▀▀▜█▛
+           ▜█▖▗█▛
+         ▗  ▝██▘  ▖
+     ▗▞▘█▙   ▝▘   ▟█▝▚▖
+     █▙ ▀▀████████▀▀ ▟█
+     ▝▜█▙▄▄▄▄▄▄▄▄▄▄▟█▛▘
+        ▝▀▀▀▀▀▀▀▀▀▀▘
 
-# 10-col, 8 rows — minimal
-_ICON_MINIMAL = [
-    "  ▄████▄▀",
-    "   ▀██▀",
-    "   ████",
-    "  █ ██ █",
-    "▄██ ██ ██▄",
-    "██████████",
-    "██████████",
-    "  ▀████▀",
-]
+████████╗██╗██████╗  █████╗ ██╗
+╚══██╔══╝██║██╔══██╗██╔══██╗██║
+   ██║   ██║██║  ██║███████║██║
+   ██║   ██║██║  ██║██╔══██║██║
+   ██║   ██║██████╔╝██║  ██║███████╗
+   ╚═╝   ╚═╝╚═════╝ ╚═╝  ╚═╝╚══════╝
+""".strip("\n")
 
-# Block-letter "TIDAL" — 6 rows
-_TEXT = [
-    "▀▀▀█▀▀▀█▀▀▀█▀▀█▀██▀  ██▀▀██ █▀▀▀",
-    "█▀▀█▀▀██▀▀▀█▀▀█▀██▀████▀▀██▀█▀▀█",
-    "   ███   ██▀▀██  ▀███▀█▀▀███▀████",
-    "   ███   ██▀▀██  ▀███▀███▀██▀████",
-    "   ███   █▀▀███████▀██  ██▀▀███▀█████",
-    "   ███   █▀▀██▀▀▀██ ███  ██▀▀███▀████▀",
-]
+# Minimal: icon + small text
+_LAYOUT_MINIMAL = r"""
+     ▗▄▄▄▄▄▄▄▄▖
+      ▜█▛▀▀▜█▛
+       ▜█▖▗█▛
+     ▗  ▝██▘  ▖
+ ▗▞▘█▙   ▝▘   ▟█▝▚▖
+ █▙ ▀▀████████▀▀ ▟█
+ ▝▜█▙▄▄▄▄▄▄▄▄▄▄▟█▛▘
+    ▝▀▀▀▀▀▀▀▀▀▀▘
 
-# Small text — 3 rows
-_TEXT_SMALL = [
-    "▀█▀ █ █▀█ ▀█▀ █",
-    " █  █ █ █ ███ █",
-    " █  █ ███ █ █ ▀█▀",
-]
+      T I D A L
+""".strip("\n")
 
 
 def _build_compact() -> list[str]:
-    icon = _ICON_COMPACT
-    text = _TEXT
-    icon_w = max(len(row) for row in icon)
-    gap = 4
-    text_start = (len(icon) - len(text)) // 2
-    lines: list[str] = []
-    for i in range(len(icon)):
-        padded = icon[i] + " " * (icon_w - len(icon[i]))
-        ti = i - text_start
-        if 0 <= ti < len(text):
-            lines.append(padded + " " * gap + text[ti])
-        else:
-            lines.append(padded)
-    return lines
+    """Icon left, text right — pre-composed."""
+    return _LAYOUT_COMPACT.split("\n")
 
 
 def _build_stacked() -> list[str]:
-    icon = _ICON_STACKED
-    text = _TEXT
-    icon_w = max(len(row) for row in icon)
-    text_w = max(len(row) for row in text)
-    lines: list[str] = []
-    if icon_w < text_w:
-        pad = (text_w - icon_w) // 2
-        lines.extend(" " * pad + row for row in icon)
-        lines.append("")
-        lines.extend(text)
-    else:
-        pad = (icon_w - text_w) // 2
-        lines.extend(icon)
-        lines.append("")
-        lines.extend(" " * pad + t for t in text)
-    return lines
+    """Icon on top, text below — pre-composed."""
+    return _LAYOUT_STACKED.split("\n")
 
 
 def _build_minimal() -> list[str]:
-    icon = _ICON_MINIMAL
-    text = _TEXT_SMALL
-    icon_w = max(len(row) for row in icon)
-    text_w = max(len(row) for row in text)
-    text_pad = max(0, (icon_w - text_w) // 2)
-    lines = list(icon)
-    lines.append("")
-    lines.extend(" " * text_pad + t for t in text)
-    return lines
+    """Icon + small text — pre-composed."""
+    return _LAYOUT_MINIMAL.split("\n")
 
 
 # ────────────────────────────────────────────────────────────
@@ -223,7 +179,7 @@ def _colorize(lines: list[str], stops: list[tuple[int, int, int]]) -> str:
 #  Public API
 # ────────────────────────────────────────────────────────────
 
-_MIN_COMPACT_COLS = 55
+_MIN_COMPACT_COLS = 68
 _MIN_STACKED_COLS = 38
 
 
