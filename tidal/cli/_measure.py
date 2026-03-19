@@ -608,7 +608,7 @@ def _format_json(results: dict[str, Any], data: SimulationData) -> str:
 
 def _format_text_section_conservation(lines: list[str], cons: dict[str, Any]) -> None:
     """Append conservation section to *lines*."""
-    from tidal.cli._console import pass_fail
+    from tidal.cli._console import key_value, pass_fail
 
     if "error" in cons:
         lines.append(f"Energy Conservation: ERROR ({cons['error']})")
@@ -616,8 +616,8 @@ def _format_text_section_conservation(lines: list[str], cons: dict[str, Any]) ->
         lines.extend(
             [
                 pass_fail("Energy Conservation", passed=cons["is_conserved"]),
-                f"  max |dE/E| = {cons['max_relative_error']:.2e}",
-                f"  threshold  = {cons['threshold']:.0e}",
+                key_value("max |dE/E|", f"{cons['max_relative_error']:.2e}"),
+                key_value("threshold", f"{cons['threshold']:.0e}"),
             ]
         )
     lines.append("")
@@ -625,35 +625,33 @@ def _format_text_section_conservation(lines: list[str], cons: dict[str, Any]) ->
 
 def _format_text_section_energy(lines: list[str], eng: dict[str, Any]) -> None:
     """Append energy section to *lines*."""
+    from tidal.cli._console import key_value
+
     if "error" in eng:
         lines.append(f"Energy: ERROR ({eng['error']})")
     else:
         lines.append("Per-Field Energy (final):")
         for name, series in eng["per_field"].items():
-            lines.append(f"  {name}: {series[-1]:.6f}")
+            lines.append(key_value(name, f"{series[-1]:.6f}"))
         lines.extend(
-            [
-                f"  interaction: {eng['interaction'][-1]:.6f}",
-                f"  total:       {eng['total'][-1]:.6f}",
-            ]
+            (
+                key_value("interaction", f"{eng['interaction'][-1]:.6f}"),
+                key_value("total", f"{eng['total'][-1]:.6f}"),
+            )
         )
     lines.append("")
 
 
 def _format_text_section_conversion(lines: list[str], conv: dict[str, Any]) -> None:
     """Append conversion section to *lines*."""
+    from tidal.cli._console import key_value
+
     if "error" in conv:
         lines.append(f"Conversion: ERROR ({conv['error']})")
     else:
         src = ", ".join(conv["source"])
         tgt = ", ".join(conv["target"])
-        lines.extend(
-            [
-                f"Conversion ({src} -> {tgt}):",
-                f"  Peak P(t) = {conv['peak_probability']:.6f}",
-                f"  at t = {conv['peak_time']:.2f}",
-            ]
-        )
+        lines.extend((f"Conversion ({src} -> {tgt}):", key_value("Peak P(t)", f"{conv['peak_probability']:.6f}"), key_value("at t", f"{conv['peak_time']:.2f}")))
     lines.append("")
 
 

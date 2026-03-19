@@ -134,6 +134,49 @@ def header(title: str) -> str:
     return f"{sep}\n{title}\n{sep}"
 
 
+def key_value(key: str, val: str, *, width: int = 20) -> str:
+    """Return an aligned key-value pair.  Key is colored when available."""
+    if _color():
+        return f"  {_CYAN}{key:<{width}}{_RESET} {val}"
+    return f"  {key:<{width}} {val}"
+
+
+def table(
+    headers: list[str],
+    rows: list[list[str]],
+    *,
+    indent: int = 2,
+) -> str:
+    """Return a simple aligned table with header underline.
+
+    Colour is additive — the table is readable without colour.
+    """
+    # Compute column widths
+    n_cols = len(headers)
+    widths = [len(h) for h in headers]
+    for row in rows:
+        for i, cell in enumerate(row[:n_cols]):
+            widths[i] = max(widths[i], len(cell))
+
+    pad = " " * indent
+    # Header row
+    hdr = pad + "  ".join(h.ljust(widths[i]) for i, h in enumerate(headers))
+    sep = pad + "  ".join("-" * widths[i] for i in range(n_cols))
+    # Data rows
+    data_lines = []
+    for row in rows:
+        cells = [
+            (row[i] if i < len(row) else "").ljust(widths[i]) for i in range(n_cols)
+        ]
+        data_lines.append(pad + "  ".join(cells))
+
+    if _color():
+        hdr = f"{_CYAN}{_BOLD}{hdr}{_RESET}"
+        sep = f"{_DIM}{sep}{_RESET}"
+
+    return "\n".join([hdr, sep, *data_lines])
+
+
 def pass_fail(label: str, *, passed: bool) -> str:
     """Return ``PASS``/``FAIL`` with colour when available."""
     tag = "PASS" if passed else "FAIL"

@@ -82,13 +82,15 @@ def list_command(args: Namespace) -> int:
 
         entries.append((jf.name, dim_label, field_str, param_str))
 
-    # Print aligned
-    name_w = max(len(e[0]) for e in entries) + 2
-    dim_w = max(len(e[1]) for e in entries) + 2
-    field_w = max(len(e[2]) for e in entries) + 2
+    # Print aligned table
+    from tidal.cli._console import table as _table
 
-    for name, dim, fields, params in entries:
-        print(f"  {name:<{name_w}} {dim:<{dim_w}} {fields:<{field_w}} {params}")
+    print(
+        _table(
+            ["Name", "Dim", "Fields", "Parameters"],
+            [list(e) for e in entries],
+        )
+    )
 
     print()
     print(f"{len(entries)} specification{'s' if len(entries) != 1 else ''} found.")
