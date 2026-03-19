@@ -2249,6 +2249,22 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
     # 9. Output
     _generate_output(args, sim_data, grid_info)
+
+    # 10. HTML report (optional)
+    report_path = getattr(args, "report", None)
+    if report_path:
+        from tidal.cli._report import generate_report
+
+        generate_report(
+            sim_data=sim_data,
+            spec=spec,
+            params=params,
+            grid_info=grid_info,
+            scheme=scheme,
+            report_path=report_path,
+        )
+        log(f"  Report saved to: {Path(report_path).resolve()}")
+
     return 0
 
 
