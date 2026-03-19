@@ -410,6 +410,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Print summary only, skip visualization",
     )
     sim_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Preview simulation setup without running (grid, solver, IC, memory estimate)",
+    )
+    sim_parser.add_argument(
         "--quiet",
         "-q",
         action="store_true",

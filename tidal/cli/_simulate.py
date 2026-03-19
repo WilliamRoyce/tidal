@@ -1912,6 +1912,41 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         log("  Note: modal solver uses k-space natively; spectral auto-disabled")
     log(f"  Scheme: {scheme}")
 
+    # --- Dry-run: preview setup and exit ---
+    if getattr(args, "dry_run", False):
+        n_fields = spec.n_components
+        n_eqs = len(spec.equations)
+        grid_pts = 1
+        for s in grid_info.shape:
+            grid_pts *= s
+        # Rough memory estimate: state vector + snapshots
+        n_snapshots = max(int((args.t_end - t_start) / (args.t_end / 100.0)) + 1, 2)
+        mem_bytes = (
+            grid_pts * n_fields * 2 * 8 * n_snapshots
+        )  # fields + velocities, float64
+        if mem_bytes < 1024 * 1024:
+            mem_str = f"{mem_bytes / 1024:.0f} KB"
+        else:
+            mem_str = f"{mem_bytes / (1024 * 1024):.1f} MB"
+        spec_name = getattr(args, "json_path", "unknown")
+        print(
+            f"  Spec:     {Path(spec_name).name} ({n_fields} fields, {n_eqs} equations)"
+        )
+        print(
+            f"  Grid:     {'x'.join(str(s) for s in grid_info.shape)} points, "
+            f"bounds {grid_info.bounds}, "
+            f"{'periodic' if all(grid_info.periodic) else 'mixed BCs'}"
+        )
+        print(
+            f"  Solver:   {scheme} (auto-selected)"
+            if args.scheme == "auto"
+            else f"  Solver:   {scheme}"
+        )
+        print(f"  FD order: {fd_order}")
+        print(f"  Steps:    ~{n_snapshots} snapshots, t={t_start}→{args.t_end}")
+        print(f"  Est. memory: ~{mem_str}")
+        return 0
+
     # Constraint-only mode: solve algebraic equations via IDA, no time evolution
     if args.mode == "constraint":
         return _constraint_mode(args, spec, grid_info, y0, params, bc, log)
