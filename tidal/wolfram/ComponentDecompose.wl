@@ -738,14 +738,17 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   ];
 
   (* Step 1.3: Expand Scalar[] wrappers before ToBasis.                    *)
-  (* xPert wraps contracted sub-expressions in Scalar[...] which is opaque *)
-  (* to ToBasis — abstract indices inside remain unconverted.  Critical    *)
-  (* for R̃-decomposed torsion expressions where xPert produces            *)
-  (* Scalar[eta[a,b] * CD[-a][TorsionCDT[-b,-c,-d]]] contractions.       *)
   componentEq = ExpandScalarWrappers[componentEq, chart];
 
-  (* Step 1.5: SeparateFieldMetrics is now hoisted to DecomposeToComponents before the
-     component loop. This step is a no-op here (already applied to eom). *)
+  (* Step 1.4: Re-apply shorthand CD[field] → CDfield substitutions.       *)
+  (* ExpandScalarWrappers may have introduced new CD[field] operators from  *)
+  (* resolved Scalar contents. The shorthand MakeRule variables (toCD1...)  *)
+  (* are globals set by _wls_shorthand_cd_tensors in _derive.py.           *)
+  If[ListQ[Global`$CDShorthandRules] && Length[Global`$CDShorthandRules] > 0,
+    Do[componentEq = componentEq /. rule, {rule, Global`$CDShorthandRules}];
+    componentEq = ToCanonical[componentEq];
+    componentEq = ContractMetric[componentEq];
+  ];
 
   (* Step 2: Staggered ToBasis + ToValues + TraceBasisDummy                *)
   (* Ref: supervisor's EuclideanSplinter (commit 4a89164).                 *)

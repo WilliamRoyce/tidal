@@ -1034,10 +1034,20 @@ def _wls_shorthand_cd_tensors(
             ]
         )
 
-    # Apply ALL shorthand rules to ALL EOM variables
+    # Apply ALL shorthand rules to ALL EOM variables.
+    # Also apply INSIDE Scalar wrappers — xPert's Scalar[eta^{ab} CD[-a][f[-b]]]
+    # wraps CD operators that MakeRule can't see from the outside.
+    all_rules = " /. ".join(rule_vars) if rule_vars else ""
     for df in dyn_fields:
         eom_var = f"eom{df['name'].capitalize()}"
-        lines.extend(f"{eom_var} = {eom_var} /. {rv};" for rv in rule_vars)
+        if all_rules:
+            lines.extend(
+                [
+                    "(* Apply shorthand rules to outer expression + inside Scalar wrappers *)",
+                    f"{eom_var} = {eom_var} /. {all_rules};",
+                    f"{eom_var} = {eom_var} /. Scalar[x_] :> Scalar[x /. {all_rules}];",
+                ]
+            )
         lines.extend(
             [
                 f"{eom_var} //= ToCanonical;",
@@ -1045,6 +1055,14 @@ def _wls_shorthand_cd_tensors(
                 f"{eom_var} = Expand[{eom_var}];",
             ]
         )
+
+    # Store rules in global $CDShorthandRules for reuse in ComponentDecompose.wl
+    # (after ExpandScalarWrappers introduces new CD operators from Scalar contents)
+    if rule_vars:
+        rules_list = ", ".join(rule_vars)
+        lines.append(f"$CDShorthandRules = {{{rules_list}}};")
+    else:
+        lines.append("$CDShorthandRules = {};")
 
     lines.extend(('Print["Shorthand CD substitution complete"];', ""))
     return lines
