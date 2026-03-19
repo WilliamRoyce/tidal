@@ -33,3 +33,6 @@ Wolfram*.tgz
 *.mathpass
 .Wolfram*
 .WolframEngine*
+
+# Literature — local arXiv TeX sources (large, not for VCS)
+Literature/
