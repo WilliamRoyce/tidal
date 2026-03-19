@@ -1070,11 +1070,66 @@ def _wls_shorthand_cd_tensors(
             ]
         )
 
-    # Store rules in global $CDShorthandRules for reuse in ComponentDecompose.wl
+    # --- Second-order CD shorthands: CD2field = CD@CD1field ---
+    # For R̃² torsion theories: the Lagrangian has ∇∇field terms (second covariant
+    # derivatives) wrapped in Scalar[]. After CD1 substitution, these become
+    # CD[-a]@CD1field[-b,...] patterns. Define CD2field to absorb these.
+    # Ref: supervisor's DDClockField = CD@DClockField (commit 4a89164).
+    cd2_rule_vars: list[str] = []
+    for df in dyn_fields:
+        head = df["head"]
+        cd1_head = f"CD1{head}"
+        cd2_head = f"CD2{head}"
+        cd2_rule_var = f"toCD2{head}"
+        cd2_rule_vars.append(cd2_rule_var)
+
+        lines.extend(
+            [
+                f"(* Second-order shorthand for CD[CD[{df['name']}]] *)",
+                f"If[xTensorQ[{cd1_head}],",
+                f"  Module[{{cd1Slots = SlotsOfTensor[{cd1_head}], cd1Rank, dummyIdxs, cd2IdxList, cd1Expr, cdIdx}},",
+                "    cd1Rank = Length[cd1Slots];",
+                f"    If[!xTensorQ[{cd2_head}],",
+                f"      dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cd1Rank}}];",
+                "      cd2IdxList = Join[{-a}, MapThread[If[#1 === 1, #2, -#2] &, {cd1Slots, dummyIdxs}]];",
+                f"      DefTensor[{cd2_head} @@ cd2IdxList, {ctx.manifold}]",
+                "    ];",
+                "    (* MakeRule: CD[-cdIdx] @ CD1field[indices] → CD2field[-cdIdx, indices] *)",
+                f"    cdIdx = DummyIn[Tangent{ctx.manifold}];",
+                f"    dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cd1Rank}}];",
+                "    cd1Expr = "
+                f"{cd1_head}"
+                " @@ MapThread[If[#1 === 1, #2, -#2] &, {cd1Slots, dummyIdxs}];",
+                f"    {cd2_rule_var} = MakeRule[{{CD[-cdIdx] @ cd1Expr, {cd2_head} @@ Join[{{-cdIdx}}, List @@ IndicesOf[Free][cd1Expr]]}}, MetricOn -> All, ContractMetrics -> True]",
+                "  ],",
+                f"  {cd2_rule_var} = {{}};",
+                "];",
+                "",
+            ]
+        )
+
+    # Apply CD2 rules after CD1 rules
+    all_cd2_rules = " /. ".join(cd2_rule_vars) if cd2_rule_vars else ""
+    if all_cd2_rules:
+        for df in dyn_fields:
+            eom_var = f"eom{df['name'].capitalize()}"
+            lines.extend(
+                [
+                    f"{eom_var} = {eom_var} /. {all_cd2_rules};",
+                    f"{eom_var} = {eom_var} /. Scalar[x_] :> Scalar[x /. {all_cd2_rules}];",
+                    f"{eom_var} //= ToCanonical;",
+                    f"{eom_var} //= ContractMetric;",
+                    f"{eom_var} //= ScreenDollarIndices;",
+                    f"{eom_var} //= CollectTensors;",
+                ]
+            )
+
+    # Store ALL rules in global $CDShorthandRules for reuse in ComponentDecompose.wl
     # (after ExpandScalarWrappers introduces new CD operators from Scalar contents)
-    if rule_vars:
-        rules_list = ", ".join(rule_vars)
-        lines.append(f"$CDShorthandRules = {{{rules_list}}};")
+    all_rule_vars = rule_vars + cd2_rule_vars
+    if all_rule_vars:
+        rules_list = ", ".join(all_rule_vars)
+        lines.append(f"$CDShorthandRules = Flatten[{{{rules_list}}}];")
     else:
         lines.append("$CDShorthandRules = {};")
 
@@ -1337,10 +1392,10 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
                 f"    Module[{{dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cdRank}}]}},",
                 "      basisIdx = Table[",
                 "        If[naturalSlots[[n]] === 1, {dummyIdxs[[n]], "
-                 f"{ctx.chart}"
-                 "}, {dummyIdxs[[n]], -"
-                 f"{ctx.chart}"
-                 "}],",
+                f"{ctx.chart}"
+                "}, {dummyIdxs[[n]], -"
+                f"{ctx.chart}"
+                "}],",
                 "        {n, cdRank}];",
                 "      Block[{Print = Null},",
                 f"        ComponentValue[ComponentArray[{cd1_head} @@ basisIdx], comp]",
@@ -1359,10 +1414,10 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
                 f"          comp = cdSplinter[{cd1_head} @@ abstractIdx];",
                 "          basisIdx = Table[",
                 "            If[placement[[n]] === 1, {dummyIdxs[[n]], "
-                 f"{ctx.chart}"
-                 "}, {dummyIdxs[[n]], -"
-                 f"{ctx.chart}"
-                 "}],",
+                f"{ctx.chart}"
+                "}, {dummyIdxs[[n]], -"
+                f"{ctx.chart}"
+                "}],",
                 "            {n, cdRank}];",
                 "          Block[{Print = Null},",
                 f"            ComponentValue[ComponentArray[{cd1_head} @@ basisIdx], comp]",
@@ -1372,6 +1427,61 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
                 "      ]",
                 "    ];",
                 f'    Print["  CD[{df["name"]}] all ", 2^cdRank, " placements computed"];',
+                "  ]",
+                "]];",
+                "",
+            ]
+        )
+
+    # --- Pre-compute CD2 shorthand ComponentValues (second-order, recursive) ---
+    # CD2field = CD@CD1field. ComponentValues computed using CD1field's ComponentValues.
+    for df in dyn_fields:
+        head = df["head"]
+        cd1_head = f"CD1{head}"
+        cd2_head = f"CD2{head}"
+        lines.extend(
+            [
+                f"(* Pre-compute ALL CD2[{df['name']}] ComponentValue placements *)",
+                f"Catch[If[xTensorQ[{cd2_head}],",
+                "  Module[{comp, cdRank, naturalSlots, mask, placement, abstractIdx, basisIdx, idxSym},",
+                f"    cdRank = Length[SlotsOfTensor[{cd2_head}]];",
+                f"    naturalSlots = SlotsOfTensor[{cd2_head}];",
+                "",
+                "    (* Natural placement: CD[-freshIdx] @ CD1field[natural indices] *)",
+                f"    Module[{{freshIdx = DummyIn[Tangent{ctx.manifold}],",
+                f"            cd1Idxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, Length[SlotsOfTensor[{cd1_head}]]}}]}},",
+                f"      Module[{{cd1Expr = {cd1_head} @@ MapThread[If[#1 === 1, #2, -#2] &, {{SlotsOfTensor[{cd1_head}], cd1Idxs}}]}},",
+                f"        comp = cdSplinter[{ctx.cd}[-freshIdx] @ cd1Expr]",
+                "      ]",
+                "    ];",
+                "",
+                "    (* Assign all placements using DummyIn indices *)",
+                f"    Module[{{dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cdRank}}]}},",
+                "      Do[",
+                "        placement = IntegerDigits[mask, 2, cdRank];",
+                "        abstractIdx = Table[",
+                "          If[placement[[n]] === 1, dummyIdxs[[n]], -dummyIdxs[[n]]],",
+                "          {n, cdRank}];",
+                "        (* Natural placement: compute from CD@CD1; others: raise/lower *)",
+                "        If[placement === Table[If[naturalSlots[[n]] === 1, 1, 0], {n, cdRank}],",
+                "          (* Natural — use comp from above *)",
+                "          Null,",
+                f"          comp = cdSplinter[{cd2_head} @@ abstractIdx]",
+                "        ];",
+                "        basisIdx = Table[",
+                "          If[placement[[n]] === 1, {dummyIdxs[[n]], "
+                 f"{ctx.chart}"
+                 "}, {dummyIdxs[[n]], -"
+                 f"{ctx.chart}"
+                 "}],",
+                "          {n, cdRank}];",
+                "        Block[{Print = Null},",
+                f"          ComponentValue[ComponentArray[{cd2_head} @@ basisIdx], comp]",
+                "        ],",
+                "        {mask, 0, 2^cdRank - 1}",
+                "      ]",
+                "    ];",
+                f'    Print["  CD2[{df["name"]}] all ", 2^cdRank, " placements computed"];',
                 "  ]",
                 "]];",
                 "",
