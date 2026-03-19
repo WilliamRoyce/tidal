@@ -850,6 +850,9 @@ isCDlikeQ[x_] := Module[{h = Head[x], hStr},
   If[StringMatchQ[hStr, "PD*"], Return[False]];
   If[IsCurvatureTensor[h] || IsCurvatureTensor[x], Return[False]];
   If[StringContainsQ[hStr, "Torsion"], Return[False]];
+  (* Exclude CD1/CD2 shorthand tensors — they have "CD" in the name but *)
+  (* are pre-computed tensors, not derivative operators.                 *)
+  If[StringMatchQ[hStr, "CD1*"] || StringMatchQ[hStr, "CD2*"], Return[False]];
   IsCovDOperator[x] || StringMatchQ[hStr, "*CD*"]
 ];
 
