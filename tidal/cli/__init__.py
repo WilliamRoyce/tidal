@@ -1299,7 +1299,13 @@ def main(argv: list[str] | None = None) -> int:  # noqa: PLR0911
     ):
         from tidal.banner import print_banner
 
-        print_banner()
+        banner_theme = os.environ.get("TIDAL_BANNER_THEME", "ocean")
+        banner_layout = os.environ.get("TIDAL_BANNER_LAYOUT", "auto")
+        print_banner(
+            theme=banner_theme,
+            layout=banner_layout,
+            version=_get_version(),
+        )
 
     if args.cite:
         from tidal.cli._cite import print_citation

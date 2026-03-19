@@ -183,7 +183,11 @@ _MIN_COMPACT_COLS = 68
 _MIN_STACKED_COLS = 38
 
 
-def get_banner(theme: str = "ocean", layout: str = "auto") -> str:
+def get_banner(
+    theme: str = "ocean",
+    layout: str = "auto",
+    version: str | None = None,
+) -> str:
     """Return the TIDAL ASCII banner as a string.
 
     Parameters
@@ -195,6 +199,8 @@ def get_banner(theme: str = "ocean", layout: str = "auto") -> str:
         "stacked"  — icon on top, text below (needs ~38 cols)
         "minimal"  — small icon + small text (needs ~20 cols)
         "auto"     — pick based on terminal width
+    version : str | None
+        If provided, appended as a tagline below the art.
     """
     if layout == "auto":
         try:
@@ -215,6 +221,11 @@ def get_banner(theme: str = "ocean", layout: str = "auto") -> str:
     }
     lines = builders.get(layout, _build_compact)()
 
+    # Append version tagline if provided
+    if version:
+        tagline = f"  v{version} — Tensor Integration and Derivation for Any Lagrangian"
+        lines.append(tagline)
+
     stops = THEMES.get(theme, THEMES["ocean"])
     if stops and _supports_color():
         return _colorize(lines, stops)
@@ -222,12 +233,15 @@ def get_banner(theme: str = "ocean", layout: str = "auto") -> str:
 
 
 def print_banner(
-    theme: str = "ocean", layout: str = "auto", file: TextIO | None = None
+    theme: str = "ocean",
+    layout: str = "auto",
+    version: str | None = None,
+    file: TextIO | None = None,
 ) -> None:
     """Print the TIDAL banner to *file* (default: sys.stderr)."""
     if file is None:
         file = sys.stderr
-    print(get_banner(theme=theme, layout=layout), file=file)
+    print(get_banner(theme=theme, layout=layout, version=version), file=file)
 
 
 if __name__ == "__main__":
