@@ -1259,7 +1259,14 @@ def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
 
-    if not args.no_banner and not os.environ.get("TIDAL_NO_BANNER"):
+    # Show banner for long-running commands and bare `tidal` (no subcommand).
+    # Quick commands (list, validate, inspect, measure, plot, analyze) skip it.
+    BANNER_COMMANDS = {None, "simulate", "derive", "sweep"}
+    if (
+        not args.no_banner
+        and not os.environ.get("TIDAL_NO_BANNER")
+        and args.command in BANNER_COMMANDS
+    ):
         from tidal.banner import print_banner
 
         print_banner()
