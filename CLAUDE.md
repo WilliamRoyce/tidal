@@ -42,7 +42,8 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - **After completing a feature/fix**, commit promptly with conventional format (feat:/fix:/refactor:/test:/docs:). No Co-Authored-By trailer. Separate unrelated changes into distinct commits.
 - **Fix lint/type/spell errors immediately** — `uv run ruff check --fix && uv run ruff format` after code changes. Fix pyright errors. Add domain terms to `.cspell.json`, fix genuine typos.
 - **Wolfram pipeline integrity**: ALL symbolic processing stays in Wolfram — never post-process equations in Python. Never skip/bypass the canonical pipeline; fix root causes.
-- **Only ONE wolframscript at a time** — single engine license. NEVER run `tidal derive` in parallel. Run derivations in the background (`run_in_background: true`) so you can continue other work while waiting.
+- **Run long commands in background**: Use `run_in_background: true` on the Bash tool for any command that takes more than a few seconds — derivations (`tidal derive`), simulations (`tidal simulate`), sweeps (`tidal sweep`), and full test suites (`pytest tests/`). Continue other work while waiting; you'll be notified on completion. Do NOT poll or sleep.
+- **Only ONE wolframscript at a time** — single engine license. NEVER run `tidal derive` in parallel.
 - **Use minimal test theories** (scalar_field, coupled_scalars) before expensive derivations.
 - **Negative energies** may be physical with (-,+,+,+) metric convention — don't "fix" without understanding the physics.
 - **Before context compaction**, update all relevant docs and memory files.
