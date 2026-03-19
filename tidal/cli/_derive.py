@@ -4136,8 +4136,15 @@ def generate_wls(
 # --- Execution ---
 
 
-def _run_wolframscript(script_path: Path) -> int:
+def _run_wolframscript(script_path: Path, *, timeout: int = 0) -> int:
     """Run wolframscript on a .wls file.
+
+    Parameters
+    ----------
+    script_path
+        Path to the .wls script.
+    timeout
+        Maximum seconds to wait. 0 means no timeout.
 
     Returns
     -------
@@ -4178,14 +4185,33 @@ def _run_wolframscript(script_path: Path) -> int:
     except OSError:
         pass
 
-    print(f"Running: wolframscript -file {script_path}")
+    timeout_effective = timeout if timeout > 0 else None
+    timeout_str = f" (timeout: {timeout}s)" if timeout_effective else ""
+    print(f"Running: wolframscript -file {script_path}{timeout_str}")
     print()
 
-    result = subprocess.run(
-        ["wolframscript", "-file", str(script_path)],
-        capture_output=False,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            ["wolframscript", "-file", str(script_path)],
+            capture_output=False,
+            check=False,
+            timeout=timeout_effective,
+        )
+    except subprocess.TimeoutExpired:
+        print(
+            f"\nError: wolframscript timed out after {timeout}s.",
+            file=sys.stderr,
+        )
+        print(
+            "Investigate which pipeline stage is the bottleneck and optimize "
+            "the algorithm. Use --timeout 0 to disable if truly needed.",
+            file=sys.stderr,
+        )
+        # Clean up orphaned WolframKernel after timeout
+        subprocess.run(
+            ["pkill", "-f", "WolframKernel"], capture_output=True, check=False
+        )
+        return 1
 
     return result.returncode
 
@@ -4250,7 +4276,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
                 "Note: wolframscript not found. Run the script manually when available."
             )
             return 0
-        return _run_wolframscript(save_path)
+        return _run_wolframscript(save_path, timeout=args.timeout)
 
     # Use temp file
     with tempfile.NamedTemporaryFile(
@@ -4260,7 +4286,7 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
         tmp_path = Path(tmp.name)
 
     try:
-        ret = _run_wolframscript(tmp_path)
+        ret = _run_wolframscript(tmp_path, timeout=args.timeout)
     finally:
         tmp_path.unlink(missing_ok=True)
 
@@ -4340,7 +4366,7 @@ def derive_command(args: Namespace) -> int:
     ext = config_path.suffix.lower()
 
     if ext == ".wls":
-        return _run_wolframscript(config_path)
+        return _run_wolframscript(config_path, timeout=args.timeout)
 
     if ext in {".toml", ".tml"}:
         return _derive_from_toml(config_path, args)

@@ -21,6 +21,9 @@ description: Run tidal derive with safety checks. Blocks parallel wolframscript.
 ```bash
 uv run tidal derive $ARGUMENTS
 ```
+The default 10-minute timeout (--timeout 600) applies automatically. Set the Bash tool timeout to 600000ms to match.
+
+If derivation times out: **do NOT increase the timeout or change the physics.** Instead, investigate how to optimize the Wolfram pipeline code itself — identify which stage is the bottleneck (decomposition, basis transformation, canonical pipeline) and optimize the algorithm, caching, or code path.
 
 ### Post-flight
 1. Verify JSON output was created in `examples/data/`

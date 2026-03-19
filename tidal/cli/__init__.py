@@ -85,6 +85,17 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=None,
         help="Override output JSON path from config",
     )
+    derive_parser.add_argument(
+        "--timeout",
+        type=int,
+        default=600,
+        metavar="SECONDS",
+        help=(
+            "Maximum time (seconds) for wolframscript execution. "
+            "Default: 600 (10 min). If exceeded, investigate which pipeline "
+            "stage is the bottleneck and optimize. Use 0 for no timeout."
+        ),
+    )
 
     # --- inspect ---
     inspect_parser = sub.add_parser(
@@ -1257,13 +1268,21 @@ def main(argv: list[str] | None = None) -> int:
         parser.print_help()
         return 0
 
+    from tidal.cli._console import configure as _configure_console
+    from tidal.cli._console import error as _console_error
+
+    _configure_console(
+        verbose=getattr(args, "verbose", False),
+        quiet=getattr(args, "quiet", False),
+    )
+
     try:
         return _dispatch(args)
     except KeyboardInterrupt:
-        print("\nInterrupted.")
+        print("\nInterrupted.", file=sys.stderr)
         return 130
     except (ValueError, FileNotFoundError, TypeError) as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        _console_error(str(exc))
         return 1
     except RuntimeError:
         import traceback
