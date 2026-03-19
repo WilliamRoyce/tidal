@@ -1180,6 +1180,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Bootstrap resamples for Sobol confidence intervals (default: 100)",
     )
 
+    # --- doctor ---
+    sub.add_parser(
+        "doctor",
+        help="Check environment health (Python, dependencies, Wolfram, xAct)",
+    )
+
     return parser
 
 
@@ -1252,6 +1258,10 @@ def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911
         from tidal.cli._analyze import analyze_command
 
         return analyze_command(args)
+    if args.command == "doctor":
+        from tidal.cli._doctor import doctor_command
+
+        return doctor_command(args)
     msg = f"Unknown command: {args.command}"
     raise ValueError(msg)
 
