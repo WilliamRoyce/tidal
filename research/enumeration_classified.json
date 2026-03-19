@@ -1,134 +1,330 @@
 {
-	"R^2":{
+	"R x R":{
 		"count":6,
 		"mixing":"curvature self-interaction"
 	},
-	"T^2":{
-		"count":3,
-		"mixing":"torsion self-interaction"
-	},
-	"F^2":{
-		"count":1,
-		"mixing":"EM self-interaction"
-	},
 	"R x F":{
 		"count":1,
-		"mixing":"h-f mixing (Gertsenshtein-type)"
-	},
-	"R x T (odd)":{
-		"count":0,
-		"mixing":"none (vanishing)"
-	},
-	"T x F (odd)":{
-		"count":0,
-		"mixing":"none (vanishing)"
-	},
-	"DT x F":{
-		"count":3,
-		"mixing":"t-f mixing"
-	},
-	"T x DF (IBP)":{
-		"count":3,
-		"mixing":"t-f mixing"
+		"mixing":"h-f mixing"
 	},
 	"R x DT":{
 		"count":10,
 		"mixing":"h-t mixing (B0-independent)"
 	},
-	"DR x T (IBP)":{
+	"T x T":{
+		"count":3,
+		"mixing":"torsion self\/kinetic"
+	},
+	"T x DF":{
+		"count":3,
+		"mixing":"t-f mixing"
+	},
+	"T x DR":{
 		"count":10,
 		"mixing":"h-t mixing (B0-independent)"
+	},
+	"F x F":{
+		"count":1,
+		"mixing":"EM self\/kinetic"
+	},
+	"F x DT":{
+		"count":3,
+		"mixing":"t-f mixing"
 	},
 	"DT x DT":{
 		"count":16,
-		"mixing":"torsion self-interaction"
+		"mixing":"torsion self\/kinetic"
 	},
 	"DF x DF":{
 		"count":3,
-		"mixing":"EM self-interaction"
+		"mixing":"EM self\/kinetic"
 	},
-	"DT x T (odd)":{
-		"count":0,
-		"mixing":"none (vanishing)"
-	},
-	"DF x F (odd)":{
-		"count":0,
-		"mixing":"none (vanishing)"
-	},
-	"R x F x F":{
-		"count":4,
-		"mixing":"h-f mixing (Gertsenshtein-type)"
-	},
-	"T x T x F":{
-		"count":3,
-		"mixing":"torsion mass correction (t^2*B0)"
-	},
-	"R x T x T":{
-		"count":26,
-		"mixing":"h-t mixing (B0-independent)"
-	},
-	"R x R x F":{
-		"count":8,
-		"mixing":"h-f mixing (Gertsenshtein-type)"
-	},
-	"T x F x F (odd)":{
-		"count":0,
-		"mixing":"none (vanishing)"
-	},
-	"R x T x F (odd)":{
-		"count":0,
-		"mixing":"none (vanishing)"
-	},
-	"DT x F x F":{
-		"count":5,
-		"mixing":"t-f mixing via B0 (cubic)"
-	},
-	"T x DF x F":{
+	"DF x DR":{
 		"count":10,
-		"mixing":"t-f mixing"
+		"mixing":"h-f mixing"
 	},
-	"R x DT x F":{
-		"count":46,
-		"mixing":"h-t mixing via B0"
+	"DR x DR":{
+		"count":32,
+		"mixing":"curvature self-interaction"
 	},
-	"eps R^2":{
+	"eps R x R":{
 		"count":13,
 		"mixing":"curvature self-interaction"
 	},
-	"eps T^2":{
-		"count":4,
-		"mixing":"torsion self-interaction"
-	},
-	"eps F^2":{
-		"count":1,
-		"mixing":"EM self-interaction"
-	},
 	"eps R x F":{
 		"count":3,
-		"mixing":"h-f mixing (Gertsenshtein-type)"
+		"mixing":"h-f mixing"
 	},
-	"eps DT x F":{
-		"count":6,
-		"mixing":"t-f mixing"
+	"eps R x DT":{
+		"count":36,
+		"mixing":"h-t mixing (B0-independent)"
+	},
+	"eps T x T":{
+		"count":4,
+		"mixing":"torsion self\/kinetic"
 	},
 	"eps T x DF":{
 		"count":6,
 		"mixing":"t-f mixing"
 	},
+	"eps T x DR":{
+		"count":36,
+		"mixing":"h-t mixing (B0-independent)"
+	},
+	"eps F x F":{
+		"count":1,
+		"mixing":"EM self\/kinetic"
+	},
+	"eps F x DT":{
+		"count":6,
+		"mixing":"t-f mixing"
+	},
+	"eps DT x DT":{
+		"count":38,
+		"mixing":"torsion self\/kinetic"
+	},
+	"eps DF x DF":{
+		"count":4,
+		"mixing":"EM self\/kinetic"
+	},
+	"eps DF x DR":{
+		"count":36,
+		"mixing":"h-f mixing"
+	},
+	"eps DR x DR":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"R x R x R":{
+		"count":31,
+		"mixing":"curvature self-interaction"
+	},
+	"R x R x F":{
+		"count":8,
+		"mixing":"h-f mixing"
+	},
+	"R x R x DT":{
+		"count":126,
+		"mixing":"h-t mixing (B0-independent)"
+	},
+	"R x T x T":{
+		"count":26,
+		"mixing":"h-t mixing (B0-independent)"
+	},
+	"R x T x DF":{
+		"count":46,
+		"mixing":"h-t mixing via B0"
+	},
+	"R x T x DR":{
+		"count":252,
+		"mixing":"h-t mixing (B0-independent)"
+	},
+	"R x F x F":{
+		"count":4,
+		"mixing":"h-f mixing (Gertsenshtein)"
+	},
+	"R x F x DT":{
+		"count":46,
+		"mixing":"h-t mixing via B0"
+	},
+	"R x DT x DT":{
+		"count":269,
+		"mixing":"h-t mixing (B0-independent)"
+	},
+	"R x DF x DF":{
+		"count":26,
+		"mixing":"h-f mixing (Gertsenshtein)"
+	},
+	"R x DF x DR":{
+		"count":252,
+		"mixing":"h-f mixing"
+	},
+	"R x DR x DR":{
+		"count":846,
+		"mixing":"curvature self-interaction"
+	},
+	"T x T x F":{
+		"count":3,
+		"mixing":"t-f mixing"
+	},
+	"T x T x DT":{
+		"count":46,
+		"mixing":"torsion self\/kinetic"
+	},
+	"T x F x DF":{
+		"count":10,
+		"mixing":"t-f mixing via B0"
+	},
+	"T x F x DR":{
+		"count":46,
+		"mixing":"h-t mixing via B0"
+	},
+	"T x DT x DF":{
+		"count":93,
+		"mixing":"t-f mixing"
+	},
+	"T x DT x DR":{
+		"count":510,
+		"mixing":"h-t mixing (B0-independent)"
+	},
+	"F x F x F":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"F x F x DT":{
+		"count":5,
+		"mixing":"t-f mixing via B0"
+	},
+	"F x DT x DT":{
+		"count":40,
+		"mixing":"t-f mixing"
+	},
+	"F x DF x DF":{
+		"count":3,
+		"mixing":"EM self\/kinetic"
+	},
+	"F x DF x DR":{
+		"count":46,
+		"mixing":"h-f mixing (Gertsenshtein)"
+	},
+	"F x DR x DR":{
+		"count":112,
+		"mixing":"h-f mixing"
+	},
+	"DT x DT x DT":{
+		"count":178,
+		"mixing":"torsion self\/kinetic"
+	},
+	"DT x DF x DF":{
+		"count":46,
+		"mixing":"t-f mixing via B0"
+	},
+	"DT x DF x DR":{
+		"count":510,
+		"mixing":"h-t mixing via B0"
+	},
+	"DT x DR x DR":{
+		"count":1648,
+		"mixing":"h-t mixing (B0-independent)"
+	},
+	"eps R x R x R":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps R x R x F":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps R x R x DT":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps R x T x T":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps R x T x DF":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps R x T x DR":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps R x F x F":{
+		"count":12,
+		"mixing":"h-f mixing (Gertsenshtein)"
+	},
+	"eps R x F x DT":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps R x DT x DT":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps R x DF x DF":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps R x DF x DR":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps R x DR x DR":{
+		"count":0,
+		"mixing":"vanishing"
+	},
 	"eps T x T x F":{
 		"count":15,
-		"mixing":"torsion mass correction (t^2*B0)"
+		"mixing":"t-f mixing"
 	},
-	"eps DT x F x F":{
+	"eps T x T x DT":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps T x F x DF":{
+		"count":36,
+		"mixing":"t-f mixing via B0"
+	},
+	"eps T x F x DR":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps T x DT x DF":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps T x DT x DR":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps F x F x F":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps F x F x DT":{
 		"count":18,
-		"mixing":"t-f mixing via B0 (cubic)"
+		"mixing":"t-f mixing via B0"
+	},
+	"eps F x DT x DT":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps F x DF x DF":{
+		"count":15,
+		"mixing":"EM self\/kinetic"
+	},
+	"eps F x DF x DR":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps F x DR x DR":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps DT x DT x DT":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps DT x DF x DF":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps DT x DF x DR":{
+		"count":0,
+		"mixing":"vanishing"
+	},
+	"eps DT x DR x DR":{
+		"count":0,
+		"mixing":"vanishing"
 	},
 	"CS: eps Tvec A F":{
 		"count":1,
-		"mixing":"Chern-Simons (A-potential)"
+		"mixing":"EM self\/kinetic"
 	},
 	"CS: eps Tor A F":{
 		"count":6,
-		"mixing":"Chern-Simons (A-potential)"
+		"mixing":"EM self\/kinetic"
 	}
 }
