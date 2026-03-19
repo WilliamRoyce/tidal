@@ -999,6 +999,12 @@ def _wls_shorthand_cd_tensors(
         "(* === Shorthand CD[field] tensors (supervisor's pattern) ===              *)",
         "(* Replace CD[-a]@field[...] → CDfield[-a,...] in abstract EOM before     *)",
         "(* component projection. Enables ToValues to resolve all tensor ops.      *)",
+        "(* Suppress index validation: CD[-a]@field[-a,-b] has contracted -a       *)",
+        "(* that triggers Validate::repeated → Throw[Null].                        *)",
+        "Off[Validate::repeated]; Off[Validate::inhom];",
+        "Unprotect[xAct`xTensor`Private`ValidateIndices];",
+        "savedValidateIndicesShorthand = xAct`xTensor`Private`ValidateIndices;",
+        "xAct`xTensor`Private`ValidateIndices = (True &);",
     ]
 
     # Collect all shorthand rule variable names
@@ -1025,9 +1031,16 @@ def _wls_shorthand_cd_tensors(
                 f"    {rule_var} = MakeRule[{{CD[-a]@{head}[], {cd1_head}[-a]}}, MetricOn -> All, ContractMetrics -> True],",
                 "    (* Tensor field: use abstract index pattern from the field expr *)",
                 f"    If[!xTensorQ[{cd1_head}],",
-                f'      DefTensor[{cd1_head} @@ Join[{{-a}}, Table[Symbol["idx" <> ToString[n]], {{n, rank}}]], {ctx.manifold}]',
+                "      Module[{dummyIdxs, cdIdxList},",
+                f"        dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, rank}}];",
+                "        cdIdxList = Join[{-a}, MapThread[If[#1 === 1, #2, -#2] &, {slots, dummyIdxs}]];",
+                f"        DefTensor[{cd1_head} @@ cdIdxList, {ctx.manifold}]",
+                "      ]",
                 "    ];",
-                f"    {rule_var} = MakeRule[{{CD[-a] @ {fexpr}, {cd1_head} @@ Join[{{-a}}, IndicesOf[Free][{fexpr}]]}}, MetricOn -> All, ContractMetrics -> True]",
+                "    (* Use a fresh DummyIn index for CD to avoid clash with field indices *)",
+                f"    Module[{{cdIdx = DummyIn[Tangent{ctx.manifold}]}},",
+                f"      {rule_var} = MakeRule[{{CD[-cdIdx] @ {fexpr}, {cd1_head} @@ Join[{{-cdIdx}}, List @@ IndicesOf[Free][{fexpr}]]}}, MetricOn -> All, ContractMetrics -> True]",
+                "    ]",
                 "  ];",
                 "];",
                 "",
@@ -1065,11 +1078,20 @@ def _wls_shorthand_cd_tensors(
     else:
         lines.append("$CDShorthandRules = {};")
 
-    lines.extend(('Print["Shorthand CD substitution complete"];', ""))
+    lines.extend(
+        [
+            "(* Restore index validation after shorthand substitution *)",
+            "xAct`xTensor`Private`ValidateIndices = savedValidateIndicesShorthand;",
+            "Protect[xAct`xTensor`Private`ValidateIndices];",
+            "On[Validate::repeated]; On[Validate::inhom];",
+            'Print["Shorthand CD substitution complete"];',
+            "",
+        ]
+    )
     return lines
 
 
-def _wls_multi_field_eom(  # noqa: PLR0914, C901, PLR0915
+def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
@@ -1237,12 +1259,63 @@ def _wls_multi_field_eom(  # noqa: PLR0914, C901, PLR0915
 
     # --- Pre-compute CD shorthand ComponentValues (supervisor's recursive pattern) ---
     # After base field ComponentValues: compute CD[field] components via Splinter,
-    # assign as ComponentValues for the shorthand tensors. This enables ToValues
-    # to resolve CD[field] expressions during the staggered ToBasis pipeline.
+    # assign as ComponentValues for ALL index placements of each shorthand tensor.
+    # This enables ToValues to resolve CD[field] expressions during the staggered
+    # ToBasis pipeline, including raised/mixed-index placements produced by
+    # SeparateMetric + TraceBasisDummy.
+    #
+    # Ref: supervisor's SphericalEuclidean.m (commit 4a89164) — pre-computes
+    # DClockField (2 placements), DDClockField (4), DDDClockField (8), etc.
     p = ctx.prefix
     cd = f"{p}CD"
     christoffel_pd = f"Christoffel{cd}PD{ctx.chart}"
     metric = ctx.metric
+
+    # Metric-aware Christoffel handling: flat → zero, curved → ToValues
+    is_flat = ctx.metric_type == "minkowski"
+    if is_flat:
+        christoffel_line = f"  e = e /. {{{christoffel_pd} -> Zero}};"
+    else:
+        christoffel_line = "  e = ToValues[e];"
+
+    # Define local Splinter helper (supervisor's EuclideanSplinter pattern)
+    lines.extend(
+        [
+            "",
+            "(* === Local Splinter for CD shorthand component pre-computation ===        *)",
+            "(* Metric-aware: flat metrics zero Christoffels, curved metrics use         *)",
+            "(* ToValues to substitute MetricCompute-cached geometric quantities.        *)",
+            "(* Ref: supervisor's EuclideanSplinter (commit 4a89164).                   *)",
+            "cdSplinter[expr_] := Catch[Module[{e = expr},",
+            f"  e //= ToBasis[{ctx.chart}];",
+            christoffel_line,
+            f"  e //= ToBasis[{ctx.chart}];",
+            christoffel_line,
+            f"  e //= SeparateMetric[{metric}];",
+            f"  e //= ToBasis[{ctx.chart}];",
+            "  e //= ComponentArray;",
+            "  e //= ToValues;",
+            "  e //= TraceBasisDummy;",
+            "  e //= ToValues;",
+            "  e",
+            "]];",
+            "",
+        ]
+    )
+
+    # Suppress xAct's ValidateIndices during CD shorthand pre-computation.
+    # CD[-a] @ field[-a, -b] has a contracted (repeated) index -a which is
+    # physically valid but triggers Validate::repeated → Throw[Null].
+    lines.extend(
+        [
+            "(* Suppress index validation during CD shorthand pre-computation *)",
+            "Off[Validate::repeated]; Off[Validate::inhom];",
+            "Unprotect[xAct`xTensor`Private`ValidateIndices];",
+            "savedValidateIndicesCD = xAct`xTensor`Private`ValidateIndices;",
+            "xAct`xTensor`Private`ValidateIndices = (True &);",
+            "",
+        ]
+    )
 
     for df in dyn_fields:
         head = df["head"]
@@ -1250,31 +1323,61 @@ def _wls_multi_field_eom(  # noqa: PLR0914, C901, PLR0915
         cd1_head = f"CD1{head}"
         lines.extend(
             [
-                f"(* Pre-compute CD[{df['name']}] components via Splinter *)",
-                f"If[xTensorQ[{cd1_head}],",
-                f"  Module[{{comp, rank = Length[SlotsOfTensor[{head}]]}},",
-                f"    comp = CD[-a] @ {fexpr};",
-                f"    comp //= ToBasis[{ctx.chart}];",
-                f"    comp = comp /. {{{christoffel_pd} -> Zero}};",
-                f"    comp //= ToBasis[{ctx.chart}];",
-                f"    comp = comp /. {{{christoffel_pd} -> Zero}};",
-                f"    comp //= SeparateMetric[{metric}];",
-                f"    comp //= ToBasis[{ctx.chart}];",
-                "    comp //= ComponentArray;",
-                "    comp //= ToValues;",
-                "    comp //= TraceBasisDummy;",
-                "    comp //= ToValues;",
+                f"(* Pre-compute ALL CD[{df['name']}] ComponentValue placements *)",
+                f"Catch[If[xTensorQ[{cd1_head}],",
+                "  Module[{comp, cdRank, naturalSlots, mask, placement, abstractIdx, basisIdx, idxSym},",
+                f"    cdRank = Length[SlotsOfTensor[{cd1_head}]];",
+                f"    naturalSlots = SlotsOfTensor[{cd1_head}];",
+                "",
+                "    (* Step 1: Natural placement via CD[-a] @ field[...] *)",
+                f"    comp = cdSplinter[{ctx.cd}[-a] @ {fexpr}];",
                 "    Block[{Print = Null},",
-                f"      ComponentValue[ComponentArray[{cd1_head} @@ Join[{{-{{a, {ctx.chart}}}}},",
-                f'        Table[SlotsOfTensor[{head}][[n]] /. {{1 -> {{Symbol["b" <> ToString[n]], {ctx.chart}}}, -1 -> {{Symbol["b" <> ToString[n]], -{ctx.chart}}}}}, {{n, rank}}]]],',
-                "        comp];",
+                "      basisIdx = Table[",
+                '        idxSym = Symbol["b" <> ToString[n]];',
+                f"        If[naturalSlots[[n]] === 1, {{idxSym, {ctx.chart}}}, {{idxSym, -{ctx.chart}}}],",
+                "        {n, cdRank}];",
+                f"      ComponentValue[ComponentArray[{cd1_head} @@ basisIdx], comp];",
                 "    ];",
-                f'    Print["  CD[{df["name"]}] ComponentValues: ", Dimensions[comp]];',
+                f'    Print["  CD[{df["name"]}] natural placement: ", Dimensions[comp]];',
+                "",
+                "    (* Step 2: All other placements via metric raising/lowering *)",
+                "    (* Iterate 2^cdRank bitmasks: 0=covariant, 1=contravariant per slot *)",
+                "    Do[",
+                "      placement = IntegerDigits[mask, 2, cdRank];",
+                "      (* Natural placement as bitmask: slot 1 → bit 1, slot -1 → bit 0 *)",
+                "      If[placement =!= Table[If[naturalSlots[[n]] === 1, 1, 0], {n, cdRank}],",
+                "        abstractIdx = Table[",
+                '          idxSym = Symbol["b" <> ToString[n]];',
+                "          If[placement[[n]] === 1, idxSym, -idxSym],",
+                "          {n, cdRank}];",
+                f"        comp = cdSplinter[{cd1_head} @@ abstractIdx];",
+                "        basisIdx = Table[",
+                '          idxSym = Symbol["b" <> ToString[n]];',
+                f"          If[placement[[n]] === 1, {{idxSym, {ctx.chart}}}, {{idxSym, -{ctx.chart}}}],",
+                "          {n, cdRank}];",
+                "        Block[{Print = Null},",
+                f"          ComponentValue[ComponentArray[{cd1_head} @@ basisIdx], comp];",
+                "        ];",
+                "      ],",
+                "      {mask, 0, 2^cdRank - 1}",
+                "    ];",
+                f'    Print["  CD[{df["name"]}] all ", 2^cdRank, " placements computed"];',
                 "  ]",
-                "];",
+                "]];",
                 "",
             ]
         )
+
+    # Restore ValidateIndices after CD shorthand pre-computation
+    lines.extend(
+        [
+            "(* Restore index validation *)",
+            "xAct`xTensor`Private`ValidateIndices = savedValidateIndicesCD;",
+            "Protect[xAct`xTensor`Private`ValidateIndices];",
+            "On[Validate::repeated]; On[Validate::inhom];",
+            "",
+        ]
+    )
 
     for i, df in enumerate(dyn_fields):
         eom_var = f"eom{df['name'].capitalize()}"

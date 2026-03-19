@@ -1757,6 +1757,31 @@ wheels = [
 ]
 
 [[package]]
+name = "rich"
+version = "14.3.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markdown-it-py" },
+    { name = "pygments" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b3/c6/f3b320c27991c46f43ee9d856302c70dc2d0fb2dba4842ff739d5f46b393/rich-14.3.3.tar.gz", hash = "sha256:b8daa0b9e4eef54dd8cf7c86c03713f53241884e814f4e2f5fb342fe520f639b", size = 230582, upload-time = "2026-02-19T17:23:12.474Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/14/25/b208c5683343959b670dc001595f2f3737e051da617f66c31f7c4fa93abc/rich-14.3.3-py3-none-any.whl", hash = "sha256:793431c1f8619afa7d3b52b2cdec859562b950ea0d4b6b505397612db8d5362d", size = 310458, upload-time = "2026-02-19T17:23:13.732Z" },
+]
+
+[[package]]
+name = "rich-argparse"
+version = "1.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "rich" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4c/f7/1c65e0245d4c7009a87ac92908294a66e7e7635eccf76a68550f40c6df80/rich_argparse-1.7.2.tar.gz", hash = "sha256:64fd2e948fc96e8a1a06e0e72c111c2ce7f3af74126d75c0f5f63926e7289cd1", size = 38500, upload-time = "2025-11-01T10:35:44.232Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/04/80/97b6f357ac458d9ad9872cc3183ca09ef7439ac89e030ea43053ba1294b6/rich_argparse-1.7.2-py3-none-any.whl", hash = "sha256:0559b1f47a19bbeb82bf15f95a057f99bcbbc98385532f57937f9fc57acc501a", size = 25476, upload-time = "2025-11-01T10:35:42.681Z" },
+]
+
+[[package]]
 name = "roman-numerals-py"
 version = "3.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -2086,7 +2111,7 @@ wheels = [
 
 [[package]]
 name = "tidal"
-version = "0.10.0"
+version = "0.11.0"
 source = { editable = "." }
 dependencies = [
     { name = "matplotlib" },
@@ -2097,6 +2122,9 @@ dependencies = [
 ]
 
 [package.optional-dependencies]
+color = [
+    { name = "rich-argparse" },
+]
 completion = [
     { name = "shtab" },
 ]
@@ -2123,6 +2151,7 @@ dev = [
 requires-dist = [
     { name = "matplotlib", specifier = ">=3.1,<4.0" },
     { name = "numpy", specifier = ">=1.22,<3.0" },
+    { name = "rich-argparse", marker = "extra == 'color'", specifier = ">=1.4" },
     { name = "salib", marker = "extra == 'sensitivity'", specifier = ">=1.4" },
     { name = "scikit-sundae", specifier = ">=1.1.2,<2.0" },
     { name = "scipy", specifier = ">=1.10,<2.0" },
@@ -2130,7 +2159,7 @@ requires-dist = [
     { name = "tqdm", specifier = ">=4.60" },
     { name = "wolframclient", marker = "extra == 'wolfram'", specifier = ">=1.4.0,<2.0" },
 ]
-provides-extras = ["wolfram", "sensitivity", "completion"]
+provides-extras = ["wolfram", "sensitivity", "completion", "color"]
 
 [package.metadata.requires-dev]
 dev = [

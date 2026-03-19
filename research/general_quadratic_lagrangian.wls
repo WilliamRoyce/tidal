@@ -270,5 +270,135 @@ Export[
   countsOnly
 ];
 
+(* ============================================================ *)
+Print["\n\n========================================"];
+Print["  PART 4: MakeContractionAnsatz — THE LAGRANGIAN ANSATZ"];
+Print["  (This is what the supervisor asked for)"];
+Print["========================================"];
+(* ============================================================ *)
+
+(* === Core parity-even Lagrangian: products of 2 field strengths === *)
+Print["\n--- Core parity-even: R^2 + T^2 + F^2 + RxF ---"];
+Block[{rr, tt, ff, rf, coreTerms, lagrangian},
+  rr = AllContractions[RCurv[-a,-b,-c,-d] * RCurv[-e,-f,-g,-h]];
+  tt = AllContractions[Tor[-a,-b,-c] * Tor[-d,-e,-f]];
+  ff = AllContractions[FF[-a,-b] * FF[-c,-d]];
+  rf = AllContractions[RCurv[-a,-b,-c,-d] * FF[-e,-f]];
+  coreTerms = Join[rr, tt, ff, rf];
+  Print["  Total parity-even core terms: ", Length[coreTerms]];
+
+  (* MakeAnsatz assigns constant coefficients *)
+  lagrangian = MakeAnsatz[coreTerms, ConstantPrefix -> "c"];
+  Print["\n  L_even = ", lagrangian // InputForm];
+  Print["\n  Written out term by term:"];
+  Do[
+    Print["    c", k, " * ", coreTerms[[k]] // InputForm],
+    {k, Length[coreTerms]}
+  ];
+];
+
+(* === Core parity-odd Lagrangian === *)
+Print["\n--- Core parity-odd: eps*(R^2 + T^2 + F^2 + RxF) ---"];
+Block[{err, ett, eff, erf, oddTerms, lagrangianOdd},
+  err = AllContractions[eps[-a,-b,-c,-d] * RCurv[-e,-f,-g,-h] * RCurv[-i,-j,-k,-l]];
+  ett = AllContractions[eps[-a,-b,-c,-d] * Tor[-e,-f,-g] * Tor[-h,-i,-j]];
+  eff = AllContractions[eps[-a,-b,-c,-d] * FF[-e,-f] * FF[-g,-h]];
+  erf = AllContractions[eps[-a,-b,-c,-d] * RCurv[-e,-f,-g,-h] * FF[-i,-j]];
+  oddTerms = Join[err, ett, eff, erf];
+  Print["  Total parity-odd core terms: ", Length[oddTerms]];
+
+  lagrangianOdd = MakeAnsatz[oddTerms, ConstantPrefix -> "d"];
+  Print["\n  L_odd = ", lagrangianOdd // InputForm];
+];
+
+Print["\n  TOTAL CORE LAGRANGIAN: ",
+  "11 parity-even + 21 parity-odd = 32 independent terms"];
+Print["  (plus 2 linear terms: Ricci scalar + cosmological constant)"];
+
+(* ============================================================ *)
+Print["\n\n========================================"];
+Print["  PART 5: PERTURBATION ORDER FILTER"];
+Print["  (Which sectors contribute at O(eps^2))"];
+Print["========================================"];
+(* ============================================================ *)
+
+(* Around T_bar=0, R_bar=0, F_bar=B0:
+   Each R factor -> O(eps), each T factor -> O(eps)
+   Each F factor -> O(1) if background, O(eps) if perturbation
+   At most 1 F can be background.
+   For O(eps^2): n_R + n_T + max(0, n_F - 1) = 2 *)
+
+CountFieldType[name_String, field_String] :=
+  StringCount[name, RegularExpression["\\b" <> field <> "\\b"]];
+
+EpsilonOrder[name_String] := Module[
+  {nR, nT, nF, nDR, nDT, nDF, totalR, totalT, totalF},
+  (* Count each type. DR contains one R, DT contains one T, DF contains one F *)
+  nR = CountFieldType[name, "R"] - CountFieldType[name, "DR"];
+  nDR = CountFieldType[name, "DR"];
+  nT = CountFieldType[name, "T"] - CountFieldType[name, "DT"];
+  nDT = CountFieldType[name, "DT"];
+  nF = CountFieldType[name, "F"] - CountFieldType[name, "DF"];
+  nDF = CountFieldType[name, "DF"];
+
+  (* R and DR both contribute curvature (eps), T and DT both torsion (eps) *)
+  totalR = nR + nDR;
+  totalT = nT + nDT;
+  totalF = nF + nDF;
+
+  (* Best case: 1 F factor replaced by background B0 *)
+  totalR + totalT + Max[0, totalF - 1]
+];
+
+Print["\n  Sector | Count | eps-order | Relevant at O(eps^2)?"];
+Print["  ", StringJoin[Table["-", 70]]];
+
+nRelevant = 0; nRelevantTerms = 0;
+nIrrelevant = 0; nIrrelevantTerms = 0;
+
+Do[
+  Block[{name = r[[1]], count = r[[2]], epsOrd, relevant},
+    If[count == 0, Continue[]];
+    epsOrd = EpsilonOrder[name];
+    relevant = (epsOrd <= 2);
+    If[relevant,
+      nRelevant++; nRelevantTerms += count,
+      nIrrelevant++; nIrrelevantTerms += count
+    ];
+    Print["  ", name, " | ", count, " | O(eps^", epsOrd, ") | ",
+      If[relevant, "YES", "no (higher order)"]];
+  ],
+  {r, Select[allResults, #[[2]] > 0 &]}
+];
+
+Print["\n  O(eps^2)-relevant: ", nRelevant, " sectors, ",
+  nRelevantTerms, " contractions"];
+Print["  Higher order (eps^3+): ", nIrrelevant, " sectors, ",
+  nIrrelevantTerms, " contractions"];
+Print["  Reduction: ", nIrrelevantTerms, " of ", nRelevantTerms + nIrrelevantTerms,
+  " contractions eliminated by perturbation order"];
+
+(* Export filtered results *)
+filteredData = Association @@ Select[
+  (#[[1]] -> <|
+    "count" -> #[[2]],
+    "mixing" -> #[[3]],
+    "eps_order" -> EpsilonOrder[#[[1]]],
+    "relevant_at_O2" -> (EpsilonOrder[#[[1]]] <= 2)
+  |>) & /@ classified,
+  Last[#]["count"] > 0 &
+];
+
+Export[
+  FileNameJoin[{DirectoryName[$InputFileName], "enumeration_classified.json"}],
+  filteredData
+];
+
+countsOnly = Association @@ ((#[[1]] -> #[[2]]) & /@ allResults);
+Export[
+  FileNameJoin[{DirectoryName[$InputFileName], "enumeration_results.json"}],
+  countsOnly
+];
+
 Print["\nExported to enumeration_results.json and enumeration_classified.json"];
 Print["=== DONE ==="];

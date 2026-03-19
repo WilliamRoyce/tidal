@@ -2942,7 +2942,8 @@ path = "output.json"
         assert ret == 0
 
         out = capsys.readouterr().out
-        assert out.count("ComponentValue") == 3
+        # 3 actual ComponentValue assignments + 1 comment mentioning ComponentValues
+        assert out.count("ComponentValue") == 4
         assert "B0val" in out
         assert "{0," in out
         assert "{1," in out
@@ -2984,7 +2985,8 @@ path = "output.json"
         assert ret == 0
 
         out = capsys.readouterr().out
-        assert out.count("ComponentValue") == 4
+        # 4 actual ComponentValue assignments + 1 comment mentioning ComponentValues
+        assert out.count("ComponentValue") == 5
 
     def test_background_field_in_lagrangian_substitution(
         self,
@@ -3175,7 +3177,8 @@ path = "output.json"
 
         out = capsys.readouterr().out
         assert "Background fields" not in out
-        assert "ComponentValue" not in out
+        # Check no actual ComponentValue assignments (ignore comments mentioning the word)
+        assert "ComponentValue[" not in out
         assert "EulerLagrangeEquation" in out
 
     def test_background_numeric_components(
