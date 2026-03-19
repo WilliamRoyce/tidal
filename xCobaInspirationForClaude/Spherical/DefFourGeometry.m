@@ -1,0 +1,36 @@
+(*===================*)
+(*  DefFourGeometry  *)
+(*===================*)
+
+DefManifold[M4,4,IndexRange[{a,z}]];
+StandardIndices=ToString/@Alphabet[];
+StandardIndicesSymb=(ToString@#)&/@Evaluate@((#[[2]])&/@{	
+	{a,"\[Alpha]"},
+	{b,"\[Beta]"},
+	{c,"\[Chi]"},
+	{d,"\[Delta]"},
+	{e,"\[Epsilon]"},
+	{f,"\[Phi]"},
+	{g,"\[Gamma]"},
+	{h,"\[Eta]"},
+	{i,"\[Iota]"},
+	{j,"\[Theta]"},
+	{k,"\[Kappa]"},
+	{l,"\[Lambda]"},
+	{m,"\[Mu]"},
+	{n,"\[Nu]"},
+	{o,"\[Omicron]"},
+	{p,"\[Pi]"},
+	{q,"\[Omega]"},
+	{r,"\[Rho]"},
+	{s,"\[Sigma]"},
+	{t,"\[Tau]"},
+	{u,"\[Upsilon]"},
+	{v,"\[Psi]"},
+	{w,"\[Omega]"},
+	{x,"\[Xi]"},
+	{y,"\[CurlyPhi]"},
+	{z,"\[Zeta]"}});
+(PrintAs@Evaluate@#1^=Evaluate@#2)&~MapThread~{ToExpression/@StandardIndices,
+	StandardIndicesSymb};
+DefMetric[-1,G[-a,-b],CD,{";","\*OverscriptBox[\(\[ScriptCapitalD]\),\(_\)]"},PrintAs->"\*OverscriptBox[\(\[ScriptG]\),\(_\)]"];
