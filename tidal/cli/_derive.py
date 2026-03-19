@@ -975,7 +975,82 @@ def _wls_component_metadata(
     ]
 
 
-def _wls_multi_field_eom(  # noqa: PLR0914, C901
+def _wls_shorthand_cd_tensors(
+    ctx: _WlsContext,
+    dyn_fields: list[dict[str, Any]],
+) -> list[str]:
+    """Generate shorthand tensor definitions + MakeRule substitutions for CD[field].
+
+    For each dynamical field ``f``, defines a shorthand tensor ``CD1f`` that
+    represents ``CD[-a]@f[indices]``, creates a ``MakeRule`` substitution rule,
+    and applies the substitution to all EOM variables.
+
+    This follows the supervisor's ``ApplyShorthand`` pattern (commit 4a89164):
+    eliminate ALL raw ``CD[-a]@field[...]`` operators from the abstract EOM
+    BEFORE component projection, so ExpandScalarWrappers and StaggeredToBasis
+    can resolve everything cleanly via ComponentValues.
+
+    The DefTensor and MakeRule are created entirely in Wolfram using xAct's
+    introspection (``SlotsOfTensor``, ``SymmetryGroupOfTensor``). No Python
+    string parsing of index expressions.
+    """
+    lines: list[str] = [
+        "",
+        "(* === Shorthand CD[field] tensors (supervisor's pattern) ===              *)",
+        "(* Replace CD[-a]@field[...] → CDfield[-a,...] in abstract EOM before     *)",
+        "(* component projection. Enables ToValues to resolve all tensor ops.      *)",
+    ]
+
+    # Collect all shorthand rule variable names
+    rule_vars: list[str] = []
+
+    for df in dyn_fields:
+        head = df["head"]
+        fexpr = df["fexpr"]  # e.g. "tidalH[-a,-b]" or "tidalT[a,-b,-c]"
+        cd1_head = f"CD1{head}"
+        rule_var = f"toCD1{head}"
+        rule_vars.append(rule_var)
+
+        # Extract the index pattern from fexpr for the MakeRule LHS/RHS
+        # The fexpr is like "tidalH[-a, -b]" — we need the indices part
+        # Use Wolfram introspection rather than Python parsing
+        lines.extend(
+            [
+                f"(* Shorthand for CD[{df['name']}] *)",
+                f"Module[{{slots = SlotsOfTensor[{head}], rank, cdIdxStr, lhs, rhs}},",
+                "  rank = Length[slots];",
+                "  If[rank == 0,",
+                "    (* Scalar field: CD[-a]@f[] → CD1f[-a] *)",
+                f"    If[!xTensorQ[{cd1_head}], DefTensor[{cd1_head}[-a], {ctx.manifold}]];",
+                f"    {rule_var} = MakeRule[{{CD[-a]@{head}[], {cd1_head}[-a]}}, MetricOn -> All, ContractMetrics -> True],",
+                "    (* Tensor field: use abstract index pattern from the field expr *)",
+                f"    If[!xTensorQ[{cd1_head}],",
+                f'      DefTensor[{cd1_head} @@ Join[{{-a}}, Table[Symbol["idx" <> ToString[n]], {{n, rank}}]], {ctx.manifold}]',
+                "    ];",
+                f"    {rule_var} = MakeRule[{{CD[-a] @ {fexpr}, {cd1_head} @@ Join[{{-a}}, IndicesOf[Free][{fexpr}]]}}, MetricOn -> All, ContractMetrics -> True]",
+                "  ];",
+                "];",
+                "",
+            ]
+        )
+
+    # Apply ALL shorthand rules to ALL EOM variables
+    for df in dyn_fields:
+        eom_var = f"eom{df['name'].capitalize()}"
+        lines.extend(f"{eom_var} = {eom_var} /. {rv};" for rv in rule_vars)
+        lines.extend(
+            [
+                f"{eom_var} //= ToCanonical;",
+                f"{eom_var} //= ContractMetric;",
+                f"{eom_var} = Expand[{eom_var}];",
+            ]
+        )
+
+    lines.extend(('Print["Shorthand CD substitution complete"];', ""))
+    return lines
+
+
+def _wls_multi_field_eom(  # noqa: PLR0914, C901, PLR0915
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
@@ -1037,6 +1112,9 @@ def _wls_multi_field_eom(  # noqa: PLR0914, C901
             "",
         ]
     )
+
+    # Shorthand tensor substitution (supervisor's pattern, commit 4a89164).
+    lines.extend(_wls_shorthand_cd_tensors(ctx, dyn_fields))
 
     # Build set of TT-gauged field names for SkipTuples optimization
     tt_fields = {entry["field"] for entry in ctx.gauge if entry["type"] == "tt"}
@@ -1137,6 +1215,47 @@ def _wls_multi_field_eom(  # noqa: PLR0914, C901
             "",
         ]
     )
+
+    # --- Pre-compute CD shorthand ComponentValues (supervisor's recursive pattern) ---
+    # After base field ComponentValues: compute CD[field] components via Splinter,
+    # assign as ComponentValues for the shorthand tensors. This enables ToValues
+    # to resolve CD[field] expressions during the staggered ToBasis pipeline.
+    p = ctx.prefix
+    cd = f"{p}CD"
+    christoffel_pd = f"Christoffel{cd}PD{ctx.chart}"
+    metric = ctx.metric
+
+    for df in dyn_fields:
+        head = df["head"]
+        fexpr = df["fexpr"]
+        cd1_head = f"CD1{head}"
+        lines.extend(
+            [
+                f"(* Pre-compute CD[{df['name']}] components via Splinter *)",
+                f"If[xTensorQ[{cd1_head}],",
+                f"  Module[{{comp, rank = Length[SlotsOfTensor[{head}]]}},",
+                f"    comp = CD[-a] @ {fexpr};",
+                f"    comp //= ToBasis[{ctx.chart}];",
+                f"    comp = comp /. {{{christoffel_pd} -> Zero}};",
+                f"    comp //= ToBasis[{ctx.chart}];",
+                f"    comp = comp /. {{{christoffel_pd} -> Zero}};",
+                f"    comp //= SeparateMetric[{metric}];",
+                f"    comp //= ToBasis[{ctx.chart}];",
+                "    comp //= ComponentArray;",
+                "    comp //= ToValues;",
+                "    comp //= TraceBasisDummy;",
+                "    comp //= ToValues;",
+                "    Block[{Print = Null},",
+                f"      ComponentValue[ComponentArray[{cd1_head} @@ Join[{{-{{a, {ctx.chart}}}}},",
+                f'        Table[SlotsOfTensor[{head}][[n]] /. {{1 -> {{Symbol["b" <> ToString[n]], {ctx.chart}}}, -1 -> {{Symbol["b" <> ToString[n]], -{ctx.chart}}}}}, {{n, rank}}]]],',
+                "        comp];",
+                "    ];",
+                f'    Print["  CD[{df["name"]}] ComponentValues: ", Dimensions[comp]];',
+                "  ]",
+                "];",
+                "",
+            ]
+        )
 
     for i, df in enumerate(dyn_fields):
         eom_var = f"eom{df['name'].capitalize()}"
