@@ -434,6 +434,14 @@ def _wls_spacetime(config: dict[str, Any], ctx: _WlsContext) -> list[str]:
         f"MetricInBasis[{ctx.metric}, -{ctx.chart}, {ctx.prefix}MetricMatrix];",
         f"SetMetricDownValues[{ctx.metric}, {ctx.chart}, {ctx.prefix}MetricMatrix];",
         "",
+        "(* Pre-compute ALL geometric quantities (Christoffels, Riemann, Ricci) as   *)",
+        "(* xCoba ComponentValues.  ToValues[] then auto-substitutes these during    *)",
+        "(* the staggered ToBasis pipeline, eliminating the need for manual          *)",
+        "(* EvaluateChristoffelComponents/EvaluateCurvatureComponents post-steps.    *)",
+        "(* Ref: supervisor's xCoba example (commit 4a89164) — MetricCompute[G,chart,All] *)",
+        f"Block[{{Print = Null}}, MetricCompute[{ctx.metric}, {ctx.chart}, All]];",
+        f'Print["MetricCompute: pre-computed all geometric quantities for {ctx.chart}"];',
+        "",
     ]
 
     # Define torsion-full covariant derivative for PGT theories.
