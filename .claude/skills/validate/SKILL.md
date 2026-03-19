@@ -59,3 +59,4 @@ If validation revealed notable problems (whether fixed or not), create GitHub is
 - Issues you fixed during validation → create and close immediately with the fix details
 - Issues that couldn't be auto-fixed (architectural, design, persistent failures) → create and leave open
 Check for duplicates first: `gh issue list -S "keyword"`.
+**NEVER include any "Generated with Claude Code" footer or attribution in issue bodies.**

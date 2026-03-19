@@ -59,11 +59,11 @@ Include references when relevant (paper citations, issue numbers, algorithm name
 Stage SPECIFIC files by name (never `git add -A` or `git add .`).
 Separate unrelated changes into distinct commits.
 
-### Step 5 — Version bump (if task is complete)
-After committing, evaluate whether to bump the version:
-- **Bump patch** (0.0.x): if committing a `fix:`, `refactor:`, `perf:`, `docs:` change that completes a task
-- **Bump minor** (0.x.0): if committing a `feat:` that completes a new feature
-- **Skip bump if**: this is a WIP commit, part of a multi-commit feature still in progress, or tests are not fully passing
+### Step 5 — Version bump
+After committing, bump the version. Default to bumping — only skip if you have more code changes to make in this same sitting:
+- **Bump patch** (0.0.x): for `fix:`, `refactor:`, `perf:`, `docs:`, `test:`, `revert:`, `style:`, `chore:` commits
+- **Bump minor** (0.x.0): for `feat:` commits that add new functionality
+- **Skip ONLY if**: you are about to make another commit immediately (same sitting, same task)
 
 If bumping:
 ```bash
@@ -119,6 +119,7 @@ gh issue create --title "Short title" --body "..." --label "enhancement"
 ```
 
 **Skip if**: truly trivial (typo/formatting) or a duplicate already exists.
+**NEVER include any "Generated with Claude Code" footer or attribution in issue bodies.**
 
 ### CRITICAL RULES
 - **NO Co-Authored-By trailer** — never add it

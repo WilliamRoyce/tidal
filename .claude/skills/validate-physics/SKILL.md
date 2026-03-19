@@ -46,3 +46,4 @@ If physics tests revealed regressions or notable behavior:
 - Unclear root cause or needs investigation → create issue with labels `validation` + `needs-investigation`, leave open
 - Include: affected example, observed vs expected behavior, relevant file paths
 Check for duplicates first: `gh issue list -S "keyword"`.
+**NEVER include any "Generated with Claude Code" footer or attribution in issue bodies.**
