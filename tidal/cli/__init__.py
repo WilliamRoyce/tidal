@@ -53,6 +53,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=False,
         help="Print citation information for TIDAL and its dependencies",
     )
+    parser.add_argument(
+        "--time",
+        action="store_true",
+        default=False,
+        help="Show wall-clock elapsed time after command completes",
+    )
     sub = parser.add_subparsers(dest="command", help="Available commands")
 
     # --- derive ---
@@ -1352,7 +1358,7 @@ def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911, C901
     raise ValueError(msg)
 
 
-def main(argv: list[str] | None = None) -> int:  # noqa: PLR0911
+def main(argv: list[str] | None = None) -> int:
     """CLI entry point.
 
     Parameters
@@ -1406,11 +1412,14 @@ def main(argv: list[str] | None = None) -> int:  # noqa: PLR0911
         quiet=getattr(args, "quiet", False),
     )
 
+    import time
+
+    t0 = time.perf_counter()
     try:
-        return _dispatch(args)
+        rc = _dispatch(args)
     except KeyboardInterrupt:
         print("\nInterrupted.", file=sys.stderr)
-        return 130
+        rc = 130
     except FileNotFoundError as exc:
         from tidal.cli._console import error_with_hint
 
@@ -1421,12 +1430,26 @@ def main(argv: list[str] | None = None) -> int:  # noqa: PLR0911
                 "Run 'tidal derive <theory.toml>' to generate from a Lagrangian.",
             ],
         )
-        return 1
+        rc = 1
     except (ValueError, TypeError) as exc:
         _console_error(str(exc))
-        return 1
+        rc = 1
     except RuntimeError:
         import traceback
 
         traceback.print_exc()
-        return 1
+        rc = 1
+
+    if args.time:
+        elapsed = time.perf_counter() - t0
+        if elapsed >= 60:  # noqa: PLR2004
+            mins = int(elapsed // 60)
+            secs = elapsed % 60
+            print(
+                f"[TIME] {args.command} completed in {mins}m {secs:.1f}s",
+                file=sys.stderr,
+            )
+        else:
+            print(f"[TIME] {args.command} completed in {elapsed:.2f}s", file=sys.stderr)
+
+    return rc
