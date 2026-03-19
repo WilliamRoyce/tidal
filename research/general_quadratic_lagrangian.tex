@@ -211,6 +211,49 @@ If the index count is odd, no scalar invariant exists from that
 tensor product. A covariant derivative adds one index, which can
 turn an odd count into an even one.
 
+\paragraph{Automated completeness.}
+An automated combinatorial loop generates \emph{all} unordered pairs
+(quadratic) and triples (cubic) from the building blocks
+$\{\Rt, T, F, \del\Rt, \del T, \del F\}$, checks index parity,
+and calls \texttt{AllContractions} on each. This guarantees no
+sector is missed: 21 quadratic pairs and 56 cubic triples are
+tested, yielding \textbf{57 non-zero sectors} with 5{,}612 total
+independent contractions.
+
+\subsection{The Core Lagrangian Ansatz}
+\label{sec:ansatz}
+
+Calling \texttt{MakeContractionAnsatz} on the core quadratic sectors
+directly produces the most general Lagrangian. The \textbf{parity-even}
+sector ($\Rt^2 + T^2 + F^2 + \Rt \times F$) yields \textbf{11 terms}:
+\begin{align}
+  \mathcal{L}_{\text{even}} &=
+    c_1\, \Rt_{abcd}\Rt^{abcd}
+  + c_2\, \Rt_{acbd}\Rt^{abcd}
+  + c_3\, \Rt^{ab}{}_{ac}\Rt_{b}{}^{d}{}_{cd}
+  + c_4\, \Rt_{abcd}\Rt^{cdab}
+  \notag\\&\quad
+  + c_5\, \Rt^{ab}{}_{ac}\Rt_{c}{}^{d}{}_{bd}
+  + c_6\, \Rt^{ab}{}_{ab}\Rt^{cd}{}_{cd}
+  \notag\\&\quad
+  + c_7\, T_{abc}T^{abc}
+  + c_8\, T_{abc}T^{bac}
+  + c_9\, T^a{}_{ab}T^{c}{}_{bc}
+  \notag\\&\quad
+  + c_{10}\, F_{ab}F^{ab}
+  + c_{11}\, F^{ab}\Rt_{acbc}\,.
+  \label{eq:L_even}
+\end{align}
+The \textbf{parity-odd} sector ($\eps \cdot \Rt^2 + \eps \cdot T^2
++ \eps \cdot F^2 + \eps \cdot \Rt \times F$) yields \textbf{21 terms},
+for a \textbf{total of 32 core parameters} (plus 2 linear:
+$\Mpl^2 \Ric$ and $\Lambda$).
+
+These are generated automatically by \texttt{MakeContractionAnsatz}
+with guaranteed completeness --- no term can be missed because
+\texttt{AllContractions} enumerates all valid index permutations
+via \texttt{xPerm}.
+
 
 %% ================================================================
 \section{The General Parity-Even Quadratic Lagrangian}
@@ -434,7 +477,7 @@ the EM sector unless carefully tuned), but we include them for completeness.
 
 
 %% ================================================================
-\section{Parity-Odd Extensions}
+\section{Parity-Odd Sector}
 \label{sec:parity_odd}
 %% ================================================================
 
@@ -470,12 +513,22 @@ $\eps_{\mu\nu\rho\sigma}$:
 
 \subsection{Derivative Parity-Odd Terms}
 
-The epsilon tensor adds 4 indices, which can make previously odd
-combinations even:
+The epsilon tensor adds 4 indices, enabling sectors that vanish
+in the parity-even case. The automated enumeration finds:
 \begin{itemize}
-  \item $\eps \cdot \del T \cdot F$ (10 indices): parity-odd torsion--EM coupling
-  \item $\eps \cdot \del F \cdot T$ (10 indices): IBP partner
+  \item $\eps \cdot \del T \times F$: \textbf{6} terms (parity-odd torsion--EM)
+  \item $\eps \cdot T \times \del F$: \textbf{6} terms (IBP partner)
+  \item $\eps \cdot \Rt \times \del T$: \textbf{36} terms
+  \item $\eps \cdot T \times \del\Rt$: \textbf{36} terms (IBP partner)
+  \item $\eps \cdot (\del T)^2$: \textbf{38} terms
+  \item $\eps \cdot (\del F)^2$: \textbf{4} terms
+  \item $\eps \cdot \del F \times \del\Rt$: \textbf{36} terms
 \end{itemize}
+\textbf{Note:} All parity-odd cubic sectors with $\geq 14$ total
+indices vanish identically in 4D (verified by automated enumeration
+with expanded index pool). This is a dimensional identity: the
+$\eps$ tensor's 4-index antisymmetrization combined with the
+inherent symmetries of $\Rt$ and $T$ forces over-antisymmetrization.
 
 \textbf{(Exact counts from enumeration.)}
 
@@ -697,6 +750,61 @@ $\Rt \times \del T \times F$ & 46 & $h \leftrightarrow t$ via $B_0$ & $F \to \ba
 \end{tabular}
 \end{table}
 
+\subsection{Perturbation-Order Filtering}
+\label{sec:eps_filter}
+
+The full automated enumeration finds 5{,}612 independent contractions
+across 57 non-zero sectors. However, most are \emph{irrelevant} for
+linearized physics around $\bar{B}_0 \neq 0$, $\bar{T} = 0$,
+$\bar{R} = 0$.
+
+Each $\Rt$ or $\del\Rt$ factor contributes $O(\epsilon)$ (metric
+perturbation), each $T$ or $\del T$ factor contributes $O(\epsilon)$
+(torsion perturbation), and each $F$ or $\del F$ factor contributes
+$O(1)$ if background or $O(\epsilon)$ if perturbation. At most one
+$F$ can be background. The perturbation order is:
+\begin{equation}
+  n_\epsilon = n_{\Rt} + n_T + \max(0,\, n_F - 1)\,.
+  \label{eq:eps_order}
+\end{equation}
+
+For $O(\epsilon^2)$ (quadratic action): $n_\epsilon \leq 2$.
+This eliminates most cubic sectors:
+\begin{itemize}
+  \item $(\del T)^3$ (178 terms): $n_\epsilon = 3$ --- irrelevant
+  \item $\Rt \times T \times T$ (26): $n_\epsilon = 3$ --- irrelevant
+  \item $\Rt^3$ (31): $n_\epsilon = 3$ --- irrelevant
+  \item $\Rt \times (\del T)^2$ (269): $n_\epsilon = 3$ --- irrelevant
+  \item $\del T \times (\del\Rt)^2$ (1{,}648): $n_\epsilon = 3$ --- irrelevant
+\end{itemize}
+Only sectors with $\leq 2$ non-EM factors survive. The
+$O(\epsilon^2)$-relevant subset contains $\sim$200 of the
+5{,}612 total contractions.
+
+\subsection{Metric Coupling and the Gertsenshtein Mechanism}
+\label{sec:metric_coupling}
+
+Every term in the Lagrangian implicitly couples to the graviton
+$h_{\mu\nu}$ through the metric used to raise/lower indices:
+\begin{equation}
+  g^{\mu\nu} = \eta^{\mu\nu} - \epsilon\, h^{\mu\nu} + O(\epsilon^2)\,.
+  \label{eq:metric_expand}
+\end{equation}
+
+The ``quadratic'' Maxwell term $-\frac{1}{4} g^{\mu\alpha}g^{\nu\beta}
+F_{\mu\nu}F_{\alpha\beta}$, when expanded, generates an effective
+\emph{cubic} coupling $h \cdot F \cdot F$. Around $\bar{B}_0 \neq 0$,
+this produces graviton--photon mixing $\propto B_0$: the
+\textbf{Gertsenshtein mechanism}. Similarly, $T^2$ generates
+$h \cdot T \cdot T$ coupling, and every other Lagrangian term
+acquires $h$-dependent corrections.
+
+This is \textbf{not a separate Lagrangian term} --- it is automatic
+in the derivation step (\texttt{xPert} expansion). The enumeration
+in this document lists the independent \emph{Lagrangian} terms;
+the graviton coupling emerges when those terms are linearized
+around the metric background.
+
 
 %% ================================================================
 \section{Chern--Simons Torsion--EM Coupling}
@@ -874,57 +982,65 @@ The complete enumeration (via \texttt{AllContractions}) yields:
 
 \begin{table}[htbp]
 \centering
-\caption{Complete enumeration of independent scalar invariants.
-  ``IBP'' indicates integration-by-parts partner sectors that
-  reduce the independent count.}
+\caption{Complete automated enumeration of independent scalar
+  invariants (57 non-zero sectors, 5{,}612 total contractions).
+  $n_\epsilon$ is the perturbation order~\eqref{eq:eps_order};
+  only $n_\epsilon \leq 2$ sectors contribute at $O(\epsilon^2)$.}
 \label{tab:full_enumeration}
-\small
-\begin{tabular}{@{}llcl@{}}
+\footnotesize
+\begin{tabular}{@{}llccl@{}}
 \toprule
-\textbf{Category} & \textbf{Sector} & \textbf{Count} & \textbf{Notes} \\
+\textbf{Category} & \textbf{Sector} & \textbf{Count} & $n_\epsilon$ & \textbf{Notes} \\
 \midrule
-\multicolumn{4}{@{}l}{\textit{Quadratic, non-derivative (standard PGT)}} \\
-& $\Rt^2$ & 6 & $\alpha_1 \ldots \alpha_6$ \\
-& $T^2$ & 3 & $\beta_1, \beta_2, \beta_3$ \\
-& $F^2$ & 1 & Maxwell \\
-& $\Rt \times F$ & 1 & $\Rt_{[\mu\nu]} F^{\mu\nu}$ \\
+\multicolumn{5}{@{}l}{\textit{Quadratic, non-derivative (standard PGT) --- 11 parity-even}} \\
+& $\Rt^2$ & 6 & 2 & $\alpha_1 \ldots \alpha_6$ \\
+& $T^2$ & 3 & 2 & $\beta_1, \beta_2, \beta_3$ \\
+& $F^2$ & 1 & 1 & Maxwell \\
+& $\Rt \times F$ & 1 & 1 & $\Rt_{[\mu\nu]} F^{\mu\nu}$ \\
 \midrule
-\multicolumn{4}{@{}l}{\textit{Quadratic, one derivative (beyond PGT)}} \\
-& $\del T \times F$ & 3 & New torsion--EM coupling \\
-& $T \times \del F$ & 3 & IBP partner \\
-& $\Rt \times \del T$ & 10 & Contains Barker's $\chi$ \\
-& $\del\Rt \times T$ & 10 & IBP partner \\
-& $(\del T)^2$ & 16 & Contains Barker's $\xi$ \\
-& $(\del F)^2$ & 3 & Higher-derivative EM \\
+\multicolumn{5}{@{}l}{\textit{Quadratic, one derivative (beyond PGT)}} \\
+& $\del T \times F$ / $T \times \del F$ & 3 / 3 & 1 & Torsion--EM (IBP pair) \\
+& $\Rt \times \del T$ / $\del\Rt \times T$ & 10 / 10 & 2 & Contains Barker's $\chi$ \\
+& $(\del T)^2$ & 16 & 2 & Contains Barker's $\xi$ \\
+& $(\del F)^2$ & 3 & 2 & Higher-derivative EM \\
+& $\del F \times \del\Rt$ & 10 & 2 & Curvature--EM derivative \\
+& $(\del\Rt)^2$ & 32 & 2 & Curvature derivative$^2$ \\
 \midrule
-\multicolumn{4}{@{}l}{\textit{Cubic, non-derivative (background $\bar{B}_0$ linearization)}} \\
-& $\Rt \times F \times F$ & 4 & Gertsenshtein-type \\
-& $T \times T \times F$ & 3 & Torsion--EM mixing \\
-& $\Rt \times T \times T$ & 26 & Curvature--torsion \\
-& $\Rt \times \Rt \times F$ & 8 & Curvature$^2$--EM \\
+\multicolumn{5}{@{}l}{\textit{Parity-odd quadratic --- 21 non-derivative + 160 derivative}} \\
+& $\eps \cdot \Rt^2$ & 13 & 2 & Pontryagin-type \\
+& $\eps \cdot T^2$ & 4 & 2 & Nieh--Yan-type \\
+& $\eps \cdot F^2$ & 1 & 1 & $F \cdot \tilde{F}$ \\
+& $\eps \cdot \Rt \times F$ & 3 & 1 & Parity-odd curv--EM \\
+& $\eps \cdot \Rt \times \del T$ / $\eps \cdot T \times \del\Rt$ & 36 / 36 & 2 & \\
+& $\eps \cdot \del T \times F$ / $\eps \cdot T \times \del F$ & 6 / 6 & 1 & \\
+& $\eps \cdot (\del T)^2$ & 38 & 2 & \\
+& $\eps \cdot (\del F)^2$ & 4 & 2 & \\
+& $\eps \cdot \del F \times \del\Rt$ & 36 & 2 & \\
 \midrule
-\multicolumn{4}{@{}l}{\textit{Cubic, one derivative}} \\
-& $\del T \times F \times F$ & 5 & Fixes $T \times F \times F$ \\
-& $T \times \del F \times F$ & 10 & IBP partner \\
-& $\Rt \times \del T \times F$ & 46 & Fixes $\Rt \times T \times F$ \\
+\multicolumn{5}{@{}l}{\textit{Cubic, $O(\epsilon^2)$-relevant ($n_\epsilon \leq 2$)}} \\
+& $\Rt \times F \times F$ & 4 & 1 & Gertsenshtein \\
+& $T \times T \times F$ & 3 & 2 & $t$ mass corr. \\
+& $\Rt \times \Rt \times F$ & 8 & 2 & \\
+& $\del T \times F \times F$ / $T \times \del F \times F$ & 5 / 10 & 1 & $t \leftrightarrow f$ mixing \\
+& $\Rt \times F \times \del T$ / $\Rt \times T \times \del F$ / $T \times F \times \del\Rt$ & 46 / 46 / 46 & 2 & $h$--$t$ via $B_0$ \\
 \midrule
-\multicolumn{4}{@{}l}{\textit{Parity-odd (with $\eps_{\mu\nu\rho\sigma}$)}} \\
-& $\eps \cdot \Rt^2$ & 13 & Pontryagin-type \\
-& $\eps \cdot T^2$ & 4 & Nieh--Yan-type \\
-& $\eps \cdot F^2$ & 1 & $F \cdot \tilde{F}$ \\
-& $\eps \cdot \Rt \times F$ & 3 & Parity-odd curv--EM \\
-& $\eps \cdot \del T \times F$ & 6 & Parity-odd $\del T$--EM \\
-& $\eps \cdot T \times \del F$ & 6 & IBP partner \\
-& $\eps \cdot T \times T \times F$ & 15 & Parity-odd cubic \\
-& $\eps \cdot \del T \times F \times F$ & 18 & Parity-odd cubic deriv. \\
+\multicolumn{5}{@{}l}{\textit{Parity-odd cubic ($n_\epsilon \leq 2$)}} \\
+& $\eps \cdot \Rt \times F \times F$ & 12 & 1 & \\
+& $\eps \cdot T \times T \times F$ & 15 & 2 & Shapiro's $\theta_{1,3}$ \\
+& $\eps \cdot T \times F \times \del F$ & 36 & 1 & \\
+& $\eps \cdot F \times F \times \del T$ & 18 & 1 & \\
+& $\eps \cdot F \times (\del F)^2$ & 15 & 2 & \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-The raw count before IBP reduction is large. After IBP, the
-independent count in each derivative sector is roughly halved.
-The quadratic non-derivative sector has $6 + 3 + 1 + 1 = 11$
-parity-even parameters, matching the standard PGT literature.
+The \textbf{core quadratic} sector has $6+3+1+1 = 11$ parity-even
+and $13+4+1+3 = 21$ parity-odd parameters (\textbf{32 total}),
+matching the standard PGT literature.
+Including one-derivative extensions adds $\sim$100 parity-even
+and $\sim$160 parity-odd terms (before IBP reduction).
+The full catalog including cubics totals 5{,}612 contractions,
+of which $\sim$200 are relevant at $O(\epsilon^2)$.
 
 \subsection{Parameter Space for Sweep}
 
