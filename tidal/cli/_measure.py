@@ -651,7 +651,13 @@ def _format_text_section_conversion(lines: list[str], conv: dict[str, Any]) -> N
     else:
         src = ", ".join(conv["source"])
         tgt = ", ".join(conv["target"])
-        lines.extend((f"Conversion ({src} -> {tgt}):", key_value("Peak P(t)", f"{conv['peak_probability']:.6f}"), key_value("at t", f"{conv['peak_time']:.2f}")))
+        lines.extend(
+            (
+                f"Conversion ({src} -> {tgt}):",
+                key_value("Peak P(t)", f"{conv['peak_probability']:.6f}"),
+                key_value("at t", f"{conv['peak_time']:.2f}"),
+            )
+        )
     lines.append("")
 
 
@@ -972,7 +978,7 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
     return results
 
 
-def measure_command(args: Namespace) -> int:  # noqa: C901, PLR0912
+def measure_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
     """Run ``tidal measure`` subcommand.
 
     Flow:
@@ -985,7 +991,30 @@ def measure_command(args: Namespace) -> int:  # noqa: C901, PLR0912
 
     Returns 0 on success, 1 on error.
     """
+    if getattr(args, "list_types", False):
+        print("Available measurement types:")
+        print("  summary              Overview of all measurements")
+        print("  energy               Per-field and total energy")
+        print("  conservation         Energy conservation check (PASS/FAIL)")
+        print("  conversion           Field conversion probability")
+        print("  mixing               Mixing length and dominant frequency")
+        print("  spectrum             Power spectrum analysis")
+        print("  spectral_conversion  Per-mode conversion in Fourier space")
+        print("  dispersion           Dispersion relation extraction")
+        print("  effective_mass       Effective mass from dispersion")
+        print("  asymptotic           Late-time asymptotic behavior")
+        print("  peak_conversion      Peak conversion probability")
+        print("  velocity             Group/phase velocity measurement")
+        print("  resonance            Resonance detection")
+        return 0
+
     from tidal.cli._console import error_with_hint
+
+    if args.data_path is None:
+        from tidal.cli._console import error as _error
+
+        _error("data_path is required")
+        return 1
 
     data_path = Path(args.data_path)
     if not data_path.exists():

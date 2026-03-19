@@ -175,6 +175,8 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     sim_parser.add_argument(
         "json_path",
+        nargs="?",
+        default=None,
         help="Path to the JSON equation specification",
     )
     # Parameters
@@ -425,6 +427,18 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Preview simulation setup without running (grid, solver, IC, memory estimate)",
     )
     sim_parser.add_argument(
+        "--list-schemes",
+        action="store_true",
+        default=False,
+        help="List available solver schemes and exit",
+    )
+    sim_parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Overwrite existing --output directory without prompting",
+    )
+    sim_parser.add_argument(
         "--report",
         type=str,
         default=None,
@@ -562,7 +576,15 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     measure_parser.add_argument(
         "data_path",
+        nargs="?",
+        default=None,
         help="Path to the simulation output directory",
+    )
+    measure_parser.add_argument(
+        "--list-types",
+        action="store_true",
+        default=False,
+        help="List available measurement types and exit",
     )
     measure_parser.add_argument(
         "--spec",
@@ -1100,6 +1122,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Print sweep plan (grid size, parameter combos) without running",
     )
     sweep_parser.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Overwrite existing --output directory without prompting",
+    )
+    sweep_parser.add_argument(
         "--config",
         default=None,
         metavar="TOML",
@@ -1184,6 +1212,11 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     analyze_parser = sub.add_parser(
         "analyze",
         help="Post-hoc analysis of sweep results (sensitivity, critical field)",
+        epilog="""Examples:
+  tidal analyze sweep_results/ --sensitivity sobol --metric P_max
+  tidal analyze sweep_results/ --critical-field B0 --metric P_final --threshold 0.99
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     analyze_parser.add_argument(
         "data_path",
@@ -1255,6 +1288,10 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "doctor",
         aliases=["doc"],
         help="Check environment health (Python, dependencies, Wolfram, xAct)",
+        epilog="""Examples:
+  tidal doctor              # Full environment check
+""",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
 
     # Shell completion (optional dependency: shtab)

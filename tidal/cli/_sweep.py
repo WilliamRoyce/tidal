@@ -2054,6 +2054,14 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
         )
         return 1
 
+    # Check output directory collision
+    if Path(args.output).exists() and not getattr(args, "force", False):
+        error_with_hint(
+            f"output directory already exists: {args.output}",
+            ["Use --force to overwrite", "Or choose a different --output path"],
+        )
+        return 1
+
     # Parse sweep specs from CLI (these override/extend TOML)
     swept_params: dict[str, list[float]] = dict(config_swept)
     converge_sizes: list[int] | None = config_converge

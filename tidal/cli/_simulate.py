@@ -2301,7 +2301,7 @@ def _validate_solver_params(args: Namespace) -> None:
         raise ValueError(msg)
 
 
-def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
+def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR0915
     """Execute the simulate command.
 
     Parameters
@@ -2314,6 +2314,20 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
     int
         Exit code.
     """
+    if getattr(args, "list_schemes", False):
+        print("Available solver schemes:")
+        print("  auto      Auto-select based on equation structure (default)")
+        print("  modal     Fourier modal solver (periodic, time-independent)")
+        print("  cvode     SUNDIALS CVODE (adaptive ODE, tolerance-controlled)")
+        print("  ida       SUNDIALS IDA (DAE, algebraic constraints)")
+        print("  leapfrog  Symplectic leapfrog (exact energy conservation)")
+        print("  scipy     SciPy solve_ivp (DOP853, Radau, BDF)")
+        return 0
+
+    if args.json_path is None:
+        _cerror("json_path is required")
+        return 1
+
     from tidal.symbolic import load_equation_system
 
     json_path = Path(args.json_path)
@@ -2394,6 +2408,14 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
         params = {**saved_params, **params}
     if params:
         log(f"  Parameters: {params}")
+
+    # Check output directory collision
+    if args.output and Path(args.output).exists() and not getattr(args, "force", False):
+        _cerror_hint(
+            f"output directory already exists: {args.output}",
+            ["Use --force to overwrite", "Or choose a different --output path"],
+        )
+        return 1
 
     # All simulation goes through the native IDA/leapfrog path
     try:
