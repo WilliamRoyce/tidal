@@ -608,13 +608,14 @@ def _format_json(results: dict[str, Any], data: SimulationData) -> str:
 
 def _format_text_section_conservation(lines: list[str], cons: dict[str, Any]) -> None:
     """Append conservation section to *lines*."""
+    from tidal.cli._console import pass_fail
+
     if "error" in cons:
         lines.append(f"Energy Conservation: ERROR ({cons['error']})")
     else:
-        status = "PASS" if cons["is_conserved"] else "FAIL"
         lines.extend(
             [
-                f"Energy Conservation: {status}",
+                pass_fail("Energy Conservation", passed=cons["is_conserved"]),
                 f"  max |dE/E| = {cons['max_relative_error']:.2e}",
                 f"  threshold  = {cons['threshold']:.0e}",
             ]
@@ -792,14 +793,13 @@ def _format_text_section_peak_conversion(
 
 def _format_text(results: dict[str, Any], data: SimulationData) -> str:  # noqa: C901
     """Produce human-readable aligned text output."""
-    lines: list[str] = []
-    sep = "=" * 64
+    from tidal.cli._console import header as _header
 
+    lines: list[str] = []
+
+    lines.append(_header(f"Measurement: {', '.join(data.fields.keys())}"))
     lines.extend(
         [
-            sep,
-            f"Measurement: {', '.join(data.fields.keys())}",
-            sep,
             "",
             "Simulation:",
             f"  Time range: {float(data.times[0]):.1f} -> {float(data.times[-1]):.1f}"
@@ -833,7 +833,7 @@ def _format_text(results: dict[str, Any], data: SimulationData) -> str:  # noqa:
     if "peak_conversion" in results:
         _format_text_section_peak_conversion(lines, results["peak_conversion"])
 
-    lines.append(sep)
+    lines.append("=" * 64)
     return "\n".join(lines)
 
 
@@ -889,11 +889,12 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
     }
     needs_source = measurements & require_source
     if needs_source and source is None:
+        from tidal.cli._console import error as _cerror
+
         names = ", ".join(sorted(needs_source))
-        print(
-            f"Error: --source required for --what={names} "
-            f"(or use --what=summary for auto-detection)",
-            file=sys.stderr,
+        _cerror(
+            f"--source required for --what={names} "
+            f"(or use --what=summary for auto-detection)"
         )
         return 1
 
@@ -929,7 +930,9 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
     if "dispersion" in measurements:
         dyn_in_source = _filter_to_dynamical(source, data, "dispersion")
         if not dyn_in_source:
-            print("Error: no dynamical fields for dispersion", file=sys.stderr)
+            from tidal.cli._console import error as _cerror
+
+            _cerror("no dynamical fields for dispersion")
             return 1
         results["dispersion"] = _run_measurement_safe(
             _run_dispersion, data, dyn_in_source
@@ -980,9 +983,11 @@ def measure_command(args: Namespace) -> int:
 
     Returns 0 on success, 1 on error.
     """
+    from tidal.cli._console import error as _cerror
+
     data_path = Path(args.data_path)
     if not data_path.exists():
-        print(f"Error: data path not found: {data_path}", file=sys.stderr)
+        _cerror(f"data path not found: {data_path}")
         return 1
 
     spec_path = _resolve_spec_path(data_path, getattr(args, "spec", None))

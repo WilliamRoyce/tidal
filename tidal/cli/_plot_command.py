@@ -9,7 +9,6 @@ Plot types: heatmap, snapshot, amplitude, energy, profile, compare.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -187,6 +186,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
     mpl.use("Agg")
     import matplotlib.pyplot as plt
 
+    from tidal.cli._console import error as _cerror
     from tidal.cli._measure import (
         _load_data,  # pyright: ignore[reportPrivateUsage]
         _resolve_spec_path,  # pyright: ignore[reportPrivateUsage]
@@ -207,15 +207,13 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
 
     data_path = Path(args.data_dir)
     if not data_path.is_dir():
-        print(f"Error: '{data_path}' is not a directory", file=sys.stderr)
+        _cerror(f"'{data_path}' is not a directory")
         return 1
 
     plot_type: str = args.type
     if plot_type not in _VALID_TYPES:
-        print(
-            f"Error: unknown plot type '{plot_type}'. "
-            f"Valid: {', '.join(sorted(_VALID_TYPES))}",
-            file=sys.stderr,
+        _cerror(
+            f"unknown plot type '{plot_type}'. Valid: {', '.join(sorted(_VALID_TYPES))}"
         )
         return 1
 
@@ -230,7 +228,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
         cross_section = _parse_cross_section(args.cross_section)
         figsize = _parse_figsize(args.figsize)
     except ValueError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        _cerror(str(exc))
         return 1
 
     # Validate overlay formula if provided
@@ -239,7 +237,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
         try:
             _validate_overlay(overlay)
         except (ValueError, TypeError) as exc:
-            print(f"Error in --overlay formula: {exc}", file=sys.stderr)
+            _cerror(f"in --overlay formula: {exc}")
             return 1
 
     # Load data
@@ -248,7 +246,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
         param_overrides: list[str] = args.param or []
         data = _load_data(data_path, spec_path, param_overrides)
     except (FileNotFoundError, ValueError, OSError) as exc:
-        print(f"Error loading data: {exc}", file=sys.stderr)
+        _cerror(f"loading data: {exc}")
         return 1
 
     if not args.quiet:
@@ -310,7 +308,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
             render_conservation(ax, data, threshold=threshold)
 
     except ValueError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        _cerror(str(exc))
         plt.close(fig)
         return 1
 
@@ -345,6 +343,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
     mpl.use("Agg")
     import matplotlib.pyplot as plt
 
+    from tidal.cli._console import error as _cerror
     from tidal.cli._sweep_panels import (
         render_convergence,
         render_replicate_convergence,
@@ -362,16 +361,13 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
     # Load sweep data
     sweep_json = data_path / "sweep.json"
     if not sweep_json.exists():
-        print(
-            f"Error: '{data_path}' is not a sweep directory (no sweep.json)",
-            file=sys.stderr,
-        )
+        _cerror(f"'{data_path}' is not a sweep directory (no sweep.json)")
         return 1
 
     try:
         results = SweepResults.from_directory(data_path)
     except (FileNotFoundError, ValueError) as exc:
-        print(f"Error loading sweep data: {exc}", file=sys.stderr)
+        _cerror(f"loading sweep data: {exc}")
         return 1
 
     # Parse metric(s)
@@ -392,10 +388,9 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                 raw_metric = candidate
                 break
         if raw_metric is None:
-            print(
-                "Error: --metric is required for sweep plots. "
-                f"Available: {', '.join(results.metric_names)}",
-                file=sys.stderr,
+            _cerror(
+                "--metric is required for sweep plots. "
+                f"Available: {', '.join(results.metric_names)}"
             )
             return 1
 
@@ -414,7 +409,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                     try:
                         render_sweep_1d(ax, results, metrics[0], overlay=overlay)
                     except ValueError as exc:
-                        print(f"Error in --overlay formula: {exc}", file=sys.stderr)
+                        _cerror(f"in --overlay formula: {exc}")
                         return 1
                 else:
                     fig = plt.figure(figsize=figsize or (8, 3 * len(metrics)))
@@ -425,16 +420,13 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                     try:
                         render_sweep_2d_with_overlay(fig, results, metrics[0], overlay)
                     except ValueError as exc:
-                        print(f"Error in --overlay formula: {exc}", file=sys.stderr)
+                        _cerror(f"in --overlay formula: {exc}")
                         return 1
                 else:
                     fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 6))
                     render_sweep_2d(ax, results, metrics[0])
             else:
-                print(
-                    f"Error: sweep plot supports 1 or 2 swept parameters, got {n_swept}",
-                    file=sys.stderr,
-                )
+                _cerror(f"sweep plot supports 1 or 2 swept parameters, got {n_swept}")
                 return 1
 
         elif plot_type == "sweep-compare":
@@ -445,39 +437,28 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
 
         elif plot_type == "convergence":
             if raw_metric is None:
-                print(
-                    "Error: --metric is required for convergence plots", file=sys.stderr
-                )
+                _cerror("--metric is required for convergence plots")
                 return 1
             fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
             render_convergence(ax, results, raw_metric)
 
         elif plot_type == "sweep-parallel":
             if raw_metric is None:
-                print(
-                    "Error: --metric is required for sweep-parallel plots",
-                    file=sys.stderr,
-                )
+                _cerror("--metric is required for sweep-parallel plots")
                 return 1
             fig, ax = plt.subplots(1, 1, figsize=figsize or (10, 6))
             render_sweep_parallel(ax, results, raw_metric)
 
         elif plot_type == "sweep-tornado":
             if raw_metric is None:
-                print(
-                    "Error: --metric is required for sweep-tornado plots",
-                    file=sys.stderr,
-                )
+                _cerror("--metric is required for sweep-tornado plots")
                 return 1
             fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
             render_sweep_tornado(ax, results, raw_metric)
 
         elif plot_type == "sweep-scatter":
             if raw_metric is None:
-                print(
-                    "Error: --metric is required for sweep-scatter plots",
-                    file=sys.stderr,
-                )
+                _cerror("--metric is required for sweep-scatter plots")
                 return 1
             n_params = len(results.swept_params)
             fig = plt.figure(figsize=figsize or (3 * n_params, 3 * n_params))
@@ -485,27 +466,23 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
 
         elif plot_type == "replicate-convergence":
             if raw_metric is None:
-                print(
-                    "Error: --metric is required for replicate-convergence plots",
-                    file=sys.stderr,
-                )
+                _cerror("--metric is required for replicate-convergence plots")
                 return 1
             if not results.has_replicates:
-                print(
-                    "Error: replicate-convergence requires ensemble data "
-                    "(use --n-replicates in sweep)",
-                    file=sys.stderr,
+                _cerror(
+                    "replicate-convergence requires ensemble data "
+                    "(use --n-replicates in sweep)"
                 )
                 return 1
             fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
             render_replicate_convergence(ax, results, raw_metric)
 
         else:
-            print(f"Error: unknown sweep plot type '{plot_type}'", file=sys.stderr)
+            _cerror(f"unknown sweep plot type '{plot_type}'")
             return 1
 
     except ValueError as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        _cerror(str(exc))
         return 1
 
     # Apply custom title

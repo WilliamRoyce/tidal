@@ -4152,14 +4152,14 @@ def _run_wolframscript(script_path: Path, *, timeout: int = 0) -> int:
         Exit code from wolframscript.
     """
     if shutil.which("wolframscript") is None:
-        print("Error: 'wolframscript' not found on PATH.", file=sys.stderr)
-        print(file=sys.stderr)
-        print("Install Wolfram Engine (free for development):", file=sys.stderr)
-        print("  https://www.wolfram.com/engine/", file=sys.stderr)
-        print(file=sys.stderr)
-        print(
-            "Or use --dry-run to see the generated script without execution.",
-            file=sys.stderr,
+        from tidal.cli._console import error_with_hint as _cerror_hint
+
+        _cerror_hint(
+            "'wolframscript' not found on PATH.",
+            [
+                "Install Wolfram Engine (free for development): https://www.wolfram.com/engine/",
+                "Or use --dry-run to see the generated script without execution.",
+            ],
         )
         return 1
 
@@ -4173,15 +4173,12 @@ def _run_wolframscript(script_path: Path, *, timeout: int = 0) -> int:
     try:
         with Path("/proc/swaps").open(encoding="ascii") as f:
             if len(f.readlines()) <= 1:  # header only
-                print(
-                    "Warning: No swap space available. Large derivations may crash.",
-                    file=sys.stderr,
+                from tidal.cli._console import warn as _cwarn
+
+                _cwarn(
+                    "No swap space available. Large derivations may crash. "
+                    "Docker Desktop: Settings → Resources → Memory → 16 GB+"
                 )
-                print(
-                    "  Docker Desktop: Settings → Resources → Memory → 16 GB+",
-                    file=sys.stderr,
-                )
-                print(file=sys.stderr)
     except OSError:
         pass
 
@@ -4328,7 +4325,9 @@ def _derive_from_toml(config_path: Path, args: Namespace) -> int:  # noqa: C901,
                 f"Validation: JSON loaded successfully ({spec.n_components} components)"
             )
         except Exception as exc:  # noqa: BLE001
-            print(f"\nWarning: JSON validation failed: {exc}", file=sys.stderr)
+            from tidal.cli._console import warn as _cwarn
+
+            _cwarn(f"JSON validation failed: {exc}")
             ret = 1
 
     # Inject derivation hash into JSON metadata for future cache checks
@@ -4358,9 +4357,11 @@ def derive_command(args: Namespace) -> int:
     int
         Exit code.
     """
+    from tidal.cli._console import error as _cerror
+
     config_path = Path(args.config)
     if not config_path.exists():
-        print(f"Error: file not found: {config_path}", file=sys.stderr)
+        _cerror(f"file not found: {config_path}")
         return 1
 
     ext = config_path.suffix.lower()
@@ -4371,8 +4372,7 @@ def derive_command(args: Namespace) -> int:
     if ext in {".toml", ".tml"}:
         return _derive_from_toml(config_path, args)
 
-    print(
-        f"Error: unsupported file extension '{ext}'. Use .toml for config or .wls for script.",
-        file=sys.stderr,
+    _cerror(
+        f"unsupported file extension '{ext}'. Use .toml for config or .wls for script."
     )
     return 1

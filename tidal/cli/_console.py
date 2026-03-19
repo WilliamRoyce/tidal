@@ -134,7 +134,7 @@ def header(title: str) -> str:
     return f"{sep}\n{title}\n{sep}"
 
 
-def pass_fail(label: str, passed: bool) -> str:
+def pass_fail(label: str, *, passed: bool) -> str:
     """Return ``PASS``/``FAIL`` with colour when available."""
     tag = "PASS" if passed else "FAIL"
     if _color():

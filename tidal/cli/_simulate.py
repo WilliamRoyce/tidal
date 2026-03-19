@@ -9,6 +9,10 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
+from tidal.cli._console import error as _cerror
+from tidal.cli._console import log as _clog
+from tidal.cli._console import warn as _cwarn
+
 if TYPE_CHECKING:
     from argparse import Namespace
     from collections.abc import Callable
@@ -1340,15 +1344,14 @@ def _check_mass_stability(
     stability = check_pointwise_mass_stability(coeff_eval, spec, grid_info)
     require_stable: bool = getattr(args, "require_stable", False)
     # Informational notes (e.g. asymmetric matrix) — suppressed in --quiet mode
-    if not getattr(args, "quiet", False):
-        for note in stability.notes:
-            print(f"  Note: {note}", file=sys.stderr)
+    for note in stability.notes:
+        _clog(f"  Note: {note}")
     # Stability errors (negative eigenvalues) — fatal with --require-stable
     for msg in stability.errors:
         if require_stable:
-            print(f"Error: {msg}", file=sys.stderr)
+            _cerror(msg)
         else:
-            print(f"  Warning: {msg}", file=sys.stderr)
+            _cwarn(msg)
     if require_stable and stability.errors:
         sys.exit(1)
 
@@ -1540,7 +1543,7 @@ def _constraint_mode(  # noqa: PLR0913, PLR0917
     )
 
     if not result["success"]:
-        print(f"Error: constraint solve failed: {result['message']}", file=sys.stderr)
+        _cerror(f"constraint solve failed: {result['message']}")
         return 1
 
     log_fn("  Constraint solve complete.")
@@ -1749,7 +1752,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     from tidal.measurement._io import SimulationData
     from tidal.solver.operators import set_fd_order, set_spectral
 
-    log = _noop if args.quiet else print
+    log = _clog
 
     # 0a. FD order — must be set before any operator evaluation.
     # CLI default is 4 (5-point Fornberg stencil); module default is 2
@@ -1780,7 +1783,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 f"Grid too small for --fd-order {fd_order}: minimum axis has "
                 f"{min_n} points but stencil width requires >= {required_n}."
             )
-            print(f"Error: {msg}", file=sys.stderr)
+            _cerror(msg)
             return 1
         # Default fd-order 4 on a tiny grid — fall back to order 2
         fd_order = 2
@@ -1809,7 +1812,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 f"Non-periodic axes: {non_periodic}. "
                 f"Use --periodic or ensure all --bc entries are 'periodic'."
             )
-            print(f"Error: {msg}", file=sys.stderr)
+            _cerror(msg)
             return 1
     else:
         # User explicitly passed --no-spectral: force FD stencils
@@ -1893,7 +1896,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 "(spectral operators produce dense coupling). "
                 "Use --scheme cvode, scipy, or leapfrog instead."
             )
-            print(f"Error: {msg}", file=sys.stderr)
+            _cerror(msg)
             return 1
     # Modal solver operates in pure k-space — spectral operators are not
     # used during time evolution.  However, keep spectral=True so that
@@ -2152,7 +2155,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         )
 
     if not result["success"]:
-        print(f"Error: solver failed: {result['message']}", file=sys.stderr)
+        _cerror(f"solver failed: {result['message']}")
         return 1
 
     # Post-simulation divergence check: verify final state is finite.
@@ -2226,10 +2229,10 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
 
     json_path = Path(args.json_path)
     if not json_path.exists():
-        print(f"Error: file not found: {json_path}", file=sys.stderr)
+        _cerror(f"file not found: {json_path}")
         return 1
 
-    log = _noop if args.quiet else print
+    log = _clog
 
     # Step 1: Load spec
     log("Loading equation specification...")
@@ -2246,13 +2249,13 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
 
         resume_dir = Path(args.resume)
         if not resume_dir.is_dir():
-            print(f"Error: resume directory not found: {resume_dir}", file=sys.stderr)
+            _cerror(f"resume directory not found: {resume_dir}")
             return 1
 
         # --resume and --ic are mutually exclusive.  argparse default is
         # "gaussian", so a non-gaussian value means the user explicitly set --ic.
         if args.ic != "gaussian":
-            print("Error: --resume and --ic cannot be used together", file=sys.stderr)
+            _cerror("--resume and --ic cannot be used together")
             return 1
 
         meta_path = resume_dir / "metadata.json"
@@ -2274,7 +2277,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
             log(f"  Resuming from: {resume_dir}")
 
     if args.snapshot is not None and args.resume is None:
-        print("Error: --snapshot requires --resume", file=sys.stderr)
+        _cerror("--snapshot requires --resume")
         return 1
 
     # Step 3: Parse parameters (merge with checkpoint metadata if resuming)
@@ -2293,6 +2296,6 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
         from tidal.solver._exceptions import SimulationDivergedError
 
         if isinstance(exc, SimulationDivergedError):
-            print(f"Error: {exc}", file=sys.stderr)
+            _cerror(str(exc))
             return 1
         raise

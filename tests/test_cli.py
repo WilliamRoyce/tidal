@@ -612,8 +612,8 @@ class TestSimulateCommand:
         )
         assert ret == 0
 
-        out = capsys.readouterr().out
-        assert "Constraint solve complete" in out
+        captured = capsys.readouterr()
+        assert "Constraint solve complete" in captured.out + captured.err
 
     # --- Solver options ---
 
@@ -653,8 +653,9 @@ class TestSimulateCommand:
         assert ret == 0
         captured = capsys.readouterr()
         # Inline KG spec lacks canonical section → auto selects IDA
-        assert "Auto-selected solver:" in captured.out
-        assert "Scheme:" in captured.out
+        combined = captured.out + captured.err
+        assert "Auto-selected solver:" in combined
+        assert "Scheme:" in combined
 
     def test_auto_selects_modal_for_periodic_constraints(
         self, inline_em_1d_json: Path, capsys: pytest.CaptureFixture[str]
@@ -675,7 +676,7 @@ class TestSimulateCommand:
         )
         assert ret == 0
         captured = capsys.readouterr()
-        assert "Auto-selected solver: modal" in captured.out
+        assert "Auto-selected solver: modal" in captured.out + captured.err
 
     def test_simulate_ida_scheme(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
@@ -696,8 +697,9 @@ class TestSimulateCommand:
         )
         assert ret == 0
         captured = capsys.readouterr()
-        assert "IDA solver" in captured.out
-        assert "snapshots stored" in captured.out
+        combined = captured.out + captured.err
+        assert "IDA solver" in combined
+        assert "snapshots stored" in combined
 
     def test_simulate_ida_plane_wave(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
@@ -741,8 +743,9 @@ class TestSimulateCommand:
         )
         assert ret == 0
         captured = capsys.readouterr()
-        assert "leapfrog" in captured.out.lower()
-        assert "snapshots stored" in captured.out
+        combined = captured.out + captured.err
+        assert "leapfrog" in combined.lower()
+        assert "snapshots stored" in combined
 
     def test_simulate_custom_snapshots(
         self, inline_kg_1d_json: Path, capsys: pytest.CaptureFixture[str]
@@ -1967,8 +1970,8 @@ class TestValidateCommand:
     ) -> None:
         ret = main(["validate", str(inline_kg_1d_json)])
         assert ret == 0
-        out = capsys.readouterr().out
-        assert "OK" in out
+        captured = capsys.readouterr()
+        assert "OK" in captured.out + captured.err
 
     def test_validate_nonexistent_file(self) -> None:
         ret = main(["validate", "nonexistent_file.json"])
@@ -2027,7 +2030,7 @@ class TestValidateCommand:
         spec_path.write_text(json.dumps(spec), encoding="utf-8")
         main(["validate", str(spec_path)])
         err = capsys.readouterr().err
-        assert "WARNING" in err
+        assert "WARN" in err
         assert "m2" in err
 
     def test_validate_coupled_scalars(
@@ -2038,8 +2041,8 @@ class TestValidateCommand:
         """Coupled scalars spec should validate successfully."""
         ret = main(["validate", str(inline_coupled_scalars_json)])
         assert ret == 0
-        out = capsys.readouterr().out
-        assert "OK" in out
+        captured = capsys.readouterr()
+        assert "OK" in captured.out + captured.err
 
     def test_validate_unknown_operator(
         self,
@@ -2145,8 +2148,8 @@ class TestValidateCommand:
             ["validate", str(inline_kg_1d_json), "--stability", "--param", "m2=1.0"]
         )
         assert ret == 0
-        out = capsys.readouterr().out
-        assert "stable" in out.lower()
+        captured = capsys.readouterr()
+        assert "stable" in (captured.out + captured.err).lower()
 
     def test_validate_stability_tachyon_detection(
         self,
@@ -3635,11 +3638,11 @@ class TestExceptionHandling:
     def test_value_error_shows_clean_message(
         self, capsys: pytest.CaptureFixture[str]
     ) -> None:
-        """ValueError should produce a clean 'Error:' message, not a traceback."""
+        """ValueError should produce a clean '[ERROR]' message, not a traceback."""
         ret = main(["simulate", "/nonexistent/spec.json"])
         assert ret == 1
         err = capsys.readouterr().err
-        assert "Error:" in err
+        assert "[ERROR]" in err
 
     def test_derive_derived_field_dry_run(
         self,

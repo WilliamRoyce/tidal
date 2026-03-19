@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import contextlib
-import sys
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -238,6 +237,10 @@ def validate_command(args: Namespace) -> int:  # noqa: C901
     """
     from pathlib import Path
 
+    from tidal.cli._console import error as _error
+    from tidal.cli._console import success as _success
+    from tidal.cli._console import warn as _warn
+
     json_path = Path(args.json_path)
 
     errors: list[str] = []
@@ -247,7 +250,7 @@ def validate_command(args: Namespace) -> int:  # noqa: C901
     errors.extend(_check_file_exists(json_path))
     if errors:
         for err in errors:
-            print(f"ERROR: {err}", file=sys.stderr)
+            _error(err)
         return 1
 
     # Check 2: Parse JSON + load EquationSystem
@@ -255,7 +258,7 @@ def validate_command(args: Namespace) -> int:  # noqa: C901
     errors.extend(parse_errors)
     if errors:
         for err in errors:
-            print(f"ERROR: {err}", file=sys.stderr)
+            _error(err)
         return 1
 
     if spec is None:
@@ -283,12 +286,12 @@ def validate_command(args: Namespace) -> int:  # noqa: C901
     # Report results
     if errors:
         for err in errors:
-            print(f"ERROR: {err}", file=sys.stderr)
+            _error(err)
         return 1
 
-    for warn in warnings:
-        print(f"WARNING: {warn}", file=sys.stderr)
+    for w in warnings:
+        _warn(w)
 
     suffix = " [stable]" if getattr(args, "stability", False) else ""
-    print(f"OK: {json_path.name} is valid{suffix}")
+    _success(f"{json_path.name} is valid{suffix}")
     return 0

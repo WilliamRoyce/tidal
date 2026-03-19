@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import json
 import re
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -346,11 +345,12 @@ def inspect_command(args: Namespace) -> int:
     int
         Exit code.
     """
+    from tidal.cli._console import error as _cerror
     from tidal.symbolic.json_loader import load_equation_system
 
     json_path = Path(args.json_path)
     if not json_path.exists():
-        print(f"Error: file not found: {json_path}", file=sys.stderr)
+        _cerror(f"file not found: {json_path}")
         return 1
 
     spec = load_equation_system(json_path)

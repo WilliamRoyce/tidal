@@ -5,7 +5,6 @@ Provides sensitivity analysis (Sobol, Morris) on completed sweep data.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -32,6 +31,7 @@ def _run_sensitivity(
     n_bootstrap: int,
 ) -> int:
     """Run the chosen sensitivity analysis and print results."""
+    from tidal.cli._console import error as _cerror
     from tidal.measurement._sensitivity import (
         compute_morris_screening,
         compute_sobol_indices,
@@ -44,10 +44,10 @@ def _run_sensitivity(
         elif method == "morris":
             result = compute_morris_screening(results, metric)
         else:
-            print(f"Error: unknown sensitivity method '{method}'", file=sys.stderr)
+            _cerror(f"unknown sensitivity method '{method}'")
             return 1
     except (ImportError, ValueError) as exc:
-        print(f"Error: {exc}", file=sys.stderr)
+        _cerror(str(exc))
         return 1
 
     print(format_sensitivity_table(result))
@@ -59,17 +59,18 @@ def analyze_command(args: Namespace) -> int:
 
     Returns 0 on success, 1 on error.
     """
+    from tidal.cli._console import error as _cerror
     from tidal.measurement._sweep_results import SweepResults
 
     data_path = Path(args.data_path)
     if not data_path.exists():
-        print(f"Error: path not found: {data_path}", file=sys.stderr)
+        _cerror(f"path not found: {data_path}")
         return 1
 
     try:
         results = SweepResults.from_directory(data_path)
     except (FileNotFoundError, ValueError) as exc:
-        print(f"Error loading sweep data: {exc}", file=sys.stderr)
+        _cerror(f"loading sweep data: {exc}")
         return 1
 
     method = getattr(args, "sensitivity", "sobol")
@@ -77,10 +78,8 @@ def analyze_command(args: Namespace) -> int:
     if metric is None:
         metric = _auto_detect_metric(results)
         if metric is None:
-            print(
-                "Error: --metric is required. "
-                f"Available: {', '.join(results.metric_names)}",
-                file=sys.stderr,
+            _cerror(
+                f"--metric is required. Available: {', '.join(results.metric_names)}"
             )
             return 1
 
