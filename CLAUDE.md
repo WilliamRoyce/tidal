@@ -77,6 +77,10 @@ Custom commands in `.claude/skills/` (main conversation only, not available to s
 - `/bump [patch|minor]` — Version bump with commit analysis (suggests level, dry-run preview, git tag)
 - `/sync-docs` — Review and update all documentation for accuracy (stats, phase status, resolved issues)
 
+## Local Literature
+
+`Literature/` contains arXiv TeX sources for frequently-cited papers (Gertsenshtein, torsion, axion-photon mixing). **Always check `Literature/` before searching online.** Read the TeX source directly — it's faster and more reliable than web fetches. For new frequently-cited papers, download TeX via arXiv and add to `Literature/<arxiv-id>/`.
+
 ## Architecture Reference
 
 See `docs/MEMORY.md` for the complete architecture reference covering: solver backends, E-L velocity form, mass/coupling matrices, Christoffel computation, background fields, gauge fixing, xAct patterns, operators, examples, and known issues.

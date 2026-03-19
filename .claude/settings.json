@@ -1,5 +1,11 @@
 {
+  "includeCoAuthoredBy": false,
+  "attribution": {
+    "commit": "",
+    "pr": ""
+  },
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
       "Bash(uv run pytest:*)",
       "Bash(uv run tidal:*)",
