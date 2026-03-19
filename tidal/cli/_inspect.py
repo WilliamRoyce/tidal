@@ -360,6 +360,12 @@ def inspect_command(args: Namespace) -> int:
         print(json.dumps(data, indent=2))
         return 0
 
+    if args.latex:
+        from tidal.symbolic.latex import system_to_latex
+
+        print(system_to_latex(spec, output_format=args.latex_format))
+        return 0
+
     _print_header(spec)
     _print_spacetime(spec)
     _print_equations(spec)

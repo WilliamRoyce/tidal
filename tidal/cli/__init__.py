@@ -106,6 +106,18 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         dest="json_output",
         help="Output machine-readable JSON instead of human-readable text",
     )
+    inspect_parser.add_argument(
+        "--latex",
+        action="store_true",
+        help="Output equations as LaTeX math",
+    )
+    inspect_parser.add_argument(
+        "--latex-format",
+        choices=["align", "document", "raw"],
+        default="align",
+        dest="latex_format",
+        help="LaTeX output format (default: align). 'document' wraps in standalone .tex",
+    )
 
     # --- simulate ---
     sim_parser = sub.add_parser(

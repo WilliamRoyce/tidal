@@ -1067,7 +1067,7 @@ class EquationSystem:
         return {eq.field_name: i for i, eq in enumerate(self.equations)}
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914
+    def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914, C901
         """Create an EquationSystem from a dictionary (parsed JSON).
 
         Raises
@@ -1101,6 +1101,16 @@ class EquationSystem:
         # Build field name -> index lookup
         fields_lookup = {f["name"]: f["index"] for f in fields_data}
 
+        # Extract tensor metadata (optional, from enriched JSON export)
+        tensor_metadata: dict[str, dict[str, Any]] = {}
+        for f in fields_data:
+            if "tensor_head" in f:
+                tensor_metadata[f["name"]] = {
+                    "tensor_head": f["tensor_head"],
+                    "tensor_rank": f.get("tensor_rank", 0),
+                    "tensor_indices": f.get("tensor_indices", []),
+                }
+
         # Parse equations
         equations = tuple(
             ComponentEquation.from_dict(eq_data, fields_lookup)
@@ -1109,6 +1119,10 @@ class EquationSystem:
 
         # Extract metadata (needed early for parameter-aware matrix computation)
         metadata = dict(data.get("metadata", {}))
+
+        # Inject tensor metadata into metadata dict for LaTeX rendering
+        if tensor_metadata:
+            metadata["tensor_metadata"] = tensor_metadata
 
         # Extract default parameters from metadata (if available) so that
         # numeric matrices reflect actual parameter values, not just ±1.0

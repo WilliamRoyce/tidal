@@ -370,13 +370,24 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
       workingEqs = newEqs]
   ];
 
-  (* Build fields list *)
+  (* Build fields list — enrich with tensor metadata when available *)
   fields = Table[
-    <|
-      "name" -> workingEqs[[i, 1]],
-      "index" -> i - 1,
-      "is_dynamical" -> True
-    |>,
+    Module[{entry, fname, tensorMeta},
+      fname = workingEqs[[i, 1]];
+      entry = <|
+        "name" -> fname,
+        "index" -> i - 1,
+        "is_dynamical" -> True
+      |>;
+      (* Inject tensor component metadata if supplied by derive pipeline *)
+      tensorMeta = Lookup[Lookup[metadata, "component_metadata", <||>], fname, Null];
+      If[tensorMeta =!= Null,
+        entry["tensor_head"] = tensorMeta["head"];
+        entry["tensor_rank"] = tensorMeta["rank"];
+        entry["tensor_indices"] = tensorMeta["indices"];
+      ];
+      entry
+    ],
     {i, nFields}
   ];
 

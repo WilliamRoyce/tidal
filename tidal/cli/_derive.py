@@ -264,6 +264,7 @@ class _WlsContext:
     gauge: list[dict[str, Any]]
     reduction: dict[str, Any] | None
     metric_diagonal: list[str]
+    metric_type: str  # "minkowski", "diagonal", or "matrix"
 
 
 def _wls_mem_print(label: str) -> str:
@@ -919,6 +920,53 @@ def _wls_matter_perturbation_setup(  # noqa: PLR0914
     return info, lines
 
 
+def _wls_component_metadata(
+    field_name: str, fexpr: str, comp_var: str, dim: int
+) -> list[str]:
+    """Generate Wolfram code to build tensor component metadata for a field.
+
+    Re-calls ``EnumerateComponentTuples`` to reconstruct the flat-index → tuple
+    mapping that was used inside ``DecomposeToComponents`` but not returned.
+    For scalars (rank 0), ``SlotsOfTensor`` is not defined, so we check
+    ``xTensorQ`` on the head first and fall back to rank=0 with empty indices.
+    """
+    head_expr = f"Head[{fexpr}]"
+    return [
+        f"(* Build tensor component metadata for {field_name} *)",
+        "Module[{fieldRank, fHead},",
+        f"  fHead = {head_expr};",
+        "  fieldRank = If[xTensorQ[fHead], Length[SlotsOfTensor[fHead]], 0];",
+        "  If[fieldRank > 0,",
+        "    Module[{allTuples, flatMap},",
+        f"      allTuples = EnumerateComponentTuples[fHead, {dim}];",
+        "      flatMap = Association[Table[allTuples[[j]] -> j - 1, {j, Length[allTuples]}]];",
+        "      componentMetadata = Join[componentMetadata, Association[Table[",
+        "        Module[{flatIdx, tuple},",
+        f"          flatIdx = {comp_var}[[k, 1]];",
+        "          tuple = SelectFirst[Keys[flatMap], flatMap[#] == flatIdx &, {}];",
+        f'          "{field_name}_" <> ToString[flatIdx] -> <|',
+        f'            "head" -> "{field_name}",',
+        '            "rank" -> fieldRank,',
+        '            "indices" -> tuple',
+        "          |>",
+        "        ],",
+        f"        {{k, Length[{comp_var}]}}",
+        "      ]]];",
+        "    ],",
+        "    (* Scalar field: rank 0, empty indices *)",
+        "    componentMetadata = Join[componentMetadata, Association[Table[",
+        f'      "{field_name}_" <> ToString[{comp_var}[[k, 1]]] -> <|',
+        f'        "head" -> "{field_name}",',
+        '        "rank" -> 0,',
+        '        "indices" -> {}',
+        "      |>,",
+        f"      {{k, Length[{comp_var}]}}",
+        "    ]]];",
+        "  ];",
+        "];",
+    ]
+
+
 def _wls_multi_field_eom(  # noqa: PLR0914
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
@@ -1004,7 +1052,7 @@ def _wls_multi_field_eom(  # noqa: PLR0914
             "",
         ]
     )
-    lines.append("fieldEquations = {};")
+    lines.extend(("fieldEquations = {};", "componentMetadata = <||>;"))
     for i, df in enumerate(dyn_fields):
         eom_var = f"eom{df['name'].capitalize()}"
         comp_var = f"comp{df['name'].capitalize()}"
@@ -1029,6 +1077,11 @@ def _wls_multi_field_eom(  # noqa: PLR0914
         )
         lines.extend(_wls_vector_background_substitution(ctx, comp_var))
         lines.extend(_wls_validate_backgrounds_after_decompose(ctx, comp_var))
+
+        # Build tensor component metadata before clearing comp_var
+        lines.extend(
+            _wls_component_metadata(df["name"], df["fexpr"], comp_var, ctx.dim)
+        )
 
         # Merge into fieldEquations immediately, then free EOM + components
         lines.extend(
@@ -1601,6 +1654,12 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
         )
         lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
         lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
+
+        # Build tensor component metadata for LaTeX export
+        lines.append("componentMetadata = <||>;")
+        lines.extend(
+            _wls_component_metadata(pert_field_name, fexpr, "componentEqs", ctx.dim)
+        )
 
         # Build fieldEquations table
         lines.extend(
@@ -2412,6 +2471,14 @@ def _wls_euler_lagrange_multi(ctx: _WlsContext) -> list[str]:
         lines.extend(_wls_validate_backgrounds_after_decompose(ctx, comp_var))
         lines.append("")
 
+    # Build tensor component metadata for LaTeX export
+    lines.append("componentMetadata = <||>;")
+    for field in ctx.fields:
+        fname = field["name"]
+        fexpr = _field_expression(field, ctx.prefix)
+        comp_var = f"comp{fname.capitalize()}"
+        lines.extend(_wls_component_metadata(fname, fexpr, comp_var, ctx.dim))
+
     # Step 6: Export
     lines.extend(("(* Step 6: Build and export JSON *)", "fieldEquations = Flatten[{"))
     for i, field in enumerate(ctx.fields):
@@ -2451,6 +2518,11 @@ def _wls_euler_lagrange_single(ctx: _WlsContext) -> list[str]:
     )
     lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
     lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
+
+    # Build tensor component metadata for LaTeX export
+    lines.append("componentMetadata = <||>;")
+    lines.extend(_wls_component_metadata(fname, fexpr, "componentEqs", ctx.dim))
+
     lines.extend(
         [
             "",
@@ -2534,6 +2606,13 @@ def _wls_linearization(ctx: _WlsContext, *, include_bg: bool = False) -> list[st
     )
     lines.extend(_wls_vector_background_substitution(ctx, "componentEqs"))
     lines.extend(_wls_validate_backgrounds_after_decompose(ctx, "componentEqs"))
+
+    # Build tensor component metadata for LaTeX export
+    lines.append("componentMetadata = <||>;")
+    lines.extend(
+        _wls_component_metadata(pert_field_name, fexpr, "componentEqs", ctx.dim)
+    )
+
     lines.extend(
         [
             "",
@@ -3726,7 +3805,8 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
         f'  "linearized" -> {linearized_str},',
         f'  "dimension" -> {ctx.dim},',
         f'  "signature" -> {{{sig_str}}},',
-        f'  "coordinates" -> {{{coord_str}}}',
+        f'  "coordinates" -> {{{coord_str}}},',
+        f'  "metric_type" -> "{ctx.metric_type}"',
     ]
 
     # Add constraint solver metadata if configured in TOML
@@ -3769,6 +3849,17 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
         lines.extend(_wls_canonical_phase_a(ctx, all_heads_str))
 
     # Build JSON — always use multi-field builder since fieldEquations
+    # Inject tensor component metadata into metadata for LaTeX export
+    lines.extend(
+        (
+            "(* Inject tensor component metadata for LaTeX export *)",
+            "If[Length[componentMetadata] > 0,",
+            '  metadata["component_metadata"] = componentMetadata;',
+            "];",
+            "",
+        )
+    )
+
     # is constructed with proper labels by both single and multi-field paths.
     # fieldEquations now contains only surviving fields (constraints
     # eliminated by Phase A above), so the JSON is born correct.
@@ -3906,6 +3997,7 @@ def generate_wls(
             [str(e) for e in config["spacetime"].get("diagonal", [])],
             config.get("reduction", {}).get("coordinate_values", {}),
         ),
+        metric_type=config["spacetime"].get("metric", "minkowski"),
     )
 
     is_linearization = ctx.linearization is not None
