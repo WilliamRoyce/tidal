@@ -40,6 +40,13 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=False,
         help="Suppress the startup banner",
     )
+    parser.add_argument(
+        "--verbose",
+        "-v",
+        action="store_true",
+        default=False,
+        help="Show detailed diagnostic output (solver selection, CFL, Jacobian tier)",
+    )
     sub = parser.add_subparsers(dest="command", help="Available commands")
 
     # --- derive ---

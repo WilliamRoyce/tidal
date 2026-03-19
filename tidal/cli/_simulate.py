@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any, cast
 
 import numpy as np
 
+from tidal.cli._console import debug as _cdebug
 from tidal.cli._console import error as _cerror
 from tidal.cli._console import log as _clog
 from tidal.cli._console import warn as _cwarn
@@ -1769,6 +1770,8 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         f"  Grid: {'x'.join(str(s) for s in grid_info.shape)}, bounds: {grid_info.bounds}"
     )
 
+    _cdebug(f"periodic={grid_info.periodic}, dx={grid_info.dx}")
+
     # 2. BC (stored in GridInfo, derive tuple for solver calls)
     bc = grid_info.effective_bc
 
@@ -1874,6 +1877,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
     scheme = _resolve_scheme(args.scheme, spec, grid_info, bc)
     if args.scheme == "auto":
         log(f"  Auto-selected solver: {scheme}")
+    _cdebug(f"solver={scheme}, fd_order={fd_order}, spectral={use_spectral}")
 
     # Spectral + IDA incompatibility: spectral operators produce dense
     # coupling (every grid point depends on every other), incompatible
@@ -1970,6 +1974,7 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         dt = args.dt
         if dt is None:
             dt = _compute_cfl_dt(spec, grid_info, params)
+            _cdebug(f"CFL dt={dt:.6e} (safety={_CFL_FACTOR})")
         # Yoshida CFL correction: the effective CFL limit is reduced by
         # max(|wᵢ|) ≈ 1.70 because the middle sub-step has |w₂| > 1.
         # Must happen before snapshot configuration so the writer
