@@ -44,9 +44,12 @@ def list_command(args: Namespace) -> int:
     scan_dir = Path(args.dir) if args.dir else _find_examples_dir()
 
     if not scan_dir.is_dir():
-        from tidal.cli._console import error as _cerror
+        from tidal.cli._console import error_with_hint
 
-        _cerror(f"directory not found: {scan_dir}")
+        error_with_hint(
+            f"directory not found: {scan_dir}",
+            hints=["Default: examples/data/. Override with positional arg."],
+        )
         return 1
 
     json_files = sorted(scan_dir.glob("*.json"))

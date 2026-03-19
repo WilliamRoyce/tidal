@@ -11,6 +11,7 @@ import numpy as np
 
 from tidal.cli._console import debug as _cdebug
 from tidal.cli._console import error as _cerror
+from tidal.cli._console import error_with_hint as _cerror_hint
 from tidal.cli._console import log as _clog
 from tidal.cli._console import warn as _cwarn
 
@@ -1350,7 +1351,13 @@ def _check_mass_stability(
     # Stability errors (negative eigenvalues) — fatal with --require-stable
     for msg in stability.errors:
         if require_stable:
-            _cerror(msg)
+            _cerror_hint(
+                msg,
+                [
+                    "Reduce `--ic-amplitude` or adjust `--param` values",
+                    "Remove `--require-stable` to run anyway (may diverge)",
+                ],
+            )
         else:
             _cwarn(msg)
     if require_stable and stability.errors:
@@ -1544,7 +1551,13 @@ def _constraint_mode(  # noqa: PLR0913, PLR0917
     )
 
     if not result["success"]:
-        _cerror(f"constraint solve failed: {result['message']}")
+        _cerror_hint(
+            f"constraint solve failed: {result['message']}",
+            [
+                "Check `--bc` for consistency with constraint equations",
+                "Try `--allow-inconsistent-ic`",
+            ],
+        )
         return 1
 
     log_fn("  Constraint solve complete.")
@@ -1786,7 +1799,13 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
                 f"Grid too small for --fd-order {fd_order}: minimum axis has "
                 f"{min_n} points but stencil width requires >= {required_n}."
             )
-            _cerror(msg)
+            _cerror_hint(
+                msg,
+                [
+                    f"Increase `--grid-shape` (need >= {required_n} points per axis)",
+                    "Or use `--fd-order 2` for coarse grids",
+                ],
+            )
             return 1
         # Default fd-order 4 on a tiny grid — fall back to order 2
         fd_order = 2
@@ -1812,10 +1831,15 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
             non_periodic = [i for i, p in enumerate(grid_info.periodic) if not p]
             msg = (
                 f"--spectral requires all boundary conditions to be periodic. "
-                f"Non-periodic axes: {non_periodic}. "
-                f"Use --periodic or ensure all --bc entries are 'periodic'."
+                f"Non-periodic axes: {non_periodic}."
             )
-            _cerror(msg)
+            _cerror_hint(
+                msg,
+                [
+                    "Use `--periodic` for all axes",
+                    "Or remove `--spectral` to use FD stencils",
+                ],
+            )
             return 1
     else:
         # User explicitly passed --no-spectral: force FD stencils
@@ -1863,10 +1887,12 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
 
     # Validate t_end > t_start for resumed simulations
     if resume_state is not None and args.t_end <= t_start:
-        print(
-            f"Error: --t-end ({args.t_end}) must be greater than "
-            f"checkpoint time ({t_start})",
-            file=sys.stderr,
+        _cerror_hint(
+            f"--t-end ({args.t_end}) must be greater than checkpoint time ({t_start})",
+            [
+                f"Checkpoint is at t={t_start}. Use a larger `--t-end`",
+                "Or use `--t-additional T` to extend by T time units",
+            ],
         )
         return 1
 
@@ -2195,7 +2221,14 @@ def _simulate(  # noqa: C901, PLR0911, PLR0912, PLR0914, PLR0915
         )
 
     if not result["success"]:
-        _cerror(f"solver failed: {result['message']}")
+        _cerror_hint(
+            f"solver failed: {result['message']}",
+            [
+                "Try coarser grid (`--grid-shape 32`)",
+                "Increase tolerances (`--rtol 1e-5`)",
+                "Try different solver (`--scheme scipy`)",
+            ],
+        )
         return 1
 
     # Post-simulation divergence check: verify final state is finite.
@@ -2269,9 +2302,7 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
 
     json_path = Path(args.json_path)
     if not json_path.exists():
-        from tidal.cli._console import error_with_hint
-
-        error_with_hint(
+        _cerror_hint(
             f"file not found: {json_path}",
             [
                 "Run 'tidal list' to see available specifications.",
@@ -2297,13 +2328,21 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
 
         resume_dir = Path(args.resume)
         if not resume_dir.is_dir():
-            _cerror(f"resume directory not found: {resume_dir}")
+            _cerror_hint(
+                f"resume directory not found: {resume_dir}",
+                [
+                    "Create output with `tidal simulate ... --output DIR`, then `--resume DIR`",
+                ],
+            )
             return 1
 
         # --resume and --ic are mutually exclusive.  argparse default is
         # "gaussian", so a non-gaussian value means the user explicitly set --ic.
         if args.ic != "gaussian":
-            _cerror("--resume and --ic cannot be used together")
+            _cerror_hint(
+                "--resume and --ic cannot be used together",
+                ["`--resume` loads IC from checkpoint. Omit `--ic` to resume."],
+            )
             return 1
 
         meta_path = resume_dir / "metadata.json"
@@ -2325,7 +2364,10 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
             log(f"  Resuming from: {resume_dir}")
 
     if args.snapshot is not None and args.resume is None:
-        _cerror("--snapshot requires --resume")
+        _cerror_hint(
+            "--snapshot requires --resume",
+            ["Usage: `--resume DIR --snapshot 3`"],
+        )
         return 1
 
     # Step 3: Parse parameters (merge with checkpoint metadata if resuming)
@@ -2344,6 +2386,13 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
         from tidal.solver._exceptions import SimulationDivergedError
 
         if isinstance(exc, SimulationDivergedError):
-            _cerror(str(exc))
+            _cerror_hint(
+                str(exc),
+                [
+                    "Try `--require-stable` to validate before running",
+                    "Reduce `--ic-amplitude` or check `--param` values",
+                    "Try smaller timestep with `--dt`",
+                ],
+            )
             return 1
         raise

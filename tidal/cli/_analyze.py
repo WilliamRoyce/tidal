@@ -44,7 +44,12 @@ def _run_sensitivity(
         elif method == "morris":
             result = compute_morris_screening(results, metric)
         else:
-            _cerror(f"unknown sensitivity method '{method}'")
+            from tidal.cli._console import error_with_hint
+
+            error_with_hint(
+                f"unknown sensitivity method '{method}'",
+                hints=["Valid: sobol (global), morris (screening)"],
+            )
             return 1
     except (ImportError, ValueError) as exc:
         _cerror(str(exc))
@@ -59,18 +64,27 @@ def analyze_command(args: Namespace) -> int:
 
     Returns 0 on success, 1 on error.
     """
-    from tidal.cli._console import error as _cerror
     from tidal.measurement._sweep_results import SweepResults
 
     data_path = Path(args.data_path)
     if not data_path.exists():
-        _cerror(f"path not found: {data_path}")
+        from tidal.cli._console import error_with_hint
+
+        error_with_hint(
+            f"path not found: {data_path}",
+            hints=["Use `tidal sweep --output` directory"],
+        )
         return 1
 
     try:
         results = SweepResults.from_directory(data_path)
     except (FileNotFoundError, ValueError) as exc:
-        _cerror(f"loading sweep data: {exc}")
+        from tidal.cli._console import error_with_hint
+
+        error_with_hint(
+            f"loading sweep data: {exc}",
+            hints=["Ensure sweep.json or results.csv exists in directory"],
+        )
         return 1
 
     method = getattr(args, "sensitivity", "sobol")
@@ -78,8 +92,13 @@ def analyze_command(args: Namespace) -> int:
     if metric is None:
         metric = _auto_detect_metric(results)
         if metric is None:
-            _cerror(
-                f"--metric is required. Available: {', '.join(results.metric_names)}"
+            from tidal.cli._console import error_with_hint
+
+            error_with_hint(
+                f"--metric is required. Available: {', '.join(results.metric_names)}",
+                hints=[
+                    "Example: `tidal analyze DIR --metric P_max --sensitivity sobol`"
+                ],
             )
             return 1
 

@@ -345,12 +345,16 @@ def inspect_command(args: Namespace) -> int:
     int
         Exit code.
     """
-    from tidal.cli._console import error as _cerror
     from tidal.symbolic.json_loader import load_equation_system
 
     json_path = Path(args.json_path)
     if not json_path.exists():
-        _cerror(f"file not found: {json_path}")
+        from tidal.cli._console import error_with_hint
+
+        error_with_hint(
+            f"file not found: {json_path}",
+            hints=["Use `tidal list` to find specs, or `tidal derive` to generate"],
+        )
         return 1
 
     spec = load_equation_system(json_path)

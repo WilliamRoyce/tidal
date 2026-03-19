@@ -187,6 +187,7 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
     import matplotlib.pyplot as plt
 
     from tidal.cli._console import error as _cerror
+    from tidal.cli._console import error_with_hint
     from tidal.cli._measure import (
         _load_data,  # pyright: ignore[reportPrivateUsage]
         _resolve_spec_path,  # pyright: ignore[reportPrivateUsage]
@@ -207,13 +208,19 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
 
     data_path = Path(args.data_dir)
     if not data_path.is_dir():
-        _cerror(f"'{data_path}' is not a directory")
+        error_with_hint(
+            f"'{data_path}' is not a directory",
+            ["Use simulation output directory: `tidal plot output/ --type heatmap`"],
+        )
         return 1
 
     plot_type: str = args.type
     if plot_type not in _VALID_TYPES:
-        _cerror(
-            f"unknown plot type '{plot_type}'. Valid: {', '.join(sorted(_VALID_TYPES))}"
+        error_with_hint(
+            f"unknown plot type '{plot_type}'. Valid: {', '.join(sorted(_VALID_TYPES))}",
+            [
+                "Valid: heatmap, snapshot, amplitude, energy, profile, compare, hamiltonian"
+            ],
         )
         return 1
 
@@ -237,7 +244,10 @@ def plot_command(args: Namespace) -> int:  # noqa: C901, PLR0911, PLR0912, PLR09
         try:
             _validate_overlay(overlay)
         except (ValueError, TypeError) as exc:
-            _cerror(f"in --overlay formula: {exc}")
+            error_with_hint(
+                f"in --overlay formula: {exc}",
+                ["Check syntax. Example: `--overlay 'sin(x)*t'`"],
+            )
             return 1
 
     # Load data
@@ -344,6 +354,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
     import matplotlib.pyplot as plt
 
     from tidal.cli._console import error as _cerror
+    from tidal.cli._console import error_with_hint
     from tidal.cli._sweep_panels import (
         render_convergence,
         render_replicate_convergence,
@@ -361,7 +372,10 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
     # Load sweep data
     sweep_json = data_path / "sweep.json"
     if not sweep_json.exists():
-        _cerror(f"'{data_path}' is not a sweep directory (no sweep.json)")
+        error_with_hint(
+            f"'{data_path}' is not a sweep directory (no sweep.json)",
+            ["Use `tidal sweep --output` directory for sweep plots"],
+        )
         return 1
 
     try:
@@ -388,9 +402,10 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                 raw_metric = candidate
                 break
         if raw_metric is None:
-            _cerror(
+            error_with_hint(
                 "--metric is required for sweep plots. "
-                f"Available: {', '.join(results.metric_names)}"
+                f"Available: {', '.join(results.metric_names)}",
+                ["Example: `--metric P_max`"],
             )
             return 1
 
@@ -409,7 +424,10 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                     try:
                         render_sweep_1d(ax, results, metrics[0], overlay=overlay)
                     except ValueError as exc:
-                        _cerror(f"in --overlay formula: {exc}")
+                        error_with_hint(
+                            f"in --overlay formula: {exc}",
+                            ["Check syntax. Example: `--overlay 'sin(x)*t'`"],
+                        )
                         return 1
                 else:
                     fig = plt.figure(figsize=figsize or (8, 3 * len(metrics)))
@@ -420,13 +438,19 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                     try:
                         render_sweep_2d_with_overlay(fig, results, metrics[0], overlay)
                     except ValueError as exc:
-                        _cerror(f"in --overlay formula: {exc}")
+                        error_with_hint(
+                            f"in --overlay formula: {exc}",
+                            ["Check syntax. Example: `--overlay 'sin(x)*t'`"],
+                        )
                         return 1
                 else:
                     fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 6))
                     render_sweep_2d(ax, results, metrics[0])
             else:
-                _cerror(f"sweep plot supports 1 or 2 swept parameters, got {n_swept}")
+                error_with_hint(
+                    f"sweep plot supports 1 or 2 swept parameters, got {n_swept}",
+                    ["Use `--type sweep-parallel` for 3+ parameters"],
+                )
                 return 1
 
         elif plot_type == "sweep-compare":
@@ -437,28 +461,40 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
 
         elif plot_type == "convergence":
             if raw_metric is None:
-                _cerror("--metric is required for convergence plots")
+                error_with_hint(
+                    "--metric is required for convergence plots",
+                    ["Example: `--metric P_max`"],
+                )
                 return 1
             fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
             render_convergence(ax, results, raw_metric)
 
         elif plot_type == "sweep-parallel":
             if raw_metric is None:
-                _cerror("--metric is required for sweep-parallel plots")
+                error_with_hint(
+                    "--metric is required for sweep-parallel plots",
+                    ["Example: `--metric P_max`"],
+                )
                 return 1
             fig, ax = plt.subplots(1, 1, figsize=figsize or (10, 6))
             render_sweep_parallel(ax, results, raw_metric)
 
         elif plot_type == "sweep-tornado":
             if raw_metric is None:
-                _cerror("--metric is required for sweep-tornado plots")
+                error_with_hint(
+                    "--metric is required for sweep-tornado plots",
+                    ["Example: `--metric P_max`"],
+                )
                 return 1
             fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
             render_sweep_tornado(ax, results, raw_metric)
 
         elif plot_type == "sweep-scatter":
             if raw_metric is None:
-                _cerror("--metric is required for sweep-scatter plots")
+                error_with_hint(
+                    "--metric is required for sweep-scatter plots",
+                    ["Example: `--metric P_max`"],
+                )
                 return 1
             n_params = len(results.swept_params)
             fig = plt.figure(figsize=figsize or (3 * n_params, 3 * n_params))
@@ -466,12 +502,16 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
 
         elif plot_type == "replicate-convergence":
             if raw_metric is None:
-                _cerror("--metric is required for replicate-convergence plots")
+                error_with_hint(
+                    "--metric is required for replicate-convergence plots",
+                    ["Example: `--metric P_max`"],
+                )
                 return 1
             if not results.has_replicates:
-                _cerror(
+                error_with_hint(
                     "replicate-convergence requires ensemble data "
-                    "(use --n-replicates in sweep)"
+                    "(use --n-replicates in sweep)",
+                    ["Re-run sweep with `--n-replicates 10`"],
                 )
                 return 1
             fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))

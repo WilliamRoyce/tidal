@@ -889,12 +889,13 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
     }
     needs_source = measurements & require_source
     if needs_source and source is None:
-        from tidal.cli._console import error as _cerror
+        from tidal.cli._console import error_with_hint
 
         names = ", ".join(sorted(needs_source))
-        _cerror(
+        error_with_hint(
             f"--source required for --what={names} "
-            f"(or use --what=summary for auto-detection)"
+            f"(or use --what=summary for auto-detection)",
+            ["Example: `--what conversion --source phi --target psi`"],
         )
         return 1
 
@@ -930,9 +931,12 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
     if "dispersion" in measurements:
         dyn_in_source = _filter_to_dynamical(source, data, "dispersion")
         if not dyn_in_source:
-            from tidal.cli._console import error as _cerror
+            from tidal.cli._console import error_with_hint
 
-            _cerror("no dynamical fields for dispersion")
+            error_with_hint(
+                "no dynamical fields for dispersion",
+                ["Check spec with `tidal inspect <json>`"],
+            )
             return 1
         results["dispersion"] = _run_measurement_safe(
             _run_dispersion, data, dyn_in_source
@@ -970,7 +974,7 @@ def _run_individual_measurements(  # noqa: C901, PLR0912
     return results
 
 
-def measure_command(args: Namespace) -> int:
+def measure_command(args: Namespace) -> int:  # noqa: C901, PLR0912
     """Run ``tidal measure`` subcommand.
 
     Flow:
@@ -983,15 +987,39 @@ def measure_command(args: Namespace) -> int:
 
     Returns 0 on success, 1 on error.
     """
-    from tidal.cli._console import error as _cerror
+    from tidal.cli._console import error_with_hint
 
     data_path = Path(args.data_path)
     if not data_path.exists():
-        _cerror(f"data path not found: {data_path}")
+        error_with_hint(
+            f"data path not found: {data_path}",
+            ["Run `tidal simulate ... --output DIR` first, then `tidal measure DIR`"],
+        )
         return 1
 
-    spec_path = _resolve_spec_path(data_path, getattr(args, "spec", None))
-    measurements = _parse_measurements(getattr(args, "what", None))
+    try:
+        spec_path = _resolve_spec_path(data_path, getattr(args, "spec", None))
+    except FileNotFoundError:
+        error_with_hint(
+            f"spec file not found for {data_path.name}",
+            ["Use `tidal list` to find specs"],
+        )
+        return 1
+    except ValueError:
+        error_with_hint(
+            f"cannot determine spec for {data_path.name}",
+            ["Provide explicitly: `tidal measure DIR --spec spec.json`"],
+        )
+        return 1
+
+    try:
+        measurements = _parse_measurements(getattr(args, "what", None))
+    except ValueError:
+        error_with_hint(
+            f"unknown measurement type in --what={getattr(args, 'what', '')}",
+            ["Available: energy, conversion, mixing, spectrum, conservation, etc."],
+        )
+        return 1
     quiet: bool = getattr(args, "quiet", False)
 
     if not quiet:

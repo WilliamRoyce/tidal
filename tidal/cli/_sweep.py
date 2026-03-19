@@ -1536,11 +1536,14 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         measurements = {s.strip() for s in raw_measure.split(",")}
         unknown = measurements - _SWEEP_MEASUREMENTS
         if unknown:
-            from tidal.cli._console import error as _cerror
+            from tidal.cli._console import error_with_hint
 
-            _cerror(
+            error_with_hint(
                 f"unknown measurement(s): {', '.join(sorted(unknown))}. "
-                f"Valid: {', '.join(sorted(_SWEEP_MEASUREMENTS))}"
+                f"Valid: {', '.join(sorted(_SWEEP_MEASUREMENTS))}",
+                [
+                    "Check spelling. Available: energy, conversion, mixing, spectrum, conservation"
+                ],
             )
             return 1
     if not measurements:
@@ -1587,11 +1590,15 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # Safety limit for large sweeps
     force_large = getattr(args, "force_large_sweep", False)
     if total_runs > _MAX_SWEEP_SIZE and not force_large:
-        from tidal.cli._console import error as _cerror
+        from tidal.cli._console import error_with_hint
 
-        _cerror(
+        error_with_hint(
             f"sweep has {total_runs} runs (limit: {_MAX_SWEEP_SIZE}). "
-            f"Use --force-large-sweep to override."
+            f"Use --force-large-sweep to override.",
+            [
+                "Reduce parameter ranges or grid points",
+                "Override with `--force-large-sweep`",
+            ],
         )
         return 1
     if total_runs > _WARN_SWEEP_SIZE:
@@ -1675,11 +1682,15 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
         # Re-check safety limit after expansion
         force_large = getattr(args, "force_large_sweep", False)
         if total_runs > _MAX_SWEEP_SIZE and not force_large:
-            from tidal.cli._console import error as _cerror
+            from tidal.cli._console import error_with_hint
 
-            _cerror(
+            error_with_hint(
                 f"sweep has {total_runs} runs (limit: {_MAX_SWEEP_SIZE}). "
-                f"Use --force-large-sweep to override."
+                f"Use --force-large-sweep to override.",
+                [
+                    "Reduce parameter ranges or grid points",
+                    "Override with `--force-large-sweep`",
+                ],
             )
             return 1
 
@@ -2018,17 +2029,29 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
             return 1
 
     from tidal.cli._console import error as _cerror
+    from tidal.cli._console import error_with_hint
 
     spec_path = Path(args.json_path) if getattr(args, "json_path", None) else None
     if spec_path is None:
-        _cerror("json_path is required (via positional arg or TOML spec)")
+        error_with_hint(
+            "json_path is required (via positional arg or TOML spec)",
+            [
+                "Example: `tidal sweep spec.json --sweep 'm2=0.1:1:10' --output results/`"
+            ],
+        )
         return 1
     if not spec_path.exists():
-        _cerror(f"file not found: {spec_path}")
+        error_with_hint(
+            f"file not found: {spec_path}",
+            ["Use `tidal list` to find specs, or `tidal derive` to generate"],
+        )
         return 1
 
     if not getattr(args, "output", None):
-        _cerror("--output is required for sweep")
+        error_with_hint(
+            "--output is required for sweep",
+            ["Required: `--output results/`"],
+        )
         return 1
 
     # Parse sweep specs from CLI (these override/extend TOML)
@@ -2039,7 +2062,12 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
     converge_spec: str | None = getattr(args, "converge", None)
 
     if converge_spec and (sweep_specs or swept_params):
-        _cerror("--sweep and --converge are mutually exclusive")
+        error_with_hint(
+            "--sweep and --converge are mutually exclusive",
+            [
+                "Choose one: parameter sweep (`--sweep`) or convergence study (`--converge`)"
+            ],
+        )
         return 1
 
     try:
@@ -2051,11 +2079,21 @@ def sweep_command(args: Namespace) -> int:  # noqa: C901, PLR0911
                 name, values = parse_sweep_spec(raw)
                 swept_params[name] = values  # CLI overrides TOML for same param
     except ValueError as exc:
-        _cerror(str(exc))
+        error_with_hint(
+            str(exc),
+            [
+                "Range: `--sweep 'm2=0.1:10:5'`",
+                "List: `--sweep 'm2=0.1,1,10'`",
+                "Log: `--sweep 'm2=0.01:10:5:log'`",
+            ],
+        )
         return 1
 
     if not swept_params and converge_sizes is None:
-        _cerror("provide --sweep, --converge, or --config with [sweep.*] sections")
+        error_with_hint(
+            "provide --sweep, --converge, or --config with [sweep.*] sections",
+            ["Specify `--sweep 'param=start:stop:N'` or `--converge '32,64,128'`"],
+        )
         return 1
 
     return _run_sweep(args, swept_params, converge_sizes)
