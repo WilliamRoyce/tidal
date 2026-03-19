@@ -27,16 +27,24 @@
 \maketitle
 
 \begin{abstract}
-We systematically enumerate all independent scalar invariants that
-are quadratic in the Riemann--Cartan curvature $\Rt_{\mu\nu\rho\sigma}$,
-torsion $T^\lambda{}_{\mu\nu}$, and electromagnetic field strength
-$F_{\mu\nu}$, including terms with one covariant derivative.
-The enumeration uses the \texttt{xTras} package for \texttt{xAct}
-(Mathematica), specifically the \texttt{AllContractions} function
-which automatically determines all independent index contractions
-respecting tensor symmetries.
-We cross-reference against the parameterizations of Barker et al.\
-(2406.12826), Shapiro (hep-th/0103093), and Hayashi--Shirafuji (1979).
+We use \texttt{MakeContractionAnsatz} from the \texttt{xTras} package
+for \texttt{xAct} (Mathematica) to \emph{automatically generate}
+the most general Lagrangian up to second order in the Riemann--Cartan
+curvature $\Rt_{\mu\nu\rho\sigma}$, torsion $T^\lambda{}_{\mu\nu}$,
+and electromagnetic field strength $F_{\mu\nu}$ in 4D.
+
+The core Lagrangian has \textbf{11 parity-even} and \textbf{21 parity-odd}
+independent parameters (32 total), produced directly by
+\texttt{MakeContractionAnsatz} with guaranteed completeness.
+We also enumerate derivative extensions (Barker's eWGT completion),
+cubic terms relevant for linearization around a magnetic background,
+and Chern--Simons torsion--EM couplings.
+
+An automated combinatorial loop over all tensor products from the
+building blocks $\{\Rt, T, F, \del\Rt, \del T, \del F\}$ finds
+\textbf{57 non-zero sectors} with 5{,}612 total independent contractions,
+of which only $\sim$200 contribute at $O(\epsilon^2)$ in the linearized
+theory around $\bar{B}_0 \neq 0$, $\bar{T} = 0$.
 \end{abstract}
 
 \tableofcontents
