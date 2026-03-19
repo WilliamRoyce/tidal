@@ -975,7 +975,7 @@ def _wls_component_metadata(
     ]
 
 
-def _wls_shorthand_cd_tensors(
+def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0914
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
@@ -1116,9 +1116,50 @@ def _wls_shorthand_cd_tensors(
                 ]
             )
 
+    # --- Third-order CD shorthands: CD3field = CD@CD2field ---
+    # For R̃² terms with three nested covariant derivatives.
+    cd3_rule_vars: list[str] = []
+    for df in dyn_fields:
+        head = df["head"]
+        cd2_head = f"CD2{head}"
+        cd3_head = f"CD3{head}"
+        cd3_rule_var = f"toCD3{head}"
+        cd3_rule_vars.append(cd3_rule_var)
+
+        lines.extend(
+            [
+                f"(* Third-order shorthand for CD[CD[CD[{df['name']}]]] *)",
+                f"If[xTensorQ[{cd2_head}],",
+                f"  Module[{{cd2Slots = SlotsOfTensor[{cd2_head}], cd2Rank, dummyIdxs, cd3IdxList}},",
+                "    cd2Rank = Length[cd2Slots];",
+                f"    If[!xTensorQ[{cd3_head}],",
+                f"      dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cd2Rank}}];",
+                "      cd3IdxList = Join[{-a}, MapThread[If[#1 === 1, #2, -#2] &, {cd2Slots, dummyIdxs}]];",
+                f"      DefTensor[{cd3_head} @@ cd3IdxList, {ctx.manifold}]",
+                "    ];",
+                f"    {cd3_rule_var} = {ctx.cd}[idx_][{cd2_head}[args__]] :> {cd3_head}[idx, args]",
+                "  ],",
+                f"  {cd3_rule_var} = {{}};",
+                "];",
+                "",
+            ]
+        )
+
+    # Apply CD3 rules
+    all_cd3_rules = " /. ".join(cd3_rule_vars) if cd3_rule_vars else ""
+    if all_cd3_rules:
+        for df in dyn_fields:
+            eom_var = f"eom{df['name'].capitalize()}"
+            lines.extend(
+                [
+                    f"{eom_var} = {eom_var} /. {all_cd3_rules};",
+                    f"{eom_var} = {eom_var} /. Scalar[x_] :> Scalar[x /. {all_cd3_rules}];",
+                ]
+            )
+
     # Store ALL rules in global $CDShorthandRules for reuse in ComponentDecompose.wl
     # (after ExpandScalarWrappers introduces new CD operators from Scalar contents)
-    all_rule_vars = rule_vars + cd2_rule_vars
+    all_rule_vars = rule_vars + cd2_rule_vars + cd3_rule_vars
     if all_rule_vars:
         rules_list = ", ".join(all_rule_vars)
         lines.append(f"$CDShorthandRules = Flatten[{{{rules_list}}}];")
@@ -1474,6 +1515,47 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
                 "      ]",
                 "    ];",
                 f'    Print["  CD2[{df["name"]}] all ", 2^cdRank, " placements computed"];',
+                "  ]",
+                "]];",
+                "",
+            ]
+        )
+
+    # --- Pre-compute CD3 shorthand ComponentValues (third-order, recursive) ---
+    for df in dyn_fields:
+        head = df["head"]
+        cd2_head = f"CD2{head}"
+        cd3_head = f"CD3{head}"
+        lines.extend(
+            [
+                f"(* Pre-compute ALL CD3[{df['name']}] ComponentValue placements *)",
+                f"Catch[If[xTensorQ[{cd3_head}],",
+                "  Module[{comp, cdRank, naturalSlots, mask, placement, abstractIdx, basisIdx},",
+                f"    cdRank = Length[SlotsOfTensor[{cd3_head}]];",
+                f"    naturalSlots = SlotsOfTensor[{cd3_head}];",
+                f"    Module[{{freshIdx = DummyIn[Tangent{ctx.manifold}],",
+                f"            cd2Idxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, Length[SlotsOfTensor[{cd2_head}]]}}]}},",
+                f"      Module[{{cd2Expr = {cd2_head} @@ MapThread[If[#1 === 1, #2, -#2] &, {{SlotsOfTensor[{cd2_head}], cd2Idxs}}]}},",
+                f"        comp = cdSplinter[{ctx.cd}[-freshIdx] @ cd2Expr]",
+                "      ]",
+                "    ];",
+                f"    Module[{{dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cdRank}}]}},",
+                "      Do[",
+                "        placement = IntegerDigits[mask, 2, cdRank];",
+                "        abstractIdx = Table[If[placement[[n]] === 1, dummyIdxs[[n]], -dummyIdxs[[n]]], {n, cdRank}];",
+                "        If[placement === Table[If[naturalSlots[[n]] === 1, 1, 0], {n, cdRank}], Null,",
+                f"          comp = cdSplinter[{cd3_head} @@ abstractIdx]];",
+                "        basisIdx = Table[If[placement[[n]] === 1, {dummyIdxs[[n]], "
+                f"{ctx.chart}"
+                "}, {dummyIdxs[[n]], -"
+                f"{ctx.chart}"
+                "}], {n, cdRank}];",
+                "        Block[{Print = Null},",
+                f"          ComponentValue[ComponentArray[{cd3_head} @@ basisIdx], comp]],",
+                "        {mask, 0, 2^cdRank - 1}",
+                "      ]",
+                "    ];",
+                f'    Print["  CD3[{df["name"]}] all ", 2^cdRank, " placements computed"];',
                 "  ]",
                 "]];",
                 "",
