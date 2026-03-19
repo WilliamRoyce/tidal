@@ -1012,7 +1012,7 @@ def _wls_shorthand_cd_tensors(
 
     for df in dyn_fields:
         head = df["head"]
-        fexpr = df["fexpr"]  # e.g. "tidalH[-a,-b]" or "tidalT[a,-b,-c]"
+        df["fexpr"]  # e.g. "tidalH[-a,-b]" or "tidalT[a,-b,-c]"
         cd1_head = f"CD1{head}"
         rule_var = f"toCD1{head}"
         rule_vars.append(rule_var)
@@ -1023,13 +1023,13 @@ def _wls_shorthand_cd_tensors(
         lines.extend(
             [
                 f"(* Shorthand for CD[{df['name']}] *)",
-                f"Module[{{slots = SlotsOfTensor[{head}], rank, cdIdxStr, lhs, rhs}},",
+                f"Module[{{slots = SlotsOfTensor[{head}], rank}},",
                 "  rank = Length[slots];",
                 "  If[rank == 0,",
-                "    (* Scalar field: CD[-a]@f[] → CD1f[-a] *)",
+                "    (* Scalar field: CD[idx]@f[] → CD1f[idx] *)",
                 f"    If[!xTensorQ[{cd1_head}], DefTensor[{cd1_head}[-a], {ctx.manifold}]];",
-                f"    {rule_var} = MakeRule[{{CD[-a]@{head}[], {cd1_head}[-a]}}, MetricOn -> All, ContractMetrics -> True],",
-                "    (* Tensor field: use abstract index pattern from the field expr *)",
+                f"    {rule_var} = {ctx.cd}[idx_][{head}[]] :> {cd1_head}[idx],",
+                "    (* Tensor field: CD[idx]@f[args] → CD1f[idx, args] *)",
                 f"    If[!xTensorQ[{cd1_head}],",
                 "      Module[{dummyIdxs, cdIdxList},",
                 f"        dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, rank}}];",
@@ -1037,10 +1037,7 @@ def _wls_shorthand_cd_tensors(
                 f"        DefTensor[{cd1_head} @@ cdIdxList, {ctx.manifold}]",
                 "      ]",
                 "    ];",
-                "    (* Use a fresh DummyIn index for CD to avoid clash with field indices *)",
-                f"    Module[{{cdIdx = DummyIn[Tangent{ctx.manifold}]}},",
-                f"      {rule_var} = MakeRule[{{CD[-cdIdx] @ {fexpr}, {cd1_head} @@ Join[{{-cdIdx}}, List @@ IndicesOf[Free][{fexpr}]]}}, MetricOn -> All, ContractMetrics -> True]",
-                "    ]",
+                f"    {rule_var} = {ctx.cd}[idx_][{head}[args__]] :> {cd1_head}[idx, args]",
                 "  ];",
                 "];",
                 "",
@@ -1094,13 +1091,8 @@ def _wls_shorthand_cd_tensors(
                 "      cd2IdxList = Join[{-a}, MapThread[If[#1 === 1, #2, -#2] &, {cd1Slots, dummyIdxs}]];",
                 f"      DefTensor[{cd2_head} @@ cd2IdxList, {ctx.manifold}]",
                 "    ];",
-                "    (* MakeRule: CD[-cdIdx] @ CD1field[indices] → CD2field[-cdIdx, indices] *)",
-                f"    cdIdx = DummyIn[Tangent{ctx.manifold}];",
-                f"    dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cd1Rank}}];",
-                "    cd1Expr = "
-                f"{cd1_head}"
-                " @@ MapThread[If[#1 === 1, #2, -#2] &, {cd1Slots, dummyIdxs}];",
-                f"    {cd2_rule_var} = MakeRule[{{CD[-cdIdx] @ cd1Expr, {cd2_head} @@ Join[{{-cdIdx}}, List @@ IndicesOf[Free][cd1Expr]]}}, MetricOn -> All, ContractMetrics -> True]",
+                "    (* Direct structural rule: CD[idx]@CD1field[args] → CD2field[idx, args] *)",
+                f"    {cd2_rule_var} = {ctx.cd}[idx_][{cd1_head}[args__]] :> {cd2_head}[idx, args]",
                 "  ],",
                 f"  {cd2_rule_var} = {{}};",
                 "];",
