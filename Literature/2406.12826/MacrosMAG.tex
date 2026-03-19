@@ -1,0 +1,272 @@
+%MacrosMAG
+
+\usepackage{etoolbox}
+\usepackage{tensor}
+
+\newrobustcmd{\PSALTer}{\textit{PSALTer}\xspace}
+\newrobustcmd{\MPl}{%
+	{m_{\mathrm{P}}} 
+}
+\newrobustcmd{\LPl}{%
+	{\ell_{\mathrm{P}}} 
+}
+\newrobustcmd{\LPhy}{%
+{\ell_{\mathrm{Phy}}} 
+}
+\newrobustcmd{\LPhyprime}{%
+{\ell^\prime_{\mathrm{Phy}}} 
+}
+\newrobustcmd{\FieldOmega}[1]{%
+  \tensor{\omega}{#1}
+}
+\newrobustcmd{\FieldTau}[1]{%
+  \tensor{\tau}{#1}
+}
+\newrobustcmd{\FieldSpin}[1]{%
+  \tensor{\sigma}{#1}
+}
+\newrobustcmd{\FieldPert}[1]{%
+  \tensor{f}{#1}
+}
+\newrobustcmd{\FieldMomentum}[1]{%
+  \tensor{k}{#1}
+}
+\newrobustcmd{\FieldVScalar}[1]{%
+  \tensor{\delta B_\perp}{#1}
+}
+\newrobustcmd{\FieldVScalarDagger}[1]{%
+  \tensor{\delta B_\perp^*}{#1}
+}
+\newrobustcmd{\FieldVVector}[1]{%
+  \tensor{\delta B_\parallel}{#1}
+}
+\newrobustcmd{\FieldVVectorDagger}[1]{%
+  \tensor{\delta B_\parallel^*}{#1}
+}
+\newrobustcmd{\FieldF}[1]{%
+  \tensor{F}{#1}
+}
+\newrobustcmd{\SCovD}[1]{%
+	\tensor{\mathscr{D}}{#1}
+}
+\newrobustcmd{\FieldH}[1]{%
+  \tensor{h}{#1}
+}
+\newrobustcmd{\FieldHHat}[1]{%
+  \tensor{\hat h}{#1}
+}
+\newrobustcmd{\FieldB}[1]{%
+  \tensor{b}{#1}
+}
+\newrobustcmd{\FieldBHat}[1]{%
+  \tensor{\hat b}{#1}
+}
+\newrobustcmd{\FieldV}[1]{%
+  \tensor{B}{#1}
+}
+\newrobustcmd{\FieldVHat}[1]{%
+  \tensor{\hat B}{#1}
+}
+\newrobustcmd{\FieldVV}[1]{%
+  \tensor{V}{#1}
+}
+\newrobustcmd{\FieldSigma}[1]{%
+  \tensor{\Sigma}{#1}
+}
+\newrobustcmd{\FieldATilde}[1]{%
+  \tensor{\tilde A}{#1}
+}
+\newrobustcmd{\Curtright}[1]{%
+  \tensor{C}{#1}
+}
+\newrobustcmd{\FieldAHat}[1]{%
+  \tensor{\hat A}{#1}
+}
+\newrobustcmd{\Alp}[1]{%
+  \tensor{\alpha}{_#1}
+}
+\newrobustcmd{\Bet}[1]{%
+  \tensor{\beta}{_#1}
+}
+\newrobustcmd{\Gam}[1]{%
+  \tensor{\gamma}{_#1}
+}
+\newrobustcmd{\MassSquared}[1]{%
+	\left(\tensor{m}{_{#1}}\right)^2
+}
+\newrobustcmd{\FieldA}[1]{%
+  \tensor{A}{#1}
+}
+\newrobustcmd{\FieldDelta}[1]{%
+	\tensor*{\delta}{#1}
+}
+\newrobustcmd{\FieldEta}[1]{%
+	\tensor{\eta}{#1}
+}
+\newrobustcmd{\FieldX}[1]{%
+	\tensor{x}{#1}
+}
+\newrobustcmd{\FieldY}[1]{%
+	\tensor{y}{#1}
+}
+\newrobustcmd{\FieldG}[1]{%
+	\tensor{g}{#1}
+}
+\newrobustcmd{\FieldGHat}[1]{%
+	\tensor{\hat g}{#1}
+}
+\newrobustcmd{\FieldLambda}[1]{%
+	\tensor{\Lambda}{#1}
+}
+\newrobustcmd{\PD}[1]{%
+	\tensor{\partial}{#1}%
+}
+\newrobustcmd{\Danger}[1]{%
+	{\color{red}{#1}}	
+}
+\newrobustcmd{\Coupling}[1]{%
+	{a_{#1}}	
+}
+\newrobustcmd{\CouplingB}[1]{%
+	{b_{#1}}	
+}
+\newrobustcmd{\MAGg}[1]{%
+	\tensor{g}{#1}
+}
+\newrobustcmd{\MAGl}[1]{%
+	\tensor{\xi}{#1}
+}
+\newrobustcmd{\MAGP}[1]{%
+  \tensor{P}{#1}
+}
+\newrobustcmd{\MAGC}[1]{%
+  \tensor{C}{#1}
+}
+\newrobustcmd{\ShiftA}[1]{%
+  \tensor{A}{#1}
+}
+\newrobustcmd{\ShiftB}[1]{%
+  \tensor{B}{#1}
+}
+\newrobustcmd{\ShiftC}[1]{%
+  \tensor{C}{#1}
+}
+\newrobustcmd{\MAGA}[1]{%
+  \tensor{\Gamma}{#1}
+}
+\newrobustcmd{\Ja}[1]{%
+	\tensor{\smash{\overset{\scalebox{0.6}{$\mathrm{(M)}$}}{\mathcal{J}}}}{#1}
+}
+\newrobustcmd{\Jv}[1]{%
+	\tensor{\smash{\overset{\scalebox{0.6}{$\mathrm{(N)}$}}{\mathcal{J}}}}{#1}
+}
+\newrobustcmd{\MAGH}[1]{%
+	\tensor{H}{#1}
+}
+\newrobustcmd{\MAGHHat}[1]{%
+	\tensor{\hat H}{#1}
+}
+\newrobustcmd{\MAGF}[1]{%
+	\tensor{R}{#1}
+}
+\newrobustcmd{\MAGFt}[1]{%
+	\tensor{\tilde{R}}{#1}
+}
+\newrobustcmd{\MAGFh}[1]{%
+	\tensor{\hat{R}}{#1}
+}
+\newrobustcmd{\MAGFa}[1]{%
+	\tensor{\check{R}}{#1}
+}
+\newrobustcmd{\MAGFb}[1]{%
+	\tensor{R}{#1}
+}
+\newrobustcmd{\MAGT}[1]{%
+	\tensor{T}{#1}
+}
+\newrobustcmd{\MAGTTilde}[1]{%
+	\tensor{\tilde T}{#1}
+}
+\newrobustcmd{\MAGTt}[1]{%
+	\tensor{\hat{T}}{#1}
+}
+\newrobustcmd{\MAGt}[1]{%
+	\tensor{t}{#1}
+}
+\newrobustcmd{\MAGQ}[1]{%
+	\tensor{Q}{#1}
+}
+\newrobustcmd{\MAGQt}[1]{%
+	\tensor{\hat{Q}}{#1}
+}
+\newrobustcmd{\MAGq}[1]{%
+	\tensor{q}{#1}
+}
+\newrobustcmd{\MAGV}[1]{%
+	\tensor{Z}{#1}
+}
+\newrobustcmd{\MAGVt}[1]{%
+	\tensor{\tilde{Z}}{#1}
+}
+
+
+\newrobustcmd{\xMAGA}[1]{%
+  \tensor{A}{#1}
+}
+\newrobustcmd{\xMAGF}[1]{%
+	\tensor{\mathcal{F}}{#1}
+}
+\newrobustcmd{\xMAGFt}[1]{%
+	\tensor{\tilde{\mathcal{F}}}{#1}
+}
+\newrobustcmd{\xMAGFa}[1]{%
+	\tensor{\mathcal{F}}{^{(14)}#1}
+}
+\newrobustcmd{\xMAGFb}[1]{%
+	\tensor{\mathcal{F}}{^{(13)}#1}
+}
+\newrobustcmd{\xMAGT}[1]{%
+	\tensor{\mathcal{T}}{#1}
+}
+\newrobustcmd{\xMAGTt}[1]{%
+	\tensor{\tilde{\mathcal{T}}}{#1}
+}
+\newrobustcmd{\xMAGQ}[1]{%
+	\tensor{\mathcal{Q}}{#1}
+}
+\newrobustcmd{\xMAGQt}[1]{%
+	\tensor{\tilde{\mathcal{Q}}}{#1}
+}
+\newrobustcmd{\xMAGTh}[1]{%
+	\tensor{\hat{\mathcal{T}}}{#1}
+}
+\newrobustcmd{\xMAGV}[1]{%
+	\tensor{\mathcal{V}}{#1}
+}
+\newrobustcmd{\g}[1]{%
+	\tensor{g}{#1}%
+}
+\newrobustcmd{\rcCon}[1]{%
+	\tensor*{\Gamma}{#1}%
+}
+\newrobustcmd{\rCon}[1]{%
+	\tensor{\mathring{\Gamma}}{#1}%
+}
+\newrobustcmd{\Con}[1]{%
+	\tensor{\mathring{\Gamma}}{#1}%
+}
+\newrobustcmd{\B}[1]{%
+	\tensor{B}{#1}%
+}
+\newrobustcmd{\rD}[1]{%
+	\tensor{\mathring{\nabla}}{#1}%
+}
+\newrobustcmd{\rcD}[1]{%
+	\tensor{\nabla}{#1}%
+}
+\newrobustcmd{\rR}[1]{%
+	\tensor{\mathring{R}}{#1}%
+}
+\newrobustcmd{\rcR}[1]{%
+	\tensor{R}{#1}%
+}
