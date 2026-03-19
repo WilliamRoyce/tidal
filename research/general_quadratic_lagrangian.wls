@@ -169,11 +169,133 @@ Do[
   {r, allResults}
 ];
 
-(* Export summary to JSON for programmatic use *)
+(* ============================================================ *)
+Print["\n\n== PART F: MIXING CLASSIFICATION (B0!=0, Tbar=0) =="];
+Print["Automated: count tensor types per sector, classify mixing"];
+(* ============================================================ *)
+
+(* Classification rules for B0!=0, Tbar=0 linearization:
+   - Count R (curvature) factors → h perturbation
+   - Count T (torsion) factors → t perturbation
+   - Count F (EM) factors → one can be background F_bar=B0
+   A cubic X*Y*Z contributes at O(eps^2) when one factor = background.
+   For t-f mixing: need >=1 torsion AND >=1 EM, with one EM -> B0.
+   For h-f mixing: need >=1 curvature AND >=1 EM.
+   For h-t mixing via B0: need curvature AND torsion AND >=1 EM.
+*)
+
+ClassifySector[name_String, count_Integer] := Module[
+  {hasR, hasT, hasF, nR, nT, nF, mixing},
+
+  (* Count tensor types from sector name *)
+  nR = StringCount[name, "R"] - StringCount[name, "DR"];
+  nR = nR + StringCount[name, "DR"];  (* DR still contains curvature *)
+  hasR = StringContainsQ[name, "R"];
+  hasT = StringContainsQ[name, "T" ~~ Except["x"]];  (* T but not "x" *)
+  hasT = hasT || StringContainsQ[name, "DT"];
+  hasF = StringContainsQ[name, "F"];
+
+  (* More precise: parse the sector name *)
+  hasR = StringContainsQ[name, RegularExpression["(^|\\s|x )D?R"]];
+  hasT = StringContainsQ[name, RegularExpression["(^|\\s|x )D?T(?!x)"]];
+  hasF = StringContainsQ[name, RegularExpression["(^|\\s|x )D?F"]];
+
+  (* Count F factors *)
+  nF = StringCount[name, RegularExpression["(?<![D])F"]];
+
+  mixing = Which[
+    count == 0, "none (vanishing)",
+    hasR && hasT && hasF, "h-t mixing via B0",
+    hasR && hasF && !hasT, "h-f mixing (Gertsenshtein-type)",
+    hasT && hasF && !hasR && nF >= 2, "t-f mixing via B0 (cubic)",
+    hasT && hasF && !hasR, "t-f mixing",
+    hasR && hasT && !hasF, "h-t mixing (B0-independent)",
+    hasR && !hasT && !hasF, "curvature self-interaction",
+    hasT && !hasR && !hasF, "torsion self-interaction",
+    hasF && !hasR && !hasT, "EM self-interaction",
+    True, "unclassified"
+  ];
+
+  (* Special case: T x T x F with Tbar=0 is t^2*B0 = mass correction *)
+  If[StringMatchQ[name, "*T x T x F*"] && !hasR,
+    mixing = "torsion mass correction (t^2*B0)"
+  ];
+
+  {name, count, mixing}
+];
+
+classifiedResults = ClassifySector[#[[1]], #[[2]]] & /@ allResults;
+
+Print["\n  Mixing Classification:"];
+Do[
+  Print["  ", r[[1]], " (", r[[2]], "): ", r[[3]]],
+  {r, classifiedResults}
+];
+
+(* ============================================================ *)
+Print["\n\n== PART G: CHERN-SIMONS (A-POTENTIAL) COUPLINGS =="];
+Print["Gauge-invariant up to boundary: eps V A F"];
+(* ============================================================ *)
+
+(* Define EM potential as rank-1 tensor *)
+DefTensor[AA[-a], M4, PrintAs -> "A"];
+
+(* The Chern-Simons form: eps^{mnrs} V_m A_n F_{rs}
+   where V is a torsion-derived vector.
+   We enumerate: eps x TorVector x A x F *)
+
+(* Torsion trace vector: T_mu = T^a_{a mu} — represent as rank-1 *)
+DefTensor[Tvec[-a], M4, PrintAs -> "Tv"];
+
+(* Enumerate: eps x Tvec x A x F (4+1+1+2=8 indices) *)
+AppendResult @ EnumerateSector["CS: eps Tvec A F",
+  eps[-a,-b,-c,-d] * Tvec[-e] * AA[-f] * FF[-g,-h]];
+
+(* Also: eps x Tor x A x F (4+3+1+2=10 indices) — full torsion, not just trace *)
+AppendResult @ EnumerateSector["CS: eps Tor A F",
+  eps[-a,-b,-c,-d] * Tor[-e,-f,-g] * AA[-h] * FF[-i,-j]];
+
+(* And: eps x DT x A x F with derivatives *)
+AppendResult @ EnumerateSector["CS: eps Tor A DF",
+  eps[-a,-b,-c,-d] * Tor[-e,-f,-g] * AA[-h] * DF[-i,-j,-k]];
+
+(* ============================================================ *)
+Print["\n\n========================================"];
+Print["  FINAL MASTER SUMMARY"];
+Print["========================================"];
+(* ============================================================ *)
+
+Do[
+  Print["  ", r[[1]], ": ", r[[2]]],
+  {r, allResults}
+];
+
+(* Export full classified results *)
+classifiedData = Association @@ (
+  (#[[1]] -> <|"count" -> #[[2]], "mixing" -> #[[3]]|>) & /@ classifiedResults
+);
+
+(* Add CS results *)
+Do[
+  If[Length[allResults] >= k && allResults[[k, 2]] > 0,
+    classifiedData[allResults[[k, 1]]] = <|
+      "count" -> allResults[[k, 2]],
+      "mixing" -> "Chern-Simons (A-potential)"
+    |>
+  ],
+  {k, Length[allResults] - 2, Length[allResults]}  (* last 3 entries are CS *)
+];
+
+Export[
+  FileNameJoin[{DirectoryName[$InputFileName], "enumeration_classified.json"}],
+  classifiedData
+];
+
+(* Also export simple counts *)
 summaryData = (#[[1]] -> #[[2]]) & /@ allResults;
 Export[
   FileNameJoin[{DirectoryName[$InputFileName], "enumeration_results.json"}],
   Association @@ summaryData
 ];
-Print["\nResults exported to enumeration_results.json"];
+Print["\nResults exported to enumeration_results.json and enumeration_classified.json"];
 Print["=== DONE ==="];

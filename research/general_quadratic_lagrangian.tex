@@ -517,48 +517,60 @@ $\Rt \times \del T$ sector, and $\xi$ to the $\del T \times \del T$ sector.
 
 
 %% ================================================================
-\section{Cross-Coupling and Background Fields}
+\section{Linearization Around a Magnetic Background}
 \label{sec:background}
 %% ================================================================
 
-\subsection{Why Cubic Terms Are Not Enumerated}
+We consider linearization around flat spacetime with a background
+magnetic field $\bar{B}_0 \neq 0$ and \emph{no background torsion}
+($\bar{T} = 0$). This is the physically relevant setting for
+Gertsenshtein-type conversion experiments.
 
-Terms cubic in field strengths (e.g., $T_{\mu\nu\alpha}\, F^{\mu\nu}\, A^\alpha$
-from Obukhov~\cite{Obukhov:2024ltorsion}) are not included in the
-quadratic enumeration. However, they contribute to the linearized
-(quadratic) action when expanded around a non-trivial background.
+\subsection{How Cubic Terms Contribute at Quadratic Order}
 
-Consider a cubic term $\mathcal{L}_3 \sim T \cdot A \cdot \del A$.
-Expanding $A = \bar{A} + \epsilon\, a$ and $T = \bar{T} + \epsilon\, t$:
+A cubic Lagrangian term $\mathcal{L}_3(X, Y, Z)$ contributes to the
+\emph{quadratic} action when one factor is replaced by its background value.
+With $\bar{F}_{\mu\nu} \neq 0$ (encoding $\bar{B}_0$) and
+$\bar{T} = 0$, $\bar{R} = 0$:
+
 \begin{equation}
-  \mathcal{L}_3^{(2)}
-  \sim \bar{T} \cdot a \cdot \del a
-  + t \cdot \bar{A} \cdot \del\bar{A}
-  + t \cdot \bar{A} \cdot \del a
-  + \cdots
-  \label{eq:cubic_linearize}
+  \mathcal{L}_3(\epsilon\, x_1,\, \epsilon\, x_2,\, \bar{F})
+  = \epsilon^2\, x_1 \cdot x_2 \cdot B_0
+  \label{eq:cubic_mechanism}
 \end{equation}
-These are quadratic in perturbations $(t, a)$ with
-background-dependent coefficients.
 
-\subsection{TIDAL Pipeline Handles This Automatically}
+where $x_1, x_2$ are perturbation fields. This generates:
+\begin{itemize}
+  \item $\mathcal{L}_3(\epsilon\, t,\, \epsilon\, f,\, \bar{F})$
+    $\Rightarrow$ \textbf{torsion--photon mixing} $\propto B_0$
+  \item $\mathcal{L}_3(\epsilon\, h,\, \epsilon\, f,\, \bar{F})$
+    $\Rightarrow$ \textbf{graviton--photon mixing} $\propto B_0$ (Gertsenshtein)
+  \item $\mathcal{L}_3(\epsilon\, h,\, \epsilon\, t,\, \bar{F})$
+    $\Rightarrow$ \textbf{graviton--torsion mixing} $\propto B_0$
+\end{itemize}
 
-In the TIDAL pipeline, this is handled via:
-\begin{enumerate}
-  \item Full nonlinear Lagrangian specified in TOML
-  \item Background fields declared via \texttt{[[background\_fields]]}
-  \item \texttt{xPert} expansion to $O(\epsilon^2)$
-  \item Variational derivative (\texttt{VarD}) on the second-order action
-\end{enumerate}
-Cross-coupling terms emerge automatically from the algebra.
-The Gertsenshtein effect (graviton--photon conversion via background
-$\bar{B}_0$) is a worked example of this mechanism.
+\textbf{Important subtlety:} With $\bar{T} = 0$, cubic terms containing
+two torsion factors give $(\epsilon\, t)^2 \cdot \bar{F} = \epsilon^2\, t^2 B_0$,
+which is a \emph{torsion self-interaction} (mass/dispersion correction
+$\propto B_0$), \textbf{not} torsion--photon mixing.
 
-\textbf{Conclusion:} For theories where the full nonlinear Lagrangian
-is quadratic in field strengths (like Einstein--Maxwell), the quadratic
-enumeration + background expansion captures everything. However, if
-the theory itself contains explicit cubic terms, those must be included
-in the Lagrangian. See Section~\ref{sec:cubic}.
+\subsection{Quadratic Terms Also Generate Mixing}
+
+Quadratic Lagrangian terms like $\del T \times F$ directly produce
+mixing: with $F = \bar{F} + \epsilon f$ and $T = \epsilon t$,
+\begin{equation}
+  \mathcal{L}_2(\del T, F) = \epsilon\, (\del t \cdot \bar{F})
+  + \epsilon^2\, (\del t \cdot f)\,.
+\end{equation}
+The $O(\epsilon)$ term is a source for torsion proportional to $B_0$,
+and the $O(\epsilon^2)$ term is torsion--photon kinetic mixing.
+No cubic terms are needed for this channel.
+
+\subsection{TIDAL Pipeline}
+
+In the TIDAL pipeline, both quadratic and cubic contributions are
+handled automatically via \texttt{xPert} expansion to $O(\epsilon^2)$
+with background fields declared via \texttt{[[background\_fields]]}.
 
 
 %% ================================================================
@@ -594,8 +606,12 @@ generates graviton--photon mixing (Gertsenshtein mechanism).
 $T_{\lambda\mu\nu} T_{\rho\sigma\tau} F_{\alpha\beta}$ has
 $3+3+2=8$ indices. \texttt{AllContractions} yields \textbf{3}
 independent terms.
-When linearized: $\bar{T} \cdot t \cdot \bar{F} + t \cdot t \cdot \bar{F}$
-generates torsion--EM mixing $\propto B_0$.
+
+\textbf{Subtlety:} With $\bar{T} = 0$, this gives
+$(\epsilon\, t)^2 \cdot \bar{F} = \epsilon^2\, t^2\, B_0$, which is a
+\emph{torsion mass correction} proportional to $B_0$,
+\textbf{not} torsion--photon mixing. Both torsion factors must be
+perturbations, leaving no slot for a photon perturbation.
 
 \subsubsection{$\Rt \times T \times T$ (26 terms)}
 
@@ -649,21 +665,148 @@ acquires terms with a derivative on any factor:
 The three IBP-related sectors share a large overlap; the truly
 independent count is significantly smaller.
 
-\subsection{Which Cubic Terms to Include?}
+\subsection{Mixing Classification Summary}
 
-For a parameter sweep with magnetic background $\bar{B}_0$:
-\begin{enumerate}
-  \item \textbf{Essential}: $\Rt \times F \times F$ (4 terms) ---
-    generates graviton--photon conversion (Gertsenshtein)
-  \item \textbf{Important}: $T \times T \times F$ (5 terms) ---
-    generates torsion--EM mixing
-  \item \textbf{With derivatives}: $\del T \times F \times F$ (5 terms) ---
-    torsion--photon coupling via derivative interaction
-  \item \textbf{Rich but complex}: $\Rt \times T \times T$ (26 terms),
-    $\Rt \times \del T \times F$ (46 before IBP) ---
-    large parameter space, may require restricting to physically
-    motivated subsets
-\end{enumerate}
+\begin{table}[htbp]
+\centering
+\caption{Cubic sectors classified by mixing type under
+$\bar{B}_0 \neq 0$, $\bar{T} = 0$ linearization.}
+\label{tab:cubic_mixing}
+\small
+\begin{tabular}{@{}llcl@{}}
+\toprule
+\textbf{Sector} & \textbf{Count} & \textbf{Mixing type} & \textbf{Mechanism} \\
+\midrule
+$\Rt \times F \times F$ & 4 & $h \leftrightarrow f$ & One $F \to \bar{F}$ \\
+$\Rt \times \Rt \times F$ & 8 & $h \leftrightarrow h$ mod.\ $B_0$ & One $F \to \bar{F}$ \\
+$T \times T \times F$ & 3 & $t$ mass corr.\ $\propto B_0$ & Both $T \to \epsilon t$ \\
+$\Rt \times T \times T$ & 26 & $h \leftrightarrow t$ (no $B_0$) & No $F$ factor \\
+\midrule
+$\del T \times F \times F$ & 5 & $t \leftrightarrow f$ & One $F \to \bar{F}$ \\
+$T \times \del F \times F$ & 10 & $t \leftrightarrow f$ (IBP) & One $F \to \bar{F}$ \\
+$\Rt \times \del T \times F$ & 46 & $h \leftrightarrow t$ via $B_0$ & $F \to \bar{F}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+%% ================================================================
+\section{Chern--Simons Torsion--EM Coupling}
+\label{sec:chern_simons}
+%% ================================================================
+
+\subsection{Gauge Potential vs.\ Field Strength Couplings}
+
+All terms enumerated in Sections~\ref{sec:lagrangian}--\ref{sec:cubic}
+are built from the \emph{field strength} $F_{\mu\nu}$ and are
+manifestly gauge-invariant. However, there exists a distinct class
+of couplings involving the gauge \emph{potential} $A_\mu$ directly.
+
+\subsection{The Unique A-Potential Structure}
+
+There is exactly \textbf{one independent} gauge-invariant structure
+involving bare $A_\mu$: the \emph{Chern--Simons form}
+\begin{equation}
+\boxed{
+  \mathcal{L}_{\text{CS}} = \eps^{\mu\nu\rho\sigma}\, V_\mu\, A_\nu\, F_{\rho\sigma}
+}
+  \label{eq:chern_simons}
+\end{equation}
+where $V_\mu$ is any vector field. Under
+$A_\mu \to A_\mu + \pd_\mu \Lambda$:
+\begin{equation}
+  \delta\mathcal{L}_{\text{CS}}
+  = \eps^{\mu\nu\rho\sigma}\, V_\mu\, (\pd_\nu\Lambda)\, F_{\rho\sigma}
+  = \pd_\nu(\eps^{\mu\nu\rho\sigma}\, V_\mu\, \Lambda\, F_{\rho\sigma})
+  + \cdots
+\end{equation}
+which is a total derivative (by the Bianchi identity
+$\pd_{[\nu} F_{\rho\sigma]} = 0$), so the \emph{action} is
+gauge-invariant up to boundary terms.
+
+All other $A_\mu$-involving terms either break gauge invariance
+or reduce to $F$-based couplings upon integration by parts.
+
+\subsection{Torsion Contractions}
+
+Contracting $V_\mu$ with torsion-derived vectors gives
+\textbf{3 independent} Chern--Simons couplings:
+\begin{align}
+  \mathcal{L}_{\text{CS}}^{(1)}
+    &= \chi_1\, \eps^{\mu\nu\rho\sigma}\, T_\mu\, A_\nu\, F_{\rho\sigma}
+    && \text{(trace torsion $\times$ helicity)}
+    \label{eq:cs_trace} \\
+  \mathcal{L}_{\text{CS}}^{(2)}
+    &= \chi_2\, \eps^{\mu\nu\rho\sigma}\, S_\mu\, A_\nu\, F_{\rho\sigma}
+    && \text{(axial torsion $\times$ helicity)}
+    \label{eq:cs_axial} \\
+  \mathcal{L}_{\text{CS}}^{(3)}
+    &= \chi_3\, \eps^{\mu\nu\rho\sigma}\, q^\lambda{}_{\mu\alpha}\, g^{\alpha}{}_{\nu}\,
+       A_\lambda\, F_{\rho\sigma}
+    && \text{(tensor torsion $\times$ helicity)}
+    \label{eq:cs_tensor}
+\end{align}
+
+Obukhov et al.~\cite{Obukhov:2024ltorsion} derive~\eqref{eq:cs_axial}
+from the minimal coupling prescription (replacing $\pd_\mu \to \del_\mu$
+in the Maxwell Lagrangian), with gauge invariance restored via the
+Stueckelberg mechanism. The torsion sources the electromagnetic
+\emph{magnetic helicity density} $\mathbf{A} \cdot \mathbf{B}$.
+
+\subsection{Comparison with Axion--Photon Coupling}
+
+The standard axion coupling
+$\mathcal{L}_{a\gamma\gamma} = -\frac{1}{4}\, g_{a\gamma\gamma}\, a\, F_{\mu\nu}\, \tilde{F}^{\mu\nu}$
+uses the \emph{field strength} dual $\tilde{F}^{\mu\nu}
+= \frac{1}{2}\,\eps^{\mu\nu\rho\sigma} F_{\rho\sigma}$, while the
+Chern--Simons form uses the \emph{potential} $A_\mu$.
+Shapiro~\cite{Shapiro:2001rz} explicitly notes that
+``the antisymmetric field \ldots\ can not be associated to the
+space-time torsion'' despite superficial similarities, because the
+fermionic interactions differ fundamentally.
+
+
+%% ================================================================
+\section{Shapiro's Non-Minimal Classification}
+\label{sec:shapiro}
+%% ================================================================
+
+Shapiro~\cite{Shapiro:2001rz} (Section~2.3) provides the complete
+classification of gauge-invariant non-minimal EM--torsion couplings.
+Minimal coupling (using the torsionful covariant derivative) breaks
+$U(1)$ gauge invariance for the photon. The most general gauge-invariant
+non-minimal coupling is:
+\begin{equation}
+  \mathcal{L}_{\text{nm}} = F_{\mu\nu}\, K^{\mu\nu}\,,
+  \label{eq:shapiro_nm}
+\end{equation}
+where $K^{\mu\nu}$ is an antisymmetric tensor built from torsion:
+\begin{align}
+  K^{\mu\nu} &= \theta_1\, \eps^{\mu\nu\alpha\beta}\, T_\alpha\, S_\beta
+  + \theta_2\, \eps^{\mu\nu\alpha\beta}\, \pd_\alpha S_\beta
+  + \theta_3\, \eps^{\mu\nu\alpha\beta}\, q^\lambda{}_{\alpha\beta}\, S_\lambda
+  \notag\\
+  &\quad + \theta_4\, q^\lambda{}_{\mu\nu}\, T_\lambda
+  + \theta_5\, (\pd_\mu T_\nu - \pd_\nu T_\mu)
+  + \theta_6\, \pd_\lambda q^\lambda{}_{\mu\nu}\,.
+  \label{eq:shapiro_theta}
+\end{align}
+
+These 6 parameters map to our enumerated sectors:
+\begin{itemize}
+  \item $\theta_2, \theta_5, \theta_6$ (derivative of torsion):
+    $\to$ our \textbf{$\del T \times F$} sector (3 parity-even)
+    and \textbf{$\eps \cdot \del T \times F$} (6 parity-odd)
+  \item $\theta_1, \theta_3$ (torsion $\times$ torsion, parity-odd):
+    $\to$ our \textbf{$\eps \cdot T \times T \times F$} sector (15 terms)
+  \item $\theta_4$ (torsion $\times$ torsion, parity-even):
+    $\to$ our \textbf{$T \times T \times F$} sector (3 terms)
+\end{itemize}
+
+\textbf{Critical limitation} (Shapiro): these non-minimal couplings
+exist \emph{only for abelian} $U(1)$ gauge fields.
+For non-abelian vectors (Standard Model $SU(2) \times SU(3)$),
+such structures are algebraically impossible.
 
 
 %% ================================================================

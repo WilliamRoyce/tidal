@@ -29,5 +29,8 @@
 	"eps DT x F":6,
 	"eps T x DF":6,
 	"eps T x T x F":15,
-	"eps DT x F x F":18
+	"eps DT x F x F":18,
+	"CS: eps Tvec A F":1,
+	"CS: eps Tor A F":6,
+	"CS: eps Tor A DF":0
 }

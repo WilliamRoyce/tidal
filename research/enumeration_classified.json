@@ -1,0 +1,134 @@
+{
+	"R^2":{
+		"count":6,
+		"mixing":"curvature self-interaction"
+	},
+	"T^2":{
+		"count":3,
+		"mixing":"torsion self-interaction"
+	},
+	"F^2":{
+		"count":1,
+		"mixing":"EM self-interaction"
+	},
+	"R x F":{
+		"count":1,
+		"mixing":"h-f mixing (Gertsenshtein-type)"
+	},
+	"R x T (odd)":{
+		"count":0,
+		"mixing":"none (vanishing)"
+	},
+	"T x F (odd)":{
+		"count":0,
+		"mixing":"none (vanishing)"
+	},
+	"DT x F":{
+		"count":3,
+		"mixing":"t-f mixing"
+	},
+	"T x DF (IBP)":{
+		"count":3,
+		"mixing":"t-f mixing"
+	},
+	"R x DT":{
+		"count":10,
+		"mixing":"h-t mixing (B0-independent)"
+	},
+	"DR x T (IBP)":{
+		"count":10,
+		"mixing":"h-t mixing (B0-independent)"
+	},
+	"DT x DT":{
+		"count":16,
+		"mixing":"torsion self-interaction"
+	},
+	"DF x DF":{
+		"count":3,
+		"mixing":"EM self-interaction"
+	},
+	"DT x T (odd)":{
+		"count":0,
+		"mixing":"none (vanishing)"
+	},
+	"DF x F (odd)":{
+		"count":0,
+		"mixing":"none (vanishing)"
+	},
+	"R x F x F":{
+		"count":4,
+		"mixing":"h-f mixing (Gertsenshtein-type)"
+	},
+	"T x T x F":{
+		"count":3,
+		"mixing":"torsion mass correction (t^2*B0)"
+	},
+	"R x T x T":{
+		"count":26,
+		"mixing":"h-t mixing (B0-independent)"
+	},
+	"R x R x F":{
+		"count":8,
+		"mixing":"h-f mixing (Gertsenshtein-type)"
+	},
+	"T x F x F (odd)":{
+		"count":0,
+		"mixing":"none (vanishing)"
+	},
+	"R x T x F (odd)":{
+		"count":0,
+		"mixing":"none (vanishing)"
+	},
+	"DT x F x F":{
+		"count":5,
+		"mixing":"t-f mixing via B0 (cubic)"
+	},
+	"T x DF x F":{
+		"count":10,
+		"mixing":"t-f mixing"
+	},
+	"R x DT x F":{
+		"count":46,
+		"mixing":"h-t mixing via B0"
+	},
+	"eps R^2":{
+		"count":13,
+		"mixing":"curvature self-interaction"
+	},
+	"eps T^2":{
+		"count":4,
+		"mixing":"torsion self-interaction"
+	},
+	"eps F^2":{
+		"count":1,
+		"mixing":"EM self-interaction"
+	},
+	"eps R x F":{
+		"count":3,
+		"mixing":"h-f mixing (Gertsenshtein-type)"
+	},
+	"eps DT x F":{
+		"count":6,
+		"mixing":"t-f mixing"
+	},
+	"eps T x DF":{
+		"count":6,
+		"mixing":"t-f mixing"
+	},
+	"eps T x T x F":{
+		"count":15,
+		"mixing":"torsion mass correction (t^2*B0)"
+	},
+	"eps DT x F x F":{
+		"count":18,
+		"mixing":"t-f mixing via B0 (cubic)"
+	},
+	"CS: eps Tvec A F":{
+		"count":1,
+		"mixing":"Chern-Simons (A-potential)"
+	},
+	"CS: eps Tor A F":{
+		"count":6,
+		"mixing":"Chern-Simons (A-potential)"
+	}
+}
