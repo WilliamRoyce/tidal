@@ -2234,7 +2234,15 @@ def simulate_command(args: Namespace) -> int:  # noqa: C901, PLR0912
 
     json_path = Path(args.json_path)
     if not json_path.exists():
-        _cerror(f"file not found: {json_path}")
+        from tidal.cli._console import error_with_hint
+
+        error_with_hint(
+            f"file not found: {json_path}",
+            [
+                "Run 'tidal list' to see available specifications.",
+                "Run 'tidal derive <theory.toml>' to generate from a Lagrangian.",
+            ],
+        )
         return 1
 
     log = _clog

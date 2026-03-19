@@ -1295,7 +1295,18 @@ def main(argv: list[str] | None = None) -> int:
     except KeyboardInterrupt:
         print("\nInterrupted.", file=sys.stderr)
         return 130
-    except (ValueError, FileNotFoundError, TypeError) as exc:
+    except FileNotFoundError as exc:
+        from tidal.cli._console import error_with_hint
+
+        error_with_hint(
+            str(exc),
+            [
+                "Run 'tidal list' to see available specifications.",
+                "Run 'tidal derive <theory.toml>' to generate from a Lagrangian.",
+            ],
+        )
+        return 1
+    except (ValueError, TypeError) as exc:
         _console_error(str(exc))
         return 1
     except RuntimeError:
