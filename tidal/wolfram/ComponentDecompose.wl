@@ -296,6 +296,45 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
   e = ToValues[e];
   e = ToValues[e];  (* Double ToValues: some expressions need two passes *)
 
+  (* Force-resolve remaining abstract-index CD operators.                 *)
+  (* After ToValues + TraceBasisDummy, some CD operators still have       *)
+  (* abstract DummyIn indices (e.g. CD[-g$35404][field[...]]) because    *)
+  (* the CD wrapper is opaque to ToBasis.  Apply ToBasis + TraceBasis-   *)
+  (* Dummy + ToValues iteratively to force basis-index conversion.       *)
+  (* This enables the downstream CD→PD rule and ConvertCDToDerivatives   *)
+  (* to resolve them (they require basis form {i, -chart}).              *)
+  (* Ref: supervisor's EuclideanSplinter applies ToBasis exhaustively.   *)
+  If[!FreeQ[e, _?isCDlikeQ],
+    Module[{prev2 = -1, cur2, iter2 = 0},
+      While[iter2 < 4,
+        If[Head[e] === Plus,
+          e = Total[ToBasis[chart] /@ List @@ e],
+          e = ToBasis[chart][e]
+        ];
+        If[!computeChristoffels,
+          e = e /. christoffelPD -> Zero,
+          e = ToValues[e]
+        ];
+        cur2 = If[Head[e] === Plus, Length[e], 1];
+        If[cur2 == prev2, Break[]];
+        prev2 = cur2;
+        iter2++;
+      ];
+      e = SeparateMetric[metric][e];
+      If[Head[e] === Plus,
+        e = Total[ToBasis[chart] /@ List @@ e],
+        e = ToBasis[chart][e]
+      ];
+      If[!computeChristoffels,
+        e = e /. christoffelPD -> Zero,
+        e = ToValues[e]
+      ];
+      e = TraceBasisDummy[e];
+      e = ToValues[e];
+      e = ToValues[e];
+    ];
+  ];
+
   (* CD[scalar] → PD[scalar]: After ToValues, field tensors are replaced
      by named scalar functions (e.g. H1[t,x,y]). Covariant derivatives of
      scalars equal partial derivatives (no Christoffel correction):
