@@ -1052,7 +1052,8 @@ def _wls_shorthand_cd_tensors(
             [
                 f"{eom_var} //= ToCanonical;",
                 f"{eom_var} //= ContractMetric;",
-                f"{eom_var} = Expand[{eom_var}];",
+                f"{eom_var} //= ScreenDollarIndices;",
+                f"{eom_var} //= CollectTensors;",
             ]
         )
 

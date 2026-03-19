@@ -302,9 +302,10 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
        CD[-{a,chart}][f[coords]] → PD[-{a,chart}][f[coords]]
      This applies to both flat and curved spacetimes.
      Ref: Wald (1984), eq. 3.1.15: ∇_a f = ∂_a f for scalar f. *)
+  (* CD[scalar] → PD[scalar] for ALL CovD operators on scalar functions *)
   Module[{pdSym = Symbol["PD" <> ToString[chart]]},
-    e = e /. covd[idx_][f_[args___]] /; FreeQ[f, _?xTensorQ] :>
-      pdSym[idx][f[args]];
+    e = e /. (f_)[idx_][g_[args___]] /; CovDQ[f] && FreeQ[g, _?xTensorQ] :>
+      pdSym[idx][g[args]];
   ];
 
   On[Validate::repeated];
