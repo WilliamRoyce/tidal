@@ -58,6 +58,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- derive ---
     derive_parser = sub.add_parser(
         "derive",
+        aliases=["der"],
         help="Derive equations from Lagrangian via Wolfram/xAct",
         description=(
             "Generate equations of motion from a Lagrangian. "
@@ -113,6 +114,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- inspect ---
     inspect_parser = sub.add_parser(
         "inspect",
+        aliases=["insp"],
         help="Display equation system information from JSON",
         description="Load a JSON specification and display its contents.",
         epilog=(
@@ -153,6 +155,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- simulate ---
     sim_parser = sub.add_parser(
         "simulate",
+        aliases=["sim"],
         help="Run PDE simulation from JSON specification",
         description="Build and run a PDE simulation from a JSON equation specification.",
         epilog=(
@@ -479,6 +482,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- list ---
     list_parser = sub.add_parser(
         "list",
+        aliases=["ls"],
         help="List available JSON specifications",
         description="Scan a directory for JSON equation specifications and display summaries.",
         epilog=(
@@ -498,6 +502,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- validate ---
     validate_parser = sub.add_parser(
         "validate",
+        aliases=["val"],
         help="Validate a JSON equation specification",
         description="Check a JSON specification for errors (unknown operators, bad references, etc.).",
         epilog=(
@@ -533,6 +538,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- measure ---
     measure_parser = sub.add_parser(
         "measure",
+        aliases=["meas"],
         help="Extract physics measurements from simulation output",
         description=(
             "Load simulation output from 'tidal simulate --output' and run "
@@ -780,6 +786,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- sweep ---
     sweep_parser = sub.add_parser(
         "sweep",
+        aliases=["sw"],
         help="Run parameter sweeps and convergence studies",
         description=(
             "Run simulate + measure across a parameter grid and aggregate "
@@ -1240,6 +1247,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- doctor ---
     sub.add_parser(
         "doctor",
+        aliases=["doc"],
         help="Check environment health (Python, dependencies, Wolfram, xAct)",
     )
 
@@ -1269,6 +1277,18 @@ def _get_version() -> str:
         return "unknown"
 
 
+_COMMAND_ALIASES: dict[str, str] = {
+    "der": "derive",
+    "insp": "inspect",
+    "sim": "simulate",
+    "ls": "list",
+    "val": "validate",
+    "meas": "measure",
+    "sw": "sweep",
+    "doc": "doctor",
+}
+
+
 def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911, C901
     """Lazily import and run the appropriate command handler.
 
@@ -1287,47 +1307,48 @@ def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911, C901
     ValueError
         If ``args.command`` is not a recognized subcommand.
     """
-    if args.command == "derive":
+    cmd = _COMMAND_ALIASES.get(args.command, args.command)
+    if cmd == "derive":
         from tidal.cli._derive import derive_command
 
         return derive_command(args)
-    if args.command == "inspect":
+    if cmd == "inspect":
         from tidal.cli._inspect import inspect_command
 
         return inspect_command(args)
-    if args.command == "simulate":
+    if cmd == "simulate":
         from tidal.cli._simulate import simulate_command
 
         return simulate_command(args)
-    if args.command == "list":
+    if cmd == "list":
         from tidal.cli._list import list_command
 
         return list_command(args)
-    if args.command == "validate":
+    if cmd == "validate":
         from tidal.cli._validate import validate_command
 
         return validate_command(args)
-    if args.command == "measure":
+    if cmd == "measure":
         from tidal.cli._measure import measure_command
 
         return measure_command(args)
-    if args.command == "plot":
+    if cmd == "plot":
         from tidal.cli._plot_command import plot_command
 
         return plot_command(args)
-    if args.command == "sweep":
+    if cmd == "sweep":
         from tidal.cli._sweep import sweep_command
 
         return sweep_command(args)
-    if args.command == "analyze":
+    if cmd == "analyze":
         from tidal.cli._analyze import analyze_command
 
         return analyze_command(args)
-    if args.command == "doctor":
+    if cmd == "doctor":
         from tidal.cli._doctor import doctor_command
 
         return doctor_command(args)
-    msg = f"Unknown command: {args.command}"
+    msg = f"Unknown command: {cmd}"
     raise ValueError(msg)
 
 
@@ -1354,7 +1375,8 @@ def main(argv: list[str] | None = None) -> int:  # noqa: PLR0911
         not args.no_banner
         and not os.environ.get("TIDAL_NO_BANNER")
         and not args.cite
-        and args.command in {None, "simulate", "derive", "sweep"}
+        and _COMMAND_ALIASES.get(args.command, args.command)
+        in {None, "simulate", "derive", "sweep"}
     ):
         from tidal.banner import print_banner
 
