@@ -15,6 +15,7 @@ Entry point: ``tidal`` command with subcommands:
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 
 from tidal.solver._defaults import DEFAULT_ATOL, DEFAULT_RTOL
@@ -32,6 +33,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         "--version",
         action="version",
         version=f"%(prog)s {_get_version()}",
+    )
+    parser.add_argument(
+        "--no-banner",
+        action="store_true",
+        default=False,
+        help="Suppress the startup banner",
     )
     sub = parser.add_subparsers(dest="command", help="Available commands")
 
@@ -1240,6 +1247,11 @@ def main(argv: list[str] | None = None) -> int:
     """
     parser = _build_parser()
     args = parser.parse_args(argv)
+
+    if not args.no_banner and not os.environ.get("TIDAL_NO_BANNER"):
+        from tidal.banner import print_banner
+
+        print_banner()
 
     if args.command is None:
         parser.print_help()
