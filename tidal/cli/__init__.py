@@ -1192,6 +1192,14 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         help="Check environment health (Python, dependencies, Wolfram, xAct)",
     )
 
+    # Shell completion (optional dependency: shtab)
+    try:
+        import shtab
+
+        shtab.add_argument_to(parser)
+    except ImportError:
+        pass
+
     return parser
 
 
