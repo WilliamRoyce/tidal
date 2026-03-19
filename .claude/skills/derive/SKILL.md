@@ -18,10 +18,11 @@ description: Run tidal derive with safety checks. Blocks parallel wolframscript.
    - Verify the TOML file exists
 
 ### Run derivation
+Run in background so you can continue other work while it executes:
 ```bash
 uv run tidal derive $ARGUMENTS
 ```
-The default 10-minute timeout (--timeout 600) applies automatically. Set the Bash tool timeout to 600000ms to match.
+Set `run_in_background: true` and `timeout: 600000` on the Bash tool call. The default 10-minute timeout (`--timeout 600`) applies automatically. You will be notified when the derivation completes — do NOT poll or sleep. Continue with other tasks the user has requested while waiting.
 
 If derivation times out: **do NOT increase the timeout or change the physics.** Instead, investigate how to optimize the Wolfram pipeline code itself — identify which stage is the bottleneck (decomposition, basis transformation, canonical pipeline) and optimize the algorithm, caching, or code path.
 
@@ -44,4 +45,4 @@ uv run tidal simulate <json_path> --grid-shape 64 --bounds 0:10 --periodic \
 5. Report: derivation time, JSON file path, number of fields, hamiltonian terms count, solver auto-selected
 
 ### Multiple TOMLs
-If the user asks to derive multiple examples, run them SEQUENTIALLY in a loop. Never use parallel execution or background processes for wolframscript.
+If the user asks to derive multiple examples, run them SEQUENTIALLY (one at a time). The wolfram-guard hook enforces this — only ONE wolframscript session can run at a time (single license). Each derivation can run in background, but wait for it to complete before starting the next.
