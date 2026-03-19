@@ -8,7 +8,7 @@ and ``flutter doctor``.
 from __future__ import annotations
 
 import shutil
-import subprocess
+import subprocess  # noqa: S404
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -30,41 +30,44 @@ def _check_package(name: str, import_name: str | None = None) -> tuple[bool, str
     mod = import_name or name
     try:
         pkg = __import__(mod)
-        ver = getattr(pkg, "__version__", "unknown")
-        return True, f"{name} {ver}"
     except ImportError:
         return False, f"{name} not installed"
+    else:
+        ver = getattr(pkg, "__version__", "unknown")
+        return True, f"{name} {ver}"
 
 
 def _check_sundials() -> tuple[bool, str]:
     """Check scikit-sundae (SUNDIALS wrapper)."""
     try:
         import sksundae
-
-        ver = getattr(sksundae, "__version__", "unknown")
-        return True, f"scikit-sundae {ver} (SUNDIALS IDA/CVODE)"
     except ImportError:
         return False, "scikit-sundae not installed — IDA/CVODE solvers unavailable"
+    else:
+        ver = getattr(sksundae, "__version__", "unknown")
+        return True, f"scikit-sundae {ver} (SUNDIALS IDA/CVODE)"
 
 
 def _check_wolframscript() -> tuple[bool, str]:
     """Check wolframscript availability."""
-    if shutil.which("wolframscript") is None:
+    wscript = shutil.which("wolframscript")
+    if wscript is None:
         return False, "wolframscript not found — 'tidal derive' will not work"
     try:
-        result = subprocess.run(
-            ["wolframscript", "-code", "$VersionNumber"],
+        result = subprocess.run(  # noqa: S603
+            [wscript, "-code", "$VersionNumber"],
             check=False,
             capture_output=True,
             text=True,
             timeout=15,
         )
+    except (subprocess.TimeoutExpired, OSError):
+        return False, "wolframscript found but timed out"
+    else:
         if result.returncode == 0:
             ver = result.stdout.strip()
             return True, f"Wolfram Engine {ver}"
         return False, "wolframscript found but not functional (check license)"
-    except (subprocess.TimeoutExpired, OSError):
-        return False, "wolframscript found but timed out"
 
 
 def _check_xact() -> tuple[bool, str]:
@@ -92,7 +95,7 @@ def _check_examples() -> tuple[bool, str]:
     return False, "no JSON specs found in examples/data/"
 
 
-def doctor_command(args: Namespace) -> int:
+def doctor_command(_args: Namespace) -> int:
     """Run environment health checks."""
     from tidal.cli._console import success as _success
     from tidal.cli._console import warn as _warn
