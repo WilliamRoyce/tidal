@@ -77,9 +77,35 @@ perturbation_field = "h"   # Metric perturbation (standard xPert)
 Torsion perturbation is **auto-registered** when a `[torsion]` section is present. No `[[linearization.matter_perturbations]]` entry is needed — the pipeline automatically:
 1. Defines the perturbation field (e.g., `t[a,-b,-c]`) from `perturbation_name`
 2. Calls `DefTensorPerturbation` to connect it to `TorsionCDT`
-3. Handles the xPert label/truncation (LI[2]→0, LI[1]→field)
-4. Sets background torsion to zero (flat Minkowski)
+3. Handles the xPert label/truncation (see below)
+4. Sets background torsion and contortion to zero (flat Minkowski)
 5. Calls VarD w.r.t. the torsion perturbation field for the torsion EOM
+
+### Perturbation Truncation Logic
+
+xPert expands each field as: `Φ = Φ̄ + ε·δΦ^(1) + ε²·δΦ^(2) + ...`
+- `LI[1]` = `δΦ^(1)` — the linear perturbation (dynamical field)
+- `LI[2]` = `δΦ^(2)` — 2nd-order correction to the field itself (NOT a separate DOF)
+
+The second-order Lagrangian L^(2) = ½δ²S contains three types of terms:
+1. `(δΦ^(1))²` — quadratic products of 1st-order perturbations → **KEPT** (give the linear EOM)
+2. `Φ̄ · δΦ^(2)` — background × 2nd-order correction → **ZERO** (background Φ̄ = 0)
+3. `δΦ^(2)` alone — appears in L^(1) only, not L^(2)
+
+Therefore `LI[2] → 0` is correct: the physical content is entirely in the `LI[1]` terms.
+This applies identically to metric (h), torsion (t), and matter (a) perturbations.
+
+### Background Contortion Zeroing
+
+The contortion `K^a_{bc} = ½(T^a_{bc} + T_b^a_c - T_{bc}^a)` is algebraically
+determined by torsion. For zero background torsion (T̄ = 0), the background
+contortion K̄ = 0. In xPert's expansion:
+- `Perturbation[K, 0]` = K̄ = 0 → zeroed via `ChristoffelCDCDT[__] :> 0`
+- `Perturbation[K, 1]` = δK(t) → **preserved** (encodes the torsion wave)
+- `Perturbation[K, 2]` → already dropped by `LI[2] → 0`
+
+This is exactly analogous to zeroing `RicciScalarCD[]` (flat background curvature)
+while keeping `Perturbation[RicciScalarCD[]]` (the graviton wave).
 
 ## Torsion Irreducible Decomposition
 

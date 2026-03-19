@@ -170,14 +170,22 @@ SeparateFieldMetrics[expr_, chart_] := Module[
 (* Used by: ExtractTensorComponent, DecomposeToComponents (rank 0),      *)
 (*          DecomposeScalarExpression.                                    *)
 ExpandScalarWrappers[expr_, chart_] := Module[
-  {result = expr, prev, iter = 0, maxIter = 5},
+  {result = expr, prev, iter = 0, maxIter = 5, manifold},
   (* Early exit if no Scalar wrappers present *)
   If[FreeQ[result, Scalar], Return[result]];
   While[!FreeQ[result, Scalar] && iter < maxIter,
     prev = result;
-    (* Single-pass replacement: Scalar[x] → ToBasis + TraceBasisDummy *)
+    (* Single-pass replacement: Scalar[x] → RenameDummies + ToBasis + TraceBasisDummy.
+       RenameDummies renames all abstract dummies inside each Scalar to fresh
+       names, preventing collision with indices in the OUTER expression (which
+       may share the same abstract names a, b, c, ...).  This is essential for
+       R̃²-decomposed Lagrangians where VarD produces outer free indices {a,b}
+       and Scalar contents reuse the same names.
+       Note: DummyIn[x, manifold] fails on Christoffel symbols (not standard
+       tensors), so we use the more robust RenameDummies[x] instead. *)
     result = result /. Scalar[x_] :> Module[{inner},
-      inner = ToBasis[chart][x];
+      inner = xAct`xTensor`RenameDummies[x];
+      inner = ToBasis[chart][inner];
       inner = TraceBasisDummy[inner];
       inner
     ];

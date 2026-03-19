@@ -999,6 +999,20 @@ def _wls_multi_field_eom(  # noqa: PLR0914
                 # all Riemann components are zero — zero them explicitly here.
                 "(* Zero any residual background curvature from VarD commutators *)",
                 f"{eom_var} = {eom_var} /. {{{riemann_cd}[__] :> 0, {einstein_cd}[__] :> 0}};",
+            ]
+        )
+        # Zero residual contortion from VarD if torsion is active
+        if ctx.torsion is not None:
+            cd = f"{p}CD"
+            christoffel_cdt_cd = f"Christoffel{cd}{ctx.cdt}"
+            lines.extend(
+                (
+                    "(* Zero residual background contortion from VarD *)",
+                    f"{eom_var} = {eom_var} /. {christoffel_cdt_cd}[__] :> 0;",
+                )
+            )
+        lines.extend(
+            [
                 _wls_mem_print(f"EOM({df['name']}) computed"),
                 "",
             ]
@@ -1450,9 +1464,25 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     )
 
     # --- Drop LI[2] and replace LI[1] for ALL perturbation fields ---
-    # Dropping LI[2] truncates the perturbation expansion at 1st order for each field.
-    # This is correct for linearized theory: field = background + ε·perturbation^(1).
-    # Products of 1st-order perturbations (quadratic action terms) are preserved.
+    #
+    # xPert expands each field as:  Φ = Φ̄ + ε·δΦ^(1) + ε²·δΦ^(2) + ...
+    #   LI[1] = δΦ^(1)  — the linear perturbation field (dynamical DOF)
+    #   LI[2] = δΦ^(2)  — second-order correction (NOT a separate DOF)
+    #
+    # The second-order action L^(2) = ½ δ²(S) contains:
+    #   (δΦ^(1))²  — quadratic products of 1st-order perturbations → KEPT
+    #                 (these give the linearized EOM upon variation)
+    #   Φ̄ · δΦ^(2) — background × 2nd-order correction → ZERO (Φ̄ = 0 for
+    #                 flat background torsion/curvature)
+    #   δΦ^(2)      — appears only in L^(1), not in L^(2)
+    #
+    # Therefore LI[2] → 0 is correct: the physical content (wave equations
+    # from quadratic δΦ^(1) × δΦ^(1) products) is entirely in LI[1] terms.
+    # This applies identically to metric (h), torsion (t), and matter (a)
+    # perturbation fields.
+    #
+    # Ref: Brizuela, Martin-Garcia, Mena Marugan (2009, Gen.Rel.Grav. 41:2415)
+    #      — xPert perturbation theory formalism
     if has_metric_pert:
         lines.extend(
             [
@@ -1526,6 +1556,40 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # torsion perturbation truncation block above (alongside LI[2]→0 and
     # LI[1]→TorsionField substitutions), following the same pattern as
     # the matter perturbation truncation.
+
+    # Zero background contortion (connection difference Γ̃ - Γ).
+    #
+    # Physics: The contortion K^a_{bc} is algebraically determined by torsion:
+    #   K^a_{bc} = ½(T^a_{bc} + T_b^{a}_c - T_{bc}^{a})
+    # For zero background torsion (T̄ = 0), the background contortion K̄ = 0.
+    #
+    # In the xPert perturbation expansion:
+    #   - Perturbation[K, 0] = K̄ = 0  ← ZEROED HERE (bare ChristoffelCDCDT)
+    #   - Perturbation[K, 1] = δK(t)   ← PRESERVED (encodes torsion wave)
+    #   - Perturbation[K, 2]           ← already dropped by LI[2]→0 truncation
+    #
+    # This is exactly analogous to zeroing RicciScalarCD[] (flat background)
+    # while keeping Perturbation[RicciScalarCD[]] (graviton wave).
+    #
+    # Technical necessity: Without this, R̃²-decomposed Lagrangians retain
+    # Scalar[K·K·η] products through VarD that ExpandScalarWrappers cannot
+    # resolve (Christoffel symbols aren't standard xAct tensors — ToBasis
+    # and RenameDummies don't work on them).
+    if ctx.torsion is not None:
+        cd = f"{p}CD"
+        cdt = ctx.cdt
+        christoffel_cdt_cd = f"Christoffel{cd}{cdt}"
+        lines.extend(
+            [
+                "",
+                "(* Zero background contortion: K = CDT Christoffel - CD Christoffel *)",
+                "(* For zero background torsion, K^a_{bc} = 0 identically.           *)",
+                "(* Perturbation[K] terms already replaced with torsion field T above.*)",
+                f"l2Raw = l2Raw /. {christoffel_cdt_cd}[__] :> 0;",
+                "l2Raw = Expand[l2Raw];",
+                'Print["After zeroing background contortion: ", If[Head[l2Raw]===Plus, Length[l2Raw], 1], " terms"];',
+            ]
+        )
 
     lines.extend(
         [
