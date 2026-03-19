@@ -35,6 +35,7 @@ Symbolic physics pipeline: Lagrangian (xAct/Mathematica) -> JSON -> native PDE s
 - Background fields declared via `[[background_fields]]` TOML section
 - Gauge fixing via `[[gauge]]` TOML section (presets: Lorenz, de Donder, Coulomb, temporal, axial)
 - Velocity naming: v_{field_name} (e.g., v_phi_0, v_A_1) — E-L velocity form, not canonical momenta
+- **User-facing errors must include hints**: Use `error_with_hint(msg, hints)` from `tidal.cli._console` instead of bare `error()` for all CLI error messages. Each hint should be an actionable suggestion (example syntax, available options, related commands, troubleshooting steps). See existing ~60 error sites across CLI modules for the pattern.
 
 ## Workflow Rules
 
