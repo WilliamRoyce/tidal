@@ -1470,10 +1470,10 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
                 "        ];",
                 "        basisIdx = Table[",
                 "          If[placement[[n]] === 1, {dummyIdxs[[n]], "
-                 f"{ctx.chart}"
-                 "}, {dummyIdxs[[n]], -"
-                 f"{ctx.chart}"
-                 "}],",
+                f"{ctx.chart}"
+                "}, {dummyIdxs[[n]], -"
+                f"{ctx.chart}"
+                "}],",
                 "          {n, cdRank}];",
                 "        Block[{Print = Null},",
                 f"          ComponentValue[ComponentArray[{cd2_head} @@ basisIdx], comp]",
