@@ -1472,12 +1472,12 @@ def _wls_linearize_from_lagrangian(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # The second-order action L^(2) = ½ δ²(S) contains:
     #   (δΦ^(1))²  — quadratic products of 1st-order perturbations → KEPT
     #                 (these give the linearized EOM upon variation)
-    #   Φ̄ · δΦ^(2) — background × 2nd-order correction → ZERO (Φ̄ = 0 for
+    #   Φ̄ · δΦ^(2) — background x 2nd-order correction → ZERO (Φ̄ = 0 for
     #                 flat background torsion/curvature)
     #   δΦ^(2)      — appears only in L^(1), not in L^(2)
     #
     # Therefore LI[2] → 0 is correct: the physical content (wave equations
-    # from quadratic δΦ^(1) × δΦ^(1) products) is entirely in LI[1] terms.
+    # from quadratic δΦ^(1) x δΦ^(1) products) is entirely in LI[1] terms.
     # This applies identically to metric (h), torsion (t), and matter (a)
     # perturbation fields.
     #

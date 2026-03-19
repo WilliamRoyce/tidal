@@ -1,0 +1,826 @@
+{
+	"metadata": {
+		"source": "xAct",
+		"lagrangian_expr": "((1/kappa^2) RicciScalarCD[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f])",
+		"derived_from": "Euler-Lagrange",
+		"gauge": "none",
+		"linearized": true,
+		"parameters": {
+			"kappa": 1.0,
+			"alpha1": 0.5
+		},
+		"reduction": {
+			"type": "plane_wave",
+			"original_dimension": 3,
+			"propagation_axis": "x",
+			"eliminated_fields": []
+		},
+		"derivation_hash": "b0b91f2ac84dc0a4d7b66d3b179741c5e6697a5b6c0b14dcc2a5838beb9bd465"
+	},
+	"spacetime": {
+		"dimension": 2,
+		"signature": [
+			-1,
+			1
+		],
+		"coordinates": [
+			"t",
+			"x"
+		]
+	},
+	"fields": [
+		{
+			"name": "h_0",
+			"index": 0,
+			"is_dynamical": true
+		},
+		{
+			"name": "h_1",
+			"index": 1,
+			"is_dynamical": true
+		},
+		{
+			"name": "h_2",
+			"index": 2,
+			"is_dynamical": true
+		},
+		{
+			"name": "h_3",
+			"index": 3,
+			"is_dynamical": true
+		},
+		{
+			"name": "h_4",
+			"index": 4,
+			"is_dynamical": true
+		},
+		{
+			"name": "h_5",
+			"index": 5,
+			"is_dynamical": true
+		},
+		{
+			"name": "t_0",
+			"index": 6,
+			"is_dynamical": true
+		},
+		{
+			"name": "t_1",
+			"index": 7,
+			"is_dynamical": true
+		},
+		{
+			"name": "t_2",
+			"index": 8,
+			"is_dynamical": true
+		},
+		{
+			"name": "t_3",
+			"index": 9,
+			"is_dynamical": true
+		},
+		{
+			"name": "t_4",
+			"index": 10,
+			"is_dynamical": true
+		},
+		{
+			"name": "t_5",
+			"index": 11,
+			"is_dynamical": true
+		},
+		{
+			"name": "t_6",
+			"index": 12,
+			"is_dynamical": true
+		},
+		{
+			"name": "t_7",
+			"index": 13,
+			"is_dynamical": true
+		},
+		{
+			"name": "t_8",
+			"index": 14,
+			"is_dynamical": true
+		}
+	],
+	"equations": [
+		{
+			"field": "h_0",
+			"lhs": {
+				"expression": "h_0",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 0.5,
+						"operator": "laplacian_x",
+						"field": "h_5",
+						"coefficient_symbolic": "1/(2*kappa^2)"
+					}
+				]
+			}
+		},
+		{
+			"field": "h_1",
+			"lhs": {
+				"expression": "h_1",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": -0.5,
+						"operator": "gradient_x",
+						"field": "v_h_5",
+						"coefficient_symbolic": "-1/2*1/kappa^2"
+					}
+				]
+			}
+		},
+		{
+			"field": "h_2",
+			"lhs": {
+				"expression": "h_2",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": -0.5,
+						"operator": "laplacian_x",
+						"field": "h_2",
+						"coefficient_symbolic": "-1/2*1/kappa^2"
+					},
+					{
+						"coefficient": 0.5,
+						"operator": "gradient_x",
+						"field": "v_h_4",
+						"coefficient_symbolic": "1/(2*kappa^2)"
+					}
+				]
+			}
+		},
+		{
+			"field": "h_3",
+			"lhs": {
+				"expression": "d2_t(h_3)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": -1.0,
+						"operator": "laplacian_x",
+						"field": "h_0"
+					},
+					{
+						"coefficient": 2.0,
+						"operator": "gradient_x",
+						"field": "v_h_1"
+					}
+				]
+			}
+		},
+		{
+			"field": "h_4",
+			"lhs": {
+				"expression": "d2_t(h_4)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "gradient_x",
+						"field": "v_h_2"
+					}
+				]
+			}
+		},
+		{
+			"field": "h_5",
+			"lhs": {
+				"expression": "d2_t(h_5)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "h_5"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_0",
+			"lhs": {
+				"expression": "t_0",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_0",
+						"coefficient_symbolic": "2*alpha1"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_1",
+			"lhs": {
+				"expression": "t_1",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_1",
+						"coefficient_symbolic": "2*alpha1"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_2",
+			"lhs": {
+				"expression": "t_2",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_2",
+						"coefficient_symbolic": "2*alpha1"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_3",
+			"lhs": {
+				"expression": "t_3",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_3",
+						"coefficient_symbolic": "2*alpha1"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_4",
+			"lhs": {
+				"expression": "t_4",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_4",
+						"coefficient_symbolic": "2*alpha1"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_5",
+			"lhs": {
+				"expression": "t_5",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_5",
+						"coefficient_symbolic": "2*alpha1"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_6",
+			"lhs": {
+				"expression": "t_6",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_6",
+						"coefficient_symbolic": "2*alpha1"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_7",
+			"lhs": {
+				"expression": "t_7",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_7",
+						"coefficient_symbolic": "2*alpha1"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_8",
+			"lhs": {
+				"expression": "t_8",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 2.0,
+						"operator": "identity",
+						"field": "t_8",
+						"coefficient_symbolic": "2*alpha1"
+					}
+				]
+			}
+		}
+	],
+	"coupling": {
+		"mass_matrix_symbolic": [
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha1",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha1",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha1",
+				null,
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha1",
+				null,
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha1",
+				null,
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha1",
+				null,
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha1",
+				null,
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha1",
+				null
+			],
+			[
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				null,
+				"2*alpha1"
+			]
+		]
+	},
+	"canonical": {
+		"hamiltonian_terms": [
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_2",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "gradient_x"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-1/2*1/kappa^2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "gradient_x"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "1/(2*kappa^2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "1/(2*kappa^2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-1/2*1/kappa^2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_1",
+					"operator": "mixed_1_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "kappa^(-2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_4",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_2",
+					"operator": "mixed_1_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-2/kappa^2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_2",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "mixed_1_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-2/kappa^2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_1",
+					"operator": "identity"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "mixed_1_1_0"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "2/kappa^2"
+			}
+		]
+	}
+}

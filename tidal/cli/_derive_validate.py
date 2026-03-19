@@ -121,6 +121,25 @@ def _validate_spacetime(config: dict[str, Any]) -> None:
         raise ValueError(msg)
 
 
+def _check_name_valid(name: str, context: str) -> None:
+    """Check that a name is a valid identifier and not reserved.
+
+    Raises
+    ------
+    ValueError
+        If the name is not alphanumeric or is reserved.
+    """
+    if not _VALID_FIELD_NAME.match(name):
+        msg = f"{context} '{name}' must be alphanumeric starting with a letter"
+        raise ValueError(msg)
+    if name in _RESERVED_NAMES:
+        msg = (
+            f"{context} '{name}' is reserved (collides with built-in operator). "
+            f"Reserved names: {sorted(_RESERVED_NAMES)}"
+        )
+        raise ValueError(msg)
+
+
 def _validate_single_field(field: dict[str, Any], index: int, dim: int) -> None:
     """Validate a single [[fields]] entry.
 
@@ -133,15 +152,7 @@ def _validate_single_field(field: dict[str, Any], index: int, dim: int) -> None:
         msg = f"[[fields]] entry {index} missing 'name'"
         raise ValueError(msg)
     fname = field["name"]
-    if not _VALID_FIELD_NAME.match(fname):
-        msg = f"Field name '{fname}' must be alphanumeric starting with a letter"
-        raise ValueError(msg)
-    if fname in _RESERVED_NAMES:
-        msg = (
-            f"Field name '{fname}' is reserved (collides with built-in operator). "
-            f"Reserved names: {sorted(_RESERVED_NAMES)}"
-        )
-        raise ValueError(msg)
+    _check_name_valid(fname, "Field name")
     if "type" not in field:
         msg = f"[[fields]] entry {index} ('{fname}') missing 'type'"
         raise ValueError(msg)
@@ -189,26 +200,10 @@ def _validate_constants(config: dict[str, Any]) -> None:
     calls, so they must be valid Wolfram identifiers (alphanumeric,
     starting with a letter, no underscores).
 
-    Raises
-    ------
-    ValueError
-        If a constant name is not a valid identifier.
     """
     names: list[str] = config.get("constants", {}).get("names", [])
     for name in names:
-        if not _VALID_FIELD_NAME.match(name):
-            msg = (
-                f"Constant name '{name}' must be alphanumeric starting with "
-                f"a letter (no underscores — Mathematica parses X_Y as "
-                f"Pattern[X, Blank[Y]])"
-            )
-            raise ValueError(msg)
-        if name in _RESERVED_NAMES:
-            msg = (
-                f"Constant name '{name}' is reserved (collides with built-in operator). "
-                f"Reserved names: {sorted(_RESERVED_NAMES)}"
-            )
-            raise ValueError(msg)
+        _check_name_valid(name, "Constant name")
 
 
 def _validate_lagrangian(config: dict[str, Any]) -> None:
