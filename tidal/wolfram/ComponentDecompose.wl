@@ -182,8 +182,15 @@ ExpandScalarWrappers[expr_, chart_] := Module[
   (* TraceBasisDummy sums over basis indices.                           *)
   While[!FreeQ[result, Scalar] && iter < maxIter,
     prev = result;
-    result = result /. Scalar[x_] :> Module[{inner},
-      inner = ToBasis[chart][x];
+    result = result /. Scalar[x_] :> Module[{inner = x},
+      (* Apply CD shorthand rules BEFORE ToBasis — while indices are     *)
+      (* still in abstract form so MakeRule patterns match. Without this *)
+      (* CD[-a]@field[...] survives ToBasis (opaque wrapper) and the     *)
+      (* post-ToBasis form has DummyIn indices that MakeRule can't match.*)
+      If[ListQ[Global`$CDShorthandRules] && Length[Global`$CDShorthandRules] > 0,
+        Do[inner = inner /. rule, {rule, Global`$CDShorthandRules}]
+      ];
+      inner = ToBasis[chart][inner];
       inner = TraceBasisDummy[inner];
       inner
     ];
