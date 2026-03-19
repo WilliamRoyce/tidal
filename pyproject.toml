@@ -48,6 +48,7 @@ dependencies = [
 wolfram = ["wolframclient>=1.4.0,<2.0"]
 sensitivity = ["SALib>=1.4"]
 completion = ["shtab>=1.5"]
+color = ["rich-argparse>=1.4"]
 
 [project.scripts]
 tidal = "tidal.cli:main"
