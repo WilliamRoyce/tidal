@@ -852,7 +852,7 @@ isCDlikeQ[x_] := Module[{h = Head[x], hStr},
   If[StringContainsQ[hStr, "Torsion"], Return[False]];
   (* Exclude CD1/CD2 shorthand tensors — they have "CD" in the name but *)
   (* are pre-computed tensors, not derivative operators.                 *)
-  If[StringMatchQ[hStr, "CD1*"] || StringMatchQ[hStr, "CD2*"] || StringMatchQ[hStr, "CD3*"] || StringMatchQ[hStr, "CD4*"], Return[False]];
+  If[StringMatchQ[hStr, "CD1*"] || StringMatchQ[hStr, "CD2*"] || StringMatchQ[hStr, "CD3*"], Return[False]];
   IsCovDOperator[x] || StringMatchQ[hStr, "*CD*"]
 ];
 
