@@ -1210,7 +1210,7 @@ def _get_version() -> str:
         return "unknown"
 
 
-def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911
+def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911, C901
     """Lazily import and run the appropriate command handler.
 
     Parameters
@@ -1272,7 +1272,7 @@ def _dispatch(args: argparse.Namespace) -> int:  # noqa: PLR0911
     raise ValueError(msg)
 
 
-def main(argv: list[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:  # noqa: PLR0911
     """CLI entry point.
 
     Parameters
@@ -1291,12 +1291,11 @@ def main(argv: list[str] | None = None) -> int:
     # Show banner for long-running commands and bare `tidal` (no subcommand).
     # Quick commands (list, validate, inspect, measure, plot, analyze) skip it.
     # Skip for --cite (info-only flag).
-    BANNER_COMMANDS = {None, "simulate", "derive", "sweep"}
     if (
         not args.no_banner
         and not os.environ.get("TIDAL_NO_BANNER")
         and not args.cite
-        and args.command in BANNER_COMMANDS
+        and args.command in {None, "simulate", "derive", "sweep"}
     ):
         from tidal.banner import print_banner
 
