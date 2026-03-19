@@ -47,6 +47,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=False,
         help="Show detailed diagnostic output (solver selection, CFL, Jacobian tier)",
     )
+    parser.add_argument(
+        "--cite",
+        action="store_true",
+        default=False,
+        help="Print citation information for TIDAL and its dependencies",
+    )
     sub = parser.add_subparsers(dest="command", help="Available commands")
 
     # --- derive ---
@@ -1268,15 +1274,23 @@ def main(argv: list[str] | None = None) -> int:
 
     # Show banner for long-running commands and bare `tidal` (no subcommand).
     # Quick commands (list, validate, inspect, measure, plot, analyze) skip it.
+    # Skip for --cite (info-only flag).
     BANNER_COMMANDS = {None, "simulate", "derive", "sweep"}
     if (
         not args.no_banner
         and not os.environ.get("TIDAL_NO_BANNER")
+        and not args.cite
         and args.command in BANNER_COMMANDS
     ):
         from tidal.banner import print_banner
 
         print_banner()
+
+    if args.cite:
+        from tidal.cli._cite import print_citation
+
+        print_citation()
+        return 0
 
     if args.command is None:
         parser.print_help()
