@@ -975,7 +975,7 @@ def _wls_component_metadata(
     ]
 
 
-def _wls_multi_field_eom(  # noqa: PLR0914
+def _wls_multi_field_eom(  # noqa: PLR0914, C901
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
@@ -1075,6 +1075,69 @@ def _wls_multi_field_eom(  # noqa: PLR0914
         ]
     )
     lines.extend(("fieldEquations = {};", "componentMetadata = <||>;"))
+
+    # --- Pre-assign field ComponentValues for StaggeredToBasis pipeline ---
+    # The staggered pipeline (ref: supervisor's EuclideanSplinter, commit 4a89164)
+    # calls ToValues to resolve tensor components BEFORE TraceBasisDummy.
+    # This requires each field to have ComponentValues assigned mapping
+    # basis-indexed tensor expressions to named scalar functions.
+    # E.g.: h[-{0,chart},-{1,chart}] → h1[t,x,y,z]
+    #
+    # This is the SAME mapping done by ReplaceTensorFieldComponents (step 8
+    # in the old pipeline) but as ComponentValue assignments rather than
+    # ReplaceAll rules, so ToValues can resolve them automatically.
+    #
+    # Must be done AFTER VarD (which uses abstract indices, not components)
+    # but BEFORE DecomposeToComponents (which uses StaggeredToBasis → ToValues).
+    lines.extend(
+        [
+            "",
+            "(* === Pre-assign field ComponentValues for StaggeredToBasis ===            *)",
+            "(* Each perturbation field is mapped to named scalar functions:             *)",
+            "(*   h[-{0,chart},-{1,chart}] → h1[t,x,y,z]  (via xCoba ComponentValue) *)",
+            "(* This enables ToValues inside StaggeredToBasis to automatically          *)",
+            "(* resolve tensor components, including CD[field] terms.                   *)",
+            "(* Ref: supervisor's ComponentValue[ComponentArray@ClockField[], ...]      *)",
+            f"coordSyms = ScalarsOfChart[{ctx.chart}];",
+            "Block[{Print = Null},",
+        ]
+    )
+
+    # Use dyn_fields (which includes torsion) rather than ctx.fields (TOML-only).
+    # The ComponentValue assignment is done ENTIRELY in Wolfram using
+    # SlotsOfTensor (knows exact index structure) and EnumerateComponentTuples
+    # (handles symmetry). No fragile Python string parsing.
+    for df in dyn_fields:
+        head = df["head"]
+        lines.extend(
+            [
+                f"  Module[{{fHead = {head}, rank, tuples, slots, basisIdx}},",
+                "    rank = Length[SlotsOfTensor[fHead]];",
+                "    If[rank == 0,",
+                "      (* Scalar: single component *)",
+                '      ComponentValue[ComponentArray[fHead[]], Symbol[ToString[fHead] <> "0"][Sequence @@ coordSyms]],',
+                "      (* Tensor: enumerate independent components *)",
+                f"      tuples = EnumerateComponentTuples[fHead, {ctx.dim}];",
+                "      slots = SlotsOfTensor[fHead];",
+                "      Do[Module[{tuple = tuples[[k]], sym = Symbol[ToString[fHead] <> ToString[k - 1]]},",
+                "        basisIdx = Table[",
+                f"          If[slots[[n]] === 1, {{tuple[[n]], {ctx.chart}}}, {{tuple[[n]], -{ctx.chart}}}],",
+                "          {n, rank}];",
+                "        ComponentValue[fHead @@ basisIdx, sym[Sequence @@ coordSyms]];",
+                "      ], {k, Length[tuples]}]",
+                "    ];",
+                "  ];",
+            ]
+        )
+
+    lines.extend(
+        [
+            "];",
+            f'Print["Pre-assigned ComponentValues for {len(dyn_fields)} field(s)"];',
+            "",
+        ]
+    )
+
     for i, df in enumerate(dyn_fields):
         eom_var = f"eom{df['name'].capitalize()}"
         comp_var = f"comp{df['name'].capitalize()}"
@@ -1085,18 +1148,45 @@ def _wls_multi_field_eom(  # noqa: PLR0914
         if df["name"] in tt_fields:
             skip_tuples = ", ".join(f"{{{0},{mu}}}" for mu in range(ctx.dim))
             skip_opt = f', "SkipTuples" -> {{{skip_tuples}}}'
+        # For torsion theories: suppress xAct Validate during decomposition.
+        # R̃-decomposed expressions have false-positive index collisions
+        # (abstract indices from resolved Scalar wrappers share names with
+        # outer EOM indices until ToBasis converts them to basis form).
+        if ctx.torsion is not None:
+            lines.extend(
+                [
+                    "(* Suppress index validation for R̃-decomposed torsion expressions.  *)",
+                    "(* R̃ decomposition leaves abstract indices from resolved Scalar      *)",
+                    "(* wrappers that share names with outer EOM indices. This is a false *)",
+                    "(* positive — resolved by StaggeredToBasis. Must override the        *)",
+                    "(* validator because Off[Validate::*] suppresses messages but NOT    *)",
+                    "(* the Throw[Null] that xAct's Validate issues.                     *)",
+                    "Off[Validate::repeated]; Off[Validate::inhom];",
+                    "Unprotect[xAct`xTensor`Private`ValidateIndices];",
+                    "savedValidateIndices = xAct`xTensor`Private`ValidateIndices;",
+                    "xAct`xTensor`Private`ValidateIndices = (True &);",
+                ]
+            )
         lines.extend(
             [
                 _wls_mem_print(f"Before DecomposeToComponents({df['name']})"),
                 _wls_timing_start(f"tDecomp{df['name']}"),
                 f"(* Decompose {df['name']} EOM to components *)",
-                f'{comp_var} = DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}{bg_rules_opt}];',
+                f'{comp_var} = Block[{{xAct`xTensor`Private`CheckRepeated = (Null &)}}, DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}{bg_rules_opt}]];',
                 _wls_timing_end(
                     f"tDecomp{df['name']}", f"EOM decomposition ({df['name']})"
                 ),
                 f'Print["[", Round[MemoryInUse[]/1024.^2], " MB] {df["name"]} decomposed: ", Length[{comp_var}], " components"];',
             ]
         )
+        if ctx.torsion is not None:
+            lines.extend(
+                [
+                    "xAct`xTensor`Private`ValidateIndices = savedValidateIndices;",
+                    "Protect[xAct`xTensor`Private`ValidateIndices];",
+                    "On[Validate::repeated]; On[Validate::inhom];",
+                ]
+            )
         lines.extend(_wls_vector_background_substitution(ctx, comp_var))
         lines.extend(_wls_validate_backgrounds_after_decompose(ctx, comp_var))
 

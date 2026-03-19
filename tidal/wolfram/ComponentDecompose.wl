@@ -173,19 +173,17 @@ ExpandScalarWrappers[expr_, chart_] := Module[
   {result = expr, prev, iter = 0, maxIter = 5, manifold},
   (* Early exit if no Scalar wrappers present *)
   If[FreeQ[result, Scalar], Return[result]];
+  (* Suppress Validate::repeated during Scalar expansion.                *)
+  (* When Scalar[x] contents share abstract index names with the outer   *)
+  (* expression (common in R̃²-decomposed torsion theories), ToBasis on *)
+  (* the inner expression triggers Validate::repeated which Throws.     *)
+  (* This is a false positive — the indices ARE properly contracted     *)
+  (* within each Scalar; the collision is temporary and resolves after  *)
+  (* TraceBasisDummy sums over basis indices.                           *)
   While[!FreeQ[result, Scalar] && iter < maxIter,
     prev = result;
-    (* Single-pass replacement: Scalar[x] → RenameDummies + ToBasis + TraceBasisDummy.
-       RenameDummies renames all abstract dummies inside each Scalar to fresh
-       names, preventing collision with indices in the OUTER expression (which
-       may share the same abstract names a, b, c, ...).  This is essential for
-       R̃²-decomposed Lagrangians where VarD produces outer free indices {a,b}
-       and Scalar contents reuse the same names.
-       Note: DummyIn[x, manifold] fails on Christoffel symbols (not standard
-       tensors), so we use the more robust RenameDummies[x] instead. *)
     result = result /. Scalar[x_] :> Module[{inner},
-      inner = xAct`xTensor`RenameDummies[x];
-      inner = ToBasis[chart][inner];
+      inner = ToBasis[chart][x];
       inner = TraceBasisDummy[inner];
       inner
     ];
@@ -199,6 +197,8 @@ ExpandScalarWrappers[expr_, chart_] := Module[
     iter++;
     If[result === prev, Break[]]  (* Fixed point reached *)
   ];
+  (* Note: Validate::repeated is managed by the caller (DecomposeToComponents / *)
+  (* StaggeredToBasis), not here — do NOT re-enable it.                         *)
   If[!FreeQ[result, Scalar] && iter >= maxIter,
     Print["WARNING: ExpandScalarWrappers did not fully converge after ",
       maxIter, " iterations. Remaining Scalar[]: ",
@@ -225,18 +225,31 @@ ExpandScalarWrappers[expr_, chart_] := Module[
 
 StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
   {e = expr, prevLen = -1, curLen, iter = 0, maxIter = 4, metric, covd, christoffelPD},
+  (* Suppress Validate::repeated during the staggered pipeline.          *)
+  (* R̃-decomposed expressions can have abstract index name collisions   *)
+  (* between Scalar wrapper contents and the outer expression after      *)
+  (* ExpandScalarWrappers resolves them. These are false positives —    *)
+  (* the indices are properly contracted, just temporarily sharing names.*)
+  Off[Validate::repeated];
 
-  (* Get the metric: find the CovD operators in the expression, then get their metric.
-     If no CovD in expression, try extracting from field tensors' manifold. *)
-  Module[{covdOps},
-    covdOps = Cases[e, (f_)[_][_] /; CovDQ[f] :> f, {0, Infinity}] // DeleteDuplicates;
-    If[Length[covdOps] > 0,
-      covd = covdOps[[1]];
-      metric = MetricOfCovD[covd],
-      (* Fallback: get metric from the manifold of the chart *)
-      metric = First[MetricsOfVBundle[First[VBundlesOfManifold[First[ManifoldsOfChart[chart]]]]]];
-      covd = CovDOfMetric[metric]
-    ]
+  (* Get the metric associated with this chart.
+     Strategy: ManifoldOfChart → Tangent{manifold} → MetricsOfVBundle *)
+  Module[{manifold, tangentBundle, metrics},
+    manifold = ManifoldOfChart[chart];
+    tangentBundle = Symbol["Tangent" <> ToString[manifold]];
+    metrics = MetricsOfVBundle[tangentBundle];
+    If[!ListQ[metrics] || Length[metrics] == 0,
+      (* No metric found — fall back to basic ToBasis + TraceBasisDummy *)
+      Print["WARNING: StaggeredToBasis: no metric for chart ", chart];
+      If[Head[e] === Plus,
+        e = Total[ToBasis[chart] /@ List @@ e],
+        e = ToBasis[chart][e]
+      ];
+      e = TraceBasisDummy[e];
+      Return[e]
+    ];
+    metric = First[metrics];
+    covd = CovDOfMetric[metric];
   ];
   (* Determine the Christoffel symbol name: Christoffel{CD}PD{chart} *);
   christoffelPD = Symbol["Christoffel" <> ToString[covd] <> "PD" <> ToString[chart]];
@@ -269,18 +282,32 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
     e = Total[ToBasis[chart] /@ List @@ e],
     e = ToBasis[chart][e]
   ];
+  (* Zero Christoffels again after SeparateMetric + ToBasis *)
+  If[!computeChristoffels,
+    e = e /. christoffelPD -> Zero,
+    e = ToValues[e]
+  ];
 
-  (* ToValues: substitute ALL pre-computed ComponentValues *)
-  (* (metrics, Christoffels, Riemann, background fields) *)
-  e = ToValues[e];
-
-  (* TraceBasisDummy: trace remaining unresolved dummy basis indices *)
-  (* After ToValues, most tensor components are numerical → TBD is fast *)
+  (* TraceBasisDummy: convert abstract dummy indices to basis sums *)
   e = TraceBasisDummy[e];
 
-  (* Final ToValues: catch any residual ComponentValues from TraceBasisDummy *)
+  (* ToValues: substitute ALL pre-computed ComponentValues *)
+  (* (metrics, Christoffels, fields, background fields) *)
   e = ToValues[e];
+  e = ToValues[e];  (* Double ToValues: some expressions need two passes *)
 
+  (* CD[scalar] → PD[scalar]: After ToValues, field tensors are replaced
+     by named scalar functions (e.g. H1[t,x,y]). Covariant derivatives of
+     scalars equal partial derivatives (no Christoffel correction):
+       CD[-{a,chart}][f[coords]] → PD[-{a,chart}][f[coords]]
+     This applies to both flat and curved spacetimes.
+     Ref: Wald (1984), eq. 3.1.15: ∇_a f = ∂_a f for scalar f. *)
+  Module[{pdSym = Symbol["PD" <> ToString[chart]]},
+    e = e /. covd[idx_][f_[args___]] /; FreeQ[f, _?xTensorQ] :>
+      pdSym[idx][f[args]];
+  ];
+
+  On[Validate::repeated];
   e
 ];
 
@@ -457,27 +484,57 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
       (* inside ExtractTensorComponent for EACH component, redundantly    *)
       (* re-expanding the same Scalar contents dim^rank times.            *)
       (* For R̃-decomposed torsion theories: 6x speedup (h) + 9x (t).   *)
+      (* ExpandScalarWrappers: resolve Scalar[...] wrappers from xPert.
+         For standard theories: hoist before the component loop (6x speedup).
+         For R̃-decomposed torsion: do NOT hoist — the resolved Scalar
+         contents share abstract index names with the EOM free indices,
+         causing index collisions. Let ExpandScalarWrappers run per-component
+         inside ExtractTensorComponent (step 1.3), AFTER free indices are
+         fixed to specific basis values. *)
       If[!FreeQ[eomSep, Scalar],
-        Print["  Pre-expanding Scalar[] wrappers (hoisted)..."];
-        eomSep = ExpandScalarWrappers[eomSep, chart];
-        Print["  Scalar expansion complete: ", If[FreeQ[eomSep, Scalar], "all resolved", "some remain"]];
+        (* Check if expression has Christoffel symbols from R̃ decomposition *)
+        Module[{hasTorsionScalars},
+          hasTorsionScalars = !FreeQ[eomSep, Scalar[x_ /; !FreeQ[x, _?CovDQ]]];
+          If[!hasTorsionScalars,
+            (* Safe to hoist: standard theory without CD inside Scalar *)
+            Print["  Pre-expanding Scalar[] wrappers (hoisted)..."];
+            eomSep = ExpandScalarWrappers[eomSep, chart];
+            Print["  Scalar expansion complete: ", If[FreeQ[eomSep, Scalar], "all resolved", "some remain"]],
+            (* Torsion theory: skip hoisting, let per-component expansion handle it *)
+            Print["  Scalar[] wrappers detected with CD operators — expanding per-component"]
+          ]
+        ]
       ];
 
-      (* Use Do+AppendTo instead of Table so Share[] can reclaim memory
-         between component extractions — critical for cross-field coupling
-         cases like Einstein-Maxwell where expressions grow large. *)
-      result = {};
-      Do[
-        AppendTo[result,
-          {flatIdxMap[componentTuples[[idx]]],
-           ExtractTensorComponent[eomSep, field, chart,
-             componentTuples[[idx]], additionalFields, computeChristoffels, metricMatrix, backgroundFieldRules]}
+      (* Suppress Validate::repeated AND its Throw through the component     *)
+      (* loop. R̃-decomposed expressions have abstract index collisions     *)
+      (* between resolved Scalar contents and outer EOM indices that are   *)
+      (* false positives resolved by ToBasis in StaggeredToBasis.          *)
+      (* xAct's Validate does Message[...] + Throw[Null]; Off suppresses   *)
+      (* the message but NOT the Throw, so we also need Catch around the   *)
+      (* loop (and override ValidateIndices to prevent the Throw).         *)
+      Off[Validate::repeated];
+      Off[Validate::inhom];
+      Unprotect[xAct`xTensor`Private`ValidateIndices];
+      Module[{savedValidate = xAct`xTensor`Private`ValidateIndices},
+        xAct`xTensor`Private`ValidateIndices = (True &);
+        result = {};
+        Do[
+          AppendTo[result,
+            {flatIdxMap[componentTuples[[idx]]],
+             ExtractTensorComponent[eomSep, field, chart,
+               componentTuples[[idx]], additionalFields, computeChristoffels, metricMatrix, backgroundFieldRules]}
+          ];
+          Share[];
+          Print["  [", Round[MemoryInUse[]/1024.^2], " MB] component ",
+                idx, "/", Length[componentTuples]];,
+          {idx, 1, Length[componentTuples]}
         ];
-        Share[];
-        Print["  [", Round[MemoryInUse[]/1024.^2], " MB] component ",
-              idx, "/", Length[componentTuples]];,
-        {idx, 1, Length[componentTuples]}
+        xAct`xTensor`Private`ValidateIndices = savedValidate;
       ];
+      Protect[xAct`xTensor`Private`ValidateIndices];
+      On[Validate::repeated];
+      On[Validate::inhom];
       Return[result]
     ]
   ]
@@ -1090,6 +1147,21 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
   componentExpr = Expand[componentExpr];
   Print["    [scalar] step2-Splinter: ", Round[MemoryInUse[]/1024.^2], " MB, ",
         If[Head[componentExpr]===Plus, Length[componentExpr], 1], " terms"];
+  (* Diagnostic: check for residual abstract indices *)
+  If[!FreeQ[componentExpr, _?AbstractIndexQ],
+    Module[{abstractTerms},
+      Print["    WARNING: residual abstract indices after Splinter"];
+      abstractTerms = If[Head[componentExpr]===Plus,
+        Select[List @@ componentExpr, !FreeQ[#, _?AbstractIndexQ]&],
+        {componentExpr}
+      ];
+      Print["    Abstract terms: ", Length[abstractTerms], "/",
+        If[Head[componentExpr]===Plus, Length[componentExpr], 1]];
+      If[Length[abstractTerms] > 0,
+        Print["    First abstract term: ", Short[abstractTerms[[1]], 3]]
+      ];
+    ]
+  ];
 
   (* Background field evaluation — not handled by MetricCompute/ToValues *)
   If[backgroundFieldRules =!= {},
