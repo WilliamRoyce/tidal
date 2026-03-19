@@ -1170,7 +1170,7 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     # --- analyze ---
     analyze_parser = sub.add_parser(
         "analyze",
-        help="Post-hoc analysis of sweep results (sensitivity analysis)",
+        help="Post-hoc analysis of sweep results (sensitivity, critical field)",
     )
     analyze_parser.add_argument(
         "data_path",
@@ -1184,13 +1184,57 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
     )
     analyze_parser.add_argument(
         "--metric",
-        help="Metric to analyze (e.g. P_max, max_energy_error)",
+        help="Metric to analyze (e.g. P_final, P_max, max_energy_error)",
     )
     analyze_parser.add_argument(
         "--bootstrap",
         type=int,
         default=100,
         help="Bootstrap resamples for Sobol confidence intervals (default: 100)",
+    )
+    # Critical field analysis
+    analyze_parser.add_argument(
+        "--critical-field",
+        dest="critical_field",
+        metavar="PARAM",
+        help=(
+            "Extract minimum field strength for full conversion. "
+            "Collapses the named swept parameter by finding the first "
+            "value where --metric >= --threshold (default: P_final >= 0.99)"
+        ),
+    )
+    analyze_parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.99,
+        help="Metric threshold for full conversion (default: 0.99)",
+    )
+    analyze_parser.add_argument(
+        "--output",
+        help="Output directory for critical field results (required with --critical-field)",
+    )
+    analyze_parser.add_argument(
+        "--no-interpolate",
+        dest="no_interpolate",
+        action="store_true",
+        help="Disable interpolation between sweep grid points",
+    )
+    analyze_parser.add_argument(
+        "--reference-formula",
+        dest="reference_formula",
+        choices=["boccaletti", "uniform"],
+        help=(
+            "Compute threshold from analytical E-M formula. "
+            "'boccaletti': localized Gaussian B-field, "
+            "'uniform': uniform B periodic domain. "
+            "Overrides --threshold."
+        ),
+    )
+    analyze_parser.add_argument(
+        "--reference-B",
+        dest="reference_B",
+        type=float,
+        help="Reference B value for analytical formula (required with --reference-formula)",
     )
 
     # --- doctor ---
