@@ -84,17 +84,6 @@ def _check_xact() -> tuple[bool, str]:
     return False, "xAct libraries not found — 'tidal derive' needs xAct/xTensor"
 
 
-def _check_examples() -> tuple[bool, str]:
-    """Check for example JSON specifications."""
-    data_dir = Path("examples/data")
-    if not data_dir.is_dir():
-        return False, "examples/data/ directory not found"
-    specs = list(data_dir.glob("*.json"))
-    if specs:
-        return True, f"{len(specs)} example JSON specs in examples/data/"
-    return False, "no JSON specs found in examples/data/"
-
-
 def doctor_command(_args: Namespace) -> int:
     """Run environment health checks."""
     from tidal.cli._console import success as _success
@@ -109,7 +98,6 @@ def doctor_command(_args: Namespace) -> int:
         _check_package("tqdm"),
         _check_wolframscript(),
         _check_xact(),
-        _check_examples(),
     ]
 
     all_ok = True
