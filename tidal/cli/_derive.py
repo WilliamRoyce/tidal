@@ -1479,6 +1479,7 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
                 f'      Print["  CD[{df["name"]}] natural placement: ", Dimensions[comp]];',
                 "",
                 f'    Print["  CD[{df["name"]}] natural placement: done"];',
+                "    ]",
                 "  ]",
                 "]];",
                 "",
