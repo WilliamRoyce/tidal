@@ -1,412 +1,904 @@
 {
-	"R x R": {
-		"count": 6,
-		"mixing": "curvature self-interaction",
-		"ghost_status": "safe"
-	},
-	"R x F": {
-		"count": 1,
-		"mixing": "h-f mixing",
-		"ghost_status": "safe"
-	},
-	"R x DT": {
-		"count": 10,
-		"mixing": "h-t mixing (B0-independent)",
-		"ghost_status": "safe"
-	},
-	"T x T": {
-		"count": 3,
-		"mixing": "torsion self/kinetic",
-		"ghost_status": "safe"
-	},
-	"T x DF": {
-		"count": 3,
-		"mixing": "t-f mixing",
-		"ghost_status": "borderline"
-	},
-	"T x DR": {
-		"count": 10,
-		"mixing": "h-t mixing (B0-independent)",
-		"ghost_status": "borderline"
-	},
-	"F x F": {
-		"count": 1,
-		"mixing": "EM self/kinetic",
-		"ghost_status": "safe"
-	},
-	"F x DT": {
-		"count": 3,
-		"mixing": "t-f mixing",
-		"ghost_status": "safe"
-	},
-	"DT x DT": {
-		"count": 16,
-		"mixing": "torsion self/kinetic",
-		"ghost_status": "safe"
-	},
-	"DF x DF": {
-		"count": 3,
-		"mixing": "EM self/kinetic",
-		"ghost_status": "ghost_prone"
-	},
-	"DF x DR": {
-		"count": 10,
-		"mixing": "h-f mixing",
-		"ghost_status": "ghost_prone"
-	},
-	"DR x DR": {
-		"count": 32,
-		"mixing": "curvature self-interaction",
-		"ghost_status": "ghost_prone"
-	},
-	"eps R x R": {
-		"count": 13,
-		"mixing": "curvature self-interaction",
-		"ghost_status": "safe"
-	},
-	"eps R x F": {
-		"count": 3,
-		"mixing": "h-f mixing",
-		"ghost_status": "safe"
-	},
-	"eps R x DT": {
-		"count": 36,
-		"mixing": "h-t mixing (B0-independent)",
-		"ghost_status": "safe"
-	},
-	"eps T x T": {
-		"count": 4,
-		"mixing": "torsion self/kinetic",
-		"ghost_status": "safe"
-	},
-	"eps T x DF": {
-		"count": 6,
-		"mixing": "t-f mixing",
-		"ghost_status": "borderline"
-	},
-	"eps T x DR": {
-		"count": 36,
-		"mixing": "h-t mixing (B0-independent)",
-		"ghost_status": "borderline"
-	},
-	"eps F x F": {
-		"count": 1,
-		"mixing": "EM self/kinetic",
-		"ghost_status": "safe"
-	},
-	"eps F x DT": {
-		"count": 6,
-		"mixing": "t-f mixing",
-		"ghost_status": "safe"
-	},
-	"eps DT x DT": {
-		"count": 38,
-		"mixing": "torsion self/kinetic",
-		"ghost_status": "safe"
-	},
-	"eps DF x DF": {
-		"count": 4,
-		"mixing": "EM self/kinetic",
-		"ghost_status": "ghost_prone"
-	},
-	"eps DF x DR": {
-		"count": 36,
-		"mixing": "h-f mixing",
-		"ghost_status": "ghost_prone"
-	},
-	"eps DR x DR": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "ghost_prone"
-	},
-	"R x R x R": {
-		"count": 31,
-		"mixing": "curvature self-interaction",
-		"ghost_status": "safe"
-	},
-	"R x R x F": {
-		"count": 8,
-		"mixing": "h-f mixing",
-		"ghost_status": "safe"
-	},
-	"R x R x DT": {
-		"count": 126,
-		"mixing": "h-t mixing (B0-independent)",
-		"ghost_status": "safe"
-	},
-	"R x T x T": {
-		"count": 26,
-		"mixing": "h-t mixing (B0-independent)",
-		"ghost_status": "safe"
-	},
-	"R x T x DF": {
-		"count": 46,
-		"mixing": "h-t mixing via B0",
-		"ghost_status": "borderline"
-	},
-	"R x T x DR": {
-		"count": 252,
-		"mixing": "h-t mixing (B0-independent)",
-		"ghost_status": "borderline"
-	},
-	"R x F x F": {
-		"count": 4,
-		"mixing": "h-f mixing (Gertsenshtein)",
-		"ghost_status": "safe"
-	},
-	"R x F x DT": {
-		"count": 46,
-		"mixing": "h-t mixing via B0",
-		"ghost_status": "safe"
-	},
-	"R x DT x DT": {
-		"count": 269,
-		"mixing": "h-t mixing (B0-independent)",
-		"ghost_status": "safe"
-	},
-	"R x DF x DF": {
-		"count": 26,
-		"mixing": "h-f mixing (Gertsenshtein)",
-		"ghost_status": "ghost_prone"
-	},
-	"R x DF x DR": {
-		"count": 252,
-		"mixing": "h-f mixing",
-		"ghost_status": "ghost_prone"
-	},
-	"R x DR x DR": {
-		"count": 846,
-		"mixing": "curvature self-interaction",
-		"ghost_status": "ghost_prone"
-	},
-	"T x T x F": {
-		"count": 3,
-		"mixing": "t-f mixing",
-		"ghost_status": "safe"
-	},
-	"T x T x DT": {
-		"count": 46,
-		"mixing": "torsion self/kinetic",
-		"ghost_status": "safe"
-	},
-	"T x F x DF": {
-		"count": 10,
-		"mixing": "t-f mixing via B0",
-		"ghost_status": "borderline"
-	},
-	"T x F x DR": {
-		"count": 46,
-		"mixing": "h-t mixing via B0",
-		"ghost_status": "borderline"
-	},
-	"T x DT x DF": {
-		"count": 93,
-		"mixing": "t-f mixing",
-		"ghost_status": "borderline"
-	},
-	"T x DT x DR": {
-		"count": 510,
-		"mixing": "h-t mixing (B0-independent)",
-		"ghost_status": "borderline"
-	},
-	"F x F x F": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "safe"
-	},
-	"F x F x DT": {
-		"count": 5,
-		"mixing": "t-f mixing via B0",
-		"ghost_status": "safe"
-	},
-	"F x DT x DT": {
-		"count": 40,
-		"mixing": "t-f mixing",
-		"ghost_status": "safe"
-	},
-	"F x DF x DF": {
-		"count": 3,
-		"mixing": "EM self/kinetic",
-		"ghost_status": "ghost_prone"
-	},
-	"F x DF x DR": {
-		"count": 46,
-		"mixing": "h-f mixing (Gertsenshtein)",
-		"ghost_status": "ghost_prone"
-	},
-	"F x DR x DR": {
-		"count": 112,
-		"mixing": "h-f mixing",
-		"ghost_status": "ghost_prone"
-	},
-	"DT x DT x DT": {
-		"count": 178,
-		"mixing": "torsion self/kinetic",
-		"ghost_status": "safe"
-	},
-	"DT x DF x DF": {
-		"count": 46,
-		"mixing": "t-f mixing via B0",
-		"ghost_status": "ghost_prone"
-	},
-	"DT x DF x DR": {
-		"count": 510,
-		"mixing": "h-t mixing via B0",
-		"ghost_status": "ghost_prone"
-	},
-	"DT x DR x DR": {
-		"count": 1648,
-		"mixing": "h-t mixing (B0-independent)",
-		"ghost_status": "ghost_prone"
-	},
-	"eps R x R x R": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "safe"
-	},
-	"eps R x R x F": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "safe"
-	},
-	"eps R x R x DT": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "safe"
-	},
-	"eps R x T x T": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "safe"
-	},
-	"eps R x T x DF": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "borderline"
-	},
-	"eps R x T x DR": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "borderline"
-	},
-	"eps R x F x F": {
-		"count": 12,
-		"mixing": "h-f mixing (Gertsenshtein)",
-		"ghost_status": "safe"
-	},
-	"eps R x F x DT": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "safe"
-	},
-	"eps R x DT x DT": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "safe"
-	},
-	"eps R x DF x DF": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "ghost_prone"
-	},
-	"eps R x DF x DR": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "ghost_prone"
-	},
-	"eps R x DR x DR": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "ghost_prone"
-	},
-	"eps T x T x F": {
-		"count": 15,
-		"mixing": "t-f mixing",
-		"ghost_status": "safe"
-	},
-	"eps T x T x DT": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "safe"
-	},
-	"eps T x F x DF": {
-		"count": 36,
-		"mixing": "t-f mixing via B0",
-		"ghost_status": "borderline"
-	},
-	"eps T x F x DR": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "borderline"
-	},
-	"eps T x DT x DF": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "borderline"
-	},
-	"eps T x DT x DR": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "borderline"
-	},
-	"eps F x F x F": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "safe"
-	},
-	"eps F x F x DT": {
-		"count": 18,
-		"mixing": "t-f mixing via B0",
-		"ghost_status": "safe"
-	},
-	"eps F x DT x DT": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "safe"
-	},
-	"eps F x DF x DF": {
-		"count": 15,
-		"mixing": "EM self/kinetic",
-		"ghost_status": "ghost_prone"
-	},
-	"eps F x DF x DR": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "ghost_prone"
-	},
-	"eps F x DR x DR": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "ghost_prone"
-	},
-	"eps DT x DT x DT": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "safe"
-	},
-	"eps DT x DF x DF": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "ghost_prone"
-	},
-	"eps DT x DF x DR": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "ghost_prone"
-	},
-	"eps DT x DR x DR": {
-		"count": 0,
-		"mixing": "vanishing",
-		"ghost_status": "ghost_prone"
-	},
-	"CS: eps Tvec A F": {
-		"count": 1,
-		"mixing": "EM self/kinetic",
-		"ghost_status": "safe"
-	},
-	"CS: eps Tor A F": {
-		"count": 6,
-		"mixing": "EM self/kinetic",
-		"ghost_status": "safe"
+	"R x R":{
+		"count":6,
+		"mixing":"curvature self-interaction",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":0
+	},
+	"R x F":{
+		"count":1,
+		"mixing":"h-f mixing",
+		"ghost_status":"safe",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":1
+	},
+	"R x DT":{
+		"count":10,
+		"mixing":"curvature self-interaction",
+		"ghost_status":"safe",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"T x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":0
+	},
+	"T x T":{
+		"count":3,
+		"mixing":"torsion self\/kinetic",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":0
+	},
+	"T x DF":{
+		"count":3,
+		"mixing":"torsion self\/kinetic",
+		"ghost_status":"borderline",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"F x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":1
+	},
+	"T x DR":{
+		"count":10,
+		"mixing":"torsion self\/kinetic",
+		"ghost_status":"borderline",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"R x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":0
+	},
+	"F x F":{
+		"count":1,
+		"mixing":"EM self\/kinetic",
+		"ghost_status":"safe",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":2
+	},
+	"F x DT":{
+		"count":3,
+		"mixing":"EM self\/kinetic",
+		"ghost_status":"safe",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":"T x DF",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":1
+	},
+	"DT x DT":{
+		"count":16,
+		"mixing":"unclassified",
+		"ghost_status":"safe",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":0
+	},
+	"DF x DF":{
+		"count":3,
+		"mixing":"unclassified",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":2
+	},
+	"DF x DR":{
+		"count":10,
+		"mixing":"unclassified",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":1
+	},
+	"DR x DR":{
+		"count":32,
+		"mixing":"unclassified",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":0
+	},
+	"eps R x R":{
+		"count":13,
+		"mixing":"curvature self-interaction",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":0
+	},
+	"eps R x F":{
+		"count":3,
+		"mixing":"h-f mixing",
+		"ghost_status":"safe",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":1
+	},
+	"eps R x DT":{
+		"count":36,
+		"mixing":"curvature self-interaction",
+		"ghost_status":"safe",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"eps T x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":0
+	},
+	"eps T x T":{
+		"count":4,
+		"mixing":"torsion self\/kinetic",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":0
+	},
+	"eps T x DF":{
+		"count":6,
+		"mixing":"torsion self\/kinetic",
+		"ghost_status":"borderline",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"eps F x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":1
+	},
+	"eps T x DR":{
+		"count":36,
+		"mixing":"torsion self\/kinetic",
+		"ghost_status":"borderline",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"eps R x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":0
+	},
+	"eps F x F":{
+		"count":1,
+		"mixing":"EM self\/kinetic",
+		"ghost_status":"safe",
+		"eps_order":1,
+		"topological":true,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":2
+	},
+	"eps F x DT":{
+		"count":6,
+		"mixing":"EM self\/kinetic",
+		"ghost_status":"safe",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":"eps T x DF",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":1
+	},
+	"eps DT x DT":{
+		"count":38,
+		"mixing":"unclassified",
+		"ghost_status":"safe",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":0
+	},
+	"eps DF x DF":{
+		"count":4,
+		"mixing":"unclassified",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":2
+	},
+	"eps DF x DR":{
+		"count":36,
+		"mixing":"unclassified",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":1
+	},
+	"eps DR x DR":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":0
+	},
+	"R x R x R":{
+		"count":31,
+		"mixing":"curvature self-interaction",
+		"ghost_status":"safe",
+		"eps_order":3,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":3,
+		"deriv_order_A":0
+	},
+	"R x R x F":{
+		"count":8,
+		"mixing":"h-f mixing",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":1
+	},
+	"R x R x DT":{
+		"count":126,
+		"mixing":"curvature self-interaction",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":"R x T x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":3,
+		"deriv_order_A":0
+	},
+	"R x T x T":{
+		"count":26,
+		"mixing":"h-t mixing (B0-independent)",
+		"ghost_status":"safe",
+		"eps_order":3,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":0
+	},
+	"R x T x DF":{
+		"count":46,
+		"mixing":"h-t mixing (B0-independent)",
+		"ghost_status":"borderline",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":"T x F x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":1
+	},
+	"R x T x DR":{
+		"count":252,
+		"mixing":"h-t mixing (B0-independent)",
+		"ghost_status":"borderline",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":"R x R x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":0
+	},
+	"R x F x F":{
+		"count":4,
+		"mixing":"h-f (Gertsenshtein)",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":2
+	},
+	"R x F x DT":{
+		"count":46,
+		"mixing":"h-f mixing",
+		"ghost_status":"safe",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"T x F x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":1
+	},
+	"R x DT x DT":{
+		"count":269,
+		"mixing":"curvature self-interaction",
+		"ghost_status":"safe",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"T x DT x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":3,
+		"deriv_order_A":0
+	},
+	"R x DF x DF":{
+		"count":26,
+		"mixing":"curvature self-interaction",
+		"ghost_status":"ghost_prone",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"F x DF x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":2
+	},
+	"R x DF x DR":{
+		"count":252,
+		"mixing":"curvature self-interaction",
+		"ghost_status":"ghost_prone",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"F x DR x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":1
+	},
+	"R x DR x DR":{
+		"count":846,
+		"mixing":"curvature self-interaction",
+		"ghost_status":"ghost_prone",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":3,
+		"deriv_order_A":0
+	},
+	"T x T x F":{
+		"count":3,
+		"mixing":"t-f mixing",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":1
+	},
+	"T x T x DT":{
+		"count":46,
+		"mixing":"torsion self\/kinetic",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":0
+	},
+	"T x F x DF":{
+		"count":10,
+		"mixing":"t-f mixing",
+		"ghost_status":"borderline",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"F x F x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":2
+	},
+	"T x F x DR":{
+		"count":46,
+		"mixing":"t-f mixing",
+		"ghost_status":"borderline",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"R x F x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":1
+	},
+	"T x DT x DF":{
+		"count":93,
+		"mixing":"torsion self\/kinetic",
+		"ghost_status":"borderline",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"F x DT x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":1
+	},
+	"T x DT x DR":{
+		"count":510,
+		"mixing":"torsion self\/kinetic",
+		"ghost_status":"borderline",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"R x DT x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":0
+	},
+	"F x F x F":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":3
+	},
+	"F x F x DT":{
+		"count":5,
+		"mixing":"EM self\/kinetic",
+		"ghost_status":"safe",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"T x F x DF",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":2
+	},
+	"F x DT x DT":{
+		"count":40,
+		"mixing":"EM self\/kinetic",
+		"ghost_status":"safe",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":"T x DT x DF",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":1
+	},
+	"F x DF x DF":{
+		"count":3,
+		"mixing":"EM self\/kinetic",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":3
+	},
+	"F x DF x DR":{
+		"count":46,
+		"mixing":"EM self\/kinetic",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":"R x DF x DF",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":2
+	},
+	"F x DR x DR":{
+		"count":112,
+		"mixing":"EM self\/kinetic",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":"R x DF x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":1
+	},
+	"DT x DT x DT":{
+		"count":178,
+		"mixing":"unclassified",
+		"ghost_status":"safe",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":3,
+		"deriv_order_A":0
+	},
+	"DT x DF x DF":{
+		"count":46,
+		"mixing":"unclassified",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":2
+	},
+	"DT x DF x DR":{
+		"count":510,
+		"mixing":"unclassified",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":1
+	},
+	"DT x DR x DR":{
+		"count":1648,
+		"mixing":"unclassified",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":3,
+		"deriv_order_A":0
+	},
+	"eps R x R x R":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"safe",
+		"eps_order":3,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":3,
+		"deriv_order_A":0
+	},
+	"eps R x R x F":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":1
+	},
+	"eps R x R x DT":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":"eps R x T x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":3,
+		"deriv_order_A":0
+	},
+	"eps R x T x T":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"safe",
+		"eps_order":3,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":0
+	},
+	"eps R x T x DF":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"borderline",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":"eps T x F x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":1
+	},
+	"eps R x T x DR":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"borderline",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":"eps R x R x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":0
+	},
+	"eps R x F x F":{
+		"count":12,
+		"mixing":"h-f (Gertsenshtein)",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":2
+	},
+	"eps R x F x DT":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"safe",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"eps T x F x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":1
+	},
+	"eps R x DT x DT":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"safe",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"eps T x DT x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":3,
+		"deriv_order_A":0
+	},
+	"eps R x DF x DF":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"ghost_prone",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"eps F x DF x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":2
+	},
+	"eps R x DF x DR":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"ghost_prone",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"eps F x DR x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":1
+	},
+	"eps R x DR x DR":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"ghost_prone",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":3,
+		"deriv_order_A":0
+	},
+	"eps T x T x F":{
+		"count":15,
+		"mixing":"t-f mixing",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":1
+	},
+	"eps T x T x DT":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":0
+	},
+	"eps T x F x DF":{
+		"count":36,
+		"mixing":"t-f mixing",
+		"ghost_status":"borderline",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"eps F x F x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":2
+	},
+	"eps T x F x DR":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"borderline",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"eps R x F x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":1
+	},
+	"eps T x DT x DF":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"borderline",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"eps F x DT x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":1
+	},
+	"eps T x DT x DR":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"borderline",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"eps R x DT x DT",
+		"ibp_safe_rep":false,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":0
+	},
+	"eps F x F x F":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"safe",
+		"eps_order":2,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":3
+	},
+	"eps F x F x DT":{
+		"count":18,
+		"mixing":"EM self\/kinetic",
+		"ghost_status":"safe",
+		"eps_order":1,
+		"topological":false,
+		"ibp_partner":"eps T x F x DF",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":2
+	},
+	"eps F x DT x DT":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"safe",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":"eps T x DT x DF",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":1
+	},
+	"eps F x DF x DF":{
+		"count":15,
+		"mixing":"EM self\/kinetic",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":3
+	},
+	"eps F x DF x DR":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":"eps R x DF x DF",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":2
+	},
+	"eps F x DR x DR":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":"eps R x DF x DR",
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":1
+	},
+	"eps DT x DT x DT":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"safe",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":3,
+		"deriv_order_A":0
+	},
+	"eps DT x DF x DF":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":1,
+		"deriv_order_A":2
+	},
+	"eps DT x DF x DR":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":2,
+		"deriv_order_A":1
+	},
+	"eps DT x DR x DR":{
+		"count":0,
+		"mixing":"vanishing",
+		"ghost_status":"ghost_prone",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":3,
+		"deriv_order_A":0
+	},
+	"CS: eps Tvec A F":{
+		"count":1,
+		"mixing":"unclassified",
+		"ghost_status":"safe",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":0
+	},
+	"CS: eps Tor A F":{
+		"count":6,
+		"mixing":"unclassified",
+		"ghost_status":"safe",
+		"eps_order":0,
+		"topological":false,
+		"ibp_partner":null,
+		"ibp_safe_rep":true,
+		"deriv_order_Gamma":0,
+		"deriv_order_A":0
 	}
 }

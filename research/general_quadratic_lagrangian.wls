@@ -260,11 +260,197 @@ Do[
   {r, nonZeroClassified}
 ];
 
-(* === Export === *)
-exportData = Association @@ ((#[[1]] -> <|"count" -> #[[2]], "mixing" -> #[[3]]|>) & /@ classified);
+(* ============================================================ *)
+Print["\n\n========================================"];
+Print["  CONSTRAINT CLASSIFICATION"];
+Print["  (ghost safety, topological, IBP, eps-order)"];
+Print["========================================"];
+(* ============================================================ *)
+
+(* --- Helper: count building blocks in a sector name --- *)
+CountBlock[name_String, block_String] := Module[{clean, parts},
+  clean = StringReplace[name, "eps " -> ""];
+  clean = StringReplace[clean, "CS: " -> ""];
+  parts = StringTrim /@ StringSplit[clean, " x "];
+  Count[parts, block]
+];
+
+(* --- Ghost classification --- *)
+GhostStatus[name_String] := Module[{nDR, nDF},
+  nDR = CountBlock[name, "DR"];
+  nDF = CountBlock[name, "DF"];
+  Which[
+    nDR + nDF == 0, "safe",
+    nDR + nDF == 1, "borderline",
+    True, "ghost_prone"
+  ]
+];
+
+(* --- Derivative order in fundamental fields --- *)
+DerivOrderGamma[name_String] := Module[{nR, nDR, nDT},
+  (* R ~ dGamma (order 1), DR ~ d^2Gamma (order 2), DT ~ dGamma (order 1) *)
+  (* T ~ Gamma (order 0), but T^2 ~ Gamma^2 contributes order 0 *)
+  nR = CountBlock[name, "R"] - CountBlock[name, "DR"];
+  nDR = CountBlock[name, "DR"];
+  nDT = CountBlock[name, "DT"];
+  (* Each R or DT contributes 1 derivative of Gamma, each DR contributes 2 *)
+  (nR + nDT) * 1 + nDR * 2
+];
+
+DerivOrderA[name_String] := Module[{nF, nDF},
+  nF = CountBlock[name, "F"] - CountBlock[name, "DF"];
+  nDF = CountBlock[name, "DF"];
+  nF * 1 + nDF * 2
+];
+
+(* --- Perturbation order (B0!=0, Tbar=0) --- *)
+EpsOrder[name_String] := Module[{nR, nDR, nT, nDT, nF, nDF, totalR, totalT, totalF},
+  nR = CountBlock[name, "R"] - CountBlock[name, "DR"];
+  nDR = CountBlock[name, "DR"];
+  nT = CountBlock[name, "T"] - CountBlock[name, "DT"];
+  nDT = CountBlock[name, "DT"];
+  nF = CountBlock[name, "F"] - CountBlock[name, "DF"];
+  nDF = CountBlock[name, "DF"];
+  totalR = nR + nDR;
+  totalT = nT + nDT;
+  totalF = nF + nDF;
+  totalR + totalT + Max[0, totalF - 1]
+];
+
+(* --- Topological identification --- *)
+IsTopological[name_String] := Module[{},
+  (* F.Ftilde = eps.F.F is a total derivative (standard identity) *)
+  If[name === "eps F x F", Return[True]];
+  (* All other sectors: not topological in PGT (torsionful R lacks pair-exchange) *)
+  False
+];
+
+(* --- IBP pair identification --- *)
+(* Two sectors are IBP partners if one can be obtained from the other
+   by moving a derivative prefix D from one block to another.
+   e.g., "DT x F" <-> "T x DF", "R x DT" <-> "DR x T" *)
+FindIBPPartner[name_String] := Module[
+  {clean, hasEps, parts, i, j, newParts, partnerName, allNames},
+  hasEps = StringStartsQ[name, "eps "];
+  clean = StringReplace[name, "eps " -> ""];
+  parts = StringTrim /@ StringSplit[clean, " x "];
+  allNames = allResults[[All, 1]];
+
+  (* Try moving D from block i to block j *)
+  Do[
+    If[StringStartsQ[parts[[i]], "D"],
+      (* Remove D from block i, add D to block j *)
+      Do[
+        If[i != j && !StringStartsQ[parts[[j]], "D"],
+          newParts = parts;
+          newParts[[i]] = StringDrop[newParts[[i]], 1]; (* remove D prefix *)
+          newParts[[j]] = "D" <> newParts[[j]];        (* add D prefix *)
+          newParts = Sort[newParts];
+          partnerName = If[hasEps, "eps ", ""] <> StringRiffle[newParts, " x "];
+          If[MemberQ[allNames, partnerName] && partnerName =!= name,
+            Return[partnerName, Module]
+          ];
+        ],
+        {j, Length[parts]}
+      ]
+    ],
+    {i, Length[parts]}
+  ];
+  None  (* no IBP partner found *)
+];
+
+(* IBP safe representative: the one that uses DT (safe) rather than DF/DR (ghost-prone) *)
+IsIBPSafeRep[name_String, partner_] := Module[{},
+  If[partner === None, Return[True]];  (* no partner = independent *)
+  (* If this sector has fewer DF+DR blocks than its partner, it's the safe rep *)
+  (CountBlock[name, "DF"] + CountBlock[name, "DR"]) <=
+  (CountBlock[partner, "DF"] + CountBlock[partner, "DR"])
+];
+
+(* --- Apply all classifications --- *)
+Print["\n  Full classification:"];
+Print["  ", StringPadRight["Sector", 25], " | ",
+  StringPadRight["Count", 6], " | ",
+  StringPadRight["Ghost", 12], " | ",
+  StringPadRight["eps", 4], " | ",
+  StringPadRight["Topo", 5], " | ",
+  StringPadRight["IBP partner", 25], " | ",
+  "Safe rep"];
+Print["  ", StringJoin[Table["-", 100]]];
+
+fullClassified = Association[];
+
+Do[
+  Block[{name = r[[1]], count = r[[2]], mix = r[[3]],
+    ghost, epsOrd, topo, ibpPartner, safeRep, derivG, derivA},
+    ghost = GhostStatus[name];
+    epsOrd = EpsOrder[name];
+    topo = IsTopological[name];
+    ibpPartner = FindIBPPartner[name];
+    safeRep = IsIBPSafeRep[name, ibpPartner];
+    derivG = DerivOrderGamma[name];
+    derivA = DerivOrderA[name];
+
+    If[count > 0,
+      Print["  ",
+        StringPadRight[name, 25], " | ",
+        StringPadRight[ToString[count], 6], " | ",
+        StringPadRight[ghost, 12], " | ",
+        StringPadRight[ToString[epsOrd], 4], " | ",
+        StringPadRight[If[topo, "YES", "no"], 5], " | ",
+        StringPadRight[If[ibpPartner === None, "-", ibpPartner], 25], " | ",
+        If[safeRep, "YES", "no"]
+      ];
+    ];
+
+    fullClassified[name] = <|
+      "count" -> count,
+      "mixing" -> mix,
+      "ghost_status" -> ghost,
+      "eps_order" -> epsOrd,
+      "topological" -> topo,
+      "ibp_partner" -> If[ibpPartner === None, Null, ibpPartner],
+      "ibp_safe_rep" -> safeRep,
+      "deriv_order_Gamma" -> derivG,
+      "deriv_order_A" -> derivA
+    |>;
+  ],
+  {r, classified}
+];
+
+(* --- Summary --- *)
+Print["\n  === PHYSICAL VIABILITY SUMMARY ==="];
+
+safePhysical = Select[fullClassified,
+  #["count"] > 0 && #["ghost_status"] === "safe" &&
+  !#["topological"] && #["ibp_safe_rep"] &];
+Print["  Safe + non-topological + IBP-independent: ",
+  Length[safePhysical], " sectors, ",
+  Total[#["count"] & /@ Values[safePhysical]], " contractions"];
+
+borderlinePhysical = Select[fullClassified,
+  #["count"] > 0 && #["ghost_status"] === "borderline" &&
+  !#["topological"] && #["ibp_safe_rep"] &];
+Print["  Borderline (needs propagator analysis): ",
+  Length[borderlinePhysical], " sectors, ",
+  Total[#["count"] & /@ Values[borderlinePhysical]], " contractions"];
+
+ghostProne = Select[fullClassified,
+  #["count"] > 0 && #["ghost_status"] === "ghost_prone" &];
+Print["  Ghost-prone (reference only): ",
+  Length[ghostProne], " sectors, ",
+  Total[#["count"] & /@ Values[ghostProne]], " contractions"];
+
+(* --- Export --- *)
 Export[
   FileNameJoin[{DirectoryName[$InputFileName], "enumeration_classified.json"}],
-  exportData
+  fullClassified
+];
+
+(* Physical-only export *)
+Export[
+  FileNameJoin[{DirectoryName[$InputFileName], "enumeration_physical.json"}],
+  safePhysical
 ];
 
 countsOnly = Association @@ ((#[[1]] -> #[[2]]) & /@ allResults);
@@ -273,8 +459,7 @@ Export[
   countsOnly
 ];
 
-(* NOTE: MakeContractionAnsatz demo and perturbation-order filter
-   are in the separate make_ansatz.wls script to keep runtime manageable. *)
+(* NOTE: MakeContractionAnsatz demo is in separate make_ansatz.wls *)
 
-Print["\nExported to enumeration_results.json and enumeration_classified.json"];
+Print["\nExported: enumeration_results.json, enumeration_classified.json, enumeration_physical.json"];
 Print["=== DONE ==="];
