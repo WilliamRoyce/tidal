@@ -16,7 +16,7 @@
 			"propagation_axis": "x",
 			"eliminated_fields": []
 		},
-		"derivation_hash": "46e2328ecbbf06b72d71862e9382108a33f748bf8446f344b1d97a2100683c8b"
+		"derivation_hash": "3534bb7227acc9c14e1565c6c59b9a834facf4c6ca1336795779f8f340810a7d"
 	},
 	"spacetime": {
 		"dimension": 2,
@@ -513,6 +513,19 @@
 			{
 				"coefficient": 1.0,
 				"factor_a": {
+					"field": "h_0",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_0",
+					"operator": "gradient_x"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-3/(4*kappa^2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
 					"field": "h_1",
 					"operator": "gradient_x"
 				},
@@ -521,7 +534,7 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "1/(4*kappa^2)"
+				"coefficient_symbolic": "5/(4*kappa^2)"
 			},
 			{
 				"coefficient": 1.0,
@@ -534,310 +547,107 @@
 					"operator": "gradient_x"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "3/(4*kappa^2)"
+				"coefficient_symbolic": "3/(2*kappa^2)"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "h_4",
+					"field": "h_0",
 					"operator": "gradient_x"
 				},
 				"factor_b": {
-					"field": "h_4",
+					"field": "h_3",
 					"operator": "gradient_x"
 				},
-				"term_class": "self",
+				"term_class": "interaction",
 				"coefficient_symbolic": "-1/2*1/kappa^2"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "h_0",
-					"operator": "identity"
+					"field": "h_4",
+					"operator": "gradient_x"
 				},
 				"factor_b": {
-					"field": "h_1",
-					"operator": "time_derivative"
+					"field": "h_4",
+					"operator": "gradient_x"
 				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "Derivative[1][PDtidalCart[{1, -tidalCart}]][Derivative[1, 0, 0][tidalH1][t[], x[], x[]]]/(2*kappa^2)",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
+				"term_class": "self",
+				"coefficient_symbolic": "-5/(4*kappa^2)"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_3",
-					"operator": "identity"
+					"operator": "gradient_x"
 				},
 				"factor_b": {
-					"field": "h_1",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-1/2*Derivative[1][PDtidalCart[{1, -tidalCart}]][Derivative[1, 0, 0][tidalH1][t[], x[], x[]]]/kappa^2",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
 					"field": "h_5",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_1",
-					"operator": "time_derivative"
+					"operator": "gradient_x"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "Derivative[1][PDtidalCart[{1, -tidalCart}]][Derivative[1, 0, 0][tidalH1][t[], x[], x[]]]/(2*kappa^2)",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_1",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-(Derivative[1][PDtidalCart[{2, -tidalCart}]][Derivative[1, 0, 0][tidalH1][t[], x[], x[]]]/kappa^2)",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_1",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_1",
-					"operator": "time_derivative"
-				},
-				"term_class": "self",
 				"coefficient_symbolic": "1/(2*kappa^2)"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "h_4",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_2",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-(Derivative[1][PDtidalCart[{1, -tidalCart}]][Derivative[1, 0, 0][tidalH2][t[], x[], x[]]]/kappa^2)",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_0",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_2",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "Derivative[1][PDtidalCart[{2, -tidalCart}]][Derivative[1, 0, 0][tidalH2][t[], x[], x[]]]/(2*kappa^2)",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_3",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_2",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "Derivative[1][PDtidalCart[{2, -tidalCart}]][Derivative[1, 0, 0][tidalH2][t[], x[], x[]]]/(2*kappa^2)",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
 					"field": "h_5",
-					"operator": "identity"
+					"operator": "gradient_x"
 				},
 				"factor_b": {
-					"field": "h_2",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-1/2*Derivative[1][PDtidalCart[{2, -tidalCart}]][Derivative[1, 0, 0][tidalH2][t[], x[], x[]]]/kappa^2",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_2",
-					"operator": "time_derivative"
-				},
-				"factor_b": {
-					"field": "h_2",
-					"operator": "time_derivative"
-				},
-				"term_class": "self",
-				"coefficient_symbolic": "1/(2*kappa^2)"
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_0",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-1/2*Derivative[1][PDtidalCart[{0, -tidalCart}]][Derivative[1, 0, 0][tidalH3][t[], x[], x[]]]/kappa^2",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_3",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "time_derivative"
-				},
-				"term_class": "self",
-				"coefficient_symbolic": "Derivative[1][PDtidalCart[{0, -tidalCart}]][Derivative[1, 0, 0][tidalH3][t[], x[], x[]]]/(2*kappa^2)",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
 					"field": "h_5",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-1/2*Derivative[1][PDtidalCart[{0, -tidalCart}]][Derivative[1, 0, 0][tidalH3][t[], x[], x[]]]/kappa^2",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_2",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_3",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "Derivative[1][PDtidalCart[{2, -tidalCart}]][Derivative[1, 0, 0][tidalH3][t[], x[], x[]]]/kappa^2",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_4",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_4",
-					"operator": "time_derivative"
+					"operator": "gradient_x"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "(2*Derivative[1][PDtidalCart[{0, -tidalCart}]][Derivative[1, 0, 0][tidalH4][t[], x[], x[]]])/kappa^2",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_2",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_4",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-(Derivative[1][PDtidalCart[{1, -tidalCart}]][Derivative[1, 0, 0][tidalH4][t[], x[], x[]]]/kappa^2)",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
+				"coefficient_symbolic": "-3/(4*kappa^2)"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
 					"field": "h_1",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_4",
 					"operator": "time_derivative"
 				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-(Derivative[1][PDtidalCart[{2, -tidalCart}]][Derivative[1, 0, 0][tidalH4][t[], x[], x[]]]/kappa^2)",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
+				"factor_b": {
+					"field": "h_1",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "5/(4*kappa^2)"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "h_4",
+					"field": "h_2",
 					"operator": "time_derivative"
 				},
 				"factor_b": {
-					"field": "h_4",
+					"field": "h_2",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "5/(4*kappa^2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_0",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_3",
+					"operator": "time_derivative"
+				},
+				"term_class": "interaction",
+				"coefficient_symbolic": "-1/2*1/kappa^2"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_3",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_3",
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
@@ -846,70 +656,41 @@
 			{
 				"coefficient": 1.0,
 				"factor_a": {
+					"field": "h_4",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_4",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-3/(2*kappa^2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
 					"field": "h_0",
-					"operator": "identity"
+					"operator": "time_derivative"
 				},
 				"factor_b": {
 					"field": "h_5",
 					"operator": "time_derivative"
 				},
 				"term_class": "interaction",
-				"coefficient_symbolic": "-1/2*Derivative[1][PDtidalCart[{0, -tidalCart}]][Derivative[1, 0, 0][tidalH5][t[], x[], x[]]]/kappa^2",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
+				"coefficient_symbolic": "-1/2*1/kappa^2"
 			},
 			{
 				"coefficient": 1.0,
 				"factor_a": {
-					"field": "h_3",
-					"operator": "identity"
-				},
-				"factor_b": {
 					"field": "h_5",
 					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "-1/2*Derivative[1][PDtidalCart[{0, -tidalCart}]][Derivative[1, 0, 0][tidalH5][t[], x[], x[]]]/kappa^2",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_5",
-					"operator": "identity"
 				},
 				"factor_b": {
 					"field": "h_5",
 					"operator": "time_derivative"
 				},
 				"term_class": "self",
-				"coefficient_symbolic": "Derivative[1][PDtidalCart[{0, -tidalCart}]][Derivative[1, 0, 0][tidalH5][t[], x[], x[]]]/(2*kappa^2)",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
-			},
-			{
-				"coefficient": 1.0,
-				"factor_a": {
-					"field": "h_1",
-					"operator": "identity"
-				},
-				"factor_b": {
-					"field": "h_5",
-					"operator": "time_derivative"
-				},
-				"term_class": "interaction",
-				"coefficient_symbolic": "Derivative[1][PDtidalCart[{1, -tidalCart}]][Derivative[1, 0, 0][tidalH5][t[], x[], x[]]]/kappa^2",
-				"coordinate_dependent": [
-					"x",
-					"x"
-				]
+				"coefficient_symbolic": "-3/(4*kappa^2)"
 			}
 		]
 	}
