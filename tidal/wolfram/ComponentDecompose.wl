@@ -351,16 +351,28 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
     ];
   ];
 
-  (* CD[scalar] → PD[scalar]: After ToValues, field tensors are replaced
+  (* CD[scalar] → Derivative: After ToValues, field tensors are replaced
      by named scalar functions (e.g. H1[t,x,y]). Covariant derivatives of
      scalars equal partial derivatives (no Christoffel correction):
-       CD[-{a,chart}][f[coords]] → PD[-{a,chart}][f[coords]]
+       CD[-{idx,chart}][f[t,x,y,...]] → Derivative[0,...,1,...,0][f][t,x,y,...]
+     where the 1 is at position idx+1. Goes directly to Derivative form
+     instead of intermediate PD (which isCDlikeQ excludes from conversion).
      This applies to both flat and curved spacetimes.
      Ref: Wald (1984), eq. 3.1.15: ∇_a f = ∂_a f for scalar f. *)
-  (* CD[scalar] → PD[scalar] for ALL CovD operators on scalar functions *)
-  Module[{pdSym = Symbol["PD" <> ToString[chart]]},
-    e = e /. (f_)[idx_][g_[args___]] /; CovDQ[f] && FreeQ[g, _?xTensorQ] :>
-      pdSym[idx][g[args]];
+  Module[{dim = DimOfManifold[ManifoldOfChart[chart]]},
+    e = e /. (f_)[{idx_Integer, chartSign_}][g_[args___]] /;
+        CovDQ[f] && FreeQ[g, _?xTensorQ] && (chartSign === chart || chartSign === -chart) :>
+      With[{orders = ReplacePart[ConstantArray[0, dim], idx + 1 -> 1]},
+        Derivative[Sequence @@ orders][g][args]
+      ];
+    (* Also handle CD applied to existing Derivative of scalar functions *)
+    e = e /. (f_)[{idx_Integer, chartSign_}][Derivative[orders__][g_][args__]] /;
+        CovDQ[f] && FreeQ[g, _?xTensorQ] && (chartSign === chart || chartSign === -chart) :>
+      With[{paddedOrders = PadRight[{orders}, dim, 0]},
+        With[{newOrders = ReplacePart[paddedOrders, idx + 1 -> paddedOrders[[idx + 1]] + 1]},
+          Derivative[Sequence @@ newOrders][g][args]
+        ]
+      ];
   ];
 
   On[Validate::repeated];
