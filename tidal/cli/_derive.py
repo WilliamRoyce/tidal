@@ -1445,6 +1445,22 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
             "savedValidateIndicesCD = xAct`xTensor`Private`ValidateIndices;",
             "xAct`xTensor`Private`ValidateIndices = (True &);",
             "",
+            "(* Determine which CD shorthands actually appear in the EOMs. *)",
+            "(* Skip expensive pre-computation for tensors that don't appear.         *)",
+            "cdShorthandPresent = Association[];",
+        ]
+    )
+    eom_vars_str = ", ".join(f"eom{df['name'].capitalize()}" for df in dyn_fields)
+    lines.extend(
+        [
+            f"Module[{{allEOMs = {{{eom_vars_str}}}}},",
+            "  Do[Module[{sym = Symbol[name]},",
+            "    cdShorthandPresent[name] = !FreeQ[allEOMs, sym]",
+            '  ], {name, Select[Names["CD*tidal*"], xTensorQ[Symbol[#]] &]}]',
+            "];",
+            'Print["CD shorthands present in EOM: ",',
+            "  Select[Keys[cdShorthandPresent], cdShorthandPresent[#] &]];",
+            "",
         ]
     )
 
@@ -1540,7 +1556,7 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
         cd1_head = f"CD1{head}"
         lines.extend(
             [
-                f"(* Pre-compute CD1[{df['name']}] ComponentValues — natural placement *)",
+                f"(* Pre-compute CD1[{df['name']}] ComponentValues — always (fast) *)",
                 f"Catch[If[xTensorQ[{cd1_head}],",
                 "  Module[{comp, cdRank, naturalSlots},",
                 f"    cdRank = Length[SlotsOfTensor[{cd1_head}]];",
@@ -1568,7 +1584,7 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
         cd2_head = f"CD2{head}"
         lines.extend(
             [
-                f"(* Pre-compute CD2[{df['name']}] ComponentValues — natural placement *)",
+                f"(* Pre-compute CD2[{df['name']}] ComponentValues — always (fast) *)",
                 f"Catch[If[xTensorQ[{cd2_head}],",
                 "  Module[{comp, cdRank, naturalSlots},",
                 f"    cdRank = Length[SlotsOfTensor[{cd2_head}]];",
@@ -1599,7 +1615,7 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
         lines.extend(
             [
                 f"(* Pre-compute CD3[{df['name']}] ComponentValues — natural placement *)",
-                f"Catch[If[xTensorQ[{cd3_head}],",
+                f'Catch[If[xTensorQ[{cd3_head}] && TrueQ[cdShorthandPresent["{cd3_head}"]],',
                 "  Module[{comp, cdRank, naturalSlots},",
                 f"    cdRank = Length[SlotsOfTensor[{cd3_head}]];",
                 f"    naturalSlots = SlotsOfTensor[{cd3_head}];",
@@ -1630,7 +1646,7 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
         lines.extend(
             [
                 f"(* Pre-compute CD4[{df['name']}] ComponentValues — natural placement *)",
-                f"Catch[If[xTensorQ[{cd4_head}],",
+                f'Catch[If[xTensorQ[{cd4_head}] && TrueQ[cdShorthandPresent["{cd4_head}"]],',
                 "  Module[{comp, cdRank, naturalSlots},",
                 f"    cdRank = Length[SlotsOfTensor[{cd4_head}]];",
                 f"    naturalSlots = SlotsOfTensor[{cd4_head}];",
