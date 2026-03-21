@@ -1,0 +1,5 @@
+# Ignore all manuscript contents to prevent the report appearing on GitHub
+# (plagiarism detection protection). Only this .gitignore and README.md are tracked.
+*
+!.gitignore
+!README.md
