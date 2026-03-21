@@ -472,17 +472,19 @@ tidal/                   # TIDAL project root
 │   │   ├── CommonUtilities.wl
 │   │   └── ...
 │   └── measurement/          # Post-hoc analysis (energy, conversion, spectra)
-├── tests/                    # Test suite (1,484 Python tests)
+├── tests/                    # Test suite (1,701 Python tests)
 │   ├── conftest.py          # Shared fixtures
 │   ├── test_cli.py          # CLI integration tests
 │   ├── test_solver_ida.py   # IDA solver tests
 │   ├── test_solver_leapfrog.py  # Leapfrog tests
 │   └── test_*.py            # Other test modules
-├── examples/                 # 27 pipeline examples
+├── examples/                 # 20 working pipeline examples
 │   ├── data/                # Generated JSON specifications
 │   └── {example}/           # Each has theory.toml, run.sh
 ├── docs/                     # Documentation
-│   └── source/              # Sphinx source files
+│   ├── tex/                 # LaTeX technical docs (25 files)
+│   ├── figures/             # TikZ diagrams (17 files)
+│   └── source/              # Sphinx API source files
 └── pyproject.toml           # Project configuration
 ```
 

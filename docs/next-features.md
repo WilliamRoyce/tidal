@@ -1,8 +1,8 @@
 # Next Features: Parameter Sweeps & Measurements
 
 **Created:** March 2026
-**Branch:** `feature/parameter-sweep` (1,568 tests passing)
-**Status:** All phases (A–D) complete
+**Branch:** `feature/torsion` (1,701 tests passing)
+**Status:** All phases (A–D) complete; sweep framework integrated into main CLI
 
 This document tracks proposed features for TIDAL's parameter sweep framework and measurement modules. Each feature includes scope, generality analysis, implementation details, and acceptance criteria.
 

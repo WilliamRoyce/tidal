@@ -75,7 +75,7 @@ The project is in a mature state with a robust symbolic pipeline from Lagrangian
 **Delivered:**
 
 - 3+1D Klein-Gordon example (Issue #71), plus spherical_kg, cylindrical_kg, gravitational_waves, massive_3form
-- `docs/JSON_SCHEMA_GUIDE.md` with complete field reference
+- `docs/tex/json_schema.tex` with complete field reference
 - Unified `_resolve_coefficient_at_point` evaluator (Phase 10b)
 
 ---
