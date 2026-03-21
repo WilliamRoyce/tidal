@@ -1455,13 +1455,14 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
     # enumerate into concrete basis components; per-tuple iteration does.
     #
     # After assigning the natural placement, computes ALL non-natural
-    # placements via cdSplinter on the shorthand tensor itself (fast —
-    # uses already-assigned natural ComponentValues for metric contraction).
+    # placements. For flat Minkowski, uses direct sign correction
+    # (raising/lowering = multiply by η_nn = ±1). For curved metrics,
+    # falls back to cdSplinter on the shorthand tensor (slower but general).
     # Ref: supervisor's SphericalEuclidean.m — computes DDClockField
     # down/up/mixed placements after defining the natural one.
     def _cv_assign_block(cd_head: str, df_name: str, level: int) -> list[str]:
         """Generate per-tuple ComponentValue assignment for a CD shorthand."""
-        return [
+        natural_block = [
             "    (* Natural placement: per-tuple assignment *)",
             f"    Module[{{tuples = Tuples[Range[0, {ctx.dim} - 1], cdRank]}},",
             "      Do[Module[{tuple = tuples[[k]], bIdx},",
@@ -1472,28 +1473,64 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
             "      ], {k, Length[tuples]}]",
             "    ];",
             f'    Print["  CD{level}[{df_name}] natural placement: ", Dimensions[comp]];',
-            "",
-            "    (* Non-natural placements: splinter shorthand tensor with raised indices *)",
-            "    (* Uses already-assigned natural ComponentValues via metric contraction *)",
-            "    Do[Module[{signs, placementComp},",
-            "      signs = 2 * IntegerDigits[mask, 2, cdRank] - 1;",
-            "      If[signs === List @@ naturalSlots, Continue[]];",
-            f"      Module[{{dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cdRank}}]}},",
-            "        Module[{idxExpr = MapThread[If[#1 === 1, #2, -#2] &, {signs, dummyIdxs}]},",
-            f"          placementComp = cdSplinter[{cd_head} @@ idxExpr]",
-            "        ]",
-            "      ];",
-            f"      Module[{{tuples = Tuples[Range[0, {ctx.dim} - 1], cdRank]}},",
-            "        Do[Module[{tuple = tuples[[k2]], bIdx},",
-            "          bIdx = Table[",
-            f"            If[signs[[n]] === 1, {{tuple[[n]], {ctx.chart}}}, {{tuple[[n]], -{ctx.chart}}}],",
-            "            {n, cdRank}];",
-            f"          ComponentValue[{cd_head} @@ bIdx, placementComp[[Sequence @@ (tuple + 1)]]];",
-            "        ], {k2, Length[tuples]}]",
-            "      ]",
-            "    ], {mask, 0, 2^cdRank - 1}];",
-            f'    Print["  CD{level}[{df_name}] all ", 2^cdRank, " placements done"];',
         ]
+
+        if is_flat:
+            # Flat Minkowski: non-natural placements via diagonal metric sign
+            # correction. η_nn = diag(sig) where sig comes from DefMetric.
+            # Raising/lowering index n multiplies comp[...,n,...] by sig[n+1].
+            # Product of sign factors for all flipped indices gives signFactor.
+            non_natural_block = [
+                "",
+                "    (* Non-natural placements: flat Minkowski sign correction *)",
+                "    (* For diagonal η, raising/lowering index n multiplies by η_{nn}. *)",
+                f"    Module[{{metricDiag = Diagonal[MetricInBasis[{metric}, -{ctx.chart}]]}},",
+                "      Do[Module[{signs, signFactor},",
+                "        signs = 2 * IntegerDigits[mask, 2, cdRank] - 1;",
+                "        If[signs === List @@ naturalSlots, Continue[]];",
+                "        (* Compute sign factor: product of η_{nn} for each flipped index *)",
+                f"        Module[{{tuples = Tuples[Range[0, {ctx.dim} - 1], cdRank]}},",
+                "          Do[Module[{tuple = tuples[[k2]], bIdx, val},",
+                "            signFactor = Product[",
+                "              If[signs[[n]] =!= naturalSlots[[n]],",
+                "                metricDiag[[tuple[[n]] + 1]], 1],",
+                "              {n, cdRank}];",
+                "            bIdx = Table[",
+                f"              If[signs[[n]] === 1, {{tuple[[n]], {ctx.chart}}}, {{tuple[[n]], -{ctx.chart}}}],",
+                "              {n, cdRank}];",
+                f"            ComponentValue[{cd_head} @@ bIdx, signFactor * comp[[Sequence @@ (tuple + 1)]]];",
+                "          ], {k2, Length[tuples]}]",
+                "        ]",
+                "      ], {mask, 0, 2^cdRank - 1}]",
+                "    ];",
+                f'    Print["  CD{level}[{df_name}] all ", 2^cdRank, " placements (flat metric sign correction)"];',
+            ]
+        else:
+            # Curved metric: compute non-natural placements via cdSplinter
+            non_natural_block = [
+                "",
+                "    (* Non-natural placements: splinter shorthand tensor with raised indices *)",
+                "    Do[Module[{signs, placementComp},",
+                "      signs = 2 * IntegerDigits[mask, 2, cdRank] - 1;",
+                "      If[signs === List @@ naturalSlots, Continue[]];",
+                f"      Module[{{dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cdRank}}]}},",
+                "        Module[{idxExpr = MapThread[If[#1 === 1, #2, -#2] &, {signs, dummyIdxs}]},",
+                f"          placementComp = cdSplinter[{cd_head} @@ idxExpr]",
+                "        ]",
+                "      ];",
+                f"      Module[{{tuples = Tuples[Range[0, {ctx.dim} - 1], cdRank]}},",
+                "        Do[Module[{tuple = tuples[[k2]], bIdx},",
+                "          bIdx = Table[",
+                f"            If[signs[[n]] === 1, {{tuple[[n]], {ctx.chart}}}, {{tuple[[n]], -{ctx.chart}}}],",
+                "            {n, cdRank}];",
+                f"          ComponentValue[{cd_head} @@ bIdx, placementComp[[Sequence @@ (tuple + 1)]]];",
+                "        ], {k2, Length[tuples]}]",
+                "      ]",
+                "    ], {mask, 0, 2^cdRank - 1}];",
+                f'    Print["  CD{level}[{df_name}] all ", 2^cdRank, " placements (cdSplinter)"];',
+            ]
+
+        return natural_block + non_natural_block
 
     for df in dyn_fields:
         head = df["head"]
