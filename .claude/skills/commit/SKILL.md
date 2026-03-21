@@ -124,5 +124,6 @@ gh issue create --title "Short title" --body "..." --label "enhancement"
 ### CRITICAL RULES
 - **NO Co-Authored-By trailer** — never add it
 - **NO committing .env, credentials, or large binaries**
+- **Only stage files YOU changed** — before `git add`, verify each file's diff is from YOUR work in this session. Never blindly stage files that may have been modified by parallel agents or worktrees. Check `git diff <file>` if unsure.
 - If `$ARGUMENTS` is provided, use it as a hint for the commit message
 - If changes span unrelated areas, make separate commits for each
