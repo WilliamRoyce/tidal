@@ -63,7 +63,7 @@ uv run pre-commit install
 ### 3. Verify Setup
 
 ```bash
-# Run tests (1,568 Python tests)
+# Run tests (1,700 Python tests)
 uv run pytest
 
 # Run linter
