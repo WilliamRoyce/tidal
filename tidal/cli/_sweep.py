@@ -40,6 +40,7 @@ import numpy as np
 if TYPE_CHECKING:
     from argparse import Namespace
 
+    from tidal.measurement._sweep_results import SweepResults
     from tidal.symbolic.json_loader import EquationSystem
 
 # Measurement types supported by sweep (subset of tidal measure)
@@ -1476,6 +1477,51 @@ def _print_eta(completed: int, total: int, start_time: float) -> None:
         print(f"    ETA: ~{eta_s / 60:.1f}min remaining")
 
 
+def _run_critical_field_post_sweep(
+    results: SweepResults,
+    args: Namespace,
+    output_dir: Path,
+) -> None:
+    """Run critical field extraction after sweep and save to subdirectory."""
+    from tidal.cli._analyze import (
+        _print_critical_field_summary,  # pyright: ignore[reportPrivateUsage]
+    )
+    from tidal.measurement._critical_field import (
+        compute_critical_field,
+        critical_field_to_sweep_results,
+    )
+
+    field_param: str = args.critical_field
+    metric = getattr(args, "cf_metric", None) or "P_final"
+    threshold: float = getattr(args, "cf_threshold", 0.99)
+    interpolate: bool = not getattr(args, "no_interpolate", False)
+
+    try:
+        cf_result = compute_critical_field(
+            results,
+            field_param,
+            metric=metric,
+            threshold=threshold,
+            interpolate=interpolate,
+        )
+    except ValueError as exc:
+        from tidal.cli._console import warn as _cwarn
+
+        _cwarn(f"critical field extraction skipped: {exc}")
+        return
+
+    reduced = critical_field_to_sweep_results(cf_result, results)
+
+    cf_dir = output_dir / "critical_field"
+    cf_dir.mkdir(parents=True, exist_ok=True)
+    reduced.to_csv(cf_dir / "results.csv")
+    reduced.to_json(cf_dir / "results.json")
+    reduced.save_sweep_json(cf_dir / "sweep.json")
+
+    print(f"\n  critical_field/: {cf_dir.resolve()}")
+    _print_critical_field_summary(cf_result)
+
+
 def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     args: Namespace,
     swept_params: dict[str, list[float]],
@@ -1863,6 +1909,11 @@ def _run_sweep(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # Convergence order estimation
     if converge_sizes is not None and len(rows) >= 3:  # noqa: PLR2004
         _report_convergence(rows, converge_sizes)
+
+    # Critical field extraction (if requested)
+    critical_field_param = getattr(args, "critical_field", None)
+    if critical_field_param and results.n_runs > 0:
+        _run_critical_field_post_sweep(results, args, output_dir)
 
     return 0
 

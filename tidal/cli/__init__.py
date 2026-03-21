@@ -787,6 +787,12 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         metavar="NAME",
         help="Colormap for heatmap/snapshot (default: RdBu_r)",
     )
+    plot_parser.add_argument(
+        "--log-scale",
+        dest="log_scale",
+        action="store_true",
+        help="Use logarithmic colorbar for heatmaps (useful for inv_B_min)",
+    )
     # Sweep-specific options
     plot_parser.add_argument(
         "--metric",
@@ -1215,6 +1221,33 @@ def _build_parser() -> argparse.ArgumentParser:  # noqa: PLR0915
         default=None,
         metavar="N",
         help="Number of samples for latin_hypercube/sobol strategies",
+    )
+
+    # Critical field extraction (post-sweep)
+    sweep_parser.add_argument(
+        "--critical-field",
+        dest="critical_field",
+        metavar="PARAM",
+        help=(
+            "After sweep, extract minimum field strength for full conversion. "
+            "Collapses the named swept parameter by finding the first value "
+            "where --metric >= --cf-threshold (default: P_final >= 0.99). "
+            "Results saved to OUTPUT/critical_field/"
+        ),
+    )
+    sweep_parser.add_argument(
+        "--cf-threshold",
+        dest="cf_threshold",
+        type=float,
+        default=0.99,
+        metavar="T",
+        help="Conversion threshold for --critical-field (default: 0.99)",
+    )
+    sweep_parser.add_argument(
+        "--no-interpolate",
+        dest="no_interpolate",
+        action="store_true",
+        help="Disable interpolation between sweep grid points for --critical-field",
     )
 
     # --- analyze ---

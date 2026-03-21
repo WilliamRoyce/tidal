@@ -418,6 +418,8 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
             n_swept = len(results.swept_params)
             overlay: str | None = getattr(args, "overlay", None)
 
+            log_scale: bool = getattr(args, "log_scale", False)
+
             if n_swept == 1:
                 if len(metrics) == 1:
                     fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 5))
@@ -436,7 +438,13 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                 if overlay:
                     fig = plt.figure(figsize=figsize or (15, 5))
                     try:
-                        render_sweep_2d_with_overlay(fig, results, metrics[0], overlay)
+                        render_sweep_2d_with_overlay(
+                            fig,
+                            results,
+                            metrics[0],
+                            overlay,
+                            log_scale=log_scale,
+                        )
                     except ValueError as exc:
                         error_with_hint(
                             f"in --overlay formula: {exc}",
@@ -445,7 +453,7 @@ def _sweep_plot(args: Namespace, data_path: Path, plot_type: str) -> int:  # noq
                         return 1
                 else:
                     fig, ax = plt.subplots(1, 1, figsize=figsize or (8, 6))
-                    render_sweep_2d(ax, results, metrics[0])
+                    render_sweep_2d(ax, results, metrics[0], log_scale=log_scale)
             else:
                 error_with_hint(
                     f"sweep plot supports 1 or 2 swept parameters, got {n_swept}",

@@ -619,3 +619,217 @@ class TestEdgeCases:
         )
         result = compute_critical_field(sweep, "B0", threshold=0.99)
         assert math.isnan(result.rows[0]["B_min"])
+
+
+# ── Sweep-integrated critical field ──────────────────────────────
+
+
+class TestSweepIntegrated:
+    """Test --critical-field flag on sweep via _run_critical_field_post_sweep."""
+
+    def test_post_sweep_produces_output(self, tmp_path: Path) -> None:
+        """Post-sweep critical field extraction writes critical_field/ subdir."""
+        from argparse import Namespace
+
+        from tidal.cli._sweep import _run_critical_field_post_sweep
+
+        # Synthetic sweep results with clean sin² crossing
+        n = 30
+        b_values = list(np.linspace(0.01, 2.0, n))
+        metric_values = [math.sin(b) ** 2 for b in b_values]
+        sweep = _make_sweep(b_values, metric_values)
+
+        args = Namespace(
+            critical_field="B0",
+            cf_threshold=0.99,
+            cf_metric=None,
+            no_interpolate=False,
+        )
+        _run_critical_field_post_sweep(sweep, args, tmp_path)
+
+        cf_dir = tmp_path / "critical_field"
+        assert cf_dir.exists()
+        assert (cf_dir / "results.csv").exists()
+        assert (cf_dir / "results.json").exists()
+        assert (cf_dir / "sweep.json").exists()
+
+        # Load and verify B_min is reasonable
+        loaded = SweepResults.from_directory(cf_dir)
+        assert loaded.n_runs >= 1
+        assert any("B_min" in row for row in loaded.rows)
+
+    def test_post_sweep_invalid_param_warns(self, tmp_path: Path) -> None:
+        """Invalid field param prints warning but doesn't raise."""
+        from argparse import Namespace
+
+        from tidal.cli._sweep import _run_critical_field_post_sweep
+
+        sweep = _make_sweep([0.1, 0.2], [0.5, 1.0])
+        args = Namespace(
+            critical_field="nonexistent",
+            cf_threshold=0.99,
+            cf_metric=None,
+            no_interpolate=False,
+        )
+        # Should not raise — just warn
+        _run_critical_field_post_sweep(sweep, args, tmp_path)
+        assert not (tmp_path / "critical_field").exists()
+
+    def test_post_sweep_multi_param(self, tmp_path: Path) -> None:
+        """Multi-parameter sweep with --critical-field collapses B0 correctly."""
+        from argparse import Namespace
+
+        from tidal.cli._sweep import _run_critical_field_post_sweep
+
+        # 2D sweep: kappa_val x B0, P = sin²(kappa_val * B0 / 2)
+        kappa_values = [1.0, 2.0]
+        b_values = list(np.linspace(0.01, 5.0, 50))
+        rows: list[dict[str, Any]] = []
+        for kv in kappa_values:
+            for b in b_values:
+                p = math.sin(kv * b / 2.0) ** 2
+                rows.append({"kappa_val": kv, "B0": b, "P_final": p})
+
+        sweep = SweepResults(
+            swept_params={"kappa_val": kappa_values, "B0": b_values},
+            fixed_params={},
+            sim_settings={"t_end": 1.0},
+            rows=rows,
+            run_dirs=[],
+            spec_path="test.json",
+            measurements=["peak_conversion"],
+        )
+
+        args = Namespace(
+            critical_field="B0",
+            cf_threshold=0.99,
+            cf_metric=None,
+            no_interpolate=False,
+        )
+        _run_critical_field_post_sweep(sweep, args, tmp_path)
+
+        cf_dir = tmp_path / "critical_field"
+        loaded = SweepResults.from_directory(cf_dir)
+
+        # Should have 2 rows (one per kappa_val), B0 collapsed
+        assert loaded.n_runs == 2
+        assert "kappa_val" in loaded.swept_params
+        assert "B0" not in loaded.swept_params
+
+        # Verify B_min values: sin²(kv * B / 2) = 0.99
+        for row in loaded.rows:
+            kv = row["kappa_val"]
+            b_analytical = 2.0 * math.asin(math.sqrt(0.99)) / kv
+            assert row["B_min"] == pytest.approx(b_analytical, rel=0.05)
+
+
+# ── Log-scale and quality overlay ────────────────────────────────
+
+
+class TestLogScaleAndQuality:
+    """Test log-scale norm and quality hatching helpers."""
+
+    def test_build_norm_linear(self) -> None:
+        """Default (linear) norm returns Normalize."""
+        from matplotlib.colors import Normalize
+
+        from tidal.cli._sweep_panels import _build_norm
+
+        vals = np.array([1.0, 2.0, 3.0])
+        norm = _build_norm(vals)
+        assert isinstance(norm, Normalize)
+
+    def test_build_norm_log(self) -> None:
+        """Log norm returns LogNorm with positive bounds."""
+        from matplotlib.colors import LogNorm
+
+        from tidal.cli._sweep_panels import _build_norm
+
+        vals = np.array([0.01, 0.1, 1.0, 10.0])
+        norm = _build_norm(vals, log_scale=True)
+        assert isinstance(norm, LogNorm)
+
+    def test_build_norm_log_with_zeros(self) -> None:
+        """Log norm with zero values clamps to smallest positive."""
+        from matplotlib.colors import LogNorm
+
+        from tidal.cli._sweep_panels import _build_norm
+
+        vals = np.array([0.0, 0.0, 0.1, 1.0])
+        norm = _build_norm(vals, log_scale=True)
+        assert isinstance(norm, LogNorm)
+
+    def test_build_norm_log_all_zero(self) -> None:
+        """Log norm with all zeros falls back to linear Normalize."""
+        from matplotlib.colors import Normalize
+
+        from tidal.cli._sweep_panels import _build_norm
+
+        vals = np.array([0.0, 0.0])
+        norm = _build_norm(vals, log_scale=True)
+        assert isinstance(norm, Normalize)
+
+    def test_build_norm_empty(self) -> None:
+        """Empty array returns default Normalize."""
+        from matplotlib.colors import Normalize
+
+        from tidal.cli._sweep_panels import _build_norm
+
+        vals = np.array([], dtype=np.float64)
+        norm = _build_norm(vals)
+        assert isinstance(norm, Normalize)
+
+    def test_quality_hatching_smoke(self) -> None:
+        """Quality hatching runs without error on synthetic data."""
+        import matplotlib.pyplot as plt
+
+        from tidal.cli._sweep_panels import _overlay_quality_hatching
+
+        fig, ax = plt.subplots()
+        p1 = np.array([0.1, 0.2, 0.3])
+        p2 = np.array([1.0, 2.0])
+        quality = np.array([["good", "coarse", "none"], ["edge", "good", "good"]])
+        _overlay_quality_hatching(ax, p1, p2, quality)
+        # Should add patches for coarse, edge, none cells
+        assert len(ax.patches) == 3
+        plt.close(fig)
+
+    def test_cli_args_parsed(self) -> None:
+        """Verify --critical-field and --cf-threshold on sweep parser."""
+        from tidal.cli import _build_parser as build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "sweep",
+                "test.json",
+                "--sweep",
+                "B0=0.1:1.0:5",
+                "--critical-field",
+                "B0",
+                "--cf-threshold",
+                "0.95",
+                "--no-interpolate",
+            ]
+        )
+        assert args.critical_field == "B0"
+        assert args.cf_threshold == 0.95
+        assert args.no_interpolate is True
+
+    def test_log_scale_cli_arg(self) -> None:
+        """Verify --log-scale on plot parser."""
+        from tidal.cli import _build_parser as build_parser
+
+        parser = build_parser()
+        args = parser.parse_args(
+            [
+                "plot",
+                "/tmp/test",
+                "--type",
+                "sweep",
+                "--metric",
+                "inv_B_min",
+                "--log-scale",
+            ]
+        )
+        assert args.log_scale is True
