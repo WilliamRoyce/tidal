@@ -1476,8 +1476,15 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
     # falls back to cdSplinter on the shorthand tensor (slower but general).
     # Ref: supervisor's SphericalEuclidean.m — computes DDClockField
     # down/up/mixed placements after defining the natural one.
-    def _cv_assign_block(cd_head: str, df_name: str, level: int) -> list[str]:
-        """Generate per-tuple ComponentValue assignment for a CD shorthand."""
+    def _cv_assign_block(
+        cd_head: str, df_name: str, level: int, *, all_placements: bool = False
+    ) -> list[str]:
+        """Generate per-tuple ComponentValue assignment for a CD shorthand.
+
+        If all_placements=True, compute ALL 2^rank placements (needed for
+        CD1/CD2 because StaggeredToBasis encounters placements not in the
+        abstract-index EOM). If False, use needed-placements scan.
+        """
         natural_block = [
             "    (* Natural placement: per-tuple assignment *)",
             f"    Module[{{tuples = Tuples[Range[0, {ctx.dim} - 1], cdRank]}},",
@@ -1491,26 +1498,39 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
             f'    Print["  CD{level}[{df_name}] natural placement: ", Dimensions[comp]];',
         ]
 
-        # Needed-placements optimization (supervisor's approach, commit 4a89164):
-        # Scan EOMs for each CD shorthand to find which index placements actually
-        # appear. Pre-compute only those + natural. For DDDD rank-4, supervisor
-        # found only 2 out of 16 placements were needed.
-        # For flat diagonal metrics, non-natural placements use sign correction
-        # (raising/lowering = multiply by g_{nn}). For curved, use cdSplinter.
+        # Non-natural placement computation:
+        # - all_placements=True (CD1/CD2): compute all 2^rank placements via sign correction
+        #   StaggeredToBasis encounters placements not in the abstract-index EOM
+        # - all_placements=False (CD3/CD4): scan EOMs for needed placements only
+        #   (supervisor's approach, commit 4a89164: DDDD only 3/16 placements)
         if is_flat:
+            if all_placements:
+                placement_setup = [
+                    "",
+                    "    (* All placements: 2^rank via diagonal metric sign correction *)",
+                    f"    Module[{{metricDiag = Diagonal[{ctx.prefix}MetricMatrix],",
+                    "            neededPlacements},",
+                    "      neededPlacements = Select[",
+                    "        Table[2 * IntegerDigits[m, 2, cdRank] - 1, {m, 0, 2^cdRank - 1}],",
+                    "        # =!= List @@ naturalSlots &];",
+                    f'      Print["  CD{level}[{df_name}] all ", Length[neededPlacements], " non-natural placements"];',
+                ]
+            else:
+                placement_setup = [
+                    "",
+                    "    (* Needed-placements: scan EOM for index signatures, correct by η *)",
+                    f"    Module[{{metricDiag = Diagonal[{ctx.prefix}MetricMatrix],",
+                    f"            allEOMs = {{{eom_vars_str}}},",
+                    "            neededPlacements, occurrences},",
+                    f"      occurrences = Cases[allEOMs, {cd_head}[inds__] :>",
+                    "        Map[If[MatchQ[#, -_], -1, 1] &, {inds}], {0, Infinity}];",
+                    "      neededPlacements = DeleteDuplicates[occurrences];",
+                    "      neededPlacements = DeleteCases[neededPlacements, List @@ naturalSlots];",
+                    f'      Print["  CD{level}[{df_name}] needed non-natural placements: ",',
+                    '        Length[neededPlacements], "/", 2^cdRank - 1];',
+                ]
             non_natural_block = [
-                "",
-                "    (* Needed-placements: scan EOM for index signatures, correct by η *)",
-                f"    Module[{{metricDiag = Diagonal[{ctx.prefix}MetricMatrix],",
-                f"            allEOMs = {{{eom_vars_str}}},",
-                "            neededPlacements, occurrences},",
-                "      (* Extract index slot signatures from all occurrences in EOM *)",
-                f"      occurrences = Cases[allEOMs, {cd_head}[inds__] :>",
-                "        Map[If[MatchQ[#, -_], -1, 1] &, {inds}], {0, Infinity}];",
-                "      neededPlacements = DeleteDuplicates[occurrences];",
-                "      neededPlacements = DeleteCases[neededPlacements, List @@ naturalSlots];",
-                f'      Print["  CD{level}[{df_name}] needed non-natural placements: ",',
-                '        Length[neededPlacements], "/", 2^cdRank - 1];',
+                *placement_setup,
                 "      Do[Module[{signs = placement, signFactor},",
                 f"        Module[{{tuples = Tuples[Range[0, {ctx.dim} - 1], cdRank]}},",
                 "          Do[Module[{tuple = tuples[[k2]], bIdx},",
@@ -1581,7 +1601,7 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
                 "    comp = Map[Simplify, comp, {Min[2, cdRank]}];",
                 "",
                 "    (* Per-tuple ComponentValue assignment *)",
-                *_cv_assign_block(cd1_head, df["name"], 1),
+                *_cv_assign_block(cd1_head, df["name"], 1, all_placements=True),
                 "  ]",
                 "]];",
                 "",
@@ -1612,7 +1632,7 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
                 "    comp = Map[Simplify, comp, {Min[2, cdRank]}];",
                 "",
                 "    (* Per-tuple ComponentValue assignment *)",
-                *_cv_assign_block(cd2_head, df["name"], 2),
+                *_cv_assign_block(cd2_head, df["name"], 2, all_placements=True),
                 "  ]",
                 "]];",
                 "",
