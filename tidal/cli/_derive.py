@@ -1448,38 +1448,73 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
         ]
     )
 
+    # --- Helper: generate per-tuple ComponentValue assignment block ---
+    # Replaces broken ComponentArray[CDN @@ dummyIdxBasis] pattern with
+    # explicit per-integer-tuple iteration matching the working base field
+    # pattern (lines 1370-1377). ComponentArray with DummyIn indices doesn't
+    # enumerate into concrete basis components; per-tuple iteration does.
+    #
+    # After assigning the natural placement, computes ALL non-natural
+    # placements via cdSplinter on the shorthand tensor itself (fast —
+    # uses already-assigned natural ComponentValues for metric contraction).
+    # Ref: supervisor's SphericalEuclidean.m — computes DDClockField
+    # down/up/mixed placements after defining the natural one.
+    def _cv_assign_block(cd_head: str, df_name: str, level: int) -> list[str]:
+        """Generate per-tuple ComponentValue assignment for a CD shorthand."""
+        return [
+            "    (* Natural placement: per-tuple assignment *)",
+            f"    Module[{{tuples = Tuples[Range[0, {ctx.dim} - 1], cdRank]}},",
+            "      Do[Module[{tuple = tuples[[k]], bIdx},",
+            "        bIdx = Table[",
+            f"          If[naturalSlots[[n]] === 1, {{tuple[[n]], {ctx.chart}}}, {{tuple[[n]], -{ctx.chart}}}],",
+            "          {n, cdRank}];",
+            f"        ComponentValue[{cd_head} @@ bIdx, comp[[Sequence @@ (tuple + 1)]]];",
+            "      ], {k, Length[tuples]}]",
+            "    ];",
+            f'    Print["  CD{level}[{df_name}] natural placement: ", Dimensions[comp]];',
+            "",
+            "    (* Non-natural placements: splinter shorthand tensor with raised indices *)",
+            "    (* Uses already-assigned natural ComponentValues via metric contraction *)",
+            "    Do[Module[{signs, placementComp},",
+            "      signs = 2 * IntegerDigits[mask, 2, cdRank] - 1;",
+            "      If[signs === List @@ naturalSlots, Continue[]];",
+            f"      Module[{{dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cdRank}}]}},",
+            "        Module[{idxExpr = MapThread[If[#1 === 1, #2, -#2] &, {signs, dummyIdxs}]},",
+            f"          placementComp = cdSplinter[{cd_head} @@ idxExpr]",
+            "        ]",
+            "      ];",
+            f"      Module[{{tuples = Tuples[Range[0, {ctx.dim} - 1], cdRank]}},",
+            "        Do[Module[{tuple = tuples[[k2]], bIdx},",
+            "          bIdx = Table[",
+            f"            If[signs[[n]] === 1, {{tuple[[n]], {ctx.chart}}}, {{tuple[[n]], -{ctx.chart}}}],",
+            "            {n, cdRank}];",
+            f"          ComponentValue[{cd_head} @@ bIdx, placementComp[[Sequence @@ (tuple + 1)]]];",
+            "        ], {k2, Length[tuples]}]",
+            "      ]",
+            "    ], {mask, 0, 2^cdRank - 1}];",
+            f'    Print["  CD{level}[{df_name}] all ", 2^cdRank, " placements done"];',
+        ]
+
     for df in dyn_fields:
         head = df["head"]
         fexpr = df["fexpr"]
         cd1_head = f"CD1{head}"
         lines.extend(
             [
-                f"(* Pre-compute ALL CD[{df['name']}] ComponentValue placements *)",
+                f"(* Pre-compute CD1[{df['name']}] ComponentValues — natural placement *)",
                 f"Catch[If[xTensorQ[{cd1_head}],",
-                "  Module[{comp, cdRank, naturalSlots, mask, placement, abstractIdx, basisIdx, idxSym},",
+                "  Module[{comp, cdRank, naturalSlots},",
                 f"    cdRank = Length[SlotsOfTensor[{cd1_head}]];",
                 f"    naturalSlots = SlotsOfTensor[{cd1_head}];",
                 "",
-                "    (* Step 1: Natural placement via CD[-freshIdx] @ field[...] *)",
+                "    (* Compute natural placement via CD[-freshIdx] @ field[...] *)",
                 f"    Module[{{freshIdx = DummyIn[Tangent{ctx.manifold}]}},",
                 f"      comp = cdSplinter[{ctx.cd}[-freshIdx] @ {fexpr}]",
                 "    ];",
-                "    (* Generate registered DummyIn indices for ComponentValue assignments *)",
-                f"    Module[{{dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cdRank}}]}},",
-                "      basisIdx = Table[",
-                "        If[naturalSlots[[n]] === 1, {dummyIdxs[[n]], "
-                f"{ctx.chart}"
-                "}, {dummyIdxs[[n]], -"
-                f"{ctx.chart}"
-                "}],",
-                "        {n, cdRank}];",
-                "      Block[{Print = Null},",
-                f"        ComponentValue[ComponentArray[{cd1_head} @@ basisIdx], comp]",
-                "      ];",
-                f'      Print["  CD[{df["name"]}] natural placement: ", Dimensions[comp]];',
+                "    comp = Map[Simplify, comp, {Min[2, cdRank]}];",
                 "",
-                f'    Print["  CD[{df["name"]}] natural placement: done"];',
-                "    ]",
+                "    (* Per-tuple ComponentValue assignment *)",
+                *_cv_assign_block(cd1_head, df["name"], 1),
                 "  ]",
                 "]];",
                 "",
@@ -1494,9 +1529,9 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
         cd2_head = f"CD2{head}"
         lines.extend(
             [
-                f"(* Pre-compute ALL CD2[{df['name']}] ComponentValue placements *)",
+                f"(* Pre-compute CD2[{df['name']}] ComponentValues — natural placement *)",
                 f"Catch[If[xTensorQ[{cd2_head}],",
-                "  Module[{comp, cdRank, naturalSlots, mask, placement, abstractIdx, basisIdx, idxSym},",
+                "  Module[{comp, cdRank, naturalSlots},",
                 f"    cdRank = Length[SlotsOfTensor[{cd2_head}]];",
                 f"    naturalSlots = SlotsOfTensor[{cd2_head}];",
                 "",
@@ -1507,21 +1542,10 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
                 f"        comp = cdSplinter[{ctx.cd}[-freshIdx] @ cd1Expr]",
                 "      ]",
                 "    ];",
+                "    comp = Map[Simplify, comp, {Min[2, cdRank]}];",
                 "",
-                "    (* Natural-only: assign the natural placement ComponentValue *)",
-                f"    Module[{{dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cdRank}}]}},",
-                "      basisIdx = Table[",
-                "        If[naturalSlots[[n]] === 1, {dummyIdxs[[n]], "
-                f"{ctx.chart}"
-                "}, {dummyIdxs[[n]], -"
-                f"{ctx.chart}"
-                "}],",
-                "        {n, cdRank}];",
-                "      Block[{Print = Null},",
-                f"        ComponentValue[ComponentArray[{cd2_head} @@ basisIdx], comp]",
-                "      ]",
-                "    ];",
-                f'    Print["  CD2[{df["name"]}] natural placement: done"];',
+                "    (* Per-tuple ComponentValue assignment *)",
+                *_cv_assign_block(cd2_head, df["name"], 2),
                 "  ]",
                 "]];",
                 "",
@@ -1535,9 +1559,9 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
         cd3_head = f"CD3{head}"
         lines.extend(
             [
-                f"(* Pre-compute ALL CD3[{df['name']}] ComponentValue placements *)",
+                f"(* Pre-compute CD3[{df['name']}] ComponentValues — natural placement *)",
                 f"Catch[If[xTensorQ[{cd3_head}],",
-                "  Module[{comp, cdRank, naturalSlots, mask, placement, abstractIdx, basisIdx},",
+                "  Module[{comp, cdRank, naturalSlots},",
                 f"    cdRank = Length[SlotsOfTensor[{cd3_head}]];",
                 f"    naturalSlots = SlotsOfTensor[{cd3_head}];",
                 f"    Module[{{freshIdx = DummyIn[Tangent{ctx.manifold}],",
@@ -1546,18 +1570,10 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
                 f"        comp = cdSplinter[{ctx.cd}[-freshIdx] @ cd2Expr]",
                 "      ]",
                 "    ];",
-                "    (* Natural-only: assign the natural placement ComponentValue *)",
-                f"    Module[{{dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cdRank}}]}},",
-                "      basisIdx = Table[If[naturalSlots[[n]] === 1, {dummyIdxs[[n]], "
-                f"{ctx.chart}"
-                "}, {dummyIdxs[[n]], -"
-                f"{ctx.chart}"
-                "}], {n, cdRank}];",
-                "      Block[{Print = Null},",
-                f"        ComponentValue[ComponentArray[{cd3_head} @@ basisIdx], comp]",
-                "      ]",
-                "    ];",
-                f'    Print["  CD3[{df["name"]}] natural placement: done"];',
+                "    comp = Map[Simplify, comp, {Min[2, cdRank]}];",
+                "",
+                "    (* Per-tuple ComponentValue assignment *)",
+                *_cv_assign_block(cd3_head, df["name"], 3),
                 "  ]",
                 "]];",
                 "",
@@ -1574,9 +1590,9 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
         cd4_head = f"CD4{head}"
         lines.extend(
             [
-                f"(* Pre-compute CD4[{df['name']}] natural placement only *)",
+                f"(* Pre-compute CD4[{df['name']}] ComponentValues — natural placement *)",
                 f"Catch[If[xTensorQ[{cd4_head}],",
-                "  Module[{comp, cdRank, naturalSlots, basisIdx},",
+                "  Module[{comp, cdRank, naturalSlots},",
                 f"    cdRank = Length[SlotsOfTensor[{cd4_head}]];",
                 f"    naturalSlots = SlotsOfTensor[{cd4_head}];",
                 f"    Module[{{freshIdx = DummyIn[Tangent{ctx.manifold}],",
@@ -1585,19 +1601,10 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
                 f"        comp = cdSplinter[{ctx.cd}[-freshIdx] @ cd3Expr]",
                 "      ]",
                 "    ];",
-                f"    Module[{{dummyIdxs = Table[DummyIn[Tangent{ctx.manifold}], {{n, cdRank}}]}},",
-                "      basisIdx = Table[",
-                "        If[naturalSlots[[n]] === 1, {dummyIdxs[[n]], "
-                f"{ctx.chart}"
-                "}, {dummyIdxs[[n]], -"
-                f"{ctx.chart}"
-                "}],",
-                "        {n, cdRank}];",
-                "      Block[{Print = Null},",
-                f"        ComponentValue[ComponentArray[{cd4_head} @@ basisIdx], comp]",
-                "      ]",
-                "    ];",
-                f'    Print["  CD4[{df["name"]}] natural placement: ", Dimensions[comp]];',
+                "    comp = Map[Simplify, comp, {Min[2, cdRank]}];",
+                "",
+                "    (* Per-tuple ComponentValue assignment *)",
+                *_cv_assign_block(cd4_head, df["name"], 4),
                 "  ]",
                 "]];",
                 "",

@@ -342,6 +342,15 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
     ];
   ];
 
+  (* Diagnostic: warn if CD shorthand tensors remain unresolved after ToValues *)
+  Module[{cdRes = Cases[e, (f_?xTensorQ)[__] /;
+      StringMatchQ[ToString[f], "CD" ~~ DigitCharacter ~~ "*"], {0, Infinity}]},
+    If[Length[cdRes] > 0,
+      Print["WARNING: Unresolved CD shorthands after ToValues: ",
+            DeleteDuplicates[Head /@ cdRes]];
+    ];
+  ];
+
   (* CD[scalar] → PD[scalar]: After ToValues, field tensors are replaced
      by named scalar functions (e.g. H1[t,x,y]). Covariant derivatives of
      scalars equal partial derivatives (no Christoffel correction):
