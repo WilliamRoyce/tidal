@@ -1,0 +1,934 @@
+{
+	"metadata": {
+		"source": "xAct",
+		"lagrangian_expr": "((1/kappa^2) RicciScalarCD[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f])",
+		"derived_from": "Euler-Lagrange",
+		"gauge": "tt(h)",
+		"linearized": true,
+		"parameters": {
+			"kappa": 1.0,
+			"alpha1": 0.5
+		},
+		"reduction": {
+			"type": "plane_wave",
+			"original_dimension": 4,
+			"propagation_axis": "z",
+			"eliminated_fields": [
+				"h_6",
+				"h_8",
+				"h_9",
+				"h_4"
+			]
+		},
+		"derivation_hash": "8087266683456771881ad1e00b2f9df323fadc0325a7c0706cc1d72c31570468"
+	},
+	"spacetime": {
+		"dimension": 2,
+		"signature": [
+			-1,
+			1
+		],
+		"coordinates": [
+			"t",
+			"x"
+		]
+	},
+	"fields": [
+		{
+			"name": "h_5",
+			"index": 0,
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				1,
+				2
+			]
+		},
+		{
+			"name": "h_7",
+			"index": 1,
+			"is_dynamical": true,
+			"tensor_head": "h",
+			"tensor_rank": 2,
+			"tensor_indices": [
+				2,
+				2
+			]
+		},
+		{
+			"name": "t_0",
+			"index": 2,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				0,
+				0,
+				1
+			]
+		},
+		{
+			"name": "t_1",
+			"index": 3,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				0,
+				0,
+				2
+			]
+		},
+		{
+			"name": "t_2",
+			"index": 4,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				0,
+				0,
+				3
+			]
+		},
+		{
+			"name": "t_3",
+			"index": 5,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				0,
+				1,
+				2
+			]
+		},
+		{
+			"name": "t_4",
+			"index": 6,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				0,
+				1,
+				3
+			]
+		},
+		{
+			"name": "t_5",
+			"index": 7,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				0,
+				2,
+				3
+			]
+		},
+		{
+			"name": "t_6",
+			"index": 8,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				1,
+				0,
+				1
+			]
+		},
+		{
+			"name": "t_7",
+			"index": 9,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				1,
+				0,
+				2
+			]
+		},
+		{
+			"name": "t_8",
+			"index": 10,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				1,
+				0,
+				3
+			]
+		},
+		{
+			"name": "t_9",
+			"index": 11,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				1,
+				1,
+				2
+			]
+		},
+		{
+			"name": "t_10",
+			"index": 12,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				1,
+				1,
+				3
+			]
+		},
+		{
+			"name": "t_11",
+			"index": 13,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				1,
+				2,
+				3
+			]
+		},
+		{
+			"name": "t_12",
+			"index": 14,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				2,
+				0,
+				1
+			]
+		},
+		{
+			"name": "t_13",
+			"index": 15,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				2,
+				0,
+				2
+			]
+		},
+		{
+			"name": "t_14",
+			"index": 16,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				2,
+				0,
+				3
+			]
+		},
+		{
+			"name": "t_15",
+			"index": 17,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				2,
+				1,
+				2
+			]
+		},
+		{
+			"name": "t_16",
+			"index": 18,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				2,
+				1,
+				3
+			]
+		},
+		{
+			"name": "t_17",
+			"index": 19,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				2,
+				2,
+				3
+			]
+		},
+		{
+			"name": "t_18",
+			"index": 20,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				3,
+				0,
+				1
+			]
+		},
+		{
+			"name": "t_19",
+			"index": 21,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				3,
+				0,
+				2
+			]
+		},
+		{
+			"name": "t_20",
+			"index": 22,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				3,
+				0,
+				3
+			]
+		},
+		{
+			"name": "t_21",
+			"index": 23,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				3,
+				1,
+				2
+			]
+		},
+		{
+			"name": "t_22",
+			"index": 24,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				3,
+				1,
+				3
+			]
+		},
+		{
+			"name": "t_23",
+			"index": 25,
+			"is_dynamical": true,
+			"tensor_head": "t",
+			"tensor_rank": 3,
+			"tensor_indices": [
+				3,
+				2,
+				3
+			]
+		}
+	],
+	"equations": [
+		{
+			"field": "h_5",
+			"lhs": {
+				"expression": "d2_t(h_5)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "h_5"
+					}
+				]
+			}
+		},
+		{
+			"field": "h_7",
+			"lhs": {
+				"expression": "d2_t(h_7)",
+				"order": {
+					"time": 2,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "laplacian_x",
+						"field": "h_7"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_0",
+			"lhs": {
+				"expression": "t_0",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_0"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_1",
+			"lhs": {
+				"expression": "t_1",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_1"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_2",
+			"lhs": {
+				"expression": "t_2",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_2"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_3",
+			"lhs": {
+				"expression": "t_3",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_3"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_4",
+			"lhs": {
+				"expression": "t_4",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_4"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_5",
+			"lhs": {
+				"expression": "t_5",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_5"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_6",
+			"lhs": {
+				"expression": "t_6",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_6"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_7",
+			"lhs": {
+				"expression": "t_7",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_7"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_8",
+			"lhs": {
+				"expression": "t_8",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_8"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_9",
+			"lhs": {
+				"expression": "t_9",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_9"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_10",
+			"lhs": {
+				"expression": "t_10",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_10"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_11",
+			"lhs": {
+				"expression": "t_11",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_11"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_12",
+			"lhs": {
+				"expression": "t_12",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_12"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_13",
+			"lhs": {
+				"expression": "t_13",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_13"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_14",
+			"lhs": {
+				"expression": "t_14",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_14"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_15",
+			"lhs": {
+				"expression": "t_15",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_15"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_16",
+			"lhs": {
+				"expression": "t_16",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_16"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_17",
+			"lhs": {
+				"expression": "t_17",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_17"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_18",
+			"lhs": {
+				"expression": "t_18",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_18"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_19",
+			"lhs": {
+				"expression": "t_19",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_19"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_20",
+			"lhs": {
+				"expression": "t_20",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_20"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_21",
+			"lhs": {
+				"expression": "t_21",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_21"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_22",
+			"lhs": {
+				"expression": "t_22",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_22"
+					}
+				]
+			}
+		},
+		{
+			"field": "t_23",
+			"lhs": {
+				"expression": "t_23",
+				"order": {
+					"time": 0,
+					"space": 0
+				}
+			},
+			"rhs": {
+				"type": "linear_combination",
+				"terms": [
+					{
+						"coefficient": 1.0,
+						"operator": "identity",
+						"field": "t_23"
+					}
+				]
+			}
+		}
+	],
+	"coupling": {},
+	"canonical": {
+		"hamiltonian_terms": [
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "gradient_x"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-7/(2*kappa^2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "gradient_x"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "gradient_x"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-7/(2*kappa^2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_5",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_5",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-7/(2*kappa^2)"
+			},
+			{
+				"coefficient": 1.0,
+				"factor_a": {
+					"field": "h_7",
+					"operator": "time_derivative"
+				},
+				"factor_b": {
+					"field": "h_7",
+					"operator": "time_derivative"
+				},
+				"term_class": "self",
+				"coefficient_symbolic": "-7/(2*kappa^2)"
+			}
+		],
+		"wolfram_constraint_elimination": true,
+		"eliminated_from_canonical": [
+			"h_6",
+			"h_8",
+			"h_9",
+			"h_4"
+		]
+	}
+}
