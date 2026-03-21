@@ -10,96 +10,76 @@
 \node[font=\normalsize\bfseries] (title) at (0,0)
     {Performance Optimisation Cascade};
 
-% --- Python micro-optimisation rounds ---
+% --- Implementation micro-optimisations (collapsed) ---
 \node[phase=Gray,
-      below=0.5cm of title, text width=6.6cm] (r1)
-    {\textbf{R1--3:} StateLayout slot groups, FieldSet.rebind(),
-     RHS term buffers, compiled regex};
-\node[speedup=Gray, right=0.2cm of r1.east, anchor=west]
-    {baseline};
-
-\node[phase=Gray,
-      below=of r1, text width=6.6cm] (r4)
-    {\textbf{R4:} Ghost-cell padding, cached \texttt{grid.dx},
-     pre-resolved operators/BCs, fused Laplacian};
-\node[speedup=Green, right=0.2cm of r4.east, anchor=west]
-    {IDA 1.13--1.40$\times$};
-
-\node[phase=Gray,
-      below=of r4, text width=6.6cm] (r5)
-    {\textbf{R5:} Per-call allocation elimination in operators};
-\node[speedup=Green, right=0.2cm of r5.east, anchor=west]
-    {scipy 1.29$\times$};
-
-\node[phase=Gray,
-      below=of r5, text width=6.6cm] (r6)
-    {\textbf{R6:} KDK force caching, zero-copy drift,
-     IDA dedup, FieldSet offsets, resolve() fast path};
-\node[speedup=Green, right=0.2cm of r6.east, anchor=west]
-    {leapfrog 1.66$\times$};
+      below=0.5cm of title, text width=6.6cm] (micro)
+    {\textbf{Implementation optimisations:} Memory layout,
+     operator fusion, allocation elimination, force caching};
+\node[speedup=Gray, right=0.2cm of micro.east, anchor=west]
+    {1.1--1.7$\times$ per solver};
 
 % --- Algorithmic phases ---
-\node[phase=Blue, below=0.4cm of r6, text width=6.6cm] (p1)
-    {\textbf{Phase 1:} Higher-order FD stencils
-     (\texttt{--fd-order 4|6})};
+\node[phase=Blue, below=0.4cm of micro, text width=6.6cm] (p1)
+    {\textbf{Higher-order finite differences}
+     (4th / 6th order stencils)};
 \node[speedup=Blue, right=0.2cm of p1.east, anchor=west,
       text width=2.6cm]
     {500$\times$ error reduction\\per order doubling};
 
 \node[phase=Purple, below=of p1, text width=6.6cm] (p2)
-    {\textbf{Phase 2:} Yoshida 4th-order leapfrog
-     (\texttt{--leapfrog-order 4}) + Forest--Ruth fused kicks};
+    {\textbf{Yoshida 4th-order leapfrog}
+     (Forest--Ruth composition)};
 \node[speedup=Purple, right=0.2cm of p2.east, anchor=west,
       text width=2.6cm]
-    {6N $\to$ 3N+1 force evals\\1.7--2.0$\times$ speedup};
+    {$6N \to 3N{+}1$ force evals\\1.7--2.0$\times$ speedup};
 
 \node[phase=Green, below=of p2, text width=6.6cm] (p3)
-    {\textbf{Phase 3:} FFT spectral operators
-     (\texttt{--spectral}), auto for periodic BCs};
+    {\textbf{Fourier spectral operators}
+     (periodic domains)};
 \node[speedup=Green, right=0.2cm of p3.east, anchor=west,
       text width=2.6cm]
     {machine precision\\exponential convergence};
 
-% --- Analytical Jacobian ---
+% --- Advanced solvers ---
 \node[phase=Orange, below=0.4cm of p3, text width=6.6cm] (jac)
-    {\textbf{Analytical Jacobian:} precomputed $dF/dy + cj\cdot dF/dy'$,
-     three tiers (dense/sparse CSC/GMRES JVP),
-     COO assembly, circulant operators};
+    {\textbf{Analytical Jacobian} $\partial F/\partial y$:
+     dense ($N \leq 2\text{K}$),
+     sparse CSC ($N \leq 200\text{K}$),
+     matrix-free GMRES ($N > 200\text{K}$)};
 \node[speedup=Orange, right=0.2cm of jac.east, anchor=west,
       text width=2.6cm]
     {dense 5.3$\times$\\
-     sparse 1.2--2.5$\times$\\
-     415$\times$ assembly};
+     sparse 1.2--2.5$\times$};
 
-% --- Modal solver ---
 \node[phase=Pink, below=0.4cm of jac, text width=6.6cm] (modal)
-    {\textbf{Modal solver:} per-mode eigdecomp (constant) /
-     \texttt{expm\_multiply} + sparse (position-dep.),
-     $O(1)$ in $t_{\mathrm{end}}$, Schur complement};
+    {\textbf{Fourier modal solver:} per-mode eigdecomp
+     (constant coefficients) / matrix exponential
+     (position-dependent),
+     Schur complement constraint elimination};
 \node[speedup=Pink, right=0.2cm of modal.east, anchor=west,
       text width=2.6cm]
-    {57--1451$\times$ vs CVODE (const.)\\
-     $\sim\!52\times$ vs CVODE (pos.-dep.)\\
+    {57--1451$\times$ vs CVODE\\
+     $\sim\!52\times$ (pos.-dep.)\\
      9.5$\times$ vs IDA};
 
 % Arrows (timeline)
-\foreach \a/\b in {r1/r4, r4/r5, r5/r6, r6/p1, p1/p2, p2/p3, p3/jac, jac/modal} {
+\foreach \a/\b in {micro/p1, p1/p2, p2/p3, p3/jac, jac/modal} {
     \draw[-{Stealth[length=3pt, width=2.5pt]}, thin, GrayLine]
         (\a.south west) ++(0.3,0) -- ++(0,-0.25);
 }
 
 % Category braces
 \draw[decorate, decoration={brace, amplitude=4pt, mirror, raise=2pt},
-      GrayLine]
-    ([xshift=-0.3cm]r1.north west) -- ([xshift=-0.3cm]r6.south west)
-    node[midway, left=8pt, font=\scriptsize, text=GrayLine,
-         align=right, rotate=90, anchor=south] {micro-opt};
-
-\draw[decorate, decoration={brace, amplitude=4pt, mirror, raise=2pt},
       BlueLine]
     ([xshift=-0.3cm]p1.north west) -- ([xshift=-0.3cm]p3.south west)
     node[midway, left=8pt, font=\scriptsize, text=BlueLine,
          align=right, rotate=90, anchor=south] {algorithmic};
+
+\draw[decorate, decoration={brace, amplitude=4pt, mirror, raise=2pt},
+      OrangeLine]
+    ([xshift=-0.3cm]jac.north west) -- ([xshift=-0.3cm]modal.south west)
+    node[midway, left=8pt, font=\scriptsize, text=OrangeLine,
+         align=right, rotate=90, anchor=south] {advanced solvers};
 
 \end{tikzpicture}
 \end{document}

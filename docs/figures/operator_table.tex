@@ -45,12 +45,11 @@ mixed\_T\_S1\_\ldots & mixed               & \textit{varies}             & \no  
 % Legend annotation
 \node[below=0.3cm of current bounding box.south, font=\scriptsize\itshape,
       text=GrayLine, align=center] {%
-    \yes\ = supported (in \texttt{\_EXACT\_MULTIPLIERS} for modal;
+    \yes\ = supported (exact Fourier multiplier for modal;
     FD stencils for all solvers) \qquad
     \no\ = not available (modal ineligible if present)\\[2pt]
-    FD orders 2/4/6 via \texttt{--fd-order}. \quad
-    Spectral (\texttt{--spectral}) uses exact multipliers for all-periodic BCs.\\[2pt]
-    $k = 2\pi \cdot \texttt{rfftfreq}(N, d{=}dx)$ --- consistent with \texttt{operators.py} convention.};
+    Finite-difference orders 2/4/6 available. \quad
+    Spectral mode uses exact multipliers for all-periodic BCs.};
 
 \end{tikzpicture}
 \end{document}

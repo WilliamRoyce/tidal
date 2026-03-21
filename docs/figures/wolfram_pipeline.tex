@@ -14,7 +14,7 @@
         fill=GreenFill, fill opacity=0.2, font=\scriptsize,
         align=center, text opacity=1, inner sep=4pt
     },
-    node distance=0.55cm
+    node distance=0.4cm
 ]
 
 % ===================================================================
@@ -25,63 +25,49 @@
     {\textbf{TOML config}\\[-1pt]
      \scriptsize fields, Lagrangian, constants};
 
-\node[check, right=0.3cm of toml] (chk0)
-    {\texttt{\_validate\_config()}};
-
 \node[stage=Purple, below=of toml] (wls)
-    {\textbf{WLS code generation}\\[-1pt]
-     \scriptsize Python $\to$ Wolfram script};
+    {\textbf{Generate Wolfram script}\\[-1pt]
+     \scriptsize from configuration};
 
 \node[stage=Purple, below=of wls] (manifold)
-    {\texttt{DefManifold} + \texttt{DefTensor}};
-\node[check, right=0.3cm of manifold] (chk1)
-    {\texttt{If[!xTensorQ[...],}\\
-     \texttt{DefTensor[...]]}};
+    {Define manifold \& tensor fields\\[-1pt]
+     \scriptsize \texttt{DefManifold}, \texttt{DefTensor}};
 
 \node[stage=Purple, below=of manifold] (lagr)
     {\textbf{Lagrangian construction}\\[-1pt]
      \scriptsize constants, gauge terms};
 
-\node[check, right=0.3cm of lagr] (chk2)
-    {\texttt{\_validate\_lagrangian()}\\
-     gradient check};
-
 \node[stage=Purple, below=of lagr] (vard)
-    {\texttt{VarD} (Euler--Lagrange)};
-\node[wlmod, right=0.3cm of vard] {EulerLagrange.wl};
+    {Euler--Lagrange variation\\[-1pt]
+     \scriptsize \texttt{VarD}: $\delta\mathcal{L}/\delta\phi^A = 0$};
 
 \node[stage=Purple, below=of vard] (sep)
-    {\texttt{SeparateFieldMetrics}};
-\node[wlmod, right=0.3cm of sep] {ComponentDecompose.wl};
+    {Separate metric from matter fields};
 
 \node[stage=Purple, below=of sep] (tobasis)
-    {\texttt{ToBasis}};
+    {Project to coordinate basis\\[-1pt]
+     \scriptsize \texttt{ToBasis}};
 
 \node[stage=Purple, below=of tobasis] (batch)
-    {\textbf{BatchedTraceBasisDummy}\\[-1pt]
-     \scriptsize fused: trace + expand + metric eval\\[-1pt]
-     \scriptsize adaptive batch size ($\sim$50 terms)};
+    {Evaluate metric contractions \& traces\\[-1pt]
+     \scriptsize batched expansion ($\sim$50 terms)};
 
 \node[stage=Purple, below=of batch] (christoffel)
-    {\texttt{EvaluateChristoffelComponents}};
-\node[annot, right=0.3cm of christoffel.east, anchor=west]
-    {\texttt{IsNonConstantMetric}\\auto-detects need};
+    {Compute Christoffel symbols $\Gamma^a_{\ bc}$\\[-1pt]
+     \scriptsize auto-detected for non-constant metrics};
 
 \node[stage=Purple, below=of christoffel] (replace)
-    {\texttt{ReplaceTensorFieldComponents}\\[-1pt]
-     \scriptsize $T_{ab} \to$ scalar functions $T_0, T_1, \ldots$};
-\node[annot, right=0.3cm of replace.east, anchor=west]
-    {\texttt{EnumerateComponentTuples}\\
-     symmetry $\to$ canonical reps};
+    {Decompose tensors $\to$ scalar components\\[-1pt]
+     \scriptsize $T_{ab} \to T_0, T_1, \ldots$
+     (symmetry $\to$ canonical reps)};
 
 \node[stage=Purple, below=of replace] (convert)
-    {\texttt{ConvertCDToDerivatives}\\[-1pt]
+    {Covariant $\to$ partial derivatives\\[-1pt]
      \scriptsize $\nabla_a \to \partial_t, \partial_x, \ldots$};
 
 \node[stage=Green, below=of convert] (export)
-    {\textbf{ExportJSON}\\[-1pt]
+    {\textbf{Export to intermediate representation}\\[-1pt]
      \scriptsize coefficients, operators, fields};
-\node[wlmod, right=0.3cm of export] {ExportJSON.wl};
 
 \node[stage=Blue, below=of export] (json)
     {\textbf{\texttt{spec.json}}};
@@ -107,20 +93,17 @@
 % ===================================================================
 \node[cache, left=1.8cm of christoffel, anchor=east,
       text width=4.8cm] (cachebox) {%
-    \textbf{\$TIDALGeometricCache}\\[3pt]
-    \textbullet\ Inverse metric: \texttt{Simplify[Inverse[g]]}\\
-    \textbullet\ Christoffels: $\Gamma^a_{\ bc}$ (3D array)\\
-    \textbullet\ Riemann: $R^a_{\ bcd}$ (4D array)\\
-    \textbullet\ Metric rules: 32 \texttt{With[]} blocks\\[3pt]
-    \textbullet\ \texttt{SetMetricDownValues}:\\
-    \quad direct \texttt{Set[]} (auto-evaluating)\\
-    \textbullet\ \texttt{SetBackgroundFieldDownValues}:\\
+    \textbf{Geometric cache}\\[3pt]
+    \textbullet\ Inverse metric: $g^{ab}$\\
+    \textbullet\ Christoffel symbols: $\Gamma^a_{\ bc}$\\
+    \textbullet\ Riemann tensor: $R^a_{\ bcd}$\\
+    \textbullet\ Metric evaluation rules\\[3pt]
+    \textbullet\ Background field components:\\
     \quad $\bar{A}_\mu \to$ coordinate functions};
 
 % Cache arrows: compute → cache, cache → reuse
 % Christoffel computed at christoffel stage
-\draw[cachearr] (christoffel.west) -- +(-0.6,0)
-    |- ([yshift=-0.2cm]cachebox.east)
+\draw[cachearr] (christoffel.west) -- (cachebox.east)
     node[midway, above, font=\scriptsize, text=BlueLine] {};
 
 % Cache reused by batch (metric eval) and replace (metric weights)
@@ -129,7 +112,7 @@
 \draw[cachearr] ([yshift=-0.6cm]cachebox.east) -|
     ([xshift=-0.6cm]replace.west) -- (replace.west);
 
-% SetMetricDownValues set at manifold stage
+% Metric rules set at manifold stage
 \draw[cachearr] (manifold.west) -- ++(-0.8,0)
     |- ([yshift=0.8cm]cachebox.east);
 
@@ -157,7 +140,7 @@
 \node[optbranch, right=4.0cm of batch] (bgfield)
     {Background fields\\[1pt]
      \scriptsize $\bar{A}_\mu(x)$ evaluation\\
-     \scriptsize via \texttt{DownValues}};
+     \scriptsize auto-substituted into equations};
 \draw[arr, densely dashed, GreenLine]
     (bgfield.west) -- (batch.east);
 

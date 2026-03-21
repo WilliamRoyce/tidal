@@ -8,57 +8,44 @@
 
 % Stages
 \node[stage=Gray] (toml)
-    {\textbf{TOML} \texttt{[[background\_fields]]}\\[1pt]
+    {\textbf{Configuration}\\[1pt]
      \scriptsize covariant components: $\bar{A}_y = -B_0 z$};
 
-\node[stage=Pink, below=of toml] (wls)
-    {\texttt{DefTensor} + \texttt{ComponentValue}\\[1pt]
-     \scriptsize xAct abstract definition};
-\node[annot, right=0.3cm of wls.east, anchor=west]
-    {covariant $\bar{A}_\mu$\\declared in xAct};
+\node[stage=Pink, below=of toml] (declare)
+    {Declare background tensor $\bar{A}_\mu$\\[1pt]
+     \scriptsize in computer algebra system};
 
-\node[stage=Pink, below=of wls] (downval)
-    {\texttt{SetBackgroundFieldDownValues}\\[1pt]
-     \scriptsize direct Mathematica \texttt{Set[]}};
-\node[annot, right=0.3cm of downval.east, anchor=west]
-    {auto-evaluating DownValues\\(not xCoba internal rules)\\$\to$ immediate collapse in\\
-     \texttt{Expand[]}};
+\node[stage=Pink, below=of declare] (assign)
+    {Assign component values\\[1pt]
+     \scriptsize auto-evaluating substitution};
+\node[annot, right=0.3cm of assign.east, anchor=west]
+    {Components collapse immediately\\during symbolic expansion};
 
-\node[stage=Purple, below=of downval] (evalPD)
-    {\texttt{EvaluatePDBackgroundField}\\[1pt]
-     \scriptsize $\partial_\mu \bar{A}_\nu \to$ coordinate derivatives};
-\node[annot, right=0.3cm of evalPD.east, anchor=west]
-    {called \emph{twice}:\\before + after\\
-     \texttt{ConvertCDToDerivatives}};
+\node[stage=Purple, below=of assign] (deriv)
+    {Evaluate coordinate derivatives $\partial_\mu \bar{A}_\nu$};
+\node[annot, right=0.3cm of deriv.east, anchor=west]
+    {Applied before + after\\
+     conversion to partial derivatives};
 
-\node[stage=Purple, below=of evalPD] (tobasis)
-    {xCoba \texttt{ToBasis} evaluation\\[1pt]
+\node[stage=Purple, below=of deriv] (fstrength)
+    {Evaluate background field strength\\[1pt]
      \scriptsize $\bar{F}_{xy} = \partial_x \bar{A}_y - \partial_y \bar{A}_x = B_0$};
-\node[annot, right=0.3cm of tobasis.east, anchor=west]
-    {background field strength\\evaluated during decomposition};
 
-\node[stage=Green, below=of tobasis] (json)
-    {\textbf{JSON export}\\[1pt]
-     \scriptsize \texttt{coordinate\_dependent: ["z"]}\\
-     \scriptsize \texttt{coefficient\_symbolic: "-B0*z[]"}};
+\node[stage=Green, below=of fstrength] (export)
+    {\textbf{Export position-dependent coefficients}};
 
-\node[stage=Blue, below=of json] (pyeval)
-    {\textbf{Python} \texttt{evaluate\_coefficient()}\\[1pt]
-     \scriptsize Mathematica$\to$Python string conversion\\
-     \scriptsize \texttt{eval(expr, \{x, y, z, params\})}};
-\node[annot, right=0.3cm of pyeval.east, anchor=west]
-    {\texttt{\_invert\_exp\_denominator()}\\
-     handles $1/e^{x^2} \to e^{-x^2}$\\to prevent overflow};
+\node[stage=Blue, below=of export] (pyeval)
+    {\textbf{Evaluate coefficients on spatial grid}\\[1pt]
+     \scriptsize overflow-safe ($1/e^{x^2} \to e^{-x^2}$)};
 
 \node[stage=Blue, below=of pyeval] (cache)
-    {\textbf{L2 spatial cache}\\[1pt]
-     \scriptsize \texttt{ndarray} on grid, computed once};
+    {\textbf{Cache on grid} (evaluated once)};
 \node[annot, right=0.3cm of cache.east, anchor=west]
-    {position-dependent but\\time-independent\\$\to$ cached at L2};
+    {Position-dependent but\\time-independent\\$\to$ single evaluation};
 
 % Arrows
-\foreach \a/\b in {toml/wls, wls/downval, downval/evalPD,
-                   evalPD/tobasis, tobasis/json, json/pyeval, pyeval/cache} {
+\foreach \a/\b in {toml/declare, declare/assign, assign/deriv,
+                   deriv/fstrength, fstrength/export, export/pyeval, pyeval/cache} {
     \draw[arr] (\a) -- (\b);
 }
 

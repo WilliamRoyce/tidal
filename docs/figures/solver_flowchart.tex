@@ -47,7 +47,7 @@
 % --- D2: Constraint eqs? ---
 \node[decision, below=of d1] (d2) {Constraint\\equations?};
 \node[annot, right=-0.7cm of d2.east, anchor=north west]
-    (a2) {time\_order $= 0$\\(elliptic / algebraic DAE)};
+    (a2) {zeroth-order in $t$\\(elliptic / algebraic DAE)};
 
 % --- IDA (constraint) ---
 \node[solver=Orange, right=of d2] (ida1) {IDA};
@@ -55,7 +55,7 @@
 % --- D3: First-order eqs? ---
 \node[decision, below=of d2] (d3) {First-order\\equations?};
 \node[annot, right=-0.4cm of d3.east, anchor=north west]
-    (a3) {time\_order $= 1$\\(diffusion / transport) \\ (implicit BDF)};
+    (a3) {first-order in $t$\\(diffusion / transport) \\ (implicit BDF)};
 
 % --- IDA (first-order) ---
 \node[solver=Orange, right=of d3] (ida2) {IDA};
@@ -63,7 +63,7 @@
 % --- D4: Dissipation? ---
 \node[decision, below=of d3] (d4) {Dissipation?};
 \node[annot, right=0.0cm of d4.east, anchor=north west]
-    (a4) {\texttt{first\_derivative\_t}\\(breaks symplecticity)};
+    (a4) {dissipative $\partial_t$ terms\\(breaks symplecticity)};
 
 % --- IDA (dissipation) ---
 \node[solver=Orange, right=3.2cm of d4] (ida3) {IDA};
@@ -71,7 +71,7 @@
 % --- D5: Missing Hamiltonian? ---
 \node[decision, below=of d4] (d5) {Missing\\Hamiltonian?};
 \node[annot, below right=0.1cm and -0.4cm of d5.east, anchor=north west]
-    (a5) {canonical $=$ None with\\second-order wave eqs};
+    (a5) {no Hamiltonian available\\for second-order wave eqs};
 
 % --- Warning + fallthrough ---
 \node[solver=Green, right=2.86cm of d5] (warn)
@@ -140,7 +140,7 @@
     \multicolumn{4}{@{}l}{\normalsize\textbf{Solver Key}}\\[4pt]
     \tikz\fill[PurpleFill!40, draw=PurpleLine, rounded corners=1pt]
         (0,0) rectangle (0.5,0.3); & \textbf{Modal}
-        & eigdecomp / \texttt{expm\_multiply} & $\sim\!10^{-16}$ precision\\[2pt]
+        & eigendecomp / matrix exponential & $\sim\!10^{-16}$ precision\\[2pt]
     \tikz\fill[OrangeFill!40, draw=OrangeLine, rounded corners=1pt]
         (0,0) rectangle (0.5,0.3); & \textbf{IDA}
         & SUNDIALS implicit DAE & $\sim\!10^{-8}$ tolerance\\[2pt]
@@ -154,7 +154,7 @@
         (0,0) rectangle (0.5,0.3); & \textbf{scipy}
         & DOP853/Radau/BDF & Manual only\\[4pt]
     \multicolumn{4}{@{}l}{\textit{Leapfrog and scipy are never auto-selected}}\\
-    \multicolumn{4}{@{}l}{\textit{(require explicit \texttt{-{}-scheme}).}}
+    \multicolumn{4}{@{}l}{\textit{(require explicit solver specification).}}
 \end{tabular}};
 
 \end{tikzpicture}

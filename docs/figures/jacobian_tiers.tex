@@ -19,7 +19,7 @@
 % Dense tier
 \node[stage=Green, right=of d1] (dense)
     {\textbf{Dense tier}\\[1pt]
-     \scriptsize 2D \texttt{jacfn} callback\\
+     \scriptsize dense Jacobian callback\\
      \scriptsize \textbf{5.3$\times$ speedup}};
 
 % D2
@@ -29,15 +29,15 @@
 % Sparse tier
 \node[stage=Purple, right=of d2] (sparse)
     {\textbf{Sparse tier}\\[1pt]
-     \scriptsize 1D CSC \texttt{jacfn} + SuperLU\_MT\\
+     \scriptsize CSC sparse Jacobian + SuperLU\\
      \scriptsize \textbf{IDA 2.5$\times$ / CVODE 1.2--1.4$\times$}};
 \node[annot, below=0.15cm of sparse]
-    {COO accumulation\\(415$\times$ assembly)\\sksundae $\geq$ 1.1.2};
+    {coordinate-format assembly\\(415$\times$ faster than dense)};
 
 % GMRES tier
 \node[stage=Blue, below=of d2] (gmres)
     {\textbf{GMRES tier}\\[1pt]
-     \scriptsize analytical JVP (\texttt{jactimes})\\
+     \scriptsize analytical Jacobian-vector product\\
      \scriptsize matrix-free};
 
 % Arrows

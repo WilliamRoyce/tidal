@@ -3,7 +3,7 @@
 
 \begin{document}
 \begin{tikzpicture}[
-    node distance=0.5cm
+    node distance=0.4cm
 ]
 
 % ===================================================================
@@ -15,7 +15,7 @@
 
 % --- Derive ---
 \node[stage=Pink, right=1.0cm of toml] (derive)
-    {\texttt{tidal derive}\\[2pt]\scriptsize Wolfram/xAct};
+    {Symbolic derivation\\[2pt]\scriptsize Wolfram/xAct};
 
 % --- JSON (narrow waist) ---
 \node[data, right=1.0cm of derive, minimum width=1.8cm,
@@ -25,19 +25,19 @@
 
 % --- Simulate ---
 \node[stage=Purple, right=1.0cm of json] (sim)
-    {\texttt{tidal simulate}\\[2pt]\scriptsize PDE solver};
+    {Numerical integration\\[2pt]\scriptsize PDE solver};
 
 % --- Snapshots ---
 \node[data, right=1.0cm of sim] (snaps)
-    {snapshots\\[-1pt]\scriptsize\texttt{.npy}};
+    {Field\\[-1pt]\scriptsize snapshots};
 
 % --- Measure ---
 \node[stage=Green, right=1.0cm of snaps] (meas)
-    {\texttt{tidal measure}\\[2pt]\scriptsize 13 metrics};
+    {Post-processing\\[2pt]\scriptsize 13 measurement types};
 
 % --- Results ---
 \node[data, right=1.0cm of meas] (results)
-    {metrics\\[-1pt]\scriptsize\texttt{.csv}};
+    {Measurement\\[-1pt]\scriptsize results};
 
 % ===================================================================
 % ARROWS (main flow)
@@ -63,16 +63,13 @@
 % ROW 3: Validation checks (below libraries)
 % ===================================================================
 \node[check, below=0.55cm of derive] (chk1)
-    {\texttt{\_validate\_config()}\\[1pt]
-     \texttt{\_validate\_lagrangian()}};
+    {Configuration and\\Lagrangian validation};
 
 \node[check, below=0.55cm of json] (chk2)
-    {\texttt{from\_dict()}\\[1pt]
-     field/operator/matrix\\validation};
+    {Field, operator, and\\matrix consistency};
 
 \node[check, below=0.55cm of sim] (chk3)
-    {\texttt{ensure\_consistent\_ic()}\\[1pt]
-     constraint pre-solve};
+    {Constraint IC\\consistency};
 
 % Check arrows (dotted, pointing up)
 \draw[dataarr, densely dotted] (chk1) -- (derive);
@@ -84,18 +81,18 @@
 % ===================================================================
 \node[stage=Lime, above=1.2cm of sim, minimum width=2.0cm,
       minimum height=1.0cm] (sweep)
-    {\texttt{tidal sweep}\\[2pt]\scriptsize parameter grid};
+    {Parameter sweep\\[2pt]\scriptsize automated grid};
 
 % Sweep arrows: wraps around simulate+measure
 \draw[arr, rounded corners=4pt]
-    (sweep.west) -| ([xshift=-0.3cm]sim.north) -- (sim.north);
+    (sweep.south) -- (sim.north);
 \draw[arr, rounded corners=4pt]
-    (meas.north) -- ([yshift=0.3cm]meas.north) -| (sweep.east);
+    (meas.north) -- ([yshift=0.3cm]meas.north) |- (sweep.east);
 
 % Plot branch
 \node[stage=Lime, right=0.8cm of results, minimum width=1.6cm,
       minimum height=1.0cm] (plot)
-    {\texttt{tidal plot}};
+    {Visualisation};
 \draw[arr] (results) -- (plot);
 
 % ===================================================================

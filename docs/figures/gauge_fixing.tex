@@ -20,7 +20,7 @@
 % ===================================================================
 % DECISION: mechanism
 % ===================================================================
-\node[decision, below=0.8cm of toml] (dmech)
+\node[decision, below=0.4cm of toml] (dmech)
     {mechanism?};
 
 \draw[arr] (toml) -- (dmech);
@@ -28,7 +28,7 @@
 % ===================================================================
 % TYPE A: Lagrangian term (left branch)
 % ===================================================================
-\node[stage=Blue, below left=0.5cm and 0.2cm of dmech,
+\node[stage=Blue, below left=0.4cm and -0.4cm of dmech.west,
       text width=4.2cm] (typeA) {%
     \textbf{Type A: Lagrangian term}\\[2pt]
     \scriptsize Add $\mathcal{L}_{\mathrm{gf}}$ \emph{before} Euler--Lagrange\\
@@ -43,10 +43,9 @@
 
 % Type A stages
 \node[stage=Purple, below=0.8cm of presetsA, text width=3.8cm] (buildA)
-    {\texttt{\_wls\_gauge\_fixing\_type\_a()}\\[1pt]
-     \scriptsize builds $\mathcal{L}_{\mathrm{gf}}$ expression};
+    {Construct $\mathcal{L}_{\mathrm{gf}}$ expression};
 
-\node[stage=Purple, below=0.5cm of buildA, text width=3.8cm] (elA)
+\node[stage=Purple, below=0.4cm of buildA, text width=3.8cm] (elA)
     {Euler--Lagrange on\\$\mathcal{L} + \mathcal{L}_{\mathrm{gf}}$};
 
 \draw[arr] (typeA) -- (presetsA);
@@ -56,7 +55,7 @@
 % ===================================================================
 % TYPE B: Constraint (right branch)
 % ===================================================================
-\node[stage=Green, below right=0.5cm and 0.2cm of dmech,
+\node[stage=Green, below right=0.4cm and -0.4cm of dmech.east,
       text width=4.0cm] (typeB) {%
     \textbf{Type B: Constraint}\\[2pt]
     \scriptsize Apply \emph{after} decomposition\\
@@ -74,9 +73,9 @@
     {Euler--Lagrange on $\mathcal{L}$\\[1pt]
      \scriptsize (unmodified)};
 
-\node[stage=Purple, below=0.5cm of elB, text width=3.8cm] (applyB)
-    {\texttt{\_wls\_gauge\_fixing\_type\_b()}\\[1pt]
-     \scriptsize substitution/elimination};
+\node[stage=Purple, below=0.4cm of elB, text width=3.8cm] (applyB)
+    {Apply gauge substitutions\\[1pt]
+     \scriptsize field elimination};
 
 \draw[arr] (typeB) -- (presetsB);
 \draw[arr] (presetsB) -- (elB) node[midway, annot, left] {field-setting or\\transverse constraints};
@@ -97,7 +96,7 @@
 % CONVERGENCE: both paths → JSON
 % ===================================================================
 \node[stage=Gray,
-      below=6.2cm of dmech] (json)
+      below=5.2cm of dmech] (json)
     {\textbf{Component equations}\\[1pt]
      \scriptsize gauge-fixed $\to$ ExportJSON};
 

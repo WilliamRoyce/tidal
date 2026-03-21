@@ -59,8 +59,8 @@
 \node[check, below=of ph2, text width=4.6cm] (ph3)
     {\textbf{Phase 3: Verification}\\[2pt]
      evaluate all constraint residuals\\
-     strict mode: \texttt{ValueError} if violated\\
-     \texttt{--allow-inconsistent-ic}: warning only};
+     halt with error if violated\\
+     (optional: proceed with warning)};
 
 % ===================================================================
 % ARROWS
@@ -89,9 +89,7 @@
 \node[check, left=of d2, text width=3.2cm] (selmethod) {%
     \textbf{Auto-select tier}\\[2pt]
     chooses method based\\
-    on BCs + coefficient type\\[2pt]
-    Tier 3 (CG/GMRES):\\
-    future, for $N > 10^6$};
+    on BCs + coefficient type};
 \draw[arr, densely dashed, OrangeLine] (selmethod) -- (d2);
 
 \end{tikzpicture}

@@ -8,8 +8,8 @@
 
 % Row 1: Config
 \node[stage=Gray] (config)
-    {\textbf{Sweep config}\\[1pt]
-     \scriptsize \texttt{--sweep "B0=0.01:0.25:40"}};
+    {\textbf{Sweep configuration}\\[1pt]
+     \scriptsize parameter range specification};
 
 % Row 2: Grid generation
 \node[stage=Pink, below=0.7cm of config] (grid)
@@ -20,14 +20,14 @@
 % Row 3: Dispatch
 \node[stage=Purple, below=0.7cm of grid, minimum width=3.0cm] (dispatch)
     {\textbf{Dispatch workers}\\[1pt]
-     \scriptsize sequential or \texttt{--parallel N}};
+     \scriptsize sequential or parallel};
 \draw[arr] (grid) -- (dispatch);
 
 % Row 4: Per-point pipeline (boxed)
 \node[stage=Blue, below left=0.9cm and 0.3cm of dispatch,
-      minimum width=2.0cm] (sim) {\texttt{simulate}};
+      minimum width=2.0cm] (sim) {Simulate};
 \node[stage=Green, right=0.8cm of sim,
-      minimum width=2.0cm] (meas) {\texttt{measure}};
+      minimum width=2.0cm] (meas) {Measure};
 \draw[arr] (sim) -- (meas);
 
 % Box around per-point
@@ -45,22 +45,21 @@
 \draw[arr, densely dotted, OrangeLine] (dispatch) -- (status);
 
 % Resume
-\node[annot, below=0.15cm of status] {\texttt{--resume}\\skips completed};
+\node[annot, below=0.15cm of status] {Resumable:\\skips completed};
 
 % Row 6: Aggregate
 \node[stage=Lime, below=0.9cm of perpoint] (agg)
-    {\textbf{Aggregate}\\[1pt]
-     \scriptsize \texttt{SweepResults}};
+    {\textbf{Aggregate results}};
 \draw[arr] (perpoint) -- (agg);
 
 % Row 7: Outputs
 \node[stage=Gray,
       below left=0.8cm and 1.0cm of agg] (csv)
-    {\texttt{results.csv}};
+    {Tabulated results};
 \node[stage=Lime, below=0.8cm of agg] (plot)
-    {\textbf{\texttt{tidal plot}}};
+    {\textbf{Visualisation}};
 \node[stage=Lime, below right=0.8cm and 1.0cm of agg] (analyze)
-    {\textbf{\texttt{tidal analyze}}\\[1pt]
+    {\textbf{Sensitivity analysis}\\[1pt]
      \scriptsize Sobol / Morris};
 
 \draw[arr] (agg) -- (csv);
