@@ -1186,6 +1186,12 @@ IdentifyMultiFieldTerm[term_, currentFieldName_, allFieldNames_] := Module[
    coeffResult, coefficient, symbolicCoeff, isTimeDependent, coordDeps,
    operatorResult, operator, isMixedTimeSpace},
 
+  (* Skip zero terms — they arise from plane-wave reduction or vanishing *)
+  (* components. Without this check, ClassifyOperatorType[0] returns     *)
+  (* {"identity", False} and ExtractTermCoefficient returns 1.0,         *)
+  (* producing the trivial equation field = 1.0 * identity(field).       *)
+  If[term === 0 || term === 0., Return[Nothing]];
+
   (* Step 1: Extract function heads from term *)
   functionHeads = ExtractFunctionHeads[term];
 

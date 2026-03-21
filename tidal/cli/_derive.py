@@ -1209,6 +1209,42 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
     else:
         lines.append("$CDShorthandRules = {};")
 
+    # Generate REVERSE rules: CD1field[idx, args] → CD[idx][field[args]]
+    # These undo the shorthand substitution before DecomposeToComponents,
+    # because StaggeredToBasis can handle raw CD operators (via ToBasis +
+    # CD→PD→Derivative chain) but NOT CD shorthand tensors (which cause
+    # recursion in ToBasis and bypass isCDlikeQ in the force-resolve loop).
+    reverse_rules: list[str] = []
+    for df in dyn_fields:
+        head = df["head"]
+        cd1_head = f"CD1{head}"
+        cd2_head = f"CD2{head}"
+        cd3_head = f"CD3{head}"
+        cd4_head = f"CD4{head}"
+        # Reverse rules: CDNfield → CD@CD(N-1)field (highest first for ReplaceRepeated)
+        reverse_rules.extend(
+            [
+                f"If[xTensorQ[{cd4_head}], {cd4_head}[idx_, args__] :> {ctx.cd}[idx][{cd3_head}[args]], {{}}]",
+                f"If[xTensorQ[{cd3_head}], {cd3_head}[idx_, args__] :> {ctx.cd}[idx][{cd2_head}[args]], {{}}]",
+                f"If[xTensorQ[{cd2_head}], {cd2_head}[idx_, args__] :> {ctx.cd}[idx][{cd1_head}[args]], {{}}]",
+            ]
+        )
+        # CD1field[idx, args] → CD[idx][field[args]]
+        if df.get("fexpr", "").endswith("[]"):
+            # Scalar field: CD1f[idx] → CD[idx][f[]]
+            reverse_rules.append(
+                f"If[xTensorQ[{cd1_head}], {cd1_head}[idx_] :> {ctx.cd}[idx][{head}[]], {{}}]"
+            )
+        else:
+            reverse_rules.append(
+                f"If[xTensorQ[{cd1_head}], {cd1_head}[idx_, args__] :> {ctx.cd}[idx][{head}[args]], {{}}]"
+            )
+    if reverse_rules:
+        rev_list = ", ".join(reverse_rules)
+        lines.append(f"$CDShorthandReverseRules = Flatten[{{{rev_list}}}];")
+    else:
+        lines.append("$CDShorthandReverseRules = {};")
+
     lines.extend(
         [
             "(* Restore index validation after shorthand substitution *)",
@@ -1709,6 +1745,11 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
         ]
     )
 
+    # Clear $CDShorthandRules BEFORE decomposition to prevent circular
+    # conversion: reverse rules convert CDN→CD@field, but ExpandScalarWrappers
+    # inside StaggeredToBasis would re-apply forward rules CD@field→CDN.
+    lines.extend(("$CDShorthandRules = {};", ""))
+
     for i, df in enumerate(dyn_fields):
         eom_var = f"eom{df['name'].capitalize()}"
         comp_var = f"comp{df['name'].capitalize()}"
@@ -1741,6 +1782,16 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
         lines.extend(
             [
                 _wls_mem_print(f"Before DecomposeToComponents({df['name']})"),
+                "(* Reverse CD shorthand substitution before decomposition.             *)",
+                "(* CD shorthand tensors (CD1field, CD2field, etc.) with abstract        *)",
+                "(* indices cannot be resolved by StaggeredToBasis (ToBasis causes       *)",
+                "(* recursion, isCDlikeQ excludes them from force-resolve). Converting   *)",
+                "(* back to raw CD@field form lets the existing ToBasis+CD→PD→Derivative *)",
+                "(* pipeline handle them correctly.                                     *)",
+                "If[ListQ[$CDShorthandReverseRules] && Length[$CDShorthandReverseRules] > 0,",
+                f"  {eom_var} = {eom_var} //. $CDShorthandReverseRules;",
+                f"  {eom_var} = {eom_var} /. Scalar[x_] :> Scalar[x //. $CDShorthandReverseRules];",
+                "];",
                 _wls_timing_start(f"tDecomp{df['name']}"),
                 f"(* Decompose {df['name']} EOM to components *)",
                 f'{comp_var} = Block[{{xAct`xTensor`Private`CheckRepeated = (Null &)}}, DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}{bg_rules_opt}]];',

@@ -313,7 +313,7 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
   (* Ref: supervisor's EuclideanSplinter applies ToBasis exhaustively.   *)
   If[!FreeQ[e, _?isCDlikeQ],
     Module[{prev2 = -1, cur2, iter2 = 0},
-      While[iter2 < 4,
+      While[iter2 < 8,
         If[Head[e] === Plus,
           e = Total[ToBasis[chart] /@ List @@ e],
           e = ToBasis[chart][e]
@@ -504,7 +504,44 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
       ];
 
       (* Convert coordinate derivatives to explicit Derivative form *)
-      componentEq = ConvertCDToDerivatives[componentEq, chart];
+      (* Catch Throw from ConvertCDToDerivatives::incomplete — the fallback *)
+      (* CD→Derivative rules in the caller handle residual operators.       *)
+      Module[{cdResult},
+        cdResult = Catch[ConvertCDToDerivatives[componentEq, chart]];
+        If[!StringQ[cdResult],
+          componentEq = cdResult
+          (* else: keep componentEq as-is, fallback below handles it *)
+        ]
+      ];
+
+      (* Fallback CD→Derivative for residual CovD operators *)
+      Module[{dim2 = GetChartDimension[chart], prevExpr2, iter2fb = 0},
+        prevExpr2 = componentEq;
+        While[iter2fb < 10,
+          componentEq = componentEq /. (f_)[{idx_Integer, s_}][g_Symbol[args___]] /;
+              CovDQ[f] && (s === chart || s === -chart) :>
+            With[{orders = ReplacePart[ConstantArray[0, dim2], idx + 1 -> 1]},
+              Derivative[Sequence @@ orders][g][args]
+            ];
+          componentEq = componentEq /. (f_)[{idx_Integer, s_}][Derivative[orders__][g_][args__]] /;
+              CovDQ[f] && (s === chart || s === -chart) :>
+            With[{paddedOrders = PadRight[{orders}, dim2, 0]},
+              With[{newOrders = ReplacePart[paddedOrders, idx + 1 -> paddedOrders[[idx + 1]] + 1]},
+                Derivative[Sequence @@ newOrders][g][args]
+              ]
+            ];
+          componentEq = componentEq /. Derivative[outerOrds__][(f_)[{idx_Integer, s_}]][g_Symbol[args__]] /;
+              CovDQ[f] && (s === chart || s === -chart) :>
+            With[{paddedOuter = PadRight[{outerOrds}, dim2, 0]},
+              With[{mergedOrders = ReplacePart[paddedOuter, idx + 1 -> paddedOuter[[idx + 1]] + 1]},
+                Derivative[Sequence @@ mergedOrders][g][args]
+              ]
+            ];
+          iter2fb++;
+          If[componentEq === prevExpr2, Break[]];
+          prevExpr2 = componentEq;
+        ];
+      ];
 
       (* Post-ConvertCDToDerivatives: catch residual BG Derivative forms *)
       If[backgroundFieldRules =!= {},
@@ -851,7 +888,40 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   ];
 
   (* Step 9: Convert coordinate derivatives to Derivative form *)
-  componentEq = ConvertCDToDerivatives[componentEq, chart];
+  (* Catch Throw from ConvertCDToDerivatives::incomplete — fallback below *)
+  Module[{cdResult9},
+    cdResult9 = Catch[ConvertCDToDerivatives[componentEq, chart]];
+    If[!StringQ[cdResult9], componentEq = cdResult9]
+  ];
+
+  (* Step 9a: Fallback CD→Derivative for residual CovD operators *)
+  Module[{dim9 = GetChartDimension[chart], prevExpr9, iter9 = 0},
+    prevExpr9 = componentEq;
+    While[iter9 < 10,
+      componentEq = componentEq /. (f_)[{idx_Integer, s_}][g_Symbol[args___]] /;
+          CovDQ[f] && (s === chart || s === -chart) :>
+        With[{orders = ReplacePart[ConstantArray[0, dim9], idx + 1 -> 1]},
+          Derivative[Sequence @@ orders][g][args]
+        ];
+      componentEq = componentEq /. (f_)[{idx_Integer, s_}][Derivative[orders__][g_][args__]] /;
+          CovDQ[f] && (s === chart || s === -chart) :>
+        With[{paddedOrders = PadRight[{orders}, dim9, 0]},
+          With[{newOrders = ReplacePart[paddedOrders, idx + 1 -> paddedOrders[[idx + 1]] + 1]},
+            Derivative[Sequence @@ newOrders][g][args]
+          ]
+        ];
+      componentEq = componentEq /. Derivative[outerOrds__][(f_)[{idx_Integer, s_}]][g_Symbol[args__]] /;
+          CovDQ[f] && (s === chart || s === -chart) :>
+        With[{paddedOuter = PadRight[{outerOrds}, dim9, 0]},
+          With[{mergedOrders = ReplacePart[paddedOuter, idx + 1 -> paddedOuter[[idx + 1]] + 1]},
+            Derivative[Sequence @@ mergedOrders][g][args]
+          ]
+        ];
+      iter9++;
+      If[componentEq === prevExpr9, Break[]];
+      prevExpr9 = componentEq;
+    ];
+  ];
 
   (* Step 9b: Catch residual background field Derivative[...][bgField][{mu,-chart}] forms
      that may survive ConvertCDToDerivatives *)
