@@ -16,7 +16,7 @@
 
 View the `tidal` package documentation [here](https://williamroyce.github.io/torsion-gertsenshtein/).
 
-A symbolic-to-numerical framework for **linearized field theory** — define a Lagrangian, derive the PDEs automatically, and simulate. Built for the **Gertsenshtein effect** (electromagnetic ↔ gravitational wave conversion; [Domcke & Garcia-Cely 2023](https://arxiv.org/abs/2301.02072)) and **torsion wave physics** (Poincare gauge theory). The graviton-photon conversion probability P = sin²(κB₀D/2) has been validated numerically to 0.04% against the Boccaletti (1970) formula. The repository includes:
+A symbolic-to-numerical framework for **linearized field theory** — define a Lagrangian, derive the PDEs automatically, and simulate. Built for the **Gertsenshtein effect** (electromagnetic ↔ gravitational wave conversion; [Domcke & Garcia-Cely 2023](https://arxiv.org/abs/2301.02072)) and **torsion wave physics** (Poincare gauge theory). The graviton-photon conversion probability P = sin²(κB₀D/2) has been validated against the Boccaletti (1970) formula. The repository includes:
 
 - A **symbolic derivation pipeline** (Mathematica/xAct) that derives linearized field equations from any Lagrangian and exports them as JSON specifications — zero hardcoded physics.
 - **Five solver backends** (SUNDIALS IDA/CVODE, Fourier modal, leapfrog, scipy) with analytical Jacobians, FFT spectral operators, and 2nd/4th/6th-order FD stencils.
@@ -48,13 +48,13 @@ Complete Lagrangian-to-PDE derivation: TOML config → Mathematica/xAct (Euler-L
 
 Five time-integration backends with automatic selection based on equation structure:
 
-| Backend | Library | Use Case | Key Feature |
-| ------- | ------- | -------- | ----------- |
-| **IDA** | SUNDIALS | DAE (algebraic constraints) | Implicit Newton, 3-tier analytical Jacobian |
-| **CVODE** | SUNDIALS | Adaptive ODE (waves) | BDF, tolerance control, sparse Jacobian |
-| **Modal** | numpy/scipy | Exact spectral (periodic, time-independent) | Machine-precision via eigendecomposition |
-| **Leapfrog** | numpy | Symplectic | Exact energy conservation (Yoshida 4th-order) |
-| **scipy** | scipy.integrate | General-purpose | DOP853, Radau, BDF via `solve_ivp` |
+| Backend      | Library         | Use Case                                    | Key Feature                                   |
+| ------------ | --------------- | ------------------------------------------- | --------------------------------------------- |
+| **IDA**      | SUNDIALS        | DAE (algebraic constraints)                 | Implicit Newton, 3-tier analytical Jacobian   |
+| **CVODE**    | SUNDIALS        | Adaptive ODE (waves)                        | BDF, tolerance control, sparse Jacobian       |
+| **Modal**    | numpy/scipy     | Exact spectral (periodic, time-independent) | Machine-precision via eigendecomposition      |
+| **Leapfrog** | numpy           | Symplectic                                  | Exact energy conservation (Yoshida 4th-order) |
+| **scipy**    | scipy.integrate | General-purpose                             | DOP853, Radau, BDF via `solve_ivp`            |
 
 Spatial operators: 2nd/4th/6th-order finite-difference stencils + FFT spectral operators (auto-enabled for all-periodic BCs). Three-tier constraint IC pre-solve (FFT → sparse matrix → automatic). Analytical Jacobian with three active tiers: dense (N ≤ 2K), sparse CSC with SuperLU_MT (N ≤ 200K), and GMRES with JVP (N > 200K).
 
@@ -62,18 +62,18 @@ Spatial operators: 2nd/4th/6th-order finite-difference stencils + FFT spectral o
 
 Unified command-line interface with 10 subcommands:
 
-| Command | Description |
-| ------- | ----------- |
-| `tidal derive theory.toml` | Generate .wls from TOML, run wolframscript to produce JSON |
-| `tidal simulate spec.json` | Full simulation with plotting (`--param`, `--ic`, `--bc`, `--scheme`) |
-| `tidal measure result_dir/` | Extract physics measurements (energy, conversion, mixing, spectra) |
-| `tidal inspect spec.json` | Display equation system info (fields, operators, parameters) |
-| `tidal list` | Discover all available JSON specs in `examples/data/` |
-| `tidal validate spec.json` | Validate JSON equation specification structure |
-| `tidal plot result_dir/` | Standalone plotting from simulation output directories |
-| `tidal sweep spec.json` | Parameter sweeps, convergence studies, adaptive sampling |
-| `tidal analyze sweep_dir/` | Post-hoc sensitivity analysis (Sobol/Morris) of sweep results |
-| `tidal doctor` | Environment diagnostics (Wolfram, dependencies, xAct) |
+| Command                     | Description                                                           |
+| --------------------------- | --------------------------------------------------------------------- |
+| `tidal derive theory.toml`  | Generate .wls from TOML, run wolframscript to produce JSON            |
+| `tidal simulate spec.json`  | Full simulation with plotting (`--param`, `--ic`, `--bc`, `--scheme`) |
+| `tidal measure result_dir/` | Extract physics measurements (energy, conversion, mixing, spectra)    |
+| `tidal inspect spec.json`   | Display equation system info (fields, operators, parameters)          |
+| `tidal list`                | Discover all available JSON specs in `examples/data/`                 |
+| `tidal validate spec.json`  | Validate JSON equation specification structure                        |
+| `tidal plot result_dir/`    | Standalone plotting from simulation output directories                |
+| `tidal sweep spec.json`     | Parameter sweeps, convergence studies, adaptive sampling              |
+| `tidal analyze sweep_dir/`  | Post-hoc sensitivity analysis (Sobol/Morris) of sweep results         |
+| `tidal doctor`              | Environment diagnostics (Wolfram, dependencies, xAct)                 |
 
 Supports `theory.toml` configs with `[[derived_fields]]`, `[[background_fields]]`, optional `[[gauge]]`, and `[torsion]` sections. Zero new dependencies (stdlib argparse + tomllib).
 
@@ -101,7 +101,6 @@ Poincare gauge theory with propagating torsion via `[torsion]` TOML section. The
 
 ### Remaining Research Targets
 
-- **Plasma detuning** (Phase F1): Requires gauge-invariant photon mass mechanism — blocked by gauge-potential coupling artifact
 - **Magnetar/FRB scattering** (Phase F3): Dipolar B(r) ∝ 1/r³ in radial coordinates
 - **Absorbing boundaries** (Phase G): Sponge layers and PML for finite-magnet interaction regions
 - **Torsion-EM mixing**: Full graviton-torsion-photon conversion in background magnetic field — the project's ultimate goal
@@ -170,28 +169,28 @@ tidal validate examples/data/coupled_scalars.json      # validate JSON spec stru
 
 **Pipeline Examples:**
 
-| Example | Dim | Key Features |
-| ------- | --- | ------------ |
-| `chern_simons/` | 2+1D | Epsilon tensor, topological mass, A_0 constraint |
-| `coupled_proca/` | 2+1D | Two massive vectors, coupled Helmholtz constraints, periodic BCs |
-| `coupled_scalars/` | 1+1D | Cross-field coupling, mass matrix, energy transfer |
-| `coupled_scattering/` | 2+1D | Position-dependent Gaussian coupling, background fields, wave scattering |
-| `curved_spacetime/` | 2+1D | De Sitter, Hubble friction, time-dependent coefficients |
-| `cylindrical_kg/` | 3+1D | Cylindrical coordinates, mixed curved/flat |
-| `cylindrical_kg_1d/` | 1+1D | Cylindrical coordinates, plane-wave dimensional reduction |
-| `elasticity/` | 2+1D | Anisotropic laplacian, cross_derivative_xy |
-| `gertsenshtein/` | 1+1D | Einstein-Maxwell graviton-photon conversion, multi-field perturbation |
-| `gravitational_waves/` | 3+1D | xPert linearization, TT gauge, constraints |
-| `gravitational_waves_1d/` | 1+1D | Linearized gravity, plane-wave 1D reduction |
-| `graviton_torsion/` | 3+1D | PGT Lagrangian, torsion perturbations, graviton-torsion mixing |
-| `massive_3form/` | 3+1D | Rank-3 antisymmetric tensor, symmetry reduction |
-| `massive_gravity/` | 2+1D | Linearized massive gravity, Fierz-Pauli mass, xPert, coupled constraints |
-| `polar_kg/` | 2+1D | Polar coordinates, Christoffel auto-detection |
-| `proca_background/` | 2+1D | Lorentzian scalar background, two Proca vectors, constraint+BG integration |
-| `scalar_potential_well/` | 1+1D | Background potential well, `[[background_fields]]`, bound states |
-| `scalar_vector_coupling/` | 2+1D | Mixed-rank cross-field (scalar+vector), 4 constants, CS+coupling |
-| `sphere_kg/` | 2+1D | KG on S², position-dependent coefficients |
-| `spherical_kg_1d/` | 1+1D | Spherical coordinates, plane-wave dimensional reduction |
+| Example                   | Dim  | Key Features                                                               |
+| ------------------------- | ---- | -------------------------------------------------------------------------- |
+| `chern_simons/`           | 2+1D | Epsilon tensor, topological mass, A_0 constraint                           |
+| `coupled_proca/`          | 2+1D | Two massive vectors, coupled Helmholtz constraints, periodic BCs           |
+| `coupled_scalars/`        | 1+1D | Cross-field coupling, mass matrix, energy transfer                         |
+| `coupled_scattering/`     | 2+1D | Position-dependent Gaussian coupling, background fields, wave scattering   |
+| `curved_spacetime/`       | 2+1D | De Sitter, Hubble friction, time-dependent coefficients                    |
+| `cylindrical_kg/`         | 3+1D | Cylindrical coordinates, mixed curved/flat                                 |
+| `cylindrical_kg_1d/`      | 1+1D | Cylindrical coordinates, plane-wave dimensional reduction                  |
+| `elasticity/`             | 2+1D | Anisotropic laplacian, cross_derivative_xy                                 |
+| `gertsenshtein/`          | 1+1D | Einstein-Maxwell graviton-photon conversion, multi-field perturbation      |
+| `gravitational_waves/`    | 3+1D | xPert linearization, TT gauge, constraints                                 |
+| `gravitational_waves_1d/` | 1+1D | Linearized gravity, plane-wave 1D reduction                                |
+| `graviton_torsion/`       | 3+1D | PGT Lagrangian, torsion perturbations, graviton-torsion mixing             |
+| `massive_3form/`          | 3+1D | Rank-3 antisymmetric tensor, symmetry reduction                            |
+| `massive_gravity/`        | 2+1D | Linearized massive gravity, Fierz-Pauli mass, xPert, coupled constraints   |
+| `polar_kg/`               | 2+1D | Polar coordinates, Christoffel auto-detection                              |
+| `proca_background/`       | 2+1D | Lorentzian scalar background, two Proca vectors, constraint+BG integration |
+| `scalar_potential_well/`  | 1+1D | Background potential well, `[[background_fields]]`, bound states           |
+| `scalar_vector_coupling/` | 2+1D | Mixed-rank cross-field (scalar+vector), 4 constants, CS+coupling           |
+| `sphere_kg/`              | 2+1D | KG on S², position-dependent coefficients                                  |
+| `spherical_kg_1d/`        | 1+1D | Spherical coordinates, plane-wave dimensional reduction                    |
 
 ## (Optional) Video Support
 
