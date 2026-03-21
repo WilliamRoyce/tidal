@@ -1477,14 +1477,16 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
 
         if is_flat:
             # Flat Minkowski: non-natural placements via diagonal metric sign
-            # correction. η_nn = diag(sig) where sig comes from DefMetric.
+            # correction. η_nn = diag(sig) where sig comes from the metric matrix.
             # Raising/lowering index n multiplies comp[...,n,...] by sig[n+1].
             # Product of sign factors for all flipped indices gives signFactor.
+            # Uses {prefix}MetricMatrix (already defined in pipeline) — NOT
+            # MetricInBasis (which is a setter in xCoba, not a reader).
             non_natural_block = [
                 "",
-                "    (* Non-natural placements: flat Minkowski sign correction *)",
-                "    (* For diagonal η, raising/lowering index n multiplies by η_{nn}. *)",
-                f"    Module[{{metricDiag = Diagonal[MetricInBasis[{metric}, -{ctx.chart}]]}},",
+                "    (* Non-natural placements: diagonal metric sign correction *)",
+                "    (* For diagonal metric, raising/lowering index n multiplies by g_{nn}. *)",
+                f"    Module[{{metricDiag = Diagonal[{ctx.prefix}MetricMatrix]}},",
                 "      Do[Module[{signs, signFactor},",
                 "        signs = 2 * IntegerDigits[mask, 2, cdRank] - 1;",
                 "        If[signs === List @@ naturalSlots, Continue[]];",
