@@ -1,0 +1,333 @@
+% Localized B-field Scattering: Boccaletti Formula and Phase Matching
+% Source: docs/gertsenshtein_localized.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Localized B-field Scattering: Boccaletti Formula and Phase Matching}
+\label{sec:gertsenshtein-localized}
+
+\subsection{Overview}
+
+When a graviton wavepacket passes through a spatially localized magnetic field region, the
+conversion probability is given by the \textbf{Boccaletti (1970) formula}:
+\begin{equation}
+  \Pconv(\text{graviton} \to \text{photon}) = \sin^2\!\left(\frac{\kappa}{2} \int_{-\infty}^{\infty} \Bzero(z)\, dz\right)
+  \label{eq:boccaletti}
+\end{equation}
+
+For a Gaussian profile $\Bzero(z) = B_\text{peak} \exp\!\bigl(-z^2/(2R^2)\bigr)$, the integral gives
+$\int \Bzero\, dz = B_\text{peak}\, R\, \sqrt{2\pi}$, so:
+\begin{equation}
+  \Pconv = \sin^2\!\left(\kappa\, B_\text{peak}\, R\, \sqrt{\pi/2}\right)
+  \label{eq:boccaletti-gaussian}
+\end{equation}
+
+\textbf{TIDAL numerical validation (48-point 2D sweep, $\kappa=1$, $k=2$, $\sigma=5$)}:
+
+\begin{table}[htbp]
+\centering
+\caption{Boccaletti formula validation across wavepacket--field size ratios.}
+\label{tab:boccaletti-sweep}
+\begin{tabular}{@{}ccccc@{}}
+\toprule
+$R/\sigma$ & $R$ & Mean err & Max err & Status \\
+\midrule
+0.40 & 2.0  & 0.00004 & 0.00008 & Boccaletti exact \\
+0.92 & 4.6  & 0.00029 & 0.00045 & Boccaletti exact \\
+1.44 & 7.2  & 0.00078 & 0.00172 & Boccaletti exact \\
+1.96 & 9.8  & 0.00113 & 0.00211 & Boccaletti exact \\
+2.48 & 12.4 & 0.00091 & 0.00144 & Boccaletti exact \\
+3.00 & 15.0 & 0.00058 & 0.00160 & Boccaletti exact \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The formula is confirmed to $< 0.003$ error across all 48 parameter combinations, including
+$R = 3\sigma$ (wavepacket width much narrower than field region). This is explained by perfect
+phase matching in massless vacuum conversion (see \cref{sec:phase-matching}).
+
+
+\subsection{Boccaletti (1970) Formula: Derivation and Exact Validity}
+\label{sec:boccaletti-derivation}
+
+\subsubsection{Derivation}
+
+Boccaletti et al.\ (1970) extended Gertsenshtein's~\cite{gertsenshtein1962wave} original result to finite-region
+boundary conditions. For a localized background $\Bzero(z)$, the conversion probability is:
+\begin{equation}
+  \Pconv(\text{graviton} \to \text{photon}) = \sin^2\!\left(\frac{\kappa}{2} \int_{-\infty}^{\infty} \Bzero(z)\, dz\right)
+\end{equation}
+
+For a Gaussian profile $\Bzero(z) = B_\text{peak} \exp\!\bigl(-z^2/(2R^2)\bigr)$:
+\begin{align}
+  \int_{-\infty}^{\infty} \Bzero(z)\, dz &= B_\text{peak}\, R\, \sqrt{2\pi} \\
+  \Pconv &= \sin^2\!\left(\kappa\, B_\text{peak}\, R\, \sqrt{\pi/2}\right)
+\end{align}
+
+\textbf{Confirmed numerically} (TIDAL, defaults $\kappa=1$, $B_\text{peak}=0.1$, $R=5.0$, $\sigma=5.0$):
+\begin{align}
+  \Pconv^\text{numerical} &= 0.3436 \quad (\text{at } t=80.4) \notag \\
+  \Pconv^\text{Boccaletti} &= \sin^2\!\bigl(1.0 \times 0.1 \times 5.0 \times \sqrt{\pi/2}\bigr) = \sin^2(0.627) = 0.3432 \notag \\
+  \text{Agreement:} &\quad 0.04\% \notag
+\end{align}
+
+\subsubsection{Connection to uniform-$B$ formula}
+
+For a uniform field $\Bzero$ over length $D$, the Boccaletti integral gives:
+\begin{equation}
+  \int_0^D \Bzero\, dz = \Bzero D, \qquad
+  \Pconv = \sin^2\!\left(\frac{\kappa\, \Bzero\, D}{2}\right)
+\end{equation}
+This recovers the standard Gertsenshtein formula (\cref{sec:gertsenshtein-formula}). Boccaletti's integral formula generalizes
+this to arbitrary spatial profiles.
+
+
+\subsection{Phase Matching: Why Boccaletti is Exact for Massless Vacuum Conversion}
+\label{sec:phase-matching}
+
+\subsubsection{Perfect phase matching}
+
+For massless graviton-photon conversion in vacuum (no plasma), both modes travel at the same
+speed ($c = 1$): their dispersion relations are identical ($k_h = k_\gamma = \omega$). This means:
+\begin{equation}
+  \Delta k = k_\gamma - k_h = 0 \quad (\text{zero momentum transfer for forward scattering})
+\end{equation}
+
+The conversion amplitude in the Born approximation is:
+\begin{equation}
+  \mathcal{A} \sim \frac{\kappa}{2} \int \Bzero(z)\, e^{i \Delta k\, z}\, dz = \frac{\kappa}{2} \int \Bzero(z)\, dz \quad (\text{since } \Delta k = 0)
+\end{equation}
+
+Since $\Delta k = 0$ exactly, the integrand has \textbf{no oscillating phase factor} --- all positions $z$
+contribute coherently, regardless of whether $R \ll \sigma$ or $R \gg \sigma$. The Boccaletti formula is
+therefore \textbf{exact} for any spatial profile of $\Bzero(z)$, not just a thin-lens approximation.
+
+\textbf{Physical picture}: Unlike in quantum optics (where different wavelengths create phase
+mismatch) or plasma-detuned conversion (where the photon has a mass), graviton and photon
+in vacuum have identical dispersion. There is no coherence length limiting the effective
+conversion region --- the entire field extent contributes in phase.
+
+\subsubsection{Born approximation validity}
+
+The formula is derived in the weak-coupling (Born) approximation. The small-angle condition
+is satisfied when:
+\begin{equation}
+  \frac{\kappa}{2} \int \Bzero(z)\, dz \ll 1 \quad (\text{weak conversion})
+\end{equation}
+For our sweep range ($B_\text{peak} \in [0.02, 0.20]$, $R \in [2, 15]$), the argument ranges from $0.05$ to
+$3.76$ --- this includes strong-field regimes near the first Rabi maximum, where the Born
+approximation breaks down yet the formula still holds (it is the exact non-perturbative Rabi
+formula $\sin^2(\theta/2)$, not just its small-angle limit).
+
+\subsubsection{When does the Boccaletti formula fail?}
+
+The formula $\Pconv = \sin^2\!\bigl(\kappa/2 \times \int \Bzero\, dz\bigr)$ breaks down when:
+
+\begin{enumerate}
+  \item \textbf{Plasma detuning}: If the photon acquires a plasma mass $\omega_p$, the phase mismatch is
+    $\Delta k = \omega_p^2/(2\omega)$, creating a coherence length $L_\text{coh} = 2\omega/\omega_p^2$. For $R \gg L_\text{coh}$, contributions
+    from different parts of the field cancel and the formula fails (Raffelt \& Stodolsky, 1988).
+
+  \item \textbf{Axion-photon mixing (non-zero axion mass)}: Same mechanism --- the axion and photon travel
+    at different speeds, and the effective integral picks up the Fourier component at $q = \Delta k$
+    rather than $q = 0$.
+
+  \item \textbf{Resonant conversion}: When $\omega_p = m_\text{axion}$ (or analogously $\Delta k = 0$ locally at some point),
+    the resonance condition creates a ``thick-lens'' Rabi behavior that is not captured by the
+    Born approximation.
+\end{enumerate}
+
+The TIDAL simulations in this document use massless fields without plasma, so none of these
+apply and the Boccaletti formula holds exactly.
+
+
+\subsection{Thin-Lens / Thick-Lens Distinction: When It Matters}
+\label{sec:thin-thick-lens}
+
+The thin-lens / thick-lens terminology is used in the literature (and in the original
+version of this document) to describe two regimes of localized scattering:
+
+\begin{table}[htbp]
+\centering
+\caption{Thin-lens vs.\ thick-lens regimes for localized B-field scattering.}
+\label{tab:lens-regimes}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Regime & Condition & Conversion formula & Context \\
+\midrule
+\textbf{Thin-lens}   & $R \ll \sigma$ or $R \ll L_\text{coh}$ & $\Pconv = \sin^2\!\bigl(\kappa/2 \times \int B\, dz\bigr)$ & Born approx., Boccaletti \\
+\textbf{Thick-lens}  & $R \gg L_\text{coh}$                   & Local Rabi oscillation                                      & WKB / adiabatic \\
+Transitional          & $R \approx L_\text{coh}$               & Neither formula exact                                       & Numerical required \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent where the relevant coherence length is \textbf{not the wavepacket width $\sigma$} but the phase-mismatch
+coherence length $L_\text{coh} = 1/|\Delta k|$.
+
+For \textbf{massless vacuum} conversion: $\Delta k = 0$, so $L_\text{coh} \to \infty$. The ``thin-lens'' condition
+$R \ll L_\text{coh}$ is always satisfied --- the formula is valid for any $R$. This is why the TIDAL
+sweep shows the Boccaletti formula holding even for $R/\sigma = 3$.
+
+For \textbf{plasma-detuned} conversion (Raffelt \& Stodolsky, 1988): $L_\text{coh} = 2\omega/\omega_p^2$. When
+$R \gg L_\text{coh}$, the thick-lens regime applies. This is the relevant regime for axion dark matter
+searches in magnetized plasmas (neutron stars, galactic clusters).
+
+The MSW (Mikheyev--Smirnov--Wolfenstein) resonance in solar neutrino oscillations is the
+extreme thick-lens case: a density gradient creates a slowly-varying phase mismatch that
+passes through zero, enabling adiabatic level crossing. Raffelt \& Stodolsky (1988) drew
+this analogy explicitly for the graviton-photon case.
+
+
+\subsection{Forward vs Backward Scattering}
+\label{sec:forward-backward}
+
+Domcke, Garcia-Cely \& Lee~\cite{domcke2025scattering} provide additional insight by treating
+the problem as classical electromagnetic scattering:
+
+\paragraph{Transmitted (forward) wave.}
+\label{par:forward}
+(Eq.~28 of~\cite{domcke2025scattering}):
+\begin{equation}
+  P_{h \to \gamma}^T = 4\pi G \times \Bzero^{T\,2} \times D^2 \quad (\text{for uniform field, forward direction})
+\end{equation}
+The amplitude is \textbf{proportional to domain size $L$} --- coherent, resonant enhancement.
+For a localized source: amplitude $= \int \Bzero(x)\, dx$ (the DC Fourier component $=$ Boccaletti).
+
+\paragraph{Reflected (backward) wave.}
+\label{par:backward}
+(Eq.~27 of~\cite{domcke2025scattering}):
+\begin{equation}
+  \text{amplitude} \propto \int \Bzero(x)\, e^{2i\omega x}\, dx \quad (\text{Fourier transform of } \Bzero \text{ at wavenumber } 2\omega)
+\end{equation}
+For large domains ($\omega L \gg 1$), reflected amplitude $\propto \sin(\omega L)/(\omega L) \to 0$. Backward scattering
+is suppressed relative to forward transmission for extended fields.
+
+\textbf{Physical meaning}: In the forward direction, all parts of the field contribute in phase
+(zero momentum transfer, $\Delta k = 0$). In the backward direction, different parts of the field
+contribute with rapidly oscillating phases (momentum transfer $2\omega$), causing destructive
+interference. This is why the Boccaletti integral formula captures only forward (transmitted)
+conversion, and only the DC Fourier component $q=0$ enters.
+
+
+\subsection{TIDAL Implementation Details}
+\label{sec:localized-implementation}
+
+\subsubsection{theory\_localized.toml}
+\label{sec:theory-localized-toml}
+
+The localized B-field is implemented via the gauge potential:
+\begin{align}
+  \bar{A}_y &= -B_\text{peak}\, R\, \sqrt{\pi/2}\; \operatorname{Erf}\!\left(\frac{z}{\sqrt{2}\,R}\right) \notag \\
+  \partial_z(\bar{A}_y) &= -B_\text{peak}\, \exp\!\bigl(-z^2/(2R^2)\bigr) = -B_x(z) \quad \checkmark \notag
+\end{align}
+
+The derived equations of motion (from Euler--Lagrange via TIDAL pipeline) are:
+\begin{align}
+  \ddt^2 h_7 &= -\kappa^2 B(x)^2\, h_7 - \kappa^2 B(x)\, \ddx a_2 + \ddx^2 h_7 \label{eq:eom-h7-loc} \\
+  \ddt^2 a_2 &= B'(x)\, h_7 + B(x)\, \ddx h_7 + \ddx^2 a_2 \label{eq:eom-a2-loc}
+\end{align}
+where $B(x) = B_\text{peak} \exp\!\bigl(-x^2/(2R^2)\bigr)$ and $B'(x) = -B_\text{peak}\, x\, \exp\!\bigl(-x^2/(2R^2)\bigr)/R^2$.
+
+The photon source $B'(x)\, h_7 + B(x)\, \ddx h_7 = \ddx\bigl(B(x)\, h_7\bigr)$ is the \textbf{total derivative}
+form, consistent with the Boccaletti integral formula (integration by parts gives $\int B'h + Bh'
+= [Bh]_{-\infty}^{+\infty} - \int B\, \ddx h$).
+
+\subsubsection{Coefficient overflow fix}
+\label{sec:coeff-overflow}
+
+The Wolfram exporter sometimes serializes \texttt{Exp[-x\textsuperscript{2}/R\textsuperscript{2}]} as \texttt{1/E\textsuperscript{\^{}}(x\textsuperscript{2}/R\textsuperscript{2})} in the
+coefficient strings. After the \texttt{E\textsuperscript{\^{}}} $\to$ \texttt{exp} substitution, this becomes \texttt{1/exp(x\textsuperscript{2}/R\textsuperscript{2})},
+which causes numpy to compute $\exp(+x^2/R^2)$ before dividing --- triggering overflow warnings
+for large $|x|$ (e.g., at grid boundaries $x = \pm 100$ with small $R = 2$).
+
+This is fixed in \texttt{tidal/symbolic/\_eval\_utils.py} (\texttt{\_invert\_exp\_denominator}): \texttt{/exp(arg)} $\to$
+\texttt{*exp(-(arg))}, avoiding the positive-exponent computation entirely.
+
+\subsubsection{Simulation setup}
+\label{sec:sim-setup}
+
+\begin{lstlisting}[style=bash]
+uv run tidal simulate examples/data/gertsenshtein_localized.json \
+  --grid-shape 1024 "--bounds=-100:100" \
+  --ic gaussian --ic-wavevector 2.0 --ic-amplitude 0.1 --ic-width 5.0 \
+  "--ic-center=-50.0" --ic-component h_7 \
+  --t-end 120.0 --param kappa=1.0 --param Bpeak=0.1 --param R=5.0
+\end{lstlisting}
+
+\textbf{Key choices}:
+\begin{itemize}
+  \item Non-periodic domain (Neumann BCs): $\bar{A}_y$ is not periodic
+  \item \texttt{t\_end=120}: stops after one pass through B-field (wavepacket reaches $x=0$ at $t \approx 50$,
+    exits field region at $t \approx 65$, hits right wall at $t \approx 150$)
+  \item \texttt{--bounds="-100:100"} and \texttt{--ic-center=-50.0}: negative values require \texttt{=} syntax in CLI
+  \item \texttt{--what conversion} (not \texttt{--what energy}): energy unreliable with position-dependent coefficients
+\end{itemize}
+
+\subsubsection{Validation scripts}
+\label{sec:validation-scripts}
+
+\begin{itemize}
+  \item \texttt{examples/gertsenshtein/run\_localized.sh} --- single validation run ($B_\text{peak}=0.1$, $R=5$)
+  \item \texttt{examples/gertsenshtein/sweep\_profile.sh} --- 2D sweep ($B_\text{peak} \in [0.02,0.20] \times R \in [2,15]$)
+\end{itemize}
+
+
+\subsection{Literature References}
+\label{sec:localized-literature}
+
+\begin{table}[htbp]
+\centering
+\caption{Literature references for localized B-field scattering.}
+\label{tab:localized-literature}
+\begin{tabular}{@{}lcp{7cm}@{}}
+\toprule
+Reference & Year & Key contribution \\
+\midrule
+Gertsenshtein~\cite{gertsenshtein1962wave} & 1962 & Original graviton-photon conversion prediction (uniform $B$, plane wave) \\
+Boccaletti et al., Nuovo Cim.\ 70B:129 & 1970 & \textbf{Finite-region formula} $\Pconv = \sin^2\!\bigl(\kappa/2 \times \int B\, dz\bigr)$; exact for massless vacuum conversion \\
+Raffelt \& Stodolsky, PRD 37:1237 & 1988 & $2\times 2$ mixing matrix; MSW resonance analogy; \textbf{plasma-detuned thick-lens regime} \\
+Ejlli, JHEP 2020:029 & 2020 & \textbf{Exact (non-perturbative) solution} in uniform $B$ --- generalizes both limits \\
+Dandoy et al.~\cite{dandoy2024constraining} & 2024 & 4-component mixing; canonical normalization; confirms $\Pconv = \sin^2(\kappa \Bzero D/2)$ \\
+Berlin et al.~\cite{berlin2024axionphoton} & 2024 & Axion-photon mixing numerics; WKB validity; free-space vs resonant regimes (analogous) \\
+Domcke et al.~\cite{domcke2025scattering} & 2025 & \textbf{GW scattering on 3D B-fields}; Born approx.; forward vs backward scattering; WKB for inhomogeneous $B$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Terminology mapping}
+\label{sec:terminology}
+
+\begin{table}[htbp]
+\centering
+\caption{Terminology mapping across the literature.}
+\label{tab:terminology}
+\begin{tabular}{@{}llll@{}}
+\toprule
+This document & Domcke et al.~\cite{domcke2025scattering} & Berlin et al.~\cite{berlin2024axionphoton} & Raffelt \& Stodolsky (1988) \\
+\midrule
+Exact (massless vacuum) & Born approx.\ $=$ exact at $\Delta k=0$ & Free-space (non-resonant, $q=0$) & Diabatic / sudden \\
+Plasma thick-lens & WKB / adiabatic & Resonant conversion & Adiabatic / MSW-like \\
+Boccaletti integral & DC Fourier component $\int \Bzero\, dx$ & $\int \Bzero\, e^{i\bm{q}\cdot\bm{r}}\, dr$ at $q=0$ & $\int B \cdot (\text{phase factor})$ \\
+Transition (plasma) & Born--adiabatic crossover & Coherence length condition & Adiabaticity parameter $\Psi$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Open Questions}
+\label{sec:localized-open}
+
+\begin{enumerate}
+  \item \textbf{Plasma detuning + localized $B$}: For \texttt{theory\_plasma.toml} (Proca mass for photon) combined
+    with a Gaussian $B(z)$, the thick-lens regime should manifest. The coherence length
+    $L_\text{coh} = 2\omega/\omega_p^2$ provides the transition scale $R \approx L_\text{coh}$. TIDAL can simulate this.
+
+  \item \textbf{Cross-regime applications}: Real magnetic field configurations (e.g., magnetar dipole
+    $B \propto 1/r^3$, galactic $B \propto \text{random}$) involve both thin-lens and thick-lens elements at different
+    scales. The TIDAL framework can handle arbitrary $B(z)$ profiles via the background field
+    mechanism --- the local equations of motion are exact regardless of regime.
+
+  \item \textbf{3D generalization}: The Domcke et al.~\cite{domcke2025scattering} framework treats full 3D B-field
+    configurations. TIDAL currently handles 1+1D plane-wave reductions. Extending to 2+1D
+    or 3+1D localized fields would require non-plane-wave IC and boundary conditions.
+\end{enumerate}

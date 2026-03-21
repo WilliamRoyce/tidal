@@ -1,0 +1,229 @@
+% Torsion in Poincaré Gauge Theory
+% Source: docs/torsion.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Torsion in Poincar\'e Gauge Theory}
+\label{sec:torsion}
+
+\subsection{Overview}
+
+TIDAL supports Poincar\'e gauge theory (PGT) Lagrangians with propagating torsion. The torsion tensor $\torsion^a{}_{bc}$ is the field strength of the translational gauge symmetry, introduced via xAct's \texttt{DefCovD} with \texttt{Torsion -> True}. Torsion components are perturbed alongside the metric perturbation using \texttt{DefTensorPerturbation}, enabling the full graviton-torsion mixing problem.
+
+\subsection{PGT Framework}
+\label{sec:torsion-pgt}
+
+In Poincar\'e gauge theory, gravity is a gauge theory of the Poincar\'e group with two independent gauge fields:
+
+\begin{itemize}
+  \item \textbf{Tetrad} (vierbein) $e^a{}_\mu$: gauges translations $\to$ encodes the metric via $\gmunu = \eta_{ab}\, e^a{}_\mu\, e^b{}_\nu$
+  \item \textbf{Spin connection} $\omega^{ab}{}_\mu$: gauges Lorentz rotations
+\end{itemize}
+
+The corresponding field strengths are:
+
+\begin{itemize}
+  \item \textbf{Torsion}: $\torsion^a{}_{\mu\nu} = \partial_\mu e^a{}_\nu - \partial_\nu e^a{}_\mu + \omega^a{}_{b\mu}\, e^b{}_\nu - \omega^a{}_{b\nu}\, e^b{}_\mu$
+  \item \textbf{Curvature}: $R^{ab}{}_{\mu\nu}$ (standard Riemann-Cartan curvature)
+\end{itemize}
+
+The Riemann-Cartan Ricci scalar $\ricci$ includes torsion contributions and is related to the Levi-Civita Ricci scalar $R$ by the identity:
+\begin{equation}
+  \ricci = R - \tfrac{1}{4}\, \torsion_{abc}\,\torsion^{abc}
+         - \tfrac{1}{2}\, \torsion_{abc}\,\torsion^{bac}
+         + \torsion^a{}_{ab}\,\torsion^{cb}{}_{c}
+         + \text{total derivative}
+  \label{eq:riemann-cartan-identity}
+\end{equation}
+(Shapiro~\cite{shapiro2002torsion}, eq.~2.17; Hehl et al., 1976)
+
+\subsection{TOML Configuration}
+\label{sec:torsion-toml}
+
+\subsubsection{Enabling Torsion}
+\label{sec:enabling-torsion}
+
+Add a \texttt{[torsion]} section to the TOML config. This is an optional, standalone section---existing theories without torsion are unaffected.
+
+\begin{lstlisting}[style=toml]
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[torsion]
+perturbation_name = "t"     # name for the linearized torsion field in equations/JSON
+# background = "Tbar"       # future: non-zero background torsion
+# irreducible = "axial"     # future: restrict to specific torsion sector
+\end{lstlisting}
+
+The \texttt{[torsion]} section:
+\begin{enumerate}
+  \item Extends the connection: defines \texttt{CDT} with \texttt{DefCovD[..., Torsion -> True]}
+  \item Auto-creates \texttt{TorsionCDT[a, -b, -c]} (antisymmetric in \texttt{-b}, \texttt{-c}) for use in the Lagrangian
+  \item Registers a perturbation field named by \texttt{perturbation\_name} (e.g., \texttt{t\_0}, \texttt{t\_1}, \ldots, \texttt{t\_8} in the JSON)
+  \item Handles background torsion zeroing (flat Minkowski) and xPert label management
+\end{enumerate}
+
+\paragraph{Architecture.}
+\label{par:torsion-architecture}
+The \texttt{[torsion]} section is separate from \texttt{[spacetime]} because in PGT, the metric (from tetrad) and torsion (from connection) are independent gauge fields. The \texttt{[spacetime]} section defines the metric and coordinates; \texttt{[torsion]} extends the connection.
+
+\paragraph{Reserved names.}
+\label{par:reserved-names}
+The \texttt{perturbation\_name} must not collide with field names, constant names, or built-in operators (\texttt{CD}, \texttt{CDT}, \texttt{eta}, \texttt{Ricci}, \texttt{Torsion}, etc.). The validation system checks this automatically.
+
+\subsubsection{Writing the Lagrangian}
+\label{sec:torsion-lagrangian}
+
+The Lagrangian must be written in \textbf{decomposed form} using \texttt{RicciScalarCD[]} (Levi-Civita, NOT \texttt{RicciScalarCDT[]}) plus explicit \texttt{TorsionCDT[...]} terms:
+
+\begin{lstlisting}[style=toml]
+[lagrangian]
+expression = "(1/kappa^2) RicciScalarCD[] + alpha1 TorsionCDT[-a,-b,-c] eta[a,d] eta[b,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha2 TorsionCDT[-a,-b,-c] eta[b,d] eta[a,e] eta[c,f] TorsionCDT[-d,-e,-f] + alpha3 TorsionCDT[b,-b,-a] eta[a,d] TorsionCDT[c,-c,-d]"
+\end{lstlisting}
+
+\paragraph{Why decomposed form?}
+\label{par:decomposed-form}
+xPert's built-in perturbation formulas assume the Levi-Civita connection. Using \texttt{RicciScalarCDT[]} directly would require decomposing it via \texttt{ChangeCurvature}, but \texttt{ChangeTorsion} converts torsion $\to$ contortion (a derived quantity that \texttt{DefTensorPerturbation} cannot perturb). The decomposed form avoids this issue entirely.
+
+The three $\torsion^2$ invariants correspond to the three irreducible pieces of torsion under $\mathrm{SO}(1,3)$:
+\begin{itemize}
+  \item $\torsion_{abc}\,\torsion^{abc}$: couples to all three irreducible sectors
+  \item $\torsion_{abc}\,\torsion^{bac}$: the ``mixed'' contraction
+  \item $\torsion^a{}_{ab}\,\torsion^{cb}{}_{c}$: the trace sector
+\end{itemize}
+
+\subsubsection{Linearization}
+\label{sec:torsion-linearization}
+
+\begin{lstlisting}[style=toml]
+[linearization]
+perturbation_field = "h"   # Metric perturbation (standard xPert)
+\end{lstlisting}
+
+Torsion perturbation is \textbf{auto-registered} when a \texttt{[torsion]} section is present. No \texttt{[[linearization.matter\_perturbations]]} entry is needed---the pipeline automatically:
+\begin{enumerate}
+  \item Defines the perturbation field (e.g., $t_{a,-b,-c}$) from \texttt{perturbation\_name}
+  \item Calls \texttt{DefTensorPerturbation} to connect it to \texttt{TorsionCDT}
+  \item Handles the xPert label/truncation (see below)
+  \item Sets background torsion and contortion to zero (flat Minkowski)
+  \item Calls \texttt{VarD} w.r.t.\ the torsion perturbation field for the torsion EOM
+\end{enumerate}
+
+\subsubsection{Perturbation Truncation Logic}
+\label{sec:perturbation-truncation}
+
+xPert expands each field as: $\Phi = \bg{\Phi} + \varepsilon\,\pert{\Phi}^{(1)} + \varepsilon^2\,\pert{\Phi}^{(2)} + \cdots$
+\begin{itemize}
+  \item \texttt{LI[1]} = $\pert{\Phi}^{(1)}$---the linear perturbation (dynamical field)
+  \item \texttt{LI[2]} = $\pert{\Phi}^{(2)}$---2nd-order correction to the field itself (NOT a separate DOF)
+\end{itemize}
+
+The second-order Lagrangian $\lag^{(2)} = \tfrac{1}{2}\,\delta^2 S$ contains three types of terms:
+\begin{enumerate}
+  \item $(\pert{\Phi}^{(1)})^2$---quadratic products of 1st-order perturbations $\to$ \textbf{KEPT} (give the linear EOM)
+  \item $\bg{\Phi} \cdot \pert{\Phi}^{(2)}$---background $\times$ 2nd-order correction $\to$ \textbf{ZERO} (background $\bg{\Phi} = 0$)
+  \item $\pert{\Phi}^{(2)}$ alone---appears in $\lag^{(1)}$ only, not $\lag^{(2)}$
+\end{enumerate}
+
+Therefore $\texttt{LI[2]} \to 0$ is correct: the physical content is entirely in the \texttt{LI[1]} terms.
+This applies identically to metric ($h$), torsion ($t$), and matter ($a$) perturbations.
+
+\subsubsection{Background Contortion Zeroing}
+\label{sec:contortion-zeroing}
+
+The contortion $\contorsion^a{}_{bc} = \tfrac{1}{2}(\torsion^a{}_{bc} + \torsion_b{}^a{}_c - \torsion_{bc}{}^a)$ is algebraically determined by torsion. For zero background torsion ($\bg{\torsion} = 0$), the background contortion $\bg{\contorsion} = 0$. In xPert's expansion:
+\begin{itemize}
+  \item \texttt{Perturbation[K, 0]} = $\bg{\contorsion}$ = 0 $\to$ zeroed via \texttt{ChristoffelCDCDT[\_\_] :> 0}
+  \item \texttt{Perturbation[K, 1]} = $\pert{\contorsion}(t)$ $\to$ \textbf{preserved} (encodes the torsion wave)
+  \item \texttt{Perturbation[K, 2]} $\to$ already dropped by $\texttt{LI[2]} \to 0$
+\end{itemize}
+
+This is exactly analogous to zeroing \texttt{RicciScalarCD[]} (flat background curvature) while keeping \texttt{Perturbation[RicciScalarCD[]]} (the graviton wave).
+
+\subsection{Torsion Irreducible Decomposition}
+\label{sec:torsion-irreducible}
+
+Torsion $\torsion_{abc}$ (24 components in 4D) decomposes into three irreducible pieces under $\mathrm{SO}(1,3)$:
+
+\begin{table}[htbp]
+\centering
+\caption{Irreducible decomposition of the torsion tensor in 4D.}
+\label{tab:torsion-irreducible}
+\begin{tabular}{@{}llcl@{}}
+\toprule
+Piece & Name & Components & Description \\
+\midrule
+${}^{(1)}\torsion_{abc}$ & Tensor (tentor) & 16 & Traceless, tensor part \\
+${}^{(2)}\torsion_a = \torsion^b{}_{ba}$ & Trace (trator) & 4 & Vector trace \\
+${}^{(3)}\torsion_a = \varepsilon_{abcd}\,\torsion^{bcd}$ & Axial (axitor) & 4 & Totally antisymmetric $\to$ pseudoscalar \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The PGT Lagrangian parameters $\alpha_1$, $\alpha_2$, $\alpha_3$ control the mass and kinetic terms for each sector independently.
+
+\subsubsection{Propagating Modes}
+\label{sec:propagating-modes}
+
+\begin{table}[htbp]
+\centering
+\caption{Propagating torsion degrees of freedom for different PGT Lagrangians.}
+\label{tab:propagating-modes}
+\begin{tabular}{@{}ll@{}}
+\toprule
+PGT Lagrangian & Propagating torsion DOF \\
+\midrule
+$R$ only (Einstein-Cartan) & 0---torsion is non-propagating \\
+$R + \alpha_1 \torsion^2$ & Massive tensor + other modes \\
+$R + \alpha_3 \torsion^2_\text{trace}$ & 1 pseudoscalar (axial) \\
+$R + \alpha_1 \torsion^2 + \alpha_2 \torsion^2 + \alpha_3 \torsion^2$ & Up to 5 modes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Key result}: Pure Einstein-Cartan ($\lag = R$ with torsion, no $\torsion^2$ terms) gives NO torsion-Gertsenshtein effect---torsion is non-propagating and vanishes for spinless EM (theorem, not approximation). The $\torsion^2$ kinetic terms are essential for propagating torsion.
+
+\subsection{Implementation Architecture}
+\label{sec:torsion-implementation}
+
+\subsubsection{What Happens During Derivation}
+\label{sec:torsion-derivation-steps}
+
+\begin{enumerate}
+  \item \texttt{[torsion]} section present $\to$ \texttt{DefCovD[CDT, Torsion -> True, FromMetric -> metric]}
+  \item Perturbation field defined: \texttt{DefTensor[\{prefix\}T[a,-b,-c], M, Antisymmetric[\{-b,-c\}]]}
+  \item \texttt{DefTensorPerturbation} connects \texttt{\{prefix\}tPert[LI[order],...]} to \texttt{TorsionCDT[...]}
+  \item Lagrangian parsed with \texttt{RicciScalarCD[]} + \texttt{TorsionCDT[...]} terms
+  \item \texttt{SetupMetricPerturbation} for metric $h$
+  \item xPert: $\lag^{(2)}$ = second-order perturbation in both $h$ and torsion
+  \item Truncation: \texttt{tPert[LI[2],...] $\to$ 0}, \texttt{tPert[LI[1],...] $\to$ T[...]}, \texttt{TorsionCDT[...] $\to$ 0}
+  \item \texttt{VarD}: derive EOM for both $h$ and $\torsion$ components
+  \item Component decomposition $\to$ plane-wave reduction $\to$ constraint elimination
+\end{enumerate}
+
+\subsubsection{Why ChangeCurvature/ChangeTorsion Were NOT Used}
+\label{sec:why-not-changecurvature}
+
+Investigation revealed:
+\begin{itemize}
+  \item \texttt{ChangeCurvature[L, CDT, CD]} correctly decomposes $\ricci \to R$ + contortion terms
+  \item But the contortion terms involve \texttt{Christoffel[CD,CDT]}---a derived xAct object
+  \item \texttt{ChangeTorsion[L, CDT, CD]} converts \texttt{TorsionCDT} $\to$ \texttt{Christoffel[CD,CDT]} (the WRONG direction)
+  \item \texttt{DefTensorPerturbation} requires fundamental tensors, not derived Christoffel differences
+  \item xAct does not provide the inverse conversion (contortion $\to$ torsion) natively
+\end{itemize}
+
+The decomposed-form Lagrangian avoids this issue entirely.
+
+\subsection{References}
+\label{sec:torsion-references}
+
+\begin{description}
+  \item[Blagojevi\'c \& Hehl (2013)] \emph{Gauge Theories of Gravitation}. Imperial College Press.
+  \item[Hehl et al.\ (1976)] ``General Relativity with Spin and Torsion.'' \emph{Rev.\ Mod.\ Phys.}\ 48:393. DOI: \href{https://doi.org/10.1103/RevModPhys.48.393}{10.1103/RevModPhys.48.393}
+  \item[Shapiro (2002)~\cite{shapiro2002torsion}] ``Physical Aspects of the Space-Time Torsion.'' \emph{Phys.\ Rept.}\ 357:113. arXiv: \href{https://arxiv.org/abs/hep-th/0103093}{hep-th/0103093}
+  \item[Hayashi \& Shirafuji (1979)] ``New General Relativity.'' \emph{Phys.\ Rev.\ D}\ 19:3524.
+  \item[Nikiforova et al.\ (2009)] ``Stability of the Massive Torsion Modes.'' arXiv: \href{https://arxiv.org/abs/0905.4007}{0905.4007}
+  \item[Barker (2023)~\cite{barker2024poincare}] ``HiGGS: Hamiltonian in Gauge Gravity Solver.'' \emph{Eur.\ Phys.\ J.\ C}\ 83:228. arXiv: \href{https://arxiv.org/abs/2206.00658}{2206.00658}
+  \item[xAct] \href{http://www.xact.es/Documentation/HTML/HTMLLinks/xTensor/DefCovD.nb.html}{DefCovD with Torsion}~\cite{martingarcia2007xact}.
+\end{description}

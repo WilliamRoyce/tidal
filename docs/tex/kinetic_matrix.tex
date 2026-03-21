@@ -1,0 +1,220 @@
+% Non-Diagonal Kinetic Matrix: Alternative Approaches
+% Source: docs/kinetic_matrix_alternatives.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Non-Diagonal Kinetic Matrix: Alternative Approaches}
+\label{sec:kinetic-matrix}
+
+When the kinetic matrix $K_{ij} = \partial \pi_i / \partial \dot{q}_j$ is non-diagonal (e.g., linearized gravity, massive gravity), the standard Hamiltonian split $\mathrm{d}q/\mathrm{d}t = \pi$ fails. This document records all investigated approaches and their tradeoffs.
+
+
+\subsection{Current Implementation: Symbolic $K^{-1}$ Inversion (Wolfram)}
+\label{sec:kinetic-current}
+
+\textbf{Status:} Implemented and working (commit \texttt{906b250}, hardened in \texttt{cb7c12f}).
+
+Compute $K$ symbolically in Wolfram, invert via \texttt{Inverse[K]}, emit $K^{-1}_{ij}$ coefficients to JSON. Field rates become:
+\begin{equation}
+  \frac{\mathrm{d}q_i}{\mathrm{d}t} = \sum_j K^{-1}_{ij}\, (\pi_j - S_j)
+  \label{eq:kinv-field-rates}
+\end{equation}
+where $S_j$ is the spatial part of $\pi_j$ (momenta evaluated with all velocities $= 0$).
+
+\textbf{Pros:}
+\begin{itemize}
+  \item Gauge-independent --- works for any theory without gauge fixing
+  \item Exact symbolic inversion --- no numerical errors
+  \item Pre-computed at derive-time --- zero runtime cost
+  \item Handles constant and parameter-dependent $K$ (via \texttt{coefficient\_symbolic})
+\end{itemize}
+
+\textbf{Cons:}
+\begin{itemize}
+  \item $K^{-1}$ entries can be large rational expressions for big systems
+  \item Requires $\det(K) \neq 0$ (throws if singular, indicating constraint structure)
+  \item \emph{Position-dependent $K$ (from curved metrics) would need grid evaluation at runtime}
+\end{itemize}
+
+\textbf{Works for:} Proca ($2\times 2$ diagonal), massive gravity ($4\times 4$), gravitational waves ($7\times 7$ dynamical block), elasticity ($2\times 2$ diagonal with symbolic $\rho$).
+
+
+\subsection{Alternative 1: Mass Matrix ODE Solvers (Julia / PETSc / SUNDIALS)}
+\label{sec:kinetic-alt1}
+
+\textbf{Status:} Investigated, not implemented. Viable future option.
+
+Instead of inverting $K$, reformulate as a mass-matrix ODE:
+\begin{equation}
+  M \cdot \frac{\mathrm{d}y}{\mathrm{d}t} = f(y, t)
+  \label{eq:mass-matrix-ode}
+\end{equation}
+where $M$ encodes the kinetic coupling. Specialised solvers handle $M$ directly.
+
+\subsubsection{Julia DifferentialEquations.jl}
+\label{sec:kinetic-julia}
+
+\begin{itemize}
+  \item \texttt{ODEProblem(M, f, u0, tspan)} with Rosenbrock or SDIRK methods
+  \item Supports mass matrix $M$ (constant or time-dependent)
+  \item \textbf{Ref:} Rackauckas \& Nie (2017), JORS 5(1), 15
+  \item \textbf{How it would work:} Export $K$ from Wolfram to JSON, construct $M$ in Julia, use \texttt{Rodas5()} or \texttt{Rosenbrock23()} for time integration
+  \item \textbf{Advantage:} Handles stiff systems, implicit methods, arbitrary $M$
+  \item \textbf{Disadvantage:} Requires Julia runtime, not Python; would need new backend
+\end{itemize}
+
+\subsubsection{PETSc TS}
+\label{sec:kinetic-petsc}
+
+\begin{itemize}
+  \item \texttt{DMTSCreateRHSMassMatrix()} for non-identity mass matrix
+  \item Implicit Runge--Kutta, BDF, ARKIMEX schemes
+  \item \textbf{Ref:} Balay et al.\ (2024), PETSc/TAO Users Manual
+  \item \textbf{Advantage:} Industrial-strength, scalable, MPI-parallel
+  \item \textbf{Disadvantage:} Heavy dependency, C API, complex setup
+\end{itemize}
+
+\subsubsection{SUNDIALS IDA}
+\label{sec:kinetic-ida}
+
+\begin{itemize}
+  \item General DAE solver: $F(t, y, y') = 0$ --- avoids $K^{-1}$ entirely
+  \item Variable-order BDF with Newton iteration
+  \item \textbf{Ref:} Hindmarsh et al.\ (2005), ACM TOMS 31(3)
+  \item \textbf{Advantage:} Most general formulation, handles constraints naturally
+  \item \textbf{Disadvantage:} Implicit (requires Jacobian), overkill for linear systems
+\end{itemize}
+
+\subsubsection{When to Consider}
+\label{sec:kinetic-alt1-when}
+
+\begin{itemize}
+  \item Position-dependent $K$ (curved spacetime with non-constant metric)
+  \item Very large $K$ ($>50\times 50$) where symbolic inversion produces huge expressions
+  \item Stiff systems where explicit methods are CFL-limited
+  \item If the numpy backend is replaced with a Julia or C++ backend
+\end{itemize}
+
+
+\subsection{Alternative 2: Gauge Fixing (Reduce $K$ to Diagonal)}
+\label{sec:kinetic-alt2}
+
+\textbf{Status:} TT gauge implemented (Phase B). De Donder implemented (Phase B). See \cref{sec:gauge-fixing}.
+
+Instead of inverting $K$, apply gauge conditions that eliminate off-diagonal kinetic coupling, making $K$ diagonal (or even identity).
+
+\subsubsection{TT Gauge (Transverse-Traceless)}
+\label{sec:kinetic-tt}
+
+\begin{itemize}
+  \item Eliminates non-physical components entirely
+  \item Reduces 10 GR components $\to$ 2 physical polarizations ($h_+$, $h_\times$)
+  \item Type B constraint: temporal zeroing + traceless + transverse
+  \item \textbf{Works for:} Gravitational waves in vacuum (massless)
+  \item \textbf{Doesn't work for:} Massive gravity (need all components for mass term)
+\end{itemize}
+
+\subsubsection{De Donder (Harmonic) Gauge}
+\label{sec:kinetic-dedonder}
+
+\begin{itemize}
+  \item Adds $\lag_\text{gf} = -\frac{1}{2\xi}\bigl(\partial^a h_{ab} - \tfrac{1}{2}\partial_b h\bigr)^2$ to the Lagrangian
+  \item Diagonalizes $K$ and exposes constraint structure ($h_0$, $h_{0i}$ become constraints)
+  \item Type A (Lagrangian term): implemented
+  \item \textbf{Works for:} Both massless and massive gravity
+  \item \textbf{Disadvantage:} Gauge-dependent; results must be checked for gauge artifacts
+\end{itemize}
+
+\subsubsection{When to Consider}
+\label{sec:kinetic-alt2-when}
+
+\begin{itemize}
+  \item When physical interpretation of individual components is needed
+  \item When reducing computational cost (fewer components to evolve)
+  \item When connecting to observables in specific gauges (e.g., TT for GW detection)
+\end{itemize}
+
+
+\subsection{Alternative 3: Symplectic Integrators with Pre-Computed $K^{-1}$}
+\label{sec:kinetic-alt3}
+
+\textbf{Status:} Investigated, not implemented.
+
+For constant $K$ (flat spacetime, constant parameters), pre-compute $K^{-1}$ once and use explicit symplectic integrator (leapfrog/Verlet) modified for $K^{-1}$:
+\begin{align}
+  q_{n+1}   &= q_n + \Delta t\; K^{-1} \cdot p_{n+1/2} \label{eq:symplectic-q} \\
+  p_{n+1}   &= p_n + \Delta t\; F(q_{n+1}) \label{eq:symplectic-p}
+\end{align}
+
+\begin{itemize}
+  \item \textbf{Ref:} Hairer \& Lubich (2003), ZAMM 83(1)
+  \item \textbf{Advantage:} Energy-conserving (symplectic), explicit, no Jacobian
+  \item \textbf{Disadvantage:} Only works for constant $K$; our current explicit RK already works
+  \item \textbf{When to consider:} Long-time simulations where energy conservation is critical
+\end{itemize}
+
+
+\subsection{Alternative 4: Runtime Numeric Inversion (NumPy)}
+\label{sec:kinetic-alt4}
+
+\textbf{Status:} Not implemented. Simplest fallback.
+
+Build $K$ numerically from JSON coefficients at runtime, invert with \texttt{numpy.linalg.inv}.
+
+\begin{itemize}
+  \item \textbf{Advantage:} Simple, no Wolfram dependency, handles parameter sweeps
+  \item \textbf{Disadvantage:} Numerical (not exact), repeated inversion per timestep for position-dependent $K$, doesn't leverage symbolic structure
+  \item \textbf{When to consider:} If symbolic $K^{-1}$ expressions become too large
+\end{itemize}
+
+
+\subsection{Alternative 5: Mass Lumping (FEM Approximation)}
+\label{sec:kinetic-alt5}
+
+\textbf{Status:} Not applicable to our spectral/FD discretization.
+
+In FEM, the mass matrix $M$ arises from basis function integration. ``Mass lumping'' replaces $M$ with a diagonal approximation (row-sum or higher-order lumping).
+
+\begin{itemize}
+  \item \textbf{Ref:} Rathgeber et al.\ (2016), ACM TOMS 43(3)
+  \item \textbf{Not applicable} because our $K$ comes from the Lagrangian structure, not from spatial discretization. $K$ is typically small ($10\times 10$ for GR) and exact inversion is feasible.
+\end{itemize}
+
+
+\subsection{Alternative 6: MultiModeCode-Style Field-Space Metric}
+\label{sec:kinetic-alt6}
+
+\textbf{Status:} Investigated for reference.
+
+In multi-field inflation, the kinetic matrix is the ``field-space metric'' $G_{IJ}$. MultiModeCode evolves transport equations with non-trivial $G_{IJ}$ directly.
+
+\begin{itemize}
+  \item \textbf{Ref:} Dias et al.\ (2015), JCAP 2015(01):030
+  \item \textbf{Relevance:} Similar mathematical structure to our $K_{ij}$
+  \item \textbf{Difference:} They evolve ODEs (homogeneous fields), we evolve PDEs (spatial grid)
+  \item \textbf{When to consider:} If we ever add multi-field inflation examples
+\end{itemize}
+
+
+\subsection{Decision Matrix}
+\label{sec:kinetic-decision}
+
+\begin{table}[htbp]
+\centering
+\caption{Comparison of kinetic matrix inversion approaches.}
+\label{tab:kinetic-decision}
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+Approach & Implemented & Exact & Runtime Cost & Position-Dep.\ $K$ & Handles DAEs \\
+\midrule
+Symbolic $K^{-1}$ (current)      & Yes     & Yes & Zero   & Partial$^*$ & No  \\
+Julia DifferentialEquations.jl   & No      & No  & Medium & Yes         & Yes \\
+PETSc TS                         & No      & No  & Low    & Yes         & Yes \\
+SUNDIALS IDA                     & No      & No  & Medium & Yes         & Yes \\
+Gauge fixing                     & Partial & Yes & Zero   & N/A         & N/A \\
+Symplectic $K^{-1}$              & No      & Yes & Low    & No          & No  \\
+NumPy inversion                  & No      & No  & High   & Yes         & No  \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+$^*$Position-dependent $K$: \texttt{coefficient\_symbolic} + \texttt{evaluate\_coefficient()} supports it, but not yet tested with non-constant $K^{-1}$ entries.

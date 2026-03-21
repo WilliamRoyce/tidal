@@ -1,0 +1,399 @@
+% Troubleshooting Guide
+% Source: docs/troubleshooting.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Troubleshooting Guide}
+\label{sec:troubleshooting}
+
+\subsection{Maintaining This Guide}
+\label{sec:maintaining-guide}
+
+\textbf{CRITICAL:} Update this file immediately when you encounter and solve new errors. Future work depends on these patterns being documented.
+
+\paragraph{When to add entries:}
+
+\begin{itemize}
+  \item \textbf{Always} when you hit a new error that takes more than 10 minutes to debug
+  \item When existing error patterns manifest in new ways
+  \item After discovering a non-obvious cause for a common symptom
+  \item When you find a better solution to an existing problem
+  \item After adding new features that create new failure modes
+\end{itemize}
+
+\paragraph{How to structure entries:}
+
+\begin{lstlisting}[style=bash]
+### Error Title (Brief, Searchable)
+
+**Symptoms:** What the user sees (error messages, wrong output)
+**Cause:** Root cause explanation
+**Solutions:** Numbered steps to fix
+**Don't:** Anti-patterns that seem like they'd work but don't
+\end{lstlisting}
+
+\paragraph{Organization:}
+
+\begin{itemize}
+  \item Group by subsystem: Wolfram/xAct, Python solver, Pipeline Integration
+  \item Keep ``Debugging Techniques'' and ``Verification Checklist'' sections at the end
+  \item Cross-reference with \texttt{MEMORY.md} for architectural context
+  \item Link to example-specific notes (like \texttt{chern-simons-notes.md}) for complex cases
+\end{itemize}
+
+\paragraph{Pruning:} Remove entries if:
+
+\begin{itemize}
+  \item The underlying code changed and the error can't happen anymore
+  \item Better solutions made the workaround obsolete (note the improvement in \texttt{MEMORY.md})
+\end{itemize}
+
+
+\subsection{Common Wolfram/xAct Issues}
+\label{sec:wolfram-xact-issues}
+
+\subsubsection{``Symbol X is already used as a manifold''}
+
+\textbf{Symptoms:} Error when running script multiple times in same kernel session.
+
+\textbf{Cause:} xAct caches tensor definitions in kernel memory.
+
+\textbf{Solutions:}
+
+\begin{enumerate}
+  \item Always check before defining:
+
+\begin{lstlisting}[style=mathematica]
+If[!xTensorQ[M2], DefManifold[M2, 3, {a,b,c,d,e,f}]]
+\end{lstlisting}
+
+  \item Use standard shared symbols across examples:
+  \begin{itemize}
+    \item Manifolds: \texttt{M2} (1+1D), \texttt{M3} (2+1D), \texttt{M4} (3+1D)
+    \item Metrics: \texttt{eta}, \texttt{eta3}, \texttt{eta4}
+    \item Covariant derivatives: \texttt{CD}, \texttt{CD3}, \texttt{CD4}
+    \item Charts: \texttt{cart}, \texttt{cart3}, \texttt{cart4}
+  \end{itemize}
+
+  \item Restart kernel if needed: \texttt{Quit[]} or \texttt{wolframscript -file} (fresh process each time)
+\end{enumerate}
+
+\textbf{Don't:} Use \texttt{RandomInteger} or timestamp-based symbol names---kernel caching makes them fail.
+
+\subsubsection{Component Equations Return All Zeros}
+
+\textbf{Symptoms:} After \texttt{DecomposeToComponents}, all equations show \texttt{0}.
+
+\textbf{Likely causes:}
+
+\begin{enumerate}
+  \item \textbf{Field strength not expanded:}
+
+\begin{lstlisting}[style=mathematica]
+(* BAD *)
+eom = VarD[A[-a], CD][L]  (* L contains F[-a,-b] *)
+components = DecomposeToComponents[eom, A[-a], cart]  (* F not expanded *)
+
+(* GOOD *)
+eom = VarD[A[-a], CD][L /. F[-a,-b] -> CD[-a][A[-b]] - CD[-b][A[-a]]]
+(* OR construct L directly in terms of CD[A] *)
+\end{lstlisting}
+
+  \item \textbf{Missing field in ToBasis conversion:}
+  \begin{itemize}
+    \item Check that field symbols appear in \texttt{componentEq} after \texttt{ToBasis[chart][eom]}
+    \item If abstract field not converted, check field definition and chart compatibility
+  \end{itemize}
+\end{enumerate}
+
+\subsubsection{Cross-Field Terms Not Detected}
+
+\textbf{Symptoms:} JSON shows all terms referencing same field, no cross-coupling.
+
+\textbf{Cause:} Other fields not transformed to coordinate form.
+
+\textbf{Example problem:}
+
+\begin{lstlisting}[style=mathematica]
+(* Chi appears as cplChi[] not cplChi0[t,x] *)
+phiEq = -0.5*cplChi[] - 1.0*cplPhi0[t,x] + Derivative[...][cplPhi0][t,x]
+\end{lstlisting}
+
+\textbf{Solution:}
+
+\begin{lstlisting}[style=mathematica]
+(* Pass all coupled fields *)
+phiComponents = DecomposeToComponents[eomPhi, phi[], cart, {chi[]}]
+chiComponents = DecomposeToComponents[eomChi, chi[], cart, {phi[]}]
+\end{lstlisting}
+
+\textbf{Verification:}
+
+\begin{itemize}
+  \item After decomposition, print equations
+  \item All field symbols should have coordinate arguments: \texttt{field0[t,x]} or \texttt{field0[t,x,y]}
+  \item No bare field symbols like \texttt{field[]}
+\end{itemize}
+
+\subsubsection{JSON Coefficients All Show 1.0}
+
+\textbf{Symptoms:} Correct operator/field but coefficient extraction fails.
+
+\textbf{Cause:} Pattern matching in \texttt{ExtractNumericCoefficient} not finding field symbols.
+
+\textbf{Debug steps:}
+
+\begin{enumerate}
+  \item Check \texttt{IdentifyMultiFieldTerm} function head extraction
+  \item Verify field names match: \texttt{"phi\_0"} $\to$ \texttt{"phi"} $\to$ \texttt{"Phi"} (case variations)
+  \item Print intermediate term structure to see actual symbols
+\end{enumerate}
+
+\textbf{Recent fix:} Use \texttt{ToLowerCase} for field base name matching (case-insensitive).
+
+\subsubsection{Multiline Lagrangian Parsed Incorrectly}
+
+\textbf{Symptoms:} Second field's terms evaluate to zero.
+
+\textbf{Cause:} Mathematica multiline without explicit \texttt{+}.
+
+\textbf{Solution:}
+
+\begin{lstlisting}[style=mathematica]
+(* BAD *)
+L = term1
+    term2  (* Treated as separate expression *)
+
+(* GOOD *)
+L = term1 +
+    term2  (* Explicit continuation *)
+
+(* OR *)
+L = (
+  term1 +
+  term2
+)
+\end{lstlisting}
+
+\textbf{Example from coupled scalars:} Required \texttt{+} before \texttt{(-1/2 CD[-a][chi[]]...)}.
+
+\subsubsection{Epsilon Tensor Not Evaluating to Numbers}
+
+\textbf{Symptoms:} Epsilon tensor like \texttt{epsiloneta3[\{0,-cart3\},\{1,-cart3\},\{2,cart3\}]} remains in output.
+
+\textbf{Cause:} Pattern mismatch in \texttt{EvaluateEpsilonComponents}.
+
+\textbf{Common issues:}
+
+\begin{enumerate}
+  \item Wrong chart name (must match exactly)
+  \item Index sign pattern not handled (mixed up/down indices)
+  \item Function not being called in pipeline
+\end{enumerate}
+
+\textbf{Solution:}
+
+\begin{lstlisting}[style=mathematica]
+(* Verify epsilon is being evaluated *)
+testExpr = epsiloneta3[{0, -cart3}, {1, -cart3}, {2, cart3}];
+result = EvaluateEpsilonComponents[testExpr, cart3];
+Print["Result: ", result];  (* Should be a number, not symbolic *)
+\end{lstlisting}
+
+\textbf{Debug:} If epsilon remains symbolic, check:
+
+\begin{itemize}
+  \item The chart variable matches exactly (e.g., \texttt{cart3} not \texttt{cart})
+  \item The epsilon tensor name matches pattern (must contain ``epsilon'')
+  \item Both covariant (\texttt{-chart}) and contravariant (\texttt{chart}) cases are handled
+\end{itemize}
+
+\subsubsection{Mixed Time-Space Derivatives in 2+1D}
+
+\textbf{Symptoms:} Extra ``laplacian'' terms on cross-fields in JSON.
+
+\textbf{Cause:} \texttt{Derivative[1, 1, 0][f][t,x,y]} ($\partial_t \partial_x f$) classified as second-order.
+
+\textbf{Current status:} Known limitation---the time derivative detection pattern is 1+1D only.
+
+\textbf{Workaround:} For now, the extra terms don't break simulation but may cause numerical artifacts.
+
+
+\subsection{Common Python Solver Issues}
+\label{sec:python-solver-issues}
+
+\textbf{Note:} TIDAL's solver layer uses SUNDIALS IDA/CVODE + native numpy operators (see \texttt{tidal/solver/}). The former py-pde-based architecture was replaced in February 2026.
+
+\subsubsection{``Unknown operator: X''}
+
+\textbf{Symptoms:} \texttt{ValueError} when loading or running a simulation.
+
+\textbf{Cause:} JSON spec references an operator not in \texttt{OPERATOR\_REGISTRY} (\texttt{tidal/solver/operators.py}).
+
+\textbf{Available operators:} \texttt{identity}, \texttt{laplacian}, \texttt{laplacian\_x}, \texttt{laplacian\_y}, \texttt{laplacian\_z}, \texttt{gradient\_x}, \texttt{gradient\_y}, \texttt{gradient\_z}, \texttt{cross\_derivative\_xy}, \texttt{cross\_derivative\_xz}, \texttt{cross\_derivative\_yz}, \texttt{biharmonic}, \texttt{first\_derivative\_t}, \texttt{mixed\_T\_S1\_S2\_...}
+
+\textbf{Fix:} Check \texttt{OPERATOR\_REGISTRY} in \texttt{tidal/solver/operators.py}. If the operator is valid but missing, add it there.
+
+\subsubsection{Grid Dimension Mismatch}
+
+\textbf{Symptoms:} Error about field dimensions vs grid dimensions.
+
+\textbf{Cause:} Using \texttt{--grid-shape} with wrong number of dimensions for the JSON spec's spatial dimension.
+
+\textbf{Check:} Match grid shape to the JSON spec's \texttt{spacetime.dimension - 1} spatial dimensions:
+
+\begin{itemize}
+  \item 1+1D specs: \texttt{--grid-shape 256} (1 spatial dimension)
+  \item 2+1D specs: \texttt{--grid-shape 64,64} (2 spatial dimensions)
+  \item 3+1D specs: \texttt{--grid-shape 32,32,32} (3 spatial dimensions)
+\end{itemize}
+
+\subsubsection{State Size Mismatch}
+
+\textbf{Symptoms:} Error about unexpected state vector size.
+
+\textbf{Cause:} State has wrong number of slots for the equation system.
+
+\textbf{How slot counts work} (via \texttt{StateLayout} in \texttt{tidal/solver/state.py}):
+
+\begin{itemize}
+  \item 2nd-order fields: 2 slots each (field + velocity, e.g., \texttt{phi\_0} + \texttt{v\_phi\_0})
+  \item 1st-order fields: 1 slot each (field only)
+  \item Constraint fields: 1 slot each (solved algebraically)
+  \item Example: 3 vector components (2nd order) $\to$ 6 total slots
+\end{itemize}
+
+\subsubsection{Non-Periodic Coefficient Warning / Error}
+
+\textbf{Symptoms:} Warning or \texttt{ValueError} at simulation start:
+\texttt{"Position-dependent coefficient `...' has N\% jump at the periodic boundary along x (left=..., right=..., leak\_metric=...)"}
+
+\textbf{Cause:} Position-dependent coefficients (e.g., background magnetic field $B(x)$) must be continuous across periodic boundaries. If they aren't, the integration-by-parts identity fails and causes $O(1)$ energy non-conservation that does \textbf{not} improve with finer grids.
+
+The check uses a \emph{leak metric} = $(\text{rel\_jump}) \times (\text{boundary\_significance})$ to estimate the actual energy leak magnitude. Warnings fire when the metric exceeds 0.01; errors when it exceeds 0.25.
+
+\textbf{Solutions:}
+
+\begin{enumerate}
+  \item \textbf{Large domain}: Use a domain large enough that the non-periodic coefficient (e.g., dipolar $B \sim 1/r^3$) is negligible at both boundaries. Terminate the simulation before waves reach the edges.
+  \item \textbf{Localised profile}: Use a windowed/Gaussian profile that naturally goes to the same value at both boundaries (e.g., $B(x) = B_\text{peak} \cdot \exp(-(x - x_0)^2 / R^2)$).
+  \item \textbf{Non-periodic BCs}: Switch to Dirichlet or Neumann BCs (\texttt{--bc neumann}).
+  \item \textbf{False positive?} If the warning fires but energy conservation is actually fine (check with \texttt{tidal measure --what conservation}), the coefficient boundary values are small enough that the leak is negligible. The leak metric should be very small in this case---if it isn't, the warning is genuine.
+\end{enumerate}
+
+\subsubsection{Constraint Solver Failures}
+
+\textbf{Symptoms:} IDA fails to converge, or constraint fields have NaN values.
+
+\textbf{Cause:} Algebraic constraint equations may have singular operators (e.g., Laplacian with periodic BCs has a null space for constant functions).
+
+\textbf{Solutions:}
+
+\begin{enumerate}
+  \item The three-tier constraint pre-solve (\texttt{tidal/solver/constraint\_solve.py}) handles most cases automatically
+  \item For periodic BCs with pure-Laplacian constraints, gauge regularisation pins the zero mode
+  \item Check \texttt{--ic} settings---constraint ICs must be consistent with dynamical field ICs
+\end{enumerate}
+
+
+\subsection{Debugging Techniques}
+\label{sec:debugging-techniques}
+
+\subsubsection{Wolfram Side}
+
+\begin{enumerate}
+  \item \textbf{Print intermediate steps:}
+
+\begin{lstlisting}[style=mathematica]
+Print["After VarD: ", eom];
+Print["After ToBasis: ", ToBasis[chart][eom]];
+Print["After metric eval: ", EvaluateMinkowskiMetric[expr, chart]];
+\end{lstlisting}
+
+  \item \textbf{Check field transformation:}
+
+\begin{lstlisting}[style=mathematica]
+(* Should see coordSyms = {t[], x[]} or {t[], x[], y[]} *)
+coordSyms = GetCoordinateSymbols[chart]
+Print[coordSyms]
+\end{lstlisting}
+
+  \item \textbf{Verify dimension:}
+
+\begin{lstlisting}[style=mathematica]
+dim = Length[ScalarsOfChart[chart]]
+Print["Dimension: ", dim]
+\end{lstlisting}
+
+  \item \textbf{Test ToCanonical:}
+
+\begin{lstlisting}[style=mathematica]
+(* Simplify before and after to see if indices contract properly *)
+Print["Before: ", expr];
+expr = ToCanonical[expr];
+expr = ContractMetric[expr];
+Print["After: ", expr];
+\end{lstlisting}
+\end{enumerate}
+
+\subsubsection{Python Side}
+
+\begin{enumerate}
+  \item \textbf{Validate JSON load:}
+
+\begin{lstlisting}[style=python]
+spec = load_equation_system(json_path)
+print(f"Dimension: {spec.dimension}")
+print(f"Components: {spec.component_names}")
+for eq in spec.equations:
+    print(f"{eq.field_name}: {len(eq.rhs_terms)} terms")
+\end{lstlisting}
+
+  \item \textbf{Check state structure:}
+
+\begin{lstlisting}[style=python]
+print(f"State fields: {len(state)}")
+for i, field in enumerate(state):
+    print(f"  {i}: {field.label}, shape={field.data.shape}")
+\end{lstlisting}
+
+  \item \textbf{Monitor evolution:}
+
+\begin{lstlisting}[style=python]
+# Add print inside evolution_rate or use callback tracker
+def check_rates(state):
+    print(f"Max field value: {max(np.max(np.abs(f.data)) for f in state)}")
+\end{lstlisting}
+\end{enumerate}
+
+
+\subsection{Verification Checklist}
+\label{sec:verification-checklist}
+
+\subsubsection{After Wolfram Changes}
+
+\begin{itemize}
+  \item Run all examples: \texttt{./scripts/run\_examples.sh} (or \texttt{tidal derive examples/*/theory.toml})
+  \item Check JSON dimension matches spacetime (2 for 1+1D, 3 for 2+1D)
+  \item Verify component count matches field rank $\times$ dimensions
+  \item Spot-check coefficients in JSON (shouldn't all be 1.0)
+  \item Confirm cross-field terms if applicable
+\end{itemize}
+
+\subsubsection{After Python Changes}
+
+\begin{itemize}
+  \item Run pytest: \texttt{uv run pytest tests/}
+  \item Test JSON loading for all examples
+  \item Run at least one simulation end-to-end
+  \item Check output plots if visualization enabled
+  \item Verify energy conservation (if applicable to physics)
+\end{itemize}
+
+\subsubsection{After Pipeline Changes}
+
+\begin{itemize}
+  \item Regression test: \texttt{coupled\_scalars} still works
+  \item Forward test: new example runs
+  \item Cross-test: modify old example to use new feature
+  \item Documentation: update \texttt{MEMORY.md} with new patterns
+\end{itemize}

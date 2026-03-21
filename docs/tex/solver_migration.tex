@@ -1,0 +1,903 @@
+% Solver Migration: py-pde to SUNDIALS/IDA
+% Source: docs/solver_migration.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Solver Migration: py-pde to SUNDIALS/IDA}
+\label{sec:solver-migration}
+
+\subsection{Overview}
+
+Replace TIDAL's py-pde numerical backend with SUNDIALS/IDA (via scikit-sundae)
+for native DAE support, eliminating the need for bolted-on constraint solvers,
+symbolic $K^{-1}$ inversion, and manual Hamiltonian splitting.
+
+\textbf{Status}: Implementation complete (February 2026). IDA, CVODE, leapfrog, and scipy backends all operational. State management (\texttt{FieldSet}, \texttt{StateLayout}), spatial operators, and grid infrastructure (\texttt{GridInfo}) fully implemented.
+
+\subsection{Motivation}
+\label{sec:migration-motivation}
+
+\subsubsection{The Problem}
+\label{sec:migration-problem}
+
+TIDAL derives equations of motion from Lagrangians via xAct/Mathematica. These
+equations are naturally a \textbf{mixed system}:
+
+\begin{itemize}
+  \item \textbf{2nd-order wave equations} (Klein--Gordon, Proca, linearized gravity):
+    $\ddt^2 \varphi = \lapl\varphi - m^2\varphi$
+  \item \textbf{1st-order evolution} (Chern--Simons, curved spacetime friction):
+    $\ddt A_i = \mathrm{RHS}$
+  \item \textbf{Algebraic constraints} (Gauss's law, Hamiltonian constraint):
+    $0 = \lapl A_0 - \ddx \pi_1 - \ddy \pi_2$
+\end{itemize}
+
+This is a \textbf{differential-algebraic equation (DAE)}, classified as index-1 when
+the constraint Jacobian is nonsingular.
+
+py-pde solves only explicit ODEs of the form $\mathrm{d}u/\mathrm{d}t = F(u)$. To force our DAE
+into this framework, we accumulated workarounds:
+
+\begin{table}[htbp]
+\centering
+\caption{Workarounds accumulated in the py-pde era.}
+\label{tab:workarounds}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Workaround & Location & Problem \\
+\midrule
+3-pass \texttt{evolution\_rate()} & \texttt{pde\_builder.py:2919--2993} & Fragile ordering; constraints must be solved before evolution \\
+Custom constraint solvers & \texttt{pde\_builder.py:1846--2750} & $\sim$900 lines of custom elliptic solver code \\
+$K^{-1}$ symbolic inversion & \texttt{\_derive.py:2110--2166} & Complicated expressions; fails for large kinetic blocks \\
+Virtual momenta & \texttt{pde\_builder.py:2759--2793} & Ad-hoc mechanism for 1st-order equations \\
+Manual $(q, \pi)$ splitting & \texttt{pde\_builder.py:842--983} & State layout management complexity \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{The Solution}
+\label{sec:migration-solution}
+
+\textbf{SUNDIALS/IDA}~\cite{hindmarsh2005sundials} solves the general implicit DAE:
+\begin{equation}
+  F(t,\, y,\, y') = 0
+  \label{eq:dae-residual}
+\end{equation}
+where $y$ is a flat state vector containing \textbf{all} variables (fields, momenta,
+constraints). The \texttt{algebraic\_idx} parameter marks which components are algebraic
+(constraints). IDA uses variable-order BDF with Newton iteration, automatically
+handling:
+
+\begin{itemize}
+  \item Mixed differential + algebraic variables
+  \item Non-diagonal kinetic matrices (mass matrices)
+  \item Stiff coupling
+  \item Consistent initial conditions
+\end{itemize}
+
+\textbf{scikit-sundae} (NREL, BSD-3) provides a clean Python interface to SUNDIALS/IDA.
+
+\subsubsection{Research Basis}
+\label{sec:migration-research}
+
+Three parallel research surveys informed this design:
+
+\begin{enumerate}
+  \item \textbf{PDE Framework Landscape} --- Assessed Dedalus, FEniCS, PETSc, SUNDIALS,
+    diffrax, Devito, scipy\_dae, diffeqpy against TIDAL's requirements.
+    Conclusion: SUNDIALS/IDA is the best fit for DAE time integration with
+    clean Python API. (Dedalus is the best full-framework alternative but
+    requires spectral spatial discretization --- future Phase~E.)
+
+  \item \textbf{Constrained Hamiltonian Evolution} --- Surveyed Einstein Toolkit, SpECTRE,
+    NRPy+, Kranc, Z4c/CCZ4, MEEP/Yee, lattice gauge theory. Consensus:
+    \textbf{constraint damping beats constraint solving} (free evolution + damping
+    source terms, not elliptic solves at every timestep).
+
+  \item \textbf{TIDAL Architecture Analysis} --- Mapped exact py-pde API surface. Found
+    clean interface boundary: py-pde provides 5 classes ($\sim$15 methods); TIDAL
+    provides all physics. 80\% of spatial operators already implemented as
+    custom numpy. Position-dependent coefficient system is pure numpy/eval.
+\end{enumerate}
+
+\subsubsection{Key References}
+\label{sec:migration-references}
+
+\begin{itemize}
+  \item Hindmarsh, Brown, Grant, Lee, Serban, Shumaker, Woodward (2005), ``SUNDIALS:
+    Suite of Nonlinear and Differential/Algebraic Equation Solvers'', ACM TOMS
+    31(3):363--396~\cite{hindmarsh2005sundials}.
+  \item Dedner, Kemm, Kr\"oner, Munz, Schnitzer (2002), ``Hyperbolic Divergence
+    Cleaning for MHD'', J.\ Comput.\ Phys.\ 175(2):645--673.
+  \item Gundlach, Calabrese, Hinder, Mart\'in-Garc\'ia (2005), ``Constraint damping in
+    the Z4 formulation and harmonic gauge'', Class.\ Quantum Grav.\ 22:3767.
+  \item Bernuzzi, Hilditch (2010), ``Constraint violation in free evolution schemes'',
+    Phys.\ Rev.\ D 81:084003.
+  \item Hairer, Lubich, Wanner (2006), ``Geometric Numerical Integration'', Springer.
+  \item Zwicker (2020), ``py-pde: A Python package for solving partial differential
+    equations'', JOSS 5(48):2158.
+  \item Brown (2009), ``Covariant formulations of BSSN and the standard gauge'',
+    Phys.\ Rev.\ D 79:104029.
+  \item Alic, Bona-Casas, Bona, Rezzolla, Palenzuela (2013), ``Conformal and
+    covariant formulation of the Z4 system'', Phys.\ Rev.\ D 85:064040.
+  \item Yoshida (1990), ``Construction of higher order symplectic integrators'',
+    Phys.\ Lett.\ A 150:262--268~\cite{yoshida1990symplectic}.
+\end{itemize}
+
+\subsection{Architecture}
+\label{sec:migration-architecture}
+
+\subsubsection{Component Replacement Map}
+\label{sec:component-replacement}
+
+\begin{table}[htbp]
+\centering
+\caption{Component replacement map from py-pde to the new solver stack.}
+\label{tab:component-replacement}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Component & Old (py-pde) & New & Rationale \\
+\midrule
+Time integration & \texttt{PDEBase.solve()} (RK4/scipy) & \textbf{scikit-sundae IDA} & Native DAE; handles constraints + mass matrices \\
+Field containers & \texttt{FieldCollection} / \texttt{ScalarField} & \textbf{Plain numpy arrays} + \texttt{GridInfo} & Remove unnecessary wrapper layer \\
+Grid & \texttt{CartesianGrid} & \textbf{\texttt{GridInfo} dataclass} & Tailored to TIDAL (bounds, shape, periodic, dx, coords) \\
+Spatial operators & \texttt{field.laplace(bc)} / custom numpy & \textbf{Custom numpy module} & Already 80\% custom; consolidate \\
+Storage & \texttt{MemoryStorage} / \texttt{CallbackTracker} & \textbf{Existing \texttt{SnapshotWriter}} & Already numpy-based disk-backed storage \\
+Kinetic matrix & $K^{-1}$ symbolic inversion & \textbf{$K$ passed directly} to IDA & Simpler expressions; IDA handles implicit solve \\
+Symplectic & N/A & \textbf{St\"ormer--Verlet} (custom) & Energy-conserving option for Hamiltonian systems \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Solver Selection}
+\label{sec:solver-selection}
+
+Users select \textbf{one scheme} per simulation via \texttt{--scheme}:
+
+\begin{table}[htbp]
+\centering
+\caption{Available solver schemes.}
+\label{tab:solver-schemes}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Scheme & Solver & Use Case & Constraints & Energy \\
+\midrule
+\texttt{ida} (default) & SUNDIALS/IDA & All systems & Algebraic (native) & Dissipative OK \\
+\texttt{leapfrog} & St\"ormer--Verlet & Hamiltonian systems & Not supported & Conserved exactly \\
+\texttt{scipy} & scipy \texttt{solve\_ivp} & Simple ODEs & Not supported & Dissipative OK \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Data Flow}
+\label{sec:data-flow}
+
+\begin{lstlisting}[style=bash]
+theory.toml
+    |
+    v (tidal derive)
+wolframscript (xAct)
+    | Lagrangian -> EOM -> K, S, RHS terms, H
+    v
+spec.json (kinetic_matrix, spatial_momenta, equations, hamiltonian)
+    |
+    v (tidal simulate --scheme ida)
+json_loader.py -> EquationSystem (kinetic_matrix, spatial_momenta, equations)
+    |
+    v
+ida.py -> build_residual_fn(spec, grid)
+    |         F_i = K_{ij} . y'_j - (pi_i - S_i)     [field slots]
+    |         F_i = y'_i - RHS_i                       [momentum slots]
+    |         F_i = RHS_i                              [constraint slots]
+    v
+sksundae.ida.IDA(residual_fn, algebraic_idx, ...)
+    |
+    v
+result.y -> SnapshotWriter -> .npy files -> tidal plot / tidal measure
+\end{lstlisting}
+
+\subsection{Key Design Decision: $K$ Instead of $K^{-1}$}
+\label{sec:K-design}
+
+\subsubsection{Current Pipeline ($K^{-1}$)}
+\label{sec:old-pipeline}
+
+The Wolfram pipeline currently (\texttt{\_derive.py:2054--2220}):
+
+\begin{enumerate}
+  \item Computes canonical momenta: $\pi_i = \partial\lag/\partial(\ddt q_i)$
+  \item Extracts kinetic matrix: $K_{ij} = \partial\pi_i/\partial(\ddt q_j)$
+  \item \textbf{Inverts $K$ symbolically}: $K^{-1} = \mathrm{Inverse}[K]$
+  \item Computes field rates: $\ddt q_i = K^{-1}_{ij} \cdot (\pi_j - S_j)$
+  \item Exports $K^{-1}$ coefficients embedded in \texttt{field\_rates} JSON
+\end{enumerate}
+
+This produces complicated expressions for non-diagonal $K$:
+
+\begin{itemize}
+  \item Chern--Simons ($2\times 2$): $\mathrm{d}A_1/\mathrm{d}t = \pi_1 - (\kappa/2)\cdot A_2 + \nabla_x A_0$
+  \item Linearized gravity ($7\times 7$): coefficients like $-4/3$, $-2/3$ from rational $K^{-1}$
+\end{itemize}
+
+\subsubsection{New Pipeline ($K$ directly)}
+\label{sec:new-pipeline}
+
+With IDA, Hamilton's 1st equation in residual form:
+\begin{equation}
+  K_{ij} \cdot \ddt q_j - \pi_i + S_i = 0
+  \label{eq:hamilton-first-residual}
+\end{equation}
+No $K^{-1}$ needed. IDA's Newton iteration solves the implicit system.
+
+The Wolfram pipeline simplifies:
+
+\begin{enumerate}
+  \item Compute $\pi_i$ --- same as before
+  \item Extract $K$ --- same as before
+  \item \sout{Invert $K$} --- removed
+  \item \sout{Compute field\_rates} --- removed
+  \item Export $K$ entries + spatial momenta $S$ directly
+\end{enumerate}
+
+\subsubsection{JSON Format Change}
+\label{sec:json-format-change}
+
+\paragraph{Old (\texttt{field\_rates} with $K^{-1}$ embedded):}
+\label{par:old-json}
+
+\begin{lstlisting}[style=json]
+"field_rates": {
+  "A_1": [
+    {"coefficient": 1.0, "operator": "identity", "field": "pi_1"},
+    {"coefficient": -0.5, "operator": "identity", "field": "A_2",
+     "coefficient_symbolic": "-kappa/2"},
+    {"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"}
+  ]
+}
+\end{lstlisting}
+
+\paragraph{New (\texttt{kinetic\_matrix} + \texttt{spatial\_momenta}):}
+\label{par:new-json}
+
+\begin{lstlisting}[style=json]
+"kinetic_matrix": {
+  "entries": [
+    {"i": 0, "j": 0, "value": 1.0},
+    {"i": 0, "j": 1, "value": 0.5, "symbolic": "kappa/2"},
+    {"i": 1, "j": 0, "value": -0.5, "symbolic": "-kappa/2"},
+    {"i": 1, "j": 1, "value": 1.0}
+  ],
+  "dimension": 2
+},
+"spatial_momenta": {
+  "A_1": [{"coefficient": 1.0, "operator": "gradient_x", "field": "A_0"}],
+  "A_2": [{"coefficient": 1.0, "operator": "gradient_y", "field": "A_0"}]
+}
+\end{lstlisting}
+
+\subsubsection{Impact on St\"ormer--Verlet}
+\label{sec:verlet-impact}
+
+Leapfrog needs explicit velocities $\ddt q = f(\pi)$. For non-diagonal $K$, solve
+the small $N_\mathrm{dyn} \times N_\mathrm{dyn}$ system $K \cdot v = \pi - S$ per timestep using
+\texttt{np.linalg.solve()}. This is $2\times 2$ to $10\times 10$ --- microseconds per call.
+
+\subsection{Position-Dependent Coefficients}
+\label{sec:pos-dep-coefficients}
+
+The coefficient evaluation system is \textbf{pure numpy/eval} with no py-pde
+dependency. It transfers to the new architecture unchanged.
+
+\subsubsection{Pipeline}
+\label{sec:coeff-pipeline}
+
+\begin{enumerate}
+  \item \textbf{JSON}: \texttt{coefficient\_symbolic} string + \texttt{coordinate\_dependent} metadata
+  \item \textbf{Conversion}: \texttt{mathematica\_to\_python()} in \texttt{\_eval\_utils.py} (regex + string
+    transforms: \texttt{E\^{}x} $\to$ \texttt{exp(x)}, \texttt{Power[x,y]} $\to$ \texttt{x**y}, etc.)
+  \item \textbf{Evaluation}: \texttt{eval(py\_expr, namespace)} where namespace includes numpy
+    functions and grid coordinate arrays
+  \item \textbf{Caching}: 4-level hierarchy:
+  \begin{itemize}
+    \item L0: preresolved constants (at \texttt{\_\_init\_\_})
+    \item L1: Mathematica$\to$Python string cache (\texttt{\_expr\_cache})
+    \item L2: spatial grid arrays (\texttt{\_spatial\_cache}) --- position-dependent,
+      time-independent terms evaluated once
+    \item L3: per-call evaluation for time+position-dependent terms
+  \end{itemize}
+\end{enumerate}
+
+\subsubsection{Grid Coordinate Injection}
+\label{sec:grid-coords}
+
+Currently: \texttt{grid.cell\_coords} from py-pde's \texttt{CartesianGrid}.
+New: \texttt{grid.cell\_coords} from TIDAL's \texttt{GridInfo} --- same numpy array, different
+source.
+
+\subsubsection{Verified Examples}
+\label{sec:verified-examples}
+
+\begin{table}[htbp]
+\centering
+\caption{Position-dependent coefficient examples verified during migration.}
+\label{tab:coeff-examples}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Example & Coefficient Type & Expression \\
+\midrule
+\texttt{sphere\_kg} & $x$-dependent Laplacian & \texttt{x[]$\wedge$2/(2*sphR$\wedge$2)} \\
+\texttt{coupled\_scattering} & Gaussian spatial coupling & \texttt{-(g0/E$\wedge$((x[]$\wedge$2+y[]$\wedge$2)/(2*R$\wedge$2)))} \\
+\texttt{curved\_spacetime} & Hubble friction (time-dep) & \texttt{-2*H(t)} \\
+\texttt{vector\_background} & tanh domain wall & \texttt{Tanh[(x[]-x0)/w]} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All evaluated by \texttt{\_resolve\_coefficient\_at\_point()} which returns \texttt{float} (scalar)
+or \texttt{np.ndarray} (grid-shaped) depending on coordinate dependence.
+
+\subsubsection{Constraint Solver Interaction}
+\label{sec:constraint-solver}
+
+\begin{itemize}
+  \item \textbf{FFT solver}: Rejects position-dependent self-terms (raises \texttt{ValueError}).
+    Only handles constant-coefficient Poisson-type constraints.
+  \item \textbf{Matrix solver}: Handles position-dependent source terms. Operator matrices
+    assembled with constant coefficients.
+  \item \textbf{IDA}: Position-dependent coefficients appear in the residual function
+    naturally. No special handling needed --- \texttt{compute\_rhs()} evaluates them per
+    call, using the spatial cache for time-independent terms.
+\end{itemize}
+
+\subsection{Implementation Checklist}
+\label{sec:implementation-checklist}
+
+\subsubsection{Step 0: Documentation}
+
+\begin{itemize}
+  \item[$\boxtimes$] Create this documentation file (\texttt{docs/solver\_migration.md})
+\end{itemize}
+
+\subsubsection{Phase 1: Foundation (GridInfo + Operators)}
+\label{sec:phase1}
+
+\paragraph{1a. GridInfo dataclass}
+\label{par:gridinfo}
+
+\begin{itemize}
+  \item[$\square$] Create \texttt{tidal/solver/\_\_init\_\_.py}
+  \item[$\square$] Create \texttt{tidal/solver/grid.py} with \texttt{GridInfo} dataclass
+  \begin{itemize}
+    \item Properties: \texttt{bounds}, \texttt{shape}, \texttt{periodic}, \texttt{dx}, \texttt{cell\_coords}, \texttt{ndim}, \texttt{num\_points}
+    \item Test: \texttt{tests/test\_solver\_grid.py}
+  \end{itemize}
+  \item[$\square$] Verify \texttt{GridInfo.cell\_coords} matches \texttt{CartesianGrid.cell\_coords} output
+    for all grid configurations (1D, 2D, 3D, periodic/non-periodic)
+\end{itemize}
+
+\paragraph{1b. Spatial operators}
+\label{par:operators}
+
+\begin{itemize}
+  \item[$\square$] Create \texttt{tidal/solver/operators.py}
+  \begin{itemize}
+    \item Functions: \texttt{laplacian}, \texttt{gradient}, \texttt{directional\_laplacian},
+      \texttt{cross\_derivative}, \texttt{identity}, \texttt{biharmonic}
+    \item Source: Refactor from \texttt{pde\_builder.py:71--304}
+    \item BC handling: ghost-cell padding for Neumann/Dirichlet
+    \item Test: \texttt{tests/test\_solver\_operators.py}
+  \end{itemize}
+  \item[$\square$] Verify numerical equivalence with py-pde operators on test grids
+  \item[$\square$] Operator registry mapping string names $\to$ functions
+\end{itemize}
+
+\paragraph{1c. Position-dependent coefficients}
+\label{par:pos-dep}
+
+\begin{itemize}
+  \item[$\square$] Verify \texttt{\_resolve\_coefficient\_at\_point()} works with \texttt{GridInfo}
+  \begin{itemize}
+    \item Change type signature: \texttt{GridBase} $\to$ \texttt{GridInfo}
+    \item \texttt{cell\_coords} property must have compatible shape
+  \end{itemize}
+  \item[$\square$] Run \texttt{sphere\_kg}, \texttt{coupled\_scattering}, \texttt{curved\_spacetime}, \texttt{vector\_background}
+    coefficient evaluation tests
+  \item[$\square$] Verify \texttt{\_spatial\_cache} produces identical arrays
+\end{itemize}
+
+\subsubsection{Phase 2: Wolfram Pipeline Changes}
+\label{sec:phase2}
+
+\paragraph{2a. Modify \texttt{\_derive.py}}
+\label{par:modify-derive}
+
+\begin{itemize}
+  \item[$\square$] In \texttt{\_wls\_canonical\_phase\_b()} (canonical Hamiltonian pipeline):
+  \begin{itemize}
+    \item Keep $K$ computation (lines 2089--2096)
+    \item Keep $K$ validation / $\det(K)$ check (lines 2101--2107)
+    \item Keep spatial momentum $S$ computation (lines 2120--2126)
+    \item Remove $K^{-1}$ inversion (lines 2110--2112)
+    \item Remove $K^{-1}$ field\_rates expansion (lines 2128--2166)
+    \item Add: emit $K$ entries to WLS metadata for JSON export
+    \item Add: emit $S$ terms to WLS metadata for JSON export
+  \end{itemize}
+\end{itemize}
+
+\paragraph{2b. Modify \texttt{ExportJSON.wl}}
+\label{par:modify-export}
+
+\begin{itemize}
+  \item[$\square$] Add \texttt{"kinetic\_matrix"} section to canonical JSON block
+  \begin{itemize}
+    \item Sparse entries: \texttt{\{"i": i, "j": j, "value": numeric, "symbolic": string\}}
+    \item Dimension field
+  \end{itemize}
+  \item[$\square$] Add \texttt{"spatial\_momenta"} section
+  \begin{itemize}
+    \item Per-field list of OperatorTerms (same format as existing RHS terms)
+  \end{itemize}
+  \item[$\square$] Remove or make optional the \texttt{"field\_rates"} section
+\end{itemize}
+
+\paragraph{2c. Modify \texttt{json\_loader.py}}
+\label{par:modify-loader}
+
+\begin{itemize}
+  \item[$\square$] Parse \texttt{kinetic\_matrix} entries into numpy array on \texttt{CanonicalStructure}
+  \item[$\square$] Parse \texttt{spatial\_momenta} into dict of OperatorTerm tuples
+  \item[$\square$] Update \texttt{CanonicalStructure} dataclass
+  \item[$\square$] Backward compatibility: if \texttt{field\_rates} present (old JSON), still parse
+\end{itemize}
+
+\paragraph{2d. Verification}
+\label{par:phase2-verify}
+
+\begin{itemize}
+  \item[$\square$] Re-derive \texttt{chern\_simons} with new pipeline --- verify $K$ matches:
+    $K = \bigl[\begin{smallmatrix} 1 & \kappa/2 \\ -\kappa/2 & 1 \end{smallmatrix}\bigr]$
+  \item[$\square$] Re-derive \texttt{coupled\_proca} --- verify $K$ is diagonal (identity)
+  \item[$\square$] Re-derive \texttt{linearized\_gravity} --- verify $K$ is $7\times 7$ with known structure
+  \item[$\square$] All existing Wolfram tests pass
+\end{itemize}
+
+\subsubsection{Phase 3: SUNDIALS/IDA Integration}
+\label{sec:phase3}
+
+\paragraph{3a. State management}
+\label{par:state-mgmt}
+
+\begin{itemize}
+  \item[$\square$] Create \texttt{tidal/solver/state.py}
+  \begin{itemize}
+    \item \texttt{state\_to\_flat()}: dict of field arrays $\to$ flat numpy array
+    \item \texttt{flat\_to\_fields()}: flat numpy array $\to$ dict of field arrays
+    \item \texttt{StateLayout} class: maps slot indices to field names and types
+    \item Test: \texttt{tests/test\_solver\_state.py}
+  \end{itemize}
+\end{itemize}
+
+\paragraph{3b. IDA residual builder}
+\label{par:ida-residual}
+
+\begin{itemize}
+  \item[$\square$] Create \texttt{tidal/solver/ida.py}
+  \begin{itemize}
+    \item \texttt{build\_residual\_fn(spec, grid)}: returns IDA-compatible residual function
+    \item Residual logic:
+    \begin{itemize}
+      \item Constraint slots: $F_i = \mathrm{RHS}_i$ (algebraic)
+      \item Momentum slots: $F_i = y'_i - \mathrm{RHS}_i$ (Hamilton's 2nd)
+      \item Field slots: $F_i = K_{ij} \cdot y'_j - (\pi_i - S_i)$ (Hamilton's 1st)
+      \item 1st-order slots: $F_i = y'_i - \mathrm{RHS}_i$
+    \end{itemize}
+    \item \texttt{build\_algebraic\_indices(spec, grid)}: returns list of algebraic indices
+    \item \texttt{build\_sparsity\_pattern(spec, grid)}: returns sparse matrix for Jacobian
+    \item Test: \texttt{tests/test\_solver\_ida.py}
+  \end{itemize}
+\end{itemize}
+
+\paragraph{3c. Solver setup and integration}
+\label{par:solver-setup}
+
+\begin{itemize}
+  \item[$\square$] IDA solver creation with appropriate options:
+  \begin{itemize}
+    \item \texttt{linsolver='sparse'} with sparsity pattern
+    \item \texttt{calc\_initcond='yp0'} for consistent initial conditions
+    \item Tolerances: \texttt{rtol=1e-8, atol=1e-10}
+    \item Thread control: \texttt{nthreads=-1}
+  \end{itemize}
+  \item[$\square$] Snapshot callback: extract fields from flat state, write via \texttt{SnapshotWriter}
+  \item[$\square$] Error handling: IDA convergence failures $\to$ clear error messages
+\end{itemize}
+
+\paragraph{3d. CLI integration}
+\label{par:cli-integration}
+
+\begin{itemize}
+  \item[$\square$] Modify \texttt{\_simulate.py}:
+  \begin{itemize}
+    \item \texttt{--scheme ida} (default): dispatch to SUNDIALS/IDA
+    \item \texttt{--scheme leapfrog}: dispatch to St\"ormer--Verlet
+    \item \texttt{--scheme scipy}: dispatch to scipy \texttt{solve\_ivp}
+    \item Remove all py-pde solver dispatch code
+    \item Build \texttt{GridInfo} instead of \texttt{CartesianGrid}
+  \end{itemize}
+  \item[$\square$] Modify \texttt{pyproject.toml}:
+  \begin{itemize}
+    \item Remove \texttt{py-pde} from dependencies
+    \item Add \texttt{scikit-sundae} as required dependency
+  \end{itemize}
+  \item[$\square$] Update \texttt{--help} text for new scheme options
+\end{itemize}
+
+\paragraph{3e. Verification}
+\label{par:phase3-verify}
+
+\begin{itemize}
+  \item[$\square$] EM plane-wave (\texttt{--scheme ida}): amplitude stable ($< 1.2\times$ initial)
+  \item[$\square$] EM plane-wave: $A_0$ constraint satisfied automatically (no separate solver)
+  \item[$\square$] Coupled Proca (\texttt{--scheme ida}): coupled Helmholtz constraints solved
+  \item[$\square$] Coupled scalars: energy conservation matches py-pde baseline
+  \item[$\square$] Chern--Simons with $\kappa$: correct dispersion relation
+  \item[$\square$] \texttt{sphere\_kg}: position-dependent coefficients handled correctly
+  \item[$\square$] \texttt{curved\_spacetime}: time-dependent Hubble friction works
+\end{itemize}
+
+\subsubsection{Phase 4: St\"ormer--Verlet Integrator}
+\label{sec:phase4}
+
+\begin{itemize}
+  \item[$\square$] Create \texttt{tidal/solver/leapfrog.py}
+  \begin{itemize}
+    \item \texttt{stormer\_verlet()} function ($\sim$20 lines)
+    \item \texttt{solve\_kinetic(K, rhs)}: identity shortcut + \texttt{np.linalg.solve}
+    \item Snapshot callback support
+    \item Test: \texttt{tests/test\_solver\_leapfrog.py}
+  \end{itemize}
+  \item[$\square$] CLI \texttt{--scheme leapfrog} dispatch
+  \item[$\square$] Verify: KG wave --- energy drift $< 10^{-10}$ over 1000 oscillation periods
+  \item[$\square$] Verify: \texttt{coupled\_scalars} --- energy conserved with leapfrog vs decaying with IDA
+\end{itemize}
+
+\subsubsection{Phase 5: Test Migration}
+\label{sec:phase5}
+
+\begin{itemize}
+  \item[$\square$] Replace \texttt{from pde import ...} in all 17 test files
+  \begin{itemize}
+    \item \texttt{CartesianGrid} $\to$ \texttt{GridInfo}
+    \item \texttt{ScalarField} $\to$ \texttt{np.ndarray}
+    \item \texttt{FieldCollection} $\to$ \texttt{dict[str, np.ndarray]}
+    \item \texttt{MemoryStorage} $\to$ \texttt{SnapshotWriter} or direct npy
+  \end{itemize}
+  \item[$\square$] Update \texttt{conftest.py} fixtures
+  \item[$\square$] Verify: \texttt{uv run pytest tests/ -q --tb=no} passes (all $\sim$1067 tests)
+\end{itemize}
+
+\subsubsection{Phase 6: Cleanup}
+\label{sec:phase6}
+
+\begin{itemize}
+  \item[$\square$] Remove py-pde from \texttt{pyproject.toml}
+  \item[$\square$] \texttt{uv run ruff check tidal/ tests/} --- 0 violations
+  \item[$\square$] \texttt{uv run pyright tidal/} --- 0 errors (strict mode)
+  \item[$\square$] Update \texttt{docs/NEXT\_PHASES.md} to reflect completed migration
+  \item[$\square$] Update \texttt{MEMORY.md} with new architecture notes
+\end{itemize}
+
+\subsubsection{Future: Phase 7 (FieldSet --- Typed Field Container)}
+\label{sec:phase7}
+
+\begin{itemize}
+  \item[$\square$] Create \texttt{tidal/solver/fieldset.py} with \texttt{FieldSet} class
+  \item[$\square$] Own field data: \texttt{dict[str, np.ndarray]} with typed access and grid shape enforcement
+  \item[$\square$] Consolidate field name validation: \texttt{parse\_field\_name()}, momentum naming conventions
+    (\texttt{pi\_phi\_0}), index validation --- single source of truth
+  \item[$\square$] Handle serialization: flat vector $\leftrightarrow$ named fields (from \texttt{state.py}), NPZ I/O
+    (from \texttt{\_io.py}), snapshot packing
+  \item[$\square$] Bridge py-pde boundary: \texttt{to\_field\_collection()} / \texttt{from\_field\_collection()} only
+    at CLI output edge
+  \item[$\square$] Replace raw \texttt{dict[str, np.ndarray]} throughout solver and measurement modules
+  \item[$\square$] Enforce invariants: grid shape consistency, field/momentum pairing, immutable metadata
+\end{itemize}
+
+\subsubsection{Future: Phase 8 (Constraint Damping / Dedner GLM)}
+\label{sec:phase8}
+
+\begin{itemize}
+  \item[$\square$] TOML: \texttt{[gauge] method = "dedner"}
+  \item[$\square$] Auto-compute $c_h$, $c_p$ from grid/domain
+  \item[$\square$] Wolfram pipeline: add auxiliary $\psi$ field, modify EOM
+  \item[$\square$] Constraint monitoring: $L^2$/$L^\infty$ norms at each snapshot
+  \item[$\square$] \texttt{constraints.npy} output alongside field data
+\end{itemize}
+
+\subsection{IDA Technical Details}
+\label{sec:ida-details}
+
+\subsubsection{Residual Function Signature}
+\label{sec:resfn-signature}
+
+\begin{lstlisting}[style=python]
+def resfn(t: float, y: np.ndarray, yp: np.ndarray, res: np.ndarray) -> None:
+    """
+    t:   Current time
+    y:   State vector (N,) -- all fields, momenta, constraints flattened
+    yp:  Time derivatives (N,) -- y' values
+    res: Output residual (N,) -- write F(t,y,y') in-place
+    """
+\end{lstlisting}
+
+\subsubsection{Solver Setup}
+\label{sec:solver-setup-code}
+
+\begin{lstlisting}[style=python]
+from sksundae.ida import IDA
+
+solver = IDA(
+    resfn,
+    algebraic_idx=algebraic_indices,  # constraint grid points
+    calc_initcond='yp0',              # auto-consistent initial yp
+    linsolver='sparse',               # SuperLU_MT (N <= 10^5)
+    sparsity=sparsity_matrix,         # Jacobian sparsity pattern
+    nthreads=-1,                      # all cores for SuperLU_MT
+    rtol=1e-8,
+    atol=1e-10,
+)
+
+result = solver.solve(t_span, y0, yp0)
+# result.t: (n_times,) time points
+# result.y: (n_times, N) solution
+# result.success: bool
+# result.nfev: residual evaluation count
+\end{lstlisting}
+
+\subsubsection{Sparsity Pattern}
+\label{sec:sparsity-pattern}
+
+The Jacobian $J_{ij} = \partial F_i/\partial y_j + \alpha \cdot \partial F_i/\partial y'_j$ has sparsity determined by
+the equation coupling structure:
+
+\begin{itemize}
+  \item Spatial operators (Laplacian, gradient) couple nearest neighbors on the grid
+  \item Cross-field terms couple different field slots at the same grid point
+  \item The kinetic matrix $K$ couples field slots at the same grid point
+\end{itemize}
+
+The sparsity pattern can be pre-computed from the equation specification without
+evaluating any numerical values.
+
+\subsubsection{Analytical Jacobian}
+\label{sec:analytical-jacobian}
+
+For \textbf{time-independent} systems (most TIDAL examples), the Jacobian
+$J = \mathrm{d}F/\mathrm{d}y + c_j \cdot \mathrm{d}F/\mathrm{d}y'$ consists of two constant sparse matrices that are
+precomputed once and supplied analytically, eliminating finite-difference
+residual evaluations. Three delivery modes by system size:
+
+\begin{table}[htbp]
+\centering
+\caption{Analytical Jacobian delivery tiers.}
+\label{tab:jacobian-tiers}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Tier & Size Range & Method & Speedup vs FD \\
+\midrule
+Dense & $N \leq 2{,}000$ & 2D \texttt{jacfn} fills dense array & 5.3$\times$ \\
+Sparse & $2{,}000 < N \leq 200{,}000$ & 1D CSC \texttt{jacfn} + SuperLU\_MT direct & IDA: 2.5$\times$, CVODE: 1.2--1.4$\times$ \\
+GMRES & $N > 200{,}000$ & \texttt{jactimes} analytical mat-vec product & Eliminates $O(n_\mathrm{colors})$ residual evals \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The sparse tier requires sksundae $\geq$ 1.1.2 (fixes
+scikit-sundae\#46
+where \texttt{jacfn} was silently overwritten when \texttt{sparsity} was provided).
+When sparsity nnz exceeds \texttt{SUPERLU\_NNZ\_LIMIT} (100K), the sparse tier falls
+through to GMRES with analytical \texttt{jactimes}. A cheap nnz pre-check via
+\texttt{build\_jacobian\_sparsity()} avoids building full matrices when they would
+be discarded.
+
+\textbf{Construction performance}: Jacobian matrices are assembled via COO triple
+accumulation (\texttt{\_COOAccumulator}) with a single CSC conversion --- $O(\mathrm{nnz})$
+total. For all-periodic BCs, operator matrices use a circulant single-probe
+construction ($O(\mathrm{nnz})$ vs $O(N^2)$ column probing).
+
+Time-dependent systems bypass the analytical Jacobian and use the FD-based
+tier system described above.
+
+Implementation: \texttt{tidal/solver/analytical\_jacobian.py}.
+
+\subsubsection{Performance Expectations}
+\label{sec:performance-expectations}
+
+\begin{table}[htbp]
+\centering
+\caption{Expected per-step performance by grid size.}
+\label{tab:performance}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Grid Size & $N$ (state) & Linear Solver & Expected Step Time \\
+\midrule
+64 & $\sim$640 & dense & $< 1$\,ms \\
+$64\times 64$ & $\sim$40{,}000 & sparse (SuperLU\_MT) & $\sim$10\,ms \\
+$128\times 128$ & $\sim$160{,}000 & sparse or GMRES & $\sim$100\,ms \\
+$256\times 256$ & $\sim$650{,}000 & GMRES + preconditioner & $\sim$1\,s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Index-1 DAE Requirement}
+\label{sec:index1}
+
+IDA requires index-1 DAEs. TIDAL's constraint equations are index-1 when:
+
+\begin{itemize}
+  \item Gauss's law $\lapl A_0 = \mathrm{source}$: invertible if BCs are periodic or Dirichlet
+    (Neumann on all boundaries has a kernel --- requires gauge fixing)
+  \item Coupled Helmholtz: $(\lapl - m^2)A_0 = \mathrm{source}$: always invertible for $m^2 > 0$
+\end{itemize}
+
+If a constraint is structurally singular (index $> 1$), IDA will fail with a
+convergence error. This is the correct behavior --- fail fast, not silently wrong.
+
+\subsection{St\"ormer--Verlet Technical Details}
+\label{sec:verlet-details}
+
+\subsubsection{Algorithm}
+\label{sec:verlet-algorithm}
+
+For separable Hamiltonian $H = T(\pi) + V(q)$:
+
+Hamilton's equations:
+\begin{align}
+  \frac{\mathrm{d}q_i}{\mathrm{d}t} &= \frac{\partial T}{\partial \pi_i} = K^{-1}_{ij}\,(\pi_j - S_j) \quad \text{[velocity from momentum]} \\
+  \frac{\mathrm{d}\pi_i}{\mathrm{d}t} &= -\frac{\partial V}{\partial q_i} = \mathrm{RHS}_i(q, \nabla q) \quad \text{[force from configuration]}
+\end{align}
+
+St\"ormer--Verlet (one step):
+\begin{align}
+  \pi_{n+1/2} &= \pi_n + \frac{\Delta t}{2} \cdot \mathrm{force}(q_n) && \text{[half-kick]} \\
+  v_{n+1/2} &= \mathrm{solve}(K,\; \pi_{n+1/2} - S(q_n)) && \text{[velocity from momentum]} \\
+  q_{n+1} &= q_n + \Delta t \cdot v_{n+1/2} && \text{[drift]} \\
+  \pi_{n+1} &= \pi_{n+1/2} + \frac{\Delta t}{2} \cdot \mathrm{force}(q_{n+1}) && \text{[half-kick]}
+\end{align}
+
+\subsubsection{Properties}
+\label{sec:verlet-properties}
+
+\begin{itemize}
+  \item \textbf{Symplectic}: preserves the symplectic 2-form exactly
+  \item \textbf{Time-reversible}: integrator is its own adjoint
+  \item \textbf{Shadow Hamiltonian}: preserves $\tilde{H} = H + O(\Delta t^2)$ exactly $\to$ no energy drift
+  \item \textbf{2nd-order accurate}: global error $O(\Delta t^2)$
+  \item \textbf{No energy drift}: unlike RK4 which drifts $O(\Delta t^4)$ per step, accumulating
+\end{itemize}
+
+\subsubsection{Limitations}
+\label{sec:verlet-limitations}
+
+\begin{itemize}
+  \item \textbf{Not for dissipative systems}: absorbing BCs, friction terms, Dedner damping
+    all break the Hamiltonian structure
+  \item \textbf{No algebraic constraints}: cannot handle Gauss's law directly
+  \item \textbf{Fixed timestep}: no adaptive stepping (CFL condition must be satisfied)
+  \item \textbf{Separable $H$ required}: $H = T(\pi) + V(q)$, not $H(q, \pi)$ with mixed terms
+\end{itemize}
+
+\subsubsection{Higher-Order Methods}
+\label{sec:higher-order}
+
+4th-order Yoshida~\cite{yoshida1990symplectic} (composition of leapfrog steps with different $\Delta t$):
+
+\begin{lstlisting}[style=python]
+# Yoshida (1990) coefficients
+c1 = c4 = 1 / (2 * (2 - 2**(1/3)))
+c2 = c3 = (1 - 2**(1/3)) / (2 * (2 - 2**(1/3)))
+d1 = d3 = 1 / (2 - 2**(1/3))
+d2 = -2**(1/3) / (2 - 2**(1/3))
+# Apply 3 leapfrog substeps with these coefficients
+\end{lstlisting}
+
+\subsection{Constraint Handling Strategy}
+\label{sec:constraint-handling}
+
+\subsubsection{Short Term: IDA Algebraic Equations}
+\label{sec:constraint-ida}
+
+IDA solves constraints as algebraic equations within the DAE. This is equivalent
+to constraint projection at every timestep --- the Newton iteration ensures the
+algebraic equations are satisfied to within tolerance.
+
+\subsubsection{Medium Term: Constraint Damping}
+\label{sec:constraint-damping}
+
+For systems where hyperbolic propagation of constraint errors is preferred
+(e.g., absorbing boundaries), add damping source terms:
+\begin{equation}
+  \text{Modified EOM: } \ddt \pi_i = \mathrm{RHS}_i - \kappa \cdot C_i
+  \label{eq:constraint-damping}
+\end{equation}
+where $C_i = 0$ is the constraint and $\kappa$ is the damping parameter.
+
+\subsubsection{Long Term: Dedner GLM}
+\label{sec:dedner-glm}
+
+For vector fields, Dedner divergence cleaning adds an auxiliary scalar $\psi$:
+\begin{align}
+  \ddt A_i &\mathrel{+}= \partial_i \psi \\
+  \ddt \psi &= -c_h^2 (\nabla \cdot A) - \frac{c_p^2}{c_h^2}\, \psi
+\end{align}
+Parameters $c_h$ (propagation speed) and $c_p$ (damping rate) are auto-computed
+from the grid spacing and domain size.
+
+\subsection{Files Reference}
+\label{sec:files-reference}
+
+\subsubsection{New Files}
+
+\begin{table}[htbp]
+\centering
+\caption{New files created during the migration.}
+\label{tab:new-files}
+\begin{tabular}{@{}ll@{}}
+\toprule
+File & Purpose \\
+\midrule
+\texttt{tidal/solver/\_\_init\_\_.py} & Solver package \\
+\texttt{tidal/solver/grid.py} & \texttt{GridInfo} dataclass \\
+\texttt{tidal/solver/operators.py} & Spatial operators (numpy) \\
+\texttt{tidal/solver/state.py} & State flattening/unflattening \\
+\texttt{tidal/solver/ida.py} & SUNDIALS/IDA integration \\
+\texttt{tidal/solver/leapfrog.py} & St\"ormer--Verlet integrator \\
+\texttt{tests/test\_solver\_grid.py} & \texttt{GridInfo} tests \\
+\texttt{tests/test\_solver\_operators.py} & Operator tests \\
+\texttt{tests/test\_solver\_state.py} & State management tests \\
+\texttt{tests/test\_solver\_ida.py} & IDA integration tests \\
+\texttt{tests/test\_solver\_leapfrog.py} & Leapfrog tests \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Modified Files}
+
+\begin{table}[htbp]
+\centering
+\caption{Files modified during the migration.}
+\label{tab:modified-files}
+\begin{tabular}{@{}ll@{}}
+\toprule
+File & Changes \\
+\midrule
+\texttt{tidal/symbolic/pde\_builder.py} & Decouple from py-pde types \\
+\texttt{tidal/symbolic/json\_loader.py} & Parse \texttt{kinetic\_matrix}, \texttt{spatial\_momenta} \\
+\texttt{tidal/cli/\_simulate.py} & New solver dispatch \\
+\texttt{tidal/cli/\_derive.py} & Export $K$ (not $K^{-1}$) \\
+\texttt{tidal/wolfram/ExportJSON.wl} & Emit new canonical sections \\
+\texttt{tidal/measurement/\_writer.py} & Remove py-pde, constraint norms \\
+\texttt{tidal/measurement/\_io.py} & Remove py-pde, use \texttt{GridInfo} \\
+\texttt{pyproject.toml} & py-pde $\to$ scikit-sundae \\
+\texttt{tests/conftest.py} & Replace fixtures \\
+17 test files & Replace py-pde imports \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Unchanged Files}
+
+\begin{table}[htbp]
+\centering
+\caption{Files unchanged by the migration.}
+\label{tab:unchanged-files}
+\begin{tabular}{@{}ll@{}}
+\toprule
+File & Why \\
+\midrule
+\texttt{tidal/symbolic/\_eval\_utils.py} & Already pure numpy/eval \\
+\texttt{tidal/wolfram/CommonUtilities.wl} & No solver dependency \\
+\texttt{tidal/wolfram/ComponentDecompose.wl} & No solver dependency \\
+\texttt{tidal/wolfram/EulerLagrange.wl} & No solver dependency \\
+\bottomrule
+\end{tabular}
+\end{table}

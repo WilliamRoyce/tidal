@@ -1,0 +1,224 @@
+% Examples: Pipeline Examples, Sweep Demonstrations, and JSON Specifications
+% Source: docs/source/examples.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Examples}
+\label{sec:examples}
+
+TIDAL includes 27 pipeline examples spanning 1+1D through 3+1D spacetimes with scalar, vector, and tensor fields.
+
+\subsection{Pipeline Examples}
+
+All pipeline examples follow the same pattern: \texttt{tidal derive theory.toml} derives equations from a Lagrangian (via \texttt{wolframscript}), exports to JSON, and a Python script or CLI command runs the simulation.
+
+\begin{table}[htbp]
+\centering
+\caption{Pipeline examples included with TIDAL.}
+\label{tab:pipeline-examples}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Example & Dim & Fields & Key Features \\
+\midrule
+\texttt{scalar\_field/}            & 1+1D & \texttt{phi\_0}       & Basic KG equation, mass term, dispersion \\
+\texttt{electromagnetic/}          & 1+1D & \texttt{A\_0}, \texttt{A\_1}  & Maxwell equations, Lorenz gauge \\
+\texttt{proca/}                    & 1+1D & \texttt{A\_0}, \texttt{A\_1}  & Massive vector field (Proca mass term) \\
+\texttt{coupled\_scalars/}         & 1+1D & \texttt{phi\_0}, \texttt{chi\_0} & Cross-field coupling, mass matrix, parameter sweeps \\
+\texttt{chern\_simons/}            & 2+1D & \texttt{A\_0}, \texttt{A\_1}, \texttt{A\_2} & Topological term, epsilon tensor, $A_0$ constraint \\
+\texttt{elasticity/}               & 2+1D & \texttt{u\_0}, \texttt{u\_1}  & Anisotropic Laplacian, \texttt{cross\_derivative\_xy} \\
+\texttt{curved\_spacetime/}        & 2+1D & \texttt{phi\_0}       & De Sitter Hubble friction, time-dependent coefficients \\
+\texttt{sphere\_kg/}               & 2+1D & \texttt{phi\_0}       & Stereographic $S^2$, position-dependent coefficients \\
+\texttt{polar\_kg/}                & 2+1D & \texttt{phi\_0}       & Polar coordinates, $1/r$ Christoffel correction \\
+\texttt{electrostatics/}           & 2+1D & \texttt{phi\_0}       & Poisson equation, constraint solve \\
+\texttt{scalar\_vector\_coupling/} & 2+1D & \texttt{phi\_0}, \texttt{A\_0}--\texttt{A\_2} & Mixed-rank cross-field (scalar+vector), 4 constants \\
+\texttt{scalar\_field\_3d/}        & 3+1D & \texttt{phi\_0}       & Full 4D Klein--Gordon \\
+\texttt{spherical\_kg/}            & 3+1D & \texttt{phi\_0}       & Spherical coordinates, trig coefficients ($\cot$, $\csc$) \\
+\texttt{cylindrical\_kg/}          & 3+1D & \texttt{phi\_0}       & Cylindrical coordinates, mixed curved/flat \\
+\texttt{massive\_gravity/}         & 2+1D & $h_{ij}$              & Linearized massive gravity, $m^2$ mass term, xPert linearization \\
+\texttt{gravitational\_waves/}     & 3+1D & $h_{ij}$              & xPert linearization, TT gauge, rank-2 tensor, constraints \\
+\texttt{massive\_3form/}           & 3+1D & $C_{ijk}$             & Rank-3 antisymmetric tensor, symmetry reduction $64 \to 4$, KG per component \\
+\texttt{coupled\_proca/}           & 2+1D & $A_i$, $B_i$          & Two massive vectors, coupled Helmholtz constraints, periodic BCs \\
+\texttt{coupled\_scattering/}      & 2+1D & \texttt{phi\_0}, \texttt{chi\_0} & Position-dependent Gaussian coupling, background fields, wave scattering \\
+\texttt{scalar\_potential\_well/}  & 1+1D & \texttt{phi\_0}       & Background potential well, \texttt{[[background\_fields]]}, bound states \\
+\texttt{cylindrical\_kg\_1d/}      & 1+1D & \texttt{phi\_0}       & Cylindrical coordinates, plane-wave 1D reduction \\
+\texttt{gravitational\_waves\_1d/} & 1+1D & $h_{ij}$              & Linearized gravity, plane-wave 1D reduction \\
+\texttt{spherical\_kg\_1d/}        & 1+1D & \texttt{phi\_0}       & Spherical coordinates, plane-wave 1D reduction \\
+\texttt{proca\_background/}        & 2+1D & $A_i$, $B_i$          & Lorentzian scalar background, two Proca vectors, constraint+BG integration \\
+\texttt{vector\_background/}       & 2+1D & \texttt{phi\_0}, $A_i$ & Tanh domain wall vector background, \texttt{ComponentValue} mechanism, sign-changing coupling \\
+\texttt{gertsenshtein/}            & 1+1D & \texttt{h\_5}, \texttt{gea\_1} & Einstein--Maxwell graviton--photon conversion, multi-field perturbation \\
+\texttt{maxwell\_perturbation/}    & 1+1D & \texttt{gea\_0}, \texttt{gea\_1} & Matter-only Proca perturbation, lightweight CI test \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Running Examples}
+
+\subsubsection{With the CLI}
+
+\begin{lstlisting}[style=bash]
+# List available JSON specifications
+tidal list
+
+# Run a simulation
+tidal simulate examples/data/klein_gordon_1d.json --t-end 20 --ic gaussian
+
+# Derive from TOML (requires wolframscript)
+tidal derive examples/scalar_field/theory.toml --run
+\end{lstlisting}
+
+\subsubsection{With \texttt{run.sh} scripts}
+
+Most examples include a \texttt{run.sh} script that runs the full pipeline:
+
+\begin{lstlisting}[style=bash]
+cd examples/scalar_field
+bash run.sh
+\end{lstlisting}
+
+Each example directory has a \texttt{run.sh} that runs the full pipeline:
+
+\begin{lstlisting}[style=bash]
+cd examples/scalar_field && bash run.sh
+cd examples/scalar_vector_coupling && bash run.sh
+\end{lstlisting}
+
+\subsection{Example Completeness}
+
+\begin{table}[htbp]
+\centering
+\caption{Completeness of example directories.}
+\label{tab:example-completeness}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Example & \texttt{theory.toml} & \texttt{run.sh} \\
+\midrule
+\texttt{scalar\_field}            & Yes & Yes \\
+\texttt{electromagnetic}          & Yes & Yes \\
+\texttt{proca}                    & Yes & Yes \\
+\texttt{coupled\_scalars}         & Yes & Yes \\
+\texttt{chern\_simons}            & Yes & Yes \\
+\texttt{elasticity}               & Yes & Yes \\
+\texttt{curved\_spacetime}        & Yes & Yes \\
+\texttt{sphere\_kg}               & Yes & Yes \\
+\texttt{polar\_kg}                & Yes & Yes \\
+\texttt{electrostatics}           & Yes & Yes \\
+\texttt{scalar\_vector\_coupling} & Yes & Yes \\
+\texttt{scalar\_field\_3d}        & Yes & Yes \\
+\texttt{spherical\_kg}            & Yes & Yes \\
+\texttt{cylindrical\_kg}          & Yes & Yes \\
+\texttt{massive\_gravity}         & Yes & Yes \\
+\texttt{gravitational\_waves}     & Yes & Yes \\
+\texttt{massive\_3form}           & Yes & Yes \\
+\texttt{coupled\_proca}           & Yes & Yes \\
+\texttt{coupled\_scattering}      & Yes & Yes \\
+\texttt{scalar\_potential\_well}  & Yes & Yes \\
+\texttt{proca\_background}        & Yes & Yes \\
+\texttt{vector\_background}       & Yes & Yes \\
+\texttt{cylindrical\_kg\_1d}      & Yes & Yes \\
+\texttt{gravitational\_waves\_1d} & Yes & Yes \\
+\texttt{spherical\_kg\_1d}        & Yes & Yes \\
+\texttt{gertsenshtein}            & Yes & Yes \\
+\texttt{maxwell\_perturbation}    & Yes & Yes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Parameter Sweeps}
+
+TIDAL includes example scripts demonstrating the \texttt{tidal sweep} framework for automated parameter studies, convergence analysis, and sensitivity analysis.
+
+\subsubsection{Sweep Examples}
+
+\begin{table}[htbp]
+\centering
+\caption{Sweep example scripts.}
+\label{tab:sweep-examples}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Script & Example & Features Demonstrated \\
+\midrule
+\texttt{coupled\_scattering/sweep.sh}           & 1D coupling sweep     & Basic CLI sweep (F1) \\
+\texttt{coupled\_scattering/sweep\_2d.sh}       & 2D coupling $\times$ mass & Cartesian product sweep (F1) \\
+\texttt{coupled\_scattering/convergence.sh}     & Grid convergence      & \texttt{--converge} flag \\
+\texttt{coupled\_scattering/sweep\_adaptive.sh} & Adaptive sampling     & \texttt{--adaptive-metric} (F2a) \\
+\texttt{coupled\_scattering/sweep\_advanced.toml}& Full TOML config     & Adaptive + resume + parallel (F1+F2a+F7) \\
+\texttt{coupled\_scattering/sweep\_scattering.sh}& Asymptotic observables & asymptotic + peak\_conversion measurements \\
+\texttt{coupled\_scalars/sweep\_coupling.sh}    & 1D coupling sweep     & Basic CLI sweep (F1) \\
+\texttt{coupled\_scalars/sweep\_mass\_ratio.sh} & Mass ratio resonance  & velocity + resonance measurements (F3) \\
+\texttt{coupled\_scalars/sweep\_2d\_sensitivity.toml} & Latin Hypercube 2D & LHS sampling (F2b) \\
+\texttt{coupled\_scalars/sweep\_2d\_sensitivity.sh}   & Sensitivity analysis & Sobol/Morris + advanced viz (F4+F8) \\
+\texttt{scalar\_field/sweep\_convergence.sh}    & Single-field convergence & Conservation convergence study \\
+\texttt{gertsenshtein/sweep\_B0.sh}             & $\Bzero$ field strength sweep & Rabi oscillation validation ($\sin^2(\kappa\Bzero t/2)$) \\
+\texttt{gertsenshtein/sweep\_coupling.sh}       & Coupling constant sweep & Graviton--photon conversion rate \\
+\texttt{gertsenshtein/sweep\_profile.sh}        & Localized $B$-field sweep & Boccaletti formula validation \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Running Sweep Examples}
+
+\begin{lstlisting}[style=bash]
+# Run from the example directory
+cd examples/coupled_scattering && bash sweep_adaptive.sh
+
+# Or use a TOML config directly
+tidal sweep --config examples/coupled_scattering/sweep_advanced.toml
+
+# Visualize results
+tidal plot sweeps/output/ --type sweep --metric P_max
+\end{lstlisting}
+
+\subsubsection{Measurement Suitability by Example Type}
+
+\begin{table}[htbp]
+\centering
+\caption{Suitable measurements by example category.}
+\label{tab:measurement-suitability}
+\begin{tabular}{@{}lp{3.5cm}p{6cm}@{}}
+\toprule
+Category & Examples & Suitable Measurements \\
+\midrule
+Coupled (flat, homogeneous) & \texttt{coupled\_scalars}, \texttt{coupled\_proca}, \texttt{scalar\_vector\_coupling} & All 13 types \\
+Scattering (flat, background) & \texttt{coupled\_scattering}, \texttt{proca\_background}, \texttt{vector\_background} & energy, conversion, mixing, asymptotic, peak\_conversion, conservation \\
+Single-field / curved & \texttt{scalar\_field}, \texttt{proca}, \texttt{polar\_kg}, etc. & energy, conservation, spectrum, dispersion \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Feature Coverage}
+
+\begin{table}[htbp]
+\centering
+\caption{Sweep feature coverage across examples.}
+\label{tab:feature-coverage}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Feature & Description & Example \\
+\midrule
+F1  & CLI + TOML sweep configs       & \texttt{sweep\_coupling.toml}, \texttt{sweep\_advanced.toml} \\
+F2a & Adaptive sampling              & \texttt{sweep\_adaptive.sh} \\
+F2b & Latin Hypercube sampling       & \texttt{sweep\_2d\_sensitivity.toml} \\
+F3  & Velocity + resonance analysis  & \texttt{sweep\_mass\_ratio.sh} \\
+F4  & Sobol/Morris sensitivity       & \texttt{sweep\_2d\_sensitivity.sh} \\
+F7  & Run status tracking + resume   & \texttt{sweep\_advanced.toml} \\
+F8  & Advanced visualization         & \texttt{sweep\_2d\_sensitivity.sh} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{JSON Specification Files}
+
+All generated JSON files live in \texttt{examples/data/}:
+
+\begin{lstlisting}[style=bash]
+ls examples/data/*.json
+\end{lstlisting}
+
+Each JSON file is a self-contained equation system specification that can be loaded with:
+
+\begin{lstlisting}[style=python]
+from tidal.symbolic.json_loader import load_equation_system
+
+spec = load_equation_system("examples/data/klein_gordon_1d.json")
+\end{lstlisting}
+
+See \cref{sec:pipeline} for details on the JSON schema.

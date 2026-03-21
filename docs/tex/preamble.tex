@@ -16,6 +16,50 @@
 \usepackage{tikz}
 \usepackage{xcolor}
 
+% --- Code listings ---
+\usepackage{listings}
+\lstset{
+  basicstyle=\ttfamily\small,
+  breaklines=true,
+  frame=single,
+  xleftmargin=1em,
+  framexleftmargin=0.5em,
+  numbers=none,
+  tabsize=2,
+  captionpos=b,
+}
+\lstdefinestyle{python}{
+  language=Python,
+  keywordstyle=\bfseries\color{blue!70!black},
+  stringstyle=\color{red!60!black},
+  commentstyle=\itshape\color{green!40!black},
+}
+\lstdefinestyle{bash}{
+  language=bash,
+  keywordstyle=\bfseries\color{green!40!black},
+  commentstyle=\itshape\color{gray},
+}
+\lstdefinestyle{json}{
+  string=[s]{"}{"},
+  stringstyle=\color{blue!70!black},
+  comment=[l]{//},
+  commentstyle=\itshape\color{gray},
+}
+\lstdefinestyle{toml}{
+  comment=[l]{\#},
+  commentstyle=\itshape\color{gray},
+  keywordstyle=\bfseries,
+  morestring=[b]",
+  stringstyle=\color{red!60!black},
+}
+\lstdefinestyle{mathematica}{
+  keywordstyle=\bfseries\color{purple!70!black},
+  commentstyle=\itshape\color{gray},
+  morecomment=[s]{(*}{*)},
+  morestring=[b]",
+  stringstyle=\color{red!60!black},
+}
+
 % --- TikZ figure style (reuse existing project styles) ---
 % When compiling standalone, uncomment:
 % \input{../figures/tidal-tikz-styles.sty}

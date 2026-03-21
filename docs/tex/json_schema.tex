@@ -1,0 +1,1153 @@
+% JSON Schema Reference: Complete specification for the Wolfram-to-Python JSON interface
+% Source: docs/JSON_SCHEMA_GUIDE.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{JSON Schema Reference}
+\label{sec:json-schema}
+
+Complete reference for the JSON specification format used as the interface between the Wolfram/xAct symbolic layer and the Python solver (SUNDIALS + numpy).
+
+\textbf{Source of truth:} \texttt{tidal/symbolic/json\_loader.py}
+
+
+\subsection{Top-Level Structure}
+\label{sec:json-top-level}
+
+\begin{lstlisting}[style=json]
+{
+  "metadata":  { ... },
+  "spacetime": { ... },
+  "fields":    [ ... ],
+  "equations": [ ... ],
+  "coupling":  { ... }
+}
+\end{lstlisting}
+
+\begin{table}[htbp]
+\centering
+\caption{Top-level JSON keys.}
+\label{tab:json-top-level}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Key & Required & Description \\
+\midrule
+\texttt{metadata}  & No       & Source info, default parameters, gauge choice \\
+\texttt{spacetime} & \textbf{Yes} & Dimension, signature, coordinates \\
+\texttt{fields}    & \textbf{Yes} & List of field components \\
+\texttt{equations} & \textbf{Yes} & Equations of motion (one per field) \\
+\texttt{coupling}  & \textbf{Yes} & Mass/coupling matrices (auto-computed from terms) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Metadata}
+\label{sec:json-metadata}
+
+Informational block documenting the Lagrangian origin. Not parsed by the PDE solver except for \texttt{parameters}.
+
+\begin{table}[htbp]
+\centering
+\caption{Metadata fields.}
+\label{tab:json-metadata}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Key & Type & Description \\
+\midrule
+\texttt{source}          & string  & \texttt{"xAct"} (derived symbolically) or \texttt{"analytical"} (hand-constructed) \\
+\texttt{lagrangian\_expr} & string  & Human-readable Lagrangian expression \\
+\texttt{derived\_from}    & string  & Always \texttt{"Euler-Lagrange"} for xAct-derived equations \\
+\texttt{gauge}           & string  & Gauge choice: \texttt{"none"}, \texttt{"lorenz"}, \texttt{"coulomb"}, \texttt{"de\_donder"} \\
+\texttt{linearized}      & boolean & Whether equations are linearized perturbations \\
+\texttt{construction}    & string  & \texttt{"analytical"} for hand-built JSON \\
+\texttt{parameters}      & object  & Default parameter values, e.g.\ \texttt{\{"H": 0.1, "m2": 1.0\}} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Example:}
+
+\begin{lstlisting}[style=json]
+{
+  "metadata": {
+    "source": "xAct",
+    "lagrangian_expr": "-1/2 g^ab nabla_a phi nabla_b phi - 1/2 m^2 phi^2",
+    "derived_from": "Euler-Lagrange",
+    "gauge": "none",
+    "parameters": { "dSH": 0.1, "dSm2": 1.0 }
+  }
+}
+\end{lstlisting}
+
+
+\subsection{Spacetime}
+\label{sec:json-spacetime}
+
+Defines the geometric background.
+
+\begin{table}[htbp]
+\centering
+\caption{Spacetime fields.}
+\label{tab:json-spacetime}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Key & Type & Required & Description \\
+\midrule
+\texttt{dimension}         & integer       & \textbf{Yes} & Total spacetime dimension: 2 (1+1D), 3 (2+1D), 4 (3+1D) \\
+\texttt{signature}         & array[int]    & No       & Metric signature, e.g.\ \texttt{[-1, 1, 1]} for Minkowski \\
+\texttt{coordinates}       & array[string] & No       & Coordinate names in order; first is always time \\
+\texttt{metric\_type}       & string        & No       & \texttt{"minkowski"}, \texttt{"conformal\_flat"}, \texttt{"polar"}, etc. \\
+\texttt{conformal\_factor}  & string        & No       & Symbolic conformal factor (Mathematica form) \\
+\texttt{metric\_components} & string        & No       & Metric description, e.g.\ \texttt{"diag(-1, 1, x\^{}2)"} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Defaults for \texttt{coordinates}: \texttt{["t","x","y","z"]} truncated to \texttt{dimension}.
+
+\textbf{Example (Minkowski 1+1D):}
+
+\begin{lstlisting}[style=json]
+{
+  "spacetime": {
+    "dimension": 2,
+    "signature": [-1, 1],
+    "coordinates": ["t", "x"]
+  }
+}
+\end{lstlisting}
+
+\textbf{Example (conformal flat):}
+
+\begin{lstlisting}[style=json]
+{
+  "spacetime": {
+    "dimension": 3,
+    "coordinates": ["t", "x", "y"],
+    "metric_type": "conformal_flat",
+    "conformal_factor": "exp(H*t)"
+  }
+}
+\end{lstlisting}
+
+\textbf{Example (polar):}
+
+\begin{lstlisting}[style=json]
+{
+  "spacetime": {
+    "dimension": 3,
+    "coordinates": ["t", "x", "y"],
+    "metric_type": "polar",
+    "metric_components": "diag(-1, 1, x^2)"
+  }
+}
+\end{lstlisting}
+
+
+\subsection{Fields}
+\label{sec:json-fields}
+
+Array of field components. Order determines the state layout.
+
+\begin{table}[htbp]
+\centering
+\caption{Field entry fields.}
+\label{tab:json-fields}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Key & Type & Required & Description \\
+\midrule
+\texttt{name}         & string  & \textbf{Yes} & Unique field name (see naming conventions) \\
+\texttt{index}        & integer & \textbf{Yes} & Numeric index (0, 1, 2, \ldots) \\
+\texttt{is\_dynamical} & boolean & \textbf{Yes} & Whether the field evolves in time (always \texttt{true}) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Field Naming Conventions}
+\label{sec:json-field-naming}
+
+\begin{table}[htbp]
+\centering
+\caption{Field naming patterns.}
+\label{tab:json-field-naming}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Format & Pattern & Examples \\
+\midrule
+Standard & \texttt{Base\_Index}           & \texttt{A\_0}, \texttt{phi\_1}, \texttt{u\_2} \\
+Tensor   & \texttt{Base\_Component\_Index} & \texttt{stress\_xy\_0}, \texttt{u\_x\_1} \\
+Compact  & \texttt{BaseIndex}            & \texttt{phi0}, \texttt{A1}, \texttt{psi2} \\
+Simple   & \texttt{Base}                 & \texttt{phi}, \texttt{psi}, \texttt{rho} (index defaults to 0) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Validation:} All names must be unique. Index values must be sequential starting from 0.
+
+\textbf{Example:}
+
+\begin{lstlisting}[style=json]
+{
+  "fields": [
+    { "name": "A_0", "index": 0, "is_dynamical": true },
+    { "name": "A_1", "index": 1, "is_dynamical": true },
+    { "name": "A_2", "index": 2, "is_dynamical": true }
+  ]
+}
+\end{lstlisting}
+
+
+\subsection{Equations}
+\label{sec:json-equations}
+
+Array of equations of motion, one per field. Length must equal the number of fields.
+
+\begin{table}[htbp]
+\centering
+\caption{Equation entry fields.}
+\label{tab:json-equations}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Key & Type & Required & Description \\
+\midrule
+\texttt{field}             & string & \textbf{Yes} & Field name this equation governs (must match a \texttt{fields[].name}) \\
+\texttt{lhs}               & object & \textbf{Yes} & Left-hand side structure \\
+\texttt{rhs}               & object & \textbf{Yes} & Right-hand side (operator terms) \\
+\texttt{constraint\_solver} & object & No       & Elliptic constraint config (only when \texttt{lhs.order.time == 0}) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{LHS Structure}
+\label{sec:json-lhs}
+
+Specifies what time derivative appears on the left-hand side.
+
+\begin{table}[htbp]
+\centering
+\caption{LHS fields.}
+\label{tab:json-lhs}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Key & Type & Required & Default & Description \\
+\midrule
+\texttt{expression}  & string  & \textbf{Yes} & --- & Human-readable LHS, e.g.\ \texttt{"d2\_t(phi\_0)"}. Informational only. \\
+\texttt{order.time}  & integer & \textbf{Yes} & 2   & Time derivative order \\
+\texttt{order.space} & integer & No       & 0   & Space derivative order on LHS (typically 0) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{PDE type is determined by \texttt{order.time}:}
+
+\begin{table}[htbp]
+\centering
+\caption{PDE classification by time derivative order.}
+\label{tab:json-pde-type}
+\begin{tabular}{@{}lll@{}}
+\toprule
+\texttt{order.time} & PDE Type & Example \\
+\midrule
+0 & Elliptic (constraint) & Poisson: $\lapl \phi = \rho$ \\
+1 & Parabolic             & Heat: $\ddt \phi = \lapl \phi$ \\
+2 & Hyperbolic (wave)     & Wave: $\ddt^2 \phi = \lapl \phi - m^2 \phi$ \\
+3+ & Higher-order         & Supported but uncommon \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Examples:}
+
+\begin{lstlisting}[style=json]
+{"lhs": {"expression": "d2_t(phi_0)", "order": {"time": 2, "space": 0}}}
+{"lhs": {"expression": "A_0",         "order": {"time": 0, "space": 0}}}
+\end{lstlisting}
+
+\subsubsection{RHS Structure}
+\label{sec:json-rhs}
+
+The right-hand side is always a linear combination of operator terms.
+
+\begin{table}[htbp]
+\centering
+\caption{RHS fields.}
+\label{tab:json-rhs}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Key & Type & Required & Description \\
+\midrule
+\texttt{type}  & string & \textbf{Yes} & Must be \texttt{"linear\_combination"} \\
+\texttt{terms} & array  & \textbf{Yes} & List of operator terms (can be empty for trivial equations) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Operator Terms}
+\label{sec:json-operator-terms}
+
+Each term represents $\text{coefficient} \times \text{operator}(\text{field})$.
+
+\begin{table}[htbp]
+\centering
+\caption{Operator term fields.}
+\label{tab:json-operator-terms}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Key & Type & Required & Default & Description \\
+\midrule
+\texttt{coefficient}          & float         & \textbf{Yes} & ---     & Numeric coefficient \\
+\texttt{operator}             & string        & \textbf{Yes} & ---     & Differential operator name \\
+\texttt{field}                & string        & \textbf{Yes} & ---     & Target field or momentum reference \\
+\texttt{coefficient\_symbolic} & string        & No       & \texttt{null} & Symbolic expression (Mathematica InputForm) \\
+\texttt{time\_dependent}       & boolean       & No       & \texttt{false} & Whether coefficient depends on time \\
+\texttt{coordinate\_dependent} & array[string] & No       & \texttt{[]} & Coordinate names the coefficient depends on \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Example (constant coefficient):}
+
+\begin{lstlisting}[style=json]
+{ "coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0" }
+\end{lstlisting}
+
+\textbf{Example (parametric --- resolved from user-supplied parameters):}
+
+\begin{lstlisting}[style=json]
+{
+  "coefficient": -1.0,
+  "operator": "identity",
+  "field": "phi_0",
+  "coefficient_symbolic": "-m2"
+}
+\end{lstlisting}
+
+\textbf{Example (time-dependent --- de Sitter mass term):}
+
+\begin{lstlisting}[style=json]
+{
+  "coefficient": 1.0,
+  "operator": "identity",
+  "field": "dSphi_0",
+  "coefficient_symbolic": "-(dSm2*E^(2*dSH*t[]))",
+  "time_dependent": true,
+  "coordinate_dependent": ["t"]
+}
+\end{lstlisting}
+
+\textbf{Example (position-dependent --- $1/r$ in polar coordinates):}
+
+\begin{lstlisting}[style=json]
+{
+  "coefficient": 1.0,
+  "operator": "gradient_x",
+  "field": "polphi_0",
+  "coefficient_symbolic": "x[]^(-1)",
+  "coordinate_dependent": ["x"]
+}
+\end{lstlisting}
+
+\textbf{Example (cross-field reference):}
+
+\begin{lstlisting}[style=json]
+{ "coefficient": -0.5, "operator": "identity", "field": "chi_0" }
+\end{lstlisting}
+
+This term appears in the \texttt{phi\_0} equation but acts on \texttt{chi\_0}.
+
+\textbf{Example (momentum reference --- mixed time-space derivative):}
+
+\begin{lstlisting}[style=json]
+{ "coefficient": -1.0, "operator": "gradient_x", "field": "pi_1" }
+\end{lstlisting}
+
+\texttt{pi\_1} references the time derivative (momentum) of the field at index~1. This encodes $\ddx(\ddt A_1)$.
+
+
+\subsection{Operator Reference}
+\label{sec:json-operators}
+
+\subsubsection{Static Operators}
+\label{sec:json-static-operators}
+
+\begin{table}[htbp]
+\centering
+\caption{Static differential operators.}
+\label{tab:json-static-operators}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Operator & Min Grid Dim & Description & Math \\
+\midrule
+\texttt{identity}            & 1 & Field itself (mass/coupling)    & $f$ \\
+\texttt{laplacian}           & 1 & Full spatial Laplacian          & $\lapl f$ \\
+\texttt{laplacian\_x}         & 1 & Second derivative in $x$        & $\partial^2 f / \partial x^2$ \\
+\texttt{laplacian\_y}         & 2 & Second derivative in $y$        & $\partial^2 f / \partial y^2$ \\
+\texttt{laplacian\_z}         & 3 & Second derivative in $z$        & $\partial^2 f / \partial z^2$ \\
+\texttt{gradient\_x}          & 1 & First derivative in $x$         & $\partial f / \partial x$ \\
+\texttt{gradient\_y}          & 2 & First derivative in $y$         & $\partial f / \partial y$ \\
+\texttt{gradient\_z}          & 3 & First derivative in $z$         & $\partial f / \partial z$ \\
+\texttt{cross\_derivative\_xy} & 2 & Mixed partial in $x$ and $y$    & $\partial^2 f / \partial x\, \partial y$ \\
+\texttt{cross\_derivative\_xz} & 3 & Mixed partial in $x$ and $z$    & $\partial^2 f / \partial x\, \partial z$ \\
+\texttt{cross\_derivative\_yz} & 3 & Mixed partial in $y$ and $z$    & $\partial^2 f / \partial y\, \partial z$ \\
+\texttt{first\_derivative\_t}  & 1 & First time derivative           & $\partial f / \partial t$ \\
+\texttt{biharmonic}          & 1 & Fourth-order Laplacian          & $\nabla^4 f$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Generic Operators (Pattern-Matched)}
+\label{sec:json-generic-operators}
+
+\begin{table}[htbp]
+\centering
+\caption{Generic pattern-matched operators.}
+\label{tab:json-generic-operators}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Pattern & Example & Description \\
+\midrule
+\texttt{derivative\_N\_x}   & \texttt{derivative\_3\_x}   & $N$th derivative along $x$: $\partial^3 f / \partial x^3$ \\
+\texttt{derivative\_N\_y}   & \texttt{derivative\_5\_y}   & $N$th derivative along $y$: $\partial^5 f / \partial y^5$ \\
+\texttt{derivative\_N\_z}   & \texttt{derivative\_4\_z}   & $N$th derivative along $z$: $\partial^4 f / \partial z^4$ \\
+\texttt{derivative\_Nx\_My} & \texttt{derivative\_2x\_1y} & Mixed: $\partial^3 f / \partial x^2\, \partial y$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Special: \texttt{first\_derivative\_t}}
+\label{sec:json-first-derivative-t}
+
+Used for Hubble friction in curved spacetime. Represents the first time derivative of a field. Unlike spatial operators, it accesses the momentum variable directly from the state vector.
+
+\subsubsection{Field References}
+\label{sec:json-field-references}
+
+A term's \texttt{field} value can be:
+\begin{itemize}
+  \item \textbf{A field name} from the \texttt{fields} list (e.g., \texttt{"phi\_0"}, \texttt{"A\_1"}, \texttt{"chi\_0"})
+  \item \textbf{A momentum reference} \texttt{"pi\_N"} where $N$ is the field index (0-based). This accesses $\ddt(\text{field}_N)$. Used for mixed time-space derivatives, e.g., \texttt{gradient\_x(pi\_1)} = $\ddx(\ddt A_1)$.
+\end{itemize}
+
+\textbf{Validation:} Momentum index $N$ must satisfy $0 \leq N < n_\text{components}$.
+
+
+\subsection{Coefficient Types}
+\label{sec:json-coefficient-types}
+
+\subsubsection{Constant}
+\label{sec:json-coeff-constant}
+
+No symbolic expression. The numeric \texttt{coefficient} value is used directly.
+
+\begin{lstlisting}[style=json]
+{ "coefficient": 1.0, "operator": "laplacian_x", "field": "phi_0" }
+\end{lstlisting}
+
+\subsubsection{Parametric}
+\label{sec:json-coeff-parametric}
+
+A \texttt{coefficient\_symbolic} that is a simple parameter name (or its negation). Resolved at runtime from the \texttt{parameters} dict passed via \texttt{--param} or \texttt{CoefficientEvaluator}.
+
+\begin{lstlisting}[style=json]
+{
+  "coefficient": -1.0,
+  "operator": "identity",
+  "field": "phi_0",
+  "coefficient_symbolic": "-polm2"
+}
+\end{lstlisting}
+
+At runtime: \texttt{--param polm2=0.5} (CLI) or \texttt{CoefficientEvaluator.resolve()} resolves this to $+0.5$.
+
+Convention: a leading \texttt{-} in the symbolic name means the parameter value is negated. So \texttt{"-polm2"} with \texttt{polm2=0.5} gives \texttt{coefficient = +0.5}.
+
+\subsubsection{Time-Dependent}
+\label{sec:json-coeff-time-dependent}
+
+Coefficient varies with time. Requires both \texttt{time\_dependent: true} and \texttt{coordinate\_dependent: ["t"]}.
+
+\begin{lstlisting}[style=json]
+{
+  "coefficient": 1.0,
+  "operator": "identity",
+  "field": "dSphi_0",
+  "coefficient_symbolic": "-(dSm2*E^(2*dSH*t[]))",
+  "time_dependent": true,
+  "coordinate_dependent": ["t"]
+}
+\end{lstlisting}
+
+The expression is evaluated at each timestep using Python's \texttt{eval()} with math functions and parameter values injected.
+
+\subsubsection{Position-Dependent}
+\label{sec:json-coeff-position-dependent}
+
+Coefficient varies with spatial coordinates. Listed in \texttt{coordinate\_dependent}.
+
+\begin{lstlisting}[style=json]
+{
+  "coefficient": 1.0,
+  "operator": "laplacian_y",
+  "field": "polphi_0",
+  "coefficient_symbolic": "x[]^(-2)",
+  "coordinate_dependent": ["x"]
+}
+\end{lstlisting}
+
+Produces an ndarray matching the grid shape. The \texttt{x[]} is Mathematica's xCoba notation for the coordinate function --- converted to plain \texttt{x} at runtime.
+
+\subsubsection{Mixed (Time + Position)}
+\label{sec:json-coeff-mixed}
+
+Both time and spatial dependence. Set \texttt{time\_dependent: true} and list all coordinates in \texttt{coordinate\_dependent}.
+
+\begin{lstlisting}[style=json]
+{
+  "coefficient_symbolic": "exp(2*H*t[])*x[]^(-2)",
+  "time_dependent": true,
+  "coordinate_dependent": ["t", "x"]
+}
+\end{lstlisting}
+
+\subsubsection{Mathematica-to-Python Conversion}
+\label{sec:json-mma-python}
+
+Symbolic expressions are stored in Mathematica InputForm. Automatic conversion handles:
+
+\begin{table}[htbp]
+\centering
+\caption{Mathematica to Python expression conversion.}
+\label{tab:json-mma-python}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Mathematica & Python & Notes \\
+\midrule
+\texttt{E\^{}(...)}                       & \texttt{exp(...)}                      & Euler's number \\
+\texttt{Power[x,y]}                    & \texttt{(x)**(y)}                      & Function form \\
+\texttt{\^{}}                             & \texttt{**}                            & Infix form \\
+\texttt{Sin[x]}, \texttt{Cos[x]}, \texttt{Tan[x]}    & \texttt{sin(x)}, \texttt{cos(x)}, \texttt{tan(x)}    & \\
+\texttt{Cot[x]}, \texttt{Sec[x]}, \texttt{Csc[x]}    & \texttt{cot(x)}, \texttt{sec(x)}, \texttt{csc(x)}    & scipy.special \\
+\texttt{ArcSin[x]}, \texttt{ArcCos[x]}        & \texttt{arcsin(x)}, \texttt{arccos(x)}        & \\
+\texttt{ArcTan[x, y]}                  & \texttt{arctan2(y, x)}                 & Argument order swapped! \\
+\texttt{Sinh[x]}, \texttt{Cosh[x]}, \texttt{Tanh[x]} & \texttt{sinh(x)}, \texttt{cosh(x)}, \texttt{tanh(x)} & \\
+\texttt{Log[x]}, \texttt{Sqrt[x]}, \texttt{Abs[x]}   & \texttt{log(x)}, \texttt{sqrt(x)}, \texttt{abs(x)}   & \\
+\texttt{Erf[x]}                        & \texttt{erf(x)}                        & scipy.special \\
+\texttt{BesselJ[n,x]}, \texttt{BesselY[n,x]}  & \texttt{jv(n,x)}, \texttt{yv(n,x)}            & scipy.special \\
+\texttt{t[]}, \texttt{x[]}, \texttt{y[]}             & \texttt{t}, \texttt{x}, \texttt{y}                   & xCoba coordinate symbols \\
+\texttt{[}, \texttt{]}                        & \texttt{(}, \texttt{)}                        & Bracket conversion \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+\subsection{Coupling}
+\label{sec:json-coupling}
+
+Mass and coupling matrices extracted from \texttt{identity} operator terms. Only symbolic matrices are stored in JSON; numeric values are auto-computed at load time from symbolic expressions and metadata parameters.
+
+\begin{table}[htbp]
+\centering
+\caption{Coupling section fields.}
+\label{tab:json-coupling}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Key & Type & Required & Description \\
+\midrule
+\texttt{mass\_matrix\_symbolic}     & array[array[string$|$null]] & \textbf{Yes} & $n \times n$ symbolic mass matrix entries \\
+\texttt{coupling\_matrix\_symbolic} & array[array[string$|$null]] & \textbf{Yes} & $n \times n$ symbolic coupling matrix entries \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Note:} Prior to the Numeric Matrix Cleanup, JSON also contained numeric \texttt{mass\_matrix} and \texttt{coupling\_matrix} arrays. These have been removed --- numeric values are now computed by \texttt{EquationSystem.from\_dict()} using symbolic expressions resolved against \texttt{metadata.parameters}.
+
+\paragraph{Convention.}
+\label{par:json-coupling-convention}
+
+\begin{equation}
+  \texttt{matrix[i][j]} = -(\text{coefficient of identity}(\text{field}_j) \text{ in equation}_i)
+  \label{eq:matrix-convention}
+\end{equation}
+
+This makes mass-squared positive for the standard Lagrangian sign convention: $\ddt^2 \phi = \ldots - m^2 \phi$ produces $\texttt{mass\_matrix[i][i]} = m^2$.
+
+\begin{itemize}
+  \item Diagonal entries ($i = j$) go in \texttt{mass\_matrix\_symbolic}
+  \item Off-diagonal entries ($i \neq j$) go in \texttt{coupling\_matrix\_symbolic}
+  \item Null entries indicate zero coupling
+\end{itemize}
+
+\paragraph{Auto-Computation.}
+\label{par:json-coupling-auto}
+
+\texttt{EquationSystem.from\_dict()} always recomputes numeric matrices from the equation terms via \texttt{\_compute\_matrices\_from\_terms}. The \texttt{\_resolve\_symbolic\_coeff} helper resolves symbolic expressions (e.g., \texttt{"-m2"}) against the \texttt{metadata.parameters} dict to produce correct numeric values.
+
+\textbf{Example (coupled scalars):}
+
+Given \texttt{phi\_0} equation has term \texttt{\{"coefficient": -1.0, "operator": "identity", "field": "phi\_0", "coefficient\_symbolic": "-m2"\}} and \texttt{\{"coefficient": -0.5, "operator": "identity", "field": "chi\_0", "coefficient\_symbolic": "-g"\}}:
+
+\begin{lstlisting}[style=json]
+{
+  "coupling": {
+    "mass_matrix_symbolic": [
+      ["-m2", null],
+      [null, "-mchi2"]
+    ],
+    "coupling_matrix_symbolic": [
+      [null, "-g"],
+      ["-g", null]
+    ]
+  }
+}
+\end{lstlisting}
+
+
+\subsection{Constraint Solver}
+\label{sec:json-constraint-solver}
+
+Per-equation configuration for elliptic constraint solving. Supports Poisson, Helmholtz, algebraic, anisotropic, and coupled multi-field constraints.
+
+\textbf{Valid only when \texttt{lhs.order.time == 0}.} Raises \texttt{ValueError} otherwise.
+
+\begin{table}[htbp]
+\centering
+\caption{Constraint solver fields.}
+\label{tab:json-constraint-solver}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Key & Type & Default & Description \\
+\midrule
+\texttt{enabled}             & boolean & \texttt{false}  & Whether to solve at each timestep \\
+\texttt{method}              & string  & \texttt{"auto"} & Solver method: \texttt{"auto"}, \texttt{"poisson"}, \texttt{"fft"}, \texttt{"sparse"} \\
+\texttt{max\_iterations}      & integer & 100    & Max iterations for iterative solvers (Gauss--Seidel) \\
+\texttt{tolerance}           & float   & $10^{-10}$ & Convergence tolerance for iterative solvers \\
+\texttt{boundary\_conditions} & object  & \texttt{\{\}} & Per-axis BCs keyed by coordinate name \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Method Selection}
+\label{sec:json-constraint-method}
+
+\begin{table}[htbp]
+\centering
+\caption{Constraint solver method selection.}
+\label{tab:json-constraint-method}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Method & When Used & Description \\
+\midrule
+\texttt{"auto"}    & Default          & FFT for periodic grids, sparse matrix for non-periodic \\
+\texttt{"fft"}     & Periodic BCs     & Fast spectral solve; supports coupled block solve via SVD \\
+\texttt{"sparse"}  & Non-periodic BCs & Sparse matrix assembly + direct solve \\
+\texttt{"poisson"} & Legacy alias     & Equivalent to \texttt{"auto"} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Coupled constraints:} When multiple constraint equations reference each other's fields (e.g., coupled Proca $A_0$/$B_0$), the solver automatically detects coupling and solves them simultaneously via block matrix (FFT) or Gauss--Seidel iteration (sparse).
+
+\subsubsection{Boundary Condition Values}
+\label{sec:json-constraint-bcs}
+
+\begin{table}[htbp]
+\centering
+\caption{Boundary condition types.}
+\label{tab:json-constraint-bcs}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Key & Type & Description \\
+\midrule
+\texttt{type}       & string & \texttt{"periodic"}, \texttt{"dirichlet"}, or \texttt{"neumann"} \\
+\texttt{value}      & float  & Fixed value (Dirichlet only) \\
+\texttt{derivative} & float  & Fixed normal derivative (Neumann only) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Example (Helmholtz with Dirichlet BCs):}
+
+\begin{lstlisting}[style=json]
+{
+  "constraint_solver": {
+    "enabled": true,
+    "method": "auto",
+    "max_iterations": 30,
+    "tolerance": 1e-10,
+    "boundary_conditions": {
+      "x": { "type": "dirichlet", "value": 0.0 },
+      "y": { "type": "dirichlet", "value": 0.0 }
+    }
+  }
+}
+\end{lstlisting}
+
+\textbf{Example (Poisson with periodic BCs):}
+
+\begin{lstlisting}[style=json]
+{
+  "constraint_solver": {
+    "enabled": true,
+    "method": "auto",
+    "boundary_conditions": {
+      "x": { "type": "periodic" },
+      "y": { "type": "periodic" }
+    }
+  }
+}
+\end{lstlisting}
+
+
+\subsection{Validation Rules}
+\label{sec:json-validation}
+
+These checks run automatically when loading JSON via \texttt{load\_equation\_system()}.
+
+\subsubsection{Schema Validation (\texttt{validate\_json\_schema})}
+\label{sec:json-validation-schema}
+
+\begin{enumerate}
+  \item Top-level keys \texttt{spacetime}, \texttt{fields}, \texttt{equations} must be present
+  \item \texttt{spacetime.dimension} must be an integer
+  \item \texttt{fields} must be non-empty; each entry must have a \texttt{name} key
+  \item \texttt{equations} must be non-empty; each entry must have \texttt{field} and \texttt{rhs} keys
+\end{enumerate}
+
+\subsubsection{Construction Validation (\texttt{EquationSystem.from\_dict})}
+\label{sec:json-validation-construction}
+
+\begin{enumerate}
+  \setcounter{enumi}{4}
+  \item All field names must be unique
+  \item Each equation's \texttt{field} must match a name in the \texttt{fields} list
+  \item \texttt{rhs.type} must be \texttt{"linear\_combination"}
+\end{enumerate}
+
+\subsubsection{Operator Validation (\texttt{OperatorTerm.from\_dict})}
+\label{sec:json-validation-operator}
+
+\begin{enumerate}
+  \setcounter{enumi}{7}
+  \item Each \texttt{operator} must be a static operator OR match a generic pattern (\texttt{derivative\_N\_x}, \texttt{derivative\_Nx\_My})
+  \item Each term must have \texttt{coefficient}, \texttt{operator}, and \texttt{field} keys
+\end{enumerate}
+
+\subsubsection{Field Reference Validation (\texttt{\_validate\_field\_references})}
+\label{sec:json-validation-field-ref}
+
+\begin{enumerate}
+  \setcounter{enumi}{9}
+  \item Regular field references must match a name in the \texttt{fields} list
+  \item Momentum references (\texttt{pi\_N}) must have a valid numeric index: $0 \leq N < n_\text{components}$
+\end{enumerate}
+
+\subsubsection{Constraint Validation (\texttt{ComponentEquation.\_\_post\_init\_\_})}
+\label{sec:json-validation-constraint}
+
+\begin{enumerate}
+  \setcounter{enumi}{11}
+  \item \texttt{constraint\_solver.enabled: true} is only valid when \texttt{lhs.order.time == 0}
+\end{enumerate}
+
+\subsubsection{Matrix Validation (\texttt{EquationSystem.\_\_post\_init\_\_})}
+\label{sec:json-validation-matrix}
+
+\begin{enumerate}
+  \setcounter{enumi}{12}
+  \item \texttt{mass\_matrix} and \texttt{coupling\_matrix} must be $n \times n$ (matching \texttt{n\_components})
+  \item A warning (not error) is emitted if matrices don't match auto-computed values
+\end{enumerate}
+
+
+\subsection{Complete Examples}
+\label{sec:json-examples}
+
+\subsubsection{Klein--Gordon (1+1D, Minimal)}
+\label{sec:json-example-kg}
+
+Source: \texttt{examples/data/klein\_gordon\_1d.json}
+
+\begin{lstlisting}[style=json]
+{
+  "metadata": {
+    "source": "xAct",
+    "lagrangian_expr":
+      "-1/2 CD[-a][phi[]] CD[a][phi[]] - 1/2 m2 phi[]^2",
+    "derived_from": "Euler-Lagrange",
+    "gauge": "none"
+  },
+  "spacetime": {
+    "dimension": 2,
+    "signature": [-1, 1],
+    "coordinates": ["t", "x"]
+  },
+  "fields": [
+    { "name": "phi_0", "index": 0, "is_dynamical": true }
+  ],
+  "equations": [
+    {
+      "field": "phi_0",
+      "lhs": {
+        "expression": "d2_t(phi_0)",
+        "order": { "time": 2, "space": 0 }
+      },
+      "rhs": {
+        "type": "linear_combination",
+        "terms": [
+          { "coefficient": -1.0,
+            "operator": "identity",
+            "field": "phi_0" },
+          { "coefficient": 1.0,
+            "operator": "laplacian_x",
+            "field": "phi_0" }
+        ]
+      }
+    }
+  ],
+  "coupling": {
+    "mass_matrix_symbolic": [[null]],
+    "coupling_matrix_symbolic": [[null]]
+  }
+}
+\end{lstlisting}
+
+\subsubsection{Coupled Scalars (Cross-Field Coupling)}
+\label{sec:json-example-coupled}
+
+Source: \texttt{examples/data/coupled\_scalars.json}
+
+Two scalar fields $\phi$ and $\chi$ with mutual coupling. Note how \texttt{phi\_0}'s equation includes \texttt{identity} acting on \texttt{chi\_0}:
+
+\begin{lstlisting}[style=json]
+{
+  "fields": [
+    { "name": "phi_0", "index": 0, "is_dynamical": true },
+    { "name": "chi_0", "index": 1, "is_dynamical": true }
+  ],
+  "equations": [
+    {
+      "field": "phi_0",
+      "lhs": {
+        "expression": "d2_t(phi_0)",
+        "order": { "time": 2 }
+      },
+      "rhs": {
+        "type": "linear_combination",
+        "terms": [
+          { "coefficient": -1.0,
+            "operator": "identity",
+            "field": "phi_0" },
+          { "coefficient": -0.5,
+            "operator": "identity",
+            "field": "chi_0" },
+          { "coefficient": 1.0,
+            "operator": "laplacian_x",
+            "field": "phi_0" }
+        ]
+      }
+    },
+    {
+      "field": "chi_0",
+      "lhs": {
+        "expression": "d2_t(chi_0)",
+        "order": { "time": 2 }
+      },
+      "rhs": {
+        "type": "linear_combination",
+        "terms": [
+          { "coefficient": -4.0,
+            "operator": "identity",
+            "field": "chi_0" },
+          { "coefficient": -0.5,
+            "operator": "identity",
+            "field": "phi_0" },
+          { "coefficient": 1.0,
+            "operator": "laplacian_x",
+            "field": "chi_0" }
+        ]
+      }
+    }
+  ],
+  "coupling": {
+    "mass_matrix_symbolic": [
+      ["-m2", null],
+      [null, "-mchi2"]
+    ],
+    "coupling_matrix_symbolic": [
+      [null, "-g"],
+      ["-g", null]
+    ]
+  }
+}
+\end{lstlisting}
+
+\subsubsection{Polar KG (Position-Dependent Coefficients)}
+\label{sec:json-example-polar}
+
+Source: \texttt{examples/data/polar\_kg.json}
+
+Christoffel corrections produce $1/r$ gradient and $1/r^2$ angular Laplacian:
+
+\begin{lstlisting}[style=json]
+{
+  "spacetime": {
+    "dimension": 3,
+    "coordinates": ["t", "x", "y"],
+    "metric_type": "polar",
+    "metric_components": "diag(-1, 1, x^2)"
+  },
+  "equations": [
+    {
+      "field": "polphi_0",
+      "lhs": {
+        "expression": "d2_t(polphi_0)",
+        "order": { "time": 2 }
+      },
+      "rhs": {
+        "type": "linear_combination",
+        "terms": [
+          {
+            "coefficient": -1.0,
+            "operator": "identity",
+            "field": "polphi_0",
+            "coefficient_symbolic": "-polm2"
+          },
+          {
+            "coefficient": 1.0,
+            "operator": "gradient_x",
+            "field": "polphi_0",
+            "coefficient_symbolic": "x[]^(-1)",
+            "coordinate_dependent": ["x"]
+          },
+          {
+            "coefficient": 1.0,
+            "operator": "laplacian_x",
+            "field": "polphi_0"
+          },
+          {
+            "coefficient": 1.0,
+            "operator": "laplacian_y",
+            "field": "polphi_0",
+            "coefficient_symbolic": "x[]^(-2)",
+            "coordinate_dependent": ["x"]
+          }
+        ]
+      }
+    }
+  ]
+}
+\end{lstlisting}
+
+\subsubsection{De Sitter KG (Time-Dependent Coefficients)}
+\label{sec:json-example-desitter}
+
+Source: \texttt{examples/data/de\_sitter\_kg.json}
+
+Hubble friction and exponentially growing mass from conformal factor:
+
+\begin{lstlisting}[style=json]
+{
+  "spacetime": {
+    "dimension": 3,
+    "coordinates": ["t", "x", "y"],
+    "metric_type": "conformal_flat",
+    "conformal_factor": "exp(H*t)"
+  },
+  "equations": [
+    {
+      "field": "dSphi_0",
+      "lhs": {
+        "expression": "d2_t(dSphi_0)",
+        "order": { "time": 2 }
+      },
+      "rhs": {
+        "type": "linear_combination",
+        "terms": [
+          {
+            "coefficient": 1.0,
+            "operator": "identity",
+            "field": "dSphi_0",
+            "coefficient_symbolic":
+              "-(dSm2*E^(2*dSH*t[]))",
+            "time_dependent": true,
+            "coordinate_dependent": ["t"]
+          },
+          {
+            "coefficient": -1.0,
+            "operator": "first_derivative_t",
+            "field": "dSphi_0",
+            "coefficient_symbolic": "-dSH"
+          },
+          { "coefficient": 1.0,
+            "operator": "laplacian_x",
+            "field": "dSphi_0" },
+          { "coefficient": 1.0,
+            "operator": "laplacian_y",
+            "field": "dSphi_0" }
+        ]
+      }
+    }
+  ]
+}
+\end{lstlisting}
+
+\subsubsection{Chern--Simons (Constraint + Momentum References)}
+\label{sec:json-example-cs}
+
+Source: \texttt{examples/data/chern\_simons\_3d.json}
+
+$A_0$ is a constraint (\texttt{time\_order=0}), $A_1$ and $A_2$ are second-order. Uses \texttt{pi\_0}, \texttt{pi\_1}, \texttt{pi\_2} momentum references and \texttt{first\_derivative\_t}:
+
+\begin{lstlisting}[style=json]
+{
+  "fields": [
+    { "name": "A_0", "index": 0, "is_dynamical": true },
+    { "name": "A_1", "index": 1, "is_dynamical": true },
+    { "name": "A_2", "index": 2, "is_dynamical": true }
+  ],
+  "equations": [
+    {
+      "field": "A_0",
+      "lhs": {
+        "expression": "A_0",
+        "order": { "time": 0, "space": 0 }
+      },
+      "rhs": {
+        "type": "linear_combination",
+        "terms": [
+          { "coefficient": 0.5,
+            "operator": "gradient_x",
+            "field": "A_2" },
+          { "coefficient": -0.5,
+            "operator": "gradient_y",
+            "field": "A_1" },
+          { "coefficient": 1.0,
+            "operator": "laplacian_x",
+            "field": "A_0" },
+          { "coefficient": 1.0,
+            "operator": "laplacian_y",
+            "field": "A_0" },
+          { "coefficient": -1.0,
+            "operator": "gradient_x",
+            "field": "pi_1" },
+          { "coefficient": -1.0,
+            "operator": "gradient_y",
+            "field": "pi_2" }
+        ]
+      }
+    },
+    {
+      "field": "A_1",
+      "lhs": {
+        "expression": "d2_t(A_1)",
+        "order": { "time": 2, "space": 0 }
+      },
+      "rhs": {
+        "type": "linear_combination",
+        "terms": [
+          { "coefficient": 0.5,
+            "operator": "first_derivative_t",
+            "field": "A_2" },
+          { "coefficient": -1.0,
+            "operator": "gradient_x",
+            "field": "pi_0" },
+          { "coefficient": -0.5,
+            "operator": "gradient_y",
+            "field": "A_0" },
+          { "coefficient": 1.0,
+            "operator": "laplacian_y",
+            "field": "A_1" },
+          { "coefficient": -1.0,
+            "operator": "cross_derivative_xy",
+            "field": "A_2" }
+        ]
+      }
+    }
+  ]
+}
+\end{lstlisting}
+
+\subsubsection{Electrostatics (Constraint Solver)}
+\label{sec:json-example-electrostatics}
+
+Example: constraint solver Poisson equation (inline test fixture in \texttt{tests/conftest.py}).
+
+Poisson equation solved as a constraint at each timestep:
+
+\begin{lstlisting}[style=json]
+{
+  "equations": [
+    {
+      "field": "phi",
+      "lhs": {
+        "expression": "phi",
+        "order": { "time": 0, "space": 0 }
+      },
+      "rhs": {
+        "type": "linear_combination",
+        "terms": [
+          { "coefficient": 1.0,
+            "operator": "laplacian",
+            "field": "phi" },
+          { "coefficient": 1.0,
+            "operator": "identity",
+            "field": "rho" }
+        ]
+      },
+      "constraint_solver": {
+        "enabled": true,
+        "method": "poisson",
+        "boundary_conditions": {
+          "x": { "type": "dirichlet", "value": 0.0 },
+          "y": { "type": "dirichlet", "value": 0.0 }
+        }
+      }
+    }
+  ]
+}
+\end{lstlisting}
+
+
+\subsection{Python API}
+\label{sec:json-python-api}
+
+\subsubsection{Loading and Simulating}
+\label{sec:json-loading}
+
+\begin{lstlisting}[style=python]
+from tidal.symbolic.json_loader import load_equation_system
+
+# Load spec (validates JSON)
+spec = load_equation_system("examples/data/polar_kg.json")
+
+# Runtime parameters are passed via CLI (--param polm2=0.5)
+# or programmatically to CoefficientEvaluator during simulation
+\end{lstlisting}
+
+\subsubsection{Key \texttt{EquationSystem} Properties}
+\label{sec:json-equation-system}
+
+\begin{table}[htbp]
+\centering
+\caption{\texttt{EquationSystem} properties.}
+\label{tab:json-equation-system}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Property & Type & Description \\
+\midrule
+\texttt{n\_components}          & \texttt{int}                          & Number of field components \\
+\texttt{dimension}             & \texttt{int}                          & Spacetime dimension \\
+\texttt{spatial\_dimension}     & \texttt{int}                          & \texttt{dimension - 1} \\
+\texttt{component\_names}       & \texttt{tuple[str, ...]}              & Field names in order \\
+\texttt{time\_orders}           & \texttt{tuple[int, ...]}              & Per-component time derivative order \\
+\texttt{state\_size}            & \texttt{int}                          & Total state variables (2nd-order: 2, others: 1) \\
+\texttt{state\_layout}          & \texttt{tuple[tuple[str,str], ...]}   & \texttt{(name, "field"/"momentum")} pairs \\
+\texttt{effective\_coordinates} & \texttt{tuple[str, ...]}              & Coordinate names (inferred if not set) \\
+\texttt{spatial\_coordinates}   & \texttt{tuple[str, ...]}              & Non-time coordinates \\
+\texttt{mass\_matrix}           & \texttt{tuple[tuple[float,...],...]}   & Auto-computed mass matrix \\
+\texttt{coupling\_matrix}       & \texttt{tuple[tuple[float,...],...]}   & Auto-computed coupling matrix \\
+\texttt{mass\_matrix\_symbolic}  & \texttt{tuple[tuple[str|None,...],...]}&Symbolic mass entries \\
+\bottomrule
+\end{tabular}
+\end{table}

@@ -1,0 +1,499 @@
+% CLI Reference: Subcommands, Options, TOML Configuration, and Common Workflows
+% Source: docs/source/cli.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{CLI Reference}
+\label{sec:cli-reference}
+
+TIDAL provides the \texttt{tidal} command-line tool with nine subcommands for the full derive-to-measure workflow.
+\textbf{Zero additional dependencies} --- uses only \texttt{argparse} and \texttt{tomllib} from the Python standard library.
+
+\subsection{Installation}
+
+\begin{lstlisting}[style=bash]
+# Install with uv (recommended)
+uv sync --all-extras
+
+# Or via pip
+pip install -e ".[dev]"
+
+# Verify
+tidal --version
+\end{lstlisting}
+
+\subsection{Subcommands}
+
+\subsubsection{\texttt{tidal derive} --- Derive equations from a Lagrangian}
+
+Generates a Wolfram Language script (\texttt{.wls}) from a TOML configuration file and optionally runs it with \texttt{wolframscript}.
+
+\begin{lstlisting}[style=bash]
+# Generate .wls only
+tidal derive examples/scalar_field/theory.toml
+
+# Generate .wls and run wolframscript via the generated run.sh
+bash examples/scalar_field/run.sh
+\end{lstlisting}
+
+\subsubsection{\texttt{tidal simulate} --- Run a PDE simulation}
+
+Loads a JSON equation specification and runs a numerical simulation with configurable parameters.
+
+\begin{lstlisting}[style=bash]
+# Basic simulation with defaults
+tidal simulate examples/data/klein_gordon_1d.json
+
+# With parameter overrides and custom settings
+tidal simulate examples/data/coupled_scalars.json \
+    --param m_phi2=1.0 --param g=0.5 \
+    --t-end 20.0 --dt 0.005 \
+    --grid-shape 256 \
+    --ic gaussian --ic-width 5.0 \
+    --bc periodic \
+    --scheme scipy
+
+# Constraint-only solve (no time evolution)
+tidal simulate examples/data/chern_simons.json --mode constraint
+\end{lstlisting}
+
+\paragraph{Options}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{@{}llp{4.5cm}@{}}
+\toprule
+Flag & Default & Description \\
+\midrule
+\texttt{--param KEY=VALUE}          & (from JSON)       & Override symbolic coefficient \\
+\texttt{--t-end FLOAT}             & 10.0              & Simulation end time \\
+\texttt{--dt FLOAT}                & 0.01              & Time step \\
+\texttt{--grid-shape INT}          & 128               & Grid points per axis \\
+\texttt{--ic \{gaussian,...\}}      & gaussian          & Initial condition preset \\
+\texttt{--ic-width FLOAT}          & 5.0               & Gaussian pulse width \\
+\texttt{--ic-component FIELD}      & (first field)     & Field component for IC (multi-field systems) \\
+\texttt{--ic-center X[,Y,Z]}      & (domain center)   & Gaussian center position \\
+\texttt{--ic-amplitude FLOAT}      & 1.0               & Gaussian amplitude \\
+\texttt{--ic-wavevector K[,K,K]}   & ---               & Wavevector for travelling wave packets \\
+\texttt{--ic-formula EXPR}         & ---               & Custom IC formula (Python expression with \texttt{x}, \texttt{y}, \texttt{z}, \texttt{np}) \\
+\texttt{--ic-formula-velocity EXPR}& ---               & Velocity formula for \texttt{--ic formula} (enables travelling waves) \\
+\texttt{--ic-field FIELD:EXPR}     & ---               & Per-field IC override formula (repeatable; \texttt{FIELD:velocity:EXPR} for velocity) \\
+\texttt{--ic-file PATH}            & ---               & Load IC from \texttt{.npy} file or simulation output directory \\
+\texttt{--ic-noise-seed N}         & ---               & Random seed for reproducible \texttt{--ic noise} \\
+\texttt{--bc TYPES}                & periodic          & Boundary conditions (comma-separated per axis) \\
+\texttt{--scheme \{ida,...,auto\}}  & auto              & Solver scheme \\
+\texttt{--mode \{evolve,constraint\}}& evolve           & Simulation mode \\
+\texttt{--plot} / \texttt{--no-plot}& \texttt{--plot}   & Enable/disable plotting \\
+\texttt{--output PATH}             & ---               & Output path (directory for snapshot data; image extension for plot-only) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{\texttt{tidal inspect} --- Display equation system info}
+
+Shows a summary of a JSON equation specification without running a simulation.
+
+\begin{lstlisting}[style=bash]
+tidal inspect examples/data/chern_simons.json
+\end{lstlisting}
+
+Output includes: spacetime dimension, field names, equation count, operator types, mass/coupling matrices.
+
+\subsubsection{\texttt{tidal list} --- Discover available JSON specs}
+
+Searches for JSON specification files in \texttt{examples/data/}.
+
+\begin{lstlisting}[style=bash]
+tidal list
+\end{lstlisting}
+
+\subsubsection{\texttt{tidal validate} --- Validate a JSON specification}
+
+Checks that a JSON file conforms to the expected equation system schema.
+
+\begin{lstlisting}[style=bash]
+tidal validate examples/data/klein_gordon_1d.json
+
+# JSON output for scripting
+tidal validate examples/data/klein_gordon_1d.json --json
+\end{lstlisting}
+
+\subsubsection{\texttt{tidal measure} --- Extract physics measurements}
+
+Loads a snapshot directory produced by \texttt{tidal simulate --output <dir>} and runs measurement analyses: energy decomposition, conversion probability, mixing length, spectral analysis, and conservation diagnostics.
+
+\begin{lstlisting}[style=bash]
+# Full summary (energy + conservation + auto-detect conversion + mixing)
+tidal measure result_dir/ --spec spec.json
+
+# Specific measurements
+tidal measure result_dir/ --what conversion,mixing \
+    --source phi_0 --target chi_0
+
+# JSON output for scripting
+tidal measure result_dir/ --what energy,conservation --json
+
+# Save 2x3 measurement plot
+tidal measure result_dir/ --output measurements.png
+\end{lstlisting}
+
+The JSON spec can be auto-discovered from \texttt{metadata.json} in the snapshot directory (stored by \texttt{tidal simulate}) or provided explicitly via \texttt{--spec}.
+
+\paragraph{Options}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{@{}llp{5cm}@{}}
+\toprule
+Flag & Default & Description \\
+\midrule
+\texttt{--spec PATH}            & (auto-discovered) & JSON equation specification \\
+\texttt{--what TYPES}           & summary           & Measurement types (comma-separated) \\
+\texttt{--source FIELDS}        & (auto-detect)     & Source field(s) for conversion (comma-separated) \\
+\texttt{--target FIELDS}        & (auto-detect)     & Target field(s) for conversion (comma-separated) \\
+\texttt{--param KEY=VALUE}      & (from metadata)   & Override parameter from \texttt{metadata.json} \\
+\texttt{--energy-threshold T}   & 1e-3              & Conservation threshold \\
+\texttt{--output PATH}          & ---               & Save plot (\texttt{.png}/\texttt{.pdf}) \\
+\texttt{--json}                 & ---               & JSON output instead of text \\
+\texttt{--quiet}                & ---               & Suppress progress messages \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Available measurement types:} \texttt{summary}, \texttt{energy}, \texttt{conversion}, \texttt{mixing}, \texttt{spectrum}, \texttt{spectral\_conversion}, \texttt{dispersion}, \texttt{conservation}, \texttt{effective\_mass}, \texttt{asymptotic}, \texttt{peak\_conversion}, \texttt{velocity}, \texttt{resonance}.
+
+\subsubsection{\texttt{tidal sweep} --- Run parameter sweeps and convergence studies}
+
+Automates running \texttt{simulate} + \texttt{measure} across a parameter grid, collecting scalar metrics into a portable CSV/JSON results table.
+
+\begin{lstlisting}[style=bash]
+# 1D sweep: coupling strength
+tidal sweep examples/data/coupled_scattering.json \
+  --sweep "g0=0.1:0.9:10" \
+  --measure conversion,mixing --source phi_0 --target chi_0 \
+  --grid-shape 256 --bounds=-40:40 --periodic \
+  --ic gaussian --ic-component phi_0 --ic-center=-20 --ic-width 3 \
+  --ic-wavevector 3 \
+  --t-end 60 --output sweeps/coupling_scan
+
+# 2D sweep: coupling x mass (cartesian product)
+tidal sweep examples/data/coupled_scattering.json \
+  --sweep "g0=0.1:0.9:5" --sweep "mChi2=0.5:4.0:5" \
+  --measure conversion --source phi_0 --target chi_0 \
+  --output sweeps/mass_coupling_2d
+
+# Grid convergence study
+tidal sweep examples/data/coupled_scattering.json \
+  --converge "32,64,128,256,512" \
+  --measure conservation \
+  --output sweeps/convergence
+\end{lstlisting}
+
+\paragraph{Sweep specification syntax}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+Format & Description & Example \\
+\midrule
+\texttt{PARAM=START:STOP:N}       & $N$ linearly-spaced values & \texttt{g0=0.1:1.0:10} \\
+\texttt{PARAM=START:STOP:N:log}   & $N$ log-spaced values      & \texttt{m2=0.01:100:20:log} \\
+\texttt{PARAM=V1,V2,...}          & Explicit values            & \texttt{g0=0.1,0.5,0.9} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Multiple \texttt{--sweep} flags produce a cartesian product grid.
+
+\paragraph{Output structure}
+
+\begin{lstlisting}
+sweeps/coupling_scan/
+|- sweep.json          # Sweep definition + provenance
+|- results.csv         # Self-contained metrics table
+|- results.json        # Same data in JSON
+|- g0_0.100/           # Individual run output
+|   |- metadata.json
+|   |- times.npy
+|   |- phi_0.npy, v_phi_0.npy, ...
+|- g0_0.200/
+|   +-- ...
+\end{lstlisting}
+
+The CSV is \textbf{self-contained and portable}: every row includes all parameters (swept + fixed), simulation settings, and measured metrics so the data can be analyzed outside TIDAL.
+
+\paragraph{Options}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{@{}llp{5cm}@{}}
+\toprule
+Flag & Default & Description \\
+\midrule
+\texttt{--sweep SPEC}             & ---  & Parameter sweep specification (repeatable) \\
+\texttt{--converge SIZES}         & ---  & Grid sizes for convergence study \\
+\texttt{--config PATH}            & ---  & TOML sweep configuration file \\
+\texttt{--measure TYPES}          & summary & Measurement types (comma-separated) \\
+\texttt{--source FIELDS}          & ---  & Source field(s) for conversion measurements \\
+\texttt{--target FIELDS}          & ---  & Target field(s) for conversion measurements \\
+\texttt{--resume}                 & ---  & Skip completed runs (checks for \texttt{metadata.json}) \\
+\texttt{--parallel N}             & 1    & Number of parallel workers \\
+\texttt{--adaptive-metric M}      & ---  & Metric driving adaptive refinement \\
+\texttt{--adaptive-budget N}      & 20   & Max total points for adaptive sampling \\
+\texttt{--adaptive-initial N}     & 5    & Initial coarse grid points \\
+\texttt{--adaptive-threshold T}   & 0.01 & Stop when max interval score $< T$ \\
+\texttt{--dry-run}                & ---  & Print sweep plan without executing \\
+\texttt{--force-large-sweep}      & ---  & Allow sweeps with $> 10{,}000$ runs \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+All \texttt{tidal simulate} flags (\texttt{--param}, \texttt{--grid-shape}, \texttt{--bounds}, \texttt{--ic}, etc.)\ are passed through unchanged.
+
+\paragraph{TOML configuration}
+
+Use \texttt{--config} for reproducible, version-controlled sweep definitions:
+
+\begin{lstlisting}[style=bash]
+tidal sweep --config examples/coupled_scattering/sweep_coupling.toml
+\end{lstlisting}
+
+CLI flags override TOML values, so \texttt{--config sweep.toml --param g0=0.3} uses TOML for everything except \texttt{g0}. See \texttt{examples/coupled\_scattering/sweep\_advanced.toml} for the full TOML schema.
+
+\paragraph{Adaptive sampling}
+
+Automatically refines near sharp features:
+
+\begin{lstlisting}[style=bash]
+tidal sweep spec.json --sweep "g0=0.01:0.9:5" \
+  --adaptive-metric P_max --adaptive-budget 20 \
+  --adaptive-threshold 0.01 \
+  --measure conversion --source phi_0 --target chi_0
+\end{lstlisting}
+
+Or via TOML:
+
+\begin{lstlisting}[style=toml]
+[sweep.g0]
+start = 0.01
+stop = 0.9
+scale = "adaptive"
+initial_count = 5
+max_count = 20
+metric = "P_max"
+threshold = 0.01
+\end{lstlisting}
+
+\paragraph{Visualizing sweep results}
+
+Use \texttt{tidal plot}:
+
+\begin{lstlisting}[style=bash]
+# 1D sweep -> line plot
+tidal plot sweeps/coupling_scan/ --type sweep --metric P_max
+
+# 2D sweep -> heatmap
+tidal plot sweeps/mass_coupling_2d/ --type sweep --metric P_max
+
+# Multi-metric subplots
+tidal plot sweeps/coupling_scan/ --type sweep --metric P_max,L_mix
+
+# Overlay timeseries from each run
+tidal plot sweeps/coupling_scan/ --type sweep-compare --metric conversion
+
+# Convergence -> log-log with fitted order
+tidal plot sweeps/convergence/ --type convergence \
+    --metric max_energy_error
+
+# Parallel coordinates (multi-parameter exploration)
+tidal plot sweeps/output/ --type sweep-parallel --metric P_max
+
+# Tornado chart (parameter importance ranking)
+tidal plot sweeps/output/ --type sweep-tornado --metric P_max
+
+# Scatter matrix (pairwise parameter relationships)
+tidal plot sweeps/output/ --type sweep-scatter --metric P_max
+\end{lstlisting}
+
+\subsubsection{\texttt{tidal analyze} --- Sensitivity analysis on sweep results}
+
+Post-hoc sensitivity analysis on completed parameter sweeps. Determines which parameters most influence a given metric.
+
+\begin{lstlisting}[style=bash]
+# Sobol global sensitivity indices (requires SALib package)
+tidal analyze sweeps/output/ --sensitivity sobol --metric P_max \
+    --bootstrap 100
+
+# Morris screening (simpler, no extra dependencies)
+tidal analyze sweeps/output/ --sensitivity morris --metric P_max
+\end{lstlisting}
+
+\paragraph{Options}
+
+\begin{table}[htbp]
+\centering
+\begin{tabular}{@{}llp{5cm}@{}}
+\toprule
+Flag & Default & Description \\
+\midrule
+\texttt{--sensitivity METHOD} & ---           & Analysis method: \texttt{sobol} or \texttt{morris} \\
+\texttt{--metric METRIC}      & (auto-detect) & Which metric to analyze \\
+\texttt{--bootstrap N}        & 100           & Bootstrap samples for Sobol confidence intervals \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{TOML Configuration (\texttt{theory.toml})}
+
+The \texttt{tidal derive} command reads a TOML file that defines the field theory:
+
+\begin{lstlisting}[style=toml]
+[spacetime]
+dimension = 3          # 2 = 1+1D, 3 = 2+1D, 4 = 3+1D
+signature = [-1, 1, 1]
+coordinates = ["t", "x", "y"]
+
+[fields]
+names = ["phi"]
+ranks = [0]            # 0 = scalar, 1 = vector, 2 = tensor
+
+[constants]
+names = ["m2"]
+values = [1.0]
+
+[lagrangian]
+expression = "1/2 CD[-a][phi[]] eta[a,b] CD[-b][phi[]] - 1/2 m2 phi[]^2"
+
+[parameters]
+output_json = "examples/data/my_theory.json"
+
+# Optional: diagonal metric for curvilinear coordinates
+[metric]
+diagonal = [-1, 1, "x[]^2"]
+\end{lstlisting}
+
+\subsubsection{Linearization (\texttt{[linearization]})}
+
+For theories defined by linearizing a tensor expression (e.g., linearized gravity via xPert), use \texttt{[linearization]} \textbf{instead of} \texttt{[lagrangian]}. The two sections are mutually exclusive.
+
+\begin{lstlisting}[style=toml]
+[linearization]
+# Tensor expression to linearize (uses CD placeholder, auto-prefixed)
+expression = "Einstein[CD][-a, -b]"
+# Which [[fields]] entry is the metric perturbation
+perturbation_field = "h"
+\end{lstlisting}
+
+This generates xPert setup (\texttt{SetupMetricPerturbation}), linearization (\texttt{LinearizeTensorExpression}), and automatic notation conversion before passing to the standard decomposition pipeline.
+
+\paragraph{Example} (\texttt{examples/gravitational\_waves/theory.toml}):
+
+\begin{lstlisting}[style=toml]
+[theory]
+name = "Linearized Gravity"
+
+[spacetime]
+dimension = 4
+metric = "minkowski"
+
+[[fields]]
+name = "h"
+type = "tensor"
+rank = 2
+symmetry = "symmetric"
+
+[linearization]
+expression = "Einstein[CD][-a, -b]"
+perturbation_field = "h"
+
+[output]
+path = "../data/linearized_gravity.json"
+\end{lstlisting}
+
+\subsubsection{Derived Fields}
+
+For theories that need intermediate tensor definitions (e.g., the electromagnetic field strength tensor), use \texttt{[[derived\_fields]]}:
+
+\begin{lstlisting}[style=toml]
+[[derived_fields]]
+name = "F"
+rank = 2
+symmetry = "antisymmetric"
+definition = "CD[-a][A[-b]] - CD[-b][A[-a]]"
+\end{lstlisting}
+
+This generates \texttt{DefTensor} + \texttt{MakeRule} in the \texttt{.wls} output, with automatic substitution before decomposition.
+
+\subsection{Common Workflows}
+
+\subsubsection{Derive and simulate a scalar field theory}
+
+\begin{lstlisting}[style=bash]
+# 1. Write theory.toml (see examples/scalar_field/theory.toml)
+
+# 2. Derive equations
+tidal derive examples/scalar_field/theory.toml
+
+# 3. Inspect the result
+tidal inspect examples/data/klein_gordon_1d.json
+
+# 4. Simulate
+tidal simulate examples/data/klein_gordon_1d.json --t-end 20 --ic gaussian
+\end{lstlisting}
+
+\subsubsection{Parameter sweep}
+
+\begin{lstlisting}[style=bash]
+# Automated sweep (recommended)
+tidal sweep examples/data/coupled_scalars.json \
+    --sweep "mPhi2=0.5:4.0:8" \
+    --measure conversion --source phi_0 --target chi_0 \
+    --output sweeps/mass_scan
+
+# Or manually with a shell loop
+for m2 in 0.5 1.0 2.0 4.0; do
+    tidal simulate examples/data/coupled_scalars.json \
+        --param mPhi2=$m2 --output "sweep_m2_${m2}.png"
+done
+\end{lstlisting}
+
+\subsubsection{Solver schemes}
+
+\begin{itemize}
+  \item \texttt{--scheme auto} (default): auto-selects best solver based on equation structure
+  \item \texttt{--scheme cvode}: SUNDIALS/CVODE --- adaptive BDF/Adams for wave systems
+  \item \texttt{--scheme ida}: SUNDIALS/IDA --- handles all equation types including algebraic constraints
+  \item \texttt{--scheme leapfrog}: symplectic St\"ormer--Verlet --- fixed $\Delta t$, zero energy drift
+  \item \texttt{--scheme scipy}: \texttt{scipy.integrate.solve\_ivp} --- DOP853/RK45/Radau/BDF
+\end{itemize}
+
+\subsubsection{Boundary conditions}
+
+Specify per-axis, comma-separated:
+
+\begin{lstlisting}[style=bash]
+# Periodic in x, Neumann in y
+tidal simulate spec.json --bc periodic,neumann
+\end{lstlisting}
+
+Available types: \texttt{periodic}, \texttt{neumann}, \texttt{dirichlet}.
+
+\subsubsection{Full derive-to-measure pipeline}
+
+\begin{lstlisting}[style=bash]
+# 1. Derive equations from a Lagrangian
+tidal derive examples/coupled_scalars/theory.toml
+
+# 2. Simulate and save to snapshot directory
+tidal simulate examples/data/coupled_scalars.json \
+    --param mPhi2=1.0 --param mChi2=4.0 --param gCpl=0.5 \
+    --t-end 20.0 --output coupled_scalars_output
+
+# 3. Extract measurements: conversion probability and mixing length
+tidal measure coupled_scalars_output/ \
+    --what conversion,mixing \
+    --source phi_0 --target chi_0
+
+# 4. Save measurement plot
+tidal measure coupled_scalars_output/ --output measurements.png
+\end{lstlisting}

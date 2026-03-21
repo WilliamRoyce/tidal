@@ -1,0 +1,287 @@
+% Multi-Field Perturbation Theory: Architecture Design
+% Source: docs/multi_field_perturbation.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Multi-Field Perturbation Theory: Architecture Design}
+\label{sec:multi-field-perturbation}
+
+\subsection{Motivation}
+\label{sec:mfp-motivation}
+
+The current \texttt{[linearization]} pipeline handles a single perturbation field --- the metric:
+\begin{equation}
+  \gmunu = \etamunu + \varepsilon\, h_{\mu\nu}
+  \label{eq:mfp-metric-pert}
+\end{equation}
+via \texttt{SetupMetricPerturbation} + \texttt{Perturbation[L, 2]} + \texttt{VarD[h]}.
+
+Many physically interesting theories require \textbf{multiple perturbation fields} expanded simultaneously around their backgrounds. The Gertsenshtein effect (Einstein--Maxwell) is the immediate use case, but the architecture is general-purpose.
+
+\subsection{Use Cases}
+\label{sec:mfp-use-cases}
+
+\begin{table}[htbp]
+\centering
+\caption{Example theories requiring multi-field perturbation.}
+\label{tab:mfp-use-cases}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Theory & Perturbation Fields & Background \\
+\midrule
+\textbf{Einstein--Maxwell} (Gertsenshtein) & metric $h_{\mu\nu}$ + EM vector $a_\mu$ & $\etamunu + \bg{A}_\mu$ (uniform $\Bzero$) \\
+\textbf{Einstein--Proca} & metric $h_{\mu\nu}$ + massive vector $a_\mu$ & $\etamunu$ \\
+\textbf{Einstein--Yang--Mills} & metric $h_{\mu\nu}$ + gauge field $a_\mu^I$ & $\etamunu + \bg{A}_\mu^I$ \\
+\textbf{Einstein--Cartan} & metric $h_{\mu\nu}$ + torsion $T^\lambda{}_{\mu\nu}$ & $\etamunu + \bg{T}$ \\
+\textbf{Scalar-tensor gravity} & metric $h_{\mu\nu}$ + scalar $\varphi$ & $\etamunu + \bg{\varphi}$ (VEV) \\
+\textbf{Matter-only} (fixed geometry) & vector $a_\mu$ (or scalar, tensor) & $\etamunu$ (fixed) + $\bg{A}_\mu$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{TOML Configuration}
+\label{sec:mfp-toml}
+
+\subsubsection{Full Multi-Field Perturbation (e.g., Einstein--Maxwell)}
+\label{sec:mfp-toml-full}
+
+\begin{lstlisting}[style=toml]
+[linearization]
+perturbation_field = "h"   # Metric perturbation (existing, unchanged)
+
+[[linearization.matter_perturbations]]
+field = "A"                # Must match a [[fields]] entry
+perturbation_name = "a"    # Name for the 1st-order perturbation tensor
+background = "Abar"        # Resolved via matching [[background_fields]] entry
+\end{lstlisting}
+
+\subsubsection{Matter-Only Perturbation (Fixed Metric)}
+\label{sec:mfp-toml-matter-only}
+
+\begin{lstlisting}[style=toml]
+[linearization]
+# perturbation_field omitted -> metric is NOT perturbed
+# Internally uses: Perturbation[Bg[__], ___] := 0
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+\end{lstlisting}
+
+\subsubsection{Multiple Matter Fields}
+\label{sec:mfp-toml-multiple}
+
+\begin{lstlisting}[style=toml]
+[linearization]
+perturbation_field = "h"
+
+[[linearization.matter_perturbations]]
+field = "A"
+perturbation_name = "a"
+background = "Abar"
+
+[[linearization.matter_perturbations]]
+field = "phi"
+perturbation_name = "dphi"
+background = "phi0"
+\end{lstlisting}
+
+\subsubsection{Backward Compatibility}
+\label{sec:mfp-toml-backward}
+
+When \texttt{matter\_perturbations} is absent, behavior is identical to the current pipeline. No existing TOML configs are affected.
+
+\subsection{Pipeline Architecture}
+\label{sec:mfp-pipeline}
+
+\subsubsection{Derived Fields and Perturbation Order}
+\label{sec:mfp-derived-fields}
+
+\textbf{Critical design detail}: The Lagrangian uses derived fields (e.g., $F$), but perturbation acts on fundamental fields ($A$).
+
+\paragraph{Pipeline sequence.}
+\label{par:mfp-pipeline-sequence}
+
+\begin{enumerate}
+  \item \textbf{User writes Lagrangian} with derived field $F$:
+    \begin{equation*}
+      \lag = -\tfrac{1}{4}\, F_{ab}\, \eta^{ac}\, \eta^{bd}\, F_{cd}
+    \end{equation*}
+
+  \item \textbf{MakeRule expansion} (existing \texttt{\_wls\_derived\_fields()} $\to$ \texttt{\_wls\_lagrangian()}):
+    $F \to \mathrm{CD}_{-a}[A_{-b}] - \mathrm{CD}_{-b}[A_{-a}]$. The Lagrangian now has $\mathrm{CD}_{-a}[A_{-b}]$ terms.
+
+  \item \textbf{xPert perturbation} of the expanded Lagrangian:
+    \texttt{Perturbation[$\sqrtg\,\lag_\text{expanded}$, 2]} + \texttt{ExpandPerturbation[]}.
+    xPert correctly produces:
+    \begin{itemize}
+      \item 0th order: $\mathrm{CD}_{-a}[A_{-b}]$ $\to$ background field strength $\bg{F}$
+      \item 1st order: $\mathrm{CD}_{-a}[\texttt{aPert}[\texttt{LI}[1], -b]]$ $\to$ perturbation field strength $f$
+    \end{itemize}
+
+  \item \textbf{Background resolution} via xCoba during \texttt{ToBasis} + \texttt{TraceBasisDummy}:
+    xCoba evaluates $\mathrm{CD}_{-a}[A_{-b}]$ $\to$ $\partial_a(\bg{A}_b)$ using known component values.
+    For flat space: $\partial_z(\bg{A}_y) = \partial_z(-\Bzero z) = -\Bzero$.
+\end{enumerate}
+
+\textbf{Key point}: The existing \texttt{\_validate\_lagrangian} check rejects \texttt{CD[-a][G[]]} in the user's Lagrangian expression. This does NOT trigger because the user writes \texttt{F[-a,-b]} (not \texttt{CD[-a][A[-b]]}). The derivatives only appear after MakeRule expansion.
+
+\subsubsection{Perturbation Order Truncation}
+\label{sec:mfp-truncation}
+
+TIDAL operates exclusively in the linearized regime. After \texttt{Perturbation[L, 2]} + \texttt{ExpandPerturbation}:
+
+\begin{table}[htbp]
+\centering
+\caption{Perturbation order truncation rules.}
+\label{tab:mfp-truncation}
+\begin{tabular}{@{}llcl@{}}
+\toprule
+Term Type & Example & Keep? & Reason \\
+\midrule
+Products of 1st-order (same field) & $h[\texttt{LI}[1]] \times h[\texttt{LI}[1]]$ & \textbf{YES} & Quadratic action \\
+Products of 1st-order (cross) & $h[\texttt{LI}[1]] \times a[\texttt{LI}[1]]$ & \textbf{YES} & Coupling terms \\
+Pure 2nd-order & $h[\texttt{LI}[2]]$ or $a[\texttt{LI}[2]]$ & \textbf{NO} & Linearized: truncate at 1st order \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Dropping \texttt{LI[2]} is equivalent to setting field $=$ background $+ \varepsilon \cdot \text{perturbation}^{(1)}$ with no $\varepsilon^2$ terms. This is correct for all linearized theories.
+
+\subsection{Wolfram Code Generation}
+\label{sec:mfp-wolfram}
+
+\subsubsection{New Function: \texttt{\_wls\_matter\_perturbation\_setup()}}
+\label{sec:mfp-wls-setup}
+
+Generates \texttt{DefTensorPerturbation} + \texttt{ComponentValue} for each matter perturbation.
+
+\begin{lstlisting}[style=mathematica]
+(* For each [[linearization.matter_perturbations]] entry: *)
+
+(* 1. Define xPert perturbation for field A *)
+DefTensorPerturbation[aPert[LI[order], -a], A[-a], M4];
+
+(* 2. Set background values for A (0th order) *)
+(* From matching [[background_fields]] entry *)
+ComponentValue[A[{0, -Cart}], 0];
+ComponentValue[A[{1, -Cart}], 0];
+ComponentValue[A[{2, -Cart}], -B0 * z[]];
+ComponentValue[A[{3, -Cart}], 0];
+\end{lstlisting}
+
+For tensor matter perturbations (rank-2):
+\begin{lstlisting}[style=mathematica]
+DefTensorPerturbation[TPert[LI[order], -a, -b], T[-a, -b], M4];
+\end{lstlisting}
+
+For scalar matter perturbations:
+\begin{lstlisting}[style=mathematica]
+DefTensorPerturbation[dphiPert[LI[order]], phi[], M4];
+\end{lstlisting}
+
+\subsubsection{Modified: \texttt{\_wls\_linearize\_from\_lagrangian()}}
+\label{sec:mfp-wls-linearize}
+
+After \texttt{ExpandPerturbation}, drop \texttt{LI[2]} and replace \texttt{LI[1]} for ALL perturbation fields:
+
+\begin{lstlisting}[style=mathematica]
+(* Existing: metric perturbation *)
+SetupMetricPerturbation[g, hpert, epsilon];
+
+(* NEW: each matter perturbation *)
+DefTensorPerturbation[aPert[LI[order], -a], A[-a], M4];
+
+(* 2nd-order perturbation of action density *)
+l2Raw = Perturbation[Sqrt[-Detg[]] * Lagrangian, 2];
+l2Raw = ExpandPerturbation[l2Raw];
+
+(* Truncate ALL fields at 1st order *)
+l2Raw = l2Raw /. hpert[LI[2], __] :> 0;
+l2Raw = l2Raw /. aPert[LI[2], __] :> 0;
+
+(* Replace xPert notation with declared field tensors *)
+l2Raw = l2Raw /. hpert[LI[1], idx__] :> H[idx];
+l2Raw = l2Raw /. aPert[LI[1], idx__] :> a[idx];
+
+(* VarD for EACH dynamical field *)
+eomH = VarD[H[-a,-b], CD][l2ForVarD];
+eomA = VarD[a[-a], CD][l2ForVarD];
+\end{lstlisting}
+
+\subsubsection{Multi-Field VarD and Component Decomposition}
+\label{sec:mfp-wls-decompose}
+
+Each dynamical field gets its own \texttt{VarD} call. The results feed into \texttt{DecomposeToComponents} with all other dynamical fields listed as \texttt{additionalFields}:
+
+\begin{lstlisting}[style=mathematica]
+(* Decompose graviton equation -- a components are additional fields *)
+DecomposeToComponents[eomH, H, {a}, ...]
+
+(* Decompose photon equation -- H components are additional fields *)
+DecomposeToComponents[eomA, a, {H}, ...]
+\end{lstlisting}
+
+The existing \texttt{additionalFields} mechanism in \texttt{DecomposeToComponents} already handles cross-field terms correctly (verified in \texttt{coupled\_scalars}, \texttt{scalar\_vector\_coupling} examples).
+
+\subsection{Background Field Strength: How $\bg{F} = d\bg{A}$ Gets Evaluated}
+\label{sec:mfp-background}
+
+For the Gertsenshtein effect, the coupling coefficients contain the background field strength $\bg{F}$. Here is the evaluation chain:
+
+\begin{enumerate}
+  \item \textbf{TOML}: \texttt{[[background\_fields]]} with components \texttt{["0", "0", "-B0 * z[]", "0"]}
+  \item \textbf{Wolfram}: \texttt{ComponentValue[A[\{2, -Cart\}], -B0 * z[]]}
+  \item \textbf{After ExpandPerturbation}: 0th-order terms contain $\mathrm{CD}_{-a}[A_{-b}]$
+  \item \textbf{ToBasis}: xCoba evaluates $\mathrm{CD}_{-a}[A_{-b}] \to \partial_a(\bg{A}_b)$ using known component values
+  \item \textbf{Result}: For $\bg{A}_y = -\Bzero z$, xCoba computes $\partial_z(\bg{A}_y) = -\Bzero$
+\end{enumerate}
+
+For uniform $\Bzero$, the coupling coefficients are constants (proportional to $\Bzero$). For localized $\Bzero(z)$, they become position-dependent coefficients --- already supported by the solver's coordinate-dependent coefficient system (\texttt{IsCoordinateDependentCoefficient} $\to$ \texttt{\_mathematica\_to\_python()} $\to$ grid evaluation $\to$ L2 cache).
+
+\subsection{Files Modified (Implemented)}
+\label{sec:mfp-files}
+
+\begin{table}[htbp]
+\centering
+\caption{Implementation status of multi-field perturbation pipeline.}
+\label{tab:mfp-files}
+\begin{tabular}{@{}lll@{}}
+\toprule
+File & Change & Status \\
+\midrule
+\texttt{tidal/cli/\_derive.py} & \texttt{\_validate\_matter\_perturbations()}, \texttt{\_validate\_single\_matter\_perturbation()} & Done \\
+\texttt{tidal/cli/\_derive.py} & \texttt{\_wls\_matter\_perturbation\_setup()} --- DefTensorPerturbation + DefTensor & Done \\
+\texttt{tidal/cli/\_derive.py} & \texttt{\_wls\_multi\_field\_eom()} --- multi-field VarD + DecomposeToComponents & Done \\
+\texttt{tidal/cli/\_derive.py} & \texttt{\_wls\_matter\_pert\_truncation()} --- LI[2] drop + LI[1] replacement & Done \\
+\texttt{tidal/cli/\_derive.py} & \texttt{\_xpert\_index\_pattern()}, \texttt{\_pert\_field\_dict()} --- helpers & Done \\
+\texttt{tidal/cli/\_derive.py} & Extended \texttt{\_validate\_gauge()} for perturbation name targets & Done \\
+\texttt{tidal/cli/\_derive.py} & Extended \texttt{\_wls\_linearize\_from\_lagrangian()} for multi-field path & Done \\
+\texttt{tests/test\_cli.py} & \texttt{TestMatterPerturbations} class (6 tests) & Done \\
+\texttt{examples/gertsenshtein/} & \texttt{theory.toml}, \texttt{run.sh}, \texttt{sweep\_coupling.sh} & Done \\
+\texttt{tidal/wolfram/ComponentDecompose.wl} & No changes needed --- \texttt{additionalFields} already sufficient & Verified \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Validation}
+\label{sec:mfp-validation}
+
+\begin{enumerate}
+  \item \textbf{Regression}: All 1568 tests pass; 28 examples unaffected
+  \item \textbf{TOML validation}: \texttt{matter\_perturbations} accepted/rejected correctly (5 error-case tests)
+  \item \textbf{WLS generation}: \texttt{--dry-run} produces correct \texttt{DefTensorPerturbation} + multi-field \texttt{VarD} (verified)
+  \item \textbf{End-to-end}: Einstein--Maxwell \texttt{--dry-run} generates correct WLS with coupling terms
+  \item \textbf{Physics}: Conversion probability validated --- uniform $\Bzero$ (RMS~0.012, 40-point sweep) and localized Gaussian (0.04\% agreement with Boccaletti formula, 48-point sweep). See \texttt{docs/gertsenshtein.md}.
+\end{enumerate}
+
+\subsection{Design Principles}
+\label{sec:mfp-design}
+
+\begin{enumerate}
+  \item \textbf{General-purpose}: Not Gertsenshtein-specific --- any theory with multiple perturbation fields
+  \item \textbf{Lagrangian-first}: All equations derived from the action, never hardcoded
+  \item \textbf{xPert-native}: Uses \texttt{DefTensorPerturbation}, not ad-hoc splitting
+  \item \textbf{Backward-compatible}: No changes when \texttt{matter\_perturbations} is absent
+  \item \textbf{Composable}: Works with existing gauge fixing, plane-wave reduction, background fields
+\end{enumerate}

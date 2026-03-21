@@ -1,0 +1,387 @@
+% Critical Field Analysis
+% Source: docs/critical_field.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Critical Field Analysis}
+\label{sec:critical-field}
+
+\textbf{Purpose}: Determine the minimum magnetic field strength required for full
+graviton-photon conversion in a given physical setup, and compare conversion
+efficiency between theories.
+
+\subsection{Physics Motivation}
+\label{sec:cf-motivation}
+
+The Gertsenshtein effect converts gravitons to photons (and vice versa) in a
+background magnetic field. The key experimental question is: \textbf{how strong
+must the magnetic field be to achieve full conversion?}
+
+For the standard Einstein--Maxwell (E-M) theory, the conversion probability
+after a wavepacket transits a localized B-field region is given by the
+Boccaletti formula:
+\begin{equation}
+  P_\text{final} = \sin^2\!\left(\frac{\kappa}{2} \int B(z)\, dz\right)
+  \label{eq:cf-boccaletti}
+\end{equation}
+
+Full conversion ($P_\text{final} = 1$) occurs at the first peak of the $\sin^2$
+oscillation, when:
+\begin{equation}
+  \frac{\kappa}{2} \int B(z)\, dz = \frac{\pi}{2}
+  \label{eq:cf-full-conversion}
+\end{equation}
+
+For a Gaussian profile $B(z) = B_\text{peak} \exp\!\bigl(-z^2 / 2R^2\bigr)$, this gives:
+\begin{equation}
+  B_\text{peak}^\text{min} = \frac{\pi}{\kappa\, R\, \sqrt{\pi/2}}
+  \label{eq:Bpeak-min}
+\end{equation}
+
+For theories with additional couplings (torsion, Chern--Simons, axion-photon),
+the conversion formula differs. The critical field analysis finds $B_\text{min}$
+numerically from sweep data, enabling direct comparison between theories.
+
+\subsection{Key Concepts}
+\label{sec:cf-concepts}
+
+\subsubsection{Why $P_\text{final}$, not $P_\text{max}$}
+\label{sec:pfinal-vs-pmax}
+
+During transit through a localized B-field, energy oscillates (Rabi
+oscillation) between graviton and photon. A momentary $P = 1$ inside the
+field region is \textbf{not} full conversion --- the energy may oscillate back
+before exit.
+
+The physically meaningful quantity is $\bm{P_\text{final}}$: the permanent net
+conversion after the wavepacket exits the B-field region. This is what a
+downstream detector would measure, and what the Boccaletti formula predicts.
+
+For uniform $B$ in a periodic domain, $P_\text{final} = P(t_\text{end}) = \sin^2(\kappa\, \Bzero\, t_\text{end} / 2)$, which is the conversion at the observation time.
+
+\subsubsection{Amplification Factor}
+\label{sec:amplification}
+
+To compare theories, define the amplification factor:
+\begin{equation}
+  \text{amplification} = \frac{B_\text{min}(\text{E-M})}{B_\text{min}(\text{new theory})}
+  \label{eq:amplification}
+\end{equation}
+at the same threshold ($P_\text{final} \geq 0.99$). If:
+\begin{itemize}
+  \item amplification $> 1$: new theory enhances conversion (needs less $B$)
+  \item amplification $< 1$: new theory weakens conversion
+  \item amplification $= 1$: identical to E-M
+\end{itemize}
+
+\subsubsection{Threshold}
+\label{sec:threshold}
+
+The default threshold is $0.99$ (full conversion within numerical tolerance).
+This is a physics-defined target, not an arbitrary number. Regions of
+parameter space where no $B$ field achieves $P_\text{final} \geq 0.99$ produce $B_\text{min} =
+\text{NaN}$, shown as blank spots on heatmaps --- which is itself informative.
+
+\subsection{Algorithm}
+\label{sec:cf-algorithm}
+
+Given sweep results with a field-strength parameter (e.g.\ \texttt{B0}) as one of the
+swept variables:
+
+\begin{enumerate}
+  \item \textbf{Group} rows by unique outer parameter combinations (all swept params
+    except the field-strength param)
+  \item \textbf{Sort} each group by the field-strength parameter (ascending)
+  \item \textbf{Scan} upward for the first crossing where $\text{metric} \geq \text{threshold}$
+  \item \textbf{Interpolate} linearly between the two bracketing grid points for
+    sub-grid accuracy (optional, enabled by default)
+  \item \textbf{Estimate errors} from three sources (see below)
+  \item \textbf{Output} a reduced \texttt{SweepResults} with the field-strength parameter
+    collapsed, containing \texttt{B\_min}, \texttt{inv\_B\_min}, and error columns
+\end{enumerate}
+
+The output plugs directly into the existing \texttt{tidal plot --type sweep}
+infrastructure --- no plot code changes needed. 1D line plots, 2D heatmaps,
+and 3+ dimension parallel coordinates all work automatically.
+
+\subsection{Error Estimation}
+\label{sec:cf-errors}
+
+Three independent error sources, combined in quadrature:
+
+\subsubsection{Grid spacing error (\texttt{B\_min\_err\_grid})}
+\label{sec:err-grid}
+
+Always available. Conservative half-interval:
+\begin{equation}
+  \varepsilon_\text{grid} = \frac{B_\text{hi} - B_\text{lo}}{2}
+  \label{eq:err-grid}
+\end{equation}
+
+This is the fundamental resolution limit of the sweep grid and dominates for
+coarse sweeps.
+
+\subsubsection{Metric propagation error (\texttt{B\_min\_err\_metric})}
+\label{sec:err-metric}
+
+Available when ensemble replicates exist. Propagates replicate standard
+deviation through the linear interpolation formula using the Jacobian:
+\begin{align}
+  B_\text{min} &= B_\text{lo} + \frac{T - m_\text{lo}}{m_\text{hi} - m_\text{lo}} \times \Delta B \label{eq:Bmin-interp} \\[6pt]
+  \frac{\partial B_\text{min}}{\partial m_\text{lo}} &= -\Delta B \times \frac{m_\text{hi} - T}{(m_\text{hi} - m_\text{lo})^2} \notag \\
+  \frac{\partial B_\text{min}}{\partial m_\text{hi}} &= -\Delta B \times \frac{T - m_\text{lo}}{(m_\text{hi} - m_\text{lo})^2} \notag \\[6pt]
+  \varepsilon_\text{metric}^2 &= \left(\frac{\partial B_\text{min}}{\partial m_\text{lo}}\right)^2 \sigma_\text{lo}^2 + \left(\frac{\partial B_\text{min}}{\partial m_\text{hi}}\right)^2 \sigma_\text{hi}^2 \label{eq:err-metric}
+\end{align}
+
+For $n_\text{replicates} \geq 5$, a more robust alternative: compute $B_\text{min}$ independently
+per replicate, take std of the distribution.
+
+\subsubsection{Interpolation model error (\texttt{B\_min\_err\_interp})}
+\label{sec:err-interp}
+
+Available when 3+ points exist near the crossing. Compares linear and
+quadratic interpolants:
+\begin{equation}
+  \varepsilon_\text{interp} = |B_\text{min}^\text{linear} - B_\text{min}^\text{quadratic}|
+  \label{eq:err-interp}
+\end{equation}
+
+The quadratic interpolant uses three points (bracketing pair + one neighbor)
+to fit a parabola through the metric values.
+
+\subsubsection{Combined error}
+\label{sec:err-combined}
+
+\begin{align}
+  \varepsilon_{B_\text{min}} &= \sqrt{\varepsilon_\text{grid}^2 + \varepsilon_\text{metric}^2 + \varepsilon_\text{interp}^2} \label{eq:err-combined} \\
+  \varepsilon_{1/B} &= \frac{\varepsilon_{B_\text{min}}}{B_\text{min}^2} \label{eq:err-inv}
+\end{align}
+
+\subsubsection{Quality flags}
+\label{sec:quality-flags}
+
+Each output point carries a \texttt{crossing\_quality} flag:
+
+\begin{table}[htbp]
+\centering
+\caption{Crossing quality flags for critical field output.}
+\label{tab:quality-flags}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Flag & Meaning \\
+\midrule
+\texttt{good}   & Clean crossing with interpolation, small errors \\
+\texttt{coarse} & Large grid gap at crossing ($\varepsilon_\text{grid} > 0.1 \times B_\text{min}$) \\
+\texttt{edge}   & Threshold exceeded at smallest parameter value \\
+\texttt{none}   & No crossing found ($B_\text{min} = \text{NaN}$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Analytical Reference Formulas}
+\label{sec:cf-reference}
+
+Built-in E-M reference formulas compute $B_\text{min}$ analytically for known
+geometries, useful for comparison:
+
+\begin{table}[htbp]
+\centering
+\caption{Built-in analytical reference formulas for $B_\text{min}$.}
+\label{tab:reference-formulas}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Formula & Geometry & $P_\text{EM}$ formula & Required params \\
+\midrule
+\texttt{boccaletti} & Gaussian $B(z)$ & $\sin^2\!\bigl(\kappa/2 \cdot B \cdot R \cdot \sqrt{\pi/2}\bigr)$ & $\kappa$, $R$ \\
+\texttt{uniform}    & Uniform $B$, periodic & $\sin^2(\kappa \cdot B \cdot t_\text{end} / 2)$                   & $\kappa$, $t_\text{end}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+For arbitrary geometries (dipolar, 2D/3D), use \texttt{--threshold} with a value
+computed from a reference simulation or literature.
+
+\subsection{Usage}
+\label{sec:cf-usage}
+
+\subsubsection{Single theory characterization}
+\label{sec:single-theory}
+
+\begin{lstlisting}[style=bash]
+# 1. Run a parameter sweep including the field-strength parameter
+uv run tidal sweep examples/data/gertsenshtein_localized.json \
+  --sweep "Bpeak=0.01:0.5:30" --sweep "R=1:20:10" \
+  --measure peak_conversion --output /tmp/sweep_torsion
+
+# 2. Extract critical field -- collapses Bpeak dimension
+#    Uses Boccaletti formula at B_ref=0.1 to compute threshold
+uv run tidal analyze /tmp/sweep_torsion \
+  --critical-field Bpeak \
+  --reference-formula boccaletti --reference-B 0.1 \
+  --output /tmp/critical_torsion
+
+# 3. Plot 1/B_min heatmap (outer params determine plot type)
+#    1 outer param -> line plot
+#    2 outer params -> 2D heatmap
+#    3+ outer params -> parallel coordinates
+uv run tidal plot /tmp/critical_torsion --type sweep --metric inv_B_min
+\end{lstlisting}
+
+\subsubsection{Theory comparison (amplification factor)}
+\label{sec:theory-comparison}
+
+\begin{lstlisting}[style=bash]
+# Run both E-M and new theory sweeps with identical parameter grids
+uv run tidal sweep examples/data/gertsenshtein_localized.json \
+  --sweep "Bpeak=0.01:0.5:30" --sweep "R=1:20:10" \
+  --measure peak_conversion --output /tmp/sweep_em
+
+uv run tidal sweep examples/data/torsion_gertsenshtein.json \
+  --sweep "Bpeak=0.01:0.5:30" --sweep "R=1:20:10" \
+  --measure peak_conversion --output /tmp/sweep_torsion
+
+# Extract B_min for both with the same threshold
+uv run tidal analyze /tmp/sweep_em \
+  --critical-field Bpeak --threshold 0.99 --output /tmp/critical_em
+uv run tidal analyze /tmp/sweep_torsion \
+  --critical-field Bpeak --threshold 0.99 --output /tmp/critical_torsion
+
+# Compare the results.csv files:
+# amplification(R) = B_min_em(R) / B_min_torsion(R)
+\end{lstlisting}
+
+\subsubsection{Simple numeric threshold}
+\label{sec:simple-threshold}
+
+\begin{lstlisting}[style=bash]
+# Directly specify a threshold (e.g. from literature)
+uv run tidal analyze /tmp/sweep_torsion \
+  --critical-field Bpeak --threshold 0.5 --output /tmp/critical_simple
+\end{lstlisting}
+
+\subsection{CLI Reference}
+\label{sec:cf-cli}
+
+\begin{lstlisting}
+tidal analyze SWEEP_DIR --critical-field PARAM [options]
+
+Required:
+  SWEEP_DIR               Path to sweep output directory
+  --critical-field PARAM  Field-strength parameter to threshold on
+  --output DIR            Output directory for reduced results
+
+Options:
+  --threshold FLOAT       Metric threshold (default: 0.99)
+  --metric STR            Metric to threshold on (default: P_final)
+  --no-interpolate        Disable linear interpolation
+  --reference-formula     {boccaletti,uniform}
+                          Compute threshold from E-M analytical formula
+  --reference-B FLOAT     Reference B value for analytical formula
+\end{lstlisting}
+
+\subsection{Output Files}
+\label{sec:cf-output}
+
+The output directory contains standard sweep result files:
+
+\begin{table}[htbp]
+\centering
+\caption{Output files from critical field analysis.}
+\label{tab:cf-output-files}
+\begin{tabular}{@{}lp{9cm}@{}}
+\toprule
+File & Contents \\
+\midrule
+\texttt{results.csv}  & One row per outer-param combination, with $B_\text{min}$, $1/B_\text{min}$, errors \\
+\texttt{results.json} & Same data in JSON format \\
+\texttt{sweep.json}   & Provenance metadata (original sweep path, threshold, metric) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Output columns}
+\label{sec:cf-columns}
+
+\begin{table}[htbp]
+\centering
+\caption{Output columns in the critical field results.}
+\label{tab:cf-columns}
+\begin{tabular}{@{}lp{9cm}@{}}
+\toprule
+Column & Description \\
+\midrule
+(outer params)              & Remaining swept parameter values \\
+\texttt{B\_min}             & Minimum field strength for conversion $\geq$ threshold \\
+\texttt{inv\_B\_min}        & $1/B_\text{min}$ (default heatmap metric --- brighter $=$ easier conversion) \\
+\texttt{B\_min\_err}        & Combined error (quadrature of grid + interp + metric) \\
+\texttt{B\_min\_err\_grid}  & Error from sweep grid spacing \\
+\texttt{B\_min\_err\_metric}& Error from replicate variance (NaN if no replicates) \\
+\texttt{B\_min\_err\_interp}& Error from interpolation model \\
+\texttt{inv\_B\_min\_err}   & Propagated error on $1/B_\text{min}$ \\
+\texttt{crossing\_quality}  & Quality flag: \texttt{good}, \texttt{coarse}, \texttt{edge}, \texttt{none} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Implementation}
+\label{sec:cf-implementation}
+
+\subsubsection{Key files}
+\label{sec:cf-key-files}
+
+\begin{table}[htbp]
+\centering
+\caption{Key implementation files for critical field analysis.}
+\label{tab:cf-key-files}
+\begin{tabular}{@{}ll@{}}
+\toprule
+File & Role \\
+\midrule
+\texttt{tidal/measurement/\_critical\_field.py} & Core algorithm: crossing detection, error estimation, analytical formulas \\
+\texttt{tidal/cli/\_analyze.py}                 & CLI dispatch for \texttt{tidal analyze --critical-field} \\
+\texttt{tidal/cli/\_\_init\_\_.py}              & CLI argument definitions \\
+\texttt{tests/test\_critical\_field.py}          & 32 unit tests covering all edge cases \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Architecture}
+\label{sec:cf-architecture}
+
+The critical field analysis is a \textbf{post-hoc cross-run reduction}, not a
+per-simulation measurement. It operates on completed sweep data:
+
+\begin{lstlisting}
+SweepResults (N swept params)
+    -> compute_critical_field()
+        -> CriticalFieldResult
+            -> critical_field_to_sweep_results()
+                -> SweepResults (N-1 swept params)
+                    -> existing tidal plot infrastructure
+\end{lstlisting}
+
+The key design insight: by producing a standard \texttt{SweepResults}, the entire
+existing plot infrastructure (1D line, 2D heatmap, parallel coordinates)
+works automatically without any plot code changes.
+
+\subsection{Future Work}
+\label{sec:cf-future}
+
+\begin{itemize}
+  \item \textbf{Arbitrary geometry formulas}: User-provided analytical expressions for
+    reference thresholds (tracked in GitHub issue)
+  \item \textbf{Paired comparison mode}: \texttt{--reference DIR} to load a reference sweep and
+    compute amplification factors directly
+  \item \textbf{Transit completeness check}: Detect whether the wavepacket has fully
+    exited the B-field region before trusting $P_\text{final}$
+  \item \textbf{Replicate-aware $B_\text{min}$}: Compute $B_\text{min}$ per replicate for robust
+    uncertainty estimation when ensemble data is available
+\end{itemize}
+
+\subsection{References}
+\label{sec:cf-references}
+
+\begin{enumerate}
+  \item Boccaletti, D.\ et al.\ (1970) Nuovo Cim.\ 70B, 129--146
+  \item Dandoy, V.\ et al.~\cite{dandoy2024constraining}
+  \item Domcke, V.\ \& Garcia-Cely, C.~\cite{domcke2023simple}
+\end{enumerate}

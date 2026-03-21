@@ -1,0 +1,159 @@
+% Derivation Performance Notes
+% Source: docs/derivation_performance.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Derivation Performance Notes}
+\label{sec:derivation-performance}
+
+\subsection{Spherical 4D Einstein-Maxwell + TT Gauge (theory\_radial.toml)}
+\label{sec:spherical-4d}
+
+Total wall time: ${\sim}40$ minutes. Peak memory: ${\sim}840$\,MB.
+
+\subsubsection{Phase Breakdown}
+
+\begin{table}[htbp]
+\centering
+\caption{Derivation phase breakdown for spherical 4D Einstein-Maxwell + TT gauge.}
+\label{tab:spherical-phases}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Phase & Time (est.) & Memory delta & Notes \\
+\midrule
+xPert $\lag^{(2)}$ expansion & ${\sim}3$\,min & +5\,MB & Fast \\
+$h$ decomp (6 components) & \textbf{${\sim}25$\,min} & +690\,MB & \textbf{DOMINANT} \\
+\quad BatchedTBD per component & ${\sim}2$\,min & +3--5\,MB & 1000--2300 terms each \\
+\quad Christoffel (first) & ${\sim}30$\,s & +285\,MB & Cache miss; subsequent ${\sim}5$\,s \\
+$a$ decomp (4 components) & ${\sim}10$\,min & +50\,MB & Rank-1, smaller \\
+ExportJSON & ${\sim}1$\,min & minimal & \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Bottlenecks}
+
+\begin{enumerate}
+  \item \textbf{BatchedTraceBasisDummyWithMetric} (${\sim}20$\,min total for 10 components)
+  \begin{itemize}
+    \item Fused \texttt{TraceBasisDummy} + \texttt{Expand} + \texttt{MetricEval} in adaptive batch groups
+    \item Generates 1000--2300 intermediate terms per component
+    \item Single largest time sink---see ``Adaptive batch sizing'' below (\cref{sec:adaptive-batch})
+  \end{itemize}
+
+  \item \textbf{Memory growth} (154$\to$840\,MB during $h$ decomp)
+  \begin{itemize}
+    \item \texttt{Share[]} between components helps but doesn't fully reclaim
+  \end{itemize}
+
+  \item \textbf{Christoffel first-call cost} (+285\,MB, ${\sim}30$\,s)
+  \begin{itemize}
+    \item Already cached via \texttt{GetCachedChristoffels}---subsequent calls $O(1)$
+    \item The 285\,MB is the Christoffel array itself ($4 \times 4 \times 4$ with symbolic entries)
+  \end{itemize}
+\end{enumerate}
+
+\subsection{Flat 4D Einstein-Maxwell (theory.toml)}
+\label{sec:flat-4d}
+
+Total: ${\sim}40$ minutes. Peak: ${\sim}170$\,MB (Wolfram heap) / ${\sim}1.3$\,GB (OS RSS).
+
+\begin{table}[htbp]
+\centering
+\caption{Derivation phase breakdown for flat 4D Einstein-Maxwell.}
+\label{tab:flat-phases}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Phase & Time & Notes \\
+\midrule
+EOM $h$ decomposition (6 comp) & ${\sim}14$\,min & 332 \& 226 terms per comp \\
+EOM $a$ decomposition (4 comp) & ${\sim}1.5$\,min & 99 terms per comp \\
+Linearization total & ${\sim}16$\,min & Includes xPert + gauge \\
+\textbf{Canonical Lagrangian decomp} & \textbf{${\sim}24$\,min} & \textbf{34 additive terms, DOMINANT} \\
+Legendre + parse & $<1$\,s & Trivial \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The canonical Lagrangian decomposition is the dominant cost (24 of 40\,min). This is intrinsic to the full Legendre transform---each of the 34 Lagrangian terms must be independently decomposed via \texttt{DecomposeScalarExpression}. Previously (${\sim}10$\,min) the canonical pipeline was skipped; now it is always computed for correct coordinate-invariant energy measurement.
+
+\subsection{Wolfram License Constraint}
+\label{sec:license-constraint}
+
+Only ONE \texttt{wolframscript} session at a time (engine license). Running two concurrent derivations exhausts the license and causes ``license error'' exit. Always serialize derivation commands. The license error can also occur mid-derivation if the WLS runs for too long; the Python post-processing (plane-wave reduction, constraint elimination) then fails because it checks \texttt{ret == 0}.
+
+\textbf{Workaround}: If the WLS completes but Python post-processing is skipped due to license error, run the plane-wave reduction manually:
+
+\begin{lstlisting}[style=python]
+from tidal.symbolic.reduction import reduce_spec
+import json, tomllib
+
+spec = json.loads(Path('examples/data/file.json').read_text())
+with open('examples/.../theory.toml', 'rb') as f:
+    config = tomllib.load(f)
+reduced = reduce_spec(spec, config['reduction'])
+Path('examples/data/file.json').write_text(json.dumps(reduced, indent='\t'))
+\end{lstlisting}
+
+\textbf{Note}: Constraint elimination is now handled entirely by the Wolfram pipeline (before JSON export). There is no Python post-processing step for constraints.
+
+
+\subsection{Optimizations}
+\label{sec:optimizations}
+
+\subsubsection{Timing Instrumentation}
+
+All major derivation phases print \texttt{[TIMING]} lines to stderr with elapsed seconds. Phases instrumented:
+
+\begin{itemize}
+  \item \texttt{Linearization (xPert L\^{}(2) + EOM decomposition)}---overall linearization
+  \item \texttt{EOM decomposition (<field>)}---per-field \texttt{DecomposeToComponents}
+  \item \texttt{Canonical Lagrangian decomposition}---\texttt{DecomposeScalarExpression} loop
+  \item \texttt{Legendre transform (momenta + H)}---canonical momentum + $H = \sum \pi v - L$
+  \item \texttt{ParseHamiltonianExpression}---structured quadratic term parsing
+\end{itemize}
+
+Each canonical Lagrangian term also reports individual time and memory.
+
+\subsubsection{Derivation Caching}
+
+\texttt{tidal derive} hashes the generated WLS script (SHA-256) and stores it in the output JSON's \texttt{metadata.derivation\_hash}. On subsequent runs, if the TOML config produces an identical WLS script and the output JSON exists with a matching hash, \texttt{wolframscript} is skipped entirely.
+
+\begin{lstlisting}[style=bash]
+# First run: full derivation (~40 min for theory_radial.toml)
+uv run tidal derive examples/gertsenshtein/theory_radial.toml
+
+# Second run: cache hit, instant
+uv run tidal derive examples/gertsenshtein/theory_radial.toml
+# -> "Derivation cache hit: gertsenshtein_radial.json"
+
+# Force re-derivation
+uv run tidal derive examples/gertsenshtein/theory_radial.toml --force-derive
+\end{lstlisting}
+
+The hash captures ALL inputs: TOML fields, parameters, Wolfram pipeline code paths, gauge config, linearization options, reduction settings. Any change to the TOML or to the Python code that generates the WLS script invalidates the cache automatically.
+
+\subsubsection{Adaptive Batch Sizing in BatchedTraceBasisDummyWithMetric}
+\label{sec:adaptive-batch}
+
+\texttt{BatchedTraceBasisDummyWithMetric} (\texttt{ComponentDecompose.wl}) fuses \texttt{TraceBasisDummy} + \texttt{Expand} + metric evaluation in batches to bound peak memory. Previously used a fixed batch size of 50.
+
+Now uses \textbf{adaptive sizing}: the first batch runs at the default size (50), then the expansion factor (peak intermediate terms / input terms) is measured. If the expansion is high enough, subsequent batches are \textbf{decreased} in size to keep peak intermediate terms below ${\sim}2000$:
+
+\begin{equation}
+  \text{batch\_size} = \min\!\bigl(\text{default},\; \max(5,\; \lfloor 2000 / \text{expansion\_factor} \rfloor)\bigr)
+  \label{eq:adaptive-batch}
+\end{equation}
+
+\textbf{Critical}: Batch size is NEVER increased above the default. \texttt{Expand[]} scales super-linearly with batch size due to cross-term interactions during simplification---empirically, doubling batch size can increase processing time by 10--20$\times$, not $2\times$. The default batch size of 50 is near-optimal for most theories.
+
+\begin{itemize}
+  \item Simple scalar theories (expansion ${\sim}1$--$5\times$): batch stays at 50 (default)
+  \item Complex tensor theories (expansion ${\sim}40$--$50\times$): batches decrease to 20--30
+  \item Per-batch diagnostics: \texttt{TraceBD}, \texttt{Expand}, \texttt{Eval} term counts + timing
+\end{itemize}
+
+Ref: \texttt{ComponentDecompose.wl}, \texttt{BatchedTraceBasisDummyWithMetric} function.
+
+\subsubsection{EOM vs Canonical Decomposition (No Caching Possible)}
+
+Investigation confirmed that the EOM pass decomposes the \textbf{equations of motion} (\texttt{VarD[L]}) via \texttt{DecomposeToComponents}, while the canonical path decomposes the \textbf{Lagrangian} itself via \texttt{DecomposeScalarExpression}. These are fundamentally different algebraic objects---the Legendre transform requires $L_\text{comp}$, not $\text{EOM}_\text{comp}$. The Wolfram kernel state (Christoffels, metric DownValues, background field DownValues) IS already reused between passes via \texttt{Share[]}.

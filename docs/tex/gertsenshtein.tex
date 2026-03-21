@@ -1,0 +1,414 @@
+% Gertsenshtein Effect: Physics Background
+% Source: docs/gertsenshtein.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Gertsenshtein Effect: Physics Background and Validation Targets}
+\label{sec:gertsenshtein}
+
+\subsection{Overview}
+\label{subsec:gertsenshtein-overview}
+
+The \textbf{Gertsenshtein effect}~(1962) is the resonant conversion of gravitational waves (gravitons) into electromagnetic waves (photons) --- and vice versa --- in an external magnetic field. The coupling arises from the standard Einstein--Maxwell system: the spacetime metric appears in the Maxwell action, so linearising around a background magnetic field generates cross-terms between the metric perturbation $h_{\mu\nu}$ and the EM perturbation $a_\mu$.
+
+This effect is the simplest instance of \textbf{graviton--matter wave mixing} and serves as the foundation for extensions to torsion waves, axion--photon--graviton mixing, and Chern--Simons gravity.
+
+\subsection{Physics}
+\label{subsec:gertsenshtein-physics}
+
+\subsubsection{The Einstein--Maxwell System}
+\label{subsec:einstein-maxwell}
+
+The full Lagrangian:
+\begin{equation}
+  \lag = \frac{1}{\kappa^2}\, R - \frac{1}{4}\, F_{\mu\nu}\, F^{\mu\nu}
+  \label{eq:gertsenshtein-lagrangian}
+\end{equation}
+where $\kappa^2 = 16\pi G$, $R$ is the Ricci scalar, and $F_{\mu\nu} = \partial_\mu A_\nu - \partial_\nu A_\mu$ is the electromagnetic field strength tensor.
+
+\subsubsection{Background Configuration}
+\label{subsec:background-config}
+
+\begin{itemize}
+  \item \textbf{Metric}: flat Minkowski $\etamunu = \mathrm{diag}(-1,+1,+1,+1)$
+  \item \textbf{EM field}: background 4-potential $\bg{A}_\mu$ generating a uniform magnetic field $\Bzero$
+    \begin{itemize}
+      \item For $\Bzero$ along $x$-axis: $\bg{A}_y = -\Bzero z$ (Coulomb gauge)
+      \item Background field strength: $\bar{F}_{yz} = \partial_z \bg{A}_y = -\Bzero$, i.e., $B_x = \Bzero$
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{Perturbation Expansion}
+\label{subsec:perturbation-expansion}
+
+Both fields are expanded around their backgrounds:
+\begin{align}
+  g_{\mu\nu} &= \eta_{\mu\nu} + \varepsilon\, h_{\mu\nu} \quad\text{(metric perturbation --- graviton)} \\
+  A_\mu      &= \bg{A}_\mu + \varepsilon\, a_\mu \quad\text{(EM perturbation --- photon)}
+\end{align}
+
+The second-order action $\delta^2(\sqrtg\, \lag)$ contains:
+\begin{itemize}
+  \item \textbf{$h \times h$ terms}: graviton self-interaction (Fierz--Pauli)
+  \item \textbf{$a \times a$ terms}: photon kinetic energy (Maxwell)
+  \item \textbf{$h \times a$ terms}: graviton--photon coupling via $\bar{F}$ --- \textbf{the Gertsenshtein effect}
+\end{itemize}
+
+The coupling coefficients are proportional to the background field strength $\Bzero$.
+
+\subsubsection{Gauge Fixing}
+\label{subsec:gauge-fixing}
+
+\begin{itemize}
+  \item \textbf{Metric}: Transverse-traceless (TT) gauge --- reduces to physical polarisation modes $h_+$, $h_\times$
+  \item \textbf{EM}: Lorenz gauge $\partial_\mu a^\mu = 0$ --- eliminates unphysical degrees of freedom
+\end{itemize}
+
+\subsubsection{Plane-Wave Reduction}
+\label{subsec:plane-wave-reduction}
+
+For GW propagating along $z$-axis with $\Bzero$ along $x$-axis:
+\begin{itemize}
+  \item Set $\ddx = \ddy = 0$ (plane-wave ansatz)
+  \item Reduces 3+1D tensor+vector system to effective 1+1D coupled equations
+  \item Only $h_+$ polarisation couples to $a_y$ (the transverse EM mode parallel to $\Bzero$)
+\end{itemize}
+
+\subsubsection{Conversion Probability}
+\label{subsec:conversion-probability}
+
+\paragraph{Vacuum, uniform $\Bzero$, propagation distance $D = c \cdot t$.}
+\label{par:vacuum-conversion}
+
+The coupled equations from our Lagrangian $(1/\kappa^2)R - (1/4)F^2$ are (after TT + Lorenz gauge, plane-wave reduction, and dividing by kinetic coefficients):
+\begin{align}
+  \ddt^2 h_+ &= \ddz^2 h_+ - \Bzero^2 \kappa^2\, h_+ - \Bzero \kappa^2\, \ddz a_y \label{eq:gert-eom-h} \\
+  \ddt^2 a_y &= \ddz^2 a_y + \Bzero\, \ddz h_+ \label{eq:gert-eom-a}
+\end{align}
+
+The coupling is asymmetric: $\Bzero\kappa^2$ on $h$ (from dividing by $1/\kappa^2$ kinetic prefactor) vs $\Bzero$ on $a$ (unit kinetic prefactor). The eigenmode analysis gives beat frequency $\Delta\omega = \Bzero\kappa$ (geometric mean of couplings), yielding:
+\begin{equation}
+  P(\text{graviton} \to \text{photon}) = \sin^2\!\left(\frac{\kappa\,\Bzero\, D}{2}\right)
+  \label{eq:gert-P-vacuum}
+\end{equation}
+
+This is confirmed numerically (RMS error $< 0.015$ across a 40-point $\Bzero$ sweep at $N = 1024$, using the corrected amplitude formula --- see \cref{sec:gertsenshtein-formula}).
+
+\paragraph{Note on P\&R error.}
+\label{par:pr-error}
+
+Palessandro \& Rothman~(2023, Eq.~26; 2024, arXiv:2405.01407) quote $P = \sin^2(\sqrt{G}\,\Bzero\,D)$, which is incorrect by a factor of $\sqrt{4\pi} = 2\sqrt{\pi} \approx 3.54$ in the argument. They fail to properly account for the $1/(16\pi G)$ kinetic prefactor when extracting the mixing frequency from their non-canonically-normalised system. Domcke \& Garcia-Cely~\cite{domcke2023magnetic} independently criticise P\&R's linearisation. Our formula is confirmed by Dandoy, Lella et al.~\cite{dandoy2024constraining}, who use canonical normalisation and obtain $\Delta_{g,\gamma} = \sqrt{4\pi G}\,\Bzero$, matching $\kappa\Bzero/2$ exactly. See \cref{sec:gertsenshtein-formula} for the full derivation and literature comparison.
+
+\paragraph{Graviton effective mass from background EM field.}
+\label{par:graviton-mass}
+
+The graviton equation includes a mass-like term $-\Bzero^2\kappa^2\, h_+$ from the interaction of the metric perturbation with the background EM stress-energy. This gives an effective graviton mass $m_g^2 = \kappa^2\Bzero^2/2$. The photon remains massless (in vacuum). This mass detuning limits the peak conversion for each $k$-mode:
+\begin{equation}
+  P_\mathrm{max}(k) = \frac{k^2}{k^2 + \kappa^2 \Bzero^2}
+  \label{eq:gert-Pmax-k}
+\end{equation}
+
+For $k \gg \kappa\Bzero$, the detuning is negligible and $P_\mathrm{max} \to 1$ (full conversion). For low-$k$ modes ($k \sim \kappa\Bzero$), the detuning is significant. A Gaussian IC (broad $k$-spectrum, dominant low-$k$) will show $P_\mathrm{peak} < 1$ even in the absence of numerical error. Use a plane-wave IC with sufficiently high $k$ for clean validation against $P = \sin^2(\kappa\Bzero t/2)$.
+
+Verified numerically: Gaussian IC ($\sigma = 1.5$, $L = 50$) gives $P_\mathrm{peak} = 0.975$ at $N = 512$; plane-wave IC ($k = 2$) gives $P_\mathrm{peak} = 0.999$ at $N = 1024$ --- both consistent with the mass correction factor.
+
+\paragraph{With detuning (plasma frequency $\omega_p$, or effective photon mass $m_\gamma$).}
+\label{par:detuned-conversion}
+
+\begin{align}
+  P &= f^2\, \sin^2(\omega_m\, D) \label{eq:gert-P-detuned} \\
+  \intertext{where:}
+  \Delta &= \frac{m_\gamma^2 - m_g^2}{2\omega} \quad\text{(mass-squared difference / $2\omega$)} \nonumber \\
+  \mu &= \frac{\kappa\,\Bzero}{2} \quad\text{(coupling strength)} \nonumber \\
+  \omega_m &= \sqrt{\Delta^2 + \mu^2} \quad\text{(mixing frequency)} \nonumber \\
+  f &= \frac{\mu}{\omega_m} \quad\text{(mixing angle)} \nonumber
+\end{align}
+
+\paragraph{Weak-field limit ($\mu D \ll 1$).}
+\label{par:weak-field}
+
+\begin{equation}
+  P \approx \frac{\kappa^2\, \Bzero^2\, D^2}{4}
+  \label{eq:gert-P-weak}
+\end{equation}
+
+\paragraph{Oscillation length.}
+\label{par:osc-length}
+
+\begin{equation}
+  L_\mathrm{osc} = \frac{2\pi}{\kappa\,\Bzero}
+  \label{eq:gert-Losc}
+\end{equation}
+
+\subsubsection{Key Physics Regimes}
+\label{subsec:physics-regimes}
+
+\begin{table}[htbp]
+\centering
+\caption{Physics regimes for graviton--photon conversion.}
+\label{tab:gert-regimes}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Regime & Condition & $P_\mathrm{max}$ & Character \\
+\midrule
+Weak coupling    & $\mu D \ll 1$                              & $\approx \kappa^2 \Bzero^2 D^2/4$ & Quadratic growth \\
+Resonant         & $\Delta = 0$ (vacuum)                      & $\sin^2(\mu D)$                    & Full Rabi oscillation \\
+Detuned          & $\Delta \gg \mu$                           & $\approx (\mu/\Delta)^2$           & Suppressed, fast oscillation \\
+MSW resonance    & $\omega_p^2 = m_g^2$ (at some position)    & Enhanced                           & Level crossing \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{References}
+\label{subsec:gertsenshtein-references}
+
+\subsubsection{Primary Sources}
+\label{subsec:primary-sources}
+
+\begin{table}[htbp]
+\centering
+\caption{Primary references for the Gertsenshtein effect.}
+\label{tab:gert-primary-refs}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Ref & Year & Key Contribution \\
+\midrule
+Gertsenshtein~\cite{gertsenshtein1962wave} & 1962 & Original prediction of graviton--photon conversion in $B$-field \\
+Boccaletti et al.~(1970) & 1970 & Finite-region boundary conditions, integral formula \\
+% NOTE: boccaletti1970 key needs adding to references.bib
+Raffelt \& Stodolsky~(1988) & 1988 & $2\times 2$ mixing-matrix formalism, MSW resonance analogy \\
+% NOTE: raffelt1988mixing key needs adding to references.bib
+Ejlli~(2020) & 2020 & First exact (non-perturbative) solution \\
+% NOTE: ejlli2020first key needs adding to references.bib
+Palessandro \& Rothman~(2023) & 2023 & Lagrangian derivation (\textbf{contains normalisation error}) \\
+% NOTE: palessandro2023 key needs adding to references.bib
+Domcke \& Garcia-Cely~\cite{domcke2023magnetic} & 2023 & Criticises P\&R linearisation; inhomogeneous $B$-field calculation \\
+\textbf{Dandoy, Lella et al.}~\cite{dandoy2024constraining} & \textbf{2024} & \textbf{4-component mixing, canonical graviton --- confirms our formula} \\
+Palessandro~(2024) & 2024 & Extended treatment (same normalisation error as 2023) \\
+% NOTE: palessandro2024 key needs adding to references.bib
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Extensions and Modern Applications}
+\label{subsec:extensions-refs}
+
+\begin{table}[htbp]
+\centering
+\caption{Modern extensions and applications of the Gertsenshtein effect.}
+\label{tab:gert-extension-refs}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Ref & Year & Key Contribution \\
+\midrule
+Domcke \& Garcia-Cely~(2024) & 2024 & Inverse Gertsenshtein as HFGW probe \\
+% NOTE: domcke2024inverse key needs adding to references.bib
+\textbf{Domcke, Garcia-Cely \& Lee}~\cite{domcke2025scattering} & \textbf{2025} & \textbf{GW scattering on 3D $B$-fields; Born approx.\ = thin-lens Boccaletti; WKB = thick-lens} \\
+Obukhov et al.~\cite{obukhov2024electrodynamics} & 2024 & Photon--torsion wave conversion in Poincar\'e gauge theory \\
+arXiv:2507.02362~(2025) & 2025 & EM--torsion coupling near black holes \\
+% NOTE: 2507.02362 key needs adding to references.bib
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Numerical Methods}
+\label{subsec:numerical-methods-refs}
+
+\begin{table}[htbp]
+\centering
+\caption{Numerical methods references relevant to graviton--photon conversion.}
+\label{tab:gert-numerical-refs}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Ref & Year & Key Contribution \\
+\midrule
+Berlin et al.~\cite{berlin2024axionphoton} & 2024 & Numerical analysis of resonant axion--photon mixing --- directly analogous methodology; WKB vs exact regimes \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Validation Targets}
+\label{subsec:validation-targets}
+
+All equations are \textbf{derived from the Lagrangian} by the TIDAL pipeline --- listed here only for comparison.
+
+\subsubsection{Target 1: Vacuum Conversion Probability}
+\label{subsec:target1}
+
+\textbf{Source}: Eigenmode analysis of coupled $h_7/a_2$ system; confirmed by Dandoy, Lella et al.~\cite{dandoy2024constraining}.
+
+\begin{itemize}
+  \item Uniform $\Bzero$, vacuum (no plasma), massless graviton
+  \item Plane wave at known wavenumber $k$ propagating along $z$
+  \item Measure $P(t)$ via \texttt{tidal measure --what conversion}
+  \item Compare: $P = \sin^2(\kappa\,\Bzero\, D / 2)$
+  \item \textbf{Acceptance}: Agreement to within 1\%
+\end{itemize}
+
+\subsubsection{Target 2: $\Bzero$ Sweep}
+\label{subsec:target2}
+
+\begin{itemize}
+  \item Sweep $\Bzero$ from weak to strong coupling
+  \item Plot $P_\mathrm{final}$ vs $\Bzero$
+  \item Compare against analytical curve
+  \item Check oscillation length scaling: $L_\mathrm{osc} \propto 1/\Bzero$
+\end{itemize}
+
+\subsubsection{Numerical Validation Results (Targets 1--2)}
+\label{subsec:validation-results}
+
+\textbf{Status: VALIDATED} --- both modal and CVODE solvers agree with analytical predictions.
+
+$\Bzero$ sweep ($N = 256$, $L = 100$, $t_\mathrm{end} = 50$, $k = 2.01$, $\kappa = 1$, 10 points across $\Bzero \in [0.01,\, 0.2]$):
+
+\begin{itemize}
+  \item Both modal and CVODE solvers agree with each other to $\sim 10^{-5}$
+  \item RMS error vs corrected analytical formula $P = \sin^2(\kappa\Bzero D/2) \times k^2/(k^2 + \kappa^2\Bzero^2)$: \textbf{0.0036} (0.36\%)
+  \item The 0.36\% error is dominated by the effective-mass correction approximation in the analytical formula, not by solver error
+  \item Error grows with $\Bzero$ as expected (mass correction $\propto \Bzero^2/k^2$)
+\end{itemize}
+
+\textbf{Recommended solver}: The \textbf{modal solver} is auto-selected for Gertsenshtein on periodic domains and provides 3.4$\times$ speedup over CVODE at $N = 256$, growing to 7.7$\times$ at $t_\mathrm{end} = 500$. Both give identical accuracy. Modal cost is $O(1)$ in simulation time (eigendecompose once, evaluate at any $t$). See \cref{sec:modal-solver} for full benchmarks.
+% NOTE: sec:modal-solver should point to a modal_solver.tex section if available
+
+\subsubsection{Target 3: Detuned Conversion (Phase F1)}
+\label{subsec:target3}
+
+\textbf{Status: NOT IMPLEMENTED --- requires gauge-invariant mass mechanism}
+
+Adding a Proca-type photon mass $-\omega_p^2/2 \cdot a_{-\mu}\, \eta^{\mu\nu}\, a_{-\nu}$ to the full 4D Lagrangian generates position-dependent coefficients $\Bzero^2\kappa^2\omega_p^2\, z^2$ on the graviton equations. These arise from the volume element expansion $(\varepsilon/2)\mathrm{Tr}(h) \times (\omega_p^2/2)|\bg{A}|^2$ where $|\bg{A}|^2 = \Bzero^2 z^2$ (since $\bg{A}_y = -\Bzero z$ in the plane-wave gauge). With periodic BCs, $z^2$ is discontinuous at the wrap point --- incorrect for a uniform plasma model.
+
+\textbf{Root cause}: xPert correctly evaluates the full second-order action including the metric coupling to the background EM energy density. In the plasma context (which is a medium effect, not a fundamental Proca field), this coupling is unphysical. No Lagrangian reformulation within the current 4D gauge-field framework can avoid this: any gauge representation of a transverse $B$-field has $|\bg{A}|^2 \propto z^2$ in 1D. An effective 1+1D scalar theory ($h_\mathrm{gw}$, $a_\mathrm{em}$ scalars) yields constant coefficients but is no different from the existing \texttt{coupled\_scalars} example.
+
+\textbf{What would be needed}: A gauge-invariant effective mass that couples only to the transverse photon polarisation without coupling to the background gauge potential through the volume element. Possible approaches: (a)~a Stueckelberg mass in unitary gauge with a carefully chosen gauge field, or (b)~a medium/refractive-index formulation at the level of the equations of motion (bypassing the Lagrangian for the plasma sector).
+
+\textbf{Reference}: Raffelt \& Stodolsky~(1988, PRD 37:1237); Dandoy, Lella et al.~\cite{dandoy2024constraining}
+
+\subsubsection{Target 4: Finite-Region Scattering (Phase F2)}
+\label{subsec:target4}
+
+\textbf{Status: IMPLEMENTED} --- see \texttt{examples/gertsenshtein/theory\_localized.toml}
+
+\paragraph{Setup.}
+Gaussian $\Bzero(z) = B_\mathrm{peak} \times \exp(-z^2/(2R^2))$ along $x$-axis. The gauge potential $\bg{A}_y = -B_\mathrm{peak} \times R \times \sqrt{\pi/2} \times \mathrm{Erf}(z/(\sqrt{2}\cdot R))$ satisfies $\partial_z(\bg{A}_y) = -\Bzero(z)$. The $\mathrm{Erf}$ function is supported by the TIDAL evaluator (\texttt{\_eval\_utils.py} \texttt{\_FUNCTION\_MAP}). Constant named \texttt{Bpeak} (not \texttt{B0\_peak}) --- in Wolfram, \texttt{X\_Y} parses as \texttt{Pattern[X, Blank[Y]]} (a pattern expression, not a symbol), silently corrupting the symbolic computation.
+
+\paragraph{Analytical target (Boccaletti 1970, weak-field Gaussian).}
+
+\begin{equation}
+  P(\text{graviton} \to \text{photon}) = \sin^2\!\left(\frac{\kappa}{2} \int \Bzero(z)\,\mathrm{d}z\right) = \sin^2\!\left(\kappa \cdot B_\mathrm{peak} \cdot R \cdot \sqrt{\frac{\pi}{2}}\right)
+  \label{eq:gert-boccaletti}
+\end{equation}
+
+\paragraph{Simulation parameters.}
+\begin{itemize}
+  \item Domain: $[-100, 100]$, 1024 points, non-periodic (Neumann BCs) --- periodic BCs are incorrect since $\bg{A}_y$ is not periodic
+  \item IC: Gaussian wavepacket ($h_7$) at $z = -50$, $\sigma = 5$, $k = 2.0$, $t_\mathrm{end} = 120$ (stops after one pass through $B$-field, before wavepacket hits right boundary at $t \approx 150$)
+  \item Measurement: \texttt{--what conversion --source h\_7 --target a\_2} (NOT \texttt{--what energy} --- position-dependent coefficients cause known limitation)
+  \item \textbf{Bounds/centre require \texttt{=} syntax}: \texttt{--bounds="-100:100"}, \texttt{--ic-center=-50.0} (shell interprets leading \texttt{-} as flag otherwise)
+\end{itemize}
+
+\paragraph{Confirmed numerical result} (defaults: $\kappa = 1$, $B_\mathrm{peak} = 0.1$, $R = 5 = \sigma$):
+\begin{lstlisting}[style=python]
+P_numerical  = 0.3436  # at t=80.4, peak of single pass
+P_Boccaletti = sin^2(1.0 * 0.1 * 5.0 * sqrt(pi/2)) = sin^2(0.627) = 0.3432
+# Agreement: 0.04% -- excellent
+\end{lstlisting}
+
+\paragraph{2D sweep ($B_\mathrm{peak} \times R$, 48 points).}
+Boccaletti formula confirmed across all regimes ($\sigma = 5$):
+
+\begin{table}[htbp]
+\centering
+\caption{2D sweep validation of Boccaletti formula across $R/\sigma$ ratios.}
+\label{tab:gert-boccaletti-sweep}
+\begin{tabular}{@{}cccc@{}}
+\toprule
+$R/\sigma$ & $R$ & Mean err vs Boccaletti & Max err \\
+\midrule
+0.40 &  2.0 & 0.00004 & 0.00008 \\
+0.92 &  4.6 & 0.00029 & 0.00045 \\
+1.44 &  7.2 & 0.00078 & 0.00172 \\
+1.96 &  9.8 & 0.00113 & 0.00211 \\
+2.48 & 12.4 & 0.00091 & 0.00144 \\
+3.00 & 15.0 & 0.00058 & 0.00160 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The Boccaletti formula $P = \sin^2(\kappa/2 \times \int \Bzero\,\mathrm{d}z)$ is \textbf{exact for massless vacuum conversion} for any $R/\sigma$ ratio. For massless graviton--photon conversion (no plasma), both modes travel at $c$ with identical dispersion ($k_h = k_\gamma$), so $\Delta k = 0$ exactly. The conversion amplitude at $q = \Delta k = 0$ is just the DC component $\int \Bzero\,\mathrm{d}z$ --- independent of $R/\sigma$ (Boccaletti et al.~1970; Domcke, Garcia-Cely \& Lee~\cite{domcke2025scattering}, Section~4.2).
+
+The thin-lens / thick-lens distinction applies when $\Delta k \neq 0$ (plasma detuning, axion mass), creating a coherence length $L_\mathrm{coh} = 1/|\Delta k|$ that limits coherent accumulation. Without plasma, $L_\mathrm{coh} \to \infty$ and the formula holds for all $R$ (see \cref{sec:gertsenshtein-localized}).
+% NOTE: sec:gertsenshtein-localized should point to a gertsenshtein_localized.tex section if available
+
+See \cref{sec:gertsenshtein-localized} for the full physics derivation, regime conditions, terminology mapping to literature, and open questions.
+
+\paragraph{Scripts.}
+\begin{itemize}
+  \item \texttt{examples/gertsenshtein/run\_localized.sh} --- single run
+  \item \texttt{examples/gertsenshtein/sweep\_profile.sh} --- 2D sweep over $B_\mathrm{peak} \times R$
+\end{itemize}
+
+\textbf{Note}: Background $\Bzero(z)$ is externally imposed --- see \cref{sec:background-fields} for the validity discussion.
+% NOTE: sec:background-fields should point to a background_fields.tex section if available
+
+\textbf{References}: Boccaletti et al.~(1970, Nuovo Cimento 70B:129); Raffelt \& Stodolsky~(1988, PRD 37:1237); Domcke, Garcia-Cely \& Lee~\cite{domcke2025scattering}
+
+\subsubsection{Target 5: Magnetar/FRB Application (Phase F3)}
+\label{subsec:target5}
+
+\begin{itemize}
+  \item Dipolar $B(r) \propto 1/r^3$ in 1+1D radial setup (spherical coordinates)
+  \item Domain $[R_\mathrm{NS},\, r_\mathrm{max}]$ --- avoids $r = 0$ singularity
+  \item Inner BC: Robin (impedance-matched) for graviton, Dirichlet for photon (conducting surface)
+  \item Inward-propagating graviton wavepacket from large $r$
+  \item Compare conversion efficiency with McDonald \& Ellis~(2024, arXiv:2406.18634)
+  % NOTE: mcdonald2024 key needs adding to references.bib
+  \item \textbf{Reference}: Kushwaha et al.~(2022, arXiv:2202.00032); Domcke, Garcia-Cely \& Lee~\cite{domcke2025scattering}
+  % NOTE: kushwaha2022 key needs adding to references.bib
+\end{itemize}
+
+\subsection{Implementation in TIDAL}
+\label{subsec:tidal-implementation}
+
+The Gertsenshtein example is implemented using the \textbf{multi-field perturbation} pipeline extension (see \cref{sec:multi-field-perturbation}).
+% NOTE: sec:multi-field-perturbation should point to a multi_field_perturbation.tex section if available
+
+\subsubsection{TOML Configuration}
+\label{subsec:toml-config}
+
+See \texttt{examples/gertsenshtein/theory.toml} for the full configuration:
+\begin{itemize}
+  \item Einstein--Maxwell Lagrangian with derived field $F$
+  \item Metric perturbation $h$ (TT gauge) + EM perturbation $a$ (Lorenz gauge)
+  \item Background 4-potential $\bg{A}$ generating uniform $\Bzero$
+  \item Plane-wave reduction to 1+1D
+\end{itemize}
+
+\subsubsection{Pipeline Flow}
+\label{subsec:pipeline-flow}
+
+\begin{lstlisting}[style=bash]
+theory.toml -> _derive.py generates .wls with:
+  1. DefTensorPerturbation for A -> A_bar + eps*a
+  2. SetupMetricPerturbation for g -> eta + eps*h
+  3. MakeRule expansion: F -> dA (before perturbation)
+  4. Perturbation[sqrt|g| L, 2] + ExpandPerturbation
+  5. Drop LI[2] terms, replace LI[1] -> field tensors
+  6. xCoba evaluates background: CD[-a][A[-b]] -> F_bar = -B0
+  7. VarD for each dynamical field -> coupled EOM
+  8. DecomposeToComponents -> JSON spec
+-> JSON spec -> simulate -> measure conversion
+\end{lstlisting}
+
+\subsection{Future Extensions}
+\label{subsec:future-extensions}
+
+\begin{enumerate}
+  \item \textbf{Plasma detuning} (Phase F1): Proca-type mass term (abandoned) --- blocked by gauge-potential coupling artefact (see \cref{subsec:target3}). Requires gauge-invariant mass mechanism for the transverse photon sector.
+  \item \textbf{Localised $B$-field scattering} (Phase F2): Implemented --- \texttt{theory\_localized.toml}, \texttt{run\_localized.sh}, \texttt{sweep\_profile.sh}. Validates Boccaletti formula $P = \sin^2(\kappa \cdot B_\mathrm{peak} \cdot R \cdot \sqrt{\pi/2})$.
+  \item \textbf{Magnetar/FRB application} (Phase F3): Dipolar $B(r)$, 1+1D radial setup, Gertsenshtein--Zel'dovich mechanism.
+  \item \textbf{Non-minimal couplings} (Phase F5): Chern--Simons gravity (parity-violating $P_L \neq P_R$), $\xi R F^2$ curvature--EM coupling. Ref: Kushwaha \& Jain~(2024, arXiv:2410.07338).
+  % NOTE: kushwaha2024nonminimal key needs adding to references.bib
+  \item \textbf{Axion--photon--graviton mixing} (future): Three-way mixing matrix with $g_{a\gamma\gamma}\, a\, F\, \tilde{F}$. Ref: Dandoy, Lella et al.~\cite{dandoy2024constraining}.
+  \item \textbf{Photon--torsion conversion} (ultimate goal): Obukhov et al.~\cite{obukhov2024electrodynamics} --- axial torsion waves coupled to EM. Separate branch after Gertsenshtein programme matures.
+\end{enumerate}

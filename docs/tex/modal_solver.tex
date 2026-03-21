@@ -1,0 +1,627 @@
+% Fourier Modal Solver: Architecture, Algorithms, and Benchmarks
+% Source: docs/modal_solver.md (migrated to LaTeX)
+% Uses macros from preamble.tex
+
+\section{Fourier Modal Solver}
+\label{sec:modal-solver}
+
+\subsection{Overview}
+\label{sec:modal-overview}
+
+The Fourier modal solver (\texttt{tidal/solver/modal.py}) provides exact, machine-precision solutions for linear PDE systems with periodic boundary conditions and time-independent coefficients. It transforms the spatial grid to Fourier space, builds a per-mode evolution matrix, and eigendecomposes to obtain the exact solution $y(t) = \exp(A \cdot t) \cdot y_0$ --- eliminating spatial discretization error entirely.
+
+\textbf{Key advantages over PDE solvers (CVODE/IDA):}
+\begin{itemize}
+  \item Machine-precision accuracy (${\sim}10^{-14}$ error, limited only by eigendecomposition)
+  \item No CFL condition or adaptive timestepping needed
+  \item $O(N^2)$ per output time after $O(N^3)$ precomputation
+  \item Exact for any time point --- no time-stepping error accumulation
+\end{itemize}
+
+\textbf{Limitations:}
+\begin{itemize}
+  \item Requires periodic boundary conditions (FFT periodicity)
+  \item Requires time-independent coefficients (evolution matrix must be constant)
+  \item Requires flat (Minkowski) metric --- curved metrics couple modes via position-dependent coefficients that decay too slowly in $k$-space
+  \item Currently pure NumPy/SciPy --- no GPU acceleration
+\end{itemize}
+
+\subsection{How It Works}
+\label{sec:modal-how}
+
+\subsubsection{First-Order Reformulation}
+\label{sec:modal-first-order}
+
+TIDAL stores state in Euler--Lagrange velocity form $(q, v)$ where $v = \mathrm{d}q/\mathrm{d}t$. A second-order PDE $\ddt^2 \varphi = L[\varphi]$ becomes:
+\begin{align}
+  \frac{\mathrm{d}\varphi}{\mathrm{d}t} &= v \\
+  \frac{\mathrm{d}v}{\mathrm{d}t} &= L[\varphi]
+\end{align}
+
+The \texttt{StateLayout} organizes field+velocity slot pairs. The modal solver reads this directly.
+
+\subsubsection{FFT to Fourier Space}
+\label{sec:modal-fft}
+
+Each field and velocity slot is transformed: $u(x) \to \hat{u}(k)$ via \texttt{numpy.fft.rfftn}. Spatial operators become multiplications:
+
+\begin{table}[htbp]
+\centering
+\caption{Fourier multipliers for spatial operators.}
+\label{tab:fourier-multipliers}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Operator & Fourier multiplier \\
+\midrule
+identity & $1$ \\
+laplacian & $-k^2$ \\
+laplacian\_x & $-k_x^2$ \\
+gradient\_x & $ik_x$ \\
+cross\_derivative\_xy & $-k_x k_y$ \\
+biharmonic & $k^4$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Fourier convention:} $k = 2\pi \cdot \texttt{numpy.fft.rfftfreq}(N, d=\Delta x)$ --- consistent with \texttt{operators.py} spectral mode. \emph{Not} the modified-wavenumber convention from \texttt{constraint\_solve.py}.
+
+\subsubsection{Build Evolution Matrix}
+\label{sec:modal-evolution-matrix}
+
+\paragraph{Constant coefficients (all terms position-independent).}
+\label{par:modal-constant}
+Each $k$-mode decouples. For a 2-field second-order system, each mode yields a $4\times 4$ matrix:
+\begin{equation}
+  \frac{\mathrm{d}}{\mathrm{d}t}
+  \begin{pmatrix} \hat\varphi_k \\ \hat v_{\varphi,k} \\ \hat\chi_k \\ \hat v_{\chi,k} \end{pmatrix}
+  = M(k) \cdot
+  \begin{pmatrix} \hat\varphi_k \\ \hat v_{\varphi,k} \\ \hat\chi_k \\ \hat v_{\chi,k} \end{pmatrix}
+  \label{eq:modal-per-mode}
+\end{equation}
+
+Result: $N_\text{modes}$ independent small matrices. Total: $O(N_\text{modes} \times N_\text{fields}^3)$.
+
+\paragraph{Position-dependent coefficients (convolution coupling).}
+\label{par:modal-posdep}
+When a coefficient $c(x)$ multiplies a field, the product in $k$-space becomes a convolution:
+\begin{equation}
+  \text{FFT}[c(x) \cdot u(x)] = \hat{c} * \hat{u} \quad\text{($k$-space convolution)}
+  \label{eq:modal-convolution}
+\end{equation}
+
+This couples different $k$-modes, creating a full $(N_\text{modes} \times N_\text{slots})^2$ matrix. Built via probe vectors (unit impulse per mode): reconstruct to physical space, multiply by coefficient, FFT back. For Gaussian $c(x)$, the kernel $\hat{c}(q)$ decays exponentially $\to$ banded matrix.
+
+\subsubsection{Time Evolution Algorithms}
+\label{sec:modal-time-evolution}
+
+Two paths depending on coefficient structure:
+
+\paragraph{Per-mode eigendecomposition (constant coefficients).}
+\label{par:modal-eigendecomp}
+When all coefficients are constant, the evolution matrix is block-diagonal in mode space. Each mode's small block ($\leq 12\times 12$) is eigendecomposed independently:
+\begin{lstlisting}[style=python]
+eigenvalues, V = np.linalg.eig(A_k)  # per-mode block
+y_k(t) = V @ (exp(eigenvalues * t) * V_inv @ y0_k)
+\end{lstlisting}
+
+This has no time-stepping error and no CFL condition. $O(N_\text{fields}^3)$ per mode, $O(N_\text{modes} \times N_\text{fields}^3)$ total.
+
+\paragraph{Nyquist mode zeroing (critical for energy conservation).}
+\label{par:modal-nyquist}
+The per-mode eigendecomposition achieves \textbf{machine-precision energy conservation} ($|\mathrm{d}E/E| \approx 2\times 10^{-14}$) after zeroing the Nyquist mode in the initial conditions. Without this, conservation degrades to ${\sim}1.5\times 10^{-5}$.
+
+\textbf{Root cause}: The rfft Nyquist bin ($k = N/2$, the last mode in even-$N$ grids) must have a purely real Fourier coefficient for real-valued fields. However, the per-mode evolution matrix $A_k$ has complex entries from the gradient coupling ($ik$ term). When $\exp(A_k \cdot t)$ evolves the Nyquist mode, it creates imaginary components in the Fourier coefficient. The \texttt{irfft} reconstruction silently drops these imaginary parts (by construction --- the Nyquist bin of a real signal \emph{is} real). This truncation discards energy from the Nyquist mode at every snapshot.
+
+\textbf{Investigation}: Per-mode analysis showed that \emph{all} modes except the Nyquist are exactly conserved to machine precision ($\mathrm{d}H_k = 0$ for $k < N/2$). The Nyquist mode's Hamiltonian grew by $500\times$ (from 0.029 to 16.8) in the complex eigendecomposition, but the stored (irfft-reconstructed) field showed shrinking amplitude --- the discarded imaginary part contained the ``missing'' energy.
+
+\textbf{Fix}: Zero the Nyquist mode's IC before eigendecomposition. This is standard practice in pseudospectral methods --- the Nyquist frequency aliases with its negative-frequency conjugate and cannot faithfully represent directional (travelling wave) content. It is the highest resolvable frequency and carries negligible physical content for well-resolved simulations.
+
+\textbf{Results} (coupled\_scalars, Gertsenshtein gradient coupling):
+
+\begin{table}[htbp]
+\centering
+\caption{Energy conservation before and after Nyquist mode zeroing.}
+\label{tab:nyquist-fix}
+\begin{tabular}{@{}lcc@{}}
+\toprule
+Grid & Before fix & After fix \\
+\midrule
+$N=128$ & $|\mathrm{d}E/E| = 2.8\times 10^{-5}$ & $|\mathrm{d}E/E| = 2.2\times 10^{-14}$ \\
+$N=256$ & $|\mathrm{d}E/E| = 1.8\times 10^{-5}$ & $|\mathrm{d}E/E| = 2.2\times 10^{-14}$ \\
+$N=512$ & $|\mathrm{d}E/E| = 1.7\times 10^{-5}$ & $|\mathrm{d}E/E| = 2.2\times 10^{-14}$ \\
+$N=1024$ & $|\mathrm{d}E/E| = 1.6\times 10^{-5}$ & $|\mathrm{d}E/E| = 2.2\times 10^{-14}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Full Gertsenshtein (6 fields): $|\mathrm{d}E/E| = 1.3\times 10^{-14}$.
+
+\textbf{References}:
+\begin{itemize}
+  \item Boyd, J.P.\ (2001). \emph{Chebyshev and Fourier Spectral Methods}, 2nd ed.\ Dover. \S11.5 (aliasing and the Nyquist mode).
+  \item Canuto, C.\ et al.\ (2006). \emph{Spectral Methods: Fundamentals in Single Domains}. Springer. \S3.2 (dealiasing via mode truncation).
+  \item Burns et al.\ (2020). Dedalus framework zeroes the top $1/3$ of modes (``$2/3$ dealiasing rule'') to prevent aliasing in nonlinear terms. Our Nyquist zeroing is the minimal version for linear systems.
+\end{itemize}
+
+\paragraph{Krylov matrix exponential (position-dependent coefficients).}
+\label{par:modal-krylov}
+Position-dependent convolution produces a full $(N_\text{slots} \times N_\text{modes})^2$ matrix that is generally \textbf{non-normal}: gradient operators ($ik$) combined with real convolution kernels create eigenvalues with significant positive real parts despite conservative physics. Eigendecomposition overflows because individual $\exp(\lambda \cdot t)$ diverge even though $\exp(A \cdot t) \cdot y_0$ is bounded (pseudospectral phenomenon; Trefethen \& Embree 2005, Ch.\ 14).
+
+The fix: \texttt{scipy.sparse.linalg.expm\_multiply} computes $\exp(A \cdot t) \cdot y_0$ directly via scaling + truncated Taylor series in matrix-vector products, which is backward-stable for non-normal matrices:
+
+\begin{lstlisting}[style=python]
+from scipy.sparse.linalg import expm_multiply
+y_all = expm_multiply(A_full, y0_flat, start=0,
+                      stop=t_end, num=n_snapshots)
+\end{lstlisting}
+
+Ref: Al-Mohy \& Higham (2011), ``Computing the Action of the Matrix Exponential'', SIAM J.\ Sci.\ Comput.\ 33(2):488--511.
+
+\subsubsection{Algorithm Selection (Dual-Path Design)}
+\label{sec:modal-algorithm-selection}
+
+The modal solver maintains two distinct time-evolution algorithms because they handle fundamentally different matrix structures. The routing is automatic --- \texttt{\_has\_position\_dependent\_terms()} determines which path is used at runtime.
+
+\paragraph{Why two methods?}
+\label{par:modal-why-two}
+
+\textbf{Constant coefficients} (uniform $\Bzero$, mass terms, coupling constants): each Fourier mode decouples, producing small per-mode blocks (e.g.\ $12\times 12$ for 6-field Gertsenshtein). Eigendecomposition of these tiny matrices is exact, fast, and well-conditioned.
+
+\textbf{Position-dependent coefficients} (localized $\Bzero(x)$, spatially-varying backgrounds): the product $c(x) \cdot u(x)$ becomes a convolution $\hat{c} * \hat{u}$ in $k$-space, coupling all modes into a single large matrix (e.g.\ $3000\times 3000$ for $N=512$, 6 fields). This matrix is \textbf{non-normal} --- gradient operators ($ik$) combined with real convolution kernels create eigenvalues with significant positive real parts despite conservative physics. Individual $\exp(\lambda \cdot t)$ diverge even though $\exp(A \cdot t) \cdot y_0$ is bounded (pseudospectral phenomenon; Trefethen \& Embree 2005, Ch.\ 14).
+
+\textbf{Concrete failure case:} For localized Gertsenshtein, eigendecomposition gave $P = 0.477$ (wrong) vs the correct $P = 0.3437$ from the Boccaletti formula. The eigendecomposition was also slower (44s) than \texttt{expm\_multiply} (21s) for this case.
+
+\paragraph{Algorithm routing.}
+\label{par:modal-routing}
+
+\begin{table}[htbp]
+\centering
+\caption{Algorithm routing for the modal solver's dual-path design.}
+\label{tab:modal-routing}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Case & Coefficient type & Matrix structure & Algorithm & Time (Gertsenshtein, $N=512$) \\
+\midrule
+Constant & Uniform & Per-mode blocks ($12\times 12$) & Eigendecomposition & ${\sim}0.02$\,s \\
+Position-dep. & Spatially varying & Sparse convolution ($3084\times 3084$) & \texttt{expm\_multiply} (sparse CSC) & ${\sim}1.4$\,s \\
+Constraints + const. & Uniform with algebraic constraints & Reduced per-mode blocks & Schur complement + eigendecomp. & ${\sim}0.08$\,s \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Detection: \texttt{\_has\_position\_dependent\_terms()} checks for spatially-varying coefficients in the JSON spec. \textbf{Both paths are $O(1)$ in simulation time $t_\text{end}$} --- the key advantage over time-stepping solvers.
+
+\paragraph{Can't we just use one method for everything?}
+\label{par:modal-one-method}
+
+\begin{itemize}
+  \item \textbf{\texttt{expm\_multiply} for everything?} No --- eigendecomposition is ${\sim}70\times$ faster for constant-coefficient cases and gives machine precision (${\sim}10^{-14}$ error).
+  \item \textbf{Eigendecomposition for everything?} No --- it gives \textbf{wrong results} for non-normal convolution matrices (position-dependent case). This is not a precision issue but a fundamental numerical instability: individual $\exp(\lambda \cdot t)$ overflow while $\exp(A \cdot t) \cdot y_0$ is bounded (pseudospectral phenomenon).
+\end{itemize}
+
+\paragraph{Sparse convolution matrix optimization.}
+\label{par:modal-sparse}
+
+For localized coefficients (e.g.\ Gaussian $\Bzero(x)$), the Fourier convolution kernel $\hat{c}(q)$ decays exponentially, making the matrix effectively banded. The \texttt{\_evolve\_full\_matrix} function exploits this: entries below a relative threshold ($10^{-14} \times \max|A|$) are zeroed, and if the resulting density is below 30\%, the matrix is converted to sparse CSC format. \texttt{scipy.sparse.linalg.expm\_multiply} natively supports sparse matrices, and its internal matrix-vector products become dramatically cheaper.
+
+\textbf{Benchmark: localized Gertsenshtein (6 fields, $t_\text{end}=120$, 51 snapshots)}
+
+\begin{table}[htbp]
+\centering
+\caption{Sparse vs.\ dense \texttt{expm\_multiply} for localized Gertsenshtein.}
+\label{tab:sparse-benchmark}
+\begin{tabular}{@{}lccccl@{}}
+\toprule
+Grid $N$ & Matrix size & Density & Dense & Sparse & Speedup & Max diff \\
+\midrule
+128 & $780\times 780$ & 4.0\% & 5.44\,s & 0.23\,s & $\mathbf{23\times}$ & $7.4\times 10^{-14}$ \\
+256 & $1548\times 1548$ & 2.6\% & 15.85\,s & 0.59\,s & $\mathbf{27\times}$ & $1.2\times 10^{-13}$ \\
+512 & $3084\times 3084$ & 1.4\% & 29.08\,s & 1.23\,s & $\mathbf{24\times}$ & $1.1\times 10^{-12}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The density decreases with $N$ because the convolution bandwidth (set by the Gaussian width $R$) is fixed while the total mode count grows --- the matrix becomes sparser at higher resolution.
+
+\textbf{End-to-end improvement:} Total \texttt{solve\_modal} time for localized Gertsenshtein at $N=512$ dropped from ${\sim}29$\,s (dense) to ${\sim}1.4$\,s (sparse + micro-optimizations), bringing it within ${\sim}70\times$ of the constant-coefficient eigendecomposition path and $\mathbf{{\sim}85\times}$ \textbf{faster than CVODE} (${\sim}120$\,s).
+
+\paragraph{Both paths outperform CVODE.}
+\label{par:modal-vs-cvode}
+
+\begin{table}[htbp]
+\centering
+\caption{Modal solver vs.\ CVODE across representative cases.}
+\label{tab:modal-vs-cvode}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Case & Modal & CVODE & Speedup \\
+\midrule
+Constant (coupled\_scalars, $N=256$) & 0.003\,s & 4.27\,s & $\mathbf{1{,}451\times}$ \\
+Constant (Gertsenshtein, $N=512$) & 0.02\,s & 1.66\,s & $\mathbf{83\times}$ \\
+Position-dep.\ (localized Gertsenshtein, $N=512$) & 1.4\,s & ${\sim}120$\,s & $\mathbf{{\sim}86\times}$ \\
+Constraint (coupled\_proca\_3d, $16^3$) & 0.08\,s & 19.0\,s & $\mathbf{{\sim}238\times}$ \\
+Long runs (Gertsenshtein, $t_\text{end}=500$) & 1.6\,s & 12.2\,s & $\mathbf{7.7\times}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Auto-Selection}
+\label{sec:modal-auto-selection}
+
+The modal solver is auto-selected (step~2 in \texttt{\_resolve\_scheme()}) when \emph{all} conditions are met:
+
+\begin{enumerate}
+  \item \textbf{Flat metric} --- \texttt{spec.canonical.volume\_element is None} (checked first; curved metrics like spherical/cylindrical have non-None volume elements)
+  \item \textbf{No constraint equations} --- no \texttt{time\_order=0} equations
+  \item \textbf{All BCs periodic} --- \texttt{grid.periodic} all \texttt{True}
+  \item \textbf{All operators supported} --- all RHS operators in \texttt{\_EXACT\_MULTIPLIERS}
+  \item \textbf{No time-dependent coefficients} --- \texttt{term.time\_dependent} all \texttt{False}
+\end{enumerate}
+
+Position-dependent coefficients are OK (handled via convolution). The full auto-selection hierarchy:
+
+\begin{lstlisting}[style=bash]
+1. Modal eligible (flat+periodic+time-independent+supported operators)
+   -> modal (handles constraints via Schur complement if present)
+2. Constraints (time_order=0) not modal-eligible -> IDA
+3. First-order (time_order=1)         -> IDA
+4. Dissipation (first_derivative_t)   -> IDA
+5. Missing canonical (wave eq)        -> warning + CVODE
+6. Pure wave, Hamiltonian             -> CVODE
+\end{lstlisting}
+
+Users can explicitly request \texttt{--scheme modal} (validated for eligibility) or override with \texttt{--scheme cvode}.
+
+\subsection{Usage}
+\label{sec:modal-usage}
+
+\begin{lstlisting}[style=bash]
+# Auto-selected for eligible systems:
+tidal simulate examples/data/coupled_scalars.json \
+  --periodic --t-end 10
+
+# Explicit selection:
+tidal simulate examples/data/coupled_scalars.json \
+  --scheme modal --periodic --t-end 10
+
+# In sweeps:
+tidal sweep examples/data/coupled_scalars.json \
+  --sweep "gCpl=0.1:1.0:20" \
+  --measure conversion --scheme modal
+\end{lstlisting}
+
+\subsection{First-Order Systems (Diffusion)}
+\label{sec:modal-first-order-systems}
+
+The modal solver handles first-order equations naturally:
+\begin{equation}
+  \partial_t u = D \cdot \partial_x^2 u \quad\to\quad \text{per-mode: } \frac{\mathrm{d}\hat{u}_k}{\mathrm{d}t} = -D k^2 \hat{u}_k
+\end{equation}
+
+Solution: $\hat{u}_k(t) = \hat{u}_k(0) \cdot \exp(-D k^2 t)$ --- exponential decay per mode, diagonal matrix.
+
+\subsection{Error Model}
+\label{sec:modal-error-model}
+
+The \textbf{only} error source is eigendecomposition precision (${\sim}10^{-14}$ for well-conditioned matrices). For parameter sweeps, numerical uncertainty is effectively zero --- the dominant error becomes the physics model itself.
+
+Comparison with other solvers on single-field KG ($k=1$, $m^2=1$, $N=64$, $t=1$):
+
+\begin{table}[htbp]
+\centering
+\caption{Error comparison: modal solver vs.\ CVODE for single-field Klein--Gordon.}
+\label{tab:modal-error}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Solver & Error vs analytical & Note \\
+\midrule
+Modal & $5\times 10^{-16}$ & Machine precision \\
+CVODE (\texttt{rtol}=$10^{-10}$) & $2.8\times 10^{-4}$ & Truncation error accumulates \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Performance Benchmarks}
+\label{sec:modal-perf-benchmarks}
+
+Coupled scalars (2 fields, 31 snapshots, $t_\text{end}=3$, periodic BCs):
+
+\begin{table}[htbp]
+\centering
+\caption{Modal vs.\ CVODE performance for coupled scalars.}
+\label{tab:modal-coupled-perf}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+Grid & Modal & CVODE (\texttt{rtol}=$10^{-10}$) & Speedup & Max diff \\
+\midrule
+$N=64$ & 0.003\,s & 0.16\,s & $\mathbf{57\times}$ & $4.0\times 10^{-4}$ \\
+$N=128$ & 0.003\,s & 0.40\,s & $\mathbf{157\times}$ & $5.2\times 10^{-4}$ \\
+$N=256$ & 0.003\,s & 4.27\,s & $\mathbf{1{,}451\times}$ & $6.3\times 10^{-4}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Key observations:
+\begin{itemize}
+  \item \textbf{Modal time is $O(1)$ in grid size} --- eigendecomposition cost is per-mode ($4\times 4$ matrices), independent of $N$. The IFFT reconstruction is $O(N \log N)$ but negligible.
+  \item \textbf{CVODE scales as $O(N^{2+})$} --- spatial operator evaluation is $O(N)$ per timestep, and more grid points require more timesteps to resolve the same physics.
+  \item \textbf{Max diff is CVODE error, not modal error} --- modal solutions are exact to machine precision (${\sim}10^{-16}$); the $10^{-4}$ difference is entirely CVODE truncation error.
+  \item \textbf{Speedup grows with $N$} --- at $N=256$ the modal solver is ${>}1000\times$ faster, making it transformative for parameter sweeps where hundreds of simulations are needed.
+  \item \textbf{Modal time is $O(1)$ in simulation time} --- eigendecomposition is done once; evaluating at any $t$ is just $\exp(\lambda \cdot \Delta t)$. CVODE must take more timesteps for longer runs. See scaling table below.
+\end{itemize}
+
+\subsubsection{Gertsenshtein Effect (6 Fields, Gradient Coupling)}
+\label{sec:modal-gertsenshtein-bench}
+
+$\Bzero$ sweep ($N=256$, $L=100$, $t_\text{end}=50$, $k=2.01$, $\kappa=1$, 10 points), $P_\text{final}$ compared to analytical $\Pconv = \sin^2(\kappa \Bzero D/2) \times k^2/(k^2 + \kappa^2 \Bzero^2)$:
+
+\begin{table}[htbp]
+\centering
+\caption{Gertsenshtein $\Bzero$ sweep: modal vs.\ CVODE vs.\ analytical.}
+\label{tab:modal-gertsenshtein}
+\begin{tabular}{@{}lcccc@{}}
+\toprule
+$\Bzero$ & $P$(modal) & $P$(CVODE) & $P$(analytical) & Error \\
+\midrule
+0.010 & 0.0612 & 0.0612 & 0.0612 & $2\times 10^{-6}$ \\
+0.031 & 0.4924 & 0.4924 & 0.4923 & $1\times 10^{-4}$ \\
+0.052 & 0.9313 & 0.9312 & 0.9307 & $6\times 10^{-4}$ \\
+0.073 & 0.9325 & 0.9325 & 0.9314 & $1\times 10^{-3}$ \\
+0.094 & 0.4949 & 0.4948 & 0.4940 & $9\times 10^{-4}$ \\
+0.116 & 0.0624 & 0.0624 & 0.0623 & $5\times 10^{-5}$ \\
+0.137 & 0.0740 & 0.0740 & 0.0734 & $6\times 10^{-4}$ \\
+0.158 & 0.5180 & 0.5180 & 0.5143 & $4\times 10^{-3}$ \\
+0.179 & 0.9435 & 0.9435 & 0.9360 & $7\times 10^{-3}$ \\
+0.200 & 0.9181 & 0.9181 & 0.9105 & $8\times 10^{-3}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{Both solvers agree to ${\sim}10^{-5}$} with each other --- identical physics, different numerics
+  \item \textbf{RMS error vs analytical: 0.0036} (0.36\%) --- dominated by the effective-mass correction approximation, not solver error
+  \item \textbf{Modal: 0.49\,s/point, CVODE: 1.66\,s/point $\to$ $3.4\times$ speedup} at $N=256$
+  \item Speedup is lower than coupled\_scalars because the 6-field Gertsenshtein system has $12\times 12$ per-mode matrices (vs $4\times 4$ for 2 fields) and $6\times$ more IFFT reconstructions per snapshot
+\end{itemize}
+
+\subsubsection{Scaling with Simulation Time ($t_\text{end}$)}
+\label{sec:modal-scaling-tend}
+
+Gertsenshtein (6 fields, $N=256$, 101 snapshots, $\Bzero=0.1$):
+
+\begin{table}[htbp]
+\centering
+\caption{Modal vs.\ CVODE scaling with simulation time.}
+\label{tab:modal-scaling-tend}
+\begin{tabular}{@{}lccc@{}}
+\toprule
+$t_\text{end}$ & Modal & CVODE & Speedup \\
+\midrule
+10  & 1.4\,s & 1.7\,s  & $\mathbf{1.2\times}$ \\
+50  & 1.5\,s & 3.1\,s  & $\mathbf{2.0\times}$ \\
+100 & 1.6\,s & 4.3\,s  & $\mathbf{2.8\times}$ \\
+200 & 2.1\,s & 7.2\,s  & $\mathbf{3.4\times}$ \\
+500 & 1.6\,s & 12.2\,s & $\mathbf{7.7\times}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{Modal cost is constant in $t_\text{end}$} (${\sim}1.5$\,s) --- eigendecomposition is done once, and evaluating $\exp(\lambda \cdot \Delta t)$ at each output time is $O(1)$ regardless of $\Delta t$. The ${\sim}1.5$\,s is Python startup + FFT + eigendecomposition overhead.
+  \item \textbf{CVODE cost scales linearly with $t_\text{end}$} --- each additional unit of simulation time requires proportionally more adaptive timesteps.
+  \item \textbf{Speedup grows linearly with $t_\text{end}$} --- for a 40-point parameter sweep at $t_\text{end}=500$, modal saves ${\sim}7$ minutes vs CVODE. For $t_\text{end}=5000$ (astrophysical timescales), the advantage would be ${\sim}50\times$.
+\end{itemize}
+
+\subsection{Implementation Details}
+\label{sec:modal-implementation}
+
+\subsubsection{Files}
+\label{sec:modal-files}
+
+\begin{table}[htbp]
+\centering
+\caption{Modal solver source files.}
+\label{tab:modal-files}
+\begin{tabular}{@{}ll@{}}
+\toprule
+File & Purpose \\
+\midrule
+\texttt{tidal/solver/modal.py} & Core solver (${\sim}1{,}400$ lines) \\
+\texttt{tidal/cli/\_simulate.py} & Auto-selection + dispatch \\
+\texttt{tidal/cli/\_\_init\_\_.py} & \texttt{"modal"} in \texttt{--scheme} choices \\
+\texttt{tests/test\_solver\_modal.py} & 35 tests (12 eligibility + 14 correctness + 4 stability + 5 constraint) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Key Functions}
+\label{sec:modal-key-functions}
+
+\begin{table}[htbp]
+\centering
+\caption{Modal solver key functions.}
+\label{tab:modal-functions}
+\begin{tabular}{@{}ll@{}}
+\toprule
+Function & Purpose \\
+\midrule
+\texttt{can\_use\_modal(spec, grid, bc)} & Eligibility check (shared with auto-selection) \\
+\texttt{solve\_modal(spec, grid, y0, \ldots)} & Main entry point --- routes to per-mode, full-matrix, or Schur path \\
+\texttt{\_fft\_slots / \_ifft\_slots} & State $\leftrightarrow$ Fourier transforms (analytical shape computation) \\
+\texttt{\_build\_per\_mode\_matrices} & Per-mode evolution matrices (constant coefficients) \\
+\texttt{\_build\_convolution\_matrix} & Convolution matrix with vectorized coupling (position-dependent) \\
+\texttt{\_build\_constraint\_eliminated\_matrices} & Fourier Schur complement with batched inversion \\
+\texttt{\_evolve\_per\_mode} & Block-aware eigendecomposition solver; optional Fourier snapshot return \\
+\texttt{\_evolve\_full\_matrix} & Sparse-aware \texttt{expm\_multiply} solver (auto-thresholds to CSC) \\
+\texttt{\_find\_independent\_blocks} & Union-find block detection for eigendecomposition \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Reused Infrastructure}
+\label{sec:modal-reused}
+
+\begin{table}[htbp]
+\centering
+\caption{Infrastructure reused by the modal solver.}
+\label{tab:modal-reused}
+\begin{tabular}{@{}lll@{}}
+\toprule
+Component & Location & How Used \\
+\midrule
+\texttt{\_get\_wavenumbers()} & \texttt{operators.py} & $k$-grid construction \\
+\texttt{is\_periodic\_bc()} & \texttt{operators.py} & Eligibility gate \\
+\texttt{StateLayout} & \texttt{state.py} & Field$\leftrightarrow$state mapping \\
+\texttt{CoefficientEvaluator} & \texttt{coefficients.py} & Coefficient resolution \\
+\texttt{SimulationProgress} & \texttt{progress.py} & tqdm progress bar \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Not reused:} \texttt{constraint\_solve.py:\_MULTIPLIERS} --- uses modified wavenumbers matching FD stencils. Modal solver defines its own exact multiplier registry.
+
+\subsection{Block-Aware Eigendecomposition}
+\label{sec:modal-block-aware}
+
+Multi-field systems often have block-diagonal per-mode matrices (e.g.\ Gertsenshtein: $h_5 \leftrightarrow a_1$ and $h_7 \leftrightarrow a_2$ as independent $4\times 4$ blocks). The modal solver detects these blocks via union-find on the coupling graph and eigendecomposes each independently. This:
+
+\begin{enumerate}
+  \item \textbf{Prevents degenerate-eigenvalue mixing} --- \texttt{np.linalg.eig} on a full matrix with repeated eigenvalues across independent blocks can mix eigenvectors, projecting nonzero-IC components onto zero-IC blocks
+  \item \textbf{Enables zero-IC block skipping} --- blocks where all initial conditions are zero produce exact zeros without eigendecomposition
+  \item \textbf{Reduces computation} --- many small eigendecompositions instead of one large one
+\end{enumerate}
+
+For systems with gradient coupling (e.g.\ Gertsenshtein $h \leftrightarrow a$), low-$k$ modes may have genuinely positive real eigenvalues (physical parametric conversion). A warning is issued when $\max(\mathrm{Re}(\lambda)) \times \Delta t > 30$ (approaching overflow).
+
+\subsection{Constraint Elimination (Fourier Schur Complement)}
+\label{sec:modal-constraint-elimination}
+
+Systems with constraint equations (\texttt{time\_order=0}, e.g., Proca $A_0$) are handled via algebraic elimination in Fourier space. The constraint self-operator $L$ (e.g., $m^2 - \nabla^2$) has exact Fourier multipliers, so $L^{-1}$ is trivially $1/(m^2 + k^2)$ per mode.
+
+\textbf{How it works}: For a mixed system with dynamical ($d$) and constraint ($c$) fields:
+\begin{align}
+  \frac{\mathrm{d}}{\mathrm{d}t}[d] &= A_{dd} \cdot d + A_{dc} \cdot c & &\text{(dynamical equations)} \label{eq:schur-dyn} \\
+  0 &= S_{cd} \cdot d + S_{cc} \cdot c & &\text{(constraint defines $c$ algebraically)} \label{eq:schur-con}
+\end{align}
+
+Substituting $c = -S_{cc}^{-1} \cdot S_{cd} \cdot d$ gives the reduced system:
+\begin{equation}
+  \frac{\mathrm{d}}{\mathrm{d}t}[d] = \bigl(A_{dd} - A_{dc} \cdot S_{cc}^{-1} \cdot S_{cd}\bigr) \cdot d
+  \label{eq:schur-reduced}
+\end{equation}
+
+The constraint velocity coupling (when dynamical equations reference $v_{A_0} = \partial_t A_0$) creates an implicit equation resolved by batched \texttt{np.linalg.solve} across all modes: $(I - A_{dc,\text{vel}} \cdot S_{cc}^{-1} \cdot S_{cd}) \cdot d' = A_\text{rhs} \cdot d$.
+
+\textbf{Optimizations:}
+\begin{itemize}
+  \item \textbf{Batched $S_{cc}$ inversion}: \texttt{np.linalg.inv(S\_cc)} inverts all modes at once (no Python loop), with vectorized singularity detection for gauge-freedom modes ($k=0$)
+  \item \textbf{Batched implicit solve}: \texttt{np.linalg.solve(lhs, A\_rhs)} across all modes simultaneously
+  \item \textbf{Fourier snapshot reuse}: \texttt{\_evolve\_per\_mode(return\_fourier=True)} saves the already-computed Fourier-space data at each snapshot, eliminating $n_\text{snapshots} \times n_\text{dyn}$ redundant forward FFTs during constraint field reconstruction
+\end{itemize}
+
+At each output time, constraint fields are reconstructed directly from the saved Fourier data: $c(k) = -S_{cc}^{-1} \cdot S_{cd} \cdot d(k)$.
+
+\textbf{Performance}: On coupled\_proca\_3d ($16^3$, $t=5$, 51 snapshots): modal 0.08\,s vs IDA 19.0\,s --- $\mathbf{{\sim}238\times}$ \textbf{speedup}. IDA fails entirely at $32\times 32$ (convergence issues), while modal runs at any grid size.
+
+\textbf{References}: Hairer \& Wanner (1996), \emph{Solving ODEs II}, Ch.\ VII; Ascher \& Petzold (1998), \emph{Computer Methods for ODEs/DAEs}, \S10.2.
+
+\subsection{Constraints and Limitations}
+\label{sec:modal-constraints-limitations}
+
+\begin{enumerate}
+  \item \textbf{Constraint equations} (\texttt{time\_order=0}): Handled via Fourier Schur complement (see \cref{sec:modal-constraint-elimination}) when all constraint operators have exact Fourier multipliers. Otherwise falls back to IDA.
+
+  \item \textbf{Curved metrics} (spherical, cylindrical, polar): Not applicable --- non-periodic domains and position-dependent operators with slowly-decaying Fourier transforms create dense all-to-all coupling.
+
+  \item \textbf{Time-dependent coefficients}: Would require ODE integration in modal space (\texttt{scipy.integrate.solve\_ivp}). Currently rejected by eligibility check (no known TIDAL examples need this).
+
+  \item \textbf{Spectral operators and energy measurement}: The modal solver works in $k$-space, but the energy measurement evaluates the Hamiltonian in physical space. The \texttt{--spectral} flag is preserved (not disabled) for modal so that the energy measurement uses FFT-based gradient operators matching the modal solver's conserved Hamiltonian. Without this, FD gradients produce conservation errors that increase with $N$ (the FD Hamiltonian differs from the Fourier Hamiltonian). For gradient$\times$gradient terms in the Hamiltonian, the measurement uses direct gradient product $\langle \partial f, \partial g \rangle$ rather than IBP $\langle -f, \partial^2 g \rangle$ when spectral is active, because rfft Nyquist-mode handling creates $O(1/N)$ discrepancy between the two.
+
+  \item \textbf{Per-mode eigendecomposition conditioning}: For coupled multi-field systems where fields have similar dispersion (e.g., massless graviton-photon), the $4\times 4$ per-mode block $A = \bigl[\begin{smallmatrix} 0 & I \\ K & 0 \end{smallmatrix}\bigr]$ has near-degenerate eigenvalue pairs, causing $\mathrm{cond}(V)$ up to $10^{291}$. This limits energy conservation to ${\sim}1.5\times 10^{-5}$ (eigenvector reconstruction error). The solution (future work) is to eigendecompose the $2\times 2$ $K$ matrix and use Hamiltonian $\cos/\sin$ structure, reducing conditioning to $O(1)$.
+\end{enumerate}
+
+\subsection{Performance Optimizations}
+\label{sec:modal-perf-optimizations}
+
+The modal solver has undergone two rounds of targeted optimization, each measured with incremental benchmarking. All changes preserve machine-precision accuracy.
+
+\subsubsection{Round 1: Sparse Convolution Matrix}
+\label{sec:modal-opt-round1}
+
+\textbf{Problem:} The position-dependent path built a dense $n_\text{total}\times n_\text{total}$ convolution matrix, but for localized coefficients (Gaussian $\Bzero$) most entries are negligibly small.
+
+\textbf{Fix:} Threshold entries below $10^{-14} \times \max|A|$, convert to sparse CSC when density $< 30\%$. \texttt{scipy.sparse.linalg.expm\_multiply} natively supports sparse matrices.
+
+\begin{table}[htbp]
+\centering
+\caption{Round 1 optimization: sparse convolution matrix.}
+\label{tab:modal-opt-round1}
+\begin{tabular}{@{}lccccl@{}}
+\toprule
+Grid $N$ & Density & Dense & Sparse & Speedup & Max diff \\
+\midrule
+128 & 4.0\% & 5.44\,s & 0.23\,s & $\mathbf{24\times}$ & $7.4\times 10^{-14}$ \\
+256 & 2.6\% & 15.85\,s & 0.59\,s & $\mathbf{27\times}$ & $1.2\times 10^{-13}$ \\
+512 & 1.4\% & 29.08\,s & 1.23\,s & $\mathbf{24\times}$ & $1.1\times 10^{-12}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection{Round 2: Micro-Optimizations}
+\label{sec:modal-opt-round2}
+
+\begin{table}[htbp]
+\centering
+\caption{Round 2 micro-optimizations.}
+\label{tab:modal-opt-round2}
+\begin{tabular}{@{}llll@{}}
+\toprule
+ID & Optimization & Location & Impact \\
+\midrule
+O1 & Vectorize convolution coupling inner loop & \texttt{\_add\_convolution\_coupling} & pos-dep $N=512$: 1.79$\to$1.36\,s \\
+O3 & Batch $S_{cc}$ inversion (eliminate per-mode loop) & \texttt{\_build\_constraint\_eliminated\_matrices} & constraint path $1.7\times$ faster \\
+O4 & Batch vel\_coupling solve & \texttt{\_build\_constraint\_eliminated\_matrices} & (part of constraint $1.7\times$) \\
+O5 & Analytical rfft shape (eliminate FFT-of-zeros probe) & \texttt{\_fft\_slots} & removes wasted computation \\
+O6 & Pre-allocate \texttt{y\_hat\_t} buffer outside timestep loop & \texttt{\_evolve\_per\_mode} & fewer allocations \\
+O7 & Return Fourier snapshots to avoid re-FFT & \texttt{\_evolve\_per\_mode} + \texttt{solve\_modal} & constraint path $1.7\times$ faster \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\textbf{Rejected:} O2 (vectorize snapshot evaluation across all output times) --- the batched exp+einsum created larger intermediate arrays with more memory pressure, making it $1.3\times$ slower than the lightweight per-timestep loop.
+
+\subsubsection{Combined Result}
+\label{sec:modal-opt-combined}
+
+\begin{table}[htbp]
+\centering
+\caption{Combined optimization results across all modal solver paths.}
+\label{tab:modal-opt-combined}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Path & Before optimization & After & Total speedup \\
+\midrule
+Constant-coeff (eigendecomp, $N=512$) & 0.026\,s & 0.020\,s & $\mathbf{1.3\times}$ \\
+Position-dep (\texttt{expm\_multiply}, $N=512$) & ${\sim}29$\,s & 1.4\,s & $\mathbf{{\sim}21\times}$ \\
+Constraint (Proca 3D, $16^3$) & 0.136\,s & 0.078\,s & $\mathbf{1.7\times}$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{References}
+\label{sec:modal-references}
+
+\begin{itemize}
+  \item Moler, C.\ \& Van Loan, C.\ (2003). ``Nineteen dubious ways to compute the exponential of a matrix, twenty-five years later.'' \emph{SIAM Review}, 45(1):3--49.
+  \item Golub, G.H.\ \& Van Loan, C.F.\ (1996). \emph{Matrix Computations}, 3rd ed.\ Johns Hopkins University Press.
+  \item Hairer, E., Lubich, C.\ \& Wanner, G.\ (2006). \emph{Geometric Numerical Integration}, Springer, \S4.
+  \item Burns, K.J.\ et al.\ (2020). ``Dedalus: A flexible framework for numerical simulations with spectral methods.'' \emph{Phys.\ Rev.\ Research}, 2:023068.
+  \item Raffelt, G.\ \& Stodolsky, L.\ (1988). ``Mixing of photons with low-mass particles in magnetic fields.'' \emph{Phys.\ Rev.\ D}, 37:1237.
+  \item Dormand, J.R.\ \& Prince, P.J.\ (1980). ``A family of embedded Runge-Kutta formulae.'' \emph{J.\ Comp.\ Appl.\ Math.}, 6.
+  \item Hindmarsh, A.C.\ et al.~\cite{hindmarsh2005sundials}. SUNDIALS: Suite of nonlinear and differential/algebraic equation solvers.
+  \item Al-Mohy, A.H.\ \& Higham, N.J.\ (2011). ``Computing the action of the matrix exponential.'' \emph{SIAM J.\ Sci.\ Comput.}, 33(2):488--511.
+  \item Trefethen, L.N.\ \& Embree, M.\ (2005). \emph{Spectra and Pseudospectra}. Princeton University Press.
+  \item Van Loan, C.\ (1978). ``Computing integrals involving the matrix exponential.'' \emph{IEEE Trans.\ Automatic Control}, 23(3):395--404.
+  \item Higham, N.J.\ (2008). \emph{Functions of Matrices: Theory and Computation}. SIAM. Ch.\ 12.
+  \item Yoshida, H.~\cite{yoshida1990symplectic}. Construction of higher-order symplectic integrators.
+\end{itemize}
