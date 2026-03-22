@@ -1748,6 +1748,9 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
     # Clear $CDShorthandRules BEFORE decomposition to prevent circular
     # conversion: reverse rules convert CDN→CD@field, but ExpandScalarWrappers
     # inside StaggeredToBasis would re-apply forward rules CD@field→CDN.
+    # CD shorthand resolution is handled by:
+    # 1. ExpandScalarWrappers (staggered ToBasis inside Scalar wrappers)
+    # 2. StaggeredToBasis (standard pipeline for the outer expression)
     lines.extend(("$CDShorthandRules = {};", ""))
 
     for i, df in enumerate(dyn_fields):
@@ -1779,6 +1782,11 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
                     "xAct`xTensor`Private`ValidateIndices = (True &);",
                 ]
             )
+        # Reverse CD shorthands before decomposition so StaggeredToBasis
+        # handles them as raw CD@field operators. The enhanced
+        # ExpandScalarWrappers (with staggered pipeline) resolves CD
+        # operators inside Scalar wrappers; StaggeredToBasis handles
+        # any remaining CDs in the outer expression.
         lines.extend(
             [
                 _wls_mem_print(f"Before DecomposeToComponents({df['name']})"),

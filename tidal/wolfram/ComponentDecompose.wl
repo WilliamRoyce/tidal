@@ -169,10 +169,31 @@ SeparateFieldMetrics[expr_, chart_] := Module[
 (*                                                                        *)
 (* Used by: ExtractTensorComponent, DecomposeToComponents (rank 0),      *)
 (*          DecomposeScalarExpression.                                    *)
-ExpandScalarWrappers[expr_, chart_] := Module[
-  {result = expr, prev, iter = 0, maxIter = 5, manifold},
+ExpandScalarWrappers[expr_, chart_, computeChristoffels_:False] := Module[
+  {result = expr, prev, iter = 0, maxIter = 5,
+   metric, covd, christoffelPD, hasCDScalars},
   (* Early exit if no Scalar wrappers present *)
   If[FreeQ[result, Scalar], Return[result]];
+
+  (* Detect if any Scalar contents have CDs — gate full staggered       *)
+  (* pipeline vs fast path.  R̃²-decomposed torsion theories produce   *)
+  (* Scalar[η^{ab}(R_{ab} + ∇∇T...)] with nested CDs that require     *)
+  (* Christoffel zeroing + SeparateMetric between ToBasis passes.       *)
+  hasCDScalars = !FreeQ[result, Scalar[x_ /; !FreeQ[x, _?CovDQ]]];
+  If[hasCDScalars,
+    Module[{manifold2, tangentBundle2, metrics2},
+      manifold2 = ManifoldOfChart[chart];
+      tangentBundle2 = Symbol["Tangent" <> ToString[manifold2]];
+      metrics2 = MetricsOfVBundle[tangentBundle2];
+      If[ListQ[metrics2] && Length[metrics2] > 0,
+        metric = First[metrics2];
+        covd = CovDOfMetric[metric];
+        christoffelPD = Symbol["Christoffel" <> ToString[covd] <> "PD" <> ToString[chart]],
+        hasCDScalars = False  (* No metric → fall back to simple path *)
+      ]
+    ]
+  ];
+
   (* Suppress Validate::repeated during Scalar expansion.                *)
   (* When Scalar[x] contents share abstract index names with the outer   *)
   (* expression (common in R̃²-decomposed torsion theories), ToBasis on *)
@@ -190,8 +211,99 @@ ExpandScalarWrappers[expr_, chart_] := Module[
       If[ListQ[Global`$CDShorthandRules] && Length[Global`$CDShorthandRules] > 0,
         Do[inner = inner /. rule, {rule, Global`$CDShorthandRules}]
       ];
-      inner = ToBasis[chart][inner];
-      inner = TraceBasisDummy[inner];
+
+      If[hasCDScalars && !FreeQ[inner, _?CovDQ],
+        (* Full staggered pipeline for Scalar contents with nested CDs.  *)
+        (* Ref: supervisor's EuclideanSplinter (commit 4a89164).         *)
+        (* Missing Christoffel zeroing between ToBasis passes was the    *)
+        (* root cause of R̃² DummyIn index survival.                    *)
+        (* Full abstract → component evaluation for Scalar contents.    *)
+        (* The Scalar content is a contracted tensor expression (scalar *)
+        (* invariant). We evaluate it by:                               *)
+        (* 1. ToCanonical + ContractMetric: simplify abstract form     *)
+        (* 2. Staggered ToBasis: convert to basis indices layer by     *)
+        (*    layer, zeroing Christoffels between passes               *)
+        (* 3. TraceBasisDummy + ToValues: sum contracted dummies and   *)
+        (*    substitute pre-computed ComponentValues                  *)
+        inner = Catch[ToCanonical[inner]];
+        inner = ContractMetric[inner, metric];
+        Module[{prev2 = -1, cur2, iter2 = 0},
+          While[iter2 < 8,
+            If[Head[inner] === Plus,
+              inner = Total[ToBasis[chart] /@ List @@ inner],
+              inner = ToBasis[chart][inner]
+            ];
+            If[!computeChristoffels,
+              inner = inner /. christoffelPD -> Zero,
+              inner = ToValues[inner]
+            ];
+            cur2 = If[Head[inner] === Plus, Length[inner], 1];
+            If[cur2 == prev2, Break[]];
+            prev2 = cur2;
+            iter2++;
+          ];
+          inner = SeparateMetric[metric][inner];
+          If[Head[inner] === Plus,
+            inner = Total[ToBasis[chart] /@ List @@ inner],
+            inner = ToBasis[chart][inner]
+          ];
+          If[!computeChristoffels,
+            inner = inner /. christoffelPD -> Zero,
+            inner = ToValues[inner]
+          ];
+          inner = TraceBasisDummy[inner];
+          inner = ToValues[inner];
+          inner = ToValues[inner];
+          (* Trace any remaining abstract DummyIn indices via explicit    *)
+          (* basis sum.  The staggered pipeline resolves MOST indices,   *)
+          (* but contracted dummies in products resist ToBasis.  Since   *)
+          (* Scalar contents are small (3-5 abstract indices typically), *)
+          (* brute-force Sum tracing is feasible: 3^5 = 243 terms.      *)
+          (* Trace remaining abstract DummyIn indices via explicit basis   *)
+          (* sum.  After the staggered pipeline, typically 3-5 abstract  *)
+          (* indices remain (contracted in products that ToBasis can't   *)
+          (* penetrate).  Iterate: find pairs, sum them, until none      *)
+          (* remain or max iterations reached.                          *)
+          Module[{dimScalar = DimOfManifold[ManifoldOfChart[chart]],
+                  iterTrace = 0, prevTrace},
+            While[iterTrace < 10,
+              prevTrace = inner;
+              Module[{upIdx, downIdx, pairedIdx, replaced},
+                (* Find UP abstract indices *)
+                upIdx = Cases[inner, s_Symbol /; AbstractIndexQ[s], {0, Infinity}] // DeleteDuplicates;
+                (* Find DOWN abstract indices: in CovD positions *)
+                downIdx = Cases[inner, (f_?CovDQ)[idx_][_] /; DownIndexQ[idx] :> UpIndex[idx], {0, Infinity}] // DeleteDuplicates;
+                (* Also in tensor positions *)
+                downIdx = Union[downIdx,
+                  Cases[inner, (f_?xTensorQ)[___, -s_Symbol, ___] /; AbstractIndexQ[s] :> s, {0, Infinity}]];
+                (* Also in metric positions *)
+                downIdx = Union[downIdx,
+                  Cases[inner, (f_?MetricQ)[___, -s_Symbol, ___] /; AbstractIndexQ[s] :> s, {0, Infinity}]];
+                pairedIdx = Intersection[upIdx, downIdx];
+                If[Length[pairedIdx] == 0, Break[]];
+                replaced = inner;
+                Do[
+                  replaced = Sum[
+                    replaced /. {p -> {i, chart}, -p -> {i, -chart}},
+                    {i, 0, dimScalar - 1}
+                  ];
+                  replaced = Expand[replaced];
+                  If[!computeChristoffels, replaced = replaced /. christoffelPD -> Zero];
+                  replaced = ToValues[replaced];
+                  replaced = Expand[replaced],
+                  {p, pairedIdx}
+                ];
+                inner = replaced;
+              ];
+              iterTrace++;
+              If[inner === prevTrace, Break[]]
+            ]
+          ];
+        ],
+        (* Fast path: simple Scalar contents without CDs *)
+        inner = ToBasis[chart][inner];
+        inner = TraceBasisDummy[inner];
+      ];
       inner
     ];
     (* Normalize negative-integer basis indices to non-negative.          *)
@@ -303,15 +415,16 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
   e = ToValues[e];
   e = ToValues[e];  (* Double ToValues: some expressions need two passes *)
 
-  (* Force-resolve remaining abstract-index CD operators.                 *)
-  (* After ToValues + TraceBasisDummy, some CD operators still have       *)
-  (* abstract DummyIn indices (e.g. CD[-g$35404][field[...]]) because    *)
-  (* the CD wrapper is opaque to ToBasis.  Apply ToBasis + TraceBasis-   *)
-  (* Dummy + ToValues iteratively to force basis-index conversion.       *)
-  (* This enables the downstream CD→PD rule and ConvertCDToDerivatives   *)
-  (* to resolve them (they require basis form {i, -chart}).              *)
+  (* Force-resolve remaining abstract-index operators.                    *)
+  (* After ToValues + TraceBasisDummy, some CD operators or CD shorthand *)
+  (* tensors still have abstract DummyIn indices because:                *)
+  (*   - CD wrappers are opaque to ToBasis                              *)
+  (*   - CD shorthands (CD1*, CD2*, ...) are excluded from isCDlikeQ    *)
+  (* Apply ToBasis + TraceBasisDummy + ToValues iteratively to force     *)
+  (* basis-index conversion for BOTH raw CDs AND CD shorthands.         *)
   (* Ref: supervisor's EuclideanSplinter applies ToBasis exhaustively.   *)
-  If[!FreeQ[e, _?isCDlikeQ],
+  If[!FreeQ[e, _?isCDlikeQ] ||
+     !FreeQ[e, (f_?xTensorQ)[__] /; StringMatchQ[ToString[f], "CD" ~~ DigitCharacter ~~ __]],
     Module[{prev2 = -1, cur2, iter2 = 0},
       While[iter2 < 8,
         If[Head[e] === Plus,
@@ -342,13 +455,60 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
     ];
   ];
 
-  (* Diagnostic: warn if CD shorthand tensors remain unresolved after ToValues *)
-  Module[{cdRes = Cases[e, (f_?xTensorQ)[__] /;
-      StringMatchQ[ToString[f], "CD" ~~ DigitCharacter ~~ "*"], {0, Infinity}]},
-    If[Length[cdRes] > 0,
-      Print["WARNING: Unresolved CD shorthands after ToValues: ",
-            DeleteDuplicates[Head /@ cdRes]];
+  (* Trace remaining abstract DummyIn indices via IndicesOf.              *)
+  (* After all ToBasis passes, some CovD operators (raw or shorthand)    *)
+  (* still have abstract DummyIn indices that ToBasis cannot convert     *)
+  (* because they're contracted in products. Use IndicesOf to find ALL   *)
+  (* abstract dummy pairs, then sum each pair over basis values.         *)
+  (* Gated on: any remaining abstract indices in the expression.        *)
+  (* Trace abstract DummyIn indices via Cases-based search.              *)
+  (* IndicesOf[] returns empty for these expressions (DummyIn indices     *)
+  (* from ExpandScalarWrappers are not tracked by xAct's index system). *)
+  (* Instead: find DummyIn-allocated symbols (g$NNN) via Cases,         *)
+  (* matching them in CovD indices and metric indices to find pairs.    *)
+  Module[{dimLocal, cdDownSyms, metricSyms, allUpSyms, paired, replaced},
+    dimLocal = DimOfManifold[ManifoldOfChart[chart]];
+    (* Find abstract symbols in CovD down-index position *)
+    (* Note: xAct may store -g$ as Times[-1, g$] or as a direct minus *)
+    cdDownSyms = Cases[e, (f_?CovDQ)[idx_][_] /; DownIndexQ[idx] :> UpIndex[idx], {0, Infinity}] // DeleteDuplicates;
+    cdDownSyms = Select[cdDownSyms, AbstractIndexQ[#] && StringMatchQ[ToString[#], "g$" ~~ __] &];
+    (* Find abstract symbols in metric positions *)
+    metricSyms = Cases[e, (f_?MetricQ)[args__] :>
+      Sequence @@ Cases[{args}, s_Symbol /; AbstractIndexQ[s]], {0, Infinity}] // DeleteDuplicates;
+    (* Find DummyIn-generated abstract symbols (g$NNN format).             *)
+    (* These are the indices from ExpandScalarWrappers that xAct's        *)
+    (* ToBasis/TraceBasisDummy cannot resolve. Standard abstract indices  *)
+    (* (a, b, c, ...) are left for the CD→Derivative fallback.           *)
+    allUpSyms = Cases[e, s_Symbol /; AbstractIndexQ[s] &&
+      StringMatchQ[ToString[s], "g$" ~~ __], {0, Infinity}] // DeleteDuplicates;
+    (* Pairs: symbols that appear as BOTH up (in metric/tensor) and down (in CD) *)
+    paired = Intersection[allUpSyms, cdDownSyms];
+    (* Also check for non-CD pairs: DummyIn indices in metrics paired with tensor down-indices *)
+    Module[{tensorDownSyms},
+      tensorDownSyms = Cases[e, (f_?xTensorQ)[-s_Symbol, ___] /; StringMatchQ[ToString[s], "g$" ~~ __] :> s,
+        {0, Infinity}] // DeleteDuplicates;
+      paired = Union[paired, Intersection[metricSyms, tensorDownSyms]]
     ];
+    If[Length[paired] > 0,
+      Print["  Tracing ", Length[paired], " abstract DummyIn pairs"];
+      replaced = e;
+      Do[
+        replaced = Sum[
+          replaced /. {p -> {i, chart}, -p -> {i, -chart}},
+          {i, 0, dimLocal - 1}
+        ];
+        (* After each pair: Expand + evaluate metrics to collapse zeros *)
+        replaced = Expand[replaced];
+        If[!computeChristoffels, replaced = replaced /. christoffelPD -> Zero];
+        replaced = ToValues[replaced];
+        replaced = Expand[replaced],
+        {p, paired}
+      ];
+      e = replaced;
+      e = TraceBasisDummy[e];
+      e = ToValues[e];
+      e = ToValues[e];
+    ]
   ];
 
   (* CD[scalar] → Derivative: After ToValues, field tensors are replaced
@@ -380,6 +540,71 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
 ];
 
 
+(* === SplinterToArray: term-by-term projection to component array ===     *)
+(*                                                                          *)
+(* Projects a single abstract-tensor term (not a sum) through the full      *)
+(* splinter pipeline INCLUDING ComponentArray, returning a dim^rank array   *)
+(* of concrete scalar expressions.  This is the key technique from the      *)
+(* supervisor's EuclideanSplinter (commit 4a89164): ComponentArray converts *)
+(* ALL abstract indices to concrete basis indices simultaneously, which     *)
+(* enables ToValues to resolve shorthand tensor ComponentValues.            *)
+(*                                                                          *)
+(* StaggeredToBasis uses TraceBasisDummy instead of ComponentArray, which   *)
+(* cannot resolve contracted abstract indices inside opaque CD wrappers.    *)
+(* SplinterToArray avoids this by atomically expanding all indices before   *)
+(* any dummy-index summation.                                               *)
+(*                                                                          *)
+(* Used by: DecomposeToComponents (term-by-term branch for R̃² torsion).   *)
+(* Ref: supervisor's EuclideanSplinter in SphericalEuclidean.m lines 239.  *)
+
+SplinterToArray[term_, chart_, computeChristoffels_:False] := Module[
+  {e = term, metric, covd, christoffelPD},
+
+  (* Get metric and Christoffel symbol *)
+  Module[{manifold, tangentBundle, metrics},
+    manifold = ManifoldOfChart[chart];
+    tangentBundle = Symbol["Tangent" <> ToString[manifold]];
+    metrics = MetricsOfVBundle[tangentBundle];
+    If[!ListQ[metrics] || Length[metrics] == 0,
+      Print["WARNING: SplinterToArray: no metric for chart ", chart];
+      Return[ToBasis[chart][e]]
+    ];
+    metric = First[metrics];
+    covd = CovDOfMetric[metric];
+  ];
+  christoffelPD = Symbol["Christoffel" <> ToString[covd] <> "PD" <> ToString[chart]];
+
+  (* Staggered ToBasis (same as StaggeredToBasis but without TraceBasisDummy) *)
+  If[Head[e] === Plus,
+    e = Total[ToBasis[chart] /@ List @@ e],
+    e = ToBasis[chart][e]
+  ];
+  If[!computeChristoffels, e = e /. christoffelPD -> Zero, e = ToValues[e]];
+  If[Head[e] === Plus,
+    e = Total[ToBasis[chart] /@ List @@ e],
+    e = ToBasis[chart][e]
+  ];
+  If[!computeChristoffels, e = e /. christoffelPD -> Zero, e = ToValues[e]];
+  e = SeparateMetric[metric][e];
+  If[Head[e] === Plus,
+    e = Total[ToBasis[chart] /@ List @@ e],
+    e = ToBasis[chart][e]
+  ];
+  If[!computeChristoffels, e = e /. christoffelPD -> Zero, e = ToValues[e]];
+
+  (* KEY: ComponentArray atomically expands ALL abstract indices into a     *)
+  (* dim^rank array.  This is what makes shorthand ComponentValues resolve  *)
+  (* — ToValues can match the concrete basis-index patterns.               *)
+  (* Ref: supervisor's EuclideanSplinter lines 246-249.                    *)
+  e = ComponentArray[e];
+  e = ToValues[e];
+  e = TraceBasisDummy[e];
+  e = ToValues[e];
+
+  e
+];
+
+
 (* === Component Decomposition === *)
 
 (* Options for DecomposeToComponents *)
@@ -389,7 +614,8 @@ Options[DecomposeToComponents] = {
   "SkipTuples" -> {},  (* Component index tuples to skip (e.g. TT-zeroed {0,mu}) *)
   "BackgroundFieldRules" -> {},  (* List of {fieldHead, {comp0, comp1, ...}} for background field eval *)
   "KilledAxes" -> {},  (* Basis indices of transverse axes for plane-wave reduction *)
-  "PertFieldHeads" -> {}  (* Perturbation field head symbols whose transverse PD should be zeroed *)
+  "PertFieldHeads" -> {},  (* Perturbation field head symbols whose transverse PD should be zeroed *)
+  "TermByTerm" -> False  (* Use term-by-term projection via SplinterToArray (for R̃² torsion) *)
 };
 
 (* 3-arg signature: eom, field, chart (no additional fields, default options) *)
@@ -480,7 +706,7 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
     componentEq = SeparateFieldMetrics[componentEq, chart];
 
     (* Expand Scalar[] wrappers before staggered ToBasis *)
-    componentEq = ExpandScalarWrappers[componentEq, chart];
+    componentEq = ExpandScalarWrappers[componentEq, chart, computeChristoffels =!= False];
 
     (* Staggered ToBasis pipeline (replaces old ToBasis + TBD + steps 4-7) *)
     componentEq = StaggeredToBasis[componentEq, chart, computeChristoffels =!= False];
@@ -603,7 +829,7 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
           If[!hasTorsionScalars,
             (* Safe to hoist: standard theory without CD inside Scalar *)
             Print["  Pre-expanding Scalar[] wrappers (hoisted)..."];
-            eomSep = ExpandScalarWrappers[eomSep, chart];
+            eomSep = ExpandScalarWrappers[eomSep, chart, computeChristoffels];
             Print["  Scalar expansion complete: ", If[FreeQ[eomSep, Scalar], "all resolved", "some remain"]],
             (* Torsion theory: skip hoisting, let per-component expansion handle it *)
             Print["  Scalar[] wrappers detected with CD operators — expanding per-component"]
@@ -623,6 +849,233 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
       Unprotect[xAct`xTensor`Private`ValidateIndices];
       Module[{savedValidate = xAct`xTensor`Private`ValidateIndices},
         xAct`xTensor`Private`ValidateIndices = (True &);
+
+        (* ================================================================ *)
+        (* Term-by-term projection (supervisor's approach, commit 4a89164). *)
+        (* Split the abstract EOM into additive terms and project each      *)
+        (* individually through SplinterToArray (which uses ComponentArray  *)
+        (* to atomically expand ALL abstract indices). This resolves CD     *)
+        (* shorthand ComponentValues that TraceBasisDummy alone cannot.     *)
+        (* Ref: SphericalEuclidean.m lines 415-428.                        *)
+        (* ================================================================ *)
+        If[OptionValue["TermByTerm"] === True,
+          Module[{eomExpanded, eomTerms, nTerms, termComp, eomComp,
+                  fieldRankLocal, dimLocal, tStart, compEq, coordSymsLocal,
+                  allFieldHeadsLocal},
+            Print["  Term-by-term projection (SplinterToArray)..."];
+            fieldRankLocal = fieldRank;
+            dimLocal = dim;
+
+            (* Per-component loop: for each component tuple, fix free      *)
+            (* indices, expand Scalars, apply shorthand rules, split into  *)
+            (* additive terms, and project each through SplinterToArray.   *)
+            (* This combines ExtractTensorComponent's free-index fixing    *)
+            (* with SplinterToArray's ComponentArray-based resolution.     *)
+            Print["  Per-component term-by-term projection..."];
+            coordSymsLocal = GetCoordinateSymbols[chart];
+            allFieldHeadsLocal = Join[{fieldHead}, ExtractFieldHead /@ additionalFields];
+            result = {};
+            Do[
+              Module[{tuple, flatIdx, componentEqLocal, eomTermsLocal, nTermsLocal,
+                      tStartLocal, termCompLocal, compAccum, allIndicesLocal,
+                      freeIdxListLocal, replacementsLocal, rankLocal},
+                tuple = componentTuples[[idx]];
+                flatIdx = flatIdxMap[tuple];
+                rankLocal = fieldRankLocal;
+
+                (* Step 1: Fix free indices to basis values (like ExtractTensorComponent) *)
+                allIndicesLocal = List @@ IndicesOf[][eomSep];
+                freeIdxListLocal = Select[allIndicesLocal, !MemberQ[allIndicesLocal, ChangeIndex[#]] &];
+                If[Length[freeIdxListLocal] < rankLocal,
+                  freeIdxListLocal = Cases[field, _Symbol?AbstractIndexQ, {0, Infinity}]
+                ];
+                replacementsLocal = Table[
+                  freeIdxListLocal[[i]] -> If[DownIndexQ[freeIdxListLocal[[i]]],
+                    {tuple[[i]], -chart},
+                    {tuple[[i]], chart}
+                  ],
+                  {i, rankLocal}
+                ];
+                componentEqLocal = eomSep /. replacementsLocal;
+
+                (* Step 2: Expand Scalar wrappers *)
+                componentEqLocal = ExpandScalarWrappers[componentEqLocal, chart, computeChristoffels];
+
+                (* Step 3: Re-apply CD shorthand rules *)
+                If[ListQ[Global`$CDShorthandRules] && Length[Global`$CDShorthandRules] > 0,
+                  Do[componentEqLocal = componentEqLocal /. rule, {rule, Global`$CDShorthandRules}]
+                ];
+
+                (* Step 4: Split into additive terms *)
+                componentEqLocal = Expand[componentEqLocal];
+                (* Peel CollectTensors wrappers *)
+                Module[{unwrapped = componentEqLocal},
+                  While[Length[unwrapped] == 1 && Head[unwrapped] =!= Plus && Head[unwrapped] =!= Times,
+                    unwrapped = unwrapped[[1]]
+                  ];
+                  If[Head[unwrapped] === Plus, componentEqLocal = unwrapped]
+                ];
+
+                eomTermsLocal = If[Head[componentEqLocal] === Plus,
+                  List @@ componentEqLocal, {componentEqLocal}];
+                nTermsLocal = Length[eomTermsLocal];
+
+                (* Step 5: Project each term through StaggeredToBasis *)
+                (* (free indices already fixed → only contracted indices remain) *)
+                compAccum = 0;
+                If[idx == 1, Print["  Component 1 diagnostic:"];
+                  Print["    ", nTermsLocal, " terms, first term Head=",
+                        Head[eomTermsLocal[[1]]], ", LeafCount=", LeafCount[eomTermsLocal[[1]]]];
+                  Print["    First term: ", Short[eomTermsLocal[[1]], 2]]];
+                Do[
+                  tStartLocal = AbsoluteTime[];
+                  termCompLocal = Catch[StaggeredToBasis[eomTermsLocal[[k]], chart, computeChristoffels]];
+                  If[StringQ[termCompLocal], Continue[]];
+                  If[idx == 1 && k <= 2,
+                    Print["    After StaggeredToBasis term ", k, ": ",
+                          Short[termCompLocal, 2]]];
+                  compAccum += termCompLocal;
+                , {k, nTermsLocal}];
+                compAccum = Expand[compAccum];
+                If[idx == 1,
+                  Print["    Accumulated: ", Short[compAccum, 2]]];
+
+                (* Step 6: Post-process (replace fields, convert CDs) *)
+                Do[
+                  compAccum = ReplaceTensorFieldComponents[compAccum, afh, chart,
+                    coordSymsLocal, dimLocal, metricMatrix],
+                  {afh, allFieldHeadsLocal}
+                ];
+                Module[{cdResult},
+                  cdResult = Catch[ConvertCDToDerivatives[compAccum, chart]];
+                  If[!StringQ[cdResult], compAccum = cdResult]
+                ];
+                (* Fallback CD→Derivative *)
+                Module[{dimFB = dimLocal, prevFB, iterFB = 0},
+                  prevFB = compAccum;
+                  While[iterFB < 10,
+                    compAccum = compAccum /. (f_)[{idxI_Integer, s_}][g_Symbol[args___]] /;
+                        CovDQ[f] && (s === chart || s === -chart) :>
+                      With[{orders = ReplacePart[ConstantArray[0, dimFB], idxI + 1 -> 1]},
+                        Derivative[Sequence @@ orders][g][args]
+                      ];
+                    compAccum = compAccum /. (f_)[{idxI_Integer, s_}][Derivative[orders__][g_][args__]] /;
+                        CovDQ[f] && (s === chart || s === -chart) :>
+                      With[{paddedOrders = PadRight[{orders}, dimFB, 0]},
+                        With[{newOrders = ReplacePart[paddedOrders, idxI + 1 -> paddedOrders[[idxI + 1]] + 1]},
+                          Derivative[Sequence @@ newOrders][g][args]
+                        ]
+                      ];
+                    iterFB++;
+                    If[compAccum === prevFB, Break[]];
+                    prevFB = compAccum;
+                  ];
+                ];
+                If[backgroundFieldRules =!= {},
+                  Do[compAccum = EvaluatePDBackgroundField[compAccum, chart, bg[[1]], bg[[2]],
+                      If[Length[bg] >= 3, bg[[3]], {}]],
+                    {bg, backgroundFieldRules}];
+                  compAccum = Expand[compAccum]
+                ];
+
+                (* Final: trace any remaining abstract DummyIn indices.    *)
+                (* After CD→Derivative fallback, some CD operators still   *)
+                (* have abstract indices (from ExpandScalarWrappers). Sum  *)
+                (* over all paired abstract indices to resolve them.       *)
+                (* xAct stores indices inside tensor heads, so also search *)
+                (* for indices extracted by IndicesOf.                     *)
+                Module[{upIdxFinal, downIdxFinal, pairedFinal, dimFinal2, replacedFinal,
+                        allIndicesFinal},
+                  dimFinal2 = dimLocal;
+                  (* Use IndicesOf to find ALL abstract indices in the expression *)
+                  allIndicesFinal = Cases[compAccum, _Symbol?AbstractIndexQ | -(_Symbol?AbstractIndexQ),
+                    {0, Infinity}] // DeleteDuplicates;
+                  upIdxFinal = Select[allIndicesFinal, !DownIndexQ[#] &];
+                  downIdxFinal = (-#) & /@ Select[allIndicesFinal, DownIndexQ];
+                  pairedFinal = Intersection[upIdxFinal, downIdxFinal];
+                  (* Also find abstract indices inside CovD operators.      *)
+                  (* xAct stores CD[-g$...] with the down index inside the  *)
+                  (* CovD head, NOT as Times[-1, g$...]. Extract CD indices *)
+                  (* directly from the pattern f_?CovDQ[idx_][...].        *)
+                  Module[{cdDownIdx},
+                    cdDownIdx = Cases[compAccum,
+                      (f_?CovDQ)[idx_][_] /; AbstractIndexQ[UpIndex[idx]] :> UpIndex[idx],
+                      {0, Infinity}] // DeleteDuplicates;
+                    If[Length[cdDownIdx] > 0,
+                      downIdxFinal = Union[downIdxFinal, cdDownIdx];
+                      pairedFinal = Intersection[upIdxFinal, downIdxFinal];
+                    ]
+                  ];
+                  (* Also check for metric tensor abstract indices *)
+                  Module[{metricIdx},
+                    metricIdx = Cases[compAccum,
+                      (f_?MetricQ)[idx1_, idx2_] /; AbstractIndexQ[UpIndex[idx1]] || AbstractIndexQ[UpIndex[idx2]] :>
+                        Sequence @@ Select[{UpIndex[idx1], UpIndex[idx2]}, AbstractIndexQ],
+                      {0, Infinity}] // DeleteDuplicates;
+                    If[Length[metricIdx] > 0,
+                      (* Add to both up and down pools *)
+                      upIdxFinal = Union[upIdxFinal, Select[metricIdx, !DownIndexQ[#] &]];
+                      downIdxFinal = Union[downIdxFinal, Select[metricIdx, Function[{x}, True]]];
+                      pairedFinal = Intersection[upIdxFinal, downIdxFinal];
+                    ]
+                  ];
+                  If[idx == 1,
+                    Print["  Post-proc tracing: ", Length[upIdxFinal], " up, ",
+                          Length[downIdxFinal], " down, ", Length[pairedFinal], " paired"];
+                    If[Length[pairedFinal] > 0,
+                      Print["  Pairs: ", Take[pairedFinal, Min[3, Length[pairedFinal]]]]
+                    ]
+                  ];
+                  If[Length[pairedFinal] > 0,
+                    Print["  Tracing ", Length[pairedFinal], " post-proc abstract pairs"];
+                    replacedFinal = compAccum;
+                    Do[
+                      (* Replace abstract index in both up and down positions *)
+                      replacedFinal = Sum[
+                        replacedFinal /. {pair -> {i, chart}, -pair -> {i, -chart}},
+                        {i, 0, dimFinal2 - 1}
+                      ],
+                      {pair, pairedFinal}
+                    ];
+                    compAccum = Expand[replacedFinal];
+                    (* Resolve any newly-created basis-form CDs *)
+                    compAccum = compAccum /. (f_)[{idxI_Integer, s_}][g_Symbol[args___]] /;
+                        CovDQ[f] && (s === chart || s === -chart) :>
+                      With[{orders = ReplacePart[ConstantArray[0, dimFinal2], idxI + 1 -> 1]},
+                        Derivative[Sequence @@ orders][g][args]
+                      ];
+                    compAccum = compAccum /. (f_)[{idxI_Integer, s_}][Derivative[orders__][g_][args__]] /;
+                        CovDQ[f] && (s === chart || s === -chart) :>
+                      With[{paddedOrders = PadRight[{orders}, dimFinal2, 0]},
+                        With[{newOrders = ReplacePart[paddedOrders, idxI + 1 -> paddedOrders[[idxI + 1]] + 1]},
+                          Derivative[Sequence @@ newOrders][g][args]
+                        ]
+                      ];
+                    (* Evaluate metric: eta[{i,chart},{j,chart}] → 0 or ±1 *)
+                    compAccum = ToValues[compAccum];
+                    compAccum = Expand[compAccum];
+                  ]
+                ];
+
+                AppendTo[result, {flatIdx, Expand[Simplify[compAccum]]}];
+                Print["  [", Round[MemoryInUse[]/1024.^2], " MB] component ",
+                      idx, "/", Length[componentTuples], " (", nTermsLocal, " terms)"];
+              ],
+              {idx, 1, Length[componentTuples]}
+            ];
+          ];
+          (* Clean up and return *)
+          xAct`xTensor`Private`ValidateIndices = savedValidate;
+          Protect[xAct`xTensor`Private`ValidateIndices];
+          On[Validate::repeated];
+          On[Validate::inhom];
+          Return[result]
+        ];
+
+        (* ================================================================ *)
+        (* Standard per-component extraction (ExtractTensorComponent).      *)
+        (* Used for non-torsion theories or when TermByTerm is not needed.  *)
+        (* ================================================================ *)
         result = {};
         Do[
           AppendTo[result,
@@ -843,7 +1296,7 @@ ExtractTensorComponent[eom_, field_, chart_, componentIndices_List,
   ];
 
   (* Step 1.3: Expand Scalar[] wrappers before ToBasis.                    *)
-  componentEq = ExpandScalarWrappers[componentEq, chart];
+  componentEq = ExpandScalarWrappers[componentEq, chart, computeChristoffels];
 
   (* Step 1.4: Re-apply shorthand CD[field] → CDfield substitutions.       *)
   (* ExpandScalarWrappers may have introduced new CD[field] operators from  *)
@@ -1262,7 +1715,7 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
   (* produce Scalar[CD_a V^a]^2 and Scalar[eta[a,b]*CD[-a][T[-b,-c,-d]]]    *)
   (* that ToBasis cannot penetrate.  Uses shared ExpandScalarWrappers with   *)
   (* bounded iteration for safety.                                           *)
-  componentExpr = ExpandScalarWrappers[componentExpr, chart];
+  componentExpr = ExpandScalarWrappers[componentExpr, chart, shouldComputeChristoffels];
 
   (* For curved spacetime: expand Christoffel symbols to metric derivatives *)
   If[shouldComputeChristoffels && metricMatrix =!= None,
