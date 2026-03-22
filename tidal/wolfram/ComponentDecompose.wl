@@ -459,8 +459,16 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
     e = ToValues[e]
   ];
 
-  (* TraceBasisDummy: convert abstract dummy indices to basis sums *)
-  e = TraceBasisDummy[e];
+  (* TraceBasisDummy: per-term to prevent O(dim^{2K}) explosion.         *)
+  (* The full expression may have K=45 contracted dummy pairs across all *)
+  (* additive terms, but each individual term has only ~3 pairs.         *)
+  (* Per-term: O(N × dim^6) instead of O(dim^90). Same pattern as       *)
+  (* BatchedTraceBasisDummyWithMetric (line 1195).                       *)
+  If[Head[e] === Plus,
+    e = Total[TraceBasisDummy /@ List @@ e],
+    e = TraceBasisDummy[e]
+  ];
+  e = Expand[e];
 
   (* ToValues: substitute ALL pre-computed ComponentValues *)
   (* (metrics, Christoffels, fields, background fields) *)
@@ -501,7 +509,11 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
         e = e /. christoffelPD -> Zero,
         e = ToValues[e]
       ];
-      e = TraceBasisDummy[e];
+      If[Head[e] === Plus,
+        e = Total[TraceBasisDummy /@ List @@ e],
+        e = TraceBasisDummy[e]
+      ];
+      e = Expand[e];
       e = ToValues[e];
       e = ToValues[e];
     ];
@@ -542,22 +554,58 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
       paired = Union[paired, Intersection[metricSyms, tensorDownSyms]]
     ];
     If[Length[paired] > 0,
-      Print["  Tracing ", Length[paired], " abstract DummyIn pairs"];
-      replaced = e;
-      Do[
-        replaced = Sum[
-          replaced /. {p -> {i, chart}, -p -> {i, -chart}},
-          {i, 0, dimLocal - 1}
+      Print["  Tracing ", Length[paired], " abstract dummy pairs (per-term)"];
+      (* Per-term tracing: each additive term has only ~3 abstract pairs,  *)
+      (* not 45 across all terms. Sum-trace each term independently to     *)
+      (* avoid O(dim^{2K}) explosion on the full expression.               *)
+      (* Mathematically safe: Einstein summation dummies are always         *)
+      (* contracted WITHIN a single product term, never across additive    *)
+      (* terms. Ref: BatchedTraceBasisDummyWithMetric (same principle).    *)
+      Module[{terms, tracedTerms = {}, tTerm},
+        terms = If[Head[e] === Plus, List @@ e, {e}];
+        Do[
+          Module[{term = terms[[k]], termPaired, upT, downT, replaced},
+            (* Find abstract dummy pairs IN THIS TERM *)
+            upT = Cases[term, s_Symbol /; AbstractIndexQ[s] &&
+              !MemberQ[coordNames, ToString[s]], {0, Infinity}] // DeleteDuplicates;
+            downT = {};
+            downT = Union[downT,
+              Cases[term, (f_?CovDQ)[idx_][_] /; DownIndexQ[idx] :> UpIndex[idx],
+                {0, Infinity}]];
+            downT = Union[downT,
+              Cases[term, (f_?xTensorQ)[___, -s_Symbol, ___] /; AbstractIndexQ[s] :> s,
+                {0, Infinity}]];
+            downT = Union[downT,
+              Cases[term, idx_ /; DownIndexQ[idx] && AbstractIndexQ[UpIndex[idx]] :> UpIndex[idx],
+                {0, Infinity}]];
+            downT = Select[downT, AbstractIndexQ];
+            termPaired = Intersection[upT, downT];
+            If[Length[termPaired] > 0,
+              replaced = term;
+              Do[
+                replaced = Sum[
+                  replaced /. {p -> {i, chart}, ChangeIndex[p] -> {i, -chart}},
+                  {i, 0, dimLocal - 1}
+                ];
+                replaced = Expand[replaced];
+                If[!computeChristoffels, replaced = replaced /. christoffelPD -> Zero];
+                replaced = ToValues[replaced];
+                replaced = Expand[replaced],
+                {p, termPaired}
+              ];
+              AppendTo[tracedTerms, replaced],
+              AppendTo[tracedTerms, term]
+            ]
+          ],
+          {k, Length[terms]}
         ];
-        (* After each pair: Expand + evaluate metrics to collapse zeros *)
-        replaced = Expand[replaced];
-        If[!computeChristoffels, replaced = replaced /. christoffelPD -> Zero];
-        replaced = ToValues[replaced];
-        replaced = Expand[replaced],
-        {p, paired}
+        e = Total[tracedTerms];
       ];
-      e = replaced;
-      e = TraceBasisDummy[e];
+      e = Expand[e];
+      If[Head[e] === Plus,
+        e = Total[TraceBasisDummy /@ List @@ e],
+        e = TraceBasisDummy[e]
+      ];
       e = ToValues[e];
       e = ToValues[e];
     ]
