@@ -711,6 +711,38 @@ SplinterToArray[term_, chart_, computeChristoffels_:False] := Module[
   e = TraceBasisDummy[e];
   e = ToValues[e];
 
+  (* CD[scalar] → Derivative: After ToValues, field tensors are replaced  *)
+  (* by named scalar functions. CovD of scalars = partial derivatives.    *)
+  (* Must be applied to each cell of the ComponentArray result.           *)
+  Module[{dim = DimOfManifold[ManifoldOfChart[chart]]},
+    e = Map[Function[{cell},
+      cell /. (f_)[{idx_Integer, chartSign_}][g_[args___]] /;
+          CovDQ[f] && FreeQ[g, _?xTensorQ] && (chartSign === chart || chartSign === -chart) :>
+        With[{orders = ReplacePart[ConstantArray[0, dim], idx + 1 -> 1]},
+          Derivative[Sequence @@ orders][g][args]
+        ]
+    ], e, {-1}];
+    e = Map[Function[{cell},
+      cell /. (f_)[{idx_Integer, chartSign_}][Derivative[orders__][g_][args__]] /;
+          CovDQ[f] && FreeQ[g, _?xTensorQ] && (chartSign === chart || chartSign === -chart) :>
+        With[{paddedOrders = PadRight[{orders}, dim, 0]},
+          With[{newOrders = ReplacePart[paddedOrders, idx + 1 -> paddedOrders[[idx + 1]] + 1]},
+            Derivative[Sequence @@ newOrders][g][args]
+          ]
+        ]
+    ], e, {-1}];
+    (* Also handle Derivative-wrapping-CD *)
+    e = Map[Function[{cell},
+      cell /. Derivative[outerOrds__][(f_)[{idx_Integer, chartSign_}]][g_Symbol[args__]] /;
+          CovDQ[f] && (chartSign === chart || chartSign === -chart) :>
+        With[{paddedOuter = PadRight[{outerOrds}, dim, 0]},
+          With[{mergedOrders = ReplacePart[paddedOuter, idx + 1 -> paddedOuter[[idx + 1]] + 1]},
+            Derivative[Sequence @@ mergedOrders][g][args]
+          ]
+        ]
+    ], e, {-1}];
+  ];
+
   e
 ];
 
@@ -969,207 +1001,114 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
         (* Ref: SphericalEuclidean.m lines 415-428.                        *)
         (* ================================================================ *)
         If[OptionValue["TermByTerm"] === True,
-          Module[{eomExpanded, eomTerms, nTerms, termComp, eomComp,
-                  fieldRankLocal, dimLocal, tStart, compEq, coordSymsLocal,
+          Module[{eomTerms, nTerms, termComp, eomComp,
+                  fieldRankLocal, dimLocal, tStart, coordSymsLocal,
                   allFieldHeadsLocal},
-            Print["  Term-by-term projection (SplinterToArray)..."];
+            (* ================================================================ *)
+            (* Supervisor's approach (SphericalEuclidean.m:415-428):             *)
+            (* Split the abstract EOM (WITH free indices) into additive terms.  *)
+            (* Project each term through SplinterToArray (which uses            *)
+            (* ComponentArray to atomically expand ALL indices to basis form).  *)
+            (* Accumulate into a dim^rank array. Post-process each component.  *)
+            (*                                                                   *)
+            (* Why this is fast: ComponentArray is O(1) per tensor, vs          *)
+            (* TraceBasisDummy which is O(dim^{2K}) for K contracted pairs.    *)
+            (* Scalar wrappers must be pre-resolved (commit 7666cd2) before    *)
+            (* this branch runs, to avoid DummyIn index contamination.         *)
+            (* ================================================================ *)
+            Print["  Term-by-term projection (SplinterToArray + ComponentArray)..."];
             fieldRankLocal = fieldRank;
             dimLocal = dim;
-
-            (* Per-component loop: for each component tuple, fix free      *)
-            (* indices, expand Scalars, apply shorthand rules, split into  *)
-            (* additive terms, and project each through SplinterToArray.   *)
-            (* This combines ExtractTensorComponent's free-index fixing    *)
-            (* with SplinterToArray's ComponentArray-based resolution.     *)
-            Print["  Per-component term-by-term projection..."];
             coordSymsLocal = GetCoordinateSymbols[chart];
             allFieldHeadsLocal = Join[{fieldHead}, ExtractFieldHead /@ additionalFields];
+
+            (* Split abstract EOM into additive terms *)
+            eomTerms = If[Head[eomSep] === Plus, List @@ eomSep, {eomSep}];
+            nTerms = Length[eomTerms];
+            Print["  EOM has ", nTerms, " additive terms"];
+
+            (* Accumulate component arrays term by term *)
+            eomComp = ConstantArray[0, Table[dimLocal, {fieldRankLocal}]];
+            Do[
+              tStart = AbsoluteTime[];
+              termComp = Catch[SplinterToArray[eomTerms[[k]], chart, computeChristoffels]];
+              If[StringQ[termComp],
+                Print["  Term ", k, "/", nTerms, ": FAILED (", termComp, ")"];
+                Continue[]
+              ];
+              eomComp += termComp;
+              If[Mod[k, 5] == 0 || k == nTerms,
+                Print["  Term ", k, "/", nTerms, " (",
+                      Round[AbsoluteTime[] - tStart, 0.1], "s, ",
+                      Round[MemoryInUse[]/1024.^2], " MB)"]
+              ];
+              Share[];
+            , {k, nTerms}];
+
+            (* Simplify accumulated component array *)
+            Print["  Simplifying component array..."];
+            eomComp = Map[Simplify, eomComp, {fieldRankLocal}];
+
+            (* Post-process each component: field replacement + CD→Derivative *)
+            Print["  Post-processing components..."];
             result = {};
             Do[
-              Module[{tuple, flatIdx, componentEqLocal, eomTermsLocal, nTermsLocal,
-                      tStartLocal, termCompLocal, compAccum, allIndicesLocal,
-                      freeIdxListLocal, replacementsLocal, rankLocal},
+              Module[{tuple, flatIdx, compExpr},
                 tuple = componentTuples[[idx]];
                 flatIdx = flatIdxMap[tuple];
-                rankLocal = fieldRankLocal;
+                compExpr = eomComp[[Sequence @@ (tuple + 1)]];
 
-                (* Step 1: Fix free indices to basis values (like ExtractTensorComponent) *)
-                allIndicesLocal = List @@ IndicesOf[][eomSep];
-                freeIdxListLocal = Select[allIndicesLocal, !MemberQ[allIndicesLocal, ChangeIndex[#]] &];
-                If[Length[freeIdxListLocal] < rankLocal,
-                  freeIdxListLocal = Cases[field, _Symbol?AbstractIndexQ, {0, Infinity}]
-                ];
-                replacementsLocal = Table[
-                  freeIdxListLocal[[i]] -> If[DownIndexQ[freeIdxListLocal[[i]]],
-                    {tuple[[i]], -chart},
-                    {tuple[[i]], chart}
-                  ],
-                  {i, rankLocal}
-                ];
-                componentEqLocal = eomSep /. replacementsLocal;
-
-                (* Step 2: Expand Scalar wrappers *)
-                componentEqLocal = ExpandScalarWrappers[componentEqLocal, chart, computeChristoffels];
-
-                (* Step 3: Re-apply CD shorthand rules *)
-                If[ListQ[Global`$CDShorthandRules] && Length[Global`$CDShorthandRules] > 0,
-                  Do[componentEqLocal = componentEqLocal /. rule, {rule, Global`$CDShorthandRules}]
-                ];
-
-                (* Step 4: Split into additive terms *)
-                componentEqLocal = Expand[componentEqLocal];
-                (* Peel CollectTensors wrappers *)
-                Module[{unwrapped = componentEqLocal},
-                  While[Length[unwrapped] == 1 && Head[unwrapped] =!= Plus && Head[unwrapped] =!= Times,
-                    unwrapped = unwrapped[[1]]
-                  ];
-                  If[Head[unwrapped] === Plus, componentEqLocal = unwrapped]
-                ];
-
-                eomTermsLocal = If[Head[componentEqLocal] === Plus,
-                  List @@ componentEqLocal, {componentEqLocal}];
-                nTermsLocal = Length[eomTermsLocal];
-
-                (* Step 5: Project each term through StaggeredToBasis *)
-                (* (free indices already fixed → only contracted indices remain) *)
-                compAccum = 0;
-                If[idx == 1, Print["  Component 1 diagnostic:"];
-                  Print["    ", nTermsLocal, " terms, first term Head=",
-                        Head[eomTermsLocal[[1]]], ", LeafCount=", LeafCount[eomTermsLocal[[1]]]];
-                  Print["    First term: ", Short[eomTermsLocal[[1]], 2]]];
+                (* Replace tensor fields with named scalar functions *)
                 Do[
-                  tStartLocal = AbsoluteTime[];
-                  termCompLocal = Catch[StaggeredToBasis[eomTermsLocal[[k]], chart, computeChristoffels]];
-                  If[StringQ[termCompLocal], Continue[]];
-                  If[idx == 1 && k <= 2,
-                    Print["    After StaggeredToBasis term ", k, ": ",
-                          Short[termCompLocal, 2]]];
-                  compAccum += termCompLocal;
-                , {k, nTermsLocal}];
-                compAccum = Expand[compAccum];
-                If[idx == 1,
-                  Print["    Accumulated: ", Short[compAccum, 2]]];
-
-                (* Step 6: Post-process (replace fields, convert CDs) *)
-                Do[
-                  compAccum = ReplaceTensorFieldComponents[compAccum, afh, chart,
+                  compExpr = ReplaceTensorFieldComponents[compExpr, afh, chart,
                     coordSymsLocal, dimLocal, metricMatrix],
                   {afh, allFieldHeadsLocal}
                 ];
+
+                (* Convert CD → Derivative *)
                 Module[{cdResult},
-                  cdResult = Catch[ConvertCDToDerivatives[compAccum, chart]];
-                  If[!StringQ[cdResult], compAccum = cdResult]
+                  cdResult = Catch[ConvertCDToDerivatives[compExpr, chart]];
+                  If[!StringQ[cdResult], compExpr = cdResult]
                 ];
                 (* Fallback CD→Derivative *)
                 Module[{dimFB = dimLocal, prevFB, iterFB = 0},
-                  prevFB = compAccum;
+                  prevFB = compExpr;
                   While[iterFB < 10,
-                    compAccum = compAccum /. (f_)[{idxI_Integer, s_}][g_Symbol[args___]] /;
+                    compExpr = compExpr /. (f_)[{idxI_Integer, s_}][g_Symbol[args___]] /;
                         CovDQ[f] && (s === chart || s === -chart) :>
                       With[{orders = ReplacePart[ConstantArray[0, dimFB], idxI + 1 -> 1]},
                         Derivative[Sequence @@ orders][g][args]
                       ];
-                    compAccum = compAccum /. (f_)[{idxI_Integer, s_}][Derivative[orders__][g_][args__]] /;
+                    compExpr = compExpr /. (f_)[{idxI_Integer, s_}][Derivative[orders__][g_][args__]] /;
                         CovDQ[f] && (s === chart || s === -chart) :>
                       With[{paddedOrders = PadRight[{orders}, dimFB, 0]},
                         With[{newOrders = ReplacePart[paddedOrders, idxI + 1 -> paddedOrders[[idxI + 1]] + 1]},
                           Derivative[Sequence @@ newOrders][g][args]
                         ]
                       ];
+                    (* Derivative-wrapping-CD *)
+                    compExpr = compExpr /. Derivative[outerOrds__][(f_)[{idxI_Integer, s_}]][g_Symbol[args__]] /;
+                        CovDQ[f] && (s === chart || s === -chart) :>
+                      With[{paddedOuter = PadRight[{outerOrds}, dimFB, 0]},
+                        With[{mergedOrders = ReplacePart[paddedOuter, idxI + 1 -> paddedOuter[[idxI + 1]] + 1]},
+                          Derivative[Sequence @@ mergedOrders][g][args]
+                        ]
+                      ];
                     iterFB++;
-                    If[compAccum === prevFB, Break[]];
-                    prevFB = compAccum;
+                    If[compExpr === prevFB, Break[]];
+                    prevFB = compExpr;
                   ];
                 ];
                 If[backgroundFieldRules =!= {},
-                  Do[compAccum = EvaluatePDBackgroundField[compAccum, chart, bg[[1]], bg[[2]],
+                  Do[compExpr = EvaluatePDBackgroundField[compExpr, chart, bg[[1]], bg[[2]],
                       If[Length[bg] >= 3, bg[[3]], {}]],
                     {bg, backgroundFieldRules}];
-                  compAccum = Expand[compAccum]
+                  compExpr = Expand[compExpr]
                 ];
 
-                (* Final: trace any remaining abstract DummyIn indices.    *)
-                (* After CD→Derivative fallback, some CD operators still   *)
-                (* have abstract indices (from ExpandScalarWrappers). Sum  *)
-                (* over all paired abstract indices to resolve them.       *)
-                (* xAct stores indices inside tensor heads, so also search *)
-                (* for indices extracted by IndicesOf.                     *)
-                Module[{upIdxFinal, downIdxFinal, pairedFinal, dimFinal2, replacedFinal,
-                        allIndicesFinal},
-                  dimFinal2 = dimLocal;
-                  (* Use IndicesOf to find ALL abstract indices in the expression *)
-                  allIndicesFinal = Cases[compAccum, _Symbol?AbstractIndexQ | -(_Symbol?AbstractIndexQ),
-                    {0, Infinity}] // DeleteDuplicates;
-                  upIdxFinal = Select[allIndicesFinal, !DownIndexQ[#] &];
-                  downIdxFinal = (-#) & /@ Select[allIndicesFinal, DownIndexQ];
-                  pairedFinal = Intersection[upIdxFinal, downIdxFinal];
-                  (* Also find abstract indices inside CovD operators.      *)
-                  (* xAct stores CD[-g$...] with the down index inside the  *)
-                  (* CovD head, NOT as Times[-1, g$...]. Extract CD indices *)
-                  (* directly from the pattern f_?CovDQ[idx_][...].        *)
-                  Module[{cdDownIdx},
-                    cdDownIdx = Cases[compAccum,
-                      (f_?CovDQ)[idx_][_] /; AbstractIndexQ[UpIndex[idx]] :> UpIndex[idx],
-                      {0, Infinity}] // DeleteDuplicates;
-                    If[Length[cdDownIdx] > 0,
-                      downIdxFinal = Union[downIdxFinal, cdDownIdx];
-                      pairedFinal = Intersection[upIdxFinal, downIdxFinal];
-                    ]
-                  ];
-                  (* Also check for metric tensor abstract indices *)
-                  Module[{metricIdx},
-                    metricIdx = Cases[compAccum,
-                      (f_?MetricQ)[idx1_, idx2_] /; AbstractIndexQ[UpIndex[idx1]] || AbstractIndexQ[UpIndex[idx2]] :>
-                        Sequence @@ Select[{UpIndex[idx1], UpIndex[idx2]}, AbstractIndexQ],
-                      {0, Infinity}] // DeleteDuplicates;
-                    If[Length[metricIdx] > 0,
-                      (* Add to both up and down pools *)
-                      upIdxFinal = Union[upIdxFinal, Select[metricIdx, !DownIndexQ[#] &]];
-                      downIdxFinal = Union[downIdxFinal, Select[metricIdx, Function[{x}, True]]];
-                      pairedFinal = Intersection[upIdxFinal, downIdxFinal];
-                    ]
-                  ];
-                  If[idx == 1,
-                    Print["  Post-proc tracing: ", Length[upIdxFinal], " up, ",
-                          Length[downIdxFinal], " down, ", Length[pairedFinal], " paired"];
-                    If[Length[pairedFinal] > 0,
-                      Print["  Pairs: ", Take[pairedFinal, Min[3, Length[pairedFinal]]]]
-                    ]
-                  ];
-                  If[Length[pairedFinal] > 0,
-                    Print["  Tracing ", Length[pairedFinal], " post-proc abstract pairs"];
-                    replacedFinal = compAccum;
-                    Do[
-                      (* Replace abstract index in both up and down positions *)
-                      replacedFinal = Sum[
-                        replacedFinal /. {pair -> {i, chart}, -pair -> {i, -chart}},
-                        {i, 0, dimFinal2 - 1}
-                      ],
-                      {pair, pairedFinal}
-                    ];
-                    compAccum = Expand[replacedFinal];
-                    (* Resolve any newly-created basis-form CDs *)
-                    compAccum = compAccum /. (f_)[{idxI_Integer, s_}][g_Symbol[args___]] /;
-                        CovDQ[f] && (s === chart || s === -chart) :>
-                      With[{orders = ReplacePart[ConstantArray[0, dimFinal2], idxI + 1 -> 1]},
-                        Derivative[Sequence @@ orders][g][args]
-                      ];
-                    compAccum = compAccum /. (f_)[{idxI_Integer, s_}][Derivative[orders__][g_][args__]] /;
-                        CovDQ[f] && (s === chart || s === -chart) :>
-                      With[{paddedOrders = PadRight[{orders}, dimFinal2, 0]},
-                        With[{newOrders = ReplacePart[paddedOrders, idxI + 1 -> paddedOrders[[idxI + 1]] + 1]},
-                          Derivative[Sequence @@ newOrders][g][args]
-                        ]
-                      ];
-                    (* Evaluate metric: eta[{i,chart},{j,chart}] → 0 or ±1 *)
-                    compAccum = ToValues[compAccum];
-                    compAccum = Expand[compAccum];
-                  ]
-                ];
-
-                AppendTo[result, {flatIdx, Expand[Simplify[compAccum]]}];
+                AppendTo[result, {flatIdx, Expand[Simplify[compExpr]]}];
                 Print["  [", Round[MemoryInUse[]/1024.^2], " MB] component ",
-                      idx, "/", Length[componentTuples], " (", nTermsLocal, " terms)"];
+                      idx, "/", Length[componentTuples]];
               ],
               {idx, 1, Length[componentTuples]}
             ];

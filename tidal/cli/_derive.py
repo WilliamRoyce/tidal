@@ -1821,28 +1821,44 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
         # ExpandScalarWrappers (with staggered pipeline) resolves CD
         # operators inside Scalar wrappers; StaggeredToBasis handles
         # any remaining CDs in the outer expression.
-        lines.extend(
-            [
-                _wls_mem_print(f"Before DecomposeToComponents({df['name']})"),
-                "(* Reverse CD shorthand substitution before decomposition.             *)",
-                "(* CD shorthand tensors (CD1field, CD2field, etc.) with abstract        *)",
-                "(* indices cannot be resolved by StaggeredToBasis (ToBasis causes       *)",
-                "(* recursion, isCDlikeQ excludes them from force-resolve). Converting   *)",
-                "(* back to raw CD@field form lets the existing ToBasis+CD→PD→Derivative *)",
-                "(* pipeline handle them correctly.                                     *)",
-                "If[ListQ[$CDShorthandReverseRules] && Length[$CDShorthandReverseRules] > 0,",
-                f"  {eom_var} = {eom_var} //. $CDShorthandReverseRules;",
-                f"  {eom_var} = {eom_var} /. Scalar[x_] :> Scalar[x //. $CDShorthandReverseRules];",
-                "];",
-                _wls_timing_start(f"tDecomp{df['name']}"),
-                f"(* Decompose {df['name']} EOM to components *)",
-                f'{comp_var} = Block[{{xAct`xTensor`Private`CheckRepeated = (Null &)}}, DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}{bg_rules_opt}]];',
-                _wls_timing_end(
-                    f"tDecomp{df['name']}", f"EOM decomposition ({df['name']})"
-                ),
-                f'Print["[", Round[MemoryInUse[]/1024.^2], " MB] {df["name"]} decomposed: ", Length[{comp_var}], " components"];',
-            ]
-        )
+        if ctx.torsion is not None:
+            # Torsion theories: use TermByTerm with SplinterToArray (ComponentArray)
+            # for O(1) index resolution instead of O(dim^90) TraceBasisDummy.
+            # Do NOT reverse CD shorthands — keep them for ComponentArray + ToValues
+            # resolution via pre-computed ComponentValues.
+            # Scalar wrappers are pre-resolved (commit 7666cd2), so DummyIn indices
+            # from Scalar expansion no longer interfere with ComponentArray.
+            lines.extend(
+                [
+                    _wls_mem_print(f"Before DecomposeToComponents({df['name']})"),
+                    _wls_timing_start(f"tDecomp{df['name']}"),
+                    f"(* Decompose {df['name']} EOM to components (TermByTerm + SplinterToArray) *)",
+                    f'{comp_var} = Block[{{xAct`xTensor`Private`CheckRepeated = (Null &)}}, DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}{bg_rules_opt}, "TermByTerm" -> True]];',
+                    _wls_timing_end(
+                        f"tDecomp{df['name']}", f"EOM decomposition ({df['name']})"
+                    ),
+                    f'Print["[", Round[MemoryInUse[]/1024.^2], " MB] {df["name"]} decomposed: ", Length[{comp_var}], " components"];',
+                ]
+            )
+        else:
+            # Standard theories: reverse CD shorthands before decomposition
+            lines.extend(
+                [
+                    _wls_mem_print(f"Before DecomposeToComponents({df['name']})"),
+                    "(* Reverse CD shorthand substitution before decomposition.             *)",
+                    "If[ListQ[$CDShorthandReverseRules] && Length[$CDShorthandReverseRules] > 0,",
+                    f"  {eom_var} = {eom_var} //. $CDShorthandReverseRules;",
+                    f"  {eom_var} = {eom_var} /. Scalar[x_] :> Scalar[x //. $CDShorthandReverseRules];",
+                    "];",
+                    _wls_timing_start(f"tDecomp{df['name']}"),
+                    f"(* Decompose {df['name']} EOM to components *)",
+                    f'{comp_var} = Block[{{xAct`xTensor`Private`CheckRepeated = (Null &)}}, DecomposeToComponents[{eom_var}, {df["fexpr"]}, {ctx.chart}, {{{others_str}}}, "MetricMatrix" -> {p}MetricMatrix{skip_opt}{bg_rules_opt}]];',
+                    _wls_timing_end(
+                        f"tDecomp{df['name']}", f"EOM decomposition ({df['name']})"
+                    ),
+                    f'Print["[", Round[MemoryInUse[]/1024.^2], " MB] {df["name"]} decomposed: ", Length[{comp_var}], " components"];',
+                ]
+            )
         if ctx.torsion is not None:
             lines.extend(
                 [
