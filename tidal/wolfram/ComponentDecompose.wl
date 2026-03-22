@@ -633,6 +633,16 @@ StaggeredToBasis[expr_, chart_, computeChristoffels_:False] := Module[
           Derivative[Sequence @@ newOrders][g][args]
         ]
       ];
+    (* Handle Derivative wrapping CD: Derivative[...][CD[{idx,±chart}]][g[args]]  *)
+    (* This arises from abstract dummy Sum tracing where CD indices get replaced  *)
+    (* before the CD→Derivative conversion, creating inverted nesting.           *)
+    e = e /. Derivative[outerOrds__][(f_)[{idx_Integer, chartSign_}]][g_Symbol[args__]] /;
+        CovDQ[f] && (chartSign === chart || chartSign === -chart) :>
+      With[{paddedOuter = PadRight[{outerOrds}, dim, 0]},
+        With[{mergedOrders = ReplacePart[paddedOuter, idx + 1 -> paddedOuter[[idx + 1]] + 1]},
+          Derivative[Sequence @@ mergedOrders][g][args]
+        ]
+      ];
   ];
 
   On[Validate::repeated];
