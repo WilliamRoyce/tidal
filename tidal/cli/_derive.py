@@ -1753,6 +1753,40 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
     # 2. StaggeredToBasis (standard pipeline for the outer expression)
     lines.extend(("$CDShorthandRules = {};", ""))
 
+    # Pre-resolve Scalar[] wrappers in each EOM using the proven
+    # DecomposeScalarExpression pipeline. Each Scalar content is a
+    # contracted tensor scalar (e.g., η^{ab}(R_{ab} + ∇T)) that
+    # DecomposeScalarExpression resolves via StaggeredToBasis + ToValues
+    # (using pre-computed CD shorthand ComponentValues).
+    # This eliminates cross-Scalar-boundary contractions (45+ abstract
+    # pairs) that DecomposeToComponents cannot handle.
+    # Ref: same mechanism that produces the correct 14-term Hamiltonian.
+    if ctx.torsion is not None:
+        all_heads = ", ".join(d["head"] for d in dyn_fields)
+        p = ctx.prefix
+        for df in dyn_fields:
+            eom_var = f"eom{df['name'].capitalize()}"
+            lines.extend(
+                [
+                    f"(* Pre-resolve Scalar[] wrappers in {df['name']} EOM.              *)",
+                    "(* Each Scalar is resolved independently via DecomposeScalar-      *)",
+                    "(* Expression, avoiding cross-Scalar boundary contraction issues.  *)",
+                    f"If[!FreeQ[{eom_var}, Scalar],",
+                    f'  Print["Pre-resolving Scalar wrappers in {df["name"]} EOM..."];',
+                    f"  {eom_var} = {eom_var} /. Scalar[x_] :> Module[{{resolved}},",
+                    "    resolved = Quiet[Catch[",
+                    f"      DecomposeScalarExpression[x, {ctx.chart}, {{{all_heads}}},",
+                    f'        "MetricMatrix" -> {p}MetricMatrix]',
+                    "    ], {Validate::repeated, Validate::inhom}];",
+                    "    If[StringQ[resolved] || resolved === Null, Scalar[x], resolved]",
+                    "  ];",
+                    '  Print["Scalar resolution: ",',
+                    f'    If[FreeQ[{eom_var}, Scalar], "all resolved", "some remain"]];',
+                    "];",
+                    "",
+                ]
+            )
+
     for i, df in enumerate(dyn_fields):
         eom_var = f"eom{df['name'].capitalize()}"
         comp_var = f"comp{df['name'].capitalize()}"
