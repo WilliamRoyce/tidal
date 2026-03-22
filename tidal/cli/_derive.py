@@ -3564,6 +3564,13 @@ def _canonical_field_heads(ctx: _WlsContext) -> tuple[str, str]:
         else:
             field_heads.append(f"{p}{fname.capitalize()}")
 
+    # Include torsion field head if present (from [torsion] TOML section).
+    # Without this, the canonical pipeline can't resolve torsion tensor
+    # components in R̃² Lagrangian terms, leaving 45+ abstract dummy pairs.
+    if ctx.torsion is not None:
+        torsion_pert_name = ctx.torsion["perturbation_name"]
+        field_heads.append(f"{p}{torsion_pert_name.capitalize()}")
+
     all_heads = list(field_heads)
     all_heads.extend(f"{p}{bg['name'].capitalize()}" for bg in ctx.background_fields)
     return ", ".join(field_heads), ", ".join(all_heads)
@@ -3996,6 +4003,24 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
             "(* Only beneficial for GW 1D (1→16 terms, 13% faster) where the single  *)",
             "(* complex EH term benefits from splitting into simpler sub-terms.        *)",
             "",
+            "(* Pre-resolve Scalar[] wrappers in canonical Lagrangian.               *)",
+            "(* For R̃²-decomposed torsion theories, Scalar wrappers contain         *)",
+            "(* contracted tensor products that create 45+ abstract dummy pairs.     *)",
+            "(* Resolve each Scalar independently via DecomposeScalarExpression       *)",
+            "(* BEFORE splitting into additive terms, matching the EOM pipeline.     *)",
+            "If[!FreeQ[lagForCanon, Scalar],",
+            '  Print["Pre-resolving Scalar wrappers in canonical Lagrangian..."];',
+            "  lagForCanon = lagForCanon /. Scalar[x_] :> Module[{resolved},",
+            "    resolved = Quiet[Catch[",
+            f"      DecomposeScalarExpression[x, {ctx.chart}, {{{all_heads_str}}},",
+            f'        "MetricMatrix" -> {p}MetricMatrix]',
+            "    ], {Validate::repeated, Validate::inhom}];",
+            "    If[StringQ[resolved] || resolved === Null, Scalar[x], resolved]",
+            "  ];",
+            '  Print["Canonical Scalar resolution: ",',
+            '    If[FreeQ[lagForCanon, Scalar], "all resolved", "some remain"]];',
+            "];",
+            "",
             "(* Decompose Lagrangian to component form.                             *)",
             "(* For memory efficiency, decompose each additive term separately and   *)",
             "(* accumulate results.  This bounds peak memory by the single-term peak *)",
@@ -4134,6 +4159,25 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
         head = pert_heads[fname] if fname in pert_heads else f"{p}{fname.capitalize()}"
         n_comps = _field_component_count(field, ctx.dim)
         lines.extend(f'compToFunc["{fname}_{j}"] = {head}{j};' for j in range(n_comps))
+
+    # Include torsion field components in compToFunc (from [torsion] TOML).
+    # Without this, constraint elimination and Hamiltonian construction
+    # fail on torsion component references.
+    if ctx.torsion is not None:
+        torsion_pert_name = ctx.torsion["perturbation_name"]
+        thead = f"{p}{torsion_pert_name.capitalize()}"
+        # Build a field dict for _field_component_count
+        torsion_field = {
+            "name": torsion_pert_name,
+            "type": "tensor",
+            "rank": 3,
+            "symmetry": "antisymmetric_23",
+        }
+        t_ncomps = _field_component_count(torsion_field, ctx.dim)
+        lines.extend(
+            f'compToFunc["{torsion_pert_name}_{j}"] = {thead}{j};'
+            for j in range(t_ncomps)
+        )
 
     # Build field function list early — needed by constraint elimination
     # and IBP (was previously only built for IBP).
