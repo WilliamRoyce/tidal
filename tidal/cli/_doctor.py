@@ -40,7 +40,7 @@ def _check_package(name: str, import_name: str | None = None) -> tuple[bool, str
 def _check_sundials() -> tuple[bool, str]:
     """Check scikit-sundae (SUNDIALS wrapper)."""
     try:
-        import sksundae
+        import sksundae  # pyright: ignore[reportMissingTypeStubs]
     except ImportError:
         return False, "scikit-sundae not installed — IDA/CVODE solvers unavailable"
     else:
