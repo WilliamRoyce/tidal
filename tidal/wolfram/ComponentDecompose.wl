@@ -215,20 +215,72 @@ ExpandScalarWrappers[expr_, chart_, computeChristoffels_:False] := Module[
       If[hasCDScalars && !FreeQ[inner, _?CovDQ],
         (* Full staggered pipeline for Scalar contents with nested CDs.  *)
         (* Ref: supervisor's EuclideanSplinter (commit 4a89164).         *)
-        (* Missing Christoffel zeroing between ToBasis passes was the    *)
-        (* root cause of R̃² DummyIn index survival.                    *)
-        (* Full abstract → component evaluation for Scalar contents.    *)
-        (* The Scalar content is a contracted tensor expression (scalar *)
-        (* invariant). We evaluate it by:                               *)
-        (* 1. ToCanonical + ContractMetric: simplify abstract form     *)
-        (* 2. Staggered ToBasis: convert to basis indices layer by     *)
-        (*    layer, zeroing Christoffels between passes               *)
-        (* 3. TraceBasisDummy + ToValues: sum contracted dummies and   *)
-        (*    substitute pre-computed ComponentValues                  *)
-        inner = Catch[ToCanonical[inner]];
-        inner = ContractMetric[inner, metric];
-        Module[{prev2 = -1, cur2, iter2 = 0},
-          While[iter2 < 8,
+        (*                                                               *)
+        (* Strategy (3-phase):                                           *)
+        (* Phase 1: Record ALL abstract dummy pairs via IndicesOf while  *)
+        (*   the expression still has proper xAct tensor structure.     *)
+        (*   IndicesOf is theory-agnostic: handles CovD, metrics,       *)
+        (*   Christoffels, Basis tensors, delta — ALL index positions.  *)
+        (* Phase 2: Staggered ToBasis pipeline resolves most pairs.     *)
+        (* Phase 3: Sum-trace any surviving pairs from the Phase 1 set. *)
+        (*                                                               *)
+        (* Why previous approaches failed:                              *)
+        (* - ToBasis: only converts FREE indices, not contracted dummies *)
+        (* - TraceBasisDummy: only traces basis-form dummies             *)
+        (* - ComponentArray: only expands free indices (scalars → no-op) *)
+        (* - Cases-based detection: misses Basis/delta/nested CovD pos.  *)
+        (* - RenameDummies: returns identical for canonical expressions  *)
+        (* IndicesOf before pipeline + Sum after = complete resolution.  *)
+
+        (* Collect ALL abstract indices in the Scalar content BEFORE the   *)
+        (* staggered pipeline, while the expression has proper tensor   *)
+        (* structure. Use Cases on ALL subexpressions to find abstract  *)
+        (* symbols, then identify dummy pairs by matching up/down.      *)
+        (* IndicesOf was tried but returns expression-level results,    *)
+        (* not individual index symbols (commit history: eb1c216 etc.). *)
+        Module[{allDummyPairs = {}, dimScalar = DimOfManifold[ManifoldOfChart[chart]]},
+          Module[{allAbstract, upSet, downSet},
+            (* Find ALL abstract symbols anywhere in the expression *)
+            allAbstract = Cases[inner, s_Symbol?AbstractIndexQ, {0, Infinity}] // DeleteDuplicates;
+            (* An abstract symbol is a dummy if it appears BOTH as +s and -s.
+               In xAct: up = s (bare symbol), down = -s (Times[-1, s]).
+               Also check DownIndexQ on the arguments of tensor/CovD heads. *)
+            upSet = allAbstract;
+            (* Build down set from multiple sources *)
+            downSet = {};
+            (* Source 1: negated symbols in the expression tree *)
+            downSet = Union[downSet,
+              Cases[inner, -s_Symbol?AbstractIndexQ :> s, {0, Infinity}]];
+            (* Source 2: CovD down-index positions *)
+            downSet = Union[downSet,
+              Cases[inner, (f_?CovDQ)[idx_][_] /; DownIndexQ[idx] :> UpIndex[idx],
+                {0, Infinity}]];
+            (* Source 3: general DownIndexQ in any position *)
+            downSet = Union[downSet,
+              Cases[inner, idx_ /; DownIndexQ[idx] && AbstractIndexQ[UpIndex[idx]] :> UpIndex[idx],
+                {0, Infinity}]];
+            allDummyPairs = Intersection[upSet, downSet];
+          ];
+
+          (* Phase 2: Staggered ToBasis pipeline (resolves most pairs).  *)
+          inner = Catch[ToCanonical[inner]];
+          inner = ContractMetric[inner, metric];
+          Module[{prev2 = -1, cur2, iter2 = 0},
+            While[iter2 < 8,
+              If[Head[inner] === Plus,
+                inner = Total[ToBasis[chart] /@ List @@ inner],
+                inner = ToBasis[chart][inner]
+              ];
+              If[!computeChristoffels,
+                inner = inner /. christoffelPD -> Zero,
+                inner = ToValues[inner]
+              ];
+              cur2 = If[Head[inner] === Plus, Length[inner], 1];
+              If[cur2 == prev2, Break[]];
+              prev2 = cur2;
+              iter2++;
+            ];
+            inner = SeparateMetric[metric][inner];
             If[Head[inner] === Plus,
               inner = Total[ToBasis[chart] /@ List @@ inner],
               inner = ToBasis[chart][inner]
@@ -237,64 +289,64 @@ ExpandScalarWrappers[expr_, chart_, computeChristoffels_:False] := Module[
               inner = inner /. christoffelPD -> Zero,
               inner = ToValues[inner]
             ];
-            cur2 = If[Head[inner] === Plus, Length[inner], 1];
-            If[cur2 == prev2, Break[]];
-            prev2 = cur2;
-            iter2++;
+            inner = TraceBasisDummy[inner];
+            inner = ToValues[inner];
+            inner = ToValues[inner];
           ];
-          inner = SeparateMetric[metric][inner];
-          If[Head[inner] === Plus,
-            inner = Total[ToBasis[chart] /@ List @@ inner],
-            inner = ToBasis[chart][inner]
-          ];
-          If[!computeChristoffels,
-            inner = inner /. christoffelPD -> Zero,
-            inner = ToValues[inner]
-          ];
-          inner = TraceBasisDummy[inner];
-          inner = ToValues[inner];
-          inner = ToValues[inner];
-          (* Trace any remaining abstract DummyIn indices via explicit    *)
-          (* basis sum.  The staggered pipeline resolves MOST indices,   *)
-          (* but contracted dummies in products resist ToBasis.  Since   *)
-          (* Scalar contents are small (3-5 abstract indices typically), *)
-          (* brute-force Sum tracing is feasible: 3^5 = 243 terms.      *)
-          (* Trace remaining abstract DummyIn indices via explicit basis   *)
-          (* sum.  After the staggered pipeline, typically 3-5 abstract  *)
-          (* indices remain (contracted in products that ToBasis can't   *)
-          (* penetrate).  Iterate: find pairs, sum them, until none      *)
-          (* remain or max iterations reached.                          *)
-          Module[{dimScalar = DimOfManifold[ManifoldOfChart[chart]],
-                  iterTrace = 0, prevTrace},
-            While[iterTrace < 10,
-              prevTrace = inner;
-              Module[{upIdx, downIdx, pairedIdx, replaced},
-                (* Find UP abstract indices *)
-                upIdx = Cases[inner, s_Symbol /; AbstractIndexQ[s], {0, Infinity}] // DeleteDuplicates;
-                (* Find DOWN abstract indices: in CovD positions *)
-                downIdx = Cases[inner, (f_?CovDQ)[idx_][_] /; DownIndexQ[idx] :> UpIndex[idx], {0, Infinity}] // DeleteDuplicates;
-                (* Also in tensor positions *)
-                downIdx = Union[downIdx,
-                  Cases[inner, (f_?xTensorQ)[___, -s_Symbol, ___] /; AbstractIndexQ[s] :> s, {0, Infinity}]];
-                (* Also in metric positions *)
-                downIdx = Union[downIdx,
-                  Cases[inner, (f_?MetricQ)[___, -s_Symbol, ___] /; AbstractIndexQ[s] :> s, {0, Infinity}]];
-                pairedIdx = Intersection[upIdx, downIdx];
-                If[Length[pairedIdx] == 0, Break[]];
-                replaced = inner;
-                Do[
-                  replaced = Sum[
-                    replaced /. {p -> {i, chart}, -p -> {i, -chart}},
-                    {i, 0, dimScalar - 1}
-                  ];
-                  replaced = Expand[replaced];
-                  If[!computeChristoffels, replaced = replaced /. christoffelPD -> Zero];
-                  replaced = ToValues[replaced];
-                  replaced = Expand[replaced],
-                  {p, pairedIdx}
+
+          (* Phase 3: Sum-trace surviving abstract pairs.                 *)
+          (* Filter to pairs that still appear in the expression.       *)
+          Module[{remaining, replaced},
+            remaining = Select[allDummyPairs, !FreeQ[inner, #] &];
+            If[Length[remaining] > 0,
+              replaced = inner;
+              Do[
+                replaced = Sum[
+                  replaced /. {p -> {i, chart}, ChangeIndex[p] -> {i, -chart}},
+                  {i, 0, dimScalar - 1}
                 ];
-                inner = replaced;
+                replaced = Expand[replaced];
+                If[!computeChristoffels, replaced = replaced /. christoffelPD -> Zero];
+                replaced = ToValues[replaced];
+                replaced = Expand[replaced],
+                {p, remaining}
               ];
+              inner = replaced;
+            ]
+          ];
+
+          (* Fallback: Cases-based detection if IndicesOf missed any.    *)
+          (* This handles edge cases where IndicesOf returns empty or    *)
+          (* the expression gained new abstract indices during pipeline. *)
+          Module[{upIdx, downIdx, pairedIdx, replaced, iterTrace = 0, prevTrace},
+            While[iterTrace < 5,
+              prevTrace = inner;
+              upIdx = Cases[inner, s_Symbol /; AbstractIndexQ[s], {0, Infinity}] // DeleteDuplicates;
+              downIdx = Cases[inner, (f_?CovDQ)[idx_][_] /; DownIndexQ[idx] :> UpIndex[idx], {0, Infinity}] // DeleteDuplicates;
+              downIdx = Union[downIdx,
+                Cases[inner, (f_?xTensorQ)[___, -s_Symbol, ___] /; AbstractIndexQ[s] :> s, {0, Infinity}]];
+              downIdx = Union[downIdx,
+                Cases[inner, (f_?MetricQ)[___, -s_Symbol, ___] /; AbstractIndexQ[s] :> s, {0, Infinity}]];
+              (* Also check Basis tensor and general DownIndexQ positions *)
+              downIdx = Union[downIdx,
+                Cases[inner, Basis[-s_Symbol, _] /; AbstractIndexQ[s] :> s, {0, Infinity}]];
+              downIdx = Union[downIdx,
+                Cases[inner, (f_?xTensorQ)[___, idx_, ___] /; DownIndexQ[idx] && AbstractIndexQ[UpIndex[idx]] :> UpIndex[idx], {0, Infinity}]];
+              pairedIdx = Intersection[upIdx, downIdx];
+              If[Length[pairedIdx] == 0, Break[]];
+              replaced = inner;
+              Do[
+                replaced = Sum[
+                  replaced /. {p -> {i, chart}, ChangeIndex[p] -> {i, -chart}},
+                  {i, 0, dimScalar - 1}
+                ];
+                replaced = Expand[replaced];
+                If[!computeChristoffels, replaced = replaced /. christoffelPD -> Zero];
+                replaced = ToValues[replaced];
+                replaced = Expand[replaced],
+                {p, pairedIdx}
+              ];
+              inner = replaced;
               iterTrace++;
               If[inner === prevTrace, Break[]]
             ]
