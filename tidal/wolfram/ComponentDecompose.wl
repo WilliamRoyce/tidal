@@ -1022,8 +1022,23 @@ DecomposeToComponents[eom_, field_, chart_, additionalFields_List, opts:OptionsP
             coordSymsLocal = GetCoordinateSymbols[chart];
             allFieldHeadsLocal = Join[{fieldHead}, ExtractFieldHead /@ additionalFields];
 
-            (* Split abstract EOM into additive terms *)
-            eomTerms = If[Head[eomSep] === Plus, List @@ eomSep, {eomSep}];
+            (* Split abstract EOM into additive terms.                    *)
+            (* Peel CollectTensors wrappers (from ToCanonical) and Expand  *)
+            (* to expose the Plus structure for term-by-term projection.  *)
+            Module[{eomForSplit = eomSep},
+              While[Head[eomForSplit] =!= Plus && Length[eomForSplit] == 1,
+                eomForSplit = eomForSplit[[1]]
+              ];
+              If[Head[eomForSplit] =!= Plus,
+                eomForSplit = Expand[eomForSplit];
+                (* Re-peel after Expand *)
+                While[Head[eomForSplit] =!= Plus && Length[eomForSplit] == 1,
+                  eomForSplit = eomForSplit[[1]]
+                ]
+              ];
+              eomTerms = If[Head[eomForSplit] === Plus,
+                List @@ eomForSplit, {eomForSplit}];
+            ];
             nTerms = Length[eomTerms];
             Print["  EOM has ", nTerms, " additive terms"];
 
