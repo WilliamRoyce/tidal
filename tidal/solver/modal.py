@@ -82,6 +82,10 @@ _EXACT_MULTIPLIERS: dict[str, _ExactMultFn] = {
     "cross_derivative_xz": lambda k_axes: -(k_axes[0] * k_axes[2]),
     "cross_derivative_yz": lambda k_axes: -(k_axes[1] * k_axes[2]),
     "biharmonic": lambda k_axes: sum(ki**2 for ki in k_axes) ** 2,  # type: ignore[return-value]
+    # 3rd-order spatial derivatives: (ik)³ = -ik³ (odd order → imaginary)
+    "derivative_3_x": lambda k_axes: -1j * k_axes[0] ** 3,
+    "derivative_3_y": lambda k_axes: -1j * k_axes[1] ** 3,
+    "derivative_3_z": lambda k_axes: -1j * k_axes[2] ** 3,
 }
 
 

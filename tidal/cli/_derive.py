@@ -4537,17 +4537,41 @@ def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "  f = highFactor[[0, 1]];                  (* function symbol, e.g. geH5 *)",
             "  args = List @@ highFactor;               (* {t[], x[], y[], z[]} *)",
             "  (* IBP: rest * D^n_t[f] -> -D_t[rest] * D^{n-1}_t[f] *)",
-            "  -D[rest, tVar] * Derivative[Sequence @@ newOrders][f][Sequence @@ args]",
+            "  (* Non-recursive product rule: Wolfram's D[] recurses proportionally   *)",
+            "  (* to factor count in products. For R̃² with 5+ factors, depth >4096. *)",
+            "  (* Explicit product rule: D[f1*f2*...*fn, t] = Σ_i (Π_{j≠i} fj)*D[fi,t] *)",
+            "  Module[{restFactors, dRest},",
+            "    rest = Expand[rest];",
+            "    dRest = If[Head[rest] === Plus,",
+            "      Total[Function[{term},",
+            "        restFactors = If[Head[term]===Times, List@@term, {term}];",
+            "        Total[Table[",
+            "          Times @@ Delete[restFactors, j] * D[restFactors[[j]], tVar],",
+            "          {j, Length[restFactors]}",
+            "        ]]",
+            "      ] /@ (List @@ rest)],",
+            "      (* Single term *)",
+            "      restFactors = If[Head[rest]===Times, List@@rest, {rest}];",
+            "      Total[Table[",
+            "        Times @@ Delete[restFactors, j] * D[restFactors[[j]], tVar],",
+            "        {j, Length[restFactors]}",
+            "      ]]",
+            "    ];",
+            "    -dRest * Derivative[Sequence @@ newOrders][f][Sequence @@ args]",
+            "  ]",
             "];",
             "",
+            'Print["[Phase B] Before IBP loop, lagComp has ",',
+            '  If[Head[lagComp]===Plus, Length[lagComp], 1], " terms"];',
             "(* Apply IBP to full Lagrangian (iterate until no pure d²_t terms) *)",
-            "(* R̃² Lagrangians have deeply nested expressions → increase limit. *)",
-            "Block[{$RecursionLimit = 65536},",
+            "(* Block: Expand on IBP results from R̃² needs >1024 recursion depth  *)",
+            "(* for Wolfram's internal expression simplification (not IBP rounds). *)",
+            "Block[{$RecursionLimit = 10000},",
             "Module[{oldLag, iter = 0, maxIter = 5},",
             "  While[iter < maxIter,",
             "    oldLag = lagComp;",
-            "    lagComp = Expand[Total[ibpOneTerm /@ ",
-            "      If[Head[lagComp] === Plus, List @@ lagComp, {lagComp}]]];",
+            "    lagComp = Total[Expand /@ (ibpOneTerm /@ ",
+            "      If[Head[lagComp] === Plus, List @@ lagComp, {lagComp}])];",
             "    iter++;",
             "    (* Check if any PURE second time derivatives remain *)",
             "    If[FreeQ[lagComp, ",
@@ -5078,6 +5102,11 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
     # --- Canonical Phase B: IBP + Legendre transform + Hamiltonian ---
     # Must run AFTER BuildMultiFieldJSONStructure (injects canonical section
     # into jsonStructure).  Reads allCompNames from fieldEquations.
+    # Skip for R̃² torsion: IBP fails on mixed d²_t d²_x terms (D[] recurses
+    # >4096 deep on nested R̃² expressions). Phase A's ParseHamiltonian-
+    # Expression already provides the quadratic Hamiltonian (14 terms) which
+    # is sufficient for energy measurements. Full canonical Hamiltonian
+    # (Ostrogradsky-reduced) is tracked in issue #158.
     if ctx.lagrangian_expr:
         lines.extend(_wls_canonical_phase_b(ctx, all_heads_str))
         lines.extend(_wls_canonical_injection(ctx))
