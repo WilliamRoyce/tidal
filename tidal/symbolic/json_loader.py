@@ -79,17 +79,19 @@ def is_known_operator(name: str) -> bool:
     user-registered custom operators (via ``register_operator``),
     dynamic patterns for generic Nth-order derivatives
     (derivative_3_x, derivative_5_y, derivative_2x_1y, ...),
-    and mixed time-space derivative operators (mixed_T_S1_S2_...).
+    mixed time-space derivative operators (mixed_T2_S2x, mixed_T_S1x, ...),
+    and pure higher-order time operators on RHS (d2_t, d3_t, d4_t).
     """
     if name in _STATIC_OPERATORS or name in _CUSTOM_OPERATORS:
         return True
     if _GENERIC_SINGLE_AXIS_RE.match(name) or _GENERIC_MULTI_AXIS_RE.match(name):
         return True
-    # Mixed time-space operators: mixed_T_S1_S2_... (all parts are digits)
-    if name.startswith("mixed_"):
-        parts = name.split("_")[1:]
-        return len(parts) >= 2 and all(p.isdigit() for p in parts)  # noqa: PLR2004
-    return False
+    # Mixed time-space operators: mixed_T[n]_S[n][axis]_...
+    # E.g., mixed_T2_S2x (time²-space²_x), mixed_T_S1x (time¹-space¹_x)
+    if name.startswith("mixed_T"):
+        return True
+    # Pure time derivative operators on RHS: d2_t, d3_t, d4_t
+    return bool(re.match(r"^d\d+_t$", name))
 
 
 # --- LHS structure ---

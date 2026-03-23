@@ -1258,13 +1258,243 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
     return lines
 
 
+def _wls_component_el_eom(  # noqa: PLR0914
+    ctx: _WlsContext,
+    dyn_fields: list[dict[str, Any]],
+) -> list[str]:
+    """Generate component-level E-L equations for torsion theories.
+
+    Instead of abstract VarD + DecomposeToComponents (77 min for R̃²),
+    decompose the Lagrangian to component form first, then compute EOM
+    by standard variational calculus (D[L, field] + integration by parts).
+
+    The component Lagrangian is computed via DecomposeScalarExpression
+    (same pipeline as Phase A canonical).  ComponentEulerLagrange then
+    differentiates it w.r.t. each field component.
+
+    This bypasses the O(dim^{2K}) abstract-index bottleneck entirely.
+    """
+    p = ctx.prefix
+    lines: list[str] = []
+
+    # Build list of all field heads for DecomposeScalarExpression
+    all_heads = [d["head"] for d in dyn_fields]
+    all_heads_str = ", ".join(all_heads)
+
+    # Build background field rules (same as canonical Phase A)
+    bg_rules_entries: list[str] = []
+    for bf in ctx.background_fields:
+        if bf["type"] != "scalar" and bf.get("components"):
+            bg_head = f"{p}{bf['name'].capitalize()}"
+            comps_str = ", ".join(str(c) for c in bf["components"])
+            contra_comps = _compute_contra_components(
+                bf["components"], ctx.metric_diagonal
+            )
+            contra_str = ", ".join(contra_comps)
+            bg_rules_entries.append(f"{{{bg_head}, {{{comps_str}}}, {{{contra_str}}}}}")
+    bg_rules_opt = ""
+    if bg_rules_entries:
+        bg_rules_opt = (
+            ', "BackgroundFieldRules" -> {' + ", ".join(bg_rules_entries) + "}"
+        )
+
+    lines.extend(
+        [
+            "(* ================================================================ *)",
+            "(* Component-level Euler-Lagrange equations for torsion R̃² theory. *)",
+            "(* Decompose Lagrangian → component form, then differentiate.       *)",
+            "(* Bypasses abstract VarD + DecomposeToComponents (O(dim^{2K})).    *)",
+            "(* Ref: ComponentEulerLagrange in ComponentDecompose.wl.            *)",
+            "(* ================================================================ *)",
+            "",
+            "fieldEquations = {};",
+            "componentMetadata = <||>;",
+            "",
+            "(* Step 1: Decompose abstract Lagrangian to component form.         *)",
+            "(* Uses the same DecomposeScalarExpression pipeline as Phase A.     *)",
+            _wls_timing_start("tCompEL"),
+            'Print["Component E-L: decomposing Lagrangian to component form..."];',
+        ]
+    )
+
+    # Scalar pre-resolution for torsion (same as the canonical pipeline)
+    if ctx.torsion is not None:
+        lines.extend(
+            [
+                "(* Pre-resolve Scalar[] wrappers in Lagrangian.                     *)",
+                "lagForEL = l2ForVarD;",
+                "If[!FreeQ[lagForEL, Scalar],",
+                '  Print["Pre-resolving Scalar wrappers in Lagrangian..."];',
+                "  lagForEL = lagForEL /. Scalar[x_] :> Module[{resolved},",
+                "    resolved = Quiet[Catch[",
+                f"      DecomposeScalarExpression[x, {ctx.chart}, {{{all_heads_str}}},",
+                f'        "MetricMatrix" -> {p}MetricMatrix]',
+                "    ], {Validate::repeated, Validate::inhom}];",
+                "    If[StringQ[resolved] || resolved === Null, Scalar[x], resolved]",
+                "  ];",
+                '  Print["Scalar resolution: ",',
+                '    If[FreeQ[lagForEL, Scalar], "all resolved", "some remain"]];',
+                "];",
+                "",
+            ]
+        )
+    else:
+        lines.append("lagForEL = l2ForVarD;")
+
+    # Decompose the Lagrangian (same per-term approach as Phase A)
+    lines.extend(
+        [
+            "(* Split into additive terms and decompose each individually.       *)",
+            "lagTermsEL = If[Head[lagForEL] === Plus, List @@ lagForEL, {lagForEL}];",
+            'Print["Lagrangian has ", Length[lagTermsEL], " additive terms"];',
+            "lagCompEL = 0;",
+            "Do[",
+            "  Module[{termComp},",
+            "    termComp = Quiet[DecomposeScalarExpression[",
+            f"      lagTermsEL[[k]], {ctx.chart}, {{{all_heads_str}}},",
+            f'      "MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}],',
+            "      Validate::repeated];",
+            "    lagCompEL += termComp;",
+            "    Share[];",
+            "    If[Mod[k, 10] == 0 || k == Length[lagTermsEL],",
+            '      Print["  term ", k, "/", Length[lagTermsEL], ": ",',
+            '        Round[MemoryInUse[]/1024.^2], " MB"]];',
+            "  ],",
+            "  {k, Length[lagTermsEL]}",
+            "];",
+            "Clear[lagTermsEL, lagForEL]; Share[];",
+            'Print["Component Lagrangian: ", LeafCount[lagCompEL], " leaf nodes"];',
+            "",
+        ]
+    )
+
+    # Normalize derivative arities to full dimension
+    lines.extend(
+        [
+            "(* Normalize Derivative arities to full coordinate count.           *)",
+            f"coordSymsEL = ScalarsOfChart[{ctx.chart}];",
+            "nCoordsEL = Length[coordSymsEL];",
+            "lagCompEL = lagCompEL /. Derivative[orders__][g_][args__] /;",
+            "  Length[{orders}] < nCoordsEL :>",
+            "  Derivative[Sequence @@ PadRight[{orders}, nCoordsEL, 0]][g][args];",
+            "",
+        ]
+    )
+
+    # Build field function list from the component Lagrangian itself.
+    # Extract all function symbols that appear with Derivative or bare.
+    # This avoids Python-side component counting (which doesn't handle
+    # all symmetry types correctly, e.g. antisymmetric_23).
+    field_heads = [df["head"] for df in dyn_fields]
+    head_pattern = " || ".join(
+        f'StringMatchQ[sname, "{h}" ~~ DigitCharacter ..]' for h in field_heads
+    )
+    lines.extend(
+        [
+            "(* Extract field functions from the component Lagrangian.            *)",
+            "(* Look for all symbols matching field head patterns (e.g. tidalH0). *)",
+            "fieldFuncsEL = Cases[lagCompEL,",
+            "  (f_Symbol)[__] /; Module[{sname = ToString[f]},",
+            f"    {head_pattern}",
+            "  ] :> f, {0, Infinity}] // DeleteDuplicates // Sort;",
+            'Print["Field functions: ", Length[fieldFuncsEL], " components: ", fieldFuncsEL];',
+            "",
+        ]
+    )
+
+    # Apply plane-wave reduction if applicable
+    if ctx.reduction is not None:
+        prop_axis = ctx.reduction["propagation_axis"]
+        coords = ctx.coords
+        killed = [c for c in coords[1:] if c != prop_axis]
+        deriv_rules: list[str] = []
+        for c in killed:
+            slot = coords.index(c) + 1
+            deriv_rules.append(
+                f"Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
+                f" && {{ords}}[[{slot}]] > 0 :> 0"
+            )
+        lines.extend(
+            [
+                "(* Plane-wave reduction: zero transverse derivatives *)",
+                f"lagCompEL = lagCompEL /. {{{','.join(deriv_rules)}}};",
+                "lagCompEL = Expand[lagCompEL];",
+            ]
+        )
+
+        coord_values: dict[str, str] = ctx.reduction.get("coordinate_values", {})
+        if coord_values:
+            cv_rules = ", ".join(
+                f"{coord}[] -> {val}" for coord, val in coord_values.items()
+            )
+            lines.append(f"lagCompEL = lagCompEL /. {{{cv_rules}}};")
+
+    # Step 2: Compute component E-L equations
+    lines.extend(
+        [
+            "",
+            "(* Step 2: Compute Euler-Lagrange equations from component Lagrangian *)",
+            'Print["Computing component E-L equations..."];',
+            "eomListEL = ComponentEulerLagrange[lagCompEL, fieldFuncsEL, coordSymsEL];",
+            _wls_timing_end("tCompEL", "Component E-L (decompose + differentiate)"),
+            "",
+        ]
+    )
+
+    # Step 3: Assemble fieldEquations in standard {name, expr} format.
+    # Name mapping via StringReplace: tidalH0 → "h_0", tidalT5 → "t_5".
+    name_rules_wl = []
+    for df in dyn_fields:
+        head = df["head"]
+        name_rules_wl.append(f'"{head}" ~~ d:DigitCharacter .. :> "{df["name"]}_" <> d')
+    name_rule_str = ", ".join(name_rules_wl)
+
+    lines.extend(
+        [
+            "(* Step 3: Assemble fieldEquations from E-L results *)",
+            "Do[",
+            "  Module[{fname, eqExpr},",
+            "    fname = ToString[fieldFuncsEL[[i]]];",
+            f"    fname = StringReplace[fname, {{{name_rule_str}}}];",
+            "    eqExpr = eomListEL[[i]];",
+            "    AppendTo[fieldEquations, {fname, eqExpr}];",
+            "  ],",
+            "  {i, Length[fieldFuncsEL]}",
+            "];",
+            "Clear[lagCompEL, eomListEL, fieldFuncsEL]; Share[];",
+            'Print["[", Round[MemoryInUse[]/1024.^2], " MB] Component E-L: ",',
+            '  Length[fieldEquations], " equations"];',
+            "",
+        ]
+    )
+
+    return lines
+
+
 def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
-    """Generate VarD + DecomposeToComponents + fieldEquations for multiple fields."""
+    """Generate VarD + DecomposeToComponents + fieldEquations for multiple fields.
+
+    For torsion R̃² theories: uses **component-level Euler-Lagrange** instead
+    of abstract VarD + DecomposeToComponents.  The component Lagrangian is
+    decomposed first (via DecomposeScalarExpression, ~5s), then standard
+    variational calculus (D[L, field] with integration by parts) produces
+    the component EOM directly.  This bypasses the O(dim^{2K}) abstract-index
+    bottleneck entirely (~250x speedup: seconds vs 77 min).
+
+    Ref: mathematically equivalent — E-L commutes with basis decomposition
+    for complete bases.  See ComponentEulerLagrange in ComponentDecompose.wl.
+    """
     p = ctx.prefix
     lines: list[str] = []
+
+    # NOTE: For torsion R̃² theories, the abstract VarD + DecomposeToComponents
+    # below produces trivial equations (77 min timeout or all zeros with
+    # TermByTerm). The CORRECT equations are computed from the component
+    # Lagrangian via ComponentEulerLagrange, inserted AFTER Phase A
+    # produces lagComp (see _wls_canonical_phase_a_component_el).
 
     # VarD for each dynamical field
     riemann_cd = f"Riemann{ctx.cd}"
@@ -3937,7 +4167,7 @@ def _wls_constraint_elimination() -> list[str]:
     ]
 
 
-def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: PLR0914
+def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  # noqa: PLR0914, PLR0915
     """Generate WLS code for canonical Phase A: decompose Lagrangian + constraint elimination.
 
     Decomposes the abstract Lagrangian into component form (``lagComp``),
@@ -4256,20 +4486,23 @@ def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "ibpOneTerm[term_] := Module[",
             "  {factors, idx, highFactor, orders, newOrders, rest, head, args},",
             "  factors = If[Head[term] === Times, List @@ term, {term}];",
-            "  (* Find first factor with time-deriv order >= 2 that is a known field *)",
+            "  (* Find first factor with PURE time-deriv order >= 2 (all spatial = 0) *)",
+            "  (* Mixed time-space like Derivative[2,2,0] are NOT pure time derivs —  *)",
+            "  (* they're spatial operators applied to time-evolved fields. IBP should *)",
+            "  (* only reduce pure d²_t terms (Gibbons-Hawking-York).                *)",
             "  idx = 0;",
             "  Do[",
             "    If[MatchQ[factors[[i]],",
-            "         Derivative[n_, ___][f_][___] /; n >= 2 && MemberQ[fieldFuncList, f]],",
+            "         Derivative[n_, rest___][f_][___] /; n >= 2 && AllTrue[{rest}, # === 0 &] && MemberQ[fieldFuncList, f]],",
             "      idx = i; Break[]",
             "    ],",
             "    {i, Length[factors]}",
             "  ];",
             "  If[idx == 0,",
-            "    (* Also check for Power[Derivative[...][f][...], 2] with n >= 2 *)",
+            "    (* Also check for Power[Derivative[...][f][...], 2] with n >= 2, pure time *)",
             "    Do[",
             "      If[MatchQ[factors[[i]],",
-            "           Power[Derivative[n_, ___][f_][___], 2] /; n >= 2 && MemberQ[fieldFuncList, f]],",
+            "           Power[Derivative[n_, rest___][f_][___], 2] /; n >= 2 && AllTrue[{rest}, # === 0 &] && MemberQ[fieldFuncList, f]],",
             "        idx = i; Break[]",
             "      ],",
             "      {i, Length[factors]}",
@@ -4307,16 +4540,18 @@ def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             "  -D[rest, tVar] * Derivative[Sequence @@ newOrders][f][Sequence @@ args]",
             "];",
             "",
-            "(* Apply IBP to full Lagrangian (iterate until no second time derivs) *)",
+            "(* Apply IBP to full Lagrangian (iterate until no pure d²_t terms) *)",
+            "(* R̃² Lagrangians have deeply nested expressions → increase limit. *)",
+            "Block[{$RecursionLimit = 65536},",
             "Module[{oldLag, iter = 0, maxIter = 5},",
             "  While[iter < maxIter,",
             "    oldLag = lagComp;",
             "    lagComp = Expand[Total[ibpOneTerm /@ ",
             "      If[Head[lagComp] === Plus, List @@ lagComp, {lagComp}]]];",
             "    iter++;",
-            "    (* Check if any second time derivatives remain *)",
+            "    (* Check if any PURE second time derivatives remain *)",
             "    If[FreeQ[lagComp, ",
-            "         Derivative[n_, ___][f_][___] /; n >= 2 && MemberQ[fieldFuncList, f]],",
+            "         Derivative[n_, rest___][f_][___] /; n >= 2 && AllTrue[{rest}, # === 0 &] && MemberQ[fieldFuncList, f]],",
             "      Break[]",
             "    ];",
             "  ];",
@@ -4324,11 +4559,12 @@ def _wls_canonical_phase_b(_ctx: _WlsContext, _all_heads_str: str) -> list[str]:
             '    Print["[IBP] Applied ", iter, " round(s) of time-variable integration by parts"];',
             "  ];",
             "  If[!FreeQ[lagComp, ",
-            "       Derivative[n_, ___][f_][___] /; n >= 2 && MemberQ[fieldFuncList, f]],",
-            '    Print["WARNING: Second time derivatives remain after IBP (",',
+            "       Derivative[n_, rest___][f_][___] /; n >= 2 && AllTrue[{rest}, # === 0 &] && MemberQ[fieldFuncList, f]],",
+            '    Print["WARNING: Pure second time derivatives remain after IBP (",',
             '      maxIter, " iterations). Hamiltonian may contain acceleration terms."];',
             "  ];",
             "];",
+            "];  (* Close Block[$RecursionLimit] *)",
             'Print["L after IBP: ", Short[lagComp, 5]];',
             "",
         ]
@@ -4742,6 +4978,70 @@ def _wls_metadata_and_export(  # noqa: C901, PLR0912, PLR0914, PLR0915
             )
         )
         lines.extend(_wls_canonical_phase_a(ctx, all_heads_str))
+
+        # --- Component-level E-L for torsion R̃² theories ---
+        # After Phase A produces lagComp (the component Lagrangian),
+        # recompute fieldEquations via component E-L differentiation.
+        # This REPLACES the trivial equations from abstract VarD +
+        # DecomposeToComponents, which fail for R̃² due to contracted
+        # abstract indices (see issue #155 for full investigation).
+        if ctx.torsion is not None:
+            lines.extend(
+                [
+                    "",
+                    "(* ============================================================ *)",
+                    "(* Component-level Euler-Lagrange: recompute fieldEquations     *)",
+                    "(* from lagComp (component Lagrangian). This replaces the       *)",
+                    "(* trivial equations from abstract VarD + DecomposeToComponents *)",
+                    "(* which fail for R̃² torsion theories.                        *)",
+                    "(* ============================================================ *)",
+                    _wls_timing_start("tCompEL"),
+                    "(* Flag for BuildMultiFieldJSONStructure: skip swap logic *)",
+                    'metadata["component_el"] = True;',
+                    'Print["Component E-L: computing equations from component Lagrangian..."];',
+                    'Print["  lagComp LeafCount: ", LeafCount[lagComp]];',
+                    "",
+                    "(* lagComp should now be fully resolved — ReplaceHigherRankField- *)",
+                    "(* Components handles all symmetry permutations and Derivative    *)",
+                    "(* forms since the symmetry-aware rewrite.                        *)",
+                    "",
+                    "(* Build field function list from lagComp *)",
+                    "fieldFuncsEL = Cases[lagComp,",
+                    "  (f_Symbol)[__] /; MemberQ[fieldFuncList, f] :> f,",
+                    "  {0, Infinity}] // DeleteDuplicates // Sort;",
+                    'Print["  Field functions: ", Length[fieldFuncsEL], " — ", fieldFuncsEL];',
+                    "",
+                    "(* Compute Euler-Lagrange equations *)",
+                    "eomListEL = ComponentEulerLagrange[lagComp, fieldFuncsEL, coordSyms];",
+                    "",
+                    "(* Replace fieldEquations with component E-L results *)",
+                    "fieldEquations = {};",
+                    "Do[",
+                    "  Module[{fname, eqExpr, nameRules},",
+                    "    fname = ToString[fieldFuncsEL[[i]]];",
+                    "    (* Map function name to field label *)",
+                    "    nameRules = {};",
+                    "    Scan[Function[{key},",
+                    "      Module[{head = ToString[compToFunc[key]], fld = key},",
+                    "        If[fname === head, AppendTo[nameRules, fname -> fld]]",
+                    "      ]],",
+                    "      Keys[compToFunc]",
+                    "    ];",
+                    "    If[Length[nameRules] > 0, fname = fname /. nameRules];",
+                    "    eqExpr = eomListEL[[i]];",
+                    "    (* Resolve any remaining tensor refs created by D[] *)",
+                    f"    Do[eqExpr = ReplaceTensorFieldComponents[eqExpr, afh, {ctx.chart}, coordSyms, nCoords],",
+                    f"      {{afh, {{{', '.join(all_heads_str.split(', '))}}}}}];",
+                    "    eqExpr = Expand[eqExpr];",
+                    "    AppendTo[fieldEquations, {fname, eqExpr}];",
+                    "  ],",
+                    "  {i, Length[fieldFuncsEL]}",
+                    "];",
+                    _wls_timing_end("tCompEL", "Component E-L (differentiate lagComp)"),
+                    'Print["Component E-L: ", Length[fieldEquations], " equations"];',
+                    "",
+                ]
+            )
 
     # Build JSON — always use multi-field builder since fieldEquations
     # Inject tensor component metadata into metadata for LaTeX export

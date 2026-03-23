@@ -116,6 +116,14 @@ batching, Einstein-Maxwell cross-coupling exceeds 7 GB; with batching, <1 GB. \
 Optional backgroundFieldRules evaluates background field DownValues during the \
 fused loop for further memory reduction.";
 
+ComponentEulerLagrange::usage =
+  "ComponentEulerLagrange[lagrangian, fieldFuncs, coords] computes Euler-Lagrange \
+equations from a COMPONENT (scalar) Lagrangian by standard variational calculus. \
+Each field function (e.g., tidalH0, tidalT5) is varied independently via D[] with \
+integration by parts for higher-order derivatives. Returns a list of EOM expressions \
+(one per field function, in the same order as fieldFuncs). \
+For quadratic Lagrangians, produces linear equations.";
+
 (* Error messages *)
 DecomposeToComponents::badopt =
   "Invalid value for option \"ComputeChristoffels\": `1`. Expected Automatic, True, or False.";
@@ -1671,6 +1679,25 @@ ReplaceRank2FieldComponents[expr_, fh_, chart_, coordSyms_, dim_, metricMatrix_:
               }
             ]
           ]
+        ];
+
+        (* Derivative-wrapped forms: Derivative[orders][fh][{basis}]         *)
+        (* Arise when D[] differentiates through tensor components that      *)
+        (* haven't been replaced with scalar functions yet.                  *)
+        If[!FreeQ[result, Derivative[__][fh]],
+          Do[
+            result = result /. {
+              Derivative[orders__][fh][{pair[[1]], sc[[1]]}, {pair[[2]], sc[[2]]}] :>
+                Derivative[orders][sym][Sequence @@ cs]
+            };
+            If[symQ && pair[[1]] =!= pair[[2]],
+              result = result /. {
+                Derivative[orders__][fh][{pair[[2]], sc[[1]]}, {pair[[1]], sc[[2]]}] :>
+                  Derivative[orders][sym][Sequence @@ cs]
+              }
+            ],
+            {sc, Tuples[{ch, -ch}, 2]}
+          ]
         ]
       ],
       {k, 1, Length[pairs]}
@@ -1684,35 +1711,114 @@ ReplaceRank2FieldComponents[expr_, fh_, chart_, coordSyms_, dim_, metricMatrix_:
 (* Follows the same pattern as ReplaceRank2FieldComponents but for arbitrary rank *)
 (* For rank-3 non-symmetric T in dim=2: T[{0,-ch},{0,-ch},{0,-ch}] -> T0[t,x], etc. *)
 ReplaceHigherRankFieldComponents[expr_, fh_, chart_, coordSyms_, dim_] := Module[
-  {result = expr, rank, tuples},
+  {result = expr, rank, canonTuples, allTuples, symGroup, gens,
+   canonMap, signMap},
 
   rank = Length[SlotsOfTensor[fh]];
-  tuples = EnumerateComponentTuples[fh, dim];
+  canonTuples = EnumerateComponentTuples[fh, dim];
+  allTuples = Tuples[Range[0, dim - 1], rank];
 
+  (* Build canonical map: for EVERY tuple, find its canonical representative *)
+  (* and the sign factor from the symmetry group.                           *)
+  (* Example: T with Antisymmetric[{2,3}]:                                  *)
+  (*   {0,0,1} → canonical {0,0,1}, sign +1                                *)
+  (*   {0,1,0} → canonical {0,0,1}, sign -1 (antisymmetric swap)           *)
+  (*   {0,0,0} → zero (antisymmetric, equal indices)                        *)
+  symGroup = SymmetryGroupOfTensor[fh];
+  gens = If[symGroup =!= StrongGenSet[{}, GenSet[]],
+    List @@ symGroup[[2]], {}];
+
+  (* For each ALL-tuple, determine: is it canonical? If not, what is the    *)
+  (* canonical tuple and sign? For simplicity, check each generator.        *)
+  canonMap = Association[];
+  signMap = Association[];
+  Do[
+    Module[{tup = allTuples[[j]], isCanon, canonIdx, sign = 1},
+      (* Check if this tuple is zero (e.g., antisymmetric with equal indices) *)
+      isCanon = isCanonicalTuple[tup, gens];
+      If[isCanon,
+        (* This IS a canonical tuple — find its index *)
+        canonIdx = FirstPosition[canonTuples, tup, {0}][[1]];
+        If[canonIdx > 0,
+          canonMap[tup] = canonIdx;
+          signMap[tup] = 1
+        ]
+      ,
+        (* Non-canonical: find the canonical partner via permutation *)
+        Do[
+          Module[{sp = extractGenSignAndPerm[gen], s, perm, permTup},
+            s = sp[[1]]; perm = sp[[2]];
+            permTup = applyPermToTuple[tup, perm];
+            If[isCanonicalTuple[permTup, gens],
+              Module[{idx = FirstPosition[canonTuples, permTup, {0}][[1]]},
+                If[idx > 0,
+                  canonMap[tup] = idx;
+                  signMap[tup] = s;
+                ]
+              ]
+            ]
+          ],
+          {gen, gens}
+        ]
+      ]
+    ],
+    {j, Length[allTuples]}
+  ];
+
+  (* Now replace: for each tuple (canonical or not), try all chart-sign    *)
+  (* configurations. Replace with sign * canonicalScalar[coords].          *)
   With[{ch = chart, cs = coordSyms},
     Do[
-      Module[{tuple = tuples[[k]], seqIdx = k - 1, sym, indexConfigs, pattern},
-        sym = Symbol[ToString[fh] <> ToString[seqIdx]];
-
-        (* Primary: all-covariant (canonical after SeparateMetric) *)
-        pattern = Table[{tuple[[n]], -ch}, {n, rank}];
-        result = result /. {fh @@ pattern :> sym[Sequence @@ cs]};
-
-        (* Safety fallback: if field still appears with this tuple, try all configs *)
-        If[!FreeQ[result, fh],
-          indexConfigs = Tuples[{ch, -ch}, rank];
-          Do[
-            Module[{pat},
-              pat = Table[{tuple[[n]], config[[n]]}, {n, rank}];
-              If[pat =!= pattern,  (* Skip already-applied covariant config *)
-                result = result /. {fh @@ pat :> sym[Sequence @@ cs]}
+      Module[{tup = allTuples[[j]]},
+        If[KeyExistsQ[canonMap, tup],
+          Module[{sym = Symbol[ToString[fh] <> ToString[canonMap[tup] - 1]],
+                  sign = signMap[tup]},
+            (* Bare tensor: all chart-sign configs *)
+            If[!FreeQ[result, fh],
+              Do[
+                Module[{pat = Table[{tup[[n]], config[[n]]}, {n, rank}]},
+                  result = result /. {fh @@ pat :> sign * sym[Sequence @@ cs]}
+                ],
+                {config, Tuples[{ch, -ch}, rank]}
               ]
-            ],
-            {config, indexConfigs}
+            ];
+            (* Derivative-wrapped forms *)
+            If[!FreeQ[result, Derivative[__][fh]],
+              Do[
+                Module[{pat = Table[{tup[[n]], config[[n]]}, {n, rank}]},
+                  result = result /. {
+                    Derivative[orders__][fh][Sequence @@ pat] :>
+                      sign * Derivative[orders][sym][Sequence @@ cs]
+                  }
+                ],
+                {config, Tuples[{ch, -ch}, rank]}
+              ]
+            ]
+          ]
+        ,
+          (* Tuple not in canonMap = zero by symmetry (e.g., antisymmetric *)
+          (* with equal indices). Replace with 0.                         *)
+          If[!FreeQ[result, fh],
+            Do[
+              Module[{pat = Table[{tup[[n]], config[[n]]}, {n, rank}]},
+                result = result /. {fh @@ pat :> 0}
+              ],
+              {config, Tuples[{ch, -ch}, rank]}
+            ]
+          ];
+          If[!FreeQ[result, Derivative[__][fh]],
+            Do[
+              Module[{pat = Table[{tup[[n]], config[[n]]}, {n, rank}]},
+                result = result /. {
+                  Derivative[orders__][fh][Sequence @@ pat] :> 0
+                }
+              ],
+              {config, Tuples[{ch, -ch}, rank]}
+            ]
           ]
         ]
       ],
-      {k, 1, Length[tuples]}
+      {j, Length[allTuples]}
     ]
   ];
 
@@ -1897,6 +2003,93 @@ DecomposeScalarExpression[expr_, chart_, allFieldHeads_List, opts:OptionsPattern
   (* Reclaim memory before returning *)
   Share[];
   Expand[componentExpr]
+];
+
+
+(* === Component-Level Euler-Lagrange Equations ===                       *)
+(*                                                                        *)
+(* Compute field equations by differentiating the COMPONENT Lagrangian    *)
+(* using standard variational calculus (Euler-Lagrange formula).          *)
+(* This bypasses abstract-index VarD + DecomposeToComponents entirely,    *)
+(* avoiding the O(dim^{2K}) TraceBasisDummy bottleneck.                   *)
+(*                                                                        *)
+(* For a quadratic Lagrangian L = (1/2) Σ q_i M_{ij} q_j, the EOM are   *)
+(* linear: EOM_i = Σ_j M_{ij} q_j = 0.  The Euler-Lagrange formula      *)
+(* with higher-order derivatives is:                                      *)
+(*   EOM_i = Σ_{|α|≥0} (-1)^|α| D^α(∂L/∂(D^α q_i))                    *)
+(* where D^α = ∂^{α_1}/∂x_1^{α_1} ... ∂^{α_n}/∂x_n^{α_n}.            *)
+(*                                                                        *)
+(* Ref: supervisor's approach decomposes L → components → project terms.  *)
+(* This goes further: compute EOM at component level, avoiding all        *)
+(* abstract-index issues.  Mathematically equivalent (E-L commutes with  *)
+(* basis decomposition for complete bases).                               *)
+(* ====================================================================== *)
+
+ComponentEulerLagrange[lagrangian_, fieldFuncs_List, coords_List] := Module[
+  {nFields = Length[fieldFuncs], nCoords = Length[coords], eom,
+   q, L = lagrangian, derivTerms, maxOrder, contribution},
+
+  Print["ComponentEulerLagrange: ", nFields, " fields, ", nCoords, " coordinates"];
+
+  (* Collect all derivative orders appearing in the Lagrangian *)
+  (* for each field function.  This determines the maximum     *)
+  (* order of the E-L formula needed.                          *)
+  eom = Table[0, {nFields}];
+
+  Do[
+    q = fieldFuncs[[i]];
+    Print["  Field ", i, "/", nFields, ": ", q];
+
+    (* Find all Derivative orders of this field in the Lagrangian *)
+    derivTerms = Cases[L,
+      Derivative[orders__][f_][args__] /; f === q :> {orders},
+      {0, Infinity}] // DeleteDuplicates;
+
+    (* Also include the undifferentiated field (identity operator) *)
+    derivTerms = Join[{{Sequence @@ Table[0, nCoords]}}, derivTerms] // DeleteDuplicates;
+
+    maxOrder = Max[Total /@ derivTerms];
+    Print["    Derivative orders: ", Length[derivTerms],
+          " unique, max total order: ", maxOrder];
+
+    (* Apply the Euler-Lagrange formula:                              *)
+    (* EOM_i = Σ_{α} (-1)^|α| * D^α[ ∂L/∂(D^α q_i) ]              *)
+    (* where the sum is over all multi-indices α that appear in L.   *)
+    contribution = 0;
+    Do[
+      Module[{alpha = orders, totalOrder, dLdDq, ibpResult},
+        totalOrder = Total[alpha];
+
+        (* ∂L/∂(D^α q_i): differentiate L w.r.t. the derivative term *)
+        If[totalOrder == 0,
+          (* Identity: ∂L/∂q_i *)
+          dLdDq = D[L, q @@ coords],
+          (* Derivative: ∂L/∂(D^α q_i) *)
+          dLdDq = D[L, Derivative[Sequence @@ alpha][q][Sequence @@ coords]]
+        ];
+
+        If[dLdDq =!= 0,
+          (* Apply (-1)^|α| * D^α to the result (integration by parts) *)
+          ibpResult = dLdDq;
+          Do[
+            If[alpha[[coordIdx]] > 0,
+              ibpResult = D[ibpResult, {coords[[coordIdx]], alpha[[coordIdx]]}]
+            ],
+            {coordIdx, nCoords}
+          ];
+          contribution += (-1)^totalOrder * ibpResult;
+        ];
+      ],
+      {orders, derivTerms}
+    ];
+
+    eom[[i]] = Expand[contribution];
+    Print["    EOM terms: ", If[Head[eom[[i]]] === Plus, Length[eom[[i]]], 1]];
+  , {i, nFields}];
+
+  (* Return as list of {fieldName, equation} pairs *)
+  (* Field name is extracted from the function symbol (e.g. tidalH0 → "h_0") *)
+  eom
 ];
 
 

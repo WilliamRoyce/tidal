@@ -308,6 +308,11 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
      Uses coefficient-sum detection: d²_t COEFFICIENTS are summed per field.
      If the sum is zero, the d²_t terms are phantom (cancel under simplification)
      and the field is not truly evolved by that equation. *)
+  (* Skip swap for component E-L equations — each equation is already    *)
+  (* correctly assigned to its field by construction (∂L/∂q_i → EOM_i). *)
+  If[TrueQ[metadata["component_el"]],
+    Print["  Skipping equation swap (component E-L: assignment is explicit)"]
+  ,
   Module[{evolvedFieldIndex, assignmentMap, needsSwap = False, newEqs},
     evolvedFieldIndex = Table[
       Module[{result = 0, terms, d2tTerms, coeffSum, coeffList},
@@ -368,7 +373,7 @@ BuildMultiFieldJSONStructure[fieldEquations_List, metadata_Association] := Modul
                 " (contains d2_t(" <> allFieldNames[[j]] <> "))"]],
         {j, nFields}];
       workingEqs = newEqs]
-  ];
+  ]];  (* Close Module + If[!component_el] *)
 
   (* Build fields list — enrich with tensor metadata when available *)
   fields = Table[
@@ -631,8 +636,13 @@ DetectLHSTimeOrder[equation_, fieldName_String] := Module[
   (* For each term, get time derivative order ONLY if it applies to the current field *)
   fieldTermOrders = Map[
     Function[term, Module[{derivs},
+      (* Only match PURE time derivatives (all spatial orders = 0).         *)
+      (* Mixed time-space like Derivative[2,2,0] must stay on RHS —        *)
+      (* they represent ∂²_t ∂²_x terms from R̃², not pure ∂²_t.         *)
       derivs = Cases[term,
-        Derivative[n_, ___][f_][___] /; FunctionMatchesField[ToString[f], fieldName] :> n,
+        Derivative[n_, rest___][f_][___] /;
+          n > 0 && AllTrue[{rest}, # === 0 &] &&
+          FunctionMatchesField[ToString[f], fieldName] :> n,
         {0, Infinity}];
       If[Length[derivs] == 0, 0, Max[derivs]]
     ]],
@@ -670,8 +680,13 @@ ContainsTimeDerivative[term_, minOrder_:2] := Module[{profile},
 (* Example: ContainsOwnTimeDerivative[-Derivative[2,0,0,0][gwH0][t,x,y,z], "h_0", 2] -> True *)
 ContainsOwnTimeDerivative[term_, fieldName_String, minOrder_Integer] := Module[
   {matchingDerivs},
+  (* Only match PURE time derivatives (all spatial orders = 0).           *)
+  (* Mixed time-space like Derivative[2,2,0] are spatial operators, not   *)
+  (* LHS time derivatives. They stay on RHS for ParseMultiFieldRHS.      *)
   matchingDerivs = Cases[term,
-    Derivative[n_, ___][f_][___] /; n >= minOrder && FunctionMatchesField[ToString[f], fieldName],
+    Derivative[n_, rest___][f_][___] /;
+      n >= minOrder && AllTrue[{rest}, # === 0 &] &&
+      FunctionMatchesField[ToString[f], fieldName],
     {0, Infinity}];
   Length[matchingDerivs] > 0
 ];
@@ -698,7 +713,10 @@ ExtractLHSCoefficient[term_] := Module[{derivParts, derivPart},
 (* Dimension-agnostic: delegates to ExtractDerivativeProfile *)
 IsMixedTimeSpaceDerivative[term_] := Module[{profile},
   profile = ExtractDerivativeProfile[term];
-  Length[profile] >= 2 && First[profile] > 0 && Max[Rest[profile]] > 0
+  (* Only first-order time + spatial qualifies as mixed (d_t f = v_f).    *)
+  (* Higher-order time (d²_t d_x, d²_t d²_x) are genuine higher-order   *)
+  (* mixed operators from R̃² Lagrangians, not velocity conversions.     *)
+  Length[profile] >= 2 && First[profile] === 1 && Max[Rest[profile]] > 0
 ];
 
 (* Identify gradient direction from derivative structure *)
@@ -1008,7 +1026,11 @@ ExtractTermCoefficient[term_, fieldHead_String, targetField_String] := Module[
 (* Delegates to ExtractDerivativeProfile to avoid duplicating extraction logic *)
 CountDerivativeOrder[term_] := Module[{profile},
   profile = ExtractDerivativeProfile[term];
-  If[Length[profile] == 0, 0, Total[profile]]
+  (* Count SPATIAL derivative order only (exclude time slot = first).     *)
+  (* Mixed time-space terms (time ≥ 2) are handled by BuildMixed-       *)
+  (* OperatorName BEFORE this function is called. The terms reaching     *)
+  (* here have time order 0 (pure spatial) or 1 (handled by IsMixed).   *)
+  If[Length[profile] <= 1, 0, Total[Rest[profile]]]
 ];
 
 (* === Generic Derivative Order Support === *)
@@ -1119,6 +1141,33 @@ ClassifySpatialProfile[spatialOrders_List] := Module[
   ]
 ];
 
+(* Build operator name for mixed time-space derivatives.                 *)
+(* Encodes the full profile: {2,2,0} → "mixed_T_S2_S0" (T=time²,      *)
+(* S2=spatial order 2 in x, S0=spatial order 0 in y).                    *)
+(* The solver's RHSEvaluator resolves "mixed_T_S..." operator names by  *)
+(* applying the indicated spatial derivatives to the field and its       *)
+(* time derivatives. For now, these terms contribute to the JSON but    *)
+(* may need solver-side support for proper time integration.            *)
+BuildMixedOperatorName[fullProfile_List] := Module[
+  {timeOrder, spatialOrders, axisNames = {"x", "y", "z", "w"},
+   parts},
+  timeOrder = First[fullProfile];
+  spatialOrders = Rest[fullProfile];
+  parts = {"mixed_T" <> If[timeOrder > 1, ToString[timeOrder], ""]};
+  Do[
+    If[i <= Length[spatialOrders] && spatialOrders[[i]] > 0,
+      AppendTo[parts, "S" <> ToString[spatialOrders[[i]]] <>
+        If[i <= Length[axisNames], axisNames[[i]], "d" <> ToString[i]]]
+    ],
+    {i, Length[spatialOrders]}
+  ];
+  (* Pure time derivative on RHS (cross-field d²_t): name "d2_t" etc. *)
+  If[Total[spatialOrders] === 0,
+    "d" <> ToString[timeOrder] <> "_t",
+    StringJoin[Riffle[parts, "_"]]
+  ]
+];
+
 (* Classify operator type based on derivative structure *)
 (* Returns {operatorName, shouldConvertToMomentum} *)
 ClassifyOperatorType[term_] := Module[
@@ -1136,10 +1185,19 @@ ClassifyOperatorType[term_] := Module[
     Return[{"first_derivative_t", False}]
   ];
 
-  (* Check for mixed time-space derivatives *)
-  (* Mixed derivatives like d_t d_x A become gradient_x(pi) since d_t A = pi *)
+  (* Check for mixed time-space derivatives (first-order time only).      *)
+  (* d_t d_x A becomes gradient_x(pi) since d_t A = pi (velocity form). *)
   If[IsMixedTimeSpaceDerivative[term],
     Return[{ExtractSpatialOperatorFromMixed[term], True}]
+  ];
+
+  (* Higher-order time derivatives on the RHS (cross-field or mixed).    *)
+  (* These arise from R̃² Lagrangians: d²_t d²_x h, d²_t h (cross-field).*)
+  (* Build a generic operator name encoding the full derivative profile. *)
+  Module[{fullProfile = ExtractDerivativeProfile[term]},
+    If[Length[fullProfile] >= 1 && First[fullProfile] >= 2,
+      Return[{BuildMixedOperatorName[fullProfile], False}]
+    ]
   ];
 
   (* Check derivative order for pure spatial derivatives *)
