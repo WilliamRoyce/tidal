@@ -10,9 +10,7 @@ third_party/
 phd-application-context.md
 wolfram_test_output.txt
 .coverage
-/examples/data/**/*.npy
-/examples/data/**/*.json
-/examples/data/**/*.csv
+/examples/data/*
 
 .claude-memory-backup/
 .claude-plans-backup/
