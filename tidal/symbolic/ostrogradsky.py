@@ -41,6 +41,13 @@ logger = logging.getLogger(__name__)
 #: Equations with higher order are reduced via Ostrogradsky.
 MAX_NATIVE_TIME_ORDER = 2
 
+#: Time-derivative order constants used in Ostrogradsky reduction logic.
+_T_ORDER_3 = 3  # 3rd time derivative: d³/dt³
+_T_ORDER_4 = 4  # 4th time derivative: Ostrogradsky threshold
+#: Spatial derivative orders for operator name mapping.
+_S_ORDER_GRADIENT = 1  # 1st spatial derivative → gradient_*
+_S_ORDER_LAPLACIAN = 2  # 2nd spatial derivative → laplacian_*
+
 # --- Operator substitution for d⁴ → d² reduction ---
 # Maps (operator_on_original_field) → (new_operator, use_auxiliary_field)
 # "auxiliary" means the term references the auxiliary field w instead of h.
@@ -81,7 +88,7 @@ class AuxiliaryField:
     original_time_order: int
 
 
-def apply_ostrogradsky_reduction(
+def apply_ostrogradsky_reduction(  # noqa: C901, PLR0914
     spec: EquationSystem,
 ) -> EquationSystem:
     """Apply Ostrogradsky reduction to higher-derivative equations.
@@ -119,7 +126,9 @@ def apply_ostrogradsky_reduction(
     )
 
     # Identify higher-order equations
-    fourth_order = [eq for eq in spec.equations if eq.time_derivative_order > 2]
+    fourth_order = [
+        eq for eq in spec.equations if eq.time_derivative_order > MAX_NATIVE_TIME_ORDER
+    ]
     if not fourth_order:
         return spec  # Nothing to reduce
 
@@ -174,7 +183,7 @@ def apply_ostrogradsky_reduction(
     next_idx = max(eq.field_index for eq in spec.equations) + 1
 
     for eq in spec.equations:
-        if eq.time_derivative_order <= 2:
+        if eq.time_derivative_order <= MAX_NATIVE_TIME_ORDER:
             # Non-4th-order: pass through, but substitute any d2_t/d3_t
             # references to 4th-order fields with auxiliary references
             new_terms = _substitute_cross_field_refs(eq.rhs_terms, aux_map, rhs_lookup)
@@ -219,7 +228,7 @@ def apply_ostrogradsky_reduction(
     new_names.extend(af.auxiliary_name for af in aux_fields)
 
     # Expand mass/coupling matrices to include auxiliary fields (zero rows/cols)
-    import numpy as np
+    import numpy as np  # noqa: PLC0415
 
     n_new = len(new_names)
     n_old = spec.n_components
@@ -248,7 +257,7 @@ def apply_ostrogradsky_reduction(
     constraint_fields = {
         eq.field_name for eq in spec.equations if eq.time_derivative_order == 0
     }
-    TIME_OPS = {"d2_t", "d3_t", "d4_t", "first_derivative_t"}
+    time_ops = {"d2_t", "d3_t", "d4_t", "first_derivative_t"}
 
     cleaned_equations: list[ComponentEquation] = []
     for eq in new_equations:
@@ -257,7 +266,7 @@ def apply_ostrogradsky_reduction(
             for t in eq.rhs_terms
             if not (
                 t.field in constraint_fields
-                and (t.operator in TIME_OPS or _MIXED_RE.match(t.operator))
+                and (t.operator in time_ops or _MIXED_RE.match(t.operator))
             )
         )
         if cleaned_terms != eq.rhs_terms:
@@ -304,13 +313,19 @@ def _reduce_rhs_terms(
     return tuple(result)
 
 
-def _reduce_single_term(
+def _reduce_single_term(  # noqa: C901, PLR0911
     term: OperatorTerm,
     own_field: str,
     aux_map: dict[str, str],
-    rhs_lookup: dict[str, tuple[OperatorTerm, ...]],
+    _rhs_lookup: dict[str, tuple[OperatorTerm, ...]],
 ) -> OperatorTerm | list[OperatorTerm] | None:
-    """Reduce a single RHS term via Ostrogradsky substitution."""
+    """Reduce a single RHS term via Ostrogradsky substitution.
+
+    Raises
+    ------
+    ValueError
+        If ``d4_t`` appears on a field that is not a 4th-order field.
+    """
     from tidal.symbolic.json_loader import OperatorTerm  # noqa: PLC0415
 
     op = term.operator
@@ -376,7 +391,7 @@ def _reduce_single_term(
         t_order = int(m.group(1))
         s_part = m.group(2)
 
-        if t_order == 2:
+        if t_order == MAX_NATIVE_TIME_ORDER:
             # mixed_T2_Sx(h) = ∂_x(∂²_t h) = ∂_x(w) → spatial_op(w)
             spatial_op = _spatial_part_to_operator(s_part)
             return OperatorTerm(
@@ -386,10 +401,10 @@ def _reduce_single_term(
                 coefficient_symbolic=term.coefficient_symbolic,
             )
 
-        if t_order == 3:
+        if t_order == _T_ORDER_3:
             # mixed_T3_Sx(h) = ∂_x(∂³_t h) = ∂_x(∂_t w)
             # → mixed_T1_Sx(w) (one less time order)
-            new_op = f"mixed_T{t_order - 2}_{s_part}"
+            new_op = f"mixed_T{t_order - MAX_NATIVE_TIME_ORDER}_{s_part}"
             return OperatorTerm(
                 operator=new_op,
                 field=aux_name,
@@ -397,9 +412,9 @@ def _reduce_single_term(
                 coefficient_symbolic=term.coefficient_symbolic,
             )
 
-        if t_order >= 4:
+        if t_order >= _T_ORDER_4:
             # Higher-order mixed: reduce by 2
-            new_op = f"mixed_T{t_order - 2}_{s_part}"
+            new_op = f"mixed_T{t_order - MAX_NATIVE_TIME_ORDER}_{s_part}"
             return OperatorTerm(
                 operator=new_op,
                 field=aux_name,
@@ -482,6 +497,11 @@ def _spatial_part_to_operator(s_part: str) -> str:
     """Convert spatial part code to standard operator name.
 
     Examples: "S1x" → "gradient_x", "S2x" → "laplacian_x"
+
+    Raises
+    ------
+    ValueError
+        If ``s_part`` does not match the expected ``S[order][axis]`` pattern.
     """
     # Parse S[order][axis] pattern
     m = re.match(r"S(\d+)(\w+)", s_part)
@@ -492,9 +512,9 @@ def _spatial_part_to_operator(s_part: str) -> str:
     order = int(m.group(1))
     axis = m.group(2)
 
-    if order == 1:
+    if order == _S_ORDER_GRADIENT:
         return f"gradient_{axis}"
-    if order == 2:
+    if order == _S_ORDER_LAPLACIAN:
         return f"laplacian_{axis}"
     # Higher-order spatial: use generic name
     return f"derivative_{order}_{axis}"

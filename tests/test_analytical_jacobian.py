@@ -746,7 +746,7 @@ class TestCirculantOperatorMatrix:
     """Verify circulant fast-path matches probing for all operator types."""
 
     @staticmethod
-    def _build_probing(operator: str, grid: GridInfo, bc: str | tuple[str, ...]) -> Any:
+    def _build_probing(operator: str, grid: GridInfo, bc: str | tuple[str, ...]) -> Any:  # noqa: ANN401
         """Build operator matrix via O(N²) probing (reference)."""
         from tidal.solver.operators import apply_operator
 

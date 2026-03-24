@@ -1069,7 +1069,7 @@ class EquationSystem:
         return {eq.field_name: i for i, eq in enumerate(self.equations)}
 
     @classmethod
-    def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914, C901
+    def from_dict(cls, data: Mapping[str, Any]) -> EquationSystem:  # noqa: PLR0914, PLR0912, C901
         """Create an EquationSystem from a dictionary (parsed JSON).
 
         Raises

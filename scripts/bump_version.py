@@ -225,7 +225,7 @@ class VersionBumper:
 
         print()
 
-    def update_files(self) -> None:
+    def update_files(self) -> None:  # noqa: PLR0912, C901
         """Phase 2: Update all files atomically."""
         print("Phase 2: Update Files")
 
@@ -385,7 +385,11 @@ class VersionBumper:
     def _create_backups(self) -> None:
         """Create .bak copies of all files before modification."""
         files = [self.pyproject_toml, self.citation_cff]
-        files.extend(f for f in [self.next_phases_md, self.roadmap_md, self.security_md] if f.exists())
+        files.extend(
+            f
+            for f in [self.next_phases_md, self.roadmap_md, self.security_md]
+            if f.exists()
+        )
         for file_path in files:
             backup_path = file_path.with_suffix(file_path.suffix + ".bak")
             shutil.copy2(file_path, backup_path)
