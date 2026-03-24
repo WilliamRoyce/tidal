@@ -1258,219 +1258,6 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
     return lines
 
 
-def _wls_component_el_eom(  # noqa: PLR0914
-    ctx: _WlsContext,
-    dyn_fields: list[dict[str, Any]],
-) -> list[str]:
-    """Generate component-level E-L equations for torsion theories.
-
-    Instead of abstract VarD + DecomposeToComponents (77 min for R̃²),
-    decompose the Lagrangian to component form first, then compute EOM
-    by standard variational calculus (D[L, field] + integration by parts).
-
-    The component Lagrangian is computed via DecomposeScalarExpression
-    (same pipeline as Phase A canonical).  ComponentEulerLagrange then
-    differentiates it w.r.t. each field component.
-
-    This bypasses the O(dim^{2K}) abstract-index bottleneck entirely.
-    """
-    p = ctx.prefix
-    lines: list[str] = []
-
-    # Build list of all field heads for DecomposeScalarExpression
-    all_heads = [d["head"] for d in dyn_fields]
-    all_heads_str = ", ".join(all_heads)
-
-    # Build background field rules (same as canonical Phase A)
-    bg_rules_entries: list[str] = []
-    for bf in ctx.background_fields:
-        if bf["type"] != "scalar" and bf.get("components"):
-            bg_head = f"{p}{bf['name'].capitalize()}"
-            comps_str = ", ".join(str(c) for c in bf["components"])
-            contra_comps = _compute_contra_components(
-                bf["components"], ctx.metric_diagonal
-            )
-            contra_str = ", ".join(contra_comps)
-            bg_rules_entries.append(f"{{{bg_head}, {{{comps_str}}}, {{{contra_str}}}}}")
-    bg_rules_opt = ""
-    if bg_rules_entries:
-        bg_rules_opt = (
-            ', "BackgroundFieldRules" -> {' + ", ".join(bg_rules_entries) + "}"
-        )
-
-    lines.extend(
-        [
-            "(* ================================================================ *)",
-            "(* Component-level Euler-Lagrange equations for torsion R̃² theory. *)",
-            "(* Decompose Lagrangian → component form, then differentiate.       *)",
-            "(* Bypasses abstract VarD + DecomposeToComponents (O(dim^{2K})).    *)",
-            "(* Ref: ComponentEulerLagrange in ComponentDecompose.wl.            *)",
-            "(* ================================================================ *)",
-            "",
-            "fieldEquations = {};",
-            "componentMetadata = <||>;",
-            "",
-            "(* Step 1: Decompose abstract Lagrangian to component form.         *)",
-            "(* Uses the same DecomposeScalarExpression pipeline as Phase A.     *)",
-            _wls_timing_start("tCompEL"),
-            'Print["Component E-L: decomposing Lagrangian to component form..."];',
-        ]
-    )
-
-    # Scalar pre-resolution for torsion (same as the canonical pipeline)
-    if ctx.torsion is not None:
-        lines.extend(
-            [
-                "(* Pre-resolve Scalar[] wrappers in Lagrangian.                     *)",
-                "lagForEL = l2ForVarD;",
-                "If[!FreeQ[lagForEL, Scalar],",
-                '  Print["Pre-resolving Scalar wrappers in Lagrangian..."];',
-                "  lagForEL = lagForEL /. Scalar[x_] :> Module[{resolved},",
-                "    resolved = Quiet[Catch[",
-                f"      DecomposeScalarExpression[x, {ctx.chart}, {{{all_heads_str}}},",
-                f'        "MetricMatrix" -> {p}MetricMatrix]',
-                "    ], {Validate::repeated, Validate::inhom}];",
-                "    If[StringQ[resolved] || resolved === Null, Scalar[x], resolved]",
-                "  ];",
-                '  Print["Scalar resolution: ",',
-                '    If[FreeQ[lagForEL, Scalar], "all resolved", "some remain"]];',
-                "];",
-                "",
-            ]
-        )
-    else:
-        lines.append("lagForEL = l2ForVarD;")
-
-    # Decompose the Lagrangian (same per-term approach as Phase A)
-    lines.extend(
-        [
-            "(* Split into additive terms and decompose each individually.       *)",
-            "lagTermsEL = If[Head[lagForEL] === Plus, List @@ lagForEL, {lagForEL}];",
-            'Print["Lagrangian has ", Length[lagTermsEL], " additive terms"];',
-            "lagCompEL = 0;",
-            "Do[",
-            "  Module[{termComp},",
-            "    termComp = Quiet[DecomposeScalarExpression[",
-            f"      lagTermsEL[[k]], {ctx.chart}, {{{all_heads_str}}},",
-            f'      "MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}],',
-            "      Validate::repeated];",
-            "    lagCompEL += termComp;",
-            "    Share[];",
-            "    If[Mod[k, 10] == 0 || k == Length[lagTermsEL],",
-            '      Print["  term ", k, "/", Length[lagTermsEL], ": ",',
-            '        Round[MemoryInUse[]/1024.^2], " MB"]];',
-            "  ],",
-            "  {k, Length[lagTermsEL]}",
-            "];",
-            "Clear[lagTermsEL, lagForEL]; Share[];",
-            'Print["Component Lagrangian: ", LeafCount[lagCompEL], " leaf nodes"];',
-            "",
-        ]
-    )
-
-    # Normalize derivative arities to full dimension
-    lines.extend(
-        [
-            "(* Normalize Derivative arities to full coordinate count.           *)",
-            f"coordSymsEL = ScalarsOfChart[{ctx.chart}];",
-            "nCoordsEL = Length[coordSymsEL];",
-            "lagCompEL = lagCompEL /. Derivative[orders__][g_][args__] /;",
-            "  Length[{orders}] < nCoordsEL :>",
-            "  Derivative[Sequence @@ PadRight[{orders}, nCoordsEL, 0]][g][args];",
-            "",
-        ]
-    )
-
-    # Build field function list from the component Lagrangian itself.
-    # Extract all function symbols that appear with Derivative or bare.
-    # This avoids Python-side component counting (which doesn't handle
-    # all symmetry types correctly, e.g. antisymmetric_23).
-    field_heads = [df["head"] for df in dyn_fields]
-    head_pattern = " || ".join(
-        f'StringMatchQ[sname, "{h}" ~~ DigitCharacter ..]' for h in field_heads
-    )
-    lines.extend(
-        [
-            "(* Extract field functions from the component Lagrangian.            *)",
-            "(* Look for all symbols matching field head patterns (e.g. tidalH0). *)",
-            "fieldFuncsEL = Cases[lagCompEL,",
-            "  (f_Symbol)[__] /; Module[{sname = ToString[f]},",
-            f"    {head_pattern}",
-            "  ] :> f, {0, Infinity}] // DeleteDuplicates // Sort;",
-            'Print["Field functions: ", Length[fieldFuncsEL], " components: ", fieldFuncsEL];',
-            "",
-        ]
-    )
-
-    # Apply plane-wave reduction if applicable
-    if ctx.reduction is not None:
-        prop_axis = ctx.reduction["propagation_axis"]
-        coords = ctx.coords
-        killed = [c for c in coords[1:] if c != prop_axis]
-        deriv_rules: list[str] = []
-        for c in killed:
-            slot = coords.index(c) + 1
-            deriv_rules.append(
-                f"Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
-                f" && {{ords}}[[{slot}]] > 0 :> 0"
-            )
-        lines.extend(
-            [
-                "(* Plane-wave reduction: zero transverse derivatives *)",
-                f"lagCompEL = lagCompEL /. {{{','.join(deriv_rules)}}};",
-                "lagCompEL = Expand[lagCompEL];",
-            ]
-        )
-
-        coord_values: dict[str, str] = ctx.reduction.get("coordinate_values", {})
-        if coord_values:
-            cv_rules = ", ".join(
-                f"{coord}[] -> {val}" for coord, val in coord_values.items()
-            )
-            lines.append(f"lagCompEL = lagCompEL /. {{{cv_rules}}};")
-
-    # Step 2: Compute component E-L equations
-    lines.extend(
-        [
-            "",
-            "(* Step 2: Compute Euler-Lagrange equations from component Lagrangian *)",
-            'Print["Computing component E-L equations..."];',
-            "eomListEL = ComponentEulerLagrange[lagCompEL, fieldFuncsEL, coordSymsEL];",
-            _wls_timing_end("tCompEL", "Component E-L (decompose + differentiate)"),
-            "",
-        ]
-    )
-
-    # Step 3: Assemble fieldEquations in standard {name, expr} format.
-    # Name mapping via StringReplace: tidalH0 → "h_0", tidalT5 → "t_5".
-    name_rules_wl = []
-    for df in dyn_fields:
-        head = df["head"]
-        name_rules_wl.append(f'"{head}" ~~ d:DigitCharacter .. :> "{df["name"]}_" <> d')
-    name_rule_str = ", ".join(name_rules_wl)
-
-    lines.extend(
-        [
-            "(* Step 3: Assemble fieldEquations from E-L results *)",
-            "Do[",
-            "  Module[{fname, eqExpr},",
-            "    fname = ToString[fieldFuncsEL[[i]]];",
-            f"    fname = StringReplace[fname, {{{name_rule_str}}}];",
-            "    eqExpr = eomListEL[[i]];",
-            "    AppendTo[fieldEquations, {fname, eqExpr}];",
-            "  ],",
-            "  {i, Length[fieldFuncsEL]}",
-            "];",
-            "Clear[lagCompEL, eomListEL, fieldFuncsEL]; Share[];",
-            'Print["[", Round[MemoryInUse[]/1024.^2], " MB] Component E-L: ",',
-            '  Length[fieldEquations], " equations"];',
-            "",
-        ]
-    )
-
-    return lines
-
-
 def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
@@ -4290,26 +4077,27 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
     # which zeros PD[{killedAxis,-chart}][...] terms BEFORE TraceBasisDummy.
     # This is implemented in ComponentDecompose.wl step 2.5.
 
+    # Batched decomposition: process multiple terms per DecomposeScalar-
+    # Expression call to leverage BatchedTraceBasisDummy efficiency.
+    # Single-term calls waste internal batching (50 terms/batch → 1 term).
+    # Batches of 20: 147 terms → 8 calls, ~15x faster.
+    # Memory-safe: 20 × dim^5 ≈ 5000 intermediates per batch (~5MB).
     lines.extend(
         [
             "lagComp = 0;",
-            "Do[",
-            "  Module[{termComp, tTerm = AbsoluteTime[]},",
-            "(* Quiet suppresses Validate::repeated from xAct's index checker     *)",
-            "(* on R̃-decomposed torsion expressions with complex contractions.   *)",
-            f"    termComp = Quiet[DecomposeScalarExpression[lagTerms[[k]], {ctx.chart}, {{{all_heads_str}}}, "
+            "Module[{batchSz = 20, nB, bS, bE, bExpr, bComp, tB},",
+            "  nB = Ceiling[Length[lagTerms] / batchSz];",
+            "  Do[",
+            "    tB = AbsoluteTime[];",
+            "    bS = (b - 1) * batchSz + 1;",
+            "    bE = Min[b * batchSz, Length[lagTerms]];",
+            "    bExpr = Total[lagTerms[[bS ;; bE]]];",
+            f"    bComp = Quiet[DecomposeScalarExpression[bExpr, {ctx.chart}, {{{all_heads_str}}}, "
             f'"MetricMatrix" -> {p}MetricMatrix{bg_rules_opt}], Validate::repeated];',
         ]
     )
 
-    # Per-term plane-wave reduction: zero transverse Derivative patterns and
-    # apply coordinate_values (e.g. y→π/2) on each term BEFORE accumulation.
-    # This is applied AFTER DecomposeScalarExpression (which already zeroed
-    # transverse PD at the pre-TraceBasisDummy stage) as defense-in-depth for
-    # any residual transverse derivatives (e.g. from Christoffel connections
-    # that produce Derivative form only after ConvertCDToDerivatives).
-    # Applying per-term instead of post-loop keeps lagComp small, making
-    # downstream IBP + Legendre transform much faster.
+    # Per-batch plane-wave reduction (linear rules → same result as per-term)
     if ctx.reduction is not None:
         prop_axis = ctx.reduction["propagation_axis"]
         coords = ctx.coords
@@ -4321,27 +4109,25 @@ def _wls_canonical_phase_a(ctx: _WlsContext, all_heads_str: str) -> list[str]:  
                 f"  Derivative[ords__][f_][args___] /; Length[{{ords}}] >= {slot}"
                 f" && {{ords}}[[{slot}]] > 0 :> 0"
             )
-        lines.append(f"    termComp = termComp /. {{{','.join(deriv_rules)}}};")
+        lines.append(f"    bComp = bComp /. {{{','.join(deriv_rules)}}};")
 
         coord_values: dict[str, str] = ctx.reduction.get("coordinate_values", {})
         if coord_values:
             cv_rules = ", ".join(
                 f"{coord}[] -> {val}" for coord, val in coord_values.items()
             )
-            lines.append(f"    termComp = termComp /. {{{cv_rules}}};")
+            lines.append(f"    bComp = bComp /. {{{cv_rules}}};")
 
-        lines.append("    termComp = Expand[termComp];")
+        lines.append("    bComp = Expand[bComp];")
 
     lines.extend(
         [
-            "    lagComp += termComp;",
+            "    lagComp += bComp;",
             "    Share[];",
-            '    Print["  term ", k, "/", Length[lagTerms], ": ",',
-            '      Round[AbsoluteTime[] - tTerm, 0.1], "s, ",',
-            '      Round[MemoryInUse[]/1024.^2], " MB",',
-            '      If[termComp === 0, " (ZERO)", ""]];',
-            "  ],",
-            "  {k, Length[lagTerms]}",
+            '    Print["  batch ", b, "/", nB, " (terms ", bS, "-", bE, "): ",',
+            '      Round[AbsoluteTime[] - tB, 0.1], "s, ",',
+            '      Round[MemoryInUse[]/1024.^2], " MB"];',
+            "  , {b, nB}];",
             "];",
         ]
     )
