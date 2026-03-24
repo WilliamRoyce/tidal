@@ -1258,7 +1258,7 @@ def _wls_shorthand_cd_tensors(  # noqa: C901, PLR0912, PLR0914, PLR0915
     return lines
 
 
-def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
+def _wls_multi_field_eom(
     ctx: _WlsContext,
     dyn_fields: list[dict[str, Any]],
 ) -> list[str]:
@@ -1274,7 +1274,6 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
     Ref: mathematically equivalent — E-L commutes with basis decomposition
     for complete bases.  See ComponentEulerLagrange in ComponentDecompose.wl.
     """
-    p = ctx.prefix
     lines: list[str] = []
 
     # SKIP VarD for ALL theories with a Lagrangian. The component E-L
@@ -1283,16 +1282,18 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
     # to VarD + DecomposeToComponents for flat spacetime.
     # VarD is kept only for non-Lagrangian theories (pure equation input).
     if ctx.lagrangian_expr:
-        if ctx.torsion is not None:
-            # Torsion: CD shorthand setup needed for Phase A decomposition
-            lines.extend(_wls_shorthand_cd_tensors(ctx, dyn_fields))
-            lines.extend(
-                [
-                    'Print["[TIMING] CD shorthand setup + pre-computation: ", '
-                    'Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];',
-                    "tSubPhase = AbsoluteTime[];",
-                ]
-            )
+        # CD shorthand setup: pre-compute ComponentValues for CD[field]
+        # tensors. Speeds up Phase A decomposition by enabling O(1)
+        # ToValues lookups instead of per-term ToBasis + TraceBasisDummy.
+        # Ref: supervisor's EuclideanSplinter pattern (commit 4a89164).
+        lines.extend(_wls_shorthand_cd_tensors(ctx, dyn_fields))
+        lines.extend(
+            [
+                'Print["[TIMING] CD shorthand setup + pre-computation: ", '
+                'Round[AbsoluteTime[] - tSubPhase, 0.1], " seconds"];',
+                "tSubPhase = AbsoluteTime[];",
+            ]
+        )
         lines.extend(
             [
                 "(* VarD skipped — component E-L computes equations from lagComp *)",
@@ -1302,6 +1303,7 @@ def _wls_multi_field_eom(  # noqa: PLR0912, PLR0914, C901, PLR0915
             ]
         )
         return lines
+    return None
 
 
 def _wls_matter_pert_truncation(mpi: dict[str, str]) -> list[str]:
